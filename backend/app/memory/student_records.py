@@ -1,0 +1,297 @@
+"""Validated, versioned updates to repeatable student records."""
+
+from copy import deepcopy
+from datetime import date, datetime, timezone
+from sqlalchemy import select
+
+from app.models import (
+    CourseRecord, EducationRecord, ExecutionRun, ExplorationExperience, ExternalInfluence, FileRecord, ProfileIssue, StudentActivity, StudentGoal, StudentProject, StudentVoiceStatement,
+    TestAttempt, WorkExperience, StudentSkill, StudentCertification, StudentCredential,
+    StudentApplication, StudentDocument, StudentRecordRevision, Workspace,
+    LanguageProficiency, ResearchRecord, AchievementRecord, FinancialSponsor,
+    ScholarshipApplication, VisaRecord,
+)
+from .errors import MemoryDataError
+from .domain_stewards import EntityAmbiguity, RecordDomainSteward
+from .student_schema import RECORD_SPECS, validate_record
+
+ENTITY_MODELS = {
+    "education": EducationRecord, "course": CourseRecord, "test_attempt": TestAttempt,
+    "work_experience": WorkExperience, "project": StudentProject, "goal": StudentGoal,
+    "activity": StudentActivity,
+    "exploration_experience": ExplorationExperience,
+    "student_voice_statement": StudentVoiceStatement, "external_influence": ExternalInfluence,
+    "skill": StudentSkill, "certification": StudentCertification, "credential": StudentCredential,
+    "application": StudentApplication, "document": StudentDocument,
+    "language_proficiency": LanguageProficiency, "research": ResearchRecord,
+    "achievement": AchievementRecord, "financial_sponsor": FinancialSponsor,
+    "scholarship_application": ScholarshipApplication, "visa": VisaRecord,
+}
+REQUIRED = {kind: spec["required"] for kind, spec in RECORD_SPECS.items()}
+ALLOWED = {kind: set(spec["properties"]) for kind, spec in RECORD_SPECS.items()}
+
+
+class RecordNeedsReview(MemoryDataError):
+    """A proposal was retained for review without changing canonical values."""
+
+
+class AmbiguousRecordMatch(RecordNeedsReview):
+    def __init__(self, record_ids: list[str]):
+        super().__init__("Several existing records match; confirm this is a separate record")
+        self.record_ids = record_ids
+
+
+def _same(left, right):
+    if isinstance(left, str) and isinstance(right, str):
+        return " ".join(left.casefold().split()) == " ".join(right.casefold().split())
+    return left == right
+
+
+def _merge(previous, patch):
+    result = deepcopy(previous)
+    for key, value in patch.items():
+        result[key] = _merge(result.get(key, {}), value) if isinstance(value, dict) else value
+    return result
+
+
+def _conflicts(previous, patch):
+    return any(key in previous and (
+        _conflicts(previous[key], value) if isinstance(previous[key], dict) and isinstance(value, dict)
+        else not _same(previous[key], value)) for key, value in patch.items())
+
+
+#: Higher is stronger. Corroboration may raise a record's standing, never
+#: lower it — a CV agreeing with a transcript-backed degree must not demote it.
+_VERIFICATION_RANK = {
+    "self_reported": 0, "extracted": 1, "document_supported": 2,
+    "externally_verified": 3, "verified": 3,
+}
+MAX_CORROBORATIONS = 10
+
+
+def _explicit_correction(evidence):
+    return (evidence or {}).get("semantic_correction") is True
+
+
+class StudentRecordService:
+    def __init__(self, db):
+        self.db = db
+
+    def list(self, workspace_id: str, kind: str, limit: int | None = None):
+        model = ENTITY_MODELS[kind]
+        statement = select(model).where(model.workspace_id == workspace_id, model.status == "active").order_by(model.updated_at.desc(), model.id)
+        if limit is not None:
+            statement = statement.limit(limit)
+        return list(self.db.execute(statement).scalars())
+
+    def get(self, workspace_id: str, kind: str, record_id: str):
+        model = ENTITY_MODELS[kind]
+        return self.db.execute(select(model).where(model.workspace_id == workspace_id,
+            model.id == record_id, model.status == "active")).scalar_one_or_none()
+
+    def _values(self, kind, row):
+        return {key: deepcopy(getattr(row, key)) for key in ALLOWED[kind] if getattr(row, key) is not None}
+
+    def _match(self, workspace_id, kind, values):
+        return RecordDomainSteward(kind).resolve_entity(
+            values, self.list(workspace_id, kind), lambda row: self._values(kind, row))
+
+    def _revision(self, workspace_id, kind, row, before, source_type, claim_origin, capture_method, evidence):
+        self.db.add(StudentRecordRevision(workspace_id=workspace_id, record_type=kind,
+            record_id=row.id, before=before, after={**self._values(kind, row), "status": row.status},
+            source_type=source_type, claim_origin=claim_origin, capture_method=capture_method, evidence=evidence))
+
+    def apply(self, workspace_id: str, kind: str, values: dict, *,
+              source_type: str, claim_origin: str, capture_method: str,
+              evidence: dict | None = None, subject_user_id: str | None = None,
+              record_id: str | None = None, supersedes_record_id: str | None = None,
+              candidate_id: str | None = None, force_new: bool = False,
+              verification_status: str | None = None):
+        values = validate_record(kind, values, partial=bool(record_id))
+        # Serialize even first writes where there is no entity row to lock.
+        owner = self.db.execute(select(Workspace).where(Workspace.id == workspace_id).with_for_update()).scalar_one_or_none()
+        if owner is None or (subject_user_id is not None and str(owner.owner_user_id) != str(subject_user_id)):
+            raise MemoryDataError("Student workspace does not exist or subject does not match")
+        try:
+            if force_new:
+                current = None
+            elif record_id:
+                current = self.get(workspace_id, kind, record_id)
+            else:
+                current = self._match(workspace_id, kind, values)
+        except EntityAmbiguity as exc:
+            self.db.add(ProfileIssue(
+                workspace_id=workspace_id, subject_user_id=subject_user_id,
+                candidate_id=candidate_id, issue_type="conflicting_record",
+                conflict_kind="entity_ambiguity",
+                summary=f"Ambiguous {kind.replace('_', ' ')} information",
+                severity="blocking", affected_type=kind,
+                clarification_question=(
+                    f"Should this be added as a separate {kind.replace('_', ' ')} record?"
+                ),
+                evidence={"record_type": kind, "proposed": values,
+                          "matching_record_ids": exc.record_ids,
+                          "force_new_on_accept": True,
+                          "proposed_source_type": source_type,
+                          "proposed_evidence": evidence},
+            ))
+            self.db.flush()
+            raise AmbiguousRecordMatch(exc.record_ids) from exc
+        if record_id and current is None:
+            raise MemoryDataError("Student record does not belong to this workspace or is inactive")
+        before = self._values(kind, current) if current else None
+        merged = validate_record(kind, _merge(before or {}, values))
+        steward = RecordDomainSteward(kind)
+        steward.validate_attribution(values, merged, source_type, evidence)
+        if kind == "exploration_experience":
+            if "student_reflection" in values:
+                if source_type not in {"user_explicit", "conversation"}:
+                    raise MemoryDataError("Student reflection requires student-sourced evidence")
+                if source_type == "conversation" and not (evidence or {}).get("quote"):
+                    raise MemoryDataError("Student reflection requires a student quote")
+            for ref in merged.get("evidence_refs") or []:
+                if self.get(workspace_id, ref["kind"], ref["id"]) is None:
+                    raise MemoryDataError("Exploration evidence must reference this student's active record")
+            if source_type in {"agent", "system"} and values.get("activity_status") == "completed":
+                self._verify_exploration_run(workspace_id, merged, evidence)
+        if kind == "course" and self.get(workspace_id, "education", merged["education_id"]) is None:
+            raise MemoryDataError("Course education record does not belong to this student")
+        if kind == "document" or (kind == "credential" and merged.get("raw_document_ref")):
+            file_ref = merged["file_id"] if kind == "document" else merged["raw_document_ref"]
+            file = self.db.execute(select(FileRecord.id).where(FileRecord.id == file_ref,
+                FileRecord.workspace_id == workspace_id, FileRecord.status == "active")).scalar_one_or_none()
+            if file is None:
+                raise MemoryDataError("Referenced file does not belong to this student")
+        old_goal = None
+        if supersedes_record_id:
+            old_goal = self.get(workspace_id, "goal", supersedes_record_id) if kind == "goal" else None
+            if old_goal is None or old_goal.goal_type != merged.get("goal_type") or (current and old_goal.id == current.id):
+                raise MemoryDataError("Only an existing goal in the same journey can be superseded")
+        changed = current and _conflicts(before, values)
+        os_progress = (kind == "exploration_experience" and source_type in {"agent", "system"}
+                       and set(values).issubset({"activity_status", "completed_at", "evidence_refs"})
+                       and bool((evidence or {}).get("execution_run_id")))
+        if steward.needs_conflict_review(changed=changed, source_type=source_type,
+                                         current=current, evidence=evidence,
+                                         os_progress=os_progress):
+            self.db.add(ProfileIssue(workspace_id=workspace_id, subject_user_id=subject_user_id,
+                candidate_id=candidate_id,
+                issue_type="conflicting_record", summary=f"Conflicting {kind.replace('_', ' ')} information",
+                conflict_kind=("source_disagreement" if current.source_type != source_type else "value_conflict"),
+                severity="blocking", affected_type=kind, affected_id=current.id,
+                clarification_question=f"Which {kind.replace('_', ' ')} information is correct?",
+                evidence={"record_type": kind, "record_id": current.id, "current": before,
+                          "proposed": values, "current_source_type": current.source_type,
+                          "proposed_source_type": source_type,
+                          "current_evidence": current.evidence, "proposed_evidence": evidence}))
+            self.db.flush()
+            raise RecordNeedsReview("The new evidence conflicts with an existing record")
+        if current:
+            if merged != before:
+                for key, value in merged.items():
+                    setattr(current, key, value)
+                current.updated_at = datetime.now(timezone.utc)
+                current.source_type = source_type
+                current.claim_origin = claim_origin
+                current.capture_method = capture_method
+            row = current
+        else:
+            row = ENTITY_MODELS[kind](workspace_id=workspace_id, subject_user_id=subject_user_id,
+                source_type=source_type, claim_origin=claim_origin, capture_method=capture_method,
+                status="active", **merged)
+            self.db.add(row)
+        default_verification = (
+            "extracted" if source_type in ("document", "agent", "system") else "self_reported"
+        )
+        if current is not None and merged == before and source_type == "document":
+            # Pure corroboration: a document confirms the record exactly as it
+            # stands. Keep the record's own evidence (who first told us) and
+            # append this document as supporting evidence, instead of the old
+            # behaviour of overwriting the original provenance.
+            self._corroborate(row, evidence)
+            proposed = verification_status or default_verification
+            if _VERIFICATION_RANK.get(proposed, 0) > _VERIFICATION_RANK.get(row.verification_status, 0):
+                row.verification_status = proposed
+        else:
+            if kind == "exploration_experience" and evidence:
+                combined = dict(row.evidence or {})
+                combined.update(evidence)
+                if "student_reflection" in values:
+                    combined["reflection"] = {"source_type": source_type, "evidence": evidence}
+                if os_progress or (current is None and source_type in {"agent", "system"}
+                                   and values.get("activity_status") == "completed"):
+                    combined["completion"] = {"source_type": source_type, "evidence": evidence}
+                row.evidence = combined
+            else:
+                row.evidence = evidence or row.evidence
+            if current is None or merged != before:
+                row.verification_status = verification_status or default_verification
+        self.db.flush()
+        if before != merged or evidence:
+            self._revision(workspace_id, kind, row, before, source_type, claim_origin, capture_method, evidence)
+        if old_goal:
+            old_before = {**self._values("goal", old_goal), "status": old_goal.status}
+            old_goal.status = "superseded"
+            self._revision(workspace_id, "goal", old_goal, old_before, source_type, claim_origin, capture_method, evidence)
+        self.db.flush()
+        return row
+
+    def _verify_exploration_run(self, workspace_id: str, values: dict,
+                                evidence: dict | None) -> None:
+        """A completed run must explicitly identify this activity as completed."""
+        run_id = (evidence or {}).get("execution_run_id")
+        if not isinstance(run_id, str) or not run_id:
+            raise MemoryDataError("OS exploration completion requires durable execution evidence")
+        run = self.db.execute(select(ExecutionRun).where(
+            ExecutionRun.id == run_id, ExecutionRun.workspace_id == workspace_id,
+            ExecutionRun.status == "completed",
+        )).scalar_one_or_none()
+        completed = run.result.get("exploration_completed") if run and isinstance(run.result, dict) else None
+        if not isinstance(completed, dict) or completed.get("completed") is not True or any(
+                completed.get(key) != values.get(key)
+                for key in ("domain", "activity_type", "title")):
+            raise MemoryDataError("Execution run does not verify this exploration completion")
+
+    def _corroborate(self, row, evidence) -> None:
+        """Append independent supporting evidence without touching values."""
+        if not evidence:
+            return
+        entry = {k: evidence[k] for k in (
+            "file_id", "locator", "quote", "authority", "document_type",
+        ) if evidence.get(k) is not None}
+        if not entry:
+            return
+        existing = dict(row.evidence or {})
+        corroborations = list(existing.get("corroborations") or [])
+        key = (entry.get("file_id"), entry.get("locator"))
+        if any((c.get("file_id"), c.get("locator")) == key for c in corroborations):
+            return
+        corroborations.append(entry)
+        existing["corroborations"] = corroborations[-MAX_CORROBORATIONS:]
+        row.evidence = existing  # reassigned so the JSONB change is detected
+
+    def snapshot(self, workspace_id: str, kinds=None, limit: int | None = None) -> dict:
+        return {kind: [{**self._values(kind, record), "id": record.id,
+                       "verification_status": self._verification(record)}
+                      for record in self.list(workspace_id, kind, limit)]
+                for kind in (kinds if kinds is not None else ENTITY_MODELS)}
+
+    @staticmethod
+    def _verification(record):
+        beginning = getattr(record, "valid_from", None)
+        if beginning and beginning > date.today().isoformat()[:len(beginning)]:
+            return "not_yet_valid"
+        expiry = (getattr(record, "expiry_date", None) or getattr(record, "expires_on", None)
+                  or getattr(record, "valid_until", None))
+        if expiry and expiry < date.today().isoformat()[:len(expiry)]:
+            return "expired"
+        return record.verification_status
+
+    def history(self, workspace_id: str, kind: str, record_id: str):
+        return list(self.db.execute(select(StudentRecordRevision).where(
+            StudentRecordRevision.workspace_id == workspace_id, StudentRecordRevision.record_type == kind,
+            StudentRecordRevision.record_id == record_id).order_by(StudentRecordRevision.created_at)).scalars())
+
+    def issues(self, workspace_id: str):
+        return list(self.db.execute(select(ProfileIssue).where(ProfileIssue.workspace_id == workspace_id,
+            ProfileIssue.status == "open").order_by(ProfileIssue.created_at.desc()).limit(20)).scalars())

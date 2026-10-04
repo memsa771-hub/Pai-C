@@ -1,0 +1,18 @@
+# Local configuration and credentials
+.env
+.env.*
+!.env.production.example
+
+# Generated files and local dependencies
+**/__pycache__/
+**/*.py[cod]
+**/.pytest_cache/
+**/node_modules/
+**/.next/
+**/.vercel/
+**/dist-desktop/
+**/*.tsbuildinfo
+
+# Local data and backups
+backups/
+*.log

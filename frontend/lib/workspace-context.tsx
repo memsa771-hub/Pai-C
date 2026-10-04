@@ -1,0 +1,1757 @@
+'use client';
+
+import React, { createContext, useContext, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { workspaceApi } from './api';
+import { capture, group } from './analytics';
+import { usePaiAuth } from './pai-auth-context';
+import { generateUserId, getStoredIdentity, storeIdentity } from './identity';
+import { networkAgentToWorkspaceAgent, networkChannelToSession } from './types';
+import { defaultWorkspaceConversation } from './primary-conversation';
+import { DMS_UI_ENABLED } from './config';
+import { useUploadQueue } from '@/hooks/use-upload-queue';
+import type { PendingUpload } from '@/hooks/use-upload-queue';
+import type { BrowserPersistentContext, BrowserTab, DMConversation, KanbanTask, Workflow, WorkflowStep, KnowledgeEntry, NotificationItem, OnlineUser, RoutineItem, TodoItem, TrashEntry, Workspace, WorkspaceAgent, WorkspaceFile, WorkspaceIdentity, WorkspaceSession } from './types';
+
+function useWorkspaceIdentity() {
+  const { user } = usePaiAuth();
+  const [localIdentity, setLocalIdentity] = useState<WorkspaceIdentity>(() => {
+    const stored = typeof window !== 'undefined' ? getStoredIdentity() : null;
+    const id = stored?.id || (typeof window !== 'undefined' ? generateUserId() : '');
+    return { id, name: stored?.name || '', isAuthenticated: false };
+  });
+
+  useEffect(() => {
+    if (!user && localIdentity.id && localIdentity.name) {
+      storeIdentity(localIdentity.id, localIdentity.name);
+    }
+  }, [user, localIdentity.id, localIdentity.name]);
+
+  const setUserName = useCallback((name: string) => {
+    setLocalIdentity((prev) => {
+      const id = prev.id || generateUserId();
+      storeIdentity(id, name);
+      return { id, name, isAuthenticated: false };
+    });
+  }, []);
+
+  if (user) {
+    const name = (user.displayName || user.email || '').trim();
+    return {
+      currentUser: { id: user.email || name, name, isAuthenticated: true } as WorkspaceIdentity,
+      setUserName: () => {},
+    };
+  }
+
+  return { currentUser: localIdentity, setUserName };
+}
+
+/**
+ * A folder mutation that the server hasn't confirmed yet.
+ *
+ * Folders exist only as a path prefix on `filename`, so creating, renaming or
+ * deleting one rewrites a batch of file rows server-side and takes a round trip
+ * to come back. Projecting the pending op over the last server list is what
+ * lets the tree move on click instead of a second later — and projecting it,
+ * rather than patching `files` once, is what survives the background poll
+ * landing mid-flight with the old tree still in it.
+ */
+type FolderOp =
+  | { kind: 'create'; path: string }
+  | { kind: 'rename'; path: string; newPath: string }
+  | { kind: 'delete'; path: string };
+
+/** The same op with the handle used to retire it once it lands. */
+type PendingFolderOp = FolderOp & { id: number };
+
+export type FolderOpKind = FolderOp['kind'];
+
+/** Marker file the backend writes so an empty folder still has a path prefix. */
+const FOLDER_KEEP = '.keep';
+
+const isUnderFolder = (filename: string, path: string) => filename.startsWith(`${path}/`);
+
+/** The file list as it will look once the pending folder ops land. */
+function applyFolderOps(files: WorkspaceFile[], ops: PendingFolderOp[]): WorkspaceFile[] {
+  if (ops.length === 0) return files;
+
+  return ops.reduce((current, op) => {
+    if (op.kind === 'delete') {
+      return current.filter((f) => !isUnderFolder(f.filename, op.path));
+    }
+    if (op.kind === 'rename') {
+      return current.map((f) =>
+        isUnderFolder(f.filename, op.path)
+          ? { ...f, filename: `${op.newPath}${f.filename.slice(op.path.length)}` }
+          : f,
+      );
+    }
+    // Create: once the refetch brings the real `.keep` row in, the stand-in
+    // would double the folder's contents, so it only fills a gap.
+    if (current.some((f) => isUnderFolder(f.filename, op.path))) return current;
+    return [
+      ...current,
+      {
+        id: `pending-folder:${op.path}`,
+        filename: `${op.path}/${FOLDER_KEEP}`,
+        contentType: 'application/x-directory',
+        size: 0,
+        uploadedBy: '',
+        channelName: null,
+        status: 'active',
+        createdAt: null,
+      },
+    ];
+  }, files);
+}
+
+/** When a thread last saw activity, tolerating a missing backend timestamp. */
+function sessionActivityAt(s: WorkspaceSession): number {
+  if (s.lastEventAt) return s.lastEventAt;
+  return s.createdAt ? new Date(s.createdAt).getTime() : 0;
+}
+
+interface LastMessageInfo {
+  content: string;
+  senderName: string;
+  isStatus?: boolean;
+}
+
+interface WorkspaceContextValue {
+  workspace: Workspace | null;
+  token: string;
+  agents: WorkspaceAgent[];
+  currentUser: WorkspaceIdentity;
+  setUserName: (name: string) => void;
+  onlineUsers: OnlineUser[];
+  sessions: WorkspaceSession[];
+  files: WorkspaceFile[];
+  selectedFileId: string | null;
+  selectedKnowledgeId: string | null;
+  currentFilePath: string;
+  currentSessionId: string | null;
+  loading: boolean;
+  error: string | null;
+  lastMessageBySession: Record<string, LastMessageInfo>;
+  activeSessionIds: Set<string>;
+  stoppingSessionIds: Set<string>;
+  completedSessionIds: Set<string>;
+  monitorMode: boolean;
+  acknowledgeCompletion: (sessionId: string) => void;
+  agentModes: Record<string, string>;
+  updateLastMessage: (sessionId: string, senderName: string, content: string, isStatus?: boolean) => void;
+  setSessionActive: (sessionId: string, active: boolean) => void;
+  updateAgentMode: (agentName: string, mode: string) => void;
+  stopAllAgents: (sessionId?: string) => Promise<void>;
+  setCurrentSessionId: (id: string | null, options?: { skipFocus?: boolean }) => void;
+  /** Read-and-clear: was the most recent setCurrentSessionId asked to skip auto-focus? */
+  consumeSkipFocus: () => boolean;
+  setSelectedFileId: (id: string | null) => void;
+  setSelectedKnowledgeId: (id: string | null) => void;
+  setCurrentFilePath: (path: string) => void;
+  createSession: (opts?: { title?: string; master?: string; participants?: string[] }) => Promise<WorkspaceSession>;
+  /** Request that a thread be opened with an agent as soon as it joins — used
+   *  by guided onboarding for the user's first agent. */
+  requestFirstThread: (agentName: string) => void;
+  renameSession: (sessionId: string, title: string) => Promise<void>;
+  updateSession: (sessionId: string, updates: { starred?: boolean; status?: string }) => Promise<void>;
+  addParticipant: (sessionId: string, agentName: string) => Promise<void>;
+  removeParticipant: (sessionId: string, agentName: string) => Promise<void>;
+  setSessionMaster: (sessionId: string, agentName: string) => Promise<void>;
+  setSessionOrchestration: (sessionId: string, updates: { mode?: string; instruction?: string | null; workflowId?: string | null }) => Promise<void>;
+  renameWorkspace: (name: string) => Promise<void>;
+  refreshWorkspace: () => Promise<void>;
+  refreshAgents: () => Promise<void>;
+  refreshFiles: () => Promise<void>;
+  /** Queue a batch into `folder` and draw it going up; see {@link PendingUpload}. */
+  enqueueUploads: (files: File[], folder: string) => void;
+  pendingUploads: PendingUpload[];
+  retryUpload: (id: string) => void;
+  cancelUpload: (id: string) => void;
+  deleteFile: (fileId: string) => Promise<void>;
+  createFolder: (path: string) => Promise<void>;
+  renameFolder: (path: string, newPath: string) => Promise<void>;
+  deleteFolder: (path: string) => Promise<void>;
+  /** Folders whose create/rename/delete is still in flight, keyed by the path
+   *  the tree is showing for them right now. */
+  pendingFolderPaths: Map<string, FolderOpKind>;
+  /** What deleting put in the trash — one entry per delete action, newest
+   *  first. Lives here rather than in the Trash view because the folder panel
+   *  counts it while that view isn't mounted. */
+  trashEntries: TrashEntry[];
+  refreshTrash: () => Promise<void>;
+  /** Put entries back. Resolves with how many files came back and how many had
+   *  to be renamed around a name taken since. */
+  restoreFromTrash: (trashIds: string[]) => Promise<{ restoredCount: number; renamedCount: number }>;
+  /** Destroy entries — bytes included. Not undoable. */
+  purgeTrash: (trashIds: string[]) => Promise<void>;
+  emptyTrash: () => Promise<void>;
+  browserTabs: BrowserTab[];
+  selectedBrowserTabId: string | null;
+  setSelectedBrowserTabId: (id: string | null) => void;
+  refreshBrowserTabs: () => Promise<void>;
+  openBrowserTab: (url?: string, contextId?: string) => Promise<BrowserTab>;
+  closeBrowserTab: (tabId: string) => Promise<void>;
+  navigateBrowserTab: (tabId: string, url: string) => Promise<BrowserTab>;
+  reconnectBrowserTab: (tabId: string) => Promise<BrowserTab>;
+  browserContexts: BrowserPersistentContext[];
+  refreshBrowserContexts: () => Promise<void>;
+  persistBrowserTab: (tabId: string, name: string) => Promise<BrowserPersistentContext>;
+  unpersistBrowserTab: (tabId: string) => Promise<void>;
+  deleteBrowserContext: (contextId: string) => Promise<void>;
+  openBrowserTabWithContext: (contextId: string, url?: string) => Promise<BrowserTab>;
+  dmConversations: DMConversation[];
+  refreshDMConversations: () => Promise<void>;
+  todos: TodoItem[];
+  refreshTodos: () => Promise<void>;
+  tasks: KanbanTask[];
+  refreshTasks: () => Promise<void>;
+  createTask: (input: { title: string; description?: string; status?: KanbanTask['status']; assignee?: string | null; workflowId?: string | null; knowledgeIds?: string[]; fileIds?: string[] }) => Promise<KanbanTask>;
+  updateTask: (id: string, updates: { title?: string; description?: string; status?: KanbanTask['status']; position?: number; assignee?: string | null; workflowId?: string | null; knowledgeIds?: string[]; fileIds?: string[] }) => Promise<void>;
+  /** Run a task: kicks off the agent (its stored assignee, or the one passed) and moves it to In Progress. */
+  runTask: (id: string, agent?: string) => Promise<void>;
+  /** Stop a running task: halts the agent and returns the card to Backlog. */
+  stopTask: (id: string) => Promise<void>;
+  deleteTask: (id: string) => Promise<void>;
+  workflows: Workflow[];
+  refreshWorkflows: () => Promise<void>;
+  createWorkflow: (input: { name: string; description?: string; steps: WorkflowStep[]; maxIterations?: number }) => Promise<Workflow>;
+  updateWorkflow: (id: string, updates: { name?: string; description?: string; steps?: WorkflowStep[]; maxIterations?: number }) => Promise<void>;
+  deleteWorkflow: (id: string) => Promise<void>;
+  routines: RoutineItem[];
+  refreshRoutines: () => Promise<void>;
+  createRoutine: (params: {
+    name: string;
+    message: string;
+    source: string;
+    hour?: number;
+    minute?: number;
+    days?: number[];
+    interval_minutes?: number;
+    conversation_history?: string;
+  }) => Promise<void>;
+  knowledge: KnowledgeEntry[];
+  refreshKnowledge: () => Promise<void>;
+  createKnowledge: (params: { title: string; content: string; description?: string }) => Promise<KnowledgeEntry>;
+  updateKnowledge: (entryId: string, params: { title?: string; content?: string; description?: string }) => Promise<KnowledgeEntry>;
+  deleteKnowledge: (entryId: string) => Promise<void>;
+  notifications: NotificationItem[];
+  unreadNotificationCount: number;
+  /** Threads with activity the user hasn't opened since */
+  unreadSessionIds: Set<string>;
+  markSessionRead: (sessionId: string) => void;
+  refreshNotifications: () => Promise<void>;
+  markNotificationRead: (id: string) => Promise<void>;
+  markAllNotificationsRead: () => Promise<void>;
+  dismissNotification: (id: string) => Promise<void>;
+  notificationSound: boolean;
+  setNotificationSound: (enabled: boolean) => void;
+}
+
+const WorkspaceContext = createContext<WorkspaceContextValue | null>(null);
+
+export function useWorkspace() {
+  const ctx = useContext(WorkspaceContext);
+  if (!ctx) throw new Error('useWorkspace must be used within WorkspaceProvider');
+  return ctx;
+}
+
+export function WorkspaceProvider({
+  workspaceId,
+  token,
+  bearerToken,
+  streamTicket: initialStreamTicket,
+  children,
+}: {
+  workspaceId: string;
+  token: string;
+  bearerToken?: string;
+  /** Short-lived read-only credential for SSE and file URLs. Placement AI
+   * passes this instead of a workspace token; self-hosted passes neither. */
+  streamTicket?: string;
+  children: React.ReactNode;
+}) {
+  const [streamTicket, setStreamTicket] = useState(initialStreamTicket || '');
+  useEffect(() => { setStreamTicket(initialStreamTicket || ''); }, [initialStreamTicket]);
+  const [workspace, setWorkspace] = useState<Workspace | null>(null);
+  const [agents, setAgents] = useState<WorkspaceAgent[]>([]);
+  const { currentUser, setUserName } = useWorkspaceIdentity();
+  const currentUserRef = useRef(currentUser);
+  currentUserRef.current = currentUser;
+  const [onlineUsers, setOnlineUsers] = useState<OnlineUser[]>([]);
+  const [sessions, setSessions] = useState<WorkspaceSession[]>([]);
+  const [currentSessionId, _setCurrentSessionId] = useState<string | null>(null);
+
+  // ── Thread read state ──
+  // The backend has no per-thread read marker, so unread is derived client-side:
+  // a thread is unread when its lastEventAt is newer than the last time the user
+  // had it open. Persisted so a reload doesn't mark everything read again.
+  const readKey = `oa-read-${workspaceId}`;
+  const [lastReadBySession, setLastReadBySession] = useState<Record<string, number>>(() => {
+    if (typeof window === 'undefined') return {};
+    try {
+      return JSON.parse(localStorage.getItem(`oa-read-${workspaceId}`) || '{}');
+    } catch {
+      return {};
+    }
+  });
+  const lastReadRef = useRef(lastReadBySession);
+  lastReadRef.current = lastReadBySession;
+
+  const persistRead = useCallback((next: Record<string, number>) => {
+    setLastReadBySession(next);
+    try {
+      localStorage.setItem(readKey, JSON.stringify(next));
+    } catch { /* storage full */ }
+  }, [readKey]);
+
+  const markSessionRead = useCallback((sessionId: string) => {
+    const now = Date.now();
+    persistRead({ ...lastReadRef.current, [sessionId]: now });
+  }, [persistRead]);
+  // Set by setCurrentSessionId({ skipFocus: true }) and consumed by ChatView's
+  // auto-focus effect, so keyboard-driven thread switches (1-9) don't steal
+  // focus from the user. Cleared on read.
+  const skipFocusRef = useRef(false);
+  const setCurrentSessionId = useCallback((id: string | null, options?: { skipFocus?: boolean }) => {
+    if (options?.skipFocus) skipFocusRef.current = true;
+    _setCurrentSessionId(id);
+    if (id) {
+      markSessionRead(id);
+      setCompletedSessionIds((prev) => {
+        if (!prev.has(id)) return prev;
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
+    }
+  }, [markSessionRead]);
+  const consumeSkipFocus = useCallback(() => {
+    const v = skipFocusRef.current;
+    skipFocusRef.current = false;
+    return v;
+  }, []);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [lastMessageBySession, setLastMessageBySession] = useState<Record<string, LastMessageInfo>>({});
+  const [activeSessionIds, setActiveSessionIds] = useState<Set<string>>(new Set());
+  const [stoppingSessionIds, setStoppingSessionIds] = useState<Set<string>>(new Set());
+  const stoppingSessionIdsRef = useRef(stoppingSessionIds);
+  stoppingSessionIdsRef.current = stoppingSessionIds;
+  const [completedSessionIds, setCompletedSessionIds] = useState<Set<string>>(new Set());
+  const [agentModes, setAgentModes] = useState<Record<string, string>>({});
+  const [files, setFiles] = useState<WorkspaceFile[]>([]);
+  const [trashEntries, setTrashEntries] = useState<TrashEntry[]>([]);
+  const [pendingFolderOps, setPendingFolderOps] = useState<PendingFolderOp[]>([]);
+  const folderOpIdRef = useRef(0);
+  /**
+   * Bumped whenever a folder mutation starts or finishes. A file list that was
+   * already in flight at that moment describes the tree before the change, so
+   * it's dropped instead of being allowed to flash the old folders back.
+   */
+  const filesEpochRef = useRef(0);
+  const commitFiles = useCallback((next: WorkspaceFile[], epoch: number) => {
+    if (epoch !== filesEpochRef.current) return;
+    setFiles(next);
+  }, []);
+  const [selectedFileId, setSelectedFileId] = useState<string | null>(null);
+  const [selectedKnowledgeId, setSelectedKnowledgeId] = useState<string | null>(null);
+  const [currentFilePath, setCurrentFilePath] = useState('');
+  const [browserTabs, setBrowserTabs] = useState<BrowserTab[]>([]);
+  const [selectedBrowserTabId, setSelectedBrowserTabId] = useState<string | null>(null);
+  const [browserContexts, setBrowserContexts] = useState<BrowserPersistentContext[]>([]);
+  const [dmConversations, setDMConversations] = useState<DMConversation[]>([]);
+  const [todos, setTodos] = useState<TodoItem[]>([]);
+  const [tasks, setTasks] = useState<KanbanTask[]>([]);
+  const [workflows, setWorkflows] = useState<Workflow[]>([]);
+  const [routines, setRoutines] = useState<RoutineItem[]>([]);
+  const [knowledge, setKnowledge] = useState<KnowledgeEntry[]>([]);
+  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
+  const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
+  const [manuallyRenamedSessions, setManuallyRenamedSessions] = useState<Set<string>>(new Set());
+
+  // Auto-select browser tabs for split browser view:
+  // - On first load: select the most recently created agent tab (if any)
+  // - On subsequent polls: select any newly appearing tab
+  const prevTabIdsRef = useRef<Set<string>>(new Set());
+  const initialSelectDoneRef = useRef(false);
+  useEffect(() => {
+    if (browserTabs.length === 0) return;
+    const currentIds = new Set(browserTabs.map(t => t.id));
+    const prevIds = prevTabIdsRef.current;
+
+    if (!initialSelectDoneRef.current) {
+      // First load — pick the most recent agent-opened tab if nothing is selected
+      initialSelectDoneRef.current = true;
+      if (!selectedBrowserTabId) {
+        const agentTabs = browserTabs.filter(t => t.createdBy?.startsWith('openagents:'));
+        if (agentTabs.length > 0) {
+          setSelectedBrowserTabId(agentTabs[agentTabs.length - 1].id);
+        }
+      }
+    } else {
+      // Subsequent polls — auto-select any newly appearing tab
+      const newTabs = browserTabs.filter(t => !prevIds.has(t.id));
+      if (newTabs.length > 0) {
+        setSelectedBrowserTabId(newTabs[newTabs.length - 1].id);
+      }
+    }
+    prevTabIdsRef.current = currentIds;
+  }, [browserTabs]);
+
+  // Notification sound — client-side preference stored in localStorage
+  const [notificationSound, _setNotificationSound] = useState(false);
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem('oa_notification_sound');
+      if (stored === 'true') _setNotificationSound(true);
+    } catch {}
+  }, []);
+  const setNotificationSound = useCallback((enabled: boolean) => {
+    _setNotificationSound(enabled);
+    try { localStorage.setItem('oa_notification_sound', String(enabled)); } catch {}
+  }, []);
+
+  // Presence heartbeat
+  useEffect(() => {
+    if (!currentUser.id || !currentUser.name.trim()) return;
+
+    let cancelled = false;
+    const sendPresence = (type: string) =>
+      workspaceApi.sendEvent({
+        type,
+        target: 'core',
+        payload: { user_id: currentUser.id, user_name: currentUser.name, sender_type: 'human' },
+        visibility: 'network',
+      }).catch(() => {});
+
+    const applyPresenceEvents = async () => {
+      try {
+        const result = await workspaceApi.pollEvents({ type: 'workspace.user', sort: 'desc', limit: 200 });
+        if (cancelled) return;
+        const cutoff = Date.now() - 45_000;
+        // Track each live connection by its (possibly per-device) user_id so
+        // that left/heartbeat events are applied per-connection correctly.
+        const connections = new Map<string, OnlineUser>();
+        for (const event of [...result.events].reverse()) {
+          const payload = (event.payload || {}) as Record<string, string>;
+          const userId = payload.user_id || payload.sender_id;
+          if (!userId) continue;
+          if (event.type === 'workspace.user.left') {
+            connections.delete(userId);
+            continue;
+          }
+          const userName = payload.user_name || payload.sender_name || 'User';
+          connections.set(userId, { id: userId, name: userName, status: 'online', lastSeen: event.timestamp });
+        }
+        // Collapse multiple connections of the same person (e.g. the same user
+        // open in two tabs / on two devices) into a single row. Anonymous users
+        // get a fresh random user_id per browser, so dedup by name — plus the
+        // current user's own id, which may differ across places (auth vs anon).
+        const myId = currentUserRef.current.id;
+        const myName = currentUserRef.current.name.trim().toLowerCase();
+        const byPerson = new Map<string, { user: OnlineUser; isSelf: boolean }>();
+        for (const conn of Array.from(connections.values())) {
+          const isSelf = conn.id === myId || (!!myName && conn.name.trim().toLowerCase() === myName);
+          const key = isSelf ? '__self__' : `name:${conn.name.trim().toLowerCase()}`;
+          const prev = byPerson.get(key);
+          const lastSeen = Math.max(conn.lastSeen, prev?.user.lastSeen ?? 0);
+          // Keep the current user's own id on the self row so the sidebar's
+          // "(you)" label (u.id === currentUser.id) keeps working.
+          byPerson.set(key, {
+            user: { id: isSelf ? myId : conn.id, name: conn.name, status: 'online', lastSeen },
+            isSelf,
+          });
+        }
+        const users = Array.from(byPerson.values())
+          .filter(({ user, isSelf }) => isSelf || user.lastSeen >= cutoff)
+          .map(({ user }) => user)
+          .sort((a, b) => {
+            if (a.id === myId) return -1;
+            if (b.id === myId) return 1;
+            return a.name.localeCompare(b.name);
+          });
+        setOnlineUsers(users);
+      } catch {
+        // non-critical
+      }
+    };
+
+    void sendPresence('workspace.user.joined');
+    void applyPresenceEvents();
+
+    const heartbeat = window.setInterval(() => {
+      void sendPresence('workspace.user.heartbeat');
+      void applyPresenceEvents();
+    }, 15_000);
+
+    const handlePageHide = () => void sendPresence('workspace.user.left');
+    window.addEventListener('pagehide', handlePageHide);
+    window.addEventListener('beforeunload', handlePageHide);
+
+    return () => {
+      cancelled = true;
+      clearInterval(heartbeat);
+      window.removeEventListener('pagehide', handlePageHide);
+      window.removeEventListener('beforeunload', handlePageHide);
+      void sendPresence('workspace.user.left');
+    };
+  }, [currentUser.id, currentUser.name]);
+
+  const updateLastMessage = useCallback((sessionId: string, senderName: string, content: string, isStatus?: boolean) => {
+    if (!isStatus || /stopped|stopping failed/i.test(content)) {
+      setStoppingSessionIds((prev) => {
+        if (!prev.has(sessionId)) return prev;
+        const next = new Set(prev);
+        next.delete(sessionId);
+        return next;
+      });
+    }
+    setLastMessageBySession((prev) => {
+      if (!content && !prev[sessionId]) return prev;
+      const existing = prev[sessionId];
+      const truncated = content.slice(0, 100);
+      if (existing && existing.content === truncated && existing.senderName === senderName && existing.isStatus === isStatus) {
+        return prev;
+      }
+      return {
+        ...prev,
+        [sessionId]: { senderName, content: truncated, isStatus },
+      };
+    });
+  }, []);
+
+  const setSessionActive = useCallback((sessionId: string, active: boolean) => {
+    setActiveSessionIds((prev) => {
+      const next = new Set(prev);
+      if (active && !stoppingSessionIdsRef.current.has(sessionId)) next.add(sessionId);
+      else next.delete(sessionId);
+      return next;
+    });
+  }, []);
+
+  const updateAgentMode = useCallback((agentName: string, mode: string) => {
+    setAgentModes((prev) => {
+      if (prev[agentName] === mode) return prev;
+      return { ...prev, [agentName]: mode };
+    });
+  }, []);
+
+  const stopAllAgents = useCallback(async (targetSessionId?: string) => {
+    const sessionIds = targetSessionId
+      ? (activeSessionIds.has(targetSessionId) ? [targetSessionId] : [])
+      : Array.from(activeSessionIds);
+    if (sessionIds.length === 0) return;
+
+    setStoppingSessionIds((prev) => {
+      const next = new Set(prev);
+      sessionIds.forEach((sid) => next.add(sid));
+      return next;
+    });
+    setActiveSessionIds((prev) => {
+      const next = new Set(prev);
+      sessionIds.forEach((sid) => next.delete(sid));
+      return next;
+    });
+    setLastMessageBySession((prev) => {
+      const next = { ...prev };
+      sessionIds.forEach((sid) => {
+        next[sid] = { senderName: 'system', content: 'Stopping...', isStatus: true };
+      });
+      return next;
+    });
+
+    const targetAgents = targetSessionId
+      ? agents.filter((a) => {
+          const session = sessions.find((s) => s.sessionId === targetSessionId);
+          return session && (session.participants || []).includes(a.agentName);
+        })
+      : agents;
+
+    const sendStop = () => Promise.allSettled(
+      targetAgents.map((a) => {
+        const channel = targetSessionId || undefined;
+        return workspaceApi.sendAgentControl(a.agentName, 'stop', { channel });
+      })
+    );
+    await sendStop();
+
+    window.setTimeout(() => {
+      setStoppingSessionIds((prevStopping) => {
+        const stillStopping = sessionIds.filter((sid) => prevStopping.has(sid));
+        if (stillStopping.length > 0) void sendStop();
+        return prevStopping;
+      });
+    }, 3000);
+  }, [activeSessionIds, agents, sessions]);
+
+  // Configure API client on mount
+  useEffect(() => {
+    workspaceApi.configure(workspaceId, token, bearerToken || undefined, streamTicket);
+    // Tie all subsequent events to this workspace so they line up with the
+    // website + launcher funnel stages for the same workspace ID.
+    if (workspaceId) {
+      group('workspace', workspaceId);
+      capture('workspace_opened', { workspace_id: workspaceId });
+    }
+  }, [workspaceId, token, bearerToken, streamTicket]);
+
+  // Tickets expire in minutes by design, so re-mint on a timer well inside
+  // that window. A ticket that lapses doesn't just stop images loading — the
+  // SSE stream reconnects with a dead credential and realtime chat goes
+  // quiet, which looks like the app hanging.
+  useEffect(() => {
+    if (!bearerToken || !initialStreamTicket) return;
+    let cancelled = false;
+    const remint = async () => {
+      try {
+        const { refreshStreamTicket } = await import('@/lib/account-api');
+        const next = await refreshStreamTicket(bearerToken);
+        if (!cancelled && next.streamTicket) setStreamTicket(next.streamTicket);
+      } catch { /* keep the current ticket; the next tick retries */ }
+    };
+    const id = window.setInterval(remint, 5 * 60 * 1000);
+    return () => { cancelled = true; window.clearInterval(id); };
+  }, [bearerToken, initialStreamTicket]);
+
+  const refreshWorkspace = useCallback(async () => {
+    try {
+      const ws = await workspaceApi.getWorkspace();
+      setWorkspace(ws);
+      setAgents(ws.agents);
+      setError(null);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to load workspace');
+    }
+  }, []);
+
+  // Track last known event timestamps per channel for change detection
+  const lastKnownEventAtRef = React.useRef<Record<string, number | null>>({});
+  const currentSessionIdRef = React.useRef<string | null>(currentSessionId);
+  currentSessionIdRef.current = currentSessionId;
+  // Track the workspace the default-thread selection last ran for, so a real
+  // workspace switch re-selects while a same-workspace re-discover/token refresh
+  // keeps the user's current thread.
+  const prevSelectedWorkspaceRef = React.useRef<string | null>(null);
+
+  /** Refresh agents and channels from the discover endpoint. */
+  const refreshDiscovery = useCallback(async () => {
+    try {
+      const discovery = await workspaceApi.discover();
+      setAgents(discovery.agents.map(networkAgentToWorkspaceAgent));
+
+      const updated = discovery.channels.map((ch) =>
+        networkChannelToSession(ch, workspaceId)
+      );
+
+      setSessions((prev) => {
+        const existingIds = new Set(prev.map((s) => s.sessionId));
+        const newChannels = updated.filter((s) => !existingIds.has(s.sessionId));
+        // Merge: update metadata but preserve user-renamed titles
+        const updatedMap = new Map(updated.map((s) => [s.sessionId, s]));
+        const merged = prev
+          .filter((s) => {
+            // Drop sessions not in remote discovery (deleted/removed on backend)
+            if (!updatedMap.has(s.sessionId)) return false;
+            return true;
+          })
+          .map((s) => {
+            const remote = updatedMap.get(s.sessionId)!;
+            // Keep local title if user manually renamed in this browser session
+            const keepLocalTitle = manuallyRenamedSessions.has(s.sessionId);
+            return {
+              ...s,
+              title: keepLocalTitle ? s.title : remote.title,
+              participants: remote.participants,
+              master: remote.master,
+              orchestrationMode: remote.orchestrationMode,
+              orchestrationInstruction: remote.orchestrationInstruction,
+              lastEventAt: remote.lastEventAt,
+              createdAt: remote.createdAt || s.createdAt,
+              status: remote.status,
+              starred: remote.starred,
+            };
+          });
+        return [...merged, ...newChannels];
+      });
+
+      // Detect channels with new activity and fetch their latest message preview
+      const staleChannels = updated.filter((ch) => {
+        const prev = lastKnownEventAtRef.current[ch.sessionId];
+        return ch.lastEventAt && ch.lastEventAt !== prev;
+      });
+
+      // Update known timestamps for the current session (ChatView handles its preview)
+      // Other channels' timestamps are updated after successful preview fetch
+      const currentSid = currentSessionIdRef.current;
+      if (currentSid) {
+        const currentCh = updated.find((ch) => ch.sessionId === currentSid);
+        if (currentCh) lastKnownEventAtRef.current[currentSid] = currentCh.lastEventAt;
+      }
+
+      // Fetch preview for changed channels (skip current session — ChatView handles it)
+      const toFetch = staleChannels.filter((ch) => ch.sessionId !== currentSid);
+      if (toFetch.length > 0) {
+        const previews = await Promise.all(
+          toFetch.map(async (ch) => {
+            try {
+              const result = await workspaceApi.pollEvents({
+                channel: ch.sessionId,
+                type: 'workspace.message',
+                sort: 'desc',
+                limit: 10,
+              });
+              if (result.events.length === 0) return null;
+              const latest = result.events[0];
+              const latestPayload = latest.payload as Record<string, string>;
+              const latestType = latestPayload?.message_type || 'chat';
+              const isAgentWorking = latestType === 'status' || latestType === 'thinking';
+              // Find the latest chat/thinking message (not status) for preview
+              const lastChat = result.events.find((e) => {
+                const mt = (e.payload as Record<string, string>)?.message_type || 'chat';
+                return mt !== 'status' && mt !== 'thinking';
+              });
+              // If agent is actively working, show the status; otherwise show last chat
+              const pick = isAgentWorking ? latest : (lastChat || latest);
+              const payload = pick.payload as Record<string, string>;
+              const sender = payload?.sender_name || pick.source.replace(/^(openagents:|human:)/, '');
+              const content = payload?.content || '';
+              const msgType = payload?.message_type || 'chat';
+              const isStatus = msgType === 'status' || msgType === 'thinking';
+              return { sessionId: ch.sessionId, senderName: sender, content, isStatus };
+            } catch { /* ignore */ }
+            return null;
+          })
+        );
+        const batch: Record<string, LastMessageInfo> = {};
+        for (let i = 0; i < previews.length; i++) {
+          const p = previews[i];
+          if (p && p.content) {
+            batch[p.sessionId] = { senderName: p.senderName, content: p.content.slice(0, 100), isStatus: p.isStatus };
+          }
+          // Mark timestamp as known only after successful fetch (so failures retry next poll)
+          if (p) {
+            const ch = toFetch[i];
+            lastKnownEventAtRef.current[ch.sessionId] = ch.lastEventAt;
+          }
+        }
+        if (Object.keys(batch).length > 0) {
+          // Update active/completed state for background threads
+          setLastMessageBySession((prev) => {
+            const newActive = new Set<string>();
+            const newCompleted = new Set<string>();
+            const newInactive = new Set<string>();
+            for (const [sid, info] of Object.entries(batch)) {
+              const wasStatus = prev[sid]?.isStatus;
+              const isStopping = stoppingSessionIds.has(sid);
+              if (info.isStatus) {
+                if (isStopping) {
+                  if (/stopped|stopping failed/i.test(info.content)) {
+                    setStoppingSessionIds((s) => {
+                      if (!s.has(sid)) return s;
+                      const next = new Set(s);
+                      next.delete(sid);
+                      return next;
+                    });
+                    newInactive.add(sid);
+                  }
+                } else {
+                  newActive.add(sid);
+                }
+              } else {
+                setStoppingSessionIds((s) => {
+                  if (!s.has(sid)) return s;
+                  const next = new Set(s);
+                  next.delete(sid);
+                  return next;
+                });
+                // Latest event is a real message — session is not working.
+                // Always clear active so the shimmer doesn't stick when the
+                // status→chat transition happens between polls or while
+                // chat-view is unmounted (homepage / monitor mode).
+                newInactive.add(sid);
+                if (wasStatus) newCompleted.add(sid);
+              }
+            }
+            if (newActive.size > 0 || newInactive.size > 0) {
+              setActiveSessionIds((s) => {
+                const next = new Set(s);
+                Array.from(newActive).forEach((sid) => next.add(sid));
+                Array.from(newInactive).forEach((sid) => next.delete(sid));
+                return next;
+              });
+            }
+            if (newCompleted.size > 0) {
+              setCompletedSessionIds((s) => {
+                const next = new Set(s);
+                Array.from(newCompleted).forEach((sid) => next.add(sid));
+                return next;
+              });
+            }
+            return { ...prev, ...batch };
+          });
+        }
+      }
+
+      // Also refresh files, browser tabs, persistent contexts, and DM conversations so sidebar counts stay current
+      const filesEpoch = filesEpochRef.current;
+      workspaceApi.listFiles().then((r) => commitFiles(r.files, filesEpoch)).catch(() => {});
+      workspaceApi.listBrowserTabs().then((r) => setBrowserTabs(r.tabs)).catch(() => {});
+      workspaceApi.listBrowserContexts().then((r) => setBrowserContexts(r.contexts)).catch(() => {});
+      workspaceApi.listConversations().then((c) => setDMConversations(c)).catch(() => {});
+      workspaceApi.listTodos().then((r) => setTodos(r.todos)).catch(() => {});
+      workspaceApi.listTasks().then((r) => setTasks(r.tasks)).catch(() => {});
+      workspaceApi.listWorkflows().then((r) => setWorkflows(r.workflows)).catch(() => {});
+      workspaceApi.listRoutines().then((r) => setRoutines(r.routines)).catch(() => {});
+      workspaceApi.listKnowledge().then((r) => setKnowledge(r.entries)).catch(() => {});
+      workspaceApi.listNotifications().then((r) => {
+        setNotifications(r.notifications);
+        setUnreadNotificationCount(r.unreadCount);
+      }).catch(() => {});
+    } catch {
+      // Non-critical — keep existing state
+    }
+  }, [workspaceId, stoppingSessionIds, commitFiles]);
+
+  // Alias for backward compat
+  const refreshAgents = refreshDiscovery;
+
+  const refreshFiles = useCallback(async () => {
+    const epoch = filesEpochRef.current;
+    try {
+      const result = await workspaceApi.listFiles();
+      commitFiles(result.files, epoch);
+    } catch {
+      // Non-critical
+    }
+  }, [commitFiles]);
+
+  const refreshTodos = useCallback(async () => {
+    try {
+      const result = await workspaceApi.listTodos();
+      setTodos(result.todos);
+    } catch {
+      // Non-critical
+    }
+  }, []);
+
+  const refreshTasks = useCallback(async () => {
+    try {
+      const result = await workspaceApi.listTasks();
+      setTasks(result.tasks);
+    } catch {
+      // Non-critical
+    }
+  }, []);
+
+  const createTask = useCallback(async (input: { title: string; description?: string; status?: KanbanTask['status']; assignee?: string | null; workflowId?: string | null; knowledgeIds?: string[]; fileIds?: string[] }) => {
+    const task = await workspaceApi.createTask(input);
+    setTasks((prev) => [...prev, task]);
+    return task;
+  }, []);
+
+  const updateTask = useCallback(async (id: string, updates: { title?: string; description?: string; status?: KanbanTask['status']; position?: number; assignee?: string | null; workflowId?: string | null; knowledgeIds?: string[]; fileIds?: string[] }) => {
+    // Optimistic — the board reflects the change immediately.
+    setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, ...updates } as KanbanTask : t)));
+    try {
+      const task = await workspaceApi.updateTask(id, updates);
+      setTasks((prev) => prev.map((t) => (t.id === id ? task : t)));
+    } catch {
+      refreshTasks();
+    }
+  }, [refreshTasks]);
+
+  const runTask = useCallback(async (id: string, agent?: string) => {
+    const task = await workspaceApi.assignTask(id, agent);
+    setTasks((prev) => prev.map((t) => (t.id === id ? task : t)));
+  }, []);
+
+  const stopTask = useCallback(async (id: string) => {
+    const task = tasks.find((t) => t.id === id);
+    // Signal the agent to abort its current run in the task thread.
+    if (task?.assignee && task.channelName) {
+      try {
+        await workspaceApi.sendAgentControl(task.assignee, 'stop', { channel: task.channelName });
+      } catch {
+        // Best-effort — still return the card to Backlog below.
+      }
+    }
+    // Paused tasks live back in Backlog; the thread is kept for a later re-run.
+    await updateTask(id, { status: 'backlog' });
+  }, [tasks, updateTask]);
+
+  const deleteTask = useCallback(async (id: string) => {
+    setTasks((prev) => prev.filter((t) => t.id !== id));
+    try {
+      await workspaceApi.deleteTask(id);
+    } catch {
+      refreshTasks();
+    }
+  }, [refreshTasks]);
+
+  const refreshWorkflows = useCallback(async () => {
+    try {
+      const result = await workspaceApi.listWorkflows();
+      setWorkflows(result.workflows);
+    } catch {
+      // Non-critical
+    }
+  }, []);
+
+  const createWorkflow = useCallback(async (input: { name: string; description?: string; steps: WorkflowStep[]; maxIterations?: number }) => {
+    const wf = await workspaceApi.createWorkflow(input);
+    setWorkflows((prev) => [wf, ...prev]);
+    return wf;
+  }, []);
+
+  const updateWorkflow = useCallback(async (id: string, updates: { name?: string; description?: string; steps?: WorkflowStep[]; maxIterations?: number }) => {
+    const wf = await workspaceApi.updateWorkflow(id, updates);
+    setWorkflows((prev) => prev.map((w) => (w.id === id ? wf : w)));
+  }, []);
+
+  const deleteWorkflow = useCallback(async (id: string) => {
+    setWorkflows((prev) => prev.filter((w) => w.id !== id));
+    try {
+      await workspaceApi.deleteWorkflow(id);
+    } catch {
+      refreshWorkflows();
+    }
+  }, [refreshWorkflows]);
+
+  const refreshRoutines = useCallback(async () => {
+    try {
+      const result = await workspaceApi.listRoutines();
+      setRoutines(result.routines);
+    } catch {
+      // Non-critical
+    }
+  }, []);
+
+  const createRoutine = useCallback(async (params: {
+    name: string;
+    message: string;
+    source: string;
+    hour?: number;
+    minute?: number;
+    days?: number[];
+    interval_minutes?: number;
+    conversation_history?: string;
+  }) => {
+    await workspaceApi.createRoutine(params);
+    await refreshRoutines();
+  }, [refreshRoutines]);
+
+  const refreshNotifications = useCallback(async () => {
+    try {
+      const result = await workspaceApi.listNotifications();
+      setNotifications(result.notifications);
+      setUnreadNotificationCount(result.unreadCount);
+    } catch {
+      // Non-critical
+    }
+  }, []);
+
+  const markNotificationRead = useCallback(async (id: string) => {
+    setNotifications((prev) => prev.map((n) => n.id === id ? { ...n, isRead: true } : n));
+    setUnreadNotificationCount((prev) => Math.max(0, prev - 1));
+    try {
+      await workspaceApi.markNotificationRead(id);
+    } catch {
+      await refreshNotifications();
+    }
+  }, [refreshNotifications]);
+
+  const markAllNotificationsRead = useCallback(async () => {
+    setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
+    setUnreadNotificationCount(0);
+    try {
+      await workspaceApi.markAllNotificationsRead();
+    } catch {
+      await refreshNotifications();
+    }
+  }, [refreshNotifications]);
+
+  const dismissNotification = useCallback(async (id: string) => {
+    const wasUnread = notifications.find((n) => n.id === id && !n.isRead);
+    setNotifications((prev) => prev.filter((n) => n.id !== id));
+    if (wasUnread) setUnreadNotificationCount((prev) => Math.max(0, prev - 1));
+    try {
+      await workspaceApi.dismissNotification(id);
+    } catch {
+      await refreshNotifications();
+    }
+  }, [notifications, refreshNotifications]);
+
+  const refreshKnowledge = useCallback(async () => {
+    try {
+      const result = await workspaceApi.listKnowledge();
+      setKnowledge(result.entries);
+    } catch {
+      // Non-critical
+    }
+  }, []);
+
+  const createKnowledge = useCallback(async (params: { title: string; content: string; description?: string }) => {
+    const entry = await workspaceApi.createKnowledge(params);
+    await refreshKnowledge();
+    return entry;
+  }, [refreshKnowledge]);
+
+  const updateKnowledge = useCallback(async (entryId: string, params: { title?: string; content?: string; description?: string }) => {
+    const entry = await workspaceApi.updateKnowledge(entryId, params);
+    await refreshKnowledge();
+    return entry;
+  }, [refreshKnowledge]);
+
+  const deleteKnowledge = useCallback(async (entryId: string) => {
+    await workspaceApi.deleteKnowledge(entryId);
+    setKnowledge((prev) => prev.filter((k) => k.id !== entryId));
+  }, []);
+
+  // Uploads are queued rather than awaited: the Files grid draws each one as it
+  // goes up, so the work has to outlive the pane that started it.
+  const { uploads, enqueueUploads, retryUpload, cancelUpload } = useUploadQueue(refreshFiles);
+
+  const refreshTrash = useCallback(async () => {
+    try {
+      const result = await workspaceApi.listTrash();
+      setTrashEntries(result.entries);
+    } catch {
+      // Non-critical
+    }
+  }, []);
+
+  // The row goes as soon as it's clicked and comes back if the request fails —
+  // waiting out the round trip left the file sitting there looking undeleted.
+  //
+  // Deleting goes through the trash rather than DELETE /files/{id}: that route
+  // soft-deletes without recording when or as part of what, so the file would
+  // land in the trash undated and unrestorable alongside its folder.
+  const deleteFile = useCallback(async (fileId: string) => {
+    const removed = files.find((f) => f.id === fileId);
+    setFiles((prev) => prev.filter((f) => f.id !== fileId));
+    if (selectedFileId === fileId) setSelectedFileId(null);
+    try {
+      await workspaceApi.moveToTrash({ fileIds: [fileId] });
+    } catch (err) {
+      if (removed) {
+        setFiles((prev) => (prev.some((f) => f.id === fileId) ? prev : [...prev, removed]));
+      }
+      throw err;
+    }
+    await refreshTrash();
+  }, [files, selectedFileId, refreshTrash]);
+
+  /**
+   * Run a folder mutation with its result already on screen.
+   *
+   * Folder mutations rewrite many file records at once, so each one refetches
+   * rather than trying to patch the local list — and a refetch is slow enough
+   * that the tree used to sit unchanged until it came back. The op is projected
+   * over `files` for the whole round trip instead, so the change is immediate;
+   * dropping it at the end is what rolls it back on failure, and on success the
+   * refetch has already put the real rows in its place.
+   */
+  const runFolderOp = useCallback(async (op: FolderOp, request: () => Promise<void>) => {
+    const id = ++folderOpIdRef.current;
+    filesEpochRef.current += 1;
+    setPendingFolderOps((prev) => [...prev, { ...op, id }]);
+    try {
+      await request();
+      filesEpochRef.current += 1;
+      await refreshFiles();
+    } finally {
+      setPendingFolderOps((prev) => prev.filter((o) => o.id !== id));
+    }
+  }, [refreshFiles]);
+
+  const createFolder = useCallback((path: string) => (
+    runFolderOp({ kind: 'create', path }, () => workspaceApi.createFolder(path))
+  ), [runFolderOp]);
+
+  const renameFolder = useCallback((path: string, newPath: string) => (
+    runFolderOp({ kind: 'rename', path, newPath }, () => workspaceApi.renameFolder(path, newPath))
+  ), [runFolderOp]);
+
+  // One trash entry for the whole folder, so it comes back in one gesture —
+  // see the note on deleteFile for why the folder DELETE route isn't used.
+  const deleteFolder = useCallback(async (path: string) => {
+    await runFolderOp({ kind: 'delete', path }, () => workspaceApi.moveToTrash({ paths: [path] }));
+    await refreshTrash();
+  }, [runFolderOp, refreshTrash]);
+
+  /**
+   * Put entries back and show them again.
+   *
+   * A restore rewrites file rows the same way a folder mutation does — and can
+   * rename around a clash while it's at it — so the file list is refetched
+   * rather than reconstructed from what went into the trash.
+   */
+  const restoreFromTrash = useCallback(async (trashIds: string[]) => {
+    const wanted = new Set(trashIds);
+    setTrashEntries((prev) => prev.filter((e) => !wanted.has(e.trashId)));
+    try {
+      const result = await workspaceApi.restoreFromTrash(trashIds);
+      await Promise.all([refreshFiles(), refreshTrash()]);
+      return result;
+    } catch (err) {
+      await refreshTrash();
+      throw err;
+    }
+  }, [refreshFiles, refreshTrash]);
+
+  const purgeTrash = useCallback(async (trashIds: string[]) => {
+    const wanted = new Set(trashIds);
+    setTrashEntries((prev) => prev.filter((e) => !wanted.has(e.trashId)));
+    try {
+      await workspaceApi.purgeTrash({ trashIds });
+    } finally {
+      await refreshTrash();
+    }
+  }, [refreshTrash]);
+
+  const emptyTrash = useCallback(async () => {
+    setTrashEntries([]);
+    try {
+      await workspaceApi.purgeTrash({ all: true });
+    } finally {
+      await refreshTrash();
+    }
+  }, [refreshTrash]);
+
+  /** Files as the user sees them: server truth with the in-flight folder ops
+   *  already applied. Unchanged identity while nothing is pending. */
+  const visibleFiles = useMemo(
+    () => applyFolderOps(files, pendingFolderOps),
+    [files, pendingFolderOps],
+  );
+
+  const pendingFolderPaths = useMemo(() => {
+    const map = new Map<string, FolderOpKind>();
+    for (const op of pendingFolderOps) {
+      map.set(op.kind === 'rename' ? op.newPath : op.path, op.kind);
+    }
+    return map;
+  }, [pendingFolderOps]);
+
+  const refreshBrowserTabs = useCallback(async () => {
+    try {
+      const result = await workspaceApi.listBrowserTabs();
+      setBrowserTabs(result.tabs);
+    } catch {
+      // Non-critical
+    }
+  }, []);
+
+  const openBrowserTab = useCallback(async (url = 'about:blank') => {
+    const tab = await workspaceApi.openBrowserTab(url);
+    await refreshBrowserTabs();
+    return tab;
+  }, [refreshBrowserTabs]);
+
+  const closeBrowserTab = useCallback(async (tabId: string) => {
+    await workspaceApi.closeBrowserTab(tabId);
+    setBrowserTabs((prev) => prev.filter((t) => t.id !== tabId));
+    if (selectedBrowserTabId === tabId) setSelectedBrowserTabId(null);
+  }, [selectedBrowserTabId]);
+
+  const navigateBrowserTab = useCallback(async (tabId: string, url: string) => {
+    const tab = await workspaceApi.navigateBrowserTab(tabId, url);
+    setBrowserTabs((prev) => prev.map((t) => (t.id === tabId ? tab : t)));
+    return tab;
+  }, []);
+
+  const reconnectBrowserTab = useCallback(async (tabId: string) => {
+    const tab = await workspaceApi.reconnectBrowserTab(tabId);
+    setBrowserTabs((prev) => prev.map((t) => (t.id === tabId ? tab : t)));
+    return tab;
+  }, []);
+
+  const refreshBrowserContexts = useCallback(async () => {
+    try {
+      const result = await workspaceApi.listBrowserContexts();
+      setBrowserContexts(result.contexts);
+    } catch {
+      // Non-critical
+    }
+  }, []);
+
+  const persistBrowserTab = useCallback(async (tabId: string, name: string) => {
+    const result = await workspaceApi.persistBrowserTab(tabId, name);
+    // Update the tab in state with the new context_id
+    setBrowserTabs((prev) => prev.map((t) => (t.id === tabId ? result.tab : t)));
+    // Add the new context to state
+    setBrowserContexts((prev) => [result.context, ...prev]);
+    return result.context;
+  }, []);
+
+  const unpersistBrowserTab = useCallback(async (tabId: string) => {
+    const updatedTab = await workspaceApi.unpersistBrowserTab(tabId);
+    setBrowserTabs((prev) => prev.map((t) => (t.id === tabId ? updatedTab : t)));
+    // Refresh contexts to remove the deleted one
+    await refreshBrowserContexts();
+  }, [refreshBrowserContexts]);
+
+  const deleteBrowserContext = useCallback(async (contextId: string) => {
+    await workspaceApi.deleteBrowserContext(contextId);
+    setBrowserContexts((prev) => prev.filter((c) => c.id !== contextId));
+    // Clear context_id from any tabs that referenced it
+    setBrowserTabs((prev) => prev.map((t) => (t.contextId === contextId ? { ...t, contextId: null } : t)));
+  }, []);
+
+  const openBrowserTabWithContext = useCallback(async (contextId: string, url = 'about:blank') => {
+    const tab = await workspaceApi.openBrowserTab(url, contextId);
+    await refreshBrowserTabs();
+    setSelectedBrowserTabId(tab.id);
+    return tab;
+  }, [refreshBrowserTabs]);
+
+  const refreshDMConversations = useCallback(async () => {
+    try {
+      const convos = await workspaceApi.listConversations();
+      setDMConversations(convos);
+    } catch {
+      // Non-critical
+    }
+  }, []);
+
+  // Initial load: workspace metadata + discover for channels
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      setLoading(true);
+      try {
+        const [ws, discovery] = await Promise.all([
+          workspaceApi.getWorkspace(),
+          workspaceApi.discover(),
+          workspaceApi.listFiles().then((r) => setFiles(r.files)).catch(() => {}),
+          // The folder panel shows the trash count from the first paint, so it
+          // loads with the files rather than when the Trash view opens.
+          workspaceApi.listTrash().then((r) => setTrashEntries(r.entries)).catch(() => {}),
+          workspaceApi.listBrowserTabs().then((r) => setBrowserTabs(r.tabs)).catch(() => {}),
+          workspaceApi.listBrowserContexts().then((r) => setBrowserContexts(r.contexts)).catch(() => {}),
+          workspaceApi.listTodos().then((r) => setTodos(r.todos)).catch(() => {}),
+          workspaceApi.listTasks().then((r) => setTasks(r.tasks)).catch(() => {}),
+          workspaceApi.listWorkflows().then((r) => setWorkflows(r.workflows)).catch(() => {}),
+          workspaceApi.listRoutines().then((r) => setRoutines(r.routines)).catch(() => {}),
+          workspaceApi.listKnowledge().then((r) => setKnowledge(r.entries)).catch(() => {}),
+          workspaceApi.listNotifications().then((r) => {
+            setNotifications(r.notifications);
+            setUnreadNotificationCount(r.unreadCount);
+          }).catch(() => {}),
+        ]);
+        if (cancelled) return;
+
+        setWorkspace(ws);
+        const wsAgents = discovery.agents.map(networkAgentToWorkspaceAgent);
+        setAgents(wsAgents);
+        capture('workspace_opened', {
+          workspace_id: workspaceId,
+          agent_count: wsAgents.length,
+          agent_types: wsAgents.map((a) => a.agentName),
+        });
+
+        const channelSessions = discovery.channels.map((ch) =>
+          networkChannelToSession(ch, workspaceId)
+        );
+        setSessions(channelSessions);
+
+        // Initialize last-known event timestamps so first discovery poll doesn't re-fetch all
+        for (const ch of channelSessions) {
+          lastKnownEventAtRef.current[ch.sessionId] = ch.lastEventAt;
+        }
+
+        // PAI Counselor is the primary workspace experience. On workspace
+        // entry, prefer its canonical persisted conversation; generic threads
+        // and DMs remain available but are secondary navigation.
+        //   • keep set — current is preserved if it still belongs to this
+        //     workspace (any discovered channel: active/archived/routine) or is
+        //     a DM, AND we did not just switch workspaces.
+        //   • pick set — when we must (re)select, mirror sidebar activeSessions:
+        //     status==='active', non-routine, newest by lastEventAt||createdAt.
+        const switchedWorkspace = prevSelectedWorkspaceRef.current !== workspaceId;
+        prevSelectedWorkspaceRef.current = workspaceId;
+        const cur = currentSessionIdRef.current;
+        const keepCurrent =
+          !switchedWorkspace &&
+          cur != null &&
+          (channelSessions.some((s) => s.sessionId === cur) ||
+            (DMS_UI_ENABLED && cur.startsWith('dm:')));
+        if (!keepCurrent) {
+          const selected = defaultWorkspaceConversation(channelSessions);
+          if (selected) {
+            setCurrentSessionId(selected.sessionId);
+          } else {
+            // No active thread to fall back to (empty/archived-only workspace,
+            // or the current thread was deleted) — clear any stale selection so
+            // the chat area shows the empty state instead of a foreign session.
+            setCurrentSessionId(null);
+          }
+        }
+
+        // Seed previews from localStorage for instant display
+        const cacheKey = `previews:${workspaceId}`;
+        try {
+          const cached = localStorage.getItem(cacheKey);
+          if (cached && !cancelled) {
+            setLastMessageBySession((prev) => ({ ...JSON.parse(cached), ...prev }));
+          }
+        } catch { /* ignore corrupt cache */ }
+
+        // Bulk fetch latest message per channel (1 request instead of N)
+        try {
+          const bulk = await workspaceApi.latestPerChannel();
+          if (!cancelled) {
+            const batch: Record<string, LastMessageInfo> = {};
+            for (const [channelName, event] of Object.entries(bulk.channels)) {
+              const payload = event.payload as Record<string, string>;
+              const sender = payload?.sender_name || event.source.replace(/^(openagents:|human:)/, '');
+              const content = payload?.content || '';
+              const msgType = payload?.message_type || 'chat';
+              const isStatus = msgType === 'status' || msgType === 'thinking';
+              if (content) {
+                batch[channelName] = { senderName: sender, content: content.slice(0, 100), isStatus };
+              }
+            }
+            setLastMessageBySession((prev) => ({ ...prev, ...batch }));
+            try {
+              localStorage.setItem(cacheKey, JSON.stringify(batch));
+            } catch { /* storage full */ }
+          }
+        } catch { /* non-critical */ }
+
+        // Also fetch DM conversations
+        workspaceApi.listConversations().then((c) => {
+          if (!cancelled) setDMConversations(c);
+        }).catch(() => {});
+      } catch (e) {
+        if (!cancelled) {
+          setError(e instanceof Error ? e.message : 'Failed to load workspace');
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [workspaceId, token]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Locally-observed activity. `lastEventAt` is null on some workspaces, so a
+  // changed message preview is the other signal that a thread moved. Status
+  // lines ("thinking…") are ignored — they aren't new messages to read.
+  const [observedActivity, setObservedActivity] = useState<Record<string, number>>({});
+  const previewSigRef = useRef<Record<string, string>>({});
+  useEffect(() => {
+    const bumped: Record<string, number> = {};
+    for (const [sid, info] of Object.entries(lastMessageBySession)) {
+      if (info.isStatus) continue;
+      const sig = `${info.senderName}|${info.content}`;
+      const prev = previewSigRef.current[sid];
+      previewSigRef.current[sid] = sig;
+      if (prev !== undefined && prev !== sig) bumped[sid] = Date.now();
+    }
+    if (Object.keys(bumped).length > 0) {
+      setObservedActivity((prevState) => ({ ...prevState, ...bumped }));
+    }
+  }, [lastMessageBySession]);
+
+  const activityAt = useCallback(
+    (s: WorkspaceSession) => Math.max(sessionActivityAt(s), observedActivity[s.sessionId] || 0),
+    [observedActivity],
+  );
+
+  const unreadSessionIds = useMemo(() => {
+    const unread = new Set<string>();
+    for (const session of sessions) {
+      if (session.sessionId === currentSessionId) continue;
+      const readAt = lastReadBySession[session.sessionId];
+      if (readAt === undefined) continue; // baselined below, not unread yet
+      if (activityAt(session) > readAt) unread.add(session.sessionId);
+    }
+    return unread;
+  }, [sessions, lastReadBySession, currentSessionId, activityAt]);
+
+  // Baseline threads we've never seen a read marker for, and keep the open
+  // thread marked read as messages stream into it.
+  useEffect(() => {
+    const known = lastReadRef.current;
+    const additions: Record<string, number> = {};
+    for (const session of sessions) {
+      if (known[session.sessionId] === undefined) {
+        additions[session.sessionId] = activityAt(session);
+      }
+    }
+    const open = sessions.find((s) => s.sessionId === currentSessionId);
+    if (open && (known[open.sessionId] || 0) < activityAt(open)) {
+      additions[open.sessionId] = activityAt(open);
+    }
+    if (Object.keys(additions).length > 0) {
+      persistRead({ ...known, ...additions });
+    }
+  }, [sessions, currentSessionId, persistRead, activityAt]);
+
+  // Persist previews to localStorage for instant rendering on reload
+  useEffect(() => {
+    if (Object.keys(lastMessageBySession).length === 0) return;
+    try {
+      localStorage.setItem(`previews:${workspaceId}`, JSON.stringify(lastMessageBySession));
+    } catch { /* storage full */ }
+  }, [lastMessageBySession, workspaceId]);
+
+  // Discovery polling — adaptive: 5s when agents are active, 15s when idle
+  const hasActiveAgentsRef = React.useRef(false);
+  hasActiveAgentsRef.current = Object.values(lastMessageBySession).some((m) => m.isStatus);
+
+  useEffect(() => {
+    let timeout: ReturnType<typeof setTimeout>;
+    const schedule = () => {
+      const delay = hasActiveAgentsRef.current ? 5_000 : 15_000;
+      timeout = setTimeout(async () => {
+        await refreshDiscovery();
+        schedule();
+      }, delay);
+    };
+    schedule();
+    return () => clearTimeout(timeout);
+  }, [refreshDiscovery]);
+
+  const createSession = useCallback(async (opts?: { title?: string; master?: string; participants?: string[] }) => {
+    // Only set a channel leader when one is explicitly requested (e.g. the
+    // single-agent DM path). The default "dynamic" orchestration mode needs no
+    // leader, so threads created from the picker start with none — a leader can
+    // be assigned later from the thread's agent menu.
+    const masterAgent = opts?.master;
+    const participants = opts?.participants || agents.map((a) => a.agentName);
+
+    const session = await workspaceApi.createChannel({
+      title: opts?.title,
+      master: masterAgent,
+      participants,
+    });
+    capture('thread_created', { participant_count: participants.length });
+    setSessions((prev) => [session, ...prev]);
+    setCurrentSessionId(session.sessionId);
+    return session;
+  }, [agents]);
+
+  // Guided onboarding: after the user's first agent is connected, open a thread
+  // with it automatically once it joins the workspace. One-shot; only ever set
+  // by the onboarding flow, so it never fires when adding agents later.
+  const [firstThreadAgent, setFirstThreadAgent] = useState<string | null>(null);
+  const firstThreadFiredRef = useRef(false);
+  const requestFirstThread = useCallback((agentName: string) => {
+    firstThreadFiredRef.current = false;
+    setFirstThreadAgent(agentName);
+  }, []);
+  useEffect(() => {
+    if (!firstThreadAgent || firstThreadFiredRef.current) return;
+    if (!agents.some((a) => a.agentName === firstThreadAgent)) return;  // wait until it joins
+    firstThreadFiredRef.current = true;
+    const name = firstThreadAgent;
+    setFirstThreadAgent(null);
+    // Onboarding conversion checkpoint: the user's first agent actually joined
+    // the workspace (not merely queued/configured).
+    capture('agent_connected', { agent_name: name, first_agent: true, source: 'guided_onboarding' });
+    // Titled explicitly — an untitled thread would show the raw channel name
+    // ("channel-abc1234") to a brand-new user as their very first thread.
+    createSession({ title: `New Thread with ${name}`, master: name, participants: [name] }).catch(() => {});
+  }, [firstThreadAgent, agents, createSession]);
+
+  const renameWorkspace = useCallback(async (name: string) => {
+    setWorkspace((prev) => (prev ? { ...prev, name } : prev));
+    try {
+      await workspaceApi.updateWorkspace({ name });
+    } catch {
+      // Best-effort — local update already applied
+    }
+  }, []);
+
+  const renameSession = useCallback(async (sessionId: string, title: string) => {
+    setSessions((prev) =>
+      prev.map((s) => (s.sessionId === sessionId ? { ...s, title } : s))
+    );
+    setManuallyRenamedSessions((prev) => new Set(prev).add(sessionId));
+    try {
+      await workspaceApi.updateChannel(sessionId, { title });
+    } catch {
+      // Best-effort — local update already applied
+    }
+  }, []);
+
+  const setSessionMaster = useCallback(async (sessionId: string, agentName: string) => {
+    // Optimistic: update the thread's leader locally, roll back on failure.
+    let previous: string | null = null;
+    setSessions((prev) =>
+      prev.map((s) => {
+        if (s.sessionId !== sessionId) return s;
+        previous = s.master ?? null;
+        return { ...s, master: agentName };
+      })
+    );
+    try {
+      await workspaceApi.updateChannel(sessionId, { masterAgent: agentName });
+    } catch {
+      setSessions((prev) =>
+        prev.map((s) => (s.sessionId === sessionId ? { ...s, master: previous } : s))
+      );
+    }
+  }, []);
+
+  const setSessionOrchestration = useCallback(async (
+    sessionId: string,
+    updates: { mode?: string; instruction?: string | null; workflowId?: string | null },
+  ) => {
+    // Optimistic: apply the mode/instruction locally, roll back on failure.
+    // Snapshot the pre-update session inside the state updater so we read
+    // fresh state (this callback is memoized with no deps). Held on an
+    // object property so the rollback branch narrows cleanly.
+    const rollback: { prev: WorkspaceSession | null } = { prev: null };
+    setSessions((prev) =>
+      prev.map((s) => {
+        if (s.sessionId !== sessionId) return s;
+        rollback.prev = s;
+        return {
+          ...s,
+          orchestrationMode: updates.mode ?? s.orchestrationMode,
+          orchestrationInstruction:
+            updates.instruction !== undefined ? updates.instruction : s.orchestrationInstruction,
+          workflowId: updates.workflowId !== undefined ? updates.workflowId : s.workflowId,
+        };
+      })
+    );
+    try {
+      await workspaceApi.updateChannel(sessionId, {
+        ...(updates.mode !== undefined && { orchestrationMode: updates.mode }),
+        ...(updates.instruction !== undefined && { orchestrationInstruction: updates.instruction }),
+        ...(updates.workflowId !== undefined && { workflowId: updates.workflowId }),
+      });
+    } catch {
+      if (rollback.prev) {
+        const restored = rollback.prev;
+        setSessions((prev) =>
+          prev.map((s) => (s.sessionId === sessionId ? restored : s))
+        );
+      }
+    }
+  }, []);
+
+  const updateSession = useCallback(async (sessionId: string, updates: { starred?: boolean; status?: string }) => {
+    // Capture previous state for rollback
+    const previousSession = sessions.find((s) => s.sessionId === sessionId);
+    // Optimistic update
+    setSessions((prev) =>
+      prev.map((s) => (s.sessionId === sessionId ? { ...s, ...updates } : s))
+    );
+    // If deleting the current session, switch away
+    const previousSessionId = currentSessionId;
+    if (updates.status === 'deleted' || updates.status === 'archived') {
+      if (currentSessionId === sessionId) {
+        const remaining = sessions.filter((s) => s.sessionId !== sessionId && s.status === 'active');
+        setCurrentSessionId(remaining.length > 0 ? remaining[0].sessionId : null);
+      }
+    }
+    try {
+      await workspaceApi.updateChannel(sessionId, updates);
+    } catch {
+      // Revert optimistic update on failure
+      if (previousSession) {
+        setSessions((prev) =>
+          prev.map((s) => (s.sessionId === sessionId ? previousSession : s))
+        );
+        if (previousSessionId !== currentSessionId) {
+          setCurrentSessionId(previousSessionId);
+        }
+      }
+    }
+  }, [currentSessionId, sessions]);
+
+  const addParticipant = useCallback(async (sessionId: string, agentName: string) => {
+    // Optimistic update
+    setSessions((prev) =>
+      prev.map((s) =>
+        s.sessionId === sessionId && !s.participants.includes(agentName)
+          ? { ...s, participants: [...s.participants, agentName] }
+          : s
+      )
+    );
+    try {
+      await workspaceApi.addChannelParticipant(sessionId, agentName);
+    } catch {
+      // Revert on failure
+      setSessions((prev) =>
+        prev.map((s) =>
+          s.sessionId === sessionId
+            ? { ...s, participants: s.participants.filter((p) => p !== agentName) }
+            : s
+        )
+      );
+    }
+  }, []);
+
+  const removeParticipant = useCallback(async (sessionId: string, agentName: string) => {
+    // Optimistic update
+    setSessions((prev) =>
+      prev.map((s) =>
+        s.sessionId === sessionId
+          ? { ...s, participants: s.participants.filter((p) => p !== agentName) }
+          : s
+      )
+    );
+    try {
+      await workspaceApi.removeChannelParticipant(sessionId, agentName);
+    } catch {
+      // Revert on failure
+      setSessions((prev) =>
+        prev.map((s) =>
+          s.sessionId === sessionId && !s.participants.includes(agentName)
+            ? { ...s, participants: [...s.participants, agentName] }
+            : s
+        )
+      );
+    }
+  }, []);
+
+  const monitorMode = !!(workspace?.settings?.monitorMode);
+
+  const acknowledgeCompletion = useCallback((sessionId: string) => {
+    setCompletedSessionIds((prev) => {
+      if (!prev.has(sessionId)) return prev;
+      const next = new Set(prev);
+      next.delete(sessionId);
+      return next;
+    });
+  }, []);
+
+  // Play notification sound when a thread completes
+  const notificationSoundRef = React.useRef(notificationSound);
+  notificationSoundRef.current = notificationSound;
+  const prevCompletedRef = React.useRef<Set<string>>(new Set());
+  useEffect(() => {
+    if (!notificationSoundRef.current) {
+      prevCompletedRef.current = completedSessionIds;
+      return;
+    }
+    // Detect newly completed sessions
+    const prev = prevCompletedRef.current;
+    const hasNew = Array.from(completedSessionIds).some((id) => !prev.has(id));
+    prevCompletedRef.current = completedSessionIds;
+    if (hasNew) {
+      try {
+        const audio = new Audio('/notification.wav');
+        audio.volume = 0.35;
+        audio.play().catch(() => {});
+      } catch {}
+    }
+  }, [completedSessionIds]);
+
+  return (
+    <WorkspaceContext.Provider
+      value={{
+        workspace,
+        token,
+        agents,
+        currentUser,
+        setUserName,
+        onlineUsers,
+        sessions,
+        files: visibleFiles,
+        selectedFileId,
+        selectedKnowledgeId,
+        currentSessionId,
+        loading,
+        error,
+        lastMessageBySession,
+        activeSessionIds,
+        stoppingSessionIds,
+        completedSessionIds,
+        monitorMode,
+        acknowledgeCompletion,
+        agentModes,
+        updateLastMessage,
+        setSessionActive,
+        updateAgentMode,
+        stopAllAgents,
+        setCurrentSessionId,
+        consumeSkipFocus,
+        setSelectedFileId,
+        setSelectedKnowledgeId,
+        currentFilePath,
+        setCurrentFilePath,
+        createSession,
+        requestFirstThread,
+        renameSession,
+        updateSession,
+        addParticipant,
+        removeParticipant,
+        setSessionMaster,
+        setSessionOrchestration,
+        renameWorkspace,
+        refreshWorkspace,
+        refreshAgents,
+        refreshFiles,
+        enqueueUploads,
+        pendingUploads: uploads,
+        retryUpload,
+        cancelUpload,
+        deleteFile,
+        createFolder,
+        renameFolder,
+        deleteFolder,
+        pendingFolderPaths,
+        trashEntries,
+        refreshTrash,
+        restoreFromTrash,
+        purgeTrash,
+        emptyTrash,
+        browserTabs,
+        selectedBrowserTabId,
+        setSelectedBrowserTabId,
+        refreshBrowserTabs,
+        openBrowserTab,
+        closeBrowserTab,
+        navigateBrowserTab,
+        reconnectBrowserTab,
+        browserContexts,
+        refreshBrowserContexts,
+        persistBrowserTab,
+        unpersistBrowserTab,
+        deleteBrowserContext,
+        openBrowserTabWithContext,
+        dmConversations,
+        refreshDMConversations,
+        todos,
+        refreshTodos,
+        tasks,
+        refreshTasks,
+        createTask,
+        updateTask,
+        runTask,
+        stopTask,
+        deleteTask,
+        workflows,
+        refreshWorkflows,
+        createWorkflow,
+        updateWorkflow,
+        deleteWorkflow,
+        routines,
+        refreshRoutines,
+        createRoutine,
+        knowledge,
+        refreshKnowledge,
+        createKnowledge,
+        updateKnowledge,
+        deleteKnowledge,
+        notifications,
+        unreadNotificationCount,
+        unreadSessionIds,
+        markSessionRead,
+        refreshNotifications,
+        markNotificationRead,
+        markAllNotificationsRead,
+        dismissNotification,
+        notificationSound,
+        setNotificationSound,
+      }}
+    >
+      {children}
+    </WorkspaceContext.Provider>
+  );
+}

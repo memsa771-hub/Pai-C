@@ -1,0 +1,197 @@
+x-backend-env: &backend-env
+  APP_ENV: production
+  DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg2://${DB_USER:-pai_admin}:${DB_PASSWORD}@postgres:5432/openagents_workspace}
+  AUTH_MODE: ${AUTH_MODE:-workspace_token}
+  IDENTITY_MODE: ${IDENTITY_MODE:-standalone}
+  CORS_ORIGINS: ${CORS_ORIGINS:-https://app.placement-ai.com}
+  WORKSPACE_ENDPOINT: ${WORKSPACE_ENDPOINT:-https://api.placement-ai.com}
+  FRONTEND_BASE_URL: ${FRONTEND_BASE_URL:-https://app.placement-ai.com}
+  PUBLIC_API_BASE: ${PUBLIC_API_BASE:-https://api.placement-ai.com}
+  WEB_CONCURRENCY: ${WEB_CONCURRENCY:-1}
+  THREADPOOL_TOKENS: ${THREADPOOL_TOKENS:-15}
+  DB_POOL_SIZE: ${DB_POOL_SIZE:-10}
+  DB_MAX_OVERFLOW: ${DB_MAX_OVERFLOW:-5}
+  DB_POOL_TIMEOUT: ${DB_POOL_TIMEOUT:-5}
+  DB_POOL_RECYCLE: ${DB_POOL_RECYCLE:-300}
+  DB_PGBOUNCER: ${DB_PGBOUNCER:-false}
+  SUPABASE_URL: ${SUPABASE_URL:?SUPABASE_URL is required}
+  SUPABASE_ANON_KEY: ${SUPABASE_ANON_KEY:?SUPABASE_ANON_KEY is required}
+  PAI_SESSION_TTL_SECONDS: ${PAI_SESSION_TTL_SECONDS:-1209600}
+  PAI_ENABLED: ${PAI_ENABLED:-false}
+  PAI_API_KEY: ${PAI_API_KEY:-}
+  PAI_MODEL: ${PAI_MODEL:-gpt-5.4-mini}
+  PAI_BASE_URL: ${PAI_BASE_URL:-https://api.openai.com/v1}
+  PAI_MEMORY_CONTEXT_ENABLED: ${PAI_MEMORY_CONTEXT_ENABLED:-true}
+  PAI_MEMORY_CONTEXT_MAX_CHARS: ${PAI_MEMORY_CONTEXT_MAX_CHARS:-6000}
+  PAI_MEMORY_CONTEXT_TIMEOUT_MS: ${PAI_MEMORY_CONTEXT_TIMEOUT_MS:-1500}
+  PAI_PROFILE_COMPLETION_ROLLOUT_MODE: ${PAI_PROFILE_COMPLETION_ROLLOUT_MODE:-shadow}
+  PAI_PROFILE_COMPLETION_ROLLOUT_AT: ${PAI_PROFILE_COMPLETION_ROLLOUT_AT:-}
+  MEMORY_EXTRACTOR_MODEL: ${MEMORY_EXTRACTOR_MODEL:-}
+  MEMORY_EXTRACTOR_API_KEY: ${MEMORY_EXTRACTOR_API_KEY:-}
+  MEMORY_EXTRACTOR_BASE_URL: ${MEMORY_EXTRACTOR_BASE_URL:-}
+  BROWSERFABRIC_API_KEY: ${BROWSERFABRIC_API_KEY:-}
+  BROWSERFABRIC_URL: ${BROWSERFABRIC_URL:-https://api.browserfabric.com}
+  BROWSERFABRIC_PROVISION_SECRET: ${BROWSERFABRIC_PROVISION_SECRET:-}
+  REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+  REDIS_CONNECT_TIMEOUT: ${REDIS_CONNECT_TIMEOUT:-0.5}
+  REDIS_SOCKET_TIMEOUT: ${REDIS_SOCKET_TIMEOUT:-0.5}
+  MEMORY_VECTOR_BACKEND: ${MEMORY_VECTOR_BACKEND:-qdrant}
+  QDRANT_URL: ${QDRANT_URL:-http://qdrant:6333}
+  QDRANT_API_KEY: ${QDRANT_API_KEY:-}
+  QDRANT_COLLECTION: ${QDRANT_COLLECTION:-pai_memory}
+  MEMORY_EMBEDDING_PROVIDER: ${MEMORY_EMBEDDING_PROVIDER:-openai}
+  MEMORY_EMBEDDING_MODEL: ${MEMORY_EMBEDDING_MODEL:-text-embedding-3-small}
+  MEMORY_EMBEDDING_API_KEY: ${MEMORY_EMBEDDING_API_KEY:-}
+  MEMORY_EMBEDDING_BASE_URL: ${MEMORY_EMBEDDING_BASE_URL:-}
+  MEMORY_EMBEDDING_DIM: ${MEMORY_EMBEDDING_DIM:-1536}
+  PAI_OPERATOR_MODEL: ${PAI_OPERATOR_MODEL:-}
+  PAI_COUNSELOR_REASONING_EFFORT: ${PAI_COUNSELOR_REASONING_EFFORT:-low}
+  PAI_OPERATOR_REASONING_EFFORT: ${PAI_OPERATOR_REASONING_EFFORT:-high}
+  PAI_OPERATOR_PHASE_MAX_TOKENS: ${PAI_OPERATOR_PHASE_MAX_TOKENS:-2000}
+  LLM_MAX_RETRIES: ${LLM_MAX_RETRIES:-4}
+  FILE_STORAGE_BACKEND: ${FILE_STORAGE_BACKEND:-s3}
+  S3_BUCKET: ${S3_BUCKET:-}
+  S3_REGION: ${S3_REGION:-eu-north-1}
+  JOB_WORKER_POLL_SECONDS: ${JOB_WORKER_POLL_SECONDS:-2}
+  JOB_WORKER_CONCURRENCY: ${JOB_WORKER_CONCURRENCY:-5}
+  RESEND_API_KEY: ${RESEND_API_KEY:-}
+  EMAIL_FROM: ${EMAIL_FROM:-Placement AI <noreply@placement-ai.com>}
+  FEEDBACK_EMAIL_TO: ${FEEDBACK_EMAIL_TO:-}
+  WEB_SEARCH_PROVIDER: ${WEB_SEARCH_PROVIDER:-}
+  WEB_SEARCH_API_KEY: ${WEB_SEARCH_API_KEY:-}
+  WEB_SEARCH_BASE_URL: ${WEB_SEARCH_BASE_URL:-}
+
+x-backend-image: &backend-image
+  image: placement-ai-backend:prod
+  build:
+    context: ./backend
+    dockerfile: Dockerfile
+    target: ${BACKEND_IMAGE_TARGET:-browser}
+
+x-logging: &default-logging
+  driver: json-file
+  options: {max-size: "10m", max-file: "5"}
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: openagents_workspace
+      POSTGRES_USER: ${DB_USER:-pai_admin}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    restart: unless-stopped
+    networks: [private]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    logging: *default-logging
+
+  migrate:
+    <<: *backend-image
+    environment: *backend-env
+    entrypoint: ["alembic", "upgrade", "head"]
+    depends_on:
+      postgres: {condition: service_healthy}
+    restart: "no"
+    networks: [private]
+    logging: *default-logging
+
+  backend:
+    <<: *backend-image
+    environment: *backend-env
+    depends_on:
+      postgres: {condition: service_healthy}
+      migrate: {condition: service_completed_successfully}
+      redis: {condition: service_healthy}
+      qdrant: {condition: service_started}
+    restart: unless-stopped
+    networks: [private]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3)"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    logging: *default-logging
+
+  worker:
+    <<: *backend-image
+    environment: *backend-env
+    entrypoint: ["python", "-m", "app.jobs.worker"]
+    depends_on:
+      postgres: {condition: service_healthy}
+      migrate: {condition: service_completed_successfully}
+      qdrant: {condition: service_started}
+    restart: unless-stopped
+    networks: [private]
+    logging: *default-logging
+
+  frontend:
+    image: placement-ai-frontend:prod
+    build:
+      context: ./frontend
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-https://api.placement-ai.com}
+        NEXT_PUBLIC_SUPABASE_URL: ${SUPABASE_URL:?SUPABASE_URL is required}
+        NEXT_PUBLIC_SUPABASE_ANON_KEY: ${SUPABASE_ANON_KEY:?SUPABASE_ANON_KEY is required}
+        NEXT_PUBLIC_ENABLE_DMS: ${NEXT_PUBLIC_ENABLE_DMS:-false}
+        NEXT_PUBLIC_ENABLE_INBOX: ${NEXT_PUBLIC_ENABLE_INBOX:-false}
+        NEXT_PUBLIC_ENABLE_TASKS: ${NEXT_PUBLIC_ENABLE_TASKS:-false}
+        NEXT_PUBLIC_ENABLE_WORKFLOWS: ${NEXT_PUBLIC_ENABLE_WORKFLOWS:-false}
+    depends_on:
+      backend: {condition: service_healthy}
+    restart: unless-stopped
+    networks: [private]
+    logging: *default-logging
+
+  redis:
+    image: redis:7.4-alpine
+    command:
+      - redis-server
+      - --save
+      - ""
+      - --appendonly
+      - "no"
+      - --maxmemory
+      - ${REDIS_MAXMEMORY:-256mb}
+      - --maxmemory-policy
+      - allkeys-lru
+    restart: unless-stopped
+    networks: [private]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+    logging: *default-logging
+
+  qdrant:
+    image: qdrant/qdrant:v1.19.1
+    volumes: ["qdrant_data:/qdrant/storage"]
+    restart: unless-stopped
+    networks: [private]
+    logging: *default-logging
+
+  caddy:
+    image: caddy:2-alpine
+    ports: ["127.0.0.1:8080:80"]
+    volumes: ["./Caddyfile:/etc/caddy/Caddyfile:ro"]
+    depends_on:
+      backend: {condition: service_healthy}
+      frontend: {condition: service_started}
+    restart: unless-stopped
+    networks: [private]
+    logging: *default-logging
+
+networks:
+  private:
+
+volumes:
+  pgdata:
+  qdrant_data:

@@ -1,0 +1,317 @@
+'use client';
+
+import { useEffect, useRef, useState } from 'react';
+import { useDesktopWorkspaceState } from './use-desktop-workspace-state';
+
+import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar';
+import { AppSidebar } from './app-sidebar';
+import { AppHeader } from './app-header';
+import { MobileHeader } from './mobile-header';
+import { useLayout, RAIL_WIDTH_COLLAPSED, RAIL_WIDTH_EXPANDED } from './layout-context';
+import { ChatView } from '@/components/chat/chat-view';
+import { ThreadList } from '@/components/threads/thread-list';
+import { FileList } from '@/components/files/file-list';
+import { FilePreview } from '@/components/files/file-preview';
+import { TrashView } from '@/components/files/trash-view';
+import { BrowserTabList } from '@/components/browser/browser-tab-list';
+import { BrowserView } from '@/components/browser/browser-view';
+import { AgentProfilePanel } from '@/components/agents/agent-profile-panel';
+import { MonitorGrid } from '@/components/monitor/monitor-grid';
+import { TasksView } from '@/components/tasks/tasks-view';
+import { WorkflowsView } from '@/components/workflows/workflows-view';
+import { RoutineList } from '@/components/routines/routine-list';
+import { InboxView } from '@/components/inbox/inbox-view';
+import { ProfileView } from '@/components/profile/profile-view';
+import { OnboardingView } from '@/components/onboarding/onboarding-view';
+import { KnowledgeView } from '@/components/knowledge/knowledge-view';
+import { KnowledgeList } from '@/components/knowledge/knowledge-list';
+import { useWorkspace } from '@/lib/workspace-context';
+import { workspaceApi } from '@/lib/api';
+import type { OnboardingState } from '@/lib/onboarding';
+import { useT } from '@/lib/i18n';
+import { NewThreadDialogHost } from '@/components/threads/new-thread-dialog-host';
+import { Button } from '@/components/ui/button';
+
+function WorkspaceLoadingScreen() {
+  const t = useT();
+
+  return (
+    <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-background">
+      <div className="flex flex-col items-center gap-5">
+        <img
+          src="/pai-emblem.png"
+          alt="Placement AI"
+          className="size-16 animate-[pulse_2s_ease-in-out_infinite] dark:hidden"
+        />
+        <img
+          src="/pai-emblem.png"
+          alt="Placement AI"
+          className="size-16 animate-[pulse_2s_ease-in-out_infinite] hidden dark:block"
+        />
+        <div className="text-center">
+          <h1 className="text-xl font-semibold tracking-tight">Placement AI</h1>
+          <p className="text-sm text-muted-foreground mt-0.5">{t('nav.workspaceFallback')}</p>
+        </div>
+      </div>
+      <div className="absolute bottom-0 left-0 right-0 h-1 bg-muted overflow-hidden">
+        <div className="h-full w-1/3 bg-primary rounded-full animate-[loading-bar_1.5s_ease-in-out_infinite]" />
+      </div>
+      <style>{`
+        @keyframes loading-bar {
+          0% { transform: translateX(-100%); }
+          50% { transform: translateX(150%); }
+          100% { transform: translateX(400%); }
+        }
+      `}</style>
+    </div>
+  );
+}
+
+function OnboardingLoadError({ retry }: { retry: () => void }) {
+  return (
+    <div className="fixed inset-0 z-50 flex flex-col items-center justify-center gap-4 bg-background p-6 text-center">
+      <img src="/pai-emblem.png" alt="Placement AI" className="size-14" />
+      <div>
+        <h1 className="font-semibold">Identity setup could not load</h1>
+        <p className="mt-1 text-sm text-muted-foreground">Please retry to finish setting up your profile.</p>
+      </div>
+      <Button onClick={retry}>Retry</Button>
+    </div>
+  );
+}
+
+export function Wrapper() {
+  useDesktopWorkspaceState();
+  const {
+    isMobile, viewMode, isAgentPanelOpen, isSidebarOpen, setSidebarOpen,
+    hasListPanel, mobilePane, splitBrowser, showBrowserPreview, isRailExpanded,
+    railDragWidth, filesSection, selectedAgentName, setSelectedAgentName,
+    openMobileDetail,
+  } = useLayout();
+  const { monitorMode, loading, currentSessionId } = useWorkspace();
+
+  useEffect(() => {
+    if (isMobile && currentSessionId === 'pai-counselor') openMobileDetail();
+  }, [isMobile, currentSessionId, openMobileDetail]);
+
+  // First-run onboarding. Checked once the workspace itself has loaded, and
+  // fail-closed: an unavailable check must not bypass mandatory identity setup.
+  const [onboarding, setOnboarding] = useState<OnboardingState | null>(null);
+  const [onboardingChecked, setOnboardingChecked] = useState(false);
+  const [onboardingAttempt, setOnboardingAttempt] = useState(0);
+  useEffect(() => {
+    if (loading) return;
+    let cancelled = false;
+    setOnboardingChecked(false);
+    workspaceApi.getOnboarding()
+      .then((state) => { if (!cancelled) setOnboarding(state); })
+      .catch(() => { /* no state means the retry gate below remains active */ })
+      .finally(() => { if (!cancelled) setOnboardingChecked(true); });
+    return () => { cancelled = true; };
+  }, [loading, onboardingAttempt]);
+
+  // Auto-dismiss the docked agent-profile panel when the user navigates away:
+  // switching to another thread (incl. starting a new chat) or to another view
+  // should not leave the profile pinned to the right. It stays open only while
+  // the selected agent's own DM is the active session in the threads view.
+  // Compared against previous values so merely *opening* the panel (which sets
+  // session+view+agent in the same tick) doesn't immediately close it.
+  const prevNavRef = useRef<{ session: string | null; view: string }>({ session: currentSessionId, view: viewMode });
+  useEffect(() => {
+    const navChanged =
+      prevNavRef.current.session !== currentSessionId || prevNavRef.current.view !== viewMode;
+    prevNavRef.current = { session: currentSessionId, view: viewMode };
+    if (!navChanged || !selectedAgentName) return;
+    const pair = ['human:user', `openagents:${selectedAgentName}`].sort();
+    const agentDm = `dm:${pair[0]},${pair[1]}`;
+    if (viewMode !== 'threads' || currentSessionId !== agentDm) setSelectedAgentName(null);
+  }, [currentSessionId, viewMode, selectedAgentName, setSelectedAgentName]);
+  // "Real agent" = a non-builtin agent that the sidebar would actually show
+  // (online or seen within the last hour). A long-offline leftover agent is
+  // hidden from the sidebar, so it must not silently block onboarding either —
+  // otherwise the workspace looks empty yet never onboards (matches nav's rule).
+  // Guided onboarding takes over only for a genuinely fresh workspace: no real
+  // agent AND no user-created threads yet. Gating on threads protects an
+  // established workspace (with history) from being hijacked by onboarding
+  // when its agent happens to be offline > 1h.
+  //
+  // Two carve-outs keep that gate honest:
+  //  • PAI Counselor's seeded "Welcome" thread (mobile funnel) is created by the
+  //    backend in EVERY fresh workspace — a builtin-led thread is not user
+  //    activity, or no workspace would ever onboard.
+  //  • Only an explicit DM selection (clicking PAI Counselor in the sidebar → a `dm:`
+  //    id) overrides the takeover. Auto-selection picks channel ids, so a
+  //    plain `!currentSessionId` gate would let the seeded thread's
+  //    auto-selection suppress onboarding too.
+
+  if (loading || !onboardingChecked) {
+    return <WorkspaceLoadingScreen />;
+  }
+
+  if (!onboarding) {
+    return <OnboardingLoadError retry={() => setOnboardingAttempt((value) => value + 1)} />;
+  }
+
+  // The student's opening statement, asked once. Gating here rather than on a
+  // route means every way into the workspace — sign-up, sign-in, a bookmarked
+  // link — passes through it, with no redirect that could loop.
+  if (onboarding?.required) {
+    return (
+      <OnboardingView
+        state={onboarding}
+        onDone={() => setOnboarding({ ...onboarding, required: false })}
+      />
+    );
+  }
+
+  // ── Mobile layout: single-pane with list/detail switching ──
+  if (isMobile) {
+    return (
+      <div className="flex flex-col h-screen w-full [&_.container-fluid]:px-5">
+        <MobileHeader />
+        <div className="flex-1 min-h-0 pt-[var(--header-height-mobile)] pb-[calc(48px+env(safe-area-inset-bottom))]">
+          {/* Full-screen views (no list/detail split) */}
+          {viewMode === 'profile' ? (
+            <div className="h-full bg-background overflow-hidden">
+              <ProfileView />
+            </div>
+          ) : viewMode === 'tasks' ? (
+            <div className="h-full bg-background overflow-hidden">
+              <TasksView />
+            </div>
+          ) : viewMode === 'workflows' ? (
+            <div className="h-full bg-background overflow-hidden">
+              <WorkflowsView />
+            </div>
+          ) : viewMode === 'inbox' ? (
+            <div className="h-full bg-background overflow-hidden">
+              <InboxView />
+            </div>
+          ) : mobilePane === 'list' ? (
+            /* List pane — full width */
+            <div className="flex h-full flex-col bg-background overflow-hidden">
+              {viewMode === 'threads' && <ThreadList />}
+              {viewMode === 'files' && <FileList />}
+              {viewMode === 'browser' && <BrowserTabList />}
+              {viewMode === 'routines' && <RoutineList />}
+              {viewMode === 'knowledge' && <KnowledgeList />}
+            </div>
+          ) : (
+            /* Detail pane — full width, edge-to-edge on mobile */
+            <div className="relative h-full bg-background overflow-hidden">
+              {(viewMode === 'threads' || viewMode === 'routines') && (
+                <div className="h-full">
+                  <ChatView />
+                </div>
+              )}
+              {viewMode === 'files' && (filesSection === 'trash' ? <TrashView /> : <FilePreview />)}
+              {viewMode === 'browser' && <BrowserView />}
+              {viewMode === 'knowledge' && <KnowledgeView />}
+            </div>
+          )}
+        </div>
+
+        {/* The agent profile is opened from the nav drawer, which is reachable
+            from every view and both panes — so it hangs off the shell rather
+            than off one branch above, where it only rendered on the detail pane
+            of a list view and tapping an agent looked like a dead click. It is
+            `fixed` so the panel's own `absolute` inset resolves to the viewport,
+            over the header and tab bar. */}
+        {isAgentPanelOpen && (
+          <div className="fixed inset-0 z-60">
+            <AgentProfilePanel />
+          </div>
+        )}
+
+        <NewThreadDialogHost />
+      </div>
+    );
+  }
+
+  // ── Desktop layout (app-shell-4) ──
+  // The sidebar holds both the icon rail and the list panel; SidebarInset is
+  // the detail area, and each view brings its own `--header-height` header so
+  // rail, list and detail line up on a single row.
+  //
+  // A few views take over the whole detail area, so the list collapses away:
+  // onboarding (no agents yet), monitor mode, and the split browser preview.
+  const listSuppressed =
+    (viewMode === 'threads' && monitorMode) ||
+    (viewMode === 'threads' && splitBrowser && showBrowserPreview);
+  const sidebarOpen = isSidebarOpen && hasListPanel && !listSuppressed;
+
+  // The shell sizes itself: rail width plus the list panel when it is showing.
+  // Expanding the rail to show labels widens the shell by the same amount.
+  // While the rail's edge is being dragged the live width wins, so the shell
+  // tracks the pointer and only settles on a state when the drag ends.
+  const railWidth =
+    railDragWidth ?? (isRailExpanded ? RAIL_WIDTH_EXPANDED : RAIL_WIDTH_COLLAPSED);
+  const shellWidth = railWidth + (sidebarOpen ? 388 : 0);
+
+  return (
+    <SidebarProvider
+      open={sidebarOpen}
+      onOpenChange={setSidebarOpen}
+      className="h-screen min-h-0 [&_.container-fluid]:px-5"
+      style={{
+        '--sidebar-width': `${shellWidth}px`,
+        '--sidebar-width-icon': `${railWidth}px`,
+        '--header-height': '48px',
+      } as React.CSSProperties}
+    >
+      <AppSidebar />
+
+      <SidebarInset className="min-w-0">
+        <AppHeader />
+        <div className="relative flex min-h-0 grow overflow-hidden">
+          {viewMode === 'threads' && monitorMode ? (
+            /* Monitor mode: 2x3 grid over the whole detail area */
+            <div className="relative flex-1 min-w-0">
+              <MonitorGrid />
+              {isAgentPanelOpen && <AgentProfilePanel />}
+            </div>
+          ) : viewMode === 'threads' && splitBrowser && showBrowserPreview ? (
+            /* Split view: chat + browser side by side */
+            <div className="flex flex-1 min-w-0">
+              <div className="relative flex-1 min-w-0 overflow-hidden border-e border-border bg-background">
+                <div className="h-full">
+                  <ChatView />
+                </div>
+                {isAgentPanelOpen && <AgentProfilePanel />}
+              </div>
+              <div className="relative flex-1 min-w-0 overflow-hidden bg-background">
+                <BrowserView />
+              </div>
+            </div>
+          ) : (
+            <div className="relative flex-1 min-w-0 overflow-hidden bg-background">
+              {(viewMode === 'threads' || viewMode === 'routines') && (
+                /* In the chat view the profile DOCKS beside the thread instead
+                   of sliding over it: clicking an agent opens their DM in the
+                   middle with the profile alongside, so neither hides the other. */
+                <div className="h-full flex">
+                  <div className="relative flex-1 min-w-0 overflow-hidden">
+                    <ChatView />
+                  </div>
+                  {isAgentPanelOpen && <AgentProfilePanel docked />}
+                </div>
+              )}
+              {viewMode === 'files' && (filesSection === 'trash' ? <TrashView /> : <FilePreview />)}
+              {viewMode === 'browser' && <BrowserView />}
+              {viewMode === 'profile' && <ProfileView />}
+              {viewMode === 'tasks' && <TasksView />}
+              {viewMode === 'workflows' && <WorkflowsView />}
+              {viewMode === 'inbox' && <InboxView />}
+              {viewMode === 'knowledge' && <KnowledgeView />}
+
+              {/* Agent profile slide-over (non-chat views keep the overlay) */}
+              {isAgentPanelOpen && viewMode !== 'threads' && viewMode !== 'routines' && <AgentProfilePanel />}
+            </div>
+          )}
+        </div>
+      </SidebarInset>
+
+      <NewThreadDialogHost />
+    </SidebarProvider>
+  );
+}

@@ -1,0 +1,34 @@
+"""Owner and machine-token authorization boundaries."""
+
+import unittest
+from types import SimpleNamespace
+from unittest.mock import MagicMock, patch
+
+from app.security.access import verify_workspace_access
+
+
+class WorkspaceAccessSecurityTests(unittest.TestCase):
+    def setUp(self):
+        self.workspace = SimpleNamespace(owner_user_id="owner-a", password_hash="machine-secret")
+        self.db = MagicMock()
+
+    def test_missing_and_wrong_credentials_are_rejected(self):
+        self.assertFalse(verify_workspace_access(self.workspace, None, None, self.db))
+        self.assertFalse(verify_workspace_access(self.workspace, "wrong", None, self.db))
+
+    def test_correct_machine_token_works_without_bearer(self):
+        self.assertTrue(verify_workspace_access(self.workspace, "machine-secret", None, self.db))
+
+    def test_verified_other_user_cannot_cross_workspace_boundary(self):
+        with patch("app.security.access.verify_identity_claims", return_value={"session_user_id": "owner-b"}):
+            self.assertFalse(verify_workspace_access(self.workspace, None, "Bearer valid-b", self.db))
+
+    def test_verified_owner_works_but_unverified_bearer_does_not(self):
+        with patch("app.security.access.verify_identity_claims", return_value={"session_user_id": "owner-a"}):
+            self.assertTrue(verify_workspace_access(self.workspace, None, "Bearer valid-a", self.db))
+        with patch("app.security.access.verify_identity_claims", return_value=None):
+            self.assertFalse(verify_workspace_access(self.workspace, None, "Bearer forged-a", self.db))
+
+
+if __name__ == "__main__":
+    unittest.main()

@@ -1,0 +1,102 @@
+import type { Metadata, Viewport } from 'next';
+import Script from 'next/script';
+import { ThemeProvider } from 'next-themes';
+import { Toaster } from '@/components/ui/sonner';
+import { PaiAuthProvider } from '@/lib/pai-auth-context';
+import { DialogsProvider } from '@/components/ui/dialogs-provider';
+import { DEFAULT_LOCALE, I18nProvider } from '@/lib/i18n';
+import { getServerTranslations } from '@/lib/i18n/server';
+import '@/styles/globals.css';
+
+// Analytics identifiers come from deployment environment variables. When a
+// key is unset the corresponding client snippet is skipped entirely.
+const POSTHOG_KEY = process.env.NEXT_PUBLIC_POSTHOG_KEY;
+const POSTHOG_HOST = process.env.NEXT_PUBLIC_POSTHOG_HOST;
+const GA_ID = process.env.NEXT_PUBLIC_GA_ID;
+
+export async function generateMetadata(): Promise<Metadata> {
+  const { t } = await getServerTranslations();
+  return {
+    title: t('metadata.title'),
+    description: t('metadata.description'),
+    ...staticMetadata,
+  };
+}
+
+const staticMetadata: Metadata = {
+  icons: {
+    icon: [
+      { url: '/favicon-32x32.png', sizes: '32x32', type: 'image/png' },
+    ],
+    apple: '/favicon-32x32.png',
+  },
+  manifest: '/site.webmanifest',
+};
+
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1,
+  viewportFit: 'cover',
+};
+
+export default async function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return (
+    <html lang={DEFAULT_LOCALE} suppressHydrationWarning>
+      <head>
+        {POSTHOG_KEY && POSTHOG_HOST && (
+        <Script id="posthog-init" strategy="afterInteractive">{`
+          !function(t,e){var o,n,p,r;e.__SV||(window.posthog=e,e._i=[],e.init=function(i,s,a){function g(t,e){var o=e.split(".");2==o.length&&(t=t[o[0]],e=o[1]),t[e]=function(){t.push([e].concat(Array.prototype.slice.call(arguments,0)))}}(p=t.createElement("script")).type="text/javascript",p.crossOrigin="anonymous",p.async=!0,p.src=s.api_host.replace(".i.posthog.com","-assets.i.posthog.com")+"/static/array.js",(r=t.getElementsByTagName("script")[0]).parentNode.insertBefore(p,r);var u=e;for(void 0!==a?u=e[a]=[]:a="posthog",u.people=u.people||[],u.toString=function(t){var e="posthog";return"posthog"!==a&&(e+="."+a),t||(e+=" (stub)"),e},u.people.toString=function(){return u.toString(1)+".people (stub)"},o="init capture register register_once register_for_session unregister unregister_for_session getFeatureFlag getFeatureFlagPayload isFeatureEnabled reloadFeatureFlags updateEarlyAccessFeatureEnrollment getEarlyAccessFeatures on onFeatureFlags onSessionId getSurveys getActiveMatchingSurveys renderSurvey canRenderSurvey getNextSurveyStep identify setPersonProperties group resetGroups setPersonPropertiesForFlags resetPersonPropertiesForFlags setGroupPropertiesForFlags resetGroupPropertiesForFlags reset get_distinct_id getGroups get_session_id get_session_replay_url alias set_config startSessionRecording stopSessionRecording sessionRecordingStarted captureException loadToolbar get_property getSessionProperty createPersonProfile opt_in_capturing opt_out_capturing has_opted_in_capturing has_opted_out_capturing clear_opt_in_out_capturing debug".split(" "),n=0;n<o.length;n++)g(u,o[n]);e._i.push([i,s,a])},e.__SV=1)}(document,window.posthog||[]);
+          posthog.init('${POSTHOG_KEY}', {
+            api_host: '${POSTHOG_HOST}',
+            person_profiles: 'identified_only',
+            // 'history_change' also fires $pageview on client-side (SPA) route
+            // changes — plain true only captures full page loads, which missed
+            // every router.push navigation (e.g. the whole /settings dashboard).
+            capture_pageview: 'history_change',
+            capture_pageleave: true,
+            autocapture: true
+          });
+        `}</Script>
+        )}
+        {GA_ID && (
+        <>
+        <Script src={`https://www.googletagmanager.com/gtag/js?id=${GA_ID}`} strategy="afterInteractive" />
+        <Script id="gtag-init" strategy="afterInteractive">{`
+          window.dataLayer = window.dataLayer || [];
+          function gtag(){dataLayer.push(arguments);}
+          gtag('js', new Date());
+          gtag('config', '${GA_ID}');
+        `}</Script>
+        </>
+        )}
+      </head>
+      {/* `suppressHydrationWarning` here is for the browser, not for us:
+          extensions routinely stamp attributes onto <body> (cz-shortcut-listen,
+          grammarly-*, …) before React hydrates, and each one raises a mismatch
+          that buries real warnings. Scoped to this element — children still
+          report normally. */}
+      <body
+        className="font-sans bg-zinc-100 dark:bg-zinc-900"
+        suppressHydrationWarning
+      >
+        <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
+          <I18nProvider>
+            {/* Legacy email/password AuthProvider was removed in v1.0 —
+                PaiAuthProvider supplies the canonical identity path. */}
+            <PaiAuthProvider>
+              <DialogsProvider>
+                {children}
+              </DialogsProvider>
+            </PaiAuthProvider>
+            <Toaster />
+          </I18nProvider>
+        </ThemeProvider>
+      </body>
+    </html>
+  );
+}

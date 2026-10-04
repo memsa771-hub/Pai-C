@@ -1,0 +1,582 @@
+'use client';
+
+import * as React from 'react';
+import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
+import { ArrowUp, Paperclip, X, FileIcon, ImageIcon, Plus, CalendarClock } from 'lucide-react';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import type { WorkspaceAgent, KnowledgeEntry } from '@/lib/types';
+import { AgentAvatar } from '@/components/agents/agent-avatar';
+import { agentLabel } from '@/lib/helpers';
+import { BookOpen } from 'lucide-react';
+import { toast } from 'sonner';
+import { useT } from '@/lib/i18n';
+import {
+  DOCUMENT_ACCEPT,
+  isUnsupportedDocumentType,
+  unsupportedDocumentMessage,
+} from '@/lib/document-types';
+
+// Keep in sync with the backend's MAX_FILE_SIZE (app/config.py); the proxy's
+// /v1/files client_max_body_size allows extra headroom for multipart
+// overhead. Oversized files would be rejected server-side anyway, so
+// reject them here with immediate feedback instead.
+const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
+
+export interface PendingFile {
+  file: File;
+  preview?: string; // data URL for images
+}
+
+interface ChatInputProps {
+  onSend: (content: string, mentions: string[], files: PendingFile[]) => void;
+  disabled?: boolean;
+  className?: string;
+  agents?: WorkspaceAgent[];
+  knowledge?: KnowledgeEntry[];
+  draft?: string;
+  onDraftChange?: (draft: string) => void;
+  onFocusChange?: (focused: boolean) => void;
+  /** Auto-focus the textarea when mounted or when this key changes. */
+  focusKey?: number;
+  onCreateRoutine?: () => void;
+}
+
+function isImageFile(file: File): boolean {
+  return file.type.startsWith('image/');
+}
+
+// Images and student documents. Documents are restricted to PDF/DOCX — the
+// only formats the server can actually read — so a student is not left
+// waiting on an upload that will come back unreadable. See
+// lib/document-types.ts; the server re-validates from the file's bytes.
+const FILE_ACCEPT = `image/*,${DOCUMENT_ACCEPT}`;
+
+export function ChatInput({ onSend, disabled, className, agents = [], knowledge = [], draft, onDraftChange, onFocusChange, focusKey, onCreateRoutine }: ChatInputProps) {
+  const t = useT();
+  const [message, setMessage] = React.useState(draft ?? '');
+  const [showMentions, setShowMentions] = React.useState(false);
+  const [mentionFilter, setMentionFilter] = React.useState('');
+  const [mentionIndex, setMentionIndex] = React.useState(0);
+  const [pendingFiles, setPendingFiles] = React.useState<PendingFile[]>([]);
+  const [isDragging, setIsDragging] = React.useState(false);
+  const [isFocused, setIsFocused] = React.useState(false);
+  const textareaRef = React.useRef<HTMLTextAreaElement>(null);
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
+  const dragCountRef = React.useRef(0);
+
+  // Auto-size the textarea to its content (capped), toggling a scrollbar past
+  // the cap. Centralized here so every path that changes `message` — typing,
+  // mention insert, draft restore on thread switch, send-clear — resizes
+  // consistently.
+  const resizeTextarea = React.useCallback(() => {
+    const ta = textareaRef.current;
+    if (!ta) return;
+    ta.style.height = 'auto';
+    const capped = Math.min(ta.scrollHeight, 200);
+    ta.style.height = `${capped}px`;
+    ta.style.overflowY = ta.scrollHeight > 200 ? 'auto' : 'hidden';
+  }, []);
+
+  // Sync message state when draft prop changes (thread switch). Note: the draft
+  // is controlled and round-trips on every keystroke, so this must NOT reset the
+  // height itself — otherwise the box collapses to one row while typing. The
+  // layout effect below handles sizing off `message`.
+  React.useEffect(() => {
+    setMessage(draft ?? '');
+  }, [draft]);
+
+  // Keep the textarea sized to its content whenever the message changes.
+  // useLayoutEffect runs synchronously before paint, so there's no flicker.
+  React.useLayoutEffect(() => {
+    resizeTextarea();
+  }, [message, resizeTextarea]);
+
+  // Auto-focus textarea when focusKey changes (thread opened/switched)
+  React.useEffect(() => {
+    if (focusKey != null && textareaRef.current) {
+      requestAnimationFrame(() => textareaRef.current?.focus());
+    }
+  }, [focusKey]);
+
+  const agentNames = agents.map((a) => a.agentName);
+
+  // Extract @mentions from message text
+  const extractMentions = (text: string): string[] => {
+    const matches = text.match(/@([\w-]+)/g) || [];
+    return matches
+      .map((m) => m.slice(1))
+      .filter((name) => agentNames.includes(name));
+  };
+
+  // Only suggest online agents — mentioning offline ones never resolves and
+  // just clutters the picker on long-lived workspaces. Filter matches either
+  // the ASCII agent name or the user-set display name (e.g. typing "小" finds
+  // the agent labeled "小明"); the inserted mention is always the agent name.
+  const filteredAgents = agents.filter(
+    (a) => a.status === 'online' && (
+      a.agentName.toLowerCase().includes(mentionFilter.toLowerCase()) ||
+      (a.displayName || '').toLowerCase().includes(mentionFilter.toLowerCase())
+    )
+  );
+
+  const filteredKnowledge = knowledge.filter(
+    (k) => k.title.toLowerCase().includes(mentionFilter.toLowerCase()) ||
+           k.slug.toLowerCase().includes(mentionFilter.toLowerCase())
+  );
+
+  type MentionItem =
+    | { type: 'agent'; agent: WorkspaceAgent }
+    | { type: 'knowledge'; entry: KnowledgeEntry };
+
+  const mentionItems: MentionItem[] = [
+    ...filteredAgents.map((agent): MentionItem => ({ type: 'agent', agent })),
+    ...filteredKnowledge.map((entry): MentionItem => ({ type: 'knowledge', entry })),
+  ];
+
+  const addFiles = React.useCallback((files: FileList | File[]) => {
+    const newFiles: PendingFile[] = [];
+    for (const file of Array.from(files)) {
+      if (file.size > MAX_FILE_SIZE) {
+        toast.error(`"${file.name}" is too large (max 50MB)`);
+        continue;
+      }
+      // Drag-and-drop bypasses the accept attribute entirely, so the same
+      // check has to run here. Only files CLAIMING an unsupported document
+      // format are rejected — an image is not a document and passes through.
+      if (isUnsupportedDocumentType(file)) {
+        toast.error(unsupportedDocumentMessage(file));
+        continue;
+      }
+      if (isImageFile(file)) {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          setPendingFiles((prev) => prev.map((pf) =>
+            pf.file === file ? { ...pf, preview: e.target?.result as string } : pf
+          ));
+        };
+        reader.readAsDataURL(file);
+      }
+      newFiles.push({ file });
+    }
+    setPendingFiles((prev) => [...prev, ...newFiles]);
+  }, []);
+
+  const removeFile = (index: number) => {
+    setPendingFiles((prev) => {
+      const removed = prev[index];
+      if (removed.preview) URL.revokeObjectURL(removed.preview);
+      return prev.filter((_, i) => i !== index);
+    });
+  };
+
+  const handleSend = () => {
+    const trimmed = message.trim();
+    if (!trimmed && pendingFiles.length === 0) return;
+    if (disabled) return;
+    const mentions = extractMentions(trimmed);
+    onSend(trimmed, mentions, pendingFiles);
+    setMessage('');
+    onDraftChange?.('');
+    setPendingFiles([]);
+    setShowMentions(false);
+    // Height resets via the layout effect when `message` becomes ''.
+    textareaRef.current?.blur();
+  };
+
+  const insertMention = (mentionText: string) => {
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+
+    const cursorPos = textarea.selectionStart;
+    const textBefore = message.slice(0, cursorPos);
+    const textAfter = message.slice(cursorPos);
+
+    const atIndex = textBefore.lastIndexOf('@');
+    if (atIndex === -1) return;
+
+    const newText = textBefore.slice(0, atIndex) + `@${mentionText} ` + textAfter;
+    setMessage(newText);
+    onDraftChange?.(newText);
+    setShowMentions(false);
+    setMentionFilter('');
+
+    setTimeout(() => {
+      textarea.focus();
+      const newCursorPos = atIndex + mentionText.length + 2;
+      textarea.setSelectionRange(newCursorPos, newCursorPos);
+    }, 0);
+  };
+
+  const insertMentionItem = (item: MentionItem) => {
+    if (item.type === 'agent') {
+      insertMention(item.agent.agentName);
+    } else {
+      insertMention(`knowledge:${item.entry.slug}`);
+    }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    // Ignore Enter during IME composition (Chinese, Japanese, Korean input)
+    if (e.nativeEvent.isComposing || e.key === 'Process') return;
+
+    if (showMentions && mentionItems.length > 0) {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        setMentionIndex((prev) => (prev + 1) % mentionItems.length);
+        return;
+      }
+      if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        setMentionIndex((prev) => (prev - 1 + mentionItems.length) % mentionItems.length);
+        return;
+      }
+      if (e.key === 'Enter' || e.key === 'Tab') {
+        e.preventDefault();
+        insertMentionItem(mentionItems[mentionIndex]);
+        return;
+      }
+      if (e.key === 'Escape') {
+        setShowMentions(false);
+        return;
+      }
+    }
+
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSend();
+      return;
+    }
+
+    // Escape blurs the textarea so global shortcuts (1-9, i, etc.) work again.
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      textareaRef.current?.blur();
+    }
+  };
+
+  // Auto-resize textarea + detect @mentions
+  const handleInput = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const value = e.target.value;
+    setMessage(value);
+    onDraftChange?.(value);
+    const textarea = e.target;
+    // Height is kept in sync by the layout effect keyed on `message`.
+
+    // Detect @mention trigger
+    const cursorPos = textarea.selectionStart;
+    const textBefore = value.slice(0, cursorPos);
+    // [^\s@] (not \w) so typing a display name like "@小明" keeps the
+    // picker open while filtering; the inserted mention is still ASCII.
+    const atMatch = textBefore.match(/@([^\s@]*)$/);
+    if (atMatch && (agents.length > 1 || knowledge.length > 0)) {
+      setMentionFilter(atMatch[1]);
+      setMentionIndex(0);
+      setShowMentions(true);
+    } else {
+      setShowMentions(false);
+    }
+  };
+
+  // Handle paste — detect images from clipboard
+  const handlePaste = (e: React.ClipboardEvent) => {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+
+    const imageFiles: File[] = [];
+    for (const item of Array.from(items)) {
+      if (item.type.startsWith('image/')) {
+        const file = item.getAsFile();
+        if (file) imageFiles.push(file);
+      }
+    }
+    if (imageFiles.length > 0) {
+      e.preventDefault();
+      addFiles(imageFiles);
+    }
+  };
+
+  // Drag-and-drop handlers
+  const handleDragEnter = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragCountRef.current++;
+    if (e.dataTransfer.types.includes('Files')) {
+      setIsDragging(true);
+    }
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragCountRef.current--;
+    if (dragCountRef.current === 0) {
+      setIsDragging(false);
+    }
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragCountRef.current = 0;
+    setIsDragging(false);
+
+    if (e.dataTransfer.files.length > 0) {
+      addFiles(e.dataTransfer.files);
+    }
+  };
+
+  /**
+   * Opens the shared file input, optionally narrowed to one kind (images).
+   * The accept list is restored afterwards so the next "Attach file" is not
+   * stuck on the narrowed filter.
+   */
+  const openFilePicker = (accept?: string) => {
+    const input = fileInputRef.current;
+    if (!input) return;
+    input.accept = accept ?? FILE_ACCEPT;
+    input.click();
+    if (accept) {
+      setTimeout(() => {
+        if (fileInputRef.current) fileInputRef.current.accept = FILE_ACCEPT;
+      }, 100);
+    }
+  };
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files.length > 0) {
+      addFiles(e.target.files);
+      e.target.value = ''; // reset so same file can be selected again
+    }
+  };
+
+  const hasContent = message.trim() || pendingFiles.length > 0;
+
+  return (
+    <div
+      className={cn('relative', className)}
+      onDragEnter={handleDragEnter}
+      onDragLeave={handleDragLeave}
+      onDragOver={handleDragOver}
+      onDrop={handleDrop}
+    >
+      {/* @mention autocomplete dropdown */}
+      {showMentions && mentionItems.length > 0 && (
+        <div className="absolute bottom-full mb-2 left-0 right-0 bg-popover border rounded-lg shadow-lg z-50 overflow-hidden max-h-70 overflow-y-auto">
+          {filteredAgents.length > 0 && filteredKnowledge.length > 0 && (
+            <div className="px-3 py-1.5 text-[10px] font-medium text-muted-foreground uppercase tracking-wider border-b border-border">{t('chatInput.mentionAgents')}</div>
+          )}
+          {filteredAgents.map((agent) => {
+            const idx = mentionItems.findIndex((m) => m.type === 'agent' && m.agent.agentName === agent.agentName);
+            return (
+              <button
+                key={agent.agentName}
+                className={cn(
+                  'w-full flex items-center gap-2.5 px-3 py-2 text-sm text-left hover:bg-accent transition-colors',
+                  idx === mentionIndex && 'bg-accent'
+                )}
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  insertMention(agent.agentName);
+                }}
+              >
+                <AgentAvatar name={agent.agentName} size={24} status={agent.status} showStatus />
+                <span className="font-medium">{agentLabel(agent)}</span>
+                {agentLabel(agent) !== agent.agentName && (
+                  <span className="text-xs text-muted-foreground truncate">@{agent.agentName}</span>
+                )}
+                <span className={cn(
+                  'text-[10px] px-1.5 py-0.5 rounded-full ml-auto',
+                  agent.role === 'master'
+                    ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400'
+                    : 'bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400'
+                )}>
+                  {agent.role}
+                </span>
+                <span className={cn(
+                  'size-2 rounded-full',
+                  agent.status === 'online' ? 'bg-green-500' : 'bg-zinc-400'
+                )} />
+              </button>
+            );
+          })}
+          {filteredKnowledge.length > 0 && (
+            <>
+              {filteredAgents.length > 0 && (
+                <div className="px-3 py-1.5 text-[10px] font-medium text-muted-foreground uppercase tracking-wider border-t border-border">{t('chatInput.mentionKnowledge')}</div>
+              )}
+              {filteredKnowledge.map((entry) => {
+                const idx = mentionItems.findIndex((m) => m.type === 'knowledge' && m.entry.id === entry.id);
+                return (
+                  <button
+                    key={entry.id}
+                    className={cn(
+                      'w-full flex items-center gap-2.5 px-3 py-2 text-sm text-left hover:bg-accent transition-colors',
+                      idx === mentionIndex && 'bg-accent'
+                    )}
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      insertMention(`knowledge:${entry.slug}`);
+                    }}
+                  >
+                    <div className="size-6 rounded-md bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center shrink-0">
+                      <BookOpen className="size-3.5 text-amber-600 dark:text-amber-400" />
+                    </div>
+                    <span className="font-medium truncate">{entry.title}</span>
+                    <span className="text-[10px] text-muted-foreground ml-auto font-mono shrink-0">@knowledge:{entry.slug}</span>
+                  </button>
+                );
+              })}
+            </>
+          )}
+        </div>
+      )}
+
+      {/* ChatGPT-style composer: one rounded bar with every control on a single
+          row — the `+` menu on the left, the growing textarea in the middle and
+          the send button on the right. Attachments stack above that row. */}
+      <div className={cn(
+        'relative flex flex-col gap-1.5 rounded-2xl border border-input bg-background px-2.5 py-2.5 shadow-xs transition-colors',
+        isDragging && 'border-primary border-dashed bg-primary/5',
+        isFocused && !isDragging && 'border-foreground/25 shadow-sm'
+      )}>
+        {/* Drag overlay */}
+        {isDragging && (
+          <div className="absolute inset-0 flex items-center justify-center rounded-2xl z-10 pointer-events-none">
+            <span className="text-sm font-medium text-primary">{t('chatInput.dropFilesHere')}</span>
+          </div>
+        )}
+
+        {/* Pending file previews */}
+        {pendingFiles.length > 0 && (
+          <div className="flex flex-wrap gap-2 px-1 pt-1">
+            {pendingFiles.map((pf, i) => (
+              <div
+                key={i}
+                className="relative group rounded-lg border bg-muted overflow-hidden"
+              >
+                {pf.preview ? (
+                  <img
+                    src={pf.preview}
+                    alt={pf.file.name}
+                    className="h-20 w-auto max-w-40 object-cover"
+                  />
+                ) : (
+                  <div className="h-20 w-24 flex flex-col items-center justify-center gap-1 px-2">
+                    <FileIcon className="size-5 text-muted-foreground" />
+                    <span className="text-[10px] text-muted-foreground truncate w-full text-center">
+                      {pf.file.name}
+                    </span>
+                  </div>
+                )}
+                <button
+                  onClick={() => removeFile(i)}
+                  className="absolute top-0.5 right-0.5 size-5 rounded-full bg-black/60 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                >
+                  <X className="size-3" />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <div className="flex items-end gap-1">
+          <input
+            ref={fileInputRef}
+            type="file"
+            multiple
+            accept={FILE_ACCEPT}
+            onChange={handleFileSelect}
+            className="hidden"
+          />
+
+          {/* Everything that isn't typing or sending lives behind the `+` */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                type="button"
+                className="mb-0.5 flex size-8 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                title={t('chatInput.addAttachments')}
+                aria-label={t('chatInput.addAttachments')}
+              >
+                <Plus className="size-5" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" side="top" className="min-w-50">
+              <DropdownMenuItem onSelect={() => openFilePicker()}>
+                <Paperclip className="size-4" />
+                {t('chatInput.attachFile')}
+              </DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => openFilePicker('image/*')}>
+                <ImageIcon className="size-4" />
+                {t('chatInput.attachImage')}
+              </DropdownMenuItem>
+              {onCreateRoutine && (
+                <DropdownMenuItem onSelect={() => onCreateRoutine()}>
+                  <CalendarClock className="size-4" />
+                  {t('chatInput.createRoutine')}
+                </DropdownMenuItem>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
+
+          <textarea
+            ref={textareaRef}
+            value={message}
+            onChange={handleInput}
+            onKeyDown={handleKeyDown}
+            onPaste={handlePaste}
+            onFocus={() => { setIsFocused(true); onFocusChange?.(true); }}
+            onBlur={() => { setIsFocused(false); onFocusChange?.(false); }}
+            placeholder={agents.length > 1 || knowledge.length > 0 ? t('chatInput.placeholderWithMentions') : t('chatInput.placeholder')}
+            rows={1}
+            disabled={disabled}
+            data-chat-input
+            className="min-w-0 flex-1 resize-none border-0 bg-transparent px-1 py-2 text-sm shadow-none placeholder:text-muted-foreground focus:outline-none"
+          />
+
+          {/* Keyboard affordance for the global 'type anywhere' shortcut */}
+          {isFocused ? (
+            <kbd
+              className="pointer-events-none mb-2.5 hidden h-4 shrink-0 items-center justify-center rounded border border-input bg-muted px-1 font-mono text-[9px] font-medium text-muted-foreground sm:flex"
+              title={t('chatInput.escHint')}
+            >
+              esc
+            </kbd>
+          ) : !message ? (
+            <kbd
+              className="pointer-events-none mb-2.5 hidden size-4 shrink-0 items-center justify-center rounded border border-input bg-muted font-mono text-[9px] font-medium text-muted-foreground sm:flex"
+              title={t('chatInput.typeHint')}
+            >
+              i
+            </kbd>
+          ) : null}
+
+          <Button
+            variant={hasContent ? 'primary' : 'secondary'}
+            size="icon"
+            className={cn(
+              'mb-0.5 size-8 shrink-0 rounded-full transition-all',
+              hasContent ? 'opacity-100' : 'opacity-50'
+            )}
+            onClick={handleSend}
+            disabled={!hasContent || disabled}
+            aria-label={t('chatInput.sendMessage')}
+          >
+            <ArrowUp className="size-4" />
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}

@@ -1,0 +1,287 @@
+import { OAUTH_PROVIDERS, type OAuthProvider } from './auth/oauth-providers';
+import { registrationPasswordError } from './password-policy';
+import { API_URL } from './config';
+
+// Thin Supabase Auth adapter — plain fetch against
+// ${SUPABASE_URL}/auth/v1/*, deliberately not @supabase/supabase-js.
+//
+// Kept structurally identical to packages/launcher/src/main/auth/supabase.ts
+// (same function names/shapes) so a future shared `packages/auth` extraction
+// is a cut-and-paste, not a rewrite — see the auth architecture plan.
+//
+// Set in workspace/.env (see workspace/.env.example) and injected at build
+// time via the Dockerfile ARG/ENV pair and docker-compose's build.args — the
+// same values Supabase already treats as public (this is the publishable
+// anon key, not a secret), just no longer hardcoded here. Never put a
+// service-role key or JWT secret here.
+export const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+export const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+
+export interface AuthSession {
+  accessToken: string;
+  refreshToken: string;
+  expiresAt: number; // unix seconds
+  user: { id: string; email: string; username: string | null };
+}
+
+export interface SignUpResult {
+  session: AuthSession | null;
+  needsEmailConfirmation: boolean;
+}
+
+function authUrl(path: string): string {
+  return `${SUPABASE_URL}/auth/v1${path}`;
+}
+
+function authHeaders(extra?: Record<string, string>): Record<string, string> {
+  return { apikey: SUPABASE_ANON_KEY, 'Content-Type': 'application/json', ...extra };
+}
+
+async function authFetch(url: string, options: RequestInit): Promise<Response> {
+  try { return await fetch(url, options); }
+  catch { throw new AuthUnreachable('Authentication is temporarily unavailable. Please try again.'); }
+}
+
+function sessionFromSupabase(body: any): AuthSession {
+  const user = body.user || {};
+  return {
+    accessToken: body.access_token,
+    refreshToken: body.refresh_token,
+    expiresAt: Math.floor(Date.now() / 1000) + (body.expires_in ?? 3600),
+    user: {
+      id: user.id,
+      email: user.email,
+      username: user.user_metadata?.username ?? null,
+    },
+  };
+}
+
+async function parseAuthError(res: Response, fallback = 'Authentication failed. Please try again.'): Promise<Error> {
+  const body = await res.json().catch(() => null);
+  const code = body?.error_code || body?.code;
+  if (code === 'email_not_confirmed') return new AuthRejected('Please confirm your email before signing in.');
+  if (code === 'weak_password') return new AuthRejected('Choose a stronger password.');
+  return authErrorFromStatus(res.status, fallback);
+}
+
+export async function signInWithPassword(email: string, password: string): Promise<AuthSession> {
+  const res = await authFetch(authUrl('/token?grant_type=password'), {
+    method: 'POST',
+    headers: authHeaders(),
+    body: JSON.stringify({ email, password }),
+  });
+  if (!res.ok) throw await parseAuthError(res, 'Invalid email or password.');
+  return sessionFromSupabase(await res.json());
+}
+
+/** PAI resolves the username; Supabase still verifies the password. */
+export async function signInWithUsername(username: string, password: string): Promise<AuthSession> {
+  const response = await authFetch(`${API_URL}/v1/auth/sign-in-username`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ username, password }),
+  });
+  if (!response.ok) throw authErrorFromStatus(response.status, response.status === 401
+    ? 'Invalid email/username or password' : 'Sign-in is temporarily unavailable');
+  const body = (await response.json()).data;
+  const userResponse = await authFetch(authUrl('/user'), {
+    headers: authHeaders({ Authorization: `Bearer ${body.access_token}` }),
+  });
+  if (!userResponse.ok) throw new AuthRejected('Invalid email/username or password');
+  return sessionFromSupabase({ ...body, user: await userResponse.json() });
+}
+
+export async function signUpWithPassword(
+  email: string,
+  password: string,
+  username: string,
+): Promise<SignUpResult> {
+  const verifier = base64UrlEncode(crypto.getRandomValues(new Uint8Array(32)));
+  const challenge = base64UrlEncode(await sha256(verifier));
+  const redirectTo = `${window.location.origin}/auth/callback`;
+  const res = await authFetch(authUrl(`/signup?redirect_to=${encodeURIComponent(redirectTo)}`), {
+    method: 'POST',
+    headers: authHeaders(),
+    body: JSON.stringify({
+      email, password, data: { username },
+      code_challenge: challenge, code_challenge_method: 's256',
+    }),
+  });
+  if (!res.ok) throw await parseAuthError(res, 'Could not create account. Please try again.');
+  const body = await res.json();
+  // Supabase returns a user with no access_token when email confirmation is
+  // required (identities present but session absent).
+  if (!body.access_token) {
+    storePkceVerifier(verifier);
+    return { session: null, needsEmailConfirmation: true };
+  }
+  return { session: sessionFromSupabase(body), needsEmailConfirmation: false };
+}
+
+/**
+ * Why an auth call failed, which decides whether the session survives it.
+ *
+ * `AuthRejected`    Supabase answered, and the answer was no. The credential
+ *                   is genuinely bad; ending the session is correct.
+ * `AuthUnreachable` we could not ask — offline, DNS, a captive portal, a
+ *                   timeout, rate limiting, or Supabase itself failing. NOT
+ *                   evidence that the session is invalid. Signing out here
+ *                   logs a student out because their wifi dropped.
+ *
+ * Mirrors packages/launcher/src/main/auth/supabase.ts, which has the same two
+ * classes for the same reason — keep them in step.
+ */
+export class AuthRejected extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'AuthRejected';
+  }
+}
+
+export class AuthUnreachable extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'AuthUnreachable';
+  }
+}
+
+/** A status is a refusal only when it is about the credential; a timeout, a
+ * rate limit and a 5xx are all "ask again later". */
+export function authErrorFromStatus(status: number, message: string): Error {
+  if (status === 408 || status === 429 || status >= 500) return new AuthUnreachable(message);
+  return new AuthRejected(message);
+}
+
+/** Refresh the access token. Throws AuthUnreachable when Supabase could not be
+ * reached, so callers can keep the session and try again. */
+export async function refreshSession(refreshToken: string): Promise<AuthSession> {
+  let res: Response;
+  try {
+    res = await fetch(authUrl('/token?grant_type=refresh_token'), {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify({ refresh_token: refreshToken }),
+    });
+  } catch (err) {
+    throw new AuthUnreachable((err as Error).message);
+  }
+  if (!res.ok) {
+    const parsed = await parseAuthError(res);
+    throw authErrorFromStatus(res.status, parsed.message);
+  }
+  return sessionFromSupabase(await res.json());
+}
+
+export async function signOut(accessToken: string): Promise<void> {
+  await fetch(authUrl('/logout'), {
+    method: 'POST',
+    headers: authHeaders({ Authorization: `Bearer ${accessToken}` }),
+  }).catch(() => {
+    /* best-effort — the local session is cleared regardless */
+  });
+}
+
+function base64UrlEncode(bytes: Uint8Array): string {
+  let str = '';
+  Array.from(bytes).forEach((b) => { str += String.fromCharCode(b); });
+  return btoa(str).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+async function sha256(input: string): Promise<Uint8Array> {
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(input));
+  return new Uint8Array(digest);
+}
+
+/** Build a Supabase OAuth (PKCE) authorize URL. Returns the verifier to store
+ * client-side and present again in exchangeOAuthCode. */
+export async function buildOAuthAuthorizeUrl(
+  provider: OAuthProvider,
+  redirectTo: string,
+): Promise<{ url: string; codeVerifier: string }> {
+  const verifierBytes = crypto.getRandomValues(new Uint8Array(32));
+  const codeVerifier = base64UrlEncode(verifierBytes);
+  const codeChallenge = base64UrlEncode(await sha256(codeVerifier));
+  const params = new URLSearchParams({
+    provider: OAUTH_PROVIDERS[provider].supabaseProvider,
+    redirect_to: redirectTo,
+    code_challenge: codeChallenge,
+    code_challenge_method: 's256',
+  });
+  return { url: authUrl(`/authorize?${params.toString()}`), codeVerifier };
+}
+
+/** Exchange the `code` Supabase redirected back with (OAuth or email
+ * confirmation) for a session, using the verifier stashed before redirecting. */
+export async function exchangeOAuthCode(code: string, codeVerifier: string): Promise<AuthSession> {
+  const res = await authFetch(authUrl('/token?grant_type=pkce'), {
+    method: 'POST',
+    headers: authHeaders(),
+    body: JSON.stringify({ auth_code: code, code_verifier: codeVerifier }),
+  });
+  if (!res.ok) throw await parseAuthError(res, 'Sign-in link is invalid or expired.');
+  return sessionFromSupabase(await res.json());
+}
+
+// The PKCE verifier only needs to survive the redirect to Supabase and back,
+// within the same tab — sessionStorage, not localStorage.
+const PKCE_VERIFIER_KEY = 'oa_pkce_verifier';
+
+export function storePkceVerifier(verifier: string): void {
+  try {
+    sessionStorage.setItem(PKCE_VERIFIER_KEY, verifier);
+  } catch {
+    /* ignore */
+  }
+}
+
+/** Reads and clears the stashed verifier — single use, matching the code. */
+export function consumePkceVerifier(): string | null {
+  try {
+    const v = sessionStorage.getItem(PKCE_VERIFIER_KEY);
+    sessionStorage.removeItem(PKCE_VERIFIER_KEY);
+    return v;
+  } catch {
+    return null;
+  }
+}
+
+/** Build the authorize URL, stash the verifier, and navigate there — the
+ * one-call form both /sign-in and /sign-up use for the OAuth buttons. */
+export async function startOAuthRedirect(
+  provider: OAuthProvider,
+  redirectTo: string = `${window.location.origin}/auth/callback`,
+): Promise<void> {
+  const { url, codeVerifier } = await buildOAuthAuthorizeUrl(provider, redirectTo);
+  storePkceVerifier(codeVerifier);
+  window.location.href = url;
+}
+/** Recovery uses the same single-use PKCE exchange as OAuth. */
+export async function requestPasswordReset(email: string): Promise<void> {
+  const verifier = base64UrlEncode(crypto.getRandomValues(new Uint8Array(32)));
+  const challenge = base64UrlEncode(await sha256(verifier));
+  const redirectTo = `${window.location.origin}/auth/reset-password`;
+  const res = await authFetch(authUrl(`/recover?redirect_to=${encodeURIComponent(redirectTo)}`), {
+    method: 'POST',
+    headers: authHeaders(),
+    body: JSON.stringify({
+      email, code_challenge: challenge, code_challenge_method: 's256',
+    }),
+  });
+  // The UI never distinguishes registered and unregistered addresses.
+  if (!res.ok && (res.status >= 500 || res.status === 429)) throw new AuthUnreachable('Recovery is temporarily unavailable');
+  storePkceVerifier(verifier);
+}
+
+export async function completePasswordReset(code: string, password: string): Promise<AuthSession> {
+  if (registrationPasswordError(password)) throw new AuthRejected('Choose a stronger password');
+  const verifier = consumePkceVerifier();
+  if (!verifier) throw new AuthRejected('Recovery link is invalid or expired');
+  const session = await exchangeOAuthCode(code, verifier);
+  const response = await authFetch(authUrl('/user'), {
+    method: 'PUT',
+    headers: authHeaders({ Authorization: `Bearer ${session.accessToken}` }),
+    body: JSON.stringify({ password }),
+  });
+  if (!response.ok) throw await parseAuthError(response, 'Could not update password. Please try again.');
+  return session;
+}

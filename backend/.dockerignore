@@ -1,0 +1,35 @@
+__pycache__
+*.pyc
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+coverage.xml
+htmlcov/
+.env
+.env.*
+.git
+.gitignore
+tests/
+test*/
+**/tests/
+**/test_*.py
+**/*_test.py
+docs/
+scripts/
+api/
+pytest.ini
+vercel.json
+*.md
+
+# Local virtualenv and dev databases — never ship to the remote builder / image
+.venv
+*.db
+local.db
+test_workspace.db
+*.sqlite
+*.sqlite3
+
+# APNs auth keys
+secrets/
+*.p8

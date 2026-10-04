@@ -1,0 +1,389 @@
+# -*- coding: utf-8 -*-
+"""
+Workspace backend configuration.
+
+All settings are loaded from environment variables. There is exactly ONE
+settings file, `workspace/.env`, and it is read by two different mechanisms:
+
+* Docker Compose reads it automatically, because it sits beside the
+  docker-compose files, and substitutes it into each service's `environment:`
+  block. A variable not listed there never reaches the container.
+* Running the backend directly (uvicorn, pytest, scripts) does NOT get that
+  for free, so `_load_env_file()` below loads the same file into os.environ.
+
+Real environment variables always win: `load_dotenv` is called WITHOUT
+override, so the file only fills in what the environment has not already set.
+That keeps Docker and the hosting platform authoritative in production while
+local runs still pick the file up.
+"""
+
+import os
+from datetime import datetime
+from pathlib import Path
+
+
+def _load_env_file() -> None:
+    """Load `workspace/.env` for processes Docker Compose did not start.
+
+    Must run before Config's class body, which reads os.environ at import.
+    Missing file or missing python-dotenv is not an error: the environment may
+    legitimately be supplied entirely from outside.
+    """
+    try:
+        from dotenv import load_dotenv
+    except ImportError:
+        return
+    # app/config.py -> app -> backend -> workspace/.env
+    env_file = Path(__file__).resolve().parents[2] / ".env"
+    if env_file.is_file():
+        load_dotenv(env_file, override=False)
+
+
+_load_env_file()
+
+
+def normalize_database_url(value: str) -> str:
+    """Select the PostgreSQL driver that is installed by requirements.txt."""
+    if value.startswith("postgresql://"):
+        return value.replace("postgresql://", "postgresql+psycopg2://", 1)
+    if value.startswith("postgres://"):
+        return value.replace("postgres://", "postgresql+psycopg2://", 1)
+    return value
+
+
+class Config:
+    """Application configuration loaded from environment variables."""
+
+    # Database
+    DATABASE_URL: str = normalize_database_url(
+        os.environ.get(
+            "DATABASE_URL",
+            "postgresql+psycopg2://postgres:dev@localhost:5432/openagents_workspace",
+        )
+    )
+    DB_POOL_SIZE: int = int(os.environ.get("DB_POOL_SIZE", "10"))
+    DB_MAX_OVERFLOW: int = int(os.environ.get("DB_MAX_OVERFLOW", "5"))
+    DB_POOL_TIMEOUT: int = int(os.environ.get("DB_POOL_TIMEOUT", "5"))
+    DB_POOL_RECYCLE: int = int(os.environ.get("DB_POOL_RECYCLE", "300"))
+    APP_ENV: str = os.environ.get("APP_ENV", "development")
+
+    # Supabase Auth — the sole human-identity provider for web/desktop (and,
+    # later, mobile). SUPABASE_ANON_KEY is the public/publishable key that also
+    # ships in every client bundle, so it is not a secret; there is
+    # deliberately no service-role key or JWT signing secret here (see
+    # app.security.human_auth.verify_identity_claims, which verifies tokens via
+    # Supabase's own JWKS/introspection instead of a shared secret).
+    #
+    # Required from the environment (see workspace/.env.example) — no default
+    # project baked into source, so a misconfigured deployment fails loudly
+    # (empty string) instead of silently talking to whichever project used to
+    # be hardcoded here.
+    SUPABASE_URL: str = os.environ.get("SUPABASE_URL", "")
+    SUPABASE_ANON_KEY: str = os.environ.get("SUPABASE_ANON_KEY", "")
+    PAI_SESSION_TTL_SECONDS: int = int(os.environ.get(
+        "PAI_SESSION_TTL_SECONDS", str(14 * 24 * 60 * 60)))
+
+    # Failed sign-ins allowed against ONE username per hour, before that
+    # account is locked out (per process, sliding window). Keyed by username,
+    # not by client address: the attack this stops is a brute force against a
+    # single account, and an address key would instead punish every student
+    # behind one school NAT or reverse proxy for each other's typos.
+    SIGN_IN_USERNAME_MAX_ATTEMPTS_PER_HOUR: int = int(
+        os.environ.get("SIGN_IN_USERNAME_MAX_ATTEMPTS_PER_HOUR", "20")
+    )
+
+    # Loose per-source backstop for the two unauthenticated auth endpoints,
+    # covering what a per-username limit cannot: password spraying (one common
+    # password against many accounts) and username enumeration. Deliberately
+    # generous, because behind a proxy or a campus NAT this is shared by every
+    # student at once — it is a ceiling on abuse, not a login quota.
+    AUTH_MAX_REQUESTS_PER_SOURCE_PER_HOUR: int = int(
+        os.environ.get("AUTH_MAX_REQUESTS_PER_SOURCE_PER_HOUR", "120")
+    )
+
+    # Identity mode: "standalone" (own agent table) or "shared" (external agent_ids)
+    IDENTITY_MODE: str = os.environ.get("IDENTITY_MODE", "standalone")
+    WORKSPACE_ENDPOINT: str = os.environ.get("WORKSPACE_ENDPOINT", "")
+
+    # Redis is an optional cache/PubSub accelerator. Short timeouts keep
+    # PostgreSQL-backed requests responsive during Redis outages.
+    REDIS_URL: str = os.environ.get("REDIS_URL", "").strip()
+    REDIS_CONNECT_TIMEOUT: float = float(os.environ.get("REDIS_CONNECT_TIMEOUT", "0.5"))
+    REDIS_SOCKET_TIMEOUT: float = float(os.environ.get("REDIS_SOCKET_TIMEOUT", "0.5"))
+
+    # Agent offline timeout in seconds
+    AGENT_TIMEOUT_SECONDS: int = int(os.environ.get("AGENT_TIMEOUT_SECONDS", "60"))
+
+    # Reject uncredentialed /v1/leave and /v1/heartbeat. Parsed the other way
+    # round from the usual flag: anything that isn't an explicit "false"/"0"/"no"
+    # enforces, so an unset, empty or misspelled env var fails CLOSED. Setting
+    # it falsey is the deliberate, temporary escape hatch for a legacy fleet.
+    ENFORCE_AGENT_LIFECYCLE_AUTH: bool = os.environ.get(
+        "ENFORCE_AGENT_LIFECYCLE_AUTH", "true"
+    ).strip().lower() not in ("false", "0", "no")
+
+    # CORS origins (comma-separated)
+    CORS_ORIGINS: str = os.environ.get("CORS_ORIGINS", "*")
+
+    # File storage
+    FILE_STORAGE_BACKEND: str = os.environ.get("FILE_STORAGE_BACKEND", "local")  # "local" or "s3"
+    FILE_STORAGE_PATH: str = os.environ.get("FILE_STORAGE_PATH", "/tmp/openagents_files")
+    S3_BUCKET: str = os.environ.get("S3_BUCKET", "")
+    S3_REGION: str = os.environ.get("S3_REGION", "us-east-1")
+    MAX_FILE_SIZE: int = int(os.environ.get("MAX_FILE_SIZE", str(50 * 1024 * 1024)))  # 50MB
+
+    # Mobile app releases (served by /v1/app/version).
+    #
+    # The build number is what the app compares — it is the `+N` half of the
+    # Flutter version (`1.0.1+25`) and must increase with every release.
+    # MIN_BUILD is the forced-update floor: a client below it blocks itself
+    # until the user updates, so raise it only for a release older clients
+    # genuinely cannot run against. Left at 0, nothing is ever forced.
+    # A LATEST_BUILD of 0 means "not configured" and offers no update at all.
+    APP_ANDROID_LATEST_VERSION: str = os.environ.get("APP_ANDROID_LATEST_VERSION", "")
+    APP_ANDROID_LATEST_BUILD: int = int(os.environ.get("APP_ANDROID_LATEST_BUILD", "0"))
+    APP_ANDROID_MIN_BUILD: int = int(os.environ.get("APP_ANDROID_MIN_BUILD", "0"))
+    APP_ANDROID_UPDATE_URL: str = os.environ.get("APP_ANDROID_UPDATE_URL", "")
+    APP_ANDROID_RELEASE_NOTES: str = os.environ.get("APP_ANDROID_RELEASE_NOTES", "")
+
+    APP_IOS_LATEST_VERSION: str = os.environ.get("APP_IOS_LATEST_VERSION", "")
+    APP_IOS_LATEST_BUILD: int = int(os.environ.get("APP_IOS_LATEST_BUILD", "0"))
+    APP_IOS_MIN_BUILD: int = int(os.environ.get("APP_IOS_MIN_BUILD", "0"))
+    APP_IOS_UPDATE_URL: str = os.environ.get("APP_IOS_UPDATE_URL", "")
+    APP_IOS_RELEASE_NOTES: str = os.environ.get("APP_IOS_RELEASE_NOTES", "")
+
+    # Optional turn router. It uses the same server-managed inference endpoint
+    # as the rest of PAI; there is no second provider credential path.
+    ROUTER_LLM_ENABLED: bool = os.environ.get("ROUTER_LLM_ENABLED", "true").lower() in ("true", "1", "yes")
+
+    # Counselor conversation bounds
+    PAI_COUNSELOR_MAX_CONTEXT_MESSAGES: int = int(os.environ.get("PAI_COUNSELOR_MAX_CONTEXT_MESSAGES", "100"))
+    # Whole-request char budget (system prompt + history + trigger message).
+    # Chars are a rough token proxy and the ratio varies by language (CJK text
+    # can approach 1 token per char) — the default assumes frontier models
+    # with 200K+ windows and leaves output-token headroom; lower it when
+    # targeting small custom models.
+    PAI_COUNSELOR_MAX_CONTEXT_CHARS: int = int(os.environ.get("PAI_COUNSELOR_MAX_CONTEXT_CHARS", "60000"))
+    PAI_COUNSELOR_MAX_DEPTH: int = int(os.environ.get("PAI_COUNSELOR_MAX_DEPTH", "3"))
+
+    # PAI Counselor — Placement AI's primary education counselor (auto-added
+    # to every workspace). Its credentials are SERVER-HELD and shared across all
+    # workspaces: never persisted per-workspace and never exposed to the frontend.
+    # PAI Counselor is only provisioned when enabled AND a key is configured, so
+    # self-hosted deployments without a key simply don't get it.
+    PAI_ENABLED: bool = os.environ.get("PAI_ENABLED", "false").lower() in ("true", "1", "yes")
+    PAI_API_KEY: str = os.environ.get("PAI_API_KEY", "")
+    PAI_BASE_URL: str = os.environ.get("PAI_BASE_URL", "https://api.openai.com/v1")
+    # minimax-m2.5: fastest reliable tool-looper on the gateway (2026-08-27
+    # screen of all 23 models: ~7s/2-turn loop, 4/4 valid reps, all quality
+    # probes passed; deepseek-4-flash had degraded to >40s continuation turns).
+    PAI_MODEL: str = os.environ.get("PAI_MODEL", "gpt-5.4-mini")
+    # Safety cap on the tool-calling loop per user message.
+    PAI_MAX_TOOL_ITERATIONS: int = int(os.environ.get("PAI_MAX_TOOL_ITERATIONS", "6"))
+    # Memory extraction (app/memory/extractor.py). Each falls back to the
+    # matching PAI_* value, so extraction works with no extra configuration —
+    # but extraction is a cheap structured-output task that runs on every turn,
+    # so it can be moved to a smaller/faster model independently of Counselor.
+    MEMORY_EXTRACTOR_MODEL: str = os.environ.get("MEMORY_EXTRACTOR_MODEL", "")
+    MEMORY_EXTRACTOR_API_KEY: str = os.environ.get("MEMORY_EXTRACTOR_API_KEY", "")
+    MEMORY_EXTRACTOR_BASE_URL: str = os.environ.get("MEMORY_EXTRACTOR_BASE_URL", "")
+
+    # ---- Student documents (app/documents/) -------------------------------
+    # Document understanding falls back to the PAI_* model configuration, so
+    # uploading a transcript works with no extra setup.
+    DOCUMENT_EXTRACTOR_MODEL: str = os.environ.get("DOCUMENT_EXTRACTOR_MODEL", "")
+    DOCUMENT_EXTRACTOR_API_KEY: str = os.environ.get("DOCUMENT_EXTRACTOR_API_KEY", "")
+    DOCUMENT_EXTRACTOR_BASE_URL: str = os.environ.get("DOCUMENT_EXTRACTOR_BASE_URL", "")
+    # The student waits on this call. Measured on a real CV with gpt-5-mini:
+    # medium ~70s, low ~26s with the same core records. Empty = model default.
+    DOCUMENT_EXTRACTOR_REASONING_EFFORT: str = os.environ.get("DOCUMENT_EXTRACTOR_REASONING_EFFORT", "low")
+    # OCR for SCANNED PDFs only; a digital PDF never reaches it. Disabling it
+    # is a supported state: a scanned upload is stored and marked `partial`
+    # rather than failing, and can be reprocessed once OCR is available.
+    DOCUMENT_OCR_ENABLED: bool = os.environ.get("DOCUMENT_OCR_ENABLED", "true").lower() not in ("0", "false", "no")
+    DOCUMENT_OCR_MODEL: str = os.environ.get("DOCUMENT_OCR_MODEL", "")
+    DOCUMENT_OCR_API_KEY: str = os.environ.get("DOCUMENT_OCR_API_KEY", "")
+    DOCUMENT_OCR_BASE_URL: str = os.environ.get("DOCUMENT_OCR_BASE_URL", "")
+
+    # ---- Memory retrieval index (app/memory/index_qdrant.py) --------------
+    # Qdrant is a DERIVED index. Losing it costs a reindex, never data.
+    # Unset backend -> NullMemoryIndex, and retrieval degrades to the existing
+    # structured/lexical paths.
+    MEMORY_VECTOR_BACKEND: str = os.environ.get("MEMORY_VECTOR_BACKEND", "")
+    QDRANT_URL: str = os.environ.get("QDRANT_URL", "")
+    QDRANT_API_KEY: str = os.environ.get("QDRANT_API_KEY", "")
+    QDRANT_COLLECTION: str = os.environ.get("QDRANT_COLLECTION", "pai_memory")
+
+    # Embeddings. Deliberately NOT defaulted to the PAI chat credentials: a
+    # chat-model key/endpoint does not necessarily serve an embeddings route,
+    # and silently pointing at one turns a config mistake into a runtime error
+    # on every indexing job. Fallback happens only when PAI is explicitly an
+    # OpenAI-compatible endpoint (see embeddings.resolve_config).
+    MEMORY_EMBEDDING_PROVIDER: str = os.environ.get("MEMORY_EMBEDDING_PROVIDER", "openai")
+    MEMORY_EMBEDDING_MODEL: str = os.environ.get(
+        "MEMORY_EMBEDDING_MODEL", "text-embedding-3-small"
+    )
+    MEMORY_EMBEDDING_API_KEY: str = os.environ.get("MEMORY_EMBEDDING_API_KEY", "")
+    MEMORY_EMBEDDING_BASE_URL: str = os.environ.get("MEMORY_EMBEDDING_BASE_URL", "")
+    # Dimensions of the configured model. Stored alongside each indexed point
+    # so a model change is detectable and can trigger a reindex rather than
+    # silently mixing incompatible vector spaces.
+    MEMORY_EMBEDDING_DIM: int = int(os.environ.get("MEMORY_EMBEDDING_DIM", "1536"))
+    # Sparse (lexical) encoder. Qdrant/bm25 via fastembed, with the collection's
+    # sparse vector configured with Modifier.IDF so Qdrant computes real BM25
+    # scoring server-side rather than us approximating it.
+    MEMORY_SPARSE_MODEL: str = os.environ.get("MEMORY_SPARSE_MODEL", "Qdrant/bm25")
+
+    # Retrieval shape. Fetch a wide candidate pool, rerank, return few.
+    MEMORY_RETRIEVAL_CANDIDATES: int = int(
+        os.environ.get("MEMORY_RETRIEVAL_CANDIDATES", "40")
+    )
+    MEMORY_RETRIEVAL_LIMIT: int = int(os.environ.get("MEMORY_RETRIEVAL_LIMIT", "8"))
+    MEMORY_RERANKER: str = os.environ.get("MEMORY_RERANKER", "")
+
+    # ---- Foreground memory injection (app/memory/foreground.py) -----------
+    # Hard ceiling on the rendered student-context block. MemoryContextService
+    # already caps per section; this is the backstop so pathological values
+    # (a very long free-text Vault field) cannot expand the system prompt.
+    # Conservative on purpose — this is context, not the conversation.
+    PAI_MEMORY_CONTEXT_MAX_CHARS: int = int(
+        os.environ.get("PAI_MEMORY_CONTEXT_MAX_CHARS", "6000")
+    )
+    # --- Per-agent model configuration ---------------------------------
+    # Counselor turns always carry function tools, and /v1/chat/completions
+    # pins a tool-calling request to reasoning_effort="none" (see
+    # inference.client._reasoning_effort_for). That is also the fastest
+    # setting, which is what a chat turn wants; this value therefore applies
+    # to Counselor calls made WITHOUT tools, such as the research handoff.
+    PAI_COUNSELOR_REASONING_EFFORT: str = os.environ.get(
+        "PAI_COUNSELOR_REASONING_EFFORT", "low"
+    )
+    # Operator runs in the background, where quality beats latency. Its
+    # UNDERSTAND, PLAN and VERIFY phases carry no tools and so honour this;
+    # its tool-execution loop is pinned to "none" by the same API rule.
+    PAI_OPERATOR_MODEL: str = os.environ.get("PAI_OPERATOR_MODEL", "")
+    PAI_OPERATOR_REASONING_EFFORT: str = os.environ.get(
+        "PAI_OPERATOR_REASONING_EFFORT", "high"
+    )
+    # `max_completion_tokens` counts REASONING tokens as well as visible ones,
+    # so a cap sized for the answer alone can be consumed entirely by thinking
+    # and return an empty string. An empty VERIFY is fatal: the status fails to
+    # parse and the run is marked failed. Observed at the previous cap of 400.
+    # The cap is a ceiling, not a target — raising it showed no latency cost
+    # (3.9s at 400 vs 3.2s at 4000) and bills only tokens actually produced.
+    PAI_OPERATOR_PHASE_MAX_TOKENS: int = int(
+        os.environ.get("PAI_OPERATOR_PHASE_MAX_TOKENS", "2000")
+    )
+    # Retries for upstream model calls. Tokens-per-minute 429s clear on a
+    # ~60s window; the SDK's default of 2 gives up well before that and the
+    # student is told PAI could not reach the language service.
+    LLM_MAX_RETRIES: int = int(os.environ.get("LLM_MAX_RETRIES", "4"))
+    # Retrieval is on the response-critical path. Past this, PAI drops to the
+    # PostgreSQL-only fallback rather than making the student wait.
+    #
+    # 1500ms was below the floor for a REMOTE embedding provider and made the
+    # vector index dead weight: measured against OpenAI text-embedding-3-small,
+    # the query embedding alone is ~900-1400ms and a warm hybrid search ~800-1000ms,
+    # while build_foreground_context reserves only 70% of this budget for the
+    # hybrid arm. Every turn timed out into the lexical fallback, so memories
+    # were embedded and never read. Set well above the provider's p95; a
+    # co-located embedding service can safely lower it again.
+    PAI_MEMORY_CONTEXT_TIMEOUT_MS: int = int(
+        os.environ.get("PAI_MEMORY_CONTEXT_TIMEOUT_MS", "3000")
+    )
+    # Master switch for automatic FOREGROUND injection into PAI Counselor.
+    #
+    # ON by default: persistent student context is available across conversations.
+    # Retrieval is bounded and remains optional through this setting.
+    # Pilot rollout — see docs/pai-memory-rollout.md:
+    #   PAI_MEMORY_CONTEXT_ENABLED=true   (+ MEMORY_VECTOR_BACKEND=qdrant for hybrid)
+    PAI_MEMORY_CONTEXT_ENABLED: bool = os.environ.get(
+        "PAI_MEMORY_CONTEXT_ENABLED", "true"
+    ).lower() in ("true", "1", "yes")
+    # Personalized-counseling completion gate. Shadow calculates and logs the
+    # policy without changing replies; "new" applies only to accounts created
+    # at/after the ISO-8601 cutoff; "all" enforces for every account.
+    PAI_PROFILE_COMPLETION_ROLLOUT_MODE: str = os.environ.get(
+        "PAI_PROFILE_COMPLETION_ROLLOUT_MODE", "shadow"
+    ).strip().lower()
+    PAI_PROFILE_COMPLETION_ROLLOUT_AT: str = os.environ.get(
+        "PAI_PROFILE_COMPLETION_ROLLOUT_AT", ""
+    ).strip()
+    # Foreground retrieval runs on its own small thread pool so a stalled
+    # PostgreSQL cannot block the event loop (see foreground_executor.py).
+    # Threads cannot be killed, so MAX_INFLIGHT — not the pool size — is what
+    # bounds abandoned DB work when the database is slow.
+    PAI_MEMORY_FOREGROUND_WORKERS: int = int(
+        os.environ.get("PAI_MEMORY_FOREGROUND_WORKERS", "4")
+    )
+    PAI_MEMORY_FOREGROUND_MAX_INFLIGHT: int = int(
+        os.environ.get("PAI_MEMORY_FOREGROUND_MAX_INFLIGHT", "8")
+    )
+    # Provider-neutral web search. Disabled unless both fields are configured;
+    # credentials remain backend-only and are never included in tool results.
+    WEB_SEARCH_PROVIDER: str = os.environ.get("WEB_SEARCH_PROVIDER", "")
+    WEB_SEARCH_API_KEY: str = os.environ.get("WEB_SEARCH_API_KEY", "")
+    WEB_SEARCH_BASE_URL: str = os.environ.get("WEB_SEARCH_BASE_URL", "")
+
+    # Transactional email. Delivery goes through Resend when a key is
+    # configured (otherwise sends are logged no-ops).
+    # The application origin, for links the backend puts in email and in
+    # integration redirects. Placement AI's canonical hosted app.
+    FRONTEND_BASE_URL: str = os.environ.get("FRONTEND_BASE_URL", "https://app.placement-ai.com")
+    RESEND_API_KEY: str = os.environ.get("RESEND_API_KEY", "")
+    # Must be a domain verified in Resend, or delivery fails.
+    EMAIL_FROM: str = os.environ.get("EMAIL_FROM", "Placement AI <noreply@placement-ai.com>")
+
+    # Chat-platform integrations (Slack / Telegram bridges). The public base
+    # URL is what external platforms call back to — Telegram setWebhook and
+    # the Slack Events API URL both derive from it.
+    PUBLIC_API_BASE: str = os.environ.get(
+        "PUBLIC_API_BASE", "https://api.placement-ai.com"
+    )
+    # The official "OpenAgents" Slack app (one-click Add to Slack). All three
+    # come from the app's Basic Information page; when unset, the UI falls
+    # back to the bring-your-own-app flow (docs/slack-app-setup.md).
+    SLACK_CLIENT_ID: str = os.environ.get("SLACK_CLIENT_ID", "")
+    SLACK_CLIENT_SECRET: str = os.environ.get("SLACK_CLIENT_SECRET", "")
+    SLACK_SIGNING_SECRET: str = os.environ.get("SLACK_SIGNING_SECRET", "")
+
+    # In-app feedback forwarding. Feedback rows always land in the DB; when
+    # this is set they are also emailed (via Resend) to the team.
+    FEEDBACK_EMAIL_TO: str = os.environ.get("FEEDBACK_EMAIL_TO", "")
+
+    # Server
+    HOST: str = os.environ.get("HOST", "0.0.0.0")
+    PORT: int = int(os.environ.get("PORT", "8000"))
+
+    def validate_startup(self) -> None:
+        """Reject incomplete production configuration before serving traffic."""
+        if self.PAI_PROFILE_COMPLETION_ROLLOUT_MODE not in {"off", "shadow", "new", "all"}:
+            raise RuntimeError(
+                "PAI_PROFILE_COMPLETION_ROLLOUT_MODE must be off, shadow, new, or all"
+            )
+        if (self.PAI_PROFILE_COMPLETION_ROLLOUT_MODE == "new"
+                and not self.PAI_PROFILE_COMPLETION_ROLLOUT_AT):
+            raise RuntimeError(
+                "PAI_PROFILE_COMPLETION_ROLLOUT_AT is required when rollout mode is new"
+            )
+        if (self.PAI_PROFILE_COMPLETION_ROLLOUT_MODE == "new"
+                and self.PAI_PROFILE_COMPLETION_ROLLOUT_AT):
+            try:
+                datetime.fromisoformat(
+                    self.PAI_PROFILE_COMPLETION_ROLLOUT_AT.replace("Z", "+00:00")
+                )
+            except ValueError as exc:
+                raise RuntimeError(
+                    "PAI_PROFILE_COMPLETION_ROLLOUT_AT must be an ISO-8601 datetime"
+                ) from exc
+        if self.APP_ENV.lower() != "production":
+            return
+        if not os.environ.get("DATABASE_URL", "").strip():
+            raise RuntimeError("DATABASE_URL is required in production")
+        if self.CORS_ORIGINS.strip() in ("", "*"):
+            raise RuntimeError("Production CORS_ORIGINS must be an explicit origin list")
+        if self.FILE_STORAGE_BACKEND == "s3" and not self.S3_BUCKET.strip():
+            raise RuntimeError("S3_BUCKET is required when FILE_STORAGE_BACKEND=s3")
+
+
+config = Config()
