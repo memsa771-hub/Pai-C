@@ -4,7 +4,7 @@ import * as React from 'react';
 import Image from 'next/image';
 import {
   ChevronLeft, ChevronRight, CircleUser, FileText, Globe,
-  Inbox, KanbanSquare, MessageSquare, Users, Waypoints,
+  Inbox, KanbanSquare, Users, Waypoints,
 } from 'lucide-react';
 import {
   Sidebar,
@@ -193,7 +193,7 @@ export function NavRail() {
   } = useLayout();
   const {
     workspace, sessions, unreadSessionIds, unreadNotificationCount,
-    currentSessionId, tasks, setCurrentSessionId, onlineUsers, currentUser,
+    tasks, setCurrentSessionId, onlineUsers, currentUser,
   } = useWorkspace();
   const t = useT();
 
@@ -207,7 +207,7 @@ export function NavRail() {
       unreadSessionIds.has(s.sessionId),
   );
 
-  const isPaiCounselorActive = viewMode === 'threads' && currentSessionId === PAI_PRIMARY_CONVERSATION_ID;
+  const isPaiCounselorActive = viewMode === 'threads';
 
   const openPaiCounselor = (): void => {
     setCurrentSessionId(PAI_PRIMARY_CONVERSATION_ID);
@@ -220,12 +220,6 @@ export function NavRail() {
     // the other half of the conversation, not a setting filed away under a
     // gear icon.
     { mode: 'profile', label: t('views.profile'), icon: <CircleUser /> },
-    {
-      mode: 'threads',
-      label: t('views.threads'),
-      icon: <MessageSquare />,
-      unread: hasUnreadThreads,
-    },
     { mode: 'files', label: t('views.files'), icon: <FileText /> },
     { mode: 'browser', label: t('views.browser'), icon: <Globe /> },
     ...(TASKS_UI_ENABLED
@@ -311,11 +305,11 @@ export function NavRail() {
         <SidebarGroup className="px-1.5">
           <SidebarGroupContent>
             <SidebarMenu className="gap-0.5">
-              {/* PAI Counselor: always the fastest way back to the one canonical
-                  conversation, distinct from Threads (which browses all of them). */}
+              {/* PAI Counselor opens the canonical conversation. Its adjacent
+                  list still lets students browse existing conversations. */}
               <SidebarMenuItem>
                 <SidebarMenuButton
-                  className={cn(!showLabels && 'justify-center!')}
+                  className={cn('relative', !showLabels && 'justify-center!')}
                   aria-label={t('views.paiCounselor')}
                   tooltip={{ children: t('views.paiCounselor'), hidden: showLabels }}
                   isActive={isPaiCounselorActive}
@@ -323,6 +317,15 @@ export function NavRail() {
                 >
                   <AgentAvatar name="pai" size={20} className="[&_svg]:size-full!" />
                   {showLabels && <span className="truncate">{t('views.paiCounselor')}</span>}
+                  {hasUnreadThreads && (
+                    <span
+                      className={cn(
+                        'absolute size-1.5 rounded-full bg-primary',
+                        showLabels ? 'top-1/2 right-2 -translate-y-1/2' : 'top-0.5 right-0.5',
+                      )}
+                      aria-hidden="true"
+                    />
+                  )}
                 </SidebarMenuButton>
               </SidebarMenuItem>
               {items.map((item) => (

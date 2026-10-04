@@ -1,7 +1,7 @@
 'use client';
 
 import {
-  CircleUser, FileText, Globe, Inbox, KanbanSquare, MessageSquare, Waypoints,
+  CircleUser, FileText, Globe, Inbox, KanbanSquare, Waypoints,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -34,12 +34,12 @@ interface NavItem {
 export function NavMain({ onNavigate }: { onNavigate?: () => void }) {
   const { viewMode, openView, setSelectedAgentName } = useLayout();
   const {
-    sessions, files, browserTabs, tasks, workflows, unreadNotificationCount,
-    currentSessionId, setCurrentSessionId,
+    files, browserTabs, tasks, workflows, unreadNotificationCount,
+    setCurrentSessionId,
   } = useWorkspace();
   const t = useT();
 
-  const isPaiCounselorActive = viewMode === 'threads' && currentSessionId === PAI_PRIMARY_CONVERSATION_ID;
+  const isPaiCounselorActive = viewMode === 'threads';
 
   const openPaiCounselor = (): void => {
     setCurrentSessionId(PAI_PRIMARY_CONVERSATION_ID);
@@ -49,14 +49,8 @@ export function NavMain({ onNavigate }: { onNavigate?: () => void }) {
   };
 
   const items: NavItem[] = [
-    // Directly under PAI Counselor — see the matching note in nav-rail.
+    // Conversations remain inside PAI Counselor; Profile is the next nav item.
     { mode: 'profile', label: t('views.profile'), icon: <CircleUser /> },
-    {
-      mode: 'threads',
-      label: t('views.threads'),
-      icon: <MessageSquare />,
-      count: sessions.filter((s) => !s.sessionId.startsWith('routine:') && !s.sessionId.startsWith('task:')).length,
-    },
     { mode: 'files', label: t('views.files'), icon: <FileText />, count: countFiles(files) },
     { mode: 'browser', label: t('views.browser'), icon: <Globe />, count: browserTabs.length },
     ...(TASKS_UI_ENABLED

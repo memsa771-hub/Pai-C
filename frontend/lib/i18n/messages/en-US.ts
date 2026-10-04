@@ -1037,7 +1037,7 @@ export const messages = {
   },
 
   threads: {
-    title: 'Threads',
+    title: 'Conversations',
     unreadCount: '{count} unread',
     unread: 'Unread',
     finished: 'Finished',

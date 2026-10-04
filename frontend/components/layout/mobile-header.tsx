@@ -50,7 +50,7 @@ export function MobileHeader() {
   };
 
   const tabs: { mode: ViewMode; icon: typeof MessageSquare; label: string }[] = [
-    { mode: 'threads', icon: MessageSquare, label: t('views.threads') },
+    { mode: 'threads', icon: MessageSquare, label: t('views.paiCounselor') },
     { mode: 'files', icon: FileText, label: t('views.files') },
     { mode: 'browser', icon: Globe, label: t('views.browser') },
   ];
