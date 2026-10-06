@@ -240,9 +240,7 @@ export class CounselorVoiceSession {
       this.callbacks.messagePosted();
       const reply = await this.waitForCounselor(posted.id, id, generation);
       if (reply && !this.closed && generation === this.generation && id === this.latestDelegation) {
-        for (const chunk of speechChunks(reply)) {
-          this.send('session.commentary.append', { delegation_id: id, content: chunk });
-        }
+        this.send('session.commentary.append', { delegation_id: id, content: reply });
       }
     } catch (error) {
       if (this.closed || generation !== this.generation || id !== this.latestDelegation) return;

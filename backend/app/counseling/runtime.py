@@ -60,6 +60,28 @@ async def run_counselor(workspace_id: str, event_data: dict) -> None:
 
 async def _run_turn(db, workspace_id: str, event_data: dict, depth: int) -> None:
     """Answer through the shared natural-text Core, then queue quiet learning."""
+    if config.PAI_COUNSELOR_V2:
+        from .turn import CounselorTurnInput, run_counselor_turn
+        from app.services.pai import PAI_AGENT_NAME
+
+        metadata = event_data.get("metadata") or {}
+        payload = event_data.get("payload") or {}
+        turn = CounselorTurnInput(
+            channel=event_data.get("target", ""), workspace_id=workspace_id,
+            student_text=str(payload.get("content") or ""),
+            attachments=tuple(payload.get("attachments") or ()),
+            session_id=metadata.get("session_id") or metadata.get("voice_session_id"),
+            source_event_id=str(event_data.get("id") or ""),
+            timestamp=_event_order_boundary(event_data),
+            source=str(event_data.get("source") or ""),
+            voice=bool(metadata.get("voice_delegation_id")),
+        )
+        if not turn.student_text.strip() and not turn.attachments:
+            return
+        _, reply, _ = await run_counselor_turn(db, turn)
+        await _post_response(db, workspace_id, turn.channel, PAI_AGENT_NAME,
+                             reply, depth, metadata=_voice_reply_metadata(event_data))
+        return
     from app.services.pai import PAI_AGENT_NAME, WorkspaceApi
     from app.memory.permissions import capabilities_for_agent
     from app.tools import AUDIENCE_COUNSELOR, ToolContext
