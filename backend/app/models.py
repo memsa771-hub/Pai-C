@@ -1073,6 +1073,31 @@ class ProfileRequirement(Base):
     )
 
 
+class ProfileFieldResponse(Base):
+    """A student's response to a requirement when there is no profile value.
+
+    Accepted values remain exclusively in Vault/typed records. This table only
+    prevents repeatedly asking about an explicit unknown, deferral or refusal.
+    """
+    __tablename__ = "pai_profile_field_responses"
+
+    id = Column(Text, primary_key=True, default=_uuid)
+    workspace_id = Column(UUID(as_uuid=False), ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False)
+    requirement_key = Column(Text, nullable=False)
+    status = Column(Text, nullable=False)
+    source_event_id = Column(Text, nullable=True)
+    created_at = Column(DateTime(timezone=True), default=_now, server_default=text("NOW()"))
+    updated_at = Column(DateTime(timezone=True), default=_now, onupdate=_now, server_default=text("NOW()"))
+
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('pending', 'valid_unknown', 'not_applicable', 'declined', 'deferred')",
+            name="ck_profile_field_response_status",
+        ),
+        UniqueConstraint("workspace_id", "requirement_key", name="uq_profile_field_response"),
+    )
+
+
 class VaultFact(Base):
     """One canonical structured fact about the student, with provenance.
 

@@ -304,7 +304,7 @@ class Config:
     # policy without changing replies; "new" applies only to accounts created
     # at/after the ISO-8601 cutoff; "all" enforces for every account.
     PAI_PROFILE_COMPLETION_ROLLOUT_MODE: str = os.environ.get(
-        "PAI_PROFILE_COMPLETION_ROLLOUT_MODE", "shadow"
+        "PAI_PROFILE_COMPLETION_ROLLOUT_MODE", "all"
     ).strip().lower()
     PAI_PROFILE_COMPLETION_ROLLOUT_AT: str = os.environ.get(
         "PAI_PROFILE_COMPLETION_ROLLOUT_AT", ""

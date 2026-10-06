@@ -106,6 +106,8 @@ class ProfileRequirementRegistry:
             target = selector.removeprefix("record:")
             kind, _, path = target.partition(".")
             return [value_at(row, path) for row in snapshot.records.get(kind, [])]
+        if selector.startswith("record_exists:"):
+            return bool(snapshot.records.get(selector.removeprefix("record_exists:")))
         if selector.startswith("journey_gap:"):
             key = selector.removeprefix("journey_gap:")
             return any(gap.get("key") == key for gap in journey.get("gaps", []))

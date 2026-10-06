@@ -21,7 +21,7 @@ from app.memory.reconciler import MemoryReconciler
 from app.memory.student_records import ENTITY_MODELS, StudentRecordService
 from app.memory.student_snapshot import StudentSnapshotService
 from app.models import (
-    MemoryCandidate, ProfileIssue, ProfileRequirement, StudentRecordRevision,
+    MemoryCandidate, ProfileFieldResponse, ProfileIssue, ProfileRequirement, StudentRecordRevision,
     User, VaultFact, VaultFieldDefinition, Workspace, VAULT_INTAKE_MODELS,
 )
 from app.services import pai
@@ -45,7 +45,7 @@ def profile_db(monkeypatch):
 
     models = [
         User, Workspace, VaultFieldDefinition, VaultFact, MemoryCandidate,
-        ProfileIssue, ProfileRequirement, StudentRecordRevision,
+        ProfileIssue, ProfileRequirement, ProfileFieldResponse, StudentRecordRevision,
         *ENTITY_MODELS.values(), *VAULT_INTAKE_MODELS,
     ]
     Base.metadata.create_all(engine, tables=[model.__table__ for model in models])
@@ -102,7 +102,8 @@ def test_completion_threshold_edges(profile_db, filled, eligible):
                 _fact(profile_db, workspace, key, True)
     profile_db.commit()
     result = ProfileCompletionService(profile_db).evaluate(workspace)
-    assert result["personalizedCounselingEligible"] is eligible
+    assert result["tierTargetsMet"] is eligible
+    assert result["personalizedCounselingEligible"] is (filled[0] == 100)
 
 
 def test_zero_tier_and_false_zero_are_filled(profile_db):
@@ -117,6 +118,63 @@ def test_zero_tier_and_false_zero_are_filled(profile_db):
         "filled": 0, "total": 0, "percentage": 100, "satisfied": True,
     }
     assert result["personalizedCounselingEligible"] is True
+
+
+def test_foundation_tracks_non_value_answers_without_claiming_a_fact(profile_db, monkeypatch):
+    workspace = profile_db.info["workspace"]
+    _requirement(profile_db, "identity.status_category", "critical")
+    _requirement(profile_db, "education.history", "critical", "record_presence", "education")
+    profile_db.commit()
+    monkeypatch.setattr(config, "PAI_PROFILE_COMPLETION_ROLLOUT_MODE", "all")
+    service = ProfileCompletionService(profile_db)
+    assert service.evaluate(workspace)["nextRequirement"]["key"] == "education.history"
+    service.record_response(workspace, "education.history", "valid_unknown")
+    profile_db.commit()
+    state = service.evaluate(workspace)
+    assert state["foundationReady"] is False
+    assert state["nextRequirement"]["key"] == "identity.status_category"
+    assert not StudentSnapshotService(profile_db).build(workspace).records["education"]
+    service.record_response(workspace, "identity.status_category", "declined")
+    profile_db.commit()
+    assert service.evaluate(workspace)["foundationReady"] is True
+
+
+def test_deferred_requirement_is_not_reasked_immediately(profile_db, monkeypatch):
+    workspace = profile_db.info["workspace"]
+    _requirement(profile_db, "first", "critical", priority=100)
+    _requirement(profile_db, "second", "critical", priority=50)
+    profile_db.commit()
+    monkeypatch.setattr(config, "PAI_PROFILE_COMPLETION_ROLLOUT_MODE", "all")
+    service = ProfileCompletionService(profile_db)
+    service.record_response(workspace, "first", "deferred")
+    profile_db.commit()
+    state = service.evaluate(workspace)
+    assert state["foundationReady"] is False
+    assert state["nextRequirement"]["key"] == "second"
+
+
+def test_pending_requirement_waits_for_processing(profile_db, monkeypatch):
+    workspace = profile_db.info["workspace"]
+    _requirement(profile_db, "education.history", "critical", "record_presence", "education")
+    profile_db.add(ProfileFieldResponse(
+        workspace_id=workspace, requirement_key="education.history", status="pending"))
+    profile_db.commit()
+    monkeypatch.setattr(config, "PAI_PROFILE_COMPLETION_ROLLOUT_MODE", "all")
+    state = ProfileCompletionService(profile_db).evaluate(workspace)
+    assert state["foundationReady"] is False
+    assert state["nextRequirement"] is None
+
+
+def test_education_details_branch_only_after_a_record_exists(profile_db):
+    workspace = profile_db.info["workspace"]
+    requirement = _requirement(profile_db, "education.level", "critical",
+                               "record_field", "education", "canonical_level")
+    requirement.applicability = {"record_exists:education": True}
+    profile_db.commit()
+    assert ProfileCompletionService(profile_db).evaluate(workspace)["fields"] == []
+    _education(profile_db, qualification_name="High school")
+    state = ProfileCompletionService(profile_db).evaluate(workspace)
+    assert state["fields"][0]["status"] == "missing"
 
 
 def test_registry_uses_highest_enabled_requirement_version(profile_db):

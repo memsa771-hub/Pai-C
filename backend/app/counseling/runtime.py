@@ -62,9 +62,11 @@ async def _run_turn(db, workspace_id: str, event_data: dict, depth: int) -> None
         wait_until_readable,
     )
     from app.memory.student_snapshot import StudentSnapshotService
+    from app.memory.profile_completion import ProfileCompletionService
     from app.memory.foreground import build_foreground_context
     from .core import CounselorCore
     from .understanding import StudentUnderstandingBuilder
+    from .turn_plan import TurnPlan
 
     if not config.PAI_API_KEY:
         await _post_error_message(
@@ -100,7 +102,22 @@ async def _run_turn(db, workspace_id: str, event_data: dict, depth: int) -> None
             for item in described
         ], ensure_ascii=False)
 
+    completion_service = ProfileCompletionService(db)
     snapshot = StudentSnapshotService(db).build(workspace_id)
+    completion = completion_service.evaluate(workspace_id, snapshot=snapshot)
+    profile_captured = False
+    if (completion["enforced"] and content
+            and str(event_data.get("source", "")).startswith("human:")):
+        from app.memory.foundation_intake import capture_foundation_turn
+        profile_captured = await capture_foundation_turn(db, workspace_id, event_data)
+        snapshot = StudentSnapshotService(db).build(workspace_id)
+        completion = completion_service.evaluate(workspace_id, snapshot=snapshot)
+    from .goal_transition import resolve_or_activate_goal
+    active_journey = await resolve_or_activate_goal(
+        db, workspace_id, event_data, PAI_AGENT_NAME,
+        foundation_ready=bool(completion.get("enforced") and completion.get("foundationReady")),
+    )
+    turn_plan = TurnPlan.from_completion(completion, snapshot, active_journey)
     understanding = StudentUnderstandingBuilder(db).build(
         workspace_id, snapshot=snapshot)
     db.rollback()
@@ -123,10 +140,35 @@ async def _run_turn(db, workspace_id: str, event_data: dict, depth: int) -> None
         understanding=understanding,
         memory_context=memory_context,
         attachment_context=attachment_context,
+        turn_plan=turn_plan,
     )
+    if turn_plan.mode == "collecting":
+        from .reply_guard import guard_collection_reply
+        reply = await guard_collection_reply(
+            reply, student_message=content or "I attached a file.",
+            question=turn_plan.question,
+        )
+    response_metadata = _voice_reply_metadata(event_data) or {}
+    if (turn_plan.mode == "open" and turn_plan.parked_goal
+            and active_journey is None
+            and str(event_data.get("source", "")).startswith("human:")):
+        from .context_projection import compact_student_context
+        from .goal_transition import reviewed_route
+        goal_row = next((row for row in snapshot.records.get("goal", [])
+                         if row.get("title") == turn_plan.parked_goal), None)
+        if goal_row and await reviewed_route(
+                reply, goal_title=turn_plan.parked_goal,
+                known_context=compact_student_context(understanding, turn_plan.parked_goal)):
+            response_metadata["route_reviewed_goal_id"] = goal_row["id"]
     assistant_event_id = await _post_response(
         db, workspace_id, channel_target, PAI_AGENT_NAME, reply, depth,
-        metadata=_voice_reply_metadata(event_data),
+        metadata=response_metadata or None,
+    )
+    logger.info(
+        "counselor: turn_plan mode=%s foundation=%d/%d question_key=%s posted=%s",
+        turn_plan.mode, *turn_plan.progress,
+        (completion.get("nextRequirement") or {}).get("key"),
+        bool(assistant_event_id),
     )
     # Scheduled review instructions are system events, not new student claims.
     # Keep the ordinary candidate/reconciliation learning path for real human
@@ -138,6 +180,7 @@ async def _run_turn(db, workspace_id: str, event_data: dict, depth: int) -> None
             user_event_id=event_data.get("id"),
             assistant_event_id=assistant_event_id,
             agent_name=PAI_AGENT_NAME,
+            profile_captured=profile_captured,
         )
 
 def _event_order_boundary(event_data: dict) -> Optional[int]:

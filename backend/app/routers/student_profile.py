@@ -51,6 +51,10 @@ class OnboardingAnswers(BaseModel):
     answers: dict[str, Any] = Field(default_factory=dict)
 
 
+class ProfileFieldResponseRequest(BaseModel):
+    status: Literal["valid_unknown", "not_applicable", "declined", "deferred"]
+
+
 def _workspace(db, network, token, authorization):
     workspace = _resolve_workspace(db, network)
     if workspace is None:
@@ -128,6 +132,25 @@ def get_profile_completion(
     if error:
         return error
     return success_response(ProfileCompletionService(db).evaluate(str(workspace.id)))
+
+
+@router.post("/completion/fields/{requirement_key}/response")
+def record_profile_field_response(
+    requirement_key: str, body: ProfileFieldResponseRequest,
+    network: str = Query(...), db: Session = Depends(get_db),
+    x_workspace_token: Optional[str] = Header(None), authorization: Optional[str] = Header(None),
+):
+    workspace, error = _workspace(db, network, x_workspace_token, authorization)
+    if error:
+        return error
+    try:
+        result = ProfileCompletionService(db).record_response(
+            str(workspace.id), requirement_key, body.status)
+        db.commit()
+        return success_response(result)
+    except ValueError as exc:
+        db.rollback()
+        return json_response(ResponseCode.BAD_REQUEST, str(exc))
 
 
 @router.get("/history")

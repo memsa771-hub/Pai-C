@@ -162,16 +162,23 @@ def test_text_and_voice_turns_use_the_same_core_and_background_learning():
              patch("app.counseling.runtime._build_conversation_context",
                    return_value=[]), \
              patch("app.memory.student_snapshot.StudentSnapshotService") as snapshots, \
+             patch("app.memory.profile_completion.ProfileCompletionService") as completion, \
              patch("app.counseling.understanding.StudentUnderstandingBuilder") as builders, \
              patch("app.counseling.core.CounselorCore") as core, \
              patch("app.counseling.runtime._post_response", post), \
              patch("app.memory.turn_hook.enqueue_turn_extraction") as extract:
             snapshots.return_value.build.return_value = snapshot
+            snapshot.records = {"goal": []}
+            completion.return_value.evaluate.return_value = {
+                "counselorMode": "normal", "enforced": False,
+                "fields": [], "nextRequirement": None,
+            }
             builders.return_value.build.return_value = _understanding()
             core.return_value.respond = core_reply
             for marker in ({}, {"voice_delegation_id": "live-turn"}):
                 await _run_turn(db, "student", {
-                    "id": "student-event", "target": "channel/pai-counselor",
+                    "id": "student-event", "source": "human:student",
+                    "target": "channel/pai-counselor",
                     "payload": {"content": "high school"},
                     "metadata": marker,
                 }, 0)
@@ -184,4 +191,91 @@ def test_text_and_voice_turns_use_the_same_core_and_background_learning():
             assert extract.call_count == 2
             assert all(call.kwargs["user_event_id"] == "student-event"
                        for call in extract.call_args_list)
+    asyncio.run(run())
+
+
+def test_collection_reconciles_before_reply_for_text_and_voice():
+    async def run():
+        db = Mock()
+        snapshot = Mock(records={"goal": []})
+        completion = {"counselorMode": "collection", "enforced": True, "fields": [{
+            "key": "education.history", "tier": "critical", "status": "missing",
+        }], "nextRequirement": {"key": "education.history", "question": "What are you studying?"}}
+        with patch("app.counseling.runtime.config.PAI_API_KEY", "server-key"), \
+             patch("app.counseling.runtime.config.PAI_MEMORY_CONTEXT_ENABLED", False), \
+             patch("app.counseling.runtime._build_conversation_context", return_value=[]), \
+             patch("app.memory.student_snapshot.StudentSnapshotService") as snapshots, \
+             patch("app.memory.profile_completion.ProfileCompletionService") as service, \
+             patch("app.counseling.understanding.StudentUnderstandingBuilder") as builder, \
+             patch("app.memory.foundation_intake.capture_foundation_turn", new_callable=AsyncMock) as capture, \
+             patch("app.counseling.core.CounselorCore") as core, \
+             patch("app.counseling.reply_guard.guard_collection_reply", new_callable=AsyncMock) as guard, \
+             patch("app.counseling.runtime._post_response", new_callable=AsyncMock) as post, \
+             patch("app.memory.turn_hook.enqueue_turn_extraction") as enqueue:
+            snapshots.return_value.build.return_value = snapshot
+            service.return_value.evaluate.return_value = completion
+            builder.return_value.build.return_value = _understanding()
+            capture.return_value = True
+            core.return_value.respond = AsyncMock(return_value="Draft")
+            guard.return_value = "Safe reply"
+            post.return_value = "assistant-event"
+            for metadata in ({}, {"voice_delegation_id": "voice-turn"}):
+                await _run_turn(db, "student", {
+                    "id": "owner-event", "source": "human:owner",
+                    "target": "channel/pai-counselor",
+                    "payload": {"content": "I completed school"}, "metadata": metadata,
+                }, 0)
+            assert capture.await_count == 2
+            assert core.return_value.respond.await_count == 2
+            assert guard.await_count == 2
+            assert all(call.kwargs["profile_captured"] is True
+                       for call in enqueue.call_args_list)
+            assert post.await_args_list[0].args[4] == "Safe reply"
+            assert post.await_args_list[1].args[4] == "Safe reply"
+    asyncio.run(run())
+
+
+def test_goal_activates_only_after_reviewed_reply_and_explicit_confirmation():
+    async def run():
+        db = Mock()
+        db.get.return_value = Mock(network_id="student", target="channel/pai-counselor",
+                                   source="human:owner", owner_user_id="owner")
+        snapshot = Mock(records={"goal": [{"id": "goal-1", "title": "Study computing"}]})
+        completion = {"enforced": True, "foundationReady": True,
+                      "counselorMode": "normal", "fields": [], "nextRequirement": None}
+        with patch("app.counseling.runtime.config.PAI_API_KEY", "server-key"), \
+             patch("app.counseling.runtime.config.PAI_MEMORY_CONTEXT_ENABLED", False), \
+             patch("app.counseling.runtime._build_conversation_context", return_value=[]), \
+             patch("app.memory.student_snapshot.StudentSnapshotService") as snapshots, \
+             patch("app.memory.profile_completion.ProfileCompletionService") as service, \
+             patch("app.counseling.understanding.StudentUnderstandingBuilder") as builder, \
+             patch("app.memory.foundation_intake.capture_foundation_turn", new_callable=AsyncMock), \
+             patch("app.counseling.goal_transition.JourneyService") as journeys, \
+             patch("app.counseling.goal_transition.StudentRecordService") as records, \
+             patch("app.counseling.goal_transition.previous_route_review",
+                   return_value=("goal-1", "We discussed the gaps and alternatives.")), \
+             patch("app.counseling.turn_semantics.classify_turn", new_callable=AsyncMock) as classify, \
+             patch("app.counseling.goal_transition.confirms_reviewed_route",
+                   new_callable=AsyncMock) as confirm, \
+             patch("app.counseling.core.CounselorCore") as core, \
+             patch("app.counseling.runtime._post_response", new_callable=AsyncMock) as post, \
+             patch("app.memory.turn_hook.enqueue_turn_extraction"):
+            snapshots.return_value.build.return_value = snapshot
+            service.return_value.evaluate.return_value = completion
+            builder.return_value.build.return_value = _understanding()
+            journeys.return_value.resolve_active.return_value = None
+            journeys.return_value.create.return_value = Mock(title="Study computing")
+            records.return_value.get.return_value = Mock(title="Study computing")
+            classify.return_value = {"journey_intent": {
+                "action": "upsert", "journey_type": "direction_discovery"}}
+            confirm.return_value = True
+            core.return_value.respond = AsyncMock(return_value="Let's begin.")
+            post.return_value = "assistant-event"
+            await _run_turn(db, "student", {
+                "id": "owner-event", "source": "human:owner", "timestamp": 1234,
+                "target": "channel/pai-counselor", "payload": {"content": "Yes, I choose that route"},
+            }, 0)
+            journeys.return_value.create.assert_called_once()
+            assert journeys.return_value.create.call_args.kwargs["primary"] is True
+            assert core.return_value.respond.await_args.kwargs["turn_plan"].active_goal == "Study computing"
     asyncio.run(run())

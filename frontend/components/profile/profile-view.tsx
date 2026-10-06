@@ -34,7 +34,7 @@ import { useT, type MessageKey } from '@/lib/i18n';
 import {
   factLabel, formatDate, formatDateRange, formatFactValue, formatResult,
   humanizeFactKey, humanizeValue, sortByRecency, sortEducation,
-  type EditableRecordKind, type StudentProfile,
+  type EditableRecordKind, type StudentProfile, type ProfileCompletion,
 } from '@/lib/student-profile';
 import {
   Chips, Collapsible, FactRow, Row, Section, StageChip, VerificationBadge,
@@ -55,6 +55,7 @@ export function ProfileView() {
   const { setCurrentSessionId } = useWorkspace();
 
   const [profile, setProfile] = React.useState<StudentProfile | null>(null);
+  const [completion, setCompletion] = React.useState<ProfileCompletion | null>(null);
   const [error, setError] = React.useState(false);
   const [loading, setLoading] = React.useState(true);
   const [editTarget, setEditTarget] = React.useState<EditTarget | null>(null);
@@ -63,7 +64,11 @@ export function ProfileView() {
   const load = React.useCallback(async (showSpinner = true) => {
     if (showSpinner) setLoading(true);
     try {
-      setProfile(await workspaceApi.getStudentProfile());
+      const [nextProfile, nextCompletion] = await Promise.all([
+        workspaceApi.getStudentProfile(), workspaceApi.getProfileCompletion(),
+      ]);
+      setProfile(nextProfile);
+      setCompletion(nextCompletion);
       setError(false);
     } catch {
       setError(true);
@@ -141,6 +146,19 @@ export function ProfileView() {
             onEdit={() => setEditingHeader(true)}
           />
 
+          {completion && <FoundationChecklist
+            completion={completion}
+            onTalkToPai={talkToPai}
+            onUpload={() => openView('files')}
+            onResponse={async (key, status) => {
+              try {
+                setCompletion(await workspaceApi.respondToProfileField(key, status));
+              } catch {
+                toast.error('Could not save that response. Please try again.');
+              }
+            }}
+          />}
+
           {profile.meta.isEmpty ? (
             <EmptyProfile
               onTalkToPai={talkToPai}
@@ -195,6 +213,44 @@ export function ProfileView() {
 // ---------------------------------------------------------------------------
 // Header
 // ---------------------------------------------------------------------------
+
+function FoundationChecklist({ completion, onTalkToPai, onUpload, onResponse }: {
+  completion: ProfileCompletion;
+  onTalkToPai: () => void;
+  onUpload: () => void;
+  onResponse: (key: string, status: 'valid_unknown' | 'not_applicable' | 'declined' | 'deferred') => Promise<void>;
+}) {
+  const critical = completion.fields.filter((field) => field.tier === 'critical');
+  const done = new Set(['answered', 'valid_unknown', 'not_applicable', 'declined']);
+  const finished = critical.filter((field) => done.has(field.status)).length;
+  if (!critical.length) return null;
+  return <section className="mt-6 rounded-xl border bg-card p-4" aria-label="Profile foundation">
+    <div className="flex flex-wrap items-center justify-between gap-3">
+      <div>
+        <h2 className="text-sm font-semibold">Profile foundation</h2>
+        <p className="mt-1 text-xs text-muted-foreground">
+          {completion.foundationReady
+            ? 'Your foundation is ready. PAI can now explore your goals with you.'
+            : `${finished} of ${critical.length} essentials covered. PAI will learn the rest with you.`}
+        </p>
+      </div>
+      {!completion.foundationReady && <div className="flex gap-2">
+        <Button size="sm" variant="outline" onClick={onUpload}>Upload documents</Button>
+        <Button size="sm" onClick={onTalkToPai}>Talk to PAI</Button>
+      </div>}
+    </div>
+    <div className="mt-3 space-y-2">
+      {critical.map((field) => <div key={field.key} className="flex flex-wrap items-center justify-between gap-2 rounded-md bg-muted/40 px-3 py-2 text-xs">
+        <span>{field.question}</span>
+        <span className="text-muted-foreground">{field.status.replaceAll('_', ' ')}</span>
+        {field.status === 'missing' && <div className="flex gap-2">
+          <button type="button" className="underline" onClick={() => onResponse(field.key, 'valid_unknown')}>Not sure</button>
+          <button type="button" className="underline" onClick={() => onResponse(field.key, 'declined')}>Prefer not to say</button>
+        </div>}
+      </div>)}
+    </div>
+  </section>;
+}
 
 function ProfileIdentity({
   profile, onEdit,

@@ -354,6 +354,19 @@ class WorkspaceApi {
     );
   }
 
+  async getProfileCompletion(): Promise<import('./student-profile').ProfileCompletion> {
+    return this.request(`/v1/student-profile/completion?network=${this.requireWorkspace()}`);
+  }
+
+  async respondToProfileField(
+    key: string, status: 'valid_unknown' | 'not_applicable' | 'declined' | 'deferred',
+  ): Promise<import('./student-profile').ProfileCompletion> {
+    return this.request(
+      `/v1/student-profile/completion/fields/${encodeURIComponent(key)}/response?network=${this.requireWorkspace()}`,
+      { method: 'POST', body: JSON.stringify({ status }) },
+    );
+  }
+
   // Application workspace: operational plans, separate from the canonical Profile.
   async searchInstitutions(q = '', countryCode = ''): Promise<import('./application-workspace').Institution[]> {
     const params = new URLSearchParams({ network: this.requireWorkspace(), q });

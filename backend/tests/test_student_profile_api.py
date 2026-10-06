@@ -29,7 +29,7 @@ from app.memory.student_records import ENTITY_MODELS
 from app.memory.vault import VaultService
 from app.models import (
     BackgroundJob, EventRecord, FileRecord, MemoryCandidate, PaiEpisode, PaiMemory,
-    ProfileIssue, ProfileRequirement, StudentRecordRevision, User, VaultFact,
+    ProfileFieldResponse, ProfileIssue, ProfileRequirement, StudentRecordRevision, User, VaultFact,
     VaultFieldDefinition, Workspace, VAULT_INTAKE_MODELS,
 )
 
@@ -63,6 +63,7 @@ def api():
 
     tables = [User, Workspace, EventRecord, FileRecord, VaultFact, VaultFieldDefinition,
               MemoryCandidate, PaiMemory, PaiEpisode, ProfileIssue, ProfileRequirement,
+              ProfileFieldResponse,
               StudentRecordRevision,
               BackgroundJob, *ENTITY_MODELS.values(), *VAULT_INTAKE_MODELS]
     Base.metadata.create_all(engine, tables=[model.__table__ for model in tables])

@@ -14,6 +14,18 @@
 
 import type { MessageKey, TranslateFn } from './i18n';
 
+export interface ProfileCompletion {
+  foundationReady: boolean;
+  counselorMode: 'collection' | 'normal';
+  fields: Array<{
+    key: string;
+    tier: 'critical' | 'important' | 'enrichment';
+    status: 'answered' | 'missing' | 'pending' | 'valid_unknown' | 'not_applicable' | 'declined' | 'deferred' | 'conflict';
+    question: string;
+    priority: number;
+  }>;
+}
+
 /** A grade in whatever system the student actually stated. Never normalized. */
 export interface RecordResult {
   gpa?: number;
