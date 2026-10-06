@@ -72,7 +72,7 @@ SLOTS = (
      "Find when the student wants to start or change direction", True,
      "When would you like to start?", "آپ کب شروع کرنا چاہتے ہیں؟",
      "Aap kab shuru karna chahte hain?"),
-    ("study_mode", "direction", 45, "vault_fact", "preferences.study_mode", None, "any",
+    ("study_mode", "direction", 45, "vault_fact", "preferences.study_load", None, "any",
      {"working_now": True}, "Find whether study must fit around current work", True,
      "Would you need to study part-time alongside work?", "کیا کام کے ساتھ جز وقتی پڑھنا ہوگا؟",
      "Kya kaam ke saath part-time parhna hoga?"),
@@ -134,6 +134,21 @@ def upgrade():
                                  "items": {"type": "string", "minLength": 1, "maxLength": 200}}),
            "tags": json.dumps(["counseling", "matching"]),
            "required_for": json.dumps(["counseling"])})
+    # Delivery mode (online/on-campus) already exists; study load is distinct.
+    connection.execute(sa.text("""
+        INSERT INTO pai_vault_field_definitions
+          (id, key, category, data_type, validation_schema, cardinality,
+           conflict_policy, sensitivity, searchable, enabled, version,
+           description, context_tags, required_for, profile_priority)
+        VALUES (:id, 'preferences.study_load', 'preferences', 'string',
+                CAST(:schema AS jsonb), 'single', 'latest_wins', 'normal',
+                FALSE, TRUE, 1, 'Full-time or part-time study availability',
+                CAST(:tags AS jsonb), CAST(:required_for AS jsonb), 55)
+        ON CONFLICT (key, version) DO NOTHING
+    """), {"id": str(uuid5(NAMESPACE_URL, "pai-counselor-085:preferences.study_load")),
+           "schema": json.dumps({"type": "string", "enum": ["full_time", "part_time", "flexible"]}),
+           "tags": json.dumps(["counseling"]),
+           "required_for": json.dumps(["counseling"])})
     statement = sa.text("""
         INSERT INTO pai_profile_requirements
           (id, key, stage, tier, source_type, source_key, source_path, selector,
@@ -163,6 +178,8 @@ def downgrade():
                            {"id": str(uuid5(NAMESPACE_URL, f"pai-counselor-085:{key}"))})
     connection.execute(sa.text("DELETE FROM pai_vault_field_definitions WHERE id = :id"),
                        {"id": str(uuid5(NAMESPACE_URL, "pai-counselor-085:preferences.location_limits"))})
+    connection.execute(sa.text("DELETE FROM pai_vault_field_definitions WHERE id = :id"),
+                       {"id": str(uuid5(NAMESPACE_URL, "pai-counselor-085:preferences.study_load"))})
     op.drop_index("idx_counselor_slot_answers_recent", table_name="pai_counselor_slot_answers")
     op.drop_table("pai_counselor_slot_answers")
     op.drop_index("idx_profile_requirements_stage", table_name="pai_profile_requirements")
