@@ -4,13 +4,16 @@
 import asyncio
 import json as _json
 import logging
+import time
+import uuid
 from typing import Optional
 
 from sqlalchemy import select
 
 from app.config import config
 from app.database import SessionLocal
-from app.models import EventRecord
+from app.inference.client import chat_completion_tools
+from app.models import EventRecord, Workspace
 
 logger = logging.getLogger(__name__)
 
@@ -56,7 +59,9 @@ async def run_counselor(workspace_id: str, event_data: dict) -> None:
 
 async def _run_turn(db, workspace_id: str, event_data: dict, depth: int) -> None:
     """Answer through the shared natural-text Core, then queue quiet learning."""
-    from app.services.pai import PAI_AGENT_NAME
+    from app.services.pai import PAI_AGENT_NAME, WorkspaceApi
+    from app.memory.permissions import capabilities_for_agent
+    from app.tools import AUDIENCE_COUNSELOR, ToolContext
     from app.documents.attachments import (
         describe_attachments, normalize_attachments,
         wait_until_readable,
@@ -64,7 +69,7 @@ async def _run_turn(db, workspace_id: str, event_data: dict, depth: int) -> None
     from app.memory.student_snapshot import StudentSnapshotService
     from app.memory.profile_completion import ProfileCompletionService
     from app.memory.foreground import build_foreground_context
-    from .core import CounselorCore
+    from .core import CounselorCore, CounselorModelProvider
     from .understanding import StudentUnderstandingBuilder
     from .turn_plan import TurnPlan
 
@@ -134,13 +139,46 @@ async def _run_turn(db, workspace_id: str, event_data: dict, depth: int) -> None
 
     logger.info("counselor: invoking core (%s), %d context messages",
                 config.PAI_MODEL, len(recent_conversation))
-    reply = await CounselorCore().respond(
+    tool_context = None
+    if turn_plan.mode == "open":
+        workspace = db.get(Workspace, workspace_id)
+        if workspace is not None:
+            from app.services.pai import PAI_ALLOWED_TOOLS
+            tool_context = ToolContext(
+                workspace_id=workspace_id, agent_name=PAI_AGENT_NAME,
+                api=WorkspaceApi(workspace_id, workspace.password_hash),
+                conversation=channel_target.removeprefix("channel/"),
+                user_id=getattr(workspace, "owner_user_id", None),
+                allowed_tools=frozenset(PAI_ALLOWED_TOOLS),
+                audience=AUDIENCE_COUNSELOR,
+                granted_capabilities=capabilities_for_agent(PAI_AGENT_NAME),
+            )
+
+    async def record_tool_result(name: str, result: dict) -> None:
+        # Internal audit event; never publish as a chat message or include it
+        # in the student's conversation context.
+        serialized = _json.dumps(result, ensure_ascii=False, default=str)
+        recorded = result if len(serialized) <= 12000 else {
+            "truncated": True, "ok": result.get("ok")}
+        db.add(EventRecord(
+            id=str(uuid.uuid4()), network_id=workspace_id,
+            type="counselor.tool.result", source=f"openagents:{PAI_AGENT_NAME}",
+            target=channel_target,
+            payload={"tool": name, "result": recorded},
+            metadata_={"trigger_event_id": event_data.get("id")},
+            timestamp=int(time.time() * 1000), visibility="private",
+        ))
+        db.commit()
+
+    reply = await CounselorCore(CounselorModelProvider(chat_completion_tools)).respond(
         student_message=content or "I attached a file.",
         recent_conversation=recent_conversation,
         understanding=understanding,
         memory_context=memory_context,
         attachment_context=attachment_context,
         turn_plan=turn_plan,
+        tool_context=tool_context,
+        record_tool_result=record_tool_result if tool_context is not None else None,
     )
     if turn_plan.mode == "collecting":
         from .reply_guard import guard_collection_reply

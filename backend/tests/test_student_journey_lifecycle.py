@@ -1,6 +1,6 @@
 """Student Journey lifecycle, validation, and integration contracts."""
 
-from unittest.mock import patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 
@@ -150,7 +150,7 @@ async def test_capability_receives_only_declared_journey_fields():
 
 
 @pytest.mark.asyncio
-async def test_counselor_turn_updates_and_receives_all_active_journeys():
+async def test_counselor_does_not_activate_a_journey_from_goal_hints_alone():
     prompts = []
 
     from app.counseling.turn_semantics import validate_turn_semantics
@@ -172,13 +172,16 @@ async def test_counselor_turn_updates_and_receives_all_active_journeys():
     with StudentSession() as student:
         with patch.object(runtime, "chat_completion_tools", model), \
                 patch("app.counseling.turn_semantics.classify_turn", classify), \
+                patch("app.memory.foundation_intake.capture_foundation_turn",
+                      new=AsyncMock(return_value=False)), \
+                patch("app.counseling.reply_guard.guard_collection_reply",
+                      new=AsyncMock(side_effect=lambda reply, **kwargs: reply)), \
                 patch.object(config, "PAI_API_KEY", "test"), \
                 patch.object(config, "PAI_MEMORY_CONTEXT_ENABLED", False):
             await student.turn("I want a master's in Germany.")
             await student.turn("I also want an internship while preparing.")
         with student.factory() as db:
             journeys = JourneyService(db).list_active(student.workspace_id)
-        assert len(journeys) == 2
-        assert "postgraduate_admission" in prompts[-1]
-        assert "internship_search" in prompts[-1]
-        assert "current_focus_goal" in prompts[-1]
+        assert journeys == []
+        assert len(prompts) == 2
+        assert all("COLLECTING" in prompt for prompt in prompts)

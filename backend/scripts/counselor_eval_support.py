@@ -19,7 +19,7 @@ from app.memory.student_records import ENTITY_MODELS, StudentRecordService
 from app.memory.vault import VaultService
 from app.models import (
     BackgroundJob, DocumentArtifact, EventRecord, ExecutionRun, FileRecord,
-    MemoryCandidate, PaiEpisode, PaiMemory, ProfileIssue, ProfileRequirement, StudentRecordRevision,
+    MemoryCandidate, PaiEpisode, PaiMemory, ProfileFieldResponse, ProfileIssue, ProfileRequirement, StudentRecordRevision,
     StudentJourney, StudentJourneyEvent, User, VaultFact, VaultFieldDefinition, Workspace,
     WorkspaceMember, VAULT_INTAKE_MODELS,
 )
@@ -71,7 +71,7 @@ class StudentSession:
         models = [User, Workspace, WorkspaceMember, ExecutionRun, EventRecord, FileRecord,
                   DocumentArtifact,
                   VaultFact, VaultFieldDefinition, MemoryCandidate, PaiMemory, PaiEpisode,
-                  ProfileIssue, ProfileRequirement, StudentRecordRevision, BackgroundJob,
+                  ProfileFieldResponse, ProfileIssue, ProfileRequirement, StudentRecordRevision, BackgroundJob,
                   StudentJourney, StudentJourneyEvent,
                   *ENTITY_MODELS.values(), *VAULT_INTAKE_MODELS]
         Base.metadata.create_all(self.engine, tables=[m.__table__ for m in models])
@@ -127,10 +127,10 @@ class StudentSession:
         self.transcript.append({"role": "assistant", "content": content, "message_type": message_type})
         return event_id
 
-    async def turn(self, content):
+    async def turn(self, content, *, metadata=None):
         event_data = {"id": str(uuid.uuid4()), "source": f"human:{self.user_id}",
                       "target": "channel/pai-counselor", "payload": {"content": content},
-                      "timestamp": self.next_timestamp()}
+                      "timestamp": self.next_timestamp(), "metadata": metadata or {}}
         self.transcript.append({"role": "user", "content": content})
         with self.factory() as db:
             db.add(EventRecord(id=event_data["id"], network_id=self.workspace_id,

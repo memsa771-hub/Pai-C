@@ -369,10 +369,10 @@ def test_same_turn_conflicts_use_current_history_but_allow_goals_and_corrections
         no_record, {"canonical_level": "bachelor", "academic_status": "current"}) is None
 
 
-def test_counselor_delta_does_not_directly_write_canonical_records():
+def test_model_envelope_does_not_directly_write_canonical_records():
     from app.config import config
     from app.counseling import runtime
-    from app.models import EducationRecord, MemoryCandidate
+    from app.models import BackgroundJob, EducationRecord, MemoryCandidate
     from scripts.counselor_eval_support import StudentSession
 
     async def run():
@@ -391,6 +391,10 @@ def test_counselor_delta_does_not_directly_write_canonical_records():
                 })}
             with patch.object(runtime, "chat_completion_tools", model), \
                  patch("app.counseling.turn_semantics.classify_turn", new_callable=AsyncMock) as classify, \
+                 patch("app.memory.foundation_intake.capture_foundation_turn",
+                       new=AsyncMock(return_value=False)), \
+                 patch("app.counseling.reply_guard.guard_collection_reply",
+                       new=AsyncMock(side_effect=lambda reply, **kwargs: reply)), \
                  patch.object(config, "PAI_API_KEY", "test"), \
                  patch.object(config, "PAI_MEMORY_CONTEXT_ENABLED", False):
                 classify.return_value = {"mirror_request": False, "mirror_confirmation": False,
@@ -404,7 +408,9 @@ def test_counselor_delta_does_not_directly_write_canonical_records():
                 assert db.execute(select(EducationRecord)).scalars().all() == []
                 candidates = db.execute(select(MemoryCandidate).where(
                     MemoryCandidate.candidate_type == "student_record")).scalars().all()
-                assert len(candidates) == 1 and candidates[0].status == "pending"
+                assert candidates == []
+                assert db.execute(select(BackgroundJob).where(
+                    BackgroundJob.job_type == "memory.extract")).scalars().first() is not None
     asyncio.run(run())
 
 
@@ -445,6 +451,12 @@ def test_chat_does_not_dump_profile_or_require_mirror_confirmation():
                         "education_claim": None}
             with patch.object(runtime, "chat_completion_tools", model), \
                  patch("app.counseling.turn_semantics.classify_turn", classify), \
+                 patch("app.memory.profile_completion.ProfileCompletionService.evaluate",
+                       return_value={"enforced": False, "foundationReady": True,
+                                     "counselorMode": "normal", "fields": [],
+                                     "nextRequirement": None}), \
+                 patch("app.counseling.goal_transition.reviewed_route",
+                       new=AsyncMock(return_value=False)), \
                  patch.object(config, "PAI_API_KEY", "test"), \
                  patch.object(config, "PAI_MEMORY_CONTEXT_ENABLED", False):
                 await student.turn("continue")
@@ -452,11 +464,11 @@ def test_chat_does_not_dump_profile_or_require_mirror_confirmation():
                 await student.turn("Yes, that's accurate.")
                 assert "Education so far" not in student.transcript[-1]["content"]
                 await student.turn("What do you think fits me?")
-                assert "Personalized provisional guidance is allowed" in received[-1]["system_prompt"]
-                assert "operator__delegate" not in {
+                assert "OPEN" in received[-1]["system_prompt"]
+                assert "operator__delegate" in {
                     tool["function"]["name"] for tool in received[-1]["tools"]}
                 await student.turn("Please research a shortlist")
-                assert "operator__delegate" not in {
+                assert "operator__delegate" in {
                     tool["function"]["name"] for tool in received[-1]["tools"]}
 
                 with student.factory() as db:
