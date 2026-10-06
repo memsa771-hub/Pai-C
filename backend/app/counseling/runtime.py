@@ -4,6 +4,7 @@
 import asyncio
 import json as _json
 import logging
+from dataclasses import replace
 from typing import Optional
 
 from sqlalchemy import select
@@ -120,6 +121,24 @@ async def _run_turn(db, workspace_id: str, event_data: dict, depth: int) -> None
     turn_plan = TurnPlan.from_completion(completion, snapshot, active_journey)
     understanding = StudentUnderstandingBuilder(db).build(
         workspace_id, snapshot=snapshot)
+    semantics = {}
+    if turn_plan.mode == "open":
+        from .evaluator import CounselingEvaluator
+        from .policy import CounselingPolicy
+        from .turn_semantics import classify_turn
+
+        semantics = await classify_turn(
+            content or "", previous_assistant=next((
+                item.get("content", "") for item in reversed(recent_conversation)
+                if item.get("role") == "assistant"), ""))
+        state = CounselingEvaluator().derive(
+            message=content or "", vault_context=understanding,
+            journey=active_journey.to_dict() if active_journey else None,
+            completion=completion, recent_conversation=recent_conversation,
+            active_conflict=next(iter(understanding.get("open_conflicts") or ()), None),
+            turn_semantics=semantics,
+        )
+        turn_plan = replace(turn_plan, policy=CounselingPolicy().decide(state))
     db.rollback()
 
     memory_context = None
@@ -142,12 +161,15 @@ async def _run_turn(db, workspace_id: str, event_data: dict, depth: int) -> None
         attachment_context=attachment_context,
         turn_plan=turn_plan,
     )
-    if turn_plan.mode == "collecting":
-        from .reply_guard import guard_collection_reply
-        reply = await guard_collection_reply(
-            reply, student_message=content or "I attached a file.",
-            question=turn_plan.question,
-        )
+    from .reply_guard import guard_reply
+    reply = await guard_reply(
+        reply, student_message=content or "I attached a file.",
+        mode=turn_plan.mode, question=turn_plan.question,
+        max_questions=turn_plan.policy.max_questions if turn_plan.policy else 1,
+        requirement_fields=completion.get("fields") or [],
+        allow_long=semantics.get("requested_detail") is True
+                   or semantics.get("requested_roadmap") is True,
+    )
     response_metadata = _voice_reply_metadata(event_data) or {}
     if (turn_plan.mode == "open" and turn_plan.parked_goal
             and active_journey is None

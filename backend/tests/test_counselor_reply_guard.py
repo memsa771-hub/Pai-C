@@ -3,7 +3,8 @@
 import asyncio
 from unittest.mock import AsyncMock, patch
 
-from app.counseling.reply_guard import guard_collection_reply
+from app.counseling.reply_guard import (deterministic_issues, guard_collection_reply,
+                                        guard_reply)
 
 
 def test_collection_guard_keeps_allowed_reply():
@@ -32,3 +33,32 @@ def test_collection_guard_fails_closed_on_invalid_review():
             question="What are you studying now?"))
     assert "You will get into X" not in result
     assert "What are you studying now?" in result
+
+
+def test_deterministic_limits_catch_two_questions_and_long_drafts():
+    assert "too_many_questions" in deterministic_issues("Where? When?")
+    assert "too_long" in deterministic_issues("word " * 121)
+    assert deterministic_issues("A short answer. What matters most?") == []
+
+
+def test_known_or_pending_profile_question_cannot_be_reasked():
+    for status in ("answered", "pending", "deferred"):
+        fields = [{"status": status, "question": "What are you studying now?"}]
+        assert "reasks_known_or_pending" in deterministic_issues(
+            "I can help. What are you studying now?", requirement_fields=fields)
+
+
+def test_open_reply_guard_rewrites_a_double_question():
+    with patch("app.counseling.reply_guard.chat_completion",
+               new=AsyncMock(return_value='{"allowed": false, "reply": "I can help. Which route matters more?"}')):
+        result = asyncio.run(guard_reply(
+            "Where? When?", student_message="Help me choose a route", mode="open"))
+    assert result == "I can help. Which route matters more?"
+
+
+def test_open_reply_guard_rejects_unsafe_rewrite():
+    with patch("app.counseling.reply_guard.chat_completion",
+               new=AsyncMock(return_value='{"allowed": false, "reply": "Where? When?"}')):
+        result = asyncio.run(guard_reply(
+            "Where? When?", student_message="Help me choose a route", mode="open"))
+    assert result.count("?") <= 1
