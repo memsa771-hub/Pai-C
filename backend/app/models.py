@@ -707,6 +707,8 @@ class StudentJourney(Base):
     blockers = Column(JSONB, nullable=False, default=list, server_default=text("'[]'"))
     next_milestone = Column(JSONB, nullable=True)
     next_recommended_action = Column(JSONB, nullable=True)
+    counselor_summary_draft = Column(JSONB, nullable=True)
+    research_request = Column(JSONB, nullable=True)
     created_at = Column(DateTime(timezone=True), default=_now, server_default=text("NOW()"))
     updated_at = Column(DateTime(timezone=True), default=_now, onupdate=_now, server_default=text("NOW()"))
     completed_at = Column(DateTime(timezone=True), nullable=True)

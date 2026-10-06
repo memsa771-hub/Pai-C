@@ -16,6 +16,7 @@ from .move import CounselorMove, plan_move
 from .scope import classify_scope
 from .slot_capture import capture_turn_slots
 from .slots import CounselorSlotRegistry, SlotState, next_open_slot
+from .summary import has_correction, is_explicit_confirmation, summary_payload
 from .understanding import StudentUnderstandingBuilder
 
 logger = logging.getLogger(__name__)
@@ -57,7 +58,8 @@ def shared_history(db, turn: CounselorTurnInput, owner_id: str,
             continue
         history.append({"role": "assistant" if row.source == "openagents:pai" else "user",
                         "content": text[:1500], "target": row.target,
-                        "session_id": (row.metadata_ or {}).get("session_id")})
+                        "session_id": (row.metadata_ or {}).get("voice_session_id")
+                        or (row.metadata_ or {}).get("session_id")})
         if len(history) == limit:
             break
     history.reverse()
@@ -80,11 +82,21 @@ def _facts(states: dict[str, SlotState]) -> dict:
 
 def _reflect(extraction: TurnExtraction | None, states: dict[str, SlotState],
              returning: bool) -> tuple[str, ...]:
+    def concise(key, value):
+        if isinstance(value, dict):
+            if key == "stated_goal":
+                return str(value.get("title") or "")
+            if key == "recent_qualification":
+                return str(value.get("qualification_name") or "")
+            if key == "budget":
+                return " ".join(str(value.get(part) or "") for part in ("amount", "currency", "period")).strip()
+        return str(value)
     if returning:
-        return tuple(str(states[key].value) for key in
+        return tuple(concise(key, states[key].value) for key in
                      ("stated_goal", "recent_qualification", "budget")
                      if key in states and states[key].value is not None)[:2]
-    return tuple(str(claim.value) for claim in (extraction.claims if extraction else ())[:2])
+    return tuple(concise(claim.key, claim.value)
+                 for claim in (extraction.claims if extraction else ())[:2])
 
 
 async def run_counselor_turn(
@@ -132,13 +144,19 @@ async def run_counselor_turn(
                                                 "DIRECTION", actor="openagents:pai")
     db.commit()
     returning = _returning(history, turn)
+    draft = journey.counselor_summary_draft
+    correction = has_correction(extraction, draft)
+    confirmed = is_explicit_confirmation(extraction, draft) and not correction
+    awaiting = bool(draft and draft.get("status") == "awaiting_confirmation" and not correction)
     move = plan_move(
         stage=journey.current_stage, requirements=requirements, states=states,
         snapshot=snapshot, scope=scope,
         student_question=extraction.student_question if extraction else "",
         emotion=extraction.emotion if extraction else "none",
         language=extraction.language if extraction else "en",
-        returning=returning, reflected_facts=_reflect(extraction, states, returning),
+        returning=returning and not correction,
+        reflected_facts=_reflect(extraction, states, returning),
+        awaiting_confirmation=awaiting, confirmed=confirmed,
     )
     understanding = StudentUnderstandingBuilder(db).build(turn.workspace_id, snapshot=snapshot)
     if writer is None:
@@ -158,4 +176,13 @@ async def run_counselor_turn(
     logger.info("counselor v2 turn=%s move=%s stage=%s slot=%s guard=%s",
                 turn.source_event_id, move.type, move.stage, move.slot_key,
                 ",".join(violations) or "pass")
+    if move.type == "summarize_for_confirmation":
+        from .guard_v2 import fallback_reply
+        if approved != fallback_reply(move, requirements):
+            journeys.set_counselor_summary(
+                turn.workspace_id, journey.id, summary_payload(states, extraction),
+                approved, turn.source_event_id)
+    elif move.type == "confirm_and_queue_research":
+        journeys.queue_counselor_research(turn.workspace_id, journey.id,
+                                          turn.source_event_id)
     return move, approved, violations

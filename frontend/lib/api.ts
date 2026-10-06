@@ -696,12 +696,13 @@ class WorkspaceApi {
   }
 
   /** Post a spoken turn to the same Counselor event pipeline used by text. */
-  async sendCounselorVoiceTurn(conversation: string, content: string, delegationId: string, senderName: string, senderId: string): Promise<ONMEvent> {
+  async sendCounselorVoiceTurn(conversation: string, content: string, delegationId: string, senderName: string, senderId: string, voiceSessionId?: string): Promise<ONMEvent> {
     return this.sendEvent({
       type: 'workspace.message.posted',
       target: `channel/${conversation}`,
       payload: { content, sender_type: 'human', sender_id: senderId, sender_name: senderName },
-      metadata: { target_agents: ['pai'], voice_delegation_id: delegationId },
+      metadata: { target_agents: ['pai'], voice_delegation_id: delegationId,
+        ...(voiceSessionId ? { voice_session_id: voiceSessionId } : {}) },
       visibility: 'channel',
     });
   }

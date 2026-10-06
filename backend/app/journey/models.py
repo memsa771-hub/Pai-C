@@ -26,6 +26,8 @@ class JourneyView:
     blockers: list[dict] = field(default_factory=list)
     next_milestone: Any = None
     next_recommended_action: Any = None
+    counselor_summary_draft: Any = None
+    research_request: Any = None
     created_at: datetime | None = None
     updated_at: datetime | None = None
     completed_at: datetime | None = None

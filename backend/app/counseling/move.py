@@ -45,17 +45,27 @@ def plan_move(*, stage: str, requirements: Sequence[ProfileRequirement],
     slot = _next(requirements, states, snapshot, slot_stage)
     key = short_key(slot) if slot is not None else None
     intent = slot.question_intent if slot is not None else None
+    if confirmed and awaiting_confirmation:
+        return CounselorMove("confirm_and_queue_research", None, None, reflect,
+                             None, language, 60, stage)
     if returning:
         return CounselorMove("returning_student", key, intent, reflect, None,
                              language, 60, stage)
     if scope == "off_topic":
         return CounselorMove("redirect_then_ask", key, intent, reflect, None,
                              language, 50, stage)
-    if confirmed and awaiting_confirmation:
-        return CounselorMove("confirm_and_queue_research", None, None, reflect,
-                             None, language, 60, stage)
     if stage == "RESEARCHING":
         return CounselorMove("ask", None, None, reflect, None, language, 60, stage)
+    if awaiting_confirmation:
+        summary_slot = _next(requirements, states, snapshot, "summary")
+        if student_question:
+            return CounselorMove("answer_then_ask", short_key(summary_slot) if summary_slot else None,
+                                 summary_slot.question_intent if summary_slot else None,
+                                 reflect, "Answer briefly, then ask for confirmation of the summary.",
+                                 language, 60, stage)
+        return CounselorMove("ask", short_key(summary_slot) if summary_slot else None,
+                             summary_slot.question_intent if summary_slot else None,
+                             reflect, None, language, 60, stage)
     if slot is None and stage == "DIRECTION":
         return CounselorMove("summarize_for_confirmation", None, None, reflect,
                              None, language, 90, stage)

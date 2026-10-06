@@ -110,6 +110,8 @@ def parse_extraction(raw: str, student_text: str,
             continue
         if decoded is None or decoded == "" or decoded == [] or decoded == {}:
             continue
+        if key == "goal_summary_confirmed" and decoded != "confirmed":
+            continue
         claims.append(SlotClaim(key, decoded, float(confidence), quote))
     unknown = tuple(dict.fromkeys([
         key for key in raw_unknown
@@ -156,7 +158,9 @@ async def extract_turn(student_text: str, history: list[dict],
         "is part_time/full_time/flexible. Put unknown or refused slots in "
         "unknown_or_declined. For those slots, set value to 'declined' for an "
         "explicit refusal or 'unknown' for don't know, with the student's exact "
-        "quote. Output the requested JSON schema only."
+        "quote. Set goal_summary_confirmed to value 'confirmed' only for an explicit, "
+        "unambiguous confirmation of the immediately preceding Counselor goal summary; "
+        "a correction, question or thanks is not confirmation. Output the requested JSON schema only."
     )
     payload = {
         "recent_turns": history[-6:], "known_facts": known_facts,

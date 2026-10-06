@@ -158,6 +158,60 @@ class JourneyService:
                         {"from": previous, "to": target}, actor)
         return self._view(row)
 
+    def set_counselor_summary(self, workspace_id: str, journey_id: str,
+                              summary: dict, reply: str, source_event_id: str,
+                              *, actor: str = "openagents:pai") -> JourneyView:
+        """Keep the reviewed draft on the student's Counselor Journey."""
+        row = self.db.execute(select(StudentJourney).where(
+            StudentJourney.workspace_id == workspace_id,
+            StudentJourney.id == journey_id,
+            StudentJourney.journey_type == "counselor_decision",
+        ).with_for_update()).scalar_one_or_none()
+        if row is None:
+            raise JourneyError("Counselor journey not found")
+        if row.current_stage != "DIRECTION":
+            raise JourneyError("Summary belongs to direction discovery")
+        current = row.counselor_summary_draft or {}
+        if current.get("source_event_id") == source_event_id:
+            return self._view(row)
+        row.counselor_summary_draft = {
+            "status": "awaiting_confirmation", "summary": summary,
+            "reply": reply, "source_event_id": source_event_id,
+            "version": int(current.get("version") or 0) + 1,
+        }
+        row.updated_at = datetime.now(timezone.utc)
+        self._event(row, JOURNEY_UPDATED, {"changed": ["counselor_summary_draft"]}, actor)
+        return self._view(row)
+
+    def queue_counselor_research(self, workspace_id: str, journey_id: str,
+                                 confirmation_event_id: str,
+                                 *, actor: str = "openagents:pai") -> JourneyView:
+        """Queue once after explicit confirmation of the current draft."""
+        row = self.db.execute(select(StudentJourney).where(
+            StudentJourney.workspace_id == workspace_id,
+            StudentJourney.id == journey_id,
+            StudentJourney.journey_type == "counselor_decision",
+        ).with_for_update()).scalar_one_or_none()
+        if row is None:
+            raise JourneyError("Counselor journey not found")
+        if row.research_request and row.research_request.get("status") == "queued":
+            return self._view(row)
+        draft = row.counselor_summary_draft or {}
+        if row.current_stage != "DIRECTION" or draft.get("status") != "awaiting_confirmation":
+            raise JourneyError("There is no Counselor summary awaiting confirmation")
+        row.research_request = {
+            "id": new_id("research"), "status": "queued",
+            "payload": draft["summary"], "summary_version": draft["version"],
+            "confirmation_event_id": confirmation_event_id,
+            "queued_at": datetime.now(timezone.utc).isoformat(),
+        }
+        row.counselor_summary_draft = {**draft, "status": "confirmed",
+                                       "confirmation_event_id": confirmation_event_id}
+        row.updated_at = datetime.now(timezone.utc)
+        self._event(row, JOURNEY_UPDATED,
+                    {"changed": ["counselor_summary_draft", "research_request"]}, actor)
+        return self.set_counselor_stage(workspace_id, journey_id, "RESEARCHING", actor=actor)
+
     def resolve_primary(self, workspace_id: str) -> JourneyView | None:
         """Deprecated exact-primary alias; fallback is explicit in resolve_active."""
         return self.get_primary(workspace_id)
@@ -461,6 +515,8 @@ class JourneyService:
             decisions=list(row.decisions or []), unresolved_decisions=list(row.unresolved_decisions or []),
             blockers=list(row.blockers or []), next_milestone=row.next_milestone,
             next_recommended_action=row.next_recommended_action,
+            counselor_summary_draft=row.counselor_summary_draft,
+            research_request=row.research_request,
             created_at=row.created_at, updated_at=row.updated_at, completed_at=row.completed_at,
         )
 

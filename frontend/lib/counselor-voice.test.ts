@@ -115,7 +115,7 @@ describe('Counselor voice', () => {
     channel.emit({ type: 'session.input_transcript.delta', delta: 'Should I study CS?', start_ms: 100, end_ms: 800 });
     channel.emit({ type: 'session.delegation.created', offset_ms: 850, delegation: { id: 'delegate-1', target: 'client' } });
     await vi.advanceTimersByTimeAsync(500);
-    expect(api.sendCounselorVoiceTurn).toHaveBeenCalledWith('pai-counselor', 'Should I study CS?', 'delegate-1', 'Student', 'owner');
+    expect(api.sendCounselorVoiceTurn).toHaveBeenCalledWith('pai-counselor', 'Should I study CS?', 'delegate-1', 'Student', 'owner', 'live-1');
     expect(channel.sent).toEqual(expect.arrayContaining([expect.objectContaining({
       type: 'session.commentary.append', delegation_id: 'delegate-1',
       content: 'That course fits your goal; let us check the costs.',
@@ -123,7 +123,7 @@ describe('Counselor voice', () => {
     channel.emit({ type: 'session.input_transcript.delta', delta: 'My budget is lower.', start_ms: 1000, end_ms: 1500 });
     channel.emit({ type: 'session.delegation.created', offset_ms: 1550, delegation: { id: 'delegate-2', target: 'client' } });
     await vi.advanceTimersByTimeAsync(500);
-    expect(api.sendCounselorVoiceTurn).toHaveBeenNthCalledWith(2, 'pai-counselor', 'My budget is lower.', 'delegate-2', 'Student', 'owner');
+    expect(api.sendCounselorVoiceTurn).toHaveBeenNthCalledWith(2, 'pai-counselor', 'My budget is lower.', 'delegate-2', 'Student', 'owner', 'live-1');
     expect(channel.sent).toEqual(expect.arrayContaining([expect.objectContaining({
       type: 'session.commentary.append', delegation_id: 'delegate-2', content: 'Your budget changes the shortlist.',
     })]));

@@ -79,8 +79,10 @@ async def _run_turn(db, workspace_id: str, event_data: dict, depth: int) -> None
         if not turn.student_text.strip() and not turn.attachments:
             return
         _, reply, _ = await run_counselor_turn(db, turn)
-        await _post_response(db, workspace_id, turn.channel, PAI_AGENT_NAME,
-                             reply, depth, metadata=_voice_reply_metadata(event_data))
+        posted = await _post_response(db, workspace_id, turn.channel, PAI_AGENT_NAME,
+                                      reply, depth, metadata=_voice_reply_metadata(event_data))
+        if not posted:
+            db.rollback()
         return
     from app.services.pai import PAI_AGENT_NAME, WorkspaceApi
     from app.memory.permissions import capabilities_for_agent

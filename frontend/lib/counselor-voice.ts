@@ -69,6 +69,7 @@ export class CounselorVoiceSession {
   private startedTimer: ReturnType<typeof setTimeout> | null = null;
   private latestDelegation = '';
   private reconnecting = false;
+  private liveSessionId = '';
 
   constructor(
     private conversation: string,
@@ -140,6 +141,7 @@ export class CounselorVoiceSession {
       if (!offer) throw new Error('Could not prepare the voice connection.');
       const answer = await workspaceApi.createCounselorVoiceSession(this.conversation, offer);
       if (this.closed || generation !== this.generation) return;
+      this.liveSessionId = answer.session_id;
       // Install this before applying the answer: session.started can arrive immediately.
       this.startedTimer = setTimeout(() => {
         if (!this.closed && generation === this.generation) {
@@ -236,7 +238,7 @@ export class CounselorVoiceSession {
       return;
     }
     try {
-      const posted = await workspaceApi.sendCounselorVoiceTurn(this.conversation, transcript, id, this.senderName, this.senderId);
+      const posted = await workspaceApi.sendCounselorVoiceTurn(this.conversation, transcript, id, this.senderName, this.senderId, this.liveSessionId);
       this.callbacks.messagePosted();
       const reply = await this.waitForCounselor(posted.id, id, generation);
       if (reply && !this.closed && generation === this.generation && id === this.latestDelegation) {
@@ -279,6 +281,7 @@ export class CounselorVoiceSession {
     this.lastDelegationOffset = 0;
     this.seenDelegations.clear();
     this.latestDelegation = '';
+    this.liveSessionId = '';
     try { await this.connect(true); }
     finally { this.reconnecting = false; }
   }
