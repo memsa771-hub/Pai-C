@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import Image from 'next/image';
-import { ChevronLeft, ChevronRight, Users } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Users, Map } from 'lucide-react';
 import {
   Sidebar,
   SidebarContent,
@@ -287,6 +287,14 @@ export function NavRail() {
                       aria-hidden="true"
                     />
                   )}
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton className={cn(!showLabels && 'justify-center!')}
+                  aria-label={t('views.roadmaps')}
+                  tooltip={{ children: t('views.roadmaps'), hidden: showLabels }}
+                  isActive={viewMode === 'roadmaps'} onClick={() => openView('roadmaps')}>
+                  <Map className="size-5" />{showLabels && <span>{t('views.roadmaps')}</span>}
                 </SidebarMenuButton>
               </SidebarMenuItem>
             </SidebarMenu>

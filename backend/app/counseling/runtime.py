@@ -231,6 +231,8 @@ async def _run_turn(db, workspace_id: str, event_data: dict, depth: int) -> None
         if delegated is not None:
             await record_tool_result("operator.delegate", delegated)
 
+    from app.roadmaps.service import RoadmapService
+    focused_roadmap = RoadmapService(db).focused(workspace_id)
     reply = await CounselorCore(CounselorModelProvider(chat_completion_tools)).respond(
         student_message=content or "I attached a file.",
         recent_conversation=recent_conversation,
@@ -240,6 +242,7 @@ async def _run_turn(db, workspace_id: str, event_data: dict, depth: int) -> None
         turn_plan=turn_plan,
         tool_context=tool_context,
         record_tool_result=record_tool_result if tool_context is not None else None,
+        focused_roadmap=focused_roadmap,
     )
     from .reply_guard import guard_reply
     reply = await guard_reply(

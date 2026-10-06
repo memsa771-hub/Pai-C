@@ -287,7 +287,7 @@ async def _post_result(
         db.rollback()
         run = db.get(ExecutionRun, run_id)
         if run is not None and str(run.workspace_id) == workspace_id and run.result:
-            if not _baseline_is_current(db, workspace_id):
+            if not _result_context_current(db, run):
                 message = ("The background work is complete. I can interpret it for you "
                            "after we confirm that my understanding of your situation is accurate.")
             else:
@@ -296,6 +296,7 @@ async def _post_result(
                     "status": status, "result": run.result,
                     "verification": run.verification, "missing": run.missing,
                     "approval_required_for": run.approval_required_for,
+                    "roadmap_research": run.task_type == "roadmap_research",
                 }
                 history = _build_conversation_context(
                     db, workspace_id, channel_target, pai.PAI_AGENT_NAME,
@@ -315,10 +316,17 @@ async def _post_result(
                         "The background work has returned, but I couldn't prepare its explanation. "
                         "Ask me to review the findings and I'll pick up from the saved result."
                     )
+        response_metadata = {"execution_run_id": run_id, "execution_status": status}
+        if run is not None and run.task_type == "roadmap_research":
+            from app.roadmaps.service import RoadmapService
+            cards = RoadmapService(db).for_run(workspace_id, run_id, presented=True)
+            if cards:
+                response_metadata["roadmaps"] = cards
+                db.commit()
         await _post_response(
             db, workspace_id, channel_target, pai.PAI_AGENT_NAME, message, depth=0,
             message_type="operator_result",
-            metadata={"execution_run_id": run_id, "execution_status": status},
+            metadata=response_metadata,
         )
     except Exception:
         logger.exception("operator: failed to auto-post result to %s", channel_target)
@@ -594,6 +602,15 @@ def _baseline_is_current(db, workspace_id: str) -> bool:
     return not view.get("open_conflicts") and not changed_domains(view, baseline)
 
 
+def _result_context_current(db, run: ExecutionRun) -> bool:
+    if run.task_type != "roadmap_research":
+        return _baseline_is_current(db, run.workspace_id)
+    from app.memory.profile_completion import ProfileCompletionService
+    from app.counseling.understanding import StudentUnderstandingBuilder
+    return (bool(ProfileCompletionService(db).evaluate(run.workspace_id).get("foundationReady"))
+            and not StudentUnderstandingBuilder(db).build(run.workspace_id).get("open_conflicts"))
+
+
 async def get_status(ctx, run_id: Optional[str]) -> dict:
     """Read an ExecutionRun back — how PAI Counselor answers "what's the
     status of X?" without re-running anything."""
@@ -609,7 +626,7 @@ async def get_status(ctx, run_id: Optional[str]) -> dict:
             return {"ok": True, "data": {"status": "none"}}
         data = serialize_run(run)
         if run.result:
-            if not _baseline_is_current(db, ctx.workspace_id):
+            if not _result_context_current(db, run):
                 data["result"] = None
                 data["verification"] = None
                 data["result_withheld"] = True

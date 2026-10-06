@@ -28,6 +28,13 @@ result of the existing work. Profile proposals are not confirmed profile facts.
 async def explain_result(workspace_id: str, history: list[dict], handoff: dict) -> str:
     """One Counselor call in the background; never on the user's reply path."""
     prompt = pai.PAI_SYSTEM_PROMPT + "\n\n" + HANDOFF_RULES
+    if handoff.get("roadmap_research"):
+        prompt += ("\n\nRoadmap research handoff: respond in at most five short lines. "
+                   "Summarize the student's stated route first, then the alternative routes "
+                   "that have actually been saved. Point to the Roadmaps section for comparison. "
+                   "Say when requirements are proposed or unconfirmed; do not convert them "
+                   "into eligibility verdicts. If a student fact is missing, ask only for the "
+                   "first decision-critical item. Never read the student Profile aloud.")
     if config.PAI_MEMORY_CONTEXT_ENABLED:
         context = await build_foreground_context(
             workspace_id, str(handoff.get("objective") or ""), pai.PAI_AGENT_NAME,
@@ -48,4 +55,12 @@ async def explain_result(workspace_id: str, history: list[dict], handoff: dict) 
         # in the background after research returns, not on a student's turn.
         reasoning_effort=config.PAI_COUNSELOR_REASONING_EFFORT,
     )
-    return (result.get("content") or "").strip()
+    reply = (result.get("content") or "").strip()
+    if handoff.get("roadmap_research"):
+        from app.counseling.reply_guard import guard_reply
+        reply = await guard_reply(reply, student_message=str(handoff.get("objective") or ""),
+                                  mode="open", question=None, max_questions=1,
+                                  requirement_fields=[], allow_long=False)
+        if len(reply.splitlines()) > 5:
+            reply = " ".join(line.strip() for line in reply.splitlines() if line.strip())
+    return reply

@@ -17,6 +17,7 @@ from app.models import (
     BackgroundJob, DocumentArtifact, EventRecord, FileRecord, MemoryCandidate,
     PaiEpisode, PaiMemory, ProfileIssue, StudentRecordRevision, User, VaultFact,
     VaultFieldDefinition, Workspace, VAULT_INTAKE_MODELS,
+    Roadmap, RoadmapStudentState,
 )
 from app.memory.field_definitions import SEED_FIELD_DEFINITIONS, VaultFieldDefinitionService
 from app.memory.student_records import ENTITY_MODELS
@@ -42,6 +43,7 @@ def db():
         User, Workspace, EventRecord, FileRecord, VaultFact, VaultFieldDefinition,
         MemoryCandidate, PaiMemory, PaiEpisode, ProfileIssue, StudentRecordRevision,
         BackgroundJob, DocumentArtifact, *ENTITY_MODELS.values(), *VAULT_INTAKE_MODELS,
+        Roadmap, RoadmapStudentState,
     ]
     Base.metadata.create_all(engine, tables=[model.__table__ for model in tables])
 

@@ -23,6 +23,7 @@ from app.memory.student_snapshot import StudentSnapshotService
 from app.models import (
     BackgroundJob, EventRecord, MemoryCandidate, ProfileFieldResponse, ProfileIssue, ProfileRequirement, StudentRecordRevision,
     User, VaultFact, VaultFieldDefinition, Workspace, VAULT_INTAKE_MODELS,
+    Roadmap, RoadmapStudentState,
 )
 from app.services import pai
 from app.tools.builtin.memory import answer_profile_requirement
@@ -48,6 +49,7 @@ def profile_db(monkeypatch):
         BackgroundJob, EventRecord,
         ProfileIssue, ProfileRequirement, ProfileFieldResponse, StudentRecordRevision,
         *ENTITY_MODELS.values(), *VAULT_INTAKE_MODELS,
+        Roadmap, RoadmapStudentState,
     ]
     Base.metadata.create_all(engine, tables=[model.__table__ for model in models])
     factory = lambda: Session(engine, autoflush=False)

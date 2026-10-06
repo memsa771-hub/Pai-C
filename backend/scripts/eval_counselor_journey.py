@@ -52,11 +52,61 @@ REPLY_GUARD_SCENARIOS = {
 }
 
 
+WORKFLOW_SCENARIOS = {
+    "germany_fsc": {
+        "student": "I completed FSc Pre-Engineering with 80% and report IELTS 7.5. I want a CS bachelor's in Germany.",
+        "risk": "No direct-entry assertion without an intake-specific cited rule",
+    },
+    "usa_alevel": {
+        "student": "My A-Level grades are weak, I have no English test, and I want a US CS bachelor's for an international tech career.",
+        "risk": "Distinguish fixable academic gaps from unknown test evidence; keep the career objective",
+    },
+    "missing_document": {
+        "student": "I do not have my final transcript yet.",
+        "risk": "Pause for the missing evidence and resume the same research run after reconciliation",
+    },
+    "over_speaking": {
+        "student": "Can you check that?",
+        "risk": "Answer briefly and ask at most one decision-critical question",
+    },
+    "rethinks": {
+        "student": "I saw the roadmaps and want to rethink my direction.",
+        "risk": "Return from proposed to direction while retaining the earlier route and decision history",
+    },
+}
+
+
 def check_reply_guard_scenarios() -> dict[str, bool]:
     """Fast offline regression checks alongside the real-model journey eval."""
     return {name: case["expected"] in deterministic_issues(
         case["reply"], requirement_fields=case.get("fields"))
         for name, case in REPLY_GUARD_SCENARIOS.items()}
+
+
+def check_workflow_scenarios() -> dict[str, bool]:
+    """Offline invariants for the five high-risk journey cases above."""
+    from app.counseling.stages import require_counselor_transition
+    from app.plugins.gap_assessment import assess_rule
+
+    cited = {"source_url": "https://example.edu/admissions", "checked_at": "2026-10-06",
+             "comparator": "gte", "threshold": 7}
+    english = {**cited, "field": "test_attempt[IELTS].overall_score"}
+    grades = {**cited, "field": "education.final_grade", "threshold": 80,
+              "remediation": {"action": "Complete the cited foundation route",
+                              "source_url": "https://example.edu/foundation"}}
+    return {
+        "germany_fsc": (assess_rule(english, {"test_attempt[IELTS].overall_score":
+                         {"value": 7.5, "evidence_level": "student_reported"}})["student_evidence"]
+                        == "student_reported"
+                        and assess_rule({**grades, "source_url": ""}, {"education.final_grade": 80})["status"]
+                        == "unknown"),
+        "usa_alevel": (assess_rule(grades, {"education.final_grade": 70})["status"] == "fixable"
+                       and assess_rule(english, {})["status"] == "unknown"),
+        "missing_document": assess_rule({**cited, "field": "education.transcript"}, {})["status"] == "unknown",
+        "over_speaking": ("too_long" in deterministic_issues("word " * 121)
+                          and "too_many_questions" in deterministic_issues("One? Two?")),
+        "rethinks": require_counselor_transition("PROPOSED", "DIRECTION") == "DIRECTION",
+    }
 
 
 
@@ -106,6 +156,9 @@ def _for_judge(runs: list[dict]) -> list[dict]:
 async def evaluate(output: str):
     if not config.PAI_API_KEY:
         raise RuntimeError("PAI_API_KEY is required for the real-model evaluation")
+    scenario_checks = check_workflow_scenarios()
+    if not all(scenario_checks.values()):
+        raise RuntimeError(f"Offline workflow scenario failed: {scenario_checks}")
     # A counselor that cannot recall what it stored is not a counselor, so the
     # real index is used whenever one is configured. Without a backend this
     # still runs, and the retrieval gates below report the degraded mode
@@ -217,6 +270,7 @@ async def evaluate(output: str):
                     "off_topic_is_brief_and_helpful", "research_explanation_is_useful_and_honest"]
         passed = all(deterministic.values()) and all(grading.get(key) is True for key in required) and not failures
         report = {"ready": passed, "model": config.PAI_MODEL, "judge_model": judge_model,
+                  "workflow_scenarios": scenario_checks,
                   "deterministic": deterministic,
                   "retrieval_modes": retrieval_modes, "vectors_enabled": vectors_enabled,
                   "memories_indexed": student.indexed,

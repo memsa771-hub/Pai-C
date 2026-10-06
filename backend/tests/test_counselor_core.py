@@ -166,6 +166,7 @@ def test_text_and_voice_turns_use_the_same_core_and_background_learning():
              patch("app.counseling.understanding.StudentUnderstandingBuilder") as builders, \
              patch("app.journey.JourneyService") as journeys, \
              patch("app.counseling.core.CounselorCore") as core, \
+             patch("app.roadmaps.service.RoadmapService.focused", return_value=None), \
              patch("app.counseling.runtime._post_response", post), \
              patch("app.memory.turn_hook.enqueue_turn_extraction") as extract:
             snapshots.return_value.build.return_value = snapshot
@@ -214,6 +215,7 @@ def test_collection_reconciles_before_reply_for_text_and_voice():
              patch("app.journey.JourneyService") as journeys, \
              patch("app.memory.foundation_intake.capture_foundation_turn", new_callable=AsyncMock) as capture, \
              patch("app.counseling.core.CounselorCore") as core, \
+             patch("app.roadmaps.service.RoadmapService.focused", return_value=None), \
              patch("app.counseling.reply_guard.guard_reply", new_callable=AsyncMock) as guard, \
              patch("app.counseling.runtime._post_response", new_callable=AsyncMock) as post, \
              patch("app.memory.turn_hook.enqueue_turn_extraction") as enqueue:
@@ -260,6 +262,7 @@ def test_goal_hint_does_not_activate_a_journey_before_a_presented_route():
              patch("app.journey.JourneyService") as journeys, \
              patch("app.counseling.turn_semantics.classify_turn", new_callable=AsyncMock) as classify, \
              patch("app.counseling.core.CounselorCore") as core, \
+             patch("app.roadmaps.service.RoadmapService.focused", return_value=None), \
              patch("app.counseling.reply_guard.guard_reply",
                    new=AsyncMock(side_effect=lambda reply, **kwargs: reply)), \
              patch("app.counseling.runtime._post_response", new_callable=AsyncMock) as post, \

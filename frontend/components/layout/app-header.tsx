@@ -102,6 +102,7 @@ export function DetailHeader({
 /** Every view mode maps onto a `views.*` message key. */
 export const VIEW_TITLE_KEYS: Record<ViewMode, MessageKey> = {
   threads: "views.paiCounselor",
+  roadmaps: "views.roadmaps",
   profile: "views.profile",
   applications: "views.applications",
   deadlines: "views.deadlines",

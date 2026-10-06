@@ -14,6 +14,8 @@ export function useNotificationNavigation() {
     const read = item.isRead ? Promise.resolve() : markNotificationRead(item.id);
     if (item.createdBy === 'system:deadline') {
       openView('deadlines');
+    } else if (item.createdBy === 'system:roadmaps') {
+      openView('roadmaps');
     } else if (TASKS_UI_ENABLED && item.channelName?.startsWith('task:')) {
       setPendingTaskChannel(item.channelName);
       openView('tasks');

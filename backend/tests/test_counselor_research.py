@@ -22,6 +22,11 @@ from app.tools.builtin import capabilities as capability_tools
 from app.tools.web_search import set_web_search_provider
 from app.memory.permissions import OPERATOR_CAPABILITIES
 from scripts.counselor_eval_support import StudentSession
+from scripts.eval_counselor_journey import check_workflow_scenarios
+
+
+def test_five_workflow_scenario_invariants():
+    assert all(check_workflow_scenarios().values())
 
 
 def test_six_research_capabilities_register_with_single_owners():
@@ -120,7 +125,8 @@ def test_research_run_stage_hook_follows_server_transition_graph():
         for stage in ("FOUNDATION", "DIRECTION", "RESEARCHING"):
             journey = journeys.set_counselor_stage(student.workspace_id, journey.id, stage)
         run = ExecutionRun(workspace_id=student.workspace_id, requested_by="openagents:pai",
-                           objective="Research", task_type="roadmap_research", status="verifying")
+                           objective="Research", task_type="roadmap_research", status="verifying",
+                           constraints={"research_key": f"{journey.id}:goal"})
         db.add(run)
         db.flush()
         on_run_status(db, run)
@@ -132,7 +138,10 @@ def test_research_run_stage_hook_follows_server_transition_graph():
         run.status = "executing"
         on_run_status(db, run)
         run.status = "completed"
-        run.result = {"capability_result": {"roadmaps": [{"title": "CS"}]}}
+        run.result = {"capability_result": {"roadmaps": [{
+            "title": "CS", "origin": "stated_goal", "route": {"url": "https://example.edu/cs"},
+            "sources": [{"url": "https://example.edu/cs", "checked_at": "2026-10-06T00:00:00+00:00"}],
+            "gaps": []}]}}
         on_run_status(db, run)
         assert journeys.get(student.workspace_id, journey.id).current_stage == "PROPOSED"
 

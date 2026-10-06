@@ -13,6 +13,10 @@ def on_run_status(db, run):
     from app.journey import JourneyService
     from app.counseling.stages import ASSESSING, NEEDS_INFO, PROPOSED, RESEARCHING
 
+    from app.roadmaps.service import RoadmapService
+    published = []
+    if run.status in {"completed", "needs_user_action", "failed"}:
+        published = RoadmapService(db).publish_from_run(run)
     journey = JourneyService(db).ensure_counselor(run.workspace_id, actor="system:research")
     stage = journey.current_stage
     target = None
@@ -21,12 +25,37 @@ def on_run_status(db, run):
     elif (run.status == "needs_user_action" and stage == ASSESSING
           and (run.pending_action or {}).get("type") == "need_from_student"):
         target = NEEDS_INFO
-    elif (run.status == "completed" and stage == ASSESSING
-          and ((run.result or {}).get("capability_result") or {}).get("roadmaps")):
+    elif run.status == "completed" and stage == ASSESSING and published:
         target = PROPOSED
     if target:
         JourneyService(db).set_counselor_stage(run.workspace_id, journey.id, target,
                                                actor="system:research")
+
+
+DIMENSION_PREFIXES = {
+    "academics": ("education", "course", "achievement"),
+    "English/tests": ("test_attempt", "language_proficiency", "tests"),
+    "finance": ("finance", "financial_sponsor"),
+    "timing": ("goal", "application"),
+    "documents": ("document", "credential", "certification"),
+}
+
+
+def fit_dimensions(gaps: list[dict]) -> dict:
+    dimensions = {name: {"level": "unknown", "reason": "No cited comparable rule yet",
+                         "source": None} for name in DIMENSION_PREFIXES}
+    weight = {"unknown": 0, "met": 1, "fixable": 2, "blocking": 3}
+    for gap in gaps:
+        field = str(gap.get("field") or "").casefold()
+        for name, prefixes in DIMENSION_PREFIXES.items():
+            if any(field.startswith(prefix) for prefix in prefixes):
+                current = dimensions[name]
+                if weight.get(gap.get("status"), 0) >= weight.get(current["level"], 0):
+                    dimensions[name] = {"level": gap.get("status") or "unknown",
+                                        "reason": gap.get("reason"),
+                                        "source": gap.get("source_url")}
+                break
+    return dimensions
 
 
 def _facts(scoped: dict) -> dict:
@@ -105,13 +134,22 @@ async def build(context, payload):
             assessed = await context.capabilities("gap.assess", {
                 "facts": _facts(context.student_context), "rules": requirement["rules"]})
             unknown_items.extend(assessed["unknowns"])
+            gaps = assessed["gaps"]
+            levels = {item.get("status") for item in gaps}
+            fit = ("weak" if "blocking" in levels else "partial" if levels & {"fixable", "unknown"}
+                   else "strong" if levels else "unconfirmed")
             roadmaps.append({
                 "origin": origin, "title": candidate["title"],
                 "route": {"country": requirement["country"], "level": level,
-                          "intake": brief.get("intake"), "url": candidate["url"]},
-                "fit_level": "unconfirmed" if requirement["status"] != "verified" else "partial",
-                "gaps": assessed["gaps"], "steps": qualification["procedures"],
-                "total_cost": None, "time_to_start": None, "risks": [],
+                          "intake": brief.get("intake"), "url": candidate["url"],
+                          "why_suggested": ("Your stated direction" if origin == "stated_goal"
+                                            else f"Another route to {objective}")},
+                "fit_level": "unconfirmed" if requirement["status"] != "verified" else fit,
+                "fit_dimensions": fit_dimensions(gaps),
+                "gaps": gaps, "steps": qualification["procedures"],
+                "total_cost": None, "time_to_start": brief.get("intake"),
+                "risks": (["Requirement set awaits review"]
+                          if requirement["status"] != "verified" else []),
                 "sources": [{"url": requirement["source_url"],
                              "checked_at": requirement["checked_at"]}],
                 "requirement_set_id": requirement["requirement_set_id"],

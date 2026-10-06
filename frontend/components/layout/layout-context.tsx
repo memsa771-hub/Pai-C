@@ -14,7 +14,7 @@ import { TASKS_UI_ENABLED, WORKFLOWS_UI_ENABLED } from '@/lib/config';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import type { FileSortKey, FileTypeFilter } from '@/components/files/file-utils';
 
-export type ViewMode = 'threads' | 'profile' | 'applications' | 'deadlines' | 'notifications' | 'files' | 'knowledge' | 'browser' | 'tasks' | 'workflows' | 'routines' | 'inbox';
+export type ViewMode = 'threads' | 'roadmaps' | 'profile' | 'applications' | 'deadlines' | 'notifications' | 'files' | 'knowledge' | 'browser' | 'tasks' | 'workflows' | 'routines' | 'inbox';
 
 /**
  * Views whose implementation ships but whose entry points are held back for a
@@ -77,7 +77,7 @@ export const VIEWS_WITH_LIST: ReadonlySet<ViewMode> = new Set<ViewMode>([
  * allow-list rather than "any ViewMode": the query string is attacker-supplied
  * in principle, and only the views something actually links to belong here.
  */
-export const ROUTABLE_VIEWS: ReadonlySet<ViewMode> = new Set<ViewMode>(['profile']);
+export const ROUTABLE_VIEWS: ReadonlySet<ViewMode> = new Set<ViewMode>(['profile', 'roadmaps']);
 
 /**
  * Per-view list-panel preference, persisted in a cookie so it survives reloads

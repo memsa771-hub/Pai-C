@@ -29,5 +29,16 @@ def review_requirement(requirement_id: str, body: ReviewRequest,
                                           reviewer="ops", decision=body.decision)
     except ResearchEvidenceError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
+    from app.roadmaps.service import RoadmapService
+    affected = RoadmapService(db).mark_stale(
+        body.workspace_id, "A requirement source was reviewed; fit needs a fresh check",
+        source_url=row.source_url)
+    if affected:
+        from app.jobs.service import BackgroundJobService
+        from app.memory.handlers import JOB_REFRESH_RESEARCH
+        BackgroundJobService(db).enqueue(
+            job_type=JOB_REFRESH_RESEARCH, workspace_id=body.workspace_id,
+            payload={"requirement_id": requirement_id},
+            idempotency_key=f"research-source-refresh:{requirement_id}:{body.decision}")
     db.commit()
     return {"id": row.id, "status": row.status, "reviewed_at": row.reviewed_at.isoformat()}

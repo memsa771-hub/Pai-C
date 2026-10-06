@@ -6,6 +6,7 @@ import { AgentAvatar } from '@/components/agents/agent-avatar';
 import { useWorkspace } from '@/lib/workspace-context';
 import { useT } from '@/lib/i18n';
 import { PAI_PRIMARY_CONVERSATION_ID } from '@/lib/primary-conversation';
+import { Map } from 'lucide-react';
 import { useLayout } from './layout-context';
 import { useWorkspaceNavigation } from './workspace-navigation';
 
@@ -31,6 +32,10 @@ export function NavMain({ onNavigate }: { onNavigate?: () => void }) {
         <SidebarMenuButton tooltip={t('views.paiCounselor')} isActive={viewMode === 'threads'} onClick={openPaiCounselor}>
           <AgentAvatar name="pai" size={16} className="[&_svg]:size-full!" />
           <span>{t('views.paiCounselor')}</span>
+        </SidebarMenuButton>
+      </SidebarMenuItem><SidebarMenuItem>
+        <SidebarMenuButton tooltip={t('views.roadmaps')} isActive={viewMode === 'roadmaps'} onClick={() => { openView('roadmaps'); onNavigate?.(); }}>
+          <Map className="size-4" /><span>{t('views.roadmaps')}</span>
         </SidebarMenuButton>
       </SidebarMenuItem></SidebarMenu></SidebarGroupContent>
     </SidebarGroup>

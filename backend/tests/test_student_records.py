@@ -19,6 +19,7 @@ from app.models import (User, Workspace, EventRecord, FileRecord, VaultFact,
     StudentRecordRevision, BackgroundJob, VAULT_INTAKE_MODELS,
     VaultAssertion, VaultEvidence, VaultAssertionEvidence, VaultRelation)
 from app.memory.candidates import MemoryCandidateService
+from app.models import Roadmap, RoadmapStudentState
 from app.memory.context import MemoryContextService
 from app.memory.extraction_context import TurnContext, build_turn_context
 from app.memory.extractor import _validate, build_user_prompt, extract_candidates
@@ -54,6 +55,7 @@ def db():
     tables = [User, Workspace, EventRecord, FileRecord, VaultFact, VaultFieldDefinition,
               MemoryCandidate, PaiMemory, PaiEpisode, ProfileIssue, StudentRecordRevision, BackgroundJob,
               *ENTITY_MODELS.values(), *VAULT_INTAKE_MODELS]
+    tables.extend([Roadmap, RoadmapStudentState])
     Base.metadata.create_all(engine, tables=[model.__table__ for model in tables])
     with Session(engine, autoflush=False) as session:
         user = User(email="student@example.test")

@@ -54,6 +54,7 @@ export const messages = {
   /** View names. Shared by the sidebar, the nav rail and the app header. */
   views: {
     paiCounselor: 'PAI Counselor',
+    roadmaps: 'Roadmaps',
     profile: 'Profile',
     applications: 'Applications',
     deadlines: 'Deadlines',

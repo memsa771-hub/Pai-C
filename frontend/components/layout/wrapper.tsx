@@ -21,6 +21,7 @@ import { TasksView } from '@/components/tasks/tasks-view';
 import { WorkflowsView } from '@/components/workflows/workflows-view';
 import { RoutineList } from '@/components/routines/routine-list';
 import { ProfileView } from '@/components/profile/profile-view';
+import { RoadmapsView } from '@/components/roadmaps/roadmaps-view';
 import { ApplicationsView } from '@/components/applications/applications-view';
 import { DeadlinesView } from '@/components/deadlines/deadlines-view';
 import { NotificationsCenterView } from '@/components/notifications/notifications-center-view';
@@ -177,6 +178,8 @@ export function Wrapper() {
             <div className="h-full bg-background overflow-hidden">
               <ProfileView />
             </div>
+          ) : viewMode === 'roadmaps' ? (
+            <div className="h-full bg-background overflow-hidden"><RoadmapsView /></div>
           ) : viewMode === 'applications' ? (
             <div className="h-full bg-background overflow-hidden"><ApplicationsView /></div>
           ) : viewMode === 'deadlines' ? (
@@ -303,6 +306,7 @@ export function Wrapper() {
               {viewMode === 'files' && (filesSection === 'trash' ? <TrashView /> : <FilePreview />)}
               {viewMode === 'browser' && <BrowserView />}
               {viewMode === 'profile' && <ProfileView />}
+              {viewMode === 'roadmaps' && <RoadmapsView />}
               {viewMode === 'applications' && <ApplicationsView />}
               {viewMode === 'deadlines' && <DeadlinesView />}
               {viewMode === 'notifications' && <NotificationsCenterView />}

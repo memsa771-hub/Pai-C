@@ -9,7 +9,7 @@ import {
   SheetTrigger,
 } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
-import { Menu, MessageSquare, CircleUser, GraduationCap } from 'lucide-react';
+import { Menu, MessageSquare, CircleUser, GraduationCap, Map } from 'lucide-react';
 import Image from 'next/image';
 import { useEffect, useState } from 'react';
 import { SidebarProvider } from '@/components/ui/sidebar';
@@ -56,6 +56,7 @@ export function MobileHeader() {
 
   const tabs: { mode: ViewMode; icon: typeof MessageSquare; label: string }[] = [
     { mode: 'threads', icon: MessageSquare, label: t('views.paiCounselor') },
+    { mode: 'roadmaps', icon: Map, label: t('views.roadmaps') },
     { mode: 'profile', icon: CircleUser, label: t('views.profile') },
     { mode: 'applications', icon: GraduationCap, label: t('views.applications') },
   ];

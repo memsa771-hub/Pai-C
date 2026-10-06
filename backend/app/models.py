@@ -795,6 +795,62 @@ class RequirementSet(Base):
     )
 
 
+class Roadmap(Base):
+    """Research artifact; source provenance stays separate from student choice."""
+    __tablename__ = "pai_roadmaps"
+
+    id = Column(Text, primary_key=True, default=_uuid)
+    workspace_id = Column(UUID(as_uuid=False), ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False)
+    journey_id = Column(Text, ForeignKey("pai_student_journeys.id", ondelete="CASCADE"), nullable=False)
+    goal_id = Column(Text, nullable=True)
+    origin = Column(Text, nullable=False)
+    title = Column(Text, nullable=False)
+    route = Column(JSONB, nullable=False, default=dict, server_default=text("'{}'"))
+    fit_level = Column(Text, nullable=True)
+    fit_dimensions = Column(JSONB, nullable=False, default=dict, server_default=text("'{}'"))
+    gaps = Column(JSONB, nullable=False, default=list, server_default=text("'[]'"))
+    steps = Column(JSONB, nullable=False, default=list, server_default=text("'[]'"))
+    total_cost = Column(JSONB, nullable=True)
+    time_to_start = Column(Text, nullable=True)
+    risks = Column(JSONB, nullable=False, default=list, server_default=text("'[]'"))
+    sources = Column(JSONB, nullable=False, default=list, server_default=text("'[]'"))
+    generation_status = Column(Text, nullable=False, default="generating", server_default=text("'generating'"))
+    stale_reason = Column(Text, nullable=True)
+    execution_run_id = Column(Text, ForeignKey("execution_runs.id", ondelete="SET NULL"), nullable=True)
+    version = Column(Integer, nullable=False, default=1, server_default=text("1"))
+    created_at = Column(DateTime(timezone=True), default=_now, server_default=text("NOW()"))
+    updated_at = Column(DateTime(timezone=True), default=_now, onupdate=_now, server_default=text("NOW()"))
+
+    __table_args__ = (
+        CheckConstraint("origin IN ('stated_goal', 'alternative', 'student_added', 'operator_suggested')", name="ck_roadmap_origin"),
+        CheckConstraint("fit_level IS NULL OR fit_level IN ('strong', 'partial', 'weak', 'not_possible_yet', 'unconfirmed')", name="ck_roadmap_fit"),
+        CheckConstraint("generation_status IN ('generating', 'ready', 'needs_info', 'failed', 'stale')", name="ck_roadmap_generation_status"),
+        CheckConstraint("version > 0", name="ck_roadmap_version"),
+        Index("idx_roadmaps_workspace_journey", "workspace_id", "journey_id", "updated_at"),
+        Index("idx_roadmaps_run", "execution_run_id"),
+    )
+
+
+class RoadmapStudentState(Base):
+    __tablename__ = "pai_roadmap_student_state"
+
+    roadmap_id = Column(Text, ForeignKey("pai_roadmaps.id", ondelete="CASCADE"), primary_key=True)
+    journey_id = Column(Text, ForeignKey("pai_student_journeys.id", ondelete="CASCADE"), nullable=False)
+    favorite = Column(Boolean, nullable=False, default=False, server_default=text("false"))
+    exploring = Column(Boolean, nullable=False, default=False, server_default=text("false"))
+    dismissed_at = Column(DateTime(timezone=True), nullable=True)
+    chosen_at = Column(DateTime(timezone=True), nullable=True)
+    focused_at = Column(DateTime(timezone=True), nullable=True)
+    presented_at = Column(DateTime(timezone=True), nullable=True)
+
+    __table_args__ = (
+        Index("uq_roadmap_chosen_per_journey", "journey_id", unique=True,
+              postgresql_where=text("chosen_at IS NOT NULL"),
+              sqlite_where=text("chosen_at IS NOT NULL")),
+        Index("idx_roadmap_student_state_journey", "journey_id"),
+    )
+
+
 class TimerRecord(Base):
     """A scheduled timer that posts a message when it fires."""
     __tablename__ = "timers"

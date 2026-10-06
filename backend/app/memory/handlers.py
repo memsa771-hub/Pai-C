@@ -33,6 +33,50 @@ JOB_EMBED = "memory.embed"
 JOB_UNINDEX = "memory.unindex"
 JOB_REINDEX = "memory.reindex"
 JOB_RESUME_RESEARCH = "memory.resume_research"
+JOB_REFRESH_RESEARCH = "research.refresh_stale"
+
+
+async def refresh_stale_research(job, db) -> dict:
+    """A reviewed source change starts a fresh, durable Counselor research run."""
+    from app.counseling.research_flow import delegate_research_if_ready
+    from app.counseling.understanding import StudentUnderstandingBuilder
+    from app.journey import JourneyService
+    from app.memory.permissions import capabilities_for_agent
+    from app.memory.student_snapshot import StudentSnapshotService
+    from app.models import Roadmap, Workspace
+    from app.services.pai import PAI_AGENT_NAME, PAI_ALLOWED_TOOLS, PAI_PRIMARY_CHANNEL, WorkspaceApi
+    from app.tools import AUDIENCE_COUNSELOR, ToolContext
+
+    workspace = db.get(Workspace, job.workspace_id)
+    if workspace is None:
+        return {"delegated": False}
+    journey = JourneyService(db).ensure_counselor(job.workspace_id)
+    stale = db.execute(select(Roadmap.id).where(
+        Roadmap.workspace_id == job.workspace_id, Roadmap.journey_id == journey.id,
+        Roadmap.generation_status == "stale").limit(1)).first()
+    if journey.current_stage not in {"PROPOSED", "CHOSEN"} or not stale:
+        return {"delegated": False}
+    snapshot = StudentSnapshotService(db).build(job.workspace_id)
+    goals = snapshot.records.get("goal", [])
+    if not any((item.get("details") or {}).get("underlying_objective") for item in goals):
+        return {"delegated": False}
+    understanding = StudentUnderstandingBuilder(db).build(job.workspace_id, snapshot=snapshot)
+    if journey.current_stage == "PROPOSED":
+        journey = JourneyService(db).set_counselor_stage(
+            job.workspace_id, journey.id, "RESEARCHING", actor="system:source_review")
+    db.commit()
+    context = ToolContext(
+        workspace_id=job.workspace_id, agent_name=PAI_AGENT_NAME,
+        api=WorkspaceApi(job.workspace_id, workspace.password_hash),
+        conversation=PAI_PRIMARY_CHANNEL,
+        allowed_tools=frozenset({"operator.delegate"}) & frozenset(PAI_ALLOWED_TOOLS),
+        audience=AUDIENCE_COUNSELOR,
+        granted_capabilities=capabilities_for_agent(PAI_AGENT_NAME),
+    )
+    result = await delegate_research_if_ready(
+        db, job.workspace_id, journey, goals, understanding, context,
+        refresh_key=(job.payload or {}).get("requirement_id") or job.id)
+    return {"delegated": bool(result and result.get("ok"))}
 
 
 async def resume_research(job, db) -> dict:
@@ -78,7 +122,7 @@ async def resume_research(job, db) -> dict:
     from app.memory.profile_completion import ProfileCompletionService
     from app.memory.student_snapshot import StudentSnapshotService
     from app.memory.permissions import capabilities_for_agent
-    from app.services.pai import PAI_AGENT_NAME, PAI_ALLOWED_TOOLS
+    from app.services.pai import PAI_AGENT_NAME, PAI_ALLOWED_TOOLS, PAI_PRIMARY_CHANNEL
     from app.tools import AUDIENCE_COUNSELOR
 
     snapshot = StudentSnapshotService(db).build(job.workspace_id)
@@ -91,18 +135,32 @@ async def resume_research(job, db) -> dict:
         identity_ready=bool(owner and owner.onboarded_at),
         foundation_ready=bool(completion.get("foundationReady")),
         goal_records=snapshot.records.get("goal", []), actor="system:reconciliation")
+    from app.models import Roadmap
+    stale = db.execute(select(Roadmap.id).where(
+        Roadmap.workspace_id == job.workspace_id,
+        Roadmap.journey_id == journey.id,
+        Roadmap.generation_status == "stale",
+    ).limit(1)).first() is not None
+    refresh_key = None
+    if journey.current_stage == "PROPOSED" and stale:
+        journey = journeys.set_counselor_stage(
+            job.workspace_id, journey.id, "RESEARCHING", actor="system:reconciliation")
+        refresh_key = candidate.id
+    elif journey.current_stage == "CHOSEN" and stale:
+        refresh_key = candidate.id
     understanding = StudentUnderstandingBuilder(db).build(job.workspace_id, snapshot=snapshot)
     db.commit()
     counselor_ctx = ToolContext(
         workspace_id=job.workspace_id, agent_name=PAI_AGENT_NAME,
         api=WorkspaceApi(job.workspace_id, workspace.password_hash),
+        conversation=PAI_PRIMARY_CHANNEL,
         allowed_tools=frozenset({"operator.delegate"}) & frozenset(PAI_ALLOWED_TOOLS),
         audience=AUDIENCE_COUNSELOR,
         granted_capabilities=capabilities_for_agent(PAI_AGENT_NAME),
     )
     delegated = await delegate_research_if_ready(
         db, job.workspace_id, journey, snapshot.records.get("goal", []),
-        understanding, counselor_ctx)
+        understanding, counselor_ctx, refresh_key=refresh_key)
     return {"resumed": resumed, "delegated": bool(delegated and delegated.get("ok"))}
 
 
@@ -527,3 +585,4 @@ job_handlers.register(JOB_EMBED, embed_memory)
 job_handlers.register(JOB_UNINDEX, unindex_memory)
 job_handlers.register(JOB_REINDEX, reindex_workspace)
 job_handlers.register(JOB_RESUME_RESEARCH, resume_research)
+job_handlers.register(JOB_REFRESH_RESEARCH, refresh_stale_research)
