@@ -1153,6 +1153,10 @@ class ProfileRequirement(Base):
     selector = Column(Text, nullable=False, default="any", server_default=text("'any'"))
     applicability = Column(JSONB, nullable=True)
     question = Column(Text, nullable=False)
+    stage = Column(Text, nullable=False, default="profile", server_default=text("'profile'"))
+    question_intent = Column(Text, nullable=True)
+    canonical_questions = Column(JSONB, nullable=True)
+    accepts_unknown = Column(Boolean, nullable=False, default=False, server_default=text("false"))
     priority = Column(Integer, nullable=False, default=50, server_default=text("50"))
     enabled = Column(Boolean, nullable=False, default=True, server_default=text("true"))
     version = Column(Integer, nullable=False, default=1, server_default=text("1"))
@@ -1174,6 +1178,8 @@ class ProfileRequirement(Base):
         ),
         CheckConstraint("priority >= 0", name="ck_profile_requirement_priority"),
         CheckConstraint("version > 0", name="ck_profile_requirement_version"),
+        CheckConstraint("stage IN ('profile', 'foundation', 'direction', 'summary')",
+                        name="ck_profile_requirement_stage"),
         Index("uq_profile_requirement_key_version", "key", "version", unique=True),
         Index("idx_profile_requirements_enabled", "enabled"),
     )
@@ -1201,6 +1207,33 @@ class ProfileFieldResponse(Base):
             name="ck_profile_field_response_status",
         ),
         UniqueConstraint("workspace_id", "requirement_key", name="uq_profile_field_response"),
+    )
+
+
+class CounselorSlotAnswer(Base):
+    """Recent student-reported slot answer awaiting canonical reconciliation.
+
+    This is shared conversation state, not a second profile or voice memory.
+    Canonical facts still enter Vault only through candidates and reconciliation.
+    """
+    __tablename__ = "pai_counselor_slot_answers"
+
+    id = Column(Text, primary_key=True, default=_uuid)
+    workspace_id = Column(UUID(as_uuid=False), ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False)
+    source_event_id = Column(Text, nullable=False)
+    slot_key = Column(Text, nullable=False)
+    value = Column(JSONB, nullable=True)
+    status = Column(Text, nullable=False, default="pending", server_default=text("'pending'"))
+    confidence = Column(Float, nullable=True)
+    quote = Column(Text, nullable=True)
+    created_at = Column(DateTime(timezone=True), default=_now, server_default=text("NOW()"))
+
+    __table_args__ = (
+        CheckConstraint("status IN ('pending', 'valid_unknown', 'declined')",
+                        name="ck_counselor_slot_answer_status"),
+        UniqueConstraint("workspace_id", "source_event_id", "slot_key",
+                         name="uq_counselor_slot_answer_event"),
+        Index("idx_counselor_slot_answers_recent", "workspace_id", "created_at"),
     )
 
 

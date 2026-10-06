@@ -25,7 +25,9 @@ class ProfileCompletionService:
     def evaluate(self, workspace_id: str, snapshot: StudentSnapshot | None = None) -> dict:
         snapshot = snapshot or self.snapshots.build(workspace_id)
         journey = self.journeys.evaluate(snapshot)
-        requirements = self.registry.active()
+        # Counselor discovery slots have their own progression. They do not
+        # change the student's profile-completeness or onboarding gate.
+        requirements = self.registry.active(stage="profile")
         responses = {
             row.requirement_key: row for row in self.db.execute(
                 select(ProfileFieldResponse).where(ProfileFieldResponse.workspace_id == workspace_id)

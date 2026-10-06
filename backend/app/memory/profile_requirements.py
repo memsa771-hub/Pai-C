@@ -50,9 +50,12 @@ class ProfileRequirementRegistry:
     def __init__(self, db):
         self.db = db
 
-    def active(self) -> list[ProfileRequirement]:
+    def active(self, *, stage: str | None = None) -> list[ProfileRequirement]:
+        filters = [ProfileRequirement.enabled.is_(True)]
+        if stage is not None:
+            filters.append(ProfileRequirement.stage == stage)
         rows = self.db.execute(
-            select(ProfileRequirement).where(ProfileRequirement.enabled.is_(True))
+            select(ProfileRequirement).where(*filters)
             .order_by(ProfileRequirement.key, ProfileRequirement.version.desc())
         ).scalars().all()
         latest: dict[str, ProfileRequirement] = {}
@@ -106,7 +109,7 @@ class ProfileRequirementRegistry:
 
     @staticmethod
     def _education_rank(row: dict) -> tuple:
-        group = education_group(row.get("canonical_level"))
+        group = education_group(row.get("canonical_level"), row.get("qualification_name"))
         status_rank = {"current": 3, "completed": 2, "incomplete": 1, "planned": 0}
         date = row.get("end_date") or str(row.get("graduation_year") or "") or row.get("start_date") or ""
         return (status_rank.get(row.get("academic_status"), 1), GROUP_ORDER.get(group, -1), date, row.get("id") or "")

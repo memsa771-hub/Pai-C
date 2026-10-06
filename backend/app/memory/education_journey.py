@@ -1,6 +1,7 @@
 """Derive broad education history and gaps without inventing records."""
 
 from typing import Any
+import re
 
 from .student_snapshot import StudentSnapshot
 
@@ -14,8 +15,40 @@ GROUP_ORDER = {"pre_university": 0, "undergraduate": 1, "postgraduate": 2, "unkn
 KNOWN_HISTORY_STATUSES = frozenset({"completed", "current"})
 
 
-def education_group(level: Any) -> str:
+def canonical_education_level(level: Any, qualification_name: Any = None) -> str | None:
+    """Map common qualification names when extraction omitted the level.
+
+    The result is only a classification hint. It never creates a Vault record
+    or overrides an explicit canonical level.
+    """
     normalized = str(level or "").strip().casefold()
+    if normalized in {item for values in LEVEL_GROUPS.values() for item in values}:
+        return normalized
+    name = re.sub(r"[^a-z0-9]+", " ", str(qualification_name or "").casefold()).strip()
+    words = set(name.split())
+    if not words:
+        return None
+    if "phd" in words or "doctorate" in words:
+        return "doctorate"
+    if "mphil" in words or ("m" in words and "phil" in words):
+        return "mphil"
+    if "masters" in words or "master" in words or words & {"ms", "msc", "ma", "mba"}:
+        return "master"
+    if "bachelor" in words or words & {"bs", "bsc", "ba", "bcom", "bba", "beng"}:
+        return "bachelor"
+    if "diploma" in words:
+        return "diploma"
+    if "associate" in words:
+        return "associate"
+    if words & {"fsc", "fa", "ics", "icom", "hssc"} or ("a" in words and words & {"level", "levels"}):
+        return "upper_secondary"
+    if "matric" in words or "ssc" in words or ("o" in words and words & {"level", "levels"}):
+        return "secondary"
+    return None
+
+
+def education_group(level: Any, qualification_name: Any = None) -> str:
+    normalized = canonical_education_level(level, qualification_name)
     for group, levels in LEVEL_GROUPS.items():
         if normalized in levels:
             return group
@@ -27,7 +60,7 @@ class EducationJourneyService:
         records = []
         for source in snapshot.records.get("education", []):
             row = dict(source)
-            row["group"] = education_group(row.get("canonical_level"))
+            row["group"] = education_group(row.get("canonical_level"), row.get("qualification_name"))
             records.append(row)
 
         records.sort(key=self._sort_key)
