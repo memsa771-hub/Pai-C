@@ -209,7 +209,7 @@ def test_collection_reconciles_before_reply_for_text_and_voice():
              patch("app.counseling.understanding.StudentUnderstandingBuilder") as builder, \
              patch("app.memory.foundation_intake.capture_foundation_turn", new_callable=AsyncMock) as capture, \
              patch("app.counseling.core.CounselorCore") as core, \
-             patch("app.counseling.reply_guard.guard_collection_reply", new_callable=AsyncMock) as guard, \
+             patch("app.counseling.reply_guard.guard_reply", new_callable=AsyncMock) as guard, \
              patch("app.counseling.runtime._post_response", new_callable=AsyncMock) as post, \
              patch("app.memory.turn_hook.enqueue_turn_extraction") as enqueue:
             snapshots.return_value.build.return_value = snapshot
@@ -258,6 +258,8 @@ def test_goal_activates_only_after_reviewed_reply_and_explicit_confirmation():
              patch("app.counseling.goal_transition.confirms_reviewed_route",
                    new_callable=AsyncMock) as confirm, \
              patch("app.counseling.core.CounselorCore") as core, \
+             patch("app.counseling.reply_guard.guard_reply",
+                   new=AsyncMock(side_effect=lambda reply, **kwargs: reply)), \
              patch("app.counseling.runtime._post_response", new_callable=AsyncMock) as post, \
              patch("app.memory.turn_hook.enqueue_turn_extraction"):
             snapshots.return_value.build.return_value = snapshot
@@ -265,6 +267,9 @@ def test_goal_activates_only_after_reviewed_reply_and_explicit_confirmation():
             builder.return_value.build.return_value = _understanding()
             journeys.return_value.resolve_active.return_value = None
             journeys.return_value.create.return_value = Mock(title="Study computing")
+            journeys.return_value.create.return_value.to_dict.return_value = {
+                "current_objective": "Study computing", "blockers": [],
+                "current_stage": "ALIGNING"}
             records.return_value.get.return_value = Mock(title="Study computing")
             classify.return_value = {"journey_intent": {
                 "action": "upsert", "journey_type": "direction_discovery"}}

@@ -25,6 +25,7 @@ universities is university_shortlist, even when the profile is incomplete.
  "profile_correction": false,
  "requested_work": false,
  "requested_roadmap": false,
+ "requested_detail": false,
  "wants_progress": false,
  "decision_intent": null,
  "context_intent": null,
@@ -77,7 +78,7 @@ def validate_turn_semantics(raw: object, *, message: str = "") -> dict:
     data = raw if isinstance(raw, dict) else {}
     result = {key: data.get(key) is True for key in (
         "general_information", "mirror_confirmation", "mirror_request",
-        "profile_correction", "requested_work", "requested_roadmap",
+        "profile_correction", "requested_work", "requested_roadmap", "requested_detail",
         "wants_progress")}
     result["decision_intent"] = validated_decision_intent(data.get("decision_intent"))
     context_intent = data.get("context_intent")

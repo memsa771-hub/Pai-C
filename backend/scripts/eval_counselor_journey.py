@@ -26,6 +26,7 @@ from app.services import operator, pai
 from app.inference.client import chat_completion_tools
 from app.tools import get_tool_executor
 from scripts.counselor_eval_support import StudentSession
+from app.counseling.reply_guard import deterministic_issues
 
 
 TURNS = [
@@ -38,6 +39,24 @@ TURNS = [
     "I want AI.",
     "Fall 2027. I have IELTS 7.5 overall. Please research two realistic MSc AI options in Germany for me now, using my budget and academic background. Check official program sources and explain any eligibility gaps.",
 ]
+
+
+REPLY_GUARD_SCENARIOS = {
+    "long_winded": {"reply": "detail " * 121, "expected": "too_long"},
+    "double_question": {"reply": "Which country? Which intake?",
+                        "expected": "too_many_questions"},
+    "known_reask": {"reply": "What are you studying now?",
+                    "fields": [{"status": "answered",
+                                "question": "What are you studying now?"}],
+                    "expected": "reasks_known_or_pending"},
+}
+
+
+def check_reply_guard_scenarios() -> dict[str, bool]:
+    """Fast offline regression checks alongside the real-model journey eval."""
+    return {name: case["expected"] in deterministic_issues(
+        case["reply"], requirement_fields=case.get("fields"))
+        for name, case in REPLY_GUARD_SCENARIOS.items()}
 
 
 

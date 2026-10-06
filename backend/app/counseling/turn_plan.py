@@ -7,6 +7,7 @@ brief as data; it cannot choose its own mode or promote a remembered goal.
 from dataclasses import dataclass
 
 from app.memory.foreground import escape_value
+from .policy import PolicyDecision
 
 
 @dataclass(frozen=True)
@@ -16,6 +17,7 @@ class TurnPlan:
     parked_goal: str | None
     progress: tuple[int, int]
     active_goal: str | None = None
+    policy: PolicyDecision | None = None
 
     @classmethod
     def from_completion(cls, completion: dict, snapshot, active_journey=None) -> "TurnPlan":
@@ -34,6 +36,10 @@ class TurnPlan:
         )
 
     def prompt(self) -> str:
+        base = self._base_prompt()
+        return base + ("\n\n" + self.policy.to_prompt() if self.policy else "")
+
+    def _base_prompt(self) -> str:
         if self.mode == "collecting":
             question_instruction = (f"Next question: {self.question} " if self.question else
                                     "There is no profile question to ask now; wait for pending or deferred information. ")
