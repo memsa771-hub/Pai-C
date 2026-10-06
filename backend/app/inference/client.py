@@ -89,6 +89,7 @@ async def chat_completion(
     reasoning_effort: Optional[str] = None,
     base_url: Optional[str] = None,
     response_format: Optional[dict] = None,
+    temperature: Optional[float] = None,
 ) -> str:
     """Return text from the configured PAI-compatible chat endpoint."""
     client = create_client(api_key, base_url=base_url)
@@ -105,6 +106,8 @@ async def chat_completion(
         kwargs[_token_limit_kwarg(model)] = max_tokens
     if response_format:
         kwargs["response_format"] = response_format
+    if temperature is not None:
+        kwargs["temperature"] = temperature
 
     try:
         response = await client.chat.completions.create(**kwargs)
