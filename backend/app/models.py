@@ -714,11 +714,14 @@ class StudentJourney(Base):
     __table_args__ = (
         CheckConstraint("status IN ('active', 'paused', 'completed', 'abandoned')", name="ck_student_journey_status"),
         CheckConstraint(
-            "current_stage IS NULL OR current_stage IN ('ORIENTING','UNDERSTANDING','ALIGNING','PLANNING','ACTING','REVIEWING','COMPLETED')",
+            "current_stage IS NULL OR current_stage IN ('ORIENTING','UNDERSTANDING','ALIGNING','PLANNING','ACTING','REVIEWING','COMPLETED','IDENTITY','FOUNDATION','DIRECTION','RESEARCHING','ASSESSING','NEEDS_INFO','PROPOSED','CHOSEN')",
             name="ck_student_journey_stage",
         ),
         Index("idx_student_journeys_workspace", "workspace_id"),
         Index("idx_student_journeys_workspace_status", "workspace_id", "status"),
+        Index("uq_counselor_journey_active", "workspace_id", unique=True,
+              postgresql_where=text("journey_type = 'counselor_decision' AND status = 'active'"),
+              sqlite_where=text("journey_type = 'counselor_decision' AND status = 'active'")),
         Index(
             "uq_student_journey_primary_active", "workspace_id", unique=True,
             postgresql_where=text("is_primary = true AND status = 'active'"),
@@ -1063,7 +1066,7 @@ class ProfileRequirement(Base):
             name="ck_profile_requirement_source_type",
         ),
         CheckConstraint(
-            "selector IN ('any', 'current_or_highest')",
+            "selector IN ('any', 'current_or_highest', 'any_present')",
             name="ck_profile_requirement_selector",
         ),
         CheckConstraint("priority >= 0", name="ck_profile_requirement_priority"),

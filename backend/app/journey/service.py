@@ -8,7 +8,7 @@ from uuid import uuid4
 
 from sqlalchemy import select
 
-from app.models import StudentJourney, StudentJourneyEvent
+from app.models import StudentJourney, StudentJourneyEvent, Workspace
 from .events import (
     JOURNEY_ABANDONED, JOURNEY_BLOCKER_ADDED, JOURNEY_BLOCKER_RESOLVED,
     JOURNEY_COMPLETED, JOURNEY_CREATED, JOURNEY_DECISION_ADDED,
@@ -43,6 +43,8 @@ class JourneyService:
 
     def create(self, workspace_id: str, journey_type: str, title: str, *,
                primary: bool = False, actor: str = "system", **values: Any) -> JourneyView:
+        if journey_type == "counselor_decision":
+            raise JourneyError("Use ensure_counselor for the Counselor journey")
         if not isinstance(journey_type, str) or not isinstance(title, str) or not journey_type.strip() or not title.strip():
             raise JourneyError("journey_type and title are required")
         invalid = set(values) - UPDATABLE
@@ -112,6 +114,50 @@ class JourneyService:
         ).order_by(StudentJourney.is_primary.desc(), StudentJourney.updated_at.desc()).limit(1)).scalar_one_or_none()
         return self._view(row) if row else None
 
+    def ensure_counselor(self, workspace_id: str, *, actor: str = "system") -> JourneyView:
+        """Create one direction-discovery container without inventing a goal."""
+        owner = self.db.execute(select(Workspace).where(
+            Workspace.id == workspace_id).with_for_update()).scalar_one_or_none()
+        if owner is None:
+            raise JourneyError("Student workspace not found")
+        row = self.db.execute(select(StudentJourney).where(
+            StudentJourney.workspace_id == workspace_id,
+            StudentJourney.journey_type == "counselor_decision",
+            StudentJourney.status == "active").limit(1)).scalar_one_or_none()
+        if row is not None:
+            return self._view(row)
+        primary_exists = self.get_primary(workspace_id) is not None
+        row = StudentJourney(
+            workspace_id=workspace_id, journey_type="counselor_decision",
+            title="Counselor direction", is_primary=not primary_exists,
+            goals=[], active_goal=None, current_focus_goal_id=None,
+            current_stage="IDENTITY", decisions=[], blockers=[],
+        )
+        self.db.add(row)
+        self.db.flush()
+        self._event(row, JOURNEY_CREATED, {"title": row.title}, actor)
+        return self._view(row)
+
+    def set_counselor_stage(self, workspace_id: str, journey_id: str, stage: str, *,
+                            actor: str = "system", validated_choice: bool = False) -> JourneyView:
+        from app.counseling.stages import require_counselor_transition
+
+        row = self._require(workspace_id, journey_id)
+        if row.journey_type != "counselor_decision":
+            raise JourneyError("Not a Counselor journey")
+        try:
+            target = require_counselor_transition(
+                row.current_stage, stage, validated_choice=validated_choice)
+        except ValueError as exc:
+            raise JourneyError(str(exc)) from exc
+        previous = row.current_stage
+        if previous != target:
+            row.current_stage = target
+            row.updated_at = datetime.now(timezone.utc)
+            self._event(row, JOURNEY_STAGE_CHANGED,
+                        {"from": previous, "to": target}, actor)
+        return self._view(row)
+
     def resolve_primary(self, workspace_id: str) -> JourneyView | None:
         """Deprecated exact-primary alias; fallback is explicit in resolve_active."""
         return self.get_primary(workspace_id)
@@ -125,6 +171,9 @@ class JourneyService:
 
     def update(self, workspace_id: str, journey_id: str, *, actor: str = "system", **changes: Any) -> JourneyView:
         row = self._require(workspace_id, journey_id)
+        if row.journey_type == "counselor_decision" and (
+                "current_stage" in changes or "journey_type" in changes):
+            raise JourneyError("Counselor stages and type are server owned")
         invalid = set(changes) - UPDATABLE
         if invalid:
             raise JourneyError(f"unsupported journey fields: {', '.join(sorted(invalid))}")
@@ -210,6 +259,8 @@ class JourneyService:
 
     def set_stage(self, workspace_id: str, journey_id: str, stage: str, *, actor: str = "system") -> JourneyView:
         row = self._require(workspace_id, journey_id)
+        if row.journey_type == "counselor_decision":
+            raise JourneyError("Use set_counselor_stage for the Counselor journey")
         try:
             target = require_transition(row.current_stage, stage)
         except ValueError as exc:
