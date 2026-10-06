@@ -47,6 +47,9 @@ class CounselingEvaluator:
 
         understanding = vault_context or {}
         baseline = understanding.get("baseline") or {}
+        foundation_ready = ((completion or {}).get("foundationReady") is True
+                            if "foundationReady" in (completion or {}) else
+                            baseline.get("status") == "confirmed")
         semantics = turn_semantics or {}
         if "baseline" in understanding:
             from .decision_sufficiency import DecisionSufficiencyEvaluator, validated_decision_intent
@@ -75,7 +78,7 @@ class CounselingEvaluator:
             elif semantics.get("wants_progress"):
                 move, focus = CounselingMove.COUNSEL, objective or "give a useful next step now"
             elif (requested_work and not blockers
-                  and (completion or {}).get("foundationReady") is True
+                  and foundation_ready
                   and (objective or (understanding.get("goals") or {}).get("nodes"))):
                 move = CounselingMove.DELEGATE
                 focus = objective or "requested research"
@@ -104,7 +107,7 @@ class CounselingEvaluator:
             return CounselingState(
                 CounselingPhase.COUNSELING if has_context else CounselingPhase.DISCOVERING,
                 "low" if has_context else "medium", move, focus,
-                move is CounselingMove.DELEGATE and (completion or {}).get("foundationReady") is True,
+                move is CounselingMove.DELEGATE and foundation_ready,
                 move is CounselingMove.BUILD_ROADMAP,
                 "full" if has_context and not conflict else "limited", relevant_unknowns,
                 conflict, objective,

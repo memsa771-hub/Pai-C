@@ -197,7 +197,7 @@ async def test_incomplete_profile_answers_with_context_but_guidance_is_locked():
                 patch.object(config, "PAI_PROFILE_COMPLETION_ROLLOUT_MODE", "all"), \
                 patch("app.memory.foundation_intake.capture_foundation_turn",
                       new=AsyncMock(return_value=False)), \
-                patch("app.counseling.reply_guard.guard_collection_reply",
+                patch("app.counseling.reply_guard.guard_reply",
                       new=AsyncMock(side_effect=lambda reply, **kwargs: reply)), \
                 patch("app.memory.foreground.build_foreground_context", new_callable=AsyncMock) as memory:
             memory.return_value = ForegroundContext()

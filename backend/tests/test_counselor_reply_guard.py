@@ -5,6 +5,7 @@ from unittest.mock import AsyncMock, patch
 
 from app.counseling.reply_guard import (deterministic_issues, guard_collection_reply,
                                         guard_reply)
+from scripts.eval_counselor_journey import check_reply_guard_scenarios
 
 
 def test_collection_guard_keeps_allowed_reply():
@@ -62,3 +63,7 @@ def test_open_reply_guard_rejects_unsafe_rewrite():
         result = asyncio.run(guard_reply(
             "Where? When?", student_message="Help me choose a route", mode="open"))
     assert result.count("?") <= 1
+
+
+def test_offline_journey_scenarios_cover_reply_traps():
+    assert all(check_reply_guard_scenarios().values())

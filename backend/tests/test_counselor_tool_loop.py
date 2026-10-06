@@ -31,7 +31,7 @@ def _delegate_call():
         })}}
 
 
-async def _exercise(completion, *, voice=False):
+async def _exercise(completion, *, voice=False, requested_work=True):
     with StudentSession() as student:
         if completion is OPEN:
             with student.factory() as db:
@@ -59,7 +59,7 @@ async def _exercise(completion, *, voice=False):
              patch("app.counseling.goal_transition.reviewed_route",
                    new=AsyncMock(return_value=False)), \
              patch("app.counseling.turn_semantics.classify_turn",
-                   new=AsyncMock(return_value={"requested_work": True})), \
+                   new=AsyncMock(return_value={"requested_work": requested_work})), \
              patch("app.counseling.reply_guard.guard_reply",
                    new=AsyncMock(side_effect=lambda reply, **kwargs: reply)), \
              patch("app.memory.foundation_intake.capture_foundation_turn",
@@ -76,7 +76,7 @@ async def _exercise(completion, *, voice=False):
             runs = db.execute(select(ExecutionRun)).scalars().all()
             audits = db.execute(select(EventRecord).where(
                 EventRecord.type == "counselor.tool.result")).scalars().all()
-            if completion is OPEN:
+            if completion is OPEN and requested_work:
                 assert len(runs) == 1
                 assert runs[0].task_type == "roadmap_research"
                 assert len(audits) == 1 and audits[0].visibility == "private"
@@ -90,6 +90,12 @@ async def _exercise(completion, *, voice=False):
                         EventRecord.source == "openagents:pai").order_by(
                             EventRecord.timestamp.desc())).scalars().first()
                     assert reply.metadata_["voice_delegation_id"] == "voice-turn"
+            elif completion is OPEN:
+                assert runs == []
+                assert len(audits) == 1
+                assert audits[0].payload["result"]["error"]["code"] == "tool_not_allowed"
+                assert "operator__delegate" not in {tool["function"]["name"]
+                                                    for tool in requests[0]["tools"]}
             else:
                 assert runs == [] and audits == []
                 assert all(not request.get("tools") for request in requests)
@@ -105,3 +111,7 @@ def test_collecting_chat_has_no_execution_tools():
 
 def test_open_voice_turn_uses_the_same_delegation_path():
     asyncio.run(_exercise(OPEN, voice=True))
+
+
+def test_open_turn_cannot_delegate_when_policy_does_not_allow_it():
+    asyncio.run(_exercise(OPEN, requested_work=False))

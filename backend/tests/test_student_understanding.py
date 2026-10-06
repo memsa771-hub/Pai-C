@@ -457,6 +457,8 @@ def test_chat_does_not_dump_profile_or_require_mirror_confirmation():
                                      "nextRequirement": None}), \
                  patch("app.counseling.goal_transition.reviewed_route",
                        new=AsyncMock(return_value=False)), \
+                 patch("app.counseling.reply_guard.guard_reply",
+                       new=AsyncMock(side_effect=lambda reply, **kwargs: reply)), \
                  patch.object(config, "PAI_API_KEY", "test"), \
                  patch.object(config, "PAI_MEMORY_CONTEXT_ENABLED", False):
                 await student.turn("continue")
@@ -465,7 +467,7 @@ def test_chat_does_not_dump_profile_or_require_mirror_confirmation():
                 assert "Education so far" not in student.transcript[-1]["content"]
                 await student.turn("What do you think fits me?")
                 assert "OPEN" in received[-1]["system_prompt"]
-                assert "operator__delegate" in {
+                assert "operator__delegate" not in {
                     tool["function"]["name"] for tool in received[-1]["tools"]}
                 await student.turn("Please research a shortlist")
                 assert "operator__delegate" in {
