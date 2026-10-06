@@ -9,7 +9,7 @@ import {
   SheetTrigger,
 } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
-import { Menu, MessageSquare, FileText, Globe } from 'lucide-react';
+import { Menu, MessageSquare, CircleUser, GraduationCap } from 'lucide-react';
 import Image from 'next/image';
 import { useEffect, useState } from 'react';
 import { SidebarProvider } from '@/components/ui/sidebar';
@@ -23,11 +23,12 @@ import { useLayout, type ViewMode } from './layout-context';
 import { useWorkspace } from '@/lib/workspace-context';
 import { useT } from '@/lib/i18n';
 import { cn } from '@/lib/utils';
+import { PAI_PRIMARY_CONVERSATION_ID } from '@/lib/primary-conversation';
 
 export function MobileHeader() {
   const [isSheetOpen, setIsSheetOpen] = useState(false);
-  const { viewMode, openView, openMobileList } = useLayout();
-  const { workspace } = useWorkspace();
+  const { viewMode, openView, openMobileDetail, setSelectedAgentName } = useLayout();
+  const { workspace, setCurrentSessionId } = useWorkspace();
   const t = useT();
 
   // Close sheet when clicking a session
@@ -45,14 +46,18 @@ export function MobileHeader() {
   const closeSheet = () => setIsSheetOpen(false);
 
   const handleViewSwitch = (mode: ViewMode) => {
+    if (mode === 'threads') {
+      setCurrentSessionId(PAI_PRIMARY_CONVERSATION_ID);
+      setSelectedAgentName(null);
+    }
     openView(mode);
-    openMobileList();
+    if (mode === 'threads') openMobileDetail();
   };
 
   const tabs: { mode: ViewMode; icon: typeof MessageSquare; label: string }[] = [
     { mode: 'threads', icon: MessageSquare, label: t('views.paiCounselor') },
-    { mode: 'files', icon: FileText, label: t('views.files') },
-    { mode: 'browser', icon: Globe, label: t('views.browser') },
+    { mode: 'profile', icon: CircleUser, label: t('views.profile') },
+    { mode: 'applications', icon: GraduationCap, label: t('views.applications') },
   ];
 
   return (

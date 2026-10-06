@@ -103,6 +103,9 @@ export function DetailHeader({
 export const VIEW_TITLE_KEYS: Record<ViewMode, MessageKey> = {
   threads: "views.paiCounselor",
   profile: "views.profile",
+  applications: "views.applications",
+  deadlines: "views.deadlines",
+  notifications: "views.notifications",
   files: "views.files",
   knowledge: "views.knowledge",
   browser: "views.browser",

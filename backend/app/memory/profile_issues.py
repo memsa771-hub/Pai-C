@@ -99,6 +99,8 @@ class ProfileIssueService:
         evidence = issue.evidence or {}
         if original is not None:
             entities = dict(original.entities or {})
+            if evidence.get("record_id") and not entities.get("record_id"):
+                entities["record_id"] = evidence["record_id"]
             if evidence.get("force_new_on_accept"):
                 entities["force_new"] = True
             return {

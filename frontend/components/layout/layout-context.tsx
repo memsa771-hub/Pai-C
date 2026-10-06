@@ -10,11 +10,11 @@ import {
   useState
 } from 'react';
 import { useIsMobile } from '@/hooks/use-mobile';
-import { INBOX_UI_ENABLED, TASKS_UI_ENABLED, WORKFLOWS_UI_ENABLED } from '@/lib/config';
+import { TASKS_UI_ENABLED, WORKFLOWS_UI_ENABLED } from '@/lib/config';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import type { FileSortKey, FileTypeFilter } from '@/components/files/file-utils';
 
-export type ViewMode = 'threads' | 'profile' | 'files' | 'knowledge' | 'browser' | 'tasks' | 'workflows' | 'routines' | 'inbox';
+export type ViewMode = 'threads' | 'profile' | 'applications' | 'deadlines' | 'notifications' | 'files' | 'knowledge' | 'browser' | 'tasks' | 'workflows' | 'routines' | 'inbox';
 
 /**
  * Views whose implementation ships but whose entry points are held back for a
@@ -23,7 +23,6 @@ export type ViewMode = 'threads' | 'profile' | 'files' | 'knowledge' | 'browser'
  * back to threads here rather than at each call site.
  */
 const HIDDEN_VIEWS: ReadonlySet<ViewMode> = new Set<ViewMode>([
-  ...(INBOX_UI_ENABLED ? [] : ['inbox' as const]),
   ...(TASKS_UI_ENABLED ? [] : ['tasks' as const]),
   ...(WORKFLOWS_UI_ENABLED ? [] : ['workflows' as const]),
 ]);
@@ -283,7 +282,7 @@ export function LayoutProvider({ children }: { children: ReactNode }) {
 
   // Switching views keeps whatever the user last chose for the target view.
   const openView = (mode: ViewMode) => {
-    const nextMode = HIDDEN_VIEWS.has(mode) ? 'threads' : mode;
+    const nextMode = mode === 'inbox' ? 'notifications' : HIDDEN_VIEWS.has(mode) ? 'threads' : mode;
     setViewMode(nextMode);
     // Files is the exception: its list pane is a folder tree, and what you want
     // on opening it is usually the file you or an agent just added — which is

@@ -8,7 +8,8 @@ DELETE /v1/routines/{id}     Cancel a routine
 """
 
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, time, timedelta, timezone
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, Header, Path, Query
@@ -40,6 +41,7 @@ class CreateRoutineRequest(BaseModel):
     minute: Optional[int] = None
     days: Optional[List[int]] = None
     interval_minutes: Optional[int] = None
+    timezone: str = "UTC"
     network: str
     source: str
     channel: Optional[str] = None
@@ -114,32 +116,29 @@ def _compute_next_fires_at(
     minute: Optional[int],
     days: Optional[List[int]],
     interval_minutes: Optional[int] = None,
+    timezone_name: str = "UTC",
+    now: datetime | None = None,
 ) -> datetime:
-    """Compute the next UTC datetime that matches the given schedule."""
-    from datetime import timedelta
-
-    now = datetime.now(timezone.utc)
-
+    """Next UTC instant for a wall-clock schedule, including DST transitions."""
+    now = (now or datetime.now(timezone.utc)).astimezone(timezone.utc)
     if interval_minutes is not None:
         return now + timedelta(minutes=interval_minutes)
-
-    today = now.replace(hour=hour, minute=minute, second=0, microsecond=0)
-
-    if days is None:
-        if today > now:
-            return today
-        return today + timedelta(days=1)
-
-    current_weekday = now.weekday()  # 0=Mon
+    zone = ZoneInfo(timezone_name)
+    local_today = now.astimezone(zone).date()
     for offset in range(8):
-        candidate = today + timedelta(days=offset)
-        wd = (current_weekday + offset) % 7
-        if wd in days:
-            if offset == 0 and candidate <= now:
-                continue
-            return candidate
-
-    return today + timedelta(days=1)
+        day = local_today + timedelta(days=offset)
+        if days is not None and day.weekday() not in days:
+            continue
+        naive = datetime.combine(day, time(hour, minute))
+        instants = set()
+        for fold in (0, 1):
+            candidate = naive.replace(tzinfo=zone, fold=fold).astimezone(timezone.utc)
+            # A spring-forward wall time may not exist. Skip that day.
+            if candidate.astimezone(zone).replace(tzinfo=None) == naive and candidate > now:
+                instants.add(candidate)
+        if instants:
+            return min(instants)
+    raise ValueError("No valid occurrence in the next eight days")
 
 
 def _describe_schedule(
@@ -147,6 +146,7 @@ def _describe_schedule(
     minute: Optional[int],
     days: Optional[List[int]],
     interval_minutes: Optional[int] = None,
+    timezone_name: str = "UTC",
 ) -> str:
     """Human-readable schedule description for the LLM prompt."""
     if interval_minutes is not None:
@@ -155,7 +155,7 @@ def _describe_schedule(
             m = interval_minutes % 60
             return f"Every {h}h{f' {m}m' if m else ''}"
         return f"Every {interval_minutes} minutes"
-    time_str = f"{hour:02d}:{minute:02d} UTC"
+    time_str = f"{hour:02d}:{minute:02d} {timezone_name}"
     if days is None:
         return f"Every day at {time_str}"
     day_names = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
@@ -306,6 +306,10 @@ async def create_routine(
     # in the target agent's dedicated routine channel. This gives each
     # (workspace, agent) pair a single canonical job queue and keeps regular
     # conversation threads from being spammed by scheduled output.
+    try:
+        ZoneInfo(body.timezone)
+    except (ZoneInfoNotFoundError, ValueError):
+        return json_response(ResponseCode.BAD_REQUEST, "Unknown timezone")
     target_agent = _normalize_agent_name(body.source)
     if not target_agent:
         return json_response(ResponseCode.BAD_REQUEST, "source is required")
@@ -332,7 +336,7 @@ async def create_routine(
     # Auto-generate context via LLM if not provided (UI-created routines)
     if not body.context:
         import asyncio
-        schedule_desc = _describe_schedule(body.hour, body.minute, body.days, body.interval_minutes)
+        schedule_desc = _describe_schedule(body.hour, body.minute, body.days, body.interval_minutes, body.timezone)
         body.context = await asyncio.to_thread(
             _generate_routine_context_sync, body.name, body.message, schedule_desc,
             body.conversation_history,
@@ -341,7 +345,7 @@ async def create_routine(
     import uuid as _uuid_mod
     routine_id = str(_uuid_mod.uuid4())
     routine_channel = _get_or_create_routine_channel(db, workspace, target_agent)
-    next_fire = _compute_next_fires_at(body.hour, body.minute, body.days, body.interval_minutes)
+    next_fire = _compute_next_fires_at(body.hour, body.minute, body.days, body.interval_minutes, body.timezone)
 
     routine = RoutineRecord(
         id=routine_id,
@@ -356,6 +360,7 @@ async def create_routine(
         schedule_minute=body.minute,
         schedule_days=body.days,
         schedule_interval_minutes=body.interval_minutes,
+        timezone=body.timezone,
         next_fires_at=next_fire,
     )
     db.add(routine)

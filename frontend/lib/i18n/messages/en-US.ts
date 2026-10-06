@@ -55,10 +55,13 @@ export const messages = {
   views: {
     paiCounselor: 'PAI Counselor',
     profile: 'Profile',
+    applications: 'Applications',
+    deadlines: 'Deadlines',
+    notifications: 'Notifications',
     threads: 'Threads',
-    files: 'Docs',
+    files: 'Documents',
     knowledge: 'Knowledge',
-    browser: 'Browser',
+    browser: 'Research Browser',
     tasks: 'Tasks',
     workflows: 'Workflows',
     routines: 'Routines',
@@ -87,6 +90,11 @@ export const messages = {
 
   nav: {
     collaboration: 'Workspace',
+    guide: 'Your guide',
+    paiOs: 'PAI OS',
+    studentProfile: 'Student profile',
+    applicationWorkspace: 'Application workspace',
+    tools: 'Tools',
     agentsWithCount: 'Agents ({online}/{total})',
     onlineWithCount: 'Online ({count})',
     you: '{name} (you)',

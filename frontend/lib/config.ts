@@ -34,12 +34,6 @@ export const API_URL = (process.env.NEXT_PUBLIC_API_URL || DEFAULT_API_URL).repl
 export const DMS_UI_ENABLED = process.env.NEXT_PUBLIC_ENABLE_DMS === 'true';
 
 /**
- * The notification inbox is reserved for a later Placement AI release. Its
- * implementation stays available behind the same kind of build-time gate.
- */
-export const INBOX_UI_ENABLED = process.env.NEXT_PUBLIC_ENABLE_INBOX === 'true';
-
-/**
  * The task board is held back for a later Placement AI release. Agents still
  * create and run tasks server-side; only the student-facing board is gated.
  */

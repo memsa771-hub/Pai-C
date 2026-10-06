@@ -1,8 +1,7 @@
 # -*- coding: utf-8 -*-
 """Durable in-app notifications.
 
-Notifications are stored in the workspace inbox. Clients receive updates
-through the existing API and realtime event channels.
+Notifications are stored in the workspace inbox and read through its API.
 """
 
 from app.models import NotificationRecord
@@ -23,6 +22,7 @@ def notify(
     channel_name: str | None = None,
     thread_id: str | None = None,
     link_url: str | None = None,
+    dedupe_key: str | None = None,
     reason: str | None = None,
     push: bool = True,
 ) -> NotificationRecord:
@@ -42,6 +42,7 @@ def notify(
         channel_name=channel_name,
         thread_id=thread_id,
         link_url=link_url,
+        dedupe_key=dedupe_key,
     )
     db.add(record)
     db.flush()

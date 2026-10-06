@@ -4,8 +4,8 @@ import { useMemo, useState } from 'react';
 import { Bell, CheckCheck, RefreshCw } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { NotificationCard } from '@/components/inbox/inbox-view';
-import { INBOX_UI_ENABLED } from '@/lib/config';
+import { NotificationCard } from '@/components/notifications/notification-card';
+import { useNotificationNavigation } from '@/components/notifications/use-notification-navigation';
 import { cn } from '@/lib/utils';
 import { useWorkspace } from '@/lib/workspace-context';
 import type { NotificationItem } from '@/lib/types';
@@ -27,10 +27,9 @@ export function NotificationsMenu({ side, align = 'end' }: NotificationsMenuProp
     markNotificationRead,
     markAllNotificationsRead,
     dismissNotification,
-    setCurrentSessionId,
-    sessions,
   } = useWorkspace();
   const { openView } = useLayout();
+  const navigate = useNotificationNavigation();
   const t = useT();
   const [open, setOpen] = useState(false);
 
@@ -49,11 +48,7 @@ export function NotificationsMenu({ side, align = 'end' }: NotificationsMenuProp
   }, [notifications]);
 
   const handleNavigate = (notification: NotificationItem) => {
-    if (!notification.isRead) markNotificationRead(notification.id);
-    if (notification.channelName && sessions.some((s) => s.sessionId === notification.channelName)) {
-      setCurrentSessionId(notification.channelName);
-      openView('threads');
-    }
+    void navigate(notification);
     setOpen(false);
   };
 
@@ -68,12 +63,13 @@ export function NotificationsMenu({ side, align = 'end' }: NotificationsMenuProp
       <PopoverTrigger asChild>
         <button
           type="button"
-          title={t('notifications.title')}
-          className="relative flex size-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+          title={unreadNotificationCount > 0 ? `${unreadNotificationCount} unread notifications` : t('notifications.title')}
+          aria-label={unreadNotificationCount > 0 ? `${t('notifications.title')}: ${unreadNotificationCount} unread` : t('notifications.title')}
+          className="relative flex size-9 shrink-0 items-center justify-center overflow-visible rounded-md text-muted-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:outline-2 focus-visible:outline-primary"
         >
-          <Bell className="size-4" />
+          <Bell className="size-5" />
           {unreadNotificationCount > 0 && (
-            <span className="absolute -end-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-medium text-destructive-foreground tabular-nums">
+            <span aria-hidden="true" className="absolute -end-1 -top-1 z-10 flex h-5 min-w-5 items-center justify-center rounded-full bg-destructive px-1 text-[11px] font-bold leading-none text-destructive-foreground shadow-sm ring-2 ring-background tabular-nums">
               {unreadNotificationCount > 99 ? '99+' : unreadNotificationCount}
             </span>
           )}
@@ -129,15 +125,15 @@ export function NotificationsMenu({ side, align = 'end' }: NotificationsMenuProp
           </ScrollArea>
         )}
 
-        {INBOX_UI_ENABLED && (
+        {(
           <button
             onClick={() => {
-              openView('inbox');
+              openView('notifications');
               setOpen(false);
             }}
             className="w-full shrink-0 border-t border-border px-3 py-2 text-center text-xs font-medium text-primary transition-colors hover:bg-muted"
           >
-            {t('notifications.viewAllInInbox')}
+            View all notifications
           </button>
         )}
       </PopoverContent>

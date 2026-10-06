@@ -372,6 +372,68 @@ def test_ordinary_conversation_cannot_silently_overwrite_record(db):
     assert service.get(db.info["workspace"], "education", initial.result_id).result["gpa"] == 3.42
 
 
+@pytest.mark.parametrize("source", ["conversation", "document"])
+def test_conflicting_fsc_stream_without_record_id_needs_profile_review(db, source):
+    workspace = db.info["workspace"]
+    _, initial = propose(db, "education", {
+        "qualification_name": "FSc Pre-Engineering", "canonical_level": "upper_secondary",
+        "field_of_study": "Pre-Engineering", "academic_status": "completed",
+    })
+    candidate, result = propose(db, "education", {
+        "qualification_name": "FSc Pre-Medical", "canonical_level": "upper_secondary",
+        "field_of_study": "Pre-Medical", "academic_status": "completed",
+    }, source=source, evidence={"quote": "I completed FSc Pre-Medical"})
+    assert not result.accepted and candidate.status == "needs_review"
+    assert [row.qualification_name for row in StudentRecordService(db).list(workspace, "education")] == ["FSc Pre-Engineering"]
+    issue = StudentRecordService(db).issues(workspace)[0]
+    assert issue.candidate_id == candidate.id
+    assert issue.evidence["record_id"] == initial.result_id
+    assert ProfileIssueService(db).resolve(workspace, issue.id, "accept_proposed")["resolved"]
+    db.commit()
+    rows = StudentRecordService(db).list(workspace, "education")
+    assert len(rows) == 1 and rows[0].id == initial.result_id
+    assert rows[0].qualification_name == "FSc Pre-Medical"
+    assert rows[0].field_of_study == "Pre-Medical"
+
+
+def test_sparse_fsc_streams_still_raise_review_without_model_level(db):
+    _, initial = propose(db, "education", {"qualification_name": "FSc Pre-Engineering"})
+    candidate, result = propose(db, "education", {"qualification_name": "FSc Pre-Medical"})
+    assert result.reason == "needs_review" and candidate.status == "needs_review"
+    assert [row.id for row in StudentRecordService(db).list(db.info["workspace"], "education")] == [initial.result_id]
+
+
+def test_model_correction_label_cannot_replace_education_identity(db):
+    workspace = db.info["workspace"]
+    _, initial = propose(db, "education", {
+        "qualification_name": "FSc", "field_of_study": "Pre-Engineering",
+    })
+    spoken = MemoryCandidateService(db).propose(
+        workspace, "student_record", key="education",
+        proposed_value={"field_of_study": "Pre-Medical"},
+        entities={"record_id": initial.result_id}, source_type="conversation",
+        input_channel="voice", confidence=0.95,
+        evidence={"quote": "I did FSc Pre-Medical", "semantic_correction": True},
+    )
+    assert MemoryReconciler(db).reconcile(spoken).reason == "needs_review"
+    assert StudentRecordService(db).get(workspace, "education", initial.result_id).field_of_study == "Pre-Engineering"
+    assert StudentRecordService(db).issues(workspace)[0].candidate_id == spoken.id
+
+
+def test_separate_bachelors_and_distinct_fsc_years_remain_possible(db):
+    workspace = db.info["workspace"]
+    for name in ("Bachelor of Science in Physics", "Bachelor of Science in Mathematics"):
+        assert propose(db, "education", {"qualification_name": name,
+               "canonical_level": "bachelor"})[1].accepted
+    assert len(StudentRecordService(db).list(workspace, "education")) == 2
+    assert propose(db, "education", {"qualification_name": "FSc Pre-Engineering",
+           "canonical_level": "upper_secondary", "graduation_year": 2020})[1].accepted
+    assert propose(db, "education", {"qualification_name": "FSc Pre-Medical",
+           "canonical_level": "upper_secondary", "graduation_year": 2023})[1].accepted
+    assert len(StudentRecordService(db).list(workspace, "education")) == 4
+    assert not StudentRecordService(db).issues(workspace)
+
+
 def test_goal_change_keeps_history_and_independent_career_goal(db):
     service = StudentRecordService(db)
     _, old = propose(db, "goal", {"goal_type": "education", "title": "Study in Canada"})

@@ -20,8 +20,10 @@ import { MonitorGrid } from '@/components/monitor/monitor-grid';
 import { TasksView } from '@/components/tasks/tasks-view';
 import { WorkflowsView } from '@/components/workflows/workflows-view';
 import { RoutineList } from '@/components/routines/routine-list';
-import { InboxView } from '@/components/inbox/inbox-view';
 import { ProfileView } from '@/components/profile/profile-view';
+import { ApplicationsView } from '@/components/applications/applications-view';
+import { DeadlinesView } from '@/components/deadlines/deadlines-view';
+import { NotificationsCenterView } from '@/components/notifications/notifications-center-view';
 import { OnboardingView } from '@/components/onboarding/onboarding-view';
 import { KnowledgeView } from '@/components/knowledge/knowledge-view';
 import { KnowledgeList } from '@/components/knowledge/knowledge-list';
@@ -175,6 +177,12 @@ export function Wrapper() {
             <div className="h-full bg-background overflow-hidden">
               <ProfileView />
             </div>
+          ) : viewMode === 'applications' ? (
+            <div className="h-full bg-background overflow-hidden"><ApplicationsView /></div>
+          ) : viewMode === 'deadlines' ? (
+            <div className="h-full bg-background overflow-hidden"><DeadlinesView /></div>
+          ) : viewMode === 'notifications' ? (
+            <div className="h-full bg-background overflow-hidden"><NotificationsCenterView /></div>
           ) : viewMode === 'tasks' ? (
             <div className="h-full bg-background overflow-hidden">
               <TasksView />
@@ -182,10 +190,6 @@ export function Wrapper() {
           ) : viewMode === 'workflows' ? (
             <div className="h-full bg-background overflow-hidden">
               <WorkflowsView />
-            </div>
-          ) : viewMode === 'inbox' ? (
-            <div className="h-full bg-background overflow-hidden">
-              <InboxView />
             </div>
           ) : mobilePane === 'list' ? (
             /* List pane — full width */
@@ -299,9 +303,11 @@ export function Wrapper() {
               {viewMode === 'files' && (filesSection === 'trash' ? <TrashView /> : <FilePreview />)}
               {viewMode === 'browser' && <BrowserView />}
               {viewMode === 'profile' && <ProfileView />}
+              {viewMode === 'applications' && <ApplicationsView />}
+              {viewMode === 'deadlines' && <DeadlinesView />}
+              {viewMode === 'notifications' && <NotificationsCenterView />}
               {viewMode === 'tasks' && <TasksView />}
               {viewMode === 'workflows' && <WorkflowsView />}
-              {viewMode === 'inbox' && <InboxView />}
               {viewMode === 'knowledge' && <KnowledgeView />}
 
               {/* Agent profile slide-over (non-chat views keep the overlay) */}

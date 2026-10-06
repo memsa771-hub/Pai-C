@@ -17,6 +17,7 @@ from sqlalchemy import (
     Boolean,
     CheckConstraint,
     Column,
+    Date,
     DateTime,
     Float,
     ForeignKey,
@@ -818,6 +819,7 @@ class NotificationRecord(Base):
     channel_name = Column(Text, nullable=True)              # optional link to related thread
     thread_id = Column(Text, nullable=True)
     link_url = Column(Text, nullable=True)                  # optional external link
+    dedupe_key = Column(Text, nullable=True)                # idempotent system notice key
     status = Column(Text, nullable=False, default="active") # active | dismissed | expired
     created_at = Column(DateTime(timezone=True), default=_now, server_default=text("NOW()"))
     read_at = Column(DateTime(timezone=True), nullable=True)
@@ -826,6 +828,7 @@ class NotificationRecord(Base):
         Index("idx_notifications_workspace_status", "workspace_id", "status"),
         Index("idx_notifications_workspace_read", "workspace_id", "is_read"),
         Index("idx_notifications_created_at", "created_at"),
+        UniqueConstraint("workspace_id", "dedupe_key", name="uq_notifications_workspace_dedupe"),
     )
 
 
@@ -1298,6 +1301,129 @@ class StudentApplication(_StudentRecord, Base):
     deadline = Column(Text, nullable=True)
     details = Column(JSONB, nullable=True)
     __table_args__ = (Index("idx_pai_applications_ws", "workspace_id", "status"),)
+
+
+class Institution(Base):
+    """Searchable institution identity, independent of any application cycle.
+
+    Student-added entries stay private until a trusted catalog provider claims
+    them. Provider identifiers belong here so later integrations can reconcile
+    catalog rows without replacing student application IDs.
+    """
+    __tablename__ = "pai_institutions"
+    id = Column(Text, primary_key=True, default=_uuid)
+    owner_workspace_id = Column(UUID(as_uuid=False), ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=True)
+    name = Column(Text, nullable=False)
+    normalized_name = Column(Text, nullable=False)
+    country_code = Column(Text, nullable=False)
+    city = Column(Text, nullable=True)
+    website_url = Column(Text, nullable=True)
+    source = Column(Text, nullable=False, default="student", server_default="student")
+    provider = Column(Text, nullable=True)
+    provider_id = Column(Text, nullable=True)
+    created_at = Column(DateTime(timezone=True), default=_now, server_default=text("NOW()"))
+    updated_at = Column(DateTime(timezone=True), default=_now, onupdate=_now, server_default=text("NOW()"))
+    __table_args__ = (
+        Index("idx_pai_institution_search", "country_code", "normalized_name"),
+        Index("uq_pai_institution_owner_country_name", "owner_workspace_id", "country_code", "normalized_name", unique=True),
+        Index("uq_pai_institution_provider", "provider", "provider_id", unique=True),
+    )
+
+
+class SavedInstitution(Base):
+    __tablename__ = "pai_saved_institutions"
+    id = Column(Text, primary_key=True, default=_uuid)
+    workspace_id = Column(UUID(as_uuid=False), ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False)
+    institution_id = Column(Text, ForeignKey("pai_institutions.id", ondelete="CASCADE"), nullable=False)
+    created_at = Column(DateTime(timezone=True), default=_now, server_default=text("NOW()"))
+    __table_args__ = (UniqueConstraint("workspace_id", "institution_id", name="uq_pai_saved_institution"),)
+
+
+class ApplicationPlan(Base):
+    """Operational application work; canonical student claims stay in Vault."""
+    __tablename__ = "pai_application_plans"
+    id = Column(Text, primary_key=True, default=_uuid)
+    workspace_id = Column(UUID(as_uuid=False), ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False)
+    institution_id = Column(Text, ForeignKey("pai_institutions.id", ondelete="CASCADE"), nullable=False)
+    program_name = Column(Text, nullable=True)
+    intake = Column(Text, nullable=True)
+    route = Column(Text, nullable=True)
+    status = Column(Text, nullable=False, default="planning", server_default="planning")
+    status_origin = Column(Text, nullable=False, default="student", server_default="student")
+    deadline_at = Column(DateTime(timezone=True), nullable=True)
+    application_url = Column(Text, nullable=True)
+    notes = Column(Text, nullable=True)
+    external_provider = Column(Text, nullable=True)
+    external_id = Column(Text, nullable=True)
+    submitted_at = Column(DateTime(timezone=True), nullable=True)
+    submission_reference = Column(Text, nullable=True)
+    created_at = Column(DateTime(timezone=True), default=_now, server_default=text("NOW()"))
+    updated_at = Column(DateTime(timezone=True), default=_now, onupdate=_now, server_default=text("NOW()"))
+    __table_args__ = (
+        Index("idx_pai_application_plans_ws_status", "workspace_id", "status"),
+        Index("idx_pai_application_plans_ws_deadline", "workspace_id", "deadline_at"),
+        Index("idx_pai_application_plans_deadline", "deadline_at"),
+        Index("uq_pai_application_plan_identity", "workspace_id", "institution_id",
+              func.lower(func.coalesce(program_name, "")),
+              func.lower(func.coalesce(intake, "")), unique=True),
+    )
+
+
+class ApplicationRequirement(Base):
+    """Per-application work item, optionally linked to an existing task/file."""
+    __tablename__ = "pai_application_requirements"
+    id = Column(Text, primary_key=True, default=_uuid)
+    application_id = Column(Text, ForeignKey("pai_application_plans.id", ondelete="CASCADE"), nullable=False)
+    label = Column(Text, nullable=False)
+    kind = Column(Text, nullable=False, default="other", server_default="other")
+    status = Column(Text, nullable=False, default="todo", server_default="todo")
+    source_type = Column(Text, nullable=False, default="student", server_default="student")
+    source_checked_at = Column(DateTime(timezone=True), nullable=True)
+    due_at = Column(DateTime(timezone=True), nullable=True)
+    source_url = Column(Text, nullable=True)
+    notes = Column(Text, nullable=True)
+    task_id = Column(Text, ForeignKey("kanban_tasks.id", ondelete="SET NULL"), nullable=True)
+    file_id = Column(Text, ForeignKey("files.id", ondelete="SET NULL"), nullable=True)
+    position = Column(Integer, nullable=False, default=0, server_default="0")
+    created_at = Column(DateTime(timezone=True), default=_now, server_default=text("NOW()"))
+    updated_at = Column(DateTime(timezone=True), default=_now, onupdate=_now, server_default=text("NOW()"))
+    __table_args__ = (Index("idx_pai_application_requirements_app", "application_id", "position"),
+                      Index("idx_pai_application_requirements_due", "due_at"))
+
+
+class ApplicationRoutine(Base):
+    """Scope an existing scheduler routine to one application plan."""
+    __tablename__ = "pai_application_routines"
+    application_id = Column(Text, ForeignKey("pai_application_plans.id", ondelete="CASCADE"), primary_key=True)
+    routine_id = Column(Text, ForeignKey("routines.id", ondelete="CASCADE"), primary_key=True)
+    created_at = Column(DateTime(timezone=True), default=_now, server_default=text("NOW()"))
+    __table_args__ = (Index("idx_pai_application_routines_routine", "routine_id"),)
+
+
+class StudentDeadline(Base):
+    """Student-owned date outside an application; never a verified external deadline."""
+    __tablename__ = "pai_student_deadlines"
+    id = Column(Text, primary_key=True, default=_uuid)
+    workspace_id = Column(UUID(as_uuid=False), ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False)
+    title = Column(Text, nullable=False)
+    due_on = Column(Date, nullable=False)
+    category = Column(Text, nullable=False, default="other", server_default="other")
+    notes = Column(Text, nullable=True)
+    source_url = Column(Text, nullable=True)
+    status = Column(Text, nullable=False, default="open", server_default="open")
+    created_at = Column(DateTime(timezone=True), default=_now, server_default=text("NOW()"))
+    updated_at = Column(DateTime(timezone=True), default=_now, onupdate=_now, server_default=text("NOW()"))
+    __table_args__ = (Index("idx_pai_student_deadlines_workspace_due", "workspace_id", "due_on"),
+                      Index("idx_pai_student_deadlines_due", "due_on"))
+
+
+class DeadlineSettings(Base):
+    """Student-selected calendar zone and reminder cadence for in-app notices."""
+    __tablename__ = "pai_deadline_settings"
+    workspace_id = Column(UUID(as_uuid=False), ForeignKey("workspaces.id", ondelete="CASCADE"), primary_key=True)
+    timezone = Column(Text, nullable=False, default="UTC", server_default="UTC")
+    reminder_days = Column(JSONB, nullable=False, default=lambda: [7, 1, 0])
+    updated_at = Column(DateTime(timezone=True), default=_now, onupdate=_now, server_default=text("NOW()"))
 
 
 class StudentDocument(_StudentRecord, Base):

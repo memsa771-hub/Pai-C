@@ -60,6 +60,30 @@ def _conflicts(previous, patch):
         else not _same(previous[key], value)) for key, value in patch.items())
 
 
+_PRE_UNIVERSITY_LEVELS = frozenset({"secondary", "upper_secondary"})
+
+
+def _possible_same_qualification(previous: dict, proposed: dict) -> bool:
+    """Flag an uncertain repeat; never infer that two degrees are the same."""
+    old_level, new_level = previous.get("canonical_level"), proposed.get("canonical_level")
+    if old_level and new_level and old_level != new_level:
+        return False
+    if old_level not in _PRE_UNIVERSITY_LEVELS and new_level not in _PRE_UNIVERSITY_LEVELS:
+        # With sparse extraction, two similarly named pre-university streams
+        # may have no level yet. A shared two-word qualification prefix is a
+        # useful ambiguity signal, but never apply it to known degree levels.
+        if old_level or new_level:
+            return False
+        old_words = str(previous.get("qualification_name") or "").casefold().replace("-", " ").split()
+        new_words = str(proposed.get("qualification_name") or "").casefold().replace("-", " ").split()
+        if len(old_words) < 2 or len(new_words) < 2 or old_words[:2] != new_words[:2]:
+            return False
+    old_year, new_year = previous.get("graduation_year"), proposed.get("graduation_year")
+    if old_year and new_year and old_year != new_year:
+        return False
+    return not _same(previous.get("qualification_name"), proposed.get("qualification_name"))
+
+
 #: Higher is stronger. Corroboration may raise a record's standing, never
 #: lower it — a CV agreeing with a transcript-backed degree must not demote it.
 _VERIFICATION_RANK = {
@@ -139,6 +163,27 @@ class StudentRecordService:
             raise AmbiguousRecordMatch(exc.record_ids) from exc
         if record_id and current is None:
             raise MemoryDataError("Student record does not belong to this workspace or is inactive")
+        if kind == "education" and current is None and not force_new and source_type != "user_explicit":
+            possible = [row for row in self.list(workspace_id, kind)
+                        if _possible_same_qualification(self._values(kind, row), values)]
+            if possible:
+                record_ids = [row.id for row in possible]
+                matched = possible[0] if len(possible) == 1 else None
+                self.db.add(ProfileIssue(
+                    workspace_id=workspace_id, subject_user_id=subject_user_id,
+                    candidate_id=candidate_id, issue_type="conflicting_record",
+                    conflict_kind="qualification_ambiguity", severity="blocking",
+                    summary="Possibly conflicting education information",
+                    affected_type=kind, affected_id=matched.id if matched else None,
+                    clarification_question="Should this replace the qualification already on your profile?",
+                    evidence={"record_type": kind, "record_id": matched.id if matched else None,
+                              "matching_record_ids": record_ids,
+                              "current": self._values(kind, matched) if matched else None,
+                              "proposed": values, "proposed_source_type": source_type,
+                              "proposed_evidence": evidence},
+                ))
+                self.db.flush()
+                raise RecordNeedsReview("Confirm whether this is the same qualification")
         before = self._values(kind, current) if current else None
         merged = validate_record(kind, _merge(before or {}, values))
         steward = RecordDomainSteward(kind)
@@ -168,12 +213,16 @@ class StudentRecordService:
             if old_goal is None or old_goal.goal_type != merged.get("goal_type") or (current and old_goal.id == current.id):
                 raise MemoryDataError("Only an existing goal in the same journey can be superseded")
         changed = current and _conflicts(before, values)
+        identity_change = bool(current and kind == "education" and any(
+            key in values and key in before and not _same(before[key], values[key])
+            for key in ("qualification_name", "canonical_level", "field_of_study")))
         os_progress = (kind == "exploration_experience" and source_type in {"agent", "system"}
                        and set(values).issubset({"activity_status", "completed_at", "evidence_refs"})
                        and bool((evidence or {}).get("execution_run_id")))
         if steward.needs_conflict_review(changed=changed, source_type=source_type,
                                          current=current, evidence=evidence,
-                                         os_progress=os_progress):
+                                         os_progress=os_progress,
+                                         identity_change=identity_change):
             self.db.add(ProfileIssue(workspace_id=workspace_id, subject_user_id=subject_user_id,
                 candidate_id=candidate_id,
                 issue_type="conflicting_record", summary=f"Conflicting {kind.replace('_', ' ')} information",

@@ -70,9 +70,14 @@ class RecordDomainSteward:
             if values.get("student_response") and not contained(values["student_response"], quote):
                 raise MemoryDataError("Student response must be in the student quote")
 
-    def needs_conflict_review(self, *, changed, source_type, current, evidence, os_progress=False):
+    def needs_conflict_review(self, *, changed, source_type, current, evidence,
+                              os_progress=False, identity_change=False):
         if not changed or os_progress or source_type == "user_explicit":
             return False
+        # A model's correction label is insufficient authority to replace the
+        # identity of a qualification. The student can confirm it in Profile.
+        if self.kind == "education" and identity_change:
+            return True
         return (
             source_type in {"document", "agent", "system"}
             or current.source_type == "document"

@@ -950,6 +950,21 @@ export function WorkspaceProvider({
     }
   }, []);
 
+  // Scheduler-created deadline reminders are durable DB records rather than
+  // socket events. Refresh the badge while the workspace tab is visible.
+  useEffect(() => {
+    if (!workspaceApi.isConfigured()) return;
+    const refreshVisible = () => {
+      if (document.visibilityState === 'visible') void refreshNotifications();
+    };
+    const timer = window.setInterval(refreshVisible, 60_000);
+    document.addEventListener('visibilitychange', refreshVisible);
+    return () => {
+      window.clearInterval(timer);
+      document.removeEventListener('visibilitychange', refreshVisible);
+    };
+  }, [refreshNotifications, workspaceId]);
+
   const markNotificationRead = useCallback(async (id: string) => {
     setNotifications((prev) => prev.map((n) => n.id === id ? { ...n, isRead: true } : n));
     setUnreadNotificationCount((prev) => Math.max(0, prev - 1));

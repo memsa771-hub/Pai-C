@@ -2,10 +2,7 @@
 
 import * as React from 'react';
 import Image from 'next/image';
-import {
-  ChevronLeft, ChevronRight, CircleUser, FileText, Globe,
-  Inbox, KanbanSquare, Users, Waypoints,
-} from 'lucide-react';
+import { ChevronLeft, ChevronRight, Users } from 'lucide-react';
 import {
   Sidebar,
   SidebarContent,
@@ -25,25 +22,16 @@ import { cn } from '@/lib/utils';
 import { useWorkspace } from '@/lib/workspace-context';
 import { useT } from '@/lib/i18n';
 import { PAI_PRIMARY_CONVERSATION_ID } from '@/lib/primary-conversation';
-import { INBOX_UI_ENABLED, TASKS_UI_ENABLED, WORKFLOWS_UI_ENABLED } from '@/lib/config';
 import {
   useLayout,
   RAIL_WIDTH_COLLAPSED,
   RAIL_WIDTH_EXPANDED,
-  type ViewMode,
 } from './layout-context';
+import { useWorkspaceNavigation } from './workspace-navigation';
 import { SearchMenu } from './search-menu';
 import { NotificationsMenu } from './notifications-menu';
 import { QrcodeMenu } from './qrcode-menu';
 import { UserMenu } from './user-menu';
-
-interface RailItem {
-  mode: ViewMode;
-  label: string;
-  icon: React.ReactNode;
-  /** Show an attention dot — unread threads, unread notifications */
-  unread?: boolean;
-}
 
 const RAIL_SNAP_POINT = (RAIL_WIDTH_COLLAPSED + RAIL_WIDTH_EXPANDED) / 2;
 
@@ -192,10 +180,11 @@ export function NavRail() {
     viewMode, openView, setSelectedAgentName, isRailExpanded, railDragWidth,
   } = useLayout();
   const {
-    workspace, sessions, unreadSessionIds, unreadNotificationCount,
-    tasks, setCurrentSessionId, onlineUsers, currentUser,
+    workspace, sessions, unreadSessionIds,
+    setCurrentSessionId, onlineUsers, currentUser,
   } = useWorkspace();
   const t = useT();
+  const groups = useWorkspaceNavigation();
 
   // Only threads the list actually shows may light the rail. Counting archived
   // and routine sessions too — as `unreadSessionIds` does on its own — leaves
@@ -214,35 +203,6 @@ export function NavRail() {
     openView('threads');
     setSelectedAgentName(null);
   };
-
-  const items: RailItem[] = [
-    // Profile sits directly under PAI Counselor: the student's own record is
-    // the other half of the conversation, not a setting filed away under a
-    // gear icon.
-    { mode: 'profile', label: t('views.profile'), icon: <CircleUser /> },
-    { mode: 'files', label: t('views.files'), icon: <FileText /> },
-    { mode: 'browser', label: t('views.browser'), icon: <Globe /> },
-    ...(TASKS_UI_ENABLED
-      ? [{
-          mode: 'tasks' as const,
-          label: t('views.tasks'),
-          icon: <KanbanSquare />,
-          // Attention dot when a task is blocked waiting on human input.
-          unread: tasks.some((task) => task.status === 'need_input'),
-        }]
-      : []),
-    ...(WORKFLOWS_UI_ENABLED
-      ? [{ mode: 'workflows' as const, label: t('views.workflows'), icon: <Waypoints /> }]
-      : []),
-    ...(INBOX_UI_ENABLED
-      ? [{
-          mode: 'inbox' as const,
-          label: t('views.inbox'),
-          icon: <Inbox />,
-          unread: unreadNotificationCount > 0,
-        }]
-      : []),
-  ];
 
   const workspaceLabel = workspace?.name || t('nav.workspaceFallback');
 
@@ -303,6 +263,7 @@ export function NavRail() {
       {/* View nav */}
       <SidebarContent>
         <SidebarGroup className="px-1.5">
+          {showLabels && <SidebarGroupLabel>{t('nav.guide')}</SidebarGroupLabel>}
           <SidebarGroupContent>
             <SidebarMenu className="gap-0.5">
               {/* PAI Counselor opens the canonical conversation. Its adjacent
@@ -328,33 +289,28 @@ export function NavRail() {
                   )}
                 </SidebarMenuButton>
               </SidebarMenuItem>
-              {items.map((item) => (
-                <SidebarMenuItem key={item.mode}>
-                  <SidebarMenuButton
-                    className={cn('relative', !showLabels && 'justify-center!')}
-                    aria-label={item.label}
-                    tooltip={{ children: item.label, hidden: showLabels }}
-                    isActive={viewMode === item.mode}
-                    onClick={() => openView(item.mode)}
-                  >
-                    {item.icon}
-                    {showLabels && <span className="truncate">{item.label}</span>}
-                    {item.unread && (
-                      <span
-                        className={cn(
-                          'absolute size-1.5 rounded-full',
-                          showLabels ? 'top-1/2 right-2 -translate-y-1/2' : 'top-0.5 right-0.5',
-                          item.mode === 'inbox' ? 'bg-destructive' : 'bg-primary',
-                        )}
-                        aria-hidden="true"
-                      />
-                    )}
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
+        {showLabels && <div className="px-3 pt-3 text-[10px] font-semibold uppercase tracking-[0.14em] text-foreground">{t('nav.paiOs')}</div>}
+        {groups.map((group) => <SidebarGroup key={group.label} className="px-1.5 pt-1">
+          {showLabels ? <SidebarGroupLabel>{group.label}</SidebarGroupLabel> : <div className="mb-2 px-2"><Separator /></div>}
+          <SidebarGroupContent><SidebarMenu className="gap-0.5">
+            {group.items.map((item) => <SidebarMenuItem key={item.mode}>
+              <SidebarMenuButton
+                className={cn('relative', !showLabels && 'justify-center!')}
+                aria-label={item.label}
+                tooltip={{ children: item.label, hidden: showLabels }}
+                isActive={viewMode === item.mode}
+                onClick={() => openView(item.mode)}
+              >
+                {item.icon}
+                {showLabels && <span className="truncate">{item.label}</span>}
+                {item.urgent && (item.count ?? 0) > 0 && <span className={cn('absolute size-1.5 rounded-full bg-destructive', showLabels ? 'top-1/2 right-2 -translate-y-1/2' : 'top-0.5 right-0.5')} aria-hidden="true" />}
+              </SidebarMenuButton>
+            </SidebarMenuItem>)}
+          </SidebarMenu></SidebarGroupContent>
+        </SidebarGroup>)}
 
         {/* Presence — real SSE-tracked connections to this workspace, deduped per
             person. Today that's just you across your own devices/tabs; the same

@@ -128,7 +128,10 @@ async def _run_turn(db, workspace_id: str, event_data: dict, depth: int) -> None
         db, workspace_id, channel_target, PAI_AGENT_NAME, reply, depth,
         metadata=_voice_reply_metadata(event_data),
     )
-    if assistant_event_id:
+    # Scheduled review instructions are system events, not new student claims.
+    # Keep the ordinary candidate/reconciliation learning path for real human
+    # turns while preventing a routine prompt from becoming Vault evidence.
+    if assistant_event_id and str(event_data.get("source", "")).startswith("human:"):
         from app.memory.turn_hook import enqueue_turn_extraction
         enqueue_turn_extraction(
             db=db, workspace_id=workspace_id, channel_target=channel_target,

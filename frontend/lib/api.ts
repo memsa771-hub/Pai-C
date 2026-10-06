@@ -354,6 +354,114 @@ class WorkspaceApi {
     );
   }
 
+  // Application workspace: operational plans, separate from the canonical Profile.
+  async searchInstitutions(q = '', countryCode = ''): Promise<import('./application-workspace').Institution[]> {
+    const params = new URLSearchParams({ network: this.requireWorkspace(), q });
+    if (countryCode) params.set('country_code', countryCode);
+    return this.request(`/v1/application-workspace/institutions?${params}`);
+  }
+
+  async getSavedInstitutions(): Promise<import('./application-workspace').Institution[]> {
+    return this.request(`/v1/application-workspace/saved?network=${this.requireWorkspace()}`);
+  }
+
+  async addInstitution(input: import('./application-workspace').CreateInstitution): Promise<import('./application-workspace').Institution> {
+    return this.request('/v1/application-workspace/institutions', {
+      method: 'POST', body: JSON.stringify({ ...input, website_url: input.website_url || null, network: this.requireWorkspace() }),
+    });
+  }
+
+  async saveInstitution(id: string): Promise<import('./application-workspace').Institution> {
+    return this.request(`/v1/application-workspace/saved/${encodeURIComponent(id)}`, {
+      method: 'POST', body: JSON.stringify({ network: this.requireWorkspace() }),
+    });
+  }
+
+  async unsaveInstitution(id: string): Promise<void> {
+    await this.request(`/v1/application-workspace/saved/${encodeURIComponent(id)}?network=${this.requireWorkspace()}`, { method: 'DELETE' });
+  }
+
+  async getApplications(): Promise<import('./application-workspace').ApplicationPlan[]> {
+    return this.request(`/v1/application-workspace/applications?network=${this.requireWorkspace()}`);
+  }
+
+  async getApplicationCalendar(start: string, end: string): Promise<{ events: import('./application-workspace').ApplicationCalendarEvent[] }> {
+    const params = new URLSearchParams({ network: this.requireWorkspace(), start, end });
+    return this.request(`/v1/application-workspace/calendar?${params}`);
+  }
+
+  async getStudentDeadlines(start: string, end: string): Promise<{ deadlines: import('./student-deadlines').StudentDeadline[]; settings: import('./student-deadlines').DeadlineSettings }> {
+    const params = new URLSearchParams({ network: this.requireWorkspace(), start, end });
+    return this.request(`/v1/deadlines?${params}`);
+  }
+
+  async createStudentDeadline(input: { title: string; due_on: string; category: string; notes?: string; source_url?: string | null }): Promise<import('./student-deadlines').StudentDeadline> {
+    return this.request('/v1/deadlines', { method: 'POST', body: JSON.stringify({ ...input, network: this.requireWorkspace() }) });
+  }
+
+  async updateStudentDeadline(id: string, input: { title?: string; due_on?: string; category?: string; notes?: string | null; source_url?: string | null; status?: 'open' | 'done' }): Promise<import('./student-deadlines').StudentDeadline> {
+    return this.request(`/v1/deadlines/${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify({ ...input, network: this.requireWorkspace() }) });
+  }
+
+  async deleteStudentDeadline(id: string): Promise<void> {
+    await this.request(`/v1/deadlines/${encodeURIComponent(id)}?network=${this.requireWorkspace()}`, { method: 'DELETE' });
+  }
+
+  async saveDeadlineSettings(input: import('./student-deadlines').DeadlineSettings): Promise<import('./student-deadlines').DeadlineSettings> {
+    return this.request('/v1/deadlines/settings/reminders', { method: 'PUT', body: JSON.stringify({ ...input, network: this.requireWorkspace() }) });
+  }
+
+  async getApplication(id: string): Promise<import('./application-workspace').ApplicationPlan> {
+    return this.request(`/v1/application-workspace/applications/${encodeURIComponent(id)}?network=${this.requireWorkspace()}`);
+  }
+
+  async createApplication(input: import('./application-workspace').CreateApplication): Promise<import('./application-workspace').ApplicationPlan> {
+    return this.request('/v1/application-workspace/applications', {
+      method: 'POST', body: JSON.stringify({ ...input, network: this.requireWorkspace() }),
+    });
+  }
+
+  async updateApplication(id: string, updates: Partial<Omit<import('./application-workspace').ApplicationPlan,
+    'id' | 'institution' | 'requirements' | 'created_at' | 'updated_at'>>): Promise<import('./application-workspace').ApplicationPlan> {
+    return this.request(`/v1/application-workspace/applications/${encodeURIComponent(id)}`, {
+      method: 'PATCH', body: JSON.stringify({ ...updates, network: this.requireWorkspace() }),
+    });
+  }
+
+  async addApplicationRequirement(id: string, input: { label: string; kind?: string; due_at?: string | null;
+    source_url?: string | null; notes?: string | null }): Promise<import('./application-workspace').ApplicationRequirement> {
+    return this.request(`/v1/application-workspace/applications/${encodeURIComponent(id)}/requirements`, {
+      method: 'POST', body: JSON.stringify({ ...input, network: this.requireWorkspace() }),
+    });
+  }
+
+  async updateApplicationRequirement(id: string, requirementId: string, updates: Partial<import('./application-workspace').ApplicationRequirement>): Promise<import('./application-workspace').ApplicationRequirement> {
+    return this.request(`/v1/application-workspace/applications/${encodeURIComponent(id)}/requirements/${encodeURIComponent(requirementId)}`, {
+      method: 'PATCH', body: JSON.stringify({ ...updates, network: this.requireWorkspace() }),
+    });
+  }
+
+  async deleteApplicationRequirement(id: string, requirementId: string): Promise<void> {
+    await this.request(`/v1/application-workspace/applications/${encodeURIComponent(id)}/requirements/${encodeURIComponent(requirementId)}?network=${this.requireWorkspace()}`, { method: 'DELETE' });
+  }
+
+  async ensureApplicationTask(id: string, requirementId: string, workflowId?: string | null): Promise<import('./application-workspace').ApplicationRequirement> {
+    return this.request(`/v1/application-workspace/applications/${encodeURIComponent(id)}/requirements/${encodeURIComponent(requirementId)}/task`, {
+      method: 'POST', body: JSON.stringify({ network: this.requireWorkspace(), workflow_id: workflowId ?? null }),
+    });
+  }
+
+  async createApplicationRoutine(id: string, input: { name: string; message: string; hour: number;
+    minute: number; days: number[] | null; timezone: string }): Promise<import('./application-workspace').ApplicationRoutine> {
+    return this.request(`/v1/application-workspace/applications/${encodeURIComponent(id)}/routines`, {
+      method: 'POST', body: JSON.stringify({ ...input, network: this.requireWorkspace() }),
+    });
+  }
+
+  async cancelApplicationRoutine(id: string, routineId: string): Promise<void> {
+    await this.request(`/v1/application-workspace/applications/${encodeURIComponent(id)}/routines/${encodeURIComponent(routineId)}?network=${this.requireWorkspace()}`, { method: 'DELETE' });
+  }
+
   /**
    * A student's own correction, written through the canonical validated path
    * (candidate -> reconciler -> Vault/typed record), so provenance and the
@@ -1522,11 +1630,12 @@ class WorkspaceApi {
   // Notifications / Inbox
   // ---------------------------------------------------------------------------
 
-  async listNotifications(opts?: { status?: string; isRead?: boolean; limit?: number }): Promise<{ notifications: NotificationItem[]; unreadCount: number }> {
+  async listNotifications(opts?: { status?: string; isRead?: boolean; limit?: number; offset?: number }): Promise<{ notifications: NotificationItem[]; unreadCount: number }> {
     const params = new URLSearchParams({ network: this.workspaceId });
     if (opts?.status) params.set('status', opts.status);
     if (opts?.isRead !== undefined) params.set('is_read', String(opts.isRead));
     if (opts?.limit) params.set('limit', String(opts.limit));
+      if (opts?.offset) params.set('offset', String(opts.offset));
     const raw = await this.request<{ notifications: Record<string, unknown>[]; unread_count: number }>(`/v1/notifications?${params}`);
     return {
       notifications: (raw.notifications || []).map((n): NotificationItem => ({
