@@ -74,7 +74,9 @@ class CounselingEvaluator:
                 move, focus = CounselingMove.REFLECT, "explain that the current profile is in Profile"
             elif semantics.get("wants_progress"):
                 move, focus = CounselingMove.COUNSEL, objective or "give a useful next step now"
-            elif requested_work and not blockers and baseline.get("status") == "confirmed":
+            elif (requested_work and not blockers
+                  and (completion or {}).get("foundationReady") is True
+                  and (objective or (understanding.get("goals") or {}).get("nodes"))):
                 move = CounselingMove.DELEGATE
                 focus = objective or "requested research"
             elif sufficiency and not sufficiency["recommendation_ready"]:
@@ -102,7 +104,7 @@ class CounselingEvaluator:
             return CounselingState(
                 CounselingPhase.COUNSELING if has_context else CounselingPhase.DISCOVERING,
                 "low" if has_context else "medium", move, focus,
-                move is CounselingMove.DELEGATE and baseline.get("status") == "confirmed",
+                move is CounselingMove.DELEGATE and (completion or {}).get("foundationReady") is True,
                 move is CounselingMove.BUILD_ROADMAP,
                 "full" if has_context and not conflict else "limited", relevant_unknowns,
                 conflict, objective,
