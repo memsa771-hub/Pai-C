@@ -10,3 +10,4 @@ class CapabilityExecutionContext:
     permissions: frozenset[str]
     tool_names: frozenset[str]
     tools: Any = None
+    capabilities: Any = None

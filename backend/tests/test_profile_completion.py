@@ -21,7 +21,7 @@ from app.memory.reconciler import MemoryReconciler
 from app.memory.student_records import ENTITY_MODELS, StudentRecordService
 from app.memory.student_snapshot import StudentSnapshotService
 from app.models import (
-    MemoryCandidate, ProfileFieldResponse, ProfileIssue, ProfileRequirement, StudentRecordRevision,
+    BackgroundJob, EventRecord, MemoryCandidate, ProfileFieldResponse, ProfileIssue, ProfileRequirement, StudentRecordRevision,
     User, VaultFact, VaultFieldDefinition, Workspace, VAULT_INTAKE_MODELS,
 )
 from app.services import pai
@@ -45,6 +45,7 @@ def profile_db(monkeypatch):
 
     models = [
         User, Workspace, VaultFieldDefinition, VaultFact, MemoryCandidate,
+        BackgroundJob, EventRecord,
         ProfileIssue, ProfileRequirement, ProfileFieldResponse, StudentRecordRevision,
         *ENTITY_MODELS.values(), *VAULT_INTAKE_MODELS,
     ]

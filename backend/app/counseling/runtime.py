@@ -208,6 +208,29 @@ async def _run_turn(db, workspace_id: str, event_data: dict, depth: int) -> None
         ))
         db.commit()
 
+    if turn_plan.mode == "open" and active_journey.current_stage == "RESEARCHING":
+        from app.tools import ToolContext, AUDIENCE_COUNSELOR
+        from app.services.pai import PAI_ALLOWED_TOOLS
+        from .research_flow import delegate_research_if_ready
+        research_context = tool_context
+        if research_context is None or "operator.delegate" not in research_context.allowed_tools:
+            workspace = db.get(Workspace, workspace_id)
+            if workspace is not None:
+                research_context = ToolContext(
+                    workspace_id=workspace_id, agent_name=PAI_AGENT_NAME,
+                    api=WorkspaceApi(workspace_id, workspace.password_hash),
+                    conversation=channel_target.removeprefix("channel/"),
+                    user_id=workspace.owner_user_id,
+                    allowed_tools=frozenset({"operator.delegate"}) & frozenset(PAI_ALLOWED_TOOLS),
+                    audience=AUDIENCE_COUNSELOR,
+                    granted_capabilities=capabilities_for_agent(PAI_AGENT_NAME),
+                )
+        delegated = await delegate_research_if_ready(
+            db, workspace_id, active_journey, snapshot.records.get("goal", []),
+            understanding, research_context)
+        if delegated is not None:
+            await record_tool_result("operator.delegate", delegated)
+
     reply = await CounselorCore(CounselorModelProvider(chat_completion_tools)).respond(
         student_message=content or "I attached a file.",
         recent_conversation=recent_conversation,

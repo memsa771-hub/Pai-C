@@ -32,6 +32,78 @@ JOB_RECONCILE = "memory.reconcile"
 JOB_EMBED = "memory.embed"
 JOB_UNINDEX = "memory.unindex"
 JOB_REINDEX = "memory.reindex"
+JOB_RESUME_RESEARCH = "memory.resume_research"
+
+
+async def resume_research(job, db) -> dict:
+    """Accepted canonical evidence resumes only matching paused runs."""
+    from app.models import ExecutionRun, MemoryCandidate, User, Workspace
+    from app.services import operator
+    from app.services.pai import WorkspaceApi
+    from app.tools import ToolContext
+
+    candidate = db.get(MemoryCandidate, (job.payload or {}).get("candidate_id"))
+    if candidate is None or candidate.workspace_id != job.workspace_id or candidate.status != "accepted":
+        return {"resumed": 0}
+    workspace = db.get(Workspace, job.workspace_id)
+    if workspace is None:
+        return {"resumed": 0}
+    runs = db.execute(select(ExecutionRun).where(
+        ExecutionRun.workspace_id == job.workspace_id,
+        ExecutionRun.status == "needs_user_action",
+    )).scalars().all()
+    matching = []
+    for run in runs:
+        pending = run.pending_action or {}
+        fields = {str(item.get("field")) for item in pending.get("items") or []
+                  if isinstance(item, dict)}
+        if (pending.get("kind") == "fact" and candidate.reconciled_at
+                and candidate.reconciled_at >= run.created_at and (candidate.key in fields or
+                any(field.startswith(str(candidate.key) + marker) for field in fields
+                    for marker in (".", "[")))):
+            matching.append(run.id)
+    db.rollback()
+    ctx = ToolContext(workspace_id=job.workspace_id, agent_name="pai-operator",
+                      api=WorkspaceApi(job.workspace_id, workspace.password_hash))
+    resumed = 0
+    for run_id in matching:
+        result = await operator.resume(ctx, run_id, {"candidate_id": candidate.id})
+        resumed += int(result.get("ok") and result.get("data", {}).get("resumed"))
+    # The same accepted-fact event can complete the final goal-discovery
+    # field. Start research from the canonical snapshot without a new chat turn.
+    from app.counseling.research_flow import delegate_research_if_ready
+    from app.counseling.stages import advance_discovery_stage
+    from app.counseling.understanding import StudentUnderstandingBuilder
+    from app.journey import JourneyService
+    from app.memory.profile_completion import ProfileCompletionService
+    from app.memory.student_snapshot import StudentSnapshotService
+    from app.memory.permissions import capabilities_for_agent
+    from app.services.pai import PAI_AGENT_NAME, PAI_ALLOWED_TOOLS
+    from app.tools import AUDIENCE_COUNSELOR
+
+    snapshot = StudentSnapshotService(db).build(job.workspace_id)
+    completion = ProfileCompletionService(db).evaluate(job.workspace_id, snapshot=snapshot)
+    owner = db.get(User, workspace.owner_user_id) if workspace.owner_user_id else None
+    journeys = JourneyService(db)
+    journey = journeys.ensure_counselor(job.workspace_id, actor="system:reconciliation")
+    journey = advance_discovery_stage(
+        journeys, job.workspace_id, journey,
+        identity_ready=bool(owner and owner.onboarded_at),
+        foundation_ready=bool(completion.get("foundationReady")),
+        goal_records=snapshot.records.get("goal", []), actor="system:reconciliation")
+    understanding = StudentUnderstandingBuilder(db).build(job.workspace_id, snapshot=snapshot)
+    db.commit()
+    counselor_ctx = ToolContext(
+        workspace_id=job.workspace_id, agent_name=PAI_AGENT_NAME,
+        api=WorkspaceApi(job.workspace_id, workspace.password_hash),
+        allowed_tools=frozenset({"operator.delegate"}) & frozenset(PAI_ALLOWED_TOOLS),
+        audience=AUDIENCE_COUNSELOR,
+        granted_capabilities=capabilities_for_agent(PAI_AGENT_NAME),
+    )
+    delegated = await delegate_research_if_ready(
+        db, job.workspace_id, journey, snapshot.records.get("goal", []),
+        understanding, counselor_ctx)
+    return {"resumed": resumed, "delegated": bool(delegated and delegated.get("ok"))}
 
 
 def _is_duplicate(db, workspace_id: str, item) -> bool:
@@ -454,3 +526,4 @@ job_handlers.register(JOB_RECONCILE, reconcile_memory)
 job_handlers.register(JOB_EMBED, embed_memory)
 job_handlers.register(JOB_UNINDEX, unindex_memory)
 job_handlers.register(JOB_REINDEX, reindex_workspace)
+job_handlers.register(JOB_RESUME_RESEARCH, resume_research)

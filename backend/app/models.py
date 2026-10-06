@@ -748,6 +748,53 @@ class StudentJourneyEvent(Base):
     )
 
 
+class Opportunity(Base):
+    """Research candidate, never a student profile fact."""
+    __tablename__ = "pai_opportunities"
+
+    id = Column(Text, primary_key=True, default=_uuid)
+    workspace_id = Column(UUID(as_uuid=False), ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False)
+    route = Column(JSONB, nullable=False)
+    institution = Column(Text, nullable=True)
+    country = Column(Text, nullable=False)
+    level = Column(Text, nullable=True)
+    intake = Column(Text, nullable=True)
+    url = Column(Text, nullable=False)
+    created_at = Column(DateTime(timezone=True), default=_now, server_default=text("NOW()"))
+    updated_at = Column(DateTime(timezone=True), default=_now, onupdate=_now, server_default=text("NOW()"))
+
+    __table_args__ = (
+        CheckConstraint("url LIKE 'https://%'", name="ck_opportunity_https_url"),
+        Index("idx_opportunities_workspace_country", "workspace_id", "country"),
+    )
+
+
+class RequirementSet(Base):
+    """Intake-scoped research evidence requiring independent review."""
+    __tablename__ = "pai_requirement_sets"
+
+    id = Column(Text, primary_key=True, default=_uuid)
+    opportunity_id = Column(Text, ForeignKey("pai_opportunities.id", ondelete="CASCADE"), nullable=False)
+    rules = Column(JSONB, nullable=False)
+    fees = Column(JSONB, nullable=False, default=dict, server_default=text("'{}'"))
+    deadlines = Column(JSONB, nullable=False, default=dict, server_default=text("'{}'"))
+    source_url = Column(Text, nullable=False)
+    checked_at = Column(DateTime(timezone=True), nullable=False)
+    version = Column(Integer, nullable=False, default=1, server_default=text("1"))
+    status = Column(Text, nullable=False, default="proposed", server_default=text("'proposed'"))
+    reviewed_by = Column(Text, nullable=True)
+    reviewed_at = Column(DateTime(timezone=True), nullable=True)
+    created_at = Column(DateTime(timezone=True), default=_now, server_default=text("NOW()"))
+
+    __table_args__ = (
+        CheckConstraint("status IN ('proposed', 'verified', 'expired')", name="ck_requirement_set_status"),
+        CheckConstraint("source_url LIKE 'https://%'", name="ck_requirement_set_https_url"),
+        CheckConstraint("version > 0", name="ck_requirement_set_version"),
+        UniqueConstraint("opportunity_id", "version", name="uq_requirement_set_version"),
+        Index("idx_requirement_sets_opportunity_status", "opportunity_id", "status"),
+    )
+
+
 class TimerRecord(Base):
     """A scheduled timer that posts a message when it fires."""
     __tablename__ = "timers"

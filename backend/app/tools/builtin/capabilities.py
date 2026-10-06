@@ -33,6 +33,7 @@ async def describe(ctx, args):
         "vault_scopes": sorted(contract.vault_scopes),
         "journey_fields": sorted(contract.journey_fields),
         "required_tools": sorted(contract.required_tools),
+        "uses_capabilities": sorted(contract.uses_capabilities),
         "permissions": sorted(contract.permissions),
         "artifacts": sorted(contract.artifacts),
         "evidence_expectations": contract.evidence_expectations,
@@ -79,35 +80,42 @@ async def invoke(ctx, args):
             },
         }}
 
-    db = new_session()
-    try:
-        scoped = StudentContextGateway(db).get(
-            ctx.workspace_id, contract.vault_scopes, caller=ctx.agent_name,
-            granted_permissions=OPERATOR_CAPABILITIES,
-        ).to_dict()
-        journey = JourneyService(db).resolve_active(ctx.workspace_id)
-        journey_data = journey.to_dict() if journey else {}
-        missing = [field for field in contract.journey_fields if journey_data.get(field) is None]
-        if missing:
-            return {"ok": False, "error": {"code": "journey_context_missing", "message": f"missing journey field: {sorted(missing)[0]}"}}
-        journey_context = {field: journey_data[field] for field in contract.journey_fields}
-    finally:
-        db.close()
-
-    try:
+    async def execute_scoped(item, item_payload, depth=0):
+        if depth > 1:
+            raise PermissionError("Nested capability delegation is not permitted")
+        db = new_session()
+        try:
+            scoped = StudentContextGateway(db).get(
+                ctx.workspace_id, item.vault_scopes, caller=ctx.agent_name,
+                granted_permissions=OPERATOR_CAPABILITIES,
+            ).to_dict()
+            journey = JourneyService(db).resolve_active(ctx.workspace_id)
+            journey_data = journey.to_dict() if journey else {}
+            missing = [field for field in item.journey_fields if journey_data.get(field) is None]
+            if missing:
+                raise PermissionError(f"missing journey field: {sorted(missing)[0]}")
+            journey_context = {field: journey_data[field] for field in item.journey_fields}
+        finally:
+            db.close()
         broker = CapabilityToolBroker(
-            contract=contract, registry=get_tool_registry(), executor=get_tool_executor(),
+            contract=item, registry=get_tool_registry(), executor=get_tool_executor(),
             host_context=ctx, platform_permissions=OPERATOR_PLATFORM_PERMISSIONS,
         )
-    except CapabilityToolUnavailable as exc:
-        return {"ok": False, "error": {"code": "required_tool_unavailable", "message": str(exc)}}
-    execution_context = CapabilityExecutionContext(
-        workspace_id=ctx.workspace_id, student_context=scoped,
-        journey_context=journey_context, permissions=OPERATOR_PLATFORM_PERMISSIONS,
-        tool_names=broker.names, tools=broker,
-    )
+
+        async def invoke_child(child_id, child_payload):
+            if child_id not in item.uses_capabilities:
+                raise PermissionError("Capability dependency is not declared")
+            child = router.resolve(child_id)
+            return await execute_scoped(child, child_payload, depth + 1)
+
+        execution_context = CapabilityExecutionContext(
+            workspace_id=ctx.workspace_id, student_context=scoped,
+            journey_context=journey_context, permissions=OPERATOR_PLATFORM_PERMISSIONS,
+            tool_names=broker.names, tools=broker, capabilities=invoke_child,
+        )
+        return await router.execute(item.id, item_payload, execution_context)
     try:
-        result = await router.execute(capability_id, payload, execution_context)
+        result = await execute_scoped(contract, payload)
     except PermissionError as exc:
         return {"ok": False, "error": {"code": "permission_denied", "message": str(exc)}}
     except Exception as exc:
