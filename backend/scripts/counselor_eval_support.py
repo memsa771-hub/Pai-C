@@ -19,8 +19,8 @@ from app.memory.student_records import ENTITY_MODELS, StudentRecordService
 from app.memory.vault import VaultService
 from app.models import (
     BackgroundJob, DocumentArtifact, EventRecord, ExecutionRun, FileRecord,
-    MemoryCandidate, PaiEpisode, PaiMemory, ProfileIssue, ProfileRequirement, StudentRecordRevision,
-    StudentJourney, StudentJourneyEvent, User, VaultFact, VaultFieldDefinition, Workspace,
+    MemoryCandidate, PaiEpisode, PaiMemory, ProfileFieldResponse, ProfileIssue, ProfileRequirement, StudentRecordRevision,
+    StudentJourney, StudentJourneyEvent, Opportunity, RequirementSet, User, VaultFact, VaultFieldDefinition, Workspace,
     WorkspaceMember, VAULT_INTAKE_MODELS,
 )
 from app.counseling import runtime
@@ -71,8 +71,8 @@ class StudentSession:
         models = [User, Workspace, WorkspaceMember, ExecutionRun, EventRecord, FileRecord,
                   DocumentArtifact,
                   VaultFact, VaultFieldDefinition, MemoryCandidate, PaiMemory, PaiEpisode,
-                  ProfileIssue, ProfileRequirement, StudentRecordRevision, BackgroundJob,
-                  StudentJourney, StudentJourneyEvent,
+                  ProfileFieldResponse, ProfileIssue, ProfileRequirement, StudentRecordRevision, BackgroundJob,
+                  StudentJourney, StudentJourneyEvent, Opportunity, RequirementSet,
                   *ENTITY_MODELS.values(), *VAULT_INTAKE_MODELS]
         Base.metadata.create_all(self.engine, tables=[m.__table__ for m in models])
         self.factory = sessionmaker(bind=self.engine, autoflush=False)
@@ -81,7 +81,8 @@ class StudentSession:
         self.indexed = 0
         self.counter = int(time.time() * 1000)
         with self.factory() as db:
-            user = User(email="counselor-eval@example.test", username="counselor_eval")
+            user = User(email="counselor-eval@example.test", username="counselor_eval",
+                        onboarded_at=datetime.now(timezone.utc))
             db.add(user)
             db.flush()
             workspace = Workspace(name="Synthetic counselor evaluation", owner_user_id=user.id,
@@ -127,10 +128,10 @@ class StudentSession:
         self.transcript.append({"role": "assistant", "content": content, "message_type": message_type})
         return event_id
 
-    async def turn(self, content):
+    async def turn(self, content, *, metadata=None):
         event_data = {"id": str(uuid.uuid4()), "source": f"human:{self.user_id}",
                       "target": "channel/pai-counselor", "payload": {"content": content},
-                      "timestamp": self.next_timestamp()}
+                      "timestamp": self.next_timestamp(), "metadata": metadata or {}}
         self.transcript.append({"role": "user", "content": content})
         with self.factory() as db:
             db.add(EventRecord(id=event_data["id"], network_id=self.workspace_id,

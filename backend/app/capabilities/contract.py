@@ -38,12 +38,14 @@ class CapabilityContract:
     journey_fields: frozenset[str] = field(default_factory=frozenset)
     permissions: frozenset[str] = field(default_factory=frozenset)
     required_tools: frozenset[str] = field(default_factory=frozenset)
+    uses_capabilities: frozenset[str] = field(default_factory=frozenset)
     artifacts: frozenset[str] = field(default_factory=frozenset)
     risk: CapabilityRisk = CapabilityRisk.READ
     approval: str = "none"
     timeout_seconds: int = 60
     retry: RetryPolicy = field(default_factory=RetryPolicy)
     evidence_expectations: dict[str, Any] = field(default_factory=dict)
+    run_status_hook: Callable[[Any, Any], None] | None = None
     provider: str = "native"
 
     def __post_init__(self):
@@ -53,3 +55,4 @@ class CapabilityContract:
         object.__setattr__(self, "journey_fields", frozenset(self.journey_fields))
         object.__setattr__(self, "permissions", frozenset(self.permissions))
         object.__setattr__(self, "required_tools", frozenset(self.required_tools))
+        object.__setattr__(self, "uses_capabilities", frozenset(self.uses_capabilities))

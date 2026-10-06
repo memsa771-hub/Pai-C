@@ -32,6 +32,9 @@ def validate(contract: CapabilityContract) -> None:
     for task_type in contract.owns_task_types:
         if not re.fullmatch(r"^[a-z][a-z0-9_]{1,63}$", task_type):
             raise InvalidCapabilityManifest(f"invalid owned task type: {task_type}")
+    for capability_id in contract.uses_capabilities:
+        if not _ID.fullmatch(capability_id) or capability_id == contract.id:
+            raise InvalidCapabilityManifest("invalid dependent capability")
     if contract.timeout_seconds <= 0 or contract.retry.max_attempts <= 0:
         raise InvalidCapabilityManifest("timeout and retry attempts must be positive")
     if contract.provider != "native":

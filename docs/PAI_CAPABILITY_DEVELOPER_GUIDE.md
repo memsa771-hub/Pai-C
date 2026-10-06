@@ -88,6 +88,25 @@ def get_capabilities():
 
 Registration makes the id and its owned task type discoverable without editing Counselor, Operator, Vault, or Journey internals. Duplicate ids, duplicate task ownership, and invalid manifests are rejected.
 
+## Research evidence operations
+
+`roadmap.build` owns `roadmap_research` and composes the five other research
+capabilities through the router. Each child receives only its declared Vault
+scopes and tools. Program page claims must carry an exact quotation from the
+fetched page, an HTTPS source URL, and `checked_at`. New requirement sets stay
+`proposed` until an operations reviewer marks them `verified`. Reads prefer a
+verified version and label proposed results as unconfirmed. The review route
+`POST /v1/ops/research/requirements/{id}/review` requires the server-only
+`PAI_OPS_REVIEW_TOKEN` header `X-PAI-Ops-Token`; leave the route disabled by
+omitting the variable. Web discovery also needs the existing
+`WEB_SEARCH_PROVIDER` and `WEB_SEARCH_API_KEY` configuration. Country-specific
+procedure links live under `app/plugins/qualification_recognition/packs/`.
+
+The Counselor starts a `roadmap_research` run when accepted goal details satisfy
+the discovery gate. Accepted facts enqueue a durable resume check in the same
+transaction as reconciliation. A matching fact resumes the same paused run;
+unrelated facts cannot satisfy its pending item.
+
 ## Testing requirements
 
 Test manifest validation, nested input/output validation, duplicate ownership rejection, task routing, least-privilege context denial, broker denial for undeclared tools, output shape, permission denial, approval pauses, every fallback policy, timeout/retry behavior, evidence, and failure paths. Prove the capability registers without changes to Operator. If it discovers student information, test that it submits a proposal and does not directly change Vault rows.

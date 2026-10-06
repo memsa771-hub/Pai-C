@@ -1,0 +1,10 @@
+{
+  "country": "Germany",
+  "last_reviewed_at": "2026-10-06",
+  "grading_scales": [],
+  "equivalence_bodies": [],
+  "document_procedures": [
+    {"description": "Check admission requirements and qualification recognition for the intended program", "source_url": "https://www.daad.de/en/studying-in-germany/requirements/overview/"},
+    {"description": "Check official educational certificate and translation procedures", "source_url": "https://www.uni-assist.de/en/how-to-apply/assemble-your-documents/educational-certificates/"}
+  ]
+}

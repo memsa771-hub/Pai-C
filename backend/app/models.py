@@ -714,11 +714,14 @@ class StudentJourney(Base):
     __table_args__ = (
         CheckConstraint("status IN ('active', 'paused', 'completed', 'abandoned')", name="ck_student_journey_status"),
         CheckConstraint(
-            "current_stage IS NULL OR current_stage IN ('ORIENTING','UNDERSTANDING','ALIGNING','PLANNING','ACTING','REVIEWING','COMPLETED')",
+            "current_stage IS NULL OR current_stage IN ('ORIENTING','UNDERSTANDING','ALIGNING','PLANNING','ACTING','REVIEWING','COMPLETED','IDENTITY','FOUNDATION','DIRECTION','RESEARCHING','ASSESSING','NEEDS_INFO','PROPOSED','CHOSEN')",
             name="ck_student_journey_stage",
         ),
         Index("idx_student_journeys_workspace", "workspace_id"),
         Index("idx_student_journeys_workspace_status", "workspace_id", "status"),
+        Index("uq_counselor_journey_active", "workspace_id", unique=True,
+              postgresql_where=text("journey_type = 'counselor_decision' AND status = 'active'"),
+              sqlite_where=text("journey_type = 'counselor_decision' AND status = 'active'")),
         Index(
             "uq_student_journey_primary_active", "workspace_id", unique=True,
             postgresql_where=text("is_primary = true AND status = 'active'"),
@@ -742,6 +745,53 @@ class StudentJourneyEvent(Base):
     __table_args__ = (
         Index("idx_student_journey_events_journey", "journey_id", "created_at"),
         Index("idx_student_journey_events_workspace", "workspace_id"),
+    )
+
+
+class Opportunity(Base):
+    """Research candidate, never a student profile fact."""
+    __tablename__ = "pai_opportunities"
+
+    id = Column(Text, primary_key=True, default=_uuid)
+    workspace_id = Column(UUID(as_uuid=False), ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False)
+    route = Column(JSONB, nullable=False)
+    institution = Column(Text, nullable=True)
+    country = Column(Text, nullable=False)
+    level = Column(Text, nullable=True)
+    intake = Column(Text, nullable=True)
+    url = Column(Text, nullable=False)
+    created_at = Column(DateTime(timezone=True), default=_now, server_default=text("NOW()"))
+    updated_at = Column(DateTime(timezone=True), default=_now, onupdate=_now, server_default=text("NOW()"))
+
+    __table_args__ = (
+        CheckConstraint("url LIKE 'https://%'", name="ck_opportunity_https_url"),
+        Index("idx_opportunities_workspace_country", "workspace_id", "country"),
+    )
+
+
+class RequirementSet(Base):
+    """Intake-scoped research evidence requiring independent review."""
+    __tablename__ = "pai_requirement_sets"
+
+    id = Column(Text, primary_key=True, default=_uuid)
+    opportunity_id = Column(Text, ForeignKey("pai_opportunities.id", ondelete="CASCADE"), nullable=False)
+    rules = Column(JSONB, nullable=False)
+    fees = Column(JSONB, nullable=False, default=dict, server_default=text("'{}'"))
+    deadlines = Column(JSONB, nullable=False, default=dict, server_default=text("'{}'"))
+    source_url = Column(Text, nullable=False)
+    checked_at = Column(DateTime(timezone=True), nullable=False)
+    version = Column(Integer, nullable=False, default=1, server_default=text("1"))
+    status = Column(Text, nullable=False, default="proposed", server_default=text("'proposed'"))
+    reviewed_by = Column(Text, nullable=True)
+    reviewed_at = Column(DateTime(timezone=True), nullable=True)
+    created_at = Column(DateTime(timezone=True), default=_now, server_default=text("NOW()"))
+
+    __table_args__ = (
+        CheckConstraint("status IN ('proposed', 'verified', 'expired')", name="ck_requirement_set_status"),
+        CheckConstraint("source_url LIKE 'https://%'", name="ck_requirement_set_https_url"),
+        CheckConstraint("version > 0", name="ck_requirement_set_version"),
+        UniqueConstraint("opportunity_id", "version", name="uq_requirement_set_version"),
+        Index("idx_requirement_sets_opportunity_status", "opportunity_id", "status"),
     )
 
 
@@ -1063,7 +1113,7 @@ class ProfileRequirement(Base):
             name="ck_profile_requirement_source_type",
         ),
         CheckConstraint(
-            "selector IN ('any', 'current_or_highest')",
+            "selector IN ('any', 'current_or_highest', 'any_present')",
             name="ck_profile_requirement_selector",
         ),
         CheckConstraint("priority >= 0", name="ck_profile_requirement_priority"),

@@ -14,10 +14,12 @@ Every outcome is recorded on the candidate row, including rejections.
 """
 
 import logging
+import time
+import uuid
 from dataclasses import dataclass
 from typing import Optional
 
-from app.models import MemoryCandidate
+from app.models import EventRecord, MemoryCandidate
 from .candidates import MemoryCandidateService
 from .episodic import EpisodicMemoryService
 from .errors import MemoryDataError
@@ -137,6 +139,21 @@ class MemoryReconciler:
         if result.accepted and candidate.candidate_type == "student_record" and candidate.key in {"project", "skill"}:
             VaultRelationService(self.db).sync_demonstrations(candidate.workspace_id, assertion.id)
         self.assertions.finish(assertion, result, candidate)
+        if result.accepted and candidate.candidate_type in {"vault_fact", "student_record"}:
+            from app.jobs.service import BackgroundJobService
+            from app.memory.handlers import JOB_RESUME_RESEARCH
+            self.db.add(EventRecord(
+                id=str(uuid.uuid4()), network_id=candidate.workspace_id,
+                type="vault.fact_accepted", source="system:reconciler", target="core",
+                payload={"candidate_id": candidate.id, "field": candidate.key,
+                         "record_id": result.result_id}, metadata_={},
+                timestamp=int(time.time() * 1000), visibility="private",
+            ))
+            BackgroundJobService(self.db).enqueue(
+                job_type=JOB_RESUME_RESEARCH, workspace_id=candidate.workspace_id,
+                payload={"candidate_id": candidate.id},
+                idempotency_key=f"research-resume:{candidate.id}",
+            )
         return result
 
     def reconcile_pending(self, workspace_id: str, limit: int = 100) -> list[ReconcileResult]:

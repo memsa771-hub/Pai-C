@@ -639,6 +639,18 @@ async def resume(ctx, run_id: str, action: dict) -> dict:
             return {"ok": False, "error": {"code": "not_paused", "message": "run is not waiting for user action"}}
         pending = dict(run.pending_action)
         kind = pending.get("kind")
+        if kind == "fact":
+            from app.models import MemoryCandidate
+            candidate = db.execute(select(MemoryCandidate).where(
+                MemoryCandidate.id == action.get("candidate_id"),
+                MemoryCandidate.workspace_id == ctx.workspace_id,
+                MemoryCandidate.status == "accepted",
+            )).scalar_one_or_none()
+            fields = {str(item.get("field")) for item in pending.get("items") or []}
+            if candidate is None or not candidate.reconciled_at or candidate.reconciled_at < run.created_at or (candidate.key not in fields and
+                                     not any(field.startswith(str(candidate.key) + marker) for field in fields
+                                             for marker in (".", "["))):
+                return {"ok": False, "error": {"code": "fact_not_accepted", "message": "A matching accepted fact is required"}}
         if kind == "approval" and action.get("approved") is not True:
             run.resume_input = {"pending_action": pending, "response": action, "received_at": _now().isoformat()}
             run.pending_action = None
@@ -705,6 +717,10 @@ async def _execute(
             run.status = status
             for key, value in fields.items():
                 setattr(run, key, value)
+            from app.capabilities import get_capability_registry
+            owner_for_update = get_capability_registry().owner_for_task_type(run.task_type)
+            if owner_for_update and owner_for_update.run_status_hook:
+                owner_for_update.run_status_hook(db, run)
             db.commit()
             db.refresh(run)
             _publish_run_updated(workspace_id, run)
@@ -749,7 +765,8 @@ async def _execute(
         ) or "(no domain capabilities installed)"
         routing_statement = (
             f"Task type {run.task_type!r} is owned by {owner.id}. You MUST use that capability; "
-            "raw domain tools are unavailable. Use capability.describe before capability.invoke."
+            "raw domain tools are unavailable. Use capability.describe before capability.invoke. "
+            "If constraints.capability_input is present, pass that exact object as capability.invoke input."
             if owner else
             f"Task type {run.task_type!r} has no installed owner; generic execution is allowed."
         )
@@ -904,6 +921,8 @@ async def _execute(
             and item.get("ok")
             for item in tool_call_log
         )
+        owner_payload_result = ((run.result or {}).get("capability_result")
+                                if resume_payload is not None else None)
         max_iters = max(1, config.PAI_MAX_TOOL_ITERATIONS)
 
         for i in range(max_iters):
@@ -992,6 +1011,27 @@ async def _execute(
                 if owner and tool_name == "capability.invoke" and tool_args.get("capability_id") == owner.id:
                     if result.get("ok"):
                         owner_succeeded = True
+                        payload_result = ((result.get("data") or {}).get("result") or {})
+                        owner_payload_result = payload_result
+                        requested = payload_result.get("pending_action") if isinstance(payload_result, dict) else None
+                        if isinstance(requested, dict) and requested.get("type") == "need_from_student":
+                            items = [item for item in requested.get("items") or []
+                                     if isinstance(item, dict) and item.get("field")]
+                            if items:
+                                pending_action = {"kind": "fact", "type": "need_from_student",
+                                                  "items": items, "required": True,
+                                                  "title": "One detail will help me finish the research",
+                                                  "prompt": str(items[0].get("reason") or "Please share the missing detail")}
+                                summary = "I need one detail to finish comparing these routes."
+                                set_status(STATUS_NEEDS_USER_ACTION, current_step=summary,
+                                           pending_action=pending_action, completed_at=None,
+                                           plan=plan, tool_calls=tool_call_log,
+                                           result={"capability_result": payload_result,
+                                                   "observations": observations[-12:]},
+                                           result_type="research")
+                                await _post_result(db, workspace_id, channel_target, run_id,
+                                                   STATUS_NEEDS_USER_ACTION, summary)
+                                return
                     elif run_policy.fallback_policy.value == "forbidden":
                         summary = f"{owner.name} could not complete the owned task; generic fallback is forbidden."
                         partial = {"summary": summary, "final_message": None, "plan": plan,
@@ -1105,6 +1145,7 @@ async def _execute(
             "tool_calls": tool_call_log,
             "observations": observations[-12:],
             "artifact_id": None,
+            "capability_result": owner_payload_result,
         }
 
         pending_action = None

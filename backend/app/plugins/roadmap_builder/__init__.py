@@ -1,0 +1,145 @@
+"""Owns roadmap_research and composes scoped research capabilities."""
+
+from app.capabilities import CapabilityContract, CapabilityRisk, FallbackPolicy
+
+DEPENDENCIES = frozenset({
+    "program.discover", "program.research", "qualification.recognize",
+    "scholarship.discover", "gap.assess",
+})
+
+
+def on_run_status(db, run):
+    """Move Counselor stages only from verified run state, never model prose."""
+    from app.journey import JourneyService
+    from app.counseling.stages import ASSESSING, NEEDS_INFO, PROPOSED, RESEARCHING
+
+    journey = JourneyService(db).ensure_counselor(run.workspace_id, actor="system:research")
+    stage = journey.current_stage
+    target = None
+    if run.status in {"executing", "verifying"} and stage in {RESEARCHING, NEEDS_INFO}:
+        target = ASSESSING
+    elif (run.status == "needs_user_action" and stage == ASSESSING
+          and (run.pending_action or {}).get("type") == "need_from_student"):
+        target = NEEDS_INFO
+    elif (run.status == "completed" and stage == ASSESSING
+          and ((run.result or {}).get("capability_result") or {}).get("roadmaps")):
+        target = PROPOSED
+    if target:
+        JourneyService(db).set_counselor_stage(run.workspace_id, journey.id, target,
+                                               actor="system:research")
+
+
+def _facts(scoped: dict) -> dict:
+    from app.memory.student_schema import RECORD_SPECS
+    facts = {}
+    for domain in (scoped.get("domains") or {}).values():
+        if isinstance(domain, dict):
+            facts.update(domain.get("facts") or {})
+            for field, value in (domain.get("facts") or {}).items():
+                if isinstance(value, dict):
+                    for key, part in value.items():
+                        if isinstance(part, (str, int, float, bool)):
+                            facts[f"{field}.{key}"] = part
+            for kind, rows in (domain.get("records") or {}).items():
+                spec = RECORD_SPECS.get(kind) or {}
+                identities = spec.get("identity") or ()
+                for row in rows or []:
+                    if not isinstance(row, dict):
+                        continue
+                    identity = ",".join(str(row.get(key) or "") for key in identities)
+                    if not identity.strip(","):
+                        continue
+                    for key, value in row.items():
+                        if isinstance(value, (str, int, float, bool)) and value != "":
+                            facts[f"{kind}[{identity}].{key}"] = {
+                                "value": value,
+                                "evidence_level": row.get("verification_status") or "student_reported"}
+    return facts
+
+
+async def build(context, payload):
+    brief = payload["brief"]
+    stated = str(brief.get("stated_preference") or "").strip()
+    objective = str(brief.get("underlying_objective") or "").strip()
+    country = str(brief.get("country") or "").strip()
+    if not stated or not objective or not country:
+        missing = next(key for key, value in (("stated_preference", stated),
+                       ("underlying_objective", objective), ("country", country)) if not value)
+        field = {"country": "goal.details.target_countries"}.get(missing, f"goal.details.{missing}")
+        return {"roadmaps": [], "unconfirmed": [], "pending_action": {
+            "type": "need_from_student", "items": [{"field": field,
+                "reason": "This changes which routes can be researched", "accepts_upload": False}]}}
+    level = str(brief.get("level") or "")
+    target = await context.capabilities("program.discover", {
+        "objective": stated, "country": country, "level": level})
+    alternatives = await context.capabilities("program.discover", {
+        "objective": objective, "country": "", "level": level})
+    candidates = []
+    seen = set()
+    for origin, group in (("stated_goal", target), ("alternative", alternatives)):
+        for item in group.get("candidates") or []:
+            if item["url"] in seen:
+                continue
+            seen.add(item["url"])
+            candidates.append((origin, item))
+            if origin == "stated_goal" or sum(kind == "alternative" for kind, _ in candidates) >= 3:
+                break
+    qualification = await context.capabilities("qualification.recognize", {
+        "country": country, "origin_country": brief.get("origin_country") or ""})
+    scholarships = await context.capabilities("scholarship.discover", {
+        "country": country, "level": level, "field": objective})
+    roadmaps = []
+    unknown_items = []
+    unconfirmed = [*(target.get("unconfirmed") or []),
+                   *(alternatives.get("unconfirmed") or []),
+                   *(scholarships.get("unconfirmed") or []),
+                   *(qualification.get("unconfirmed") or [])]
+    for origin, candidate in candidates[:4]:
+        researched = await context.capabilities("program.research", {
+            "url": candidate["url"], "country": country if origin == "stated_goal" else "unknown",
+            "level": level, "intake": brief.get("intake") or "",
+            "route": {"url": candidate["url"], "title": candidate["title"]}})
+        unconfirmed.extend(researched.get("unconfirmed") or [])
+        requirements = researched.get("requirements") or []
+        for requirement in requirements:
+            assessed = await context.capabilities("gap.assess", {
+                "facts": _facts(context.student_context), "rules": requirement["rules"]})
+            unknown_items.extend(assessed["unknowns"])
+            roadmaps.append({
+                "origin": origin, "title": candidate["title"],
+                "route": {"country": requirement["country"], "level": level,
+                          "intake": brief.get("intake"), "url": candidate["url"]},
+                "fit_level": "unconfirmed" if requirement["status"] != "verified" else "partial",
+                "gaps": assessed["gaps"], "steps": qualification["procedures"],
+                "total_cost": None, "time_to_start": None, "risks": [],
+                "sources": [{"url": requirement["source_url"],
+                             "checked_at": requirement["checked_at"]}],
+                "requirement_set_id": requirement["requirement_set_id"],
+                "research_status": requirement["status"],
+            })
+    if unknown_items:
+        unique = list({item["field"]: item for item in unknown_items}.values())
+        return {"roadmaps": roadmaps, "unconfirmed": unconfirmed, "pending_action": {
+            "type": "need_from_student", "items": unique}}
+    return {"roadmaps": roadmaps, "unconfirmed": unconfirmed, "pending_action": None}
+
+
+def get_capabilities():
+    return [CapabilityContract(
+        id="roadmap.build", version="1.0.0", name="Roadmap research",
+        description="Compose cited program research, qualification procedures and deterministic gaps.",
+        input_schema={"type": "object", "properties": {
+            "brief": {"type": "object"}}, "required": ["brief"]},
+        output_schema={"type": "object", "properties": {
+            "roadmaps": {"type": "array"}, "unconfirmed": {"type": "array"},
+            "pending_action": {}},
+            "required": ["roadmaps", "unconfirmed", "pending_action"]},
+        handler=build, owns_task_types=frozenset({"roadmap_research"}),
+        fallback_policy=FallbackPolicy.FORBIDDEN,
+        vault_scopes=frozenset({"education", "goals", "preferences", "finance", "tests"}),
+        permissions=frozenset(), required_tools=frozenset(),
+        uses_capabilities=DEPENDENCIES, artifacts=frozenset({"roadmap"}),
+        risk=CapabilityRisk.READ, timeout_seconds=300,
+        evidence_expectations={"roadmaps": "proposed research with source URLs and checked_at"},
+        run_status_hook=on_run_status,
+    )]

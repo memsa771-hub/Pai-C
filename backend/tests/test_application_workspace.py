@@ -1,5 +1,6 @@
 """Application planning HTTP contract and workspace isolation."""
 from datetime import datetime, timezone
+from urllib.parse import parse_qsl
 
 import pytest
 from fastapi.testclient import TestClient
@@ -67,8 +68,10 @@ def _post(client, path, network, token="first-secret", **fields):
 
 
 def _get(client, path, network, token="first-secret"):
-    return client.get(f"/v1/application-workspace/{path}",
-                      headers={"X-Workspace-Token": token}, params={"network": network})
+    route, _, query = path.partition("?")
+    return client.get(f"/v1/application-workspace/{route}",
+                      headers={"X-Workspace-Token": token},
+                      params={"network": network, **dict(parse_qsl(query))})
 
 
 def test_student_can_add_search_and_save_private_institution(api):
