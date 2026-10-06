@@ -88,6 +88,7 @@ async def chat_completion(
     max_tokens: Optional[int] = None,
     reasoning_effort: Optional[str] = None,
     base_url: Optional[str] = None,
+    response_format: Optional[dict] = None,
 ) -> str:
     """Return text from the configured PAI-compatible chat endpoint."""
     client = create_client(api_key, base_url=base_url)
@@ -102,6 +103,8 @@ async def chat_completion(
         kwargs["reasoning_effort"] = effort
     if max_tokens:
         kwargs[_token_limit_kwarg(model)] = max_tokens
+    if response_format:
+        kwargs["response_format"] = response_format
 
     try:
         response = await client.chat.completions.create(**kwargs)
