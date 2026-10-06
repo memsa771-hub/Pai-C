@@ -172,6 +172,8 @@ async def test_counselor_does_not_activate_a_journey_from_goal_hints_alone():
     with StudentSession() as student:
         with patch.object(runtime, "chat_completion_tools", model), \
                 patch("app.counseling.turn_semantics.classify_turn", classify), \
+                patch("app.counseling.reply_guard.guard_reply",
+                      new=AsyncMock(side_effect=lambda reply, **kwargs: reply)), \
                 patch("app.memory.foundation_intake.capture_foundation_turn",
                       new=AsyncMock(return_value=False)), \
                 patch("app.counseling.reply_guard.guard_collection_reply",
@@ -182,6 +184,9 @@ async def test_counselor_does_not_activate_a_journey_from_goal_hints_alone():
             await student.turn("I also want an internship while preparing.")
         with student.factory() as db:
             journeys = JourneyService(db).list_active(student.workspace_id)
-        assert journeys == []
+        assert len(journeys) == 1
+        assert journeys[0].journey_type == "counselor_decision"
+        assert journeys[0].current_stage == "FOUNDATION"
+        assert journeys[0].active_goal is None
         assert len(prompts) == 2
         assert all("COLLECTING" in prompt for prompt in prompts)

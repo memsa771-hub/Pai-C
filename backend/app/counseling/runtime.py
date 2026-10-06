@@ -14,7 +14,7 @@ from sqlalchemy import select
 from app.config import config
 from app.database import SessionLocal
 from app.inference.client import chat_completion_tools
-from app.models import EventRecord, Workspace
+from app.models import EventRecord, User, Workspace
 
 logger = logging.getLogger(__name__)
 
@@ -118,11 +118,22 @@ async def _run_turn(db, workspace_id: str, event_data: dict, depth: int) -> None
         profile_captured = await capture_foundation_turn(db, workspace_id, event_data)
         snapshot = StudentSnapshotService(db).build(workspace_id)
         completion = completion_service.evaluate(workspace_id, snapshot=snapshot)
-    from .goal_transition import resolve_or_activate_goal
-    active_journey = await resolve_or_activate_goal(
-        db, workspace_id, event_data, PAI_AGENT_NAME,
-        foundation_ready=bool(completion.get("enforced") and completion.get("foundationReady")),
+    from app.journey import JourneyService
+    from .stages import advance_discovery_stage
+
+    journeys = JourneyService(db)
+    active_journey = journeys.ensure_counselor(
+        workspace_id, actor=f"openagents:{PAI_AGENT_NAME}")
+    workspace = db.get(Workspace, workspace_id)
+    owner = db.get(User, workspace.owner_user_id) if workspace and workspace.owner_user_id else None
+    active_journey = advance_discovery_stage(
+        journeys, workspace_id, active_journey,
+        identity_ready=bool(owner and owner.onboarded_at),
+        foundation_ready=bool(completion.get("foundationReady")),
+        goal_records=snapshot.records.get("goal", []),
+        actor=f"openagents:{PAI_AGENT_NAME}",
     )
+    db.commit()
     turn_plan = TurnPlan.from_completion(completion, snapshot, active_journey)
     understanding = StudentUnderstandingBuilder(db).build(
         workspace_id, snapshot=snapshot)
@@ -143,7 +154,12 @@ async def _run_turn(db, workspace_id: str, event_data: dict, depth: int) -> None
             active_conflict=next(iter(understanding.get("open_conflicts") or ()), None),
             turn_semantics=semantics,
         )
-        turn_plan = replace(turn_plan, policy=CounselingPolicy().decide(state))
+        decision = CounselingPolicy().decide(state)
+        if turn_plan.question and active_journey.current_stage == "DIRECTION":
+            decision = replace(decision, move="ASK", focus="goal discovery",
+                               max_questions=1, operator_allowed=False,
+                               roadmap_allowed=False)
+        turn_plan = replace(turn_plan, policy=decision)
     db.rollback()
 
     memory_context = None
@@ -212,17 +228,6 @@ async def _run_turn(db, workspace_id: str, event_data: dict, depth: int) -> None
                    or semantics.get("requested_roadmap") is True,
     )
     response_metadata = _voice_reply_metadata(event_data) or {}
-    if (turn_plan.mode == "open" and turn_plan.parked_goal
-            and active_journey is None
-            and str(event_data.get("source", "")).startswith("human:")):
-        from .context_projection import compact_student_context
-        from .goal_transition import reviewed_route
-        goal_row = next((row for row in snapshot.records.get("goal", [])
-                         if row.get("title") == turn_plan.parked_goal), None)
-        if goal_row and await reviewed_route(
-                reply, goal_title=turn_plan.parked_goal,
-                known_context=compact_student_context(understanding, turn_plan.parked_goal)):
-            response_metadata["route_reviewed_goal_id"] = goal_row["id"]
     assistant_event_id = await _post_response(
         db, workspace_id, channel_target, PAI_AGENT_NAME, reply, depth,
         metadata=response_metadata or None,

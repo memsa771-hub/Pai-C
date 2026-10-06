@@ -81,7 +81,8 @@ class StudentSession:
         self.indexed = 0
         self.counter = int(time.time() * 1000)
         with self.factory() as db:
-            user = User(email="counselor-eval@example.test", username="counselor_eval")
+            user = User(email="counselor-eval@example.test", username="counselor_eval",
+                        onboarded_at=datetime.now(timezone.utc))
             db.add(user)
             db.flush()
             workspace = Workspace(name="Synthetic counselor evaluation", owner_user_id=user.id,

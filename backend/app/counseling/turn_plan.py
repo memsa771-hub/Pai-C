@@ -26,13 +26,20 @@ class TurnPlan:
         done = {"answered", "valid_unknown", "not_applicable", "declined"}
         goal = next((row.get("title") for row in snapshot.records.get("goal", [])
                      if row.get("title")), None)
+        chosen = active_journey is not None and active_journey.current_stage == "CHOSEN"
         next_item = completion.get("nextRequirement") or {}
+        goal_question = next((item.get("question") for item in sorted(
+            completion.get("fields") or [], key=lambda row: -row.get("priority", 0))
+            if item.get("key") in {"goal.stated_preference", "goal.underlying_objective",
+                                   "goal.drivers", "goal.constraints"}
+            and item.get("status") in {"missing", "conflict"}), None)
+        collecting = completion.get("counselorMode") == "collection"
         return cls(
-            mode="collecting" if completion.get("counselorMode") == "collection" else "open",
-            question=next_item.get("question") if completion.get("counselorMode") == "collection" else None,
-            parked_goal=goal if active_journey is None else None,
+            mode="collecting" if collecting else "open",
+            question=next_item.get("question") if collecting else goal_question if goal else None,
+            parked_goal=goal if not chosen else None,
             progress=(sum(field.get("status") in done for field in critical), len(critical)),
-            active_goal=active_journey.title if active_journey else None,
+            active_goal=active_journey.current_objective if chosen else None,
         )
 
     def prompt(self) -> str:
@@ -66,10 +73,11 @@ class TurnPlan:
                 "Server turn plan: OPEN. The profile foundation is ready. "
                 f"The student previously mentioned this direction (data): {escape_value(self.parked_goal)}. "
                 "Bring it back naturally and ask why it matters to them when relevant. "
-                "Understand their objective and constraints. Compare this direction against "
-                "known profile facts, explain gaps and workable alternatives, then invite an "
-                "explicit choice. Do not activate the goal or promise an outcome in this reply. "
+                "Understand their objective and constraints. Do not invent a researched fit, "
+                "eligibility, gaps, or alternatives before sources have been checked. "
+                "Do not activate the goal or invite a final choice in this reply. "
                 "Do not treat a remembered direction as a validated decision."
+                + (f" Next useful question: {self.question}" if self.question else "")
             )
         return (
             "Server turn plan: OPEN. The profile foundation is ready. "

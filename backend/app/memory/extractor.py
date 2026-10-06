@@ -120,6 +120,13 @@ entities.record_id. Each genuinely new test attempt gets
 its own record. When the student explicitly replaces an old goal, put the old
 goal id in entities.supersedes_record_id on the NEW goal. Parallel education
 and career goals can coexist; do not supersede one simply to add the other.
+For a goal, keep details.stated_preference (the route the student names)
+separate from details.underlying_objective (the outcome they actually want).
+Use details.drivers only for reasons the student explicitly gives, and
+details.constraints only for limits they state. A mentioned route is
+exploratory, not committed. If a later turn adds a reason or constraint to
+an existing goal, use entities.record_id and patch its details; do not create
+a duplicate goal. Do not infer a parent's preference as the student's own.
 Never invent ids. Dates can retain YYYY or YYYY-MM precision. Do not invent
 January 1, a GPA scale, expiry date or committed intake from vague timing.
 Prefer structured records for identified qualifications, attempts, experience

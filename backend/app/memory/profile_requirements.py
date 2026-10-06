@@ -11,7 +11,7 @@ from .student_snapshot import StudentSnapshot
 
 TIERS = ("critical", "important", "enrichment")
 SOURCE_TYPES = ("vault_fact", "record_presence", "record_field", "journey_gap")
-SELECTORS = ("any", "current_or_highest")
+SELECTORS = ("any", "current_or_highest", "any_present")
 
 
 def is_filled(value: Any) -> bool:
@@ -33,6 +33,17 @@ def value_at(value: Any, path: str | None) -> Any:
             return None
         value = value.get(part)
     return value
+
+
+def path_present(value: Any, path: str | None) -> bool:
+    """A deliberate empty collection can answer a presence-based requirement."""
+    for part in (path or "").split("."):
+        if not part:
+            continue
+        if not isinstance(value, dict) or part not in value:
+            return False
+        value = value[part]
+    return value is not None
 
 
 class ProfileRequirementRegistry:
@@ -79,6 +90,8 @@ class ProfileRequirementRegistry:
             return True, bool(snapshot.records.get(requirement.source_key))
         if requirement.source_type == "record_field":
             rows = self.select_records(requirement, snapshot)
+            if requirement.selector == "any_present":
+                return True, any(path_present(row, requirement.source_path) for row in rows)
             return True, any(is_filled(value_at(row, requirement.source_path)) for row in rows)
         gaps = {gap["key"] for gap in journey.get("gaps", [])}
         if requirement.source_key not in gaps:

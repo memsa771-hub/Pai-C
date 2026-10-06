@@ -164,6 +164,7 @@ def test_text_and_voice_turns_use_the_same_core_and_background_learning():
              patch("app.memory.student_snapshot.StudentSnapshotService") as snapshots, \
              patch("app.memory.profile_completion.ProfileCompletionService") as completion, \
              patch("app.counseling.understanding.StudentUnderstandingBuilder") as builders, \
+             patch("app.journey.JourneyService") as journeys, \
              patch("app.counseling.core.CounselorCore") as core, \
              patch("app.counseling.runtime._post_response", post), \
              patch("app.memory.turn_hook.enqueue_turn_extraction") as extract:
@@ -174,6 +175,9 @@ def test_text_and_voice_turns_use_the_same_core_and_background_learning():
                 "fields": [], "nextRequirement": None,
             }
             builders.return_value.build.return_value = _understanding()
+            journeys.return_value.ensure_counselor.return_value = Mock(
+                id="journey", current_stage="FOUNDATION", title="Counselor direction",
+                to_dict=Mock(return_value={"current_stage": "FOUNDATION", "blockers": []}))
             core.return_value.respond = core_reply
             for marker in ({}, {"voice_delegation_id": "live-turn"}):
                 await _run_turn(db, "student", {
@@ -207,6 +211,7 @@ def test_collection_reconciles_before_reply_for_text_and_voice():
              patch("app.memory.student_snapshot.StudentSnapshotService") as snapshots, \
              patch("app.memory.profile_completion.ProfileCompletionService") as service, \
              patch("app.counseling.understanding.StudentUnderstandingBuilder") as builder, \
+             patch("app.journey.JourneyService") as journeys, \
              patch("app.memory.foundation_intake.capture_foundation_turn", new_callable=AsyncMock) as capture, \
              patch("app.counseling.core.CounselorCore") as core, \
              patch("app.counseling.reply_guard.guard_reply", new_callable=AsyncMock) as guard, \
@@ -215,6 +220,8 @@ def test_collection_reconciles_before_reply_for_text_and_voice():
             snapshots.return_value.build.return_value = snapshot
             service.return_value.evaluate.return_value = completion
             builder.return_value.build.return_value = _understanding()
+            journeys.return_value.ensure_counselor.return_value = Mock(
+                id="journey", current_stage="FOUNDATION", title="Counselor direction")
             capture.return_value = True
             core.return_value.respond = AsyncMock(return_value="Draft")
             guard.return_value = "Safe reply"
@@ -235,7 +242,7 @@ def test_collection_reconciles_before_reply_for_text_and_voice():
     asyncio.run(run())
 
 
-def test_goal_activates_only_after_reviewed_reply_and_explicit_confirmation():
+def test_goal_hint_does_not_activate_a_journey_before_a_presented_route():
     async def run():
         db = Mock()
         db.get.return_value = Mock(network_id="student", target="channel/pai-counselor",
@@ -250,13 +257,8 @@ def test_goal_activates_only_after_reviewed_reply_and_explicit_confirmation():
              patch("app.memory.profile_completion.ProfileCompletionService") as service, \
              patch("app.counseling.understanding.StudentUnderstandingBuilder") as builder, \
              patch("app.memory.foundation_intake.capture_foundation_turn", new_callable=AsyncMock), \
-             patch("app.counseling.goal_transition.JourneyService") as journeys, \
-             patch("app.counseling.goal_transition.StudentRecordService") as records, \
-             patch("app.counseling.goal_transition.previous_route_review",
-                   return_value=("goal-1", "We discussed the gaps and alternatives.")), \
+             patch("app.journey.JourneyService") as journeys, \
              patch("app.counseling.turn_semantics.classify_turn", new_callable=AsyncMock) as classify, \
-             patch("app.counseling.goal_transition.confirms_reviewed_route",
-                   new_callable=AsyncMock) as confirm, \
              patch("app.counseling.core.CounselorCore") as core, \
              patch("app.counseling.reply_guard.guard_reply",
                    new=AsyncMock(side_effect=lambda reply, **kwargs: reply)), \
@@ -265,22 +267,17 @@ def test_goal_activates_only_after_reviewed_reply_and_explicit_confirmation():
             snapshots.return_value.build.return_value = snapshot
             service.return_value.evaluate.return_value = completion
             builder.return_value.build.return_value = _understanding()
-            journeys.return_value.resolve_active.return_value = None
-            journeys.return_value.create.return_value = Mock(title="Study computing")
-            journeys.return_value.create.return_value.to_dict.return_value = {
-                "current_objective": "Study computing", "blockers": [],
-                "current_stage": "ALIGNING"}
-            records.return_value.get.return_value = Mock(title="Study computing")
+            journeys.return_value.ensure_counselor.return_value = Mock(
+                id="journey", title="Counselor direction", current_stage="DIRECTION",
+                to_dict=Mock(return_value={"current_stage": "DIRECTION", "blockers": []}))
             classify.return_value = {"journey_intent": {
                 "action": "upsert", "journey_type": "direction_discovery"}}
-            confirm.return_value = True
             core.return_value.respond = AsyncMock(return_value="Let's begin.")
             post.return_value = "assistant-event"
             await _run_turn(db, "student", {
                 "id": "owner-event", "source": "human:owner", "timestamp": 1234,
                 "target": "channel/pai-counselor", "payload": {"content": "Yes, I choose that route"},
             }, 0)
-            journeys.return_value.create.assert_called_once()
-            assert journeys.return_value.create.call_args.kwargs["primary"] is True
-            assert core.return_value.respond.await_args.kwargs["turn_plan"].active_goal == "Study computing"
+            journeys.return_value.create.assert_not_called()
+            assert core.return_value.respond.await_args.kwargs["turn_plan"].active_goal is None
     asyncio.run(run())
