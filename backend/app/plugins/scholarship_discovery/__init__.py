@@ -9,6 +9,10 @@ async def discover(context, payload):
     result = await context.tools.invoke("web.search", {
         "query": query + " university scholarship official international students", "limit": 6})
     leads = []
+    if not result.get("ok"):
+        error = result.get("error") or {}
+        return {"scholarships": [], "unconfirmed": [{"reason": error.get("message") or "Search unavailable",
+                                                       "code": error.get("code") or "search_failed"}]}
     if result.get("ok"):
         for hit in result.get("results") or []:
             if public_https(hit.get("url")):

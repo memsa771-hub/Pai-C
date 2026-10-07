@@ -35,6 +35,7 @@ def on_run_status(db, run):
 DIMENSION_PREFIXES = {
     "academics": ("education", "course", "achievement"),
     "English/tests": ("test_attempt", "language_proficiency", "tests"),
+    "coursework": ("subject", "coursework", "module", "prerequisite"),
     "finance": ("finance", "financial_sponsor"),
     "timing": ("goal", "application"),
     "documents": ("document", "credential", "certification"),
@@ -87,6 +88,18 @@ def _facts(scoped: dict) -> dict:
 
 
 async def build(context, payload):
+    from app.config import config
+    from app.plugins._shared.budget import bounded_research
+
+    with bounded_research(
+        queries=config.PAI_RESEARCH_MAX_QUERIES,
+        fetches=config.PAI_RESEARCH_MAX_FETCHES,
+        seconds=config.PAI_RESEARCH_MAX_SECONDS,
+    ):
+        return await _build(context, payload)
+
+
+async def _build(context, payload):
     brief = payload["brief"]
     stated = str(brief.get("stated_preference") or "").strip()
     objective = str(brief.get("underlying_objective") or "").strip()
@@ -105,13 +118,17 @@ async def build(context, payload):
         "objective": objective, "country": "", "level": level})
     candidates = []
     seen = set()
+    refresh_candidate = brief.get("refresh_candidate")
+    if isinstance(refresh_candidate, dict) and refresh_candidate.get("url"):
+        candidates.append(("stated_goal", refresh_candidate))
+        seen.add(refresh_candidate["url"])
     for origin, group in (("stated_goal", target), ("alternative", alternatives)):
         for item in group.get("candidates") or []:
             if item["url"] in seen:
                 continue
             seen.add(item["url"])
             candidates.append((origin, item))
-            if origin == "stated_goal" or sum(kind == "alternative" for kind, _ in candidates) >= 3:
+            if origin == "stated_goal" or sum(kind == "alternative" for kind, _ in candidates) >= 2:
                 break
     qualification = await context.capabilities("qualification.recognize", {
         "country": country, "origin_country": brief.get("origin_country") or ""})
@@ -123,16 +140,23 @@ async def build(context, payload):
                    *(alternatives.get("unconfirmed") or []),
                    *(scholarships.get("unconfirmed") or []),
                    *(qualification.get("unconfirmed") or [])]
-    for origin, candidate in candidates[:4]:
-        researched = await context.capabilities("program.research", {
-            "url": candidate["url"], "country": country if origin == "stated_goal" else "unknown",
-            "level": level, "intake": brief.get("intake") or "",
-            "route": {"url": candidate["url"], "title": candidate["title"]}})
+    for origin, candidate in candidates[:3]:
+        research_input = {
+            "url": candidate["url"], "country": candidate.get("country") or (country if origin == "stated_goal" else "unknown"),
+            "level": candidate.get("level") or level, "intake": candidate.get("intake") or brief.get("intake") or "",
+            "route": {"url": candidate["url"], "title": candidate["title"]}}
+        if candidate.get("related_urls"):
+            research_input["corroborating_url"] = candidate["related_urls"][0]
+        researched = await context.capabilities("program.research", research_input)
         unconfirmed.extend(researched.get("unconfirmed") or [])
         requirements = researched.get("requirements") or []
         for requirement in requirements:
+            verified = requirement["status"] == "verified"
+            # A quoted but unverified threshold is still a lead, not an
+            # eligibility rule. Never turn it into a student verdict.
+            comparable_rules = requirement["rules"] if verified else []
             assessed = await context.capabilities("gap.assess", {
-                "facts": _facts(context.student_context), "rules": requirement["rules"]})
+                "facts": _facts(context.student_context), "rules": comparable_rules})
             unknown_items.extend(assessed["unknowns"])
             gaps = assessed["gaps"]
             levels = {item.get("status") for item in gaps}
@@ -144,12 +168,12 @@ async def build(context, payload):
                           "intake": brief.get("intake"), "url": candidate["url"],
                           "why_suggested": ("Your stated direction" if origin == "stated_goal"
                                             else f"Another route to {objective}")},
-                "fit_level": "unconfirmed" if requirement["status"] != "verified" else fit,
+                "fit_level": "unconfirmed" if not verified else fit,
                 "fit_dimensions": fit_dimensions(gaps),
                 "gaps": gaps, "steps": qualification["procedures"],
                 "total_cost": None, "time_to_start": brief.get("intake"),
-                "risks": (["Requirement set awaits review"]
-                          if requirement["status"] != "verified" else []),
+                "risks": (["Requirement facts are still being checked against official sources"]
+                          if not verified else []),
                 "sources": [{"url": requirement["source_url"],
                              "checked_at": requirement["checked_at"]}],
                 "requirement_set_id": requirement["requirement_set_id"],

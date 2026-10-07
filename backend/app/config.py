@@ -327,6 +327,14 @@ class Config:
     WEB_SEARCH_PROVIDER: str = os.environ.get("WEB_SEARCH_PROVIDER", "")
     WEB_SEARCH_API_KEY: str = os.environ.get("WEB_SEARCH_API_KEY", "")
     WEB_SEARCH_BASE_URL: str = os.environ.get("WEB_SEARCH_BASE_URL", "")
+    WEB_SEARCH_MAX_RETRIES: int = int(os.environ.get("WEB_SEARCH_MAX_RETRIES", "2"))
+    WEB_SEARCH_CACHE_TTL_SECONDS: int = int(os.environ.get("WEB_SEARCH_CACHE_TTL_SECONDS", "86400"))
+    PAI_RESEARCH_FRESHNESS_DAYS: int = int(os.environ.get("PAI_RESEARCH_FRESHNESS_DAYS", "30"))
+    PAI_RESEARCH_DEADLINE_FRESHNESS_DAYS: int = int(os.environ.get("PAI_RESEARCH_DEADLINE_FRESHNESS_DAYS", "7"))
+    PAI_RESEARCH_SWEEP_SECONDS: int = int(os.environ.get("PAI_RESEARCH_SWEEP_SECONDS", "3600"))
+    PAI_RESEARCH_MAX_QUERIES: int = int(os.environ.get("PAI_RESEARCH_MAX_QUERIES", "8"))
+    PAI_RESEARCH_MAX_FETCHES: int = int(os.environ.get("PAI_RESEARCH_MAX_FETCHES", "12"))
+    PAI_RESEARCH_MAX_SECONDS: int = int(os.environ.get("PAI_RESEARCH_MAX_SECONDS", "240"))
 
     # Transactional email. Delivery goes through Resend when a key is
     # configured (otherwise sends are logged no-ops).

@@ -2,8 +2,11 @@
   "country": "United Kingdom",
   "last_reviewed_at": "2026-10-06",
   "grading_scales": [],
-  "equivalence_bodies": [],
+  "equivalence_bodies": [
+    {"name": "UK ENIC", "scope": "optional comparability statement where a provider requests one", "source_url": "https://www.gov.uk/government/publications/recognition-of-uk-professional-qualifications-in-eu-member-states/recognition-of-uk-professional-qualifications-in-eu-member-states"}
+  ],
   "document_procedures": [
-    {"description": "Check international qualification entry requirements for the specific course provider", "source_url": "https://www.ucas.com/international/international-students/applying-university-international-student/entry-requirements-uk-courses"}
+    {"description": "Check international qualification entry requirements for the specific course provider", "source_url": "https://www.ucas.com/international/international-students/applying-to-university-as-an-international-student"},
+    {"description": "Check the programme's accepted English evidence and score with the provider", "source_url": "https://www.ucas.com/international/international-students/applying-university-international-student/english-language-tests-elts/what-level-english-do-i-need-get-uk-university"}
   ]
 }

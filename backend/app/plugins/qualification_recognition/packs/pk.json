@@ -1,13 +1,22 @@
 {
   "country": "Pakistan",
   "last_reviewed_at": "2026-10-06",
+  "qualification_families": [
+    {"level": "secondary", "names": ["Matric", "SSC", "O Level"], "source_url": "https://ibcc.edu.pk/equivalence-intro/british-system/"},
+    {"level": "upper_secondary", "names": ["FSc Pre-Engineering", "FSc Pre-Medical", "ICS", "FA", "HSSC", "A Level"], "source_url": "https://ibcc.edu.pk/equivalence-intro/british-system/"},
+    {"level": "technical_diploma", "names": ["DAE"], "source_url": "https://ibcc.edu.pk/faqs/equivalence-faqs/"},
+    {"level": "bachelor", "names": ["BS", "BSc", "BA", "BCom"], "source_url": "https://www.hec.gov.pk/Urdu/services/students/Degree%20Attestation%20System/Pages/Documents-Attested.aspx"},
+    {"level": "master", "names": ["MS", "MPhil"], "source_url": "https://www.hec.gov.pk/Urdu/services/students/Degree%20Attestation%20System/Pages/Documents-Attested.aspx"}
+  ],
   "grading_scales": [],
   "equivalence_bodies": [
     {"name": "IBCC", "scope": "school qualifications and equivalence", "source_url": "https://ibcc.edu.pk/equivalence-application-process/"},
-    {"name": "HEC", "scope": "higher education degree attestation", "source_url": "https://www.hec.gov.pk/english/services/students/das/Pages/Degree-Attestation.aspx"}
+    {"name": "HEC", "scope": "higher education degree attestation", "source_url": "https://www.hec.gov.pk/english/services/students/das/Pages/Degree-Attestation.aspx"},
+    {"name": "MOFA", "scope": "subsequent document attestation when the destination asks for it", "source_url": "https://apostille.mofa.gov.pk/sops"}
   ],
   "document_procedures": [
     {"description": "Check whether school equivalence is required for the specific route", "source_url": "https://ibcc.edu.pk/equivalence-application-process/"},
-    {"description": "Check degree attestation requirements for completed higher education", "source_url": "https://www.hec.gov.pk/english/services/students/das/Pages/Degree-Attestation.aspx"}
+    {"description": "Check degree attestation requirements for completed higher education", "source_url": "https://www.hec.gov.pk/english/services/students/das/Pages/Degree-Attestation.aspx"},
+    {"description": "Check whether the destination asks for MOFA attestation after IBCC or HEC", "source_url": "https://apostille.mofa.gov.pk/sops"}
   ]
 }

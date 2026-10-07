@@ -10,6 +10,7 @@ from app.database import get_db
 from app.api.response import success_response
 from app.models import Roadmap
 from app.roadmaps.service import RoadmapError, RoadmapService
+from app.research.requirements import RequirementStore, ResearchEvidenceError
 from app.routers.network import _resolve_workspace, _verify_workspace_access
 
 router = APIRouter(prefix="/v1/roadmaps", tags=["Roadmaps"])
@@ -63,6 +64,21 @@ def get_roadmap(roadmap_id: str, network: str = Query(...), db=Depends(get_db),
                 x_workspace_token: str | None = Header(None), authorization: str | None = Header(None)):
     workspace = _authorized(db, network, x_workspace_token, authorization)
     return _result(lambda: RoadmapService(db).get(str(workspace.id), roadmap_id, presented=True), db)
+
+
+@router.post("/requirements/{requirement_id}/report")
+def report_wrong_requirement(requirement_id: str, network: str = Query(...), db=Depends(get_db),
+                             x_workspace_token: str | None = Header(None),
+                             authorization: str | None = Header(None)):
+    workspace = _authorized(db, network, x_workspace_token, authorization)
+    try:
+        row = RequirementStore(db).report_wrong_info(str(workspace.id), requirement_id)
+    except ResearchEvidenceError as exc:
+        db.rollback()
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    db.commit()
+    return success_response({"requirement_id": row.id, "status": row.status,
+                             "message": "Thanks. PAI will recheck this source."})
 
 
 @router.post("/{roadmap_id}/focus")

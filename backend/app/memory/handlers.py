@@ -37,13 +37,13 @@ JOB_REFRESH_RESEARCH = "research.refresh_stale"
 
 
 async def refresh_stale_research(job, db) -> dict:
-    """A reviewed source change starts a fresh, durable Counselor research run."""
+    """A reported or expired source starts a fresh Counselor research run."""
     from app.counseling.research_flow import delegate_research_if_ready
     from app.counseling.understanding import StudentUnderstandingBuilder
     from app.journey import JourneyService
     from app.memory.permissions import capabilities_for_agent
     from app.memory.student_snapshot import StudentSnapshotService
-    from app.models import Roadmap, Workspace
+    from app.models import Opportunity, RequirementSet, Roadmap, Workspace
     from app.services.pai import PAI_AGENT_NAME, PAI_ALLOWED_TOOLS, PAI_PRIMARY_CHANNEL, WorkspaceApi
     from app.tools import AUDIENCE_COUNSELOR, ToolContext
 
@@ -73,9 +73,22 @@ async def refresh_stale_research(job, db) -> dict:
         audience=AUDIENCE_COUNSELOR,
         granted_capabilities=capabilities_for_agent(PAI_AGENT_NAME),
     )
+    requirement_id = (job.payload or {}).get("requirement_id")
+    refresh_candidate = None
+    if requirement_id:
+        pair = db.execute(select(RequirementSet, Opportunity).join(Opportunity).where(
+            RequirementSet.id == requirement_id,
+            Opportunity.workspace_id == job.workspace_id)).first()
+        if pair:
+            _, opportunity = pair
+            refresh_candidate = {"url": opportunity.url,
+                                 "title": opportunity.route.get("title") or opportunity.institution or "Route",
+                                 "country": opportunity.country,
+                                 "level": opportunity.level,
+                                 "intake": opportunity.intake}
     result = await delegate_research_if_ready(
         db, job.workspace_id, journey, goals, understanding, context,
-        refresh_key=(job.payload or {}).get("requirement_id") or job.id)
+        refresh_key=requirement_id or job.id, refresh_candidate=refresh_candidate)
     return {"delegated": bool(result and result.get("ok"))}
 
 

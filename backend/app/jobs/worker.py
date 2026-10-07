@@ -32,8 +32,10 @@ import asyncio
 import logging
 import os
 import signal
+import time
 
 from app.database import new_session
+from app.config import config
 from app.jobs.service import (
     LEASE_RENEW_SECONDS,
     BackgroundJobService,
@@ -147,6 +149,7 @@ async def run_worker_loop(
         worker, concurrency, list(job_handlers.registered()),
     )
     tick = 0
+    next_research_sweep = 0.0
     in_flight: set[asyncio.Task] = set()
 
     try:
@@ -154,6 +157,21 @@ async def run_worker_loop(
             if max_iterations is not None and tick >= max_iterations:
                 break
             tick += 1
+
+            if time.monotonic() >= next_research_sweep:
+                next_research_sweep = time.monotonic() + max(60, config.PAI_RESEARCH_SWEEP_SECONDS)
+                db = new_session()
+                try:
+                    from app.research.scheduler import enqueue_due_verification
+                    count = enqueue_due_verification(db)
+                    db.commit()
+                    if count:
+                        logger.info("queued %d due research verification refreshes", count)
+                except Exception:
+                    db.rollback()
+                    logger.exception("research verification sweep failed")
+                finally:
+                    db.close()
 
             # Drop finished tasks so their slots are free again.
             in_flight = {t for t in in_flight if not t.done()}

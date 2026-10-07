@@ -2,22 +2,43 @@
 
 from app.capabilities import CapabilityContract, CapabilityRisk, FallbackPolicy
 from app.plugins._shared.sources import checked_now, public_https
+from urllib.parse import urldefrag, urlsplit
 
 
 async def discover(context, payload):
-    query = " ".join(str(payload[key]).strip() for key in ("objective", "country", "level")
-                     if payload.get(key)) + " university official program admissions"
-    result = await context.tools.invoke("web.search", {"query": query, "limit": 8})
-    if not result.get("ok"):
-        return {"candidates": [], "unconfirmed": [{"reason": "Search unavailable"}]}
+    terms = " ".join(str(payload[key]).strip() for key in ("objective", "country", "level")
+                     if payload.get(key)).strip()
+    queries = (f"{terms} university programme official admissions",
+               f"{terms} university course entry requirements tuition")
     candidates = []
-    for hit in result.get("results") or []:
-        url = hit.get("url")
-        if public_https(url):
+    failures = []
+    seen = set()
+    for query in queries:
+        result = await context.tools.invoke("web.search", {"query": query, "limit": 8})
+        if not result.get("ok"):
+            error = result.get("error") or {}
+            failures.append({"reason": error.get("message") or "Search unavailable",
+                             "code": error.get("code") or "search_failed"})
+            continue
+        for hit in result.get("results") or []:
+            url = urldefrag(str(hit.get("url") or ""))[0].rstrip("/")
+            if not public_https(url) or url in seen:
+                continue
+            seen.add(url)
             candidates.append({"title": str(hit.get("title") or ""), "url": url,
                                "country": payload.get("country"), "level": payload.get("level"),
+                               "why_match": f"Candidate page for {payload['objective']}",
                                "checked_at": checked_now(), "status": "unconfirmed"})
-    return {"candidates": candidates, "unconfirmed": []}
+            if len(candidates) >= 8:
+                break
+        if len(candidates) >= 8:
+            break
+    for candidate in candidates:
+        host = urlsplit(candidate["url"]).hostname
+        candidate["related_urls"] = [item["url"] for item in candidates
+                                     if item["url"] != candidate["url"]
+                                     and urlsplit(item["url"]).hostname == host][:2]
+    return {"candidates": candidates, "unconfirmed": failures}
 
 
 def get_capabilities():

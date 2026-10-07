@@ -20,7 +20,8 @@ from app.memory.vault import VaultService
 from app.models import (
     BackgroundJob, DocumentArtifact, EventRecord, ExecutionRun, FileRecord,
     CounselorSlotAnswer, CounselorTurnDecision, MemoryCandidate, PaiEpisode, PaiMemory, ProfileFieldResponse, ProfileIssue, ProfileRequirement, StudentRecordRevision,
-    StudentJourney, StudentJourneyEvent, Opportunity, RequirementSet, Roadmap, RoadmapStudentState,
+    StudentJourney, StudentJourneyEvent, Institution, InstitutionDomain,
+    Opportunity, RequirementSet, Roadmap, RoadmapStudentState,
     NotificationRecord, User, VaultFact, VaultFieldDefinition, Workspace,
     WorkspaceMember, VAULT_INTAKE_MODELS,
 )
@@ -75,7 +76,8 @@ class StudentSession:
                   ProfileFieldResponse, ProfileIssue, ProfileRequirement, CounselorSlotAnswer,
                   CounselorTurnDecision,
                   StudentRecordRevision, BackgroundJob,
-                  StudentJourney, StudentJourneyEvent, Opportunity, RequirementSet,
+                  StudentJourney, StudentJourneyEvent, Institution, InstitutionDomain,
+                  Opportunity, RequirementSet,
                   Roadmap, RoadmapStudentState, NotificationRecord,
                   *ENTITY_MODELS.values(), *VAULT_INTAKE_MODELS]
         Base.metadata.create_all(self.engine, tables=[m.__table__ for m in models])

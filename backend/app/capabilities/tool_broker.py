@@ -8,7 +8,7 @@ class CapabilityToolUnavailable(PermissionError):
 
 
 def permission_for_tool(name: str) -> str:
-    if name == "web.search" or name == "web.fetch":
+    if name in {"web.search", "web.fetch", "web.institution_registry"}:
         return "web.read"
     if name == "files.read" or name == "files.list":
         return "files.read"
@@ -60,6 +60,11 @@ class CapabilityToolBroker:
     async def invoke(self, name: str, arguments: dict) -> dict:
         if name not in self._tool_names:
             raise CapabilityToolUnavailable(f"undeclared capability tool: {name}")
+        from app.plugins._shared.budget import spend
+        exceeded = spend(name)
+        if exceeded:
+            return {"ok": False, "error": {"code": exceeded,
+                                             "message": "Research run limit reached"}}
         # ToolExecutor performs recursive schema validation and ToolPolicy
         # authorization. The broker never imports a builtin implementation.
         return await self._executor.execute(name, arguments, self._context)

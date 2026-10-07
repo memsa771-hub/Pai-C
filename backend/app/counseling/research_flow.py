@@ -25,7 +25,8 @@ def research_brief(goal: dict, understanding: dict) -> dict:
 
 async def delegate_research_if_ready(db, workspace_id: str, journey, goals: list[dict],
                                      understanding: dict, tool_context,
-                                     refresh_key: str | None = None) -> dict | None:
+                                     refresh_key: str | None = None,
+                                     refresh_candidate: dict | None = None) -> dict | None:
     allowed_stage = journey.current_stage == "RESEARCHING" or (
         journey.current_stage == "CHOSEN" and refresh_key is not None)
     if not allowed_stage or not goals or tool_context is None:
@@ -41,6 +42,8 @@ async def delegate_research_if_ready(db, workspace_id: str, journey, goals: list
     if any((item.constraints or {}).get("research_key") == key for item in prior):
         return None
     brief = research_brief(goal, understanding)
+    if refresh_candidate:
+        brief["refresh_candidate"] = refresh_candidate
     from app.tools import get_tool_executor
     return await get_tool_executor().execute("operator.delegate", {
         "objective": f"Research sourced routes for {brief['stated_preference']}",

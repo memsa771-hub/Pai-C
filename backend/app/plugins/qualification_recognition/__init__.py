@@ -1,12 +1,27 @@
 """Data-driven qualification procedure discovery, never an automatic equivalence verdict."""
 
 import json
+from decimal import Decimal, InvalidOperation
 from pathlib import Path
 
 from app.capabilities import CapabilityContract, CapabilityRisk, FallbackPolicy
 
 
 PACKS = Path(__file__).parent / "packs"
+
+
+def marks_percentage(qualification: dict) -> float | None:
+    """Arithmetic on awarded marks only; CGPA is not a universal percentage."""
+    if not isinstance(qualification, dict):
+        return None
+    try:
+        earned = Decimal(str(qualification["marks_obtained"]))
+        total = Decimal(str(qualification["marks_total"]))
+        if not earned.is_finite() or not total.is_finite() or total <= 0 or earned < 0 or earned > total:
+            return None
+        return float((earned / total * 100).quantize(Decimal("0.01")))
+    except (KeyError, TypeError, ValueError, InvalidOperation):
+        return None
 
 
 async def recognize(context, payload):
@@ -24,8 +39,16 @@ async def recognize(context, payload):
         procedures.extend({**item, "country": pack["country"],
                            "last_reviewed_at": pack.get("last_reviewed_at")}
                           for item in pack["document_procedures"])
-    return {"procedures": procedures, "recognition": "unknown", "unconfirmed": [
-        {"reason": "Qualification recognition requires a program-scoped official assessment"}]}
+    qualification = payload.get("qualification") or {}
+    if not isinstance(qualification, dict):
+        qualification = {}
+    percentage = marks_percentage(qualification)
+    return {"procedures": procedures, "recognition": "unknown",
+            "marks_percentage": percentage, "grade_band": qualification.get("grade") or None,
+            "unconfirmed": [
+                {"reason": "Qualification recognition requires a program-scoped official assessment"},
+                *([{"reason": "CGPA cannot be converted to a universal percentage"}]
+                  if qualification.get("cgpa") is not None and percentage is None else [])]}
 
 
 def get_capabilities():

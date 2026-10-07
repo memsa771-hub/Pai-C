@@ -772,7 +772,7 @@ class Opportunity(Base):
 
 
 class RequirementSet(Base):
-    """Intake-scoped research evidence requiring independent review."""
+    """Intake-scoped research evidence with automatic verification results."""
     __tablename__ = "pai_requirement_sets"
 
     id = Column(Text, primary_key=True, default=_uuid)
@@ -783,17 +783,34 @@ class RequirementSet(Base):
     source_url = Column(Text, nullable=False)
     checked_at = Column(DateTime(timezone=True), nullable=False)
     version = Column(Integer, nullable=False, default=1, server_default=text("1"))
-    status = Column(Text, nullable=False, default="proposed", server_default=text("'proposed'"))
-    reviewed_by = Column(Text, nullable=True)
-    reviewed_at = Column(DateTime(timezone=True), nullable=True)
+    status = Column(Text, nullable=False, default="unconfirmed", server_default=text("'unconfirmed'"))
+    verification_checks = Column(JSONB, nullable=False, default=dict, server_default=text("'{}'"))
+    cycle_label = Column(Text, nullable=True)
+    verified_at = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True), default=_now, server_default=text("NOW()"))
 
     __table_args__ = (
-        CheckConstraint("status IN ('proposed', 'verified', 'expired')", name="ck_requirement_set_status"),
+        CheckConstraint("status IN ('unconfirmed', 'verified', 'expired')", name="ck_requirement_set_status"),
         CheckConstraint("source_url LIKE 'https://%'", name="ck_requirement_set_https_url"),
         CheckConstraint("version > 0", name="ck_requirement_set_version"),
         UniqueConstraint("opportunity_id", "version", name="uq_requirement_set_version"),
         Index("idx_requirement_sets_opportunity_status", "opportunity_id", "status"),
+    )
+
+
+class InstitutionDomain(Base):
+    """Trusted domain assertion tied to a provider-backed institution catalog row."""
+    __tablename__ = "pai_institution_domains"
+    id = Column(Text, primary_key=True, default=_uuid)
+    institution_id = Column(Text, ForeignKey("pai_institutions.id", ondelete="CASCADE"), nullable=False)
+    domain = Column(Text, nullable=False)
+    source_url = Column(Text, nullable=False)
+    origin = Column(Text, nullable=False)
+    checked_at = Column(DateTime(timezone=True), nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint("institution_id", "domain", name="uq_institution_domain"),
+        Index("idx_institution_domains_domain", "domain"),
     )
 
 

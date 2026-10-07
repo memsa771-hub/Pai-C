@@ -94,11 +94,11 @@ Registration makes the id and its owned task type discoverable without editing C
 capabilities through the router. Each child receives only its declared Vault
 scopes and tools. Program page claims must carry an exact quotation from the
 fetched page, an HTTPS source URL, and `checked_at`. New requirement sets stay
-`proposed` until an operations reviewer marks them `verified`. Reads prefer a
-verified version and label proposed results as unconfirmed. The review route
-`POST /v1/ops/research/requirements/{id}/review` requires the server-only
-`PAI_OPS_REVIEW_TOKEN` header `X-PAI-Ops-Token`; leave the route disabled by
-omitting the variable. Web discovery also needs the existing
+`unconfirmed` until automatic official-domain, current-cycle, schema,
+corroboration, and freshness checks pass. Reads prefer a verified version and
+label other results unconfirmed. Students can report a questionable row through
+the workspace-authenticated Roadmaps API; the worker queues re-research. No
+human operations review or review token is required. Web discovery needs the existing
 `WEB_SEARCH_PROVIDER` and `WEB_SEARCH_API_KEY` configuration. Country-specific
 procedure links live under `app/plugins/qualification_recognition/packs/`.
 

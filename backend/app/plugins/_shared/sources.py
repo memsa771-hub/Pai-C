@@ -31,6 +31,6 @@ def cited_facts(facts: list[dict], content: str, url: str, checked_at: str) -> l
                 and public_https(url)):
             accepted.append({"field": fact["field"], "value": fact["value"],
                              "quote": quote, "source_url": url, "checked_at": checked_at,
-                             **{key: fact[key] for key in ("kind", "comparator", "threshold", "remediation")
+                             **{key: fact[key] for key in ("kind", "comparator", "threshold", "unit", "scale", "remediation")
                                 if key in fact}})
     return accepted

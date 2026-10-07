@@ -38,6 +38,7 @@ def register_builtin_tools(registry):
         ToolDefinition("files.read", "Read a file's text by file ID. PDF and Word documents return their parsed contents; if a document is still being processed this reports that instead of text.", obj({"file_id": {"type": "string"}, "max_chars": {"type": "integer"}, "pages": {"type": "string", "description": "Optional page or section range, e.g. '2' or '1-3'."}}, ["file_id"]), "files", ToolRisk.READ, files.read_file, audiences=BOTH),
         ToolDefinition("web.search", "Search the public web using the configured provider.", obj({"query": {"type": "string"}, "limit": {"type": "integer"}}, ["query"]), "web", ToolRisk.READ, web.search, audiences=BOTH),
         ToolDefinition("web.fetch", "Read a public URL through the workspace fetch and safety pipeline.", obj({"url": {"type": "string"}, "mode": {"type": "string", "enum": ["auto", "static", "render"]}, "max_chars": {"type": "integer"}}, ["url"]), "web", ToolRisk.READ, web.fetch, audiences=BOTH),
+        ToolDefinition("web.institution_registry", "Resolve an institution's official website against the public ROR registry.", obj({"url": {"type": "string"}}, ["url"]), "web", ToolRisk.READ, web.institution_registry, audiences=OPERATOR_ONLY),
 
         # ---- Real execution — Operator's domain only. Counselor delegates
         # instead of calling these; see operator.delegate below.

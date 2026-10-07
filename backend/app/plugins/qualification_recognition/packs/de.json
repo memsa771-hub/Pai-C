@@ -2,9 +2,14 @@
   "country": "Germany",
   "last_reviewed_at": "2026-10-06",
   "grading_scales": [],
-  "equivalence_bodies": [],
+  "equivalence_bodies": [
+    {"name": "DAAD admission database", "scope": "school qualification route screening; institution decides admission", "source_url": "https://www.daad.de/en/studying-in-germany/requirements/overview/"},
+    {"name": "uni-assist", "scope": "document evaluation where the chosen institution uses My assist", "source_url": "https://www.uni-assist.de/en/how-to-apply/assemble-your-documents/educational-certificates/"}
+  ],
   "document_procedures": [
     {"description": "Check admission requirements and qualification recognition for the intended program", "source_url": "https://www.daad.de/en/studying-in-germany/requirements/overview/"},
-    {"description": "Check official educational certificate and translation procedures", "source_url": "https://www.uni-assist.de/en/how-to-apply/assemble-your-documents/educational-certificates/"}
+    {"description": "Check official educational certificate and translation procedures", "source_url": "https://www.uni-assist.de/en/how-to-apply/assemble-your-documents/educational-certificates/"},
+    {"description": "For Pakistani credentials, check country-specific document requirements including HEC attestation", "source_url": "https://www.uni-assist.de/en/tools/info-country-by-country/details-country/country/pk/"},
+    {"description": "Check whether APS applies to the student's country; do not presume it for Pakistan", "source_url": "https://www.uni-assist.de/en/tools/glossary-of-terms/description/term/akademische-pruefstelle-aps/"}
   ]
 }

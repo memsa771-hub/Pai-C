@@ -5,6 +5,43 @@ from datetime import datetime
 
 from app.capabilities import CapabilityContract, CapabilityRisk, FallbackPolicy
 from app.plugins._shared.sources import checked_now, cited_facts, data, public_https
+from app.plugins._shared.verification import official_url
+
+
+EXTRACTION_PROMPT = (
+    "Extract only explicit programme admission facts from the supplied official page. "
+    "Return a JSON object with a facts array. Each fact is "
+    "{field,value,quote,kind,comparator,threshold,unit,scale}. "
+    "Cover entry qualification, minimum grades, required subjects or coursework, "
+    "English and other tests, documents, application route, deadline by intake, "
+    "tuition, other stated costs, and language of instruction only when shown. "
+    "For a fee, value must be {amount:number,currency:ISO_4217,basis:per_year|per_semester|total|per_credit}; "
+    "for a deadline, value must be an ISO date. Do not invent missing units, dates, or exchange rates. "
+    "kind is requirement, fee, deadline, or intake. Comparator is gte, lte, or eq only "
+    "when a threshold is explicit. For a student-comparable rule use a field key "
+    "from the canonical list; replace angle-bracket identity placeholders with the "
+    "explicit qualification or test name. Otherwise retain the page term and omit comparator. "
+    "Quote must be an exact contiguous excerpt. No inference or student profile facts. "
+    "Use an empty array when unclear."
+)
+
+
+async def _extract_page(content, url, payload, comparison_fields, checked_at):
+    from app.config import config
+    from app.inference.client import chat_completion
+
+    raw = await chat_completion(
+        api_key=config.PAI_API_KEY, model=config.PAI_MODEL,
+        system_prompt=EXTRACTION_PROMPT,
+        messages=[{"role": "user", "content": json.dumps({
+            "country": payload["country"], "level": payload.get("level"),
+            "intake": payload.get("intake"), "source_url": url,
+            "comparison_fields": comparison_fields,
+            "page": content[:18000]}, ensure_ascii=False)}],
+        max_tokens=2200, base_url=config.PAI_BASE_URL or None,
+    )
+    parsed = json.loads(raw.strip().removeprefix("```json").removesuffix("```").strip())
+    return cited_facts(parsed.get("facts") or [], content, url, checked_at)
 
 
 async def research(context, payload):
@@ -17,9 +54,7 @@ async def research(context, payload):
     if not content or not public_https(actual_url):
         return {"requirements": [], "unconfirmed": [{"reason": "Source page unavailable", "url": url}]}
     checked_at = checked_now()
-    from app.config import config
     from app.database import new_session
-    from app.inference.client import chat_completion
     from app.memory.field_definitions import VaultFieldDefinitionService
     from app.memory.field_definitions import ENTITY_BACKED_LEGACY_FIELDS
     from app.memory.student_schema import RECORD_SPECS
@@ -43,28 +78,7 @@ async def research(context, payload):
     finally:
         catalog_db.close()
     try:
-        raw = await chat_completion(
-            api_key=config.PAI_API_KEY, model=config.PAI_MODEL,
-            system_prompt=("Extract only explicit admission requirements, fees, deadlines and intake from "
-                           "the supplied page. Return JSON object with facts array of "
-                           "{field,value,quote,kind,comparator,threshold}. "
-                           "kind is requirement, fee, deadline, or intake. Comparator is gte, lte, "
-                           "or eq only when the threshold is explicit. "
-                           "For a student-comparable rule, use a field key from the supplied canonical "
-                           "field list. Replace the angle bracket identity placeholder with the "
-                           "explicit qualification or test name from the page (for example IELTS). "
-                           "If none fits, retain the page's term and omit comparator. "
-                           "Quote must be an exact contiguous excerpt. "
-                           "No inference, no profile facts, no unsourced values. Use an empty array if unclear."),
-            messages=[{"role": "user", "content": json.dumps({
-                "country": payload["country"], "level": payload.get("level"),
-                "intake": payload.get("intake"), "source_url": actual_url,
-                "comparison_fields": comparison_fields,
-                "page": content[:18000]}, ensure_ascii=False)}],
-            max_tokens=1800, base_url=config.PAI_BASE_URL or None,
-        )
-        parsed = json.loads(raw.strip().removeprefix("```json").removesuffix("```").strip())
-        facts = cited_facts(parsed.get("facts") or [], content, actual_url, checked_at)
+        facts = await _extract_page(content, actual_url, payload, comparison_fields, checked_at)
     except Exception:
         facts = []
     if not facts:
@@ -72,18 +86,45 @@ async def research(context, payload):
     from app.research.requirements import RequirementStore
     db = new_session()
     try:
+        store = RequirementStore(db)
+        institution = store.institution_for_url(actual_url)
+        if institution is None:
+            identity = data(await context.tools.invoke(
+                "web.institution_registry", {"url": actual_url})).get("identity")
+            if identity:
+                institution = store.register_provider_identity(identity)
+        secondary_facts = []
+        secondary_at = None
+        secondary_url = payload.get("corroborating_url")
+        if (secondary_url and institution and secondary_url != actual_url and
+                official_url(secondary_url, store.official_domains(institution))):
+            secondary_page = data(await context.tools.invoke(
+                "web.fetch", {"url": secondary_url, "max_chars": 20000}))
+            secondary_content = str(secondary_page.get("content") or "")
+            actual_secondary_url = str(secondary_page.get("url") or secondary_url)
+            if (secondary_content and actual_secondary_url != actual_url and
+                    official_url(actual_secondary_url, store.official_domains(institution))):
+                secondary_at = datetime.fromisoformat(checked_now())
+                try:
+                    secondary_facts = await _extract_page(
+                        secondary_content, actual_secondary_url, payload,
+                        comparison_fields, secondary_at.isoformat())
+                except Exception:
+                    secondary_facts = []
         rules = [fact for fact in facts if fact.get("kind") not in {"fee", "deadline"}]
         fees = {fact["field"]: fact for fact in facts if fact.get("kind") == "fee"}
         deadlines = {fact["field"]: fact for fact in facts if fact.get("kind") == "deadline"}
-        opportunity, requirement_set = RequirementStore(db).propose(
+        opportunity, requirement_set = store.propose(
             context.workspace_id, route=payload.get("route") or {"url": actual_url},
             country=payload["country"], level=payload.get("level"),
-            intake=payload.get("intake"), institution=payload.get("institution"),
+            intake=payload.get("intake"), institution=institution,
             source_url=actual_url, checked_at=datetime.fromisoformat(checked_at),
-            rules=rules, fees=fees, deadlines=deadlines,
+            rules=rules, fees=fees, deadlines=deadlines, page_text=content,
+            corroboration=secondary_facts, corroborated_at=secondary_at,
         )
         result = {"opportunity_id": opportunity.id, "requirement_set_id": requirement_set.id,
-                  "status": "proposed", "rules": rules, "fees": fees,
+                  "status": requirement_set.status, "verification_checks": requirement_set.verification_checks,
+                  "rules": rules, "fees": fees,
                   "deadlines": deadlines, "source_url": actual_url,
                   "checked_at": checked_at, "country": payload["country"],
                   "level": payload.get("level"), "intake": payload.get("intake")}
@@ -100,14 +141,16 @@ def get_capabilities():
         input_schema={"type": "object", "properties": {
             "url": {"type": "string"}, "country": {"type": "string"},
             "level": {"type": "string"}, "intake": {"type": "string"},
-            "institution": {"type": "string"}, "route": {"type": "object"}},
+            "institution": {"type": "string"}, "route": {"type": "object"},
+            "corroborating_url": {"type": "string"}},
             "required": ["url", "country"]},
         output_schema={"type": "object", "properties": {
             "requirements": {"type": "array"}, "unconfirmed": {"type": "array"}},
             "required": ["requirements", "unconfirmed"]},
         handler=research, owns_task_types=frozenset({"program_research"}),
         fallback_policy=FallbackPolicy.FORBIDDEN, vault_scopes=frozenset(),
-        permissions=frozenset({"web.read"}), required_tools=frozenset({"web.fetch"}),
+        permissions=frozenset({"web.read"}),
+        required_tools=frozenset({"web.fetch", "web.institution_registry"}),
         risk=CapabilityRisk.READ, timeout_seconds=90,
         evidence_expectations={"claims": "exact source quote, HTTPS URL, checked_at, proposed status"},
     )]
