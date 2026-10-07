@@ -170,7 +170,8 @@ async def test_counselor_does_not_activate_a_journey_from_goal_hints_alone():
         return {"role": "assistant", "content": "Let's work through it."}
 
     with StudentSession() as student:
-        with patch.object(runtime, "chat_completion_tools", model), \
+        with patch.object(config, "PAI_COUNSELOR_V2", False), \
+                patch.object(runtime, "chat_completion_tools", model), \
                 patch("app.counseling.turn_semantics.classify_turn", classify), \
                 patch("app.counseling.reply_guard.guard_reply",
                       new=AsyncMock(side_effect=lambda reply, **kwargs: reply)), \

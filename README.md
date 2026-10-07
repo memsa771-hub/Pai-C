@@ -9,6 +9,15 @@ The `dev` branch contains ongoing application changes. Merge reviewed changes
 into `main`. Use `docker-compose.prod.yml` on the server;
 `docker-compose.local.yml` is for local development only.
 
+## Offline Counselor tests
+
+Install `backend/requirements.txt`, `pytest`, and `pytest-asyncio`, then run
+`cd backend && python -m pytest -q`. The default selection excludes billed
+`counselor_sim` and network-backed `live_research` tests. Run those markers
+explicitly only when their credentials and costs are intended. Legacy runtime
+tests explicitly select the legacy path; current Counselor v2 tests exercise
+the shared chat and voice pipeline.
+
 ## AWS production architecture
 
 Production runs on one AWS EC2 Ubuntu 24.04 host with Docker Compose:

@@ -49,7 +49,8 @@ async def _exercise(completion, *, voice=False, requested_work=True):
                 return {"role": "assistant", "content": "", "tool_calls": [_delegate_call()]}
             return {"role": "assistant", "content": "I am checking the routes for you."}
 
-        with patch.object(runtime, "chat_completion_tools", model), \
+        with patch.object(config, "PAI_COUNSELOR_V2", False), \
+             patch.object(runtime, "chat_completion_tools", model), \
              patch.object(config, "PAI_API_KEY", "test"), \
              patch.object(config, "PAI_MEMORY_CONTEXT_ENABLED", False), \
              patch("app.memory.profile_completion.ProfileCompletionService.evaluate",

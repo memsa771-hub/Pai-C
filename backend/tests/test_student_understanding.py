@@ -389,7 +389,8 @@ def test_model_envelope_does_not_directly_write_canonical_records():
                         }], "memories": [], "conflicts": [], "unknowns": []},
                     },
                 })}
-            with patch.object(runtime, "chat_completion_tools", model), \
+            with patch.object(config, "PAI_COUNSELOR_V2", False), \
+                 patch.object(runtime, "chat_completion_tools", model), \
                  patch("app.counseling.turn_semantics.classify_turn", new_callable=AsyncMock) as classify, \
                  patch("app.memory.foundation_intake.capture_foundation_turn",
                        new=AsyncMock(return_value=False)), \
@@ -449,7 +450,8 @@ def test_chat_does_not_dump_profile_or_require_mirror_confirmation():
                         "topic_focus": None, "context_intent": None,
                         "discovery_statuses": [], "explicit_commands": [],
                         "education_claim": None}
-            with patch.object(runtime, "chat_completion_tools", model), \
+            with patch.object(config, "PAI_COUNSELOR_V2", False), \
+                 patch.object(runtime, "chat_completion_tools", model), \
                  patch("app.counseling.turn_semantics.classify_turn", classify), \
                  patch("app.memory.profile_completion.ProfileCompletionService.evaluate",
                        return_value={"enforced": False, "foundationReady": True,
