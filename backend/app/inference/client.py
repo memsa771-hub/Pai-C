@@ -27,6 +27,9 @@ def _reasoning_effort_for(
         return None
     if has_tools:
         return _tool_call_effort_for(model)
+    if name.startswith("gpt-5.4") and effort == "minimal":
+        # Current GPT-5.4 API accepts none/low/medium/high/xhigh, not minimal.
+        return "none"
     return effort if effort in REASONING_EFFORTS else None
 
 
