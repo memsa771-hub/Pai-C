@@ -5,6 +5,9 @@ import { ChatMessages } from './chat-messages';
 import { PaiDmIntro } from './pai-dm-intro';
 import { ChatInput, type PendingFile } from './chat-input';
 import { CounselorVoiceControl } from './counselor-voice-control';
+import { CounselorGoalSummaryCard } from './counselor-goal-summary';
+import { CounselorRequestPanel } from './counselor-request-panel';
+import { CounselorResearchStatus } from './counselor-research-status';
 import { ThreadStatusBar } from './thread-status-bar';
 import { useWorkspace } from '@/lib/workspace-context';
 import { useMessagePolling } from '@/hooks/use-polling';
@@ -407,7 +410,8 @@ export function ChatView() {
   }, [displayMessages, updateAgentMode]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleSend = useCallback(
-    async (content: string, mentions: string[] = [], files: PendingFile[] = []) => {
+    async (content: string, mentions: string[] = [], files: PendingFile[] = [],
+           throwOnError = false) => {
       if (!currentSessionId) return;
       if (!currentUser.id || !currentUser.name.trim()) return;
 
@@ -507,6 +511,7 @@ export function ChatView() {
           draftsRef.current[currentSessionId] = content;
           if (prevSessionIdRef.current === currentSessionId) setCurrentDraft(content);
         }
+        if (throwOnError) throw err;
       }
     },
     [currentSessionId, currentUser.id, currentUser.name, forceRefresh, agents, isDM, dmCounterpart]
@@ -975,6 +980,12 @@ export function ChatView() {
             cramped on a 27" 4K, where the pane itself is 2000px+ wide. */}
         {(!isDM || dmWritable) && (
           <div className="mx-auto w-full max-w-3xl px-3 lg:px-5 pt-1 pb-2 xl:max-w-4xl 2xl:max-w-6xl lg:pb-3">
+            {currentSessionId === 'pai-counselor' && <div className="mb-2">
+              <CounselorResearchStatus />
+              <CounselorGoalSummaryCard refreshKey={displayMessages.length}
+                onSend={(message) => handleSend(message, [], [], true)} />
+              <CounselorRequestPanel refreshKey={displayMessages.length} />
+            </div>}
             {currentSessionId && currentUser.id && (
               !isDM && (currentSessionId === 'pai-counselor' || currentSession?.master === 'pai' || currentSession?.participants.includes('pai'))
             ) && (

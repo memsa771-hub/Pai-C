@@ -24,6 +24,15 @@ from .understanding import StudentUnderstandingBuilder
 logger = logging.getLogger(__name__)
 
 
+async def _timed(stage: str, event_id: str, work):
+    started = time.monotonic()
+    try:
+        return await work
+    finally:
+        logger.info("counselor span event=%s stage=%s duration_ms=%d",
+                    event_id, stage, round((time.monotonic() - started) * 1000))
+
+
 @dataclass(frozen=True)
 class CounselorTurnInput:
     channel: str  # delivery/logging only; not supplied to planner, models or guard
@@ -145,10 +154,12 @@ async def run_counselor_turn(
     human = turn.source.startswith("human:")
     if human and turn.student_text.strip():
         scope, extraction = await asyncio.gather(
-            classify_scope(turn.student_text, history),
-            extract_turn(turn.student_text, history, requirements, known,
-                         awaiting_summary=awaiting_summary,
-                         expected_slot=expected_slot),
+            _timed("scope", turn.source_event_id,
+                   classify_scope(turn.student_text, history)),
+            _timed("extraction", turn.source_event_id,
+                   extract_turn(turn.student_text, history, requirements, known,
+                                awaiting_summary=awaiting_summary,
+                                expected_slot=expected_slot)),
         )
         capture_extraction = extraction
         if awaiting_summary and extraction.summary_response == "confirmed":
@@ -177,9 +188,14 @@ async def run_counselor_turn(
     db.commit()
     returning = _returning(history, turn)
     draft = journey.counselor_summary_draft
+    from .student_requests import StudentRequestService
+    request_service = StudentRequestService(db)
+    open_request = (request_service.oldest_open(turn.workspace_id)
+                    if journey.current_stage == "NEEDS_INFO" else None)
     correction = has_correction(extraction, draft)
     confirmed = is_explicit_confirmation(extraction, draft) and not correction
     awaiting = bool(draft and draft.get("status") == "awaiting_confirmation" and not correction)
+    planner_started = time.monotonic()
     move = plan_move(
         stage=journey.current_stage, requirements=requirements, states=states,
         snapshot=snapshot, scope=scope,
@@ -190,7 +206,11 @@ async def run_counselor_turn(
         reflected_facts=_reflect(extraction, states, returning),
         awaiting_confirmation=awaiting, confirmed=confirmed,
         first_turn=not history and not (extraction and extraction.claims),
+        open_request=request_service.serialize(open_request) if open_request else None,
+        replanning=(journey.next_recommended_action or {}).get("type") == "replan_discussion",
     )
+    logger.info("counselor span event=%s stage=planner duration_ms=%d",
+                turn.source_event_id, round((time.monotonic() - planner_started) * 1000))
     understanding = StudentUnderstandingBuilder(db).build(turn.workspace_id, snapshot=snapshot)
     if writer is None:
         from .writer import write_move
@@ -198,14 +218,15 @@ async def run_counselor_turn(
     if guard is None:
         from .guard_v2 import approve_reply
         guard = approve_reply
-    reply = await writer(move=move, student_text=turn.student_text,
-                         history=history, understanding=understanding,
-                         states=states, requirements=requirements)
-    approved, violations = await guard(
+    reply = await _timed("writer", turn.source_event_id, writer(
+        move=move, student_text=turn.student_text,
+        history=history, understanding=understanding,
+        states=states, requirements=requirements))
+    approved, violations = await _timed("guard", turn.source_event_id, guard(
         reply=reply, move=move, student_text=turn.student_text,
         states=states, requirements=requirements,
         writer=writer, history=history, understanding=understanding,
-    )
+    ))
     logger.info("counselor v2 turn=%s move=%s stage=%s slot=%s guard=%s",
                 turn.source_event_id, move.type, move.stage, move.slot_key,
                 ",".join(violations) or "pass")
@@ -225,4 +246,9 @@ async def run_counselor_turn(
     elif move.type == "confirm_and_queue_research":
         journeys.queue_counselor_research(turn.workspace_id, journey.id,
                                           turn.source_event_id)
+    elif move.type == "ask_research_request" and open_request:
+        request_service.mark_asked(open_request)
+    elif move.type == "replan_discussion":
+        journey_row = db.get(StudentJourney, journey.id)
+        journey_row.next_recommended_action = None
     return move, approved, violations

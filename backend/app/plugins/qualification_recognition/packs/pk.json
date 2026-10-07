@@ -8,15 +8,18 @@
     {"level": "bachelor", "names": ["BS", "BSc", "BA", "BCom"], "source_url": "https://www.hec.gov.pk/Urdu/services/students/Degree%20Attestation%20System/Pages/Documents-Attested.aspx"},
     {"level": "master", "names": ["MS", "MPhil"], "source_url": "https://www.hec.gov.pk/Urdu/services/students/Degree%20Attestation%20System/Pages/Documents-Attested.aspx"}
   ],
-  "grading_scales": [],
+  "grading_scales": [
+    {"scope": "SSC and HSSC reporting from 2026, phased by class and board", "grades": ["A++", "A+", "A", "B++", "B+", "B", "C+", "C", "D", "U"], "conversion": "Use the student's awarded marks and total for a percentage; do not infer one from a letter grade", "source_url": "https://ibcc.edu.pk/faqs/new-grading-system-of-ssc-hssc-faqs/"},
+    {"scope": "Higher education CGPA", "conversion": "No universal percentage conversion; require the awarding institution's documented scale and the destination's policy", "source_url": "https://www.hec.gov.pk/english/services/students/DES/Pages/Downloads.aspx"}
+  ],
   "equivalence_bodies": [
     {"name": "IBCC", "scope": "school qualifications and equivalence", "source_url": "https://ibcc.edu.pk/equivalence-application-process/"},
     {"name": "HEC", "scope": "higher education degree attestation", "source_url": "https://www.hec.gov.pk/english/services/students/das/Pages/Degree-Attestation.aspx"},
     {"name": "MOFA", "scope": "subsequent document attestation when the destination asks for it", "source_url": "https://apostille.mofa.gov.pk/sops"}
   ],
   "document_procedures": [
-    {"description": "Check whether school equivalence is required for the specific route", "source_url": "https://ibcc.edu.pk/equivalence-application-process/"},
-    {"description": "Check degree attestation requirements for completed higher education", "source_url": "https://www.hec.gov.pk/english/services/students/das/Pages/Degree-Attestation.aspx"},
-    {"description": "Check whether the destination asks for MOFA attestation after IBCC or HEC", "source_url": "https://apostille.mofa.gov.pk/sops"}
+    {"description": "Check whether school equivalence is required for the specific route", "owner_hint": "PAI", "source_url": "https://ibcc.edu.pk/equivalence-application-process/"},
+    {"description": "Check degree attestation requirements for completed higher education", "owner_hint": "PAI", "source_url": "https://www.hec.gov.pk/english/services/students/das/Pages/Degree-Attestation.aspx"},
+    {"description": "Check whether the destination asks for MOFA attestation after IBCC or HEC", "owner_hint": "PAI", "source_url": "https://apostille.mofa.gov.pk/sops"}
   ]
 }

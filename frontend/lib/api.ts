@@ -365,7 +365,7 @@ class WorkspaceApi {
     return response.roadmaps;
   }
 
-  async getRoadmap(id: string): Promise<import('./roadmaps').Roadmap> {
+  async getRoadmap(id: string): Promise<import('./roadmaps').RoadmapDetail> {
     return this.request(`/v1/roadmaps/${encodeURIComponent(id)}?network=${this.requireWorkspace()}`);
   }
 
@@ -397,9 +397,34 @@ class WorkspaceApi {
     return response.confirm_token;
   }
 
-  async chooseRoadmap(id: string, confirmToken: string): Promise<import('./roadmaps').Roadmap> {
+  async chooseRoadmap(id: string, confirmToken: string,
+                      choiceChannel: 'chat' | 'voice' | 'roadmaps' = 'roadmaps'): Promise<import('./roadmaps').Roadmap> {
     return this.request(`/v1/roadmaps/${encodeURIComponent(id)}/choose?network=${this.requireWorkspace()}`,
-      { method: 'POST', body: JSON.stringify({ confirm_token: confirmToken }) });
+      { method: 'POST', body: JSON.stringify({ confirm_token: confirmToken, choice_channel: choiceChannel }) });
+  }
+
+  async getCurrentDecision(): Promise<import('./roadmaps').DecisionRecord | null> {
+    return this.request(`/v1/decision-records/current?network=${this.requireWorkspace()}`);
+  }
+
+  async getCounselorGoalSummary(): Promise<import('./roadmaps').CounselorGoalSummary> {
+    return this.request(`/v1/counselor/summary?network=${this.requireWorkspace()}`);
+  }
+
+  async getStudentRequests(): Promise<import('./roadmaps').StudentRequest[]> {
+    const response = await this.request<{ requests: import('./roadmaps').StudentRequest[] }>(
+      `/v1/student-requests?network=${this.requireWorkspace()}`);
+    return response.requests;
+  }
+
+  async reportWrongRequirement(id: string): Promise<void> {
+    await this.request(`/v1/roadmaps/requirements/${encodeURIComponent(id)}/report?network=${this.requireWorkspace()}`,
+      { method: 'POST' });
+  }
+
+  async retryRoadmap(id: string): Promise<import('./roadmaps').Roadmap> {
+    return this.request(`/v1/roadmaps/${encodeURIComponent(id)}/retry?network=${this.requireWorkspace()}`,
+      { method: 'POST' });
   }
 
   async addCustomRoadmapGoal(input: import('./roadmaps').CustomRoadmapGoal): Promise<import('./roadmaps').Roadmap> {

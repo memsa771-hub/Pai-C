@@ -1,12 +1,16 @@
 """Versioned, program- and intake-scoped research evidence."""
 
 from datetime import datetime, timezone
+import logging
+import time
 from uuid import uuid4
 
 from sqlalchemy import select
 
 from app.models import EventRecord, Institution, InstitutionDomain, Opportunity, RequirementSet
 from app.plugins._shared.verification import SourceVerifier, _host, official_url
+
+logger = logging.getLogger(__name__)
 
 
 class ResearchEvidenceError(ValueError):
@@ -123,6 +127,7 @@ class RequirementStore:
             version = 1
         claims = [*rules, *(fees or {}).values(), *(deadlines or {}).values()]
         from app.config import config
+        verification_started = time.monotonic()
         verdict = SourceVerifier(
             freshness_days=max(1, config.PAI_RESEARCH_FRESHNESS_DAYS),
             deadline_freshness_days=max(1, config.PAI_RESEARCH_DEADLINE_FRESHNESS_DAYS)).verify(
@@ -130,6 +135,8 @@ class RequirementStore:
             official_domains=self.official_domains(institution), intake=intake,
             page_text=page_text, checked_at=checked_at,
             corroboration=corroboration, corroborated_at=corroborated_at)
+        logger.info("research span stage=verifier status=%s duration_ms=%d",
+                    verdict.status, round((time.monotonic() - verification_started) * 1000))
         requirement = RequirementSet(
             id=str(uuid4()), opportunity_id=opportunity.id, rules=rules,
             fees=fees or {}, deadlines=deadlines or {}, source_url=source_url,

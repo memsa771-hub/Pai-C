@@ -30,7 +30,9 @@ def upgrade():
                                                     server_default=sa.text("'{}'")))
     op.add_column("pai_requirement_sets", sa.Column("cycle_label", sa.Text()))
     op.add_column("pai_requirement_sets", sa.Column("verified_at", sa.DateTime(timezone=True)))
-    op.execute("UPDATE pai_requirement_sets SET status = 'unconfirmed' WHERE status = 'proposed'")
+    # Legacy manual approvals have none of the five recorded automatic checks.
+    # They cannot retain a verified label after the verifier becomes the gate.
+    op.execute("UPDATE pai_requirement_sets SET status = 'unconfirmed' WHERE status IN ('proposed', 'verified')")
     op.drop_constraint("ck_requirement_set_status", "pai_requirement_sets", type_="check")
     op.create_check_constraint("ck_requirement_set_status", "pai_requirement_sets",
                                "status IN ('unconfirmed', 'verified', 'expired')")

@@ -5,6 +5,7 @@ Notifications are stored in the workspace inbox and read through its API.
 """
 
 from app.models import NotificationRecord
+from sqlalchemy import select
 
 REASON_APPROVAL = "approval"
 REASON_TASK_COMPLETED = "task_completed"
@@ -47,3 +48,11 @@ def notify(
     db.add(record)
     db.flush()
     return record
+
+
+def notify_once(db, workspace_id: str, *, dedupe_key: str, **message) -> NotificationRecord:
+    """Use one inbox event for an idempotent research lifecycle transition."""
+    existing = db.execute(select(NotificationRecord).where(
+        NotificationRecord.workspace_id == str(workspace_id),
+        NotificationRecord.dedupe_key == dedupe_key)).scalar_one_or_none()
+    return existing or notify(db, workspace_id, dedupe_key=dedupe_key, **message)

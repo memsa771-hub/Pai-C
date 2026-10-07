@@ -11,6 +11,8 @@ MoveType = Literal[
     "greet", "ask", "answer_then_ask", "acknowledge_then_ask",
     "redirect_then_ask", "summarize_for_confirmation",
     "confirm_and_queue_research", "returning_student", "wellbeing", "crisis",
+    "ask_research_request", "research_wait",
+    "replan_discussion",
 ]
 
 
@@ -24,6 +26,8 @@ class CounselorMove:
     language: str
     max_words: int
     stage: str
+    request_id: str | None = None
+    request_field: str | None = None
 
 
 def _next(requirements: Sequence[ProfileRequirement], states: Mapping[str, SlotState],
@@ -36,12 +40,24 @@ def plan_move(*, stage: str, requirements: Sequence[ProfileRequirement],
               student_question: str, emotion: str, language: str,
               returning: bool = False, awaiting_confirmation: bool = False,
               confirmed: bool = False, reflected_facts: Sequence[str] = (),
-              first_turn: bool = False) -> CounselorMove:
+              first_turn: bool = False, open_request: dict | None = None,
+              replanning: bool = False) -> CounselorMove:
     """Precedence is explicit; channel, models and databases cannot affect it."""
     language = language if language in {"en", "ur", "roman_ur", "mixed"} else "en"
     reflect = tuple(str(value) for value in reflected_facts if value)[:2]
     if scope in {"crisis", "wellbeing"}:
         return CounselorMove(scope, None, None, (), None, language, 60, stage)
+    if stage == "NEEDS_INFO" and open_request:
+        if open_request.get("asked_at"):
+            return CounselorMove("research_wait", None, None, reflect, None, language, 60, stage)
+        return CounselorMove("ask_research_request", None,
+                             str(open_request.get("reason") or "Missing student detail"),
+                             reflect, None, language, 60, stage,
+                             request_id=open_request.get("id"),
+                             request_field=open_request.get("item_key"))
+    if replanning:
+        return CounselorMove("replan_discussion", None, None, reflect,
+                             None, language, 60, stage)
     slot_stage = "foundation" if stage in {"IDENTITY", "FOUNDATION"} else "direction"
     slot = _next(requirements, states, snapshot, slot_stage)
     key = short_key(slot) if slot is not None else None

@@ -11,12 +11,13 @@ from app.plugins._shared.verification import official_url
 EXTRACTION_PROMPT = (
     "Extract only explicit programme admission facts from the supplied official page. "
     "Return a JSON object with a facts array. Each fact is "
-    "{field,value,quote,kind,comparator,threshold,unit,scale}. "
+    "{field,value,quote,kind,category,comparator,threshold,unit,scale}. "
     "Cover entry qualification, minimum grades, required subjects or coursework, "
     "English and other tests, documents, application route, deadline by intake, "
     "tuition, other stated costs, and language of instruction only when shown. "
     "For a fee, value must be {amount:number,currency:ISO_4217,basis:per_year|per_semester|total|per_credit}; "
-    "for a deadline, value must be an ISO date. Do not invent missing units, dates, or exchange rates. "
+    "for a deadline, value must be an ISO date. Fee category is tuition, living, or other. "
+    "Do not invent missing units, dates, or exchange rates. "
     "kind is requirement, fee, deadline, or intake. Comparator is gte, lte, or eq only "
     "when a threshold is explicit. For a student-comparable rule use a field key "
     "from the canonical list; replace angle-bracket identity placeholders with the "
@@ -127,7 +128,9 @@ async def research(context, payload):
                   "rules": rules, "fees": fees,
                   "deadlines": deadlines, "source_url": actual_url,
                   "checked_at": checked_at, "country": payload["country"],
-                  "level": payload.get("level"), "intake": payload.get("intake")}
+                  "level": payload.get("level"), "intake": payload.get("intake"),
+                  "corroborating_source_url": (actual_secondary_url if secondary_facts else None),
+                  "corroborated_at": secondary_at.isoformat() if secondary_facts and secondary_at else None}
         db.commit()
     finally:
         db.close()

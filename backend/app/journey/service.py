@@ -139,7 +139,8 @@ class JourneyService:
         return self._view(row)
 
     def set_counselor_stage(self, workspace_id: str, journey_id: str, stage: str, *,
-                            actor: str = "system", validated_choice: bool = False) -> JourneyView:
+                            actor: str = "system", validated_choice: bool = False,
+                            replan_escalation: bool = False) -> JourneyView:
         from app.counseling.stages import require_counselor_transition
 
         row = self._require(workspace_id, journey_id)
@@ -147,7 +148,8 @@ class JourneyService:
             raise JourneyError("Not a Counselor journey")
         try:
             target = require_counselor_transition(
-                row.current_stage, stage, validated_choice=validated_choice)
+                row.current_stage, stage, validated_choice=validated_choice,
+                replan_escalation=replan_escalation)
         except ValueError as exc:
             raise JourneyError(str(exc)) from exc
         previous = row.current_stage

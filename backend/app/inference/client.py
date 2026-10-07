@@ -114,6 +114,8 @@ async def chat_completion(
 
     try:
         response = await client.chat.completions.create(**kwargs)
+        from app.plugins._shared.budget import record_model_usage
+        record_model_usage(getattr(response, "usage", None))
         message = response.choices[0].message
         text = message.content or ""
         if not text and getattr(message, "reasoning", None):
@@ -152,6 +154,8 @@ async def chat_completion_tools(
 
     try:
         response = await client.chat.completions.create(**kwargs)
+        from app.plugins._shared.budget import record_model_usage
+        record_model_usage(getattr(response, "usage", None))
         message = response.choices[0].message
         result: dict = {"role": "assistant", "content": message.content or ""}
         tool_calls = getattr(message, "tool_calls", None)

@@ -14,9 +14,17 @@ def on_run_status(db, run):
     from app.counseling.stages import ASSESSING, NEEDS_INFO, PROPOSED, RESEARCHING
 
     from app.roadmaps.service import RoadmapService
+    from app.counseling.student_requests import StudentRequestService
     published = []
     if run.status in {"completed", "needs_user_action", "failed"}:
         published = RoadmapService(db).publish_from_run(run)
+    StudentRequestService(db).sync_research_run(run)
+    if run.status == "failed":
+        from app.services.notify import notify_once
+        notify_once(db, run.workspace_id, dedupe_key=f"research-failed:{run.id}",
+                    source="system:roadmaps", title="Research needs another try",
+                    message="PAI could not complete this route check",
+                    link_url="/roadmaps")
     journey = JourneyService(db).ensure_counselor(run.workspace_id, actor="system:research")
     stage = journey.current_stage
     target = None
@@ -25,7 +33,7 @@ def on_run_status(db, run):
     elif (run.status == "needs_user_action" and stage == ASSESSING
           and (run.pending_action or {}).get("type") == "need_from_student"):
         target = NEEDS_INFO
-    elif run.status == "completed" and stage == ASSESSING and published:
+    elif run.status in {"completed", "failed"} and stage == ASSESSING and published:
         target = PROPOSED
     if target:
         JourneyService(db).set_counselor_stage(run.workspace_id, journey.id, target,
@@ -90,13 +98,18 @@ def _facts(scoped: dict) -> dict:
 async def build(context, payload):
     from app.config import config
     from app.plugins._shared.budget import bounded_research
+    import time
 
+    started = time.monotonic()
     with bounded_research(
         queries=config.PAI_RESEARCH_MAX_QUERIES,
         fetches=config.PAI_RESEARCH_MAX_FETCHES,
         seconds=config.PAI_RESEARCH_MAX_SECONDS,
-    ):
-        return await _build(context, payload)
+    ) as budget:
+        result = await _build(context, payload)
+        result["research_metrics"] = budget.usage() | {
+            "elapsed_ms": round((time.monotonic() - started) * 1000)}
+        return result
 
 
 async def _build(context, payload):
@@ -116,11 +129,17 @@ async def _build(context, payload):
         "objective": stated, "country": country, "level": level})
     alternatives = await context.capabilities("program.discover", {
         "objective": objective, "country": "", "level": level})
+    family_wish = brief.get("family_wish") or {}
+    family_direction = str(family_wish.get("suggested_direction") or "").strip()
+    family_routes = {"candidates": [], "unconfirmed": []}
+    if family_direction and family_direction.casefold() != stated.casefold():
+        family_routes = await context.capabilities("program.discover", {
+            "objective": family_direction, "country": country, "level": level})
     candidates = []
     seen = set()
     refresh_candidate = brief.get("refresh_candidate")
     if isinstance(refresh_candidate, dict) and refresh_candidate.get("url"):
-        candidates.append(("stated_goal", refresh_candidate))
+        candidates.append((refresh_candidate.get("origin") or "stated_goal", refresh_candidate))
         seen.add(refresh_candidate["url"])
     for origin, group in (("stated_goal", target), ("alternative", alternatives)):
         for item in group.get("candidates") or []:
@@ -128,8 +147,15 @@ async def _build(context, payload):
                 continue
             seen.add(item["url"])
             candidates.append((origin, item))
-            if origin == "stated_goal" or sum(kind == "alternative" for kind, _ in candidates) >= 2:
+            if (sum(kind == "stated_goal" for kind, _ in candidates) >= 2
+                    if origin == "stated_goal" else
+                    sum(kind == "alternative" for kind, _ in candidates) >= 2):
                 break
+    for item in family_routes.get("candidates") or []:
+        if item["url"] not in seen:
+            candidates.append(("family_wish", item))
+            seen.add(item["url"])
+            break
     qualification = await context.capabilities("qualification.recognize", {
         "country": country, "origin_country": brief.get("origin_country") or ""})
     scholarships = await context.capabilities("scholarship.discover", {
@@ -138,9 +164,10 @@ async def _build(context, payload):
     unknown_items = []
     unconfirmed = [*(target.get("unconfirmed") or []),
                    *(alternatives.get("unconfirmed") or []),
+                   *(family_routes.get("unconfirmed") or []),
                    *(scholarships.get("unconfirmed") or []),
                    *(qualification.get("unconfirmed") or [])]
-    for origin, candidate in candidates[:3]:
+    for origin, candidate in candidates[:5]:
         research_input = {
             "url": candidate["url"], "country": candidate.get("country") or (country if origin == "stated_goal" else "unknown"),
             "level": candidate.get("level") or level, "intake": candidate.get("intake") or brief.get("intake") or "",
@@ -151,6 +178,7 @@ async def _build(context, payload):
         unconfirmed.extend(researched.get("unconfirmed") or [])
         requirements = researched.get("requirements") or []
         for requirement in requirements:
+            from app.plugins._shared.costs import route_cost
             verified = requirement["status"] == "verified"
             # A quoted but unverified threshold is still a lead, not an
             # eligibility rule. Never turn it into a student verdict.
@@ -167,15 +195,24 @@ async def _build(context, payload):
                 "route": {"country": requirement["country"], "level": level,
                           "intake": brief.get("intake"), "url": candidate["url"],
                           "why_suggested": ("Your stated direction" if origin == "stated_goal"
+                                            else "A separate route your family suggested" if origin == "family_wish"
                                             else f"Another route to {objective}")},
                 "fit_level": "unconfirmed" if not verified else fit,
                 "fit_dimensions": fit_dimensions(gaps),
                 "gaps": gaps, "steps": qualification["procedures"],
-                "total_cost": None, "time_to_start": brief.get("intake"),
+                "total_cost": route_cost(requirement.get("fees") or {}, verified=verified),
+                "time_to_start": brief.get("intake"),
                 "risks": (["Requirement facts are still being checked against official sources"]
                           if not verified else []),
+                "scholarships": scholarships.get("scholarships") or [],
                 "sources": [{"url": requirement["source_url"],
-                             "checked_at": requirement["checked_at"]}],
+                             "checked_at": requirement["checked_at"],
+                             "status": requirement["status"]},
+                            *([{"url": requirement["corroborating_source_url"],
+                                "checked_at": requirement["corroborated_at"],
+                                "status": requirement["status"]}]
+                              if requirement.get("corroborating_source_url") and
+                              requirement.get("corroborated_at") else [])],
                 "requirement_set_id": requirement["requirement_set_id"],
                 "research_status": requirement["status"],
             })

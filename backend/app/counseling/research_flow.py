@@ -5,11 +5,13 @@ from sqlalchemy import select
 from app.models import ExecutionRun
 
 
-def research_brief(goal: dict, understanding: dict) -> dict:
+def research_brief(goal: dict, understanding: dict, summary: dict | None = None) -> dict:
     from .context_projection import compact_student_context
 
     details = goal.get("details") or {}
     countries = details.get("target_countries") or []
+    summary = summary or {}
+    family = (summary.get("family_wish") or {}).get("value")
     return {
         "goal_id": goal.get("id"),
         "stated_preference": details.get("stated_preference") or goal.get("title"),
@@ -20,6 +22,7 @@ def research_brief(goal: dict, understanding: dict) -> dict:
         "level": details.get("degree_level") or "",
         "intake": details.get("target_intake") or "",
         "profile_summary": compact_student_context(understanding, goal.get("title") or ""),
+        "family_wish": family if isinstance(family, dict) else None,
     }
 
 
@@ -41,7 +44,9 @@ async def delegate_research_if_ready(db, workspace_id: str, journey, goals: list
     ).order_by(ExecutionRun.created_at.desc()).limit(30)).scalars().all()
     if any((item.constraints or {}).get("research_key") == key for item in prior):
         return None
-    brief = research_brief(goal, understanding)
+    draft = journey.counselor_summary_draft or {}
+    brief = research_brief(goal, understanding,
+                           draft.get("summary") if draft.get("status") == "confirmed" else None)
     if refresh_candidate:
         brief["refresh_candidate"] = refresh_candidate
     from app.tools import get_tool_executor

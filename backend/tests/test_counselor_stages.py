@@ -23,6 +23,8 @@ def test_every_counselor_transition_is_explicit(current, target):
     allowed = current == target or target in TRANSITIONS[current]
     if target == CHOSEN:
         allowed = current == target
+    if current == CHOSEN and target == DIRECTION:
+        allowed = False
     if allowed:
         assert require_counselor_transition(current, target) == target
     else:
@@ -36,6 +38,13 @@ def test_chosen_requires_server_validated_student_choice():
     with pytest.raises(ValueError):
         require_counselor_transition(DIRECTION, CHOSEN,
                                      validated_choice=True)
+
+
+def test_chosen_replanning_requires_explicit_escalation():
+    with pytest.raises(ValueError):
+        require_counselor_transition(CHOSEN, DIRECTION)
+    assert require_counselor_transition(
+        CHOSEN, DIRECTION, replan_escalation=True) == DIRECTION
 
 
 def test_counselor_journey_starts_without_an_active_goal_and_rejects_generic_stage_edits():

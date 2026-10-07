@@ -110,6 +110,7 @@ async def resume_research(job, db) -> dict:
         ExecutionRun.status == "needs_user_action",
     )).scalars().all()
     matching = []
+    matching_fields = {}
     for run in runs:
         pending = run.pending_action or {}
         fields = {str(item.get("field")) for item in pending.get("items") or []
@@ -119,13 +120,22 @@ async def resume_research(job, db) -> dict:
                 any(field.startswith(str(candidate.key) + marker) for field in fields
                     for marker in (".", "[")))):
             matching.append(run.id)
+            matching_fields[run.id] = [field for field in fields if candidate.key == field or
+                                        any(field.startswith(str(candidate.key) + marker)
+                                            for marker in (".", "["))]
     db.rollback()
     ctx = ToolContext(workspace_id=job.workspace_id, agent_name="pai-operator",
                       api=WorkspaceApi(job.workspace_id, workspace.password_hash))
     resumed = 0
     for run_id in matching:
         result = await operator.resume(ctx, run_id, {"candidate_id": candidate.id})
-        resumed += int(result.get("ok") and result.get("data", {}).get("resumed"))
+        accepted = bool(result.get("ok") and result.get("data", {}).get("resumed"))
+        resumed += int(accepted)
+        if accepted:
+            from app.counseling.student_requests import StudentRequestService
+            for field in matching_fields[run_id]:
+                StudentRequestService(db).mark_answered(job.workspace_id, run_id, field)
+            db.commit()
     # The same accepted-fact event can complete the final goal-discovery
     # field. Start research from the canonical snapshot without a new chat turn.
     from app.counseling.research_flow import delegate_research_if_ready

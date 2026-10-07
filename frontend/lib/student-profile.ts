@@ -176,6 +176,7 @@ export interface GoalRecord extends RecordBase {
   target_date?: string;
   details?: {
     motivation?: string;
+    underlying_objective?: string;
     success_criteria?: string;
     degree_level?: string;
     field_of_study?: string;

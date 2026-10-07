@@ -6,7 +6,7 @@ from unittest.mock import AsyncMock, patch
 import httpx
 import pytest
 
-from app.plugins._shared.budget import bounded_research, spend
+from app.plugins._shared.budget import bounded_research, record_model_usage, spend
 from app.tools.builtin.web import search
 
 
@@ -51,10 +51,13 @@ async def test_search_has_explicit_unconfigured_and_nonretryable_failure():
 
 
 def test_research_budget_limits_each_tool_and_resets_after_run():
-    with bounded_research(queries=1, fetches=2, seconds=60):
+    with bounded_research(queries=1, fetches=2, seconds=60) as budget:
         assert spend("web.search") is None
         assert spend("web.search") == "research_query_budget_exceeded"
         assert spend("web.fetch") is None
         assert spend("web.fetch") is None
         assert spend("web.fetch") == "research_fetch_budget_exceeded"
+        record_model_usage(SimpleNamespace(prompt_tokens=120, completion_tokens=30))
+        assert budget.usage() == {"queries": 1, "fetches": 2, "model_calls": 1,
+                                  "input_tokens": 120, "output_tokens": 30}
     assert spend("web.search") is None

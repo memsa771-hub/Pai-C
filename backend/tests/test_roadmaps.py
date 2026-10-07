@@ -9,7 +9,7 @@ from fastapi.testclient import TestClient
 from app.database import get_db
 from app.main import app
 from app.journey import JourneyService
-from app.models import ExecutionRun, Roadmap, RoadmapStudentState
+from app.models import DecisionRecord, ExecutionRun, NotificationRecord, Roadmap, RoadmapStudentState, StudentJourney
 from app.roadmaps.service import RoadmapError, RoadmapService
 from scripts.counselor_eval_support import StudentSession
 
@@ -60,10 +60,39 @@ def test_student_actions_preserve_content_and_validate_presented_choice():
         assert chosen["chosen_at"]
         assert service.get(student.workspace_id, first.id)["title"] == "CS pathway"
         assert JourneyService(db).get(student.workspace_id, journey.id).current_stage == "CHOSEN"
+        decision = RoadmapService(db).current_decision(student.workspace_id)
+        assert decision["roadmap_id"] == first.id
+        assert decision["roadmap_version"] == first.version
+        assert decision["choice_channel"] == "roadmaps"
+        assert decision["assumptions"] == ["Earlier goal summary was not recorded"]
         with pytest.raises(RoadmapError, match="Counselor"):
             service.choose(student.workspace_id, second.id,
                            service.choice_token(second, "test-secret"), "test-secret")
         db.commit()
+
+
+def test_choice_snapshots_confirmed_objective_gaps_and_risks():
+    with StudentSession() as student, student.factory() as db:
+        journey = _journey(db, student.workspace_id)
+        row = db.get(StudentJourney, journey.id)
+        row.counselor_summary_draft = {"status": "confirmed", "summary": {
+            "stated_goal": {"value": "Computer science", "status": "answered"},
+            "envisioned_outcome": {"value": "Build accessible software", "status": "answered"}}}
+        card = _card(db, student.workspace_id, journey.id, "CS pathway")
+        card.gaps = [{"status": "fixable", "field": "test.english", "reason": "Retake"},
+                     {"status": "met", "field": "education.level"}]
+        card.risks = ["Fee may change"]
+        service = RoadmapService(db)
+        service.list(student.workspace_id, presented=True)
+        service.choose(student.workspace_id, card.id,
+                       service.choice_token(card, "test-secret"), "test-secret",
+                       choice_channel="voice")
+        record = db.query(DecisionRecord).one()
+        assert record.real_objective == "Build accessible software"
+        assert record.choice_channel == "voice"
+        assert record.accepted_gaps == [card.gaps[0]]
+        assert record.accepted_risks == ["Fee may change"]
+        assert record.assumptions == []
 
 
 def test_custom_card_is_idempotent_for_same_reconciled_goal():
@@ -87,6 +116,9 @@ def test_profile_change_marks_fit_stale_without_erasing_student_state():
         assert result["generation_status"] == "stale"
         assert result["stale_reason"] == "Student profile changed: education"
         assert result["favorite"] is True
+        assert db.query(NotificationRecord).filter_by(
+            workspace_id=student.workspace_id,
+            dedupe_key=f"roadmap-stale:{card.id}:{card.version}").count() == 1
         service.list(student.workspace_id, presented=True)
         with pytest.raises(RoadmapError, match="ready"):
             service.choose(student.workspace_id, card.id,
@@ -131,6 +163,60 @@ def test_refreshed_research_updates_same_card_and_keeps_favorite():
         assert restored["stale_reason"] is None
         assert restored["favorite"] is True
         assert restored["version"] == 2
+        assert db.query(NotificationRecord).filter_by(
+            workspace_id=student.workspace_id,
+            dedupe_key=f"roadmap-ready:{first}:2").one().title == "Roadmap refreshed"
+
+
+def test_missing_search_result_keeps_a_failed_stated_goal_card():
+    with StudentSession() as student, student.factory() as db:
+        journey = _journey(db, student.workspace_id)
+        run = ExecutionRun(workspace_id=student.workspace_id,
+                           requested_by="openagents:pai", objective="Research",
+                           task_type="roadmap_research", status="completed",
+                           constraints={"research_key": f"{journey.id}:goal",
+                                        "capability_input": {"brief": {
+                                            "stated_preference": "Architecture abroad",
+                                            "country": "Germany"}}},
+                           result={"capability_result": {"roadmaps": [], "unconfirmed": [
+                               {"reason": "Search provider unavailable"}]}})
+        db.add(run)
+        db.flush()
+        published = RoadmapService(db).publish_from_run(run)
+        assert len(published) == 1
+        card = RoadmapService(db).get(student.workspace_id, published[0])
+        assert card["origin"] == "stated_goal"
+        assert card["generation_status"] == "failed"
+        assert card["stale_reason"] == "Search provider unavailable"
+        assert card["sources"] == []
+
+
+def test_failed_route_retry_reuses_its_brief_and_preserves_origin():
+    with StudentSession() as student, student.factory() as db:
+        journey = _journey(db, student.workspace_id)
+        card = _card(db, student.workspace_id, journey.id, "CS alternative")
+        card.generation_status = "failed"
+        card.route = {"url": "https://example.edu/cs", "country": "Germany"}
+        old = ExecutionRun(workspace_id=student.workspace_id,
+                           requested_by="openagents:pai", objective="Research CS",
+                           task_type="roadmap_research", status="failed",
+                           constraints={"research_key": f"{journey.id}:goal",
+                                        "capability_input": {"brief": {
+                                            "stated_preference": "CS in Germany",
+                                            "underlying_objective": "tech career",
+                                            "country": "Germany"}}})
+        db.add(old)
+        db.flush()
+        card.execution_run_id = old.id
+        objective, constraints = RoadmapService(db).prepare_retry(student.workspace_id, card.id)
+        assert objective == "Research CS"
+        assert constraints["research_key"] != old.constraints["research_key"]
+        assert "refresh_candidate" not in old.constraints["capability_input"]["brief"]
+        assert constraints["capability_input"]["brief"]["refresh_candidate"]["origin"] == "alternative"
+        assert card.generation_status == "generating"
+        assert JourneyService(db).get(student.workspace_id, journey.id).current_stage == "RESEARCHING"
+        with pytest.raises(RoadmapError, match="Only failed or stale"):
+            RoadmapService(db).prepare_retry(student.workspace_id, card.id)
 
 
 def test_roadmap_api_is_workspace_scoped_and_choice_requires_presentation():
@@ -164,5 +250,8 @@ def test_roadmap_api_is_workspace_scoped_and_choice_requires_presentation():
                                  json={"confirm_token": token.json()["data"]["confirm_token"]})
             assert chosen.status_code == 200
             assert chosen.json()["data"]["chosen_at"]
+            decision = client.get("/v1/decision-records/current", params=params, headers=headers)
+            assert decision.status_code == 200
+            assert decision.json()["data"]["roadmap_id"] == card.id
         finally:
             app.dependency_overrides.pop(get_db, None)

@@ -75,6 +75,10 @@ def deterministic_violations(reply: str, move, states, requirements,
         problems.append("answered_slot_question")
     if move.slot_key and questions == 0:
         problems.append("missing_planned_question")
+    if move.type == "ask_research_request" and questions == 0:
+        problems.append("missing_planned_question")
+    if move.type == "research_wait" and questions:
+        problems.append("unexpected_question")
     elif move.slot_key and questions and not _question_matches_slot(text, move, requirements):
         problems.append("wrong_slot_question")
     if not move.slot_key and move.type in {"crisis", "wellbeing", "confirm_and_queue_research"} and questions:
@@ -173,6 +177,21 @@ def fallback_reply(move, requirements) -> str:
                 "ur": "میں آپ کے مقصد کے مطابق راستے دیکھوں گا، اور اسے حاصل کرنے کے دوسرے طریقے بھی۔",
                 "roman_ur": "Main aap ke maqsad ke liye munasib raaste dekhunga, aur us tak pohanchne ke doosre tareeqe bhi.",
                 "mixed": "Main aap ke goal ke liye munasib raaste dekhunga, aur alternatives bhi."}[move.language]
+    if move.type == "ask_research_request":
+        return {"en": "I found a detail that changes the route comparison. Could you tell me more about it?",
+                "roman_ur": "Routes compare karne ke liye aik detail chahiye. Kya aap us ke bare mein bata sakte hain?",
+                "ur": "راستوں کا موازنہ کرنے کے لیے ایک تفصیل چاہیے۔ کیا آپ اس کے بارے میں بتا سکتے ہیں؟",
+                "mixed": "Routes compare karne ke liye aik detail chahiye. Kya aap us ke bare mein bata sakte hain?"}[move.language]
+    if move.type == "research_wait":
+        return {"en": "Thanks. I’ll use what you shared to continue checking these routes.",
+                "roman_ur": "Shukriya. Main aap ki di hui detail se routes check karunga.",
+                "ur": "شکریہ۔ میں آپ کی دی ہوئی تفصیل سے راستے دوبارہ دیکھوں گا۔",
+                "mixed": "Shukriya. Main aap ki di hui detail se routes check karunga."}[move.language]
+    if move.type == "replan_discussion":
+        return {"en": "That route needs another look. What outcome still matters most to you?",
+                "roman_ur": "Us route ko dobara dekhna hoga. Aap ke liye ab bhi sab se zaroori outcome kya hai?",
+                "ur": "اس راستے پر دوبارہ غور کرنا ہوگا۔ آپ کے لیے اب بھی سب سے اہم مقصد کیا ہے؟",
+                "mixed": "Us route ko dobara dekhna hoga. Aap ke liye ab bhi sab se zaroori outcome kya hai?"}[move.language]
     return prefix
 
 

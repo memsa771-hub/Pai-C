@@ -5,6 +5,36 @@ from app.plugins._shared.sources import checked_now, public_https
 from urllib.parse import urldefrag, urlsplit
 
 
+def _prefer_known_official(candidates: list[dict]) -> list[dict]:
+    """Use existing provider-backed domain assertions to rank search leads."""
+    from sqlalchemy import select
+    from app.database import new_session
+    from app.models import Institution, InstitutionDomain
+    from app.plugins._shared.verification import _host, official_url
+
+    hosts = {_host(item["url"]) for item in candidates}
+    suffixes = {".".join(parts[index:]) for host in hosts if host
+                for parts in [host.split(".")]
+                for index in range(max(0, len(parts) - 1))}
+    if not suffixes:
+        return candidates
+    try:
+        db = new_session()
+    except Exception:
+        return candidates
+    try:
+        trusted = set(db.execute(select(InstitutionDomain.domain).join(Institution).where(
+            InstitutionDomain.domain.in_(suffixes),
+            Institution.owner_workspace_id.is_(None),
+            Institution.provider.isnot(None),
+        )).scalars())
+    except Exception:
+        return candidates
+    finally:
+        db.close()
+    return sorted(candidates, key=lambda item: not official_url(item["url"], trusted))
+
+
 async def discover(context, payload):
     terms = " ".join(str(payload[key]).strip() for key in ("objective", "country", "level")
                      if payload.get(key)).strip()
@@ -33,6 +63,7 @@ async def discover(context, payload):
                 break
         if len(candidates) >= 8:
             break
+    candidates = _prefer_known_official(candidates)
     for candidate in candidates:
         host = urlsplit(candidate["url"]).hostname
         candidate["related_urls"] = [item["url"] for item in candidates

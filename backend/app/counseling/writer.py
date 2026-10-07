@@ -17,7 +17,10 @@ def _brief(move, states, requirements, student_text, history, understanding, vio
         "move": {"type": move.type, "slot_key": move.slot_key,
                  "question_intent": move.question_intent, "reflect": move.reflect,
                  "answer_scope": move.answer_scope, "language": move.language,
-                 "max_words": move.max_words, "stage": move.stage},
+                 "max_words": move.max_words, "stage": move.stage,
+                 "research_request": ({"field": move.request_field,
+                                        "reason": move.question_intent}
+                                       if move.request_id else None)},
         "canonical_question": (slot.canonical_questions or {}).get(move.language)
         if slot is not None else None,
         "known_student_context": compact_student_context(understanding, student_text),

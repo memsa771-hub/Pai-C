@@ -27,10 +27,18 @@ from app.tools.web_search import set_web_search_provider
 from app.memory.permissions import OPERATOR_CAPABILITIES
 from scripts.counselor_eval_support import StudentSession
 from scripts.eval_counselor_journey import check_workflow_scenarios
+from scripts.eval_counselor_research_recorded import evaluate_recorded
 
 
 def test_five_workflow_scenario_invariants():
     assert all(check_workflow_scenarios().values())
+
+
+@pytest.mark.asyncio
+async def test_ten_persona_recorded_research_contracts():
+    results = await evaluate_recorded()
+    assert len(results) == 10
+    assert all(all(row["checks"].values()) for row in results)
 
 
 def test_six_research_capabilities_register_with_single_owners():
@@ -201,9 +209,39 @@ async def test_roadmap_composition_pauses_on_unknown_canonical_field():
     result = await build(context, {"brief": {"stated_preference": "CS in Germany",
                                     "underlying_objective": "international tech career", "country": "Germany"}})
     assert result["pending_action"]["type"] == "need_from_student"
+    assert result["research_metrics"]["model_calls"] == 0
+    assert result["research_metrics"]["elapsed_ms"] >= 0
     assert result["pending_action"]["items"][0]["field"] == "test.english_score"
     assert "program.research" in calls and "gap.assess" in calls
     assert result["roadmaps"][0]["research_status"] == "verified"
+
+
+@pytest.mark.asyncio
+async def test_family_wish_gets_separate_unconfirmed_route():
+    async def child(capability_id, payload):
+        if capability_id == "program.discover":
+            objective = payload["objective"]
+            return {"candidates": [{"url": f"https://example.edu/{objective.replace(' ', '-')}",
+                                     "title": objective}], "unconfirmed": []}
+        if capability_id == "program.research":
+            return {"requirements": [{"country": "Pakistan", "status": "unconfirmed",
+                    "source_url": payload["url"], "checked_at": "2026-10-07T00:00:00+00:00",
+                    "requirement_set_id": payload["url"], "rules": []}], "unconfirmed": []}
+        if capability_id == "qualification.recognize":
+            return {"procedures": [], "unconfirmed": []}
+        if capability_id == "scholarship.discover":
+            return {"scholarships": [], "unconfirmed": []}
+        if capability_id == "gap.assess":
+            assert payload["rules"] == []
+            return {"gaps": [], "unknowns": []}
+        raise AssertionError(capability_id)
+    result = await build(SimpleNamespace(capabilities=child, student_context={}), {"brief": {
+        "stated_preference": "Medicine", "underlying_objective": "Help patients",
+        "country": "Pakistan", "family_wish": {"suggested_direction": "Engineering"}}})
+    assert result["roadmaps"][0]["origin"] == "stated_goal"
+    assert any(item["origin"] == "family_wish" for item in result["roadmaps"])
+    assert all(item["fit_level"] == "unconfirmed" and not item["gaps"]
+               for item in result["roadmaps"])
 
 
 def test_research_run_stage_hook_follows_server_transition_graph():
@@ -232,6 +270,30 @@ def test_research_run_stage_hook_follows_server_transition_graph():
             "gaps": []}]}}
         on_run_status(db, run)
         assert journeys.get(student.workspace_id, journey.id).current_stage == "PROPOSED"
+
+
+def test_failed_research_publishes_retryable_card_and_leaves_assessing():
+    with StudentSession() as student, student.factory() as db:
+        journeys = JourneyService(db)
+        journey = journeys.ensure_counselor(student.workspace_id)
+        for stage in ("FOUNDATION", "DIRECTION", "RESEARCHING", "ASSESSING"):
+            journey = journeys.set_counselor_stage(student.workspace_id, journey.id, stage)
+        run = ExecutionRun(workspace_id=student.workspace_id,
+                           requested_by="openagents:pai", objective="Research",
+                           task_type="roadmap_research", status="failed",
+                           constraints={"research_key": f"{journey.id}:goal",
+                                        "capability_input": {"brief": {
+                                            "stated_preference": "CS in Germany",
+                                            "underlying_objective": "tech career", "country": "Germany"}}},
+                           result={"capability_result": {"roadmaps": [], "unconfirmed": [
+                               {"reason": "Search provider unavailable"}]}})
+        db.add(run)
+        db.flush()
+        on_run_status(db, run)
+        assert journeys.get(student.workspace_id, journey.id).current_stage == "PROPOSED"
+        from app.roadmaps.service import RoadmapService
+        card = RoadmapService(db).for_run(student.workspace_id, run.id)[0]
+        assert card["generation_status"] == "failed"
 
 
 @pytest.mark.asyncio

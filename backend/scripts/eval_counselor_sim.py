@@ -1,7 +1,6 @@
-"""Opt-in, model-backed Counselor simulation on isolated synthetic workspaces.
+"""Offline research contracts by default; billed conversation simulation with --live.
 
-Run with PAI_API_KEY set. The default 20 repetitions per persona are intentionally
-outside normal pytest/CI because they make many billed model calls.
+The live mode needs PAI_API_KEY and may make many billed model calls.
 """
 
 import argparse
@@ -358,12 +357,23 @@ def report(results, path):
 
 def main():
     parser = argparse.ArgumentParser()
+    parser.add_argument("--live", action="store_true",
+                        help="Opt in to the billed model-backed conversation evaluation")
     parser.add_argument("--runs", type=int, default=20)
     parser.add_argument("--max-turns", type=int, default=25)
     parser.add_argument("--switch-runs", type=int, default=3)
     parser.add_argument("--output", type=Path)
     parser.add_argument("--persona", action="append", choices=[item["id"] for item in PERSONAS])
     args = parser.parse_args()
+    if not args.live:
+        from scripts.eval_counselor_research_recorded import evaluate_recorded, report_recorded
+        output = args.output or Path("eval_reports") / f"counselor_research_recorded_{datetime.now(timezone.utc):%Y%m%d}.md"
+        results = asyncio.run(evaluate_recorded(args.persona))
+        report_recorded(results, output)
+        print(f"report={output}")
+        if any(not all(row["checks"].values()) for row in results):
+            sys.exit(1)
+        return
     output = args.output or Path("eval_reports") / f"counselor_sim_{datetime.now(timezone.utc):%Y%m%d}.md"
     results = asyncio.run(evaluate(args.runs, args.max_turns, args.switch_runs, args.persona))
     report(results, output)

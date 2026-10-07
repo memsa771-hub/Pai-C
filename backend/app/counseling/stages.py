@@ -21,18 +21,20 @@ TRANSITIONS = {
     ASSESSING: frozenset({NEEDS_INFO, PROPOSED}),
     NEEDS_INFO: frozenset({ASSESSING}),
     PROPOSED: frozenset({DIRECTION, RESEARCHING, CHOSEN}),
-    CHOSEN: frozenset(),
+    CHOSEN: frozenset({DIRECTION}),
 }
 
 
 def require_counselor_transition(current: str, target: str, *,
-                                 validated_choice: bool = False) -> str:
+                                 validated_choice: bool = False,
+                                 replan_escalation: bool = False) -> str:
     if current not in TRANSITIONS or target not in TRANSITIONS:
         logger.warning("counselor stage rejected unknown stage %s -> %s", current, target)
         raise ValueError("Unknown Counselor stage")
     if target == current:
         return current
-    if target not in TRANSITIONS[current] or (target == CHOSEN and not validated_choice):
+    if (target not in TRANSITIONS[current] or (target == CHOSEN and not validated_choice)
+            or (current == CHOSEN and target == DIRECTION and not replan_escalation)):
         logger.warning("counselor stage rejected %s -> %s", current, target)
         raise ValueError(f"Invalid Counselor transition: {current} -> {target}")
     return target

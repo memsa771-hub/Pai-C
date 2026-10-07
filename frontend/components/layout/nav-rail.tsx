@@ -22,6 +22,7 @@ import { cn } from '@/lib/utils';
 import { useWorkspace } from '@/lib/workspace-context';
 import { useT } from '@/lib/i18n';
 import { PAI_PRIMARY_CONVERSATION_ID } from '@/lib/primary-conversation';
+import { COUNSELOR_ONLY_UI } from '@/lib/config';
 import {
   useLayout,
   RAIL_WIDTH_COLLAPSED,
@@ -300,7 +301,7 @@ export function NavRail() {
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
-        {showLabels && <div className="px-3 pt-3 text-[10px] font-semibold uppercase tracking-[0.14em] text-foreground">{t('nav.paiOs')}</div>}
+        {showLabels && !COUNSELOR_ONLY_UI && <div className="px-3 pt-3 text-[10px] font-semibold uppercase tracking-[0.14em] text-foreground">{t('nav.paiOs')}</div>}
         {groups.map((group) => <SidebarGroup key={group.label} className="px-1.5 pt-1">
           {showLabels ? <SidebarGroupLabel>{group.label}</SidebarGroupLabel> : <div className="mb-2 px-2"><Separator /></div>}
           <SidebarGroupContent><SidebarMenu className="gap-0.5">

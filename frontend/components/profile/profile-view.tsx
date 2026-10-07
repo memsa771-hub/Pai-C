@@ -702,6 +702,7 @@ function TestsBlock({ profile, onEdit }: { profile: StudentProfile; onEdit: Open
             title={language.language}
             meta={[humanizeValue(language.evidence_type)]}
             trailing={language.proficiency}
+            badges={<VerificationBadge status={language.verification_status} />}
             {...langProps(language)}
           />
         ))}
@@ -733,6 +734,7 @@ function ExperienceBlock({ profile, onEdit }: { profile: StudentProfile; onEdit:
             humanizeValue(record.experience_type),
             record.details?.country,
           ]}
+          badges={<VerificationBadge status={record.verification_status} />}
           notes={
             record.details?.responsibilities?.length ? (
               <ul className="list-disc space-y-0.5 ps-4 text-sm text-muted-foreground">
@@ -768,6 +770,7 @@ function ProjectsBlock({ profile, onEdit }: { profile: StudentProfile; onEdit: O
           title={record.name}
           subtitle={record.role}
           meta={[formatDateRange(record.start_date, record.end_date, t('studentProfile.present'))]}
+          badges={<VerificationBadge status={record.verification_status} />}
           notes={
             <>
               {record.details?.description && (
@@ -805,6 +808,7 @@ function SkillsBlock({ profile, onEdit }: { profile: StudentProfile; onEdit: Ope
           key={record.id}
           title={record.name}
           trailing={record.proficiency}
+          badges={<VerificationBadge status={record.verification_status} />}
           {...editProps(record)}
         />
       ))}
@@ -866,6 +870,7 @@ function ResearchBlock({ profile, onEdit }: { profile: StudentProfile; onEdit: O
               record.role,
             ]}
             notes={record.details?.publication_title}
+            badges={<VerificationBadge status={record.verification_status} />}
             {...researchProps(record)}
           />
         ))}
@@ -884,6 +889,7 @@ function ResearchBlock({ profile, onEdit }: { profile: StudentProfile; onEdit: O
             subtitle={record.issuer}
             meta={[formatDate(record.achieved_on), humanizeValue(record.achievement_type),
                    humanizeValue(record.details?.level)]}
+            badges={<VerificationBadge status={record.verification_status} />}
             {...achievementProps(record)}
           />
         ))}
@@ -916,11 +922,18 @@ function GoalsBlock({ profile, onEdit }: { profile: StudentProfile; onEdit: Open
             formatDate(record.target_date),
             record.details?.target_intake,
           ]}
+          badges={<VerificationBadge status={record.verification_status} />}
           notes={
             <>
               {record.details?.motivation && (
                 <p className="text-sm text-muted-foreground">{record.details.motivation}</p>
               )}
+              {record.details?.underlying_objective && (
+                <p className="text-sm text-muted-foreground">{t('studentProfile.realObjective')}: {record.details.underlying_objective}</p>
+              )}
+              {record.details?.constraints?.length ? (
+                <p className="text-sm text-muted-foreground">{t('studentProfile.constraints')}: {record.details.constraints.join(', ')}</p>
+              ) : null}
               {record.details?.target_countries?.length ? (
                 <div className="mt-1.5">
                   <Chips values={record.details.target_countries} />
@@ -955,6 +968,7 @@ function FinanceBlock({ profile }: { profile: StudentProfile }) {
             key={record.id}
             title={record.name || humanizeValue(record.sponsor_type)}
             meta={[record.details?.relationship, humanizeValue(record.commitment_status)]}
+            badges={<VerificationBadge status={record.verification_status} />}
             trailing={formatFactValue({
               amount: record.details?.amount, currency: record.details?.currency,
             })}
@@ -973,6 +987,7 @@ function FinanceBlock({ profile }: { profile: StudentProfile }) {
             title={record.scholarship_name}
             subtitle={record.provider}
             meta={[humanizeValue(record.application_status), formatDate(record.deadline)]}
+            badges={<VerificationBadge status={record.verification_status} />}
             trailing={formatFactValue({
               amount: record.details?.award_amount, currency: record.details?.currency,
             })}
@@ -1002,6 +1017,7 @@ function ApplicationsBlock({ profile }: { profile: StudentProfile }) {
             subtitle={record.program_name ? record.institution_name : undefined}
             meta={[record.intake, formatDate(record.deadline), record.details?.next_action]}
             trailing={humanizeValue(record.application_status)}
+            badges={<VerificationBadge status={record.verification_status} />}
           />
         ))}
       </Section>

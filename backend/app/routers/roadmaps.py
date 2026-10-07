@@ -22,6 +22,7 @@ class FlagAction(BaseModel):
 
 class ChoiceAction(BaseModel):
     confirm_token: str
+    choice_channel: Literal["chat", "voice", "roadmaps"] = "roadmaps"
 
 
 class CustomGoal(BaseModel):
@@ -63,7 +64,7 @@ def list_roadmaps(network: str = Query(...), filter: Literal["all", "favorites",
 def get_roadmap(roadmap_id: str, network: str = Query(...), db=Depends(get_db),
                 x_workspace_token: str | None = Header(None), authorization: str | None = Header(None)):
     workspace = _authorized(db, network, x_workspace_token, authorization)
-    return _result(lambda: RoadmapService(db).get(str(workspace.id), roadmap_id, presented=True), db)
+    return _result(lambda: RoadmapService(db).get_detail(str(workspace.id), roadmap_id, presented=True), db)
 
 
 @router.post("/requirements/{requirement_id}/report")
@@ -79,6 +80,46 @@ def report_wrong_requirement(requirement_id: str, network: str = Query(...), db=
     db.commit()
     return success_response({"requirement_id": row.id, "status": row.status,
                              "message": "Thanks. PAI will recheck this source."})
+
+
+@router.post("/{roadmap_id}/retry")
+async def retry_roadmap(roadmap_id: str, network: str = Query(...), db=Depends(get_db),
+                        x_workspace_token: str | None = Header(None),
+                        authorization: str | None = Header(None)):
+    workspace = _authorized(db, network, x_workspace_token, authorization)
+    workspace_id = str(workspace.id)
+    try:
+        objective, constraints = RoadmapService(db).prepare_retry(workspace_id, roadmap_id)
+    except RoadmapError as exc:
+        db.rollback()
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    db.commit()
+    from app.memory.permissions import capabilities_for_agent
+    from app.services.pai import PAI_AGENT_NAME, PAI_ALLOWED_TOOLS, PAI_PRIMARY_CHANNEL, WorkspaceApi
+    from app.tools import AUDIENCE_COUNSELOR, ToolContext, get_tool_executor
+
+    context = ToolContext(
+        workspace_id=workspace_id, agent_name=PAI_AGENT_NAME,
+        api=WorkspaceApi(workspace_id, workspace.password_hash),
+        conversation=PAI_PRIMARY_CHANNEL,
+        allowed_tools=frozenset({"operator.delegate"}) & frozenset(PAI_ALLOWED_TOOLS),
+        audience=AUDIENCE_COUNSELOR,
+        granted_capabilities=capabilities_for_agent(PAI_AGENT_NAME),
+    )
+    delegated = await get_tool_executor().execute("operator.delegate", {
+        "objective": objective, "task_type": "roadmap_research",
+        "intent": "academic_planning", "constraints": constraints,
+        "context_refs": ["vault", "memory"],
+    }, context)
+    row = db.get(Roadmap, roadmap_id)
+    if not delegated.get("ok"):
+        row.generation_status = "failed"
+        row.stale_reason = "Research could not start; try again later"
+        db.commit()
+        raise HTTPException(status_code=503, detail=row.stale_reason)
+    row.execution_run_id = delegated["data"]["run_id"]
+    db.commit()
+    return success_response(RoadmapService(db).get(workspace_id, roadmap_id))
 
 
 @router.post("/{roadmap_id}/focus")
@@ -173,7 +214,8 @@ def choose_roadmap(roadmap_id: str, body: ChoiceAction, network: str = Query(...
                    authorization: str | None = Header(None)):
     workspace = _authorized(db, network, x_workspace_token, authorization)
     return _result(lambda: RoadmapService(db).choose(str(workspace.id), roadmap_id,
-                                                     body.confirm_token, workspace.password_hash), db)
+                                                     body.confirm_token, workspace.password_hash,
+                                                     choice_channel=body.choice_channel), db)
 
 
 @router.post("/custom")

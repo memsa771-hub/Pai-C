@@ -7,12 +7,13 @@ import hmac
 import json
 import secrets
 import time
+from copy import deepcopy
 from datetime import datetime, timezone
-from uuid import NAMESPACE_URL, uuid5
+from uuid import NAMESPACE_URL, uuid4, uuid5
 
 from sqlalchemy import select, update
 
-from app.models import ExecutionRun, NotificationRecord, Roadmap, RoadmapStudentState, StudentJourney
+from app.models import DecisionRecord, ExecutionRun, Opportunity, RequirementSet, Roadmap, RoadmapStudentState, StudentJourney
 from app.plugins._shared.sources import public_https
 
 
@@ -74,6 +75,76 @@ class RoadmapService:
             state.presented_at = _now()
         return self.serialize(roadmap, state)
 
+    def get_detail(self, workspace_id: str, roadmap_id: str, *, presented=False) -> dict:
+        roadmap, state = self._require(workspace_id, roadmap_id)
+        if presented and state.presented_at is None:
+            state.presented_at = _now()
+        result = self.serialize(roadmap, state)
+        evidence = (self.db.execute(select(RequirementSet).join(Opportunity).where(
+            RequirementSet.id == roadmap.requirement_set_id,
+            Opportunity.workspace_id == workspace_id)).scalar_one_or_none()
+            if roadmap.requirement_set_id else None)
+        if evidence:
+            result["evidence"] = {
+                "id": evidence.id, "status": evidence.status, "version": evidence.version,
+                "rules": evidence.rules, "fees": evidence.fees,
+                "deadlines": evidence.deadlines,
+                "verification_checks": evidence.verification_checks,
+                "source_url": evidence.source_url,
+                "checked_at": evidence.checked_at.isoformat(),
+            }
+            versions = self.db.execute(select(RequirementSet).where(
+                RequirementSet.opportunity_id == evidence.opportunity_id,
+            ).order_by(RequirementSet.version.desc())).scalars().all()
+            result["evidence_history"] = [{"version": row.version, "status": row.status,
+                                          "checked_at": row.checked_at.isoformat(),
+                                          "source_url": row.source_url} for row in versions]
+        else:
+            result["evidence"] = None
+            result["evidence_history"] = []
+        return result
+
+    def prepare_retry(self, workspace_id: str, roadmap_id: str) -> tuple[str, dict]:
+        """Retry the prior research brief while keeping this card and its state."""
+        roadmap, _ = self._require(workspace_id, roadmap_id, lock=True)
+        if roadmap.generation_status not in {"failed", "stale"}:
+            raise RoadmapError("Only failed or stale research can be retried")
+        previous = self.db.get(ExecutionRun, roadmap.execution_run_id)
+        if (previous is None or previous.workspace_id != workspace_id
+                or previous.task_type != "roadmap_research"):
+            raise RoadmapError("Previous research brief is unavailable")
+        constraints = deepcopy(previous.constraints or {})
+        capability_input = constraints.get("capability_input") or {}
+        brief = capability_input.get("brief")
+        if not isinstance(brief, dict):
+            raise RoadmapError("Previous research brief is unavailable")
+        journey = self.db.execute(select(StudentJourney).where(
+            StudentJourney.id == roadmap.journey_id,
+            StudentJourney.workspace_id == workspace_id)).scalar_one_or_none()
+        if journey is None or journey.current_stage not in {"PROPOSED", "DIRECTION", "RESEARCHING", "CHOSEN"}:
+            raise RoadmapError("Counselor is not ready to retry this route")
+        constraints["research_key"] = f"{roadmap.journey_id}:retry:{uuid4()}"
+        if roadmap.origin == "student_added":
+            constraints["roadmap_id"] = roadmap.id
+        else:
+            constraints.pop("roadmap_id", None)
+            url = (roadmap.route or {}).get("url")
+            if public_https(url):
+                brief["refresh_candidate"] = {
+                    "url": url, "title": roadmap.title, "origin": roadmap.origin,
+                    "country": (roadmap.route or {}).get("country"),
+                    "level": (roadmap.route or {}).get("level"),
+                    "intake": (roadmap.route or {}).get("intake")}
+        roadmap.generation_status = "generating"
+        roadmap.stale_reason = None
+        roadmap.updated_at = _now()
+        if journey.current_stage in {"PROPOSED", "DIRECTION"}:
+            from app.journey import JourneyService
+            JourneyService(self.db).set_counselor_stage(
+                workspace_id, journey.id, "RESEARCHING", actor="human:student")
+        self.db.flush()
+        return previous.objective, constraints
+
     def for_run(self, workspace_id: str, run_id: str, *, presented=False) -> list[dict]:
         pairs = self.db.execute(select(Roadmap, RoadmapStudentState).join(
             RoadmapStudentState, RoadmapStudentState.roadmap_id == Roadmap.id).where(
@@ -92,7 +163,9 @@ class RoadmapService:
             "id", "workspace_id", "journey_id", "goal_id", "origin", "title", "route",
             "fit_level", "fit_dimensions", "gaps", "steps", "total_cost", "time_to_start",
             "risks", "sources", "generation_status", "execution_run_id", "version",
+            "scholarships",
             "stale_reason",
+            "requirement_set_id",
         )} | {
             "favorite": state.favorite, "exploring": state.exploring,
             "dismissed_at": state.dismissed_at.isoformat() if state.dismissed_at else None,
@@ -129,8 +202,13 @@ class RoadmapService:
                 if not isinstance(gap, dict) or not public_https(gap.get("source_url")):
                     raise RoadmapError("Each published gap needs a source URL")
             origin = candidate.get("origin")
-            if origin not in {"stated_goal", "alternative"}:
+            if origin not in {"stated_goal", "alternative", "family_wish"}:
                 continue
+            requirement_id = candidate.get("requirement_set_id")
+            if requirement_id and not self.db.execute(select(RequirementSet.id).join(Opportunity).where(
+                RequirementSet.id == requirement_id,
+                Opportunity.workspace_id == run.workspace_id)).first():
+                raise RoadmapError("Roadmap evidence does not belong to this student")
             if custom_id and position == 0:
                 roadmap = self.db.get(Roadmap, custom_id)
                 if roadmap is None or roadmap.workspace_id != run.workspace_id:
@@ -156,8 +234,10 @@ class RoadmapService:
                 "total_cost": candidate.get("total_cost"),
                 "time_to_start": candidate.get("time_to_start"),
                 "risks": candidate.get("risks") or [], "sources": sources,
+                "scholarships": candidate.get("scholarships") or [],
                 "generation_status": next_status,
                 "stale_reason": None,
+                "requirement_set_id": requirement_id,
             }
             changed_content = any(getattr(roadmap, key) != value for key, value in content.items())
             for key, value in content.items():
@@ -168,12 +248,39 @@ class RoadmapService:
                 roadmap.updated_at = _now()
             changed.append(roadmap.id)
             if next_status == "ready" and previous_status != "ready":
-                self._notify_ready(run.workspace_id, roadmap)
+                self._notify_ready(run.workspace_id, roadmap,
+                                   refreshed=previous_status == "stale")
         if custom_id and custom_id not in changed and run.status in {"failed", "needs_user_action"}:
             placeholder = self.db.get(Roadmap, custom_id)
             if placeholder and placeholder.workspace_id == run.workspace_id:
                 placeholder.generation_status = "needs_info" if run.status == "needs_user_action" else "failed"
                 changed.append(placeholder.id)
+        if not custom_id and not any(isinstance(item, dict) and
+                                     item.get("origin") == "stated_goal" for item in candidates):
+            brief = ((run.constraints or {}).get("capability_input") or {}).get("brief") or {}
+            title = str(brief.get("stated_preference") or "").strip()
+            if title:
+                roadmap_id = str(uuid5(NAMESPACE_URL,
+                                       f"pai-roadmap:{journey_id}:stated_goal:unresolved:{title.casefold()}"))
+                card = self.db.get(Roadmap, roadmap_id)
+                if card is None:
+                    card = Roadmap(id=roadmap_id, workspace_id=run.workspace_id,
+                                   journey_id=journey_id, goal_id=brief.get("goal_id"),
+                                   origin="stated_goal", title=title,
+                                   route={"country": brief.get("country"),
+                                          "level": brief.get("level")},
+                                   generation_status="failed")
+                    self.db.add(card)
+                    self.db.add(RoadmapStudentState(roadmap_id=roadmap_id,
+                                                    journey_id=journey_id))
+                card.execution_run_id = run.id
+                card.generation_status = "needs_info" if run.status == "needs_user_action" else "failed"
+                reasons = artifact.get("unconfirmed") or []
+                card.stale_reason = next((str(item.get("reason")) for item in reasons
+                                          if isinstance(item, dict) and item.get("reason")),
+                                         "PAI could not confirm a programme for this direction yet")
+                card.updated_at = _now()
+                changed.append(card.id)
         self.db.flush()
         return changed
 
@@ -190,18 +297,19 @@ class RoadmapService:
             row.generation_status = "stale"
             row.stale_reason = reason[:240]
             row.updated_at = _now()
+            from app.services.notify import notify_once
+            notify_once(self.db, workspace_id, dedupe_key=f"roadmap-stale:{row.id}:{row.version}",
+                        source="system:roadmaps", title="Roadmap needs a fresh check",
+                        message=row.title, link_url="/roadmaps")
             affected += 1
         return affected
 
-    def _notify_ready(self, workspace_id: str, roadmap: Roadmap):
-        from app.services.notify import notify
+    def _notify_ready(self, workspace_id: str, roadmap: Roadmap, *, refreshed: bool = False):
+        from app.services.notify import notify_once
         key = f"roadmap-ready:{roadmap.id}:{roadmap.version}"
-        exists = self.db.execute(select(NotificationRecord.id).where(
-            NotificationRecord.workspace_id == workspace_id,
-            NotificationRecord.dedupe_key == key)).first()
-        if exists is None:
-            notify(self.db, workspace_id, source="system:roadmaps", title="A roadmap is ready",
-                   message=roadmap.title, link_url="/roadmaps", dedupe_key=key)
+        notify_once(self.db, workspace_id, source="system:roadmaps",
+                    title="Roadmap refreshed" if refreshed else "A roadmap is ready",
+                    message=roadmap.title, link_url="/roadmaps", dedupe_key=key)
 
     def set_flag(self, workspace_id: str, roadmap_id: str, field: str, value: bool) -> dict:
         if field not in {"favorite", "exploring"}:
@@ -288,7 +396,10 @@ class RoadmapService:
         signature = hmac.new(workspace_secret.encode(), body.encode(), hashlib.sha256).hexdigest()
         return f"{expiry}.{signature}"
 
-    def choose(self, workspace_id: str, roadmap_id: str, token: str, workspace_secret: str) -> dict:
+    def choose(self, workspace_id: str, roadmap_id: str, token: str, workspace_secret: str,
+               *, choice_channel: str = "roadmaps") -> dict:
+        if choice_channel not in {"chat", "voice", "roadmaps"}:
+            raise RoadmapError("Invalid choice channel")
         roadmap, state = self._require(workspace_id, roadmap_id, lock=True)
         journey = self.db.execute(select(StudentJourney).where(
             StudentJourney.id == roadmap.journey_id,
@@ -313,6 +424,29 @@ class RoadmapService:
         JourneyService(self.db).set_counselor_stage(
             workspace_id, journey.id, "CHOSEN", actor="human:student", validated_choice=True)
         state.chosen_at = _now()
+        draft = journey.counselor_summary_draft or {}
+        confirmed_summary = (draft.get("summary") if draft.get("status") == "confirmed"
+                             else None)
+        assumptions = []
+        if not isinstance(confirmed_summary, dict):
+            confirmed_summary = {"stated_goal": {"value": roadmap.title,
+                                                  "status": "confirmed_by_route_choice"}}
+            assumptions.append("Earlier goal summary was not recorded")
+        if roadmap.fit_level == "unconfirmed":
+            assumptions.append("Eligibility fit is unconfirmed")
+        if any(source.get("status") == "unconfirmed" for source in roadmap.sources or []):
+            assumptions.append("Some cited research remains unconfirmed")
+        objective = confirmed_summary.get("envisioned_outcome") or {}
+        if isinstance(objective, dict):
+            objective = objective.get("value")
+        decision = DecisionRecord(
+            workspace_id=workspace_id, journey_id=journey.id,
+            roadmap_id=roadmap.id, roadmap_version=roadmap.version,
+            confirmed_summary=confirmed_summary, real_objective=objective or None,
+            accepted_gaps=[gap for gap in roadmap.gaps or [] if gap.get("status") != "met"],
+            accepted_risks=list(roadmap.risks or []), assumptions=assumptions,
+            choice_channel=choice_channel, chosen_at=state.chosen_at)
+        self.db.add(decision)
         journey.current_objective = roadmap.title
         journey.active_goal = {"roadmap_id": roadmap.id, "goal_id": roadmap.goal_id,
                                "route": roadmap.route, "title": roadmap.title}
@@ -322,3 +456,14 @@ class RoadmapService:
         journey.decisions = decisions
         self.db.flush()
         return self.serialize(roadmap, state)
+
+    def current_decision(self, workspace_id: str) -> dict | None:
+        row = self.db.execute(select(DecisionRecord).where(
+            DecisionRecord.workspace_id == workspace_id,
+        ).order_by(DecisionRecord.chosen_at.desc(), DecisionRecord.id.desc()).limit(1)).scalar_one_or_none()
+        if row is None:
+            return None
+        return {key: getattr(row, key) for key in (
+            "id", "journey_id", "roadmap_id", "roadmap_version", "confirmed_summary",
+            "real_objective", "accepted_gaps", "accepted_risks", "assumptions",
+            "choice_channel") } | {"chosen_at": row.chosen_at.isoformat()}

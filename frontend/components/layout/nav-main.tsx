@@ -6,6 +6,7 @@ import { AgentAvatar } from '@/components/agents/agent-avatar';
 import { useWorkspace } from '@/lib/workspace-context';
 import { useT } from '@/lib/i18n';
 import { PAI_PRIMARY_CONVERSATION_ID } from '@/lib/primary-conversation';
+import { COUNSELOR_ONLY_UI } from '@/lib/config';
 import { Map } from 'lucide-react';
 import { useLayout } from './layout-context';
 import { useWorkspaceNavigation } from './workspace-navigation';
@@ -39,7 +40,7 @@ export function NavMain({ onNavigate }: { onNavigate?: () => void }) {
         </SidebarMenuButton>
       </SidebarMenuItem></SidebarMenu></SidebarGroupContent>
     </SidebarGroup>
-    <div className="px-4 pt-4 text-[11px] font-semibold uppercase tracking-[0.14em] text-foreground">{t('nav.paiOs')}</div>
+    {!COUNSELOR_ONLY_UI && <div className="px-4 pt-4 text-[11px] font-semibold uppercase tracking-[0.14em] text-foreground">{t('nav.paiOs')}</div>}
     {groups.map((group) => <SidebarGroup key={group.label}>
       <SidebarGroupLabel>{group.label}</SidebarGroupLabel>
       <SidebarGroupContent><SidebarMenu className="gap-0.5">

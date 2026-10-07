@@ -1,5 +1,10 @@
 """Model-safe discovery and policy-enforced capability invocation."""
 
+import logging
+import time
+
+logger = logging.getLogger(__name__)
+
 
 def _summary(contract):
     return {
@@ -113,7 +118,12 @@ async def invoke(ctx, args):
             journey_context=journey_context, permissions=OPERATOR_PLATFORM_PERMISSIONS,
             tool_names=broker.names, tools=broker, capabilities=invoke_child,
         )
-        return await router.execute(item.id, item_payload, execution_context)
+        started = time.monotonic()
+        try:
+            return await router.execute(item.id, item_payload, execution_context)
+        finally:
+            logger.info("research span capability=%s duration_ms=%d",
+                        item.id, round((time.monotonic() - started) * 1000))
     try:
         result = await execute_scoped(contract, payload)
     except PermissionError as exc:

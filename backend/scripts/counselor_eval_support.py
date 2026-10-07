@@ -21,7 +21,7 @@ from app.models import (
     BackgroundJob, DocumentArtifact, EventRecord, ExecutionRun, FileRecord,
     CounselorSlotAnswer, CounselorTurnDecision, MemoryCandidate, PaiEpisode, PaiMemory, ProfileFieldResponse, ProfileIssue, ProfileRequirement, StudentRecordRevision,
     StudentJourney, StudentJourneyEvent, Institution, InstitutionDomain,
-    Opportunity, RequirementSet, Roadmap, RoadmapStudentState,
+    Opportunity, RequirementSet, Roadmap, RoadmapStudentState, DecisionRecord, StudentRequest,
     NotificationRecord, User, VaultFact, VaultFieldDefinition, Workspace,
     WorkspaceMember, VAULT_INTAKE_MODELS,
 )
@@ -78,7 +78,7 @@ class StudentSession:
                   StudentRecordRevision, BackgroundJob,
                   StudentJourney, StudentJourneyEvent, Institution, InstitutionDomain,
                   Opportunity, RequirementSet,
-                  Roadmap, RoadmapStudentState, NotificationRecord,
+                  Roadmap, RoadmapStudentState, DecisionRecord, StudentRequest, NotificationRecord,
                   *ENTITY_MODELS.values(), *VAULT_INTAKE_MODELS]
         Base.metadata.create_all(self.engine, tables=[m.__table__ for m in models])
         self.factory = sessionmaker(bind=self.engine, autoflush=False)

@@ -163,9 +163,7 @@ export function Chips({ values }: { values?: string[] }) {
 }
 
 /**
- * How well-evidenced a record is. Only shown when it says something the
- * student can act on — "expired" and "from a document" do; "self-reported",
- * which is the default for anything they simply told PAI, does not.
+ * Keep the evidence level visible for every record, including student reports.
  */
 export function VerificationBadge({ status }: { status?: string }) {
   const t = useT();
@@ -176,14 +174,21 @@ export function VerificationBadge({ status }: { status?: string }) {
       </Badge>
     );
   }
-  if (status === 'document_supported' || status === 'externally_verified' || status === 'verified') {
+  if (status === 'externally_verified' || status === 'verified') {
     return (
       <Badge variant="success" appearance="light" size="sm">
-        {t('studentProfile.documentSupported')}
+        {t('studentProfile.externallyVerified')}
       </Badge>
     );
   }
-  return null;
+  if (status === 'document_supported') {
+    return <Badge variant="success" appearance="light" size="sm">{t('studentProfile.documentSupported')}</Badge>;
+  }
+  if (status === 'needs_review' || status === 'extracted') {
+    return <Badge variant="warning" appearance="light" size="sm">{status === 'needs_review'
+      ? t('studentProfile.needsReviewEvidence') : t('studentProfile.extractedEvidence')}</Badge>;
+  }
+  return <Badge variant="secondary" appearance="light" size="sm">{t('studentProfile.studentReported')}</Badge>;
 }
 
 /**
