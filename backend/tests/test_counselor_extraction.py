@@ -87,6 +87,15 @@ def test_low_confidence_and_missing_quote_cannot_answer_slot():
         assert result.claims == ()
 
 
+def test_punctuation_normalized_quote_keeps_verbatim_student_evidence():
+    rows = [requirement("qualification_group")]
+    result = parse_extraction(envelope({"qualification_group": {
+        "value": "Pre-Engineering", "confidence": .9,
+        "quote": "pre-engineering",
+    }}), "I studied pre engineering", rows)
+    assert result.claims[0].quote == "pre engineering"
+
+
 def test_typed_result_and_scalar_wrapper_reach_canonical_candidate_shape():
     rows = [requirement("academic_result"), requirement("academic_status")]
     message = "I finished FSc with 844/1100"
@@ -118,6 +127,49 @@ def test_graduation_year_is_not_a_target_intake():
     }
     result = parse_extraction(envelope(slots), message, rows)
     assert "timing" not in {claim.key for claim in result.claims}
+
+
+def test_spoken_completion_fragment_is_not_goal_timing():
+    message = "I'm just completed it 2020... 2"
+    rows = [requirement("academic_status"), requirement("timing")]
+    result = parse_extraction(envelope({
+        "academic_status": {"value": "completed", "confidence": .9,
+                            "quote": message},
+        "timing": {"value": "2020", "confidence": .9, "quote": "2020"},
+    }), message, rows, expected_slot="recent_qualification")
+    assert {claim.key for claim in result.claims} == {"academic_status"}
+
+
+def test_bare_year_during_foundation_cannot_become_target_intake():
+    message = "I'm just completed it 2020... 2"
+    rows = [requirement("academic_result"), requirement("timing")]
+    result = parse_extraction(envelope({
+        "academic_result": None,
+        "timing": {"value": "2020", "confidence": .9, "quote": "2020"},
+    }), message, rows, expected_slot="academic_result")
+    assert result.claims == ()
+
+
+def test_spoken_year_fragment_cannot_become_gpa_or_marks():
+    message = "I'm just completed it 2020... 2"
+    rows = [requirement("academic_result")]
+    for value in ({"gpa": 2}, {"marks_obtained": 2}, {"grade": "2020"}):
+        result = parse_extraction(envelope({"academic_result": {
+            "value": value, "confidence": .9, "quote": message,
+        }}), message, rows, expected_slot="academic_result")
+        assert result.claims == ()
+
+
+def test_qualification_name_cannot_become_an_academic_grade():
+    message = "fsc pre engineering was my highest qualification"
+    rows = [requirement("recent_qualification"), requirement("academic_result")]
+    result = parse_extraction(envelope({
+        "recent_qualification": {"value": {"qualification_name": "fsc pre engineering"},
+                                 "confidence": .9, "quote": "fsc pre engineering"},
+        "academic_result": {"value": {"grade": "fsc pre engineering"},
+                            "confidence": .9, "quote": "fsc pre engineering"},
+    }), message, rows)
+    assert {claim.key for claim in result.claims} == {"recent_qualification"}
 
 
 def test_timing_claim_survives_null_other_slots():
@@ -226,6 +278,24 @@ async def test_one_aux_model_call_receives_same_context_without_channel():
     assert "channel" not in call["messages"][0]["content"]
     assert "Lahore" in call["messages"][0]["content"]
     assert "field_interest" in call["system_prompt"]
+
+
+@pytest.mark.asyncio
+async def test_focused_recovery_captures_missed_spoken_qualification():
+    message = "I studied the FSc... Uh, n- pre- engineering"
+    rows = [requirement("recent_qualification", accepts_unknown=False)]
+    primary = envelope({"recent_qualification": None})
+    focused = envelope({"recent_qualification": {
+        "value": {"qualification_name": "FSc Pre-Engineering"},
+        "confidence": .9, "quote": "I studied the FSc... Uh, n- pre- engineering",
+    }})
+    with patch("app.counseling.extraction.chat_completion",
+               new=AsyncMock(side_effect=[primary, focused])) as model:
+        result = await extract_turn(message, [], rows, {}, expected_slot="recent_qualification")
+    assert model.await_count == 2
+    assert result.claims == (SlotClaim("recent_qualification",
+                                       {"qualification_name": "FSc Pre-Engineering"},
+                                       .9, message),)
 
 
 @pytest.mark.asyncio

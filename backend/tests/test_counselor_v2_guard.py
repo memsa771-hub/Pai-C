@@ -35,9 +35,18 @@ def move(**changes):
     ("Which universities do you prefer?", {}, {}, "wrong_slot_question"),
     ("The word limit was declined by the system. What is your budget?", {}, {}, "internal_language"),
     ("Your budget is student_budget_words. What is your budget?", {}, {}, "internal_language"),
+    ("You completed FSc in 2020. What is your budget?", {}, {}, "unverified_year"),
 ])
 def test_deterministic_rules(reply, change, states, expected):
     assert expected in deterministic_violations(reply, move(**change), states, [SLOT])
+
+
+def test_guard_allows_year_after_slot_has_grounded_it():
+    reply = "You completed FSc in 2022. What is your budget?"
+    states = {"recent_qualification": SlotState(
+        "recent_qualification", "answered", {"qualification_name": "FSc",
+                                             "graduation_year": 2022})}
+    assert "unverified_year" not in deterministic_violations(reply, move(), states, [SLOT])
 
 
 @pytest.mark.asyncio

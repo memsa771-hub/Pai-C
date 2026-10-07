@@ -4,10 +4,19 @@ import asyncio
 from datetime import datetime, timezone
 from unittest.mock import AsyncMock, Mock, patch
 
+import pytest
+
 from app.counseling.core import CounselorCore, compact_student_context
 from app.counseling.runtime import _run_turn
 from app.counseling.understanding import StudentUnderstandingBuilder
 from app.memory.student_snapshot import StudentSnapshot
+
+
+@pytest.fixture(autouse=True)
+def legacy_counselor_runtime():
+    """These cases exercise the previous Counselor path explicitly."""
+    with patch("app.counseling.runtime.config.PAI_COUNSELOR_V2", False):
+        yield
 
 
 class Provider:

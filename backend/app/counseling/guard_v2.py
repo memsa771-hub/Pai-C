@@ -64,6 +64,13 @@ def deterministic_violations(reply: str, move, states, requirements,
         problems.append("unrequested_list")
     if _INTERNAL_LEAK.search(text):
         problems.append("internal_language")
+    # Speech transcripts can contain unfinished years ("2020... 2"). A year
+    # may be reflected only after extraction has grounded it in turn state.
+    grounded = json.dumps({key: state.value for key, state in states.items()
+                           if state.answered and state.value is not None},
+                          ensure_ascii=False, default=str)
+    if any(year not in grounded for year in re.findall(r"\b(?:19|20|21)\d{2}\b", text)):
+        problems.append("unverified_year")
     if move.slot_key and states.get(move.slot_key) and states[move.slot_key].answered:
         problems.append("answered_slot_question")
     if move.slot_key and questions == 0:
@@ -148,6 +155,13 @@ def fallback_reply(move, requirements) -> str:
     if move.slot_key:
         slot = next((row for row in requirements if short_key(row) == move.slot_key), None)
         question = (slot.canonical_questions or {}).get(move.language) if slot else None
+        if move.type == "answer_then_ask":
+            prefix = {
+                "en": "I'll help you explore routes that fit your goal.",
+                "roman_ur": "Main aap ke maqsad ke mutabiq raaste dekhne mein madad karunga.",
+                "ur": "میں آپ کے مقصد کے مطابق راستے دیکھنے میں مدد کروں گا۔",
+                "mixed": "Main aap ke goal ke mutabiq raaste dekhne mein madad karunga.",
+            }[move.language]
         return f"{prefix} {question}" if question else prefix
     if move.type == "summarize_for_confirmation":
         return {"en": "Have I understood your goal correctly?",
