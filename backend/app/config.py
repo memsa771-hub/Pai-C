@@ -180,7 +180,7 @@ class Config:
     PAI_MODEL: str = os.environ.get("PAI_MODEL", "gpt-5.4-mini")
     PAI_COUNSELOR_AUX_MODEL: str = os.environ.get("PAI_COUNSELOR_AUX_MODEL", "")
     PAI_COUNSELOR_WRITER_MODEL: str = os.environ.get("PAI_COUNSELOR_WRITER_MODEL", "")
-    PAI_COUNSELOR_V2: bool = os.environ.get("PAI_COUNSELOR_V2", "false").lower() in ("true", "1", "yes")
+    PAI_COUNSELOR_V2: bool = os.environ.get("PAI_COUNSELOR_V2", "true").lower() in ("true", "1", "yes")
     # Safety cap on the tool-calling loop per user message.
     PAI_MAX_TOOL_ITERATIONS: int = int(os.environ.get("PAI_MAX_TOOL_ITERATIONS", "6"))
     # Memory extraction (app/memory/extractor.py). Each falls back to the
