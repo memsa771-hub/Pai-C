@@ -9,10 +9,15 @@ from sqlalchemy.orm import Session
 from sqlalchemy.pool import StaticPool
 
 from app.counseling.slots import CounselorSlotRegistry, next_open_slot, resolve_slot_states
+from app.counseling.extraction import SlotClaim, TurnExtraction
+from app.counseling.slot_capture import capture_turn_slots
 from app.database import Base
 from app.memory.education_journey import canonical_education_level, education_group
 from app.memory.student_snapshot import StudentSnapshot
+from app.memory.student_snapshot import StudentSnapshotService
 from app.models import CounselorSlotAnswer, EventRecord, ProfileRequirement
+from scripts.counselor_eval_support import StudentSession
+from scripts.eval_counselor_sim import _seed_slots
 
 
 @compiles(JSONB, "sqlite")
@@ -44,6 +49,19 @@ def test_canonical_qualification_names_fill_level_without_reasking():
     assert canonical_education_level(None, "something unfamiliar") is None
 
 
+def test_goal_reason_uses_motivation_statement_not_unrelated_goal_or_interest():
+    row = slot("goal_reason", "direction", 95, "record_field",
+               "student_voice_statement", "statement")
+    states = resolve_slot_states([row], snapshot(records={
+        "goal": [{"title": "MBBS", "details": {"motivation": "family wish"}}],
+        "student_voice_statement": [
+            {"voice_type": "interest", "statement": "biology"},
+            {"voice_type": "motivation", "statement": "I like practical lab work"},
+        ],
+    }))
+    assert states["goal_reason"].value == "I like practical lab work"
+
+
 def test_canonical_fact_wins_and_recent_pending_prevents_repeat():
     rows = [slot("budget", "direction", 50, source_key="finance.budget"),
             slot("timing", "direction", 40), slot("field_interest", "direction", 30)]
@@ -53,6 +71,17 @@ def test_canonical_fact_wins_and_recent_pending_prevents_repeat():
     assert states["budget"].value == "15 lakh"
     assert states["budget"].status == "answered"
     assert next_open_slot(rows, states, student, "direction").key == "discovery.field_interest"
+
+
+def test_accepted_budget_preserves_student_range_words_for_summary():
+    rows = [slot("budget", "direction", 50, source_key="finance.budget")]
+    student = snapshot(facts={"finance.budget": {
+        "value": {"amount": 400000, "currency": "unspecified", "period": "per_year"},
+        "evidence": {"quote": "3-4 lakh per year"},
+    }})
+    state = resolve_slot_states(rows, student)["budget"]
+    assert state.answered
+    assert state.quote == "3-4 lakh per year"
 
 
 def test_unknown_and_declined_are_answered_but_empty_pending_is_not():
@@ -125,7 +154,95 @@ def test_pending_window_uses_five_student_turns_not_five_slot_rows():
             recent = CounselorSlotRegistry(db).pending_recent(workspace)
             assert "slot-0" not in recent
             assert len(recent) == 6
-            assert recent["slot-5"] == ("pending", "answer-5")
-            assert recent["shared"] == ("pending", "answer-5")
+            assert recent["slot-5"] == ("pending", "answer-5", None)
+            assert recent["shared"] == ("pending", "answer-5", None)
     finally:
         engine.dispose()
+
+
+def test_goal_reason_survives_more_than_five_turns_in_accepted_record():
+    with StudentSession() as student:
+        with student.factory() as db:
+            _seed_slots(db)
+            event_id = "goal-reason-turn"
+            db.add(EventRecord(id=event_id, network_id=student.workspace_id,
+                               type="workspace.message.posted", source=f"human:{student.user_id}",
+                               target="channel/pai", payload={"content": "I like lab work"},
+                               timestamp=student.next_timestamp()))
+            db.commit()
+            extraction = TurnExtraction((SlotClaim("goal_reason", "I like lab work", .9,
+                                                   "I like lab work",
+                                                   {"claim_owner": "student"}),),
+                                        "", "none", "en", ())
+            registry = CounselorSlotRegistry(db)
+            capture_turn_slots(db, student.workspace_id, event_id, extraction,
+                               registry.active(), StudentSnapshotService(db).build(student.workspace_id))
+            for number in range(6):
+                db.add(EventRecord(id=f"later-{number}", network_id=student.workspace_id,
+                                   type="workspace.message.posted", source=f"human:{student.user_id}",
+                                   target="channel/pai", payload={"content": "next"},
+                                   timestamp=student.next_timestamp()))
+            db.commit()
+            snapshot = StudentSnapshotService(db).build(student.workspace_id)
+            state = registry.states(student.workspace_id, snapshot)["goal_reason"]
+            assert state.answered
+            assert state.value == "I like lab work"
+
+
+def test_family_wish_is_accepted_as_external_influence():
+    with StudentSession() as student:
+        with student.factory() as db:
+            _seed_slots(db)
+            event_id = "family-turn"
+            db.add(EventRecord(id=event_id, network_id=student.workspace_id,
+                               type="workspace.message.posted", source=f"human:{student.user_id}",
+                               target="channel/pai", payload={"content": "my father wants medicine"},
+                               timestamp=student.next_timestamp()))
+            db.commit()
+            claim = SlotClaim("family_wish", {
+                "influencer_type": "parent", "source_label": "father",
+                "suggested_direction": "medicine", "influence_type": "career_suggestion",
+            }, .9, "my father wants medicine", {"claim_owner": "external"})
+            capture_turn_slots(db, student.workspace_id, event_id,
+                               TurnExtraction((claim,), "", "none", "en", ()),
+                               CounselorSlotRegistry(db).active(),
+                               StudentSnapshotService(db).build(student.workspace_id))
+            db.commit()
+            snapshot = StudentSnapshotService(db).build(student.workspace_id)
+            assert snapshot.records["external_influence"][0]["suggested_direction"] == "medicine"
+            assert not snapshot.records["goal"]
+
+
+def test_direction_answers_survive_without_a_chosen_goal_record():
+    with StudentSession() as student:
+        with student.factory() as db:
+            _seed_slots(db)
+            event_id = "direction-turn"
+            message = "UI/UX design; product designer at a software company; next fall"
+            db.add(EventRecord(id=event_id, network_id=student.workspace_id,
+                               type="workspace.message.posted", source=f"human:{student.user_id}",
+                               target="channel/pai", payload={"content": message},
+                               timestamp=student.next_timestamp()))
+            db.commit()
+            claims = tuple(SlotClaim(key, phrase, .9, phrase,
+                                     {"claim_owner": "student"}) for key, phrase in (
+                ("field_interest", "UI/UX design"),
+                ("envisioned_outcome", "product designer at a software company"),
+                ("timing", "next fall"),
+            ))
+            registry = CounselorSlotRegistry(db)
+            capture_turn_slots(db, student.workspace_id, event_id,
+                               TurnExtraction(claims, "", "none", "en", ()),
+                               registry.active(), StudentSnapshotService(db).build(student.workspace_id))
+            for number in range(6):
+                db.add(EventRecord(id=f"direction-later-{number}",
+                                   network_id=student.workspace_id,
+                                   type="workspace.message.posted", source=f"human:{student.user_id}",
+                                   target="channel/pai", payload={"content": "next"},
+                                   timestamp=student.next_timestamp()))
+            db.commit()
+            snapshot = StudentSnapshotService(db).build(student.workspace_id)
+            states = registry.states(student.workspace_id, snapshot)
+            assert all(states[key].answered for key in
+                       ("field_interest", "envisioned_outcome", "timing"))
+            assert not snapshot.records["goal"]

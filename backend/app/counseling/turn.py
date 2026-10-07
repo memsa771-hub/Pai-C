@@ -2,13 +2,15 @@
 
 import asyncio
 import logging
-from dataclasses import dataclass
+import time
+import uuid
+from dataclasses import dataclass, replace
 from typing import Callable, Awaitable
 
 from sqlalchemy import select
 
 from app.config import config
-from app.models import EventRecord, User, Workspace
+from app.models import CounselorTurnDecision, EventRecord, StudentJourney, User, Workspace
 from app.memory.student_snapshot import StudentSnapshotService
 from app.journey import JourneyService
 from .extraction import TurnExtraction, extract_turn
@@ -80,6 +82,19 @@ def _facts(states: dict[str, SlotState]) -> dict:
             if state.status in {"answered", "pending"} and state.value is not None}
 
 
+def _last_planned_slot(db, turn: CounselorTurnInput) -> str | None:
+    query = select(CounselorTurnDecision).where(
+        CounselorTurnDecision.workspace_id == turn.workspace_id)
+    if turn.timestamp is not None:
+        query = query.where(CounselorTurnDecision.source_timestamp < turn.timestamp)
+    row = db.execute(query.order_by(CounselorTurnDecision.source_timestamp.desc(),
+                                     CounselorTurnDecision.id.desc())
+                     .limit(1)).scalar_one_or_none()
+    value = (row.slot_key or ("goal_summary_confirmed"
+            if row.move == "summarize_for_confirmation" else None)) if row else None
+    return value if isinstance(value, str) else None
+
+
 def _reflect(extraction: TurnExtraction | None, states: dict[str, SlotState],
              returning: bool) -> tuple[str, ...]:
     def concise(key, value):
@@ -118,14 +133,31 @@ async def run_counselor_turn(
     requirements = registry.active()
     states = registry.states(turn.workspace_id, snapshot, before_timestamp=turn.timestamp)
     known = _facts(states)
+    expected_slot = _last_planned_slot(db, turn)
+    existing_journey = db.execute(select(StudentJourney).where(
+        StudentJourney.workspace_id == turn.workspace_id,
+        StudentJourney.journey_type == "counselor_decision",
+        StudentJourney.status == "active",
+    )).scalar_one_or_none()
+    awaiting_summary = bool(existing_journey and
+                            (existing_journey.counselor_summary_draft or {}).get("status")
+                            == "awaiting_confirmation")
     human = turn.source.startswith("human:")
     if human and turn.student_text.strip():
         scope, extraction = await asyncio.gather(
             classify_scope(turn.student_text, history),
-            extract_turn(turn.student_text, history, requirements, known),
+            extract_turn(turn.student_text, history, requirements, known,
+                         awaiting_summary=awaiting_summary,
+                         expected_slot=expected_slot),
         )
+        capture_extraction = extraction
+        if awaiting_summary and extraction.summary_response == "confirmed":
+            capture_extraction = replace(
+                extraction, claims=tuple(claim for claim in extraction.claims
+                                         if claim.key == "goal_summary_confirmed"),
+                unknown_or_declined=(), response_statuses=())
         capture_turn_slots(db, turn.workspace_id, turn.source_event_id,
-                           extraction, requirements, snapshot,
+                           capture_extraction, requirements, snapshot,
                            channel="voice" if turn.voice else "conversation")
         db.commit()
         snapshot = snapshots.build(turn.workspace_id)
@@ -157,6 +189,7 @@ async def run_counselor_turn(
         returning=returning and not correction,
         reflected_facts=_reflect(extraction, states, returning),
         awaiting_confirmation=awaiting, confirmed=confirmed,
+        first_turn=not history and not (extraction and extraction.claims),
     )
     understanding = StudentUnderstandingBuilder(db).build(turn.workspace_id, snapshot=snapshot)
     if writer is None:
@@ -176,6 +209,13 @@ async def run_counselor_turn(
     logger.info("counselor v2 turn=%s move=%s stage=%s slot=%s guard=%s",
                 turn.source_event_id, move.type, move.stage, move.slot_key,
                 ",".join(violations) or "pass")
+    db.add(CounselorTurnDecision(
+        id=str(uuid.uuid4()), workspace_id=turn.workspace_id,
+        source_event_id=turn.source_event_id,
+        source_timestamp=turn.timestamp if turn.timestamp is not None else int(time.time() * 1000),
+        move=move.type, slot_key=move.slot_key,
+        guard_violations=list(violations),
+    ))
     if move.type == "summarize_for_confirmation":
         from .guard_v2 import fallback_reply
         if approved != fallback_reply(move, requirements):

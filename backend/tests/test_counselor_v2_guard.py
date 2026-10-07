@@ -12,7 +12,7 @@ SLOT = SimpleNamespace(key="discovery.budget", canonical_questions={
     "ur": "آپ کتنا خرچ کر سکتے ہیں؟",
     "roman_ur": "Aap kitna kharch kar sakte hain?",
     "mixed": "Aap kitna kharch kar sakte hain?",
-})
+}, question_intent="Find affordable budget and currency")
 
 
 def move(**changes):
@@ -32,6 +32,9 @@ def move(**changes):
     ("What is your budget?", {}, {"budget": SlotState("budget", "pending", 100)}, "answered_slot_question"),
     ("I hear you.", {}, {}, "missing_planned_question"),
     ("What is your budget?", {"language": "ur"}, {}, "language_mismatch"),
+    ("Which universities do you prefer?", {}, {}, "wrong_slot_question"),
+    ("The word limit was declined by the system. What is your budget?", {}, {}, "internal_language"),
+    ("Your budget is student_budget_words. What is your budget?", {}, {}, "internal_language"),
 ])
 def test_deterministic_rules(reply, change, states, expected):
     assert expected in deterministic_violations(reply, move(**change), states, [SLOT])

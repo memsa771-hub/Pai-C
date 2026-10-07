@@ -15,6 +15,7 @@ class SlotState:
     key: str
     status: str  # answered | pending | valid_unknown | declined | missing
     value: Any = None
+    quote: str | None = None
 
     @property
     def answered(self) -> bool:
@@ -36,18 +37,38 @@ def _canonical_value(requirement: ProfileRequirement, snapshot: StudentSnapshot)
     rows = ProfileRequirementRegistry(None).select_records(requirement, snapshot)
     if short_key(requirement) == "subject_likes":
         rows = [row for row in rows if row.get("voice_type") in {"interest", "dislike"}]
+    if short_key(requirement) == "goal_reason":
+        rows = [row for row in rows if row.get("voice_type") == "motivation"]
+    if short_key(requirement) in {"field_interest", "envisioned_outcome", "timing"}:
+        tags = {"field_interest": ("interest", "field_interest"),
+                "envisioned_outcome": ("direction", "envisioned_outcome"),
+                "timing": ("preference", "target_intake")}
+        voice_type, direction = tags[short_key(requirement)]
+        rows = [row for row in rows if row.get("voice_type") == voice_type
+                and row.get("direction") == direction]
     if short_key(requirement) == "family_wish":
         rows = [row for row in rows if row.get("influencer_type") in {"parent", "sibling", "other"}]
     for row in rows:
         value = value_at(row, requirement.source_path)
         if is_filled(value):
             return value
+    # Preserve answers already accepted under the earlier slot-source versions.
+    if requirement.source_key == "student_voice_statement":
+        key = short_key(requirement)
+        if key == "field_interest":
+            return snapshot.fact_value("career.primary_interest")
+        if key in {"envisioned_outcome", "timing"}:
+            path = "details.underlying_objective" if key == "envisioned_outcome" else "details.target_intake"
+            for goal in snapshot.records.get("goal", ()):
+                value = value_at(goal, path)
+                if is_filled(value):
+                    return value
     return None
 
 
 def resolve_slot_states(
     requirements: Sequence[ProfileRequirement], snapshot: StudentSnapshot,
-    *, pending: Mapping[str, tuple[str, Any]] | None = None,
+    *, pending: Mapping[str, tuple] | None = None,
     responses: Mapping[str, str] | None = None,
 ) -> dict[str, SlotState]:
     """Canonical accepted facts win; recent pending answers prevent re-asks."""
@@ -58,10 +79,16 @@ def resolve_slot_states(
         key = short_key(requirement)
         value = _canonical_value(requirement, snapshot)
         if is_filled(value):
-            states[key] = SlotState(key, "answered", value)
+            evidence = ((snapshot.facts.get(requirement.source_key) or {}).get("evidence") or {}
+                        if requirement.source_type == "vault_fact" else {})
+            quote = evidence.get("quote") if isinstance(evidence, dict) else None
+            states[key] = SlotState(key, "answered", value,
+                                    quote if isinstance(quote, str) else None)
         elif key in pending:
-            status, value = pending[key]
-            states[key] = SlotState(key, status, value)
+            answer = pending[key]
+            status, value = answer[:2]
+            states[key] = SlotState(key, status, value,
+                                    answer[2] if len(answer) > 2 else None)
         elif responses.get(requirement.key) in {"valid_unknown", "declined"}:
             states[key] = SlotState(key, responses[requirement.key])
         else:
@@ -118,7 +145,7 @@ class CounselorSlotRegistry:
         return [row for row in self.requirements.active()
                 if row.stage in {"foundation", "direction", "summary"}]
 
-    def pending_recent(self, workspace_id: str, *, before_timestamp: int | None = None) -> dict[str, tuple[str, Any]]:
+    def pending_recent(self, workspace_id: str, *, before_timestamp: int | None = None) -> dict[str, tuple]:
         """Only answers from the last five actual student messages count."""
         query = select(EventRecord.id).where(
             EventRecord.network_id == workspace_id,
@@ -137,9 +164,9 @@ class CounselorSlotRegistry:
             CounselorSlotAnswer.workspace_id == workspace_id,
             CounselorSlotAnswer.source_event_id.in_(event_ids),
         ).order_by(EventRecord.timestamp.desc(), EventRecord.id.desc())).scalars().all()
-        answers: dict[str, tuple[str, Any]] = {}
+        answers: dict[str, tuple] = {}
         for row in rows:
-            answers.setdefault(row.slot_key, (row.status, row.value))
+            answers.setdefault(row.slot_key, (row.status, row.value, row.quote))
         return answers
 
     def states(self, workspace_id: str, snapshot: StudentSnapshot,

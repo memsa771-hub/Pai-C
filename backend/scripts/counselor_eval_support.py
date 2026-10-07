@@ -19,7 +19,7 @@ from app.memory.student_records import ENTITY_MODELS, StudentRecordService
 from app.memory.vault import VaultService
 from app.models import (
     BackgroundJob, DocumentArtifact, EventRecord, ExecutionRun, FileRecord,
-    CounselorSlotAnswer, MemoryCandidate, PaiEpisode, PaiMemory, ProfileFieldResponse, ProfileIssue, ProfileRequirement, StudentRecordRevision,
+    CounselorSlotAnswer, CounselorTurnDecision, MemoryCandidate, PaiEpisode, PaiMemory, ProfileFieldResponse, ProfileIssue, ProfileRequirement, StudentRecordRevision,
     StudentJourney, StudentJourneyEvent, Opportunity, RequirementSet, Roadmap, RoadmapStudentState,
     NotificationRecord, User, VaultFact, VaultFieldDefinition, Workspace,
     WorkspaceMember, VAULT_INTAKE_MODELS,
@@ -73,6 +73,7 @@ class StudentSession:
                   DocumentArtifact,
                   VaultFact, VaultFieldDefinition, MemoryCandidate, PaiMemory, PaiEpisode,
                   ProfileFieldResponse, ProfileIssue, ProfileRequirement, CounselorSlotAnswer,
+                  CounselorTurnDecision,
                   StudentRecordRevision, BackgroundJob,
                   StudentJourney, StudentJourneyEvent, Opportunity, RequirementSet,
                   Roadmap, RoadmapStudentState, NotificationRecord,

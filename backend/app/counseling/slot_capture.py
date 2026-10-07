@@ -27,6 +27,13 @@ def _text(value: Any) -> str | None:
     return value.strip() if isinstance(value, str) and value.strip() else None
 
 
+def _student_clause(claim: SlotClaim) -> str:
+    """Keep accepted voice records tied to verbatim student-owned words."""
+    attribution = claim.attribution or {}
+    clause = attribution.get("student_clause_quote") if attribution.get("claim_owner") == "mixed" else None
+    return clause if isinstance(clause, str) and clause.strip() else claim.quote
+
+
 def _numbers_supported(value: dict, quote: str) -> bool:
     observed = {float(number) for number in re.findall(r"\d+(?:\.\d+)?", quote)}
     return all(float(item) in observed for item in value.values()
@@ -120,15 +127,35 @@ def _record_proposals(claims: dict[str, SlotClaim], snapshot: StudentSnapshot) -
         proposals.append(("external_influence", family, ["family_wish"], None))
     likes = _value(claims, "subject_likes")
     if _text(likes):
-        proposals.append(("student_voice_statement", {"voice_type": "interest", "statement": likes},
+        proposals.append(("student_voice_statement", {"voice_type": "interest",
+                          "statement": _student_clause(claims["subject_likes"])},
                           ["subject_likes"], None))
+    reason = _text(_value(claims, "goal_reason"))
+    if reason:
+        goal_value = _value(claims, "stated_goal")
+        direction = (goal_value.get("title") if isinstance(goal_value, dict) else None)
+        values = {"voice_type": "motivation",
+                  "statement": _student_clause(claims["goal_reason"])}
+        if direction:
+            values["direction"] = direction
+        proposals.append(("student_voice_statement", values, ["goal_reason"], None))
+    for key, voice_type, direction in (
+        ("field_interest", "interest", "field_interest"),
+        ("envisioned_outcome", "direction", "envisioned_outcome"),
+        ("timing", "preference", "target_intake"),
+    ):
+        claim = claims.get(key)
+        if claim is not None and _text(claim.value):
+            proposals.append(("student_voice_statement", {
+                "voice_type": voice_type, "statement": _student_clause(claim),
+                "direction": direction,
+            }, [key], None))
     return proposals
 
 
 def _vault_proposals(claims: dict[str, SlotClaim]) -> list[tuple[str, Any, list[str]]]:
     proposals = []
     mappings = {
-        "field_interest": "career.primary_interest",
         "budget": "finance.budget",
         "study_mode": "preferences.study_load",
         "location_limits": "preferences.location_limits",
@@ -137,7 +164,7 @@ def _vault_proposals(claims: dict[str, SlotClaim]) -> list[tuple[str, Any, list[
         if key not in claims:
             continue
         value = claims[key].value
-        if key in {"field_interest", "study_mode"} and not _text(value):
+        if key == "study_mode" and not _text(value):
             continue
         if key == "budget" and not isinstance(value, dict):
             continue
@@ -207,7 +234,8 @@ def capture_turn_slots(db, workspace_id: str, source_event_id: str,
             source_type="conversation", input_channel=channel,
             source_event_ids=[source_event_id],
             entities={"record_id": record_id} if record_id else {},
-            evidence={"quote": anchor.quote, "slot_quotes": {key: claims[key].quote for key in keys}},
+            evidence={"quote": anchor.quote, "slot_quotes": {key: claims[key].quote for key in keys},
+                      **({"attribution": anchor.attribution} if anchor.attribution else {})},
         )
         reconciler.reconcile(candidate)
         candidate_ids.append(candidate.id)

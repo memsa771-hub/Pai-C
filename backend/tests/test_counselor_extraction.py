@@ -24,7 +24,8 @@ def requirement(key, *, accepts_unknown=True):
 def envelope(slots, *, language="en", unknown=(), question="", emotion="none"):
     return json.dumps({"slots": slots, "student_question": question,
                        "emotion": emotion, "language": language,
-                       "unknown_or_declined": list(unknown)}, ensure_ascii=False)
+                       "unknown_or_declined": list(unknown),
+                       "summary_response": "other"}, ensure_ascii=False)
 
 
 @pytest.mark.parametrize("message,language,quote", [
@@ -86,6 +87,92 @@ def test_low_confidence_and_missing_quote_cannot_answer_slot():
         assert result.claims == ()
 
 
+def test_typed_result_and_scalar_wrapper_reach_canonical_candidate_shape():
+    rows = [requirement("academic_result"), requirement("academic_status")]
+    message = "I finished FSc with 844/1100"
+    slots = {
+        "academic_result": {"value": {"marks_obtained": 844, "marks_total": 1100,
+                                      "gpa": None, "gpa_scale": None,
+                                      "percentage": None, "grade": None},
+                            "confidence": 0.9, "quote": "844/1100"},
+        "academic_status": {"value": {"value": "completed"},
+                            "confidence": 0.9, "quote": "finished"},
+    }
+    result = parse_extraction(envelope(slots), message, rows)
+    assert {claim.key: claim.value for claim in result.claims} == {
+        "academic_result": {"marks_obtained": 844, "marks_total": 1100},
+        "academic_status": "completed",
+    }
+
+
+def test_graduation_year_is_not_a_target_intake():
+    message = "BS electrical engineering done 2025. I want MS in Germany"
+    rows = [requirement("recent_qualification"), requirement("stated_goal"),
+            requirement("timing")]
+    slots = {
+        "recent_qualification": {"value": {"qualification_name": "BS electrical engineering"},
+                                 "confidence": .9, "quote": "BS electrical engineering done 2025"},
+        "stated_goal": {"value": {"title": "MS in Germany", "goal_type": "education"},
+                        "confidence": .9, "quote": "MS in Germany"},
+        "timing": {"value": "2025", "confidence": .9, "quote": "2025"},
+    }
+    result = parse_extraction(envelope(slots), message, rows)
+    assert "timing" not in {claim.key for claim in result.claims}
+
+
+def test_timing_claim_survives_null_other_slots():
+    message = "I want to start next year"
+    rows = [requirement("recent_qualification"), requirement("envisioned_outcome"),
+            requirement("timing")]
+    result = parse_extraction(envelope({"recent_qualification": None,
+                                        "envisioned_outcome": None,
+                                        "timing": {"value": "next year", "confidence": .9,
+                                                   "quote": "next year"}}),
+                              message, rows)
+    assert result.claims[0].key == "timing"
+
+
+def test_direct_answer_survives_omitted_general_slot():
+    rows = [requirement("goal_reason")]
+    message = "i like solving puzzles and helping diagnose people"
+    item = {"value": message, "confidence": .9, "quote": message,
+            "attribution": {"claim_owner": "student", "student_clause_quote": None,
+                            "alignment_quote": None}}
+    raw = json.dumps({"slots": {"goal_reason": None},
+                      "answer_to_last_question": item,
+                      "student_question": "", "emotion": "none", "language": "en",
+                      "unknown_or_declined": []})
+    result = parse_extraction(raw, message, rows, expected_slot="goal_reason")
+    assert result.claims[0].key == "goal_reason"
+    assert result.claims[0].attribution["claim_owner"] == "student"
+
+
+def test_undecided_answer_to_goal_question_is_valid_unknown():
+    rows = [requirement("stated_goal")]
+    raw = json.dumps({"slots": {"stated_goal": None},
+                      "answer_to_last_question": None,
+                      "last_question_status": "unknown",
+                      "student_question": "", "emotion": "stressed", "language": "en",
+                      "unknown_or_declined": [], "summary_response": "other"})
+    result = parse_extraction(raw, "i'm feeling stuck and don't know what to do",
+                              rows, expected_slot="stated_goal")
+    assert result.unknown_or_declined == ("stated_goal",)
+    assert result.response_statuses == (("stated_goal", "valid_unknown"),)
+
+
+def test_exact_last_answer_excerpt_fills_scalar_timing_only():
+    rows = [requirement("timing")]
+    message = "Main 2026 ke fall intake se shuru karna chahta hun"
+    raw = json.dumps({"slots": {"timing": None}, "answer_to_last_question": None,
+                      "answer_text": "2026 ke fall intake",
+                      "last_question_status": "answered", "student_question": "",
+                      "emotion": "none", "language": "roman_ur",
+                      "unknown_or_declined": [], "summary_response": "other"})
+    result = parse_extraction(raw, message, rows, expected_slot="timing")
+    assert result.claims[0].value == "2026 ke fall intake"
+    assert result.claims[0].quote in message
+
+
 def test_record_patch_targets_matching_qualification_and_family_stays_separate():
     snapshot = StudentSnapshot("student", {}, {
         "education": [
@@ -111,6 +198,19 @@ def test_record_patch_targets_matching_qualification_and_family_stays_separate()
     assert "academic_result" not in proposals[0][2]
 
 
+def test_goal_reason_has_durable_student_voice_candidate_with_multiple_goals():
+    snapshot = StudentSnapshot("student", {}, {
+        "goal": [{"id": "old", "title": "MBBS"},
+                 {"id": "new", "title": "explore lab work"}],
+    }, (), datetime.now(timezone.utc))
+    proposals = _record_proposals({
+        "goal_reason": SlotClaim("goal_reason", "I like practical lab work", .9,
+                                 "I like practical lab work")}, snapshot)
+    assert any(kind == "student_voice_statement" and values == {
+        "voice_type": "motivation", "statement": "I like practical lab work",
+    } for kind, values, _, _ in proposals)
+
+
 @pytest.mark.asyncio
 async def test_one_aux_model_call_receives_same_context_without_channel():
     rows = [requirement("field_interest")]
@@ -118,13 +218,26 @@ async def test_one_aux_model_call_receives_same_context_without_channel():
                                              "quote": "biology"}}, language="roman_ur")
     with patch("app.counseling.extraction.chat_completion", new=AsyncMock(return_value=response)) as model:
         result = await extract_turn("biology pasand hai", [{"role": "user", "content": "hello"}],
-                                    rows, {"city": "Lahore"})
+                                    rows, {"city": "Lahore"}, expected_slot="field_interest")
     assert result.claims[0].value == "biology"
     model.assert_awaited_once()
     call = model.call_args.kwargs
     assert call["response_format"]["type"] == "json_schema"
     assert "channel" not in call["messages"][0]["content"]
     assert "Lahore" in call["messages"][0]["content"]
+    assert "field_interest" in call["system_prompt"]
+
+
+@pytest.mark.asyncio
+async def test_empty_structured_response_retries_once_with_larger_limit():
+    rows = [requirement("field_interest")]
+    valid = envelope({"field_interest": {"value": "biology", "confidence": .9,
+                                         "quote": "biology"}})
+    with patch("app.counseling.extraction.chat_completion",
+               new=AsyncMock(side_effect=["", valid])) as model:
+        result = await extract_turn("biology", [], rows, {})
+    assert result.claims[0].value == "biology"
+    assert [call.kwargs["max_tokens"] for call in model.await_args_list] == [1200, 2400]
 
 
 def test_capture_routes_student_claims_through_candidates_and_reconciler():

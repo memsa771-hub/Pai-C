@@ -1239,6 +1239,24 @@ class CounselorSlotAnswer(Base):
     )
 
 
+class CounselorTurnDecision(Base):
+    """Private, durable move audit for the next turn's extraction focus."""
+    __tablename__ = "pai_counselor_turn_decisions"
+
+    id = Column(Text, primary_key=True, default=_uuid)
+    workspace_id = Column(UUID(as_uuid=False), ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False)
+    source_event_id = Column(Text, nullable=False)
+    source_timestamp = Column(BigInteger, nullable=False)
+    move = Column(Text, nullable=False)
+    slot_key = Column(Text, nullable=True)
+    guard_violations = Column(JSONB, nullable=False, default=list, server_default=text("'[]'"))
+
+    __table_args__ = (
+        UniqueConstraint("workspace_id", "source_event_id", name="uq_counselor_turn_decision_source"),
+        Index("idx_counselor_turn_decision_recent", "workspace_id", "source_timestamp"),
+    )
+
+
 class VaultFact(Base):
     """One canonical structured fact about the student, with provenance.
 

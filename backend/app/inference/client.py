@@ -9,7 +9,7 @@ from typing import Optional
 from openai import AsyncOpenAI, OpenAI
 
 
-REASONING_EFFORTS = ("none", "low", "medium", "high")
+REASONING_EFFORTS = ("none", "minimal", "low", "medium", "high")
 _NO_NONE_MODELS_PREFIXES = ("gpt-5-mini",)
 
 

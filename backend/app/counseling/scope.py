@@ -16,11 +16,14 @@ async def classify_scope(student_text: str, history: list[dict]) -> str:
         }, ensure_ascii=False)}],
         system_prompt=(
             "Classify the current student message. crisis means immediate danger or "
-            "self-harm; wellbeing means distress needing a supportive pause; off_topic "
+            "self-harm; wellbeing means severe distress needing a supportive pause, "
+            "beyond ordinary admission disappointment or family pressure. Missing a "
+            "desired program, feeling down, or feeling lost about study is in_scope; "
+            "the separate emotion field allows brief empathy while discovery continues. off_topic "
             "means unrelated to education or career. Education, career, and normal "
             "feelings about them are in_scope. Return JSON only."
         ),
-        max_tokens=60,
+        max_tokens=150, reasoning_effort="minimal",
         response_format={"type": "json_schema", "json_schema": {
             "name": "pai_counselor_scope", "strict": True,
             "schema": {"type": "object", "properties": {"scope": {

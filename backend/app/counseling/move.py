@@ -35,7 +35,8 @@ def plan_move(*, stage: str, requirements: Sequence[ProfileRequirement],
               states: Mapping[str, SlotState], snapshot: Any, scope: str,
               student_question: str, emotion: str, language: str,
               returning: bool = False, awaiting_confirmation: bool = False,
-              confirmed: bool = False, reflected_facts: Sequence[str] = ()) -> CounselorMove:
+              confirmed: bool = False, reflected_facts: Sequence[str] = (),
+              first_turn: bool = False) -> CounselorMove:
     """Precedence is explicit; channel, models and databases cannot affect it."""
     language = language if language in {"en", "ur", "roman_ur", "mixed"} else "en"
     reflect = tuple(str(value) for value in reflected_facts if value)[:2]
@@ -48,7 +49,7 @@ def plan_move(*, stage: str, requirements: Sequence[ProfileRequirement],
     if confirmed and awaiting_confirmation:
         return CounselorMove("confirm_and_queue_research", None, None, reflect,
                              None, language, 60, stage)
-    if returning:
+    if returning and key is not None and not awaiting_confirmation:
         return CounselorMove("returning_student", key, intent, reflect, None,
                              language, 60, stage)
     if scope == "off_topic":
@@ -56,6 +57,8 @@ def plan_move(*, stage: str, requirements: Sequence[ProfileRequirement],
                              language, 50, stage)
     if stage == "RESEARCHING":
         return CounselorMove("ask", None, None, reflect, None, language, 60, stage)
+    if first_turn:
+        return CounselorMove("greet", key, intent, reflect, None, language, 60, stage)
     if awaiting_confirmation:
         summary_slot = _next(requirements, states, snapshot, "summary")
         if student_question:
