@@ -19,7 +19,7 @@ ENTRYPOINT ["./entrypoint.sh"]
 # It omits Chromium and its OS libraries, reducing cold build time and size.
 FROM python-deps AS cloud
 COPY . .
-RUN chmod +x entrypoint.sh
+RUN sed -i 's/\r$//' entrypoint.sh && chmod +x entrypoint.sh
 
 # Default image retains local Playwright/Chromium for self-hosted and fallback
 # browser use. Browser installation stays cached when application code changes.
@@ -34,4 +34,4 @@ RUN --mount=type=cache,id=pai-os-playwright-shell,target=/root/.cache/playwright
 
 FROM browser-deps AS browser
 COPY . .
-RUN chmod +x entrypoint.sh
+RUN sed -i 's/\r$//' entrypoint.sh && chmod +x entrypoint.sh
