@@ -21,7 +21,8 @@ from scripts.counselor_eval_support import StudentSession
 def test_one_runtime_and_no_deleted_imports_or_mode_switch():
     root = Path(__file__).resolve().parents[1] / "app"
     deleted = {"core", "turn_plan", "turn_semantics", "goal_transition", "evaluator",
-               "continuous_discovery", "decision_sufficiency", "reply_guard", "turn_contract"}
+               "continuous_discovery", "decision_sufficiency", "reply_guard", "turn_contract",
+               "policy", "state", "research_flow"}
     assert not hasattr(config, "PAI_COUNSELOR_MODE")
     assert not hasattr(runtime, "_run_legacy_turn")
     for name in deleted:

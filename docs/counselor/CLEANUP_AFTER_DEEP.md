@@ -58,17 +58,46 @@ new research requires a confirmed mirror. Stale refreshes remain supported.
 
 ## Retained modules and importers
 
-Production importer inventory (relative to `backend/app/`):
+Production importer inventory after the follow-up code cleanup (relative to
+`backend/app/`):
 
 | Module | Importers | Why retained |
 | --- | --- | --- |
 | `understanding.py` | `counseling/baseline.py`, `services/operator.py`, `memory/handlers.py` | Canonical student understanding for research and baseline checks |
 | `discovery.py` | `counseling/understanding.py`, `memory/discovery_intake.py` | Existing discovery data projection/status compatibility |
 | `baseline.py` | `services/operator.py` | Background result baseline validation |
-| `policy.py` | `counseling/__init__.py`, `tools/__init__.py`, `tools/executor.py`, `tools/registry.py` | Shared tool permission contracts, not a second conversation runtime |
-| `state.py` | `counseling/__init__.py`, `counseling/policy.py`, `journey/__init__.py` | Shared state types and Journey contracts |
-| `context_projection.py` | `counseling/research_flow.py` | Compact research brief projection |
-| `research_flow.py` | `counseling/research_gateway.py`, `memory/handlers.py` | Existing research brief and refresh entry point |
+| `context_projection.py` | `counseling/research_gateway.py` | Compact research brief projection |
+| `research_gateway.py` | `memory/handlers.py` | Single guarded research entry point and private brief/delegation helpers |
+
+`understanding.py`, `baseline.py`, `discovery.py`, `context_projection.py` and
+`memory/discovery_intake.py` are scheduled for removal in PR 7/8, when the research
+brief is built from the confirmed Mirror, Notebook and student snapshot. Their
+remaining consumers must be migrated first; deep profile context already uses
+the student snapshot independently. This cleanup does not remove or replace
+their current behavior.
+
+### Follow-up code cleanup
+
+Removed the dead Counselor policy/state modules and emptied the package exports.
+Before deletion, the policy was imported only by the Counselor package initializer;
+the state was imported only by that policy and initializer. `tools/policy.py` and
+`journey/state.py` are separate active modules and remain unchanged.
+
+The old research-flow module was folded into `research_gateway.py`. The brief
+builder and delegation implementation are private there; reconciliation now calls
+the public `request_research` directly, removing the redundant forwarding wrapper.
+The old module's importers were the gateway, memory handler and two test files;
+all were updated. The two old journey/recorded-research evaluation scripts were
+imported only by `tests/test_counselor_research.py`. Their meaningful assertions
+now live in `tests/test_counselor_deep_research_contracts.py`: reported evidence,
+cited remediation, missing documents, rethink transitions, one question, and
+sourced stated/alternative/family routes with deterministic missing-fact requests.
+Repeated persona labels were replaced by the four distinct score/family cases.
+
+The cleanup is verified by both reference searches and an offline `python -c`
+import sweep of every Python module under `app/`, including the routers and job
+handlers. Importing modules does not start the application's lifespan or workers;
+network access is disabled for the sweep and backend suite.
 
 Other retained compatibility: `services/counselor_prompt.py` is imported by
 `services/pai.py`; its shared prompt is used by background handoff. It is not the

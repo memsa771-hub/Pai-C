@@ -137,9 +137,9 @@ async def resume_research(job, db) -> dict:
             for field in matching_fields[run_id]:
                 StudentRequestService(db).mark_answered(job.workspace_id, run_id, field)
             db.commit()
-    # The same accepted-fact event can complete the final goal-discovery
-    # field. Start research from the canonical snapshot without a new chat turn.
-    from app.counseling.research_flow import delegate_research_if_ready
+    # Resume permitted research from the canonical snapshot without a new chat
+    # turn; discovery alone must not bypass the mirror-confirmation gate.
+    from app.counseling.research_gateway import request_research
     from app.counseling.stages import advance_discovery_stage
     from app.counseling.understanding import StudentUnderstandingBuilder
     from app.journey import JourneyService
@@ -183,9 +183,10 @@ async def resume_research(job, db) -> dict:
         audience=AUDIENCE_COUNSELOR,
         granted_capabilities=capabilities_for_agent(PAI_AGENT_NAME),
     )
-    delegated = await delegate_research_if_ready(
-        db, job.workspace_id, journey, snapshot.records.get("goal", []),
-        understanding, counselor_ctx, refresh_key=refresh_key)
+    delegated = await request_research(
+        "stale_refresh" if refresh_key else "roadmap_light", job.workspace_id,
+        db=db, journey=journey, goals=snapshot.records.get("goal", []),
+        understanding=understanding, tool_context=counselor_ctx, refresh_key=refresh_key)
     return {"resumed": resumed, "delegated": bool(delegated and delegated.get("ok"))}
 
 

@@ -26,19 +26,6 @@ from app.tools.builtin import capabilities as capability_tools
 from app.tools.web_search import set_web_search_provider
 from app.memory.permissions import OPERATOR_CAPABILITIES
 from scripts.counselor_eval_support import StudentSession
-from scripts.eval_counselor_journey import check_workflow_scenarios
-from scripts.eval_counselor_research_recorded import evaluate_recorded
-
-
-def test_five_workflow_scenario_invariants():
-    assert all(check_workflow_scenarios().values())
-
-
-@pytest.mark.asyncio
-async def test_ten_persona_recorded_research_contracts():
-    results = await evaluate_recorded()
-    assert len(results) == 10
-    assert all(all(row["checks"].values()) for row in results)
 
 
 def test_six_research_capabilities_register_with_single_owners():
@@ -312,7 +299,7 @@ async def test_accepted_fact_event_resumes_same_paused_run_without_student_conti
         db.commit()
         with patch.object(operator, "resume", AsyncMock(return_value={
                 "ok": True, "data": {"resumed": True}})) as resumed, \
-                patch("app.counseling.research_flow.delegate_research_if_ready",
+                patch("app.counseling.research_gateway.request_research",
                       AsyncMock(return_value=None)):
             outcome = await resume_research(SimpleNamespace(
                 workspace_id=student.workspace_id, payload={"candidate_id": candidate.id}), db)
