@@ -68,21 +68,29 @@ async def _workspace_lock(db, workspace_id: str):
     if local is None:
         local = asyncio.Lock()
         _locks[workspace_id] = local
-    async with local:
-        connection = None
+    if local.locked():
+        raise AnalysisOrderPending("workspace analysis already running")
+    await local.acquire()
+    connection = None
+    acquired = False
+    try:
         if db.bind.dialect.name == "postgresql":
             key = int.from_bytes(hashlib.blake2b(
                 workspace_id.encode("utf-8"), digest_size=8).digest(), "big", signed=True)
             connection = db.bind.connect()
-            connection.execute(text("SELECT pg_advisory_lock(:key)"), {"key": key})
-        try:
-            yield
-        finally:
-            if connection is not None:
-                try:
+            acquired = bool(connection.execute(
+                text("SELECT pg_try_advisory_lock(:key)"), {"key": key}).scalar_one())
+            if not acquired:
+                raise AnalysisOrderPending("workspace analysis already running")
+        yield
+    finally:
+        if connection is not None:
+            try:
+                if acquired:
                     connection.execute(text("SELECT pg_advisory_unlock(:key)"), {"key": key})
-                finally:
-                    connection.close()
+            finally:
+                connection.close()
+        local.release()
 
 
 def _prior_job_pending(db, job) -> bool:
@@ -135,15 +143,18 @@ def _input(db, workspace_id: str, student: EventRecord, assistant: EventRecord,
 
 async def _candidate(db, workspace_id: str, student: EventRecord,
                      assistant: EventRecord, previous):
+    student_id = student.id
+    analyst_input = _input(db, workspace_id, student, assistant, previous.notebook)
+    # Do not hold read transactions or database connections across model calls.
+    db.rollback()
     raw = await chat_completion(
         api_key=config.PAI_API_KEY, model=config.PAI_ANALYST_MODEL,
-        messages=[{"role": "user", "content": _input(
-            db, workspace_id, student, assistant, previous.notebook)}],
+        messages=[{"role": "user", "content": analyst_input}],
         system_prompt=load_prompt("analyst"),
         response_format={"type": "json_object"},
         reasoning_effort=config.PAI_ANALYST_REASONING_EFFORT,
         base_url=config.PAI_BASE_URL,
-        usage_callback=usage_callback("analyst", config.PAI_ANALYST_MODEL, student.id),
+        usage_callback=usage_callback("analyst", config.PAI_ANALYST_MODEL, student_id),
     )
     try:
         parsed = json.loads(raw)
@@ -152,7 +163,8 @@ async def _candidate(db, workspace_id: str, student: EventRecord,
     if not isinstance(parsed, dict) or not isinstance(parsed.get("notebook"), dict):
         raise ValueError("analyst returned no notebook")
     candidate, issues = sanitize_notebook(parsed["notebook"])
-    with token_usage_turn(student.id):
+    db.rollback()
+    with token_usage_turn(student_id):
         filtered, removals = await filter_sensitive_changes(previous.notebook, candidate)
     return enforce_mirror_readiness(filtered), issues, removals
 

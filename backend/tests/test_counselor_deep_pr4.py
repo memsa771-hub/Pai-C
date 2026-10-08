@@ -1,8 +1,9 @@
 """Offline Analyst ordering, storage, stage and failure boundaries."""
 
+import asyncio
 import json
 from types import SimpleNamespace
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import uuid4
 
 import pytest
@@ -11,7 +12,7 @@ from sqlalchemy import select
 from app.config import config
 from app.counseling import runtime
 from app.counseling.deep.analysis import (
-    AnalysisOrderPending, analyze_job, enqueue_turn_analysis,
+    AnalysisOrderPending, _workspace_lock, analyze_job, enqueue_turn_analysis,
 )
 from app.counseling.deep.coverage import enforce_mirror_readiness
 from app.counseling.deep.notebook import NotebookService, NotebookVersionConflict
@@ -118,6 +119,69 @@ async def test_analysis_waits_for_earlier_workspace_turn():
             result = await analyze_job(second_job, db)
         assert result["version"] == 2
         assert model.await_count == 2
+
+
+@pytest.mark.asyncio
+async def test_second_workspace_analysis_retries_immediately_while_first_is_running():
+    with StudentSession() as student, student.factory() as db:
+        first_job, _ = _turn_job(student, db)
+        second_job, _ = _turn_job(student, db)
+        entered = asyncio.Event()
+        release = asyncio.Event()
+
+        async def paused_model(**_kwargs):
+            entered.set()
+            await release.wait()
+            return _model_notebook()
+
+        with patch("app.counseling.deep.analysis.chat_completion", side_effect=paused_model), \
+                patch("app.counseling.deep.analysis.filter_sensitive_changes", _no_sensitive):
+            first = asyncio.create_task(analyze_job(first_job, db))
+            await asyncio.wait_for(entered.wait(), 1)
+            try:
+                with pytest.raises(AnalysisOrderPending, match="already running"):
+                    await asyncio.wait_for(analyze_job(second_job, db), 0.1)
+            finally:
+                release.set()
+                await first
+
+
+@pytest.mark.asyncio
+async def test_postgres_advisory_lock_is_nonblocking():
+    connection = SimpleNamespace(execute=MagicMock(return_value=SimpleNamespace(
+        scalar_one=lambda: False)), close=MagicMock())
+    engine = SimpleNamespace(dialect=SimpleNamespace(name="postgresql"),
+                             connect=lambda: connection)
+    db = SimpleNamespace(bind=engine)
+    with pytest.raises(AnalysisOrderPending, match="already running"):
+        async with _workspace_lock(db, "test-workspace"):
+            pytest.fail("unavailable lock must not enter analysis")
+    assert "pg_try_advisory_lock" in str(connection.execute.call_args.args[0])
+    connection.close.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_no_read_transaction_during_analyst_or_sensitive_model_call():
+    with StudentSession() as student, student.factory() as db:
+        job, _ = _turn_job(student, db)
+        analyst_open = []
+        sensitive_open = []
+
+        async def analyst_response(**_kwargs):
+            analyst_open.append(db.in_transaction())
+            return _model_notebook(person={"daily_life": "A daily activity"})
+
+        async def sensitive_response(**kwargs):
+            sensitive_open.append(db.in_transaction())
+            entries = json.loads(kwargs["messages"][0]["content"])
+            return json.dumps({"decisions": [
+                {"path": entry["path"], "sensitive": False} for entry in entries]})
+
+        with patch("app.counseling.deep.analysis.chat_completion", side_effect=analyst_response), \
+                patch("app.counseling.deep.sensitive.chat_completion", side_effect=sensitive_response):
+            await analyze_job(job, db)
+        assert analyst_open == [False]
+        assert sensitive_open == [False]
 
 
 @pytest.mark.asyncio
@@ -269,6 +333,28 @@ async def test_one_batched_sensitive_model_call_per_analysis():
         assert sensitive.await_count == 1
         assert result["sensitive_removed"] == 1
         assert [claim.id for claim in NotebookService(db).get(student.workspace_id).notebook.claims] == ["b"]
+
+
+@pytest.mark.asyncio
+async def test_prepend_to_five_item_list_checks_only_new_entry():
+    def claim(index):
+        return {"id": str(index), "claim": f"Activity {index}",
+                "evidence_level": "claimed", "evidence": f"Statement {index}"}
+
+    prior = [claim(index) for index in range(5)]
+    previous = CounselorNotebookData.model_validate({"claims": prior})
+    candidate = CounselorNotebookData.model_validate({"claims": [claim(5), *prior]})
+    checked = []
+
+    async def fake_checker(entries):
+        checked.extend(entries)
+        return set()
+
+    cleaned, removals = await filter_sensitive_changes(previous, candidate, fake_checker)
+    assert checked == [{"path": "claims[0]", "text": json.dumps(
+        candidate.claims[0].model_dump(mode="json"), ensure_ascii=False, separators=(",", ":"))}]
+    assert len(cleaned.claims) == 6
+    assert removals == []
 
 
 @pytest.mark.asyncio

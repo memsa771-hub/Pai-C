@@ -75,13 +75,6 @@ def _default(field) -> Any:
     return field.default if field.default is not PydanticUndefined else _DROP
 
 
-def _prior_list_entry(old: list, item: Any, index: int) -> Any:
-    if isinstance(item, dict) and "id" in item:
-        return next((previous for previous in old if isinstance(previous, dict)
-                     and previous.get("id") == item["id"]), None)
-    return old[index] if index < len(old) else None
-
-
 def _nested_model(annotation: Any) -> type[BaseModel] | None:
     if isinstance(annotation, type) and issubclass(annotation, BaseModel):
         return annotation
@@ -102,7 +95,7 @@ def _changed_entries(old: dict, new: dict, model: type[BaseModel], path: str = "
             previous_entries = prior if isinstance(prior, list) else []
             entries.extend({"path": f"{field_path}[{index}]", "text": _entry_text(item)}
                            for index, item in enumerate(value)
-                           if item != _prior_list_entry(previous_entries, item, index))
+                           if item not in previous_entries)
         elif isinstance(value, dict) and (nested_model := _nested_model(field.annotation)):
             entries.extend(_changed_entries(prior or {}, value, nested_model, field_path))
         elif isinstance(value, str) and value and get_origin(field.annotation) is not Literal:

@@ -203,6 +203,7 @@ def _deep_foundation_ready(db, workspace_id: str) -> bool:
 
 
 def _research_delegate_allowed(mode: str, journey, refresh_key: str | None) -> bool:
+    """PR 6 mirror confirmation must set counselor_summary_draft.status='confirmed'."""
     if mode != "deep" or refresh_key is not None or journey.current_stage in {"PROPOSED", "CHOSEN"}:
         return True
     return (journey.current_stage == "RESEARCHING"
