@@ -11,6 +11,7 @@ from app.counseling.deep.context import DeepContext, build_context
 from app.counseling.deep.polish import contains_blocked_script, polish_reply
 from app.counseling.deep.prompts import load_prompt
 from app.counseling.deep.turn_input import CounselorTurnInput, shared_history
+from app.counseling.deep.usage import usage_callback
 from app.inference.client import chat_completion
 
 logger = logging.getLogger(__name__)
@@ -78,6 +79,7 @@ async def run_deep_turn(db, turn: CounselorTurnInput) -> DeepTurnResult:
         response_format={"type": "json_object"},
         reasoning_effort=config.PAI_COUNSELOR_REASONING_EFFORT,
         base_url=config.PAI_BASE_URL,
+        usage_callback=usage_callback("counselor", config.PAI_COUNSELOR_MODEL, turn.source_event_id),
     )
     model_ms = int((time.monotonic() - started) * 1000)
     polish_started = time.monotonic()
@@ -92,6 +94,7 @@ async def run_deep_turn(db, turn: CounselorTurnInput) -> DeepTurnResult:
             response_format={"type": "json_object"},
             reasoning_effort=config.PAI_COUNSELOR_REASONING_EFFORT,
             base_url=config.PAI_BASE_URL,
+            usage_callback=usage_callback("counselor_retry", config.PAI_COUNSELOR_MODEL, turn.source_event_id),
         )
         model_ms += int((time.monotonic() - retry_started) * 1000)
         polish_started = time.monotonic()

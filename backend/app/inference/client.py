@@ -4,7 +4,8 @@ Provider catalogs and user-managed credentials intentionally do not live here.
 PAI selects its model, key, and optional gateway once through server config.
 """
 
-from typing import Optional
+from collections.abc import Callable
+from typing import Any, Optional
 
 from openai import AsyncOpenAI, OpenAI
 
@@ -93,6 +94,7 @@ async def chat_completion(
     base_url: Optional[str] = None,
     response_format: Optional[dict] = None,
     temperature: Optional[float] = None,
+    usage_callback: Optional[Callable[[Any], None]] = None,
 ) -> str:
     """Return text from the configured PAI-compatible chat endpoint."""
     client = create_client(api_key, base_url=base_url)
@@ -116,6 +118,8 @@ async def chat_completion(
         response = await client.chat.completions.create(**kwargs)
         from app.plugins._shared.budget import record_model_usage
         record_model_usage(getattr(response, "usage", None))
+        if usage_callback is not None:
+            usage_callback(getattr(response, "usage", None))
         message = response.choices[0].message
         text = message.content or ""
         if not text and getattr(message, "reasoning", None):

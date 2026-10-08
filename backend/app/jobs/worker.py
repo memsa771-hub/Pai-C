@@ -248,6 +248,7 @@ def main() -> None:
     # worker must load them before it starts claiming.
     import app.memory.handlers  # noqa: F401
     import app.documents.handlers  # noqa: F401
+    import app.counseling.deep.analysis  # noqa: F401
 
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)

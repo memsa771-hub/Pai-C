@@ -139,16 +139,17 @@ async def test_fake_sensitive_checker_drops_changed_entry_and_keeps_academic_tex
     candidate, _ = sanitize_notebook(data)
     checked = []
 
-    async def fake_checker(text):
-        checked.append(text)
-        return "PTI supporter" in text
+    async def fake_checker(entries):
+        checked.append(entries)
+        return {entry["path"] for entry in entries if "PTI supporter" in entry["text"]}
 
     with caplog.at_level("INFO", logger="app.counseling.deep.sensitive"):
         cleaned, removals = await filter_sensitive_changes(previous, candidate, fake_checker)
     assert [claim.id for claim in cleaned.claims] == ["c1"]
     assert cleaned.person.daily_life == data["person"]["daily_life"]
     assert [item.path for item in removals] == ["claims[1]"]
-    assert len(checked) == 3
+    assert len(checked) == 1
+    assert len(checked[0]) == 3
     assert "PTI supporter" not in caplog.text
     assert "claims[1]" in caplog.text
 
@@ -159,14 +160,14 @@ async def test_fake_checker_removes_changed_scalar_and_skips_unchanged_entries()
     candidate, _ = sanitize_notebook(_note(emotional_notes="I was diagnosed with ADHD."))
     checked = []
 
-    async def fake_checker(text):
-        checked.append(text)
-        return True
+    async def fake_checker(entries):
+        checked.append(entries)
+        return {entry["path"] for entry in entries}
 
     cleaned, removals = await filter_sensitive_changes(previous, candidate, fake_checker)
     assert cleaned.emotional_notes == ""
     assert [item.path for item in removals] == ["emotional_notes"]
-    assert checked == [candidate.emotional_notes]
+    assert checked == [[{"path": "emotional_notes", "text": candidate.emotional_notes}]]
 
 
 @pytest.mark.asyncio
@@ -176,8 +177,8 @@ async def test_fake_checker_drops_sensitive_optional_goal_as_one_changed_entry()
         "stated_goal": {"text": "A personal affiliation", "first_said_turn": 1},
     })
 
-    async def fake_checker(text):
-        return True
+    async def fake_checker(entries):
+        return {entry["path"] for entry in entries}
 
     cleaned, removals = await filter_sensitive_changes(previous, candidate, fake_checker)
     assert cleaned.stated_goal is None
@@ -187,14 +188,14 @@ async def test_fake_checker_drops_sensitive_optional_goal_as_one_changed_entry()
 @pytest.mark.asyncio
 async def test_model_checker_uses_one_json_call_and_rejects_invalid_decision():
     with patch("app.counseling.deep.sensitive.chat_completion",
-               new=AsyncMock(return_value='{"sensitive":false}')) as model:
-        assert await model_sensitive_checker("A general academic topic") is False
+               new=AsyncMock(return_value='{"decisions":[{"path":"values[0]","sensitive":false}]}')) as model:
+        assert await model_sensitive_checker([{"path": "values[0]", "text": "A general academic topic"}]) == set()
     assert model.await_count == 1
     assert model.call_args.kwargs["response_format"] == {"type": "json_object"}
     with patch("app.counseling.deep.sensitive.chat_completion",
-               new=AsyncMock(return_value='{"sensitive":"maybe"}')):
-        with pytest.raises(ValueError, match="invalid decision"):
-            await model_sensitive_checker("A statement")
+               new=AsyncMock(return_value='{"decisions":[{"path":"values[0]","sensitive":"maybe"}]}')):
+        with pytest.raises(ValueError, match="invalid path or decision"):
+            await model_sensitive_checker([{"path": "values[0]", "text": "A statement"}])
 
 
 def test_one_invalid_claim_does_not_block_five_valid_claims(notebook_db):
