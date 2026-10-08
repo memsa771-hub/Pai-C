@@ -38,7 +38,7 @@ JOB_REFRESH_RESEARCH = "research.refresh_stale"
 
 async def refresh_stale_research(job, db) -> dict:
     """A reported or expired source starts a fresh Counselor research run."""
-    from app.counseling.research_flow import delegate_research_if_ready
+    from app.counseling.research_gateway import request_research
     from app.counseling.understanding import StudentUnderstandingBuilder
     from app.journey import JourneyService
     from app.memory.permissions import capabilities_for_agent
@@ -86,8 +86,9 @@ async def refresh_stale_research(job, db) -> dict:
                                  "country": opportunity.country,
                                  "level": opportunity.level,
                                  "intake": opportunity.intake}
-    result = await delegate_research_if_ready(
-        db, job.workspace_id, journey, goals, understanding, context,
+    result = await request_research(
+        "stale_refresh", job.workspace_id, db=db, journey=journey, goals=goals,
+        understanding=understanding, tool_context=context,
         refresh_key=requirement_id or job.id, refresh_candidate=refresh_candidate)
     return {"delegated": bool(result and result.get("ok"))}
 

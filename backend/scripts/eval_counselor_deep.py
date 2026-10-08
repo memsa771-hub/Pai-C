@@ -22,6 +22,7 @@ from unittest.mock import patch
 
 from app.config import config
 from app.counseling.deep.analysis import analyze_job, enqueue_turn_analysis
+from app.counseling.deep.actions import dispatch_action
 from app.counseling.deep.notebook import NotebookService
 from app.counseling.deep.polish import contains_blocked_script
 from app.counseling.deep.turn import run_deep_turn
@@ -246,6 +247,7 @@ def _metrics(persona: dict, turns: list[dict], notebook: dict, grader: dict | No
         "unsourced_world_facts": (grader or {}).get("unsourced_world_facts"),
         "yes_man_replies": (grader or {}).get("yes_man_replies"),
         "turns_to_mirror": mirror_turn,
+        "note_question": sum(turn["action"].get("type") == "note_question" for turn in turns),
         "latency_p50_ms": _percentile([turn["counselor_latency_ms"] for turn in turns], 0.5),
         "latency_p95_ms": _percentile([turn["counselor_latency_ms"] for turn in turns], 0.95),
         "pipeline_p50_ms": _percentile([turn["pipeline_ms"] for turn in turns], 0.5),
@@ -306,6 +308,8 @@ async def evaluate_persona(persona: dict, ledger: UsageLedger, *, live: bool,
                                                   persona.get("channel") == "voice")
                         with phase("counselor"):
                             answer = await run_deep_turn(db, turn)
+                        action_kind, action_status = await dispatch_action(
+                            db, turn, answer.action, answer.context)
                         counselor_latency_ms = round((time.monotonic() - start) * 1000)
                         assistant_id = await student.post_response(
                             db, student.workspace_id, turn.channel, "pai", answer.reply, 0)
@@ -328,7 +332,8 @@ async def evaluate_persona(persona: dict, ledger: UsageLedger, *, live: bool,
                     calls = ledger.calls[before:]
                     result["turns"].append({
                         "turn": index, "student": message, "reply": answer.reply,
-                        "action": answer.action, "counselor_latency_ms": counselor_latency_ms,
+                        "action": {**answer.action, "type": action_kind},
+                        "action_status": action_status, "counselor_latency_ms": counselor_latency_ms,
                         "pipeline_ms": round((time.monotonic() - start) * 1000),
                         "model_calls": len(calls), "usage": calls,
                         "cost_usd": round(sum(call["cost_usd"] for call in calls), 8),

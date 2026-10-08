@@ -143,3 +143,40 @@ async def filter_sensitive_changes(
     if output is _DROP:
         raise ValueError("sensitive check could not clean notebook")
     return CounselorNotebookData.model_validate(output), removals
+
+
+async def check_notebook_before_mirror(workspace_id: str, *, db=None,
+                                       checker: SensitiveChecker | None = None):
+    """Batch the whole notebook once before PR 6 generates a mirror.
+
+    Return (snapshot, removals). Removed content is persisted with optimistic
+    locking, and readiness is cleared so discovery can repair the gaps. A
+    failed check or concurrent update raises; callers must not generate a
+    mirror from an unchecked or stale snapshot. No read transaction is kept
+    open during the model call.
+    """
+    from app.counseling.deep.notebook import NotebookService, NotebookVersionConflict
+    from app.counseling.deep.usage import token_usage_turn
+    from app.database import new_session
+
+    if db is None:
+        with new_session() as session:
+            return await check_notebook_before_mirror(workspace_id, db=session, checker=checker)
+    service = NotebookService(db)
+    previous = service.get(workspace_id)
+    db.rollback()
+    with token_usage_turn(previous.last_event_id):
+        clean, removals = await filter_sensitive_changes(
+            CounselorNotebookData(), previous.notebook,
+            checker=checker or model_sensitive_checker)
+    current = service.get(workspace_id)
+    if current.version != previous.version:
+        db.rollback()
+        raise NotebookVersionConflict("notebook changed during pre-mirror check")
+    if not removals:
+        db.rollback()
+        return previous, []
+    clean = clean.model_copy(update={"mirror_ready": False})
+    snapshot, _ = service.apply(workspace_id, clean, previous.last_event_id,
+                                expected_version=previous.version)
+    return snapshot, removals

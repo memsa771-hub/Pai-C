@@ -16,8 +16,7 @@ from app.counseling.deep.notebook import NotebookService, NotebookVersionConflic
 from app.counseling.deep.notebook_sanitize import sanitize_notebook
 from app.counseling.deep.notebook_schema import CounselorNotebookData
 from app.counseling.deep.prompts import load_prompt
-from app.counseling.deep.sensitive import filter_sensitive_changes
-from app.counseling.deep.usage import token_usage_turn, usage_callback
+from app.counseling.deep.usage import usage_callback
 from app.counseling.stages import advance_discovery_stage
 from app.inference.client import chat_completion
 from app.jobs.service import BackgroundJobService, job_handlers
@@ -163,10 +162,7 @@ async def _candidate(db, workspace_id: str, student: EventRecord,
     if not isinstance(parsed, dict) or not isinstance(parsed.get("notebook"), dict):
         raise ValueError("analyst returned no notebook")
     candidate, issues = sanitize_notebook(parsed["notebook"])
-    db.rollback()
-    with token_usage_turn(student_id):
-        filtered, removals = await filter_sensitive_changes(previous.notebook, candidate)
-    return enforce_mirror_readiness(filtered), issues, removals
+    return enforce_mirror_readiness(candidate), issues, []
 
 
 def _advance_stage(db, workspace_id: str, notebook) -> None:

@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session
 
 from app.counseling.deep.notebook_schema import CounselorNotebookData
 from app.counseling.deep.notebook_sanitize import SanitizationIssue, sanitize_notebook
-from app.models import CounselorNotebook, CounselorNotebookHistory, EventRecord, Workspace
+from app.models import CounselorNotebook, CounselorNotebookHistory, CounselorNotedQuestion, EventRecord, Workspace
 
 
 class NotebookVersionConflict(Exception):
@@ -122,5 +122,6 @@ class NotebookService:
 
     def delete_for_workspace(self, workspace_id: str) -> None:
         """Purge private notes within the caller's workspace-delete transaction."""
+        self.db.execute(delete(CounselorNotedQuestion).where(CounselorNotedQuestion.workspace_id == workspace_id))
         self.db.execute(delete(CounselorNotebookHistory).where(CounselorNotebookHistory.workspace_id == workspace_id))
         self.db.execute(delete(CounselorNotebook).where(CounselorNotebook.workspace_id == workspace_id))

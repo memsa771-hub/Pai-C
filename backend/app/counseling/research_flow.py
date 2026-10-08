@@ -1,10 +1,5 @@
 """Server-owned handoff from accepted goal discovery to Operator research."""
 
-from sqlalchemy import select
-
-from app.models import ExecutionRun
-
-
 def research_brief(goal: dict, understanding: dict, summary: dict | None = None) -> dict:
     from .context_projection import compact_student_context
 
@@ -30,29 +25,11 @@ async def delegate_research_if_ready(db, workspace_id: str, journey, goals: list
                                      understanding: dict, tool_context,
                                      refresh_key: str | None = None,
                                      refresh_candidate: dict | None = None) -> dict | None:
-    allowed_stage = journey.current_stage == "RESEARCHING" or (
-        journey.current_stage == "CHOSEN" and refresh_key is not None)
-    if not allowed_stage or not goals or tool_context is None:
-        return None
-    goal = next((item for item in goals if (item.get("details") or {}).get("underlying_objective")), None)
-    if goal is None:
-        return None
-    key = f"{journey.id}:{goal['id']}" + (f":refresh:{refresh_key}" if refresh_key else "")
-    prior = db.execute(select(ExecutionRun).where(
-        ExecutionRun.workspace_id == workspace_id,
-        ExecutionRun.task_type == "roadmap_research",
-    ).order_by(ExecutionRun.created_at.desc()).limit(30)).scalars().all()
-    if any((item.constraints or {}).get("research_key") == key for item in prior):
-        return None
-    draft = journey.counselor_summary_draft or {}
-    brief = research_brief(goal, understanding,
-                           draft.get("summary") if draft.get("status") == "confirmed" else None)
-    if refresh_candidate:
-        brief["refresh_candidate"] = refresh_candidate
-    from app.tools import get_tool_executor
-    return await get_tool_executor().execute("operator.delegate", {
-        "objective": f"Research sourced routes for {brief['stated_preference']}",
-        "task_type": "roadmap_research", "intent": "academic_planning",
-        "constraints": {"research_key": key, "capability_input": {"brief": brief}},
-        "context_refs": ["vault", "memory"],
-    }, tool_context)
+    """Compatibility entry for existing legacy and reconciliation callers."""
+    from app.counseling.research_gateway import request_research
+
+    return await request_research(
+        "stale_refresh" if refresh_key else "roadmap_light", workspace_id,
+        db=db, journey=journey, goals=goals, understanding=understanding,
+        tool_context=tool_context, refresh_key=refresh_key,
+        refresh_candidate=refresh_candidate)

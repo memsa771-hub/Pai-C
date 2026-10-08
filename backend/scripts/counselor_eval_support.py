@@ -18,7 +18,7 @@ from app.memory.field_definitions import SEED_FIELD_DEFINITIONS, VaultFieldDefin
 from app.memory.student_records import ENTITY_MODELS, StudentRecordService
 from app.memory.vault import VaultService
 from app.models import (
-    BackgroundJob, DocumentArtifact, EventRecord, ExecutionRun, FileRecord,
+    BackgroundJob, DocumentArtifact, EventRecord, ExecutionRun, FileRecord, CounselorNotedQuestion,
     CounselorSlotAnswer, CounselorTurnDecision, CounselorNotebook, CounselorNotebookHistory, MemoryCandidate, PaiEpisode, PaiMemory, ProfileFieldResponse, ProfileIssue, ProfileRequirement, StudentRecordRevision,
     StudentJourney, StudentJourneyEvent, Institution, InstitutionDomain,
     Opportunity, RequirementSet, Roadmap, RoadmapStudentState, DecisionRecord, StudentRequest,
@@ -74,7 +74,7 @@ class StudentSession:
                   DocumentArtifact,
                   VaultFact, VaultFieldDefinition, MemoryCandidate, PaiMemory, PaiEpisode,
                   ProfileFieldResponse, ProfileIssue, ProfileRequirement, CounselorSlotAnswer,
-                  CounselorTurnDecision, CounselorNotebook, CounselorNotebookHistory,
+                  CounselorTurnDecision, CounselorNotebook, CounselorNotebookHistory, CounselorNotedQuestion,
                   StudentRecordRevision, BackgroundJob,
                   StudentJourney, StudentJourneyEvent, Institution, InstitutionDomain,
                   Opportunity, RequirementSet,
