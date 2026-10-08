@@ -22,15 +22,14 @@ Roadmaps are sourced research artifacts for the Counselor Journey. They are sepa
 - Research pauses create shared `student_requests`; an accepted profile candidate or document extraction resumes the same run. The future OS may read requests and the latest `decision_records` row. `PAI_OS_SERVICE_TOKEN` protects the future OS escalation intake and must stay on the backend.
 - A confirmed choice snapshots the goal summary, objective, accepted gaps and risks, roadmap version, and channel. Escalation from `CHOSEN` requires an authenticated, typed reason and preserves that snapshot.
 - Research runs retain `research_metrics` with search/registry queries, page fetches, model calls, input/output tokens reported by the provider, and elapsed milliseconds. A token count is not a currency estimate. Internal logs emit duration spans for Counselor scope, extraction, planner, writer, guard, each capability call, and source verification. Logs include identifiers and statuses, never student text or profile values.
-- `python -m scripts.eval_counselor_sim` runs the ten-persona synthetic recorded research-contract evaluation without credentials or network calls and writes a report under `backend/eval_reports`. It checks roadmap composition and source gates, not real institution coverage or natural conversation quality. `--live` opts into the existing billed model-backed conversation evaluation. The default `pytest` suite uses recorded or synthetic providers and runs without network access.
+- `python -m scripts.eval_counselor_research_recorded` runs the ten-persona synthetic research-contract evaluation without credentials or network calls and writes a report under `backend/eval_reports`. It checks roadmap composition and source gates, not real institution coverage or natural conversation quality. The default `pytest` suite uses recorded or synthetic providers and runs without network access. A deep conversation evaluator follows in a later milestone.
 
 ## Configuration
 
 | Variable | Purpose |
 | --- | --- |
 | `PAI_ENABLED`, `PAI_API_KEY`, `PAI_MODEL`, `PAI_BASE_URL` | Server-only Counselor and Operator inference. Never expose the key to the browser. |
-| `PAI_COUNSELOR_V2` | Shared text/voice turn pipeline, enabled by default. |
-| `PAI_COUNSELOR_AUX_MODEL`, `PAI_COUNSELOR_WRITER_MODEL` | Optional separate models for extraction/scope/guard and the reply writer; empty uses `PAI_MODEL`. |
+| `PAI_COUNSELOR_MODE` | `deep` (default) or `legacy`. During PR 1, deep uses the retained Core conversation path until the one-call deep turn is implemented in PR 3. |
 | `WEB_SEARCH_PROVIDER`, `WEB_SEARCH_API_KEY`, `WEB_SEARCH_BASE_URL` | Search provider. An unset provider yields a visible research failure; no result is fabricated. |
 | `WEB_SEARCH_MAX_RETRIES`, `WEB_SEARCH_CACHE_TTL_SECONDS` | Transient search retry count and cache lifetime. |
 | `PAI_RESEARCH_MAX_QUERIES`, `PAI_RESEARCH_MAX_FETCHES`, `PAI_RESEARCH_MAX_SECONDS` | Per-run search, fetch and time bounds. |

@@ -39,8 +39,8 @@ def enqueue_turn_extraction(
     Caller must have COMMITTED the assistant reply first — the payload carries
     only IDs, and the worker reads those rows back from PostgreSQL.
 
-    Idempotent on the turn: the key is derived from both event IDs, so a retry,
-    a duplicated hook, or a redelivered event all resolve to the same job.
+    Idempotent on the student event: a retry or duplicated reply cannot queue
+    a second extraction of the same student statement.
 
     Never raises. Memory formation is an enhancement to a conversation that has
     already succeeded; a failure here must not surface to the student.
@@ -64,9 +64,7 @@ def enqueue_turn_extraction(
                 "agent_name": agent_name,
                 "profile_captured": profile_captured,
             },
-            # Both IDs: the same user message answered twice (a retried
-            # invocation) is a genuinely different turn to extract from.
-            idempotency_key=f"extract:turn:{user_event_id}:{assistant_event_id}",
+            idempotency_key=f"extract:turn:{user_event_id}",
         )
         db.commit()
         logger.info(
