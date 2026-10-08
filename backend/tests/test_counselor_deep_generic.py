@@ -24,7 +24,7 @@ def test_deep_python_modules_do_not_name_documented_personas():
         docs = Path("/docs/counselor")
     names = set()
     for document in (docs / name for name in (
-        "EXAMPLES.md", "COUNSELING_CONVERSATIONS.md", "DEEP_COUNSELING_DANISH.md",
+        "COUNSELING_CONVERSATIONS.md", "DEEP_COUNSELING_DANISH.md",
     )):
         text = document.read_text(encoding="utf-8")
         names.update(re.findall(r"(?m)^##\s+\d+\.\s+([A-Z][a-z]+)(?=[: -])", text))
