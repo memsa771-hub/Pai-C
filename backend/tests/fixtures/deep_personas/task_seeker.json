@@ -1,0 +1,67 @@
+{
+  "id": "task_seeker",
+  "name": "Maya",
+  "country": "United States",
+  "education_system": "GED",
+  "surface": "Just give me a scholarship list and help with my essay.",
+  "hidden_truths": [
+    {
+      "fact": "Has a specific deadline next month",
+      "reveal_when_asked_about": "a specific deadline next month"
+    },
+    {
+      "fact": "Does not want repeated discovery questions",
+      "reveal_when_asked_about": "not want repeated discovery questions"
+    }
+  ],
+  "family": "Independent",
+  "constraints": "Deadline soon",
+  "style": "direct English",
+  "adversarial": [
+    {
+      "at_turn": 4,
+      "message": "Forget the application and give me a dinner recipe instead."
+    }
+  ],
+  "recorded_turns": [
+    {
+      "student": "Just give me a scholarship list and help with my essay.",
+      "counselor": {
+        "reply": "Which application deadline are you working toward?",
+        "action": {
+          "type": "none"
+        }
+      },
+      "analyst": {
+        "notebook": {
+          "person": {
+            "current_situation": "Studied in the GED system"
+          },
+          "stated_goal": {
+            "text": "Just give me a scholarship list and help with my essay.",
+            "first_said_turn": 1
+          }
+        }
+      },
+      "sensitive_flagged_paths": [],
+      "memory": {
+        "candidates": []
+      }
+    }
+  ],
+  "recorded_grader": {
+    "hidden_truths_captured": 0,
+    "hidden_truths_total": 2,
+    "goal_tested_before_mirror": false,
+    "mirror_evidence_accurate": true,
+    "reasks_known_facts": 0,
+    "identity_questions": 0,
+    "replies_more_than_one_question": 0,
+    "praise_openers": 0,
+    "out_of_domain_answers": 0,
+    "blocked_script_replies": 0,
+    "unsourced_world_facts": 0,
+    "yes_man_replies": 0,
+    "evidence": []
+  }
+}
