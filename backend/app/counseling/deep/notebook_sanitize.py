@@ -13,97 +13,19 @@ from app.counseling.deep.notebook_schema import CounselorNotebookData
 
 logger = logging.getLogger(__name__)
 
-PROTECTED_PHRASES = (
-    "political science", "politics and international relations",
-    "international relations", "religious studies", "comparative religion",
-    "islamic studies", "islamiat", "pakistan studies", "psychology",
-    "clinical psychology",
-)
-
-# The notebook records observed behavior, not diagnoses or sensitive beliefs.
-BANNED_TERMS = (
-    "adhd", "ocd", "ptsd", "autism", "autistic", "depression",
-    "depressed", "anxiety", "anxious", "bipolar", "schizophrenia",
-    "dyslexia", "diagnosis", "diagnosed", "disorder",
-    "religion", "religious", "muslim", "hindu", "christian", "sikh",
-    "buddhist", "atheist", "islam", "hinduism", "christianity",
-    "catholic", "jewish", "jain", "jainism",
-    "sect", "sunni", "shia", "shiite", "ahmadi", "barelvi", "deobandi",
-    "caste", "brahmin", "dalit", "rajput",
-    "politics", "political", "party affiliation", "democrat", "republican",
-    "pti", "pml-n", "pmln", "ppp", "bjp",
-)
-
-
-def _whole_phrases(phrases: tuple[str, ...]) -> re.Pattern[str]:
-    choices = "|".join(re.escape(item) for item in sorted(phrases, key=len, reverse=True))
-    return re.compile(r"(?<!\w)(?:" + choices + r")(?!\w)", re.IGNORECASE)
-
-
-_PROTECTED = _whole_phrases(PROTECTED_PHRASES)
-_BANNED = _whole_phrases(BANNED_TERMS)
-
-
 @dataclass(frozen=True)
 class SanitizationIssue:
     path: str
     action: str
-    term: str | None = None
     reason: str | None = None
 
 
 def _record(issues: list[SanitizationIssue], path: str, action: str, *,
-            term: str | None = None, reason: str | None = None) -> None:
-    issue = SanitizationIssue(path, action, term, reason)
+            reason: str | None = None) -> None:
+    issue = SanitizationIssue(path, action, reason)
     issues.append(issue)
     # Never log the student text or ValidationError (whose repr includes input).
-    logger.info("notebook_sanitize path=%s action=%s term=%s reason=%s",
-                path, action, term, reason)
-
-
-def _banned_terms(value: str) -> list[str]:
-    protected = [(match.start(), match.end()) for match in _PROTECTED.finditer(value)]
-    found: list[str] = []
-    for match in _BANNED.finditer(value):
-        if any(start <= match.start() and match.end() <= end for start, end in protected):
-            continue
-        term = match.group(0).lower()
-        if term not in found:
-            found.append(term)
-    return found
-
-
-def _entry_terms(value: Any) -> list[str]:
-    if isinstance(value, str):
-        return _banned_terms(value)
-    if isinstance(value, dict):
-        parts = value.values()
-    elif isinstance(value, list):
-        parts = value
-    else:
-        return []
-    found: list[str] = []
-    for part in parts:
-        for term in _entry_terms(part):
-            if term not in found:
-                found.append(term)
-    return found
-
-
-def _clean_prose(value: str, path: str, issues: list[SanitizationIssue]) -> str:
-    # Keep sentence punctuation and wording intact for all unaffected text.
-    if not _banned_terms(value):
-        return value
-    sentences = re.split(r"(?<=[.!?])\s+|\n+", value)
-    kept: list[str] = []
-    for sentence in sentences:
-        terms = _banned_terms(sentence)
-        if terms:
-            for term in terms:
-                _record(issues, path, "removed_sentence", term=term)
-        elif sentence.strip():
-            kept.append(sentence.strip())
-    return " ".join(kept)
+    logger.info("notebook_sanitize path=%s action=%s reason=%s", path, action, reason)
 
 
 def _model_type(annotation: Any) -> type[BaseModel] | None:
@@ -162,16 +84,6 @@ def _clean_model(value: Any, model: type[BaseModel], path: str,
             kept: list[Any] = []
             for index, entry in enumerate(item):
                 entry_path = f"{field_path}[{index}]"
-                # Unknown keys are discarded, so they must not condemn a
-                # valid entry solely because they contain a banned word.
-                searchable = ({name: part for name, part in entry.items()
-                               if name in entry_model.model_fields}
-                              if entry_model and isinstance(entry, dict) else entry)
-                terms = _entry_terms(searchable)
-                if terms:
-                    for term in terms:
-                        _record(issues, entry_path, "dropped_entry", term=term)
-                    continue
                 try:
                     candidate = (_clean_model(entry, entry_model, entry_path, issues)
                                  if entry_model else entry)
@@ -183,8 +95,7 @@ def _clean_model(value: Any, model: type[BaseModel], path: str,
             continue
         try:
             candidate = (_clean_model(item, nested, field_path, issues)
-                         if nested and item is not None else
-                         _clean_prose(item, field_path, issues) if isinstance(item, str) else item)
+                         if nested and item is not None else item)
             cleaned[key] = TypeAdapter(annotation).validate_python(candidate)
         except (ValidationError, ValueError) as exc:
             reason = _failure_reason(exc) if isinstance(exc, ValidationError) else "invalid_value"

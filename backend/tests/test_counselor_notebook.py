@@ -1,7 +1,7 @@
 """Offline PR 2 contract tests for private Counselor Notebook storage."""
 
 from uuid import uuid4
-from unittest.mock import patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 from sqlalchemy import create_engine, delete, event, select
@@ -15,6 +15,7 @@ from app.counseling.deep.notebook import (
     NotebookService, NotebookVersionConflict, NotebookWorkspaceNotFound,
 )
 from app.counseling.deep.notebook_sanitize import sanitize_notebook
+from app.counseling.deep.sensitive import filter_sensitive_changes, model_sensitive_checker
 from app.models import CounselorNotebook, CounselorNotebookHistory, EventRecord, User, Workspace
 from app.routers.workspaces import delete_workspace
 
@@ -88,7 +89,7 @@ def test_notebook_requires_evidence_and_student_source_event(notebook_db):
     assert service.get(first).version == 1
 
 
-def test_notebook_drops_banned_entry_and_keeps_coach_empty(notebook_db):
+def test_notebook_validates_shape_without_content_classification(notebook_db):
     db, first, _, events = notebook_db
     data = _note(
         emotional_notes="Anxiety after exams; political family tension",
@@ -102,21 +103,21 @@ def test_notebook_drops_banned_entry_and_keeps_coach_empty(notebook_db):
     assert saved.notebook.coach == {}
     assert saved.notebook.engagement_style == "short_answers"
     assert saved.notebook.goal_history[0].goal == "Study abroad"
-    assert saved.notebook.claims == []
-    assert saved.notebook.emotional_notes == ""
-    assert any(issue.path == "claims[0]" and issue.term == "adhd" for issue in changes)
+    assert saved.notebook.claims[0].claim == data["claims"][0]["claim"]
+    assert saved.notebook.emotional_notes == data["emotional_notes"]
+    assert not any(issue.path in {"claims[0]", "emotional_notes"} for issue in changes)
 
 
-def test_banned_content_drops_whole_entry_instead_of_erasing_evidence(notebook_db):
+def test_storage_preserves_valid_entry_text_without_word_matching(notebook_db):
     db, first, _, events = notebook_db
     data = _note()
     data["claims"][0]["evidence"] = "ADHD"
     snapshot, changes = NotebookService(db).apply(first, data, events[0])
-    assert snapshot.notebook.claims == []
-    assert any(issue.path == "claims[0]" and issue.term == "adhd" for issue in changes)
+    assert snapshot.notebook.claims[0].evidence == data["claims"][0]["evidence"]
+    assert changes == []
 
 
-def test_academic_phrases_survive_case_insensitively(notebook_db):
+def test_academic_text_survives_storage_validation(notebook_db):
     db, first, _, events = notebook_db
     data = _note(
         person={"daily_life": "Studies Political Science and RELIGIOUS STUDIES. Reads Islamiat."},
@@ -127,41 +128,73 @@ def test_academic_phrases_survive_case_insensitively(notebook_db):
     assert snapshot.notebook.person.daily_life == data["person"]["daily_life"]
     assert snapshot.notebook.claims[0].claim == data["claims"][0]["claim"]
     assert snapshot.notebook.values == data["values"]
-    assert not any(issue.term for issue in changes)
+    assert changes == []
 
 
-@pytest.mark.parametrize("phrase", [
-    "Political Science", "POLITICS AND INTERNATIONAL RELATIONS",
-    "international relations", "Religious Studies", "comparative religion",
-    "Islamic Studies", "Islamiat", "Pakistan Studies", "psychology",
-    "Clinical Psychology",
-])
-def test_every_protected_academic_phrase_is_preserved(phrase):
-    notebook, changes = sanitize_notebook({"person": {"daily_life": f"Studies {phrase}."}})
-    assert notebook.person.daily_life == f"Studies {phrase}."
-    assert not changes
-
-
-def test_sensitive_affiliation_drops_only_offending_entry(notebook_db):
-    db, first, _, events = notebook_db
-    data = _note()
+@pytest.mark.asyncio
+async def test_fake_sensitive_checker_drops_changed_entry_and_keeps_academic_text(caplog):
+    previous, _ = sanitize_notebook({})
+    data = _note(person={"daily_life": "Studies Political Science and Religious Studies."})
     data["claims"].append({**data["claims"][0], "id": "c2", "claim": "family is PTI supporter"})
-    snapshot, changes = NotebookService(db).apply(first, data, events[0])
-    assert [claim.id for claim in snapshot.notebook.claims] == ["c1"]
-    assert any(issue.path == "claims[1]" and issue.term == "pti" for issue in changes)
+    candidate, _ = sanitize_notebook(data)
+    checked = []
+
+    async def fake_checker(text):
+        checked.append(text)
+        return "PTI supporter" in text
+
+    with caplog.at_level("INFO", logger="app.counseling.deep.sensitive"):
+        cleaned, removals = await filter_sensitive_changes(previous, candidate, fake_checker)
+    assert [claim.id for claim in cleaned.claims] == ["c1"]
+    assert cleaned.person.daily_life == data["person"]["daily_life"]
+    assert [item.path for item in removals] == ["claims[1]"]
+    assert len(checked) == 3
+    assert "PTI supporter" not in caplog.text
+    assert "claims[1]" in caplog.text
 
 
-def test_diagnosis_sentence_removed_remainder_kept_and_log_is_redacted(notebook_db, caplog):
-    db, first, _, events = notebook_db
-    sentence = "I was diagnosed with ADHD during school. I now study mathematics."
-    with caplog.at_level("INFO", logger="app.counseling.deep.notebook_sanitize"):
-        snapshot, changes = NotebookService(db).apply(
-            first, _note(emotional_notes=sentence), events[0],
-        )
-    assert snapshot.notebook.emotional_notes == "I now study mathematics."
-    assert any(issue.path == "emotional_notes" and issue.term == "adhd" for issue in changes)
-    assert "I was diagnosed" not in caplog.text
-    assert "emotional_notes" in caplog.text
+@pytest.mark.asyncio
+async def test_fake_checker_removes_changed_scalar_and_skips_unchanged_entries():
+    previous, _ = sanitize_notebook(_note())
+    candidate, _ = sanitize_notebook(_note(emotional_notes="I was diagnosed with ADHD."))
+    checked = []
+
+    async def fake_checker(text):
+        checked.append(text)
+        return True
+
+    cleaned, removals = await filter_sensitive_changes(previous, candidate, fake_checker)
+    assert cleaned.emotional_notes == ""
+    assert [item.path for item in removals] == ["emotional_notes"]
+    assert checked == [candidate.emotional_notes]
+
+
+@pytest.mark.asyncio
+async def test_fake_checker_drops_sensitive_optional_goal_as_one_changed_entry():
+    previous, _ = sanitize_notebook({})
+    candidate, _ = sanitize_notebook({
+        "stated_goal": {"text": "A personal affiliation", "first_said_turn": 1},
+    })
+
+    async def fake_checker(text):
+        return True
+
+    cleaned, removals = await filter_sensitive_changes(previous, candidate, fake_checker)
+    assert cleaned.stated_goal is None
+    assert [item.path for item in removals] == ["stated_goal.text"]
+
+
+@pytest.mark.asyncio
+async def test_model_checker_uses_one_json_call_and_rejects_invalid_decision():
+    with patch("app.counseling.deep.sensitive.chat_completion",
+               new=AsyncMock(return_value='{"sensitive":false}')) as model:
+        assert await model_sensitive_checker("A general academic topic") is False
+    assert model.await_count == 1
+    assert model.call_args.kwargs["response_format"] == {"type": "json_object"}
+    with patch("app.counseling.deep.sensitive.chat_completion",
+               new=AsyncMock(return_value='{"sensitive":"maybe"}')):
+        with pytest.raises(ValueError, match="invalid decision"):
+            await model_sensitive_checker("A statement")
 
 
 def test_one_invalid_claim_does_not_block_five_valid_claims(notebook_db):

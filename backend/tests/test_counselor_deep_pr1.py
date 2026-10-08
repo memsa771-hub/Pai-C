@@ -9,7 +9,7 @@ import pytest
 from app.config import config
 from app.counseling import runtime
 from app.counseling.deep.polish import (
-    contains_devanagari, has_list, question_count, strip_praise_opener,
+    contains_blocked_script, has_list, question_count, polish_reply,
 )
 from app.counseling.deep.prompts import load_prompt
 from app.counseling.deep.turn_input import CounselorTurnInput, _returning, shared_history
@@ -93,17 +93,16 @@ def test_shared_history_crosses_chat_and_voice_without_future_leak():
 
 
 def test_moved_reply_checks_and_prompt_files():
-    assert strip_praise_opener("Great, tell me more.") == "tell me more."
+    assert polish_reply("Tell me more? How long?") == "Tell me more?"
     assert question_count("What did you do? How long?") == 2
     assert has_list("- A route\n- Another route")
-    assert contains_devanagari("मुझे बताओ")
-    assert not contains_devanagari("Mujhe batao")
-    for name in ("counselor", "analyst", "mirror", "roadmap_builder"):
+    assert contains_blocked_script("α", "Greek")
+    assert not contains_blocked_script("a", "Greek")
+    for name in ("counselor", "analyst", "mirror", "roadmap_builder", "sensitive_check", "language_retry"):
         assert load_prompt(name).strip()
     with pytest.raises(ValueError, match="Unknown Counselor prompt"):
         load_prompt("other")
 
-    # In the repository checkout, assert the shipped files remain verbatim.
     source = Path(__file__).resolve().parents[2] / "docs/counselor/COUNSELOR_V3_PROMPTS.md"
     if source.is_file():
         import re

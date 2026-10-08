@@ -243,6 +243,7 @@ async def build_foreground_context(
     query: str,
     caller: str = "counselor",
     intent: str | None = None,
+    lexical_only: bool = False,
 ) -> ForegroundContext:
     """Retrieve and render student context under a bounded timeout.
 
@@ -276,6 +277,22 @@ async def build_foreground_context(
         context.episodes = len(student.episodes) if student else 0
         context.chars = len(block)
         context.truncated = truncated
+        context.elapsed_ms = int((time.monotonic() - started) * 1000)
+        return context
+
+    if lexical_only:
+        # Deep Counselor context must not make an embeddings/model request.
+        # Reuse the existing bounded PostgreSQL-only retrieval tier.
+        try:
+            student = await asyncio.wait_for(
+                run_bounded(_structured, workspace_id, query, caller, intent), budget_s
+            )
+            return _finish(student, "lexical")
+        except (asyncio.TimeoutError, ForegroundBusy):
+            context.mode = "timeout"
+        except Exception:
+            logger.warning("memory context: lexical retrieval failed", exc_info=True)
+            context.mode = "error"
         context.elapsed_ms = int((time.monotonic() - started) * 1000)
         return context
 

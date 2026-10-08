@@ -1,0 +1,576 @@
+{
+  "student_messages": [
+    "AoA. mujhe AI engineer banna hai aur Canada jana hai. kaise jaun?",
+    "ICS kiya hai is saal, result aa gaya. Ab free hoon",
+    "68% aaye. Theek hai bas, maths mein kam aaye",
+    "dono thora. Calculus bilkul samajh nahi aata tha. Computer mein acha tha",
+    "programming. C++ mein patterns wagaira banana. Python bhi seekha hai maine khud",
+    "YouTube pe ek 12 ghante ka course hai, us se",
+    "... aadha shayad. 5-6 ghante",
+    "exams aa gaye the. Phir dobara start nahi kiya"
+  ],
+  "cases": [
+    {
+      "label": "configured-low",
+      "model": "gpt-5-mini",
+      "effort": "low",
+      "turns": [
+        {
+          "turn": 1,
+          "student": "AoA. mujhe AI engineer banna hai aur Canada jana hai. kaise jaun?",
+          "reply": "AoA — tum AI engineer ban'na chahte ho aur Canada jaana chahte ho; is goal par baad mein wapas aayenge. Ab batao, abhi tum kya kar rahe ho—padhai, naukri, ya kuch aur?",
+          "action": {
+            "type": "none"
+          },
+          "words": 32,
+          "question_marks": 1,
+          "context_tokens": {
+            "today": 3,
+            "language_policy": 37,
+            "profile": 33,
+            "notebook": 176,
+            "memory": 17,
+            "research": 12,
+            "journey": 5
+          },
+          "model_ms": 3632,
+          "polish_ms": 0,
+          "total_ms": 3774
+        },
+        {
+          "turn": 2,
+          "student": "ICS kiya hai is saal, result aa gaya. Ab free hoon",
+          "reply": "Tumne ICS complete kiya aur ab free ho.",
+          "action": {
+            "type": "none",
+            "question": "Kya tumne programming ki hai; agar haan to konsi language use ki?"
+          },
+          "words": 8,
+          "question_marks": 0,
+          "context_tokens": {
+            "today": 3,
+            "language_policy": 37,
+            "profile": 33,
+            "notebook": 176,
+            "memory": 17,
+            "research": 12,
+            "journey": 5
+          },
+          "model_ms": 2718,
+          "polish_ms": 0,
+          "total_ms": 2745
+        },
+        {
+          "turn": 3,
+          "student": "68% aaye. Theek hai bas, maths mein kam aaye",
+          "reply": "Tumne ICS 68% ke saath pass kiya aur maths mein kam score aaya.",
+          "action": {
+            "type": "none",
+            "question": "Kya tumne school/college ke dauran koi programming ya AI-related projects ya courses kiye hain?"
+          },
+          "words": 13,
+          "question_marks": 0,
+          "context_tokens": {
+            "today": 3,
+            "language_policy": 37,
+            "profile": 33,
+            "notebook": 176,
+            "memory": 17,
+            "research": 12,
+            "journey": 5
+          },
+          "model_ms": 2321,
+          "polish_ms": 0,
+          "total_ms": 2354
+        },
+        {
+          "turn": 4,
+          "student": "dono thora. Calculus bilkul samajh nahi aata tha. Computer mein acha tha",
+          "reply": "Calculus bilkul samajh nahi aaya aur computer mein acha tha.",
+          "action": {
+            "type": "none",
+            "question": "Computer mein 'acha' se kya matlab—konsa kaam ya project tumne khud kiya?"
+          },
+          "words": 10,
+          "question_marks": 0,
+          "context_tokens": {
+            "today": 3,
+            "language_policy": 37,
+            "profile": 33,
+            "notebook": 176,
+            "memory": 17,
+            "research": 12,
+            "journey": 5
+          },
+          "model_ms": 2736,
+          "polish_ms": 0,
+          "total_ms": 2763
+        },
+        {
+          "turn": 5,
+          "student": "programming. C++ mein patterns wagaira banana. Python bhi seekha hai maine khud",
+          "reply": "Tum C++ mein patterns banate thay aur khud se Python seekhi hai.",
+          "action": {
+            "type": "none",
+            "question": "Kya tumne koi chalne wala project ya program banaya hai—ek misaal batao?"
+          },
+          "words": 12,
+          "question_marks": 0,
+          "context_tokens": {
+            "today": 3,
+            "language_policy": 37,
+            "profile": 33,
+            "notebook": 176,
+            "memory": 17,
+            "research": 12,
+            "journey": 5
+          },
+          "model_ms": 2375,
+          "polish_ms": 0,
+          "total_ms": 2400
+        },
+        {
+          "turn": 6,
+          "student": "YouTube pe ek 12 ghante ka course hai, us se",
+          "reply": "I want to understand you properly. Could you tell me a little more?",
+          "action": {
+            "type": "none"
+          },
+          "words": 13,
+          "question_marks": 1,
+          "context_tokens": {
+            "today": 3,
+            "language_policy": 37,
+            "profile": 33,
+            "notebook": 176,
+            "memory": 17,
+            "research": 12,
+            "journey": 5
+          },
+          "model_ms": 2530,
+          "polish_ms": 0,
+          "total_ms": 2562
+        },
+        {
+          "turn": 7,
+          "student": "... aadha shayad. 5-6 ghante",
+          "reply": "Tumne woh course 5–6 ghante dekh liye; aadha raha. Kya tumne koi chhota programming project banaya jo dekhane layak ho?",
+          "action": {
+            "type": "none"
+          },
+          "words": 20,
+          "question_marks": 1,
+          "context_tokens": {
+            "today": 3,
+            "language_policy": 37,
+            "profile": 33,
+            "notebook": 176,
+            "memory": 17,
+            "research": 12,
+            "journey": 5
+          },
+          "model_ms": 2086,
+          "polish_ms": 0,
+          "total_ms": 2114
+        },
+        {
+          "turn": 8,
+          "student": "exams aa gaye the. Phir dobara start nahi kiya",
+          "reply": "Exams ki wajah se course dobara shuru nahi kiya.",
+          "action": {
+            "type": "none",
+            "question": "Kya tumhare paas koi code file ya GitHub repository hai jisme tumne C++ ya Python projects rakhe hon?"
+          },
+          "words": 9,
+          "question_marks": 0,
+          "context_tokens": {
+            "today": 3,
+            "language_policy": 37,
+            "profile": 33,
+            "notebook": 176,
+            "memory": 17,
+            "research": 12,
+            "journey": 5
+          },
+          "model_ms": 1811,
+          "polish_ms": 0,
+          "total_ms": 1844
+        }
+      ],
+      "p50_total_ms": 2481,
+      "p95_total_ms": 3774
+    },
+    {
+      "label": "configured-medium",
+      "model": "gpt-5-mini",
+      "effort": "medium",
+      "turns": [
+        {
+          "turn": 1,
+          "student": "AoA. mujhe AI engineer banna hai aur Canada jana hai. kaise jaun?",
+          "reply": "Samjha — aap AI engineer banna chahtay hain aur Canada jana chahtay hain; is par baad mein wapas aata hoon. Abhi aap kya kar rahay hain?",
+          "action": {
+            "type": "none"
+          },
+          "words": 26,
+          "question_marks": 1,
+          "context_tokens": {
+            "today": 3,
+            "language_policy": 37,
+            "profile": 33,
+            "notebook": 176,
+            "memory": 17,
+            "research": 12,
+            "journey": 5
+          },
+          "model_ms": 5378,
+          "polish_ms": 0,
+          "total_ms": 5452
+        },
+        {
+          "turn": 2,
+          "student": "ICS kiya hai is saal, result aa gaya. Ab free hoon",
+          "reply": "Samjha — aapne ICS complete kar liya aur ab free hain. Aapke final marks (percent ya grades) kya rahe?",
+          "action": {
+            "type": "none"
+          },
+          "words": 19,
+          "question_marks": 1,
+          "context_tokens": {
+            "today": 3,
+            "language_policy": 37,
+            "profile": 33,
+            "notebook": 176,
+            "memory": 17,
+            "research": 12,
+            "journey": 5
+          },
+          "model_ms": 4026,
+          "polish_ms": 0,
+          "total_ms": 4057
+        },
+        {
+          "turn": 3,
+          "student": "68% aaye. Theek hai bas, maths mein kam aaye",
+          "reply": "Samjha — aapko 68% miley aur maths kam raha.",
+          "action": {
+            "type": "none",
+            "question": ""
+          },
+          "words": 9,
+          "question_marks": 0,
+          "context_tokens": {
+            "today": 3,
+            "language_policy": 37,
+            "profile": 33,
+            "notebook": 176,
+            "memory": 17,
+            "research": 12,
+            "journey": 5
+          },
+          "model_ms": 3794,
+          "polish_ms": 0,
+          "total_ms": 3836
+        },
+        {
+          "turn": 4,
+          "student": "dono thora. Calculus bilkul samajh nahi aata tha. Computer mein acha tha",
+          "reply": "Samjha — calculus bilkul samajh nahi aata tha magar computer mein aap acha thay. Computer mein aap ne specifically kya kiya?",
+          "action": {
+            "type": "none"
+          },
+          "words": 21,
+          "question_marks": 1,
+          "context_tokens": {
+            "today": 3,
+            "language_policy": 37,
+            "profile": 33,
+            "notebook": 176,
+            "memory": 17,
+            "research": 12,
+            "journey": 5
+          },
+          "model_ms": 3848,
+          "polish_ms": 0,
+          "total_ms": 3877
+        },
+        {
+          "turn": 5,
+          "student": "programming. C++ mein patterns wagaira banana. Python bhi seekha hai maine khud",
+          "reply": "Samjha — aap C++ mein patterns banate thay aur self-taught Python seekhi. Kya aapne koi project banaya hai jo dikha sakte ho?",
+          "action": {
+            "type": "none"
+          },
+          "words": 22,
+          "question_marks": 1,
+          "context_tokens": {
+            "today": 3,
+            "language_policy": 37,
+            "profile": 33,
+            "notebook": 176,
+            "memory": 17,
+            "research": 12,
+            "journey": 5
+          },
+          "model_ms": 4228,
+          "polish_ms": 0,
+          "total_ms": 4259
+        },
+        {
+          "turn": 6,
+          "student": "YouTube pe ek 12 ghante ka course hai, us se",
+          "reply": "Samjha — aapne YouTube ka 12 ghante ka course kiya. Kya us course se koi project complete kiya hai jo aap dikha sakte ho?",
+          "action": {
+            "type": "none"
+          },
+          "words": 24,
+          "question_marks": 1,
+          "context_tokens": {
+            "today": 3,
+            "language_policy": 37,
+            "profile": 33,
+            "notebook": 176,
+            "memory": 17,
+            "research": 12,
+            "journey": 5
+          },
+          "model_ms": 3046,
+          "polish_ms": 0,
+          "total_ms": 3397
+        },
+        {
+          "turn": 7,
+          "student": "... aadha shayad. 5-6 ghante",
+          "reply": "Samjha — aapne course ka lagbhag aadha hissa (5-6 ghante) kiya aur project aadha complete hai. Kya aapne project ka code kahin save kiya hai jise main dekh sakun?",
+          "action": {
+            "type": "none"
+          },
+          "words": 29,
+          "question_marks": 1,
+          "context_tokens": {
+            "today": 3,
+            "language_policy": 37,
+            "profile": 33,
+            "notebook": 176,
+            "memory": 17,
+            "research": 12,
+            "journey": 5
+          },
+          "model_ms": 5174,
+          "polish_ms": 0,
+          "total_ms": 5255
+        },
+        {
+          "turn": 8,
+          "student": "exams aa gaye the. Phir dobara start nahi kiya",
+          "reply": "Samjha — aapne project aadha chhor diya kyunki exams aa gaye thay. Aaj rozana kitna waqt AI ya programming seekhne ko de sakte ho?",
+          "action": {
+            "type": "none"
+          },
+          "words": 24,
+          "question_marks": 1,
+          "context_tokens": {
+            "today": 3,
+            "language_policy": 37,
+            "profile": 33,
+            "notebook": 176,
+            "memory": 17,
+            "research": 12,
+            "journey": 5
+          },
+          "model_ms": 4197,
+          "polish_ms": 0,
+          "total_ms": 4272
+        }
+      ],
+      "p50_total_ms": 4158,
+      "p95_total_ms": 5452
+    },
+    {
+      "label": "strongest-low",
+      "model": "gpt-6-astra",
+      "effort": "low",
+      "turns": [
+        {
+          "turn": 1,
+          "student": "AoA. mujhe AI engineer banna hai aur Canada jana hai. kaise jaun?",
+          "reply": "Wa alaikum assalam, Danish. AI engineer banne aur Canada jane par wapas aayenge; raaste ki maloomat official sources se check hogi. Pehle tumhein samajhna zaroori hai: aaj kal tumhara aam din kaise guzarta hai?",
+          "action": {
+            "type": "ask_research",
+            "question": "Canada jane aur AI engineering mein career banane ke raaston ki official sources se tasdeeq karein; student ki taleem aur halaat abhi maloom nahin, is liye filhaal zaati eligibility ka faisla na karein."
+          },
+          "words": 34,
+          "question_marks": 1,
+          "context_tokens": {
+            "today": 3,
+            "language_policy": 37,
+            "profile": 33,
+            "notebook": 176,
+            "memory": 17,
+            "research": 12,
+            "journey": 5
+          },
+          "model_ms": 7699,
+          "polish_ms": 0,
+          "total_ms": 7792
+        },
+        {
+          "turn": 2,
+          "student": "ICS kiya hai is saal, result aa gaya. Ab free hoon",
+          "reply": "Is saal ICS kiya hai, aur ab free ho. In dinon apna waqt kis kaam mein guzarte ho?",
+          "action": {
+            "type": "none"
+          },
+          "words": 18,
+          "question_marks": 1,
+          "context_tokens": {
+            "today": 3,
+            "language_policy": 37,
+            "profile": 33,
+            "notebook": 176,
+            "memory": 17,
+            "research": 12,
+            "journey": 5
+          },
+          "model_ms": 3654,
+          "polish_ms": 0,
+          "total_ms": 3707
+        },
+        {
+          "turn": 3,
+          "student": "68% aaye. Theek hai bas, maths mein kam aaye",
+          "reply": "68% aaye, aur maths mein kam rahe. Maths ki tayari karte waqt sab se zyada mushkil kis cheez mein hoti thi?",
+          "action": {
+            "type": "none"
+          },
+          "words": 21,
+          "question_marks": 1,
+          "context_tokens": {
+            "today": 3,
+            "language_policy": 37,
+            "profile": 33,
+            "notebook": 176,
+            "memory": 17,
+            "research": 12,
+            "journey": 5
+          },
+          "model_ms": 3486,
+          "polish_ms": 0,
+          "total_ms": 3563
+        },
+        {
+          "turn": 4,
+          "student": "dono thora. Calculus bilkul samajh nahi aata tha. Computer mein acha tha",
+          "reply": "Calculus samajh nahi aata tha, lekin computer mein acha tha. Computer mein apne kiye hue kisi ek kaam ke baare mein bataoge?",
+          "action": {
+            "type": "none"
+          },
+          "words": 22,
+          "question_marks": 1,
+          "context_tokens": {
+            "today": 3,
+            "language_policy": 37,
+            "profile": 33,
+            "notebook": 176,
+            "memory": 17,
+            "research": 12,
+            "journey": 5
+          },
+          "model_ms": 3548,
+          "polish_ms": 0,
+          "total_ms": 3591
+        },
+        {
+          "turn": 5,
+          "student": "programming. C++ mein patterns wagaira banana. Python bhi seekha hai maine khud",
+          "reply": "C++ mein patterns banaye aur Python khud seekha. Python mein apne banaye hue kisi ek program ke baare mein bataoge?",
+          "action": {
+            "type": "none"
+          },
+          "words": 20,
+          "question_marks": 1,
+          "context_tokens": {
+            "today": 3,
+            "language_policy": 37,
+            "profile": 33,
+            "notebook": 176,
+            "memory": 17,
+            "research": 12,
+            "journey": 5
+          },
+          "model_ms": 4189,
+          "polish_ms": 0,
+          "total_ms": 4278
+        },
+        {
+          "turn": 6,
+          "student": "YouTube pe ek 12 ghante ka course hai, us se",
+          "reply": "Python YouTube ke 12 ghante wale course se seekha. Us mein se ab tak kya khud code karke chalaya hai?",
+          "action": {
+            "type": "none"
+          },
+          "words": 20,
+          "question_marks": 1,
+          "context_tokens": {
+            "today": 3,
+            "language_policy": 37,
+            "profile": 33,
+            "notebook": 176,
+            "memory": 17,
+            "research": 12,
+            "journey": 5
+          },
+          "model_ms": 4783,
+          "polish_ms": 0,
+          "total_ms": 4814
+        },
+        {
+          "turn": 7,
+          "student": "... aadha shayad. 5-6 ghante",
+          "reply": "Ab tak course ke takreeban 5–6 ghante dekhe hain. Dekhte hue khud kya code likh kar chalaya tha?",
+          "action": {
+            "type": "none"
+          },
+          "words": 18,
+          "question_marks": 1,
+          "context_tokens": {
+            "today": 3,
+            "language_policy": 37,
+            "profile": 33,
+            "notebook": 176,
+            "memory": 17,
+            "research": 12,
+            "journey": 5
+          },
+          "model_ms": 4413,
+          "polish_ms": 0,
+          "total_ms": 4450
+        },
+        {
+          "turn": 8,
+          "student": "exams aa gaye the. Phir dobara start nahi kiya",
+          "reply": "Exams ki wajah se course ruk gaya, phir dobara shuru nahi hua. Exams ke baad kis cheez mein tumhara waqt guzarta raha?",
+          "action": {
+            "type": "none"
+          },
+          "words": 22,
+          "question_marks": 1,
+          "context_tokens": {
+            "today": 3,
+            "language_policy": 37,
+            "profile": 33,
+            "notebook": 176,
+            "memory": 17,
+            "research": 12,
+            "journey": 5
+          },
+          "model_ms": 4661,
+          "polish_ms": 0,
+          "total_ms": 4689
+        }
+      ],
+      "p50_total_ms": 4364,
+      "p95_total_ms": 7792
+    }
+  ]
+}

@@ -1,0 +1,1 @@
+Does this text state a health/medical diagnosis, religion, sect, caste, or political affiliation of a person? Answer JSON {"sensitive": true|false}. Judge the statement about a person, not the mere presence of a related word in an academic or general context. Return only the JSON object.

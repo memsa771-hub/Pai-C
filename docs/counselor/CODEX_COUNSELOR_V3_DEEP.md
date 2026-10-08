@@ -46,7 +46,7 @@ student message (chat or voice transcript): the shared CounselorTurnInput
   │    system = counselor.md
   │    input  = <context> (profile, notebook, memory, research*) + last 20 messages + current message
   │    output = {reply, action}
-  │    → light deterministic polish (one question, no praise opener, Devanagari retry)
+  │    → light deterministic polish (one question, list detection, Devanagari retry)
   │    → post the same reply to chat and voice
   │
   └─ after the post, in the background (job queue):
@@ -100,14 +100,14 @@ All model calls go through `app/inference/client.py` so the provider can be swap
   - `apply(workspace_id, new_notebook, source_event_id)`:
     - validates the schema from section 0 of the prompts file (pydantic);
     - rejects any entry without evidence;
-    - strips banned content (a diagnosis-word list, plus religion, sect, caste and politics terms);
+    - keeps valid content after schema validation; the PR 4 Analyst pipeline checks changed entries with the generic model-based sensitivity check before applying;
     - bumps the version;
     - optimistic lock on `version`.
 - Privacy: the notebook is visible only to the student's own Counselor, Mirror and roadmap builder. It is never sent to other plugins or OS agents. Workspace deletion deletes it.
 - Tests:
   - Schema validation.
   - An entry without evidence is rejected.
-  - A banned word is stripped.
+  - Valid text is preserved by storage; a fake sensitivity checker drops a changed entry before apply.
   - Two concurrent applies: one wins and the other retries.
   - Workspace isolation.
 
@@ -122,7 +122,7 @@ All model calls go through `app/inference/client.py` so the provider can be swap
   - One `chat_completion` with `response_format=json_object`, `PAI_COUNSELOR_MODEL`, the last 20 shared-history messages and the current message.
   - Parse the JSON. If it is invalid, use the raw text as the reply with no action. Never show JSON to the student.
 - Deterministic polish (reuse `guard_v2.deterministic_violations` helpers):
-  - Strip a leading praise opener.
+  - Praise openers are handled by the prompt and measured by evaluation, with no vocabulary list in code.
   - More than one question: keep the text up to and including the first question.
   - Devanagari in the reply: one retry with "Reply again in Roman Urdu with Urdu words"; then a fixed Roman Urdu fallback.
   - No other second model call.
@@ -137,7 +137,7 @@ All model calls go through `app/inference/client.py` so the provider can be swap
   - Exactly one call per normal turn.
   - Invalid JSON falls back to text.
   - Two questions are trimmed.
-  - The praise opener is stripped.
+  - Praise wording is left to the prompt and evaluation.
   - A Devanagari reply triggers a retry.
   - `mirror` is ignored when not ready.
   - `mirror` enqueues the job when ready.
