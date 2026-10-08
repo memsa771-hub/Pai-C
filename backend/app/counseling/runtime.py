@@ -59,31 +59,34 @@ async def run_counselor(workspace_id: str, event_data: dict) -> None:
 
 
 async def _run_turn(db, workspace_id: str, event_data: dict, depth: int) -> None:
-    """Answer through the shared natural-text Core, then queue quiet learning."""
-    if config.PAI_COUNSELOR_V2:
-        from .turn import CounselorTurnInput, run_counselor_turn
+    """Dispatch a turn, then queue learning only after a successful post."""
+    if config.PAI_COUNSELOR_MODE == "deep":
+        posted = await _run_deep_turn(db, workspace_id, event_data, depth)
+    elif config.PAI_COUNSELOR_MODE == "legacy":
+        posted = await _run_legacy_turn(db, workspace_id, event_data, depth)
+    else:
+        raise ValueError(f"Unsupported Counselor mode: {config.PAI_COUNSELOR_MODE}")
+    if posted and str(event_data.get("source") or "").startswith("human:"):
+        from app.memory.turn_hook import enqueue_turn_extraction
         from app.services.pai import PAI_AGENT_NAME
 
-        metadata = event_data.get("metadata") or {}
-        payload = event_data.get("payload") or {}
-        turn = CounselorTurnInput(
-            channel=event_data.get("target", ""), workspace_id=workspace_id,
-            student_text=str(payload.get("content") or ""),
-            attachments=tuple(payload.get("attachments") or ()),
-            session_id=metadata.get("session_id") or metadata.get("voice_session_id"),
-            source_event_id=str(event_data.get("id") or ""),
-            timestamp=_event_order_boundary(event_data),
-            source=str(event_data.get("source") or ""),
-            voice=bool(metadata.get("voice_delegation_id")),
+        assistant_event_id, channel_target, profile_captured = posted
+        enqueue_turn_extraction(
+            db=db, workspace_id=workspace_id, channel_target=channel_target,
+            user_event_id=event_data.get("id"),
+            assistant_event_id=assistant_event_id,
+            agent_name=PAI_AGENT_NAME,
+            profile_captured=profile_captured,
         )
-        if not turn.student_text.strip() and not turn.attachments:
-            return
-        _, reply, _ = await run_counselor_turn(db, turn)
-        posted = await _post_response(db, workspace_id, turn.channel, PAI_AGENT_NAME,
-                                      reply, depth, metadata=_voice_reply_metadata(event_data))
-        if not posted:
-            db.rollback()
-        return
+
+
+async def _run_deep_turn(db, workspace_id: str, event_data: dict, depth: int):
+    """PR 1 compatibility path; PR 3 replaces this with the deep turn."""
+    return await _run_legacy_turn(db, workspace_id, event_data, depth)
+
+
+async def _run_legacy_turn(db, workspace_id: str, event_data: dict, depth: int):
+    """The retained Counselor Core conversation path."""
     from app.services.pai import PAI_AGENT_NAME, WorkspaceApi
     from app.memory.permissions import capabilities_for_agent
     from app.tools import AUDIENCE_COUNSELOR, ToolContext
@@ -288,18 +291,7 @@ async def _run_turn(db, workspace_id: str, event_data: dict, depth: int) -> None
         (completion.get("nextRequirement") or {}).get("key"),
         bool(assistant_event_id),
     )
-    # Scheduled review instructions are system events, not new student claims.
-    # Keep the ordinary candidate/reconciliation learning path for real human
-    # turns while preventing a routine prompt from becoming Vault evidence.
-    if assistant_event_id and str(event_data.get("source", "")).startswith("human:"):
-        from app.memory.turn_hook import enqueue_turn_extraction
-        enqueue_turn_extraction(
-            db=db, workspace_id=workspace_id, channel_target=channel_target,
-            user_event_id=event_data.get("id"),
-            assistant_event_id=assistant_event_id,
-            agent_name=PAI_AGENT_NAME,
-            profile_captured=profile_captured,
-        )
+    return (assistant_event_id, channel_target, profile_captured) if assistant_event_id else None
 
 def _event_order_boundary(event_data: dict) -> Optional[int]:
     """Best-effort extraction of the triggering event's timestamp (unix ms)."""

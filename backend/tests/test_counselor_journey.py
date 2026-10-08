@@ -22,7 +22,7 @@ from scripts.counselor_eval_support import StudentSession
 @pytest.fixture(autouse=True)
 def _semantic_turn_fixture():
     with patch("app.counseling.turn_semantics.classify_turn", new_callable=AsyncMock) as classify, \
-         patch.object(config, "PAI_COUNSELOR_V2", False):
+         patch.object(config, "PAI_COUNSELOR_MODE", "legacy"):
         classify.return_value = {
             "general_information": False, "mirror_confirmation": False,
             "mirror_request": False, "profile_correction": False,
