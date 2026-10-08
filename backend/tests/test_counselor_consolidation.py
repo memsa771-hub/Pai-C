@@ -21,8 +21,12 @@ from scripts.counselor_eval_support import StudentSession
 def test_one_runtime_and_no_deleted_imports_or_mode_switch():
     root = Path(__file__).resolve().parents[1] / "app"
     deleted = {"core", "turn_plan", "turn_semantics", "goal_transition", "evaluator",
-               "continuous_discovery", "decision_sufficiency", "reply_guard", "turn_contract"}
+               "continuous_discovery", "decision_sufficiency", "reply_guard", "turn_contract",
+               "policy", "state", "research_flow"}
     assert not hasattr(config, "PAI_COUNSELOR_MODE")
+    for retired in ("services/counselor_prompt.py", "memory/eval_behavior.py",
+                    "memory/foundation_intake.py"):
+        assert not (root / retired).exists()
     assert not hasattr(runtime, "_run_legacy_turn")
     for name in deleted:
         assert not (root / "counseling" / f"{name}.py").exists()
@@ -83,14 +87,24 @@ async def test_deep_output_cannot_write_profile_or_activate_goal():
 
 
 @pytest.mark.asyncio
-async def test_research_handoff_uses_deterministic_polish_without_second_call():
-    from app.services.counselor_handoff import explain_result
-    model = AsyncMock(return_value={"content": "What matters most? What else?"})
-    with patch("app.services.counselor_handoff.chat_completion_tools", model), \
-            patch.object(config, "PAI_MEMORY_CONTEXT_ENABLED", False):
-        reply = await explain_result("workspace", [], {"roadmap_research": True})
+async def test_research_handoff_runs_through_the_deep_counselor_turn():
+    from types import SimpleNamespace
+    from app.services import counselor_handoff
+    from app.counseling.deep.prompts import load_prompt
+    session = Mock()
+    deep_turn = AsyncMock(return_value=SimpleNamespace(reply="What matters most?"))
+    history = [{"role": "user", "content": "earlier"}]
+    with patch.object(counselor_handoff, "new_session", return_value=session), \
+            patch.object(counselor_handoff, "run_deep_turn", deep_turn):
+        reply = await counselor_handoff.explain_result("workspace", history, {"roadmap_research": True})
     assert reply == "What matters most?"
-    assert model.await_count == 1
+    deep_turn.assert_awaited_once()
+    turn = deep_turn.await_args.args[1]
+    assert turn.workspace_id == "workspace" and turn.source == "system:handoff"
+    assert "roadmap_research" in turn.student_text
+    assert deep_turn.await_args.kwargs == {"history": history, "instructions": "handoff"}
+    session.close.assert_called_once()
+    assert "BACKGROUND RESULT HANDOFF" in load_prompt("handoff")
 
 
 @pytest.mark.asyncio

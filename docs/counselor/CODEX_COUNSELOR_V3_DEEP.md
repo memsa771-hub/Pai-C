@@ -186,7 +186,7 @@ Deep is the sole Counselor path after consolidation; no mode flag or legacy fall
 - Voice: the reply text is the intro + opinion + question (dimensions are shown on screen only).
 - Confirm runs the existing confirmation path:
   - mark the mirror as confirmed;
-  - build the research brief from the mirror lanes + notebook (extend `research_flow.research_brief` to carry the lanes, strengths, constraints and family concerns);
+  - build the research brief from the mirror lanes + notebook (extend the private brief builder in `research_gateway.py` to carry the lanes, strengths, constraints and family concerns);
   - queue research.
 - Tests:
   - A mirror without `mirror_ready` cannot be created.

@@ -37,7 +37,7 @@ PAI_PRIMARY_CHANNEL = "pai-counselor"
 # two Operator hand-off tools — nothing that performs real execution (writes,
 # browser automation, destructive or multi-step actions) and nothing that lets
 # the student manage agents or spin up threads (PAI has no agent picker; see
-# PAI_SYSTEM_PROMPT below — that's Operator's business, not a conversational
+# the deep Counselor prompt — that's Operator's business, not a conversational
 # one). Those live behind PAI Operator (see app/services/operator.py), which
 # discovers them itself via the "operator" tool audience (see
 # app/tools/registry.py) rather than a list maintained here.
@@ -50,8 +50,8 @@ PAI_PRIMARY_CHANNEL = "pai-counselor"
 # to be listed here despite being real execution, not lightweight reads).
 #
 # Do not add write/execution tools to this tuple — route that work through
-# operator.delegate instead; see the module docstring and PAI_SYSTEM_PROMPT
-# below for the counsel-vs-execute split this enforces.
+# operator.delegate instead; the deep Counselor never calls tools itself
+# (research goes through app/counseling/research_gateway.py).
 PAI_ALLOWED_TOOLS = (
     "workspace.threads.list", "tasks.list", "files.list", "files.read",
     # PAI Operator — see app/services/operator.py. Counselor never touches
@@ -368,7 +368,6 @@ class WorkspaceApi:
 # System prompt
 # ---------------------------------------------------------------------------
 
-from app.services.counselor_prompt import PAI_SYSTEM_PROMPT
 
 
 async def workspace_state_summary(api: WorkspaceApi) -> str:
@@ -400,7 +399,7 @@ async def workspace_state_summary(api: WorkspaceApi) -> str:
             if real:
                 # Grounding only — e.g. a real background agent a developer has
                 # running. Never surface this to the student as something to
-                # manage; see the "no agent picker" rule in PAI_SYSTEM_PROMPT.
+                # manage; see the "no agent picker" rule above PAI_ALLOWED_TOOLS.
                 lines.append(f"- Other internal processes active: {', '.join(real)}")
             else:
                 lines.append("- You are the student's only point of contact right now.")
@@ -417,44 +416,3 @@ async def workspace_state_summary(api: WorkspaceApi) -> str:
         return "Current workspace state (live): (unavailable)"
 
     return "\n".join(lines)
-
-
-# ---------------------------------------------------------------------------
-# Tools (OpenAI function-calling schemas + executor)
-# ---------------------------------------------------------------------------
-
-def allowed_tools_for_mode(mode: str = "normal") -> frozenset[str]:
-    # Legacy completion mode is a reporting metric, not the counseling gate.
-    # Runtime removes execution tools until the Student Mirror is confirmed.
-    return frozenset(PAI_ALLOWED_TOOLS)
-
-
-def build_tools(mode: str = "normal") -> list[dict]:
-    """Compatibility facade; schemas are owned by the shared ToolRegistry."""
-    from app.tools import get_tool_registry
-    from app.memory.permissions import COUNSELOR_CAPABILITIES
-    return get_tool_registry().openai_tools_for_agent(
-        allowed_tools_for_mode(mode), granted_capabilities=COUNSELOR_CAPABILITIES,
-    )
-
-
-
-async def execute_tool(
-    api: WorkspaceApi, agent_name: str, name: str, args: dict,
-) -> dict:
-    """Compatibility facade; execution is owned by the shared ToolExecutor."""
-    from app.tools import AUDIENCE_COUNSELOR, ToolContext, get_tool_executor
-    from app.memory.permissions import capabilities_for_agent
-    aliases = {
-        "list_agents": "workspace.agents.list", "list_threads": "workspace.threads.list",
-        "create_thread": "workspace.thread.create", "list_tasks": "tasks.list",
-        "create_task": "tasks.create",
-    }
-    context = ToolContext(
-        workspace_id=api.workspace_id, agent_name=agent_name, api=api,
-        allowed_tools=frozenset(PAI_ALLOWED_TOOLS), audience=AUDIENCE_COUNSELOR,
-        # Keyed on the calling agent, so this facade cannot be used to borrow
-        # Counselor's grant from a different agent.
-        granted_capabilities=capabilities_for_agent(agent_name),
-    )
-    return await get_tool_executor().execute(aliases.get(name, name), args, context)

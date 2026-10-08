@@ -123,7 +123,6 @@ async def test_research_gateway_always_enforces_confirmation():
 
 @pytest.mark.asyncio
 async def test_stale_refresh_routes_through_gateway_and_keeps_chosen_stage():
-    from app.counseling.research_flow import delegate_research_if_ready
     with StudentSession() as student, student.factory() as db:
         journey = research_journey(student, db, "CHOSEN")
         db.add(Roadmap(workspace_id=student.workspace_id, journey_id=journey.id,
@@ -132,9 +131,10 @@ async def test_stale_refresh_routes_through_gateway_and_keeps_chosen_stage():
         kwargs = dict(refresh_key="source-change")
         with patch("app.counseling.research_gateway._delegate_existing_research",
                    new=AsyncMock(return_value={"ok": True})) as delegate:
-            result = await delegate_research_if_ready(
-                db, student.workspace_id, journey, [], {},
-                SimpleNamespace(workspace_id=student.workspace_id), **kwargs)
+            result = await request_research(
+                "stale_refresh", student.workspace_id, db=db, journey=journey,
+                goals=[], understanding={},
+                tool_context=SimpleNamespace(workspace_id=student.workspace_id), **kwargs)
             assert result == {"ok": True}
             assert delegate.call_args.kwargs["refresh_key"] == "source-change"
         assert JourneyService(db).get(student.workspace_id, journey.id).current_stage == "CHOSEN"

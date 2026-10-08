@@ -77,8 +77,7 @@ acknowledge the uncertainty and clarify only when it changes the advice.
 If the block is absent, stored context is unavailable for this turn; this can
 be a retrieval failure and does not prove the student has no saved profile."""
 
-# Repeated AFTER the data. Behavioural evaluation (app/memory/eval_behavior.py,
-# scenario C) showed gpt-4o-mini obeying an instruction embedded in a memory
+# Repeated AFTER the data. An earlier behavioural evaluation (scenario C) showed gpt-4o-mini obeying an instruction embedded in a memory
 # when the only rule sat above the block: the injected text was the last thing
 # it read before the user message. Restating the boundary on the far side
 # closes that recency gap. This is defence in depth on top of the structural
