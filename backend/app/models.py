@@ -137,6 +137,8 @@ class CounselorNotedQuestion(Base):
     id = Column(UUID(as_uuid=False), primary_key=True, default=_uuid)
     workspace_id = Column(UUID(as_uuid=False), ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False)
     question_to_research = Column(Text, nullable=False)
+    fact_id = Column(Text, nullable=True)
+    answer = Column(JSONB, nullable=True)
     source_event_id = Column(Text, ForeignKey("events.id", ondelete="CASCADE"), nullable=False)
     status = Column(Text, nullable=False, default="open", server_default=text("'open'"))
     created_at = Column(DateTime(timezone=True), nullable=False, default=_now)

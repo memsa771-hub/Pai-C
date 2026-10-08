@@ -1,107 +1,79 @@
-"""Single Counselor entry point for research delegation.
-
-Deep discovery stores questions only. PR 6 must mark the mirror summary as
-confirmed before requesting roadmap_light. roadmap_deep is reserved until its
-chosen-roadmap research implementation is introduced.
-"""
+"""One research gateway, authorized by a versioned confirmed Mirror."""
 
 from sqlalchemy import select
 
 from app.journey import JourneyService
-from app.models import ExecutionRun, Roadmap, RoadmapStudentState, Workspace
+from app.models import CounselorNotedQuestion, ExecutionRun, Roadmap, RoadmapStudentState, Workspace
 
 
-def _research_brief(goal: dict, understanding: dict, summary: dict | None = None) -> dict:
-    from .context_projection import compact_student_context
-
-    details = goal.get("details") or {}
-    countries = details.get("target_countries") or []
-    summary = summary or {}
-    family = (summary.get("family_wish") or {}).get("value")
-    return {
-        "goal_id": goal.get("id"),
-        "stated_preference": details.get("stated_preference") or goal.get("title"),
-        "underlying_objective": details.get("underlying_objective"),
-        "drivers": details.get("drivers") or [],
-        "constraints": details.get("constraints") or [],
-        "country": countries[0] if len(countries) == 1 else "",
-        "level": details.get("degree_level") or "",
-        "intake": details.get("target_intake") or "",
-        "profile_summary": compact_student_context(understanding, goal.get("title") or ""),
-        "family_wish": family if isinstance(family, dict) else None,
-    }
+def mirror_is_current(db, workspace_id, version=None):
+    journey = next((item for item in JourneyService(db).list_active(workspace_id)
+                    if item.journey_type == "counselor_decision"), None)
+    draft = (journey.counselor_summary_draft or {}) if journey else {}
+    return bool(draft.get("type") == "mirror" and draft.get("status") == "confirmed"
+                and (version is None or draft.get("version") == version))
 
 
-async def request_research(kind: str, workspace_id: str, *, db, journey,
-                           goals: list[dict], understanding: dict, tool_context,
-                           refresh_key: str | None = None,
-                           refresh_candidate: dict | None = None,
-                           roadmap_id: str | None = None) -> dict | None:
+def _research_brief(db, workspace_id, journey, snapshot=None):
+    from app.counseling.deep.notebook import NotebookService
+    from app.memory.student_snapshot import StudentSnapshotService
+
+    snapshot = snapshot or StudentSnapshotService(db).build(workspace_id)
+    draft = journey.counselor_summary_draft or {}
+    notebook = NotebookService(db).get(workspace_id).notebook.model_dump(mode="json")
+    questions = db.scalars(select(CounselorNotedQuestion).where(
+        CounselorNotedQuestion.workspace_id == workspace_id,
+        CounselorNotedQuestion.status.in_(("open", "unanswered")))).all()
+    goals = snapshot.records.get("goal", [])
+    return {"mirror": draft.get("mirror") or {}, "mirror_version": draft.get("version"),
+        "notebook": notebook, "goals": goals, "goal_id": goals[0].get("id") if goals else None,
+        "profile": {"facts": snapshot.facts, "records": snapshot.records},
+        "stated_preference": (notebook.get("stated_goal") or {}).get("text") or
+            next((item["picture"] for item in (draft.get("mirror") or {}).get("dimensions", [])
+                  if item["key"] == "stated_goal"), ""),
+        "questions": [{"id": item.id, "question": item.question_to_research} for item in questions],
+        "decisive_fields": ["eligibility", "required_tests", "cost_range", "intake_window"]}
+
+
+async def request_research(kind, workspace_id, *, db, journey, tool_context,
+                           goals=None, snapshot=None, refresh_key=None, refresh_candidate=None,
+                           roadmap_id=None):
     if kind not in {"roadmap_light", "roadmap_deep", "stale_refresh"}:
         raise ValueError("unknown Counselor research kind")
-    if tool_context is None or tool_context.workspace_id != workspace_id:
+    if tool_context is None or tool_context.workspace_id != workspace_id or journey is None:
         return None
     workspace = db.scalar(select(Workspace.id).where(
-        Workspace.id == workspace_id, Workspace.status == "active"))
-    if workspace is None or journey is None:
-        return None
+        Workspace.id == workspace_id, Workspace.status == "active").with_for_update())
     journey = JourneyService(db).get(workspace_id, journey.id)
-    if journey is None or journey.status != "active" or journey.journey_type != "counselor_decision":
+    if not workspace or not journey or journey.status != "active" or not mirror_is_current(db, workspace_id):
         return None
-    if kind == "roadmap_light":
-        if refresh_key is not None or journey.current_stage != "RESEARCHING":
-            return None
-        if (
-                journey.counselor_summary_draft or {}).get("status") != "confirmed":
-            return None
-    elif kind == "stale_refresh":
+    if kind == "roadmap_light" and (refresh_key is not None or journey.current_stage != "RESEARCHING"):
+        return None
+    if kind == "stale_refresh":
         if not refresh_key or journey.current_stage not in {"RESEARCHING", "PROPOSED", "CHOSEN"}:
             return None
-        stale = db.scalar(select(Roadmap.id).where(
-            Roadmap.workspace_id == workspace_id, Roadmap.journey_id == journey.id,
-            Roadmap.generation_status == "stale").limit(1))
-        if stale is None:
+        if not db.scalar(select(Roadmap.id).where(Roadmap.workspace_id == workspace_id,
+                Roadmap.journey_id == journey.id, Roadmap.generation_status == "stale").limit(1)):
             return None
-    else:
-        chosen = db.scalar(select(Roadmap.id).join(
-            RoadmapStudentState, RoadmapStudentState.roadmap_id == Roadmap.id).where(
-                Roadmap.workspace_id == workspace_id, Roadmap.journey_id == journey.id,
-                Roadmap.id == roadmap_id, RoadmapStudentState.chosen_at.is_not(None)))
-        if journey.current_stage != "CHOSEN" or chosen is None:
+    if kind == "roadmap_deep":
+        chosen = db.scalar(select(Roadmap.id).join(RoadmapStudentState).where(
+            Roadmap.workspace_id == workspace_id, Roadmap.id == roadmap_id,
+            Roadmap.journey_id == journey.id, RoadmapStudentState.chosen_at.is_not(None)))
+        if journey.current_stage != "CHOSEN" or not chosen:
             return None
         raise NotImplementedError("chosen roadmap deep research is deferred")
-    return await _delegate_existing_research(
-        db, workspace_id, journey, goals, understanding, tool_context,
-        refresh_key=refresh_key, refresh_candidate=refresh_candidate)
-
-
-async def _delegate_existing_research(db, workspace_id: str, journey, goals: list[dict],
-                                     understanding: dict, tool_context,
-                                     refresh_key: str | None = None,
-                                     refresh_candidate: dict | None = None) -> dict | None:
-    allowed_stage = journey.current_stage == "RESEARCHING" or (
-        journey.current_stage in {"PROPOSED", "CHOSEN"} and refresh_key is not None)
-    if not allowed_stage or not goals or tool_context is None:
-        return None
-    goal = next((item for item in goals if (item.get("details") or {}).get("underlying_objective")), None)
-    if goal is None:
-        return None
-    key = f"{journey.id}:{goal['id']}" + (f":refresh:{refresh_key}" if refresh_key else "")
-    prior = db.execute(select(ExecutionRun).where(
-        ExecutionRun.workspace_id == workspace_id,
-        ExecutionRun.task_type == "roadmap_research",
-    ).order_by(ExecutionRun.created_at.desc()).limit(30)).scalars().all()
+    brief = _research_brief(db, workspace_id, journey, snapshot)
+    key = f"{journey.id}:mirror:{brief['mirror_version']}" + (f":refresh:{refresh_key}" if refresh_key else "")
+    prior = db.scalars(select(ExecutionRun).where(ExecutionRun.workspace_id == workspace_id,
+                        ExecutionRun.task_type == "roadmap_research")).all()
     if any((item.constraints or {}).get("research_key") == key for item in prior):
         return None
-    draft = journey.counselor_summary_draft or {}
-    brief = _research_brief(
-        goal, understanding, draft.get("summary") if draft.get("status") == "confirmed" else None)
     if refresh_candidate:
         brief["refresh_candidate"] = refresh_candidate
     from app.tools import get_tool_executor
     return await get_tool_executor().execute("operator.delegate", {
-        "objective": f"Research sourced routes for {brief['stated_preference']}",
+        "objective": "Research decisive facts for the confirmed student routes and noted questions",
         "task_type": "roadmap_research", "intent": "academic_planning",
-        "constraints": {"research_key": key, "capability_input": {"brief": brief}},
-        "context_refs": ["vault", "memory"],
-    }, tool_context)
+        "constraints": {"research_key": key, "mirror_version": brief["mirror_version"],
+                        "capability_input": {"brief": brief}},
+        "context_refs": ["vault", "memory"]}, tool_context)

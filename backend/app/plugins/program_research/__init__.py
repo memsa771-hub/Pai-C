@@ -13,7 +13,7 @@ EXTRACTION_PROMPT = (
     "Return a JSON object with a facts array. Each fact is "
     "{field,value,quote,kind,category,comparator,threshold,unit,scale}. "
     "Cover entry qualification, minimum grades, required subjects or coursework, "
-    "English and other tests, documents, application route, deadline by intake, "
+    "language proficiency and other tests, documents, application route, deadline by intake, "
     "tuition, other stated costs, and language of instruction only when shown. "
     "For a fee, value must be {amount:number,currency:ISO_4217,basis:per_year|per_semester|total|per_credit}; "
     "for a deadline, value must be an ISO date. Fee category is tuition, living, or other. "
@@ -24,12 +24,16 @@ EXTRACTION_PROMPT = (
     "explicit qualification or test name. Otherwise retain the page term and omit comparator. "
     "Quote must be an exact contiguous excerpt. No inference or student profile facts. "
     "Use an empty array when unclear."
+    " When focus is supplied, extract only the decisive fields and answers to its questions."
 )
 
 
 async def _extract_page(content, url, payload, comparison_fields, checked_at):
     from app.config import config
     from app.inference.client import chat_completion
+    from app.plugins._shared.budget import spend, record_model_usage
+    if spend("model"):
+        raise ValueError("research_student_budget_exceeded")
 
     raw = await chat_completion(
         api_key=config.PAI_API_KEY, model=config.PAI_MODEL,
@@ -38,8 +42,10 @@ async def _extract_page(content, url, payload, comparison_fields, checked_at):
             "country": payload["country"], "level": payload.get("level"),
             "intake": payload.get("intake"), "source_url": url,
             "comparison_fields": comparison_fields,
+            "focus": payload.get("focus"),
             "page": content[:18000]}, ensure_ascii=False)}],
         max_tokens=2200, base_url=config.PAI_BASE_URL or None,
+        usage_callback=record_model_usage,
     )
     parsed = json.loads(raw.strip().removeprefix("```json").removesuffix("```").strip())
     return cited_facts(parsed.get("facts") or [], content, url, checked_at)
@@ -49,6 +55,13 @@ async def research(context, payload):
     url = payload["url"]
     if not public_https(url):
         return {"requirements": [], "unconfirmed": [{"reason": "Invalid source URL"}]}
+    from app.database import new_session
+    from app.research.requirements import RequirementStore
+    with new_session() as cache_db:
+        cached = RequirementStore(cache_db).cached(context.workspace_id, payload)
+        if cached:
+            cache_db.commit()
+            return {"requirements": [cached], "unconfirmed": []}
     fetched = data(await context.tools.invoke("web.fetch", {"url": url, "max_chars": 20000}))
     content = str(fetched.get("content") or "")
     actual_url = str(fetched.get("url") or url)
@@ -122,6 +135,7 @@ async def research(context, payload):
             source_url=actual_url, checked_at=datetime.fromisoformat(checked_at),
             rules=rules, fees=fees, deadlines=deadlines, page_text=content,
             corroboration=secondary_facts, corroborated_at=secondary_at,
+            public_facts=True,
         )
         result = {"opportunity_id": opportunity.id, "requirement_set_id": requirement_set.id,
                   "status": requirement_set.status, "verification_checks": requirement_set.verification_checks,
@@ -132,6 +146,7 @@ async def research(context, payload):
                   "corroborating_source_url": (actual_secondary_url if secondary_facts else None),
                   "corroborated_at": secondary_at.isoformat() if secondary_facts and secondary_at else None}
         db.commit()
+        result = {**result, **store.payload(opportunity, requirement_set)}
     finally:
         db.close()
     return {"requirements": [result], "unconfirmed": []}
@@ -145,7 +160,7 @@ def get_capabilities():
             "url": {"type": "string"}, "country": {"type": "string"},
             "level": {"type": "string"}, "intake": {"type": "string"},
             "institution": {"type": "string"}, "route": {"type": "object"},
-            "corroborating_url": {"type": "string"}},
+            "corroborating_url": {"type": "string"}, "focus": {"type": "object"}},
             "required": ["url", "country"]},
         output_schema={"type": "object", "properties": {
             "requirements": {"type": "array"}, "unconfirmed": {"type": "array"}},

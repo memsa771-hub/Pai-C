@@ -39,7 +39,6 @@ JOB_REFRESH_RESEARCH = "research.refresh_stale"
 async def refresh_stale_research(job, db) -> dict:
     """A reported or expired source starts a fresh Counselor research run."""
     from app.counseling.research_gateway import request_research
-    from app.counseling.understanding import StudentUnderstandingBuilder
     from app.journey import JourneyService
     from app.memory.permissions import capabilities_for_agent
     from app.memory.student_snapshot import StudentSnapshotService
@@ -58,9 +57,6 @@ async def refresh_stale_research(job, db) -> dict:
         return {"delegated": False}
     snapshot = StudentSnapshotService(db).build(job.workspace_id)
     goals = snapshot.records.get("goal", [])
-    if not any((item.get("details") or {}).get("underlying_objective") for item in goals):
-        return {"delegated": False}
-    understanding = StudentUnderstandingBuilder(db).build(job.workspace_id, snapshot=snapshot)
     if journey.current_stage == "PROPOSED":
         journey = JourneyService(db).set_counselor_stage(
             job.workspace_id, journey.id, "RESEARCHING", actor="system:source_review")
@@ -88,7 +84,7 @@ async def refresh_stale_research(job, db) -> dict:
                                  "intake": opportunity.intake}
     result = await request_research(
         "stale_refresh", job.workspace_id, db=db, journey=journey, goals=goals,
-        understanding=understanding, tool_context=context,
+        snapshot=snapshot, tool_context=context,
         refresh_key=requirement_id or job.id, refresh_candidate=refresh_candidate)
     return {"delegated": bool(result and result.get("ok"))}
 
@@ -141,7 +137,6 @@ async def resume_research(job, db) -> dict:
     # turn; discovery alone must not bypass the mirror-confirmation gate.
     from app.counseling.research_gateway import request_research
     from app.counseling.stages import advance_discovery_stage
-    from app.counseling.understanding import StudentUnderstandingBuilder
     from app.journey import JourneyService
     from app.memory.student_snapshot import StudentSnapshotService
     from app.memory.permissions import capabilities_for_agent
@@ -170,7 +165,6 @@ async def resume_research(job, db) -> dict:
         refresh_key = candidate.id
     elif journey.current_stage == "CHOSEN" and stale:
         refresh_key = candidate.id
-    understanding = StudentUnderstandingBuilder(db).build(job.workspace_id, snapshot=snapshot)
     may_delegate = _research_delegate_allowed(journey, refresh_key)
     db.commit()
     if not may_delegate:
@@ -186,7 +180,7 @@ async def resume_research(job, db) -> dict:
     delegated = await request_research(
         "stale_refresh" if refresh_key else "roadmap_light", job.workspace_id,
         db=db, journey=journey, goals=snapshot.records.get("goal", []),
-        understanding=understanding, tool_context=counselor_ctx, refresh_key=refresh_key)
+        snapshot=snapshot, tool_context=counselor_ctx, refresh_key=refresh_key)
     return {"resumed": resumed, "delegated": bool(delegated and delegated.get("ok"))}
 
 

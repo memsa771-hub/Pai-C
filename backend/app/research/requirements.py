@@ -4,6 +4,11 @@ from datetime import datetime, timezone
 import logging
 import time
 from uuid import uuid4
+import hashlib
+import json
+from copy import deepcopy
+from datetime import timedelta
+from urllib.parse import urldefrag, urlsplit
 
 from sqlalchemy import select
 
@@ -77,7 +82,8 @@ class RequirementStore:
                 deadlines: dict | None = None,
                 opportunity_id: str | None = None, page_text: str = "",
                 corroboration: list[dict] | None = None,
-                corroborated_at: datetime | None = None) -> tuple[Opportunity, RequirementSet]:
+                corroborated_at: datetime | None = None,
+                public_facts: bool = False) -> tuple[Opportunity, RequirementSet]:
         if not isinstance(route, dict) or not country or not isinstance(rules, list):
             raise ResearchEvidenceError("Route, country and rules are required")
         if not isinstance(checked_at, datetime) or checked_at.tzinfo is None:
@@ -144,6 +150,11 @@ class RequirementStore:
             verification_checks=verdict.checks, cycle_label=verdict.cycle_label,
             verified_at=datetime.now(timezone.utc) if verdict.status == "verified" else None)
         self.db.add(requirement)
+        if (public_facts and verdict.status == "verified" and not urlsplit(source_url).query
+                and official_url(source_url, self.official_domains(institution))):
+            requirement.verification_checks = {**requirement.verification_checks,
+                "public_cache": {"key": self.cache_key(source_url, country, level, intake,
+                    route.get("program_id")), "passed": True}}
         self.db.flush()
         if previous and (previous.rules != rules or previous.fees != (fees or {})
                          or previous.deadlines != (deadlines or {})
@@ -180,6 +191,70 @@ class RequirementStore:
             domains.update(self.db.execute(select(InstitutionDomain.domain).where(
                 InstitutionDomain.institution_id == institution.id)).scalars())
         return domains
+
+    @staticmethod
+    def cache_key(url, country, level=None, intake=None, program_id=None):
+        scope = [urldefrag(url)[0].rstrip("/"), country, level or "", intake or "", program_id or ""]
+        return hashlib.sha256(json.dumps(scope, ensure_ascii=True).encode()).hexdigest()
+
+    def cached(self, workspace_id, payload):
+        """Reuse only explicitly public, official facts; clone no private route data."""
+        from app.config import config
+        from app.research.scheduler import _near_deadline
+
+        url = payload["url"]
+        key = self.cache_key(url, payload["country"], payload.get("level"),
+                             payload.get("intake"), (payload.get("route") or {}).get("program_id"))
+        pairs = self.db.execute(select(RequirementSet, Opportunity).join(Opportunity).where(
+            RequirementSet.source_url == url,
+            Opportunity.country == payload["country"], Opportunity.level == payload.get("level"),
+            Opportunity.intake == payload.get("intake"),
+        ).order_by(RequirementSet.checked_at.desc(), RequirementSet.created_at.desc(),
+                   RequirementSet.version.desc())).all()
+        eligible = [(row, opportunity) for row, opportunity in pairs
+                    if ((row.verification_checks or {}).get("public_cache") or {}).get("key") == key]
+        if not eligible:
+            return None
+        row, opportunity = eligible[0]
+        now = datetime.now(timezone.utc)
+        checked = row.checked_at.replace(tzinfo=timezone.utc) if row.checked_at.tzinfo is None else row.checked_at
+        window = (config.PAI_RESEARCH_DEADLINE_FRESHNESS_DAYS if _near_deadline(row, now.date())
+                  else config.PAI_RESEARCH_FRESHNESS_DAYS)
+        if (row.status != "verified" or checked < now - timedelta(days=max(1, window))
+                or not official_url(url, self.official_domains(opportunity.institution))):
+            return None
+        if opportunity.workspace_id == workspace_id:
+            return self.payload(opportunity, row, cached=True)
+        # Materialize just public evidence into a workspace-owned Opportunity.
+        # Student annotations, report text and source workspace IDs never cross.
+        local = Opportunity(id=str(uuid4()), workspace_id=workspace_id,
+            route={"url": url, **({"program_id": payload["route"]["program_id"]}
+                  if (payload.get("route") or {}).get("program_id") else {})},
+            country=payload["country"], level=payload.get("level"), intake=payload.get("intake"),
+            institution=opportunity.institution, url=url)
+        clone = RequirementSet(id=str(uuid4()), opportunity_id=local.id,
+            rules=deepcopy(row.rules), fees=deepcopy(row.fees), deadlines=deepcopy(row.deadlines),
+            source_url=url, checked_at=row.checked_at, status="verified", version=1,
+            verified_at=row.verified_at, cycle_label=row.cycle_label,
+            verification_checks={"public_cache": {"key": key, "passed": True}})
+        self.db.add_all([local, clone])
+        self.db.flush()
+        return self.payload(local, clone, cached=True)
+
+    @staticmethod
+    def payload(opportunity, row, *, cached=False):
+        def fact(value, kind, key):
+            return {**value, "fact_id": f"{row.id}:{kind}:{key}", "status": row.status,
+                    "source_url": value.get("source_url") or row.source_url,
+                    "checked_at": value.get("checked_at") or row.checked_at.isoformat()}
+        return {"opportunity_id": opportunity.id, "requirement_set_id": row.id,
+            "status": row.status, "verification_checks": row.verification_checks,
+            "rules": [fact(value, "rule", index) for index, value in enumerate(row.rules or [])],
+            "fees": {key: fact(value, "fee", key) for key, value in (row.fees or {}).items()},
+            "deadlines": {key: fact(value, "deadline", key) for key, value in (row.deadlines or {}).items()},
+            "source_url": row.source_url, "checked_at": row.checked_at.isoformat(),
+            "country": opportunity.country, "level": opportunity.level, "intake": opportunity.intake,
+            "cached": cached}
 
     def preferred(self, workspace_id: str, opportunity_id: str) -> RequirementSet | None:
         rows = self.db.execute(select(RequirementSet).join(Opportunity).where(

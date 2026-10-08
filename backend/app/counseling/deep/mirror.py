@@ -189,7 +189,6 @@ def enqueue_confirmed_research(db, workspace_id: str, journey) -> str:
 
 async def confirmed_research_job(job, db) -> dict:
     from app.counseling.research_gateway import request_research
-    from app.counseling.understanding import StudentUnderstandingBuilder
     from app.memory.student_snapshot import StudentSnapshotService
     from app.memory.permissions import capabilities_for_agent
     from app.services.pai import PAI_ALLOWED_TOOLS, WorkspaceApi
@@ -205,7 +204,6 @@ async def confirmed_research_job(job, db) -> dict:
         if request.get("handoff_status") == "done":
             return {"status": "duplicate"}
         snapshot = StudentSnapshotService(db).build(job.workspace_id)
-        understanding = StudentUnderstandingBuilder(db).build(job.workspace_id, snapshot=snapshot)
         workspace = db.get(Workspace, job.workspace_id)
         ctx = ToolContext(workspace_id=job.workspace_id, agent_name="pai",
             api=WorkspaceApi(job.workspace_id, workspace.password_hash),
@@ -213,7 +211,7 @@ async def confirmed_research_job(job, db) -> dict:
             allowed_tools=frozenset({"operator.delegate"}) & frozenset(PAI_ALLOWED_TOOLS),
             audience=AUDIENCE_COUNSELOR, granted_capabilities=capabilities_for_agent("pai"))
         outcome = await request_research("roadmap_light", job.workspace_id, db=db, journey=journey,
-            goals=snapshot.records.get("goal", []), understanding=understanding, tool_context=ctx)
+            snapshot=snapshot, tool_context=ctx)
         if outcome is not None and not outcome.get("ok"):
             raise RuntimeError("Confirmed research handoff failed")
         from app.models import StudentJourney
