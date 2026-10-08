@@ -1,5 +1,7 @@
 # Codex task: PAI Counselor v3 "deep" (in-depth personal counseling)
 
+> Base branch and PR order in this file are historical. Current order: PR 6 Mirror, PR 7 research cache + light research, PR 8 roadmaps from the mirror. PRs go into dev.
+
 Repo: `memsa771-hub/Pai-C`. Base: `feature/counselor-complete`. Work branch: `feature/counselor-deep`. One PR per step into `feature/counselor-complete`. Never push to `dev` or `main`.
 
 This task **replaces** `codex_prompt_counselor_simple.md`. The successful-post memory hook and context builder remain; consolidation removes the temporary mode switch.
