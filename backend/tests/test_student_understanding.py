@@ -472,7 +472,8 @@ def test_chat_does_not_dump_profile_or_require_mirror_confirmation():
                 assert "operator__delegate" not in {
                     tool["function"]["name"] for tool in received[-1]["tools"]}
                 await student.turn("Please research a shortlist")
-                assert "operator__delegate" in {
+                # Research delegation is server-owned through the gateway.
+                assert "operator__delegate" not in {
                     tool["function"]["name"] for tool in received[-1]["tools"]}
 
                 with student.factory() as db:

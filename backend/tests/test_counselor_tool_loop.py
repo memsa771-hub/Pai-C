@@ -77,13 +77,13 @@ async def _exercise(completion, *, voice=False, requested_work=True):
             runs = db.execute(select(ExecutionRun)).scalars().all()
             audits = db.execute(select(EventRecord).where(
                 EventRecord.type == "counselor.tool.result")).scalars().all()
-            if completion is OPEN and requested_work:
-                assert len(runs) == 1
-                assert runs[0].task_type == "roadmap_research"
+            if completion is OPEN:
+                assert runs == []
                 assert len(audits) == 1 and audits[0].visibility == "private"
-                assert audits[0].payload["result"]["data"]["run_id"] == runs[0].id
-                assert "operator__delegate" in {tool["function"]["name"]
-                                                 for tool in requests[0]["tools"]}
+                assert audits[0].payload["result"]["error"]["code"] == "tool_not_allowed"
+                assert requests[0]["tools"]
+                assert "operator__delegate" not in {tool["function"]["name"]
+                                                    for tool in requests[0]["tools"]}
                 assert requests[1]["messages"][-1]["role"] == "tool"
                 if voice:
                     reply = db.execute(select(EventRecord).where(
@@ -91,18 +91,12 @@ async def _exercise(completion, *, voice=False, requested_work=True):
                         EventRecord.source == "openagents:pai").order_by(
                             EventRecord.timestamp.desc())).scalars().first()
                     assert reply.metadata_["voice_delegation_id"] == "voice-turn"
-            elif completion is OPEN:
-                assert runs == []
-                assert len(audits) == 1
-                assert audits[0].payload["result"]["error"]["code"] == "tool_not_allowed"
-                assert "operator__delegate" not in {tool["function"]["name"]
-                                                    for tool in requests[0]["tools"]}
             else:
                 assert runs == [] and audits == []
                 assert all(not request.get("tools") for request in requests)
 
 
-def test_open_chat_delegates_and_persists_tool_result():
+def test_open_chat_rejects_direct_delegation_and_persists_audit():
     asyncio.run(_exercise(OPEN))
 
 
@@ -110,7 +104,7 @@ def test_collecting_chat_has_no_execution_tools():
     asyncio.run(_exercise(COLLECTING))
 
 
-def test_open_voice_turn_uses_the_same_delegation_path():
+def test_open_voice_turn_rejects_the_same_direct_delegation():
     asyncio.run(_exercise(OPEN, voice=True))
 
 
