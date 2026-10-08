@@ -15,7 +15,8 @@ All paths below are under `backend/app/counseling/`:
 - `evaluator.py`, `continuous_discovery.py`, `decision_sufficiency.py`: old turn policy derivation.
 - `reply_guard.py`, `turn_contract.py`: old response repair/model loops and envelopes.
 
-The previous importer list is saved in [consolidation-importers-before.txt](consolidation-importers-before.txt).
+The pre-consolidation importer inventory was retired during docs cleanup; the
+retained-module inventory below records the relevant callers and rationale.
 The package-export importer `tests/test_pai_core_architecture.py` also used
 `CounselingEvaluator`; its obsolete evaluator test was removed. Final searches
 cover both module imports and exported symbol names. No production importer of
