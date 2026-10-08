@@ -116,7 +116,7 @@ async def dispatch_action(db, turn: CounselorTurnInput, action: dict,
                 reason=None if ready else "not_ready")
         return kind, "requested" if ready else "ignored"
     if kind == "ask_research":
-        question = action.get("question")
+        question = action.get("research_question") or action.get("question")
         return kind, await _research(db, turn, context,
                                      question.strip() if isinstance(question, str) else "")
     if kind == "wellbeing":

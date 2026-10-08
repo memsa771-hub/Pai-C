@@ -2,7 +2,7 @@
 
 Every Python AST string and numeric literal in `backend/app/counseling/deep/*.py` is listed below, including repeated occurrences and docstrings. Boolean and null literals are not strings or numbers. These are protocol identifiers, section labels, regex syntax, storage fields, and bounded generic operations. No student words, persona names, academic subjects, countries, or language-specific text select a conversation path. Tunable model, budget, history, research, and language settings live in `app/config.py` with environment overrides.
 
-Inventory: **536 literal occurrences** across 11 Python modules.
+Inventory: **537 literal occurrences** across 11 Python modules.
 
 | File | Line | Literal | Why retained |
 | --- | ---: | --- | --- |
@@ -93,6 +93,7 @@ Inventory: **536 literal occurrences** across 11 Python modules.
 | actions.py | 117 | <code>&#x27;requested&#x27;</code> | Action names, event fields, rate-limit accounting, or status codes; no student-topic matching. |
 | actions.py | 118 | <code>&#x27;ask_research&#x27;</code> | Action names, event fields, rate-limit accounting, or status codes; no student-topic matching. |
 | actions.py | 119 | <code>&#x27;question&#x27;</code> | Action names, event fields, rate-limit accounting, or status codes; no student-topic matching. |
+| actions.py | 119 | <code>&#x27;research_question&#x27;</code> | Action names, event fields, rate-limit accounting, or status codes; no student-topic matching. |
 | actions.py | 121 | <code>&#x27;&#x27;</code> | Action names, event fields, rate-limit accounting, or status codes; no student-topic matching. |
 | actions.py | 122 | <code>&#x27;wellbeing&#x27;</code> | Action names, event fields, rate-limit accounting, or status codes; no student-topic matching. |
 | actions.py | 123 | <code>&#x27;recorded&#x27;</code> | Action names, event fields, rate-limit accounting, or status codes; no student-topic matching. |

@@ -61,3 +61,22 @@ Action payloads and section token counts for each turn are preserved in [the mac
 | 8 | exams aa gaye the. Phir dobara start nahi kiya | Exams ki wajah se course ruk gaya, phir dobara shuru nahi hua. Exams ke baad kis cheez mein tumhara waqt guzarta raha? | 22 | 1 | No | No | 4689 |
 
 Action payloads and section token counts for each turn are preserved in [the machine-readable result](./pr15-model-matrix.json).
+
+## PR 3 acceptance rerun: counselor v3.2, gpt-6-astra low
+
+The same first eight student messages were rerun with the verbatim v3.2 prompt and one real model call per turn. Each spoken reply contains one distinct question; turn 1 action is `none` (no `ask_research`). No model selection is inferred from this check.
+
+Usage is from the provider response. Input includes cached input; reasoning is a subset of output. Estimated USD = (uncached input × $10 + cached input × $1 + output × $50) / 1,000,000 at [OpenAI standard short-context rates](https://developers.openai.com/api/docs/models/gpt-6-astra). Cache writes, taxes, provider discounts and other fees are not included.
+
+| Turn | Student | Spoken reply | Action | Input | Cached input | Output | Reasoning | Est. USD | total_ms |
+| ---: | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| 1 | AoA. mujhe AI engineer banna hai aur Canada jana hai. kaise jaun? | Wa alaikum assalam, Danish. AI engineer banne aur Canada jane ki baat par wapas aayenge; pehle aapko samajhna chahta hoon. Aaj kal aap kya kar rahe hain? | none | 2212 | 0 | 65 | 0 | 0.025370 | 4589 |
+| 2 | ICS kiya hai is saal, result aa gaya. Ab free hoon | Is saal ICS ke baad ab aap free hain. Aaj kal aapka aam din kaise guzarta hai? | none | 2287 | 2209 | 43 | 0 | 0.005139 | 6518 |
+| 3 | 68% aaye. Theek hai bas, maths mein kam aaye | Aapke 68% aaye, maths mein kam rahe. Maths mein kis cheez par sab se zyada atakte thay? | none | 2337 | 2284 | 44 | 0 | 0.005014 | 3614 |
+| 4 | dono thora. Calculus bilkul samajh nahi aata tha. Computer mein acha tha | Calculus samajh nahi aata tha, lekin computer mein aap acha mehsoos karte thay. Computer mein khud kiya hua koi kaam bata sakte hain? | none | 2396 | 2334 | 55 | 0 | 0.005704 | 4222 |
+| 5 | programming. C++ mein patterns wagaira banana. Python bhi seekha hai maine khud | Python aapne khud seekhi. Us mein apne aap kya banaya hai? | none | 2465 | 2393 | 36 | 0 | 0.004913 | 3893 |
+| 6 | YouTube pe ek 12 ghante ka course hai, us se | Python aapne YouTube ke 12 ghante ke course se seekhi. Course se hat kar khud koi code likha tha? | none | 2509 | 2462 | 45 | 0 | 0.005182 | 3625 |
+| 7 | ... aadha shayad. 5-6 ghante | Course ke taqreeban 5–6 ghante dekhe thay. Phir aage dekhna kis wajah se ruk gaya? | none | 2561 | 2506 | 45 | 0 | 0.005306 | 2875 |
+| 8 | exams aa gaye the. Phir dobara start nahi kiya | Exams ki wajah se course ruka, phir dobara shuru nahi hua. Exams ke baad se aapka waqt zyada kis cheez mein guzarta hai? | none | 2615 | 2558 | 53 | 0 | 0.005778 | 4077 |
+
+Estimated total: $0.062406. Full per-turn provider usage is also in [JSON](./pr15-astra-v32.json).

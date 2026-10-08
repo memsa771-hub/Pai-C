@@ -163,6 +163,22 @@ async def test_research_reservation_commits_before_operator_uses_another_session
 
 
 @pytest.mark.asyncio
+async def test_research_question_prefers_new_key_and_accepts_old_key():
+    with StudentSession() as student, student.factory() as db:
+        context = DeepContext("", {}, CounselorNotebookData(), None, 0)
+        with patch("app.counseling.deep.actions._research", new=AsyncMock(return_value="accepted")) as research:
+            turn = _turn(student)
+            for action, expected in (
+                ({"type": "ask_research", "research_question": "New request?", "question": "Old request?"}, "New request?"),
+                ({"type": "ask_research", "question": "Old request?"}, "Old request?"),
+            ):
+                assert await dispatch_action(db, turn, action, context) == ("ask_research", "accepted")
+                assert research.call_args.args[3] == expected
+            assert await dispatch_action(db, turn, {"type": "none", "research_question": "Ignore me?"}, context) == ("none", "none")
+            assert research.await_count == 2
+
+
+@pytest.mark.asyncio
 async def test_identity_marked_never_ask_and_other_workspace_excluded():
     with StudentSession() as student, student.factory() as db:
         db.get(User, student.user_id).display_name = "Danish"
@@ -209,3 +225,38 @@ async def test_runtime_posts_and_enqueues_extraction_once():
         assert student.transcript[-1]["content"] == "What are you doing now?"
         assert model.await_count == 1
         enqueue.assert_called_once()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("reply,action,expected_log", [
+    ("I heard you.", {"type": "none"}, True),
+    ("I will show your mirror.", {"type": "mirror"}, False),
+    ("I am here with you.", {"type": "wellbeing"}, False),
+    ("What happened next?", {"type": "none"}, False),
+])
+async def test_runtime_logs_missing_spoken_question_without_student_text(
+    caplog, reply, action, expected_log,
+):
+    with StudentSession() as student, student.factory() as db:
+        event_data = {"id": str(uuid4()), "source": f"human:{student.user_id}",
+                      "target": "channel/chat", "payload": {"content": "Private student input"},
+                      "timestamp": student.next_timestamp(), "metadata": {}}
+        db.add(EventRecord(id=event_data["id"], network_id=student.workspace_id,
+                           type="workspace.message.posted", source=event_data["source"],
+                           target="channel/chat", payload=event_data["payload"],
+                           timestamp=event_data["timestamp"]))
+        db.commit()
+        with patch.object(config, "PAI_COUNSELOR_MODE", "deep"), \
+                patch.object(config, "PAI_API_KEY", "fake"), \
+                patch("app.counseling.deep.turn.chat_completion",
+                      new=AsyncMock(return_value=_answer(reply, action))), \
+                patch("app.counseling.deep.actions.dispatch_action",
+                      new=AsyncMock(return_value=(action["type"], "recorded"))), \
+                patch("app.memory.turn_hook.enqueue_turn_extraction"), \
+                caplog.at_level("INFO", logger="app.counseling.runtime"):
+            await runtime._run_turn(db, student.workspace_id, event_data, 0)
+        matching = [record for record in caplog.records if "reply_without_question" in record.message]
+        assert bool(matching) is expected_log
+        if matching:
+            assert event_data["id"] in matching[0].message
+            assert "Private student input" not in matching[0].message

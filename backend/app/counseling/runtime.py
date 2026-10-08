@@ -111,6 +111,11 @@ async def _run_deep_turn(db, workspace_id: str, event_data: dict, depth: int):
     )
     started = time.monotonic()
     result = await run_deep_turn(db, turn)
+    from app.counseling.deep.polish import question_count
+
+    if (question_count(result.reply) == 0
+            and result.action.get("type") not in {"mirror", "wellbeing"}):
+        logger.info("reply_without_question turn_id=%s", turn.source_event_id)
     post_started = time.monotonic()
     assistant_event_id = await _post_response(
         db, workspace_id, turn.channel, PAI_AGENT_NAME, result.reply, depth,
