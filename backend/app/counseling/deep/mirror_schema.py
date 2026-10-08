@@ -70,8 +70,8 @@ class CounselorMirror(MirrorPart):
         if contains_blocked_script(json.dumps(self.model_dump(), ensure_ascii=False),
                                    config.PAI_LANGUAGE_BLOCKED_SCRIPTS):
             raise ValueError("mirror contains a blocked script")
-        if any(_WORLD_NUMBER.search(text) for text in [self.opinion, *self.blockers]):
-            raise ValueError("opinion or blockers contain numeric world-fact patterns")
+        if _WORLD_NUMBER.search(self.opinion):
+            raise ValueError("opinion contains numeric world-fact patterns")
         if question_count(self.spoken_reply()) != 1 or question_count(self.question) != 1:
             raise ValueError("mirror must end with one spoken confirmation question")
         return self

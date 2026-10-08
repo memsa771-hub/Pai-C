@@ -163,7 +163,9 @@ async def build_context(db, workspace_id: str, turn: CounselorTurnInput, *,
         }}
     if research is not None:
         sections["research"] = _json(research)
-    sections["journey"] = _json({"stage": journey.current_stage if journey else "IDENTITY"})
+    draft = (journey.counselor_summary_draft or {}) if journey else {}
+    sections["journey"] = _json({"stage": journey.current_stage if journey else "IDENTITY",
+        "mirror_status": draft.get("status"), "mirror_notebook_version": draft.get("notebook_version")})
     text = "<context>\n" + "\n".join(
         f"<{name}>{value}</{name}>" for name, value in sections.items()
     ) + "\n</context>"

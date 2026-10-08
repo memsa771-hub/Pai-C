@@ -17,7 +17,7 @@ Return one JSON object, with this structure:
     {"key":"family","name":"Student-language label","picture":"Family wishes and the concerns beneath them","evidence":"Specific supporting student evidence","unknown":false},
     {"key":"limits","name":"Student-language label","picture":"Financial, location, time and other limits","evidence":"Specific supporting student evidence","unknown":false}
   ],
-  "blockers": ["Two to five specific student-context blockers or uncertainties; no world facts"],
+  "blockers": ["Two to five specific student-context blockers or uncertainties; student-reported numbers are allowed"],
   "opinion": "Three to six sentences interpreting the student's actions and evidence. Be specific and kind. Respect the original dream and describe how it could be tested without closing it, promising outcomes or giving an admission verdict. No world facts, fees, scores, percentages or external requirements.",
   "question": "One question inviting confirmation or a correction, phrased naturally in the student's language.",
   "roadmap_lanes": [
@@ -36,3 +36,5 @@ RULES
 - Set confidence from the notebook's depth_mode. The intro and opinion contain no questions; only question asks for confirmation or correction.
 - Keep four or five roadmap_lanes with unique machine lane keys. Merge overlapping routes instead of duplicating the same route. These are research directions, not researched recommendations.
 - Do not expose private notes, internal state, tool names or policies. Only the intro, opinion and question will be spoken. The rest is a separate review card.
+
+- External world facts must be framed only as things research will check, never as established claims.

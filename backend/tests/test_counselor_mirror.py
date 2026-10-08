@@ -89,7 +89,7 @@ def test_mirror_fixture_and_prompt_document_match():
 
 
 @pytest.mark.parametrize("change", ["evidence", "duplicate_dimension", "duplicate_lane", "few_lanes",
-                                    "many_lanes", "currency", "percent", "score", "blocked", "question"])
+                                    "many_lanes", "currency", "score", "blocked", "question"])
 def test_mirror_validation_rejects_broken_contract(change):
     data = mirror_data()
     if change == "evidence": data["dimensions"][0]["evidence"] = " "
@@ -110,6 +110,7 @@ def test_mirror_allows_explicit_unknown_and_student_numbers_in_dimensions():
     data = mirror_data()
     data["dimensions"][0].update(unknown=True, evidence="", picture="We have not explored this yet.")
     data["dimensions"][1]["picture"] = "You reported a score of 80%."
+    data["blockers"][0] = "You reported a score of 80%."
     assert CounselorMirror.model_validate(data).dimensions[0].unknown
 
 
@@ -191,6 +192,20 @@ async def test_second_invalid_generation_keeps_discovery_and_logs_no_text(caplog
         post.assert_not_awaited()
         assert JourneyService(db).get(student.workspace_id, journey.id).current_stage == "DIRECTION"
         assert "private broken text" not in caplog.text
+        current = JourneyService(db).get(student.workspace_id, journey.id)
+        assert current.counselor_summary_draft["status"] == "failed"
+        from app.counseling.deep.context import build_context
+        assert '"mirror_status":"failed"' in (await build_context(db, student.workspace_id, turn)).text.replace(" ", "")
+        job = db.get(BackgroundJob, job_id)
+        job.status = "completed"
+        db.commit()
+        retry = enqueue_mirror(db, turn)
+        assert retry != job_id
+        db.commit()
+        db.get(BackgroundJob, retry).status = "completed"
+        db.commit()
+        enqueue_mirror(db, turn)
+        assert len(db.scalars(select(BackgroundJob).where(BackgroundJob.job_type == JOB_MIRROR)).all()) == 2
 
 
 @pytest.mark.asyncio

@@ -40,12 +40,23 @@ def enqueue_mirror(db, turn: CounselorTurnInput) -> str | None:
         BackgroundJob.status.in_(("pending", "running"))))
     if pending:
         return pending.id
+    prior = db.scalars(select(BackgroundJob).where(
+        BackgroundJob.workspace_id == turn.workspace_id, BackgroundJob.job_type == JOB_MIRROR,
+    )).all()
+    attempts = [item for item in prior if (item.payload or {}).get("notebook_version") == snapshot.version]
+    if attempts:
+        draft = journey.counselor_summary_draft or {}
+        if (len(attempts) >= 2 or draft.get("notebook_version") != snapshot.version
+                or draft.get("status") not in {"failed", "needs_discovery"}):
+            return attempts[-1].id
+    attempt = len(attempts)
     try:
         job = BackgroundJobService(db).enqueue(
             JOB_MIRROR, {"notebook_version": snapshot.version, "journey_id": journey.id,
-                         "source_event_id": turn.source_event_id, "channel": turn.channel},
+                         "source_event_id": turn.source_event_id, "channel": turn.channel,
+                         "mirror_attempt": attempt},
             workspace_id=turn.workspace_id,
-            idempotency_key=f"counselor:mirror:{turn.workspace_id}:{snapshot.version}")
+            idempotency_key=f"counselor:mirror:{turn.workspace_id}:{snapshot.version}:{attempt}")
     except IntegrityError:
         # A different version won the partial-unique pending-job race.
         job = db.scalar(select(BackgroundJob).where(
@@ -94,13 +105,15 @@ async def mirror_job(job, db) -> dict:
         if draft.get("type") == "mirror" and draft.get("notebook_version") == payload.get("notebook_version"):
             if draft.get("status") in {"awaiting_confirmation", "confirmed"}:
                 return await _publish(db, job, draft)
-            return {"status": "superseded"}
+            if draft.get("status") not in {"failed", "needs_discovery"}:
+                return {"status": "superseded"}
         snapshot = NotebookService(db).get(job.workspace_id)
         if (snapshot.version != payload.get("notebook_version")
                 or not snapshot.notebook.mirror_ready or journey.current_stage != "DIRECTION"):
             return {"status": "not_ready_or_stale"}
         checked, removals = await check_notebook_before_mirror(job.workspace_id, db=db)
         if removals or not checked.notebook.mirror_ready:
+            _record_failure(db, job, "needs_discovery", checked.version)
             return {"status": "needs_discovery"}
         student = db.scalar(select(EventRecord).where(
             EventRecord.id == payload.get("source_event_id"), EventRecord.network_id == job.workspace_id,
@@ -130,6 +143,7 @@ async def mirror_job(job, db) -> dict:
             except (TypeError, ValueError):
                 logger.warning("counselor_mirror_invalid job_id=%s attempt=%d", job_id, attempt + 1)
                 if attempt:
+                    _record_failure(db, job, "failed", checked.version)
                     return {"status": "invalid", "model_calls": 2}
                 # Regenerate against the same checked context; no sensitive
                 # recheck or broken draft is sent to the student.
@@ -150,6 +164,19 @@ async def mirror_job(job, db) -> dict:
         # without making another model/sensitivity call.
         db.commit()
         return await _publish(db, job, journey.counselor_summary_draft)
+
+
+def _record_failure(db, job, status, notebook_version):
+    from app.models import StudentJourney
+
+    row = db.scalar(select(StudentJourney).where(
+        StudentJourney.id == job.payload["journey_id"], StudentJourney.workspace_id == job.workspace_id,
+        StudentJourney.status == "active").with_for_update())
+    if row is not None and row.current_stage == "DIRECTION":
+        row.counselor_summary_draft = {"type": "mirror", "status": status,
+            "notebook_version": notebook_version, "mirror_attempt": job.payload.get("mirror_attempt", 0),
+            "version": (row.counselor_summary_draft or {}).get("version", 0)}
+        db.commit()
 
 
 def enqueue_confirmed_research(db, workspace_id: str, journey) -> str:
