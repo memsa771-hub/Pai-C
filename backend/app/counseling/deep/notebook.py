@@ -4,44 +4,16 @@ Callers must supply the source student event. A stale writer receives a
 NotebookVersionConflict and must fetch the latest version before retrying.
 """
 
-import re
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from typing import Any
 
 from sqlalchemy import delete, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.counseling.deep.notebook_schema import CounselorNotebookData
+from app.counseling.deep.notebook_sanitize import SanitizationIssue, sanitize_notebook
 from app.models import CounselorNotebook, CounselorNotebookHistory, EventRecord, Workspace
-
-
-# Conservative whole-word filters for protected beliefs/affiliations and
-# diagnostic labels. The notebook stores observed behavior instead.
-BANNED_TERMS = (
-    "adhd", "ocd", "ptsd", "autism", "autistic", "depression",
-    "depressed", "anxiety", "anxious", "bipolar", "schizophrenia",
-    "dyslexia", "diagnosis", "diagnosed", "disorder",
-    "religion", "religious", "muslim", "hindu", "christian", "sikh",
-    "buddhist", "atheist", "islam", "hinduism", "christianity",
-    "catholic", "jewish", "jain", "jainism",
-    "sect", "sunni", "shia", "shiite", "ahmadi", "barelvi", "deobandi",
-    "caste", "brahmin", "dalit", "rajput",
-    "politics", "political", "party affiliation", "democrat", "republican",
-    "pti", "pml-n", "pmln", "ppp", "bjp",
-)
-_BANNED = re.compile(r"(?<!\w)(?:" + "|".join(re.escape(term) for term in sorted(BANNED_TERMS, key=len, reverse=True)) + r")(?!\w)", re.IGNORECASE)
-
-
-def _strip_banned(value: Any) -> Any:
-    if isinstance(value, str):
-        return re.sub(r"\s{2,}", " ", _BANNED.sub("", value)).strip()
-    if isinstance(value, list):
-        return [_strip_banned(item) for item in value]
-    if isinstance(value, dict):
-        return {key: _strip_banned(item) for key, item in value.items()}
-    return value
 
 
 class NotebookVersionConflict(Exception):
@@ -82,7 +54,7 @@ class NotebookService:
     def apply(
         self, workspace_id: str, new_notebook: CounselorNotebookData | dict,
         source_event_id: str, *, expected_version: int | None = None,
-    ) -> NotebookSnapshot:
+    ) -> tuple[NotebookSnapshot, list[SanitizationIssue]]:
         """Validate, sanitize and atomically write one complete snapshot.
 
         expected_version is optional for first-party callers that load and
@@ -108,12 +80,14 @@ class NotebookService:
             raise ValueError("source_event_id must be a student event in this workspace")
 
         raw = new_notebook.model_dump(mode="json") if isinstance(new_notebook, CounselorNotebookData) else new_notebook
-        # Validate both sides of sanitization: malformed input is never
-        # normalized into validity, and stripping cannot remove evidence.
-        parsed = CounselorNotebookData.model_validate(raw)
-        clean = CounselorNotebookData.model_validate(_strip_banned(parsed.model_dump(mode="json")))
-        payload = clean.model_dump(mode="json")
+        if not isinstance(raw, dict):
+            raise ValueError("notebook must be an object")
+        clean, changes = sanitize_notebook(raw)
         current = self.get(workspace_id)
+        empty = CounselorNotebookData().model_dump(mode="json")
+        payload = clean.model_dump(mode="json")
+        if current.notebook.model_dump(mode="json") != empty and payload == empty:
+            raise ValueError("sanitization would erase the existing notebook")
         if expected_version is not None and current.version != expected_version:
             raise NotebookVersionConflict(f"expected {expected_version}, found {current.version}")
         version = current.version + 1
@@ -144,7 +118,7 @@ class NotebookService:
             source_event_id=source_event_id, created_at=now,
         ))
         self.db.commit()
-        return NotebookSnapshot(clean, version, source_event_id)
+        return NotebookSnapshot(clean, version, source_event_id), changes
 
     def delete_for_workspace(self, workspace_id: str) -> None:
         """Purge private notes within the caller's workspace-delete transaction."""

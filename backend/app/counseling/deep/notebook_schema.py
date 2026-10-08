@@ -2,7 +2,7 @@
 
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
 class Note(BaseModel):
@@ -95,12 +95,11 @@ class Hypothesis(Note):
     def trim_evidence(cls, value: str) -> str:
         return value.strip()
 
-    @field_validator("evidence_against")
-    @classmethod
-    def has_evidence(cls, value: str, info) -> str:
-        if not value and not info.data.get("evidence_for"):
+    @model_validator(mode="after")
+    def has_evidence(self):
+        if not self.evidence_for and not self.evidence_against:
             raise ValueError("hypothesis evidence is required")
-        return value
+        return self
 
 
 class OpenQuestion(Note):
