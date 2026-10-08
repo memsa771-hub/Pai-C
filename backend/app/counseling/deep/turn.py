@@ -61,12 +61,15 @@ def _parse_response(raw: str) -> tuple[str, dict]:
     return re.sub(r'\\"\s*,?\s*$', "", stripped), {"type": "none"}
 
 
-async def run_deep_turn(db, turn: CounselorTurnInput) -> DeepTurnResult:
-    context = await build_context(db, turn.workspace_id, turn)
+async def run_deep_turn(db, turn: CounselorTurnInput, *,
+                        roadmap_id: str | None = None,
+                        history: list[dict] | None = None) -> DeepTurnResult:
+    context = await build_context(db, turn.workspace_id, turn, roadmap_id=roadmap_id)
     owner_id = turn.source.removeprefix("human:") if turn.source.startswith("human:") else ""
-    history = [{"role": item["role"], "content": item["content"]}
-               for item in shared_history(db, turn, owner_id,
-                                          limit=config.PAI_COUNSELOR_HISTORY_SIZE)]
+    if history is None:
+        history = [{"role": item["role"], "content": item["content"]}
+                   for item in shared_history(db, turn, owner_id,
+                                              limit=config.PAI_COUNSELOR_HISTORY_SIZE)]
     current = turn.student_text.strip() or "I attached a document."
     messages = [*history, {"role": "user", "content": current}]
     # Read transactions must not remain open over the network call.

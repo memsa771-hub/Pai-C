@@ -57,10 +57,8 @@ async def explain_result(workspace_id: str, history: list[dict], handoff: dict) 
     )
     reply = (result.get("content") or "").strip()
     if handoff.get("roadmap_research"):
-        from app.counseling.reply_guard import guard_reply
-        reply = await guard_reply(reply, student_message=str(handoff.get("objective") or ""),
-                                  mode="open", question=None, max_questions=1,
-                                  requirement_fields=[], allow_long=False)
+        from app.counseling.deep.polish import polish_reply
+        reply = polish_reply(reply)
         if len(reply.splitlines()) > 5:
             reply = " ".join(line.strip() for line in reply.splitlines() if line.strip())
     return reply

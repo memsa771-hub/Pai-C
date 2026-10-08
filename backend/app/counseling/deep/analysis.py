@@ -174,7 +174,7 @@ def _advance_stage(db, workspace_id: str, notebook) -> None:
         journeys, workspace_id, journey,
         identity_ready=bool(owner and owner.onboarded_at),
         foundation_ready=bool(notebook.coverage.person and notebook.coverage.education),
-        goal_records=[], actor="system:counselor_analyst", allow_auto_research=False,
+        goal_records=[], actor="system:counselor_analyst",
     )
     db.commit()
 

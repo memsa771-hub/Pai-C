@@ -200,7 +200,6 @@ class Config:
     PAI_COUNSELOR_NOTEBOOK_CONTEXT_TOKENS: int = int(os.environ.get("PAI_COUNSELOR_NOTEBOOK_CONTEXT_TOKENS", "1800"))
     PAI_COUNSELOR_HISTORY_SIZE: int = int(os.environ.get("PAI_COUNSELOR_HISTORY_SIZE", "20"))
     PAI_COUNSELOR_SENSITIVE_CHECK_MAX_TOKENS: int = int(os.environ.get("PAI_COUNSELOR_SENSITIVE_CHECK_MAX_TOKENS", "4096"))
-    PAI_COUNSELOR_MODE: str = os.environ.get("PAI_COUNSELOR_MODE", "deep").strip().lower()
     # Safety cap on the tool-calling loop per user message.
     PAI_MAX_TOOL_ITERATIONS: int = int(os.environ.get("PAI_MAX_TOOL_ITERATIONS", "6"))
     # Memory extraction (app/memory/extractor.py). Each falls back to the
@@ -389,8 +388,6 @@ class Config:
 
     def validate_startup(self) -> None:
         """Reject incomplete production configuration before serving traffic."""
-        if self.PAI_COUNSELOR_MODE not in {"deep", "legacy"}:
-            raise RuntimeError("PAI_COUNSELOR_MODE must be deep or legacy")
         if not self.PAI_LANGUAGE_BLOCKED_SCRIPT_REPLACEMENT.strip():
             raise RuntimeError("PAI_LANGUAGE_BLOCKED_SCRIPT_REPLACEMENT must not be empty")
         if not self.PAI_COUNSELOR_FALLBACK_REPLY.strip():

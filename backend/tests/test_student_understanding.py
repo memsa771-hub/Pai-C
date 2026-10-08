@@ -1,16 +1,11 @@
 from datetime import datetime, timezone
 from types import SimpleNamespace
 import uuid
-import asyncio
-import json
 from unittest.mock import AsyncMock, patch
 
 from sqlalchemy import select
 
 from app.counseling.baseline import changed_domains, confirmed, metadata, save
-from app.counseling.evaluator import CounselingEvaluator
-from app.counseling.policy import CounselingPolicy
-from app.counseling.turn_contract import parse_turn
 from app.counseling.understanding import (StudentUnderstandingBuilder, baseline_sufficient,
                                          same_turn_education_conflict, student_mirror)
 from app.memory.student_snapshot import StudentSnapshot
@@ -74,29 +69,6 @@ def test_mirror_and_confirmation_metadata_invalidate_only_changed_domain():
     assert "Python" in affected_mirror and "BA" not in affected_mirror
 
 
-def test_turn_contract_keeps_state_internal():
-    response, state = parse_turn('{"response":"What is your degree?",'
-                                 '"counselor_state":{"student_understanding_delta":'
-                                 '{"facts":[{"key":"goal.direction","value":"AI"}]},'
-                                 '"next_move":{"type":"ASK","focus":"education"}}}')
-    assert response == "What is your degree?"
-    assert state["student_understanding_delta"]["records"] == []
-    assert parse_turn("A plain reply") == ("A plain reply", {})
-
-
-def test_partial_profile_allows_provisional_counseling():
-    view = StudentUnderstandingBuilder().build("student", snapshot=_snapshot({
-        "education": [_education("BS CS", "bachelor")],
-    }))
-    state = CounselingEvaluator().derive(
-        message="Which master's fits me?", vault_context=view, journey={"current_stage": "planning"},
-        completion={"personalizedCounselingEligible": True},
-    )
-    policy = CounselingPolicy().decide(state)
-    assert view["education"]["nodes"][0]["qualification_name"] == "BS CS"
-    assert policy.personalized_advice_allowed
-    assert not policy.operator_allowed
-    assert policy.max_questions <= 1
 
 
 def test_onboarding_identity_and_uploaded_document_are_reused():
@@ -105,13 +77,7 @@ def test_onboarding_identity_and_uploaded_document_are_reused():
         {"identity.full_name": {"value": "A Student", "source_type": "user_explicit"}},
     ), field_definitions={"identity.full_name": SimpleNamespace(
         sensitivity="normal", context_tags=[])})
-    state = CounselingEvaluator().derive(
-        message="I uploaded my CV", vault_context=view, journey=None,
-        completion={"personalizedCounselingEligible": False},
-    )
     assert view["identity"]["full_name"]["value"] == "A Student"
-    assert state.next_move.value == "REFLECT"
-    assert state.focus == "use uploaded evidence"
 
 
 def test_operator_intake_only_proposes_quoted_claims():
@@ -180,20 +146,6 @@ def test_baseline_sufficiency_depends_on_situation():
                              sensitivity="normal", context_tags=[])})
     assert baseline_sufficient(view)
 
-
-def test_confirmed_baseline_unlocks_counseling_and_delegation():
-    view = StudentUnderstandingBuilder().build("student", snapshot=_snapshot({
-        "education": [_education("BS CS", "bachelor", result={"gpa": 3.2})],
-        "goal": [{"id": "g", "title": "Master's", "details": {"motivation": "career"}}],
-    }), baseline={"status": "confirmed", "version": 1})
-    state = CounselingEvaluator().derive(
-        message="Please research a shortlist", vault_context=view, journey=None,
-        completion={"personalizedCounselingEligible": True},
-        turn_semantics={"requested_work": True},
-    )
-    policy = CounselingPolicy().decide(state)
-    assert state.phase.value == "COUNSELING"
-    assert policy.personalized_advice_allowed and policy.operator_allowed
 
 
 def test_early_student_experience_is_not_inferred_inapplicable():
@@ -332,29 +284,6 @@ def test_career_change_requires_relevant_history_and_constraints():
     assert view["domain_status"]["constraints"] == "NOT_APPLICABLE"
 
 
-def test_confirmed_advice_roadmap_and_operator_permissions_are_distinct():
-    evaluator, policy = CounselingEvaluator(), CounselingPolicy()
-    view = StudentUnderstandingBuilder().build("student", snapshot=_snapshot({
-        "education": [_education("BS CS", "bachelor", result={"gpa": 3.2})],
-        "goal": [{"id": "g", "title": "Career in software",
-                  "details": {"motivation": "build products"}}],
-    }), baseline={"status": "confirmed", "version": 1})
-    def decision(message):
-        semantics = ({"requested_work": True} if "shortlist" in message else
-                     {"requested_roadmap": True} if "roadmap" in message else {})
-        return policy.decide(evaluator.derive(
-            message=message, vault_context=view, journey=None,
-            completion={"personalizedCounselingEligible": True},
-            turn_semantics=semantics))
-    advice = decision("What do you think fits me?")
-    assert advice.personalized_advice_allowed and not advice.roadmap_allowed
-    assert not advice.operator_allowed
-    roadmap = decision("Build my roadmap")
-    assert roadmap.personalized_advice_allowed and roadmap.roadmap_allowed
-    assert not roadmap.operator_allowed
-    delegation = decision("Please research a shortlist")
-    assert delegation.operator_allowed and not delegation.roadmap_allowed
-
 
 def test_same_turn_conflicts_use_current_history_but_allow_goals_and_corrections():
     current_master = StudentUnderstandingBuilder().build("student", snapshot=_snapshot({
@@ -367,151 +296,3 @@ def test_same_turn_conflicts_use_current_history_but_allow_goals_and_corrections
     no_record = StudentUnderstandingBuilder().build("student", snapshot=_snapshot())
     assert same_turn_education_conflict(
         no_record, {"canonical_level": "bachelor", "academic_status": "current"}) is None
-
-
-def test_model_envelope_does_not_directly_write_canonical_records():
-    from app.config import config
-    from app.counseling import runtime
-    from app.models import BackgroundJob, EducationRecord, MemoryCandidate
-    from scripts.counselor_eval_support import StudentSession
-
-    async def run():
-        with StudentSession() as student:
-            async def model(**kwargs):
-                return {"role": "assistant", "content": json.dumps({
-                    "response": "I have your degree as BS CS. What would you like to pursue?",
-                    "counselor_state": {
-                        "phase": "DISCOVERING", "baseline_ready": False,
-                        "next_move": {"type": "ASK", "focus": "current_direction"},
-                        "student_understanding_delta": {"facts": [], "records": [{
-                            "type": "education", "data": {"qualification_name": "BS CS"},
-                            "evidence": {"quote": "BS CS"},
-                        }], "memories": [], "conflicts": [], "unknowns": []},
-                    },
-                })}
-            with patch.object(config, "PAI_COUNSELOR_MODE", "legacy"), \
-                 patch.object(runtime, "chat_completion_tools", model), \
-                 patch("app.counseling.turn_semantics.classify_turn", new_callable=AsyncMock) as classify, \
-                 patch("app.memory.foundation_intake.capture_foundation_turn",
-                       new=AsyncMock(return_value=False)), \
-                 patch("app.counseling.reply_guard.guard_collection_reply",
-                       new=AsyncMock(side_effect=lambda reply, **kwargs: reply)), \
-                 patch.object(config, "PAI_API_KEY", "test"), \
-                 patch.object(config, "PAI_MEMORY_CONTEXT_ENABLED", False):
-                classify.return_value = {"mirror_request": False, "mirror_confirmation": False,
-                                         "profile_correction": False, "general_information": False,
-                                         "requested_work": False, "requested_roadmap": False,
-                                         "decision_intent": None, "topic_focus": None,
-                                         "context_intent": None, "discovery_statuses": [],
-                                         "explicit_commands": [], "education_claim": None}
-                await student.turn("I did BS CS")
-            with student.factory() as db:
-                assert db.execute(select(EducationRecord)).scalars().all() == []
-                candidates = db.execute(select(MemoryCandidate).where(
-                    MemoryCandidate.candidate_type == "student_record")).scalars().all()
-                assert candidates == []
-                assert db.execute(select(BackgroundJob).where(
-                    BackgroundJob.job_type == "memory.extract")).scalars().first() is not None
-    asyncio.run(run())
-
-
-def test_chat_does_not_dump_profile_or_require_mirror_confirmation():
-    from app.config import config
-    from app.counseling import runtime
-    from app.counseling.understanding import StudentUnderstandingBuilder
-    from app.memory.student_records import StudentRecordService
-    from scripts.counselor_eval_support import StudentSession
-
-    async def run():
-        with StudentSession() as student:
-            with student.factory() as db:
-                records = StudentRecordService(db)
-                for kind, values in (
-                    ("education", {"qualification_name": "BS CS", "canonical_level": "bachelor",
-                                   "result": {"gpa": 3.2, "gpa_scale": 4.0}}),
-                    ("goal", {"goal_type": "career", "title": "Build software",
-                              "details": {"motivation": "I enjoy solving problems"}}),
-                ):
-                    records.apply(student.workspace_id, kind, values,
-                                  source_type="user_explicit", claim_origin="student",
-                                  capture_method="conversation")
-                db.commit()
-
-            received = []
-            async def model(**kwargs):
-                received.append(kwargs)
-                return {"role": "assistant", "content": "A useful direction is to build on your CS work."}
-            async def classify(message, **kwargs):
-                return {"mirror_request": message == "continue",
-                        "mirror_confirmation": message == "Yes, that's accurate.",
-                        "profile_correction": False, "general_information": False,
-                        "requested_work": message == "Please research a shortlist",
-                        "requested_roadmap": False, "decision_intent": None,
-                        "topic_focus": None, "context_intent": None,
-                        "discovery_statuses": [], "explicit_commands": [],
-                        "education_claim": None}
-            with patch.object(config, "PAI_COUNSELOR_MODE", "legacy"), \
-                 patch.object(runtime, "chat_completion_tools", model), \
-                 patch("app.counseling.turn_semantics.classify_turn", classify), \
-                 patch("app.memory.profile_completion.ProfileCompletionService.evaluate",
-                       return_value={"enforced": False, "foundationReady": True,
-                                     "counselorMode": "normal", "fields": [],
-                                     "nextRequirement": None}), \
-                 patch("app.counseling.goal_transition.reviewed_route",
-                       new=AsyncMock(return_value=False)), \
-                 patch("app.counseling.reply_guard.guard_reply",
-                       new=AsyncMock(side_effect=lambda reply, **kwargs: reply)), \
-                 patch.object(config, "PAI_API_KEY", "test"), \
-                 patch.object(config, "PAI_MEMORY_CONTEXT_ENABLED", False):
-                await student.turn("continue")
-                assert student.transcript[-1]["content"] == "A useful direction is to build on your CS work."
-                await student.turn("Yes, that's accurate.")
-                assert "Education so far" not in student.transcript[-1]["content"]
-                await student.turn("What do you think fits me?")
-                assert "OPEN" in received[-1]["system_prompt"]
-                assert "operator__delegate" not in {
-                    tool["function"]["name"] for tool in received[-1]["tools"]}
-                await student.turn("Please research a shortlist")
-                # Research delegation is server-owned through the gateway.
-                assert "operator__delegate" not in {
-                    tool["function"]["name"] for tool in received[-1]["tools"]}
-
-                with student.factory() as db:
-                    StudentRecordService(db).apply(
-                        student.workspace_id, "skill", {"name": "Python"},
-                        source_type="user_explicit", claim_origin="student",
-                        capture_method="conversation")
-                    db.commit()
-                await student.turn("continue")
-                assert "Education so far" not in student.transcript[-1]["content"]
-                with student.factory() as db:
-                    view = StudentUnderstandingBuilder(db).build(student.workspace_id)
-                    assert any(row["name"] == "Python" for row in view["skills"]["nodes"])
-    asyncio.run(run())
-
-
-if __name__ == "__main__":
-    test_global_education_gaps_and_multiple_records()
-    test_multiple_work_records_and_skill_links_are_derived()
-    test_mirror_and_confirmation_metadata_invalidate_only_changed_domain()
-    test_turn_contract_keeps_state_internal()
-    test_partial_profile_allows_provisional_counseling()
-    test_onboarding_identity_and_uploaded_document_are_reused()
-    test_operator_intake_only_proposes_quoted_claims()
-    test_same_turn_current_education_conflict_is_clarified()
-    test_baseline_sufficiency_depends_on_situation()
-    test_confirmed_baseline_unlocks_counseling_and_delegation()
-    test_early_student_experience_is_not_inferred_inapplicable()
-    test_education_edges_and_courses_are_derived_without_inventing_qualifications()
-    test_course_update_invalidates_only_education_mirror_domain()
-    test_other_record_families_and_finance_are_projected_separately()
-    test_cross_domain_support_links_are_bounded_and_evidenced()
-    test_cs_education_has_derived_relevance_to_stated_ai_goal()
-    test_large_sections_report_coverage_without_unbounded_nodes()
-    test_school_and_undecided_students_do_not_need_work_or_budget()
-    test_career_change_requires_relevant_history_and_constraints()
-    test_confirmed_advice_roadmap_and_operator_permissions_are_distinct()
-    test_same_turn_conflicts_use_current_history_but_allow_goals_and_corrections()
-    test_counselor_delta_does_not_directly_write_canonical_records()
-    test_chat_does_not_dump_profile_or_require_mirror_confirmation()
-    print("23 understanding tests passed")

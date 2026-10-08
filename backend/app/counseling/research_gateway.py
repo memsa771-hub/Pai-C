@@ -7,7 +7,6 @@ chosen-roadmap research implementation is introduced.
 
 from sqlalchemy import select
 
-from app.config import config
 from app.journey import JourneyService
 from app.models import ExecutionRun, Roadmap, RoadmapStudentState, Workspace
 from app.counseling.research_flow import research_brief
@@ -32,7 +31,7 @@ async def request_research(kind: str, workspace_id: str, *, db, journey,
     if kind == "roadmap_light":
         if refresh_key is not None or journey.current_stage != "RESEARCHING":
             return None
-        if config.PAI_COUNSELOR_MODE == "deep" and (
+        if (
                 journey.counselor_summary_draft or {}).get("status") != "confirmed":
             return None
     elif kind == "stale_refresh":

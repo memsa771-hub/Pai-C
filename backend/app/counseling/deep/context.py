@@ -118,7 +118,8 @@ class DeepContext:
     build_ms: int
 
 
-async def build_context(db, workspace_id: str, turn: CounselorTurnInput) -> DeepContext:
+async def build_context(db, workspace_id: str, turn: CounselorTurnInput, *,
+                        roadmap_id: str | None = None) -> DeepContext:
     """Build every section from workspace-scoped reads; make no model calls."""
     started = time.monotonic()
     if workspace_id != turn.workspace_id:
@@ -149,6 +150,17 @@ async def build_context(db, workspace_id: str, turn: CounselorTurnInput) -> Deep
         "open_threads": [item.question_intent for item in notebook.open_questions[:3]],
     })
     research = _research(db, workspace_id, journey)
+    if roadmap_id is not None:
+        row = db.scalar(select(Roadmap).where(
+            Roadmap.id == roadmap_id, Roadmap.workspace_id == workspace_id))
+        if row is None:
+            raise ValueError("roadmap belongs to another workspace or does not exist")
+        research = {**(research or {}), "selected_roadmap": {
+            "id": row.id, "title": row.title, "status": row.generation_status,
+            "route": _short(row.route), "fit_dimensions": _short(row.fit_dimensions),
+            "gaps": _short(row.gaps), "steps": _short(row.steps),
+            "risks": _short(row.risks), "sources": _short(row.sources),
+        }}
     if research is not None:
         sections["research"] = _json(research)
     sections["journey"] = _json({"stage": journey.current_stage if journey else "IDENTITY"})

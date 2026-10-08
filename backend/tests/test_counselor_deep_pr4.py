@@ -85,8 +85,7 @@ async def test_successful_deep_turn_enqueues_one_analysis_after_reply():
         event_data = {"id": event_id, "source": f"human:{student.user_id}",
                       "target": "channel/pai-counselor", "payload": {"content": "I need guidance"},
                       "timestamp": timestamp, "metadata": {}}
-        with patch.object(config, "PAI_COUNSELOR_MODE", "deep"), \
-                patch.object(config, "PAI_API_KEY", "fake"), \
+        with patch.object(config, "PAI_API_KEY", "fake"), \
                 patch("app.counseling.deep.turn.chat_completion",
                       new=AsyncMock(return_value=json.dumps({
                           "reply": "What matters most to you?", "action": {"type": "none"}}))):
@@ -414,15 +413,14 @@ def test_mirror_ready_is_forced_false_until_configured_coverage_is_complete(mode
     assert enforce_mirror_readiness(complete).mirror_ready is True
 
 
-def test_deep_research_gate_and_legacy_stage_behavior():
+def test_research_gate_never_auto_advances_before_confirmation():
     before = SimpleNamespace(current_stage="DIRECTION", counselor_summary_draft={})
     confirmed = SimpleNamespace(current_stage="RESEARCHING",
                                 counselor_summary_draft={"status": "confirmed"})
     stale = SimpleNamespace(current_stage="PROPOSED", counselor_summary_draft={})
-    assert not _research_delegate_allowed("deep", before, None)
-    assert _research_delegate_allowed("deep", confirmed, None)
-    assert _research_delegate_allowed("deep", stale, "refresh")
-    assert _research_delegate_allowed("legacy", before, None)
+    assert not _research_delegate_allowed(before, None)
+    assert _research_delegate_allowed(confirmed, None)
+    assert _research_delegate_allowed(stale, "refresh")
 
     class Journeys:
         def set_counselor_stage(self, workspace_id, journey_id, stage, **kwargs):
@@ -430,13 +428,9 @@ def test_deep_research_gate_and_legacy_stage_behavior():
 
     goals = [{"details": {"stated_preference": "a", "underlying_objective": "b",
                           "constraints": []}}]
-    legacy = advance_discovery_stage(Journeys(), "workspace", SimpleNamespace(
-        id="journey", current_stage="DIRECTION"), identity_ready=True,
-        foundation_ready=True, goal_records=goals)
     deep = advance_discovery_stage(Journeys(), "workspace", SimpleNamespace(
         id="journey", current_stage="DIRECTION"), identity_ready=True,
-        foundation_ready=True, goal_records=goals, allow_auto_research=False)
-    assert legacy.current_stage == "RESEARCHING"
+        foundation_ready=True, goal_records=goals)
     assert deep.current_stage == "DIRECTION"
 
 

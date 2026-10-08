@@ -1,4 +1,4 @@
-"""The PR 1 mode boundary, shared turn input, prompts and memory hook."""
+"""Shared deep turn input, prompts and successful-post learning hooks."""
 
 import uuid
 from pathlib import Path
@@ -19,17 +19,15 @@ from scripts.counselor_eval_support import StudentSession
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("mode", ["deep", "legacy"])
-async def test_each_mode_queues_one_extraction_after_successful_human_post(mode):
+async def test_deep_queues_learning_after_successful_human_post():
     event = {"id": "student-event", "source": "human:student", "target": "channel/pai"}
     deep = AsyncMock(return_value=("assistant-event", "channel/pai", False))
-    legacy = AsyncMock(return_value=("assistant-event", "channel/pai", False))
-    with patch.object(config, "PAI_COUNSELOR_MODE", mode), \
-            patch.object(runtime, "_run_deep_turn", deep), \
-            patch.object(runtime, "_run_legacy_turn", legacy), \
+    with patch.object(runtime, "_run_deep_turn", deep), \
+            patch("app.counseling.deep.analysis.enqueue_turn_analysis") as analyze, \
             patch("app.memory.turn_hook.enqueue_turn_extraction") as enqueue:
         await runtime._run_turn(Mock(), "workspace", event, 0)
-    assert (deep.await_count, legacy.await_count) == ((1, 0) if mode == "deep" else (0, 1))
+    assert deep.await_count == 1
+    analyze.assert_called_once()
     enqueue.assert_called_once()
     assert enqueue.call_args.kwargs["user_event_id"] == "student-event"
     assert enqueue.call_args.kwargs["assistant_event_id"] == "assistant-event"
@@ -40,18 +38,11 @@ async def test_each_mode_queues_one_extraction_after_successful_human_post(mode)
     ("human:student", None), ("openagents:pai", ("assistant-event", "channel/pai", False)),
 ])
 async def test_extraction_requires_a_successful_human_turn(source, posted):
-    with patch.object(config, "PAI_COUNSELOR_MODE", "deep"), \
-            patch.object(runtime, "_run_deep_turn", new=AsyncMock(return_value=posted)), \
+    with patch.object(runtime, "_run_deep_turn", new=AsyncMock(return_value=posted)), \
             patch("app.memory.turn_hook.enqueue_turn_extraction") as enqueue:
         await runtime._run_turn(Mock(), "workspace", {"id": "event", "source": source}, 0)
     enqueue.assert_not_called()
 
-
-def test_mode_defaults_to_deep_and_rejects_unknown_values():
-    assert config.PAI_COUNSELOR_MODE == "deep"
-    with patch.object(config, "PAI_COUNSELOR_MODE", "v2"):
-        with pytest.raises(RuntimeError, match="deep or legacy"):
-            config.validate_startup()
 
 
 def test_retry_of_same_student_event_uses_one_extraction_key():

@@ -155,8 +155,7 @@ async def test_runtime_posts_and_enqueues_extraction_once():
                            target="channel/chat", payload=event_data["payload"],
                            timestamp=event_data["timestamp"]))
         db.commit()
-        with patch.object(config, "PAI_COUNSELOR_MODE", "deep"), \
-                patch.object(config, "PAI_API_KEY", "fake"), \
+        with patch.object(config, "PAI_API_KEY", "fake"), \
                 patch("app.counseling.deep.turn.chat_completion",
                       new=AsyncMock(return_value=_answer("What are you doing now?"))) as model, \
                 patch("app.memory.turn_hook.enqueue_turn_extraction") as enqueue:
@@ -185,8 +184,7 @@ async def test_runtime_logs_missing_spoken_question_without_student_text(
                            target="channel/chat", payload=event_data["payload"],
                            timestamp=event_data["timestamp"]))
         db.commit()
-        with patch.object(config, "PAI_COUNSELOR_MODE", "deep"), \
-                patch.object(config, "PAI_API_KEY", "fake"), \
+        with patch.object(config, "PAI_API_KEY", "fake"), \
                 patch("app.counseling.deep.turn.chat_completion",
                       new=AsyncMock(return_value=_answer(reply, action))), \
                 patch("app.counseling.deep.actions.dispatch_action",

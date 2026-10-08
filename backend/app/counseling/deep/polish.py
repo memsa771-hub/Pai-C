@@ -46,3 +46,11 @@ def keep_first_question(reply: str) -> str:
 
 def polish_reply(reply: str) -> str:
     return keep_first_question(reply.strip())
+
+
+_RETRY_RESPONSE = "I couldn't finish that reply. Please retry your last message so I can pick up from here."
+_SAFE_RESPONSE = "I can help with that. Let's work from what you've shared and take the next useful step."
+
+def is_counselor_fallback(response: str) -> bool:
+    """Preserve filtering of historical failed-repair placeholders."""
+    return response in {_SAFE_RESPONSE, _RETRY_RESPONSE}

@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from sqlalchemy import select
 
 from app.models import EventRecord
+from app.counseling.deep.polish import is_counselor_fallback
 
 
 @dataclass(frozen=True)
@@ -38,8 +39,12 @@ def shared_history(db, turn: CounselorTurnInput, owner_id: str,
     for row in rows:
         payload = row.payload or {}
         text = payload.get("content")
-        if (payload.get("message_type", "chat") != "chat" or not isinstance(text, str)
-                or not text.strip() or text.startswith("[Error]")):
+        message_type = payload.get("message_type", "chat")
+        if ((message_type != "chat" and not (
+                message_type == "operator_result" and row.source == "openagents:pai"))
+                or not isinstance(text, str)
+                or not text.strip() or text.startswith("[Error]")
+                or (row.source == "openagents:pai" and is_counselor_fallback(text))):
             continue
         history.append({"role": "assistant" if row.source == "openagents:pai" else "user",
                         "content": text[:1500], "target": row.target,

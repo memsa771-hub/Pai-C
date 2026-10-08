@@ -19,19 +19,6 @@ from app.tools import ToolContext
 from scripts.counselor_eval_support import StudentSession
 
 
-@pytest.fixture(autouse=True)
-def _semantic_turn_fixture():
-    with patch("app.counseling.turn_semantics.classify_turn", new_callable=AsyncMock) as classify, \
-         patch.object(config, "PAI_COUNSELOR_MODE", "legacy"):
-        classify.return_value = {
-            "general_information": False, "mirror_confirmation": False,
-            "mirror_request": False, "profile_correction": False,
-            "requested_work": False, "requested_roadmap": False,
-            "decision_intent": None, "context_intent": None, "topic_focus": None,
-            "education_claim": None, "discovery_statuses": [], "explicit_commands": [],
-        }
-        yield
-
 
 @pytest.mark.asyncio
 async def test_multi_turn_history_and_profile_jobs_survive_a_background_result():
@@ -40,9 +27,9 @@ async def test_multi_turn_history_and_profile_jobs_survive_a_background_result()
 
         async def model(**kwargs):
             received.append(kwargs)
-            return {"role": "assistant", "content": "Let's compare program fit and living costs."}
+            return json.dumps({"reply": "What matters most about this route?", "action": {"type": "none"}})
 
-        with patch.object(runtime, "chat_completion_tools", model), \
+        with patch("app.counseling.deep.turn.chat_completion", model), \
                 patch.object(config, "PAI_API_KEY", "test"), \
                 patch.object(config, "PAI_MEMORY_CONTEXT_ENABLED", False):
             await student.turn("I want to study abroad for a master's.")
@@ -60,7 +47,7 @@ async def test_multi_turn_history_and_profile_jobs_survive_a_background_result()
         assert any("Germany" in m["content"] for m in last_messages)
         with student.factory() as db:
             jobs = db.execute(select(BackgroundJob)).scalars().all()
-            assert len(jobs) == 3
+            assert len(jobs) == 6
             assert all(job.status == "pending" for job in jobs)  # never waited on extraction
 
 
@@ -106,13 +93,6 @@ async def test_slow_vector_retrieval_keeps_time_for_canonical_fallback():
     assert "Germany" in result.block
     assert time.monotonic() - started < 0.9
 
-
-def test_short_followups_retain_the_student_journey_query():
-    history = [{"role": "user", "content": "I want to study abroad"},
-               {"role": "assistant", "content": "What is your yearly budget?"},
-               {"role": "user", "content": "About €12k"}]
-    assert runtime._student_context_query(history, "About €12k") == "About €12k"
-    assert runtime._student_context_query(history, "Help with my career") == "Help with my career"
 
 
 @pytest.mark.asyncio
@@ -174,40 +154,6 @@ async def test_result_is_interpreted_by_counselor_and_does_not_create_student_fa
             assert db.execute(select(BackgroundJob)).scalars().all() == []
             assert student.transcript[-1]["content"].startswith("Given your budget")
 
-
-@pytest.mark.asyncio
-async def test_incomplete_profile_answers_with_context_but_guidance_is_locked():
-    with StudentSession() as student:
-        with student.factory() as db:
-            db.add(ProfileRequirement(
-                key="education.history", tier="critical", source_type="record_presence",
-                source_key="education", selector="any",
-                question="What is your current or highest qualification?",
-                priority=100, version=1, enabled=True,
-            ))
-            db.commit()
-        received = []
-
-        async def model(**kwargs):
-            received.append(kwargs)
-            return {"role": "assistant", "content": "IELTS is an English-language proficiency test."}
-
-        with patch.object(runtime, "chat_completion_tools", model), \
-                patch.object(config, "PAI_API_KEY", "test"), \
-                patch.object(config, "PAI_MEMORY_CONTEXT_ENABLED", True), \
-                patch.object(config, "PAI_PROFILE_COMPLETION_ROLLOUT_MODE", "all"), \
-                patch("app.memory.foundation_intake.capture_foundation_turn",
-                      new=AsyncMock(return_value=False)), \
-                patch("app.counseling.reply_guard.guard_reply",
-                      new=AsyncMock(side_effect=lambda reply, **kwargs: reply)), \
-                patch("app.memory.foreground.build_foreground_context", new_callable=AsyncMock) as memory:
-            memory.return_value = ForegroundContext()
-            await student.turn("What is IELTS?")
-
-        assert not received[0]["tools"]
-        memory.assert_awaited()
-        assert "COLLECTING" in received[0]["system_prompt"]
-        assert student.transcript[-1]["content"].startswith("IELTS is")
 
 
 @pytest.mark.asyncio

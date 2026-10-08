@@ -26,7 +26,7 @@ from app.services import operator, pai
 from app.inference.client import chat_completion_tools
 from app.tools import get_tool_executor
 from scripts.counselor_eval_support import StudentSession
-from app.counseling.reply_guard import deterministic_issues
+from app.counseling.deep.polish import polish_reply, question_count
 
 
 TURNS = [
@@ -39,17 +39,6 @@ TURNS = [
     "I want AI.",
     "Fall 2027. I have IELTS 7.5 overall. Please research two realistic MSc AI options in Germany for me now, using my budget and academic background. Check official program sources and explain any eligibility gaps.",
 ]
-
-
-REPLY_GUARD_SCENARIOS = {
-    "long_winded": {"reply": "detail " * 121, "expected": "too_long"},
-    "double_question": {"reply": "Which country? Which intake?",
-                        "expected": "too_many_questions"},
-    "known_reask": {"reply": "What are you studying now?",
-                    "fields": [{"status": "answered",
-                                "question": "What are you studying now?"}],
-                    "expected": "reasks_known_or_pending"},
-}
 
 
 WORKFLOW_SCENARIOS = {
@@ -76,13 +65,6 @@ WORKFLOW_SCENARIOS = {
 }
 
 
-def check_reply_guard_scenarios() -> dict[str, bool]:
-    """Fast offline regression checks alongside the real-model journey eval."""
-    return {name: case["expected"] in deterministic_issues(
-        case["reply"], requirement_fields=case.get("fields"))
-        for name, case in REPLY_GUARD_SCENARIOS.items()}
-
-
 def check_workflow_scenarios() -> dict[str, bool]:
     """Offline invariants for the five high-risk journey cases above."""
     from app.counseling.stages import require_counselor_transition
@@ -103,8 +85,7 @@ def check_workflow_scenarios() -> dict[str, bool]:
         "usa_alevel": (assess_rule(grades, {"education.final_grade": 70})["status"] == "fixable"
                        and assess_rule(english, {})["status"] == "unknown"),
         "missing_document": assess_rule({**cited, "field": "education.transcript"}, {})["status"] == "unknown",
-        "over_speaking": ("too_long" in deterministic_issues("word " * 121)
-                          and "too_many_questions" in deterministic_issues("One? Two?")),
+        "over_speaking": question_count(polish_reply("One? Two?")) == 1,
         "rethinks": require_counselor_transition("PROPOSED", "DIRECTION") == "DIRECTION",
     }
 

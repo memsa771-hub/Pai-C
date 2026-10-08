@@ -19,7 +19,7 @@ from app.models import Channel, ChannelMember, EventRecord, Workspace
 from app.security.event_identity import resolve_human
 from app.services.pai import PAI_AGENT_NAME
 from app.routers.network import _workspace_filter
-from app.counseling.turn_contract import is_counselor_fallback
+from app.counseling.deep.polish import is_counselor_fallback
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/v1/counselor/voice", tags=["Counselor voice"])

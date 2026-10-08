@@ -141,29 +141,22 @@ async def resume_research(job, db) -> dict:
     # field. Start research from the canonical snapshot without a new chat turn.
     from app.counseling.research_flow import delegate_research_if_ready
     from app.counseling.stages import advance_discovery_stage
-    from app.config import config
     from app.counseling.understanding import StudentUnderstandingBuilder
     from app.journey import JourneyService
-    from app.memory.profile_completion import ProfileCompletionService
     from app.memory.student_snapshot import StudentSnapshotService
     from app.memory.permissions import capabilities_for_agent
     from app.services.pai import PAI_AGENT_NAME, PAI_ALLOWED_TOOLS, PAI_PRIMARY_CHANNEL
     from app.tools import AUDIENCE_COUNSELOR
 
     snapshot = StudentSnapshotService(db).build(job.workspace_id)
-    completion = ProfileCompletionService(db).evaluate(job.workspace_id, snapshot=snapshot)
     owner = db.get(User, workspace.owner_user_id) if workspace.owner_user_id else None
     journeys = JourneyService(db)
     journey = journeys.ensure_counselor(job.workspace_id, actor="system:reconciliation")
     journey = advance_discovery_stage(
         journeys, job.workspace_id, journey,
         identity_ready=bool(owner and owner.onboarded_at),
-        foundation_ready=(
-            bool(completion.get("foundationReady")) if config.PAI_COUNSELOR_MODE != "deep"
-            else _deep_foundation_ready(db, job.workspace_id)
-        ),
-        goal_records=snapshot.records.get("goal", []), actor="system:reconciliation",
-        allow_auto_research=config.PAI_COUNSELOR_MODE != "deep")
+        foundation_ready=_deep_foundation_ready(db, job.workspace_id),
+        goal_records=snapshot.records.get("goal", []), actor="system:reconciliation")
     from app.models import Roadmap
     stale = db.execute(select(Roadmap.id).where(
         Roadmap.workspace_id == job.workspace_id,
@@ -178,7 +171,7 @@ async def resume_research(job, db) -> dict:
     elif journey.current_stage == "CHOSEN" and stale:
         refresh_key = candidate.id
     understanding = StudentUnderstandingBuilder(db).build(job.workspace_id, snapshot=snapshot)
-    may_delegate = _research_delegate_allowed(config.PAI_COUNSELOR_MODE, journey, refresh_key)
+    may_delegate = _research_delegate_allowed(journey, refresh_key)
     db.commit()
     if not may_delegate:
         return {"resumed": resumed, "delegated": False}
@@ -203,9 +196,9 @@ def _deep_foundation_ready(db, workspace_id: str) -> bool:
     return bool(coverage.person and coverage.education)
 
 
-def _research_delegate_allowed(mode: str, journey, refresh_key: str | None) -> bool:
+def _research_delegate_allowed(journey, refresh_key: str | None) -> bool:
     """PR 6 mirror confirmation must set counselor_summary_draft.status='confirmed'."""
-    if mode != "deep" or refresh_key is not None or journey.current_stage in {"PROPOSED", "CHOSEN"}:
+    if refresh_key is not None or journey.current_stage in {"PROPOSED", "CHOSEN"}:
         return True
     return (journey.current_stage == "RESEARCHING"
             and (journey.counselor_summary_draft or {}).get("status") == "confirmed")

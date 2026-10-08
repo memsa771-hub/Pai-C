@@ -10,7 +10,6 @@ from app.capabilities.context import CapabilityExecutionContext
 from app.capabilities.manifest import InvalidCapabilityManifest
 from app.capabilities.permissions import CapabilityAccessDenied
 from app.capabilities.router import CapabilityNotFound
-from app.counseling import CounselingEvaluator, CounselingMove, CounselingPolicy
 from app.journey import JourneyService
 from app.memory.student_context_gateway import StudentContextAccessDenied, StudentContextGateway
 from app.models import ExecutionRun
@@ -51,28 +50,6 @@ def test_journey_supports_lifetime_history_and_one_resolved_primary():
         assert [e["event_type"] for e in service.history(student.workspace_id, second.id)] == [
             "journey.created", "journey.updated",
         ]
-
-
-def test_counseling_policy_blocks_planning_and_conflict_forces_clarification():
-    evaluator = CounselingEvaluator()
-    incomplete = evaluator.derive(
-        message="Make my roadmap", vault_context={}, journey={"current_objective": "shortlist"},
-        completion={"personalizedCounselingEligible": False,
-                    "missingCritical": [{"key": "education.history"}]},
-    )
-    decision = CounselingPolicy().decide(incomplete)
-    assert not decision.personalized_advice_allowed
-    assert not decision.roadmap_allowed
-    assert not decision.operator_allowed
-
-    conflict = evaluator.derive(
-        message="I already completed a PhD", vault_context={},
-        journey={"current_objective": "undergraduate BBA"},
-        completion={"personalizedCounselingEligible": True},
-        active_conflict={"summary": "degree level conflicts"},
-    )
-    assert conflict.next_move is CounselingMove.CLARIFY
-    assert CounselingPolicy().decide(conflict).max_questions == 1
 
 
 @pytest.mark.asyncio
