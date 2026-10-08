@@ -14,6 +14,8 @@ latest `dev`, open PRs into `dev`, and return the checkout to latest `dev` after
 
 ## File index
 
+- [RESEARCH_ROADMAPS.md](RESEARCH_ROADMAPS.md): confirmed-Mirror research, evidence cache, budgets, grounded lanes and migrations 099/100; read before changing research or publication.
+
 - [MIRROR.md](MIRROR.md): versioned Mirror jobs, validation, Confirm/Edit, voice and migration 098; read before changing the review flow.
 - [LEAN_COUNSELOR.md](LEAN_COUNSELOR.md): current discovery, deferred questions, pre-Mirror safety and per-turn memory decisions; read before changing runtime behavior.
 - [CLEANUP_AFTER_DEEP.md](CLEANUP_AFTER_DEEP.md): consolidation history, retained importers, database follow-up and offline startup check; read before removing compatibility code. Branch inventories are historical.
@@ -34,5 +36,4 @@ in `backend/scripts/eval/prompts/`; use recorded fixtures or fake models for tes
 ## Next
 
 Mirror generation, sensitive checking, Confirm/Edit and the research handoff are wired.
-PR 7 adds the research cache and new light-research brief; PR 8 builds roadmaps
-from the confirmed Mirror. Existing Roadmaps still loads. PAI OS is unchanged.
+PR 7/8 adds the evidence cache, light-research brief and grounded Mirror roadmaps. Chosen-roadmap deep research is deferred. PAI OS is unchanged.

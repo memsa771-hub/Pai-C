@@ -194,6 +194,8 @@ def test_missing_search_result_keeps_a_failed_stated_goal_card():
 def test_failed_route_retry_reuses_its_brief_and_preserves_origin():
     with StudentSession() as student, student.factory() as db:
         journey = _journey(db, student.workspace_id)
+        row = db.get(StudentJourney, journey.id)
+        row.counselor_summary_draft = {"type": "mirror", "status": "confirmed", "version": 1}
         card = _card(db, student.workspace_id, journey.id, "CS alternative")
         card.generation_status = "failed"
         card.route = {"url": "https://example.edu/cs", "country": "Germany"}
@@ -255,3 +257,16 @@ def test_roadmap_api_is_workspace_scoped_and_choice_requires_presentation():
             assert decision.json()["data"]["roadmap_id"] == card.id
         finally:
             app.dependency_overrides.pop(get_db, None)
+
+@pytest.mark.parametrize('status', ['failed','needs_info'])
+def test_custom_route_can_retry_even_if_initial_delegation_never_created_a_run(status):
+    with StudentSession() as student, student.factory() as db:
+        journey = _journey(db, student.workspace_id)
+        row = db.get(StudentJourney, journey.id)
+        row.counselor_summary_draft = {'type':'mirror','status':'confirmed','version':1}
+        card = _card(db, student.workspace_id, journey.id, 'My own route')
+        card.origin = 'student_added'
+        card.generation_status = status
+        objective, constraints = RoadmapService(db).prepare_retry(student.workspace_id, card.id)
+        assert objective == card.title and constraints['roadmap_id'] == card.id
+        assert card.generation_status == 'generating'

@@ -187,3 +187,22 @@ The test entry point is explicitly guarded and must never be used for deployment
   returned 200, and Playwright rendered the Roadmaps heading and empty state.
 - No real model API calls. No branch/worktree deletion or database schema removal.
   The disposable Compose stack was stopped and removed after verification.
+
+## PR 7/8 removal completed
+
+The research brief now uses the confirmed Mirror, Notebook and student snapshot.
+Removed understanding.py, context_projection.py, baseline.py, discovery.py and
+memory/discovery_intake.py after replacing the gateway, memory-handler and Operator
+consumers. Removed the unused Operator delta intake; the per-turn memory extractor
+and validated candidate/reconciliation flow remain the canonical write path.
+Deleted test_counselor_core.py and test_student_understanding.py because they tested
+those retired projections and intake. Current context, extraction, Mirror-gate,
+research and roadmap tests cover the retained behavior. Old composition assertions
+were replaced by grounded Mirror-lane, cache, budget and sourced-question tests;
+deterministic gap assessment and source-verifier assertions remain.
+
+ProfileCompletionService.foundationReady remains because the Profile UI and its
+TypeScript contract still use it. It no longer authorizes Counselor research.
+No database tables were dropped. The retained-module inventory above is historical
+for the earlier consolidation; research_gateway.py is the current research entry
+point. See RESEARCH_ROADMAPS.md for the current flow and cache sharing rules.

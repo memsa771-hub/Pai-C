@@ -38,16 +38,48 @@ def _research_brief(db, workspace_id, journey, snapshot=None):
 async def request_research(kind, workspace_id, *, db, journey, tool_context,
                            goals=None, snapshot=None, refresh_key=None, refresh_candidate=None,
                            roadmap_id=None):
+    """Serialize gateway requests without holding row locks across Operator calls."""
+    from sqlalchemy import text
+    import hashlib
+    lock = None
+    key = int.from_bytes(hashlib.sha256(workspace_id.encode()).digest()[:8], "big", signed=True)
+    try:
+        if db.get_bind().dialect.name == "postgresql":
+            lock = db.get_bind().connect()
+            if not lock.scalar(text("SELECT pg_try_advisory_lock(:key)"), {"key": key}):
+                lock.close()
+                lock = None
+                return {"ok": False, "error": {"code": "research_busy"}}
+        return await _request_research(kind, workspace_id, db=db, journey=journey,
+            tool_context=tool_context, goals=goals, snapshot=snapshot, refresh_key=refresh_key,
+            refresh_candidate=refresh_candidate, roadmap_id=roadmap_id)
+    finally:
+        if lock is not None:
+            try:
+                lock.execute(text("SELECT pg_advisory_unlock(:key)"), {"key": key})
+            finally:
+                lock.close()
+
+
+async def _request_research(kind, workspace_id, *, db, journey, tool_context,
+                           goals=None, snapshot=None, refresh_key=None, refresh_candidate=None,
+                           roadmap_id=None):
     if kind not in {"roadmap_light", "roadmap_deep", "stale_refresh"}:
         raise ValueError("unknown Counselor research kind")
     if tool_context is None or tool_context.workspace_id != workspace_id or journey is None:
         return None
     workspace = db.scalar(select(Workspace.id).where(
-        Workspace.id == workspace_id, Workspace.status == "active").with_for_update())
+        Workspace.id == workspace_id, Workspace.status == "active"))
     journey = JourneyService(db).get(workspace_id, journey.id)
     if not workspace or not journey or journey.status != "active" or not mirror_is_current(db, workspace_id):
         return None
-    if kind == "roadmap_light" and (refresh_key is not None or journey.current_stage != "RESEARCHING"):
+    target = db.scalar(select(Roadmap).where(Roadmap.id == roadmap_id,
+        Roadmap.workspace_id == workspace_id, Roadmap.journey_id == journey.id)) if roadmap_id else None
+    if roadmap_id and target is None:
+        return None
+    if kind == "roadmap_light" and ((journey.current_stage != "RESEARCHING" and
+            not (journey.current_stage == "CHOSEN" and target and refresh_key)) or
+            (refresh_key is not None and target is None)):
         return None
     if kind == "stale_refresh":
         if not refresh_key or journey.current_stage not in {"RESEARCHING", "PROPOSED", "CHOSEN"}:
@@ -63,17 +95,25 @@ async def request_research(kind, workspace_id, *, db, journey, tool_context,
             return None
         raise NotImplementedError("chosen roadmap deep research is deferred")
     brief = _research_brief(db, workspace_id, journey, snapshot)
+    if target and target.origin == "student_added":
+        brief["custom_roadmap"] = {"id": target.id, "title": target.title, "route": target.route or {}}
     key = f"{journey.id}:mirror:{brief['mirror_version']}" + (f":refresh:{refresh_key}" if refresh_key else "")
+    if target:
+        key += f":route:{target.id}"
     prior = db.scalars(select(ExecutionRun).where(ExecutionRun.workspace_id == workspace_id,
                         ExecutionRun.task_type == "roadmap_research")).all()
-    if any((item.constraints or {}).get("research_key") == key for item in prior):
-        return None
+    existing = next((item for item in prior if (item.constraints or {}).get("research_key") == key), None)
+    if existing:
+        return {"ok": True, "data": {"run_id": existing.id, "status": existing.status, "resumed": True}}
     if refresh_candidate:
         brief["refresh_candidate"] = refresh_candidate
     from app.tools import get_tool_executor
-    return await get_tool_executor().execute("operator.delegate", {
+    payload = {
         "objective": "Research decisive facts for the confirmed student routes and noted questions",
         "task_type": "roadmap_research", "intent": "academic_planning",
         "constraints": {"research_key": key, "mirror_version": brief["mirror_version"],
+                        **({"roadmap_id": target.id} if target and target.origin == "student_added" else {}),
                         "capability_input": {"brief": brief}},
-        "context_refs": ["vault", "memory"]}, tool_context)
+        "context_refs": ["vault", "memory"]}
+    db.commit()
+    return await get_tool_executor().execute("operator.delegate", payload, tool_context)

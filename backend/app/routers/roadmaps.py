@@ -98,7 +98,7 @@ async def retry_roadmap(roadmap_id: str, network: str = Query(...), db=Depends(g
     db.commit()
     from app.memory.permissions import capabilities_for_agent
     from app.services.pai import PAI_AGENT_NAME, PAI_ALLOWED_TOOLS, PAI_PRIMARY_CHANNEL, WorkspaceApi
-    from app.tools import AUDIENCE_COUNSELOR, ToolContext, get_tool_executor
+    from app.tools import AUDIENCE_COUNSELOR, ToolContext
 
     context = ToolContext(
         workspace_id=workspace_id, agent_name=PAI_AGENT_NAME,
@@ -108,13 +108,16 @@ async def retry_roadmap(roadmap_id: str, network: str = Query(...), db=Depends(g
         audience=AUDIENCE_COUNSELOR,
         granted_capabilities=capabilities_for_agent(PAI_AGENT_NAME),
     )
-    delegated = await get_tool_executor().execute("operator.delegate", {
-        "objective": objective, "task_type": "roadmap_research",
-        "intent": "academic_planning", "constraints": constraints,
-        "context_refs": ["vault", "memory"],
-    }, context)
+    from app.counseling.research_gateway import request_research
+    from app.journey import JourneyService
+    target = db.get(Roadmap, roadmap_id)
+    journey = JourneyService(db).get(workspace_id, target.journey_id)
+    delegated = await request_research("roadmap_light", workspace_id, db=db,
+        journey=journey, tool_context=context, roadmap_id=roadmap_id,
+        refresh_key=constraints["research_key"],
+        refresh_candidate=((constraints.get("capability_input") or {}).get("brief") or {}).get("refresh_candidate"))
     row = db.get(Roadmap, roadmap_id)
-    if not delegated.get("ok"):
+    if not delegated or not delegated.get("ok"):
         row.generation_status = "failed"
         row.stale_reason = "Research could not start; try again later"
         db.commit()
@@ -225,16 +228,16 @@ async def add_custom_goal(body: CustomGoal, network: str = Query(...), db=Depend
                           x_workspace_token: str | None = Header(None), authorization: str | None = Header(None)):
     workspace = _authorized(db, network, x_workspace_token, authorization)
     workspace_id = str(workspace.id)
-    from app.memory.profile_completion import ProfileCompletionService
+    from app.counseling.research_gateway import mirror_is_current, request_research
     from app.memory.candidates import MemoryCandidateService
     from app.memory.reconciler import MemoryReconciler
     from app.journey import JourneyService
     from app.services.pai import PAI_AGENT_NAME, PAI_ALLOWED_TOOLS, PAI_PRIMARY_CHANNEL, WorkspaceApi
     from app.memory.permissions import capabilities_for_agent
-    from app.tools import AUDIENCE_COUNSELOR, ToolContext, get_tool_executor
+    from app.tools import AUDIENCE_COUNSELOR, ToolContext
 
-    if not ProfileCompletionService(db).evaluate(workspace_id).get("foundationReady"):
-        raise HTTPException(status_code=409, detail="Complete the profile foundation with PAI before researching a route")
+    if not mirror_is_current(db, workspace_id):
+        raise HTTPException(status_code=409, detail="Confirm your current Mirror with PAI before researching a route")
     details = {"stated_preference": body.title, "direction_status": "exploring"}
     if body.country:
         details["target_countries"] = [body.country]
@@ -255,7 +258,7 @@ async def add_custom_goal(body: CustomGoal, network: str = Query(...), db=Depend
         db.commit()  # Keep the candidate and its conflict or rejection history.
         raise HTTPException(status_code=409, detail="The goal needs review in Profile before research")
     journey = JourneyService(db).ensure_counselor(workspace_id, actor="human:student")
-    if journey.current_stage in {"DIRECTION", "PROPOSED"}:
+    if journey.current_stage == "PROPOSED":
         journey = JourneyService(db).set_counselor_stage(
             workspace_id, journey.id, "RESEARCHING", actor="human:student")
     card = RoadmapService(db).create_custom(
@@ -272,20 +275,10 @@ async def add_custom_goal(body: CustomGoal, network: str = Query(...), db=Depend
         audience=AUDIENCE_COUNSELOR,
         granted_capabilities=capabilities_for_agent(PAI_AGENT_NAME),
     )
-    delegated = await get_tool_executor().execute("operator.delegate", {
-        "objective": f"Research sourced routes for {body.title}",
-        "task_type": "roadmap_research", "intent": "academic_planning",
-        "constraints": {"origin": "student_added", "roadmap_id": card["id"],
-                        "research_key": f"{journey.id}:custom:{card['id']}",
-                        "capability_input": {"brief": {
-                            "goal_id": result.result_id, "stated_preference": body.title,
-                            "underlying_objective": body.why or "",
-                            "country": body.country or "", "level": body.level or "",
-                            "field": body.field or ""}}},
-        "context_refs": ["vault", "memory"],
-    }, context)
+    delegated = await request_research("roadmap_light", workspace_id, db=db,
+        journey=journey, tool_context=context, roadmap_id=card["id"])
     row = db.get(Roadmap, card["id"])
-    if delegated.get("ok"):
+    if delegated and delegated.get("ok"):
         row.execution_run_id = delegated["data"]["run_id"]
     else:
         row.generation_status = "failed"

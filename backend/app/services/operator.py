@@ -286,8 +286,9 @@ async def _post_result(
         from app.counseling.posting import _build_conversation_context, _post_response
         db.rollback()
         run = db.get(ExecutionRun, run_id)
+        context_current = bool(run and _result_context_current(db, run))
         if run is not None and str(run.workspace_id) == workspace_id and run.result:
-            if not _result_context_current(db, run):
+            if not context_current:
                 message = ("The background work is complete. I can interpret it for you "
                            "after we confirm that my understanding of your situation is accurate.")
             else:
@@ -298,6 +299,9 @@ async def _post_result(
                     "approval_required_for": run.approval_required_for,
                     "roadmap_research": run.task_type == "roadmap_research",
                 }
+                if run.task_type == "roadmap_research":
+                    from app.roadmaps.service import RoadmapService
+                    handoff["roadmaps"] = RoadmapService(db).for_run(workspace_id, run_id)
                 history = _build_conversation_context(
                     db, workspace_id, channel_target, pai.PAI_AGENT_NAME,
                     exclude_event_id="", max_chars=12000,
@@ -317,7 +321,7 @@ async def _post_result(
                         "Ask me to review the findings and I'll pick up from the saved result."
                     )
         response_metadata = {"execution_run_id": run_id, "execution_status": status}
-        if run is not None and run.task_type == "roadmap_research":
+        if context_current and run is not None and run.task_type == "roadmap_research":
             from app.roadmaps.service import RoadmapService
             cards = RoadmapService(db).for_run(workspace_id, run_id, presented=True)
             if cards:
@@ -403,112 +407,6 @@ def _resolve_memory_context(workspace_id: str, context_refs: Optional[list], que
         db.close()
 
 
-def consume_student_understanding_delta(db, workspace_id: str, delta: dict,
-                                        *, source_event_id: str | None = None,
-                                        source_text: str = "",
-                                        semantic_statuses: list[dict] | None = None,
-                                        semantic_commands: list[dict] | None = None) -> int:
-    """Operator intake for Counselor proposals; reconciliation owns all canonical writes.
-
-    Source trust is assigned here, never accepted from model output. Conflicts and
-    unknowns are planning signals, not claims to persist.
-    """
-    from app.jobs.service import BackgroundJobService
-    from app.memory.candidates import MemoryCandidateService
-    from app.memory.extraction_context import build_turn_context
-    from app.memory.extractor import _validate
-    from app.memory.explicit_commands import (authorizes_fact, authorizes_memory_forget,
-                                              validated_commands)
-    from app.memory.field_definitions import VaultFieldDefinitionService
-
-    if not isinstance(delta, dict) or delta.get("conflicts") or not source_event_id:
-        return 0
-    # Caller text and model trust fields are not evidence. Resolve the same
-    # durable, workspace-scoped owner event used by background extraction.
-    turn = build_turn_context(db, workspace_id, source_event_id)
-    if turn is None or turn.is_empty():
-        return 0
-    commands = validated_commands(semantic_commands, turn.user_text)
-    from app.memory.discovery_intake import consume_discovery_statuses
-    consume_discovery_statuses(db, workspace_id, turn, delta.get("unknowns"),
-                               semantic_statuses=semantic_statuses)
-    candidates = MemoryCandidateService(db)
-    fields = VaultFieldDefinitionService(db)
-    allowed_keys = {definition.key for definition in fields.list_definitions()}
-    ids = []
-    for bucket in ("facts", "records", "memories"):
-        items = delta.get(bucket) or []
-        if not isinstance(items, list):
-            continue
-        for item in items[:20]:
-            if not isinstance(item, dict):
-                continue
-            operation = item.get("operation", "upsert")
-            evidence = item.get("evidence")
-            quote = evidence.get("quote") if isinstance(evidence, dict) else None
-            raw = {
-                "candidate_type": {"facts": "vault_fact", "records": "student_record",
-                                   "memories": "semantic_memory"}[bucket],
-                "operation": "upsert", "quote": quote, "confidence": 0.8,
-                "key": item.get("key") if bucket == "facts" else item.get("type"),
-                "proposed_value": item.get("value") if bucket == "facts" else item.get("data"),
-                "content": item.get("content"), "entities": item.get("entities") or {},
-                "attribution": item.get("attribution"),
-            }
-            explicit = False
-            if operation == "upsert":
-                if bucket == "facts" and not isinstance(raw["key"], str):
-                    continue
-                validated = _validate(raw, turn, allowed_keys)
-                if validated is None:
-                    continue
-                explicit = (bucket == "facts" or (
-                    bucket == "records" and validated.entities.get("record_id"))) and authorizes_fact(
-                    commands, "upsert", validated.key, proposed_value=validated.proposed_value)
-                candidate_args = {
-                    "candidate_type": validated.candidate_type,
-                    "key": validated.key, "proposed_value": validated.proposed_value,
-                    "content": validated.content, "entities": validated.entities,
-                    "evidence": {**validated.evidence, "capture": "counselor_delta"},
-                }
-            elif (bucket == "facts" and operation == "retract") or (bucket == "memories" and operation == "forget"):
-                # Destructive proposals have a separate, narrow command gate;
-                # the upsert-only extractor must not acquire deletion powers.
-                from app.memory.extractor import _normalize
-                if not isinstance(quote, str) or not quote.strip() or _normalize(quote) not in _normalize(turn.user_text):
-                    continue
-                key = item.get("key")
-                if bucket == "facts":
-                    if not isinstance(key, str) or key not in allowed_keys or not authorizes_fact(
-                            commands, operation, key, turn.vault.get(key)):
-                        continue
-                elif not authorizes_memory_forget(commands, item.get("content")):
-                    continue
-                explicit = True
-                candidate_args = {
-                    "candidate_type": raw["candidate_type"],
-                    "key": key if bucket == "facts" else None,
-                    "content": item.get("content") if bucket == "memories" else None,
-                    "evidence": {"quote": quote[:500], "user_event_id": source_event_id,
-                                 "capture": "counselor_delta"},
-                }
-            else:
-                continue
-            candidate = candidates.propose(
-                workspace_id=workspace_id, operation=operation,
-                confidence=1.0 if explicit else 0.8,
-                source_type="user_explicit" if explicit else "conversation",
-                allow_user_explicit=explicit, source_event_ids=[source_event_id],
-                **candidate_args,
-            )
-            ids.append(candidate.id)
-    if ids:
-        BackgroundJobService(db).enqueue(
-            "memory.reconcile", {"candidate_ids": ids}, workspace_id,
-            idempotency_key="counselor-delta:" + ":".join(ids),
-        )
-    return len(ids)
-
 
 def is_available() -> bool:
     """Operator shares Counselor's server credentials — nothing to check
@@ -591,24 +489,16 @@ async def delegate(ctx, objective: str, constraints: Optional[dict], context_ref
 
 
 def _baseline_is_current(db, workspace_id: str) -> bool:
-    """Background results cannot rely on stale approval between user turns."""
-    from app.counseling.baseline import metadata, changed_domains
-    from app.counseling.understanding import StudentUnderstandingBuilder
-    from app.models import Workspace
-    baseline = metadata(db.get(Workspace, workspace_id))
-    if baseline.get("status") != "confirmed":
-        return False
-    view = StudentUnderstandingBuilder(db).build(workspace_id, baseline=baseline)
-    return not view.get("open_conflicts") and not changed_domains(view, baseline)
+    from app.counseling.research_gateway import mirror_is_current
+    return mirror_is_current(db, workspace_id)
 
 
 def _result_context_current(db, run: ExecutionRun) -> bool:
+    from app.counseling.research_gateway import mirror_is_current
     if run.task_type != "roadmap_research":
         return _baseline_is_current(db, run.workspace_id)
-    from app.memory.profile_completion import ProfileCompletionService
-    from app.counseling.understanding import StudentUnderstandingBuilder
-    return (bool(ProfileCompletionService(db).evaluate(run.workspace_id).get("foundationReady"))
-            and not StudentUnderstandingBuilder(db).build(run.workspace_id).get("open_conflicts"))
+    version = (run.constraints or {}).get("mirror_version")
+    return version is not None and mirror_is_current(db, run.workspace_id, version)
 
 
 async def get_status(ctx, run_id: Optional[str]) -> dict:
