@@ -7,11 +7,33 @@
   "hidden_truths": [
     {
       "fact": "Daughter has not agreed to this choice",
-      "reveal_when_asked_about": "has not agreed to this choice"
+      "category": "claim_depth",
+      "reveal_when": "Ask for a concrete example of independent work and what was actually completed."
     },
     {
       "fact": "Parent is worried about local job security",
-      "reveal_when_asked_about": "is worried about local job security"
+      "category": "family_underlying_concern",
+      "reveal_when": "Ask what the relevant family member is afraid might happen beneath their stated preference."
+    },
+    {
+      "fact": "Parent’s preference came from a relative’s secure employment",
+      "category": "interest_source",
+      "reveal_when": "Ask what first drew them toward this wish, before discussing its benefits."
+    },
+    {
+      "fact": "Daughter has kept drawing independently, according to the parent",
+      "category": "sustained_real_interest",
+      "reveal_when": "Ask which activity they have kept doing regularly and for how long."
+    },
+    {
+      "fact": "Student is unavailable today and has not authorized a route decision",
+      "category": "hidden_constraint",
+      "reveal_when": "Ask what practical responsibility or resource limit would prevent following a route."
+    },
+    {
+      "fact": "Parent reports daughter organizes school events; student must confirm",
+      "category": "hidden_skill",
+      "reveal_when": "Ask what others rely on them to organize, solve or explain in everyday life."
     }
   ],
   "family": "Parent is speaking for student",
@@ -51,17 +73,49 @@
   ],
   "recorded_grader": {
     "hidden_truths_captured": 0,
-    "hidden_truths_total": 2,
+    "hidden_truths_total": 6,
     "goal_tested_before_mirror": false,
     "mirror_evidence_accurate": true,
     "reasks_known_facts": 0,
     "identity_questions": 0,
-    "replies_more_than_one_question": 0,
-    "praise_openers": 0,
     "out_of_domain_answers": 0,
     "blocked_script_replies": 0,
     "unsourced_world_facts": 0,
     "yes_man_replies": 0,
-    "evidence": []
+    "evidence": [],
+    "hidden_truths": [
+      {
+        "fact": "Daughter has not agreed to this choice",
+        "captured": false
+      },
+      {
+        "fact": "Parent is worried about local job security",
+        "captured": false
+      },
+      {
+        "fact": "Parent’s preference came from a relative’s secure employment",
+        "captured": false
+      },
+      {
+        "fact": "Daughter has kept drawing independently, according to the parent",
+        "captured": false
+      },
+      {
+        "fact": "Student is unavailable today and has not authorized a route decision",
+        "captured": false
+      },
+      {
+        "fact": "Parent reports daughter organizes school events; student must confirm",
+        "captured": false
+      }
+    ],
+    "claims_probed": 0,
+    "claims_total": 0,
+    "replies_more_than_one_ask": 0,
+    "praise_or_filler": 0,
+    "replies_without_question": 0,
+    "advice_before_mirror": 0,
+    "invented_student_facts": 0,
+    "tone_issues": 0
   }
 }

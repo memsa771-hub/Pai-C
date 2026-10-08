@@ -7,7 +7,7 @@ from unittest.mock import patch
 import pytest
 
 from scripts.eval.cost import load_prices, token_record
-from scripts.eval_counselor_deep import PERSONAS, PRICES, load_personas, run_evaluation
+from scripts.eval_counselor_deep import PERSONAS, PRICES, load_personas, run_evaluation, _eval_context, _metrics
 
 
 def test_persona_fixtures_are_diverse_data():
@@ -16,6 +16,11 @@ def test_persona_fixtures_are_diverse_data():
     assert len({persona["country"] for persona in personas}) >= 8
     assert len({persona["education_system"] for persona in personas}) >= 8
     assert all(persona["hidden_truths"] and persona["recorded_turns"] for persona in personas)
+    for persona in personas:
+        assert 5 <= len(persona["hidden_truths"]) <= 6
+        assert len({item["category"] for item in persona["hidden_truths"]}) >= 4
+        assert all(set(item) == {"fact", "category", "reveal_when"}
+                   for item in persona["hidden_truths"])
 
 
 @pytest.mark.asyncio
@@ -97,3 +102,29 @@ async def test_live_requires_explicit_positive_budget_before_any_client(tmp_path
         with pytest.raises(ValueError, match="positive --max-cost-usd"):
             await run_evaluation(live=True, result_dir=tmp_path)
     assert list(tmp_path.iterdir()) == []
+
+
+def test_eval_context_tags_and_all_grader_fields_are_preserved():
+    text = _eval_context({"id": "synthetic", "recorded_grader": {}}, [], {}, "injection")
+    for tag in ("persona", "transcript", "notebook", "inject"):
+        assert f"<{tag}>" in text and f"</{tag}>" in text
+    assert "recorded_grader" not in text
+    grader = {"hidden_truths": [{"fact": "synthetic", "captured": True}],
+              "claims_probed": 1, "claims_total": 2, "replies_more_than_one_ask": 3,
+              "replies_without_question": 4, "advice_before_mirror": 5,
+              "invented_student_facts": 6, "tone_issues": 7,
+              "evidence": [{"metric": "tone_issues", "turn": 1, "quote": "synthetic"}]}
+    metrics = _metrics({"hidden_truths": [1]}, [], {}, grader)
+    assert all(metrics[key] == value for key, value in grader.items())
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("model", ["gpt-6-sol", "gpt-5.6-terra", "gpt-5.6-luna"])
+async def test_unverified_prices_refuse_live_before_any_client(tmp_path, model):
+    from app.config import config
+    with patch.object(config, "PAI_API_KEY", "fake"), \
+            patch.object(config, "PAI_COUNSELOR_MODEL", model), \
+            patch("openai.AsyncOpenAI", side_effect=AssertionError("provider forbidden")):
+        with pytest.raises(ValueError, match="verification required"):
+            await run_evaluation(live=True, max_cost_usd=1, result_dir=tmp_path,
+                                 simulator_model="gpt-5-mini", grader_model="gpt-5-mini")

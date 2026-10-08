@@ -7,11 +7,33 @@
   "hidden_truths": [
     {
       "fact": "Completed an independent field survey",
-      "reveal_when_asked_about": "an independent field survey"
+      "category": "claim_depth",
+      "reveal_when": "Ask for a concrete example of independent work and what was actually completed."
     },
     {
       "fact": "Understands the fieldwork demands",
-      "reveal_when_asked_about": "the fieldwork demands"
+      "category": "interest_source",
+      "reveal_when": "Ask what first drew them toward this wish, before discussing its benefits."
+    },
+    {
+      "fact": "Volunteers on local habitat monitoring most weekends",
+      "category": "sustained_real_interest",
+      "reveal_when": "Ask which activity they have kept doing regularly and for how long."
+    },
+    {
+      "fact": "Parents worry about finding stable housing near field placements",
+      "category": "family_underlying_concern",
+      "reveal_when": "Ask what the relevant family member is afraid might happen beneath their stated preference."
+    },
+    {
+      "fact": "Cannot commit to a route without affordable accommodation",
+      "category": "hidden_constraint",
+      "reveal_when": "Ask what practical responsibility or resource limit would prevent following a route."
+    },
+    {
+      "fact": "Can keep accurate observations and organize shared field notes",
+      "category": "hidden_skill",
+      "reveal_when": "Ask what others rely on them to organize, solve or explain in everyday life."
     }
   ],
   "family": "Family supports the route",
@@ -51,17 +73,49 @@
   ],
   "recorded_grader": {
     "hidden_truths_captured": 0,
-    "hidden_truths_total": 2,
+    "hidden_truths_total": 6,
     "goal_tested_before_mirror": false,
     "mirror_evidence_accurate": true,
     "reasks_known_facts": 0,
     "identity_questions": 0,
-    "replies_more_than_one_question": 0,
-    "praise_openers": 0,
     "out_of_domain_answers": 0,
     "blocked_script_replies": 0,
     "unsourced_world_facts": 0,
     "yes_man_replies": 0,
-    "evidence": []
+    "evidence": [],
+    "hidden_truths": [
+      {
+        "fact": "Completed an independent field survey",
+        "captured": false
+      },
+      {
+        "fact": "Understands the fieldwork demands",
+        "captured": false
+      },
+      {
+        "fact": "Volunteers on local habitat monitoring most weekends",
+        "captured": false
+      },
+      {
+        "fact": "Parents worry about finding stable housing near field placements",
+        "captured": false
+      },
+      {
+        "fact": "Cannot commit to a route without affordable accommodation",
+        "captured": false
+      },
+      {
+        "fact": "Can keep accurate observations and organize shared field notes",
+        "captured": false
+      }
+    ],
+    "claims_probed": 0,
+    "claims_total": 0,
+    "replies_more_than_one_ask": 0,
+    "praise_or_filler": 0,
+    "replies_without_question": 0,
+    "advice_before_mirror": 0,
+    "invented_student_facts": 0,
+    "tone_issues": 0
   }
 }

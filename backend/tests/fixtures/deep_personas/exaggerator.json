@@ -7,11 +7,33 @@
   "hidden_truths": [
     {
       "fact": "Only followed tutorial examples",
-      "reveal_when_asked_about": "followed tutorial examples"
+      "category": "claim_depth",
+      "reveal_when": "Ask for a concrete example of independent work and what was actually completed."
     },
     {
       "fact": "Has not shipped an independent project",
-      "reveal_when_asked_about": "not shipped an independent project"
+      "category": "claim_depth",
+      "reveal_when": "Ask for a concrete example of independent work and what was actually completed."
+    },
+    {
+      "fact": "Returns to fixing neighbors’ devices more often than coding",
+      "category": "sustained_real_interest",
+      "reveal_when": "Ask which activity they have kept doing regularly and for how long."
+    },
+    {
+      "fact": "Family fears paying tuition without a realistic income path",
+      "category": "family_underlying_concern",
+      "reveal_when": "Ask what the relevant family member is afraid might happen beneath their stated preference."
+    },
+    {
+      "fact": "Cannot pay tuition without continuing small repair jobs",
+      "category": "hidden_constraint",
+      "reveal_when": "Ask what practical responsibility or resource limit would prevent following a route."
+    },
+    {
+      "fact": "Can explain device problems clearly to customers",
+      "category": "hidden_skill",
+      "reveal_when": "Ask what others rely on them to organize, solve or explain in everyday life."
     }
   ],
   "family": "Family expects a quick job",
@@ -51,17 +73,49 @@
   ],
   "recorded_grader": {
     "hidden_truths_captured": 0,
-    "hidden_truths_total": 2,
+    "hidden_truths_total": 6,
     "goal_tested_before_mirror": false,
     "mirror_evidence_accurate": true,
     "reasks_known_facts": 0,
     "identity_questions": 0,
-    "replies_more_than_one_question": 0,
-    "praise_openers": 0,
     "out_of_domain_answers": 0,
     "blocked_script_replies": 0,
     "unsourced_world_facts": 0,
     "yes_man_replies": 0,
-    "evidence": []
+    "evidence": [],
+    "hidden_truths": [
+      {
+        "fact": "Only followed tutorial examples",
+        "captured": false
+      },
+      {
+        "fact": "Has not shipped an independent project",
+        "captured": false
+      },
+      {
+        "fact": "Returns to fixing neighbors’ devices more often than coding",
+        "captured": false
+      },
+      {
+        "fact": "Family fears paying tuition without a realistic income path",
+        "captured": false
+      },
+      {
+        "fact": "Cannot pay tuition without continuing small repair jobs",
+        "captured": false
+      },
+      {
+        "fact": "Can explain device problems clearly to customers",
+        "captured": false
+      }
+    ],
+    "claims_probed": 0,
+    "claims_total": 0,
+    "replies_more_than_one_ask": 0,
+    "praise_or_filler": 0,
+    "replies_without_question": 0,
+    "advice_before_mirror": 0,
+    "invented_student_facts": 0,
+    "tone_issues": 0
   }
 }

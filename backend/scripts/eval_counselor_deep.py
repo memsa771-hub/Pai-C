@@ -134,6 +134,8 @@ class TrackedLiveClient:
     async def create(self, **kwargs):
         model = kwargs["model"]
         self.ledger.before_call(model)
+        if self.ledger.prices[model].get("verify_before_live"):
+            raise ValueError(f"price verification required before live: {model}")
         response = await self.real.chat.completions.create(**kwargs)
         self.ledger.record(getattr(response, "usage", None), model, _phase.get())
         return response
@@ -160,15 +162,25 @@ def live_tracking(ledger: UsageLedger):
         yield
 
 
-async def _live_student(persona: dict, transcript: list[dict], model: str) -> str:
+def _eval_context(persona: dict, transcript: list[dict], notebook: dict,
+                  inject: str | None = None) -> str:
+    persona = {key: value for key, value in persona.items()
+               if key not in {"recorded_turns", "recorded_grader"}}
+    return "\n".join(f"<{key}>{json.dumps(value, ensure_ascii=False)}</{key}>"
+                     for key, value in (("persona", persona), ("transcript", transcript),
+                                        ("notebook", notebook), ("inject", inject)))
+
+
+async def _live_student(persona: dict, transcript: list[dict], model: str,
+                        notebook: dict | None = None, inject: str | None = None) -> str:
     from app.inference.client import chat_completion
 
     prompt = (PROMPTS / "simulated_student.md").read_text(encoding="utf-8")
     with phase("simulated_student"):
         return (await chat_completion(
             api_key=config.PAI_API_KEY, model=model, system_prompt=prompt,
-            messages=[{"role": "user", "content": json.dumps({
-                "persona": persona, "transcript": transcript}, ensure_ascii=False)}],
+            messages=[{"role": "user", "content": _eval_context(
+                persona, transcript, notebook or {}, inject)}],
             base_url=config.PAI_BASE_URL,
         )).strip()
 
@@ -180,9 +192,7 @@ async def _live_grader(persona: dict, transcript: list[dict], notebook: dict, mo
     with phase("grader"):
         raw = await chat_completion(
             api_key=config.PAI_API_KEY, model=model, system_prompt=prompt,
-            messages=[{"role": "user", "content": json.dumps({
-                "persona": persona, "transcript": transcript,
-                "notebook": notebook}, ensure_ascii=False)}],
+            messages=[{"role": "user", "content": _eval_context(persona, transcript, notebook)}],
             response_format={"type": "json_object"}, base_url=config.PAI_BASE_URL,
         )
     result = json.loads(raw)
@@ -202,11 +212,17 @@ def _percentile(values: list[int], percentile: float) -> float | None:
 
 
 def _metrics(persona: dict, turns: list[dict], notebook: dict, grader: dict | None) -> dict:
+    grader = dict(grader or {})
+    if isinstance(grader.get("hidden_truths"), list):
+        grader["hidden_truths_captured"] = sum(
+            item.get("captured") is True for item in grader["hidden_truths"]
+            if isinstance(item, dict))
     claims = notebook.get("claims") or []
     questions = [len(re.findall(r"[?\u061f]", turn["reply"])) for turn in turns]
     mirror_turn = next((turn["turn"] for turn in turns
                         if turn["action"].get("type") == "mirror"), None)
     return {
+        **(grader or {}),
         "hidden_truths_total": len(persona["hidden_truths"]),
         "hidden_truths_captured": (grader or {}).get("hidden_truths_captured"),
         "hidden_truth_recall": (round(grader["hidden_truths_captured"] / len(persona["hidden_truths"]), 3)
@@ -214,16 +230,16 @@ def _metrics(persona: dict, turns: list[dict], notebook: dict, grader: dict | No
                                 and isinstance(grader.get("hidden_truths_captured"), int) else None),
         "claims_probed_beyond_claimed": sum(item.get("evidence_level") in
                                              {"tried", "sustained", "proven"} for item in claims),
-        "claims_total": len(claims),
+        "claims_total": (grader or {}).get("claims_total"),
         "goal_tested_before_mirror": (grader or {}).get("goal_tested_before_mirror"),
         "mirror_ready_reached": bool(notebook.get("mirror_ready")),
         "mirror_evidence_accurate": ((grader or {}).get("mirror_evidence_accurate")
                                      if mirror_turn is not None else None),
         "reasks_known_facts": (grader or {}).get("reasks_known_facts"),
         "identity_questions": (grader or {}).get("identity_questions"),
-        "replies_more_than_one_question": (grader or {}).get("replies_more_than_one_question"),
+        "replies_more_than_one_question": (grader or {}).get("replies_more_than_one_ask"),
         "question_marks_over_one": sum(count > 1 for count in questions),
-        "praise_openers": (grader or {}).get("praise_openers"),
+        "praise_openers": (grader or {}).get("praise_or_filler"),
         "out_of_domain_answers": (grader or {}).get("out_of_domain_answers"),
         "blocked_script_replies": sum(contains_blocked_script(
             turn["reply"], config.PAI_LANGUAGE_BLOCKED_SCRIPTS) for turn in turns),
@@ -271,10 +287,9 @@ async def evaluate_persona(persona: dict, ledger: UsageLedger, *, live: bool,
                         message = persona["surface"]
                     elif opener:
                         message = opener["student"]
-                    elif injection:
-                        message = injection
                     else:
-                        message = await _live_student(persona, transcript, simulator_model)
+                        message = await _live_student(persona, transcript, simulator_model,
+                                                      result.get("notebook") or {}, injection)
                     start = time.monotonic()
                     event_id = str(uuid.uuid4())
                     timestamp = student.next_timestamp()
@@ -383,6 +398,8 @@ def write_report(report: dict, directory: Path) -> tuple[Path, Path]:
                          f"{usage['cached_input']} | {usage['output']} | {usage['reasoning']} | "
                          f"{usage['cost_usd']:.6f} |")
         lines.append("")
+        lines.extend(["### Grader decisions and evidence", "", "```json",
+                      json.dumps(item.get("grader"), ensure_ascii=False, indent=2), "```", ""])
     lines.extend(["The JSON report includes every per-call token record and final notebook.", ""])
     md_path.write_text("\n".join(lines), encoding="utf-8")
     return md_path, json_path
@@ -411,6 +428,8 @@ async def run_evaluation(*, live: bool = False, max_cost_usd: float | None = Non
                       simulator_model or config.PAI_MODEL,
                       grader_model or config.PAI_COUNSELOR_MODEL}:
             ledger.before_call(model)
+            if ledger.prices[model].get("verify_before_live"):
+                raise ValueError(f"price verification required before live: {model}")
     result = {"mode": "live" if live else "offline", "status": "complete", "personas": [],
               "cost_usd": 0.0, "all_calls": []}
     for persona in personas:

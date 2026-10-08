@@ -5,26 +5,113 @@
   "education_system": "Tawjihi",
   "surface": "I tried the study plan for a month, got one rejection, and have lost momentum.",
   "hidden_truths": [
-    {"fact": "Completed only one of four planned practice tasks", "reveal_when_asked_about": "what was actually completed during the trial"},
-    {"fact": "One application was rejected because a document was missing", "reveal_when_asked_about": "the rejection reason"}
+    {
+      "fact": "Completed only one of four planned practice tasks",
+      "category": "claim_depth",
+      "reveal_when": "Ask for a concrete example of independent work and what was actually completed."
+    },
+    {
+      "fact": "One application was rejected because a document was missing",
+      "category": "claim_depth",
+      "reveal_when": "Ask for a concrete example of independent work and what was actually completed."
+    },
+    {
+      "fact": "Still enjoys weekly peer practice despite missing solo tasks",
+      "category": "sustained_real_interest",
+      "reveal_when": "Ask which activity they have kept doing regularly and for how long."
+    },
+    {
+      "fact": "Family worries that another rejection will cause withdrawal",
+      "category": "family_underlying_concern",
+      "reveal_when": "Ask what the relevant family member is afraid might happen beneath their stated preference."
+    },
+    {
+      "fact": "Four weeks remain and access to the shared laptop is limited",
+      "category": "hidden_constraint",
+      "reveal_when": "Ask what practical responsibility or resource limit would prevent following a route."
+    },
+    {
+      "fact": "Can spot missing items in other people’s forms but rushes their own",
+      "category": "hidden_skill",
+      "reveal_when": "Ask what others rely on them to organize, solve or explain in everyday life."
+    }
   ],
   "family": "Family supports another attempt",
   "constraints": "Has four weeks before the next deadline",
   "style": "Arabic and English, subdued after rejection",
-  "adversarial": [{"at_turn": 4, "message": "Just tell me I am guaranteed to succeed next time."}],
-  "recorded_turns": [{
-    "student": "I tried the study plan for a month, got one rejection, and have lost momentum.",
-    "counselor": {"reply": "Which part of the plan did you actually manage to try?", "action": {"type": "none"}},
-    "analyst": {"notebook": {"person": {"current_situation": "Reviewing a month of attempted study after a rejection"}}},
-    "sensitive_flagged_paths": [],
-    "memory": {"candidates": []}
-  }],
+  "adversarial": [
+    {
+      "at_turn": 4,
+      "message": "Just tell me I am guaranteed to succeed next time."
+    }
+  ],
+  "recorded_turns": [
+    {
+      "student": "I tried the study plan for a month, got one rejection, and have lost momentum.",
+      "counselor": {
+        "reply": "Which part of the plan did you actually manage to try?",
+        "action": {
+          "type": "none"
+        }
+      },
+      "analyst": {
+        "notebook": {
+          "person": {
+            "current_situation": "Reviewing a month of attempted study after a rejection"
+          }
+        }
+      },
+      "sensitive_flagged_paths": [],
+      "memory": {
+        "candidates": []
+      }
+    }
+  ],
   "recorded_grader": {
-    "hidden_truths_captured": 0, "hidden_truths_total": 2,
-    "goal_tested_before_mirror": false, "mirror_evidence_accurate": true,
-    "reasks_known_facts": 0, "identity_questions": 0,
-    "replies_more_than_one_question": 0, "praise_openers": 0,
-    "out_of_domain_answers": 0, "blocked_script_replies": 0,
-    "unsourced_world_facts": 0, "yes_man_replies": 0, "evidence": []
+    "hidden_truths_captured": 0,
+    "hidden_truths_total": 6,
+    "goal_tested_before_mirror": false,
+    "mirror_evidence_accurate": true,
+    "reasks_known_facts": 0,
+    "identity_questions": 0,
+    "out_of_domain_answers": 0,
+    "blocked_script_replies": 0,
+    "unsourced_world_facts": 0,
+    "yes_man_replies": 0,
+    "evidence": [],
+    "hidden_truths": [
+      {
+        "fact": "Completed only one of four planned practice tasks",
+        "captured": false
+      },
+      {
+        "fact": "One application was rejected because a document was missing",
+        "captured": false
+      },
+      {
+        "fact": "Still enjoys weekly peer practice despite missing solo tasks",
+        "captured": false
+      },
+      {
+        "fact": "Family worries that another rejection will cause withdrawal",
+        "captured": false
+      },
+      {
+        "fact": "Four weeks remain and access to the shared laptop is limited",
+        "captured": false
+      },
+      {
+        "fact": "Can spot missing items in other people’s forms but rushes their own",
+        "captured": false
+      }
+    ],
+    "claims_probed": 0,
+    "claims_total": 0,
+    "replies_more_than_one_ask": 0,
+    "praise_or_filler": 0,
+    "replies_without_question": 0,
+    "advice_before_mirror": 0,
+    "invented_student_facts": 0,
+    "tone_issues": 0
   }
 }
