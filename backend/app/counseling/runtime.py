@@ -78,6 +78,10 @@ async def _run_turn(db, workspace_id: str, event_data: dict, depth: int) -> None
             agent_name=PAI_AGENT_NAME,
             profile_captured=profile_captured,
         )
+        if config.PAI_COUNSELOR_MODE == "deep":
+            from app.counseling.deep.analysis import enqueue_turn_analysis
+
+            enqueue_turn_analysis(db, workspace_id, event_data.get("id"), assistant_event_id)
 
 
 async def _run_deep_turn(db, workspace_id: str, event_data: dict, depth: int):
