@@ -162,7 +162,9 @@ class JourneyService:
 
     def set_counselor_summary(self, workspace_id: str, journey_id: str,
                               summary: dict, reply: str, source_event_id: str,
-                              *, actor: str = "openagents:pai") -> JourneyView:
+                              *, actor: str = "openagents:pai",
+                              notebook_version: int | None = None,
+                              channel: str | None = None) -> JourneyView:
         """Keep the reviewed draft on the student's Counselor Journey."""
         row = self.db.execute(select(StudentJourney).where(
             StudentJourney.workspace_id == workspace_id,
@@ -181,13 +183,20 @@ class JourneyService:
             "reply": reply, "source_event_id": source_event_id,
             "version": int(current.get("version") or 0) + 1,
         }
+        if notebook_version is not None:
+            row.counselor_summary_draft = {
+                **row.counselor_summary_draft, "type": "mirror", "mirror": summary,
+                "notebook_version": notebook_version, "channel": channel,
+            }
+            self.set_counselor_stage(workspace_id, journey_id, "MIRROR", actor=actor)
         row.updated_at = datetime.now(timezone.utc)
         self._event(row, JOURNEY_UPDATED, {"changed": ["counselor_summary_draft"]}, actor)
         return self._view(row)
 
     def queue_counselor_research(self, workspace_id: str, journey_id: str,
                                  confirmation_event_id: str,
-                                 *, actor: str = "openagents:pai") -> JourneyView:
+                                 *, actor: str = "openagents:pai",
+                                 expected_version: int | None = None) -> JourneyView:
         """Queue once after explicit confirmation of the current draft."""
         row = self.db.execute(select(StudentJourney).where(
             StudentJourney.workspace_id == workspace_id,
@@ -196,14 +205,16 @@ class JourneyService:
         ).with_for_update()).scalar_one_or_none()
         if row is None:
             raise JourneyError("Counselor journey not found")
-        if row.research_request and row.research_request.get("status") == "queued":
-            return self._view(row)
         draft = row.counselor_summary_draft or {}
-        if row.current_stage != "DIRECTION" or draft.get("status") != "awaiting_confirmation":
+        if expected_version is not None and draft.get("version") != expected_version:
+            raise JourneyError("The Counselor summary has changed")
+        if draft.get("status") == "confirmed" and row.research_request:
+            return self._view(row)
+        if row.current_stage != "MIRROR" or draft.get("status") != "awaiting_confirmation":
             raise JourneyError("There is no Counselor summary awaiting confirmation")
         row.research_request = {
             "id": new_id("research"), "status": "queued",
-            "payload": draft["summary"], "summary_version": draft["version"],
+            "payload": draft.get("mirror") or draft["summary"], "summary_version": draft["version"],
             "confirmation_event_id": confirmation_event_id,
             "queued_at": datetime.now(timezone.utc).isoformat(),
         }
@@ -213,6 +224,22 @@ class JourneyService:
         self._event(row, JOURNEY_UPDATED,
                     {"changed": ["counselor_summary_draft", "research_request"]}, actor)
         return self.set_counselor_stage(workspace_id, journey_id, "RESEARCHING", actor=actor)
+
+    def request_counselor_summary_changes(self, workspace_id: str, journey_id: str,
+                                           expected_version: int, *, actor: str) -> JourneyView:
+        row = self.db.execute(select(StudentJourney).where(
+            StudentJourney.workspace_id == workspace_id, StudentJourney.id == journey_id,
+            StudentJourney.journey_type == "counselor_decision", StudentJourney.status == "active",
+        ).with_for_update()).scalar_one_or_none()
+        draft = (row.counselor_summary_draft or {}) if row else {}
+        if (row is None or row.current_stage != "MIRROR"
+                or draft.get("version") != expected_version
+                or draft.get("status") != "awaiting_confirmation"):
+            raise JourneyError("There is no current Mirror awaiting changes")
+        row.counselor_summary_draft = {**draft, "status": "needs_changes"}
+        row.research_request = None
+        self._event(row, JOURNEY_UPDATED, {"changed": ["counselor_summary_draft"]}, actor)
+        return self.set_counselor_stage(workspace_id, journey_id, "DIRECTION", actor=actor)
 
     def resolve_primary(self, workspace_id: str) -> JourneyView | None:
         """Deprecated exact-primary alias; fallback is explicit in resolve_active."""

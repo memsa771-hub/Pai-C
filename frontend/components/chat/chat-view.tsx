@@ -5,7 +5,7 @@ import { ChatMessages } from './chat-messages';
 import { PaiDmIntro } from './pai-dm-intro';
 import { ChatInput, type PendingFile } from './chat-input';
 import { CounselorVoiceControl } from './counselor-voice-control';
-import { CounselorGoalSummaryCard } from './counselor-goal-summary';
+import { CounselorMirrorCard } from '@/components/counselor/counselor-mirror-card';
 import { CounselorRequestPanel } from './counselor-request-panel';
 import { CounselorResearchStatus } from './counselor-research-status';
 import { ThreadStatusBar } from './thread-status-bar';
@@ -982,8 +982,8 @@ export function ChatView() {
           <div className="mx-auto w-full max-w-3xl px-3 lg:px-5 pt-1 pb-2 xl:max-w-4xl 2xl:max-w-6xl lg:pb-3">
             {currentSessionId === 'pai-counselor' && <div className="mb-2">
               <CounselorResearchStatus />
-              <CounselorGoalSummaryCard refreshKey={displayMessages.length}
-                onSend={(message) => handleSend(message, [], [], true)} />
+              <CounselorMirrorCard refreshKey={`${currentSessionId}:${displayMessages.length}`}
+                onUpdated={forceRefresh} />
               <CounselorRequestPanel refreshKey={displayMessages.length} />
             </div>}
             {currentSessionId && currentUser.id && (

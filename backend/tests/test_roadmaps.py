@@ -17,7 +17,7 @@ from scripts.counselor_eval_support import StudentSession
 def _journey(db, workspace_id):
     journeys = JourneyService(db)
     journey = journeys.ensure_counselor(workspace_id)
-    for stage in ("FOUNDATION", "DIRECTION", "RESEARCHING", "ASSESSING", "PROPOSED"):
+    for stage in ("FOUNDATION", "DIRECTION", "MIRROR", "RESEARCHING", "ASSESSING", "PROPOSED"):
         journey = journeys.set_counselor_stage(workspace_id, journey.id, stage)
     return journey
 

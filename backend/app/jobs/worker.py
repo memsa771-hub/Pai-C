@@ -249,6 +249,7 @@ def main() -> None:
     import app.memory.handlers  # noqa: F401
     import app.documents.handlers  # noqa: F401
     import app.counseling.deep.analysis  # noqa: F401
+    import app.counseling.deep.mirror  # noqa: F401
 
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)

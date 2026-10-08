@@ -253,6 +253,7 @@ export class CounselorVoiceSession {
 
   private async waitForCounselor(after: string, id: string, generation: number): Promise<string | null> {
     const deadline = Date.now() + 90_000;
+    let pendingReply: string | null = null;
     while (!this.closed && generation === this.generation && Date.now() < deadline) {
       const page = await workspaceApi.pollEvents({
         after, type: 'workspace.message', limit: 100, channel: this.conversation,
@@ -261,12 +262,17 @@ export class CounselorVoiceSession {
         if (event.source === 'openagents:pai' && event.metadata?.voice_delegation_id === id) {
           this.callbacks.messagePosted();
           const content = String(event.payload?.content || '');
+          if (event.metadata?.mirror_pending) {
+            pendingReply = content;
+            continue;
+          }
           return content.startsWith('[Error]') ? 'I could not reach PAI right now. Please try again.' : content;
         }
       }
       if (page.has_more && page.events.length) after = page.events[page.events.length - 1].id;
       await pause(700);
     }
+    if (pendingReply && !this.closed && generation === this.generation) return pendingReply;
     throw new Error('PAI took too long to respond. Please try again.');
   }
 

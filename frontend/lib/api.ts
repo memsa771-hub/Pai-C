@@ -407,8 +407,18 @@ class WorkspaceApi {
     return this.request(`/v1/decision-records/current?network=${this.requireWorkspace()}`);
   }
 
-  async getCounselorGoalSummary(): Promise<import('./roadmaps').CounselorGoalSummary> {
+  async getCounselorSummary(): Promise<import('./counselor-mirror').CounselorMirrorDraft> {
     return this.request(`/v1/counselor/summary?network=${this.requireWorkspace()}`);
+  }
+
+  async confirmCounselorMirror(version: number): Promise<void> {
+    await this.request(`/v1/counselor/summary/confirm?network=${this.requireWorkspace()}`,
+      { method: 'POST', body: JSON.stringify({ version }) });
+  }
+
+  async editCounselorMirror(version: number, text: string): Promise<void> {
+    await this.request(`/v1/counselor/summary/edit?network=${this.requireWorkspace()}`,
+      { method: 'POST', body: JSON.stringify({ version, text }) });
   }
 
   async getStudentRequests(): Promise<import('./roadmaps').StudentRequest[]> {

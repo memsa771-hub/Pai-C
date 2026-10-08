@@ -180,6 +180,7 @@ class Config:
     PAI_MODEL: str = os.environ.get("PAI_MODEL", "gpt-5.4-mini")
     PAI_COUNSELOR_MODEL: str = os.environ.get("PAI_COUNSELOR_MODEL", "") or PAI_MODEL
     PAI_ANALYST_MODEL: str = os.environ.get("PAI_ANALYST_MODEL", "") or PAI_COUNSELOR_MODEL
+    PAI_MIRROR_MODEL: str = os.environ.get("PAI_MIRROR_MODEL", "") or PAI_COUNSELOR_MODEL
     PAI_SENSITIVE_CHECK_MODEL: str = os.environ.get("PAI_SENSITIVE_CHECK_MODEL", "") or PAI_ANALYST_MODEL
     PAI_ANALYST_HISTORY_SIZE: int = int(os.environ.get("PAI_ANALYST_HISTORY_SIZE", "60"))
     PAI_ANALYST_REASONING_EFFORT: str = os.environ.get("PAI_ANALYST_REASONING_EFFORT", "low")

@@ -53,6 +53,26 @@ afterEach(() => {
 });
 
 describe('Counselor voice', () => {
+  it('waits for a Mirror and returns only its spoken content', async () => {
+    vi.useFakeTimers();
+    const voice = new CounselorVoiceSession('pai-counselor', 'Student', 'owner', {
+      status: vi.fn(), transcript: vi.fn(), messagePosted: vi.fn(),
+    });
+    (voice as unknown as { closed: boolean }).closed = false;
+    api.pollEvents.mockResolvedValueOnce({ events: [{ id: 'pending', source: 'openagents:pai',
+      metadata: { voice_delegation_id: 'mirror-turn', mirror_pending: true },
+      payload: { content: 'Preparing your picture.' } }], has_more: false })
+      .mockResolvedValueOnce({ events: [{ id: 'mirror', source: 'openagents:pai',
+        metadata: { voice_delegation_id: 'mirror-turn' }, payload: {
+          message_type: 'counselor_mirror', content: 'Your picture. My opinion. Is it accurate?',
+          mirror: { dimensions: [{ evidence: 'Private structured details' }] },
+        } }], has_more: false });
+    const result = (voice as unknown as { waitForCounselor(a: string, b: string, c: number): Promise<string> })
+      .waitForCounselor('student', 'mirror-turn', 0);
+    await vi.advanceTimersByTimeAsync(701);
+    expect(await result).toBe('Your picture. My opinion. Is it accurate?');
+    expect(api.pollEvents).toHaveBeenCalledTimes(2);
+  });
   it('keeps complete short sentences together for spoken replies', () => {
     const result = speechChunks('First, compare the courses. Then check the cost and funding.');
     expect(result).toEqual(['First, compare the courses. Then check the cost and funding.']);

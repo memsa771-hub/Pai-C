@@ -71,7 +71,7 @@ def _recent_dialogue(db: Session, workspace_id: str, target: str, owner_id: str)
     history = []
     for row in reversed(rows):
         payload = row.payload or {}
-        if payload.get("message_type", "chat") != "chat":
+        if payload.get("message_type", "chat") not in {"chat", "counselor_mirror"}:
             continue
         content = str(payload.get("content") or "").strip()
         if content and not content.startswith("[Error]") and not is_counselor_fallback(content):

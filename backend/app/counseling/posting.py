@@ -80,7 +80,7 @@ def _build_conversation_context(
 
             payload = row.payload or {}
             message_type = payload.get("message_type", "chat")
-            if message_type != "chat" and not (
+            if message_type not in {"chat", "counselor_mirror"} and not (
                 message_type == "operator_result" and row.source == f"openagents:{agent_name}"
             ):
                 continue
@@ -136,6 +136,7 @@ async def _post_response(
     attachments: Optional[list] = None,
     message_type: str = "chat",
     metadata: Optional[dict] = None,
+    extra_payload: Optional[dict] = None,
 ) -> Optional[str]:
     """Post the Counselor's response through the event pipeline.
 
@@ -165,6 +166,7 @@ async def _post_response(
         return None
 
     payload: dict = {
+        **(extra_payload or {}),
         "content": content,
         "message_type": message_type,
     }

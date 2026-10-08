@@ -88,12 +88,6 @@ export interface DecisionRecord {
   chosen_at: string;
 }
 
-export interface CounselorGoalSummary {
-  status: 'awaiting_confirmation' | 'confirmed' | null;
-  summary: Record<string, { value: unknown; status: string; student_words?: string }>;
-  version: number | null;
-}
-
 export interface CustomRoadmapGoal {
   title: string;
   country?: string;

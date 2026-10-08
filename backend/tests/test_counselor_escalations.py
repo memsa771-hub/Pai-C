@@ -14,7 +14,7 @@ def test_internal_escalation_preserves_history_and_queues_replan():
     with StudentSession() as student, student.factory() as db:
         service = JourneyService(db)
         journey = service.ensure_counselor(student.workspace_id)
-        for stage in ("FOUNDATION", "DIRECTION", "RESEARCHING", "ASSESSING", "PROPOSED", "CHOSEN"):
+        for stage in ("FOUNDATION", "DIRECTION", "MIRROR", "RESEARCHING", "ASSESSING", "PROPOSED", "CHOSEN"):
             journey = service.set_counselor_stage(student.workspace_id, journey.id, stage,
                                                   validated_choice=stage == "CHOSEN")
         db.commit()

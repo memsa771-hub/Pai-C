@@ -110,9 +110,13 @@ async def _run_deep_turn(db, workspace_id: str, event_data: dict, depth: int):
             and result.action.get("type") not in {"mirror", "wellbeing"}):
         logger.info("reply_without_question turn_id=%s", turn.source_event_id)
     post_started = time.monotonic()
+    reply_metadata = _voice_reply_metadata(event_data)
+    if (reply_metadata and result.action.get("type") == "mirror"
+            and result.context.notebook.mirror_ready):
+        reply_metadata["mirror_pending"] = True
     assistant_event_id = await _post_response(
         db, workspace_id, turn.channel, PAI_AGENT_NAME, result.reply, depth,
-        metadata=_voice_reply_metadata(event_data),
+        metadata=reply_metadata,
     )
     post_ms = int((time.monotonic() - post_started) * 1000)
     if not assistant_event_id:

@@ -41,7 +41,7 @@ def shared_history(db, turn: CounselorTurnInput, owner_id: str,
         text = payload.get("content")
         message_type = payload.get("message_type", "chat")
         if ((message_type != "chat" and not (
-                message_type == "operator_result" and row.source == "openagents:pai"))
+                message_type in {"operator_result", "counselor_mirror"} and row.source == "openagents:pai"))
                 or not isinstance(text, str)
                 or not text.strip() or text.startswith("[Error]")
                 or (row.source == "openagents:pai" and is_counselor_fallback(text))):

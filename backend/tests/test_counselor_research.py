@@ -235,7 +235,7 @@ def test_research_run_stage_hook_follows_server_transition_graph():
     with StudentSession() as student, student.factory() as db:
         journeys = JourneyService(db)
         journey = journeys.ensure_counselor(student.workspace_id)
-        for stage in ("FOUNDATION", "DIRECTION", "RESEARCHING"):
+        for stage in ("FOUNDATION", "DIRECTION", "MIRROR", "RESEARCHING"):
             journey = journeys.set_counselor_stage(student.workspace_id, journey.id, stage)
         run = ExecutionRun(workspace_id=student.workspace_id, requested_by="openagents:pai",
                            objective="Research", task_type="roadmap_research", status="verifying",
@@ -263,7 +263,7 @@ def test_failed_research_publishes_retryable_card_and_leaves_assessing():
     with StudentSession() as student, student.factory() as db:
         journeys = JourneyService(db)
         journey = journeys.ensure_counselor(student.workspace_id)
-        for stage in ("FOUNDATION", "DIRECTION", "RESEARCHING", "ASSESSING"):
+        for stage in ("FOUNDATION", "DIRECTION", "MIRROR", "RESEARCHING", "ASSESSING"):
             journey = journeys.set_counselor_stage(student.workspace_id, journey.id, stage)
         run = ExecutionRun(workspace_id=student.workspace_id,
                            requested_by="openagents:pai", objective="Research",

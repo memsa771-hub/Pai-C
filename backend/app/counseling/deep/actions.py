@@ -38,6 +38,10 @@ async def dispatch_action(db, turn: CounselorTurnInput, action: dict,
     if kind == "mirror":
         ready = bool(context.notebook.mirror_ready)
         logger.info("counselor: mirror requested ready=%s", ready)
+        if ready:
+            from app.counseling.deep.mirror import enqueue_mirror
+
+            enqueue_mirror(db, turn)
         _record(db, turn, kind, "requested" if ready else "ignored",
                 reason=None if ready else "not_ready")
         return kind, "requested" if ready else "ignored"

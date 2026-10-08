@@ -761,7 +761,7 @@ class StudentJourney(Base):
     __table_args__ = (
         CheckConstraint("status IN ('active', 'paused', 'completed', 'abandoned')", name="ck_student_journey_status"),
         CheckConstraint(
-            "current_stage IS NULL OR current_stage IN ('ORIENTING','UNDERSTANDING','ALIGNING','PLANNING','ACTING','REVIEWING','COMPLETED','IDENTITY','FOUNDATION','DIRECTION','RESEARCHING','ASSESSING','NEEDS_INFO','PROPOSED','CHOSEN')",
+            "current_stage IS NULL OR current_stage IN ('ORIENTING','UNDERSTANDING','ALIGNING','PLANNING','ACTING','REVIEWING','COMPLETED','IDENTITY','FOUNDATION','DIRECTION','MIRROR','RESEARCHING','ASSESSING','NEEDS_INFO','PROPOSED','CHOSEN')",
             name="ck_student_journey_stage",
         ),
         Index("idx_student_journeys_workspace", "workspace_id"),
@@ -2166,4 +2166,7 @@ class BackgroundJob(Base):
         Index("idx_background_jobs_claim", "status", "available_at", "priority"),
         Index("idx_background_jobs_workspace", "workspace_id"),
         UniqueConstraint("idempotency_key", name="uq_background_jobs_idempotency"),
+        Index("uq_counselor_mirror_pending", "workspace_id", unique=True,
+              postgresql_where=text("job_type = 'counselor.mirror' AND status IN ('pending', 'running')"),
+              sqlite_where=text("job_type = 'counselor.mirror' AND status IN ('pending', 'running')")),
     )
