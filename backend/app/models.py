@@ -130,6 +130,23 @@ class Workspace(Base):
     )
 
 
+class CounselorNotedQuestion(Base):
+    """A student fact question deferred until roadmap research."""
+
+    __tablename__ = "counselor_noted_questions"
+    id = Column(UUID(as_uuid=False), primary_key=True, default=_uuid)
+    workspace_id = Column(UUID(as_uuid=False), ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False)
+    question_to_research = Column(Text, nullable=False)
+    source_event_id = Column(Text, ForeignKey("events.id", ondelete="CASCADE"), nullable=False)
+    status = Column(Text, nullable=False, default="open", server_default=text("'open'"))
+    created_at = Column(DateTime(timezone=True), nullable=False, default=_now)
+    __table_args__ = (
+        UniqueConstraint("workspace_id", "source_event_id", name="uq_counselor_noted_question_event"),
+        CheckConstraint("length(trim(question_to_research)) > 0", name="ck_counselor_noted_question_text"),
+        Index("idx_counselor_noted_question_status", "workspace_id", "status"),
+    )
+
+
 class CounselorNotebook(Base):
     """Private Counselor working notes for one student workspace."""
 

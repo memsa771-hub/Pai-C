@@ -16,7 +16,7 @@ from app.counseling.deep.notebook import (
 )
 from app.counseling.deep.notebook_sanitize import sanitize_notebook
 from app.counseling.deep.sensitive import filter_sensitive_changes, model_sensitive_checker
-from app.models import CounselorNotebook, CounselorNotebookHistory, EventRecord, User, Workspace
+from app.models import CounselorNotebook, CounselorNotebookHistory, CounselorNotedQuestion, EventRecord, User, Workspace
 from app.routers.workspaces import delete_workspace
 
 
@@ -40,7 +40,7 @@ def notebook_db():
 
     Base.metadata.create_all(engine, tables=[
         User.__table__, Workspace.__table__, EventRecord.__table__,
-        CounselorNotebook.__table__, CounselorNotebookHistory.__table__,
+        CounselorNotebook.__table__, CounselorNotebookHistory.__table__, CounselorNotedQuestion.__table__,
     ])
     with Session(engine) as db:
         first, second = str(uuid4()), str(uuid4())

@@ -17,7 +17,7 @@ from app.counseling.deep.analysis import (
 from app.counseling.deep.coverage import enforce_mirror_readiness
 from app.counseling.deep.notebook import NotebookService, NotebookVersionConflict
 from app.counseling.deep.notebook_schema import CounselorNotebookData
-from app.counseling.deep.sensitive import filter_sensitive_changes, model_sensitive_checker
+from app.counseling.deep.sensitive import filter_sensitive_changes, model_sensitive_checker, check_notebook_before_mirror
 from app.counseling.deep.usage import usage_callback
 from app.counseling.stages import advance_discovery_stage
 from app.jobs.service import BackgroundJobService
@@ -59,8 +59,7 @@ async def test_analysis_is_idempotent_and_workspace_scoped():
         assert enqueue_turn_analysis(db, student.workspace_id, event_id,
                                      job.payload["assistant_event_id"]) == job.id
         model = AsyncMock(return_value=_model_notebook(person={"daily_life": "Studies at home"}))
-        with patch("app.counseling.deep.analysis.chat_completion", model), \
-                patch("app.counseling.deep.analysis.filter_sensitive_changes", _no_sensitive):
+        with patch("app.counseling.deep.analysis.chat_completion", model):
             first = await analyze_job(job, db)
             again = await analyze_job(job, db)
         assert first["version"] == 1
@@ -108,8 +107,7 @@ async def test_analysis_waits_for_earlier_workspace_turn():
         first_job, _ = _turn_job(student, db, "First private event")
         second_job, _ = _turn_job(student, db, "Second private event")
         model = AsyncMock(return_value=_model_notebook(person={"daily_life": "Known"}))
-        with patch("app.counseling.deep.analysis.chat_completion", model), \
-                patch("app.counseling.deep.analysis.filter_sensitive_changes", _no_sensitive):
+        with patch("app.counseling.deep.analysis.chat_completion", model):
             with pytest.raises(AnalysisOrderPending):
                 await analyze_job(second_job, db)
             assert model.await_count == 0
@@ -134,8 +132,7 @@ async def test_second_workspace_analysis_retries_immediately_while_first_is_runn
             await release.wait()
             return _model_notebook()
 
-        with patch("app.counseling.deep.analysis.chat_completion", side_effect=paused_model), \
-                patch("app.counseling.deep.analysis.filter_sensitive_changes", _no_sensitive):
+        with patch("app.counseling.deep.analysis.chat_completion", side_effect=paused_model):
             first = asyncio.create_task(analyze_job(first_job, db))
             await asyncio.wait_for(entered.wait(), 1)
             try:
@@ -180,6 +177,8 @@ async def test_no_read_transaction_during_analyst_or_sensitive_model_call():
         with patch("app.counseling.deep.analysis.chat_completion", side_effect=analyst_response), \
                 patch("app.counseling.deep.sensitive.chat_completion", side_effect=sensitive_response):
             await analyze_job(job, db)
+            assert sensitive_open == []
+            await check_notebook_before_mirror(student.workspace_id, db=db)
         assert analyst_open == [False]
         assert sensitive_open == [False]
 
@@ -200,7 +199,6 @@ async def test_version_conflict_refetches_and_reruns_once():
             return real_apply(service, *args, **kwargs)
 
         with patch("app.counseling.deep.analysis.chat_completion", model), \
-                patch("app.counseling.deep.analysis.filter_sensitive_changes", _no_sensitive), \
                 patch.object(NotebookService, "apply", conflicting_apply):
             result = await analyze_job(job, db)
         assert result["model_calls"] == 2
@@ -225,7 +223,6 @@ async def test_retry_finishes_stage_after_notebook_was_saved():
             return _advance_stage(*args)
 
         with patch("app.counseling.deep.analysis.chat_completion", model), \
-                patch("app.counseling.deep.analysis.filter_sensitive_changes", _no_sensitive), \
                 patch("app.counseling.deep.analysis._advance_stage", fail_stage_once):
             with pytest.raises(RuntimeError, match="stage temporarily unavailable"):
                 await analyze_job(job, db)
@@ -243,8 +240,7 @@ async def test_analyst_coverage_advances_foundation_without_starting_research():
         job, _ = _turn_job(student, db)
         model = AsyncMock(return_value=_model_notebook(
             coverage={"person": True, "education": True}, mirror_ready=True))
-        with patch("app.counseling.deep.analysis.chat_completion", model), \
-                patch("app.counseling.deep.analysis.filter_sensitive_changes", _no_sensitive):
+        with patch("app.counseling.deep.analysis.chat_completion", model):
             await analyze_job(job, db)
         notebook = NotebookService(db).get(student.workspace_id).notebook
         journey = JourneyService(db).ensure_counselor(student.workspace_id)
@@ -263,7 +259,7 @@ def test_failed_analysis_job_uses_existing_backoff():
 
 
 @pytest.mark.asyncio
-async def test_sensitive_changed_entry_is_dropped_before_storage(caplog):
+async def test_sensitive_content_is_dropped_before_mirror(caplog):
     with StudentSession() as student, student.factory() as db:
         job, _ = _turn_job(student, db)
         raw = _model_notebook(claims=[{
@@ -274,20 +270,22 @@ async def test_sensitive_changed_entry_is_dropped_before_storage(caplog):
             "evidence": "student described the work", "probed": True,
         }])
 
-        async def filter_with_fake(previous, candidate):
-            async def checker(entries):
-                return {entry["path"] for entry in entries
-                        if "private flagged text" in entry["text"]}
-            return await filter_sensitive_changes(previous, candidate, checker=checker)
+        async def checker(entries):
+            return {entry["path"] for entry in entries
+                    if "private flagged text" in entry["text"]}
 
         with patch("app.counseling.deep.analysis.chat_completion", new=AsyncMock(return_value=raw)), \
-                patch("app.counseling.deep.analysis.filter_sensitive_changes", filter_with_fake), \
                 caplog.at_level("INFO", logger="app.counseling.deep.sensitive"):
             result = await analyze_job(job, db)
-        assert result["sensitive_removed"] == 1
-        assert [claim.id for claim in NotebookService(db).get(student.workspace_id).notebook.claims] == ["b"]
+            assert result["sensitive_removed"] == 0
+            assert len(NotebookService(db).get(student.workspace_id).notebook.claims) == 2
+            snapshot, removals = await check_notebook_before_mirror(
+                student.workspace_id, db=db, checker=checker)
+        assert len(removals) == 1
+        assert [claim.id for claim in snapshot.notebook.claims] == ["b"]
         assert "claims[0]" in caplog.text
         assert "private flagged text" not in caplog.text
+
 
 
 @pytest.mark.asyncio
@@ -305,7 +303,7 @@ async def test_sensitive_check_uses_configured_model():
 
 
 @pytest.mark.asyncio
-async def test_one_batched_sensitive_model_call_per_analysis():
+async def test_no_sensitive_call_per_analysis_and_one_batch_before_mirror():
     with StudentSession() as student, student.factory() as db:
         job, _ = _turn_job(student, db)
         raw = _model_notebook(person={"daily_life": "daily activity"}, claims=[{
@@ -329,9 +327,12 @@ async def test_one_batched_sensitive_model_call_per_analysis():
         with patch("app.counseling.deep.analysis.chat_completion", analyst), \
                 patch("app.counseling.deep.sensitive.chat_completion", sensitive):
             result = await analyze_job(job, db)
+            assert sensitive.await_count == 0
+            _, removals = await check_notebook_before_mirror(student.workspace_id, db=db)
         assert analyst.await_count == 1
         assert sensitive.await_count == 1
-        assert result["sensitive_removed"] == 1
+        assert result["sensitive_removed"] == 0
+        assert len(removals) == 1
         assert [claim.id for claim in NotebookService(db).get(student.workspace_id).notebook.claims] == ["b"]
 
 

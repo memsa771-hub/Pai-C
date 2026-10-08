@@ -16,7 +16,7 @@ from app.journey import JourneyService
 from app.memory.episodic import EpisodicMemoryService
 from app.memory.foreground import build_foreground_context
 from app.memory.student_snapshot import StudentSnapshotService
-from app.models import ExecutionRun, Roadmap, StudentRequest, User, Workspace
+from app.models import Roadmap, User, Workspace
 from app.plugins._shared.sources import public_https
 
 logger = logging.getLogger(__name__)
@@ -96,65 +96,17 @@ def _profile(db, workspace_id: str) -> dict:
                                     for issue in snapshot.issues[:5]]}
 
 
-def _cited_facts(value: object, *, limit: int = 8) -> list[dict]:
-    found: list[dict] = []
-
-    def visit(item: object) -> None:
-        if len(found) >= limit:
-            return
-        if isinstance(item, dict):
-            url = item.get("source_url") or item.get("url")
-            quote = item.get("quote") or item.get("text")
-            checked = item.get("checked_at")
-            if public_https(url) and isinstance(quote, str) and checked:
-                found.append({"text": quote[:500], "source_url": url,
-                              "checked_at": str(checked),
-                              "label": "verified" if item.get("status") == "verified" else "unconfirmed"})
-                return
-            for child in item.values():
-                visit(child)
-        elif isinstance(item, list):
-            for child in item:
-                visit(child)
-
-    visit(value)
-    return found
-
-
-def _research(db, workspace_id: str, journey) -> dict:
-    if journey is None:
-        return {"facts": [], "roadmaps": [], "open_requests": []}
-    runs = db.execute(select(ExecutionRun).where(
-        ExecutionRun.workspace_id == workspace_id,
-        ExecutionRun.task_type == "question_research",
-    ).order_by(ExecutionRun.created_at.desc()).limit(15)).scalars().all()
-    relevant = [run for run in runs if (run.constraints or {}).get("journey_id") == journey.id]
-    facts = [fact for run in relevant[:3] if run.status == "completed"
-             for fact in _cited_facts(run.result)]
-    active_run_ids = {run.id for run in relevant}
-    requests = db.execute(select(StudentRequest).where(
-        StudentRequest.workspace_id == workspace_id, StudentRequest.status == "open",
-        StudentRequest.execution_run_id.in_(active_run_ids),
-    ).limit(5)).scalars().all() if active_run_ids else []
-    confirmed = journey.current_stage in {"PROPOSED", "CHOSEN"} or (
-        journey.current_stage == "RESEARCHING" and
-        (journey.counselor_summary_draft or {}).get("status") == "confirmed"
-    )
-    roadmaps = []
-    if confirmed:
-        rows = db.execute(select(Roadmap).where(
-            Roadmap.workspace_id == workspace_id, Roadmap.journey_id == journey.id,
-        ).order_by(Roadmap.created_at.desc()).limit(5)).scalars().all()
-        roadmaps = [{"id": row.id, "title": row.title,
-                     "status": row.generation_status,
-                     "sources": [item for item in (row.sources or [])[:5]
-                                 if public_https(item.get("url") if isinstance(item, dict) else None)]}
-                    for row in rows]
-    return {"facts": facts[:8], "research_status": [
-        {"status": run.status, "question": run.objective[:250]} for run in relevant[:3]],
-        "roadmaps": roadmaps,
-        "open_requests": [{"item_key": row.item_key, "reason": row.reason[:250]}
-                          for row in requests]}
+def _research(db, workspace_id: str, journey) -> dict | None:
+    if journey is None or (journey.counselor_summary_draft or {}).get("status") != "confirmed":
+        return None
+    rows = db.execute(select(Roadmap).where(
+        Roadmap.workspace_id == workspace_id, Roadmap.journey_id == journey.id,
+    ).order_by(Roadmap.created_at.desc()).limit(5)).scalars().all()
+    return {"roadmaps": [{"id": row.id, "title": row.title,
+                          "status": row.generation_status,
+                          "sources": [item for item in (row.sources or [])[:5]
+                                      if public_https(item.get("url") if isinstance(item, dict) else None)]}
+                         for row in rows]}
 
 
 @dataclass(frozen=True)
@@ -196,7 +148,9 @@ async def build_context(db, workspace_id: str, turn: CounselorTurnInput) -> Deep
         "latest_episode_summary": recent[0].summary[:500] if recent else None,
         "open_threads": [item.question_intent for item in notebook.open_questions[:3]],
     })
-    sections["research"] = _json(_research(db, workspace_id, journey))
+    research = _research(db, workspace_id, journey)
+    if research is not None:
+        sections["research"] = _json(research)
     sections["journey"] = _json({"stage": journey.current_stage if journey else "IDENTITY"})
     text = "<context>\n" + "\n".join(
         f"<{name}>{value}</{name}>" for name, value in sections.items()

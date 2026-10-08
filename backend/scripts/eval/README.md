@@ -11,3 +11,5 @@ The JSON report retains the full per-call usage, transcript, Notebook, and grade
 Simulator and grader inputs use the `<persona>`, `<transcript>`, `<notebook>` and `<inject>` sections expected by the supplied prompts. Recorded outputs are excluded from the persona sent to a model. Every persona has six hidden truths, with a category and a specific-question reveal condition. Reports retain per-truth capture decisions, claim counts, all quality counts and their quoted evidence.
 
 Price entries marked `verify_before_live` are placeholders, including any zero rates. Live preflight and the call wrapper reject these entries until their rates have been verified and the flag removed. Offline replay remains available without verifying prices.
+
+Lean mode records `note_question` actions, including compatible old question actions, through the real dispatcher without starting research. The `note_question` metric counts these actions. A normal replay now accounts for Counselor, Analyst and memory extraction calls; sensitivity calls are deferred to the separate pre-mirror check. Existing fake sensitivity recording support remains available for that later evaluation boundary.

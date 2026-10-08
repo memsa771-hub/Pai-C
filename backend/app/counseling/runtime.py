@@ -277,8 +277,9 @@ async def _run_legacy_turn(db, workspace_id: str, event_data: dict, depth: int):
         if workspace is not None:
             from app.services.pai import PAI_ALLOWED_TOOLS
             allowed = set(PAI_ALLOWED_TOOLS)
-            if turn_plan.policy and not turn_plan.policy.operator_allowed:
-                allowed.discard("operator.delegate")
+            # Research delegation is server-owned through research_gateway,
+            # never a model-selected tool in the legacy Counselor surface.
+            allowed.discard("operator.delegate")
             tool_context = ToolContext(
                 workspace_id=workspace_id, agent_name=PAI_AGENT_NAME,
                 api=WorkspaceApi(workspace_id, workspace.password_hash),

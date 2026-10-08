@@ -118,67 +118,6 @@ async def test_mirror_request_ignored_until_notebook_ready():
 
 
 @pytest.mark.asyncio
-async def test_research_action_is_limited_to_five_per_workspace_day():
-    with StudentSession() as student, student.factory() as db:
-        context = DeepContext("", {}, CounselorNotebookData(), None, 0)
-        executor = AsyncMock()
-        executor.execute.return_value = {"ok": True, "data": {"run_id": "run"}}
-        with patch("app.tools.get_tool_executor", return_value=executor), \
-                patch.object(config, "PAI_COUNSELOR_RESEARCH_DAILY_LIMIT", 5):
-            statuses = []
-            for index in range(6):
-                _, status = await dispatch_action(
-                    db, _turn(student), {"type": "ask_research", "question": f"What is fee {index}?"}, context,
-                )
-                statuses.append(status)
-        assert statuses == ["accepted"] * 5 + ["rate_limited"]
-        assert executor.execute.await_count == 5
-
-
-@pytest.mark.asyncio
-async def test_research_reservation_commits_before_operator_uses_another_session():
-    with StudentSession() as student, student.factory() as db:
-        context = DeepContext("", {}, CounselorNotebookData(), None, 0)
-
-        async def delegate(*args):
-            with student.factory() as separate_db:
-                statuses = separate_db.scalars(select(EventRecord).where(
-                    EventRecord.type == "counselor.action.ask_research",
-                )).all()
-                assert [row.payload["status"] for row in statuses] == ["pending"]
-            return {"ok": True, "data": {"run_id": "run"}}
-
-        executor = AsyncMock()
-        executor.execute.side_effect = delegate
-        with patch("app.tools.get_tool_executor", return_value=executor):
-            _, status = await dispatch_action(
-                db, _turn(student), {"type": "ask_research", "question": "What is the fee?"},
-                context,
-            )
-        assert status == "accepted"
-        event = db.scalar(select(EventRecord).where(
-            EventRecord.type == "counselor.action.ask_research",
-        ))
-        assert event.payload == {"status": "accepted", "run_id": "run"}
-
-
-@pytest.mark.asyncio
-async def test_research_question_prefers_new_key_and_accepts_old_key():
-    with StudentSession() as student, student.factory() as db:
-        context = DeepContext("", {}, CounselorNotebookData(), None, 0)
-        with patch("app.counseling.deep.actions._research", new=AsyncMock(return_value="accepted")) as research:
-            turn = _turn(student)
-            for action, expected in (
-                ({"type": "ask_research", "research_question": "New request?", "question": "Old request?"}, "New request?"),
-                ({"type": "ask_research", "question": "Old request?"}, "Old request?"),
-            ):
-                assert await dispatch_action(db, turn, action, context) == ("ask_research", "accepted")
-                assert research.call_args.args[3] == expected
-            assert await dispatch_action(db, turn, {"type": "none", "research_question": "Ignore me?"}, context) == ("none", "none")
-            assert research.await_count == 2
-
-
-@pytest.mark.asyncio
 async def test_identity_marked_never_ask_and_other_workspace_excluded():
     with StudentSession() as student, student.factory() as db:
         db.get(User, student.user_id).display_name = "Danish"
@@ -191,7 +130,7 @@ async def test_identity_marked_never_ask_and_other_workspace_excluded():
         assert '"identity_never_ask"' in context.text
         assert "Danish" in context.text
         assert "Private Other" not in context.text
-        assert set(context.section_tokens) == {"today", "language_policy", "profile", "notebook", "memory", "research", "journey"}
+        assert set(context.section_tokens) == {"today", "language_policy", "profile", "notebook", "memory", "journey"}
 
 
 @pytest.mark.asyncio
