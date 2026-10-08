@@ -63,7 +63,8 @@ def _parse_response(raw: str) -> tuple[str, dict]:
 
 async def run_deep_turn(db, turn: CounselorTurnInput, *,
                         roadmap_id: str | None = None,
-                        history: list[dict] | None = None) -> DeepTurnResult:
+                        history: list[dict] | None = None,
+                        instructions: str | None = None) -> DeepTurnResult:
     context = await build_context(db, turn.workspace_id, turn, roadmap_id=roadmap_id)
     owner_id = turn.source.removeprefix("human:") if turn.source.startswith("human:") else ""
     if history is None:
@@ -75,6 +76,8 @@ async def run_deep_turn(db, turn: CounselorTurnInput, *,
     # Read transactions must not remain open over the network call.
     db.rollback()
     prompt = load_prompt("counselor") + "\n\n" + context.text
+    if instructions:
+        prompt += "\n\n" + load_prompt(instructions)
     started = time.monotonic()
     raw = await chat_completion(
         api_key=config.PAI_API_KEY, model=config.PAI_COUNSELOR_MODEL,

@@ -14,7 +14,7 @@ from app.documents.retrieval import (
 )
 from app.documents.service import DocumentArtifactService
 from app.models import DocumentArtifact
-from app.services.pai import allowed_tools_for_mode
+from app.services.pai import PAI_ALLOWED_TOOLS
 from tests.documents.conftest import make_file
 from tests.documents.fixtures import TRANSCRIPT_PAGES, make_pdf
 from tests.documents.test_parse_job import _StubStore, _run
@@ -164,20 +164,12 @@ class TestPurgeLifecycle:
         assert result["parsed"] is True
 
 
-class TestCollectionModeGate:
-    def test_legacy_collection_mode_keeps_known_context_available(self):
-        # The confirmation gate controls recommendations; the Counselor still
-        # needs an uploaded CV or transcript during discovery.
-        assert "files.read" in allowed_tools_for_mode("collection")
-
-    def test_files_read_is_available_in_normal_mode(self):
-        assert "files.read" in allowed_tools_for_mode("normal")
-
-    def test_legacy_mode_does_not_hide_canonical_context(self):
-        collection = allowed_tools_for_mode("collection")
+class TestCounselorToolBoundary:
+    def test_counselor_tools_keep_known_context_available(self):
+        assert "files.read" in PAI_ALLOWED_TOOLS
         for tool in ("memory.context", "vault.get", "memory.search", "memory.episodes"):
-            assert tool in collection
-        assert "profile.answer" not in collection
+            assert tool in PAI_ALLOWED_TOOLS
+        assert "profile.answer" not in PAI_ALLOWED_TOOLS
 
     def test_ingestion_is_infrastructure_not_a_counselor_tool(self):
         """Automatic ingestion remains infrastructure, not a Counselor tool.
@@ -189,7 +181,7 @@ class TestCollectionModeGate:
             JOB_DOCUMENT_EXTRACT, JOB_DOCUMENT_INDEX, JOB_DOCUMENT_PARSE,
         )
 
-        collection = allowed_tools_for_mode("collection")
+        collection = frozenset(PAI_ALLOWED_TOOLS)
         for job_type in (JOB_DOCUMENT_PARSE, JOB_DOCUMENT_EXTRACT, JOB_DOCUMENT_INDEX):
             assert job_type not in collection
 

@@ -44,7 +44,7 @@ def register_builtin_tools(registry):
         # instead of calling these; see operator.delegate below.
         # workspace.agents.list/workspace.thread.create are here too, even
         # though they're reads/lightweight — PAI does not let the student
-        # manage agents or spin up threads directly (see PAI_SYSTEM_PROMPT in
+        # manage agents or spin up threads directly (see PAI_ALLOWED_TOOLS in
         # app/services/pai.py), so Counselor has no business calling either. ----
         ToolDefinition("workspace.agents.list", "List agents in this workspace and their status.", EMPTY, "workspace", ToolRisk.READ, workspace.list_agents, audiences=OPERATOR_ONLY),
         ToolDefinition("workspace.thread.create", "Create a workspace conversation.", obj({"title": {"type": "string"}, "agents": {"type": "array", "items": {"type": "string"}}}, ["title"]), "workspace", ToolRisk.WRITE, workspace.create_thread, audiences=OPERATOR_ONLY),
