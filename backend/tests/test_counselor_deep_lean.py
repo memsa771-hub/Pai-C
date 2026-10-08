@@ -104,21 +104,17 @@ async def test_deep_context_has_only_roadmaps_after_mirror_confirmation():
 
 
 @pytest.mark.asyncio
-async def test_research_gateway_enforces_deep_confirmation_and_keeps_legacy():
+async def test_research_gateway_always_enforces_confirmation():
     with StudentSession() as student, student.factory() as db:
         journey = research_journey(student, db)
         ctx = SimpleNamespace(workspace_id=student.workspace_id)
         kwargs = dict(db=db, journey=journey, goals=[], understanding={}, tool_context=ctx)
         with patch("app.counseling.research_gateway._delegate_existing_research",
                    new=AsyncMock(return_value={"ok": True})) as delegate:
-            with patch.object(config, "PAI_COUNSELOR_MODE", "deep"):
-                assert await request_research("roadmap_light", student.workspace_id, **kwargs) is None
-                delegate.assert_not_awaited()
-                kwargs["journey"] = research_journey(student, db, confirmed=True)
-                assert await request_research("roadmap_light", student.workspace_id, **kwargs) == {"ok": True}
-            kwargs["journey"] = research_journey(student, db)
-            with patch.object(config, "PAI_COUNSELOR_MODE", "legacy"):
-                assert await request_research("roadmap_light", student.workspace_id, **kwargs) == {"ok": True}
+            assert await request_research("roadmap_light", student.workspace_id, **kwargs) is None
+            delegate.assert_not_awaited()
+            kwargs["journey"] = research_journey(student, db, confirmed=True)
+            assert await request_research("roadmap_light", student.workspace_id, **kwargs) == {"ok": True}
             kwargs["tool_context"] = SimpleNamespace(workspace_id="another-workspace")
             assert await request_research("roadmap_light", student.workspace_id, **kwargs) is None
             with pytest.raises(ValueError, match="unknown"):
@@ -152,8 +148,7 @@ async def test_gateway_reuses_existing_operator_payload_and_deduplicates_runs():
         executor = SimpleNamespace(execute=AsyncMock(return_value={"ok": True}))
         goals = [{"id": "goal", "title": "Student route", "details": {
             "underlying_objective": "An education goal", "constraints": []}}]
-        with patch.object(config, "PAI_COUNSELOR_MODE", "deep"), \
-                patch("app.tools.get_tool_executor", return_value=executor):
+        with patch("app.tools.get_tool_executor", return_value=executor):
             assert await request_research("roadmap_light", student.workspace_id,
                 db=db, journey=journey, goals=goals, understanding={}, tool_context=ctx) == {"ok": True}
             name, payload, used_ctx = executor.execute.call_args.args
@@ -247,8 +242,7 @@ async def test_per_turn_extraction_fallback_does_not_skip_intervening_messages()
 
     with StudentSession() as student, student.factory() as db:
         sources = []
-        with patch.object(config, "PAI_COUNSELOR_MODE", "deep"), \
-                patch.object(config, "PAI_API_KEY", "fake"), \
+        with patch.object(config, "PAI_API_KEY", "fake"), \
                 patch("app.counseling.deep.turn.chat_completion", new=AsyncMock(
                     return_value='{"reply":"What happened next?","action":{"type":"none"}}')):
             for _ in range(6):
@@ -263,29 +257,3 @@ async def test_per_turn_extraction_fallback_does_not_skip_intervening_messages()
             BackgroundJob.job_type == "memory.extract")).all()
         assert {job.payload["user_event_id"] for job in jobs} == set(sources)
         assert len(jobs) == 6
-
-
-@pytest.mark.asyncio
-async def test_legacy_model_tools_cannot_bypass_research_gateway():
-    from app.counseling import runtime
-    from app.counseling.policy import PolicyDecision
-
-    with StudentSession() as student, student.factory() as db:
-        turn = source_turn(student, db)
-        response = AsyncMock(return_value="What matters most to you?")
-        with patch.object(config, "PAI_API_KEY", "fake"), \
-                patch.object(config, "PAI_MEMORY_CONTEXT_ENABLED", False), \
-                patch("app.memory.profile_completion.ProfileCompletionService.evaluate", return_value={
-                    "enforced": False, "foundationReady": True, "counselorMode": "open"}), \
-                patch("app.counseling.turn_semantics.classify_turn", new=AsyncMock(return_value={})), \
-                patch("app.counseling.policy.CounselingPolicy.decide", return_value=PolicyDecision(
-                    "COUNSEL", None, True, True, True, 1)), \
-                patch("app.counseling.core.CounselorCore.respond", response), \
-                patch("app.counseling.reply_guard.guard_reply", new=AsyncMock(
-                    return_value="What matters most to you?")):
-            await runtime._run_legacy_turn(db, student.workspace_id, {
-                "id": turn.source_event_id, "source": turn.source, "target": turn.channel,
-                "payload": {"content": turn.student_text}, "timestamp": turn.timestamp}, 0)
-        tool_context = response.call_args.kwargs["tool_context"]
-        assert tool_context is not None
-        assert "operator.delegate" not in tool_context.allowed_tools

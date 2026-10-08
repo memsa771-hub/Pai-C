@@ -2,7 +2,7 @@
 
 Repo: `memsa771-hub/Pai-C`. Base: `feature/counselor-complete`. Work branch: `feature/counselor-deep`. One PR per step into `feature/counselor-complete`. Never push to `dev` or `main`.
 
-This task **replaces** `codex_prompt_counselor_simple.md`. If any simple-mode PRs are already merged, keep their mode flag, memory hook fix and context builder, and extend them.
+This task **replaces** `codex_prompt_counselor_simple.md`. The successful-post memory hook and context builder remain; consolidation removes the temporary mode switch.
 
 ## Scope of THIS build: up to roadmaps only (read first)
 
@@ -65,7 +65,7 @@ Models are configurable:
 
 | Setting | Use | Recommended |
 | --- | --- | --- |
-| `PAI_COUNSELOR_MODEL` | Counselor | Strongest conversational model available, reasoning low for speed |
+| Consolidation | Deep is the sole Counselor path; successful human posts queue extraction and analysis. |
 | `PAI_ANALYST_MODEL` | Analyst | Strong, reasoning medium |
 | `PAI_MIRROR_MODEL` | Mirror | Strongest, reasoning high |
 | `PAI_ROADMAP_MODEL` | Roadmap builder | Strong |
@@ -74,11 +74,11 @@ All model calls go through `app/inference/client.py` so the provider can be swap
 
 ## Steps
 
-### Step 1: Mode flag, memory hook, prompt files
+### Step 1: Memory hook and prompt files (mode switch retired)
 
-- `PAI_COUNSELOR_MODE = deep | simple | v2 | legacy`. Default `deep` locally; add it to both compose files.
-- `runtime._run_turn` dispatches on the mode. v2 and legacy stay untouched behind the flag.
-- Fix: after a successful post, call `enqueue_turn_extraction` in every mode (v2 currently returns before it).
+Deep is the sole Counselor path after consolidation; no mode flag or legacy fallback is available.
+- `runtime._run_turn` always uses deep after consolidation.
+- After each successful human post, queue `enqueue_turn_extraction` and Analyst work.
 - `backend/app/counseling/deep/prompts/{counselor,analyst,mirror,roadmap_builder}.md`, copied verbatim from `docs/counselor/COUNSELOR_V3_PROMPTS.md`. A loader caches them. Prompt text never lives in Python strings.
 - Tests:
   - Dispatch picks the right path.
@@ -119,7 +119,7 @@ All model calls go through `app/inference/client.py` so the provider can be swap
   - Memory from `build_foreground_context` + the last episodic summary + open threads.
   - Research only when the journey is past mirror confirmation.
 - `deep/turn.py`: `run_deep_turn(db, turn)`.
-  - One `chat_completion` with `response_format=json_object`, `PAI_COUNSELOR_MODEL`, the last 20 shared-history messages and the current message.
+Deep is the sole Counselor path after consolidation; no mode flag or legacy fallback is available.
   - Parse the JSON. If it is invalid, use the raw text as the reply with no action. Never show JSON to the student.
 - Deterministic polish (reuse `guard_v2.deterministic_violations` helpers):
   - Praise openers are handled by the prompt and measured by evaluation, with no vocabulary list in code.
@@ -370,7 +370,7 @@ All model calls go through `app/inference/client.py` so the provider can be swap
 
 ### Step 11: Local manual test (re-run after steps 5, 6, 9 and 10)
 
-Update `docs/COUNSELOR_LOCAL_TEST.md` (`PAI_COUNSELOR_MODE=deep`). Play Danish yourself from `DEEP_COUNSELING_DANISH.md` and check:
+Deep is the sole Counselor path after consolidation; no mode flag or legacy fallback is available.
 
 1. The goal is noted, not answered.
 2. "Python seekha hai" gets a depth question.

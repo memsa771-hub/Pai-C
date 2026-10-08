@@ -29,7 +29,7 @@ Roadmaps are sourced research artifacts for the Counselor Journey. They are sepa
 | Variable | Purpose |
 | --- | --- |
 | `PAI_ENABLED`, `PAI_API_KEY`, `PAI_MODEL`, `PAI_BASE_URL` | Server-only Counselor and Operator inference. Never expose the key to the browser. |
-| `PAI_COUNSELOR_MODE` | `deep` (default) or `legacy`. During PR 1, deep uses the retained Core conversation path until the one-call deep turn is implemented in PR 3. |
+| Consolidation | Deep is the sole Counselor path; successful human posts queue extraction and analysis. |
 | `WEB_SEARCH_PROVIDER`, `WEB_SEARCH_API_KEY`, `WEB_SEARCH_BASE_URL` | Search provider. An unset provider yields a visible research failure; no result is fabricated. |
 | `WEB_SEARCH_MAX_RETRIES`, `WEB_SEARCH_CACHE_TTL_SECONDS` | Transient search retry count and cache lifetime. |
 | `PAI_RESEARCH_MAX_QUERIES`, `PAI_RESEARCH_MAX_FETCHES`, `PAI_RESEARCH_MAX_SECONDS` | Per-run search, fetch and time bounds. |

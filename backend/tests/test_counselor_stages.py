@@ -106,4 +106,4 @@ def test_multiturn_goal_details_reconcile_to_one_student_reported_goal():
         moved = advance_discovery_stage(
             service, student.workspace_id, journey, identity_ready=True,
             foundation_ready=True, goal_records=snapshot.records["goal"])
-        assert moved.current_stage == RESEARCHING
+        assert moved.current_stage == DIRECTION

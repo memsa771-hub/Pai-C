@@ -238,9 +238,9 @@ def test_roadmap_api_is_workspace_scoped_and_choice_requires_presentation():
             response = client.get("/v1/roadmaps", params=params, headers=headers)
             assert response.status_code == 200
             assert response.json()["data"]["roadmaps"][0]["id"] == card.id
-            with patch("app.counseling.core.CounselorModelProvider.respond",
-                       AsyncMock(return_value="Which part of this route matters most to you?")), \
-                    patch("app.counseling.runtime._post_response", AsyncMock(return_value="event-1")) as posted:
+            with patch("app.counseling.deep.turn.chat_completion",
+                       AsyncMock(return_value='{"reply":"Which part of this route matters most to you?","action":{"type":"none"}}')), \
+                    patch("app.counseling.posting._post_response", AsyncMock(return_value="event-1")) as posted:
                 focused = client.post(url + "/focus", params=params, headers=headers)
                 assert focused.status_code == 200
                 assert posted.await_args.args[2] == "channel/pai-counselor"

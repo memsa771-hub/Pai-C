@@ -1,0 +1,70 @@
+﻿legacy-counselor-final:backend/app/counseling/__init__.py:1:from .evaluator import CounselingEvaluator
+legacy-counselor-final:backend/app/counseling/core.py:11:from .turn_contract import needs_response_repair, parse_turn, repair_student_response
+legacy-counselor-final:backend/app/counseling/evaluator.py:25:        from .continuous_discovery import evaluate_continuous_discovery
+legacy-counselor-final:backend/app/counseling/evaluator.py:55:            from .decision_sufficiency import DecisionSufficiencyEvaluator, validated_decision_intent
+legacy-counselor-final:backend/app/counseling/evaluator.py:56:            from .continuous_discovery import evaluate_continuous_discovery
+legacy-counselor-final:backend/app/counseling/goal_transition.py:112:    from .turn_semantics import classify_turn
+legacy-counselor-final:backend/app/counseling/reply_guard.py:10:from .turn_contract import parse_turn
+legacy-counselor-final:backend/app/counseling/runtime.py:170:    from .core import CounselorCore, CounselorModelProvider
+legacy-counselor-final:backend/app/counseling/runtime.py:172:    from .turn_plan import TurnPlan
+legacy-counselor-final:backend/app/counseling/runtime.py:239:        from .evaluator import CounselingEvaluator
+legacy-counselor-final:backend/app/counseling/runtime.py:241:        from .turn_semantics import classify_turn
+legacy-counselor-final:backend/app/counseling/runtime.py:345:    from .reply_guard import guard_reply
+legacy-counselor-final:backend/app/counseling/runtime.py:458:                from app.counseling.turn_contract import is_counselor_fallback
+legacy-counselor-final:backend/app/counseling/turn_semantics.py:9:from .decision_sufficiency import validated_decision_intent
+legacy-counselor-final:backend/app/routers/counselor_voice.py:22:from app.counseling.turn_contract import is_counselor_fallback
+legacy-counselor-final:backend/app/routers/roadmaps.py:138:        from app.counseling.core import CounselorModelProvider
+legacy-counselor-final:backend/app/routers/roadmaps.py:151:            from app.counseling.reply_guard import guard_reply
+legacy-counselor-final:backend/app/services/counselor_handoff.py:60:        from app.counseling.reply_guard import guard_reply
+legacy-counselor-final:backend/scripts/eval_counselor_journey.py:29:from app.counseling.reply_guard import deterministic_issues
+legacy-counselor-final:backend/tests/test_continuous_discovery.py:7:from app.counseling.continuous_discovery import evaluate_continuous_discovery
+legacy-counselor-final:backend/tests/test_continuous_discovery.py:8:from app.counseling.evaluator import CounselingEvaluator
+legacy-counselor-final:backend/tests/test_continuous_discovery.py:10:from app.counseling.turn_semantics import validated_journey_intent
+legacy-counselor-final:backend/tests/test_counselor_core.py:9:from app.counseling.core import CounselorCore, compact_student_context
+legacy-counselor-final:backend/tests/test_counselor_core.py:177:             patch("app.counseling.core.CounselorCore") as core, \
+legacy-counselor-final:backend/tests/test_counselor_core.py:226:             patch("app.counseling.core.CounselorCore") as core, \
+legacy-counselor-final:backend/tests/test_counselor_core.py:228:             patch("app.counseling.reply_guard.guard_reply", new_callable=AsyncMock) as guard, \
+legacy-counselor-final:backend/tests/test_counselor_core.py:272:             patch("app.counseling.turn_semantics.classify_turn", new_callable=AsyncMock) as classify, \
+legacy-counselor-final:backend/tests/test_counselor_core.py:273:             patch("app.counseling.core.CounselorCore") as core, \
+legacy-counselor-final:backend/tests/test_counselor_core.py:275:             patch("app.counseling.reply_guard.guard_reply",
+legacy-counselor-final:backend/tests/test_counselor_deep_lean.py:280:                patch("app.counseling.turn_semantics.classify_turn", new=AsyncMock(return_value={})), \
+legacy-counselor-final:backend/tests/test_counselor_deep_lean.py:283:                patch("app.counseling.core.CounselorCore.respond", response), \
+legacy-counselor-final:backend/tests/test_counselor_deep_lean.py:284:                patch("app.counseling.reply_guard.guard_reply", new=AsyncMock(
+legacy-counselor-final:backend/tests/test_counselor_journey.py:24:    with patch("app.counseling.turn_semantics.classify_turn", new_callable=AsyncMock) as classify, \
+legacy-counselor-final:backend/tests/test_counselor_journey.py:201:                patch("app.counseling.reply_guard.guard_reply",
+legacy-counselor-final:backend/tests/test_counselor_reply_guard.py:6:from app.counseling.reply_guard import (deterministic_issues, guard_collection_reply,
+legacy-counselor-final:backend/tests/test_counselor_reply_guard.py:13:    with patch("app.counseling.reply_guard.chat_completion",
+legacy-counselor-final:backend/tests/test_counselor_reply_guard.py:21:    with patch("app.counseling.reply_guard.chat_completion",
+legacy-counselor-final:backend/tests/test_counselor_reply_guard.py:30:    with patch("app.counseling.reply_guard.chat_completion",
+legacy-counselor-final:backend/tests/test_counselor_reply_guard.py:53:    with patch("app.counseling.reply_guard.chat_completion",
+legacy-counselor-final:backend/tests/test_counselor_reply_guard.py:61:    with patch("app.counseling.reply_guard.chat_completion",
+legacy-counselor-final:backend/tests/test_counselor_response_quality.py:7:from app.counseling.decision_sufficiency import (DecisionSufficiencyEvaluator,
+legacy-counselor-final:backend/tests/test_counselor_response_quality.py:9:from app.counseling.evaluator import CounselingEvaluator
+legacy-counselor-final:backend/tests/test_counselor_response_quality.py:11:from app.counseling.turn_contract import (needs_response_repair, parse_turn,
+legacy-counselor-final:backend/tests/test_counselor_tool_loop.py:58:             patch("app.counseling.goal_transition.resolve_or_activate_goal",
+legacy-counselor-final:backend/tests/test_counselor_tool_loop.py:60:             patch("app.counseling.goal_transition.reviewed_route",
+legacy-counselor-final:backend/tests/test_counselor_tool_loop.py:62:             patch("app.counseling.turn_semantics.classify_turn",
+legacy-counselor-final:backend/tests/test_counselor_tool_loop.py:64:             patch("app.counseling.reply_guard.guard_reply",
+legacy-counselor-final:backend/tests/test_counselor_tool_loop.py:68:             patch("app.counseling.reply_guard.guard_collection_reply",
+legacy-counselor-final:backend/tests/test_direction_discovery.py:7:from app.counseling.evaluator import CounselingEvaluator
+legacy-counselor-final:backend/tests/test_goal_transition.py:6:from app.counseling.goal_transition import confirms_reviewed_route, reviewed_route
+legacy-counselor-final:backend/tests/test_goal_transition.py:10:    with patch("app.counseling.goal_transition.chat_completion",
+legacy-counselor-final:backend/tests/test_goal_transition.py:21:    with patch("app.counseling.goal_transition.chat_completion",
+legacy-counselor-final:backend/tests/test_multilingual_semantic_contract.py:3:from app.counseling.decision_sufficiency import (
+legacy-counselor-final:backend/tests/test_multilingual_semantic_contract.py:5:from app.counseling.turn_semantics import validate_turn_semantics
+legacy-counselor-final:backend/tests/test_multilingual_semantic_contract.py:15:from app.counseling.turn_semantics import classify_turn
+legacy-counselor-final:backend/tests/test_multilingual_semantic_contract.py:92:    with patch("app.counseling.turn_semantics.chat_completion",
+legacy-counselor-final:backend/tests/test_roadmaps.py:241:            with patch("app.counseling.core.CounselorModelProvider.respond",
+legacy-counselor-final:backend/tests/test_student_journey_lifecycle.py:156:    from app.counseling.turn_semantics import validate_turn_semantics
+legacy-counselor-final:backend/tests/test_student_journey_lifecycle.py:175:                patch("app.counseling.turn_semantics.classify_turn", classify), \
+legacy-counselor-final:backend/tests/test_student_journey_lifecycle.py:176:                patch("app.counseling.reply_guard.guard_reply",
+legacy-counselor-final:backend/tests/test_student_journey_lifecycle.py:180:                patch("app.counseling.reply_guard.guard_collection_reply",
+legacy-counselor-final:backend/tests/test_student_understanding.py:11:from app.counseling.evaluator import CounselingEvaluator
+legacy-counselor-final:backend/tests/test_student_understanding.py:13:from app.counseling.turn_contract import parse_turn
+legacy-counselor-final:backend/tests/test_student_understanding.py:394:                 patch("app.counseling.turn_semantics.classify_turn", new_callable=AsyncMock) as classify, \
+legacy-counselor-final:backend/tests/test_student_understanding.py:397:                 patch("app.counseling.reply_guard.guard_collection_reply",
+legacy-counselor-final:backend/tests/test_student_understanding.py:455:                 patch("app.counseling.turn_semantics.classify_turn", classify), \
+legacy-counselor-final:backend/tests/test_student_understanding.py:460:                 patch("app.counseling.goal_transition.reviewed_route",
+legacy-counselor-final:backend/tests/test_student_understanding.py:462:                 patch("app.counseling.reply_guard.guard_reply",
+legacy-counselor-final:backend/tests/test_student_voice_decision_sufficiency.py:10:from app.counseling.decision_sufficiency import (DecisionSufficiencyEvaluator,
+legacy-counselor-final:backend/tests/test_student_voice_decision_sufficiency.py:12:from app.counseling.evaluator import CounselingEvaluator

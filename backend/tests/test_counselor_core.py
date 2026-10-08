@@ -1,32 +1,11 @@
-"""The active Counselor answers in prose from bounded student context."""
+"""Bounded student context projection retained after Core removal."""
 
-import asyncio
 from datetime import datetime, timezone
-from unittest.mock import AsyncMock, Mock, patch
 
-import pytest
 
-from app.counseling.core import CounselorCore, compact_student_context
-from app.counseling.runtime import _run_turn
+from app.counseling.context_projection import compact_student_context
 from app.counseling.understanding import StudentUnderstandingBuilder
 from app.memory.student_snapshot import StudentSnapshot
-
-
-@pytest.fixture(autouse=True)
-def legacy_counselor_runtime():
-    """These cases exercise the previous Counselor path explicitly."""
-    with patch("app.counseling.runtime.config.PAI_COUNSELOR_MODE", "legacy"):
-        yield
-
-
-class Provider:
-    def __init__(self, reply):
-        self.reply = reply
-        self.calls = []
-
-    async def respond(self, messages, system_prompt):
-        self.calls.append((messages, system_prompt))
-        return self.reply
 
 
 def _understanding():
@@ -105,21 +84,6 @@ def test_context_does_not_invent_or_leak_unselected_links():
     assert "connections" not in context
 
 
-def test_short_follow_up_uses_previous_student_topic_for_record_selection():
-    provider = Provider("The robotics project used Python.")
-    view = {"projects": {"nodes": [
-        {"id": "first", "name": "Debate club"},
-        {"id": "second", "name": "Robotics project"},
-    ]}}
-    asyncio.run(CounselorCore(provider).respond(
-        student_message="And that?",
-        recent_conversation=[{"role": "user", "content": "Tell me about my robotics project"},
-                             {"role": "assistant", "content": "Let's look at it."}],
-        understanding=view,
-    ))
-    assert "Robotics project" in provider.calls[0][1]
-
-
 def test_projection_consumes_real_understanding_education_links():
     snapshot = StudentSnapshot(
         "student", {}, {
@@ -134,162 +98,3 @@ def test_projection_consumes_real_understanding_education_links():
     context = compact_student_context(view, "Compiler Python Algorithms")
     assert "Algorithms belongs to BS CS" in context["connections"]
     assert "Compiler supports Python" in context["connections"]
-
-
-def test_core_uses_one_natural_text_model_call_with_recent_context():
-    provider = Provider("Your father's suggestion is one input. What school work do you enjoy?")
-    reply = asyncio.run(CounselorCore(provider).respond(
-        student_message="My father wants CS but I am unsure.",
-        recent_conversation=[{"role": "user", "content": "I study A Levels."}],
-        understanding=_understanding(),
-    ))
-    assert reply == provider.reply
-    messages, prompt = provider.calls[0]
-    assert len(provider.calls) == 1
-    assert messages[-1]["content"] == "My father wants CS but I am unsure."
-    assert "A Levels" in prompt and "Math" in prompt
-    assert "counselor_state" not in prompt
-    assert "Return a JSON object" not in prompt
-
-
-def test_legacy_json_is_only_a_visibility_guard():
-    provider = Provider('{"response":"What are you studying now?",'
-                        '"counselor_state":{"next_move":{"type":"ASK"}}}')
-    reply = asyncio.run(CounselorCore(provider).respond(
-        student_message="hi", recent_conversation=[], understanding={}))
-    assert reply == "What are you studying now?"
-
-
-def test_text_and_voice_turns_use_the_same_core_and_background_learning():
-    async def run():
-        db = Mock()
-        snapshot = Mock()
-        core_reply = AsyncMock(return_value="What subjects are you studying?")
-        post = AsyncMock(return_value="assistant-event")
-        with patch("app.counseling.runtime.config.PAI_API_KEY", "server-key"), \
-             patch("app.counseling.runtime.config.PAI_MEMORY_CONTEXT_ENABLED", False), \
-             patch("app.counseling.runtime._build_conversation_context",
-                   return_value=[]), \
-             patch("app.memory.student_snapshot.StudentSnapshotService") as snapshots, \
-             patch("app.memory.profile_completion.ProfileCompletionService") as completion, \
-             patch("app.counseling.understanding.StudentUnderstandingBuilder") as builders, \
-             patch("app.journey.JourneyService") as journeys, \
-             patch("app.counseling.core.CounselorCore") as core, \
-             patch("app.roadmaps.service.RoadmapService.focused", return_value=None), \
-             patch("app.counseling.runtime._post_response", post), \
-             patch("app.memory.turn_hook.enqueue_turn_extraction") as extract:
-            snapshots.return_value.build.return_value = snapshot
-            snapshot.records = {"goal": []}
-            completion.return_value.evaluate.return_value = {
-                "counselorMode": "normal", "enforced": False,
-                "fields": [], "nextRequirement": None,
-            }
-            builders.return_value.build.return_value = _understanding()
-            journeys.return_value.ensure_counselor.return_value = Mock(
-                id="journey", current_stage="FOUNDATION", title="Counselor direction",
-                to_dict=Mock(return_value={"current_stage": "FOUNDATION", "blockers": []}))
-            core.return_value.respond = core_reply
-            for marker in ({}, {"voice_delegation_id": "live-turn"}):
-                await _run_turn(db, "student", {
-                    "id": "student-event", "source": "human:student",
-                    "target": "channel/pai-counselor",
-                    "payload": {"content": "high school"},
-                    "metadata": marker,
-                }, 0)
-            assert core_reply.await_count == 2
-            assert all(call.kwargs["student_message"] == "high school"
-                       for call in core_reply.await_args_list)
-            assert post.await_args_list[0].kwargs["metadata"] is None
-            assert post.await_args_list[1].kwargs["metadata"] == {
-                "voice_delegation_id": "live-turn"}
-            assert extract.call_count == 2
-            assert all(call.kwargs["user_event_id"] == "student-event"
-                       for call in extract.call_args_list)
-    asyncio.run(run())
-
-
-def test_collection_reconciles_before_reply_for_text_and_voice():
-    async def run():
-        db = Mock()
-        snapshot = Mock(records={"goal": []})
-        completion = {"counselorMode": "collection", "enforced": True, "fields": [{
-            "key": "education.history", "tier": "critical", "status": "missing",
-        }], "nextRequirement": {"key": "education.history", "question": "What are you studying?"}}
-        with patch("app.counseling.runtime.config.PAI_API_KEY", "server-key"), \
-             patch("app.counseling.runtime.config.PAI_MEMORY_CONTEXT_ENABLED", False), \
-             patch("app.counseling.runtime._build_conversation_context", return_value=[]), \
-             patch("app.memory.student_snapshot.StudentSnapshotService") as snapshots, \
-             patch("app.memory.profile_completion.ProfileCompletionService") as service, \
-             patch("app.counseling.understanding.StudentUnderstandingBuilder") as builder, \
-             patch("app.journey.JourneyService") as journeys, \
-             patch("app.memory.foundation_intake.capture_foundation_turn", new_callable=AsyncMock) as capture, \
-             patch("app.counseling.core.CounselorCore") as core, \
-             patch("app.roadmaps.service.RoadmapService.focused", return_value=None), \
-             patch("app.counseling.reply_guard.guard_reply", new_callable=AsyncMock) as guard, \
-             patch("app.counseling.runtime._post_response", new_callable=AsyncMock) as post, \
-             patch("app.memory.turn_hook.enqueue_turn_extraction") as enqueue:
-            snapshots.return_value.build.return_value = snapshot
-            service.return_value.evaluate.return_value = completion
-            builder.return_value.build.return_value = _understanding()
-            journeys.return_value.ensure_counselor.return_value = Mock(
-                id="journey", current_stage="FOUNDATION", title="Counselor direction")
-            capture.return_value = True
-            core.return_value.respond = AsyncMock(return_value="Draft")
-            guard.return_value = "Safe reply"
-            post.return_value = "assistant-event"
-            for metadata in ({}, {"voice_delegation_id": "voice-turn"}):
-                await _run_turn(db, "student", {
-                    "id": "owner-event", "source": "human:owner",
-                    "target": "channel/pai-counselor",
-                    "payload": {"content": "I completed school"}, "metadata": metadata,
-                }, 0)
-            assert capture.await_count == 2
-            assert core.return_value.respond.await_count == 2
-            assert guard.await_count == 2
-            assert all(call.kwargs["profile_captured"] is True
-                       for call in enqueue.call_args_list)
-            assert post.await_args_list[0].args[4] == "Safe reply"
-            assert post.await_args_list[1].args[4] == "Safe reply"
-    asyncio.run(run())
-
-
-def test_goal_hint_does_not_activate_a_journey_before_a_presented_route():
-    async def run():
-        db = Mock()
-        db.get.return_value = Mock(network_id="student", target="channel/pai-counselor",
-                                   source="human:owner", owner_user_id="owner")
-        snapshot = Mock(records={"goal": [{"id": "goal-1", "title": "Study computing"}]})
-        completion = {"enforced": True, "foundationReady": True,
-                      "counselorMode": "normal", "fields": [], "nextRequirement": None}
-        with patch("app.counseling.runtime.config.PAI_API_KEY", "server-key"), \
-             patch("app.counseling.runtime.config.PAI_MEMORY_CONTEXT_ENABLED", False), \
-             patch("app.counseling.runtime._build_conversation_context", return_value=[]), \
-             patch("app.memory.student_snapshot.StudentSnapshotService") as snapshots, \
-             patch("app.memory.profile_completion.ProfileCompletionService") as service, \
-             patch("app.counseling.understanding.StudentUnderstandingBuilder") as builder, \
-             patch("app.memory.foundation_intake.capture_foundation_turn", new_callable=AsyncMock), \
-             patch("app.journey.JourneyService") as journeys, \
-             patch("app.counseling.turn_semantics.classify_turn", new_callable=AsyncMock) as classify, \
-             patch("app.counseling.core.CounselorCore") as core, \
-             patch("app.roadmaps.service.RoadmapService.focused", return_value=None), \
-             patch("app.counseling.reply_guard.guard_reply",
-                   new=AsyncMock(side_effect=lambda reply, **kwargs: reply)), \
-             patch("app.counseling.runtime._post_response", new_callable=AsyncMock) as post, \
-             patch("app.memory.turn_hook.enqueue_turn_extraction"):
-            snapshots.return_value.build.return_value = snapshot
-            service.return_value.evaluate.return_value = completion
-            builder.return_value.build.return_value = _understanding()
-            journeys.return_value.ensure_counselor.return_value = Mock(
-                id="journey", title="Counselor direction", current_stage="DIRECTION",
-                to_dict=Mock(return_value={"current_stage": "DIRECTION", "blockers": []}))
-            classify.return_value = {"journey_intent": {
-                "action": "upsert", "journey_type": "direction_discovery"}}
-            core.return_value.respond = AsyncMock(return_value="Let's begin.")
-            post.return_value = "assistant-event"
-            await _run_turn(db, "student", {
-                "id": "owner-event", "source": "human:owner", "timestamp": 1234,
-                "target": "channel/pai-counselor", "payload": {"content": "Yes, I choose that route"},
-            }, 0)
-            journeys.return_value.create.assert_not_called()
-            assert core.return_value.respond.await_args.kwargs["turn_plan"].active_goal is None
-    asyncio.run(run())

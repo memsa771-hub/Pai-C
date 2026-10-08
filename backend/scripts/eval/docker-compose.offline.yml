@@ -1,0 +1,65 @@
+# Disposable smoke stack, no .env files, fake credentials only, no outbound network.
+x-app: &app
+  image: pai-counselor-offline-backend:check
+  build:
+    context: ../..
+    target: cloud
+  working_dir: /app
+  volumes:
+    - ../..:/app
+  environment: &env
+    APP_ENV: development
+    DATABASE_URL: postgresql+psycopg2://offline:offline@postgres:5432/offline
+    PAI_ENABLED: "true"
+    PAI_API_KEY: offline-fake-key
+    PAI_BASE_URL: http://127.0.0.1:1
+    PAI_OFFLINE_STARTUP_CHECK: "1"
+    PAI_MEMORY_CONTEXT_ENABLED: "false"
+    MEMORY_VECTOR_BACKEND: none
+    FILE_STORAGE_BACKEND: local
+    CORS_ORIGINS: http://localhost:13000
+    FRONTEND_BASE_URL: http://localhost:13000
+    PUBLIC_API_BASE: http://localhost:18000
+    WORKSPACE_ENDPOINT: http://localhost:18000
+  networks: [offline]
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: offline
+      POSTGRES_PASSWORD: offline
+      POSTGRES_DB: offline
+    networks: [offline]
+    healthcheck:
+      test: [CMD-SHELL, "pg_isready -U offline -d offline"]
+      interval: 2s
+      timeout: 2s
+      retries: 20
+  migrate:
+    <<: *app
+    entrypoint: [alembic, upgrade, head]
+    depends_on:
+      postgres: {condition: service_healthy}
+  backend:
+    <<: *app
+    entrypoint: [python, -m, uvicorn, scripts.offline_startup_app:app, --host, 0.0.0.0, --port, "8000"]
+    depends_on:
+      migrate: {condition: service_completed_successfully}
+    ports: ["127.0.0.1:18000:8000"]
+    networks: [offline, host_access]
+  frontend:
+    image: pai-counselor-offline-frontend:check
+    build:
+      context: ../../../frontend
+      args:
+        NEXT_PUBLIC_API_URL: http://localhost:18000
+        NEXT_PUBLIC_SUPABASE_URL: http://localhost:18000
+        NEXT_PUBLIC_SUPABASE_ANON_KEY: offline-anon-key
+    networks: [offline, host_access]
+    ports: ["127.0.0.1:13000:3000"]
+
+networks:
+  offline:
+    internal: true
+  host_access: {}
