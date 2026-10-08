@@ -178,6 +178,7 @@ class Config:
     # screen of all 23 models: ~7s/2-turn loop, 4/4 valid reps, all quality
     # probes passed; deepseek-4-flash had degraded to >40s continuation turns).
     PAI_MODEL: str = os.environ.get("PAI_MODEL", "gpt-5.4-mini")
+    PAI_COUNSELOR_MODEL: str = os.environ.get("PAI_COUNSELOR_MODEL", "") or PAI_MODEL
     PAI_COUNSELOR_MODE: str = os.environ.get("PAI_COUNSELOR_MODE", "deep").strip().lower()
     # Safety cap on the tool-calling loop per user message.
     PAI_MAX_TOOL_ITERATIONS: int = int(os.environ.get("PAI_MAX_TOOL_ITERATIONS", "6"))

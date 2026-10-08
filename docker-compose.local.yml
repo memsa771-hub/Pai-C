@@ -3,6 +3,7 @@ services:
     environment:
       APP_ENV: development
       PAI_COUNSELOR_MODE: ${PAI_COUNSELOR_MODE:-deep}
+      PAI_COUNSELOR_MODEL: ${PAI_COUNSELOR_MODEL:-}
       CORS_ORIGINS: http://localhost:3000,http://127.0.0.1:3000
       FRONTEND_BASE_URL: http://localhost:3000
       PUBLIC_API_BASE: http://localhost:8000
@@ -22,6 +23,7 @@ services:
     environment:
       APP_ENV: development
       PAI_COUNSELOR_MODE: ${PAI_COUNSELOR_MODE:-deep}
+      PAI_COUNSELOR_MODEL: ${PAI_COUNSELOR_MODEL:-}
       FILE_STORAGE_BACKEND: local
       FILE_STORAGE_PATH: /data/files
     volumes:
