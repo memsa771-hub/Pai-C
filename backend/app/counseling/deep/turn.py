@@ -8,15 +8,12 @@ from dataclasses import dataclass
 
 from app.config import config
 from app.counseling.deep.context import DeepContext, build_context
-from app.counseling.deep.polish import contains_devanagari, polish_reply
+from app.counseling.deep.polish import contains_blocked_script, polish_reply
 from app.counseling.deep.prompts import load_prompt
 from app.counseling.deep.turn_input import CounselorTurnInput, shared_history
 from app.inference.client import chat_completion
 
 logger = logging.getLogger(__name__)
-_ROMAN_URDU_FALLBACK = "Main aap ki baat samajh raha hoon. Aap is baare mein thora aur bata sakte hain?"
-_PLAIN_FALLBACK = "I want to understand you properly. Could you tell me a little more?"
-_DEVANAGARI_RETRY = "Reply again in Roman Urdu with Urdu words, no Devanagari"
 
 
 @dataclass(frozen=True)
@@ -49,7 +46,7 @@ def _parse_response(raw: str) -> tuple[str, dict]:
     # Do not display malformed JSON or internal action keys to the student.
     stripped = raw.strip()
     if stripped.startswith(("{", "[", "```")) or not stripped:
-        return _PLAIN_FALLBACK, {"type": "none"}
+        return config.PAI_COUNSELOR_FALLBACK_REPLY, {"type": "none"}
     if stripped.startswith('"'):
         try:
             decoded, end = json.JSONDecoder().raw_decode(stripped)
@@ -57,7 +54,7 @@ def _parse_response(raw: str) -> tuple[str, dict]:
                 return decoded, {"type": "none"}
         except ValueError:
             pass
-        return _PLAIN_FALLBACK, {"type": "none"}
+        return config.PAI_COUNSELOR_FALLBACK_REPLY, {"type": "none"}
     # A truncated JSON string can leave an escaped closing quote and comma
     # after otherwise readable prose. Remove only that transport fragment.
     return re.sub(r'\\"\s*,?\s*$', "", stripped), {"type": "none"}
@@ -70,11 +67,10 @@ async def run_deep_turn(db, turn: CounselorTurnInput) -> DeepTurnResult:
                for item in shared_history(db, turn, owner_id,
                                           limit=config.PAI_COUNSELOR_HISTORY_SIZE)]
     current = turn.student_text.strip() or "I attached a document."
-    messages = [{"role": "user", "content": context.text}, *history,
-                {"role": "user", "content": current}]
+    messages = [*history, {"role": "user", "content": current}]
     # Read transactions must not remain open over the network call.
     db.rollback()
-    prompt = load_prompt("counselor")
+    prompt = load_prompt("counselor") + "\n\n" + context.text
     started = time.monotonic()
     raw = await chat_completion(
         api_key=config.PAI_API_KEY, model=config.PAI_COUNSELOR_MODEL,
@@ -87,12 +83,12 @@ async def run_deep_turn(db, turn: CounselorTurnInput) -> DeepTurnResult:
     polish_started = time.monotonic()
     reply, action = _parse_response(raw)
     reply = polish_reply(reply)
-    if contains_devanagari(reply):
+    if contains_blocked_script(reply, config.PAI_LANGUAGE_BLOCKED_SCRIPTS):
         initial_polish_ms = int((time.monotonic() - polish_started) * 1000)
         retry_started = time.monotonic()
         retried = await chat_completion(
             api_key=config.PAI_API_KEY, model=config.PAI_COUNSELOR_MODEL,
-            messages=messages, system_prompt=prompt + "\n" + _DEVANAGARI_RETRY,
+            messages=messages, system_prompt=prompt + "\n\n" + load_prompt("language_retry"),
             response_format={"type": "json_object"},
             reasoning_effort=config.PAI_COUNSELOR_REASONING_EFFORT,
             base_url=config.PAI_BASE_URL,
@@ -101,11 +97,11 @@ async def run_deep_turn(db, turn: CounselorTurnInput) -> DeepTurnResult:
         polish_started = time.monotonic()
         reply, action = _parse_response(retried)
         reply = polish_reply(reply)
-        if contains_devanagari(reply):
-            reply, action = _ROMAN_URDU_FALLBACK, {"type": "none"}
+        if contains_blocked_script(reply, config.PAI_LANGUAGE_BLOCKED_SCRIPTS):
+            reply, action = config.PAI_COUNSELOR_FALLBACK_REPLY, {"type": "none"}
     else:
         initial_polish_ms = 0
     if not reply:
-        reply, action = _PLAIN_FALLBACK, {"type": "none"}
+        reply, action = config.PAI_COUNSELOR_FALLBACK_REPLY, {"type": "none"}
     return DeepTurnResult(reply, action, context, model_ms,
                           initial_polish_ms + int((time.monotonic() - polish_started) * 1000))

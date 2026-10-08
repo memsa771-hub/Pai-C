@@ -41,6 +41,11 @@ async def test_normal_deep_turn_uses_one_json_model_call():
         assert model.call_args.kwargs["response_format"] == {"type": "json_object"}
         assert model.call_args.kwargs["model"] == config.PAI_COUNSELOR_MODEL
         assert model.call_args.kwargs["reasoning_effort"] == "low"
+        system_prompt = model.call_args.kwargs["system_prompt"]
+        assert "<context>" in system_prompt
+        assert "<language_policy>" in system_prompt
+        assert all("<context>" not in item["content"] for item in model.call_args.kwargs["messages"])
+        assert model.call_args.kwargs["messages"][-1] == {"role": "user", "content": "I want to study AI"}
 
 
 @pytest.mark.asyncio
@@ -84,14 +89,20 @@ async def test_question_trim_leaves_opening_wording_for_prompt_and_eval():
 
 
 @pytest.mark.asyncio
-async def test_devanagari_retries_once_then_uses_fixed_fallback():
+async def test_configured_blocked_script_retries_once_then_uses_configured_fallback():
     with StudentSession() as student, student.factory() as db:
-        model = AsyncMock(side_effect=[_answer("मुझे बताओ?"), _answer("फिर बताओ?")])
-        with patch("app.counseling.deep.turn.chat_completion", model):
+        model = AsyncMock(side_effect=[_answer("\u03b1\u03b2?"), _answer("\u03b3\u03b4?")])
+        with patch("app.counseling.deep.turn.chat_completion", model), \
+                patch.object(config, "PAI_LANGUAGE_BLOCKED_SCRIPTS", "Greek"), \
+                patch.object(config, "PAI_LANGUAGE_BLOCKED_SCRIPT_REPLACEMENT", "configured replacement"), \
+                patch.object(config, "PAI_COUNSELOR_FALLBACK_REPLY", "Configured fallback."):
             result = await run_deep_turn(db, _turn(student))
         assert model.await_count == 2
-        assert "Reply again in Roman Urdu with Urdu words, no Devanagari" in model.call_args.kwargs["system_prompt"]
-        assert result.reply == "Main aap ki baat samajh raha hoon. Aap is baare mein thora aur bata sakte hain?"
+        retry_prompt = model.call_args.kwargs["system_prompt"]
+        assert '"blocked_scripts":["Greek"]' in retry_prompt
+        assert '"replacement":"configured replacement"' in retry_prompt
+        assert "<context>" in retry_prompt
+        assert result.reply == "Configured fallback."
         assert result.action["type"] == "none"
 
 
@@ -164,7 +175,7 @@ async def test_identity_marked_never_ask_and_other_workspace_excluded():
         assert '"identity_never_ask"' in context.text
         assert "Danish" in context.text
         assert "Private Other" not in context.text
-        assert set(context.section_tokens) == {"today", "profile", "notebook", "memory", "research", "journey"}
+        assert set(context.section_tokens) == {"today", "language_policy", "profile", "notebook", "memory", "research", "journey"}
 
 
 @pytest.mark.asyncio

@@ -173,6 +173,12 @@ async def build_context(db, workspace_id: str, turn: CounselorTurnInput) -> Deep
         raise ValueError("turn belongs to another workspace")
     sections: dict[str, str] = {
         "today": datetime.now(timezone.utc).date().isoformat(),
+        "language_policy": _json({
+            "blocked_scripts": [name.strip() for name in config.PAI_LANGUAGE_BLOCKED_SCRIPTS.split(",")
+                                if name.strip()],
+            "replacement": config.PAI_LANGUAGE_BLOCKED_SCRIPT_REPLACEMENT,
+            "fallback_reply": config.PAI_COUNSELOR_FALLBACK_REPLY,
+        }),
         "profile": _json(_profile(db, workspace_id)),
     }
     notebook = NotebookService(db).get(workspace_id).notebook
