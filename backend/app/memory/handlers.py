@@ -78,6 +78,11 @@ async def refresh_stale_research(job, db) -> dict:
         if pair:
             _, opportunity = pair
             refresh_candidate = {"url": opportunity.url,
+                                 "lanes": [row.lane for row in db.scalars(select(Roadmap).where(
+                                     Roadmap.workspace_id == job.workspace_id,
+                                     Roadmap.journey_id == journey.id,
+                                     Roadmap.generation_status == "stale"))
+                                     if (row.route or {}).get("url") == opportunity.url and row.lane],
                                  "title": opportunity.route.get("title") or opportunity.institution or "Route",
                                  "country": opportunity.country,
                                  "level": opportunity.level,

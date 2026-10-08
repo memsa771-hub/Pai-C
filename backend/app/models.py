@@ -869,6 +869,7 @@ class Roadmap(Base):
     workspace_id = Column(UUID(as_uuid=False), ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False)
     journey_id = Column(Text, ForeignKey("pai_student_journeys.id", ondelete="CASCADE"), nullable=False)
     goal_id = Column(Text, nullable=True)
+    lane = Column(Text, nullable=True)
     origin = Column(Text, nullable=False)
     title = Column(Text, nullable=False)
     route = Column(JSONB, nullable=False, default=dict, server_default=text("'{}'"))
@@ -897,6 +898,7 @@ class Roadmap(Base):
         Index("idx_roadmaps_workspace_journey", "workspace_id", "journey_id", "updated_at"),
         Index("idx_roadmaps_run", "execution_run_id"),
         Index("idx_roadmaps_requirement_set", "requirement_set_id"),
+        Index("uq_roadmaps_journey_lane", "workspace_id", "journey_id", "lane", unique=True),
     )
 
 

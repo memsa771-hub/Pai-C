@@ -67,6 +67,8 @@ class CounselorMirror(MirrorPart):
         lanes = [part.lane for part in self.roadmap_lanes]
         if len(set(lanes)) != len(lanes):
             raise ValueError("roadmap lane keys must be unique")
+        if "stated_goal" in lanes and "strength_based" in lanes and "test_the_dream" not in lanes:
+            raise ValueError("distinct stated and strength routes require an original-dream test lane")
         if contains_blocked_script(json.dumps(self.model_dump(), ensure_ascii=False),
                                    config.PAI_LANGUAGE_BLOCKED_SCRIPTS):
             raise ValueError("mirror contains a blocked script")

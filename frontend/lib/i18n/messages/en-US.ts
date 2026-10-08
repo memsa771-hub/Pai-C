@@ -11,6 +11,18 @@
  */
 
 export const messages = {
+  roadmapFit: {
+    routeTitle: 'Route to review',
+    title: 'How this route fits you', why_for_you: 'Why this route',
+    strengths_used: 'Strengths you can use', weakness_guarded: 'Support for growth',
+    family_fit: 'Family considerations', real_why_fit: 'What matters to you',
+    constraints_fit: 'Your practical limits', test_30_days: 'A test for the next month',
+    need: 'What is needed', have: 'What you have', gap: 'What to work on',
+    questions: 'Your questions', unanswered: 'This still needs a sourced answer.',
+    unknown: 'More context is needed.', missing: 'Some evidence still needs checking.',
+    missingEligibility: 'Entry requirements', missingTests: 'Required tests',
+    missingCosts: 'Costs', missingTiming: 'Intake and timing', missingOther: 'Other supporting evidence',
+  },
   metadata: {
     title: 'Placement AI Workspace',
     description: 'Interact with your AI agents in real time',

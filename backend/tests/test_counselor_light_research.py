@@ -48,12 +48,16 @@ async def test_cache_hit_skips_all_live_tools_and_model_calls():
 def test_public_cache_copy_never_copies_student_route_or_workspace_metadata():
     with StudentSession() as student, student.factory() as db:
         payload, evidence = seed(db, student.workspace_id)
+        evidence.rules = [{**evidence.rules[0], "question_ids": ["private-question"],
+                           "private_annotation": "Private fact annotation"}]
+        db.commit()
         other = Workspace(name="Other", settings={}); db.add(other); db.commit()
         result = RequirementStore(db).cached(other.id, payload)
         clone = db.get(Opportunity, result["opportunity_id"])
         assert clone.workspace_id == other.id and clone.route == {"url": payload["url"]}
         assert result["requirement_set_id"] != evidence.id
         assert "Do not share" not in str(result)
+        assert "private-question" not in str(result) and "Private fact annotation" not in str(result)
 
 
 def test_stale_or_newer_unconfirmed_evidence_is_not_a_cache_hit():
@@ -82,3 +86,42 @@ def test_brief_uses_confirmed_mirror_not_legacy_understanding():
         assert result["mirror"] == mirror and result["mirror_version"] == 4
         assert result["stated_preference"] == "My original wish"
         assert "notebook" in result and "profile" in result and "questions" in result
+
+@pytest.mark.asyncio
+async def test_stale_cache_refreshes_through_existing_plugin_and_store_with_fakes():
+    with StudentSession() as student, student.factory() as db:
+        payload, old = seed(db, student.workspace_id, old=True)
+        source = payload['url']
+        tools = SimpleNamespace(invoke=AsyncMock(return_value={'ok':True, 'data': {
+            'url':source, 'content':'Completed study required'}}))
+        facts = [{'field':'eligibility','decisive_field':'eligibility','kind':'requirement',
+            'value':'Completed study','quote':'Completed study required','source_url':source}]
+        with patch('app.plugins.program_research._extract_page', AsyncMock(return_value=facts)) as extractor:
+            result = await research(SimpleNamespace(workspace_id=student.workspace_id, tools=tools), payload)
+        extractor.assert_awaited_once()
+        assert tools.invoke.await_args.args[0] == 'web.fetch'
+        assert result['requirements'][0]['requirement_set_id'] != old.id
+        assert result['requirements'][0]['rules'][0]['quote'] == facts[0]['quote']
+
+def test_new_unconfirmed_public_observation_cannot_hide_behind_old_verified_cache():
+    with StudentSession() as student, student.factory() as db:
+        payload, old = seed(db, student.workspace_id)
+        newer = RequirementSet(opportunity_id=old.opportunity_id, source_url=old.source_url,
+            checked_at=datetime.now(timezone.utc), version=2, status='unconfirmed',
+            rules=old.rules, fees={}, deadlines={}, verification_checks={
+                'public_cache': {'key':RequirementStore.cache_key(payload['url'], 'fixture','degree','next'), 'passed':False}})
+        db.add(newer); db.commit()
+        other = Workspace(name='Other', settings={}); db.add(other); db.commit()
+        assert RequirementStore(db).cached(other.id, payload) is None
+
+
+def test_local_report_cannot_be_bypassed_by_another_workspace_verified_copy():
+    with StudentSession() as student, student.factory() as db:
+        payload, original = seed(db, student.workspace_id)
+        other = Workspace(name='Other', settings={}); db.add(other); db.commit()
+        assert RequirementStore(db).cached(other.id, payload)
+        db.commit()
+        original.status = 'unconfirmed'
+        original.verification_checks = {**original.verification_checks, 'student_report': {'passed':False}}
+        db.commit()
+        assert RequirementStore(db).cached(student.workspace_id, payload) is None

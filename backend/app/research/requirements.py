@@ -22,6 +22,13 @@ class ResearchEvidenceError(ValueError):
     pass
 
 
+def _public_claim(claim):
+    """Copy the evidence schema, never workspace-specific extension metadata."""
+    return {key: deepcopy(value) for key, value in claim.items() if key in {
+        "field", "value", "quote", "source_url", "checked_at", "kind", "category",
+        "comparator", "threshold", "unit", "scale", "decisive_field"}}
+
+
 def _https_url(value: str) -> str:
     from urllib.parse import urlparse
     parsed = urlparse(str(value or ""))
@@ -150,11 +157,11 @@ class RequirementStore:
             verification_checks=verdict.checks, cycle_label=verdict.cycle_label,
             verified_at=datetime.now(timezone.utc) if verdict.status == "verified" else None)
         self.db.add(requirement)
-        if (public_facts and verdict.status == "verified" and not urlsplit(source_url).query
+        if (public_facts and not urlsplit(source_url).query
                 and official_url(source_url, self.official_domains(institution))):
             requirement.verification_checks = {**requirement.verification_checks,
                 "public_cache": {"key": self.cache_key(source_url, country, level, intake,
-                    route.get("program_id")), "passed": True}}
+                    route.get("program_id")), "passed": verdict.status == "verified"}}
         self.db.flush()
         if previous and (previous.rules != rules or previous.fees != (fees or {})
                          or previous.deadlines != (deadlines or {})
@@ -197,6 +204,16 @@ class RequirementStore:
         scope = [urldefrag(url)[0].rstrip("/"), country, level or "", intake or "", program_id or ""]
         return hashlib.sha256(json.dumps(scope, ensure_ascii=True).encode()).hexdigest()
 
+    @staticmethod
+    def is_fresh(row):
+        from app.config import config
+        from app.research.scheduler import _near_deadline
+        now = datetime.now(timezone.utc)
+        checked = row.checked_at.replace(tzinfo=timezone.utc) if row.checked_at.tzinfo is None else row.checked_at
+        window = (config.PAI_RESEARCH_DEADLINE_FRESHNESS_DAYS if _near_deadline(row, now.date())
+                  else config.PAI_RESEARCH_FRESHNESS_DAYS)
+        return now - timedelta(days=max(1, window)) <= checked <= now
+
     def cached(self, workspace_id, payload):
         """Reuse only explicitly public, official facts; clone no private route data."""
         from app.config import config
@@ -215,12 +232,13 @@ class RequirementStore:
                     if ((row.verification_checks or {}).get("public_cache") or {}).get("key") == key]
         if not eligible:
             return None
+        own = next((item for item, opportunity in pairs if opportunity.workspace_id == workspace_id
+            and (opportunity.route or {}).get("program_id") == (payload.get("route") or {}).get("program_id")), None)
+        if own is not None and own.status != "verified":
+            return None
         row, opportunity = eligible[0]
-        now = datetime.now(timezone.utc)
-        checked = row.checked_at.replace(tzinfo=timezone.utc) if row.checked_at.tzinfo is None else row.checked_at
-        window = (config.PAI_RESEARCH_DEADLINE_FRESHNESS_DAYS if _near_deadline(row, now.date())
-                  else config.PAI_RESEARCH_FRESHNESS_DAYS)
-        if (row.status != "verified" or checked < now - timedelta(days=max(1, window))
+        if (row.status != "verified" or not self.is_fresh(row)
+                or not ((row.verification_checks or {}).get("public_cache") or {}).get("passed")
                 or not official_url(url, self.official_domains(opportunity.institution))):
             return None
         if opportunity.workspace_id == workspace_id:
@@ -233,7 +251,9 @@ class RequirementStore:
             country=payload["country"], level=payload.get("level"), intake=payload.get("intake"),
             institution=opportunity.institution, url=url)
         clone = RequirementSet(id=str(uuid4()), opportunity_id=local.id,
-            rules=deepcopy(row.rules), fees=deepcopy(row.fees), deadlines=deepcopy(row.deadlines),
+            rules=[_public_claim(claim) for claim in row.rules or []],
+            fees={key: _public_claim(claim) for key, claim in (row.fees or {}).items()},
+            deadlines={key: _public_claim(claim) for key, claim in (row.deadlines or {}).items()},
             source_url=url, checked_at=row.checked_at, status="verified", version=1,
             verified_at=row.verified_at, cycle_label=row.cycle_label,
             verification_checks={"public_cache": {"key": key, "passed": True}})

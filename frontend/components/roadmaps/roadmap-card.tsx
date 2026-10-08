@@ -1,4 +1,5 @@
 'use client';
+import { RoadmapFit } from './roadmap-fit';
 
 import { ExternalLink, Heart, MessageCircle, X } from 'lucide-react';
 import type { Roadmap } from '@/lib/roadmaps';
@@ -25,7 +26,7 @@ export function RoadmapCard({ roadmap, busy, onAction, onDetails }: {
     <div className="flex items-start justify-between gap-3">
       <div>
         <p className="text-[11px] font-semibold uppercase tracking-wide text-primary">{originLabel}</p>
-        <h3 className="mt-1 text-base font-semibold">{roadmap.title}</h3>
+        <h3 className="mt-1 text-base font-semibold">{roadmap.title || t('roadmapFit.routeTitle')}</h3>
         {routeDetail && <p className="mt-1 text-xs text-muted-foreground">{routeDetail}</p>}
       </div>
       <button type="button" disabled={busy}
@@ -55,7 +56,8 @@ export function RoadmapCard({ roadmap, busy, onAction, onDetails }: {
       <div className="mt-1 flex flex-wrap gap-1.5">{Object.entries(roadmap.fit_dimensions).map(([area, fit]) =>
         <span key={area} title={fit.reason || undefined} className="rounded-full border px-2 py-1">{area}: {fit.level}</span>)}</div>
     </div>}
-    {roadmap.gaps.length > 0 && <div className="mt-3 text-sm">
+    <RoadmapFit roadmap={roadmap} compact />
+    {!roadmap.lane && roadmap.gaps.length > 0 && <div className="mt-3 text-sm">
       <p className="font-medium">{t('counselorRoadmaps.gaps')}</p>
       <ul className="mt-1 list-disc space-y-1 pl-5 text-muted-foreground">
         {roadmap.gaps.slice(0, 3).map((gap, index) => <li key={`${gap.field || 'gap'}-${index}`}>
@@ -88,7 +90,7 @@ export function RoadmapCard({ roadmap, busy, onAction, onDetails }: {
       {roadmap.generation_status === 'ready' && !roadmap.chosen_at && !roadmap.dismissed_at &&
         <button type="button" disabled={busy} onClick={() => onAction('rethink', roadmap)}
           className="rounded-lg border px-3 py-1.5 text-xs hover:bg-muted disabled:opacity-50">{t('counselorRoadmaps.rethink')}</button>}
-      {['failed', 'stale'].includes(roadmap.generation_status) &&
+      {['failed', 'stale', 'needs_info'].includes(roadmap.generation_status) &&
         <button type="button" disabled={busy} onClick={() => onAction('retry', roadmap)}
           className="rounded-lg border px-3 py-1.5 text-xs hover:bg-muted disabled:opacity-50">{t('counselorRoadmaps.retry')}</button>}
       {!roadmap.chosen_at && <button type="button" disabled={busy}

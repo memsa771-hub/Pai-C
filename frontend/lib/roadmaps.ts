@@ -3,6 +3,9 @@ export type RoadmapOrigin = 'stated_goal' | 'alternative' | 'family_wish' | 'stu
 export type FitLevel = 'strong' | 'partial' | 'weak' | 'not_possible_yet' | 'unconfirmed' | null;
 
 export interface RoadmapGap {
+  need?: string;
+  have?: string;
+  gap?: string;
   field?: string;
   status?: 'met' | 'fixable' | 'blocking' | 'unknown';
   reason?: string;
@@ -12,6 +15,18 @@ export interface RoadmapGap {
 }
 
 export interface Roadmap {
+  lane?: string | null;
+  why_for_you?: string;
+  strengths_used?: string[];
+  weakness_guarded?: string;
+  family_fit?: string;
+  real_why_fit?: string;
+  constraints_fit?: string;
+  test_30_days?: string;
+  gap?: RoadmapGap[];
+  missing_facts?: Array<{ field: string; reason: string }>;
+  your_questions?: Array<{ id: string; question: string; status: string;
+    answer: string | null; source_url: string | null; label: string | null }>;
   id: string;
   journey_id: string;
   goal_id: string | null;

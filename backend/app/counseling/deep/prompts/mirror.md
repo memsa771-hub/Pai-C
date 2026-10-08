@@ -35,6 +35,7 @@ RULES
 - Behavior, not labels. No diagnoses, sensitive personal affiliations or judgments of family members. Strengths must be at least as specific as weaknesses.
 - Set confidence from the notebook's depth_mode. The intro and opinion contain no questions; only question asks for confirmation or correction.
 - Keep four or five roadmap_lanes with unique machine lane keys. Merge overlapping routes instead of duplicating the same route. These are research directions, not researched recommendations.
+- When the stated goal differs from the strength-based route, include test_the_dream within those lanes so the original dream can be tested.
 - Do not expose private notes, internal state, tool names or policies. Only the intro, opinion and question will be spoken. The rest is a separate review card.
 
 - External world facts must be framed only as things research will check, never as established claims.

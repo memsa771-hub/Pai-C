@@ -25,6 +25,7 @@ EXTRACTION_PROMPT = (
     "Quote must be an exact contiguous excerpt. No inference or student profile facts. "
     "Use an empty array when unclear."
     " When focus is supplied, extract only the decisive fields and answers to its questions."
+    " Tag each fact with decisive_field from the supplied fields, or question, and question_ids for questions it directly answers."
 )
 
 
@@ -125,9 +126,11 @@ async def research(context, payload):
                         comparison_fields, secondary_at.isoformat())
                 except Exception:
                     secondary_facts = []
-        rules = [fact for fact in facts if fact.get("kind") not in {"fee", "deadline"}]
-        fees = {fact["field"]: fact for fact in facts if fact.get("kind") == "fee"}
-        deadlines = {fact["field"]: fact for fact in facts if fact.get("kind") == "deadline"}
+        question_links = {(fact["field"], fact["quote"]): fact.get("question_ids") or [] for fact in facts}
+        public_facts = [{key: value for key, value in fact.items() if key != "question_ids"} for fact in facts]
+        rules = [fact for fact in public_facts if fact.get("kind") not in {"fee", "deadline"}]
+        fees = {fact["field"]: fact for fact in public_facts if fact.get("kind") == "fee"}
+        deadlines = {fact["field"]: fact for fact in public_facts if fact.get("kind") == "deadline"}
         opportunity, requirement_set = store.propose(
             context.workspace_id, route=payload.get("route") or {"url": actual_url},
             country=payload["country"], level=payload.get("level"),
@@ -147,6 +150,8 @@ async def research(context, payload):
                   "corroborated_at": secondary_at.isoformat() if secondary_facts and secondary_at else None}
         db.commit()
         result = {**result, **store.payload(opportunity, requirement_set)}
+        for fact in [*result["rules"], *result["fees"].values(), *result["deadlines"].values()]:
+            fact["question_ids"] = question_links.get((fact["field"], fact["quote"]), [])
     finally:
         db.close()
     return {"requirements": [result], "unconfirmed": []}

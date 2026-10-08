@@ -107,13 +107,21 @@ class RoadmapService:
     def prepare_retry(self, workspace_id: str, roadmap_id: str) -> tuple[str, dict]:
         """Retry the prior research brief while keeping this card and its state."""
         roadmap, _ = self._require(workspace_id, roadmap_id, lock=True)
-        if roadmap.generation_status not in {"failed", "stale"}:
-            raise RoadmapError("Only failed or stale research can be retried")
-        previous = self.db.get(ExecutionRun, roadmap.execution_run_id)
-        if (previous is None or previous.workspace_id != workspace_id
+        from app.counseling.research_gateway import mirror_is_current
+        if not mirror_is_current(self.db, workspace_id):
+            raise RoadmapError("Confirm your current Mirror before retrying research")
+        if roadmap.generation_status not in {"failed", "stale", "needs_info"}:
+            raise RoadmapError("Only failed or stale or incomplete research can be retried")
+        previous = self.db.get(ExecutionRun, roadmap.execution_run_id) if roadmap.execution_run_id else None
+        if previous is None and roadmap.origin == "student_added":
+            constraints = {"capability_input": {"brief": {}}}
+            objective = roadmap.title
+        elif (previous is None or previous.workspace_id != workspace_id
                 or previous.task_type != "roadmap_research"):
             raise RoadmapError("Previous research brief is unavailable")
-        constraints = deepcopy(previous.constraints or {})
+        else:
+            constraints = deepcopy(previous.constraints or {})
+            objective = previous.objective
         capability_input = constraints.get("capability_input") or {}
         brief = capability_input.get("brief")
         if not isinstance(brief, dict):
@@ -131,6 +139,7 @@ class RoadmapService:
             url = (roadmap.route or {}).get("url")
             if public_https(url):
                 brief["refresh_candidate"] = {
+                      "lane": roadmap.lane,
                     "url": url, "title": roadmap.title, "origin": roadmap.origin,
                     "country": (roadmap.route or {}).get("country"),
                     "level": (roadmap.route or {}).get("level"),
@@ -143,7 +152,7 @@ class RoadmapService:
             JourneyService(self.db).set_counselor_stage(
                 workspace_id, journey.id, "RESEARCHING", actor="human:student")
         self.db.flush()
-        return previous.objective, constraints
+        return objective, constraints
 
     def for_run(self, workspace_id: str, run_id: str, *, presented=False) -> list[dict]:
         pairs = self.db.execute(select(Roadmap, RoadmapStudentState).join(
@@ -160,13 +169,13 @@ class RoadmapService:
     @staticmethod
     def serialize(roadmap: Roadmap, state: RoadmapStudentState) -> dict:
         return {key: getattr(roadmap, key) for key in (
-            "id", "workspace_id", "journey_id", "goal_id", "origin", "title", "route",
+            "id", "workspace_id", "journey_id", "goal_id", "origin", "title", "route", "lane",
             "fit_level", "fit_dimensions", "gaps", "steps", "total_cost", "time_to_start",
             "risks", "sources", "generation_status", "execution_run_id", "version",
             "scholarships",
             "stale_reason",
             "requirement_set_id",
-        )} | {
+        )} | ((roadmap.route or {}).get("counselor_fit") or {}) | {"gap": roadmap.gaps} | {
             "favorite": state.favorite, "exploring": state.exploring,
             "dismissed_at": state.dismissed_at.isoformat() if state.dismissed_at else None,
             "chosen_at": state.chosen_at.isoformat() if state.chosen_at else None,
@@ -180,6 +189,12 @@ class RoadmapService:
         if run.task_type != "roadmap_research":
             raise RoadmapError("Run does not own roadmap research")
         artifact = ((run.result or {}).get("capability_result") or {})
+        if not artifact.get("mirror_version") and (run.constraints or {}).get("mirror_version"):
+            brief = ((run.constraints or {}).get("capability_input") or {}).get("brief") or {}
+            artifact = {"mirror_version": run.constraints["mirror_version"], "roadmaps": [],
+                "light_research": {"lanes": [], "decisive_fields": brief.get("decisive_fields") or []}}
+        if artifact.get("mirror_version") is not None:
+            return self._publish_mirror_run(run, artifact)
         candidates = artifact.get("roadmaps") or []
         journey_id = str((run.constraints or {}).get("research_key") or "").split(":", 1)[0]
         journey = self.db.execute(select(StudentJourney).where(
@@ -281,6 +296,126 @@ class RoadmapService:
                                          "PAI could not confirm a programme for this direction yet")
                 card.updated_at = _now()
                 changed.append(card.id)
+        self.db.flush()
+        return changed
+
+    def _publish_mirror_run(self, run, artifact):
+        from app.config import config
+        from app.counseling.deep.polish import contains_blocked_script
+        from app.research.requirements import RequirementStore
+        from app.counseling.research_gateway import mirror_is_current
+        from app.models import CounselorNotedQuestion
+        from app.counseling.deep.roadmaps import FIT_FIELDS, fact_index, ground_roadmap, lanes_for_mirror
+
+        version = artifact["mirror_version"]
+        if (run.constraints or {}).get("mirror_version") != version:
+            return []
+        if not mirror_is_current(self.db, run.workspace_id, version):
+            return []
+        journey_id = (run.constraints or {}).get("research_key", "").split(":", 1)[0]
+        journey = self.db.scalar(select(StudentJourney).where(StudentJourney.id == journey_id,
+            StudentJourney.workspace_id == run.workspace_id, StudentJourney.status == "active"))
+        if journey is None or (journey.counselor_summary_draft or {}).get("version") != version:
+            return []
+        brief = ((run.constraints or {}).get("capability_input") or {}).get("brief") or {}
+        research = artifact.get("light_research") or {}
+        facts = fact_index(research)
+        # Reject forged fact IDs: provenance must exist in this workspace's
+        # evidence store. The public cache materializes an isolated local copy.
+        for key, fact in list(facts.items()):
+            row = self.db.scalar(select(RequirementSet).join(Opportunity).where(
+                RequirementSet.id == fact.get("requirement_set_id"), Opportunity.workspace_id == run.workspace_id))
+            stored = RequirementStore.payload(self.db.get(Opportunity, row.opportunity_id), row) if row else {}
+            candidates = [*(stored.get("rules") or []), *(stored.get("fees") or {}).values(),
+                          *(stored.get("deadlines") or {}).values()]
+            match = next((item for item in candidates if item["fact_id"] == key and
+                         item.get("quote") == fact.get("quote") and item.get("source_url") == fact.get("source_url")), None)
+            if match is None: facts.pop(key)
+            else:
+                fact.update(match)
+                fact["label"] = row.status if RequirementStore.is_fresh(row) else "unconfirmed"
+        research = {**research, "lanes": [{**lane, "facts": [facts[item["fact_id"]]
+            for item in lane.get("facts") or [] if item.get("fact_id") in facts]}
+            for lane in research.get("lanes") or []]}
+        changed = []
+        answers = {item["question_id"]: item for item in artifact.get("question_answers") or []
+                   if isinstance(item, dict) and item.get("question_id") and item.get("fact_id") in facts
+                     and facts[item["fact_id"]].get("label") == "verified"
+                     and not contains_blocked_script(facts[item["fact_id"]]["quote"], config.PAI_LANGUAGE_BLOCKED_SCRIPTS)}
+        previous_answers = []
+        requested_ids = {item["id"] for item in brief.get("questions") or []}
+        for question in self.db.scalars(select(CounselorNotedQuestion).where(
+                CounselorNotedQuestion.workspace_id == run.workspace_id,
+                CounselorNotedQuestion.status == "answered")):
+            if question.id in requested_ids:
+                continue
+            evidence = self.db.scalar(select(RequirementSet).join(Opportunity).where(
+                RequirementSet.id == (question.fact_id or "").split(":", 1)[0],
+                Opportunity.workspace_id == run.workspace_id))
+            valid = bool(evidence and evidence.status == "verified" and RequirementStore.is_fresh(evidence)
+                and not contains_blocked_script((question.answer or {}).get("text", ""), config.PAI_LANGUAGE_BLOCKED_SCRIPTS))
+            if not valid:
+                question.status = "unanswered"
+            answer = question.answer or {}
+            previous_answers.append({"id": question.id, "question": question.question_to_research,
+                "status": "answered" if valid else "unanswered", "answer": answer.get("text") if valid else None,
+                "source_url": answer.get("source_url") if valid else None,
+                "label": "verified" if valid else "unconfirmed"})
+        by_lane = {item.get("lane"): item for item in artifact.get("roadmaps") or [] if isinstance(item, dict)}
+        custom_id = (run.constraints or {}).get("roadmap_id")
+        lanes = ([{"lane": "student_added", "why": (brief.get("custom_roadmap") or {}).get("title", "")}]
+                 if custom_id else lanes_for_mirror(brief.get("mirror") or {}))
+        for lane in lanes:
+            candidate = by_lane.get(lane["lane"], {})
+            # Revalidate at publication, not only at generation. Translate the
+            # generated artifact back to its input contract without trusting status.
+            candidate = {**candidate, "status": candidate.get("generation_status"),
+                         "gap": candidate.get("gap") or []}
+            item = ground_roadmap(candidate, lane, facts, research)
+            if run.status != "completed":
+                item["generation_status"] = "needs_info"
+            roadmap_id = custom_id or str(uuid5(NAMESPACE_URL, f"pai-mirror-roadmap:{journey_id}:{lane['lane']}"))
+            roadmap = self.db.get(Roadmap, roadmap_id)
+            if roadmap is not None and (roadmap.workspace_id != run.workspace_id or roadmap.journey_id != journey_id):
+                raise RoadmapError("Roadmap does not belong to this journey")
+            if roadmap is None:
+                roadmap = Roadmap(id=roadmap_id, workspace_id=run.workspace_id, journey_id=journey_id,
+                    lane=lane["lane"], origin=item["origin"], title=item["title"], version=1)
+                self.db.add(roadmap); self.db.flush()
+                self.db.add(RoadmapStudentState(roadmap_id=roadmap_id, journey_id=journey_id))
+            elif roadmap.execution_run_id != run.id:
+                roadmap.version += 1
+            fit = {key: item.get(key) for key in FIT_FIELDS}
+            if custom_id: fit["lane"] = "student_added"
+            fit.update(missing_facts=item["missing_facts"], mirror_version=version,
+                       facts=item.get("facts") or [], citations=item.get("citations") or {})
+            fit["your_questions"] = [{"id": question["id"], "question": question["question"],
+                "status": "answered" if question["id"] in answers else "unanswered",
+                "answer": facts[answers[question["id"]]["fact_id"]]["quote"] if question["id"] in answers else None,
+                "source_url": facts[answers[question["id"]]["fact_id"]]["source_url"] if question["id"] in answers else None,
+                "label": facts[answers[question["id"]]["fact_id"]]["label"] if question["id"] in answers else None}
+                for question in brief.get("questions") or []] + previous_answers
+            previous_status = roadmap.generation_status
+            roadmap.route = {**item["route"], "counselor_fit": fit}
+            roadmap.title = item["title"]; roadmap.gaps = item["gap"]
+            roadmap.steps = item["steps"]; roadmap.risks = item["risks"]
+            roadmap.sources = item["sources"]; roadmap.generation_status = item["generation_status"]
+            roadmap.requirement_set_id = item["requirement_set_id"]
+            roadmap.execution_run_id = run.id; roadmap.updated_at = _now(); roadmap.stale_reason = None
+            if item["generation_status"] == "ready" and previous_status != "ready":
+                self._notify_ready(run.workspace_id, roadmap, refreshed=previous_status == "stale")
+            changed.append(roadmap.id)
+        for question in brief.get("questions") or []:
+            row = self.db.scalar(select(CounselorNotedQuestion).where(
+                CounselorNotedQuestion.id == question["id"], CounselorNotedQuestion.workspace_id == run.workspace_id))
+            if not row: continue
+            answer = answers.get(row.id)
+            fact = facts.get(answer["fact_id"]) if answer else None
+            if fact and fact.get("label") == "verified":
+                row.status = "answered"; row.fact_id = fact["fact_id"]
+                row.answer = {"text": fact["quote"], "source_url": fact["source_url"], "label": fact["label"]}
+            elif row.status != "answered":
+                row.status = "unanswered"
         self.db.flush()
         return changed
 
@@ -409,6 +544,11 @@ class RoadmapService:
             raise RoadmapError("Counselor has not presented a route for choice")
         if state.presented_at is None or state.dismissed_at or roadmap.generation_status != "ready":
             raise RoadmapError("Only a presented, ready roadmap can be chosen")
+        mirror_version = ((roadmap.route or {}).get("counselor_fit") or {}).get("mirror_version")
+        if mirror_version is not None:
+            from app.counseling.research_gateway import mirror_is_current
+            if not mirror_is_current(self.db, workspace_id, mirror_version):
+                raise RoadmapError("This route needs research for the current Mirror")
         try:
             expiry_text, signature = token.split(".", 1)
             expiry = int(expiry_text)
@@ -425,7 +565,7 @@ class RoadmapService:
             workspace_id, journey.id, "CHOSEN", actor="human:student", validated_choice=True)
         state.chosen_at = _now()
         draft = journey.counselor_summary_draft or {}
-        confirmed_summary = (draft.get("summary") if draft.get("status") == "confirmed"
+        confirmed_summary = (draft.get("mirror") or draft.get("summary") if draft.get("status") == "confirmed"
                              else None)
         assumptions = []
         if not isinstance(confirmed_summary, dict):

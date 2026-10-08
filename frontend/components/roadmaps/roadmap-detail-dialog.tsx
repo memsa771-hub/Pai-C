@@ -1,4 +1,5 @@
 'use client';
+import { RoadmapFit } from './roadmap-fit';
 
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
@@ -71,6 +72,7 @@ export function RoadmapDetailDialog({ roadmapId, onClose, onReported }: {
         {loading && <p role="status">{t('counselorRoadmaps.loading')}</p>}
         {error && <p role="alert" className="text-destructive">{error}</p>}
         {detail && <>
+          <RoadmapFit roadmap={detail} />
           <section>
             <h3 className="font-semibold">{t('counselorRoadmaps.routeSummary')}</h3>
             <p className="mt-1 text-muted-foreground">{readable(detail.route.country)} {readable(detail.route.level)} {readable(detail.route.intake)}</p>
@@ -84,7 +86,7 @@ export function RoadmapDetailDialog({ roadmapId, onClose, onReported }: {
             <ul className="mt-1 space-y-1">{Object.entries(detail.fit_dimensions).map(([name, item]) =>
               <li key={name}><strong>{name}:</strong> {item.level} — {item.reason}</li>)}</ul>
           </section>}
-          {detail.gaps.length > 0 && <section>
+          {!detail.lane && detail.gaps.length > 0 && <section>
             <h3 className="font-semibold">{t('counselorRoadmaps.gaps')}</h3>
             <ul className="mt-1 space-y-2">{detail.gaps.map((gap, index) =>
               <li key={`${gap.field || 'gap'}-${index}`}>{gap.reason || gap.status}

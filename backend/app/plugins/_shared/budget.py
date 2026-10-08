@@ -22,6 +22,10 @@ class ResearchBudget:
     def spend(self, tool_name: str) -> str | None:
         if time.monotonic() >= self.deadline:
             return "research_time_budget_exceeded"
+        if tool_name in {"web.search", "web.institution_registry"} and self.queries_left <= 0:
+            return "research_query_budget_exceeded"
+        if tool_name == "web.fetch" and self.fetches_left <= 0:
+            return "research_fetch_budget_exceeded"
         if tool_name in {"web.search", "web.fetch", "web.institution_registry", "model"} and self.workspace_id:
             from app.config import config
             from app.database import new_session

@@ -1,0 +1,150 @@
+[
+  {
+    "lane": "stated_goal",
+    "title": "Explore the original wish.",
+    "why_for_you": "Based on your described experience",
+    "strengths_used": [
+      "Practical work"
+    ],
+    "weakness_guarded": "Test the interest before committing",
+    "family_fit": "Discuss the concerns you described",
+    "real_why_fit": "Compare this with your stated motivation",
+    "constraints_fit": "Check whether it respects your stated limits",
+    "gap": [
+      {
+        "need": "Verified route requirements",
+        "have": "Student-reported education",
+        "gap": "Requirements still need evidence"
+      }
+    ],
+    "test_30_days": "Try a small relevant project and review how it felt",
+    "generation_status": "needs_info",
+    "missing_facts": [
+      {
+        "field": "eligibility",
+        "reason": "missing_decisive_fact"
+      }
+    ],
+    "sources": [],
+    "your_questions": [
+      {
+        "id": "fixture-question",
+        "question": "What is required?",
+        "status": "unanswered",
+        "answer": null,
+        "source_url": null
+      }
+    ]
+  },
+  {
+    "lane": "strength_based",
+    "title": "Explore demonstrated strengths.",
+    "why_for_you": "Based on your described experience",
+    "strengths_used": [
+      "Practical work"
+    ],
+    "weakness_guarded": "Test the interest before committing",
+    "family_fit": "Discuss the concerns you described",
+    "real_why_fit": "Compare this with your stated motivation",
+    "constraints_fit": "Check whether it respects your stated limits",
+    "gap": [
+      {
+        "need": "Verified route requirements",
+        "have": "Student-reported education",
+        "gap": "Requirements still need evidence"
+      }
+    ],
+    "test_30_days": "Try a small relevant project and review how it felt",
+    "generation_status": "needs_info",
+    "missing_facts": [
+      {
+        "field": "eligibility",
+        "reason": "missing_decisive_fact"
+      }
+    ],
+    "sources": [],
+    "your_questions": [
+      {
+        "id": "fixture-question",
+        "question": "What is required?",
+        "status": "unanswered",
+        "answer": null,
+        "source_url": null
+      }
+    ]
+  },
+  {
+    "lane": "safe_or_local",
+    "title": "Respect current constraints.",
+    "why_for_you": "Based on your described experience",
+    "strengths_used": [
+      "Practical work"
+    ],
+    "weakness_guarded": "Test the interest before committing",
+    "family_fit": "Discuss the concerns you described",
+    "real_why_fit": "Compare this with your stated motivation",
+    "constraints_fit": "Check whether it respects your stated limits",
+    "gap": [
+      {
+        "need": "Verified route requirements",
+        "have": "Student-reported education",
+        "gap": "Requirements still need evidence"
+      }
+    ],
+    "test_30_days": "Try a small relevant project and review how it felt",
+    "generation_status": "needs_info",
+    "missing_facts": [
+      {
+        "field": "eligibility",
+        "reason": "missing_decisive_fact"
+      }
+    ],
+    "sources": [],
+    "your_questions": [
+      {
+        "id": "fixture-question",
+        "question": "What is required?",
+        "status": "unanswered",
+        "answer": null,
+        "source_url": null
+      }
+    ]
+  },
+  {
+    "lane": "test_the_dream",
+    "title": "Test the wish through experience.",
+    "why_for_you": "Based on your described experience",
+    "strengths_used": [
+      "Practical work"
+    ],
+    "weakness_guarded": "Test the interest before committing",
+    "family_fit": "Discuss the concerns you described",
+    "real_why_fit": "Compare this with your stated motivation",
+    "constraints_fit": "Check whether it respects your stated limits",
+    "gap": [
+      {
+        "need": "Verified route requirements",
+        "have": "Student-reported education",
+        "gap": "Requirements still need evidence"
+      }
+    ],
+    "test_30_days": "Try a small relevant project and review how it felt",
+    "generation_status": "needs_info",
+    "missing_facts": [
+      {
+        "field": "eligibility",
+        "reason": "missing_decisive_fact"
+      }
+    ],
+    "sources": [],
+    "your_questions": [
+      {
+        "id": "fixture-question",
+        "question": "What is required?",
+        "status": "unanswered",
+        "answer": null,
+        "source_url": null
+      }
+    ]
+  }
+]
