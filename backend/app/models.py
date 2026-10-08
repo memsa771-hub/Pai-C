@@ -130,6 +130,34 @@ class Workspace(Base):
     )
 
 
+class CounselorNotebook(Base):
+    """Private Counselor working notes for one student workspace."""
+
+    __tablename__ = "counselor_notebooks"
+
+    id = Column(UUID(as_uuid=False), primary_key=True, default=_uuid)
+    workspace_id = Column(UUID(as_uuid=False), ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False, unique=True)
+    notebook = Column(JSONB, nullable=False)
+    version = Column(Integer, nullable=False)
+    updated_at = Column(DateTime(timezone=True), nullable=False, default=_now)
+    last_event_id = Column(Text, nullable=False)
+
+
+class CounselorNotebookHistory(Base):
+    """Immutable snapshot of each accepted notebook version."""
+
+    __tablename__ = "counselor_notebook_history"
+
+    id = Column(UUID(as_uuid=False), primary_key=True, default=_uuid)
+    workspace_id = Column(UUID(as_uuid=False), ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False)
+    version = Column(Integer, nullable=False)
+    notebook = Column(JSONB, nullable=False)
+    source_event_id = Column(Text, nullable=False)
+    created_at = Column(DateTime(timezone=True), nullable=False, default=_now)
+
+    __table_args__ = (UniqueConstraint("workspace_id", "version", name="uq_counselor_notebook_history_version"),)
+
+
 class WorkspaceMember(Base):
     """Agent membership in a workspace (network membership)."""
     __tablename__ = "workspace_members"
