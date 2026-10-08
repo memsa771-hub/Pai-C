@@ -20,7 +20,6 @@ from app.models import ExecutionRun, Roadmap, StudentRequest, User, Workspace
 from app.plugins._shared.sources import public_https
 
 logger = logging.getLogger(__name__)
-_NOTEBOOK_TOKEN_BUDGET = 1800
 _NOTEBOOK_ORDER = (
     "open_questions", "coverage", "claims", "family", "constraints",
     "mirror_ready", "depth_mode", "engagement_style", "stated_goal", "person",
@@ -58,12 +57,12 @@ def _trim_notebook(notebook) -> dict:
             kept = []
             for item in value:
                 candidate = {**selected, key: [*kept, item]}
-                if estimated_tokens(_json(candidate)) > _NOTEBOOK_TOKEN_BUDGET:
+                if estimated_tokens(_json(candidate)) > config.PAI_COUNSELOR_NOTEBOOK_CONTEXT_TOKENS:
                     break
                 kept.append(item)
             value = kept
         candidate = {**selected, key: value}
-        if estimated_tokens(_json(candidate)) <= _NOTEBOOK_TOKEN_BUDGET:
+        if estimated_tokens(_json(candidate)) <= config.PAI_COUNSELOR_NOTEBOOK_CONTEXT_TOKENS:
             selected[key] = value
     return selected
 

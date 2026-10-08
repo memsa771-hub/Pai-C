@@ -55,6 +55,16 @@ async def test_invalid_json_falls_back_to_plain_text_without_action():
 
 
 @pytest.mark.asyncio
+async def test_malformed_string_fragment_does_not_reach_student():
+    with StudentSession() as student, student.factory() as db:
+        with patch("app.counseling.deep.turn.chat_completion",
+                   new=AsyncMock(return_value='Tell me more?\\",')):
+            result = await run_deep_turn(db, _turn(student))
+        assert result.reply == "Tell me more?"
+        assert result.action["type"] == "none"
+
+
+@pytest.mark.asyncio
 async def test_fenced_json_parse_retry_never_displays_json():
     with StudentSession() as student, student.factory() as db:
         with patch("app.counseling.deep.turn.chat_completion",
@@ -65,15 +75,12 @@ async def test_fenced_json_parse_retry_never_displays_json():
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("opener", ["Great,", "Zabardast,", "bohat acha,", "bahut acha,",
-                                          "kya baat hai,", "shabash,", "wah,", "بہت اچھا،",
-                                          "زبردست،", "شاباش،"])
-async def test_praise_openers_removed_and_two_questions_trimmed(opener):
+async def test_question_trim_leaves_opening_wording_for_prompt_and_eval():
     with StudentSession() as student, student.factory() as db:
-        text = f"{opener} Tell me what you built? How long did it take?"
+        text = "Great, tell me what you built? How long did it take?"
         with patch("app.counseling.deep.turn.chat_completion", new=AsyncMock(return_value=_answer(text))):
             result = await run_deep_turn(db, _turn(student))
-        assert result.reply == "Tell me what you built?"
+        assert result.reply == "Great, tell me what you built?"
 
 
 @pytest.mark.asyncio
@@ -105,7 +112,8 @@ async def test_research_action_is_limited_to_five_per_workspace_day():
         context = DeepContext("", {}, CounselorNotebookData(), None, 0)
         executor = AsyncMock()
         executor.execute.return_value = {"ok": True, "data": {"run_id": "run"}}
-        with patch("app.tools.get_tool_executor", return_value=executor):
+        with patch("app.tools.get_tool_executor", return_value=executor), \
+                patch.object(config, "PAI_COUNSELOR_RESEARCH_DAILY_LIMIT", 5):
             statuses = []
             for index in range(6):
                 _, status = await dispatch_action(

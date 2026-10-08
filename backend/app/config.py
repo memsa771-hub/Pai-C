@@ -179,6 +179,10 @@ class Config:
     # probes passed; deepseek-4-flash had degraded to >40s continuation turns).
     PAI_MODEL: str = os.environ.get("PAI_MODEL", "gpt-5.4-mini")
     PAI_COUNSELOR_MODEL: str = os.environ.get("PAI_COUNSELOR_MODEL", "") or PAI_MODEL
+    PAI_COUNSELOR_RESEARCH_DAILY_LIMIT: int = int(os.environ.get("PAI_COUNSELOR_RESEARCH_DAILY_LIMIT", "5"))
+    PAI_COUNSELOR_NOTEBOOK_CONTEXT_TOKENS: int = int(os.environ.get("PAI_COUNSELOR_NOTEBOOK_CONTEXT_TOKENS", "1800"))
+    PAI_COUNSELOR_HISTORY_SIZE: int = int(os.environ.get("PAI_COUNSELOR_HISTORY_SIZE", "20"))
+    PAI_COUNSELOR_SENSITIVE_CHECK_MAX_TOKENS: int = int(os.environ.get("PAI_COUNSELOR_SENSITIVE_CHECK_MAX_TOKENS", "256"))
     PAI_COUNSELOR_MODE: str = os.environ.get("PAI_COUNSELOR_MODE", "deep").strip().lower()
     # Safety cap on the tool-calling loop per user message.
     PAI_MAX_TOOL_ITERATIONS: int = int(os.environ.get("PAI_MAX_TOOL_ITERATIONS", "6"))
@@ -370,6 +374,11 @@ class Config:
         """Reject incomplete production configuration before serving traffic."""
         if self.PAI_COUNSELOR_MODE not in {"deep", "legacy"}:
             raise RuntimeError("PAI_COUNSELOR_MODE must be deep or legacy")
+        if min(self.PAI_COUNSELOR_RESEARCH_DAILY_LIMIT,
+               self.PAI_COUNSELOR_NOTEBOOK_CONTEXT_TOKENS,
+               self.PAI_COUNSELOR_HISTORY_SIZE,
+               self.PAI_COUNSELOR_SENSITIVE_CHECK_MAX_TOKENS) < 1:
+            raise RuntimeError("Deep Counselor limits must be positive")
         if self.PAI_PROFILE_COMPLETION_ROLLOUT_MODE not in {"off", "shadow", "new", "all"}:
             raise RuntimeError(
                 "PAI_PROFILE_COMPLETION_ROLLOUT_MODE must be off, shadow, new, or all"

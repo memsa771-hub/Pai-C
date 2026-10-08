@@ -5,10 +5,10 @@ from pathlib import Path
 
 
 _PROMPT_DIR = Path(__file__).with_name("prompts")
-_NAMES = frozenset({"counselor", "analyst", "mirror", "roadmap_builder"})
+_NAMES = frozenset({"counselor", "analyst", "mirror", "roadmap_builder", "sensitive_check"})
 
 
-@lru_cache(maxsize=4)
+@lru_cache(maxsize=len(_NAMES))
 def load_prompt(name: str) -> str:
     if name not in _NAMES:
         raise ValueError(f"Unknown Counselor prompt: {name}")

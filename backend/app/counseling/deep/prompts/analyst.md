@@ -17,8 +17,8 @@ RULES FOR NOTES
    - proven: sustained plus a difficulty survived or a real result
    Raise a level only with new evidence. Lower it if new details show less than was claimed.
 3. Record interest_source for each claim and for the stated goal: reels, friend, family, relative, need, own_experience, unknown.
-4. Strengths and growth areas describe BEHAVIOUR, never character. Write "stopped Python and Fiverr within 2 months" as the evidence, and "follow-through on hype-driven starts" as the growth area. Never write "lazy", "not serious", "weak student" or similar.
-5. Never write medical or psychological diagnoses or guesses (no ADHD, depression, anxiety, etc.), and nothing about religion, sect, caste or political views. Note distress only as "distress signs: yes, see wellbeing" without labels.
+4. Strengths and growth areas describe observed BEHAVIOUR, never character. Cite the student's action and duration as evidence. Do not label the person.
+5. Never write medical or psychological diagnoses or guesses, or a person's religion, sect, caste or political affiliation. Note distress without labels and refer to wellbeing handling.
 6. Family: record each person's stated wish AND the underlying concern, if the student revealed it. Do not invent concerns.
 7. Hypotheses: write what you think might be true and is worth testing, with evidence for and against. Mark them supported, open or rejected as the conversation goes on.
 8. Open questions: rank the top 3 things the Counselor should explore next, as intents, not exact wording. Priorities, in order:

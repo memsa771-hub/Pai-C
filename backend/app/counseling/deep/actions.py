@@ -7,13 +7,13 @@ from uuid import uuid4
 
 from sqlalchemy import func, select
 
+from app.config import config
 from app.counseling.deep.context import DeepContext
 from app.counseling.deep.turn_input import CounselorTurnInput
 from app.models import EventRecord, Roadmap, Workspace
 
 logger = logging.getLogger(__name__)
 _KNOWN = frozenset({"none", "mirror", "ask_research", "wellbeing", "rethink"})
-_DAILY_RESEARCH_LIMIT = 5
 
 
 def _record(db, turn: CounselorTurnInput, name: str, status: str, **details) -> None:
@@ -53,7 +53,7 @@ async def _research(db, turn: CounselorTurnInput, context: DeepContext, question
         EventRecord.timestamp >= start_ms,
         EventRecord.payload["status"].as_string().in_(("pending", "accepted")),
     )) or 0
-    if used >= _DAILY_RESEARCH_LIMIT:
+    if used >= config.PAI_COUNSELOR_RESEARCH_DAILY_LIMIT:
         _record(db, turn, "ask_research", "ignored", reason="daily_limit")
         return "rate_limited"
     # Reserve the daily slot while the workspace row is locked, then release

@@ -110,7 +110,7 @@ Detailed specs for each milestone are in `docs/counselor/CODEX_COUNSELOR_V3_DEEP
 | PR | Milestone | Spec | Done when |
 |---|---|---|---|
 | **1** | Cleanup + mode flag + memory-hook fix + docs committed | §3 here, [1] | v2 files deleted; `PAI_COUNSELOR_MODE` works; extraction queued in every mode; tests green |
-| **2** | Counselor Notebook storage + service | [2] (with the step 9 fields: `engagement_style`, `depth_mode`, `goal_history`, `chapter`; `coach` stays empty) | Schema validation, evidence required, banned-content stripping, workspace isolation |
+| **2** | Counselor Notebook storage + service | [2] (with the step 9 fields: `engagement_style`, `depth_mode`, `goal_history`, `chapter`; `coach` stays empty) | Schema validation, evidence required, workspace isolation; content checking follows the Analyst in PR 4 |
 | **3** | Deep Counselor turn (1 model call) + polish + actions | [3] | One call per turn; JSON fallback; one-question trim; Devanagari retry; `mirror` and `ask_research` actions validated |
 | **4** | Analyst job + stage gating (§3.4 stages/handlers) | [4] | Notebook updated after each turn; `mirror_ready` enforced by code per `depth_mode`; no automatic research before mirror confirmation |
 | **5** | Hidden-truth eval harness (first 8 personas incl. Danish, Hamza, Bilal, the task seeker, short answers, Usman/Devanagari) | [7] | Offline fixture run in CI; `--live` report generated; targets reported (they don't have to be met yet) |
@@ -120,6 +120,8 @@ Detailed specs for each milestone are in `docs/counselor/CODEX_COUNSELOR_V3_DEEP
 | **9** | Eval targets + manual test + cleanup doc | [7] targets, [11] | All zero-targets at 0; hidden-truth recall ≥ 0.8 on Danish and ≥ 0.7 average; manual checklist passes; `CLEANUP_AFTER_DEEP.md` written |
 
 **Prompt tuning rule (from PR 5 on):** change only the `.md` prompts, re-run the eval, and keep a change only if recall improves without breaking any zero-target. Log every iteration in `backend/scripts/results/`.
+
+**Generic-only override for PR 3 onward:** no runtime vocabulary lists for sensitive content or praise. PR 4 checks each changed notebook entry with `deep/prompts/sensitive_check.md` in the background before `NotebookService.apply`; storage itself performs schema validation only. Daily research, notebook context, shared-history and reasoning settings have environment overrides. Praise is a prompt and evaluation concern.
 
 ## 5. Speed, grounding and domain (must hold in every PR)
 

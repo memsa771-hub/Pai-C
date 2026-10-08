@@ -50,14 +50,25 @@ def _parse_response(raw: str) -> tuple[str, dict]:
     stripped = raw.strip()
     if stripped.startswith(("{", "[", "```")) or not stripped:
         return _PLAIN_FALLBACK, {"type": "none"}
-    return stripped, {"type": "none"}
+    if stripped.startswith('"'):
+        try:
+            decoded, end = json.JSONDecoder().raw_decode(stripped)
+            if isinstance(decoded, str) and not stripped[end:].strip().strip(","):
+                return decoded, {"type": "none"}
+        except ValueError:
+            pass
+        return _PLAIN_FALLBACK, {"type": "none"}
+    # A truncated JSON string can leave an escaped closing quote and comma
+    # after otherwise readable prose. Remove only that transport fragment.
+    return re.sub(r'\\"\s*,?\s*$', "", stripped), {"type": "none"}
 
 
 async def run_deep_turn(db, turn: CounselorTurnInput) -> DeepTurnResult:
     context = await build_context(db, turn.workspace_id, turn)
     owner_id = turn.source.removeprefix("human:") if turn.source.startswith("human:") else ""
     history = [{"role": item["role"], "content": item["content"]}
-               for item in shared_history(db, turn, owner_id, limit=20)]
+               for item in shared_history(db, turn, owner_id,
+                                          limit=config.PAI_COUNSELOR_HISTORY_SIZE)]
     current = turn.student_text.strip() or "I attached a document."
     messages = [{"role": "user", "content": context.text}, *history,
                 {"role": "user", "content": current}]
