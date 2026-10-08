@@ -1,10 +1,8 @@
-from types import SimpleNamespace
 from unittest.mock import patch
 
 from fastapi.testclient import TestClient
 
 from app.config import config
-from app.counseling.move import plan_move
 from app.database import get_db
 from app.journey import JourneyService
 from app.main import app
@@ -39,10 +37,5 @@ def test_internal_escalation_preserves_history_and_queues_replan():
             assert row.current_stage == "DIRECTION"
             assert row.decisions[-1]["reason_type"] == "blocking_gap"
             assert row.next_recommended_action == {"type": "replan_discussion"}
-            move = plan_move(stage="DIRECTION", requirements=[], states={},
-                             snapshot=SimpleNamespace(), scope="in_scope",
-                             student_question="", emotion="none", language="en",
-                             replanning=True)
-            assert move.type == "replan_discussion"
         finally:
             app.dependency_overrides.pop(get_db, None)

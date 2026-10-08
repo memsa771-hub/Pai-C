@@ -38,7 +38,7 @@ JOB_REFRESH_RESEARCH = "research.refresh_stale"
 
 async def refresh_stale_research(job, db) -> dict:
     """A reported or expired source starts a fresh Counselor research run."""
-    from app.counseling.research_flow import delegate_research_if_ready
+    from app.counseling.research_gateway import request_research
     from app.counseling.understanding import StudentUnderstandingBuilder
     from app.journey import JourneyService
     from app.memory.permissions import capabilities_for_agent
@@ -86,8 +86,9 @@ async def refresh_stale_research(job, db) -> dict:
                                  "country": opportunity.country,
                                  "level": opportunity.level,
                                  "intake": opportunity.intake}
-    result = await delegate_research_if_ready(
-        db, job.workspace_id, journey, goals, understanding, context,
+    result = await request_research(
+        "stale_refresh", job.workspace_id, db=db, journey=journey, goals=goals,
+        understanding=understanding, tool_context=context,
         refresh_key=requirement_id or job.id, refresh_candidate=refresh_candidate)
     return {"delegated": bool(result and result.get("ok"))}
 
@@ -142,21 +143,19 @@ async def resume_research(job, db) -> dict:
     from app.counseling.stages import advance_discovery_stage
     from app.counseling.understanding import StudentUnderstandingBuilder
     from app.journey import JourneyService
-    from app.memory.profile_completion import ProfileCompletionService
     from app.memory.student_snapshot import StudentSnapshotService
     from app.memory.permissions import capabilities_for_agent
     from app.services.pai import PAI_AGENT_NAME, PAI_ALLOWED_TOOLS, PAI_PRIMARY_CHANNEL
     from app.tools import AUDIENCE_COUNSELOR
 
     snapshot = StudentSnapshotService(db).build(job.workspace_id)
-    completion = ProfileCompletionService(db).evaluate(job.workspace_id, snapshot=snapshot)
     owner = db.get(User, workspace.owner_user_id) if workspace.owner_user_id else None
     journeys = JourneyService(db)
     journey = journeys.ensure_counselor(job.workspace_id, actor="system:reconciliation")
     journey = advance_discovery_stage(
         journeys, job.workspace_id, journey,
         identity_ready=bool(owner and owner.onboarded_at),
-        foundation_ready=bool(completion.get("foundationReady")),
+        foundation_ready=_deep_foundation_ready(db, job.workspace_id),
         goal_records=snapshot.records.get("goal", []), actor="system:reconciliation")
     from app.models import Roadmap
     stale = db.execute(select(Roadmap.id).where(
@@ -172,7 +171,10 @@ async def resume_research(job, db) -> dict:
     elif journey.current_stage == "CHOSEN" and stale:
         refresh_key = candidate.id
     understanding = StudentUnderstandingBuilder(db).build(job.workspace_id, snapshot=snapshot)
+    may_delegate = _research_delegate_allowed(journey, refresh_key)
     db.commit()
+    if not may_delegate:
+        return {"resumed": resumed, "delegated": False}
     counselor_ctx = ToolContext(
         workspace_id=job.workspace_id, agent_name=PAI_AGENT_NAME,
         api=WorkspaceApi(job.workspace_id, workspace.password_hash),
@@ -185,6 +187,21 @@ async def resume_research(job, db) -> dict:
         db, job.workspace_id, journey, snapshot.records.get("goal", []),
         understanding, counselor_ctx, refresh_key=refresh_key)
     return {"resumed": resumed, "delegated": bool(delegated and delegated.get("ok"))}
+
+
+def _deep_foundation_ready(db, workspace_id: str) -> bool:
+    from app.counseling.deep.notebook import NotebookService
+
+    coverage = NotebookService(db).get(workspace_id).notebook.coverage
+    return bool(coverage.person and coverage.education)
+
+
+def _research_delegate_allowed(journey, refresh_key: str | None) -> bool:
+    """PR 6 mirror confirmation must set counselor_summary_draft.status='confirmed'."""
+    if refresh_key is not None or journey.current_stage in {"PROPOSED", "CHOSEN"}:
+        return True
+    return (journey.current_stage == "RESEARCHING"
+            and (journey.counselor_summary_draft or {}).get("status") == "confirmed")
 
 
 def _is_duplicate(db, workspace_id: str, item) -> bool:

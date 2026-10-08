@@ -1,0 +1,199 @@
+"""Offline deep Counselor turn, channel parity, actions and grounding."""
+
+import json
+from unittest.mock import AsyncMock, patch
+from uuid import uuid4
+
+import pytest
+from sqlalchemy import select
+
+from app.config import config
+from app.counseling import runtime
+from app.counseling.deep.actions import dispatch_action
+from app.counseling.deep.context import DeepContext, build_context
+from app.counseling.deep.notebook_schema import CounselorNotebookData
+from app.counseling.deep.turn import run_deep_turn
+from app.counseling.deep.turn_input import CounselorTurnInput
+from app.models import EventRecord, User, Workspace
+from scripts.counselor_eval_support import StudentSession
+
+
+def _turn(student, text="I want to study AI", channel="channel/chat", voice=False):
+    return CounselorTurnInput(
+        channel, student.workspace_id, text, (), None, str(uuid4()),
+        student.next_timestamp(), f"human:{student.user_id}", voice,
+    )
+
+
+def _answer(reply, action=None):
+    return json.dumps({"reply": reply, "action": action or {"type": "none"}})
+
+
+@pytest.mark.asyncio
+async def test_normal_deep_turn_uses_one_json_model_call():
+    with StudentSession() as student, student.factory() as db:
+        model = AsyncMock(return_value=_answer("Tell me about your day?"))
+        with patch("app.counseling.deep.turn.chat_completion", model), \
+                patch.object(config, "PAI_API_KEY", "fake"):
+            result = await run_deep_turn(db, _turn(student))
+        assert result.reply == "Tell me about your day?"
+        assert model.await_count == 1
+        assert model.call_args.kwargs["response_format"] == {"type": "json_object"}
+        assert model.call_args.kwargs["model"] == config.PAI_COUNSELOR_MODEL
+        assert model.call_args.kwargs["reasoning_effort"] == "low"
+        system_prompt = model.call_args.kwargs["system_prompt"]
+        assert "<context>" in system_prompt
+        assert "<language_policy>" in system_prompt
+        assert all("<context>" not in item["content"] for item in model.call_args.kwargs["messages"])
+        assert model.call_args.kwargs["messages"][-1] == {"role": "user", "content": "I want to study AI"}
+
+
+@pytest.mark.asyncio
+async def test_invalid_json_falls_back_to_plain_text_without_action():
+    with StudentSession() as student, student.factory() as db:
+        with patch("app.counseling.deep.turn.chat_completion",
+                   new=AsyncMock(return_value="Tell me what you did last week?")) as model:
+            result = await run_deep_turn(db, _turn(student))
+        assert result.reply == "Tell me what you did last week?"
+        assert result.action["type"] == "none"
+        assert model.await_count == 1
+
+
+@pytest.mark.asyncio
+async def test_malformed_string_fragment_does_not_reach_student():
+    with StudentSession() as student, student.factory() as db:
+        with patch("app.counseling.deep.turn.chat_completion",
+                   new=AsyncMock(return_value='Tell me more?\\",')):
+            result = await run_deep_turn(db, _turn(student))
+        assert result.reply == "Tell me more?"
+        assert result.action["type"] == "none"
+
+
+@pytest.mark.asyncio
+async def test_fenced_json_parse_retry_never_displays_json():
+    with StudentSession() as student, student.factory() as db:
+        with patch("app.counseling.deep.turn.chat_completion",
+                   new=AsyncMock(return_value='```json\n{"reply":"What did you make?","action":{"type":"none"}}\n```')) as model:
+            result = await run_deep_turn(db, _turn(student))
+        assert result.reply == "What did you make?"
+        assert model.await_count == 1
+
+
+@pytest.mark.asyncio
+async def test_question_trim_leaves_opening_wording_for_prompt_and_eval():
+    with StudentSession() as student, student.factory() as db:
+        text = "Great, tell me what you built? How long did it take?"
+        with patch("app.counseling.deep.turn.chat_completion", new=AsyncMock(return_value=_answer(text))):
+            result = await run_deep_turn(db, _turn(student))
+        assert result.reply == "Great, tell me what you built?"
+
+
+@pytest.mark.asyncio
+async def test_configured_blocked_script_retries_once_then_uses_configured_fallback():
+    with StudentSession() as student, student.factory() as db:
+        model = AsyncMock(side_effect=[_answer("\u03b1\u03b2?"), _answer("\u03b3\u03b4?")])
+        with patch("app.counseling.deep.turn.chat_completion", model), \
+                patch.object(config, "PAI_LANGUAGE_BLOCKED_SCRIPTS", "Greek"), \
+                patch.object(config, "PAI_LANGUAGE_BLOCKED_SCRIPT_REPLACEMENT", "configured replacement"), \
+                patch.object(config, "PAI_COUNSELOR_FALLBACK_REPLY", "Configured fallback."):
+            result = await run_deep_turn(db, _turn(student))
+        assert model.await_count == 2
+        retry_prompt = model.call_args.kwargs["system_prompt"]
+        assert '"blocked_scripts":["Greek"]' in retry_prompt
+        assert '"replacement":"configured replacement"' in retry_prompt
+        assert "<context>" in retry_prompt
+        assert result.reply == "Configured fallback."
+        assert result.action["type"] == "none"
+
+
+@pytest.mark.asyncio
+async def test_mirror_request_ignored_until_notebook_ready():
+    with StudentSession() as student, student.factory() as db:
+        turn = _turn(student)
+        context = DeepContext("", {}, CounselorNotebookData(), None, 0)
+        kind, status = await dispatch_action(db, turn, {"type": "mirror"}, context)
+        assert (kind, status) == ("mirror", "ignored")
+        row = db.scalar(select(EventRecord).where(EventRecord.type == "counselor.action.mirror"))
+        assert row.payload["reason"] == "not_ready"
+
+
+@pytest.mark.asyncio
+async def test_identity_marked_never_ask_and_other_workspace_excluded():
+    with StudentSession() as student, student.factory() as db:
+        db.get(User, student.user_id).display_name = "Danish"
+        other_user = User(email="another-student@example.test", display_name="Private Other")
+        db.add(other_user)
+        db.flush()
+        db.add(Workspace(name="Other workspace", owner_user_id=other_user.id))
+        db.commit()
+        context = await build_context(db, student.workspace_id, _turn(student))
+        assert '"identity_never_ask"' in context.text
+        assert "Danish" in context.text
+        assert "Private Other" not in context.text
+        assert set(context.section_tokens) == {"today", "language_policy", "profile", "notebook", "memory", "journey"}
+
+
+@pytest.mark.asyncio
+async def test_voice_and_chat_same_turn_have_identical_model_input_and_reply():
+    with StudentSession() as student, student.factory() as db:
+        model = AsyncMock(return_value=_answer("What did you enjoy doing?"))
+        with patch("app.counseling.deep.turn.chat_completion", model):
+            chat = await run_deep_turn(db, _turn(student, channel="channel/chat"))
+            voice = await run_deep_turn(db, _turn(student, channel="channel/voice", voice=True))
+        assert chat.reply == voice.reply
+        assert model.await_args_list[0].kwargs["messages"] == model.await_args_list[1].kwargs["messages"]
+
+
+@pytest.mark.asyncio
+async def test_runtime_posts_and_enqueues_extraction_once():
+    with StudentSession() as student, student.factory() as db:
+        event_data = {"id": str(uuid4()), "source": f"human:{student.user_id}",
+                      "target": "channel/chat", "payload": {"content": "I finished ICS"},
+                      "timestamp": student.next_timestamp(), "metadata": {}}
+        db.add(EventRecord(id=event_data["id"], network_id=student.workspace_id,
+                           type="workspace.message.posted", source=event_data["source"],
+                           target="channel/chat", payload=event_data["payload"],
+                           timestamp=event_data["timestamp"]))
+        db.commit()
+        with patch.object(config, "PAI_API_KEY", "fake"), \
+                patch("app.counseling.deep.turn.chat_completion",
+                      new=AsyncMock(return_value=_answer("What are you doing now?"))) as model, \
+                patch("app.memory.turn_hook.enqueue_turn_extraction") as enqueue:
+            await runtime._run_turn(db, student.workspace_id, event_data, 0)
+        assert student.transcript[-1]["content"] == "What are you doing now?"
+        assert model.await_count == 1
+        enqueue.assert_called_once()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("reply,action,expected_log", [
+    ("I heard you.", {"type": "none"}, True),
+    ("I will show your mirror.", {"type": "mirror"}, False),
+    ("I am here with you.", {"type": "wellbeing"}, False),
+    ("What happened next?", {"type": "none"}, False),
+])
+async def test_runtime_logs_missing_spoken_question_without_student_text(
+    caplog, reply, action, expected_log,
+):
+    with StudentSession() as student, student.factory() as db:
+        event_data = {"id": str(uuid4()), "source": f"human:{student.user_id}",
+                      "target": "channel/chat", "payload": {"content": "Private student input"},
+                      "timestamp": student.next_timestamp(), "metadata": {}}
+        db.add(EventRecord(id=event_data["id"], network_id=student.workspace_id,
+                           type="workspace.message.posted", source=event_data["source"],
+                           target="channel/chat", payload=event_data["payload"],
+                           timestamp=event_data["timestamp"]))
+        db.commit()
+        with patch.object(config, "PAI_API_KEY", "fake"), \
+                patch("app.counseling.deep.turn.chat_completion",
+                      new=AsyncMock(return_value=_answer(reply, action))), \
+                patch("app.counseling.deep.actions.dispatch_action",
+                      new=AsyncMock(return_value=(action["type"], "recorded"))), \
+                patch("app.memory.turn_hook.enqueue_turn_extraction"), \
+                caplog.at_level("INFO", logger="app.counseling.runtime"):
+            await runtime._run_turn(db, student.workspace_id, event_data, 0)
+        matching = [record for record in caplog.records if "reply_without_question" in record.message]
+        assert bool(matching) is expected_log
+        if matching:
+            assert event_data["id"] in matching[0].message
+            assert "Private student input" not in matching[0].message

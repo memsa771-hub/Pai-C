@@ -130,6 +130,51 @@ class Workspace(Base):
     )
 
 
+class CounselorNotedQuestion(Base):
+    """A student fact question deferred until roadmap research."""
+
+    __tablename__ = "counselor_noted_questions"
+    id = Column(UUID(as_uuid=False), primary_key=True, default=_uuid)
+    workspace_id = Column(UUID(as_uuid=False), ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False)
+    question_to_research = Column(Text, nullable=False)
+    source_event_id = Column(Text, ForeignKey("events.id", ondelete="CASCADE"), nullable=False)
+    status = Column(Text, nullable=False, default="open", server_default=text("'open'"))
+    created_at = Column(DateTime(timezone=True), nullable=False, default=_now)
+    __table_args__ = (
+        UniqueConstraint("workspace_id", "source_event_id", name="uq_counselor_noted_question_event"),
+        CheckConstraint("length(trim(question_to_research)) > 0", name="ck_counselor_noted_question_text"),
+        Index("idx_counselor_noted_question_status", "workspace_id", "status"),
+    )
+
+
+class CounselorNotebook(Base):
+    """Private Counselor working notes for one student workspace."""
+
+    __tablename__ = "counselor_notebooks"
+
+    id = Column(UUID(as_uuid=False), primary_key=True, default=_uuid)
+    workspace_id = Column(UUID(as_uuid=False), ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False, unique=True)
+    notebook = Column(JSONB, nullable=False)
+    version = Column(Integer, nullable=False)
+    updated_at = Column(DateTime(timezone=True), nullable=False, default=_now)
+    last_event_id = Column(Text, nullable=False)
+
+
+class CounselorNotebookHistory(Base):
+    """Immutable snapshot of each accepted notebook version."""
+
+    __tablename__ = "counselor_notebook_history"
+
+    id = Column(UUID(as_uuid=False), primary_key=True, default=_uuid)
+    workspace_id = Column(UUID(as_uuid=False), ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False)
+    version = Column(Integer, nullable=False)
+    notebook = Column(JSONB, nullable=False)
+    source_event_id = Column(Text, nullable=False)
+    created_at = Column(DateTime(timezone=True), nullable=False, default=_now)
+
+    __table_args__ = (UniqueConstraint("workspace_id", "version", name="uq_counselor_notebook_history_version"),)
+
+
 class WorkspaceMember(Base):
     """Agent membership in a workspace (network membership)."""
     __tablename__ = "workspace_members"

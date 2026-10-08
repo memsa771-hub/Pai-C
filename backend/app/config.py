@@ -178,9 +178,28 @@ class Config:
     # screen of all 23 models: ~7s/2-turn loop, 4/4 valid reps, all quality
     # probes passed; deepseek-4-flash had degraded to >40s continuation turns).
     PAI_MODEL: str = os.environ.get("PAI_MODEL", "gpt-5.4-mini")
-    PAI_COUNSELOR_AUX_MODEL: str = os.environ.get("PAI_COUNSELOR_AUX_MODEL", "")
-    PAI_COUNSELOR_WRITER_MODEL: str = os.environ.get("PAI_COUNSELOR_WRITER_MODEL", "")
-    PAI_COUNSELOR_V2: bool = os.environ.get("PAI_COUNSELOR_V2", "true").lower() in ("true", "1", "yes")
+    PAI_COUNSELOR_MODEL: str = os.environ.get("PAI_COUNSELOR_MODEL", "") or PAI_MODEL
+    PAI_ANALYST_MODEL: str = os.environ.get("PAI_ANALYST_MODEL", "") or PAI_COUNSELOR_MODEL
+    PAI_SENSITIVE_CHECK_MODEL: str = os.environ.get("PAI_SENSITIVE_CHECK_MODEL", "") or PAI_ANALYST_MODEL
+    PAI_ANALYST_HISTORY_SIZE: int = int(os.environ.get("PAI_ANALYST_HISTORY_SIZE", "60"))
+    PAI_ANALYST_REASONING_EFFORT: str = os.environ.get("PAI_ANALYST_REASONING_EFFORT", "low")
+    PAI_SENSITIVE_CHECK_REASONING_EFFORT: str = os.environ.get(
+        "PAI_SENSITIVE_CHECK_REASONING_EFFORT", "low")
+    PAI_MIRROR_COVERAGE_REQUIREMENTS_JSON: str = os.environ.get(
+        "PAI_MIRROR_COVERAGE_REQUIREMENTS_JSON", ""
+    )
+    PAI_LANGUAGE_BLOCKED_SCRIPTS: str = os.environ.get("PAI_LANGUAGE_BLOCKED_SCRIPTS", "Devanagari")
+    PAI_LANGUAGE_BLOCKED_SCRIPT_REPLACEMENT: str = os.environ.get(
+        "PAI_LANGUAGE_BLOCKED_SCRIPT_REPLACEMENT", "Roman Urdu"
+    )
+    PAI_COUNSELOR_FALLBACK_REPLY: str = os.environ.get(
+        "PAI_COUNSELOR_FALLBACK_REPLY",
+        "I want to understand you properly. Could you tell me a little more?",
+    )
+    PAI_COUNSELOR_RESEARCH_DAILY_LIMIT: int = int(os.environ.get("PAI_COUNSELOR_RESEARCH_DAILY_LIMIT", "5"))
+    PAI_COUNSELOR_NOTEBOOK_CONTEXT_TOKENS: int = int(os.environ.get("PAI_COUNSELOR_NOTEBOOK_CONTEXT_TOKENS", "1800"))
+    PAI_COUNSELOR_HISTORY_SIZE: int = int(os.environ.get("PAI_COUNSELOR_HISTORY_SIZE", "20"))
+    PAI_COUNSELOR_SENSITIVE_CHECK_MAX_TOKENS: int = int(os.environ.get("PAI_COUNSELOR_SENSITIVE_CHECK_MAX_TOKENS", "4096"))
     # Safety cap on the tool-calling loop per user message.
     PAI_MAX_TOOL_ITERATIONS: int = int(os.environ.get("PAI_MAX_TOOL_ITERATIONS", "6"))
     # Memory extraction (app/memory/extractor.py). Each falls back to the
@@ -369,6 +388,31 @@ class Config:
 
     def validate_startup(self) -> None:
         """Reject incomplete production configuration before serving traffic."""
+        if not self.PAI_LANGUAGE_BLOCKED_SCRIPT_REPLACEMENT.strip():
+            raise RuntimeError("PAI_LANGUAGE_BLOCKED_SCRIPT_REPLACEMENT must not be empty")
+        if not self.PAI_COUNSELOR_FALLBACK_REPLY.strip():
+            raise RuntimeError("PAI_COUNSELOR_FALLBACK_REPLY must not be empty")
+        import re
+        import regex as unicode_regex
+
+        for script in self.PAI_LANGUAGE_BLOCKED_SCRIPTS.split(","):
+            name = script.strip()
+            if not name:
+                continue
+            if not re.fullmatch(r"[A-Za-z_][A-Za-z_ ]*", name):
+                raise RuntimeError("PAI_LANGUAGE_BLOCKED_SCRIPTS contains an invalid script name")
+            try:
+                pattern = unicode_regex.compile(rf"\p{{Script={name}}}")
+            except unicode_regex.error as exc:
+                raise RuntimeError("PAI_LANGUAGE_BLOCKED_SCRIPTS contains an unknown script") from exc
+            if pattern.search(self.PAI_COUNSELOR_FALLBACK_REPLY):
+                raise RuntimeError("PAI_COUNSELOR_FALLBACK_REPLY uses a blocked script")
+        if min(self.PAI_COUNSELOR_RESEARCH_DAILY_LIMIT,
+               self.PAI_COUNSELOR_NOTEBOOK_CONTEXT_TOKENS,
+               self.PAI_COUNSELOR_HISTORY_SIZE,
+               self.PAI_ANALYST_HISTORY_SIZE,
+               self.PAI_COUNSELOR_SENSITIVE_CHECK_MAX_TOKENS) < 1:
+            raise RuntimeError("Deep Counselor limits must be positive")
         if self.PAI_PROFILE_COMPLETION_ROLLOUT_MODE not in {"off", "shadow", "new", "all"}:
             raise RuntimeError(
                 "PAI_PROFILE_COMPLETION_ROLLOUT_MODE must be off, shadow, new, or all"

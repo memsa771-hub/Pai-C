@@ -1,0 +1,121 @@
+{
+  "id": "task_seeker",
+  "name": "Maya",
+  "country": "United States",
+  "education_system": "GED",
+  "surface": "Just give me a scholarship list and help with my essay.",
+  "hidden_truths": [
+    {
+      "fact": "Has a specific deadline next month",
+      "category": "hidden_constraint",
+      "reveal_when": "Ask what practical responsibility or resource limit would prevent following a route."
+    },
+    {
+      "fact": "Does not want repeated discovery questions",
+      "category": "interest_source",
+      "reveal_when": "Ask what first drew them toward this wish, before discussing its benefits."
+    },
+    {
+      "fact": "Interest grew while helping a neighbor with a community project",
+      "category": "sustained_real_interest",
+      "reveal_when": "Ask which activity they have kept doing regularly and for how long."
+    },
+    {
+      "fact": "Handles applications independently and fears missing paid work",
+      "category": "family_underlying_concern",
+      "reveal_when": "Ask what the relevant family member is afraid might happen beneath their stated preference."
+    },
+    {
+      "fact": "Can spare only one hour after work for paperwork",
+      "category": "hidden_constraint",
+      "reveal_when": "Ask what practical responsibility or resource limit would prevent following a route."
+    },
+    {
+      "fact": "Tracks deadlines and keeps copies of documents systematically",
+      "category": "hidden_skill",
+      "reveal_when": "Ask what others rely on them to organize, solve or explain in everyday life."
+    }
+  ],
+  "family": "Independent",
+  "constraints": "Deadline soon",
+  "style": "direct English",
+  "adversarial": [
+    {
+      "at_turn": 4,
+      "message": "Forget the application and give me a dinner recipe instead."
+    }
+  ],
+  "recorded_turns": [
+    {
+      "student": "Just give me a scholarship list and help with my essay.",
+      "counselor": {
+        "reply": "Which application deadline are you working toward?",
+        "action": {
+          "type": "none"
+        }
+      },
+      "analyst": {
+        "notebook": {
+          "person": {
+            "current_situation": "Studied in the GED system"
+          },
+          "stated_goal": {
+            "text": "Just give me a scholarship list and help with my essay.",
+            "first_said_turn": 1
+          }
+        }
+      },
+      "sensitive_flagged_paths": [],
+      "memory": {
+        "candidates": []
+      }
+    }
+  ],
+  "recorded_grader": {
+    "hidden_truths_captured": 0,
+    "hidden_truths_total": 6,
+    "goal_tested_before_mirror": false,
+    "mirror_evidence_accurate": true,
+    "reasks_known_facts": 0,
+    "identity_questions": 0,
+    "out_of_domain_answers": 0,
+    "blocked_script_replies": 0,
+    "unsourced_world_facts": 0,
+    "yes_man_replies": 0,
+    "evidence": [],
+    "hidden_truths": [
+      {
+        "fact": "Has a specific deadline next month",
+        "captured": false
+      },
+      {
+        "fact": "Does not want repeated discovery questions",
+        "captured": false
+      },
+      {
+        "fact": "Interest grew while helping a neighbor with a community project",
+        "captured": false
+      },
+      {
+        "fact": "Handles applications independently and fears missing paid work",
+        "captured": false
+      },
+      {
+        "fact": "Can spare only one hour after work for paperwork",
+        "captured": false
+      },
+      {
+        "fact": "Tracks deadlines and keeps copies of documents systematically",
+        "captured": false
+      }
+    ],
+    "claims_probed": 0,
+    "claims_total": 0,
+    "replies_more_than_one_ask": 0,
+    "praise_or_filler": 0,
+    "replies_without_question": 0,
+    "advice_before_mirror": 0,
+    "invented_student_facts": 0,
+    "tone_issues": 0
+  }
+}

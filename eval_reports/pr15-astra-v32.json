@@ -1,0 +1,142 @@
+{
+  "model": "gpt-6-astra",
+  "reasoning_effort": "low",
+  "turns": [
+    {
+      "turn": 1,
+      "student": "AoA. mujhe AI engineer banna hai aur Canada jana hai. kaise jaun?",
+      "reply": "Wa alaikum assalam, Danish. AI engineer banne aur Canada jane ki baat par wapas aayenge; pehle aapko samajhna chahta hoon. Aaj kal aap kya kar rahe hain?",
+      "action": {
+        "type": "none"
+      },
+      "total_ms": 4589,
+      "model_calls": 1,
+      "usage": {
+        "input_tokens": 2212,
+        "cached_input_tokens": 0,
+        "output_tokens": 65,
+        "reasoning_tokens": 0,
+        "estimated_usd": 0.02537
+      }
+    },
+    {
+      "turn": 2,
+      "student": "ICS kiya hai is saal, result aa gaya. Ab free hoon",
+      "reply": "Is saal ICS ke baad ab aap free hain. Aaj kal aapka aam din kaise guzarta hai?",
+      "action": {
+        "type": "none"
+      },
+      "total_ms": 6518,
+      "model_calls": 1,
+      "usage": {
+        "input_tokens": 2287,
+        "cached_input_tokens": 2209,
+        "output_tokens": 43,
+        "reasoning_tokens": 0,
+        "estimated_usd": 0.005139
+      }
+    },
+    {
+      "turn": 3,
+      "student": "68% aaye. Theek hai bas, maths mein kam aaye",
+      "reply": "Aapke 68% aaye, maths mein kam rahe. Maths mein kis cheez par sab se zyada atakte thay?",
+      "action": {
+        "type": "none"
+      },
+      "total_ms": 3614,
+      "model_calls": 1,
+      "usage": {
+        "input_tokens": 2337,
+        "cached_input_tokens": 2284,
+        "output_tokens": 44,
+        "reasoning_tokens": 0,
+        "estimated_usd": 0.005014
+      }
+    },
+    {
+      "turn": 4,
+      "student": "dono thora. Calculus bilkul samajh nahi aata tha. Computer mein acha tha",
+      "reply": "Calculus samajh nahi aata tha, lekin computer mein aap acha mehsoos karte thay. Computer mein khud kiya hua koi kaam bata sakte hain?",
+      "action": {
+        "type": "none"
+      },
+      "total_ms": 4222,
+      "model_calls": 1,
+      "usage": {
+        "input_tokens": 2396,
+        "cached_input_tokens": 2334,
+        "output_tokens": 55,
+        "reasoning_tokens": 0,
+        "estimated_usd": 0.005704
+      }
+    },
+    {
+      "turn": 5,
+      "student": "programming. C++ mein patterns wagaira banana. Python bhi seekha hai maine khud",
+      "reply": "Python aapne khud seekhi. Us mein apne aap kya banaya hai?",
+      "action": {
+        "type": "none"
+      },
+      "total_ms": 3893,
+      "model_calls": 1,
+      "usage": {
+        "input_tokens": 2465,
+        "cached_input_tokens": 2393,
+        "output_tokens": 36,
+        "reasoning_tokens": 0,
+        "estimated_usd": 0.004913
+      }
+    },
+    {
+      "turn": 6,
+      "student": "YouTube pe ek 12 ghante ka course hai, us se",
+      "reply": "Python aapne YouTube ke 12 ghante ke course se seekhi. Course se hat kar khud koi code likha tha?",
+      "action": {
+        "type": "none"
+      },
+      "total_ms": 3625,
+      "model_calls": 1,
+      "usage": {
+        "input_tokens": 2509,
+        "cached_input_tokens": 2462,
+        "output_tokens": 45,
+        "reasoning_tokens": 0,
+        "estimated_usd": 0.005182
+      }
+    },
+    {
+      "turn": 7,
+      "student": "... aadha shayad. 5-6 ghante",
+      "reply": "Course ke taqreeban 5–6 ghante dekhe thay. Phir aage dekhna kis wajah se ruk gaya?",
+      "action": {
+        "type": "none"
+      },
+      "total_ms": 2875,
+      "model_calls": 1,
+      "usage": {
+        "input_tokens": 2561,
+        "cached_input_tokens": 2506,
+        "output_tokens": 45,
+        "reasoning_tokens": 0,
+        "estimated_usd": 0.005306
+      }
+    },
+    {
+      "turn": 8,
+      "student": "exams aa gaye the. Phir dobara start nahi kiya",
+      "reply": "Exams ki wajah se course ruka, phir dobara shuru nahi hua. Exams ke baad se aapka waqt zyada kis cheez mein guzarta hai?",
+      "action": {
+        "type": "none"
+      },
+      "total_ms": 4077,
+      "model_calls": 1,
+      "usage": {
+        "input_tokens": 2615,
+        "cached_input_tokens": 2558,
+        "output_tokens": 53,
+        "reasoning_tokens": 0,
+        "estimated_usd": 0.005778
+      }
+    }
+  ]
+}

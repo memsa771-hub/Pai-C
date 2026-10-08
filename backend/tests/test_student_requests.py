@@ -1,11 +1,9 @@
 """One durable question survives channels and resumes only from accepted facts."""
 
 from datetime import datetime, timezone
-from types import SimpleNamespace
 
 from fastapi.testclient import TestClient
 
-from app.counseling.move import plan_move
 from app.counseling.student_requests import StudentRequestService
 from app.database import get_db
 from app.main import app
@@ -33,20 +31,11 @@ def test_research_request_is_idempotent_and_asked_once():
             workspace_id=student.workspace_id,
             dedupe_key=f"research-request:{requests[0]['id']}").count() == 1
         assert requests[0]["accepts_upload"] is True
-        move = plan_move(stage="NEEDS_INFO", requirements=[], states={},
-                         snapshot=SimpleNamespace(), scope="in_scope",
-                         student_question="", emotion="none", language="en",
-                         open_request=requests[0])
-        assert move.type == "ask_research_request"
-        assert move.request_field == "test_attempt[IELTS].overall_score"
+        assert requests[0]["item_key"] == "test_attempt[IELTS].overall_score"
         row = service.oldest_open(student.workspace_id)
         service.mark_asked(row)
         db.flush()
-        repeated = plan_move(stage="NEEDS_INFO", requirements=[], states={},
-                             snapshot=SimpleNamespace(), scope="in_scope",
-                             student_question="", emotion="none", language="en",
-                             open_request=service.serialize(row))
-        assert repeated.type == "research_wait"
+        assert service.serialize(row)["asked_at"] is not None
         service.mark_answered(student.workspace_id, run.id, row.item_key)
         db.flush()
         assert service.list(student.workspace_id) == []

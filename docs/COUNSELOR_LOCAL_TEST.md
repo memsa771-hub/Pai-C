@@ -1,8 +1,10 @@
 # Local Placement AI test build
 
-Use the `workspace` worktree on local `dev`. Counselor, Roadmaps, Profile,
+Use the worktree for the branch under test. Counselor, Roadmaps, Profile,
 Documents, Applications, Deadlines, Browser, and the existing notification
 inbox are in one app. The API key stays in the ignored `.env` on the backend.
+Deep is the sole Counselor path after consolidation; no mode flag or legacy fallback is available.
+The backup tag `legacy-counselor-final` preserves the prior implementation.
 
 From `PAI-OS/workspace`, rebuild the existing local Compose project:
 

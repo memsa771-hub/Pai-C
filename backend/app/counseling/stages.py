@@ -50,10 +50,4 @@ def advance_discovery_stage(journeys, workspace_id: str, journey, *,
     if journey.current_stage == FOUNDATION and foundation_ready:
         journey = journeys.set_counselor_stage(
             workspace_id, journey.id, DIRECTION, actor=actor)
-    if journey.current_stage == DIRECTION:
-        details = (goal_records[0].get("details") or {}) if goal_records else {}
-        if (details.get("stated_preference") and details.get("underlying_objective")
-                and "constraints" in details):
-            journey = journeys.set_counselor_stage(
-                workspace_id, journey.id, RESEARCHING, actor=actor)
     return journey

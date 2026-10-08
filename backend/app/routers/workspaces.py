@@ -652,7 +652,7 @@ def delete_workspace(
 ):
     """Soft-delete a workspace (set status to 'deleted'). Requires workspace token or verified owner auth."""
     workspace = db.execute(
-        select(Workspace).where(_workspace_filter(workspace_id))
+        select(Workspace).where(_workspace_filter(workspace_id)).with_for_update()
     ).scalar_one_or_none()
 
     if not workspace or workspace.status == "deleted":
@@ -661,6 +661,11 @@ def delete_workspace(
     if not _verify_workspace_access(workspace, x_workspace_token, authorization):
         return _workspace_access_denied(authorization)
 
+    # Workspace deletion is soft for shared records; private Counselor notes
+    # must be removed immediately, including their version history.
+    from app.counseling.deep.notebook import NotebookService
+
+    NotebookService(db).delete_for_workspace(str(workspace.id))
     workspace.status = "deleted"
     db.commit()
 

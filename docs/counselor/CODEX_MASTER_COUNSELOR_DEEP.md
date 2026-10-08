@@ -60,23 +60,15 @@ Then delete:
 | Tests: `test_counselor_v2_channel_parity.py`, `test_counselor_v2_guard.py`, `test_counselor_v2_move.py`, `test_counselor_v2_summary.py`, `test_counselor_v2_journey_pg.py`, `test_counselor_slots.py`, `test_counselor_extraction.py` | Their code is gone. Port any still-relevant assertion (re-asks, praise openers, channel parity) to the new deep tests |
 | `scripts/eval_counselor_sim.py` | Replaced by `scripts/eval_counselor_deep.py`. Keep any useful code from `counselor_eval_support.py` in the new script |
 | `docs/counselor/RUNTIME_PROMPTS.md` | Simple-mode prompts, replaced by `COUNSELOR_V3_PROMPTS.md` |
-| The `PAI_COUNSELOR_V2` flag | Replaced by `PAI_COUNSELOR_MODE = deep | legacy` (default `deep`). Update both compose files and `.env` examples |
+| Consolidation | Deep is the sole Counselor path; successful human posts queue extraction and analysis. |
 
 **Database:** do NOT drop tables or rows created by migrations 082/085/087/089 in this task, even if they become unused. List them in the final PR as follow-up cleanup.
 
-### 3.2 KEEP for now; do NOT delete in this task (legacy path, still imported elsewhere)
+### 3.2 Consolidation status
 
-`core.py`, `turn_plan.py`, `turn_contract.py`, `reply_guard.py`, `policy.py`, `evaluator.py`, `turn_semantics.py`, `goal_transition.py`, `decision_sufficiency.py`, `continuous_discovery.py`, `discovery.py`, `state.py`, `baseline.py`, `understanding.py`, `context_projection.py`.
-
-They are still used by:
-
-- `routers/roadmaps.py` (`CounselorModelProvider`, `guard_reply`, `_post_response`)
-- `services/operator.py` (`baseline`, `StudentUnderstandingBuilder`)
-- `memory/handlers.py`
-- `routers/counselor_voice.py` (`is_counselor_fallback`)
-- `tools/*` (`policy`)
-
-`PAI_COUNSELOR_MODE=legacy` keeps the old conversation path as an emergency fallback. In the final PR, add `docs/counselor/CLEANUP_AFTER_DEEP.md` listing each of these modules with its remaining importers, for a later cleanup task.
+The temporary legacy runtime has been removed in PR 5b-2. Shared understanding,
+projection, baseline, discovery, policy and state remain. See
+[CLEANUP_AFTER_DEEP.md](CLEANUP_AFTER_DEEP.md) for exact importers and the backup tag.
 
 ### 3.3 KEEP and REUSE (do not rewrite)
 
@@ -96,7 +88,7 @@ They are still used by:
 
 | File | Change |
 |---|---|
-| `counseling/runtime.py` | `_run_turn` dispatches on `PAI_COUNSELOR_MODE`. In every mode, after a successful post, call `enqueue_turn_extraction` (this fixes the v2 bug) |
+| Consolidation | Deep is the sole Counselor path; successful human posts queue extraction and analysis. |
 | `counseling/stages.py` | `advance_discovery_stage(..., allow_auto_research: bool)`. In deep mode it is `False`: `DIRECTION → RESEARCHING` happens only through mirror confirmation |
 | `memory/handlers.py` | In deep mode, do not call `delegate_research_if_ready` from reconciliation unless the journey is already past mirror confirmation (stale-refresh in `PROPOSED`/`CHOSEN` keeps working) |
 | Analyst (`COUNSELOR_V3_PROMPTS.md` §2) | Produces only the notebook. **No `vault_facts`**: the existing `memory.extract` job (via `enqueue_turn_extraction`) fills the Vault through candidates → reconciler, as it already does |
@@ -109,8 +101,8 @@ Detailed specs for each milestone are in `docs/counselor/CODEX_COUNSELOR_V3_DEEP
 
 | PR | Milestone | Spec | Done when |
 |---|---|---|---|
-| **1** | Cleanup + mode flag + memory-hook fix + docs committed | §3 here, [1] | v2 files deleted; `PAI_COUNSELOR_MODE` works; extraction queued in every mode; tests green |
-| **2** | Counselor Notebook storage + service | [2] (with the step 9 fields: `engagement_style`, `depth_mode`, `goal_history`, `chapter`; `coach` stays empty) | Schema validation, evidence required, banned-content stripping, workspace isolation |
+| Consolidation | Deep is the sole Counselor path; successful human posts queue extraction and analysis. |
+| **2** | Counselor Notebook storage + service | [2] (with the step 9 fields: `engagement_style`, `depth_mode`, `goal_history`, `chapter`; `coach` stays empty) | Schema validation, evidence required, workspace isolation; content checking follows the Analyst in PR 4 |
 | **3** | Deep Counselor turn (1 model call) + polish + actions | [3] | One call per turn; JSON fallback; one-question trim; Devanagari retry; `mirror` and `ask_research` actions validated |
 | **4** | Analyst job + stage gating (§3.4 stages/handlers) | [4] | Notebook updated after each turn; `mirror_ready` enforced by code per `depth_mode`; no automatic research before mirror confirmation |
 | **5** | Hidden-truth eval harness (first 8 personas incl. Danish, Hamza, Bilal, the task seeker, short answers, Usman/Devanagari) | [7] | Offline fixture run in CI; `--live` report generated; targets reported (they don't have to be met yet) |
@@ -120,6 +112,8 @@ Detailed specs for each milestone are in `docs/counselor/CODEX_COUNSELOR_V3_DEEP
 | **9** | Eval targets + manual test + cleanup doc | [7] targets, [11] | All zero-targets at 0; hidden-truth recall ≥ 0.8 on Danish and ≥ 0.7 average; manual checklist passes; `CLEANUP_AFTER_DEEP.md` written |
 
 **Prompt tuning rule (from PR 5 on):** change only the `.md` prompts, re-run the eval, and keep a change only if recall improves without breaking any zero-target. Log every iteration in `backend/scripts/results/`.
+
+**Generic-only override for PR 3 onward:** no runtime vocabulary lists for sensitive content or praise. PR 4 checks each changed notebook entry with `deep/prompts/sensitive_check.md` in the background before `NotebookService.apply`; storage itself performs schema validation only. Daily research, notebook context, shared-history and reasoning settings have environment overrides. Praise is a prompt and evaluation concern.
 
 ## 5. Speed, grounding and domain (must hold in every PR)
 
