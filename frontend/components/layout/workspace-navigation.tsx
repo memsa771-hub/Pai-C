@@ -1,7 +1,7 @@
 'use client';
 
 import { CalendarClock, CircleUser, FileText, Globe, GraduationCap, KanbanSquare, Waypoints } from 'lucide-react';
-import { COUNSELOR_ONLY_UI, TASKS_UI_ENABLED, WORKFLOWS_UI_ENABLED } from '@/lib/config';
+import { TASKS_UI_ENABLED, WORKFLOWS_UI_ENABLED } from '@/lib/config';
 import { countFiles } from '@/components/files/file-utils';
 import { useT } from '@/lib/i18n';
 import { useWorkspace } from '@/lib/workspace-context';
@@ -25,17 +25,14 @@ export function useWorkspaceNavigation(): WorkspaceNavGroup[] {
   const t = useT();
   const { files, browserTabs, tasks, workflows } = useWorkspace();
 
-  const profile =
+  return [
     {
       label: t('nav.studentProfile'),
       items: [
         { mode: 'profile', label: t('views.profile'), icon: <CircleUser /> },
         { mode: 'files', label: t('views.files'), icon: <FileText />, count: countFiles(files) },
       ],
-    } satisfies WorkspaceNavGroup;
-  if (COUNSELOR_ONLY_UI) return [profile];
-  return [
-    profile,
+    },
     {
       label: t('nav.applicationWorkspace'),
       items: [

@@ -10,7 +10,7 @@ import {
   useState
 } from 'react';
 import { useIsMobile } from '@/hooks/use-mobile';
-import { COUNSELOR_ONLY_UI, TASKS_UI_ENABLED, WORKFLOWS_UI_ENABLED } from '@/lib/config';
+import { TASKS_UI_ENABLED, WORKFLOWS_UI_ENABLED } from '@/lib/config';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import type { FileSortKey, FileTypeFilter } from '@/components/files/file-utils';
 
@@ -23,8 +23,6 @@ export type ViewMode = 'threads' | 'roadmaps' | 'profile' | 'applications' | 'de
  * back to threads here rather than at each call site.
  */
 const HIDDEN_VIEWS: ReadonlySet<ViewMode> = new Set<ViewMode>([
-  ...(COUNSELOR_ONLY_UI ? ['applications', 'deadlines', 'browser', 'tasks',
-    'workflows', 'routines', 'knowledge'] as const : []),
   ...(TASKS_UI_ENABLED ? [] : ['tasks' as const]),
   ...(WORKFLOWS_UI_ENABLED ? [] : ['workflows' as const]),
 ]);

@@ -37,7 +37,6 @@ Roadmaps are sourced research artifacts for the Counselor Journey. They are sepa
 | `PAI_RESEARCH_FRESHNESS_DAYS`, `PAI_RESEARCH_DEADLINE_FRESHNESS_DAYS` | Maximum age of verified sources, with a shorter window near deadlines. |
 | `PAI_RESEARCH_SWEEP_SECONDS` | Worker interval for stale-source checks. |
 | `PAI_OS_SERVICE_TOKEN` | Backend-to-backend escalation token for later OS integration. |
-| `NEXT_PUBLIC_COUNSELOR_ONLY` | Build-time UI flag, `true` in this testing release. Shows Counselor, Roadmaps, Profile, Documents, and notifications; `false` restores OS navigation later. |
 
 The backend API and job worker must both run. Apply migrations before starting either. Source refresh and reconciliation require the worker. The ROR organization registry is consulted through the declared `web.institution_registry` tool and needs outbound access; unavailable registry results leave research unconfirmed.
 

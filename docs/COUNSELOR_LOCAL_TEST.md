@@ -1,31 +1,21 @@
-# Local Counselor test build
+# Local Placement AI test build
 
-The local worktree is `../counselor-complete` on branch
-`feature/counselor-complete`. Its ignored `.env` has been copied from
-`../workspace/.env`; the API key stays server-side. The build flag
-`NEXT_PUBLIC_COUNSELOR_ONLY=true` shows Counselor, Roadmaps, Profile,
-Documents, and the existing notification inbox. The OS views are hidden in
-this test build; the underlying OS code is untouched.
+Use the `workspace` worktree on local `dev`. Counselor, Roadmaps, Profile,
+Documents, Applications, Deadlines, Browser, and the existing notification
+inbox are in one app. The API key stays in the ignored `.env` on the backend.
 
-Ports 3000, 8000, and 8080 are currently used by the existing `pai-v3-local`
-stack. When ready to switch, run these PowerShell commands from `PAI-OS`:
+From `PAI-OS/workspace`, rebuild the existing local Compose project:
 
 ```powershell
-cd workspace
-docker compose --env-file .env -f docker-compose.prod.yml -f docker-compose.local.yml down
-cd ..\counselor-complete
-docker compose --env-file .env -p pai-counselor-test -f docker-compose.prod.yml -f docker-compose.local.yml up --build -d
+docker compose --env-file .env -p pai-v3-local -f docker-compose.prod.yml -f docker-compose.local.yml up --build -d
 ```
 
-Open `http://localhost:3000`. The new Compose project has separate database
-and storage volumes, so the existing workspace data remains in the stopped
-stack. A fresh account/profile is needed in the test stack. To return:
+Open `http://localhost:3000`. This preserves the existing
+`pai-v3-local` database and storage volumes. If another Compose project
+is using ports 3000 or 8000, stop that project first. To stop the test stack:
 
 ```powershell
-cd ..\counselor-complete
-docker compose --env-file .env -p pai-counselor-test -f docker-compose.prod.yml -f docker-compose.local.yml down
-cd ..\workspace
-docker compose --env-file .env -f docker-compose.prod.yml -f docker-compose.local.yml up -d
+docker compose --env-file .env -p pai-v3-local -f docker-compose.prod.yml -f docker-compose.local.yml down
 ```
 
 Manual path: complete Profile foundation in Counselor, confirm the goal

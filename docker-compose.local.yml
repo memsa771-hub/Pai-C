@@ -29,7 +29,6 @@ services:
     build:
       args:
         NEXT_PUBLIC_API_URL: http://localhost:8000
-        NEXT_PUBLIC_COUNSELOR_ONLY: ${NEXT_PUBLIC_COUNSELOR_ONLY:-true}
     ports:
       - "127.0.0.1:3000:3000"
 

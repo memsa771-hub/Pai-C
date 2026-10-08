@@ -45,9 +45,6 @@ export const TASKS_UI_ENABLED = process.env.NEXT_PUBLIC_ENABLE_TASKS === 'true';
  */
 export const WORKFLOWS_UI_ENABLED = process.env.NEXT_PUBLIC_ENABLE_WORKFLOWS === 'true';
 
-/** Keep this testing release focused on the Counselor and its supporting surfaces. */
-export const COUNSELOR_ONLY_UI = process.env.NEXT_PUBLIC_COUNSELOR_ONLY !== 'false';
-
 /**
  * The sign-in page, on this origin.
  *
