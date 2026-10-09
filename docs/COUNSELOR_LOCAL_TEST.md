@@ -1,60 +1,73 @@
-# Local deep Counselor testing
+# Founder checklist: local Counselor
 
-Use the single `PAI-OS/workspace` checkout. Start PR branches from latest `dev`,
-open PRs into `dev`, then return the folder to latest `dev` after delivery.
-Deep is the sole Counselor; there is no legacy mode flag. The rollback tag is
-`legacy-counselor-final`.
+From the single `PAI-OS/workspace` checkout on `dev`, keep existing backend
+credentials in the ignored `.env`. Choose supported `PAI_COUNSELOR_MODEL`,
+`PAI_ANALYST_MODEL`, `PAI_SENSITIVE_CHECK_MODEL`, `PAI_MIRROR_MODEL` and
+`PAI_ROADMAP_MODEL`; see the measured recommendations in `eval_reports/`.
+Never put permanent keys in the frontend. This checklist does not change `.env`.
 
-## Environment
-
-In the ignored local `.env`, keep the existing backend provider/API-key settings
-and select models supported by that provider:
-
-```dotenv
-PAI_ENABLED=true
-PAI_COUNSELOR_MODEL=<strong-model-id>
-PAI_ANALYST_MODEL=<cheaper-model-id>
-PAI_SENSITIVE_CHECK_MODEL=<safety-check-model-id>
-PAI_MIRROR_MODEL=<mirror-model-id>
-```
-
-Replace the placeholders. The sensitive-check model is for the pre-Mirror helper,
-not a per-turn call. If unset, Analyst defaults to Counselor and the sensitive
-checker defaults to Analyst. Mirror defaults to Counselor. Permanent keys belong only on the backend.
-
-## Start and stop
-
-From `PAI-OS/workspace`:
+## Start
 
 ```powershell
 docker compose --env-file .env -p pai-v3-local -f docker-compose.prod.yml -f docker-compose.local.yml up --build -d
 ```
 
-Open `http://localhost:3000`. Keep this project name to reuse its database and
-storage volumes. Migrations include `096_counselor_notebooks` and
-`097_counselor_noted_questions` and `098_counselor_mirror`. If another stack occupies ports 3000/8000, stop
-that stack first. Stop this stack without deleting its volumes:
+Open http://localhost:3000 and sign in. Backend **and worker** must run.
+Use the same project name to keep your database. Migrations 096–100 cover
+Notebook, noted questions, Mirror, sourced answers and roadmap lane identity.
+
+## Test as a student
+
+- Start a fresh conversation with a goal. Share completed/current education,
+  what you have actually tried, family concerns, time and budget constraints.
+- Expect a natural reflection and one useful question at a time. No route plan,
+  unsupported admission claims, identity re-asks or repeated education loop.
+- Correct an education claim; inspect Profile. Conflicting statements must go
+  through Vault reconciliation, not silently replace accepted facts.
+- Upload a document and inspect extracted evidence/verification. Analyst notes
+  remain private; student Profile still uses the existing Vault.
+- Switch text ? voice ? text. The conversation and Profile stay shared. Interrupt
+  speech, end the call, and reconnect. Check no internal JSON is displayed/spoken.
+
+## Mirror
+
+- Once discovery is sufficient, wait for the background Mirror card.
+- Expand dimensions; every known picture has your supporting evidence. Unknowns
+  must be honest. Lanes reflect your wishes, strengths and limits.
+- **Edit:** correct a detail. Expect discovery to resume and a revised card later.
+- **Confirm:** confirm the current version. Repeated clicks must not queue duplicate
+  research. Research begins only after confirmation.
+
+## Roadmaps
+
+- Wait for light research and open Roadmaps. Expect one card per confirmed lane.
+- Inspect personal fit, action test, gaps, steps and cited sources. Every external
+  requirement/timing/number must have evidence. Your own numbers/action targets
+  need no research citation. Each fact shows verified or unconfirmed honestly.
+- A cited unconfirmed fact alone must not block a ready card. Missing decisive
+  information should identify the gap as needs_info, never invent an answer.
+- Choose/rethink a route; inspect that your choice persists. Add your own route.
+- Report an outdated source; expect a stale marker and bounded refresh, with your
+  annotations preserved. A new confirmed Mirror receives a new research allowance.
+
+## If something fails
+
+```powershell
+docker compose --env-file .env -p pai-v3-local -f docker-compose.prod.yml -f docker-compose.local.yml logs --tail 100 backend worker migrate
+```
+
+Record the screen, time, conversation and expected result; redact credentials.
+Manual model/voice/document/research use can incur charges. For a provider-free
+check, use the fake-provider procedure in
+[counselor/CLEANUP_AFTER_DEEP.md](counselor/CLEANUP_AFTER_DEEP.md#reproducible-offline-startup-check).
+Automated suites use fake models. This checklist is not a claim that a founder
+manual acceptance session has already been completed.
+
+## Stop without deleting data
 
 ```powershell
 docker compose --env-file .env -p pai-v3-local -f docker-compose.prod.yml -f docker-compose.local.yml down
 ```
 
-## What to test now
-
-Test counseling only: state a goal, explain current and previous education,
-correct a fact, and continue the same conversation through text and voice.
-Check Profile and document intake through the existing Vault reconciliation flow.
-Background Analyst notes are private and separate from accepted Profile facts;
-async jobs can finish after a reply has appeared.
-
-When discovery is ready, the background worker checks the Notebook and generates
-a Mirror card. Expand its evidence rows; Edit sends a normal student correction
-and resumes discovery. Confirm advances to research and queues one durable light
-research handoff. Keep the worker running. Research still uses the existing brief;
-PR 7/8 add the new research and roadmap flow. Questions are noted during counseling.
-Existing Roadmaps and PAI OS surfaces are unchanged.
-
-Automated tests use fake models/recorded fixtures. Manual chat, voice and document
-processing can call configured providers and incur charges; do not use them when
-real API calls are prohibited. For a provider-free startup check, use the isolated
-fake-provider procedure in [the consolidation record](counselor/CLEANUP_AFTER_DEEP.md#reproducible-offline-startup-check).
+Rollback reference: `legacy-counselor-final` (requires compatible deployment and
+schema review; do not delete database volumes to roll back).
