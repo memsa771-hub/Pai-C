@@ -26,10 +26,13 @@ async def collect_light_research(context, brief):
     for lane in lanes:
         key = lane["lane"]
         # The route is student data, not an inline list of destinations or subjects.
+        route = lane.get("route") or {}
+        goal_text = " ".join(str(goal.get("title") or goal.get("text") or "") for goal in goals)
         search = {"objective": " ".join(str(value) for value in (
-            lane.get("title"), lane.get("why")) if value),
-            "country": lane.get("country") or (countries[0] if len(countries) == 1 else ""),
-            "level": lane.get("level") or details.get("degree_level") or ""}
+            route.get("field"), route.get("level"), route.get("place_preference"),
+            route.get("kind"), goal_text) if value),
+            "country": route.get("place_preference") or (countries[0] if len(countries) == 1 else ""),
+            "level": route.get("level") or details.get("degree_level") or ""}
         source = lane.get("source_url") or lane.get("url")
         refresh = brief.get("refresh_candidate") or {}
         if refresh.get("url") and key in refresh.get("lanes", [refresh.get("lane")]):

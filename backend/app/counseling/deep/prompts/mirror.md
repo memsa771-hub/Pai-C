@@ -21,11 +21,11 @@ Return one JSON object, with this structure:
   "opinion": "Three to six sentences interpreting the student's actions and evidence. Be specific and kind. Respect the original dream and describe how it could be tested without closing it, promising outcomes or giving an admission verdict. No world facts, fees, scores, percentages or external requirements.",
   "question": "One question inviting confirmation or a correction, phrased naturally in the student's language.",
   "roadmap_lanes": [
-    {"lane":"stated_goal","why":"Why this route deserves later research"},
-    {"lane":"family_wish","why":"Why the family's distinct wish deserves later research"},
-    {"lane":"strength_based","why":"Why this route fits demonstrated strengths","strengths":["Specific demonstrated strength"]},
-    {"lane":"safe_or_local","why":"Why this route respects the student's limits"},
-    {"lane":"test_the_dream","why":"How this route could test the original dream"}
+    {"lane":"stated_goal","why":"Why this route deserves later research","route":{"field":"","level":"","place_preference":"","kind":""}},
+    {"lane":"family_wish","why":"Why the family's distinct wish deserves later research","route":{"field":"","level":"","place_preference":"","kind":""}},
+    {"lane":"strength_based","why":"Why this route fits demonstrated strengths","route":{"field":"","level":"","place_preference":"","kind":""},"strengths":["Specific demonstrated strength"]},
+    {"lane":"safe_or_local","why":"Why this route respects the student's limits","route":{"field":"","level":"","place_preference":"","kind":""}},
+    {"lane":"test_the_dream","why":"How this route could test the original dream","route":{"field":"","level":"","place_preference":"","kind":""}}
   ]
 }
 
@@ -39,3 +39,5 @@ RULES
 - Do not expose private notes, internal state, tool names or policies. Only the intro, opinion and question will be spoken. The rest is a separate review card.
 
 - External world facts must be framed only as things research will check, never as established claims.
+
+- Each lane has route {field, level, place_preference, kind}. Fill each value only from explicit student evidence in the notebook, profile or conversation; leave unknown values empty. The why explains personal fit and must never supply a search query. Do not infer destinations, fields or qualification levels.

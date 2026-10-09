@@ -95,6 +95,8 @@ async def _request_research(kind, workspace_id, *, db, journey, tool_context,
             return None
         raise NotImplementedError("chosen roadmap deep research is deferred")
     brief = _research_brief(db, workspace_id, journey, snapshot)
+    brief["research_kind"] = kind
+    brief["refresh_key"] = refresh_key
     if target and target.origin == "student_added":
         brief["custom_roadmap"] = {"id": target.id, "title": target.title, "route": target.route or {}}
     key = f"{journey.id}:mirror:{brief['mirror_version']}" + (f":refresh:{refresh_key}" if refresh_key else "")

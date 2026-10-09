@@ -53,6 +53,9 @@ async def build(context, payload):
         fetches=config.PAI_RESEARCH_MAX_FETCHES,
         seconds=config.PAI_RESEARCH_MAX_SECONDS,
         workspace_id=context.workspace_id,
+        mirror_version=payload["brief"].get("mirror_version"),
+        scope=payload["brief"].get("research_kind", "roadmap_light"),
+        refresh_key=payload["brief"].get("refresh_key"),
     ) as budget:
         result = await _build(context, payload)
         result["research_metrics"] = budget.usage() | {
@@ -67,7 +70,8 @@ async def _build(context, payload):
     brief = dict(payload["brief"])
     custom = brief.get("custom_roadmap")
     brief["mirror"] = {**brief["mirror"], "roadmap_lanes": ([{
-        "lane": "student_added", "why": custom["title"], **custom.get("route", {})}]
+        "lane": "student_added", "why": custom["title"], "route": custom.get("route", {}),
+        **{key: value for key, value in custom.get("route", {}).items() if key in {"url", "source_url"}}}]
         if custom else lanes_for_mirror(brief["mirror"]))}
     research = await collect_light_research(context, brief)
     research["decisive_fields"] = brief["decisive_fields"]

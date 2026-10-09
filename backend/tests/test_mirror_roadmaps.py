@@ -40,7 +40,10 @@ def test_original_dream_retained_as_a_test_lane():
     mirror, _ = example()
     mirror["roadmap_lanes"] = [item for item in mirror["roadmap_lanes"] if item["lane"] != "test_the_dream"]
     mirror["roadmap_lanes"].append({"lane": "family_wish", "why": "A separate family wish"})
-    assert "test_the_dream" in {item["lane"] for item in lanes_for_mirror(mirror)}
+    from app.counseling.deep.mirror_schema import CounselorMirror
+    with pytest.raises(ValueError, match="original-dream"):
+        CounselorMirror.model_validate(mirror)
+    assert lanes_for_mirror(mirror) == mirror["roadmap_lanes"]
 
 
 @pytest.mark.asyncio
@@ -66,7 +69,7 @@ async def test_one_grounded_card_per_lane_questions_sourced_and_publication_idem
         db.add_all([opportunity, evidence]); db.commit()
         facts = [{**item, "label": "verified", "requirement_set_id": evidence.id}
                  for item in RequirementStore.payload(opportunity, evidence)["rules"]]
-        for card in cards: card["citations"]["gap.0.need"] = [facts[0]["fact_id"]]
+        for card in cards: card["citations"]["gap.0.need"] = [item["fact_id"] for item in facts]
         brief = {"mirror": mirror, "mirror_version": 1, "notebook": {}, "profile": {},
                  "questions": [{"id": question.id, "question": question.question_to_research}]}
         research = {"lanes": [{"lane": item["lane"], "facts": facts} for item in mirror["roadmap_lanes"]],
@@ -138,8 +141,10 @@ def test_dream_test_never_silently_replaces_another_confirmed_lane():
     mirror['roadmap_lanes'] = [item for item in mirror['roadmap_lanes'] if item['lane'] != 'test_the_dream']
     mirror['roadmap_lanes'] += [{'lane':'family_wish','why':'A distinct family direction'},
                                {'lane':'another_route','why':'Another student direction'}]
-    with pytest.raises(ValueError, match='no room'):
-        lanes_for_mirror(mirror)
+    from app.counseling.deep.mirror_schema import CounselorMirror
+    with pytest.raises(ValueError, match='original-dream'):
+        CounselorMirror.model_validate(mirror)
+    assert lanes_for_mirror(mirror) == mirror['roadmap_lanes']
 
 @pytest.mark.asyncio
 async def test_sourced_question_cannot_render_a_config_blocked_script():

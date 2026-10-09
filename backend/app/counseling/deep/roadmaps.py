@@ -36,19 +36,9 @@ class RoadmapCandidate(BaseModel):
 
 
 def lanes_for_mirror(mirror):
-    lanes = [dict(item) for item in mirror.get("roadmap_lanes") or []]
-    keys = [item.get("lane") for item in lanes]
-    if not 4 <= len(lanes) <= 5 or len(set(keys)) != len(keys):
-        raise ValueError("Mirror requires four or five unique lanes")
-    # Lane semantics are machine-schema identifiers, never student vocabulary.
-    if "stated_goal" in keys and "strength_based" in keys and "test_the_dream" not in keys:
-        dream = {"lane": "test_the_dream", "why": next(
-            item["why"] for item in lanes if item["lane"] == "stated_goal")}
-        if len(lanes) == 4:
-            lanes.append(dream)
-        else:
-            raise ValueError("Mirror has no room for its original-dream test")
-    return lanes
+    # Validation and regeneration belong to the Mirror job. Research preserves
+    # the student's confirmed lanes, without modifying them or failing later.
+    return [dict(item) for item in mirror.get("roadmap_lanes") or []]
 
 
 def fact_index(research):
@@ -70,7 +60,7 @@ def _strings(value, prefix=""):
                 yield from _strings(item, f"{prefix}.{key}".strip("."))
 
 
-def ground_roadmap(candidate, lane, facts, research):
+def ground_roadmap(candidate, lane, facts, research, student_data=None):
     candidate = candidate if isinstance(candidate, dict) else {}
     missing = []
     try:
@@ -82,6 +72,7 @@ def ground_roadmap(candidate, lane, facts, research):
     if not isinstance(citations, dict):
         citations = {}
     used = set()
+    own_numbers = set(_NUMBER.findall(json.dumps(student_data or {}, default=str)))
     fields = {key: candidate.get(key, [] if key == "strengths_used" else "") for key in FIT_FIELDS}
     fields.update(title=candidate.get("title") or lane["why"],
         gap=candidate.get("gap") or [], steps=candidate.get("steps") or [],
@@ -93,31 +84,40 @@ def ground_roadmap(candidate, lane, facts, research):
         ids = citations.get(path) or []
         if not isinstance(ids, list): ids = []
         refs = [facts[item] for item in ids if isinstance(item, str) and item in facts]
-        required = bool(_NUMBER.search(text)) or path.startswith("facts.") or (
-            path.startswith("gap.") and path.endswith(".need"))
+        world_field = (path.startswith("facts.") or
+            (path.startswith("gap.") and path.endswith(".need")) or
+            (path.startswith("steps.") and path.endswith(".when")))
+        personal_field = path.split(".")[0] in FIT_FIELDS or (
+            path.startswith("gap.") and path.endswith(".have"))
+        numbers = set(_NUMBER.findall(text))
+        external_numbers = numbers if world_field or not personal_field else numbers - own_numbers
+        if path == "test_30_days":
+            external_numbers = set()  # Self-set action targets, never outside-world requirements.
+        required = world_field or bool(external_numbers)
         if required and not refs:
             missing.append({"field": path, "reason": "missing_research_fact"})
         if refs:
-            used.update(item for item in ids if item in facts)
             supported = {number for fact in refs for number in _NUMBER.findall(
                 json.dumps({"quote": fact["quote"], "value": fact.get("value")}, ensure_ascii=True))}
-            if any(number not in supported for number in _NUMBER.findall(text)):
+            if any(number not in supported for number in external_numbers):
                 missing.append({"field": path, "reason": "unsupported_number"})
-            if any(fact.get("label") != "verified" for fact in refs):
-                missing.append({"field": path, "reason": "unconfirmed_research_fact"})
+            else:
+                used.update(item for item in ids if item in facts)
     lane_facts = next((item.get("facts") or [] for item in research.get("lanes") or []
                        if item["lane"] == lane["lane"]), [])
-    covered = {fact.get("decisive_field") for fact in lane_facts if fact.get("label") == "verified"}
+    covered = {fact.get("decisive_field") for fact in lane_facts
+               if fact.get("fact_id") in used and fact.get("fact_id") in facts}
     for field in research.get("decisive_fields") or []:
         if field not in covered:
             missing.append({"field": field, "reason": "missing_decisive_fact"})
-    if not lane_facts:
+    if not lane_facts or not used:
         missing.append({"field": "decisive_facts", "reason": "missing_research_fact"})
     if contains_blocked_script(json.dumps(fields, ensure_ascii=False), config.PAI_LANGUAGE_BLOCKED_SCRIPTS):
         # A broken-script artifact is never sent to the UI, even as needs_info.
         fields = {key: ([] if key == "strengths_used" else "") for key in FIT_FIELDS}
         fields.update(title="", gap=[], steps=[], risks=[], facts=[])
         missing.append({"field": "language_policy", "reason": "blocked_script"})
+        missing.append({"field": "decisive_facts", "reason": "missing_decisive_fact"})
     # Remove unsupported text rather than publishing a false claim under a warning.
     for item in missing:
         if item.get("reason") in {"unsupported_number", "missing_research_fact"}:
@@ -132,11 +132,17 @@ def ground_roadmap(candidate, lane, facts, research):
     sources = [{"fact_id": item, "url": facts[item]["source_url"],
                 "checked_at": facts[item]["checked_at"], "status": facts[item]["label"],
                 "quote": facts[item]["quote"]} for item in sorted(used)]
+    for index, item in enumerate(fields.get("facts") or []):
+        if isinstance(item, dict):
+            refs = [facts[key] for key in citations.get(f"facts.{index}.text", []) if key in facts]
+            if refs:
+                item["label"] = "verified" if all(ref.get("label") == "verified" for ref in refs) else "unconfirmed"
     return {**fields, "title": fields.get("title") or "", "lane": lane["lane"],
         "origin": lane["lane"] if lane["lane"] in {"stated_goal", "family_wish"} else "alternative",
         "route": {"url": sources[0]["url"]} if sources else {},
         "sources": sources, "citations": citations, "missing_facts": missing,
-        "generation_status": "needs_info" if missing or candidate.get("status") != "ready" else "ready",
+        "generation_status": "needs_info" if any(item["reason"] == "missing_decisive_fact"
+            or item["field"] == "decisive_facts" for item in missing) else "ready",
         "requirement_set_id": next((facts[item].get("requirement_set_id") for item in used), None)}
 
 
@@ -167,7 +173,8 @@ async def build_mirror_roadmaps(brief, research):
         logger.warning("roadmap_builder_failed error_type=%s", type(exc).__name__)
         parsed = {}
     candidates = {item.get("lane"): item for item in parsed.get("roadmaps") or [] if isinstance(item, dict)}
-    roadmaps = [ground_roadmap(candidates.get(lane["lane"], {}), lane, facts, research) for lane in lanes]
+    student_data = {key: brief.get(key) or {} for key in ("notebook", "profile", "mirror")}
+    roadmaps = [ground_roadmap(candidates.get(lane["lane"], {}), lane, facts, research, student_data) for lane in lanes]
     answers = []
     for answer in parsed.get("question_answers") or []:
         if not isinstance(answer, dict): continue

@@ -1,93 +1,117 @@
 {
-    "confidence":  "full",
-    "opinion":  "Your actions suggest that practical work matters to you. We can test your original direction while respecting your limits.",
-    "roadmap_lanes":  [
-                          {
-                              "why":  "Explore the original wish.",
-                              "lane":  "stated_goal"
-                          },
-                          {
-                              "why":  "Explore demonstrated strengths.",
-                              "lane":  "strength_based"
-                          },
-                          {
-                              "why":  "Respect current constraints.",
-                              "lane":  "safe_or_local"
-                          },
-                          {
-                              "why":  "Test the wish through experience.",
-                              "lane":  "test_the_dream"
-                          }
-                      ],
-    "dimensions":  [
-                       {
-                           "picture":  "A picture based on what you shared.",
-                           "key":  "education",
-                           "name":  "education",
-                           "evidence":  "You described this during our conversation.",
-                           "unknown":  false
-                       },
-                       {
-                           "picture":  "A picture based on what you shared.",
-                           "key":  "stated_goal",
-                           "name":  "stated goal",
-                           "evidence":  "You described this during our conversation.",
-                           "unknown":  false
-                       },
-                       {
-                           "picture":  "A picture based on what you shared.",
-                           "key":  "wish_source",
-                           "name":  "wish source",
-                           "evidence":  "You described this during our conversation.",
-                           "unknown":  false
-                       },
-                       {
-                           "picture":  "A picture based on what you shared.",
-                           "key":  "done",
-                           "name":  "done",
-                           "evidence":  "You described this during our conversation.",
-                           "unknown":  false
-                       },
-                       {
-                           "picture":  "A picture based on what you shared.",
-                           "key":  "strengths",
-                           "name":  "strengths",
-                           "evidence":  "You described this during our conversation.",
-                           "unknown":  false
-                       },
-                       {
-                           "picture":  "A picture based on what you shared.",
-                           "key":  "holds_back",
-                           "name":  "holds back",
-                           "evidence":  "You described this during our conversation.",
-                           "unknown":  false
-                       },
-                       {
-                           "picture":  "A picture based on what you shared.",
-                           "key":  "drives",
-                           "name":  "drives",
-                           "evidence":  "You described this during our conversation.",
-                           "unknown":  false
-                       },
-                       {
-                           "picture":  "A picture based on what you shared.",
-                           "key":  "family",
-                           "name":  "family",
-                           "evidence":  "You described this during our conversation.",
-                           "unknown":  false
-                       },
-                       {
-                           "picture":  "A picture based on what you shared.",
-                           "key":  "limits",
-                           "name":  "limits",
-                           "evidence":  "You described this during our conversation.",
-                           "unknown":  false
-                       }
-                   ],
-    "blockers":  [
-                     "Your available time needs clarification.",
-                     "Your next direction needs testing."
-                 ],
-    "question":  "Does this picture feel right, or what should I change?",
-    "intro":  "Here is how I understand your situation."
+  "confidence": "full",
+  "opinion": "Your actions suggest that practical work matters to you. We can test your original direction while respecting your limits.",
+  "roadmap_lanes": [
+    {
+      "why": "Explore the original wish.",
+      "lane": "stated_goal",
+      "route": {
+        "field": "",
+        "level": "",
+        "place_preference": "",
+        "kind": ""
+      }
+    },
+    {
+      "why": "Explore demonstrated strengths.",
+      "lane": "strength_based",
+      "route": {
+        "field": "",
+        "level": "",
+        "place_preference": "",
+        "kind": ""
+      }
+    },
+    {
+      "why": "Respect current constraints.",
+      "lane": "safe_or_local",
+      "route": {
+        "field": "",
+        "level": "",
+        "place_preference": "",
+        "kind": ""
+      }
+    },
+    {
+      "why": "Test the wish through experience.",
+      "lane": "test_the_dream",
+      "route": {
+        "field": "",
+        "level": "",
+        "place_preference": "",
+        "kind": ""
+      }
+    }
+  ],
+  "dimensions": [
+    {
+      "picture": "A picture based on what you shared.",
+      "key": "education",
+      "name": "education",
+      "evidence": "You described this during our conversation.",
+      "unknown": false
+    },
+    {
+      "picture": "A picture based on what you shared.",
+      "key": "stated_goal",
+      "name": "stated goal",
+      "evidence": "You described this during our conversation.",
+      "unknown": false
+    },
+    {
+      "picture": "A picture based on what you shared.",
+      "key": "wish_source",
+      "name": "wish source",
+      "evidence": "You described this during our conversation.",
+      "unknown": false
+    },
+    {
+      "picture": "A picture based on what you shared.",
+      "key": "done",
+      "name": "done",
+      "evidence": "You described this during our conversation.",
+      "unknown": false
+    },
+    {
+      "picture": "A picture based on what you shared.",
+      "key": "strengths",
+      "name": "strengths",
+      "evidence": "You described this during our conversation.",
+      "unknown": false
+    },
+    {
+      "picture": "A picture based on what you shared.",
+      "key": "holds_back",
+      "name": "holds back",
+      "evidence": "You described this during our conversation.",
+      "unknown": false
+    },
+    {
+      "picture": "A picture based on what you shared.",
+      "key": "drives",
+      "name": "drives",
+      "evidence": "You described this during our conversation.",
+      "unknown": false
+    },
+    {
+      "picture": "A picture based on what you shared.",
+      "key": "family",
+      "name": "family",
+      "evidence": "You described this during our conversation.",
+      "unknown": false
+    },
+    {
+      "picture": "A picture based on what you shared.",
+      "key": "limits",
+      "name": "limits",
+      "evidence": "You described this during our conversation.",
+      "unknown": false
+    }
+  ],
+  "blockers": [
+    "Your available time needs clarification.",
+    "Your next direction needs testing."
+  ],
+  "question": "Does this picture feel right, or what should I change?",
+  "intro": "Here is how I understand your situation."
 }

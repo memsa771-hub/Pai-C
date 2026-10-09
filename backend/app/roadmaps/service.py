@@ -371,9 +371,10 @@ class RoadmapService:
             # generated artifact back to its input contract without trusting status.
             candidate = {**candidate, "status": candidate.get("generation_status"),
                          "gap": candidate.get("gap") or []}
-            item = ground_roadmap(candidate, lane, facts, research)
-            if run.status != "completed":
-                item["generation_status"] = "needs_info"
+            item = ground_roadmap(candidate, lane, facts, research,
+                {key: brief.get(key) or {} for key in ("notebook", "profile", "mirror")})
+            # A useful cited route can be ready even if the overall research run
+            # needs more input for a different route or an unanswered question.
             roadmap_id = custom_id or str(uuid5(NAMESPACE_URL, f"pai-mirror-roadmap:{journey_id}:{lane['lane']}"))
             roadmap = self.db.get(Roadmap, roadmap_id)
             if roadmap is not None and (roadmap.workspace_id != run.workspace_id or roadmap.journey_id != journey_id):

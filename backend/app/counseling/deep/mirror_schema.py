@@ -44,10 +44,18 @@ class MirrorDimension(MirrorPart):
         return self
 
 
+class MirrorRoute(MirrorPart):
+    field: str = ""
+    level: str = ""
+    place_preference: str = ""
+    kind: str = ""
+
+
 class MirrorLane(MirrorPart):
     lane: Text
     why: Text
     strengths: list[Text] = Field(default_factory=list)
+    route: MirrorRoute = Field(default_factory=MirrorRoute)
 
 
 class CounselorMirror(MirrorPart):
