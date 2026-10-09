@@ -1,7 +1,15 @@
 # Counselor documentation
 
-Start here for the current deep Counselor. Work in `workspace`; branch from
-latest `dev`, open PRs into `dev`, and return the checkout to latest `dev` afterward.
+Start here for the current deep Counselor. Work in `workspace` on `pai-c`.
+
+## Branches
+
+- `pai-c` = PAI Counselor work (`backend/app/pai_c`, Counselor prompts, and Counselor/roadmap frontend). `pai-os` = PAI OS work by the other developer. Both start from `dev`.
+- Shared code (memory, models, Alembic migrations, routers, tools, inference, security): keep changes small and merge them to `dev` quickly.
+- Before creating any Alembic migration, pull `dev` into `pai-c` first so revision numbers do not collide; coordinate with the other developer if migrations are being created concurrently.
+- Merge tested `pai-c` work into `dev` at least weekly; pull `dev` into `pai-c` after every `dev` change.
+- `main` only receives code tested on `dev`.
+- Counselor tasks use `pai-c` unless explicitly directed otherwise. End each task with local `pai-c` matching `origin/pai-c` and a clean Git status.
 
 ## Current architecture
 
