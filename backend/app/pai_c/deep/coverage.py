@@ -4,7 +4,7 @@ import json
 from pathlib import Path
 
 from app.config import config
-from app.counseling.deep.notebook_schema import CounselorNotebookData, Coverage
+from app.pai_c.deep.notebook_schema import CounselorNotebookData, Coverage
 
 _DEFAULT_FILE = Path(__file__).with_name("coverage_requirements.json")
 

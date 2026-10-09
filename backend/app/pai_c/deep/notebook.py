@@ -11,8 +11,8 @@ from sqlalchemy import delete, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.counseling.deep.notebook_schema import CounselorNotebookData
-from app.counseling.deep.notebook_sanitize import SanitizationIssue, sanitize_notebook
+from app.pai_c.deep.notebook_schema import CounselorNotebookData
+from app.pai_c.deep.notebook_sanitize import SanitizationIssue, sanitize_notebook
 from app.models import CounselorNotebook, CounselorNotebookHistory, CounselorNotedQuestion, EventRecord, Workspace
 
 

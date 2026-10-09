@@ -13,7 +13,7 @@ from app.config import config
 from app.memory.context import StudentContext
 from app.memory.foreground import ForegroundContext, build_foreground_context
 from app.models import BackgroundJob, ExecutionRun, ProfileRequirement
-from app.counseling import runtime
+from app.pai_c import runtime
 from app.services import operator, pai
 from app.tools import ToolContext
 from scripts.counselor_eval_support import StudentSession
@@ -29,7 +29,7 @@ async def test_multi_turn_history_and_profile_jobs_survive_a_background_result()
             received.append(kwargs)
             return json.dumps({"reply": "What matters most about this route?", "action": {"type": "none"}})
 
-        with patch("app.counseling.deep.turn.chat_completion", model), \
+        with patch("app.pai_c.deep.turn.chat_completion", model), \
                 patch.object(config, "PAI_API_KEY", "test"), \
                 patch.object(config, "PAI_MEMORY_CONTEXT_ENABLED", False):
             await student.turn("I want to study abroad for a master's.")
@@ -146,7 +146,7 @@ async def test_result_is_interpreted_by_counselor_and_does_not_create_student_fa
             db.add(run)
             db.commit()
             with patch.object(operator, "_baseline_is_current", return_value=True), \
-                 patch("app.services.counselor_handoff.explain_result", AsyncMock(
+                 patch("app.pai_c.handoff.explain_result", AsyncMock(
                     return_value="Given your budget, verify the academic credits before paying an application fee.")) as explain:
                 await operator._post_result(db, student.workspace_id, "channel/pai-counselor", run.id,
                                              "completed", "Found programs.")
@@ -174,7 +174,7 @@ async def test_operator_result_cannot_bypass_unconfirmed_baseline():
             db.add(run)
             db.commit()
             with patch.object(config, "PAI_PROFILE_COMPLETION_ROLLOUT_MODE", "all"), \
-                    patch("app.services.counselor_handoff.explain_result", AsyncMock()) as explain:
+                    patch("app.pai_c.handoff.explain_result", AsyncMock()) as explain:
                 await operator._post_result(
                     db, student.workspace_id, "channel/pai-counselor", run.id,
                     "completed", "Secret personalized ranking",

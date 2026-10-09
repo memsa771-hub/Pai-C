@@ -11,6 +11,7 @@ from app.database import get_db
 from app.models import StudentJourney
 from app.journey import JourneyService, JourneyError
 from app.routers.roadmaps import _authorized
+from app.pai_c.summary_access import _journey
 
 router = APIRouter(prefix="/v1/counselor", tags=["Counselor"])
 
@@ -41,21 +42,11 @@ class MirrorEdit(MirrorAction):
     text: str = Field(min_length=1, max_length=8000)
 
 
-def _journey(db, workspace_id):
-    row = db.scalar(select(StudentJourney).where(
-        StudentJourney.workspace_id == workspace_id,
-        StudentJourney.journey_type == "counselor_decision", StudentJourney.status == "active",
-    ).with_for_update())
-    if row is None or (row.counselor_summary_draft or {}).get("type") != "mirror":
-        raise HTTPException(409, "No current Mirror")
-    return row
-
-
 @router.post("/summary/confirm")
 def confirm_summary(body: MirrorAction, network: str = Query(...), db=Depends(get_db),
                     x_workspace_token: str | None = Header(None),
                     authorization: str | None = Header(None)):
-    from app.counseling.deep.mirror import enqueue_confirmed_research
+    from app.pai_c.deep.mirror import enqueue_confirmed_research
 
     workspace = _authorized(db, network, x_workspace_token, authorization)
     row = _journey(db, str(workspace.id))

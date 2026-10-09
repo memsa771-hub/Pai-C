@@ -429,7 +429,7 @@ async def notify_document_job(job, db) -> dict:
     from sqlalchemy import select
 
     from app.models import FileRecord
-    from app.counseling.runtime import _post_response
+    from app.pai_c.runtime import _post_response
     from app.services.pai import PAI_AGENT_NAME
     from .progress import completion_message, learned_summary
 

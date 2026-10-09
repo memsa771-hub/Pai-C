@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from sqlalchemy import select
 
 from app.models import EventRecord
-from app.counseling.deep.polish import is_counselor_fallback
+from app.pai_c.deep.polish import is_counselor_fallback
 
 
 @dataclass(frozen=True)

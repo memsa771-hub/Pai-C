@@ -10,7 +10,7 @@ from sqlalchemy import select
 from app.database import get_db
 from app.api.response import success_response
 from app.models import Roadmap
-from app.roadmaps.service import RoadmapError, RoadmapService
+from app.pai_c.roadmaps.service import RoadmapError, RoadmapService
 from app.research.requirements import RequirementStore, ResearchEvidenceError
 from app.routers.network import _resolve_workspace, _verify_workspace_access
 
@@ -108,7 +108,7 @@ async def retry_roadmap(roadmap_id: str, network: str = Query(...), db=Depends(g
         audience=AUDIENCE_COUNSELOR,
         granted_capabilities=capabilities_for_agent(PAI_AGENT_NAME),
     )
-    from app.counseling.research_gateway import request_research
+    from app.pai_c.research_gateway import request_research
     from app.journey import JourneyService
     target = db.get(Roadmap, roadmap_id)
     journey = JourneyService(db).get(workspace_id, target.journey_id)
@@ -139,9 +139,9 @@ async def focus_roadmap(roadmap_id: str, network: str = Query(...), db=Depends(g
     title = current.title
     result = _result(lambda: RoadmapService(db).focus(str(workspace.id), roadmap_id), db)
     if first_focus:
-        from app.counseling.posting import _build_conversation_context, _post_response
-        from app.counseling.deep.turn import run_deep_turn
-        from app.counseling.deep.turn_input import CounselorTurnInput
+        from app.pai_c.posting import _build_conversation_context, _post_response
+        from app.pai_c.deep.turn import run_deep_turn
+        from app.pai_c.deep.turn_input import CounselorTurnInput
         from app.services.pai import PAI_AGENT_NAME, PAI_PRIMARY_CHANNEL
         try:
             target = f"channel/{PAI_PRIMARY_CHANNEL}"
@@ -228,7 +228,7 @@ async def add_custom_goal(body: CustomGoal, network: str = Query(...), db=Depend
                           x_workspace_token: str | None = Header(None), authorization: str | None = Header(None)):
     workspace = _authorized(db, network, x_workspace_token, authorization)
     workspace_id = str(workspace.id)
-    from app.counseling.research_gateway import mirror_is_current, request_research
+    from app.pai_c.research_gateway import mirror_is_current, request_research
     from app.memory.candidates import MemoryCandidateService
     from app.memory.reconciler import MemoryReconciler
     from app.journey import JourneyService

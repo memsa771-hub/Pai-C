@@ -2,7 +2,7 @@
 
 The goal is the best possible in-depth counseling, not filling the Vault. The Vault still fills, but quietly, in the background.
 
-The system has 4 model roles. Each prompt below goes **verbatim** into `backend/app/counseling/deep/prompts/`.
+The system has 4 model roles. Each prompt below goes **verbatim** into `backend/app/pai_c/deep/prompts/`.
 
 | Role | When it runs | Speed | Its prompt |
 |---|---|---|---|

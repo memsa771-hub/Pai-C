@@ -663,7 +663,7 @@ def delete_workspace(
 
     # Workspace deletion is soft for shared records; private Counselor notes
     # must be removed immediately, including their version history.
-    from app.counseling.deep.notebook import NotebookService
+    from app.pai_c.deep.notebook import NotebookService
 
     NotebookService(db).delete_for_workspace(str(workspace.id))
     workspace.status = "deleted"

@@ -8,7 +8,7 @@ from app.config import config
 from app.jobs.service import BackgroundJobService
 from app.memory.handlers import JOB_REFRESH_RESEARCH
 from app.models import Opportunity, RequirementSet
-from app.roadmaps.service import RoadmapService
+from app.pai_c.roadmaps.service import RoadmapService
 
 
 def _near_deadline(row: RequirementSet, today: date) -> bool:

@@ -166,7 +166,7 @@ class RequirementStore:
         if previous and (previous.rules != rules or previous.fees != (fees or {})
                          or previous.deadlines != (deadlines or {})
                          or previous.status != verdict.status):
-            from app.roadmaps.service import RoadmapService
+            from app.pai_c.roadmaps.service import RoadmapService
             RoadmapService(self.db).mark_stale(
                 workspace_id, "Research evidence changed; this route needs a fresh fit check",
                 source_url=source_url)
@@ -299,7 +299,7 @@ class RequirementStore:
         checks = dict(row.verification_checks or {})
         checks["student_report"] = {"passed": False, "reason": "Student reported this information may be wrong"}
         row.verification_checks = checks
-        from app.roadmaps.service import RoadmapService
+        from app.pai_c.roadmaps.service import RoadmapService
         RoadmapService(self.db).mark_stale(
             workspace_id, "A student reported a source may be wrong; we are checking it",
             source_url=row.source_url)

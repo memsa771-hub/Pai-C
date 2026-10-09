@@ -7,7 +7,7 @@ change PAI OS features, or migrate/drop any database objects.
 
 ## Deleted modules
 
-All paths below are under `backend/app/counseling/`:
+All paths below are under `backend/app/pai_c/`:
 
 - `core.py`: replaced by the existing `deep/turn.py`.
 - `turn_plan.py`, `turn_semantics.py`: old intake/classifier turn routing.

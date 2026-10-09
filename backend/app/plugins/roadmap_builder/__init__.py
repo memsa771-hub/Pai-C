@@ -11,10 +11,10 @@ DEPENDENCIES = frozenset({
 def on_run_status(db, run):
     """Move Counselor stages only from verified run state, never model prose."""
     from app.journey import JourneyService
-    from app.counseling.stages import ASSESSING, NEEDS_INFO, PROPOSED, RESEARCHING
+    from app.pai_c.stages import ASSESSING, NEEDS_INFO, PROPOSED, RESEARCHING
 
-    from app.roadmaps.service import RoadmapService
-    from app.counseling.student_requests import StudentRequestService
+    from app.pai_c.roadmaps.service import RoadmapService
+    from app.pai_c.student_requests import StudentRequestService
     published = []
     if run.status in {"completed", "needs_user_action", "failed"}:
         published = RoadmapService(db).publish_from_run(run)
@@ -64,8 +64,8 @@ async def build(context, payload):
 
 
 async def _build(context, payload):
-    from app.research.light import collect_light_research
-    from app.counseling.deep.roadmaps import build_mirror_roadmaps, lanes_for_mirror
+    from app.pai_c.light_research import collect_light_research
+    from app.pai_c.deep.roadmaps import build_mirror_roadmaps, lanes_for_mirror
 
     brief = dict(payload["brief"])
     custom = brief.get("custom_roadmap")

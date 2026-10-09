@@ -7,12 +7,12 @@ from unittest.mock import AsyncMock, Mock, patch
 import pytest
 
 from app.config import config
-from app.counseling import runtime
-from app.counseling.deep.polish import (
+from app.pai_c import runtime
+from app.pai_c.deep.polish import (
     contains_blocked_script, has_list, question_count, polish_reply,
 )
-from app.counseling.deep.prompts import load_prompt
-from app.counseling.deep.turn_input import CounselorTurnInput, _returning, shared_history
+from app.pai_c.deep.prompts import load_prompt
+from app.pai_c.deep.turn_input import CounselorTurnInput, _returning, shared_history
 from app.memory.turn_hook import enqueue_turn_extraction
 from app.models import EventRecord
 from scripts.counselor_eval_support import StudentSession
@@ -23,7 +23,7 @@ async def test_deep_queues_learning_after_successful_human_post():
     event = {"id": "student-event", "source": "human:student", "target": "channel/pai"}
     deep = AsyncMock(return_value=("assistant-event", "channel/pai", False))
     with patch.object(runtime, "_run_deep_turn", deep), \
-            patch("app.counseling.deep.analysis.enqueue_turn_analysis") as analyze, \
+            patch("app.pai_c.deep.analysis.enqueue_turn_analysis") as analyze, \
             patch("app.memory.turn_hook.enqueue_turn_extraction") as enqueue:
         await runtime._run_turn(Mock(), "workspace", event, 0)
     assert deep.await_count == 1

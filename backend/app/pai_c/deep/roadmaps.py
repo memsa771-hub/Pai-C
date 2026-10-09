@@ -6,9 +6,9 @@ import re
 from pydantic import BaseModel, Field, ValidationError
 
 from app.config import config
-from app.counseling.deep.polish import contains_blocked_script
-from app.counseling.deep.prompts import load_prompt
-from app.counseling.deep.usage import usage_callback
+from app.pai_c.deep.polish import contains_blocked_script
+from app.pai_c.deep.prompts import load_prompt
+from app.pai_c.deep.usage import usage_callback
 from app.inference.client import chat_completion
 from app.plugins._shared.sources import public_https
 

@@ -15,7 +15,7 @@ def mirror_is_current(db, workspace_id, version=None):
 
 
 def _research_brief(db, workspace_id, journey, snapshot=None):
-    from app.counseling.deep.notebook import NotebookService
+    from app.pai_c.deep.notebook import NotebookService
     from app.memory.student_snapshot import StudentSnapshotService
 
     snapshot = snapshot or StudentSnapshotService(db).build(workspace_id)

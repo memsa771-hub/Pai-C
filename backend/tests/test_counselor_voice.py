@@ -7,7 +7,7 @@ from unittest.mock import Mock, patch
 import httpx
 
 from app.routers.counselor_voice import VoiceSessionRequest, _recent_dialogue, _target_for_conversation, create_voice_session
-from app.counseling.runtime import _voice_reply_metadata
+from app.pai_c.runtime import _voice_reply_metadata
 from app.security.event_identity import Actor
 
 WORKSPACE_ID = "11111111-1111-4111-8111-111111111111"

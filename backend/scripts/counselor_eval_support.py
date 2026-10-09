@@ -25,7 +25,7 @@ from app.models import (
     NotificationRecord, User, VaultFact, VaultFieldDefinition, Workspace,
     WorkspaceMember, VAULT_INTAKE_MODELS,
 )
-from app.counseling import runtime
+from app.pai_c import runtime
 from app.services import pai
 
 
@@ -108,7 +108,7 @@ class StudentSession:
             self.user_id = str(user.id)
         self.patches = [patch.object(pai, "WorkspaceApi", EvalWorkspaceApi),
                         patch.object(runtime, "_post_response", self.post_response),
-                        patch("app.counseling.posting._post_response", self.post_response)]
+                        patch("app.pai_c.posting._post_response", self.post_response)]
         for item in self.patches:
             item.start()
         return self

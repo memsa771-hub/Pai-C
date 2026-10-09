@@ -21,12 +21,12 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 from app.config import config
-from app.counseling.deep.analysis import analyze_job, enqueue_turn_analysis
-from app.counseling.deep.actions import dispatch_action
-from app.counseling.deep.notebook import NotebookService
-from app.counseling.deep.polish import contains_blocked_script
-from app.counseling.deep.turn import run_deep_turn
-from app.counseling.deep.turn_input import CounselorTurnInput
+from app.pai_c.deep.analysis import analyze_job, enqueue_turn_analysis
+from app.pai_c.deep.actions import dispatch_action
+from app.pai_c.deep.notebook import NotebookService
+from app.pai_c.deep.polish import contains_blocked_script
+from app.pai_c.deep.turn import run_deep_turn
+from app.pai_c.deep.turn_input import CounselorTurnInput
 from app.inference import client as inference_client
 from app.memory.turn_hook import enqueue_turn_extraction
 from app.memory.index import NullMemoryIndex
@@ -119,9 +119,9 @@ class RecordedModels:
             stack.enter_context(patch.object(config, "PAI_API_KEY", "recorded-only"))
             stack.enter_context(patch.object(config, "MEMORY_EXTRACTOR_API_KEY", "recorded-only"))
             stack.enter_context(patch("app.inference.client.create_client", no_network))
-            stack.enter_context(patch("app.counseling.deep.turn.chat_completion", self.counselor))
-            stack.enter_context(patch("app.counseling.deep.analysis.chat_completion", self.analyst))
-            stack.enter_context(patch("app.counseling.deep.sensitive.chat_completion", self.sensitive))
+            stack.enter_context(patch("app.pai_c.deep.turn.chat_completion", self.counselor))
+            stack.enter_context(patch("app.pai_c.deep.analysis.chat_completion", self.analyst))
+            stack.enter_context(patch("app.pai_c.deep.sensitive.chat_completion", self.sensitive))
             stack.enter_context(patch("app.memory.extractor.chat_completion", self.memory))
             yield
 
@@ -156,7 +156,7 @@ class TrackedLiveClient:
 @contextmanager
 def live_tracking(ledger: UsageLedger):
     original = inference_client.create_client
-    from app.counseling.deep import sensitive
+    from app.pai_c.deep import sensitive
 
     real_sensitive_call = sensitive.chat_completion
 
@@ -182,7 +182,7 @@ def live_tracking(ledger: UsageLedger):
         stack.enter_context(patch.object(config,"WEB_SEARCH_MAX_RETRIES",0))
         with patch("app.inference.client.create_client",
                lambda api_key, base_url=None: TrackedLiveClient(api_key, base_url, original, ledger)), \
-            patch("app.counseling.deep.sensitive.chat_completion", tagged_sensitive_call), \
+            patch("app.pai_c.deep.sensitive.chat_completion", tagged_sensitive_call), \
             patch("app.memory.index._index", NullMemoryIndex()):
             yield
 
@@ -409,7 +409,7 @@ async def complete_mirror_pipeline(student):
     database is opened, and external write actions remain disabled by EvalWorkspaceApi.
     """
     from sqlalchemy import select
-    from app.counseling.deep.mirror import mirror_job, enqueue_confirmed_research, confirmed_research_job, JOB_MIRROR
+    from app.pai_c.deep.mirror import mirror_job, enqueue_confirmed_research, confirmed_research_job, JOB_MIRROR
     from app.journey import JourneyService
     from app.models import Roadmap
     from app.services import operator
@@ -417,7 +417,7 @@ async def complete_mirror_pipeline(student):
         job=db.scalar(select(BackgroundJob).where(BackgroundJob.workspace_id==student.workspace_id,
             BackgroundJob.job_type==JOB_MIRROR,BackgroundJob.status=='pending'))
         if job is None: return {'status':'mirror_not_queued'}
-        with phase('mirror'), patch('app.counseling.deep.mirror._post_response',student.post_response):
+        with phase('mirror'), patch('app.pai_c.deep.mirror._post_response',student.post_response):
             outcome=await mirror_job(job,db)
         job.status='succeeded'; db.commit()
         journey=JourneyService(db).ensure_counselor(student.workspace_id)

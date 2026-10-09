@@ -10,8 +10,8 @@ from datetime import datetime, timezone
 from sqlalchemy import select
 
 from app.config import config
-from app.counseling.deep.notebook import NotebookService
-from app.counseling.deep.turn_input import CounselorTurnInput
+from app.pai_c.deep.notebook import NotebookService
+from app.pai_c.deep.turn_input import CounselorTurnInput
 from app.journey import JourneyService
 from app.memory.episodic import EpisodicMemoryService
 from app.memory.foreground import build_foreground_context

@@ -10,14 +10,14 @@ from contextlib import asynccontextmanager
 from sqlalchemy import select, text
 
 from app.config import config
-from app.counseling.deep.context import _json, _profile
-from app.counseling.deep.coverage import enforce_mirror_readiness
-from app.counseling.deep.notebook import NotebookService, NotebookVersionConflict
-from app.counseling.deep.notebook_sanitize import sanitize_notebook
-from app.counseling.deep.notebook_schema import CounselorNotebookData
-from app.counseling.deep.prompts import load_prompt
-from app.counseling.deep.usage import usage_callback
-from app.counseling.stages import advance_discovery_stage
+from app.pai_c.deep.context import _json, _profile
+from app.pai_c.deep.coverage import enforce_mirror_readiness
+from app.pai_c.deep.notebook import NotebookService, NotebookVersionConflict
+from app.pai_c.deep.notebook_sanitize import sanitize_notebook
+from app.pai_c.deep.notebook_schema import CounselorNotebookData
+from app.pai_c.deep.prompts import load_prompt
+from app.pai_c.deep.usage import usage_callback
+from app.pai_c.stages import advance_discovery_stage
 from app.inference.client import chat_completion
 from app.jobs.service import BackgroundJobService, job_handlers
 from app.journey import JourneyService

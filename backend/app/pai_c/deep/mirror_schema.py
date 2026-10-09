@@ -8,7 +8,7 @@ from pydantic import BaseModel, ConfigDict, Field, StringConstraints, model_vali
 from typing_extensions import Annotated
 
 from app.config import config
-from app.counseling.deep.polish import contains_blocked_script, question_count
+from app.pai_c.deep.polish import contains_blocked_script, question_count
 
 Text = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
 DIMENSION_KEYS = frozenset({

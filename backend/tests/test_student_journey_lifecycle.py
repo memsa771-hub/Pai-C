@@ -8,7 +8,7 @@ import app.capabilities as capability_module
 from app.capabilities import CapabilityContract, CapabilityRegistry
 from app.config import config
 from app.journey import JourneyCoordinator, JourneyError, JourneyService
-from app.counseling import runtime
+from app.pai_c import runtime
 from app.tools import ToolContext
 from app.tools.builtin import capabilities as capability_tools
 from scripts.counselor_eval_support import StudentSession

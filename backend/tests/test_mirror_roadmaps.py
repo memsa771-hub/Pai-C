@@ -8,11 +8,11 @@ from uuid import uuid4
 import pytest
 from sqlalchemy import select
 
-from app.counseling.deep.roadmaps import FIT_FIELDS, build_mirror_roadmaps, ground_roadmap, lanes_for_mirror
+from app.pai_c.deep.roadmaps import FIT_FIELDS, build_mirror_roadmaps, ground_roadmap, lanes_for_mirror
 from app.journey import JourneyService
 from app.models import CounselorNotedQuestion, EventRecord, ExecutionRun, Opportunity, RequirementSet, Roadmap, StudentJourney
 from app.research.requirements import RequirementStore
-from app.roadmaps.service import RoadmapService
+from app.pai_c.roadmaps.service import RoadmapService
 from scripts.counselor_eval_support import StudentSession
 from datetime import datetime, timezone
 
@@ -40,7 +40,7 @@ def test_original_dream_retained_as_a_test_lane():
     mirror, _ = example()
     mirror["roadmap_lanes"] = [item for item in mirror["roadmap_lanes"] if item["lane"] != "test_the_dream"]
     mirror["roadmap_lanes"].append({"lane": "family_wish", "why": "A separate family wish"})
-    from app.counseling.deep.mirror_schema import CounselorMirror
+    from app.pai_c.deep.mirror_schema import CounselorMirror
     with pytest.raises(ValueError, match="original-dream"):
         CounselorMirror.model_validate(mirror)
     assert lanes_for_mirror(mirror) == mirror["roadmap_lanes"]
@@ -75,7 +75,7 @@ async def test_one_grounded_card_per_lane_questions_sourced_and_publication_idem
         research = {"lanes": [{"lane": item["lane"], "facts": facts} for item in mirror["roadmap_lanes"]],
                     "decisive_fields": [item["field"] for item in facts]}
         raw = {"roadmaps": cards, "question_answers": [{"question_id": question.id, "fact_id": facts[0]["fact_id"]}]}
-        with patch("app.counseling.deep.roadmaps.chat_completion", AsyncMock(return_value=json.dumps(raw))) as model:
+        with patch("app.pai_c.deep.roadmaps.chat_completion", AsyncMock(return_value=json.dumps(raw))) as model:
             artifact = await build_mirror_roadmaps(brief, research)
         model.assert_awaited_once()
         assert len(artifact["roadmaps"]) == len(mirror["roadmap_lanes"])
@@ -108,7 +108,7 @@ async def test_budget_exhaustion_publishes_missing_lane_facts_without_model_call
     mirror, _ = example()
     with StudentSession() as student, patch.object(config, 'PAI_RESEARCH_MAX_CALLS_PER_STUDENT', 0):
         with bounded_research(queries=5, fetches=5, seconds=30, workspace_id=student.workspace_id):
-            with patch('app.counseling.deep.roadmaps.chat_completion', AsyncMock()) as model:
+            with patch('app.pai_c.deep.roadmaps.chat_completion', AsyncMock()) as model:
                 result = await build_mirror_roadmaps({'mirror': mirror, 'mirror_version': 1,
                     'notebook': {}, 'profile': {}}, {'lanes': [], 'decisive_fields': ['eligibility']})
         model.assert_not_awaited()
@@ -141,7 +141,7 @@ def test_dream_test_never_silently_replaces_another_confirmed_lane():
     mirror['roadmap_lanes'] = [item for item in mirror['roadmap_lanes'] if item['lane'] != 'test_the_dream']
     mirror['roadmap_lanes'] += [{'lane':'family_wish','why':'A distinct family direction'},
                                {'lane':'another_route','why':'Another student direction'}]
-    from app.counseling.deep.mirror_schema import CounselorMirror
+    from app.pai_c.deep.mirror_schema import CounselorMirror
     with pytest.raises(ValueError, match='original-dream'):
         CounselorMirror.model_validate(mirror)
     assert lanes_for_mirror(mirror) == mirror['roadmap_lanes']
@@ -156,6 +156,6 @@ async def test_sourced_question_cannot_render_a_config_blocked_script():
              'questions':[{'id':'question','question':'What is required?'}]}
     raw = {'roadmaps':[], 'question_answers':[{'question_id':'question','fact_id':'fact'}]}
     with patch.object(config, 'PAI_LANGUAGE_BLOCKED_SCRIPTS', 'Devanagari'), \
-         patch('app.counseling.deep.roadmaps.chat_completion', AsyncMock(return_value=json.dumps(raw))):
+         patch('app.pai_c.deep.roadmaps.chat_completion', AsyncMock(return_value=json.dumps(raw))):
         result = await build_mirror_roadmaps(brief, {'lanes':[], 'question_facts':[fact]})
     assert result['question_answers'] == []

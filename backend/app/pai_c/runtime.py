@@ -9,7 +9,7 @@ from sqlalchemy import select
 
 from app.config import config
 from app.database import SessionLocal
-from app.counseling.posting import _post_response
+from app.pai_c.posting import _post_response
 
 logger = logging.getLogger(__name__)
 
@@ -68,16 +68,16 @@ async def _run_turn(db, workspace_id: str, event_data: dict, depth: int) -> None
             agent_name=PAI_AGENT_NAME,
             profile_captured=profile_captured,
         )
-        from app.counseling.deep.analysis import enqueue_turn_analysis
+        from app.pai_c.deep.analysis import enqueue_turn_analysis
 
         enqueue_turn_analysis(db, workspace_id, event_data.get("id"), assistant_event_id)
 
 
 async def _run_deep_turn(db, workspace_id: str, event_data: dict, depth: int):
     """One deep Counselor response, posted through the shared chat/voice path."""
-    from app.counseling.deep.actions import dispatch_action
-    from app.counseling.deep.turn import run_deep_turn
-    from app.counseling.deep.turn_input import CounselorTurnInput
+    from app.pai_c.deep.actions import dispatch_action
+    from app.pai_c.deep.turn import run_deep_turn
+    from app.pai_c.deep.turn_input import CounselorTurnInput
     from app.documents.attachments import normalize_attachments
     from app.models import CounselorTurnDecision
     from app.services.pai import PAI_AGENT_NAME
@@ -104,7 +104,7 @@ async def _run_deep_turn(db, workspace_id: str, event_data: dict, depth: int):
     )
     started = time.monotonic()
     result = await run_deep_turn(db, turn)
-    from app.counseling.deep.polish import question_count
+    from app.pai_c.deep.polish import question_count
 
     if (question_count(result.reply) == 0
             and result.action.get("type") not in {"mirror", "wellbeing"}):

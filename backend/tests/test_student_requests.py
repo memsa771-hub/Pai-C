@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 
 from fastapi.testclient import TestClient
 
-from app.counseling.student_requests import StudentRequestService
+from app.pai_c.student_requests import StudentRequestService
 from app.database import get_db
 from app.main import app
 from app.models import ExecutionRun, NotificationRecord

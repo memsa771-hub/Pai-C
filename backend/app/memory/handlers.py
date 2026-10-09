@@ -38,7 +38,7 @@ JOB_REFRESH_RESEARCH = "research.refresh_stale"
 
 async def refresh_stale_research(job, db) -> dict:
     """A reported or expired source starts a fresh Counselor research run."""
-    from app.counseling.research_gateway import request_research
+    from app.pai_c.research_gateway import request_research
     from app.journey import JourneyService
     from app.memory.permissions import capabilities_for_agent
     from app.memory.student_snapshot import StudentSnapshotService
@@ -134,14 +134,14 @@ async def resume_research(job, db) -> dict:
         accepted = bool(result.get("ok") and result.get("data", {}).get("resumed"))
         resumed += int(accepted)
         if accepted:
-            from app.counseling.student_requests import StudentRequestService
+            from app.pai_c.student_requests import StudentRequestService
             for field in matching_fields[run_id]:
                 StudentRequestService(db).mark_answered(job.workspace_id, run_id, field)
             db.commit()
     # Resume permitted research from the canonical snapshot without a new chat
     # turn; discovery alone must not bypass the mirror-confirmation gate.
-    from app.counseling.research_gateway import request_research
-    from app.counseling.stages import advance_discovery_stage
+    from app.pai_c.research_gateway import request_research
+    from app.pai_c.stages import advance_discovery_stage
     from app.journey import JourneyService
     from app.memory.student_snapshot import StudentSnapshotService
     from app.memory.permissions import capabilities_for_agent
@@ -190,7 +190,7 @@ async def resume_research(job, db) -> dict:
 
 
 def _deep_foundation_ready(db, workspace_id: str) -> bool:
-    from app.counseling.deep.notebook import NotebookService
+    from app.pai_c.deep.notebook import NotebookService
 
     coverage = NotebookService(db).get(workspace_id).notebook.coverage
     return bool(coverage.person and coverage.education)

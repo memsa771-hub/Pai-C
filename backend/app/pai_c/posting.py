@@ -90,7 +90,7 @@ def _build_conversation_context(
 
             source = row.source or ""
             if source == f"openagents:{agent_name}":
-                from app.counseling.deep.polish import is_counselor_fallback
+                from app.pai_c.deep.polish import is_counselor_fallback
                 if is_counselor_fallback(content):
                     continue
             if source == f"openagents:{agent_name}":

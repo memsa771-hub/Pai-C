@@ -8,12 +8,12 @@ import pytest
 from sqlalchemy import select
 
 from app.config import config
-from app.counseling import runtime
-from app.counseling.deep.actions import dispatch_action
-from app.counseling.deep.context import DeepContext, build_context
-from app.counseling.deep.notebook_schema import CounselorNotebookData
-from app.counseling.deep.turn import run_deep_turn
-from app.counseling.deep.turn_input import CounselorTurnInput
+from app.pai_c import runtime
+from app.pai_c.deep.actions import dispatch_action
+from app.pai_c.deep.context import DeepContext, build_context
+from app.pai_c.deep.notebook_schema import CounselorNotebookData
+from app.pai_c.deep.turn import run_deep_turn
+from app.pai_c.deep.turn_input import CounselorTurnInput
 from app.models import EventRecord, User, Workspace
 from scripts.counselor_eval_support import StudentSession
 
@@ -33,7 +33,7 @@ def _answer(reply, action=None):
 async def test_normal_deep_turn_uses_one_json_model_call():
     with StudentSession() as student, student.factory() as db:
         model = AsyncMock(return_value=_answer("Tell me about your day?"))
-        with patch("app.counseling.deep.turn.chat_completion", model), \
+        with patch("app.pai_c.deep.turn.chat_completion", model), \
                 patch.object(config, "PAI_API_KEY", "fake"):
             result = await run_deep_turn(db, _turn(student))
         assert result.reply == "Tell me about your day?"
@@ -51,7 +51,7 @@ async def test_normal_deep_turn_uses_one_json_model_call():
 @pytest.mark.asyncio
 async def test_invalid_json_falls_back_to_plain_text_without_action():
     with StudentSession() as student, student.factory() as db:
-        with patch("app.counseling.deep.turn.chat_completion",
+        with patch("app.pai_c.deep.turn.chat_completion",
                    new=AsyncMock(return_value="Tell me what you did last week?")) as model:
             result = await run_deep_turn(db, _turn(student))
         assert result.reply == "Tell me what you did last week?"
@@ -62,7 +62,7 @@ async def test_invalid_json_falls_back_to_plain_text_without_action():
 @pytest.mark.asyncio
 async def test_malformed_string_fragment_does_not_reach_student():
     with StudentSession() as student, student.factory() as db:
-        with patch("app.counseling.deep.turn.chat_completion",
+        with patch("app.pai_c.deep.turn.chat_completion",
                    new=AsyncMock(return_value='Tell me more?\\",')):
             result = await run_deep_turn(db, _turn(student))
         assert result.reply == "Tell me more?"
@@ -72,7 +72,7 @@ async def test_malformed_string_fragment_does_not_reach_student():
 @pytest.mark.asyncio
 async def test_fenced_json_parse_retry_never_displays_json():
     with StudentSession() as student, student.factory() as db:
-        with patch("app.counseling.deep.turn.chat_completion",
+        with patch("app.pai_c.deep.turn.chat_completion",
                    new=AsyncMock(return_value='```json\n{"reply":"What did you make?","action":{"type":"none"}}\n```')) as model:
             result = await run_deep_turn(db, _turn(student))
         assert result.reply == "What did you make?"
@@ -83,7 +83,7 @@ async def test_fenced_json_parse_retry_never_displays_json():
 async def test_question_trim_leaves_opening_wording_for_prompt_and_eval():
     with StudentSession() as student, student.factory() as db:
         text = "Great, tell me what you built? How long did it take?"
-        with patch("app.counseling.deep.turn.chat_completion", new=AsyncMock(return_value=_answer(text))):
+        with patch("app.pai_c.deep.turn.chat_completion", new=AsyncMock(return_value=_answer(text))):
             result = await run_deep_turn(db, _turn(student))
         assert result.reply == "Great, tell me what you built?"
 
@@ -92,7 +92,7 @@ async def test_question_trim_leaves_opening_wording_for_prompt_and_eval():
 async def test_configured_blocked_script_retries_once_then_uses_configured_fallback():
     with StudentSession() as student, student.factory() as db:
         model = AsyncMock(side_effect=[_answer("\u03b1\u03b2?"), _answer("\u03b3\u03b4?")])
-        with patch("app.counseling.deep.turn.chat_completion", model), \
+        with patch("app.pai_c.deep.turn.chat_completion", model), \
                 patch.object(config, "PAI_LANGUAGE_BLOCKED_SCRIPTS", "Greek"), \
                 patch.object(config, "PAI_LANGUAGE_BLOCKED_SCRIPT_REPLACEMENT", "configured replacement"), \
                 patch.object(config, "PAI_COUNSELOR_FALLBACK_REPLY", "Configured fallback."):
@@ -137,7 +137,7 @@ async def test_identity_marked_never_ask_and_other_workspace_excluded():
 async def test_voice_and_chat_same_turn_have_identical_model_input_and_reply():
     with StudentSession() as student, student.factory() as db:
         model = AsyncMock(return_value=_answer("What did you enjoy doing?"))
-        with patch("app.counseling.deep.turn.chat_completion", model):
+        with patch("app.pai_c.deep.turn.chat_completion", model):
             chat = await run_deep_turn(db, _turn(student, channel="channel/chat"))
             voice = await run_deep_turn(db, _turn(student, channel="channel/voice", voice=True))
         assert chat.reply == voice.reply
@@ -156,7 +156,7 @@ async def test_runtime_posts_and_enqueues_extraction_once():
                            timestamp=event_data["timestamp"]))
         db.commit()
         with patch.object(config, "PAI_API_KEY", "fake"), \
-                patch("app.counseling.deep.turn.chat_completion",
+                patch("app.pai_c.deep.turn.chat_completion",
                       new=AsyncMock(return_value=_answer("What are you doing now?"))) as model, \
                 patch("app.memory.turn_hook.enqueue_turn_extraction") as enqueue:
             await runtime._run_turn(db, student.workspace_id, event_data, 0)
@@ -185,12 +185,12 @@ async def test_runtime_logs_missing_spoken_question_without_student_text(
                            timestamp=event_data["timestamp"]))
         db.commit()
         with patch.object(config, "PAI_API_KEY", "fake"), \
-                patch("app.counseling.deep.turn.chat_completion",
+                patch("app.pai_c.deep.turn.chat_completion",
                       new=AsyncMock(return_value=_answer(reply, action))), \
-                patch("app.counseling.deep.actions.dispatch_action",
+                patch("app.pai_c.deep.actions.dispatch_action",
                       new=AsyncMock(return_value=(action["type"], "recorded"))), \
                 patch("app.memory.turn_hook.enqueue_turn_extraction"), \
-                caplog.at_level("INFO", logger="app.counseling.runtime"):
+                caplog.at_level("INFO", logger="app.pai_c.runtime"):
             await runtime._run_turn(db, student.workspace_id, event_data, 0)
         matching = [record for record in caplog.records if "reply_without_question" in record.message]
         assert bool(matching) is expected_log

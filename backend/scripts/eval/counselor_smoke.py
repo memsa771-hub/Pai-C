@@ -19,10 +19,10 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from app.config import config
-from app.counseling.deep.polish import (
+from app.pai_c.deep.polish import (
     contains_blocked_script, has_list, polish_reply, question_count,
 )
-from app.counseling.deep.prompts import load_prompt
+from app.pai_c.deep.prompts import load_prompt
 from app.inference.client import _reasoning_effort_for, create_client, _token_limit_kwarg
 from scripts.eval.cost import UsageLedger, BudgetReached, load_prices
 

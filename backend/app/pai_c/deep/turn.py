@@ -7,11 +7,11 @@ import time
 from dataclasses import dataclass
 
 from app.config import config
-from app.counseling.deep.context import DeepContext, build_context
-from app.counseling.deep.polish import contains_blocked_script, polish_reply
-from app.counseling.deep.prompts import load_prompt
-from app.counseling.deep.turn_input import CounselorTurnInput, shared_history
-from app.counseling.deep.usage import usage_callback
+from app.pai_c.deep.context import DeepContext, build_context
+from app.pai_c.deep.polish import contains_blocked_script, polish_reply
+from app.pai_c.deep.prompts import load_prompt
+from app.pai_c.deep.turn_input import CounselorTurnInput, shared_history
+from app.pai_c.deep.usage import usage_callback
 from app.inference.client import chat_completion
 
 logger = logging.getLogger(__name__)

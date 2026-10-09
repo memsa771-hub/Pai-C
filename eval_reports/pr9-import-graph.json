@@ -1,0 +1,1974 @@
+{
+  "modules": 244,
+  "counselor_roots": [
+    "app.pai_c",
+    "app.pai_c.deep",
+    "app.pai_c.deep.actions",
+    "app.pai_c.deep.analysis",
+    "app.pai_c.deep.context",
+    "app.pai_c.deep.coverage",
+    "app.pai_c.deep.mirror",
+    "app.pai_c.deep.mirror_schema",
+    "app.pai_c.deep.notebook",
+    "app.pai_c.deep.notebook_sanitize",
+    "app.pai_c.deep.notebook_schema",
+    "app.pai_c.deep.noted_questions",
+    "app.pai_c.deep.polish",
+    "app.pai_c.deep.prompts",
+    "app.pai_c.deep.roadmaps",
+    "app.pai_c.deep.sensitive",
+    "app.pai_c.deep.turn",
+    "app.pai_c.deep.turn_input",
+    "app.pai_c.deep.usage",
+    "app.pai_c.handoff",
+    "app.pai_c.light_research",
+    "app.pai_c.posting",
+    "app.pai_c.research_gateway",
+    "app.pai_c.roadmaps",
+    "app.pai_c.roadmaps.service",
+    "app.pai_c.runtime",
+    "app.pai_c.stages",
+    "app.pai_c.student_requests",
+    "app.pai_c.summary_access",
+    "app.pai_c.voice_context"
+  ],
+  "reachable": [
+    "app",
+    "app.api",
+    "app.api.response",
+    "app.application_workspace",
+    "app.application_workspace.access",
+    "app.application_workspace.calendar",
+    "app.application_workspace.catalog",
+    "app.application_workspace.context",
+    "app.application_workspace.operations",
+    "app.application_workspace.plans",
+    "app.application_workspace.queries",
+    "app.application_workspace.schemas",
+    "app.application_workspace.serializers",
+    "app.browser",
+    "app.browser.credentials",
+    "app.browser.egress",
+    "app.browser.maintenance",
+    "app.browser.manager",
+    "app.capabilities",
+    "app.capabilities.context",
+    "app.capabilities.contract",
+    "app.capabilities.execution_policy",
+    "app.capabilities.loader",
+    "app.capabilities.manifest",
+    "app.capabilities.permissions",
+    "app.capabilities.registry",
+    "app.capabilities.router",
+    "app.capabilities.tool_broker",
+    "app.config",
+    "app.database",
+    "app.deadlines",
+    "app.deadlines.service",
+    "app.documents",
+    "app.documents.attachments",
+    "app.documents.classify",
+    "app.documents.content",
+    "app.documents.extractor",
+    "app.documents.handlers",
+    "app.documents.ocr",
+    "app.documents.parsers",
+    "app.documents.progress",
+    "app.documents.reader",
+    "app.documents.retrieval",
+    "app.documents.service",
+    "app.documents.types",
+    "app.documents.untrusted",
+    "app.eventing",
+    "app.eventing.events",
+    "app.eventing.factory",
+    "app.eventing.handlers",
+    "app.eventing.handlers.agents",
+    "app.eventing.handlers.channels",
+    "app.eventing.handlers.messages",
+    "app.eventing.handlers.routing",
+    "app.eventing.handlers.workflows",
+    "app.eventing.mods",
+    "app.eventing.pipeline",
+    "app.files",
+    "app.files.storage",
+    "app.files.types",
+    "app.inference",
+    "app.inference.client",
+    "app.infrastructure",
+    "app.infrastructure.cache",
+    "app.jobs",
+    "app.jobs.service",
+    "app.journey",
+    "app.journey.coordinator",
+    "app.journey.direction_discovery",
+    "app.journey.events",
+    "app.journey.models",
+    "app.journey.schemas",
+    "app.journey.service",
+    "app.journey.state",
+    "app.journey.transitions",
+    "app.main",
+    "app.memory",
+    "app.memory.candidates",
+    "app.memory.context",
+    "app.memory.dedupe",
+    "app.memory.domain_stewards",
+    "app.memory.education_journey",
+    "app.memory.embeddings",
+    "app.memory.episodic",
+    "app.memory.errors",
+    "app.memory.extraction_context",
+    "app.memory.extractor",
+    "app.memory.field_definitions",
+    "app.memory.foreground",
+    "app.memory.foreground_executor",
+    "app.memory.handlers",
+    "app.memory.index",
+    "app.memory.index_lifecycle",
+    "app.memory.index_qdrant",
+    "app.memory.onboarding",
+    "app.memory.permissions",
+    "app.memory.profile_completion",
+    "app.memory.profile_issues",
+    "app.memory.profile_requirements",
+    "app.memory.readiness",
+    "app.memory.reconciler",
+    "app.memory.rerank",
+    "app.memory.retriever",
+    "app.memory.semantic",
+    "app.memory.sparse",
+    "app.memory.student_context",
+    "app.memory.student_context_gateway",
+    "app.memory.student_profile_view",
+    "app.memory.student_records",
+    "app.memory.student_schema",
+    "app.memory.student_snapshot",
+    "app.memory.turn_hook",
+    "app.memory.vault",
+    "app.memory.vault_intake",
+    "app.memory.vault_relations",
+    "app.memory.voice_attribution",
+    "app.models",
+    "app.mods",
+    "app.mods.auth",
+    "app.mods.persistence",
+    "app.mods.workspace_mod",
+    "app.pai_c",
+    "app.pai_c.deep",
+    "app.pai_c.deep.actions",
+    "app.pai_c.deep.analysis",
+    "app.pai_c.deep.context",
+    "app.pai_c.deep.coverage",
+    "app.pai_c.deep.mirror",
+    "app.pai_c.deep.mirror_schema",
+    "app.pai_c.deep.notebook",
+    "app.pai_c.deep.notebook_sanitize",
+    "app.pai_c.deep.notebook_schema",
+    "app.pai_c.deep.noted_questions",
+    "app.pai_c.deep.polish",
+    "app.pai_c.deep.prompts",
+    "app.pai_c.deep.roadmaps",
+    "app.pai_c.deep.sensitive",
+    "app.pai_c.deep.turn",
+    "app.pai_c.deep.turn_input",
+    "app.pai_c.deep.usage",
+    "app.pai_c.handoff",
+    "app.pai_c.light_research",
+    "app.pai_c.posting",
+    "app.pai_c.research_gateway",
+    "app.pai_c.roadmaps",
+    "app.pai_c.roadmaps.service",
+    "app.pai_c.runtime",
+    "app.pai_c.stages",
+    "app.pai_c.student_requests",
+    "app.pai_c.summary_access",
+    "app.pai_c.voice_context",
+    "app.plugins",
+    "app.plugins._shared",
+    "app.plugins._shared.budget",
+    "app.plugins._shared.institution_registry",
+    "app.plugins._shared.sources",
+    "app.plugins._shared.verification",
+    "app.plugins.gap_assessment",
+    "app.plugins.program_discovery",
+    "app.plugins.program_research",
+    "app.plugins.qualification_recognition",
+    "app.plugins.roadmap_builder",
+    "app.plugins.scholarship_discovery",
+    "app.realtime",
+    "app.realtime.composing",
+    "app.research",
+    "app.research.requirements",
+    "app.research.scheduler",
+    "app.routers",
+    "app.routers.account",
+    "app.routers.app_version",
+    "app.routers.application_workspace",
+    "app.routers.auth",
+    "app.routers.browser",
+    "app.routers.counselor_summary",
+    "app.routers.counselor_voice",
+    "app.routers.deadlines",
+    "app.routers.decision_records",
+    "app.routers.escalations",
+    "app.routers.events",
+    "app.routers.feedback",
+    "app.routers.fetch",
+    "app.routers.files",
+    "app.routers.integrations",
+    "app.routers.knowledge",
+    "app.routers.network",
+    "app.routers.notifications",
+    "app.routers.operator",
+    "app.routers.roadmaps",
+    "app.routers.routines",
+    "app.routers.search",
+    "app.routers.shares",
+    "app.routers.student_profile",
+    "app.routers.student_requests",
+    "app.routers.tasks",
+    "app.routers.timers",
+    "app.routers.todos",
+    "app.routers.workflows",
+    "app.routers.workspaces",
+    "app.security",
+    "app.security.access",
+    "app.security.app_session",
+    "app.security.errors",
+    "app.security.event_identity",
+    "app.security.human_auth",
+    "app.security.identity",
+    "app.security.network",
+    "app.security.stream_ticket",
+    "app.services",
+    "app.services.email",
+    "app.services.integrations",
+    "app.services.notify",
+    "app.services.operator",
+    "app.services.pai",
+    "app.services.workflow",
+    "app.tools",
+    "app.tools.builtin",
+    "app.tools.builtin.browser",
+    "app.tools.builtin.capabilities",
+    "app.tools.builtin.files",
+    "app.tools.builtin.memory",
+    "app.tools.builtin.operator",
+    "app.tools.builtin.tasks",
+    "app.tools.builtin.web",
+    "app.tools.builtin.workspace",
+    "app.tools.context",
+    "app.tools.executor",
+    "app.tools.policy",
+    "app.tools.registry",
+    "app.tools.schema",
+    "app.tools.web_search",
+    "app.workspace",
+    "app.workspace.naming"
+  ],
+  "os_candidates": [
+    "app.application_workspace",
+    "app.application_workspace.access",
+    "app.application_workspace.calendar",
+    "app.application_workspace.catalog",
+    "app.application_workspace.context",
+    "app.application_workspace.operations",
+    "app.application_workspace.plans",
+    "app.application_workspace.queries",
+    "app.application_workspace.schemas",
+    "app.application_workspace.serializers",
+    "app.deadlines",
+    "app.deadlines.service",
+    "app.pai_os",
+    "app.services.workflow"
+  ],
+  "os_eligible": [
+    "app.pai_os"
+  ],
+  "os_ineligible": [
+    "app.application_workspace",
+    "app.application_workspace.access",
+    "app.application_workspace.calendar",
+    "app.application_workspace.catalog",
+    "app.application_workspace.context",
+    "app.application_workspace.operations",
+    "app.application_workspace.plans",
+    "app.application_workspace.queries",
+    "app.application_workspace.schemas",
+    "app.application_workspace.serializers",
+    "app.deadlines",
+    "app.deadlines.service",
+    "app.services.workflow"
+  ],
+  "dynamic_imports_requiring_review": [],
+  "edges": {
+    "app": [],
+    "app.api": [
+      "app.api"
+    ],
+    "app.api.response": [
+      "app.api"
+    ],
+    "app.application_workspace": [
+      "app.application_workspace",
+      "app.application_workspace.calendar",
+      "app.application_workspace.catalog",
+      "app.application_workspace.operations",
+      "app.application_workspace.plans"
+    ],
+    "app.application_workspace.access": [
+      "app.api.response",
+      "app.application_workspace",
+      "app.routers.network",
+      "app.security.event_identity"
+    ],
+    "app.application_workspace.calendar": [
+      "app.api.response",
+      "app.application_workspace",
+      "app.application_workspace.access",
+      "app.application_workspace.serializers",
+      "app.database",
+      "app.models"
+    ],
+    "app.application_workspace.catalog": [
+      "app.api.response",
+      "app.application_workspace",
+      "app.application_workspace.access",
+      "app.application_workspace.queries",
+      "app.application_workspace.schemas",
+      "app.application_workspace.serializers",
+      "app.database",
+      "app.models"
+    ],
+    "app.application_workspace.context": [
+      "app.application_workspace",
+      "app.models"
+    ],
+    "app.application_workspace.operations": [
+      "app.api.response",
+      "app.application_workspace",
+      "app.application_workspace.access",
+      "app.application_workspace.queries",
+      "app.application_workspace.schemas",
+      "app.application_workspace.serializers",
+      "app.database",
+      "app.models",
+      "app.routers.routines",
+      "app.services.pai"
+    ],
+    "app.application_workspace.plans": [
+      "app.api.response",
+      "app.application_workspace",
+      "app.application_workspace.access",
+      "app.application_workspace.queries",
+      "app.application_workspace.schemas",
+      "app.application_workspace.serializers",
+      "app.database",
+      "app.deadlines.service",
+      "app.models"
+    ],
+    "app.application_workspace.queries": [
+      "app.application_workspace",
+      "app.models"
+    ],
+    "app.application_workspace.schemas": [
+      "app.application_workspace"
+    ],
+    "app.application_workspace.serializers": [
+      "app.application_workspace",
+      "app.models"
+    ],
+    "app.browser": [
+      "app.browser"
+    ],
+    "app.browser.credentials": [
+      "app.browser",
+      "app.browser.manager"
+    ],
+    "app.browser.egress": [
+      "app.browser",
+      "app.security.network"
+    ],
+    "app.browser.maintenance": [
+      "app.browser",
+      "app.browser.credentials",
+      "app.browser.manager",
+      "app.database",
+      "app.eventing.events",
+      "app.models",
+      "app.routers.network"
+    ],
+    "app.browser.manager": [
+      "app.browser",
+      "app.browser.credentials",
+      "app.browser.egress",
+      "app.security.network"
+    ],
+    "app.capabilities": [
+      "app.capabilities",
+      "app.capabilities.contract",
+      "app.capabilities.loader",
+      "app.capabilities.registry",
+      "app.capabilities.router"
+    ],
+    "app.capabilities.context": [
+      "app.capabilities"
+    ],
+    "app.capabilities.contract": [
+      "app.capabilities"
+    ],
+    "app.capabilities.execution_policy": [
+      "app.capabilities",
+      "app.capabilities.contract"
+    ],
+    "app.capabilities.loader": [
+      "app.capabilities",
+      "app.plugins",
+      "app.plugins._shared",
+      "app.plugins.gap_assessment",
+      "app.plugins.program_discovery",
+      "app.plugins.program_research",
+      "app.plugins.qualification_recognition",
+      "app.plugins.roadmap_builder",
+      "app.plugins.scholarship_discovery"
+    ],
+    "app.capabilities.manifest": [
+      "app.capabilities",
+      "app.capabilities.contract",
+      "app.tools.schema"
+    ],
+    "app.capabilities.permissions": [
+      "app.capabilities"
+    ],
+    "app.capabilities.registry": [
+      "app.capabilities",
+      "app.capabilities.contract",
+      "app.capabilities.manifest"
+    ],
+    "app.capabilities.router": [
+      "app.capabilities",
+      "app.capabilities.context",
+      "app.capabilities.manifest",
+      "app.capabilities.permissions"
+    ],
+    "app.capabilities.tool_broker": [
+      "app.capabilities",
+      "app.plugins._shared.budget",
+      "app.tools"
+    ],
+    "app.config": [
+      "app"
+    ],
+    "app.database": [
+      "app",
+      "app.config"
+    ],
+    "app.deadlines": [
+      "app.deadlines"
+    ],
+    "app.deadlines.service": [
+      "app.database",
+      "app.deadlines",
+      "app.models",
+      "app.services.notify"
+    ],
+    "app.documents": [
+      "app.documents",
+      "app.documents.types"
+    ],
+    "app.documents.attachments": [
+      "app.documents",
+      "app.documents.reader",
+      "app.models"
+    ],
+    "app.documents.classify": [
+      "app.documents"
+    ],
+    "app.documents.content": [
+      "app.documents"
+    ],
+    "app.documents.extractor": [
+      "app.config",
+      "app.documents",
+      "app.documents.classify",
+      "app.documents.content",
+      "app.documents.untrusted",
+      "app.inference.client",
+      "app.memory.errors",
+      "app.memory.student_records",
+      "app.memory.student_schema"
+    ],
+    "app.documents.handlers": [
+      "app.documents",
+      "app.documents.classify",
+      "app.documents.content",
+      "app.documents.extractor",
+      "app.documents.ocr",
+      "app.documents.parsers",
+      "app.documents.progress",
+      "app.documents.retrieval",
+      "app.documents.service",
+      "app.files.storage",
+      "app.jobs.service",
+      "app.memory.candidates",
+      "app.memory.field_definitions",
+      "app.memory.handlers",
+      "app.memory.student_snapshot",
+      "app.models",
+      "app.pai_c.runtime",
+      "app.services.pai"
+    ],
+    "app.documents.ocr": [
+      "app.config",
+      "app.documents",
+      "app.inference.client"
+    ],
+    "app.documents.parsers": [
+      "app.documents",
+      "app.documents.content"
+    ],
+    "app.documents.progress": [
+      "app.documents",
+      "app.documents.extractor",
+      "app.models"
+    ],
+    "app.documents.reader": [
+      "app.documents",
+      "app.documents.content",
+      "app.documents.progress",
+      "app.documents.service"
+    ],
+    "app.documents.retrieval": [
+      "app.documents",
+      "app.documents.content",
+      "app.memory.index"
+    ],
+    "app.documents.service": [
+      "app.documents",
+      "app.documents.types",
+      "app.jobs.service",
+      "app.models"
+    ],
+    "app.documents.types": [
+      "app.documents"
+    ],
+    "app.documents.untrusted": [
+      "app.documents",
+      "app.documents.content"
+    ],
+    "app.eventing": [
+      "app.eventing",
+      "app.eventing.events",
+      "app.eventing.mods",
+      "app.eventing.pipeline"
+    ],
+    "app.eventing.events": [
+      "app.eventing"
+    ],
+    "app.eventing.factory": [
+      "app.eventing",
+      "app.eventing.pipeline",
+      "app.mods.auth",
+      "app.mods.persistence",
+      "app.mods.workspace_mod"
+    ],
+    "app.eventing.handlers": [
+      "app.eventing.handlers"
+    ],
+    "app.eventing.handlers.agents": [
+      "app.eventing.events",
+      "app.eventing.handlers",
+      "app.eventing.mods",
+      "app.models",
+      "app.workspace",
+      "app.workspace.naming"
+    ],
+    "app.eventing.handlers.channels": [
+      "app.eventing.events",
+      "app.eventing.handlers",
+      "app.eventing.mods",
+      "app.models"
+    ],
+    "app.eventing.handlers.messages": [
+      "app.config",
+      "app.eventing.events",
+      "app.eventing.handlers",
+      "app.eventing.handlers.agents",
+      "app.eventing.handlers.routing",
+      "app.eventing.handlers.workflows",
+      "app.eventing.mods",
+      "app.models"
+    ],
+    "app.eventing.handlers.routing": [
+      "app.config",
+      "app.eventing.events",
+      "app.eventing.handlers",
+      "app.inference.client",
+      "app.infrastructure",
+      "app.infrastructure.cache",
+      "app.models",
+      "app.services.pai",
+      "app.workspace.naming"
+    ],
+    "app.eventing.handlers.workflows": [
+      "app.config",
+      "app.eventing.events",
+      "app.eventing.handlers",
+      "app.eventing.handlers.routing",
+      "app.inference.client",
+      "app.models",
+      "app.services.notify"
+    ],
+    "app.eventing.mods": [
+      "app.eventing",
+      "app.eventing.events"
+    ],
+    "app.eventing.pipeline": [
+      "app.eventing",
+      "app.eventing.events",
+      "app.eventing.mods"
+    ],
+    "app.files": [
+      "app.files"
+    ],
+    "app.files.storage": [
+      "app.config",
+      "app.files"
+    ],
+    "app.files.types": [
+      "app.files"
+    ],
+    "app.inference": [
+      "app.inference",
+      "app.inference.client"
+    ],
+    "app.inference.client": [
+      "app.config",
+      "app.inference",
+      "app.plugins._shared.budget"
+    ],
+    "app.infrastructure": [
+      "app.infrastructure"
+    ],
+    "app.infrastructure.cache": [
+      "app.config",
+      "app.infrastructure"
+    ],
+    "app.jobs": [
+      "app.jobs",
+      "app.jobs.service"
+    ],
+    "app.jobs.service": [
+      "app.jobs",
+      "app.models"
+    ],
+    "app.jobs.worker": [
+      "app.config",
+      "app.database",
+      "app.documents.handlers",
+      "app.jobs",
+      "app.jobs.service",
+      "app.memory.handlers",
+      "app.pai_c.deep.analysis",
+      "app.pai_c.deep.mirror",
+      "app.research.scheduler"
+    ],
+    "app.journey": [
+      "app.journey",
+      "app.journey.coordinator",
+      "app.journey.direction_discovery",
+      "app.journey.service",
+      "app.journey.state",
+      "app.journey.transitions"
+    ],
+    "app.journey.coordinator": [
+      "app.journey",
+      "app.journey.direction_discovery",
+      "app.journey.service",
+      "app.journey.transitions"
+    ],
+    "app.journey.direction_discovery": [
+      "app.journey",
+      "app.journey.service",
+      "app.memory.student_records"
+    ],
+    "app.journey.events": [
+      "app.journey"
+    ],
+    "app.journey.milestones": [
+      "app.journey"
+    ],
+    "app.journey.models": [
+      "app.journey"
+    ],
+    "app.journey.schemas": [
+      "app.journey"
+    ],
+    "app.journey.service": [
+      "app.journey",
+      "app.journey.events",
+      "app.journey.models",
+      "app.journey.schemas",
+      "app.journey.transitions",
+      "app.models",
+      "app.pai_c.stages"
+    ],
+    "app.journey.state": [
+      "app.journey"
+    ],
+    "app.journey.transitions": [
+      "app.journey"
+    ],
+    "app.main": [
+      "app",
+      "app.api.response",
+      "app.application_workspace.context",
+      "app.browser.maintenance",
+      "app.browser.manager",
+      "app.config",
+      "app.database",
+      "app.deadlines.service",
+      "app.eventing.events",
+      "app.eventing.factory",
+      "app.eventing.mods",
+      "app.infrastructure.cache",
+      "app.memory.embeddings",
+      "app.models",
+      "app.pai_c.runtime",
+      "app.routers",
+      "app.routers.account",
+      "app.routers.app_version",
+      "app.routers.application_workspace",
+      "app.routers.auth",
+      "app.routers.browser",
+      "app.routers.counselor_summary",
+      "app.routers.counselor_voice",
+      "app.routers.deadlines",
+      "app.routers.decision_records",
+      "app.routers.escalations",
+      "app.routers.events",
+      "app.routers.feedback",
+      "app.routers.fetch",
+      "app.routers.files",
+      "app.routers.integrations",
+      "app.routers.knowledge",
+      "app.routers.network",
+      "app.routers.notifications",
+      "app.routers.operator",
+      "app.routers.roadmaps",
+      "app.routers.routines",
+      "app.routers.search",
+      "app.routers.shares",
+      "app.routers.student_profile",
+      "app.routers.student_requests",
+      "app.routers.tasks",
+      "app.routers.timers",
+      "app.routers.todos",
+      "app.routers.workflows",
+      "app.routers.workspaces",
+      "app.security.app_session",
+      "app.security.errors",
+      "app.services.pai"
+    ],
+    "app.memory": [
+      "app.memory",
+      "app.memory.permissions"
+    ],
+    "app.memory.candidates": [
+      "app.memory",
+      "app.memory.field_definitions",
+      "app.models"
+    ],
+    "app.memory.context": [
+      "app.memory",
+      "app.memory.episodic",
+      "app.memory.field_definitions",
+      "app.memory.foreground",
+      "app.memory.permissions",
+      "app.memory.retriever",
+      "app.memory.semantic",
+      "app.memory.student_records",
+      "app.memory.student_schema",
+      "app.memory.vault",
+      "app.tools.policy"
+    ],
+    "app.memory.dedupe": [
+      "app.memory",
+      "app.models"
+    ],
+    "app.memory.domain_stewards": [
+      "app.memory",
+      "app.memory.errors",
+      "app.memory.student_schema",
+      "app.memory.voice_attribution"
+    ],
+    "app.memory.education_journey": [
+      "app.memory",
+      "app.memory.student_snapshot"
+    ],
+    "app.memory.embeddings": [
+      "app.config",
+      "app.memory"
+    ],
+    "app.memory.episodic": [
+      "app.memory",
+      "app.memory.dedupe",
+      "app.memory.index_lifecycle",
+      "app.models"
+    ],
+    "app.memory.errors": [
+      "app.memory"
+    ],
+    "app.memory.eval_dataset": [
+      "app.memory"
+    ],
+    "app.memory.eval_retrieval": [
+      "app.config",
+      "app.database",
+      "app.memory",
+      "app.memory.embeddings",
+      "app.memory.episodic",
+      "app.memory.eval_dataset",
+      "app.memory.handlers",
+      "app.memory.index",
+      "app.memory.index_qdrant",
+      "app.memory.retriever",
+      "app.memory.semantic",
+      "app.memory.sparse",
+      "app.models"
+    ],
+    "app.memory.explicit_commands": [
+      "app.memory",
+      "app.memory.voice_attribution"
+    ],
+    "app.memory.extraction_context": [
+      "app.memory",
+      "app.memory.semantic",
+      "app.memory.student_records",
+      "app.memory.vault",
+      "app.models"
+    ],
+    "app.memory.extractor": [
+      "app.config",
+      "app.inference.client",
+      "app.memory",
+      "app.memory.errors",
+      "app.memory.student_records",
+      "app.memory.student_schema",
+      "app.memory.voice_attribution"
+    ],
+    "app.memory.field_definitions": [
+      "app.memory",
+      "app.memory.errors",
+      "app.models",
+      "app.tools.executor"
+    ],
+    "app.memory.foreground": [
+      "app.config",
+      "app.database",
+      "app.memory",
+      "app.memory.foreground_executor",
+      "app.memory.index",
+      "app.memory.student_context"
+    ],
+    "app.memory.foreground_executor": [
+      "app.config",
+      "app.memory"
+    ],
+    "app.memory.handlers": [
+      "app.documents.handlers",
+      "app.jobs.service",
+      "app.journey",
+      "app.memory",
+      "app.memory.candidates",
+      "app.memory.dedupe",
+      "app.memory.episodic",
+      "app.memory.extraction_context",
+      "app.memory.extractor",
+      "app.memory.field_definitions",
+      "app.memory.index",
+      "app.memory.permissions",
+      "app.memory.reconciler",
+      "app.memory.semantic",
+      "app.memory.student_snapshot",
+      "app.models",
+      "app.pai_c.deep.notebook",
+      "app.pai_c.research_gateway",
+      "app.pai_c.stages",
+      "app.pai_c.student_requests",
+      "app.services",
+      "app.services.operator",
+      "app.services.pai",
+      "app.tools"
+    ],
+    "app.memory.index": [
+      "app.config",
+      "app.memory",
+      "app.memory.index_qdrant"
+    ],
+    "app.memory.index_lifecycle": [
+      "app.jobs.service",
+      "app.memory",
+      "app.memory.handlers"
+    ],
+    "app.memory.index_qdrant": [
+      "app.config",
+      "app.memory",
+      "app.memory.embeddings",
+      "app.memory.index",
+      "app.memory.sparse"
+    ],
+    "app.memory.onboarding": [
+      "app.memory",
+      "app.memory.candidates",
+      "app.memory.errors",
+      "app.memory.reconciler",
+      "app.memory.vault",
+      "app.models"
+    ],
+    "app.memory.permissions": [
+      "app.memory",
+      "app.services.operator",
+      "app.services.pai",
+      "app.tools.policy"
+    ],
+    "app.memory.profile_completion": [
+      "app.config",
+      "app.memory",
+      "app.memory.education_journey",
+      "app.memory.profile_requirements",
+      "app.memory.student_snapshot",
+      "app.models"
+    ],
+    "app.memory.profile_issues": [
+      "app.memory",
+      "app.memory.candidates",
+      "app.memory.errors",
+      "app.memory.reconciler",
+      "app.memory.vault_intake",
+      "app.models"
+    ],
+    "app.memory.profile_requirements": [
+      "app.memory",
+      "app.memory.education_journey",
+      "app.memory.student_snapshot",
+      "app.models"
+    ],
+    "app.memory.readiness": [
+      "app.memory",
+      "app.memory.field_definitions",
+      "app.memory.student_records",
+      "app.memory.vault"
+    ],
+    "app.memory.reconciler": [
+      "app.jobs.service",
+      "app.journey.direction_discovery",
+      "app.memory",
+      "app.memory.candidates",
+      "app.memory.episodic",
+      "app.memory.errors",
+      "app.memory.field_definitions",
+      "app.memory.handlers",
+      "app.memory.semantic",
+      "app.memory.student_records",
+      "app.memory.vault",
+      "app.memory.vault_intake",
+      "app.memory.vault_relations",
+      "app.models",
+      "app.pai_c.roadmaps.service"
+    ],
+    "app.memory.rerank": [
+      "app.config",
+      "app.memory"
+    ],
+    "app.memory.retriever": [
+      "app.config",
+      "app.memory",
+      "app.memory.episodic",
+      "app.memory.index",
+      "app.memory.rerank",
+      "app.memory.semantic"
+    ],
+    "app.memory.semantic": [
+      "app.memory",
+      "app.memory.dedupe",
+      "app.memory.index_lifecycle",
+      "app.models"
+    ],
+    "app.memory.sparse": [
+      "app.config",
+      "app.memory"
+    ],
+    "app.memory.student_context": [
+      "app.memory",
+      "app.memory.context",
+      "app.memory.readiness",
+      "app.memory.student_records"
+    ],
+    "app.memory.student_context_gateway": [
+      "app.memory",
+      "app.memory.permissions",
+      "app.memory.student_records",
+      "app.memory.vault"
+    ],
+    "app.memory.student_profile_view": [
+      "app.memory",
+      "app.memory.field_definitions",
+      "app.memory.readiness",
+      "app.memory.student_records",
+      "app.memory.vault"
+    ],
+    "app.memory.student_records": [
+      "app.memory",
+      "app.memory.domain_stewards",
+      "app.memory.errors",
+      "app.memory.student_schema",
+      "app.models"
+    ],
+    "app.memory.student_schema": [
+      "app.memory",
+      "app.memory.errors",
+      "app.tools.executor"
+    ],
+    "app.memory.student_snapshot": [
+      "app.memory",
+      "app.memory.student_records",
+      "app.memory.vault",
+      "app.models"
+    ],
+    "app.memory.turn_hook": [
+      "app.jobs.service",
+      "app.memory",
+      "app.memory.handlers"
+    ],
+    "app.memory.vault": [
+      "app.memory",
+      "app.memory.field_definitions",
+      "app.models"
+    ],
+    "app.memory.vault_intake": [
+      "app.documents.classify",
+      "app.memory",
+      "app.memory.field_definitions",
+      "app.models"
+    ],
+    "app.memory.vault_relations": [
+      "app.memory",
+      "app.memory.errors",
+      "app.memory.student_records",
+      "app.models"
+    ],
+    "app.memory.voice_attribution": [
+      "app.memory"
+    ],
+    "app.models": [
+      "app",
+      "app.database"
+    ],
+    "app.mods": [
+      "app.mods"
+    ],
+    "app.mods.auth": [
+      "app.eventing.events",
+      "app.eventing.mods",
+      "app.mods",
+      "app.security.access"
+    ],
+    "app.mods.persistence": [
+      "app.eventing.events",
+      "app.eventing.mods",
+      "app.models",
+      "app.mods"
+    ],
+    "app.mods.workspace_mod": [
+      "app.eventing.events",
+      "app.eventing.handlers.agents",
+      "app.eventing.handlers.channels",
+      "app.eventing.handlers.messages",
+      "app.eventing.mods",
+      "app.mods"
+    ],
+    "app.pai_c": [
+      "app.pai_c"
+    ],
+    "app.pai_c.deep": [
+      "app.pai_c.deep"
+    ],
+    "app.pai_c.deep.actions": [
+      "app.journey",
+      "app.models",
+      "app.pai_c.deep",
+      "app.pai_c.deep.context",
+      "app.pai_c.deep.mirror",
+      "app.pai_c.deep.noted_questions",
+      "app.pai_c.deep.turn_input",
+      "app.pai_c.roadmaps.service"
+    ],
+    "app.pai_c.deep.analysis": [
+      "app.config",
+      "app.inference.client",
+      "app.jobs.service",
+      "app.journey",
+      "app.memory.episodic",
+      "app.models",
+      "app.pai_c.deep",
+      "app.pai_c.deep.context",
+      "app.pai_c.deep.coverage",
+      "app.pai_c.deep.notebook",
+      "app.pai_c.deep.notebook_sanitize",
+      "app.pai_c.deep.notebook_schema",
+      "app.pai_c.deep.prompts",
+      "app.pai_c.deep.usage",
+      "app.pai_c.stages"
+    ],
+    "app.pai_c.deep.context": [
+      "app.config",
+      "app.journey",
+      "app.memory.episodic",
+      "app.memory.foreground",
+      "app.memory.student_snapshot",
+      "app.models",
+      "app.pai_c.deep",
+      "app.pai_c.deep.notebook",
+      "app.pai_c.deep.turn_input",
+      "app.plugins._shared.sources"
+    ],
+    "app.pai_c.deep.coverage": [
+      "app.config",
+      "app.pai_c.deep",
+      "app.pai_c.deep.notebook_schema"
+    ],
+    "app.pai_c.deep.mirror": [
+      "app.config",
+      "app.inference.client",
+      "app.jobs.service",
+      "app.journey",
+      "app.memory.permissions",
+      "app.memory.student_snapshot",
+      "app.models",
+      "app.pai_c.deep",
+      "app.pai_c.deep.analysis",
+      "app.pai_c.deep.context",
+      "app.pai_c.deep.mirror_schema",
+      "app.pai_c.deep.notebook",
+      "app.pai_c.deep.prompts",
+      "app.pai_c.deep.sensitive",
+      "app.pai_c.deep.turn_input",
+      "app.pai_c.deep.usage",
+      "app.pai_c.posting",
+      "app.pai_c.research_gateway",
+      "app.pai_c.runtime",
+      "app.services.pai",
+      "app.tools"
+    ],
+    "app.pai_c.deep.mirror_schema": [
+      "app.config",
+      "app.pai_c.deep",
+      "app.pai_c.deep.polish"
+    ],
+    "app.pai_c.deep.notebook": [
+      "app.models",
+      "app.pai_c.deep",
+      "app.pai_c.deep.notebook_sanitize",
+      "app.pai_c.deep.notebook_schema"
+    ],
+    "app.pai_c.deep.notebook_sanitize": [
+      "app.pai_c.deep",
+      "app.pai_c.deep.notebook_schema"
+    ],
+    "app.pai_c.deep.notebook_schema": [
+      "app.pai_c.deep"
+    ],
+    "app.pai_c.deep.noted_questions": [
+      "app.models",
+      "app.pai_c.deep"
+    ],
+    "app.pai_c.deep.polish": [
+      "app.pai_c.deep"
+    ],
+    "app.pai_c.deep.prompts": [
+      "app.pai_c.deep"
+    ],
+    "app.pai_c.deep.roadmaps": [
+      "app.config",
+      "app.inference.client",
+      "app.pai_c.deep",
+      "app.pai_c.deep.polish",
+      "app.pai_c.deep.prompts",
+      "app.pai_c.deep.usage",
+      "app.plugins._shared.budget",
+      "app.plugins._shared.sources"
+    ],
+    "app.pai_c.deep.sensitive": [
+      "app.config",
+      "app.database",
+      "app.inference.client",
+      "app.pai_c.deep",
+      "app.pai_c.deep.notebook",
+      "app.pai_c.deep.notebook_schema",
+      "app.pai_c.deep.prompts",
+      "app.pai_c.deep.usage"
+    ],
+    "app.pai_c.deep.turn": [
+      "app.config",
+      "app.inference.client",
+      "app.pai_c.deep",
+      "app.pai_c.deep.context",
+      "app.pai_c.deep.polish",
+      "app.pai_c.deep.prompts",
+      "app.pai_c.deep.turn_input",
+      "app.pai_c.deep.usage"
+    ],
+    "app.pai_c.deep.turn_input": [
+      "app.models",
+      "app.pai_c.deep",
+      "app.pai_c.deep.polish"
+    ],
+    "app.pai_c.deep.usage": [
+      "app.pai_c.deep"
+    ],
+    "app.pai_c.handoff": [
+      "app.database",
+      "app.pai_c",
+      "app.pai_c.deep.turn",
+      "app.pai_c.deep.turn_input"
+    ],
+    "app.pai_c.light_research": [
+      "app.pai_c",
+      "app.plugins._shared.sources"
+    ],
+    "app.pai_c.posting": [
+      "app.config",
+      "app.eventing.events",
+      "app.eventing.factory",
+      "app.eventing.mods",
+      "app.infrastructure",
+      "app.infrastructure.cache",
+      "app.models",
+      "app.pai_c",
+      "app.pai_c.deep.polish",
+      "app.services.integrations",
+      "app.services.workflow"
+    ],
+    "app.pai_c.research_gateway": [
+      "app.journey",
+      "app.memory.student_snapshot",
+      "app.models",
+      "app.pai_c",
+      "app.pai_c.deep.notebook",
+      "app.tools"
+    ],
+    "app.pai_c.roadmaps": [
+      "app.pai_c.roadmaps"
+    ],
+    "app.pai_c.roadmaps.service": [
+      "app.config",
+      "app.journey",
+      "app.models",
+      "app.pai_c.deep.polish",
+      "app.pai_c.deep.roadmaps",
+      "app.pai_c.research_gateway",
+      "app.pai_c.roadmaps",
+      "app.plugins._shared.sources",
+      "app.research.requirements",
+      "app.services.notify"
+    ],
+    "app.pai_c.runtime": [
+      "app.config",
+      "app.database",
+      "app.documents.attachments",
+      "app.memory.turn_hook",
+      "app.models",
+      "app.pai_c",
+      "app.pai_c.deep.actions",
+      "app.pai_c.deep.analysis",
+      "app.pai_c.deep.polish",
+      "app.pai_c.deep.turn",
+      "app.pai_c.deep.turn_input",
+      "app.pai_c.posting",
+      "app.services.pai"
+    ],
+    "app.pai_c.stages": [
+      "app.pai_c"
+    ],
+    "app.pai_c.student_requests": [
+      "app.models",
+      "app.pai_c",
+      "app.services.notify"
+    ],
+    "app.pai_c.summary_access": [
+      "app.models",
+      "app.pai_c"
+    ],
+    "app.pai_c.voice_context": [
+      "app.models",
+      "app.pai_c",
+      "app.pai_c.deep.polish",
+      "app.services.pai"
+    ],
+    "app.pai_os": [
+      "app.pai_os"
+    ],
+    "app.plugins": [
+      "app.plugins"
+    ],
+    "app.plugins._shared": [
+      "app.plugins._shared"
+    ],
+    "app.plugins._shared.budget": [
+      "app.config",
+      "app.database",
+      "app.models",
+      "app.plugins._shared"
+    ],
+    "app.plugins._shared.costs": [
+      "app.plugins._shared"
+    ],
+    "app.plugins._shared.institution_registry": [
+      "app.infrastructure.cache",
+      "app.plugins._shared",
+      "app.plugins._shared.verification"
+    ],
+    "app.plugins._shared.sources": [
+      "app.plugins._shared"
+    ],
+    "app.plugins._shared.verification": [
+      "app.plugins._shared"
+    ],
+    "app.plugins.gap_assessment": [
+      "app.capabilities",
+      "app.plugins._shared.sources",
+      "app.plugins.gap_assessment"
+    ],
+    "app.plugins.program_discovery": [
+      "app.capabilities",
+      "app.database",
+      "app.models",
+      "app.plugins._shared.sources",
+      "app.plugins._shared.verification",
+      "app.plugins.program_discovery"
+    ],
+    "app.plugins.program_research": [
+      "app.capabilities",
+      "app.config",
+      "app.database",
+      "app.inference.client",
+      "app.memory.field_definitions",
+      "app.memory.student_schema",
+      "app.plugins._shared.budget",
+      "app.plugins._shared.sources",
+      "app.plugins._shared.verification",
+      "app.plugins.program_research",
+      "app.research.requirements"
+    ],
+    "app.plugins.qualification_recognition": [
+      "app.capabilities",
+      "app.plugins.qualification_recognition"
+    ],
+    "app.plugins.roadmap_builder": [
+      "app.capabilities",
+      "app.config",
+      "app.journey",
+      "app.pai_c.deep.roadmaps",
+      "app.pai_c.light_research",
+      "app.pai_c.roadmaps.service",
+      "app.pai_c.stages",
+      "app.pai_c.student_requests",
+      "app.plugins._shared.budget",
+      "app.plugins.roadmap_builder",
+      "app.services.notify"
+    ],
+    "app.plugins.scholarship_discovery": [
+      "app.capabilities",
+      "app.config",
+      "app.inference.client",
+      "app.plugins._shared.sources",
+      "app.plugins._shared.verification",
+      "app.plugins.scholarship_discovery"
+    ],
+    "app.realtime": [
+      "app.realtime"
+    ],
+    "app.realtime.composing": [
+      "app.infrastructure",
+      "app.infrastructure.cache",
+      "app.realtime"
+    ],
+    "app.research": [
+      "app.research"
+    ],
+    "app.research.requirements": [
+      "app.config",
+      "app.jobs.service",
+      "app.memory.handlers",
+      "app.models",
+      "app.pai_c.roadmaps.service",
+      "app.plugins._shared.verification",
+      "app.research",
+      "app.research.scheduler"
+    ],
+    "app.research.scheduler": [
+      "app.config",
+      "app.jobs.service",
+      "app.memory.handlers",
+      "app.models",
+      "app.pai_c.roadmaps.service",
+      "app.research"
+    ],
+    "app.routers": [
+      "app.routers"
+    ],
+    "app.routers.account": [
+      "app.api.response",
+      "app.database",
+      "app.files.storage",
+      "app.memory.index",
+      "app.models",
+      "app.routers",
+      "app.routers.network",
+      "app.security.access",
+      "app.security.app_session",
+      "app.security.human_auth",
+      "app.security.stream_ticket"
+    ],
+    "app.routers.app_version": [
+      "app.api.response",
+      "app.config",
+      "app.routers"
+    ],
+    "app.routers.application_workspace": [
+      "app.application_workspace",
+      "app.routers"
+    ],
+    "app.routers.auth": [
+      "app.api.response",
+      "app.config",
+      "app.database",
+      "app.infrastructure.cache",
+      "app.models",
+      "app.routers",
+      "app.security.access",
+      "app.security.app_session",
+      "app.security.human_auth",
+      "app.security.identity"
+    ],
+    "app.routers.browser": [
+      "app.api.response",
+      "app.browser.credentials",
+      "app.browser.manager",
+      "app.database",
+      "app.eventing.events",
+      "app.models",
+      "app.routers",
+      "app.routers.network",
+      "app.security.event_identity",
+      "app.security.network"
+    ],
+    "app.routers.counselor_summary": [
+      "app.api.response",
+      "app.database",
+      "app.journey",
+      "app.models",
+      "app.pai_c.deep.mirror",
+      "app.pai_c.summary_access",
+      "app.routers",
+      "app.routers.events",
+      "app.routers.roadmaps"
+    ],
+    "app.routers.counselor_voice": [
+      "app.api.response",
+      "app.config",
+      "app.database",
+      "app.models",
+      "app.pai_c.voice_context",
+      "app.routers",
+      "app.routers.network",
+      "app.security.event_identity"
+    ],
+    "app.routers.deadlines": [
+      "app.api.response",
+      "app.application_workspace.access",
+      "app.database",
+      "app.deadlines.service",
+      "app.models",
+      "app.routers"
+    ],
+    "app.routers.decision_records": [
+      "app.api.response",
+      "app.database",
+      "app.pai_c.roadmaps.service",
+      "app.routers",
+      "app.routers.roadmaps"
+    ],
+    "app.routers.escalations": [
+      "app.api.response",
+      "app.config",
+      "app.database",
+      "app.journey",
+      "app.models",
+      "app.routers"
+    ],
+    "app.routers.events": [
+      "app.api.response",
+      "app.database",
+      "app.eventing.events",
+      "app.eventing.factory",
+      "app.eventing.mods",
+      "app.infrastructure",
+      "app.infrastructure.cache",
+      "app.models",
+      "app.pai_c.runtime",
+      "app.realtime.composing",
+      "app.routers",
+      "app.routers.network",
+      "app.security",
+      "app.security.event_identity",
+      "app.security.stream_ticket",
+      "app.services.integrations",
+      "app.services.workflow"
+    ],
+    "app.routers.feedback": [
+      "app.api.response",
+      "app.config",
+      "app.database",
+      "app.models",
+      "app.routers",
+      "app.security.access",
+      "app.services.email"
+    ],
+    "app.routers.fetch": [
+      "app.api.response",
+      "app.browser.manager",
+      "app.database",
+      "app.routers",
+      "app.routers.browser",
+      "app.routers.network",
+      "app.security.network"
+    ],
+    "app.routers.files": [
+      "app.api.response",
+      "app.config",
+      "app.database",
+      "app.documents",
+      "app.documents.reader",
+      "app.documents.service",
+      "app.eventing.events",
+      "app.files.storage",
+      "app.files.types",
+      "app.jobs.service",
+      "app.models",
+      "app.routers",
+      "app.routers.network",
+      "app.security",
+      "app.security.event_identity",
+      "app.security.network",
+      "app.security.stream_ticket"
+    ],
+    "app.routers.integrations": [
+      "app.api.response",
+      "app.config",
+      "app.database",
+      "app.models",
+      "app.routers",
+      "app.routers.network",
+      "app.security.access",
+      "app.services",
+      "app.services.integrations"
+    ],
+    "app.routers.knowledge": [
+      "app.api.response",
+      "app.database",
+      "app.eventing.events",
+      "app.files.storage",
+      "app.models",
+      "app.routers",
+      "app.routers.network",
+      "app.security.event_identity"
+    ],
+    "app.routers.network": [
+      "app.api.response",
+      "app.config",
+      "app.database",
+      "app.eventing.events",
+      "app.eventing.factory",
+      "app.eventing.mods",
+      "app.models",
+      "app.realtime.composing",
+      "app.routers",
+      "app.security.access",
+      "app.security.event_identity",
+      "app.services.pai"
+    ],
+    "app.routers.notifications": [
+      "app.api.response",
+      "app.database",
+      "app.models",
+      "app.routers",
+      "app.routers.network",
+      "app.security.event_identity",
+      "app.services.notify"
+    ],
+    "app.routers.operator": [
+      "app.api.response",
+      "app.database",
+      "app.models",
+      "app.routers",
+      "app.routers.network",
+      "app.services.operator"
+    ],
+    "app.routers.roadmaps": [
+      "app.api.response",
+      "app.database",
+      "app.journey",
+      "app.memory.candidates",
+      "app.memory.permissions",
+      "app.memory.reconciler",
+      "app.models",
+      "app.pai_c.deep.turn",
+      "app.pai_c.deep.turn_input",
+      "app.pai_c.posting",
+      "app.pai_c.research_gateway",
+      "app.pai_c.roadmaps.service",
+      "app.research.requirements",
+      "app.routers",
+      "app.routers.network",
+      "app.services.pai",
+      "app.tools"
+    ],
+    "app.routers.routines": [
+      "app.api.response",
+      "app.database",
+      "app.eventing.handlers.routing",
+      "app.models",
+      "app.routers",
+      "app.routers.network"
+    ],
+    "app.routers.search": [
+      "app.api.response",
+      "app.database",
+      "app.routers",
+      "app.routers.network"
+    ],
+    "app.routers.shares": [
+      "app.api.response",
+      "app.database",
+      "app.models",
+      "app.routers",
+      "app.routers.network"
+    ],
+    "app.routers.student_profile": [
+      "app.api.response",
+      "app.database",
+      "app.memory.candidates",
+      "app.memory.errors",
+      "app.memory.onboarding",
+      "app.memory.profile_completion",
+      "app.memory.profile_issues",
+      "app.memory.readiness",
+      "app.memory.reconciler",
+      "app.memory.student_profile_view",
+      "app.memory.student_records",
+      "app.memory.vault",
+      "app.models",
+      "app.routers",
+      "app.routers.network"
+    ],
+    "app.routers.student_requests": [
+      "app.api.response",
+      "app.database",
+      "app.pai_c.student_requests",
+      "app.routers",
+      "app.routers.roadmaps"
+    ],
+    "app.routers.tasks": [
+      "app.api.response",
+      "app.database",
+      "app.eventing.events",
+      "app.models",
+      "app.routers",
+      "app.routers.network",
+      "app.security.event_identity",
+      "app.services.workflow"
+    ],
+    "app.routers.timers": [
+      "app.api.response",
+      "app.database",
+      "app.models",
+      "app.routers",
+      "app.routers.network",
+      "app.security.event_identity"
+    ],
+    "app.routers.todos": [
+      "app.api.response",
+      "app.database",
+      "app.eventing.events",
+      "app.models",
+      "app.routers",
+      "app.routers.network",
+      "app.security.event_identity"
+    ],
+    "app.routers.workflows": [
+      "app.api.response",
+      "app.database",
+      "app.models",
+      "app.routers",
+      "app.routers.network",
+      "app.security.event_identity"
+    ],
+    "app.routers.workspaces": [
+      "app.api.response",
+      "app.config",
+      "app.database",
+      "app.models",
+      "app.pai_c.deep.notebook",
+      "app.routers",
+      "app.routers.network",
+      "app.security.access",
+      "app.security.human_auth",
+      "app.services.pai",
+      "app.services.workflow",
+      "app.workspace",
+      "app.workspace.naming"
+    ],
+    "app.security": [
+      "app.security"
+    ],
+    "app.security.access": [
+      "app.models",
+      "app.security",
+      "app.security.human_auth",
+      "app.services.pai"
+    ],
+    "app.security.app_session": [
+      "app.config",
+      "app.models",
+      "app.security"
+    ],
+    "app.security.errors": [
+      "app.security"
+    ],
+    "app.security.event_identity": [
+      "app.eventing.events",
+      "app.eventing.factory",
+      "app.eventing.mods",
+      "app.models",
+      "app.security",
+      "app.security.access",
+      "app.security.human_auth",
+      "app.services.operator",
+      "app.services.pai"
+    ],
+    "app.security.human_auth": [
+      "app.config",
+      "app.database",
+      "app.security",
+      "app.security.app_session",
+      "app.security.errors"
+    ],
+    "app.security.identity": [
+      "app.security",
+      "app.security.human_auth"
+    ],
+    "app.security.network": [
+      "app.security"
+    ],
+    "app.security.stream_ticket": [
+      "app.models",
+      "app.security"
+    ],
+    "app.services": [
+      "app.services"
+    ],
+    "app.services.email": [
+      "app.config",
+      "app.services"
+    ],
+    "app.services.integrations": [
+      "app.config",
+      "app.database",
+      "app.eventing.events",
+      "app.eventing.factory",
+      "app.eventing.mods",
+      "app.infrastructure",
+      "app.infrastructure.cache",
+      "app.models",
+      "app.pai_c.runtime",
+      "app.routers.events",
+      "app.services",
+      "app.services.workflow"
+    ],
+    "app.services.notify": [
+      "app.models",
+      "app.services"
+    ],
+    "app.services.operator": [
+      "app.capabilities",
+      "app.capabilities.execution_policy",
+      "app.config",
+      "app.database",
+      "app.inference.client",
+      "app.infrastructure",
+      "app.infrastructure.cache",
+      "app.journey",
+      "app.memory.errors",
+      "app.memory.foreground",
+      "app.memory.permissions",
+      "app.memory.profile_issues",
+      "app.memory.student_context",
+      "app.models",
+      "app.pai_c.handoff",
+      "app.pai_c.posting",
+      "app.pai_c.research_gateway",
+      "app.pai_c.roadmaps.service",
+      "app.services",
+      "app.services.pai",
+      "app.tools"
+    ],
+    "app.services.pai": [
+      "app.config",
+      "app.main",
+      "app.models",
+      "app.security.event_identity",
+      "app.services",
+      "app.workspace",
+      "app.workspace.naming"
+    ],
+    "app.services.workflow": [
+      "app.database",
+      "app.eventing.events",
+      "app.eventing.handlers.routing",
+      "app.models",
+      "app.pai_c.runtime",
+      "app.routers.network",
+      "app.services",
+      "app.services.notify",
+      "app.services.pai"
+    ],
+    "app.tools": [
+      "app.tools",
+      "app.tools.builtin",
+      "app.tools.context",
+      "app.tools.executor",
+      "app.tools.policy",
+      "app.tools.registry"
+    ],
+    "app.tools.builtin": [
+      "app.tools.builtin",
+      "app.tools.builtin.browser",
+      "app.tools.builtin.capabilities",
+      "app.tools.builtin.files",
+      "app.tools.builtin.memory",
+      "app.tools.builtin.operator",
+      "app.tools.builtin.tasks",
+      "app.tools.builtin.web",
+      "app.tools.builtin.workspace",
+      "app.tools.policy",
+      "app.tools.registry"
+    ],
+    "app.tools.builtin.browser": [
+      "app.tools.builtin"
+    ],
+    "app.tools.builtin.capabilities": [
+      "app.capabilities",
+      "app.capabilities.context",
+      "app.capabilities.contract",
+      "app.capabilities.permissions",
+      "app.capabilities.router",
+      "app.capabilities.tool_broker",
+      "app.database",
+      "app.journey",
+      "app.memory.permissions",
+      "app.memory.student_context_gateway",
+      "app.tools",
+      "app.tools.builtin"
+    ],
+    "app.tools.builtin.files": [
+      "app.tools.builtin"
+    ],
+    "app.tools.builtin.memory": [
+      "app.database",
+      "app.jobs.service",
+      "app.memory.candidates",
+      "app.memory.context",
+      "app.memory.episodic",
+      "app.memory.field_definitions",
+      "app.memory.profile_completion",
+      "app.memory.readiness",
+      "app.memory.reconciler",
+      "app.memory.semantic",
+      "app.memory.student_context",
+      "app.memory.student_records",
+      "app.memory.student_schema",
+      "app.memory.vault",
+      "app.models",
+      "app.tools.builtin"
+    ],
+    "app.tools.builtin.operator": [
+      "app.services",
+      "app.services.operator",
+      "app.tools.builtin"
+    ],
+    "app.tools.builtin.tasks": [
+      "app.tools.builtin"
+    ],
+    "app.tools.builtin.web": [
+      "app.config",
+      "app.infrastructure.cache",
+      "app.plugins._shared.institution_registry",
+      "app.tools.builtin",
+      "app.tools.web_search"
+    ],
+    "app.tools.builtin.workspace": [
+      "app.database",
+      "app.models",
+      "app.security.event_identity",
+      "app.tools.builtin"
+    ],
+    "app.tools.context": [
+      "app.tools"
+    ],
+    "app.tools.executor": [
+      "app.tools",
+      "app.tools.policy",
+      "app.tools.schema"
+    ],
+    "app.tools.local": [
+      "app.tools.local",
+      "app.tools.local.provider"
+    ],
+    "app.tools.local.provider": [
+      "app.tools.local"
+    ],
+    "app.tools.mcp": [
+      "app.tools.mcp",
+      "app.tools.mcp.provider"
+    ],
+    "app.tools.mcp.provider": [
+      "app.tools.mcp"
+    ],
+    "app.tools.policy": [
+      "app.tools",
+      "app.tools.registry"
+    ],
+    "app.tools.registry": [
+      "app.tools",
+      "app.tools.policy"
+    ],
+    "app.tools.schema": [
+      "app.tools"
+    ],
+    "app.tools.web_search": [
+      "app.config",
+      "app.tools"
+    ],
+    "app.workspace": [
+      "app.workspace"
+    ],
+    "app.workspace.naming": [
+      "app.models",
+      "app.workspace"
+    ]
+  },
+  "imported_count": 244
+}

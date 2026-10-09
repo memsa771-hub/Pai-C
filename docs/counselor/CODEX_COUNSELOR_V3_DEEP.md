@@ -81,7 +81,7 @@ All model calls go through `app/inference/client.py` so the provider can be swap
 Deep is the sole Counselor path after consolidation; no mode flag or legacy fallback is available.
 - `runtime._run_turn` always uses deep after consolidation.
 - After each successful human post, queue `enqueue_turn_extraction` and Analyst work.
-- `backend/app/counseling/deep/prompts/{counselor,analyst,mirror,roadmap_builder}.md`, copied verbatim from `docs/counselor/COUNSELOR_V3_PROMPTS.md`. A loader caches them. Prompt text never lives in Python strings.
+- `backend/app/pai_c/deep/prompts/{counselor,analyst,mirror,roadmap_builder}.md`, copied verbatim from `docs/counselor/COUNSELOR_V3_PROMPTS.md`. A loader caches them. Prompt text never lives in Python strings.
 - Tests:
   - Dispatch picks the right path.
   - The extraction job is queued once per turn in every mode.

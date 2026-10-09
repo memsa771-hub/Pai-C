@@ -140,7 +140,7 @@ class MemoryReconciler:
             VaultRelationService(self.db).sync_demonstrations(candidate.workspace_id, assertion.id)
         self.assertions.finish(assertion, result, candidate)
         if result.accepted and candidate.candidate_type in {"vault_fact", "student_record"}:
-            from app.roadmaps.service import RoadmapService
+            from app.pai_c.roadmaps.service import RoadmapService
             RoadmapService(self.db).mark_stale(
                 candidate.workspace_id, f"Student profile changed: {candidate.key or 'profile'}")
             from app.jobs.service import BackgroundJobService

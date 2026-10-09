@@ -215,7 +215,7 @@ def test_failed_research_publishes_retryable_card_and_leaves_assessing():
         db.flush()
         on_run_status(db, run)
         assert journeys.get(student.workspace_id, journey.id).current_stage == "PROPOSED"
-        from app.roadmaps.service import RoadmapService
+        from app.pai_c.roadmaps.service import RoadmapService
         card = RoadmapService(db).for_run(student.workspace_id, run.id)[0]
         assert card["generation_status"] == "failed"
 
@@ -236,7 +236,7 @@ async def test_accepted_fact_event_resumes_same_paused_run_without_student_conti
         db.commit()
         with patch.object(operator, "resume", AsyncMock(return_value={
                 "ok": True, "data": {"resumed": True}})) as resumed, \
-                patch("app.counseling.research_gateway.request_research",
+                patch("app.pai_c.research_gateway.request_research",
                       AsyncMock(return_value=None)):
             outcome = await resume_research(SimpleNamespace(
                 workspace_id=student.workspace_id, payload={"candidate_id": candidate.id}), db)

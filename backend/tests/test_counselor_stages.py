@@ -5,7 +5,7 @@ from itertools import product
 import pytest
 from sqlalchemy import select
 
-from app.counseling.stages import (CHOSEN, DIRECTION, FOUNDATION, IDENTITY,
+from app.pai_c.stages import (CHOSEN, DIRECTION, FOUNDATION, IDENTITY,
                                    PROPOSED, RESEARCHING, TRANSITIONS,
                                    advance_discovery_stage,
                                    require_counselor_transition)

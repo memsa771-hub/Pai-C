@@ -107,7 +107,7 @@ class RoadmapService:
     def prepare_retry(self, workspace_id: str, roadmap_id: str) -> tuple[str, dict]:
         """Retry the prior research brief while keeping this card and its state."""
         roadmap, _ = self._require(workspace_id, roadmap_id, lock=True)
-        from app.counseling.research_gateway import mirror_is_current
+        from app.pai_c.research_gateway import mirror_is_current
         if not mirror_is_current(self.db, workspace_id):
             raise RoadmapError("Confirm your current Mirror before retrying research")
         if roadmap.generation_status not in {"failed", "stale", "needs_info"}:
@@ -301,11 +301,11 @@ class RoadmapService:
 
     def _publish_mirror_run(self, run, artifact):
         from app.config import config
-        from app.counseling.deep.polish import contains_blocked_script
+        from app.pai_c.deep.polish import contains_blocked_script
         from app.research.requirements import RequirementStore
-        from app.counseling.research_gateway import mirror_is_current
+        from app.pai_c.research_gateway import mirror_is_current
         from app.models import CounselorNotedQuestion
-        from app.counseling.deep.roadmaps import FIT_FIELDS, fact_index, ground_roadmap, lanes_for_mirror
+        from app.pai_c.deep.roadmaps import FIT_FIELDS, fact_index, ground_roadmap, lanes_for_mirror
 
         version = artifact["mirror_version"]
         if (run.constraints or {}).get("mirror_version") != version:
@@ -547,7 +547,7 @@ class RoadmapService:
             raise RoadmapError("Only a presented, ready roadmap can be chosen")
         mirror_version = ((roadmap.route or {}).get("counselor_fit") or {}).get("mirror_version")
         if mirror_version is not None:
-            from app.counseling.research_gateway import mirror_is_current
+            from app.pai_c.research_gateway import mirror_is_current
             if not mirror_is_current(self.db, workspace_id, mirror_version):
                 raise RoadmapError("This route needs research for the current Mirror")
         try:

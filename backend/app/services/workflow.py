@@ -72,7 +72,7 @@ def _maybe_run_counselor(workspace, channel_name: str, content: str, agent: str)
     from app.services.pai import PAI_AGENT_NAME
     if agent != PAI_AGENT_NAME:
         return
-    from app.counseling.runtime import run_counselor
+    from app.pai_c.runtime import run_counselor
     snapshot = {
         "target": f"channel/{channel_name}",
         "source": WORKFLOW_SOURCE,

@@ -51,7 +51,7 @@ PAI_PRIMARY_CHANNEL = "pai-counselor"
 #
 # Do not add write/execution tools to this tuple — route that work through
 # operator.delegate instead; the deep Counselor never calls tools itself
-# (research goes through app/counseling/research_gateway.py).
+# (research goes through app/pai_c/research_gateway.py).
 PAI_ALLOWED_TOOLS = (
     "workspace.threads.list", "tasks.list", "files.list", "files.read",
     # PAI Operator — see app/services/operator.py. Counselor never touches

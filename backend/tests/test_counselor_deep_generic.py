@@ -10,7 +10,7 @@ def test_documented_counselor_prompt_matches_runtime_prompt():
     docs = backend.parent / "docs"
     if not docs.exists():
         docs = Path("/docs")
-    runtime = (backend / "app/counseling/deep/prompts/counselor.md").read_text(encoding="utf-8")
+    runtime = (backend / "app/pai_c/deep/prompts/counselor.md").read_text(encoding="utf-8")
     documentation = (docs / "counselor/COUNSELOR_V3_PROMPTS.md").read_text(encoding="utf-8")
     section = documentation.split("## 1.", 1)[1].split("## 2.", 1)[0]
     documented = section.split("```text\n", 1)[1].split("\n```", 1)[0]
@@ -30,7 +30,7 @@ def test_deep_python_modules_do_not_name_documented_personas():
         names.update(re.findall(r"(?m)^##\s+\d+\.\s+([A-Z][a-z]+)(?=[: -])", text))
         names.update(re.findall(r"(?m)^\*\*Student:\*\*\s+([A-Z][a-z]+)", text))
     assert names, "The documentation persona inventory must be present"
-    deep = backend / "app" / "counseling" / "deep"
+    deep = backend / "app" / "pai_c" / "deep"
     assert list(deep.glob("*.py")), "Deep Counselor source must be present"
     for source in deep.glob("*.py"):
         content = source.read_text(encoding="utf-8")

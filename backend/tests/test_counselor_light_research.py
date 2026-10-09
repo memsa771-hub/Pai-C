@@ -11,7 +11,7 @@ from sqlalchemy import select
 from app.config import config
 from app.models import Institution, Opportunity, RequirementSet, Workspace
 from app.research.requirements import RequirementStore
-from app.counseling.research_gateway import _research_brief
+from app.pai_c.research_gateway import _research_brief
 from app.plugins.program_research import research
 from app.plugins._shared.budget import bounded_research, spend
 from scripts.counselor_eval_support import StudentSession

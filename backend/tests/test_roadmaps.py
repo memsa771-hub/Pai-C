@@ -10,7 +10,7 @@ from app.database import get_db
 from app.main import app
 from app.journey import JourneyService
 from app.models import DecisionRecord, ExecutionRun, NotificationRecord, Roadmap, RoadmapStudentState, StudentJourney
-from app.roadmaps.service import RoadmapError, RoadmapService
+from app.pai_c.roadmaps.service import RoadmapError, RoadmapService
 from scripts.counselor_eval_support import StudentSession
 
 
@@ -240,9 +240,9 @@ def test_roadmap_api_is_workspace_scoped_and_choice_requires_presentation():
             response = client.get("/v1/roadmaps", params=params, headers=headers)
             assert response.status_code == 200
             assert response.json()["data"]["roadmaps"][0]["id"] == card.id
-            with patch("app.counseling.deep.turn.chat_completion",
+            with patch("app.pai_c.deep.turn.chat_completion",
                        AsyncMock(return_value='{"reply":"Which part of this route matters most to you?","action":{"type":"none"}}')), \
-                    patch("app.counseling.posting._post_response", AsyncMock(return_value="event-1")) as posted:
+                    patch("app.pai_c.posting._post_response", AsyncMock(return_value="event-1")) as posted:
                 focused = client.post(url + "/focus", params=params, headers=headers)
                 assert focused.status_code == 200
                 assert posted.await_args.args[2] == "channel/pai-counselor"

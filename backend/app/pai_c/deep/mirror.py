@@ -7,15 +7,15 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 
 from app.config import config
-from app.counseling.deep.analysis import _workspace_lock
-from app.counseling.deep.context import build_context
-from app.counseling.deep.mirror_schema import CounselorMirror
-from app.counseling.deep.notebook import NotebookService
-from app.counseling.deep.prompts import load_prompt
-from app.counseling.deep.sensitive import check_notebook_before_mirror
-from app.counseling.deep.turn_input import CounselorTurnInput, shared_history
-from app.counseling.deep.usage import usage_callback
-from app.counseling.posting import _post_response
+from app.pai_c.deep.analysis import _workspace_lock
+from app.pai_c.deep.context import build_context
+from app.pai_c.deep.mirror_schema import CounselorMirror
+from app.pai_c.deep.notebook import NotebookService
+from app.pai_c.deep.prompts import load_prompt
+from app.pai_c.deep.sensitive import check_notebook_before_mirror
+from app.pai_c.deep.turn_input import CounselorTurnInput, shared_history
+from app.pai_c.deep.usage import usage_callback
+from app.pai_c.posting import _post_response
 from app.inference.client import chat_completion
 from app.jobs.service import BackgroundJobService, job_handlers
 from app.journey import JourneyService
@@ -78,7 +78,7 @@ async def _publish(db, job, draft) -> dict:
     source = db.scalar(select(EventRecord).where(
         EventRecord.id == job.payload.get("source_event_id"),
         EventRecord.network_id == job.workspace_id))
-    from app.counseling.runtime import _voice_reply_metadata
+    from app.pai_c.runtime import _voice_reply_metadata
 
     voice_metadata = _voice_reply_metadata({"metadata": source.metadata_}) if source else None
     message = await _post_response(
@@ -188,7 +188,7 @@ def enqueue_confirmed_research(db, workspace_id: str, journey) -> str:
 
 
 async def confirmed_research_job(job, db) -> dict:
-    from app.counseling.research_gateway import request_research
+    from app.pai_c.research_gateway import request_research
     from app.memory.student_snapshot import StudentSnapshotService
     from app.memory.permissions import capabilities_for_agent
     from app.services.pai import PAI_ALLOWED_TOOLS, WorkspaceApi

@@ -9,10 +9,10 @@ import pytest
 from sqlalchemy import select
 
 from app.config import config
-from app.counseling import posting, runtime
-from app.counseling.deep.polish import is_counselor_fallback
-from app.counseling.deep.turn import run_deep_turn
-from app.counseling.deep.turn_input import CounselorTurnInput
+from app.pai_c import posting, runtime
+from app.pai_c.deep.polish import is_counselor_fallback
+from app.pai_c.deep.turn import run_deep_turn
+from app.pai_c.deep.turn_input import CounselorTurnInput
 from app.journey import JourneyService
 from app.models import BackgroundJob, EducationRecord, EventRecord, MemoryCandidate, Roadmap
 from scripts.counselor_eval_support import StudentSession
@@ -29,12 +29,12 @@ def test_one_runtime_and_no_deleted_imports_or_mode_switch():
         assert not (root / retired).exists()
     assert not hasattr(runtime, "_run_legacy_turn")
     for name in deleted:
-        assert not (root / "counseling" / f"{name}.py").exists()
+        assert not (root / "pai_c" / f"{name}.py").exists()
     for path in root.rglob("*.py"):
         source = path.read_text(encoding="utf-8")
         assert not re.search(r"\bPAI_COUNSELOR_MODE\b", source)
         for name in deleted:
-            assert f"app.counseling.{name} import" not in source
+            assert f"app.pai_c.{name} import" not in source
 
 
 @pytest.mark.parametrize("text,expected", [
@@ -56,7 +56,7 @@ async def test_selected_roadmap_uses_deep_prompt_and_is_workspace_scoped():
         db.commit()
         turn = CounselorTurnInput("channel/pai", student.workspace_id, "I opened this route.",
                                   (), None, "", None, f"human:{student.user_id}")
-        with patch("app.counseling.deep.turn.chat_completion", new=AsyncMock(
+        with patch("app.pai_c.deep.turn.chat_completion", new=AsyncMock(
                 return_value='{"reply":"Which part matters most?","action":{"type":"none"}}')) as model:
             result = await run_deep_turn(db, turn, roadmap_id=row.id, history=[])
             assert result.reply == "Which part matters most?"
@@ -72,7 +72,7 @@ async def test_selected_roadmap_uses_deep_prompt_and_is_workspace_scoped():
 async def test_deep_output_cannot_write_profile_or_activate_goal():
     with StudentSession() as student:
         with patch.object(config, "PAI_API_KEY", "fake"), patch(
-                "app.counseling.deep.turn.chat_completion", new=AsyncMock(return_value=json.dumps({
+                "app.pai_c.deep.turn.chat_completion", new=AsyncMock(return_value=json.dumps({
                     "reply": "What did you enjoy about it?", "action": {"type": "none"},
                     "student_understanding_delta": {"education": [{"qualification_name": "Invented"}]},
                 }))):
@@ -89,8 +89,8 @@ async def test_deep_output_cannot_write_profile_or_activate_goal():
 @pytest.mark.asyncio
 async def test_research_handoff_runs_through_the_deep_counselor_turn():
     from types import SimpleNamespace
-    from app.services import counselor_handoff
-    from app.counseling.deep.prompts import load_prompt
+    from app.pai_c import handoff as counselor_handoff
+    from app.pai_c.deep.prompts import load_prompt
     session = Mock()
     deep_turn = AsyncMock(return_value=SimpleNamespace(reply="What matters most?"))
     history = [{"role": "user", "content": "earlier"}]
@@ -120,7 +120,7 @@ async def test_posting_runs_all_post_commit_hooks_before_return():
         loop = Mock()
         with patch("app.eventing.factory.pipeline.process", new=AsyncMock(side_effect=persist)), \
                 patch("app.infrastructure.cache.publish_event") as publish, \
-                patch("app.counseling.posting.asyncio.get_running_loop", return_value=loop):
+                patch("app.pai_c.posting.asyncio.get_running_loop", return_value=loop):
             event_id = await real_post(db, student.workspace_id, "channel/pai", "pai",
                                        "What matters most?", 0, metadata={"voice_delegation_id": "voice-1"})
         assert db.get(EventRecord, event_id).metadata_["voice_delegation_id"] == "voice-1"

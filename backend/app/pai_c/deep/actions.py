@@ -6,8 +6,8 @@ from uuid import uuid4
 
 from sqlalchemy import select
 
-from app.counseling.deep.context import DeepContext
-from app.counseling.deep.turn_input import CounselorTurnInput
+from app.pai_c.deep.context import DeepContext
+from app.pai_c.deep.turn_input import CounselorTurnInput
 from app.models import EventRecord, Roadmap
 
 logger = logging.getLogger(__name__)
@@ -39,14 +39,14 @@ async def dispatch_action(db, turn: CounselorTurnInput, action: dict,
         ready = bool(context.notebook.mirror_ready)
         logger.info("counselor: mirror requested ready=%s", ready)
         if ready:
-            from app.counseling.deep.mirror import enqueue_mirror
+            from app.pai_c.deep.mirror import enqueue_mirror
 
             enqueue_mirror(db, turn)
         _record(db, turn, kind, "requested" if ready else "ignored",
                 reason=None if ready else "not_ready")
         return kind, "requested" if ready else "ignored"
     if kind == "note_question":
-        from app.counseling.deep.noted_questions import NotedQuestionService
+        from app.pai_c.deep.noted_questions import NotedQuestionService
 
         question = (action.get("question_to_research") or action.get("research_question")
                     or action.get("question"))
@@ -66,7 +66,7 @@ async def dispatch_action(db, turn: CounselorTurnInput, action: dict,
         _record(db, turn, kind, "ignored", reason="no_roadmaps")
         return kind, "ignored"
     from app.journey import JourneyService
-    from app.roadmaps.service import RoadmapError, RoadmapService
+    from app.pai_c.roadmaps.service import RoadmapError, RoadmapService
 
     try:
         stage = context.journey.current_stage

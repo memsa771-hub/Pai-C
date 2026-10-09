@@ -176,7 +176,7 @@ async def test_end_to_end_completion_runs_existing_mirror_job_and_confirmation_o
     from sqlalchemy import select
     from scripts.counselor_eval_support import StudentSession
     from scripts.eval_counselor_deep import complete_mirror_pipeline
-    from app.counseling.deep.mirror import enqueue_mirror
+    from app.pai_c.deep.mirror import enqueue_mirror
     from app.models import BackgroundJob, StudentJourney
     from test_counselor_mirror import prepare, mirror_data, safe_model
     with StudentSession() as student, student.factory() as db:
@@ -187,9 +187,9 @@ async def test_end_to_end_completion_runs_existing_mirror_job_and_confirmation_o
             assert current.counselor_summary_draft['status']=='confirmed'
             assert current.current_stage=='RESEARCHING'
             return {'status':'done'}
-        with patch('app.counseling.deep.mirror.chat_completion',AsyncMock(return_value=json.dumps(mirror_data()))), \
-             patch('app.counseling.deep.sensitive.chat_completion',AsyncMock(side_effect=safe_model)), \
-             patch('app.counseling.deep.mirror.confirmed_research_job',AsyncMock(side_effect=confirmed)) as research:
+        with patch('app.pai_c.deep.mirror.chat_completion',AsyncMock(return_value=json.dumps(mirror_data()))), \
+             patch('app.pai_c.deep.sensitive.chat_completion',AsyncMock(side_effect=safe_model)), \
+             patch('app.pai_c.deep.mirror.confirmed_research_job',AsyncMock(side_effect=confirmed)) as research:
             result=await complete_mirror_pipeline(student)
         research.assert_awaited_once()
         assert result['mirror'] and result['status']=='no_roadmaps'

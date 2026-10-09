@@ -10,16 +10,16 @@ import pytest
 from sqlalchemy import select
 
 from app.config import config
-from app.counseling import runtime
-from app.counseling.deep.analysis import (
+from app.pai_c import runtime
+from app.pai_c.deep.analysis import (
     AnalysisOrderPending, _workspace_lock, analyze_job, enqueue_turn_analysis,
 )
-from app.counseling.deep.coverage import enforce_mirror_readiness
-from app.counseling.deep.notebook import NotebookService, NotebookVersionConflict
-from app.counseling.deep.notebook_schema import CounselorNotebookData
-from app.counseling.deep.sensitive import filter_sensitive_changes, model_sensitive_checker, check_notebook_before_mirror
-from app.counseling.deep.usage import usage_callback
-from app.counseling.stages import advance_discovery_stage
+from app.pai_c.deep.coverage import enforce_mirror_readiness
+from app.pai_c.deep.notebook import NotebookService, NotebookVersionConflict
+from app.pai_c.deep.notebook_schema import CounselorNotebookData
+from app.pai_c.deep.sensitive import filter_sensitive_changes, model_sensitive_checker, check_notebook_before_mirror
+from app.pai_c.deep.usage import usage_callback
+from app.pai_c.stages import advance_discovery_stage
 from app.jobs.service import BackgroundJobService
 from app.inference.client import chat_completion
 from app.journey import JourneyService
@@ -59,7 +59,7 @@ async def test_analysis_is_idempotent_and_workspace_scoped():
         assert enqueue_turn_analysis(db, student.workspace_id, event_id,
                                      job.payload["assistant_event_id"]) == job.id
         model = AsyncMock(return_value=_model_notebook(person={"daily_life": "Studies at home"}))
-        with patch("app.counseling.deep.analysis.chat_completion", model):
+        with patch("app.pai_c.deep.analysis.chat_completion", model):
             first = await analyze_job(job, db)
             again = await analyze_job(job, db)
         assert first["version"] == 1
@@ -86,7 +86,7 @@ async def test_successful_deep_turn_enqueues_one_analysis_after_reply():
                       "target": "channel/pai-counselor", "payload": {"content": "I need guidance"},
                       "timestamp": timestamp, "metadata": {}}
         with patch.object(config, "PAI_API_KEY", "fake"), \
-                patch("app.counseling.deep.turn.chat_completion",
+                patch("app.pai_c.deep.turn.chat_completion",
                       new=AsyncMock(return_value=json.dumps({
                           "reply": "What matters most to you?", "action": {"type": "none"}}))):
             await runtime._run_turn(db, student.workspace_id, event_data, 0)
@@ -106,7 +106,7 @@ async def test_analysis_waits_for_earlier_workspace_turn():
         first_job, _ = _turn_job(student, db, "First private event")
         second_job, _ = _turn_job(student, db, "Second private event")
         model = AsyncMock(return_value=_model_notebook(person={"daily_life": "Known"}))
-        with patch("app.counseling.deep.analysis.chat_completion", model):
+        with patch("app.pai_c.deep.analysis.chat_completion", model):
             with pytest.raises(AnalysisOrderPending):
                 await analyze_job(second_job, db)
             assert model.await_count == 0
@@ -131,7 +131,7 @@ async def test_second_workspace_analysis_retries_immediately_while_first_is_runn
             await release.wait()
             return _model_notebook()
 
-        with patch("app.counseling.deep.analysis.chat_completion", side_effect=paused_model):
+        with patch("app.pai_c.deep.analysis.chat_completion", side_effect=paused_model):
             first = asyncio.create_task(analyze_job(first_job, db))
             await asyncio.wait_for(entered.wait(), 1)
             try:
@@ -173,8 +173,8 @@ async def test_no_read_transaction_during_analyst_or_sensitive_model_call():
             return json.dumps({"decisions": [
                 {"path": entry["path"], "sensitive": False} for entry in entries]})
 
-        with patch("app.counseling.deep.analysis.chat_completion", side_effect=analyst_response), \
-                patch("app.counseling.deep.sensitive.chat_completion", side_effect=sensitive_response):
+        with patch("app.pai_c.deep.analysis.chat_completion", side_effect=analyst_response), \
+                patch("app.pai_c.deep.sensitive.chat_completion", side_effect=sensitive_response):
             await analyze_job(job, db)
             assert sensitive_open == []
             await check_notebook_before_mirror(student.workspace_id, db=db)
@@ -197,7 +197,7 @@ async def test_version_conflict_refetches_and_reruns_once():
                 raise NotebookVersionConflict("concurrent write")
             return real_apply(service, *args, **kwargs)
 
-        with patch("app.counseling.deep.analysis.chat_completion", model), \
+        with patch("app.pai_c.deep.analysis.chat_completion", model), \
                 patch.object(NotebookService, "apply", conflicting_apply):
             result = await analyze_job(job, db)
         assert result["model_calls"] == 2
@@ -210,7 +210,7 @@ async def test_retry_finishes_stage_after_notebook_was_saved():
         job, _ = _turn_job(student, db)
         model = AsyncMock(return_value=_model_notebook(
             coverage={"person": True, "education": True}))
-        from app.counseling.deep.analysis import _advance_stage
+        from app.pai_c.deep.analysis import _advance_stage
 
         calls = 0
 
@@ -221,8 +221,8 @@ async def test_retry_finishes_stage_after_notebook_was_saved():
                 raise RuntimeError("stage temporarily unavailable")
             return _advance_stage(*args)
 
-        with patch("app.counseling.deep.analysis.chat_completion", model), \
-                patch("app.counseling.deep.analysis._advance_stage", fail_stage_once):
+        with patch("app.pai_c.deep.analysis.chat_completion", model), \
+                patch("app.pai_c.deep.analysis._advance_stage", fail_stage_once):
             with pytest.raises(RuntimeError, match="stage temporarily unavailable"):
                 await analyze_job(job, db)
             db.rollback()
@@ -239,7 +239,7 @@ async def test_analyst_coverage_advances_foundation_without_starting_research():
         job, _ = _turn_job(student, db)
         model = AsyncMock(return_value=_model_notebook(
             coverage={"person": True, "education": True}, mirror_ready=True))
-        with patch("app.counseling.deep.analysis.chat_completion", model):
+        with patch("app.pai_c.deep.analysis.chat_completion", model):
             await analyze_job(job, db)
         notebook = NotebookService(db).get(student.workspace_id).notebook
         journey = JourneyService(db).ensure_counselor(student.workspace_id)
@@ -273,8 +273,8 @@ async def test_sensitive_content_is_dropped_before_mirror(caplog):
             return {entry["path"] for entry in entries
                     if "private flagged text" in entry["text"]}
 
-        with patch("app.counseling.deep.analysis.chat_completion", new=AsyncMock(return_value=raw)), \
-                caplog.at_level("INFO", logger="app.counseling.deep.sensitive"):
+        with patch("app.pai_c.deep.analysis.chat_completion", new=AsyncMock(return_value=raw)), \
+                caplog.at_level("INFO", logger="app.pai_c.deep.sensitive"):
             result = await analyze_job(job, db)
             assert result["sensitive_removed"] == 0
             assert len(NotebookService(db).get(student.workspace_id).notebook.claims) == 2
@@ -293,7 +293,7 @@ async def test_sensitive_check_uses_configured_model():
     with patch.object(config, "PAI_SENSITIVE_CHECK_MODEL", "configured-checker"), \
             patch.object(config, "PAI_SENSITIVE_CHECK_REASONING_EFFORT", "low"), \
             patch.object(config, "PAI_COUNSELOR_SENSITIVE_CHECK_MAX_TOKENS", 4096), \
-            patch("app.counseling.deep.sensitive.chat_completion", model):
+            patch("app.pai_c.deep.sensitive.chat_completion", model):
         assert await model_sensitive_checker([{"path": "claims[0]", "text": "a changed entry"}]) == set()
     assert model.call_args.kwargs["model"] == "configured-checker"
     assert model.call_args.kwargs["reasoning_effort"] == "low"
@@ -323,8 +323,8 @@ async def test_no_sensitive_call_per_analysis_and_one_batch_before_mirror():
 
         analyst = AsyncMock(return_value=raw)
         sensitive = AsyncMock(side_effect=sensitive_response)
-        with patch("app.counseling.deep.analysis.chat_completion", analyst), \
-                patch("app.counseling.deep.sensitive.chat_completion", sensitive):
+        with patch("app.pai_c.deep.analysis.chat_completion", analyst), \
+                patch("app.pai_c.deep.sensitive.chat_completion", sensitive):
             result = await analyze_job(job, db)
             assert sensitive.await_count == 0
             _, removals = await check_notebook_before_mirror(student.workspace_id, db=db)
@@ -361,7 +361,7 @@ async def test_prepend_to_five_item_list_checks_only_new_entry():
 async def test_batched_sensitive_decisions_must_cover_exactly_the_submitted_paths():
     entries = [{"path": "person.daily_life", "text": "an entry"},
                {"path": "claims[0]", "text": "another entry"}]
-    with patch("app.counseling.deep.sensitive.chat_completion", new=AsyncMock(
+    with patch("app.pai_c.deep.sensitive.chat_completion", new=AsyncMock(
             return_value='{"decisions":[{"path":"person.daily_life","sensitive":false}]}')):
         with pytest.raises(ValueError, match="omitted"):
             await model_sensitive_checker(entries)
@@ -371,7 +371,7 @@ def test_token_usage_log_records_each_call_without_content(caplog):
     usage = SimpleNamespace(prompt_tokens=31, completion_tokens=12,
                             prompt_tokens_details=SimpleNamespace(cached_tokens=7),
                             completion_tokens_details=SimpleNamespace(reasoning_tokens=3))
-    with caplog.at_level("INFO", logger="app.counseling.deep.usage"):
+    with caplog.at_level("INFO", logger="app.pai_c.deep.usage"):
         usage_callback("analyst", "fake-model", "turn-id")(usage)
     assert "input=31 cached_input=7 output=12 reasoning=3" in caplog.text
     assert "turn_id=turn-id" in caplog.text
@@ -439,7 +439,7 @@ async def test_failed_analysis_preserves_last_good_notebook_and_reply():
     with StudentSession() as student, student.factory() as db:
         job, _ = _turn_job(student, db)
         before = NotebookService(db).get(student.workspace_id)
-        with patch("app.counseling.deep.analysis.chat_completion",
+        with patch("app.pai_c.deep.analysis.chat_completion",
                    new=AsyncMock(side_effect=RuntimeError("provider unavailable"))):
             with pytest.raises(RuntimeError, match="provider unavailable"):
                 await analyze_job(job, db)

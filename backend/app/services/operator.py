@@ -283,7 +283,7 @@ async def _post_result(
     if not channel_target or not message:
         return
     try:
-        from app.counseling.posting import _build_conversation_context, _post_response
+        from app.pai_c.posting import _build_conversation_context, _post_response
         db.rollback()
         run = db.get(ExecutionRun, run_id)
         context_current = bool(run and _result_context_current(db, run))
@@ -300,7 +300,7 @@ async def _post_result(
                     "roadmap_research": run.task_type == "roadmap_research",
                 }
                 if run.task_type == "roadmap_research":
-                    from app.roadmaps.service import RoadmapService
+                    from app.pai_c.roadmaps.service import RoadmapService
                     handoff["roadmaps"] = RoadmapService(db).for_run(workspace_id, run_id)
                 history = _build_conversation_context(
                     db, workspace_id, channel_target, pai.PAI_AGENT_NAME,
@@ -308,7 +308,7 @@ async def _post_result(
                 )
                 db.rollback()
                 try:
-                    from app.services.counselor_handoff import explain_result
+                    from app.pai_c.handoff import explain_result
                     explained = await explain_result(workspace_id, history, handoff)
                     if explained:
                         message = explained
@@ -322,7 +322,7 @@ async def _post_result(
                     )
         response_metadata = {"execution_run_id": run_id, "execution_status": status}
         if context_current and run is not None and run.task_type == "roadmap_research":
-            from app.roadmaps.service import RoadmapService
+            from app.pai_c.roadmaps.service import RoadmapService
             cards = RoadmapService(db).for_run(workspace_id, run_id, presented=True)
             if cards:
                 response_metadata["roadmaps"] = cards
@@ -489,12 +489,12 @@ async def delegate(ctx, objective: str, constraints: Optional[dict], context_ref
 
 
 def _baseline_is_current(db, workspace_id: str) -> bool:
-    from app.counseling.research_gateway import mirror_is_current
+    from app.pai_c.research_gateway import mirror_is_current
     return mirror_is_current(db, workspace_id)
 
 
 def _result_context_current(db, run: ExecutionRun) -> bool:
-    from app.counseling.research_gateway import mirror_is_current
+    from app.pai_c.research_gateway import mirror_is_current
     if run.task_type != "roadmap_research":
         return _baseline_is_current(db, run.workspace_id)
     version = (run.constraints or {}).get("mirror_version")

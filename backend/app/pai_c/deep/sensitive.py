@@ -11,9 +11,9 @@ from pydantic import BaseModel
 from pydantic_core import PydanticUndefined
 
 from app.config import config
-from app.counseling.deep.notebook_schema import CounselorNotebookData
-from app.counseling.deep.prompts import load_prompt
-from app.counseling.deep.usage import usage_callback
+from app.pai_c.deep.notebook_schema import CounselorNotebookData
+from app.pai_c.deep.prompts import load_prompt
+from app.pai_c.deep.usage import usage_callback
 from app.inference.client import chat_completion
 
 logger = logging.getLogger(__name__)
@@ -155,8 +155,8 @@ async def check_notebook_before_mirror(workspace_id: str, *, db=None,
     mirror from an unchecked or stale snapshot. No read transaction is kept
     open during the model call.
     """
-    from app.counseling.deep.notebook import NotebookService, NotebookVersionConflict
-    from app.counseling.deep.usage import token_usage_turn
+    from app.pai_c.deep.notebook import NotebookService, NotebookVersionConflict
+    from app.pai_c.deep.usage import token_usage_turn
     from app.database import new_session
 
     if db is None:

@@ -12,14 +12,14 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 
 from app.config import config
-from app.counseling.deep.actions import dispatch_action
-from app.counseling.deep.context import DeepContext
-from app.counseling.deep.mirror import (JOB_MIRROR, JOB_RESEARCH, confirmed_research_job,
+from app.pai_c.deep.actions import dispatch_action
+from app.pai_c.deep.context import DeepContext
+from app.pai_c.deep.mirror import (JOB_MIRROR, JOB_RESEARCH, confirmed_research_job,
                                         enqueue_mirror, mirror_job)
-from app.counseling.deep.mirror_schema import CounselorMirror
-from app.counseling.deep.notebook import NotebookService
-from app.counseling.deep.turn_input import CounselorTurnInput, shared_history
-from app.counseling.stages import require_counselor_transition
+from app.pai_c.deep.mirror_schema import CounselorMirror
+from app.pai_c.deep.notebook import NotebookService
+from app.pai_c.deep.turn_input import CounselorTurnInput, shared_history
+from app.pai_c.stages import require_counselor_transition
 from app.database import get_db
 from app.journey import JourneyService
 from app.main import app
@@ -85,7 +85,7 @@ def test_mirror_fixture_and_prompt_document_match():
     documented = (docs / "counselor/COUNSELOR_V3_PROMPTS.md").read_text(encoding="utf-8")
     section = documented.split("## 3.", 1)[1].split("## 4.", 1)[0]
     assert section.split("```text\n", 1)[1].split("\n```", 1)[0].rstrip() == (
-        root / "app/counseling/deep/prompts/mirror.md").read_text(encoding="utf-8").rstrip()
+        root / "app/pai_c/deep/prompts/mirror.md").read_text(encoding="utf-8").rstrip()
 
 
 @pytest.mark.parametrize("change", ["evidence", "duplicate_dimension", "duplicate_lane", "few_lanes",
@@ -157,9 +157,9 @@ async def test_mirror_posts_once_reuses_sensitive_check_and_system_context(inval
             assert kwargs["model"] == config.PAI_MIRROR_MODEL
             return replies.pop(0)
 
-        with patch("app.counseling.deep.sensitive.chat_completion", AsyncMock(side_effect=safe_model)) as safety, \
-             patch("app.counseling.deep.mirror.chat_completion", AsyncMock(side_effect=model)) as call, \
-             patch("app.counseling.deep.mirror._post_response", AsyncMock(side_effect=fake_post(student))) as post:
+        with patch("app.pai_c.deep.sensitive.chat_completion", AsyncMock(side_effect=safe_model)) as safety, \
+             patch("app.pai_c.deep.mirror.chat_completion", AsyncMock(side_effect=model)) as call, \
+             patch("app.pai_c.deep.mirror._post_response", AsyncMock(side_effect=fake_post(student))) as post:
             assert (await mirror_job(job, db))["status"] == "posted"
             assert (await mirror_job(job, db))["status"] == "posted"
         assert call.await_count == (2 if invalid_first else 1)
@@ -184,9 +184,9 @@ async def test_second_invalid_generation_keeps_discovery_and_logs_no_text(caplog
         turn, journey, _ = prepare(student, db)
         job_id = enqueue_mirror(db, turn)
         db.commit()
-        with patch("app.counseling.deep.sensitive.chat_completion", AsyncMock(side_effect=safe_model)), \
-             patch("app.counseling.deep.mirror.chat_completion", AsyncMock(return_value="private broken text")) as model, \
-             patch("app.counseling.deep.mirror._post_response", AsyncMock()) as post:
+        with patch("app.pai_c.deep.sensitive.chat_completion", AsyncMock(side_effect=safe_model)), \
+             patch("app.pai_c.deep.mirror.chat_completion", AsyncMock(return_value="private broken text")) as model, \
+             patch("app.pai_c.deep.mirror._post_response", AsyncMock()) as post:
             assert (await mirror_job(db.get(BackgroundJob, job_id), db))["status"] == "invalid"
         assert model.await_count == 2
         post.assert_not_awaited()
@@ -194,7 +194,7 @@ async def test_second_invalid_generation_keeps_discovery_and_logs_no_text(caplog
         assert "private broken text" not in caplog.text
         current = JourneyService(db).get(student.workspace_id, journey.id)
         assert current.counselor_summary_draft["status"] == "failed"
-        from app.counseling.deep.context import build_context
+        from app.pai_c.deep.context import build_context
         assert '"mirror_status":"failed"' in (await build_context(db, student.workspace_id, turn)).text.replace(" ", "")
         job = db.get(BackgroundJob, job_id)
         job.status = "completed"
@@ -218,8 +218,8 @@ async def test_sensitive_removal_blocks_mirror_generation():
             entries = json.loads(kwargs["messages"][0]["content"])
             return json.dumps({"decisions": [{"path": item["path"],
                 "sensitive": item["path"] == "person.daily_life"} for item in entries]})
-        with patch("app.counseling.deep.sensitive.chat_completion", AsyncMock(side_effect=sensitive)) as check, \
-             patch("app.counseling.deep.mirror.chat_completion", AsyncMock()) as model:
+        with patch("app.pai_c.deep.sensitive.chat_completion", AsyncMock(side_effect=sensitive)) as check, \
+             patch("app.pai_c.deep.mirror.chat_completion", AsyncMock()) as model:
             assert (await mirror_job(db.get(BackgroundJob, job_id), db))["status"] == "needs_discovery"
         assert check.await_count == 1
         model.assert_not_awaited()
@@ -233,17 +233,17 @@ async def test_stale_notebook_skips_generation_and_failed_check_never_posts():
         job_id = enqueue_mirror(db, turn)
         db.commit()
         job = db.get(BackgroundJob, job_id)
-        with patch("app.counseling.deep.mirror.check_notebook_before_mirror",
+        with patch("app.pai_c.deep.mirror.check_notebook_before_mirror",
                    AsyncMock(side_effect=RuntimeError("safety unavailable"))), \
-             patch("app.counseling.deep.mirror.chat_completion", AsyncMock()) as model, \
-             patch("app.counseling.deep.mirror._post_response", AsyncMock()) as post:
+             patch("app.pai_c.deep.mirror.chat_completion", AsyncMock()) as model, \
+             patch("app.pai_c.deep.mirror._post_response", AsyncMock()) as post:
             with pytest.raises(RuntimeError, match="safety unavailable"):
                 await mirror_job(job, db)
             model.assert_not_awaited()
             post.assert_not_awaited()
         NotebookService(db).apply(student.workspace_id, snapshot.notebook,
                                   turn.source_event_id, expected_version=snapshot.version)
-        with patch("app.counseling.deep.mirror.chat_completion", AsyncMock()) as model:
+        with patch("app.pai_c.deep.mirror.chat_completion", AsyncMock()) as model:
             assert (await mirror_job(job, db))["status"] == "not_ready_or_stale"
             model.assert_not_awaited()
 
@@ -283,7 +283,7 @@ async def test_confirm_is_versioned_scoped_and_hands_off_exactly_once():
             assert current.counselor_summary_draft["status"] == "confirmed"
             jobs = db.scalars(select(BackgroundJob).where(BackgroundJob.job_type == JOB_RESEARCH)).all()
             assert len(jobs) == 1
-            with patch("app.counseling.research_gateway.request_research", AsyncMock(return_value={"ok": True})) as research:
+            with patch("app.pai_c.research_gateway.request_research", AsyncMock(return_value={"ok": True})) as research:
                 assert (await confirmed_research_job(jobs[0], db))["status"] == "done"
                 assert (await confirmed_research_job(jobs[0], db))["status"] == "duplicate"
             research.assert_awaited_once()
@@ -304,7 +304,7 @@ def test_edit_posts_normal_student_event_and_returns_to_discovery():
         try:
             with patch("app.security.event_identity.verify_identity_claims", return_value={"session_user_id": student.user_id}), \
                  patch("app.routers.events.pipeline.process", AsyncMock(side_effect=persist)), \
-                 patch("app.counseling.runtime.run_counselor", AsyncMock()) as counselor, \
+                 patch("app.pai_c.runtime.run_counselor", AsyncMock()) as counselor, \
                  patch("app.services.workflow.advance_workflow"), patch("app.services.integrations.relay_for_event"), \
                  patch("app.infrastructure.cache.publish_event"), patch("app.routers.events._invalidate_poll_cache"):
                 response = client.post(f"/v1/counselor/summary/edit?network={student.workspace_id}",

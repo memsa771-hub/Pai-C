@@ -29,11 +29,16 @@ latest `dev`, open PRs into `dev`, and return the checkout to latest `dev` after
 
 ## Runtime prompts
 
-Authoritative runtime prompts live in `backend/app/counseling/deep/prompts/`.
+Authoritative runtime prompts live in `backend/app/pai_c/deep/prompts/`.
 Not every stored prompt has a wired feature yet. Offline evaluation prompts live
 in `backend/scripts/eval/prompts/`; use recorded fixtures or fake models for tests.
+
+- [TARGETS.md](TARGETS.md): measurable release gates and evaluation caps.
+- [RESTRUCTURE.md](RESTRUCTURE.md): moved files and verified shared/OS import boundaries.
 
 ## Next
 
 Mirror generation, sensitive checking, Confirm/Edit and the research handoff are wired.
-PR 7/8 adds the evidence cache, light-research brief and grounded Mirror roadmaps. Chosen-roadmap deep research is deferred. PAI OS is unchanged.
+The evidence cache, light-research brief and grounded Mirror roadmaps are wired. Chosen-roadmap deep research is deferred. PAI OS is unchanged.
+
+Validate the release gates in TARGETS.md; the PR 9 consolidated paid run was incomplete.

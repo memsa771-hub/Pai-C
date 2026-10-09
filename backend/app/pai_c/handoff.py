@@ -8,8 +8,8 @@ import json
 import time
 import uuid
 
-from app.counseling.deep.turn import run_deep_turn
-from app.counseling.deep.turn_input import CounselorTurnInput
+from app.pai_c.deep.turn import run_deep_turn
+from app.pai_c.deep.turn_input import CounselorTurnInput
 from app.database import new_session
 
 

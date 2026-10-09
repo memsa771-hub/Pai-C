@@ -9,7 +9,7 @@ from typing import Any, Union, get_args, get_origin
 from pydantic import BaseModel, TypeAdapter, ValidationError
 from pydantic_core import PydanticUndefined
 
-from app.counseling.deep.notebook_schema import CounselorNotebookData
+from app.pai_c.deep.notebook_schema import CounselorNotebookData
 
 logger = logging.getLogger(__name__)
 

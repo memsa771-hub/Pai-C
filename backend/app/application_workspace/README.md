@@ -1,7 +1,7 @@
 # Application Workspace backend
 
 This package owns student-managed college and application planning. It is
-separate from `app/counseling`, Student Profile and Vault.
+separate from `app/pai_c`, Student Profile and Vault.
 
 | File | Responsibility |
 | --- | --- |

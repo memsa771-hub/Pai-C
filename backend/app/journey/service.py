@@ -141,7 +141,7 @@ class JourneyService:
     def set_counselor_stage(self, workspace_id: str, journey_id: str, stage: str, *,
                             actor: str = "system", validated_choice: bool = False,
                             replan_escalation: bool = False) -> JourneyView:
-        from app.counseling.stages import require_counselor_transition
+        from app.pai_c.stages import require_counselor_transition
 
         row = self._require(workspace_id, journey_id)
         if row.journey_type != "counselor_decision":

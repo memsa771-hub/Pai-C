@@ -1,4 +1,4 @@
-﻿# Mirror research and roadmaps (PR 7/8)
+# Mirror research and roadmaps (PR 7/8)
 
 Research starts only after the student confirms the current versioned Mirror.
 Discovery replies still make one Counselor call, with the Analyst and existing
@@ -46,9 +46,10 @@ The existing scheduler marks expired evidence unconfirmed and queues refresh.
 
 - `PAI_ROADMAP_MODEL`: defaults to PAI_COUNSELOR_MODEL.
 - `PAI_RESEARCH_MAX_CALLS_PER_STUDENT`: default 40, a persistent workspace/student
-  allowance covering research searches, fetches, registry and model calls.
-  Stored in Workspace.settings.counselor_research_calls; it does not reset daily.
+  allowance per confirmed Mirror version covering searches, fetches, registry and model calls.
+  Stored in Workspace.settings.counselor_research_budgets with separate version keys.
   Existing per-run query/fetch/time limits also apply. Cache hits do not spend it.
+- `PAI_RESEARCH_REFRESH_MAX_CALLS`: default 8, a separate allowance per confirmed Mirror version for stale refreshes.
 - Migration 099 adds answer JSON and fact_id to counselor_noted_questions.
 - Migration 100 adds nullable lane and a unique workspace/journey/lane index to
   pai_roadmaps. Fit metadata and questions use existing route JSONB; gaps use gaps.
@@ -58,7 +59,7 @@ The existing scheduler marks expired evidence unconfirmed and queues refresh.
 Model output is untrusted. The publisher resolves fact IDs to the student's
 RequirementSets again and restores stored quotes, values and verification labels.
 Numbers must occur in cited quotes/values; structured requirements need citations.
-Missing decisive facts and unconfirmed citations prevent a ready status.
+A route is ready when all decisive fields have cited facts, including honestly labeled unconfirmed facts. Missing decisive facts prevent readiness. Student-evidence numbers and self-set action targets do not require research citations.
 Personal-fit prose is constrained by the prompt to student evidence, not world
 requirements. Deterministic checks cannot prove the semantics of arbitrary prose;
 no claim of live conversation quality is made from these offline tests.
@@ -72,19 +73,19 @@ No live model, web search or other paid API evaluation was run for this change.
 - `backend/alembic/versions/099_counselor_light_research.py`
 - `backend/alembic/versions/100_mirror_roadmap_lanes.py`
 - `backend/app/config.py`
-- `backend/app/counseling/baseline.py`
-- `backend/app/counseling/context_projection.py`
-- `backend/app/counseling/deep/context.py`
-- `backend/app/counseling/deep/mirror.py`
-- `backend/app/counseling/deep/mirror_schema.py`
-- `backend/app/counseling/deep/prompts/counselor.md`
-- `backend/app/counseling/deep/prompts/handoff.md`
-- `backend/app/counseling/deep/prompts/mirror.md`
-- `backend/app/counseling/deep/prompts/roadmap_builder.md`
-- `backend/app/counseling/deep/roadmaps.py`
-- `backend/app/counseling/discovery.py`
-- `backend/app/counseling/research_gateway.py`
-- `backend/app/counseling/understanding.py`
+- `backend/app/pai_c/baseline.py`
+- `backend/app/pai_c/context_projection.py`
+- `backend/app/pai_c/deep/context.py`
+- `backend/app/pai_c/deep/mirror.py`
+- `backend/app/pai_c/deep/mirror_schema.py`
+- `backend/app/pai_c/deep/prompts/counselor.md`
+- `backend/app/pai_c/deep/prompts/handoff.md`
+- `backend/app/pai_c/deep/prompts/mirror.md`
+- `backend/app/pai_c/deep/prompts/roadmap_builder.md`
+- `backend/app/pai_c/deep/roadmaps.py`
+- `backend/app/pai_c/discovery.py`
+- `backend/app/pai_c/research_gateway.py`
+- `backend/app/pai_c/understanding.py`
 - `backend/app/memory/discovery_intake.py`
 - `backend/app/memory/handlers.py`
 - `backend/app/models.py`
@@ -92,9 +93,9 @@ No live model, web search or other paid API evaluation was run for this change.
 - `backend/app/plugins/_shared/sources.py`
 - `backend/app/plugins/program_research/__init__.py`
 - `backend/app/plugins/roadmap_builder/__init__.py`
-- `backend/app/research/light.py`
+- `backend/app/pai_c/light_research.py`
 - `backend/app/research/requirements.py`
-- `backend/app/roadmaps/service.py`
+- `backend/app/pai_c/roadmaps/service.py`
 - `backend/app/routers/roadmaps.py`
 - `backend/app/services/operator.py`
 - `backend/tests/fixtures/roadmaps/mirror_lanes.json`

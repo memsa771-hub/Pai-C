@@ -11,11 +11,11 @@ from sqlalchemy.orm import Session
 from sqlalchemy.pool import StaticPool
 
 from app.database import Base
-from app.counseling.deep.notebook import (
+from app.pai_c.deep.notebook import (
     NotebookService, NotebookVersionConflict, NotebookWorkspaceNotFound,
 )
-from app.counseling.deep.notebook_sanitize import sanitize_notebook
-from app.counseling.deep.sensitive import filter_sensitive_changes, model_sensitive_checker
+from app.pai_c.deep.notebook_sanitize import sanitize_notebook
+from app.pai_c.deep.sensitive import filter_sensitive_changes, model_sensitive_checker
 from app.models import CounselorNotebook, CounselorNotebookHistory, CounselorNotedQuestion, EventRecord, User, Workspace
 from app.routers.workspaces import delete_workspace
 
@@ -143,7 +143,7 @@ async def test_fake_sensitive_checker_drops_changed_entry_and_keeps_academic_tex
         checked.append(entries)
         return {entry["path"] for entry in entries if "PTI supporter" in entry["text"]}
 
-    with caplog.at_level("INFO", logger="app.counseling.deep.sensitive"):
+    with caplog.at_level("INFO", logger="app.pai_c.deep.sensitive"):
         cleaned, removals = await filter_sensitive_changes(previous, candidate, fake_checker)
     assert [claim.id for claim in cleaned.claims] == ["c1"]
     assert cleaned.person.daily_life == data["person"]["daily_life"]
@@ -187,12 +187,12 @@ async def test_fake_checker_drops_sensitive_optional_goal_as_one_changed_entry()
 
 @pytest.mark.asyncio
 async def test_model_checker_uses_one_json_call_and_rejects_invalid_decision():
-    with patch("app.counseling.deep.sensitive.chat_completion",
+    with patch("app.pai_c.deep.sensitive.chat_completion",
                new=AsyncMock(return_value='{"decisions":[{"path":"values[0]","sensitive":false}]}')) as model:
         assert await model_sensitive_checker([{"path": "values[0]", "text": "A general academic topic"}]) == set()
     assert model.await_count == 1
     assert model.call_args.kwargs["response_format"] == {"type": "json_object"}
-    with patch("app.counseling.deep.sensitive.chat_completion",
+    with patch("app.pai_c.deep.sensitive.chat_completion",
                new=AsyncMock(return_value='{"decisions":[{"path":"values[0]","sensitive":"maybe"}]}')):
         with pytest.raises(ValueError, match="invalid path or decision"):
             await model_sensitive_checker([{"path": "values[0]", "text": "A statement"}])

@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, Header, Query
 
 from app.api.response import success_response
 from app.database import get_db
-from app.roadmaps.service import RoadmapService
+from app.pai_c.roadmaps.service import RoadmapService
 from app.routers.roadmaps import _authorized
 
 router = APIRouter(prefix="/v1/decision-records", tags=["Counselor decisions"])

@@ -5,7 +5,7 @@ from typing import Literal
 from fastapi import APIRouter, Depends, Header, Query
 
 from app.api.response import success_response
-from app.counseling.student_requests import StudentRequestService
+from app.pai_c.student_requests import StudentRequestService
 from app.database import get_db
 from app.routers.roadmaps import _authorized
 

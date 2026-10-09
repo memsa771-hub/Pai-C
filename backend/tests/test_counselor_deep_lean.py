@@ -12,13 +12,13 @@ import pytest
 from sqlalchemy import select
 
 from app.config import config
-from app.counseling.deep.actions import dispatch_action
-from app.counseling.deep.context import DeepContext, build_context
-from app.counseling.deep.notebook import NotebookService, NotebookVersionConflict
-from app.counseling.deep.notebook_schema import CounselorNotebookData
-from app.counseling.deep.sensitive import check_notebook_before_mirror
-from app.counseling.deep.turn_input import CounselorTurnInput
-from app.counseling.research_gateway import request_research
+from app.pai_c.deep.actions import dispatch_action
+from app.pai_c.deep.context import DeepContext, build_context
+from app.pai_c.deep.notebook import NotebookService, NotebookVersionConflict
+from app.pai_c.deep.notebook_schema import CounselorNotebookData
+from app.pai_c.deep.sensitive import check_notebook_before_mirror
+from app.pai_c.deep.turn_input import CounselorTurnInput
+from app.pai_c.research_gateway import request_research
 from app.journey import JourneyService
 from app.models import CounselorNotedQuestion, EventRecord, ExecutionRun, Roadmap, StudentJourney
 from scripts.counselor_eval_support import StudentSession
@@ -166,7 +166,7 @@ async def test_gateway_reuses_existing_operator_payload_and_deduplicates_runs():
 
 
 def test_only_research_gateway_directly_calls_operator_delegate():
-    directory = Path(__file__).resolve().parents[1] / "app" / "counseling"
+    directory = Path(__file__).resolve().parents[1] / "app" / "pai_c"
     found = []
     for path in directory.rglob("*.py"):
         for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
@@ -238,13 +238,13 @@ async def test_recorded_harness_reports_note_question_without_research(tmp_path)
 
 @pytest.mark.asyncio
 async def test_per_turn_extraction_fallback_does_not_skip_intervening_messages():
-    from app.counseling import runtime
+    from app.pai_c import runtime
     from app.models import BackgroundJob
 
     with StudentSession() as student, student.factory() as db:
         sources = []
         with patch.object(config, "PAI_API_KEY", "fake"), \
-                patch("app.counseling.deep.turn.chat_completion", new=AsyncMock(
+                patch("app.pai_c.deep.turn.chat_completion", new=AsyncMock(
                     return_value='{"reply":"What happened next?","action":{"type":"none"}}')):
             for _ in range(6):
                 turn = source_turn(student, db)
