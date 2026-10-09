@@ -30,6 +30,8 @@ latest `dev`, open PRs into `dev`, and return the checkout to latest `dev` after
 ## Runtime prompts
 
 Authoritative runtime prompts live in `backend/app/pai_c/deep/prompts/`.
+
+Read-only session export: from `backend`, run `python -m scripts.export_counselor_session --workspace <id>`; optional `--out <path>` and repeated `--usage-log <saved-log>` include attributable per-call usage. Default exports in `eval_reports/sessions/` are gitignored. Missing logs and historical Mirror statuses are explicitly marked unavailable; exports remain private student data.
 Not every stored prompt has a wired feature yet. Offline evaluation prompts live
 in `backend/scripts/eval/prompts/`; use recorded fixtures or fake models for tests.
 

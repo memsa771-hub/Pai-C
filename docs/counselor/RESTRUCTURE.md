@@ -57,12 +57,12 @@ in a network-disabled container imports every module and exports static dependen
 including function-local imports, relative/package imports and all allowlisted first-party plugins.
 Graph JSON: eval_reports/pr9-import-graph.json.
 
-No operational application/deadline/workflow module is eligible for pai_os yet:
+No operational application/deadline/workflow module is eligible for a separate OS package yet:
 `pai_c.runtime -> services.pai -> app.main -> routers.application_workspace -> application_workspace`
 and `app.main -> routers.deadlines -> deadlines.service` are real transitive imports.
 WorkspaceApi lazily imports app.main for its internal ASGI transport. Moving these
-OS modules would break the required isolation rule. pai_os is a reserved namespace
-only; this PR does not refactor the shared transport to manufacture isolation.
+OS modules would break the required isolation rule. No empty OS placeholder is kept;
+the shared transport is not refactored to manufacture isolation.
 
 `services.pai` stays shared: security, event routing, application operations and
 workflow scheduling also import it. Roadmap domain service moved with Counselor;
@@ -75,6 +75,6 @@ are updated directly. No duplicate models or tables are created.
 
 ## Evaluation limitation
 
-After the moves: 244/244 app modules import; backend 629 tests and 8 subtests pass (3 production-only tests skipped); frontend 22 tests pass; production build passes. A final targeted check of voice, Mirror and review fixes passes all 32 tests. The one paid consolidated
+After the moves: 243/243 app modules import; backend 631 tests and 8 subtests pass (3 production-only tests skipped); frontend 22 tests pass; production build passes. A final targeted check of voice, Mirror and review fixes passes all 32 tests. The one paid consolidated
 evaluation was incomplete; see eval_reports/pr9-results.md. This structure change
 does not claim production conversation quality or founder acceptance.

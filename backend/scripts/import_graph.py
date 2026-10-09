@@ -62,7 +62,7 @@ def main():
     modules,edges,unresolved=graph(root)
     starts={name for name in modules if name.startswith('app.pai_c')}
     found=reachable(edges,starts)
-    candidates={name for name in modules if name.startswith(('app.application_workspace','app.deadlines','app.services.workflow','app.pai_os'))}
+    candidates={name for name in modules if name.startswith(('app.application_workspace','app.deadlines','app.services.workflow'))}
     imported=[]
     if args.import_all:
         for name in sorted(modules): importlib.import_module(name); imported.append(name)

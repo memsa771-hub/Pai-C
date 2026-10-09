@@ -1,5 +1,5 @@
 {
-  "modules": 244,
+  "modules": 243,
   "counselor_roots": [
     "app.pai_c",
     "app.pai_c.deep",
@@ -280,12 +280,9 @@
     "app.application_workspace.serializers",
     "app.deadlines",
     "app.deadlines.service",
-    "app.pai_os",
     "app.services.workflow"
   ],
-  "os_eligible": [
-    "app.pai_os"
-  ],
+  "os_eligible": [],
   "os_ineligible": [
     "app.application_workspace",
     "app.application_workspace.access",
@@ -1307,9 +1304,6 @@
       "app.pai_c.deep.polish",
       "app.services.pai"
     ],
-    "app.pai_os": [
-      "app.pai_os"
-    ],
     "app.plugins": [
       "app.plugins"
     ],
@@ -1970,5 +1964,5 @@
       "app.workspace"
     ]
   },
-  "imported_count": 244
+  "imported_count": 243
 }

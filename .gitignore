@@ -2,6 +2,7 @@
 .env
 .env.*
 !.env.production.example
+!.env.example
 
 # Generated files and local dependencies
 **/__pycache__/
@@ -16,3 +17,4 @@
 # Local data and backups
 backups/
 *.log
+eval_reports/sessions/
