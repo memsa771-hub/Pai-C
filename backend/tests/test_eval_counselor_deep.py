@@ -119,7 +119,7 @@ def test_eval_context_tags_and_all_grader_fields_are_preserved():
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("model", ["gpt-6-sol", "gpt-5.6-terra", "gpt-5.6-luna"])
+@pytest.mark.parametrize("model", ["gpt-5.6-terra", "gpt-5.6-luna"])
 async def test_unverified_prices_refuse_live_before_any_client(tmp_path, model):
     from app.config import config
     with patch.object(config, "PAI_API_KEY", "fake"), \
@@ -128,3 +128,69 @@ async def test_unverified_prices_refuse_live_before_any_client(tmp_path, model):
         with pytest.raises(ValueError, match="verification required"):
             await run_evaluation(live=True, max_cost_usd=1, result_dir=tmp_path,
                                  simulator_model="gpt-5-mini", grader_model="gpt-5-mini")
+
+
+def test_cost_guard_reserves_worst_case_before_network():
+    from scripts.eval.cost import UsageLedger, BudgetReached
+    ledger=UsageLedger(load_prices(PRICES),.001)
+    with pytest.raises(BudgetReached):
+        ledger.reserve('gpt-6-astra',[{'role':'user','content':'hello'}],4096)
+    assert ledger.calls==[] and ledger.reserved_usd==0
+
+
+def test_cost_guard_counts_outstanding_reservations():
+    from scripts.eval.cost import UsageLedger, BudgetReached
+    ledger=UsageLedger(load_prices(PRICES),.03)
+    ledger.reserve('gpt-6-sol',[{'role':'user','content':'hello'}],1024)
+    with pytest.raises(BudgetReached):
+        ledger.reserve('gpt-6-sol',[{'role':'user','content':'hello'}],2048)
+
+@pytest.mark.asyncio
+async def test_empty_live_grader_keeps_report_without_another_call(tmp_path):
+    from scripts.eval.cost import UsageLedger
+    from scripts.eval_counselor_deep import evaluate_persona, RecordedModels
+    persona=next(item for item in load_personas(PERSONAS) if item['id']=='danish')
+    ledger=UsageLedger(load_prices(PRICES))
+    recorded=RecordedModels(ledger); recorded.turn=persona['recorded_turns'][0]
+    with recorded.install(), patch('scripts.eval_counselor_deep.live_tracking',lambda ledger: recorded.install()), \
+         patch('scripts.eval_counselor_deep._live_grader',side_effect=json.JSONDecodeError('empty','',0)):
+        result=await evaluate_persona(persona,ledger,live=True,max_turns=1,
+            simulator_model='gpt-5-mini',grader_model='gpt-5-mini',progress_dir=tmp_path)
+    assert result['status']=='grader_failed'
+    assert len(result['turns'])==1
+    assert (tmp_path/'partial_danish.json').exists()
+    assert result['grader'] is None
+
+
+def test_usage_checkpoint_survives_a_reserved_but_failed_call(tmp_path):
+    from scripts.eval.cost import UsageLedger
+    path=tmp_path/'ledger.json'
+    ledger=UsageLedger(load_prices(PRICES),.5,checkpoint_path=path)
+    ledger.reserve('gpt-6-sol',[{'role':'user','content':'hello'}],1024)
+    data=json.loads(path.read_text())
+    assert data['reserved_usd']>0 and data['calls']==[]
+
+@pytest.mark.asyncio
+async def test_end_to_end_completion_runs_existing_mirror_job_and_confirmation_offline():
+    from unittest.mock import AsyncMock
+    from sqlalchemy import select
+    from scripts.counselor_eval_support import StudentSession
+    from scripts.eval_counselor_deep import complete_mirror_pipeline
+    from app.counseling.deep.mirror import enqueue_mirror
+    from app.models import BackgroundJob, StudentJourney
+    from test_counselor_mirror import prepare, mirror_data, safe_model
+    with StudentSession() as student, student.factory() as db:
+        turn,journey,_=prepare(student,db)
+        enqueue_mirror(db,turn); db.commit()
+        async def confirmed(job,db):
+            current=db.get(StudentJourney,job.payload['journey_id'])
+            assert current.counselor_summary_draft['status']=='confirmed'
+            assert current.current_stage=='RESEARCHING'
+            return {'status':'done'}
+        with patch('app.counseling.deep.mirror.chat_completion',AsyncMock(return_value=json.dumps(mirror_data()))), \
+             patch('app.counseling.deep.sensitive.chat_completion',AsyncMock(side_effect=safe_model)), \
+             patch('app.counseling.deep.mirror.confirmed_research_job',AsyncMock(side_effect=confirmed)) as research:
+            result=await complete_mirror_pipeline(student)
+        research.assert_awaited_once()
+        assert result['mirror'] and result['status']=='no_roadmaps'
+        assert db.scalar(select(BackgroundJob.id).where(BackgroundJob.job_type=='counselor.mirror_research'))

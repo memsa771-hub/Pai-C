@@ -14,6 +14,7 @@ import argparse
 import asyncio
 import json
 import time
+import statistics
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -22,7 +23,8 @@ from app.counseling.deep.polish import (
     contains_blocked_script, has_list, polish_reply, question_count,
 )
 from app.counseling.deep.prompts import load_prompt
-from app.inference.client import _reasoning_effort_for, create_client
+from app.inference.client import _reasoning_effort_for, create_client, _token_limit_kwarg
+from scripts.eval.cost import UsageLedger, BudgetReached, load_prices
 
 PRICES = Path(__file__).with_name("model_prices.json")
 
@@ -50,13 +52,18 @@ def _cost(price: dict, usage: dict) -> float:
 
 
 async def run(args) -> dict:
-    prices = json.loads(PRICES.read_text())
+    prices = load_prices(PRICES)
+    if args.max_cost_usd <= 0:
+        raise ValueError("positive budget required")
+    ledger = UsageLedger(prices, args.max_cost_usd)
     price = prices.get(args.model)
     if not price or not (price.get("input") or price.get("output")):
         raise SystemExit(f"No price for {args.model} in {PRICES.name}; add it before a live run.")
+    if price.get("verify_before_live"):
+        raise ValueError("price verification required before live")
     fixture = json.loads(Path(args.messages).read_text(encoding="utf-8"))
     system = load_prompt("counselor") + "\n\n" + _context(fixture.get("profile", {}))
-    client = create_client(config.PAI_API_KEY, base_url=config.PAI_BASE_URL)
+    client = create_client(config.PAI_API_KEY, base_url=config.PAI_BASE_URL).with_options(max_retries=0)
     effort = _reasoning_effort_for(args.model, args.reasoning_effort, has_tools=False)
     history: list[dict] = []
     turns, spent = [], 0.0
@@ -64,18 +71,31 @@ async def run(args) -> dict:
         messages = [{"role": "system", "content": system},
                     *history[-args.history_size:], {"role": "user", "content": student}]
         kwargs = {"model": args.model, "messages": messages,
-                  "response_format": {"type": "json_object"}}
+                  "response_format": {"type": "json_object"},
+                  _token_limit_kwarg(args.model): getattr(args, "output_limit", 1024)}
         if effort:
             kwargs["reasoning_effort"] = effort
+        try:
+            reservation = ledger.reserve(args.model, messages, getattr(args, "output_limit", 1024))
+        except BudgetReached:
+            break
         started = time.monotonic()
-        response = await client.chat.completions.create(**kwargs)
+        try:
+            response = await client.chat.completions.create(**kwargs)
+        except Exception:
+            break  # Retain ambiguous-call reservation; never retry.
         elapsed = int((time.monotonic() - started) * 1000)
         raw = response.choices[0].message.content or ""
         u = response.usage
         details = getattr(u, "prompt_tokens_details", None)
         usage = {"input_tokens": u.prompt_tokens, "output_tokens": u.completion_tokens,
                  "cached_input_tokens": getattr(details, "cached_tokens", 0) or 0}
-        cost = _cost(price, usage)
+        try:
+            record = ledger.settle(u, args.model, "counselor", reservation)
+        except BudgetReached:
+            break
+        usage["reasoning_tokens"] = record["reasoning"]
+        cost = record["cost_usd"]
         spent += cost
         try:
             parsed = json.loads(raw)
@@ -101,8 +121,11 @@ async def run(args) -> dict:
     summary = {
         "model": args.model, "reasoning_effort": effort, "turns": len(turns),
         "total_usd": round(spent, 4),
-        "p50_ms": latencies[len(latencies) // 2] if latencies else None,
+        "p50_ms": statistics.median(latencies) if latencies else None,
         "max_ms": latencies[-1] if latencies else None,
+        "p95_ms": round(statistics.quantiles(latencies, n=100, method="inclusive")[94], 1) if len(latencies)>1 else (latencies[0] if latencies else None),
+        "reserved_usd": ledger.reserved_usd,
+        "status": "complete" if len(turns)==len(fixture["messages"]) else "partial",
         "cache_hit_ratio": round(sum(t["usage"]["cached_input_tokens"] for t in turns) / input_total, 3)
         if input_total else 0,
         "invalid_json": sum(not t["valid_json"] for t in turns),
@@ -111,6 +134,7 @@ async def run(args) -> dict:
         "blocked_script_replies": sum(t["blocked_script"] for t in turns),
         "max_words": max((t["words"] for t in turns), default=0),
     }
+    await client.close()
     return {"summary": summary, "turns": turns}
 
 
@@ -122,6 +146,7 @@ def main() -> None:
     parser.add_argument("--reasoning-effort", default=config.PAI_COUNSELOR_REASONING_EFFORT)
     parser.add_argument("--history-size", type=int, default=config.PAI_COUNSELOR_HISTORY_SIZE)
     parser.add_argument("--out", type=Path)
+    parser.add_argument("--output-limit", type=int, default=1024)
     args = parser.parse_args()
     result = asyncio.run(run(args))
     print(json.dumps(result["summary"], indent=2))

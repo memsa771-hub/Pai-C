@@ -1,0 +1,190 @@
+{
+  "summary": {
+    "model": "gpt-6-sol",
+    "reasoning_effort": "low",
+    "turns": 8,
+    "total_usd": 0.0141,
+    "p50_ms": 2429.0,
+    "max_ms": 4306,
+    "p95_ms": 3796.8,
+    "reserved_usd": 0,
+    "status": "complete",
+    "cache_hit_ratio": 0.862,
+    "invalid_json": 0,
+    "multi_question_replies": 0,
+    "list_replies": 0,
+    "blocked_script_replies": 0,
+    "max_words": 35
+  },
+  "turns": [
+    {
+      "turn": 1,
+      "student": "AoA. mujhe AI engineer banna hai aur Canada jana hai. kaise jaun?",
+      "reply": "Wa Alaikum Assalam, Danish. AI engineer banna aur Canada jana aapka goal hai; is par wapas aayenge. Canada jaane ka tareeqa official sources se check karke bataunga. Abhi aap apne din mein kya karte hain?",
+      "action": {
+        "type": "note_question",
+        "question_to_research": "AI engineer banne ke liye Canada kaise ja sakta hoon?"
+      },
+      "valid_json": true,
+      "questions_before_polish": 1,
+      "has_list": false,
+      "words": 35,
+      "blocked_script": false,
+      "ms": 4306,
+      "usage": {
+        "input_tokens": 2060,
+        "output_tokens": 122,
+        "cached_input_tokens": 0,
+        "reasoning_tokens": 20
+      },
+      "usd": 0.00534
+    },
+    {
+      "turn": 2,
+      "student": "ICS kiya hai is saal, result aa gaya. Ab free hoon",
+      "reply": "ICS ka result aa gaya hai aur ab aap free hain. Aajkal apna waqt kis kaam mein guzarte hain?",
+      "action": {
+        "type": "none"
+      },
+      "valid_json": true,
+      "questions_before_polish": 1,
+      "has_list": false,
+      "words": 19,
+      "blocked_script": false,
+      "ms": 2851,
+      "usage": {
+        "input_tokens": 2143,
+        "output_tokens": 67,
+        "cached_input_tokens": 2057,
+        "reasoning_tokens": 18
+      },
+      "usd": 0.001253
+    },
+    {
+      "turn": 3,
+      "student": "68% aaye. Theek hai bas, maths mein kam aaye",
+      "reply": "68% aaye, aur maths mein kam number aane ka aapko khayal hai. Maths mein sab se zyada mushkil kis cheez mein hui?",
+      "action": {
+        "type": "none"
+      },
+      "valid_json": true,
+      "questions_before_polish": 1,
+      "has_list": false,
+      "words": 22,
+      "blocked_script": false,
+      "ms": 1974,
+      "usage": {
+        "input_tokens": 2193,
+        "output_tokens": 63,
+        "cached_input_tokens": 2140,
+        "reasoning_tokens": 7
+      },
+      "usd": 0.001164
+    },
+    {
+      "turn": 4,
+      "student": "dono thora. Calculus bilkul samajh nahi aata tha. Computer mein acha tha",
+      "reply": "Calculus samajh nahi aata tha, lekin computer mein aapko apni pakar behtar lagi. Computer mein aisa kya kiya tha jisse aapko yeh laga?",
+      "action": {
+        "type": "none"
+      },
+      "valid_json": true,
+      "questions_before_polish": 1,
+      "has_list": false,
+      "words": 23,
+      "blocked_script": false,
+      "ms": 2335,
+      "usage": {
+        "input_tokens": 2258,
+        "output_tokens": 70,
+        "cached_input_tokens": 2190,
+        "reasoning_tokens": 6
+      },
+      "usd": 0.001274
+    },
+    {
+      "turn": 5,
+      "student": "programming. C++ mein patterns wagaira banana. Python bhi seekha hai maine khud",
+      "reply": "C++ mein patterns banaye aur Python khud seekhi. Python mein apne aap kya banaya tha?",
+      "action": {
+        "type": "none"
+      },
+      "valid_json": true,
+      "questions_before_polish": 1,
+      "has_list": false,
+      "words": 15,
+      "blocked_script": false,
+      "ms": 1838,
+      "usage": {
+        "input_tokens": 2330,
+        "output_tokens": 51,
+        "cached_input_tokens": 2255,
+        "reasoning_tokens": 5
+      },
+      "usd": 0.001111
+    },
+    {
+      "turn": 6,
+      "student": "YouTube pe ek 12 ghante ka course hai, us se",
+      "reply": "Python aapne YouTube ke course se seekhi. Course ke baad apne aap koi chhota program banaya tha?",
+      "action": {
+        "type": "none"
+      },
+      "valid_json": true,
+      "questions_before_polish": 1,
+      "has_list": false,
+      "words": 17,
+      "blocked_script": false,
+      "ms": 2218,
+      "usage": {
+        "input_tokens": 2378,
+        "output_tokens": 59,
+        "cached_input_tokens": 2327,
+        "reasoning_tokens": 8
+      },
+      "usd": 0.001157
+    },
+    {
+      "turn": 7,
+      "student": "... aadha shayad. 5-6 ghante",
+      "reply": "Toh 12 ghante ke course mein se taqreeban 5–6 ghante dekhe thay. Us mein se kya cheez khud likh kar chalayi thi?",
+      "action": {
+        "type": "none"
+      },
+      "valid_json": true,
+      "questions_before_polish": 1,
+      "has_list": false,
+      "words": 22,
+      "blocked_script": false,
+      "ms": 2811,
+      "usage": {
+        "input_tokens": 2430,
+        "output_tokens": 74,
+        "cached_input_tokens": 2375,
+        "reasoning_tokens": 13
+      },
+      "usd": 0.001325
+    },
+    {
+      "turn": 8,
+      "student": "exams aa gaye the. Phir dobara start nahi kiya",
+      "reply": "Exams ki wajah se Python course ruk gaya, aur phir dobara shuru nahi hua. C++ mein patterns banate waqt aap khud logic sochte thay ya dekh kar likhte thay?",
+      "action": {
+        "type": "none"
+      },
+      "valid_json": true,
+      "questions_before_polish": 1,
+      "has_list": false,
+      "words": 29,
+      "blocked_script": false,
+      "ms": 2523,
+      "usage": {
+        "input_tokens": 2494,
+        "output_tokens": 82,
+        "cached_input_tokens": 2427,
+        "reasoning_tokens": 17
+      },
+      "usd": 0.001439
+    }
+  ]
+}

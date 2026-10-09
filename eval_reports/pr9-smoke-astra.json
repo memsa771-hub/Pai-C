@@ -1,0 +1,189 @@
+{
+  "summary": {
+    "model": "gpt-6-astra",
+    "reasoning_effort": "low",
+    "turns": 8,
+    "total_usd": 0.0616,
+    "p50_ms": 3568.0,
+    "max_ms": 4463,
+    "p95_ms": 4191.4,
+    "reserved_usd": 0,
+    "status": "complete",
+    "cache_hit_ratio": 0.863,
+    "invalid_json": 0,
+    "multi_question_replies": 0,
+    "list_replies": 0,
+    "blocked_script_replies": 0,
+    "max_words": 33
+  },
+  "turns": [
+    {
+      "turn": 1,
+      "student": "AoA. mujhe AI engineer banna hai aur Canada jana hai. kaise jaun?",
+      "reply": "Wa alaikum assalam, Danish. AI engineer banne aur Canada jane par wapas aayenge; raasta samajhne ke liye pehle aapko jaanna hai. Abhi aap apne din ka zyada hissa kis kaam mein guzarte hain?",
+      "action": {
+        "type": "none"
+      },
+      "valid_json": true,
+      "questions_before_polish": 1,
+      "has_list": false,
+      "words": 33,
+      "blocked_script": false,
+      "ms": 4463,
+      "usage": {
+        "input_tokens": 2060,
+        "output_tokens": 75,
+        "cached_input_tokens": 0,
+        "reasoning_tokens": 0
+      },
+      "usd": 0.02435
+    },
+    {
+      "turn": 2,
+      "student": "ICS kiya hai is saal, result aa gaya. Ab free hoon",
+      "reply": "ICS ke result ke baad ab free hain. Aaj kal aapka aam din kaise guzarta hai?",
+      "action": {
+        "type": "none"
+      },
+      "valid_json": true,
+      "questions_before_polish": 1,
+      "has_list": false,
+      "words": 16,
+      "blocked_script": false,
+      "ms": 2869,
+      "usage": {
+        "input_tokens": 2145,
+        "output_tokens": 40,
+        "cached_input_tokens": 2057,
+        "reasoning_tokens": 0
+      },
+      "usd": 0.004937
+    },
+    {
+      "turn": 3,
+      "student": "68% aaye. Theek hai bas, maths mein kam aaye",
+      "reply": "68% aaye, aur maths mein kam rahe. Maths ki tayari mein sab se zyada mushkil kis cheez mein hui thi?",
+      "action": {
+        "type": "none"
+      },
+      "valid_json": true,
+      "questions_before_polish": 1,
+      "has_list": false,
+      "words": 20,
+      "blocked_script": false,
+      "ms": 3674,
+      "usage": {
+        "input_tokens": 2192,
+        "output_tokens": 44,
+        "cached_input_tokens": 2142,
+        "reasoning_tokens": 0
+      },
+      "usd": 0.004842
+    },
+    {
+      "turn": 4,
+      "student": "dono thora. Calculus bilkul samajh nahi aata tha. Computer mein acha tha",
+      "reply": "Calculus samajh nahi aata tha, lekin computer mein aap khud ko acha samajhte thay. Computer mein koi aisa kaam batayenge jo aapne khud kiya tha?",
+      "action": {
+        "type": "none"
+      },
+      "valid_json": true,
+      "questions_before_polish": 1,
+      "has_list": false,
+      "words": 25,
+      "blocked_script": false,
+      "ms": 3552,
+      "usage": {
+        "input_tokens": 2251,
+        "output_tokens": 61,
+        "cached_input_tokens": 2189,
+        "reasoning_tokens": 0
+      },
+      "usd": 0.005859
+    },
+    {
+      "turn": 5,
+      "student": "programming. C++ mein patterns wagaira banana. Python bhi seekha hai maine khud",
+      "reply": "C++ mein patterns banaye aur Python khud seekhi. Python mein aapne apne aap kya banaya tha?",
+      "action": {
+        "type": "none"
+      },
+      "valid_json": true,
+      "questions_before_polish": 1,
+      "has_list": false,
+      "words": 16,
+      "blocked_script": false,
+      "ms": 3172,
+      "usage": {
+        "input_tokens": 2326,
+        "output_tokens": 50,
+        "cached_input_tokens": 2248,
+        "reasoning_tokens": 0
+      },
+      "usd": 0.005528
+    },
+    {
+      "turn": 6,
+      "student": "YouTube pe ek 12 ghante ka course hai, us se",
+      "reply": "Python YouTube ke 12 ghante ke course se seekhi. Us course ko dekhte hue aapne khud code likhne ki kitni practice ki?",
+      "action": {
+        "type": "none"
+      },
+      "valid_json": true,
+      "questions_before_polish": 1,
+      "has_list": false,
+      "words": 22,
+      "blocked_script": false,
+      "ms": 3584,
+      "usage": {
+        "input_tokens": 2377,
+        "output_tokens": 51,
+        "cached_input_tokens": 2323,
+        "reasoning_tokens": 0
+      },
+      "usd": 0.005413
+    },
+    {
+      "turn": 7,
+      "student": "... aadha shayad. 5-6 ghante",
+      "reply": "Course ka takreeban aadha hissa kiya tha. Jahan course ruka, us waqt kya hua tha?",
+      "action": {
+        "type": "none"
+      },
+      "valid_json": true,
+      "questions_before_polish": 1,
+      "has_list": false,
+      "words": 15,
+      "blocked_script": false,
+      "ms": 3175,
+      "usage": {
+        "input_tokens": 2435,
+        "output_tokens": 41,
+        "cached_input_tokens": 2374,
+        "reasoning_tokens": 0
+      },
+      "usd": 0.005034
+    },
+    {
+      "turn": 8,
+      "student": "exams aa gaye the. Phir dobara start nahi kiya",
+      "reply": "Exams ki wajah se course ruka, phir dobara shuru nahi hua. Result ke baad aapka waqt sab se zyada kis cheez mein guzra hai?",
+      "action": {
+        "type": "none"
+      },
+      "valid_json": true,
+      "questions_before_polish": 1,
+      "has_list": false,
+      "words": 24,
+      "blocked_script": false,
+      "ms": 3687,
+      "usage": {
+        "input_tokens": 2485,
+        "output_tokens": 54,
+        "cached_input_tokens": 2432,
+        "reasoning_tokens": 0
+      },
+      "usd": 0.005662
+    }
+  ]
+}

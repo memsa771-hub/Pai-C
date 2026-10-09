@@ -128,17 +128,25 @@ class RecordedModels:
 
 class TrackedLiveClient:
     def __init__(self, api_key, base_url, original, ledger):
-        self.real = original(api_key, base_url=base_url)
+        self.real = original(api_key, base_url=base_url).with_options(max_retries=0)
         self.ledger = ledger
         self.chat = SimpleNamespace(completions=SimpleNamespace(create=self.create))
 
     async def create(self, **kwargs):
         model = kwargs["model"]
-        self.ledger.before_call(model)
-        if self.ledger.prices[model].get("verify_before_live"):
-            raise ValueError(f"price verification required before live: {model}")
-        response = await self.real.chat.completions.create(**kwargs)
-        self.ledger.record(getattr(response, "usage", None), model, _phase.get())
+        limit = int(kwargs.get("max_completion_tokens") or kwargs.get("max_tokens") or 4096)
+        kwargs[inference_client._token_limit_kwarg(model)] = limit
+        budget_input = list(kwargs["messages"])
+        if kwargs.get("tools"):
+            budget_input.append({"role": "system", "content": json.dumps(kwargs["tools"])})
+        reservation = self.ledger.reserve(model, budget_input, limit)
+        try:
+            response = await self.real.chat.completions.create(**kwargs)
+        except Exception:
+            # An ambiguous transport error may still be billable. Retain the
+            # reservation, stop, and never issue an automatic retry.
+            raise BudgetReached("provider request failed; reservation retained") from None
+        self.ledger.settle(getattr(response, "usage", None), model, _phase.get(), reservation)
         return response
 
     async def close(self):
@@ -156,11 +164,27 @@ def live_tracking(ledger: UsageLedger):
         with phase("sensitive"):
             return await real_sensitive_call(**kwargs)
 
-    with patch("app.inference.client.create_client",
+    with ExitStack() as stack:
+        if config.WEB_SEARCH_PROVIDER:
+            from app.tools.web_search import TavilyWebSearchProvider
+            prices=json.loads((ROOT / "eval" / "tool_prices.json").read_text())
+            original_search=TavilyWebSearchProvider.search
+            async def priced_search(provider, query, limit=5):
+                cost=prices["tavily"]["basic_search_usd"]
+                if ledger.max_cost_usd is not None and ledger.exposure+ledger.reserved_usd+cost*1.1 > ledger.max_cost_usd:
+                    raise BudgetReached("search budget reached")
+                ledger.calls.append({"phase":"search","model":"tavily","input":0,"cached_input":0,"output":0,"reasoning":0,"cost_usd":cost})
+                ledger.checkpoint()
+                return await original_search(provider,query,limit)
+            if config.WEB_SEARCH_PROVIDER != "tavily":
+                raise ValueError("no verified evaluation price for configured search provider")
+            stack.enter_context(patch.object(TavilyWebSearchProvider,"search",priced_search))
+        stack.enter_context(patch.object(config,"WEB_SEARCH_MAX_RETRIES",0))
+        with patch("app.inference.client.create_client",
                lambda api_key, base_url=None: TrackedLiveClient(api_key, base_url, original, ledger)), \
             patch("app.counseling.deep.sensitive.chat_completion", tagged_sensitive_call), \
             patch("app.memory.index._index", NullMemoryIndex()):
-        yield
+            yield
 
 
 def _eval_context(persona: dict, transcript: list[dict], notebook: dict,
@@ -257,7 +281,8 @@ def _metrics(persona: dict, turns: list[dict], notebook: dict, grader: dict | No
 
 async def evaluate_persona(persona: dict, ledger: UsageLedger, *, live: bool,
                            max_turns: int, simulator_model: str = "",
-                           grader_model: str = "") -> dict:
+                           grader_model: str = "", end_to_end: bool = False,
+                           progress_dir: Path | None = None) -> dict:
     result = {"persona": persona["id"], "turns": [], "status": "complete", "grader": None}
     recorded = RecordedModels(ledger)
     transcript: list[dict] = []
@@ -313,6 +338,14 @@ async def evaluate_persona(persona: dict, ledger: UsageLedger, *, live: bool,
                         counselor_latency_ms = round((time.monotonic() - start) * 1000)
                         assistant_id = await student.post_response(
                             db, student.workspace_id, turn.channel, "pai", answer.reply, 0)
+                        if live and progress_dir:
+                            progress_dir.mkdir(parents=True, exist_ok=True)
+                            (progress_dir / f"partial_{persona['id']}.json").write_text(json.dumps({
+                                "persona": persona["id"], "turns": result["turns"],
+                                "pending_turn": {"student": message, "reply": answer.reply,
+                                                 "action": answer.action},
+                                "notebook": result.get("notebook"), "calls": ledger.calls},
+                                ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
                         analysis_id = enqueue_turn_analysis(
                             db, student.workspace_id, event_id, assistant_id)
                         job = db.get(BackgroundJob, analysis_id)
@@ -339,11 +372,18 @@ async def evaluate_persona(persona: dict, ledger: UsageLedger, *, live: bool,
                         "cost_usd": round(sum(call["cost_usd"] for call in calls), 8),
                     })
                     result["notebook"] = notebook
-                    if answer.action.get("type") == "mirror":
+                    if answer.action.get("type") == "mirror" and (not end_to_end or action_status == "requested"):
+                        if end_to_end and action_status == "requested":
+                            result["completion"] = await complete_mirror_pipeline(student)
+                            transcript.extend(result["completion"].get("transcript") or [])
                         break
                 except BudgetReached as exc:
                     result["status"] = "budget_reached"
                     result["stop_reason"] = str(exc)
+                    break
+                except Exception as exc:
+                    result["status"]="failed"
+                    result["stop_reason"]=type(exc).__name__
                     break
             if result["status"] != "budget_reached" and live:
                 try:
@@ -352,10 +392,54 @@ async def evaluate_persona(persona: dict, ledger: UsageLedger, *, live: bool,
                 except BudgetReached as exc:
                     result["status"] = "budget_reached"
                     result["stop_reason"] = str(exc)
+                except (TypeError, ValueError) as exc:
+                    result["status"] = "grader_failed"
+                    result["stop_reason"] = type(exc).__name__
             elif not live:
                 result["grader"] = persona.get("recorded_grader")
     result["metrics"] = _metrics(persona, result["turns"], result.get("notebook") or {}, result["grader"])
     return result
+
+
+
+async def complete_mirror_pipeline(student):
+    """Exercise existing durable jobs, confirmation, gateway and Operator.
+
+    Confirmation belongs only to the synthetic evaluation student. No existing
+    database is opened, and external write actions remain disabled by EvalWorkspaceApi.
+    """
+    from sqlalchemy import select
+    from app.counseling.deep.mirror import mirror_job, enqueue_confirmed_research, confirmed_research_job, JOB_MIRROR
+    from app.journey import JourneyService
+    from app.models import Roadmap
+    from app.services import operator
+    with student.factory() as db:
+        job=db.scalar(select(BackgroundJob).where(BackgroundJob.workspace_id==student.workspace_id,
+            BackgroundJob.job_type==JOB_MIRROR,BackgroundJob.status=='pending'))
+        if job is None: return {'status':'mirror_not_queued'}
+        with phase('mirror'), patch('app.counseling.deep.mirror._post_response',student.post_response):
+            outcome=await mirror_job(job,db)
+        job.status='succeeded'; db.commit()
+        journey=JourneyService(db).ensure_counselor(student.workspace_id)
+        draft=journey.counselor_summary_draft or {}
+        result={'status':outcome['status'],'mirror':draft.get('mirror'),'transcript':[]}
+        if draft.get('status')!='awaiting_confirmation': return result
+        result['transcript'].append({'role':'mirror','content':draft.get('mirror')})
+        journey=JourneyService(db).queue_counselor_research(student.workspace_id,journey.id,str(uuid.uuid4()),
+            actor='human:evaluation_confirmation',expected_version=draft['version'])
+        research_id=enqueue_confirmed_research(db,student.workspace_id,journey);db.commit()
+        with phase('light_research'):
+            await confirmed_research_job(db.get(BackgroundJob,research_id),db)
+            tasks=list(operator._running_tasks)
+            if tasks: await asyncio.gather(*tasks)
+        db.expire_all()
+        rows=db.scalars(select(Roadmap).where(Roadmap.workspace_id==student.workspace_id)).all()
+        result['roadmaps']=[{'lane':row.lane,'title':row.title,'status':row.generation_status,
+            'route':row.route,'sources':row.sources,'gaps':row.gaps,'steps':row.steps} for row in rows]
+        result['ready_ratio']=sum(row.generation_status=='ready' for row in rows)/len(rows) if rows else 0
+        result['status']='published' if rows else 'no_roadmaps'
+        result['transcript'].append({'role':'roadmaps','content':result['roadmaps']})
+        return result
 
 
 def write_report(report: dict, directory: Path) -> tuple[Path, Path]:
@@ -403,6 +487,7 @@ def write_report(report: dict, directory: Path) -> tuple[Path, Path]:
                          f"{usage['cached_input']} | {usage['output']} | {usage['reasoning']} | "
                          f"{usage['cost_usd']:.6f} |")
         lines.append("")
+        lines.extend(["### End-to-end completion", "", "```json", json.dumps(item.get("completion"), ensure_ascii=False, indent=2), "```", ""])
         lines.extend(["### Grader decisions and evidence", "", "```json",
                       json.dumps(item.get("grader"), ensure_ascii=False, indent=2), "```", ""])
     lines.extend(["The JSON report includes every per-call token record and final notebook.", ""])
@@ -414,7 +499,7 @@ async def run_evaluation(*, live: bool = False, max_cost_usd: float | None = Non
                          max_turns: int = 40, persona_ids: set[str] | None = None,
                          fixture_dir: Path = PERSONAS, price_file: Path = PRICES,
                          result_dir: Path = RESULTS, simulator_model: str = "",
-                         grader_model: str = "") -> dict:
+                         grader_model: str = "", end_to_end: bool = False) -> dict:
     if live and (max_cost_usd is None or max_cost_usd <= 0):
         raise ValueError("--live requires a positive --max-cost-usd")
     if max_turns < 1:
@@ -427,8 +512,11 @@ async def run_evaluation(*, live: bool = False, max_cost_usd: float | None = Non
         raise ValueError("no selected persona fixtures")
     ledger = UsageLedger(load_prices(price_file), max_cost_usd)
     if live:
+        ledger.checkpoint_path = result_dir / "live_usage_ledger.json"
+    if live:
         for model in {config.PAI_COUNSELOR_MODEL, config.PAI_ANALYST_MODEL,
                       config.PAI_SENSITIVE_CHECK_MODEL,
+                      *({config.PAI_MIRROR_MODEL, config.PAI_ROADMAP_MODEL, config.PAI_OPERATOR_MODEL or config.PAI_MODEL} if end_to_end else set()),
                       config.MEMORY_EXTRACTOR_MODEL or config.PAI_MODEL,
                       simulator_model or config.PAI_MODEL,
                       grader_model or config.PAI_COUNSELOR_MODEL}:
@@ -442,7 +530,8 @@ async def run_evaluation(*, live: bool = False, max_cost_usd: float | None = Non
         item = await evaluate_persona(
             persona, ledger, live=live, max_turns=max_turns,
             simulator_model=simulator_model or config.PAI_MODEL,
-            grader_model=grader_model or config.PAI_COUNSELOR_MODEL)
+            grader_model=grader_model or config.PAI_COUNSELOR_MODEL, end_to_end=end_to_end,
+            progress_dir=result_dir if live else None)
         persona_calls = ledger.calls[persona_start:]
         item["total_cost_usd"] = round(sum(call["cost_usd"] for call in persona_calls), 8)
         item["usage_by_phase"] = {
@@ -468,6 +557,7 @@ def main() -> None:
     mode.add_argument("--offline", action="store_true", help="Replay recorded fixtures (default)")
     mode.add_argument("--live", action="store_true", help="Allow real model calls")
     parser.add_argument("--max-cost-usd", type=float)
+    parser.add_argument("--end-to-end", action="store_true", help="Generate Mirror, confirm and await real research/publication")
     parser.add_argument("--max-turns", type=int, default=40)
     parser.add_argument("--persona", action="append", dest="personas")
     parser.add_argument("--simulator-model", default="")
@@ -480,7 +570,7 @@ def main() -> None:
         live=args.live, max_cost_usd=args.max_cost_usd, max_turns=args.max_turns,
         persona_ids=set(args.personas) if args.personas else None,
         result_dir=args.result_dir, simulator_model=args.simulator_model,
-        grader_model=args.grader_model))
+        grader_model=args.grader_model, end_to_end=args.end_to_end))
     print(json.dumps({"status": result["status"], "personas": len(result["personas"]),
                       "cost_usd": result["cost_usd"], "paths": result["paths"]}))
 
