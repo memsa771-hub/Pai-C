@@ -14,9 +14,8 @@ from app.pai_c.deep.notebook import NotebookService
 from app.pai_c.deep.prompts import load_prompt
 from app.pai_c.deep.sensitive import check_notebook_before_mirror
 from app.pai_c.deep.turn_input import CounselorTurnInput, shared_history
-from app.pai_c.deep.usage import usage_callback
 from app.pai_c.posting import _post_response
-from app.inference.client import chat_completion
+from app.inference.gateway import complete as chat_completion, resolve_model
 from app.jobs.service import BackgroundJobService, job_handlers
 from app.journey import JourneyService
 from app.models import BackgroundJob, EventRecord, Workspace
@@ -132,11 +131,11 @@ async def mirror_job(job, db) -> dict:
         db.rollback()
         for attempt in range(2):
             db.rollback()
-            raw = await chat_completion(
-                api_key=config.PAI_API_KEY, model=config.PAI_MIRROR_MODEL,
+            raw = await chat_completion(role="mirror",
+                api_key=config.PAI_API_KEY, model=resolve_model("mirror"),
                 system_prompt=prompt, messages=messages, response_format={"type": "json_object"},
                 reasoning_effort=config.PAI_COUNSELOR_REASONING_EFFORT, base_url=config.PAI_BASE_URL,
-                usage_callback=usage_callback("mirror", config.PAI_MIRROR_MODEL, turn.source_event_id))
+                turn_id=turn.source_event_id)
             try:
                 mirror = CounselorMirror.model_validate(json.loads(raw))
                 break

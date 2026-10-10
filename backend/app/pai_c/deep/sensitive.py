@@ -13,8 +13,7 @@ from pydantic_core import PydanticUndefined
 from app.config import config
 from app.pai_c.deep.notebook_schema import CounselorNotebookData
 from app.pai_c.deep.prompts import load_prompt
-from app.pai_c.deep.usage import usage_callback
-from app.inference.client import chat_completion
+from app.inference.gateway import complete as chat_completion, resolve_model
 
 logger = logging.getLogger(__name__)
 ChangedEntry = dict[str, str]
@@ -32,15 +31,14 @@ async def model_sensitive_checker(entries: list[ChangedEntry]) -> set[str]:
     """One model call for the batch; require one decision for every submitted path."""
     if not entries:
         return set()
-    raw = await chat_completion(
-        api_key=config.PAI_API_KEY, model=config.PAI_SENSITIVE_CHECK_MODEL,
+    raw = await chat_completion(role="sensitive",
+        api_key=config.PAI_API_KEY, model=resolve_model("sensitive"),
         messages=[{"role": "user", "content": json.dumps(entries, ensure_ascii=False)}],
         system_prompt=load_prompt("sensitive_check"),
         response_format={"type": "json_object"},
         max_tokens=config.PAI_COUNSELOR_SENSITIVE_CHECK_MAX_TOKENS,
         reasoning_effort=config.PAI_SENSITIVE_CHECK_REASONING_EFFORT,
         base_url=config.PAI_BASE_URL,
-        usage_callback=usage_callback("sensitive", config.PAI_SENSITIVE_CHECK_MODEL),
     )
     try:
         answer = json.loads(raw)
@@ -156,7 +154,7 @@ async def check_notebook_before_mirror(workspace_id: str, *, db=None,
     open during the model call.
     """
     from app.pai_c.deep.notebook import NotebookService, NotebookVersionConflict
-    from app.pai_c.deep.usage import token_usage_turn
+    from app.inference.gateway import token_usage_turn
     from app.database import new_session
 
     if db is None:

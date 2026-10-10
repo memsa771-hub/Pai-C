@@ -16,9 +16,8 @@ from app.pai_c.deep.notebook import NotebookService, NotebookVersionConflict
 from app.pai_c.deep.notebook_sanitize import sanitize_notebook
 from app.pai_c.deep.notebook_schema import CounselorNotebookData
 from app.pai_c.deep.prompts import load_prompt
-from app.pai_c.deep.usage import usage_callback
 from app.pai_c.stages import advance_discovery_stage
-from app.inference.client import chat_completion
+from app.inference.gateway import complete as chat_completion, resolve_model
 from app.jobs.service import BackgroundJobService, job_handlers
 from app.journey import JourneyService
 from app.memory.episodic import EpisodicMemoryService
@@ -146,14 +145,14 @@ async def _candidate(db, workspace_id: str, student: EventRecord,
     analyst_input = _input(db, workspace_id, student, assistant, previous.notebook)
     # Do not hold read transactions or database connections across model calls.
     db.rollback()
-    raw = await chat_completion(
-        api_key=config.PAI_API_KEY, model=config.PAI_ANALYST_MODEL,
+    raw = await chat_completion(role="analyst",
+        api_key=config.PAI_API_KEY, model=resolve_model("analyst"),
         messages=[{"role": "user", "content": analyst_input}],
         system_prompt=load_prompt("analyst"),
         response_format={"type": "json_object"},
         reasoning_effort=config.PAI_ANALYST_REASONING_EFFORT,
         base_url=config.PAI_BASE_URL,
-        usage_callback=usage_callback("analyst", config.PAI_ANALYST_MODEL, student_id),
+        turn_id=student_id,
     )
     try:
         parsed = json.loads(raw)

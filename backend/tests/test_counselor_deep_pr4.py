@@ -371,7 +371,7 @@ def test_token_usage_log_records_each_call_without_content(caplog):
     usage = SimpleNamespace(prompt_tokens=31, completion_tokens=12,
                             prompt_tokens_details=SimpleNamespace(cached_tokens=7),
                             completion_tokens_details=SimpleNamespace(reasoning_tokens=3))
-    with caplog.at_level("INFO", logger="app.pai_c.deep.usage"):
+    with caplog.at_level("INFO", logger="app.inference.gateway"):
         usage_callback("analyst", "fake-model", "turn-id")(usage)
     assert "input=31 cached_input=7 output=12 reasoning=3" in caplog.text
     assert "turn_id=turn-id" in caplog.text

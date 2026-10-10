@@ -138,6 +138,7 @@ async def chat_completion_tools(
     max_tokens: Optional[int] = None,
     base_url: Optional[str] = None,
     reasoning_effort: Optional[str] = None,
+    usage_callback: Optional[Callable[[Any], None]] = None,
 ) -> dict:
     """Return an assistant message, including normalized function calls."""
     client = create_client(api_key, base_url=base_url)
@@ -160,6 +161,8 @@ async def chat_completion_tools(
         response = await client.chat.completions.create(**kwargs)
         from app.plugins._shared.budget import record_model_usage
         record_model_usage(getattr(response, "usage", None))
+        if usage_callback is not None:
+            usage_callback(getattr(response, "usage", None))
         message = response.choices[0].message
         result: dict = {"role": "assistant", "content": message.content or ""}
         tool_calls = getattr(message, "tool_calls", None)
@@ -178,3 +181,32 @@ async def chat_completion_tools(
         return result
     finally:
         await client.close()
+
+
+def warm_sdk_imports() -> None:
+    """Import the OpenAI SDK's lazily-loaded resource modules up front.
+
+    `AsyncOpenAI.embeddings` is a cached_property that imports
+    `openai.resources.embeddings` on first ACCESS, which pulls in the whole
+    `openai.resources` package (including `.chat`). Foreground retrieval
+    reaches that attribute from the bounded worker thread while the request
+    thread may be importing `openai.resources.chat` for the chat call, and two
+    threads walking the same partially-initialized package deadlock on the
+    import lock — a real `_DeadlockError` that killed hybrid retrieval as soon
+    as the budget was large enough for it to get that far. Importing once, at
+    module load on the main thread, means neither thread imports later.
+    """
+    import logging
+    logger = logging.getLogger(__name__)
+    try:
+        import openai.resources  # noqa: F401
+    except Exception:  # SDK absent or restructured: degrade, never break import
+        logger.debug("embeddings: could not pre-import openai resources", exc_info=True)
+
+
+def create_embedding_client(api_key: str, base_url: Optional[str] = None) -> AsyncOpenAI:
+    """Keep embedding SDK defaults and the original, unnormalized endpoint."""
+    kwargs = {"api_key": api_key}
+    if base_url:
+        kwargs["base_url"] = base_url
+    return AsyncOpenAI(**kwargs)

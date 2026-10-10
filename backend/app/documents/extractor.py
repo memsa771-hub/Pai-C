@@ -176,7 +176,8 @@ def _model_config() -> tuple[str, str, Optional[str]]:
     from app.config import config
 
     api_key = getattr(config, "DOCUMENT_EXTRACTOR_API_KEY", "") or config.PAI_API_KEY
-    model = getattr(config, "DOCUMENT_EXTRACTOR_MODEL", "") or config.PAI_MODEL
+    from app.inference.gateway import resolve_model
+    model = resolve_model("document_extractor")
     base_url = (
         getattr(config, "DOCUMENT_EXTRACTOR_BASE_URL", "")
         or config.PAI_BASE_URL
@@ -436,7 +437,7 @@ async def understand_document(
     existing_records: dict,
 ) -> DocumentUnderstanding:
     """Classify and extract. Raises DocumentExtractionError on bad output."""
-    from app.inference.client import chat_completion
+    from app.inference.gateway import complete as chat_completion
 
     if not segments:
         return DocumentUnderstanding("unknown", 0.0, None, [])
@@ -451,7 +452,7 @@ async def understand_document(
     )
     from app.config import config
 
-    raw = await chat_completion(
+    raw = await chat_completion(role="document_extractor",
         api_key=api_key, model=model,
         messages=[{"role": "user", "content": prompt}],
         system_prompt=SYSTEM_PROMPT, max_tokens=8000, base_url=base_url,

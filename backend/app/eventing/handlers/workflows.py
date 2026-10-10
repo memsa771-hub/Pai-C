@@ -111,22 +111,10 @@ def _classify_task_progress(task, latest_content: str, db, workspace) -> str:
     )
 
     try:
-        from app.inference.client import _token_limit_kwarg, create_sync_client
+        from app.inference.gateway import complete_sync
 
-        client = create_sync_client(
-            config.PAI_API_KEY, base_url=config.PAI_BASE_URL or None,
-        )
-        model = _get_router_model()
-        try:
-            kwargs = {
-                "model": model,
-                "messages": [{"role": "user", "content": prompt}],
-                _token_limit_kwarg(model): 15,
-            }
-            resp = client.chat.completions.create(**kwargs)
-            raw = resp.choices[0].message.content.strip()
-        finally:
-            client.close()
+        raw = complete_sync("router", [{"role": "user", "content": prompt}],
+            api_key=config.PAI_API_KEY, base_url=config.PAI_BASE_URL or None, max_tokens=15)
         result = raw.lower()
         logger.info("Task classifier: %s (task=%s)", raw, task.id)
         if "need_input" in result:

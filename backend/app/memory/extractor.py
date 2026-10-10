@@ -23,7 +23,7 @@ from dataclasses import dataclass
 from typing import Any, Optional
 
 from app.config import config
-from app.inference.client import chat_completion
+from app.inference.gateway import complete as chat_completion, resolve_model
 
 logger = logging.getLogger(__name__)
 
@@ -205,7 +205,7 @@ def _model_config() -> tuple[str, str, Optional[str]]:
     model later without touching Counselor.
     """
     api_key = getattr(config, "MEMORY_EXTRACTOR_API_KEY", "") or config.PAI_API_KEY
-    model = getattr(config, "MEMORY_EXTRACTOR_MODEL", "") or config.PAI_MODEL
+    model = resolve_model("extractor")
     base_url = (
         getattr(config, "MEMORY_EXTRACTOR_BASE_URL", "")
         or config.PAI_BASE_URL
@@ -659,7 +659,7 @@ async def extract_candidates(
         raise ExtractionError("no extraction API key configured")
 
     specs = field_specs or [{"key": key} for key in sorted(allowed_vault_keys)]
-    raw = await chat_completion(
+    raw = await chat_completion(role="extractor",
         api_key=api_key, model=model,
         messages=[{"role": "user", "content": build_user_prompt(turn, specs)}],
         system_prompt=SYSTEM_PROMPT, max_tokens=4000, base_url=base_url,

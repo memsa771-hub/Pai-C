@@ -397,10 +397,10 @@ async def _route_with_llm(
     )
 
     try:
-        from app.inference.client import chat_completion
+        from app.inference.gateway import complete as chat_completion, resolve_model
 
-        model = _get_router_model()
-        raw_result = (await chat_completion(
+        model = resolve_model("router")
+        raw_result = (await chat_completion(role="router",
             api_key=config.PAI_API_KEY,
             model=model,
             messages=[{"role": "user", "content": prompt}],

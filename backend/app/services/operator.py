@@ -57,7 +57,7 @@ from app.config import config
 from app.database import new_session
 from app.models import ExecutionRun
 from app.services import pai
-from app.inference.client import chat_completion, chat_completion_tools
+from app.inference.gateway import complete as chat_completion, complete as chat_completion_tools, resolve_model
 
 logger = logging.getLogger(__name__)
 
@@ -634,7 +634,7 @@ async def _execute(
 
         api_key = config.PAI_API_KEY
         # Operator may run a different model from Counselor; empty reuses it.
-        model = config.PAI_OPERATOR_MODEL or config.PAI_MODEL
+        model = resolve_model("operator")
         # UNDERSTAND/PLAN/VERIFY carry no tools and honour this. The execute
         # loop below carries tools and is pinned to "none" by the provider.
         effort = config.PAI_OPERATOR_REASONING_EFFORT
@@ -690,7 +690,7 @@ async def _execute(
                 )
             else:
                 db.rollback()
-                understanding = await chat_completion(
+                understanding = await chat_completion(role="operator",
                     api_key=api_key, model=model,
                     reasoning_effort=effort,
                     messages=[{"role": "user", "content": (
@@ -720,7 +720,7 @@ async def _execute(
                 plan = list(run.plan or []) or [{"id": "objective", "title": objective, "status": "working"}]
             else:
                 db.rollback()
-                plan_raw = await chat_completion(
+                plan_raw = await chat_completion(role="operator",
                 api_key=api_key, model=model,
                 reasoning_effort=effort,
                 messages=[{"role": "user", "content": (
@@ -836,7 +836,7 @@ async def _execute(
             use_tools = tools if i < max_iters - 1 else None
             db.rollback()
             try:
-                msg = await chat_completion_tools(
+                msg = await chat_completion_tools(role="operator", tool_response=True,
                     api_key=api_key, model=model,
                     reasoning_effort=effort,
                     messages=messages, tools=use_tools,
@@ -993,7 +993,7 @@ async def _execute(
         set_status("verifying", current_step="Verifying the result")
         try:
             db.rollback()
-            verify_raw = await chat_completion(
+            verify_raw = await chat_completion(role="operator",
                 api_key=api_key, model=model,
                 reasoning_effort=effort,
                 messages=[{"role": "user", "content": (

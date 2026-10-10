@@ -11,8 +11,7 @@ from app.pai_c.deep.context import DeepContext, build_context
 from app.pai_c.deep.polish import contains_blocked_script, polish_reply
 from app.pai_c.deep.prompts import load_prompt
 from app.pai_c.deep.turn_input import CounselorTurnInput, shared_history
-from app.pai_c.deep.usage import usage_callback
-from app.inference.client import chat_completion
+from app.inference.gateway import complete as chat_completion, resolve_model
 
 logger = logging.getLogger(__name__)
 
@@ -79,13 +78,13 @@ async def run_deep_turn(db, turn: CounselorTurnInput, *,
     if instructions:
         prompt += "\n\n" + load_prompt(instructions)
     started = time.monotonic()
-    raw = await chat_completion(
-        api_key=config.PAI_API_KEY, model=config.PAI_COUNSELOR_MODEL,
+    raw = await chat_completion(role="counselor",
+        api_key=config.PAI_API_KEY, model=resolve_model("counselor"),
         messages=messages, system_prompt=prompt,
         response_format={"type": "json_object"},
         reasoning_effort=config.PAI_COUNSELOR_REASONING_EFFORT,
         base_url=config.PAI_BASE_URL,
-        usage_callback=usage_callback("counselor", config.PAI_COUNSELOR_MODEL, turn.source_event_id),
+        phase="counselor", turn_id=turn.source_event_id,
     )
     model_ms = int((time.monotonic() - started) * 1000)
     polish_started = time.monotonic()
@@ -94,13 +93,13 @@ async def run_deep_turn(db, turn: CounselorTurnInput, *,
     if contains_blocked_script(reply, config.PAI_LANGUAGE_BLOCKED_SCRIPTS):
         initial_polish_ms = int((time.monotonic() - polish_started) * 1000)
         retry_started = time.monotonic()
-        retried = await chat_completion(
-            api_key=config.PAI_API_KEY, model=config.PAI_COUNSELOR_MODEL,
+        retried = await chat_completion(role="counselor",
+            api_key=config.PAI_API_KEY, model=resolve_model("counselor"),
             messages=messages, system_prompt=prompt + "\n\n" + load_prompt("language_retry"),
             response_format={"type": "json_object"},
             reasoning_effort=config.PAI_COUNSELOR_REASONING_EFFORT,
             base_url=config.PAI_BASE_URL,
-            usage_callback=usage_callback("counselor_retry", config.PAI_COUNSELOR_MODEL, turn.source_event_id),
+            phase="counselor_retry", turn_id=turn.source_event_id,
         )
         model_ms += int((time.monotonic() - retry_started) * 1000)
         polish_started = time.monotonic()

@@ -31,13 +31,13 @@ EXTRACTION_PROMPT = (
 
 async def _extract_page(content, url, payload, comparison_fields, checked_at):
     from app.config import config
-    from app.inference.client import chat_completion
+    from app.inference.gateway import complete as chat_completion, resolve_model
     from app.plugins._shared.budget import spend, record_model_usage
     if spend("model"):
         raise ValueError("research_student_budget_exceeded")
 
-    raw = await chat_completion(
-        api_key=config.PAI_API_KEY, model=config.PAI_MODEL,
+    raw = await chat_completion(role="research_extract",
+        api_key=config.PAI_API_KEY, model=resolve_model("research_extract"),
         system_prompt=EXTRACTION_PROMPT,
         messages=[{"role": "user", "content": json.dumps({
             "country": payload["country"], "level": payload.get("level"),
