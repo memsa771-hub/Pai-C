@@ -361,3 +361,114 @@ model/provider calls were made.
    remains a later contract decision. Approval and accepted-fact paths are retained.
 4. Chosen-route deep research and the excluded PAI OS broken helpers remain deferred
    exactly as before. FigJam's other future triggers were not added in this task.
+
+
+## P1d: Memory Service, Messenger and Orchestrator
+
+### Memory ownership
+
+| Facade method | Existing implementation | Callers / ownership |
+| --- | --- | --- |
+| recent_turns | deep/turn_input.shared_history | Counselor turn, Mirror; same causal chat/voice history |
+| profile | StudentSnapshotService.build | context and confirmed-Mirror handoff; one read per context |
+| truth_map | NotebookService.get | context, Analyst, Mirror, pre-Mirror sensitive check |
+| latest_episode | EpisodicMemoryService.recent | context and Analyst |
+| agent_capabilities | permissions.capabilities_for_agent | confirmed-Mirror handoff |
+| apply_truth_map | NotebookService.apply | Analyst and sensitive check only; same validation/version locks |
+| enqueue_turn_extraction | shared memory.turn_hook | runtime after a successful human reply; unchanged candidate/reconciliation flow |
+
+No new memory store, write ownership or extraction cadence. The facade's extraction
+hook is required to remove runtime's direct shared-memory import; it queues the
+existing extractor, rather than writing Vault facts. Context retains snapshot
+profile, latest episode and notebook open threads, and removes the duplicate
+foreground block. No existing test asserted that duplicate block. A new regression
+asserts one profile read and the retained memory fields.
+
+### Input entry points
+
+| Caller | Orchestrator entry | Scheduling |
+| --- | --- | --- |
+| routers/events (chat and delegated voice) | handle_student_message | same FastAPI background task |
+| main application review | handle_student_message | same asyncio task |
+| services/workflow | handle_student_message | same thread/coroutine runner |
+| services/integrations | handle_student_message | same asyncio.run |
+| services/operator result handoff | handle_research_result | same awaited result explanation |
+| routers/roadmaps focus | handle_roadmap_discussion | same awaited deep turn and post; router keeps exception handling |
+| documents/handlers notify | handle_document_update | same queued document job and awaited post |
+
+### Outbound path
+
+Counselor runtime, Mirror, Operator result, roadmap discussion and document notify
+use posting.send_to_student -> existing private _post_response -> event pipeline,
+commit, Redis, workflow advance and integration relay. Arguments, payloads, voice
+metadata and post-commit hooks remain unchanged. Orchestrator wrappers do not change
+job scheduling or add model calls. Notifications outside this existing message
+pipeline remain unchanged: no new notification design was specified.
+
+### Checks
+
+AST ownership checks cover shared-memory dependencies, private-post imports,
+external runtime/handoff/turn imports, Truth Map write callers and Counselor-visible
+event construction. Fake-provider regressions cover argument forwarding and one
+profile read. Existing tests change only moved patch targets; existing shared-memory
+foreground tests remain intact. Model calls per ordinary turn are unchanged: one
+Counselor call (optional one blocked-script retry), background Analyst and existing
+per-turn memory extraction; sensitivity remains batched before Mirror.
+
+### P1d open questions
+
+- Generic PAI OS workflow/agent events, onboarding welcome messages and independent
+  notification producers are not rerouted: this task defines existing Counselor
+  entry points and does not specify their shared contracts.
+- Semantic retrieval has no new facade method in this task's specified API; no new
+  retrieval or memory-writing behavior is added.
+- origin/pai-os is absent; public shared services and OS contract tests are retained.
+
+### Approved shared-module signaling
+
+"Shared modules signal PAI C only by enqueueing a named job through the Task
+Runtime; they never import pai_c."
+
+The reconciler queues roadmaps.mark_stale with {workspace_id, reason} and
+idempotency key roadmap-stale:<candidate.id>, in the same transaction as the
+accepted Vault fact/student record and memory.resume_research. The owner is
+pai_c/roadmaps/jobs.py; the system capability is installed centrally by the
+existing Capability Registry. Its typed contract requires both payload fields,
+and its handler rejects a workspace that differs from the job workspace.
+
+The existing RoadmapService.mark_stale implementation is unchanged: same rows,
+stale reason, student flags, notification text and dedupe key. The accepted
+behavior change is asynchronous invalidation by the worker. Job retries on
+already-stale rows do not create another notification. No code moved into
+JourneyService, and no new queue/table/runtime was added.
+
+Tests prove one job per accepted vault_fact/student_record candidate, unchanged
+ready status until dispatch, matching stale status and notifications afterward,
+retry dedupe, transaction rollback and workspace rejection. No existing test
+asserted immediate stale status through reconciliation, so no existing expected
+behavior assertion needed changing; direct mark_stale tests remain unchanged.
+
+### P1d verification (offline)
+
+| Check | Before P1d | After P1d |
+| --- | --- | --- |
+| Full backend suite | 846 passed, 3 production-only skips, 8 subtests | 865 passed, same 3 skips, 8 subtests |
+| New spine checks | Not present | 17 passed; 2 additional system-capability parameter cases |
+| Frontend | 23 passed | 23 passed |
+| Production build | PASS | PASS |
+| Every app module imported | 248/248 | 251/251 |
+
+No real model/API calls or .env edits. Providers are fake, and the temporary test
+guard prohibits external socket connections. Full suites include PAI OS table,
+service-token and internal-escalation contract checks. Temporary offline guard and
+dependency folders are removed before the final commit. Existing tests change moved patch targets and the system-job catalog (including
+the new job's required test payload); existing behavior assertions remain. _judge
+and routers/routines.py are untouched.
+
+P1a-P1d spine complete: Model Gateway, Task Runtime/Capability Registry, Research
+Gateway/durable Operator runs, PAI C Memory Service, Orchestrator and Messenger.
+Remaining future behavior and API decisions are listed above under Open questions.
+
+Final full backend run: 170.68 seconds. The initial catalog assertion failure was
+fixed by adding the approved new capability and its required test payload; the
+final complete run is green.
