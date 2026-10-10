@@ -151,6 +151,7 @@ async def run_worker_loop(
     )
     tick = 0
     next_research_sweep = 0.0
+    next_session_sweep = 0.0
     in_flight: set[asyncio.Task] = set()
 
     try:
@@ -171,6 +172,21 @@ async def run_worker_loop(
                 except Exception:
                     db.rollback()
                     logger.exception("research verification sweep failed")
+                finally:
+                    db.close()
+
+            if time.monotonic() >= next_session_sweep:
+                interval = max(1, config.PAI_SESSION_SWEEP_SECONDS)
+                next_session_sweep = time.monotonic() + interval
+                db = new_session()
+                try:
+                    from app.runtime.task_runtime import enqueue
+                    enqueue(db, job_type="session.sweep", payload={},
+                            idempotency_key=f"session-sweep:{int(time.time()) // interval}")
+                    db.commit()
+                except Exception:
+                    db.rollback()
+                    logger.exception("session sweep enqueue failed")
                 finally:
                     db.close()
 

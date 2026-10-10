@@ -4,6 +4,7 @@ from .contract import CapabilityContract
 
 def load_system_capabilities(registry):
     from app.pai_c.deep import analysis, mirror
+    from app.pai_c import sessions
     from app.pai_c.roadmaps import jobs as roadmaps
     from app.memory import handlers as memory
     from app.research import jobs as research
@@ -13,6 +14,7 @@ def load_system_capabilities(registry):
     string = {"type": "string"}
     array = {"type": "array"}
     entries = (
+        (sessions.JOB_SWEEP, sessions.sweep_job, {}),
         (analysis.JOB_ANALYZE, analysis.analyze_job, {"user_event_id": string, "assistant_event_id": string, "source_timestamp": {"type": "number"}}),
         (mirror.JOB_MIRROR, mirror.mirror_job, {"notebook_version": {"type": "integer"}, "journey_id": string, "source_event_id": string, "channel": string, "mirror_attempt": {"type": "integer"}}),
         (mirror.JOB_RESEARCH, mirror.confirmed_research_job, {"journey_id": string, "version": {"type": "integer"}}),

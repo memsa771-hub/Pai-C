@@ -57,3 +57,53 @@ class MemoryService:
         latest = self.db.scalar(select(CounselorNotebook).where(CounselorNotebook.workspace_id == workspace_id))
         history = self.db.scalars(select(CounselorNotebookHistory).where(CounselorNotebookHistory.workspace_id == workspace_id).order_by(CounselorNotebookHistory.version)).all()
         return {"latest": export_row(latest) if latest else None, "history": [export_row(row) for row in history]}
+
+    def session_turns(self, workspace_id):
+        from sqlalchemy import select
+        from app.models import EventRecord, Workspace
+        workspace = self.db.get(Workspace, workspace_id)
+        if workspace is None:
+            return []
+        rows = self.db.scalars(select(EventRecord).where(
+            EventRecord.network_id == workspace_id,
+            EventRecord.type == "workspace.message.posted",
+            EventRecord.source.in_((f"human:{workspace.owner_user_id}", "openagents:pai")),
+        ).order_by(EventRecord.timestamp, EventRecord.id)).all()
+        return [{"id": row.id, "timestamp": row.timestamp,
+                 "role": "student" if row.source.startswith("human:") else "counselor",
+                 "content": row.payload["content"]}
+                for row in rows if isinstance((row.payload or {}).get("content"), str)
+                and row.payload["content"].strip()
+                and (row.payload or {}).get("message_type", "chat") in
+                    ("chat", "counselor_mirror", "operator_result")]
+
+    def ended_sessions(self, now_ms):
+        from sqlalchemy import select
+        from app.config import config
+        from app.models import Workspace
+        gap = max(1, config.PAI_SESSION_GAP_MINUTES) * 60_000
+        ended = []
+        for workspace_id in self.db.scalars(select(Workspace.id)):
+            turns = self.session_turns(workspace_id)
+            groups = []
+            last_student = None
+            for turn in turns:
+                if turn["role"] == "student":
+                    if last_student is None or turn["timestamp"] - last_student >= gap:
+                        groups.append([])
+                    last_student = turn["timestamp"]
+                if groups:
+                    groups[-1].append(turn)
+            covered = {event_id for row in self.session_summaries(workspace_id, limit=None)
+                       for event_id in row.source_event_ids or []}
+            for group in groups:
+                students = [row for row in group if row["role"] == "student"]
+                first, last = students[0], students[-1]
+                if now_ms - last["timestamp"] > gap and last["id"] not in covered:
+                    ended.append({"workspace_id": workspace_id,
+                                  "first_event_id": first["id"], "last_event_id": last["id"]})
+        return ended
+
+    def session_summaries(self, workspace_id, limit=2):
+        return EpisodicMemoryService(self.db).recent(
+            workspace_id, limit=limit, event_type="session_summary")
