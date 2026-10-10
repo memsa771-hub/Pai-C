@@ -107,3 +107,62 @@ class MemoryService:
     def session_summaries(self, workspace_id, limit=2):
         return EpisodicMemoryService(self.db).recent(
             workspace_id, limit=limit, event_type="session_summary")
+
+    def is_return_visit(self, workspace_id):
+        from app.config import config
+        students = [row for row in self.session_turns(workspace_id) if row["role"] == "student"]
+        return (len(students) >= 2 and students[-1]["timestamp"] - students[-2]["timestamp"]
+                > max(1, config.PAI_SESSION_GAP_MINUTES) * 60_000)
+
+    def session_input(self, workspace_id, first_event_id, last_event_id):
+        from sqlalchemy import select
+        from app.config import config
+        from app.models import CounselorNotebookHistory
+        from app.pai_c.deep.notebook_schema import CounselorNotebookData
+        turns = self.session_turns(workspace_id)
+        students = [row for row in turns if row["role"] == "student"]
+        by_id = {row["id"]: row for row in students}
+        first, last = by_id.get(first_event_id), by_id.get(last_event_id)
+        if first is None or last is None or first["timestamp"] > last["timestamp"]:
+            raise ValueError("Invalid session boundaries")
+        following = next((row for row in students if row["timestamp"] > last["timestamp"]), None)
+        upper = following["timestamp"] if following else last["timestamp"] + max(1, config.PAI_SESSION_GAP_MINUTES) * 60_000
+        selected = [row for row in turns if first["timestamp"] <= row["timestamp"] < upper]
+        ids = {row["id"] for row in selected}
+        history = self.db.scalars(select(CounselorNotebookHistory).where(
+            CounselorNotebookHistory.workspace_id == workspace_id
+        ).order_by(CounselorNotebookHistory.version)).all()
+        previous = CounselorNotebookData().model_dump(mode="json")
+        changes = []
+        for version in history:
+            current = CounselorNotebookData.model_validate(version.notebook).model_dump(mode="json")
+            if version.source_event_id in ids:
+                for key in current:
+                    if previous.get(key) != current[key]:
+                        changes.append({"version": version.version, "field": key,
+                                        "before": previous.get(key), "after": current[key]})
+            previous = current
+        return {"turns": selected, "truth_map_changes": changes}
+
+    def record_session_summary(self, workspace_id, data, turns):
+        from datetime import datetime, timezone
+        last_id = next(row["id"] for row in reversed(turns) if row["role"] == "student")
+        for episode in self.session_summaries(workspace_id, limit=None):
+            if last_id in (episode.source_event_ids or []):
+                return episode
+        # Session-specific fingerprint prevents equal summaries collapsing distinct sessions.
+        from app.memory.dedupe import episode_fingerprint
+        from app.models import PaiEpisode, Workspace
+        self.db.get(Workspace, workspace_id, with_for_update=True)
+        for episode in self.session_summaries(workspace_id, limit=None):
+            if last_id in (episode.source_event_ids or []):
+                return episode
+        summary = "; ".join(data["discussed"]) or "Session completed."
+        row = PaiEpisode(workspace_id=workspace_id, event_type="session_summary",
+            summary=summary[:1000], entities=data, importance=0.5, status="active",
+            occurred_at=datetime.fromtimestamp(turns[-1]["timestamp"] / 1000, timezone.utc),
+            source_event_ids=[turn["id"] for turn in turns],
+            fingerprint=episode_fingerprint("session_summary", last_id))
+        self.db.add(row)
+        self.db.flush()
+        return row

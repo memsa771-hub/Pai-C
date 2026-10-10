@@ -19,6 +19,7 @@ _turn_id: ContextVar[str] = ContextVar('counselor_token_turn_id', default='')
 _DEFAULT = object()
 _MODELS = {
     'counselor': ('PAI_COUNSELOR_MODEL', 'PAI_MODEL'),
+    'summarizer': ('PAI_SUMMARIZER_MODEL', 'PAI_ANALYST_MODEL', 'PAI_COUNSELOR_MODEL', 'PAI_MODEL'),
     'analyst': ('PAI_ANALYST_MODEL', 'PAI_COUNSELOR_MODEL', 'PAI_MODEL'),
     'mirror': ('PAI_MIRROR_MODEL', 'PAI_COUNSELOR_MODEL', 'PAI_MODEL'),
     'roadmap': ('PAI_ROADMAP_MODEL', 'PAI_COUNSELOR_MODEL', 'PAI_MODEL'),
@@ -34,6 +35,7 @@ _MODELS = {
 _EFFORTS = {
     'counselor': 'PAI_COUNSELOR_REASONING_EFFORT',
     'analyst': 'PAI_ANALYST_REASONING_EFFORT',
+    'summarizer': 'PAI_ANALYST_REASONING_EFFORT',
     'mirror': 'PAI_COUNSELOR_REASONING_EFFORT',
     'roadmap': 'PAI_COUNSELOR_REASONING_EFFORT',
     'sensitive': 'PAI_SENSITIVE_CHECK_REASONING_EFFORT',

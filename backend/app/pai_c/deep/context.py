@@ -134,9 +134,11 @@ async def build_context(db, workspace_id: str, turn: CounselorTurnInput, *,
     sections["notebook"] = _json(_trim_notebook(notebook))
     journey = next((item for item in JourneyService(db).list(workspace_id, status="active")
                     if item.journey_type == "counselor_decision"), None)
-    recent = MemoryService(db).latest_episode(workspace_id, limit=1)
+    memory = MemoryService(db)
+    recent = memory.session_summaries(workspace_id, limit=2) if memory.is_return_visit(workspace_id) else []
     sections["memory"] = _json({
         "latest_episode_summary": recent[0].summary[:500] if recent else None,
+        "session_summaries": [{"summary": row.summary, "entities": row.entities} for row in recent],
         "open_threads": [item.question_intent for item in notebook.open_questions[:3]],
     })
     research = _research(db, workspace_id, journey)
