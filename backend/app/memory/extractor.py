@@ -52,149 +52,30 @@ class ExtractedCandidate:
     evidence: dict
 
 
-SYSTEM_PROMPT = """\
-You extract durable facts about a student from one turn of conversation with \
-their counsellor, for a long-term student profile.
-
-Capture every clearly stated education/career fact, goal, reason, constraint,
-skill and experience that will help future counseling. A student's introduction
-can contain several important facts: do not save only their country or degree
-and miss the budget, motivation or career direction. Empty output is correct
-for a greeting or irrelevant small talk. Be conservative about INFERENCE, not
-about remembering what the student actually told PAI.
-
-STORE only durable information that will still matter weeks from now:
-- a concrete profile fact the student states about themselves
-- a stable preference, goal or constraint they express
-- a decision they made, or an action they took, with a reason
-- education, test attempts, work, projects, or goals that materially describe
-  the student's education or professional journey
-- a quoted outside suggestion or peer path as external_influence, or an own
-  interest, dislike or uncertainty as student_voice_statement. Never turn a
-  parent, friend, teacher or social-media suggestion into the student's goal
-  or primary interest unless they separately claim it as theirs.
-
-NEVER store:
-- greetings, small talk, thanks, acknowledgements
-- anything the ASSISTANT claimed, suggested or recommended, unless the student
-  explicitly adopted it in their own words
-- a hypothetical question as a committed personal goal
-- your own inferences about the student's personality or ability
-- anything already present in the existing profile or memories below, unless
-  the student is CORRECTING it
-- transient logistics ("let me check", "one moment")
-- casual entertainment preferences unrelated to education or career
-
-EVIDENCE RULE: only the student's own message is evidence. The assistant's \
-reply is provided solely to help you resolve references like "that country" or \
-"the same budget". If only the assistant said something, it is not a fact.
-
-CORRECTIONS: when the student corrects an existing value, propose the NEW value. \
-Do not try to delete or edit the old one. Set attribution.correction=true only
-when the quoted student message explicitly corrects that value, and include
-attribution.correction_quote copied exactly from the correction clause.
-
-Exploratory personal ambitions are useful: save a seriously considered path
-with commitment="exploratory" or "considering", never upgrade it to a decision.
-Capture motivations, career direction, target timing and relevant family/cost
-constraints in the record's defined details or a concise semantic memory.
-Casual movie likes do not belong in the profile; studying film or public
-service ambitions do. Understand the student's message in whatever language
-or mixture of languages they use. Preserve the original evidence quote and
-return the same canonical structure regardless of language.
-Short answers such as "Germany", "about €12k", or "AI" can state important
-constraints in an ongoing counseling conversation. Resolve their meaning from
-the preceding student messages and the question being answered. Preserve the
-currency/period only when stated or unambiguously established by that question.
-"Cost is important" expresses affordability as a constraint, not an amount.
-Do not lose these incremental answers because they are short, and do not turn
-a request for one movie into a career interest. A recommendation by PAI remains
-context only, including any research result, until the student adopts it.
-
-Use the supplied RECORD SCHEMAS as the authoritative record field list.
-If an existing record is being completed or corrected, put its exact id in
-entities.record_id and propose only changed/new fields. Do not create a fresh
-degree/job/course every time it is mentioned. A course needs an existing
-education_id from CURRENT STUDENT RECORDS; a course correction needs its
-entities.record_id. Each genuinely new test attempt gets
-its own record. When the student explicitly replaces an old goal, put the old
-goal id in entities.supersedes_record_id on the NEW goal. Parallel education
-and career goals can coexist; do not supersede one simply to add the other.
-For a goal, keep details.stated_preference (the route the student names)
-separate from details.underlying_objective (the outcome they actually want).
-Use details.drivers only for reasons the student explicitly gives, and
-details.constraints only for limits they state. A mentioned route is
-exploratory, not committed. If a later turn adds a reason or constraint to
-an existing goal, use entities.record_id and patch its details; do not create
-a duplicate goal. Do not infer a parent's preference as the student's own.
-Never invent ids. Dates can retain YYYY or YYYY-MM precision. Do not invent
-January 1, a GPA scale, expiry date or committed intake from vague timing.
-Prefer structured records for identified qualifications, attempts, experience
-and goals. An isolated GPA whose qualification cannot be identified may still
-use a registered scalar field; do not manufacture an education identity.
-
-Return ONLY a JSON object, no prose and no markdown fences:
-
-{"candidates": [ ... ]}
-
-Each candidate is one of:
-
-  {"candidate_type": "student_record", "operation": "upsert",
-   "key": "education|course|test_attempt|language_proficiency|work_experience|project|activity|exploration_experience|goal|student_voice_statement|external_influence|skill|certification|credential|research|achievement|financial_sponsor|scholarship_application|visa|application",
-   "proposed_value": <object with only stated fields>,
-   "confidence": 0.0-1.0, "quote": "<the student's exact words>",
-   "attribution": {"claim_owner": "student|external|mixed|uncertain",
-                   "student_clause_quote": "<exact own clause if mixed>"}}
-
-Use fields from the supplied schema. Preserve original qualification wording.
-Keep separate records separate. OMIT any field the student did not state:
-never write "Unknown", "N/A" or a guessed year, institution, date or score.
-The record kind (education, test_attempt, ...) is the "key". "candidate_type"
-is ALWAYS one of the four names above. "quote" and "confidence" are candidate
-fields at the top level -- never inside "proposed_value".
-
-  {"candidate_type": "vault_fact", "operation": "upsert",
-   "key": "<copy one key EXACTLY from the VAULT FIELDS list in the user message;
-           never invent or abbreviate one>",
-   "proposed_value": <value matching that field's declared type>,
-   "confidence": 0.0-1.0,
-   "quote": "<the student's exact words that state this>",
-   "attribution": {"claim_owner": "student|external|mixed|uncertain",
-                   "student_clause_quote": "<exact own clause if mixed>"}}
-
-  {"candidate_type": "semantic_memory", "operation": "upsert",
-   "content": "<one short third-person sentence about the student>",
-   "memory_type": "preference|goal|constraint|interest|context",
-   "entities": {...}, "confidence": 0.0-1.0,
-   "quote": "<the student's exact words>"}
-
-  {"candidate_type": "episode", "operation": "upsert",
-   "content": "<what the student decided or did, and why>",
-   "event_type": "<short_snake_case_label>",
-   "entities": {...}, "confidence": 0.0-1.0,
-   "quote": "<the student's exact words>"}
-
-`quote` MUST be copied from the student's message. If you cannot quote the \
-student for a candidate, do not emit that candidate.
-
-For goals, career.primary_interest, student_voice_statement, and
-external_influence, classify claim ownership from meaning, not wording. An
-outside suggestion is external even if the student reports it in first person.
-For mixed statements, split the external suggestion from the student's own
-preference into separate candidates. A student-owned candidate from a mixed
-quote must include student_clause_quote copied exactly from the student's own
-clause. Uncertain ownership never becomes a goal or preference. Only include
-student_alignment on an influence when the student explicitly expresses it;
-then include attribution.alignment_quote copied exactly from that part of the
-student's message. Preserve uncertainty as voice_type=uncertainty. Do not infer
-personality, commitment, or alignment from outside pressure.
-For a real change over time, such as moving to another city, include
-attribution.temporal_change=true and attribution.change_quote copied from the
-student's statement of the change. A contradiction without a stated change is
-not a temporal transition.
-
-If nothing is worth storing, return {"candidates": []}.
+SYSTEM_PROMPT = """You extract durable objective student facts from one counseling turn.
+The student's message is the only evidence. The assistant and earlier context only resolve references. Return JSON {"candidates": [...]} and no prose.
+Use the supplied Vault fields and record schemas. Preserve original qualification wording and reuse exact existing record ids for corrections. Propose only stated fields; never infer dates, scores, currency, institutions or commitment. Every candidate needs a quote copied from the student's message and confidence 0-1.
+Candidates: vault_fact with key/proposed_value; student_record with key/proposed_value; semantic_memory with content/memory_type; episode with content/event_type. All use candidate_type, operation upsert, quote, confidence and optional entities. Existing record patches use entities.record_id; goal replacement uses entities.supersedes_record_id. Course references need an existing education_id.
+Goals record only the student's expressed objective target: stated_preference, target_countries, degree_level, field_of_study, target_intake. Preserve exploratory/considering commitment when stated; never upgrade it. Use attribution.claim_owner student/external/mixed/uncertain; mixed goals need attribution.student_clause_quote. Outside suggestions never become student goals.
+Do not propose student_voice_statement, external_influence, career.primary_interest, or interpretive goal details. Motivations, drivers, underlying objectives, limits and career interpretations belong to the separate Truth Map, not the Vault. Do not invent personality or affiliations. Greetings and transient logistics produce no candidates.
+For explicit corrections include attribution.correction and correction_quote; for explicit changes over time include attribution.temporal_change and change_quote. Copy their evidence, never infer change from a contradiction. Dates may retain year/month precision; do not invent a date. Nothing already recorded is reproposed unless corrected. No evidence means no candidate.
 """
+
+_STOPPED_RECORD_KINDS = frozenset({"student_voice_statement", "external_influence"})
+_GOAL_TARGET_DETAILS = frozenset({"stated_preference", "target_countries", "degree_level", "field_of_study", "target_intake"})
+
+
+def _extractor_specs():
+    from copy import deepcopy
+    from .student_schema import extraction_specs
+    specs = deepcopy(extraction_specs())
+    for kind in _STOPPED_RECORD_KINDS:
+        specs.pop(kind, None)
+    details = specs.get("goal", {}).get("properties", {}).get("details", {})
+    if "properties" in details:
+        details["properties"] = {k: v for k, v in details["properties"].items() if k in _GOAL_TARGET_DETAILS}
+    return specs
+
 
 
 def _model_config() -> tuple[str, str, Optional[str]]:
@@ -227,7 +108,7 @@ def _render_field_specs(field_specs) -> str:
     lines = []
     for spec in field_specs:
         key = spec.get("key")
-        if not key:
+        if not key or key == "career.primary_interest":
             continue
         bits = [f"- {key}"]
         if spec.get("data_type"):
@@ -256,7 +137,7 @@ def build_user_prompt(turn, field_specs=None) -> str:
         parts.append(_render_field_specs(field_specs))
     from .student_schema import extraction_specs
     parts.append("RECORD SCHEMAS (new records require their required fields; existing record patches may be partial):\n"
-                 + json.dumps(extraction_specs(), ensure_ascii=False))
+                 + json.dumps(_extractor_specs(), ensure_ascii=False))
     if getattr(turn, "records", None):
         parts.append("EXISTING RECORDS (reuse the exact id when updating; do not duplicate):\n"
                      + json.dumps(turn.records, ensure_ascii=False))
@@ -482,6 +363,8 @@ def _validate(raw: dict, turn, allowed_vault_keys: set[str]) -> Optional[Extract
     raw = _coerce_proposal(raw)
 
     candidate_type = raw.get("candidate_type")
+    if raw.get("key") in _STOPPED_RECORD_KINDS or raw.get("key") == "career.primary_interest":
+        return drop("interpretation belongs to the Truth Map")
     if candidate_type not in CANDIDATE_TYPES:
         return drop(f"unknown candidate_type {candidate_type!r}")
 
@@ -532,12 +415,6 @@ def _validate(raw: dict, turn, allowed_vault_keys: set[str]) -> Optional[Extract
         if proposed is None:
             return drop(f"vault_fact {key!r} stated no actual value")
         proposed = _normalize_currencies(proposed)
-        if key == "career.primary_interest":
-            owner = validated_attribution(attribution, kind=key, quote=quote,
-                                          message=turn.user_text)
-            if not isinstance(proposed, str) or owner is None:
-                return drop("student interest lacks student-owned attribution")
-            evidence["attribution"] = owner
         # A money field of 0 is a model filling in a blank, not a figure the
         # student gave ("Cost is important" became {"amount": 0} in testing).
         # Storing it as canonical makes every affordability check wrong; no
@@ -584,6 +461,8 @@ def _validate(raw: dict, turn, allowed_vault_keys: set[str]) -> Optional[Extract
         value = _strip_placeholders(value)
         if not isinstance(value, dict) or not value:
             return drop(f"{kind} record stated no actual values")
+        if kind == "goal" and isinstance(value.get("details"), dict):
+            value = {**value, "details": {key: child for key, child in value["details"].items() if key in _GOAL_TARGET_DETAILS}}
         value = _drop_unevidenced_dates(value, turn.user_text)
         value = _normalize_currencies(value)
         if not value:
@@ -594,15 +473,6 @@ def _validate(raw: dict, turn, allowed_vault_keys: set[str]) -> Optional[Extract
             if owner is None:
                 return drop(f"{kind} lacks valid claim ownership")
             evidence["attribution"] = owner
-        if kind == "student_voice_statement":
-            if _normalize(str(value.get("statement") or "")) not in _normalize(quote):
-                return drop("student voice statement is not in its quote")
-        if kind == "external_influence":
-            if value.get("student_alignment"):
-                alignment_quote = attribution.get("alignment_quote") if isinstance(attribution, dict) else None
-                if not contained(alignment_quote, quote):
-                    return drop("influence alignment lacks a student quote")
-                evidence["attribution"]["alignment_quote"] = alignment_quote
         try:
             value = validate_record(kind, value, partial="record_id" in clean_entities)
         except MemoryDataError as exc:
