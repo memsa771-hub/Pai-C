@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 """PAI Counselor runtime for events addressed to the built-in counselor."""
 
+import asyncio
 import logging
 import time
 from typing import Optional
@@ -72,6 +73,18 @@ async def _run_turn(db, workspace_id: str, event_data: dict, depth: int) -> None
         enqueue_turn_analysis(db, workspace_id, event_data.get("id"), assistant_event_id)
 
 
+async def _check_safety(student_text, history):
+    from app.pai_c.safety.gate import check_message
+    started = time.monotonic()
+    try:
+        result = await asyncio.wait_for(check_message(student_text, history),
+            timeout=config.PAI_SAFETY_TIMEOUT_MS / 1000)
+    except Exception as exc:
+        logger.warning("safety_gate_error error_type=%s", type(exc).__name__)
+        result = None
+    return result, int((time.monotonic() - started) * 1000)
+
+
 async def _run_deep_turn(db, workspace_id: str, event_data: dict, depth: int):
     """One deep Counselor response, posted through the shared chat/voice path."""
     from app.pai_c.deep.actions import dispatch_action
@@ -102,19 +115,53 @@ async def _run_deep_turn(db, workspace_id: str, event_data: dict, depth: int):
         source=event_data.get("source") or "", voice=bool(metadata.get("voice_delegation_id")),
     )
     started = time.monotonic()
-    result = await run_deep_turn(db, turn)
+    safety = None
+    safety_ms = 0
+    if turn.source.startswith("human:"):
+        from app.pai_c.memory import MemoryService
+        from app.inference.gateway import token_usage_turn
+        owner_id = turn.source.removeprefix("human:")
+        recent = MemoryService(db).recent_turns(turn, owner_id,
+            limit=max(4, config.PAI_COUNSELOR_HISTORY_SIZE))
+        history = [{"role": row["role"], "content": row["content"]}
+                   for row in recent[-config.PAI_COUNSELOR_HISTORY_SIZE:]]
+        with token_usage_turn(turn.source_event_id):
+            checked, normal = await asyncio.gather(
+                _check_safety(turn.student_text, recent),
+                run_deep_turn(db, turn, history=history), return_exceptions=True)
+        safety, safety_ms = checked
+        result = normal
+    else:
+        result = await run_deep_turn(db, turn)
+    flagged = safety is not None and safety.level in {"concern", "urgent"}
+    fallback_reply = None
+    if flagged:
+        try:
+            result = await run_deep_turn(db, turn, history=history,
+                instructions="wellbeing", safety_level=safety.level)
+        except Exception as exc:
+            db.rollback()
+            logger.warning("wellbeing_reply_error error_type=%s", type(exc).__name__)
+            fallback_reply = config.PAI_WELLBEING_FALLBACK_REPLY
+            if config.PAI_WELLBEING_RESOURCES:
+                fallback_reply += "\n\n" + config.PAI_WELLBEING_RESOURCES
+    elif isinstance(result, BaseException):
+        raise result
+    reply = fallback_reply if fallback_reply is not None else result.reply
+    action = {"type": "wellbeing"} if flagged else result.action
+    context = None if isinstance(result, BaseException) else result.context
     from app.pai_c.deep.polish import question_count
 
-    if (question_count(result.reply) == 0
-            and result.action.get("type") not in {"mirror", "wellbeing"}):
+    if (question_count(reply) == 0
+            and action.get("type") not in {"mirror", "wellbeing"}):
         logger.info("reply_without_question turn_id=%s", turn.source_event_id)
     post_started = time.monotonic()
     reply_metadata = _voice_reply_metadata(event_data)
-    if (reply_metadata and result.action.get("type") == "mirror"
-            and result.context.notebook.mirror_ready):
+    if (reply_metadata and action.get("type") == "mirror"
+            and context.notebook.mirror_ready):
         reply_metadata["mirror_pending"] = True
     assistant_event_id = await send_to_student(
-        db, workspace_id, turn.channel, PAI_AGENT_NAME, result.reply, depth,
+        db, workspace_id, turn.channel, PAI_AGENT_NAME, reply, depth,
         metadata=reply_metadata,
     )
     post_ms = int((time.monotonic() - post_started) * 1000)
@@ -123,7 +170,7 @@ async def _run_deep_turn(db, workspace_id: str, event_data: dict, depth: int):
     move = "none"
     status = "none"
     try:
-        move, status = await dispatch_action(db, turn, result.action, result.context)
+        move, status = await dispatch_action(db, turn, action, context)
     except Exception:
         db.rollback()
         logger.exception("counselor: deep action failed after reply was posted")
@@ -135,13 +182,18 @@ async def _run_deep_turn(db, workspace_id: str, event_data: dict, depth: int):
         db.add(CounselorTurnDecision(
             workspace_id=workspace_id, source_event_id=turn.source_event_id,
             source_timestamp=turn.timestamp or int(time.time() * 1000),
-            move=move, guard_violations=[] if status != "failed" else ["action_failed"],
+            move="wellbeing" if flagged else move,
+            safety_level=safety.level if safety else None,
+            safety_category=safety.category if safety else None,
+            guard_violations=[] if status != "failed" else ["action_failed"],
         ))
         db.commit()
     logger.info(
         "counselor_deep_turn context_ms=%d model_ms=%d polish_ms=%d "
-        "post_ms=%d total_ms=%d action=%s action_status=%s",
-        result.context.build_ms, result.model_ms, result.polish_ms, post_ms,
+        "post_ms=%d safety_ms=%d total_ms=%d action=%s action_status=%s",
+        context.build_ms if context else 0,
+        result.model_ms if not isinstance(result, BaseException) else 0,
+        result.polish_ms if not isinstance(result, BaseException) else 0, post_ms, safety_ms,
         int((time.monotonic() - started) * 1000), move, status,
     )
     return assistant_event_id, turn.channel

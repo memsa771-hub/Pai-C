@@ -180,6 +180,14 @@ class Config:
     PAI_MODEL: str = os.environ.get("PAI_MODEL", "gpt-5.4-mini")
     PAI_COUNSELOR_MODEL: str = os.environ.get("PAI_COUNSELOR_MODEL", "") or PAI_MODEL
     PAI_ANALYST_MODEL: str = os.environ.get("PAI_ANALYST_MODEL", "") or PAI_COUNSELOR_MODEL
+    PAI_SAFETY_MODEL: str = os.environ.get("PAI_SAFETY_MODEL", "") or PAI_ANALYST_MODEL or PAI_MODEL
+    PAI_SAFETY_REASONING_EFFORT: str = os.environ.get("PAI_SAFETY_REASONING_EFFORT", "low")
+    PAI_SAFETY_TIMEOUT_MS: int = int(os.environ.get("PAI_SAFETY_TIMEOUT_MS", "3000"))
+    PAI_WELLBEING_RESOURCES: str = os.environ.get("PAI_WELLBEING_RESOURCES", "")
+    PAI_WELLBEING_FALLBACK_REPLY: str = os.environ.get(
+        "PAI_WELLBEING_FALLBACK_REPLY",
+        "I'm sorry you're going through this. Please reach out to someone you trust. "
+        "If you are in immediate danger, contact local emergency services.")
     PAI_MIRROR_MODEL: str = os.environ.get("PAI_MIRROR_MODEL", "") or PAI_COUNSELOR_MODEL
     PAI_ROADMAP_MODEL: str = os.environ.get("PAI_ROADMAP_MODEL", "") or PAI_COUNSELOR_MODEL
     PAI_RESEARCH_MAX_CALLS_PER_STUDENT: int = int(os.environ.get("PAI_RESEARCH_MAX_CALLS_PER_STUDENT", "40"))

@@ -129,8 +129,6 @@ class VaultFieldDefinitionService:
         definition = self.get(key)
         if definition is None:
             raise VaultFieldError(f"no enabled field definition for {key}")
-        if not definition.enabled:
-            raise VaultFieldError(f"Vault field is disabled: {key}")
 
         schema = definition.validation_schema
         if schema:

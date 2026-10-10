@@ -5,7 +5,7 @@ from pathlib import Path
 
 
 _PROMPT_DIR = Path(__file__).with_name("prompts")
-_NAMES = frozenset({"counselor", "analyst", "mirror", "roadmap_builder", "sensitive_check", "language_retry", "handoff", "session_summary"})
+_NAMES = frozenset({"counselor", "analyst", "mirror", "roadmap_builder", "sensitive_check", "language_retry", "handoff", "session_summary", "wellbeing"})
 
 
 @lru_cache(maxsize=len(_NAMES))

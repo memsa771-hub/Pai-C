@@ -11,3 +11,10 @@ def offline_memory_index():
         yield
     finally:
         index._index = previous
+
+
+@pytest.fixture(autouse=True)
+def offline_safety_model(monkeypatch):
+    from unittest.mock import AsyncMock
+    from app.pai_c.safety import gate
+    monkeypatch.setattr(gate, "complete", AsyncMock(return_value='{"level":"none","category":null}'))

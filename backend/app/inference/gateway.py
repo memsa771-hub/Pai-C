@@ -18,6 +18,7 @@ logger = logging.getLogger(__name__)
 _turn_id: ContextVar[str] = ContextVar('counselor_token_turn_id', default='')
 _DEFAULT = object()
 _MODELS = {
+    'safety': ('PAI_SAFETY_MODEL', 'PAI_ANALYST_MODEL', 'PAI_MODEL'),
     'counselor': ('PAI_COUNSELOR_MODEL', 'PAI_MODEL'),
     'summarizer': ('PAI_SUMMARIZER_MODEL', 'PAI_ANALYST_MODEL', 'PAI_COUNSELOR_MODEL', 'PAI_MODEL'),
     'analyst': ('PAI_ANALYST_MODEL', 'PAI_COUNSELOR_MODEL', 'PAI_MODEL'),
@@ -33,6 +34,7 @@ _MODELS = {
     'embeddings': ('MEMORY_EMBEDDING_MODEL',),
 }
 _EFFORTS = {
+    'safety': 'PAI_SAFETY_REASONING_EFFORT',
     'counselor': 'PAI_COUNSELOR_REASONING_EFFORT',
     'analyst': 'PAI_ANALYST_REASONING_EFFORT',
     'summarizer': 'PAI_ANALYST_REASONING_EFFORT',

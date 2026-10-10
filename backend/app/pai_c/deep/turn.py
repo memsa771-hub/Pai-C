@@ -64,7 +64,8 @@ def _parse_response(raw: str) -> tuple[str, dict]:
 async def run_deep_turn(db, turn: CounselorTurnInput, *,
                         roadmap_id: str | None = None,
                         history: list[dict] | None = None,
-                        instructions: str | None = None) -> DeepTurnResult:
+                        instructions: str | None = None,
+                        safety_level: str | None = None) -> DeepTurnResult:
     context = await build_context(db, turn.workspace_id, turn, roadmap_id=roadmap_id)
     owner_id = turn.source.removeprefix("human:") if turn.source.startswith("human:") else ""
     if history is None:
@@ -78,6 +79,10 @@ async def run_deep_turn(db, turn: CounselorTurnInput, *,
     prompt = load_prompt("counselor") + "\n\n" + context.text
     if instructions:
         prompt += "\n\n" + load_prompt(instructions)
+        if instructions == "wellbeing":
+            prompt += "\n<safety_level>" + str(safety_level or "concern") + "</safety_level>"
+            if safety_level == "urgent":
+                prompt += "\n<wellbeing_resources>" + config.PAI_WELLBEING_RESOURCES + "</wellbeing_resources>"
     started = time.monotonic()
     raw = await chat_completion(role="counselor",
         api_key=config.PAI_API_KEY, model=resolve_model("counselor"),
