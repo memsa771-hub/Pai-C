@@ -11,6 +11,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 
+from tests.truth_map_fixtures import item
 from app.config import config
 from app.pai_c.deep.actions import dispatch_action
 from app.pai_c.deep.context import DeepContext
@@ -43,8 +44,7 @@ def prepare(student, db, *, ready=True):
         timestamp=stamp))
     db.commit()
     snapshot, _ = NotebookService(db).apply(student.workspace_id, {
-        "person": {"daily_life": "I study and work on practical projects.",
-                   "current_situation": "I completed school."}, "mirror_ready": ready,
+        "said": [item("I study and work on practical projects.", key="daily_life")], "mirror_ready": ready,
     }, event_id, expected_version=0)
     service = JourneyService(db)
     journey = service.ensure_counselor(student.workspace_id)
@@ -217,7 +217,7 @@ async def test_sensitive_removal_blocks_mirror_generation():
         async def sensitive(**kwargs):
             entries = json.loads(kwargs["messages"][0]["content"])
             return json.dumps({"decisions": [{"path": item["path"],
-                "sensitive": item["path"] == "person.daily_life"} for item in entries]})
+                "sensitive": item["path"] == "said[0]"} for item in entries]})
         with patch("app.pai_c.deep.sensitive.chat_completion", AsyncMock(side_effect=sensitive)) as check, \
              patch("app.pai_c.deep.mirror.chat_completion", AsyncMock()) as model:
             assert (await mirror_job(db.get(BackgroundJob, job_id), db))["status"] == "needs_discovery"

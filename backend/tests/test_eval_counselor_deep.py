@@ -32,8 +32,8 @@ async def test_recorded_persona_runs_deep_turn_analyst_and_memory_end_to_end(tmp
     assert len(person["turns"]) == 2
     assert person["turns"][0]["reply"] == "What have you done independently with Python so far?"
     assert person["turns"][0]["model_calls"] == 3
-    assert person["notebook"]["stated_goal"]["first_said_turn"] == 1
-    assert person["notebook"]["claims"][0]["evidence_level"] == "tried"
+    assert person["notebook"]["schema_version"] == 2
+    assert next(item["level"] for item in person["notebook"]["said"] if item["key"] == "claim") == "tried"
     assert set(person["usage_by_phase"]) == {
         "counselor", "analyst", "memory_extractor"}
     assert person["metrics"]["hidden_truth_recall"] == 0.167

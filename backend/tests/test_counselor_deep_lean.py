@@ -11,6 +11,7 @@ from uuid import uuid4
 import pytest
 from sqlalchemy import select
 
+from tests.truth_map_fixtures import item
 from app.config import config
 from app.pai_c.deep.actions import dispatch_action
 from app.pai_c.deep.context import DeepContext, build_context
@@ -183,40 +184,40 @@ async def test_pre_mirror_check_batches_old_unchanged_content_and_persists_remov
     with StudentSession() as student, student.factory() as db:
         turn = source_turn(student, db)
         NotebookService(db).apply(student.workspace_id, {
-            "person": {"daily_life": "An ordinary day"}, "values": ["flagged", "retained"]
+            "said": [item("An ordinary day", key="daily_life")], "self": [item("flagged", key="value", id="v1"), item("retained", key="value", id="v2")]
         }, turn.source_event_id, expected_version=0)
         checked = []
 
         async def checker(entries):
             assert not db.in_transaction()
             checked.append(entries)
-            return {"values[0]"}
+            return {"self[0]"}
 
         snapshot, removals = await check_notebook_before_mirror(
             student.workspace_id, db=db, checker=checker)
         assert len(checked) == 1
-        assert {entry["path"] for entry in checked[0]} == {"person.daily_life", "values[0]", "values[1]"}
-        assert snapshot.notebook.values == ["retained"]
+        assert {entry["path"] for entry in checked[0]} == {"said[0]", "self[0]", "self[1]"}
+        assert [entry.value for entry in snapshot.notebook.self] == ["retained"]
         assert snapshot.notebook.mirror_ready is False
         assert snapshot.version == 2 and len(removals) == 1
-        assert NotebookService(db).get(student.workspace_id).notebook.values == ["retained"]
+        assert [entry.value for entry in NotebookService(db).get(student.workspace_id).notebook.self] == ["retained"]
 
 
 @pytest.mark.asyncio
 async def test_pre_mirror_check_refuses_a_concurrent_notebook_change():
     with StudentSession() as student, student.factory() as db:
         turn = source_turn(student, db)
-        NotebookService(db).apply(student.workspace_id, {"values": ["old"]}, turn.source_event_id)
+        NotebookService(db).apply(student.workspace_id, {"self": [item("old", key="value")]}, turn.source_event_id)
 
         async def checker(entries):
             with student.factory() as other:
-                NotebookService(other).apply(student.workspace_id, {"values": ["new"]},
+                NotebookService(other).apply(student.workspace_id, {"self": [item("new", key="value")]},
                                              turn.source_event_id, expected_version=1)
             return set()
 
         with pytest.raises(NotebookVersionConflict):
             await check_notebook_before_mirror(student.workspace_id, db=db, checker=checker)
-        assert NotebookService(db).get(student.workspace_id).notebook.values == ["new"]
+        assert [entry.value for entry in NotebookService(db).get(student.workspace_id).notebook.self] == ["new"]
 
 
 @pytest.mark.asyncio

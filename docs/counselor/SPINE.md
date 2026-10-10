@@ -472,3 +472,147 @@ Remaining future behavior and API decisions are listed above under Open question
 Final full backend run: 170.68 seconds. The initial catalog assertion failure was
 fixed by adding the approved new capability and its required test payload; the
 final complete run is green.
+
+## Truth Map v2 (P2a)
+
+### Approved decisions and ownership
+
+The PAI C Memory Service owns access to the Truth Map. The shared memory package
+remains facts-only and never imports PAI C or reads interpretation. Existing Vault
+rows remain readable; only new extractor proposals change. Research, plugins and
+Operator receive interpretation through MemoryService.understanding_summary:
+said, source, pressures, self, sure, excluding private fields. The research gateway
+builds the brief once; refresh/resume jobs use the same facade.
+
+| Part | Shape | Purpose |
+| --- | --- | --- |
+| said | Item list | Stated wishes, claims and situation |
+| shown | Item list | Demonstrated work, with evidence level |
+| source | Item list + generic category | Origins: self/family/peers/media/need/other/unknown |
+| pressures | items + people | Generic student-described roles, wishes and concerns |
+| self | Item list | Strengths, growth, drivers, values, preferences and limits |
+| sure | score/reason/would_raise/asked_at/history | 0-10 or null; every earlier rating retained |
+
+Items: id, key, value, required nonempty evidence, kind, confidence, optional
+level, first_seen, last_confirmed, active/retired status, optional vault_fact_ref.
+People additionally require evidence and both dates. Objective fact-family keys
+require a Vault reference; the Analyst prompt forbids copying objective data.
+Free-text semantic ownership is instructed by the prompt, not guessed with a
+word list. Private fields: tensions, identity_status, decision_difficulties,
+hypotheses, private_notes. Existing open_questions, mirror fields, depth,
+engagement, chapter and goal_history remain. Coach data is deferred and archived.
+
+Coverage is said/shown/source/pressures/self/sure. Data-defined requirements:
+full = all six; focused = said/shown/source/pressures/sure;
+light = said/source/sure. No daily_life prerequisite.
+One foundation_ready(truth_map), exposed by MemoryService, requires coverage.said
+AND coverage.self. Analyst stage advancement and research jobs use that function.
+
+### Migration 101 (no new tables)
+
+Both counselor_notebooks.notebook and counselor_notebook_history.notebook become
+schema_version 2. Every original JSON object is retained verbatim in legacy_v1.
+It is immutable at the write boundary, deep-copied on read, hidden from repr and
+normal serialization, excluded from context, Analyst schema/input, sensitivity,
+research and exporter. Exports expose has_legacy_v1 only. V1 input is rejected.
+Current rows lack created_at: use the earliest history.created_at for first_seen,
+or updated_at when history is absent; last_confirmed uses updated_at. Each
+history row uses its own created_at for both dates. Downgrade restores the archive
+and fails safely for new v2 rows with no v1 archive.
+
+| V1 field | V2 mapping |
+| --- | --- |
+| stated_goal.text | said/stated_goal |
+| source_of_goal | source/source_of_goal, normalized category |
+| claims | said/claim; level retained; sustained/proven also shown |
+| claim.interest_source | source/claim_source with claim text |
+| claim.probed | claim item value.probed |
+| person.current_situation/location_context/daily_life | said items with same keys |
+| strengths/growth_areas | self/strength or growth_area; confidence retained |
+| drivers | self/driver; value.text and value.weight |
+| values/learning_style/work_preferences | self/value, learning_style, work_preference |
+| constraints | self/limit; type/detail/hard retained in value |
+| family father/mother/others | pressures.people, roles father/mother/other for migration only |
+| family.pressure_level | pressures.items/family_pressure |
+| emotional_notes | private_notes |
+| hypotheses/open_questions/mirror_blockers/depth/engagement/chapter/goal_history | Retained |
+| old coverage | Recomputed from v2 parts; certainty remains unknown |
+| old mirror_ready | Cleared: v1 never established v2 certainty coverage |
+
+Source category mapping: reels -> media; friend -> peers; relative/family ->
+family; need -> need; own_experience -> self; unknown -> unknown.
+Missing migrated evidence uses exactly "migrated from v1 notebook (no evidence recorded)"
+with low confidence, kind said and null reference. New items require real nonempty
+evidence; a migration placeholder is not new evidence. Unmapped original fields
+remain only in legacy_v1: stated_goal.first_said_turn, old coverage, coach, plus
+any unknown or additional v1 fields. Original claim ids remain stable in items.
+
+Example: {claim:"Built independently", evidence_level:"proven", probed:true,
+interest_source:"own_experience"} becomes said/claim and shown/claim with
+value {text:"Built independently",probed:true}, level proven, supporting evidence,
+both dates and low confidence unless recorded; source/claim_source category self.
+The untouched original entry is also retained privately in legacy_v1.
+
+### Vault boundary and consumer scan
+
+New memory extractor proposals reject student_voice_statement,
+external_influence and career.primary_interest. Goal details keep only
+stated_preference, target_countries, degree_level, field_of_study, target_intake.
+underlying_objective/drivers/constraints/career_direction and other interpretive
+goal details are removed before validation. The prompt's supplied extraction
+schemas and Vault-field list use the same restriction. Shared record schemas and
+legacy reads are unchanged.
+
+| Reader | Change |
+| --- | --- |
+| deep/context | V2 ordered trimming; archive excluded |
+| deep/analysis | V2 schema/context, facade foundation gate |
+| deep/mirror + prompt | Existing context builder supplies v2; same mirror output contract |
+| deep/sensitive | V2 batching; private archive excluded |
+| research/gateway | Public understanding_summary; stated goal from said |
+| research/jobs | Same facade gate and summary for refresh/resume |
+| deep/roadmaps + prompt | Existing brief now carries v2 public understanding |
+| session exporter | Facade reads latest/history and emits v2 + archive flag |
+| evaluation harness | V2 replay fixtures and claim-level metrics |
+| workspace deletion | Facade lifecycle method, no direct NotebookService import |
+
+Grep found one intentional interpretive write retained: routers/roadmaps.py
+stores the student's manually added route why as details.underlying_objective.
+This is explicitly unchanged. Shared profile view/student context/snapshot,
+records, stewards, voice attribution and Vault intake retain existing-row reads,
+as required by the approved decision; none reads the Truth Map.
+
+### P2a open questions
+
+- No additional semantic checker for arbitrary item.value text was specified.
+  Structural objective-family keys are checked in code; semantic separation is
+  enforced by the Analyst instruction and evidence schema, with no keyword classifier.
+- Objective-family validation checks structural keys, not arbitrary prose.
+  Analyst profile input now includes the existing scalar Vault ids for references;
+  missing references must never be invented. No shared snapshot redesign is included.
+- Goal-history's existing source enum remains unchanged as requested. New source
+  items use the generic categories; historical source labels remain in goal_history.
+
+### P2a verification (offline)
+
+| Check | Before P2a (clean d944f40 baseline) | After P2a |
+| --- | --- | --- |
+| Full backend | 865 passed, 3 production-only skips, 8 subtests | 885 passed, same 3 skips, 8 subtests |
+| Frontend | 23 passed | 23 passed |
+| Production build | PASS | PASS |
+| All app modules imported | 251 | 252/252, no failures |
+
+The final backend run completed in 160.91 seconds. Two SQLite reflection warnings
+concern an existing expression index; migration assertions passed. Full suites
+include unchanged PAI OS decision/request tables, service-token and escalation
+contract tests. Dedicated tests cover actual Alembic conversion of both tables,
+verbatim archives, v1 rejection, schema evidence/reference requirements,
+foundation gating, all depth-mode readiness requirements, Analyst v2 output,
+sensitivity/archive separation, certainty history, interpretation ownership,
+extractor restrictions, prompt parity and v2 exports with history. Existing
+replay/storage/sensitivity assertions are ported to the new field structure.
+
+No live model calls, external test sockets, .env edits, new tables or shared
+profile redesign. Ordinary turn model-call counts are unchanged. Temporary test
+guard/dependency folders are removed before the final commit. The migration is
+verified offline; it has not been applied to the founder's local database.

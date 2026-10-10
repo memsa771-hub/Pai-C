@@ -27,9 +27,9 @@ def test_export_order_redaction_isolation_and_no_writes(tmp_path):
             metadata_={"trigger_event_id": "earlier"}, payload={"status": "recorded"}))
         db.add(CounselorTurnDecision(workspace_id=workspace, source_event_id="earlier",
             source_timestamp=10, move="note_question"))
-        db.add(CounselorNotebook(workspace_id=workspace, notebook={"note": "deployment-secret"},
+        db.add(CounselorNotebook(workspace_id=workspace, notebook={"schema_version": 2, "private_notes": "deployment-secret", "legacy_v1": {"note": "private archival payload"}},
             version=2, last_event_id="earlier"))
-        db.add(CounselorNotebookHistory(workspace_id=workspace, notebook={"note": "older"},
+        db.add(CounselorNotebookHistory(workspace_id=workspace, notebook={"schema_version": 2, "private_notes": "older", "legacy_v1": {"note": "private archival payload"}},
             version=1, source_event_id="earlier"))
         journey = StudentJourney(id="journey-export", workspace_id=workspace,
             journey_type="counselor_decision", title="Study", current_stage="MIRROR",
@@ -57,6 +57,11 @@ def test_export_order_redaction_isolation_and_no_writes(tmp_path):
         assert result["conversation"][0]["decisions"][0]["move"] == "note_question"
         assert result["notebook"]["latest"]["version"] == 2
         assert result["notebook"]["history"][0]["version"] == 1
+        for version in [result["notebook"]["latest"], *result["notebook"]["history"]]:
+            assert version["notebook"]["schema_version"] == 2
+            assert version["notebook"]["has_legacy_v1"] is True
+            assert "legacy_v1" not in version["notebook"]
+        assert "private archival payload" not in json.dumps(result)
         assert result["noted_questions"][0]["status"] == "open"
         assert result["mirror_drafts"][0]["draft"]["version"] == 2
         assert result["roadmaps"][0]["missing_facts"] == ["entry"]

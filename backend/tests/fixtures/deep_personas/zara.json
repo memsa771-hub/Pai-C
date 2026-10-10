@@ -56,13 +56,74 @@
       },
       "analyst": {
         "notebook": {
-          "person": {
-            "current_situation": "Studied in the International Baccalaureate system"
+          "schema_version": 2,
+          "said": [
+            {
+              "id": "v1:said:0",
+              "key": "stated_goal",
+              "value": "I want a famous university for international relations.",
+              "evidence": "I want a famous university for international relations.",
+              "kind": "said",
+              "confidence": "low",
+              "level": null,
+              "first_seen": "2026-01-01T00:00:00+00:00",
+              "last_confirmed": "2026-01-01T00:00:00+00:00",
+              "status": "active",
+              "vault_fact_ref": null
+            },
+            {
+              "id": "v1:said:1",
+              "key": "current_situation",
+              "value": "Studied in the International Baccalaureate system",
+              "evidence": "I want a famous university for international relations.",
+              "kind": "said",
+              "confidence": "low",
+              "level": null,
+              "first_seen": "2026-01-01T00:00:00+00:00",
+              "last_confirmed": "2026-01-01T00:00:00+00:00",
+              "status": "active",
+              "vault_fact_ref": null
+            }
+          ],
+          "shown": [],
+          "source": [
+            {
+              "id": "v1:source:0",
+              "key": "source_of_goal",
+              "value": "I want a famous university for international relations.",
+              "evidence": "I want a famous university for international relations.",
+              "kind": "said",
+              "confidence": "low",
+              "level": null,
+              "first_seen": "2026-01-01T00:00:00+00:00",
+              "last_confirmed": "2026-01-01T00:00:00+00:00",
+              "status": "active",
+              "vault_fact_ref": null,
+              "category": "unknown"
+            }
+          ],
+          "pressures": {
+            "items": [],
+            "people": []
           },
-          "stated_goal": {
-            "text": "I want a famous university for international relations.",
-            "first_said_turn": 1
-          }
+          "self": [],
+          "sure": {
+            "score": null,
+            "reason": "",
+            "would_raise": "",
+            "asked_at": null,
+            "history": []
+          },
+          "private_notes": "",
+          "coverage": {
+            "said": true,
+            "shown": false,
+            "source": true,
+            "self": false,
+            "pressures": false,
+            "sure": false
+          },
+          "mirror_ready": false
         }
       },
       "sensitive_flagged_paths": [],

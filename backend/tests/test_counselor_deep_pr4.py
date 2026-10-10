@@ -9,6 +9,7 @@ from uuid import uuid4
 import pytest
 from sqlalchemy import select
 
+from tests.truth_map_fixtures import item, v2_fixture
 from app.config import config
 from app.pai_c import runtime
 from app.pai_c.deep.analysis import (
@@ -45,7 +46,7 @@ def _turn_job(student, db, text="A private student statement"):
 
 
 def _model_notebook(**updates):
-    return json.dumps({"notebook": {**CounselorNotebookData().model_dump(mode="json"), **updates}})
+    return json.dumps({"notebook": {**CounselorNotebookData().model_dump(mode="json"), **v2_fixture(**updates)}})
 
 
 async def _no_sensitive(_previous, candidate):
@@ -65,7 +66,7 @@ async def test_analysis_is_idempotent_and_workspace_scoped():
         assert first["version"] == 1
         assert again["status"] == "duplicate"
         assert model.await_count == 1
-        assert NotebookService(db).get(student.workspace_id).notebook.person.daily_life == "Studies at home"
+        assert NotebookService(db).get(student.workspace_id).notebook.said[0].value == "Studies at home"
         assert "<notebook_schema>" in model.call_args.kwargs["messages"][0]["content"]
         assert "<profile>" in model.call_args.kwargs["messages"][0]["content"]
         assert "<transcript>" in model.call_args.kwargs["messages"][0]["content"]
@@ -209,7 +210,7 @@ async def test_retry_finishes_stage_after_notebook_was_saved():
     with StudentSession() as student, student.factory() as db:
         job, _ = _turn_job(student, db)
         model = AsyncMock(return_value=_model_notebook(
-            coverage={"person": True, "education": True}))
+            coverage={"said": True, "self": True}))
         from app.pai_c.deep.analysis import _advance_stage
 
         calls = 0
@@ -238,7 +239,7 @@ async def test_analyst_coverage_advances_foundation_without_starting_research():
     with StudentSession() as student, student.factory() as db:
         job, _ = _turn_job(student, db)
         model = AsyncMock(return_value=_model_notebook(
-            coverage={"person": True, "education": True}, mirror_ready=True))
+            coverage={"said": True, "self": True}, mirror_ready=True))
         with patch("app.pai_c.deep.analysis.chat_completion", model):
             await analyze_job(job, db)
         notebook = NotebookService(db).get(student.workspace_id).notebook
@@ -277,24 +278,24 @@ async def test_sensitive_content_is_dropped_before_mirror(caplog):
                 caplog.at_level("INFO", logger="app.pai_c.deep.sensitive"):
             result = await analyze_job(job, db)
             assert result["sensitive_removed"] == 0
-            assert len(NotebookService(db).get(student.workspace_id).notebook.claims) == 2
+            assert len(NotebookService(db).get(student.workspace_id).notebook.said) == 2
             snapshot, removals = await check_notebook_before_mirror(
                 student.workspace_id, db=db, checker=checker)
-        assert len(removals) == 1
-        assert [claim.id for claim in snapshot.notebook.claims] == ["b"]
-        assert "claims[0]" in caplog.text
+        assert len(removals) == 2
+        assert [claim.id for claim in snapshot.notebook.said] == ["b"]
+        assert "said[0]" in caplog.text
         assert "private flagged text" not in caplog.text
 
 
 
 @pytest.mark.asyncio
 async def test_sensitive_check_uses_configured_model():
-    model = AsyncMock(return_value='{"decisions":[{"path":"claims[0]","sensitive":false}]}')
+    model = AsyncMock(return_value='{"decisions":[{"path":"said[0]","sensitive":false}]}')
     with patch.object(config, "PAI_SENSITIVE_CHECK_MODEL", "configured-checker"), \
             patch.object(config, "PAI_SENSITIVE_CHECK_REASONING_EFFORT", "low"), \
             patch.object(config, "PAI_COUNSELOR_SENSITIVE_CHECK_MAX_TOKENS", 4096), \
             patch("app.pai_c.deep.sensitive.chat_completion", model):
-        assert await model_sensitive_checker([{"path": "claims[0]", "text": "a changed entry"}]) == set()
+        assert await model_sensitive_checker([{"path": "said[0]", "text": "a changed entry"}]) == set()
     assert model.call_args.kwargs["model"] == "configured-checker"
     assert model.call_args.kwargs["reasoning_effort"] == "low"
     assert model.call_args.kwargs["max_tokens"] == 4096
@@ -316,9 +317,9 @@ async def test_no_sensitive_call_per_analysis_and_one_batch_before_mirror():
         async def sensitive_response(**kwargs):
             entries = json.loads(kwargs["messages"][0]["content"])
             assert {entry["path"] for entry in entries} >= {
-                "person.daily_life", "claims[0]", "claims[1]"}
+                "said[2]", "said[0]", "said[1]"}
             return json.dumps({"decisions": [
-                {"path": entry["path"], "sensitive": entry["path"] == "claims[0]"}
+                {"path": entry["path"], "sensitive": entry["path"] == "said[0]"}
                 for entry in entries]})
 
         analyst = AsyncMock(return_value=raw)
@@ -332,18 +333,17 @@ async def test_no_sensitive_call_per_analysis_and_one_batch_before_mirror():
         assert sensitive.await_count == 1
         assert result["sensitive_removed"] == 0
         assert len(removals) == 1
-        assert [claim.id for claim in NotebookService(db).get(student.workspace_id).notebook.claims] == ["b"]
+        assert [claim.id for claim in NotebookService(db).get(student.workspace_id).notebook.said if claim.key == "claim"] == ["b"]
 
 
 @pytest.mark.asyncio
 async def test_prepend_to_five_item_list_checks_only_new_entry():
     def claim(index):
-        return {"id": str(index), "claim": f"Activity {index}",
-                "evidence_level": "claimed", "evidence": f"Statement {index}"}
+        return item(f"Activity {index}", id=str(index), level="claimed", evidence=f"Statement {index}")
 
     prior = [claim(index) for index in range(5)]
-    previous = CounselorNotebookData.model_validate({"claims": prior})
-    candidate = CounselorNotebookData.model_validate({"claims": [claim(5), *prior]})
+    previous = CounselorNotebookData.model_validate({"said": prior})
+    candidate = CounselorNotebookData.model_validate({"said": [claim(5), *prior]})
     checked = []
 
     async def fake_checker(entries):
@@ -351,16 +351,16 @@ async def test_prepend_to_five_item_list_checks_only_new_entry():
         return set()
 
     cleaned, removals = await filter_sensitive_changes(previous, candidate, fake_checker)
-    assert checked == [{"path": "claims[0]", "text": json.dumps(
-        candidate.claims[0].model_dump(mode="json"), ensure_ascii=False, separators=(",", ":"))}]
-    assert len(cleaned.claims) == 6
+    assert checked == [{"path": "said[0]", "text": json.dumps(
+        candidate.said[0].model_dump(mode="json"), ensure_ascii=False, separators=(",", ":"))}]
+    assert len(cleaned.said) == 6
     assert removals == []
 
 
 @pytest.mark.asyncio
 async def test_batched_sensitive_decisions_must_cover_exactly_the_submitted_paths():
     entries = [{"path": "person.daily_life", "text": "an entry"},
-               {"path": "claims[0]", "text": "another entry"}]
+               {"path": "said[0]", "text": "another entry"}]
     with patch("app.pai_c.deep.sensitive.chat_completion", new=AsyncMock(
             return_value='{"decisions":[{"path":"person.daily_life","sensitive":false}]}')):
         with pytest.raises(ValueError, match="omitted"):
@@ -396,9 +396,9 @@ async def test_chat_completion_invokes_per_call_usage_callback():
 
 
 @pytest.mark.parametrize("mode,keys", [
-    ("full", ("person", "education", "claims_probed", "proven_interests", "family", "real_why", "constraints", "goal_tested")),
-    ("focused", ("person", "education", "real_why", "family", "constraints", "goal_tested")),
-    ("light", ("person", "education", "real_why", "constraints")),
+    ("full", ("said", "shown", "source", "pressures", "self", "sure")),
+    ("focused", ("said", "shown", "source", "pressures", "sure")),
+    ("light", ("said", "source", "sure")),
 ])
 def test_mirror_ready_is_forced_false_until_configured_coverage_is_complete(mode, keys):
     missing = CounselorNotebookData.model_validate({

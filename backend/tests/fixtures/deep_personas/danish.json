@@ -56,22 +56,104 @@
       },
       "analyst": {
         "notebook": {
-          "person": {
-            "current_situation": "Studied in the ICS system"
-          },
-          "stated_goal": {
-            "text": "I want to become an AI engineer and study in Canada.",
-            "first_said_turn": 1
-          },
-          "claims": [
+          "schema_version": 2,
+          "said": [
             {
-              "id": "python-experience",
-              "claim": "Learned Python",
-              "evidence_level": "claimed",
+              "id": "v1:said:0",
+              "key": "stated_goal",
+              "value": "I want to become an AI engineer and study in Canada.",
+              "evidence": "I want to become an AI engineer and study in Canada. I have learned Python.",
+              "kind": "said",
+              "confidence": "low",
+              "level": null,
+              "first_seen": "2026-01-01T00:00:00+00:00",
+              "last_confirmed": "2026-01-01T00:00:00+00:00",
+              "status": "active",
+              "vault_fact_ref": null
+            },
+            {
+              "id": "v1:said:1",
+              "key": "claim",
+              "value": {
+                "text": "Learned Python",
+                "probed": false
+              },
               "evidence": "Student said they learned Python",
-              "probed": false
+              "kind": "said",
+              "confidence": "low",
+              "level": "claimed",
+              "first_seen": "2026-01-01T00:00:00+00:00",
+              "last_confirmed": "2026-01-01T00:00:00+00:00",
+              "status": "active",
+              "vault_fact_ref": null
+            },
+            {
+              "id": "v1:said:2",
+              "key": "current_situation",
+              "value": "Studied in the ICS system",
+              "evidence": "I want to become an AI engineer and study in Canada. I have learned Python.",
+              "kind": "said",
+              "confidence": "low",
+              "level": null,
+              "first_seen": "2026-01-01T00:00:00+00:00",
+              "last_confirmed": "2026-01-01T00:00:00+00:00",
+              "status": "active",
+              "vault_fact_ref": null
             }
-          ]
+          ],
+          "shown": [],
+          "source": [
+            {
+              "id": "v1:source:0",
+              "key": "source_of_goal",
+              "value": "I want to become an AI engineer and study in Canada.",
+              "evidence": "I want to become an AI engineer and study in Canada. I have learned Python.",
+              "kind": "said",
+              "confidence": "low",
+              "level": null,
+              "first_seen": "2026-01-01T00:00:00+00:00",
+              "last_confirmed": "2026-01-01T00:00:00+00:00",
+              "status": "active",
+              "vault_fact_ref": null,
+              "category": "unknown"
+            },
+            {
+              "id": "v1:source:1",
+              "key": "claim_source",
+              "value": "Learned Python",
+              "evidence": "Student said they learned Python",
+              "kind": "said",
+              "confidence": "low",
+              "level": "claimed",
+              "first_seen": "2026-01-01T00:00:00+00:00",
+              "last_confirmed": "2026-01-01T00:00:00+00:00",
+              "status": "active",
+              "vault_fact_ref": null,
+              "category": "unknown"
+            }
+          ],
+          "pressures": {
+            "items": [],
+            "people": []
+          },
+          "self": [],
+          "sure": {
+            "score": null,
+            "reason": "",
+            "would_raise": "",
+            "asked_at": null,
+            "history": []
+          },
+          "private_notes": "",
+          "coverage": {
+            "said": true,
+            "shown": false,
+            "source": true,
+            "self": false,
+            "pressures": false,
+            "sure": false
+          },
+          "mirror_ready": false
         }
       },
       "sensitive_flagged_paths": [],
@@ -119,22 +201,104 @@
       },
       "analyst": {
         "notebook": {
-          "person": {
-            "current_situation": "Studied in the ICS system"
-          },
-          "stated_goal": {
-            "text": "I want to become an AI engineer and study in Canada.",
-            "first_said_turn": 1
-          },
-          "claims": [
+          "schema_version": 2,
+          "said": [
             {
-              "id": "python-experience",
-              "claim": "Started learning Python through a course",
-              "evidence_level": "tried",
+              "id": "v1:said:0",
+              "key": "stated_goal",
+              "value": "I want to become an AI engineer and study in Canada.",
+              "evidence": "I watched about half a Python course and only copied the examples; I have not built anything alone.",
+              "kind": "said",
+              "confidence": "low",
+              "level": null,
+              "first_seen": "2026-01-01T00:00:00+00:00",
+              "last_confirmed": "2026-01-01T00:00:00+00:00",
+              "status": "active",
+              "vault_fact_ref": null
+            },
+            {
+              "id": "v1:said:1",
+              "key": "claim",
+              "value": {
+                "text": "Started learning Python through a course",
+                "probed": true
+              },
               "evidence": "Watched about half and copied examples; no independent project",
-              "probed": true
+              "kind": "said",
+              "confidence": "low",
+              "level": "tried",
+              "first_seen": "2026-01-01T00:00:00+00:00",
+              "last_confirmed": "2026-01-01T00:00:00+00:00",
+              "status": "active",
+              "vault_fact_ref": null
+            },
+            {
+              "id": "v1:said:2",
+              "key": "current_situation",
+              "value": "Studied in the ICS system",
+              "evidence": "I watched about half a Python course and only copied the examples; I have not built anything alone.",
+              "kind": "said",
+              "confidence": "low",
+              "level": null,
+              "first_seen": "2026-01-01T00:00:00+00:00",
+              "last_confirmed": "2026-01-01T00:00:00+00:00",
+              "status": "active",
+              "vault_fact_ref": null
             }
-          ]
+          ],
+          "shown": [],
+          "source": [
+            {
+              "id": "v1:source:0",
+              "key": "source_of_goal",
+              "value": "I want to become an AI engineer and study in Canada.",
+              "evidence": "I watched about half a Python course and only copied the examples; I have not built anything alone.",
+              "kind": "said",
+              "confidence": "low",
+              "level": null,
+              "first_seen": "2026-01-01T00:00:00+00:00",
+              "last_confirmed": "2026-01-01T00:00:00+00:00",
+              "status": "active",
+              "vault_fact_ref": null,
+              "category": "unknown"
+            },
+            {
+              "id": "v1:source:1",
+              "key": "claim_source",
+              "value": "Started learning Python through a course",
+              "evidence": "Watched about half and copied examples; no independent project",
+              "kind": "said",
+              "confidence": "low",
+              "level": "tried",
+              "first_seen": "2026-01-01T00:00:00+00:00",
+              "last_confirmed": "2026-01-01T00:00:00+00:00",
+              "status": "active",
+              "vault_fact_ref": null,
+              "category": "unknown"
+            }
+          ],
+          "pressures": {
+            "items": [],
+            "people": []
+          },
+          "self": [],
+          "sure": {
+            "score": null,
+            "reason": "",
+            "would_raise": "",
+            "asked_at": null,
+            "history": []
+          },
+          "private_notes": "",
+          "coverage": {
+            "said": true,
+            "shown": false,
+            "source": true,
+            "self": false,
+            "pressures": false,
+            "sure": false
+          },
+          "mirror_ready": false
         }
       },
       "sensitive_flagged_paths": [],
