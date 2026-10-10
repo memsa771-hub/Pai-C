@@ -31,3 +31,7 @@ def enforce_mirror_readiness(notebook: CounselorNotebookData) -> CounselorNotebo
     if notebook.mirror_ready and any(not coverage[key] for key in required):
         return notebook.model_copy(update={"mirror_ready": False})
     return notebook
+
+
+def foundation_ready(truth_map: CounselorNotebookData) -> bool:
+    return bool(truth_map.coverage.said and truth_map.coverage.self)
