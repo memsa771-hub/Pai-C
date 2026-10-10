@@ -65,14 +65,16 @@ async def test_delegation_returns_while_execution_is_still_waiting():
         with patch.object(operator, "_execute", slow), patch.object(operator, "is_available", return_value=True):
             result = await asyncio.wait_for(operator.delegate(ctx, "Research programs", {}, None,
                                                              "study_abroad_matching"), 0.5)
-            await asyncio.wait_for(started.wait(), 0.5)
+            assert not started.is_set()
             assert result["ok"] and not release.is_set()
             with student.factory() as db:
                 run = db.get(ExecutionRun, result["data"]["run_id"])
                 assert run.context_refs == ["vault", "memory", "episodes"]
                 assert run.constraints["student_intent"] == "study_abroad_matching"
             release.set()
-            await asyncio.gather(*list(operator._running_tasks))
+            with student.factory() as db:
+                job = db.scalar(select(BackgroundJob).where(BackgroundJob.job_type == "operator.run"))
+                assert job.payload["run_id"] == result["data"]["run_id"]
 
 
 @pytest.mark.asyncio

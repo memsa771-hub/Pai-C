@@ -7,7 +7,7 @@ def load_system_capabilities(registry):
     from app.memory import handlers as memory
     from app.research import jobs as research
     from app.documents import handlers as documents
-    from app.services.operator import run_agent_job
+    from app.services.operator import run_operator_job
 
     string = {"type": "string"}
     array = {"type": "array"}
@@ -29,10 +29,10 @@ def load_system_capabilities(registry):
         (documents.JOB_DOCUMENT_NOTIFY, documents.notify_document_job, {"file_id": string}),
     )
     registry.register(CapabilityContract(
-        id="agent.run", version="1.0.0", name="Agent loop",
-        description="Internal open-ended Operator loop", kind="system",
+        id="operator.run", version="1.0.0", name="Operator run",
+        description="Internal durable Operator workflow or agent run", kind="system",
         input_schema={"type": "object", "properties": {"run_id": string}, "required": ["run_id"]},
-        output_schema={"type": "object"}, handler=run_agent_job,
+        output_schema={"type": "object"}, handler=run_operator_job,
     ))
     for job_type, handler, properties in entries:
         registry.register(CapabilityContract(

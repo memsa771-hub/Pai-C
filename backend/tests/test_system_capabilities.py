@@ -141,4 +141,4 @@ def test_every_enqueued_job_type_has_system_contract():
                 raise AssertionError(f"Unreviewed enqueue type in {path}")
             assert get_capability_registry().get(argument).kind == "system", str(path)
             seen.add(argument)
-    assert seen == set(JOB_TYPES)
+    assert seen == set(JOB_TYPES) | {"operator.run"}

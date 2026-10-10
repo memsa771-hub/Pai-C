@@ -2132,7 +2132,7 @@ class DocumentArtifact(Base):
 class BackgroundJob(Base):
     """Durable work queue. Deliberately generic — not a memory-only table.
 
-    PAI Operator uses `asyncio.create_task()`, which loses work on restart.
+    PAI Operator uses this same durable queue so work survives restart.
     That is acceptable for a run whose status the user is watching; it is not
     acceptable for memory formation, where silent loss means the student's
     profile quietly drifts from what they told us.

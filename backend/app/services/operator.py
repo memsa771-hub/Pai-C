@@ -75,7 +75,6 @@ STATUS_NEEDS_USER_ACTION = "needs_user_action"
 STATUS_FAILED = "failed"
 _TERMINAL = frozenset({STATUS_COMPLETED, STATUS_FAILED})
 _OUTCOMES = frozenset({STATUS_COMPLETED, STATUS_NEEDS_USER_ACTION, STATUS_FAILED})
-_running_tasks: set[asyncio.Task] = set()
 
 OPERATOR_SYSTEM_PROMPT = """\
 You are PAI Operator, Placement AI's internal execution intelligence.
@@ -455,6 +454,9 @@ async def delegate(ctx, objective: str, constraints: Optional[dict], context_ref
             ExecutionRun.status.notin_(_TERMINAL),
         ).order_by(ExecutionRun.created_at.desc()).limit(1)).scalar_one_or_none()
         if existing is not None and (existing.constraints or {}) == constraints:
+            if existing.status != STATUS_NEEDS_USER_ACTION:
+                _enqueue_run(db, existing)
+                db.commit()
             return {"ok": True, "data": {"run_id": existing.id, "status": existing.status,
                                           "objective": objective, "already_running": True}}
         run = ExecutionRun(
@@ -469,21 +471,14 @@ async def delegate(ctx, objective: str, constraints: Optional[dict], context_ref
             current_step="Queued",
         )
         db.add(run)
+        db.flush()
+        _enqueue_run(db, run)
         db.commit()
         db.refresh(run)
         run_id = run.id
         data = {"run_id": run_id, "status": run.status, "objective": objective, "task_type": task_type}
     finally:
         db.close()
-
-    # Fire-and-forget: the request/tool-call that got us here returns well
-    # before this finishes. `ctx.api` is a stateless per-call HTTP client
-    # (just workspace_id + token), safe to keep using from the background task.
-    task = asyncio.create_task(
-        _execute(run_id, ctx.workspace_id, ctx.api, objective, constraints or {}, context_refs or [], channel_target)
-    )
-    _running_tasks.add(task)
-    task.add_done_callback(_running_tasks.discard)
 
     return {"ok": True, "data": data}
 
@@ -586,21 +581,17 @@ async def resume(ctx, run_id: str, action: dict) -> dict:
                 return {"ok": False, "error": {"code": "action_incomplete", "message": str(exc)}}
             if not resolution.get("resolved"):
                 return {"ok": False, "error": {"code": "conflict_unresolved", "message": str(resolution.get("reason") or "profile conflict remains unresolved")}}
-        run.resume_input = {"pending_action": pending, "response": action, "received_at": _now().isoformat()}
+        resume_count = int((run.resume_input or {}).get("resume_count", 0)) + 1
+        run.resume_input = {"pending_action": pending, "response": action,
+                            "received_at": _now().isoformat(), "resume_count": resume_count}
         run.pending_action = None
         run.status = "pending"
         run.current_step = "Resuming with the student's response"
         run.completed_at = None
+        _enqueue_run(db, run)
         db.commit()
-        objective, constraints, context_refs, target = run.objective, run.constraints or {}, run.context_refs or [], run.channel_target
     finally:
         db.close()
-    task = asyncio.create_task(_execute(
-        run_id, ctx.workspace_id, ctx.api, objective, constraints, context_refs, target,
-        resume_payload=action,
-    ))
-    _running_tasks.add(task)
-    task.add_done_callback(_running_tasks.discard)
     return {"ok": True, "data": {"run_id": run_id, "status": "pending", "resumed": True}}
 
 
@@ -612,7 +603,6 @@ async def _execute(
     run_id: str, workspace_id: str, api: Any,
     objective: str, constraints: dict, context_refs: list,
     channel_target: Optional[str] = None, resume_payload: Optional[dict] = None,
-    *, _agent_only: bool = False,
 ) -> None:
     db = new_session()
     try:
@@ -637,7 +627,7 @@ async def _execute(
         from app.capabilities.execution_policy import resolve_run_policy
         workflow_policy = resolve_run_policy(get_capability_registry(), run.task_type, run.resume_input)
         capability_input = (run.constraints or {}).get("capability_input")
-        if not _agent_only and workflow_policy.owner and isinstance(capability_input, dict):
+        if workflow_policy.owner and isinstance(capability_input, dict):
             await _execute_workflow(db, run, api, workflow_policy, capability_input, set_status)
             return
 
@@ -1193,23 +1183,35 @@ async def _execute_workflow(db, run, api, policy, capability_input, set_status):
                        _terminal_message(status, summary, verification["missing"], verification))
 
 
-async def run_agent_job(job, db):
-    """System capability adapter to the unchanged open-ended loop."""
+async def run_operator_job(job, db):
+    """Durable adapter: existing run policy chooses workflow or agent execution."""
     from app.models import Workspace
     run = db.get(ExecutionRun, (job.payload or {}).get("run_id"))
     if run is None or run.workspace_id != job.workspace_id:
         raise LookupError("Execution run is unavailable in this workspace")
-    if run.status in _TERMINAL:
+    if run.status in _TERMINAL or run.status == STATUS_NEEDS_USER_ACTION:
         return {"run_id": run.id, "status": run.status}
+    if getattr(job, "idempotency_key", None) not in (None, _run_job_key(run)):
+        return {"run_id": run.id, "status": "superseded"}
     workspace = db.get(Workspace, job.workspace_id)
     if workspace is None:
         raise LookupError("Workspace is unavailable")
     args = (run.id, run.workspace_id, pai.WorkspaceApi(workspace.id, workspace.password_hash),
             run.objective, run.constraints or {}, run.context_refs or [], run.channel_target)
-    resume_payload = run.resume_input or None
+    resume_payload = (run.resume_input or {}).get("response")
     db.rollback()
-    await _execute(*args, resume_payload=resume_payload,
-                   _agent_only=True)
+    await _execute(*args, resume_payload=resume_payload)
     db.expire_all()
     run = db.get(ExecutionRun, job.payload["run_id"])
     return {"run_id": run.id, "status": run.status}
+
+
+def _run_job_key(run):
+    count = int((run.resume_input or {}).get("resume_count", 0))
+    return f"operator:{run.id}:resume:{count}"
+
+
+def _enqueue_run(db, run):
+    from app.runtime.task_runtime import enqueue
+    return enqueue(db, "operator.run", {"run_id": run.id},
+                   workspace_id=run.workspace_id, idempotency_key=_run_job_key(run))

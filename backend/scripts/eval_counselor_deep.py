@@ -430,8 +430,13 @@ async def complete_mirror_pipeline(student):
         research_id=enqueue_confirmed_research(db,student.workspace_id,journey);db.commit()
         with phase('light_research'):
             await confirmed_research_job(db.get(BackgroundJob,research_id),db)
-            tasks=list(operator._running_tasks)
-            if tasks: await asyncio.gather(*tasks)
+            from app.runtime.task_runtime import run as dispatch_job
+            operator_jobs=db.scalars(select(BackgroundJob).where(
+                BackgroundJob.workspace_id==student.workspace_id,
+                BackgroundJob.job_type=='operator.run',BackgroundJob.status=='pending')).all()
+            for operator_job in operator_jobs:
+                await dispatch_job(operator_job,db)
+                operator_job.status='succeeded';db.commit()
         db.expire_all()
         rows=db.scalars(select(Roadmap).where(Roadmap.workspace_id==student.workspace_id)).all()
         result['roadmaps']=[{'lane':row.lane,'title':row.title,'status':row.generation_status,

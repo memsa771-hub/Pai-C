@@ -38,7 +38,7 @@ async def test_workflow_checked_invocation_zero_operator_calls_same_run_and_resu
         seen.append((context, payload))
         return {"summary": "Done", "artifacts": [{"id": "artifact"}], "pending_action": None}
     hook = Mock()
-    registry = CapabilityRegistry(); registry.register(owner(handler, run_status_hook=hook))
+    registry = workflow_registry(); registry.register(owner(handler, run_status_hook=hook))
     with StudentSession() as student:
         run_id = create_run(student)
         with patch.object(capability_module, "_registry", registry), \
@@ -68,7 +68,7 @@ async def test_workflow_checked_invocation_zero_operator_calls_same_run_and_resu
 @pytest.mark.asyncio
 async def test_workflow_approval_resume_uses_same_row_and_permission_path():
     handler = AsyncMock(return_value={"summary": "Approved work done"})
-    registry = CapabilityRegistry(); registry.register(owner(handler, approval="always"))
+    registry = workflow_registry(); registry.register(owner(handler, approval="always"))
     with StudentSession() as student:
         run_id = create_run(student)
         with patch.object(capability_module, "_registry", registry), \
@@ -85,7 +85,7 @@ async def test_workflow_approval_resume_uses_same_row_and_permission_path():
                 assert run.pending_action["capability_id"] == "example.workflow"
             resumed = await operator.resume(ToolContext(student.workspace_id, "pai", object()), run_id, {"approved": True})
             assert resumed["data"]["run_id"] == run_id and resumed["data"]["resumed"] is True
-            await asyncio.gather(*list(operator._running_tasks))
+            await dispatch_queued(student)
             handler.assert_awaited_once()
             with student.factory() as db:
                 run = db.get(ExecutionRun, run_id)
@@ -100,7 +100,7 @@ async def test_workflow_approval_resume_uses_same_row_and_permission_path():
     {"type": "need_from_student", "items": [{"field": "education.level", "reason": "Need level"}]},
 ])
 async def test_workflow_capability_pending_action_pauses_without_model(pending):
-    registry = CapabilityRegistry(); registry.register(owner(AsyncMock(return_value={"pending_action": pending})))
+    registry = workflow_registry(); registry.register(owner(AsyncMock(return_value={"pending_action": pending})))
     with StudentSession() as student:
         run_id = create_run(student)
         with patch.object(capability_module, "_registry", registry), \
@@ -122,7 +122,7 @@ async def test_workflow_capability_pending_action_pauses_without_model(pending):
 @pytest.mark.parametrize("changes", [{}, {"permissions": {"unknown.permission"}}, {"input_schema": {"type": "object", "required": ["missing"]}}])
 async def test_workflow_error_is_failed_no_generic_fallback(changes):
     handler = AsyncMock(side_effect=ValueError("capability error"))
-    registry = CapabilityRegistry(); registry.register(owner(handler, **changes))
+    registry = workflow_registry(); registry.register(owner(handler, **changes))
     with StudentSession() as student:
         run_id = create_run(student)
         with patch.object(capability_module, "_registry", registry), \
@@ -139,20 +139,20 @@ async def test_workflow_error_is_failed_no_generic_fallback(changes):
 
 
 @pytest.mark.asyncio
-async def test_agent_run_dispatch_calls_existing_loop_and_checks_workspace():
+async def test_operator_run_dispatch_calls_policy_selected_execution_and_checks_workspace():
     from app.runtime.task_runtime import run as dispatch
     from app.capabilities import get_capability_registry
     with StudentSession() as student, student.factory() as db:
         run_id = create_run(student, task_type="unowned_task")
-        job = SimpleNamespace(job_type="agent.run", workspace_id=student.workspace_id, payload={"run_id": run_id})
+        job = SimpleNamespace(job_type="operator.run", workspace_id=student.workspace_id, payload={"run_id": run_id})
         with patch.object(operator, "_execute", AsyncMock()) as loop:
             await dispatch(job, db)
-            assert loop.await_args.kwargs["_agent_only"] is True
+            assert "_agent_only" not in loop.await_args.kwargs
             assert loop.await_args.args[0] == run_id
         job.workspace_id = "other-workspace"
         with pytest.raises(LookupError):
             await dispatch(job, db)
-        assert get_capability_registry().get("agent.run").kind == "system"
+        assert get_capability_registry().get("operator.run").kind == "system"
 
 
 @pytest.mark.asyncio
@@ -163,7 +163,7 @@ async def test_roadmap_research_installed_owner_uses_workflow_without_operator_p
     contract = installed.owner_for_task_type("roadmap_research")
     handler = AsyncMock(return_value={"roadmaps": [], "unconfirmed": ["Undecisive fact"],
                                      "pending_action": None, "mirror_version": 1})
-    registry = CapabilityRegistry()
+    registry = workflow_registry()
     registry.register(replace(contract, handler=handler))
     with StudentSession() as student:
         with student.factory() as db:
@@ -188,7 +188,7 @@ async def test_roadmap_research_installed_owner_uses_workflow_without_operator_p
 @pytest.mark.asyncio
 @pytest.mark.parametrize("owned", [False, True])
 async def test_no_owner_or_no_fixed_input_keeps_existing_model_phases(owned):
-    registry = CapabilityRegistry()
+    registry = workflow_registry()
     handler = AsyncMock()
     if owned:
         registry.register(owner(handler))
@@ -225,7 +225,7 @@ async def test_workflow_text_pending_resume_keeps_same_input_and_row():
         {"pending_action": {"kind": "text", "title": "Detail", "prompt": "Provide detail", "required": True}},
         {"summary": "Finished"},
     ])
-    registry = CapabilityRegistry(); registry.register(owner(handler))
+    registry = workflow_registry(); registry.register(owner(handler))
     with StudentSession() as student:
         run_id = create_run(student)
         with patch.object(capability_module, "_registry", registry), \
@@ -235,9 +235,28 @@ async def test_workflow_text_pending_resume_keeps_same_input_and_row():
             await operator._execute(run_id, student.workspace_id, object(), "Work", {}, [], None)
             result = await operator.resume(ToolContext(student.workspace_id, "pai", object()), run_id, {"text": "Detail"})
             assert result["data"]["resumed"]
-            await asyncio.gather(*list(operator._running_tasks))
+            await dispatch_queued(student)
         assert handler.await_count == 2
         assert handler.await_args_list[0].args[1] == handler.await_args_list[1].args[1]
         with student.factory() as db:
             run = db.get(ExecutionRun, run_id)
             assert run.status == "completed" and run.resume_input["response"] == {"text": "Detail"}
+
+
+async def dispatch_queued(student):
+    from sqlalchemy import select
+    from app.models import BackgroundJob
+    from app.runtime.task_runtime import run
+    with student.factory() as db:
+        jobs = db.scalars(select(BackgroundJob).where(BackgroundJob.job_type == "operator.run",
+                         BackgroundJob.status == "pending")).all()
+        for job in jobs:
+            await run(job, db)
+            job.status = "succeeded"; db.commit()
+
+
+def workflow_registry():
+    from app.capabilities import get_capability_registry
+    registry = CapabilityRegistry()
+    registry.register(get_capability_registry().get("operator.run"))
+    return registry
