@@ -858,3 +858,96 @@ migration 103 all-version retirement/downgrade, the Python guard and currency
 cases. All tests use fake providers; a temporary socket guard rejects external
 connections. Temporary guard/dependency folders are removed before the last commit.
 No live API calls, .env edits, new queue/runtime or reader refactor.
+
+
+## P3 Round 1 - Step A: concurrent safety gate
+
+Step A is implemented. Step B (Planner patches/plans) is pending a decision on
+bounding the growing Truth Map input; it is not implemented by this checkpoint.
+No existing files were moved, and the Analyst remains unchanged.
+
+### Flow and ownership
+
+Human event -> Memory Service recent turns fetched once -> concurrent safety
+classification and normal deep Counselor turn -> post exactly one selected reply
+through Messenger. Safety receives text only (current message + last four chat
+entries), never a database session. All model calls use the Model Gateway.
+
+| Gate outcome | Posted reply | Turn decision |
+| --- | --- | --- |
+| none | Existing normal reply | Existing action; classification metadata only |
+| concern / urgent | Discard normal reply; generate with wellbeing instructions | move=wellbeing; level and category |
+| Error / timeout / invalid JSON | Existing normal reply (fail open) | No classification metadata |
+| Wellbeing generation fails | Configured care fallback, plus configured resources if present | move=wellbeing |
+
+The wellbeing prompt reflects feelings, pauses counseling tasks, avoids career
+questions, encourages trusted support, follows the student language policy, and
+uses configured resources for urgent cases. No resources are invented.
+The gate returns only a strictly validated level/category pair; no reasons are
+returned, stored or logged. Error logs contain error type only.
+
+### Config and migration
+
+Only the specifically authorized .env.example documentation was edited; .env and
+all other .env.* files were untouched.
+
+| Config | Default / resolution |
+| --- | --- |
+| PAI_SAFETY_MODEL | PAI_ANALYST_MODEL -> PAI_MODEL |
+| PAI_SAFETY_REASONING_EFFORT | low |
+| PAI_SAFETY_TIMEOUT_MS | 3000 |
+| PAI_WELLBEING_RESOURCES | Empty |
+| PAI_WELLBEING_FALLBACK_REPLY | Generic care + trusted person / local emergency support |
+
+Migration 104 currently adds nullable safety_level and safety_category to
+pai_counselor_turn_decisions. Its downgrade removes these two columns and
+preserves existing decisions. The pai_turn_plans table specified for Step B has
+not been added yet. The unreachable disabled-definition validation branch was
+removed; the existing missing-enabled-definition rejection stays unchanged.
+
+### Calls, timing and offline checks
+
+Normal human turn: one Counselor + one safety call inline, existing Analyst and
+extractor in the background. Flagged turn: the normal Counselor call is discarded
+and one wellbeing Counselor call is added. Existing language repair remains an
+exceptional retry. No live model calls were made.
+
+safety_ms is included in the existing counselor_deep_turn timing log. The gate
+runs concurrently, so normal-path waiting is the slower of gate and Counselor,
+not their sum. A gate slower than the Counselor can still delay posting until the
+classification completes or its timeout expires. This is an inherent limitation
+of waiting for classification before posting; concurrency tests verify that a
+flagged normal reply never leaks to the student.
+
+The 24 new offline checks cover English and romanized intent/abuse/distress,
+ordinary exam/family/career concerns, invalid JSON, timeout/error fail-open,
+pre-post concurrency, fallback/resource behavior, the real wellbeing prompt with
+fake models, role fallback resolution, text-only input, and migration roundtrip.
+Test conftest installs a fake safety provider for existing runtime tests.
+
+### Open question for Step B
+
+Twelve recent chat entries alone do not bound a growing Truth Map. Approval is
+pending to reuse the existing notebook context token budget for Planner input
+while applying patches to the complete stored map. No trimming design or Planner
+implementation was invented while that decision remains unanswered.
+
+
+### Step A verification results
+
+| Check | Before (3a07547) | Step A checkpoint |
+| --- | --- | --- |
+| Full backend | 888 passed; 3 production-only skips; 8 subtests | 912 passed; same 3 skips; 8 subtests |
+| Production-only security | 3 passed; 4 subtests | 3 passed; 4 subtests |
+| Frontend | 23 passed | 23 passed |
+| Production frontend build | PASS | PASS |
+| All app modules imported | 248 | 250; zero failures |
+| Focused OS contract + gateway + architecture | Existing green | 54 passed |
+
+Final full backend run: 165.86 seconds. The two existing SQLite expression-index
+reflection warnings in migration 101 are unchanged. The dedicated production run
+covers the three cases skipped in the normal test environment. All providers
+were fake; a temporary socket guard rejected external network connections.
+Temporary guard/dependency folders were removed before the documentation commit.
+Fixture checks prove routing and prompt contracts, not live-model classification
+accuracy; no live classification quality or paid latency measurement was run.
