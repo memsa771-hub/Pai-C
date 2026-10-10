@@ -33,7 +33,7 @@ JOB_REINDEX = "memory.reindex"
 def _is_duplicate(db, workspace_id: str, item) -> bool:
     """Already-known memory/episode? Vault handles its own conflicts.
 
-    A Vault fact is never skipped here: "my CGPA is 3.52" restated is harmless
+    A Vault fact is never skipped here: "my grade is 3.52" restated is harmless
     (the reconciler retains the existing row), and a *correction* must always
     reach the reconciler.
     """
@@ -124,8 +124,6 @@ async def extract_memory(job, db) -> dict:
             return {"candidates_proposed": 0, "reason": "source_turn_missing"}
 
         definitions = VaultFieldDefinitionService(db).list_definitions()
-        from app.memory.field_definitions import ENTITY_BACKED_LEGACY_FIELDS
-        definitions = [d for d in definitions if d.key not in ENTITY_BACKED_LEGACY_FIELDS]
         allowed_keys = {d.key for d in definitions}
         # The same set twice, for two different jobs: `allowed_keys` is the
         # authorization filter, `field_specs` is what the model is actually

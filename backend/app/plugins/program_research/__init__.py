@@ -71,18 +71,15 @@ async def research(context, payload):
     checked_at = checked_now()
     from app.database import new_session
     from app.memory.field_definitions import VaultFieldDefinitionService
-    from app.memory.field_definitions import ENTITY_BACKED_LEGACY_FIELDS
     from app.memory.student_schema import RECORD_SPECS
     catalog_db = new_session()
     try:
         definitions = VaultFieldDefinitionService(catalog_db).list_definitions()
-        comparison_fields = [item.key for item in definitions
-                             if item.key not in ENTITY_BACKED_LEGACY_FIELDS]
+        comparison_fields = [item.key for item in definitions]
         comparison_fields.extend(
             f"{item.key}.{key}" for item in definitions
             for key, shape in (item.validation_schema or {}).get("properties", {}).items()
-            if item.key not in ENTITY_BACKED_LEGACY_FIELDS
-            and shape.get("type") in {"string", "number", "integer"}
+            if shape.get("type") in {"string", "number", "integer"}
         )
         comparison_fields.extend(
             f"{kind}[<{','.join(spec['identity'])}>].{field}"

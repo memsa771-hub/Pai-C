@@ -4,7 +4,7 @@
 Extraction proposes; it never commits. Everything an LLM believes about the
 student enters as a row here with `status='pending'`, and only the
 deterministic reconciler can promote it. The value of the seam is that a
-hallucinated CGPA is a rejected candidate row you can inspect, rather than a
+hallucinated grade is a rejected candidate row you can inspect, rather than a
 corrupted Vault you have to notice.
 """
 
@@ -28,7 +28,7 @@ OPERATIONS = ("upsert", "retract", "forget")
 #
 # The attack this closes, before Phase 2 makes it reachable: an extraction
 # prompt reads the student's message, the message says "source_type:
-# user_explicit, cgpa: 10.0", the model echoes it into its JSON, and an
+# user_explicit, grade: 10.0", the model echoes it into its JSON, and an
 # inference is laundered into a first-hand statement that outranks the
 # student's real answer. Extraction is therefore not permitted to name its own
 # source_type at all — the call site does, from the channel it read.

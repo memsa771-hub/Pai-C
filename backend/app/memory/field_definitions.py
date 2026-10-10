@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """Vault field definitions — the Vault's schema, stored as data.
 
-Adding `tests.pte.score` must be an INSERT, never an edit to reconciliation or
+Adding a new field must be an INSERT, never an edit to reconciliation or
 retrieval. So every rule that varies per field lives in a row:
 
     validation_schema   what a legal value looks like (JSON Schema fragment)
@@ -26,12 +26,6 @@ from .errors import MemoryDataError
 
 logger = logging.getLogger(__name__)
 
-# These values now live in independently addressable typed records. Existing
-# rows remain readable as history, but new extraction must never create a
-# second canonical truth beside EducationRecord/TestAttempt.
-ENTITY_BACKED_LEGACY_FIELDS = frozenset({
-    "education.cgpa", "education.backlogs", "tests.ielts.score",
-})
 FIELD_ALIASES = {"preferences.countries": "preferences.target_countries"}
 
 
@@ -52,33 +46,6 @@ def usable_in_counseling(definition) -> bool:
 # must handle (number with range, enum, string, array, boolean), NOT an
 # attempt to model the domain — Phase 2 adds fields as data.
 SEED_FIELD_DEFINITIONS: tuple[dict, ...] = (
-    {
-        "key": "education.cgpa",
-        "category": "education",
-        "data_type": "number",
-        "validation_schema": {"type": "number", "minimum": 0, "maximum": 10},
-        "cardinality": "single",
-        "conflict_policy": "latest_wins",
-        "description": "Cumulative grade point average on the student's stated scale.",
-    },
-    {
-        "key": "education.backlogs",
-        "category": "education",
-        "data_type": "integer",
-        "validation_schema": {"type": "integer", "minimum": 0, "maximum": 100},
-        "cardinality": "single",
-        "conflict_policy": "latest_wins",
-        "description": "Number of outstanding failed subjects.",
-    },
-    {
-        "key": "tests.ielts.score",
-        "category": "tests",
-        "data_type": "number",
-        "validation_schema": {"type": "number", "minimum": 0, "maximum": 9},
-        "cardinality": "single",
-        "conflict_policy": "highest_confidence",
-        "description": "Overall IELTS band score.",
-    },
     {
         "key": "finance.budget",
         "category": "finance",
@@ -161,7 +128,7 @@ class VaultFieldDefinitionService:
         """
         definition = self.get(key)
         if definition is None:
-            raise VaultFieldError(f"Unknown vault field: {key}")
+            raise VaultFieldError(f"no enabled field definition for {key}")
         if not definition.enabled:
             raise VaultFieldError(f"Vault field is disabled: {key}")
 

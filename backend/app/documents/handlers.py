@@ -209,9 +209,7 @@ async def extract_document_job(job, db) -> dict:
     it does for conversation.
     """
     from app.memory.candidates import MemoryCandidateService
-    from app.memory.field_definitions import (
-        ENTITY_BACKED_LEGACY_FIELDS, VaultFieldDefinitionService,
-    )
+    from app.memory.field_definitions import VaultFieldDefinitionService
     from app.memory.student_snapshot import StudentSnapshotService
     from .classify import authority_for, is_journey_document
     from .extractor import EXTRACTOR_VERSION, DocumentExtractionError, understand_document
@@ -239,10 +237,7 @@ async def extract_document_job(job, db) -> dict:
     # Existing state comes from the shared snapshot — never a second view of
     # "what we know", which would drift from the canonical one.
     snapshot = StudentSnapshotService(db).build(workspace_id)
-    definitions = [
-        d for d in VaultFieldDefinitionService(db).list_definitions()
-        if d.key not in ENTITY_BACKED_LEGACY_FIELDS
-    ]
+    definitions = VaultFieldDefinitionService(db).list_definitions()
     allowed_keys = {d.key for d in definitions}
     field_specs = [
         {"key": d.key, "data_type": d.data_type, "description": d.description}

@@ -165,7 +165,7 @@ def register_builtin_tools(registry):
             "vault.get",
             "Read the student's structured profile. Omit field_key for facts, "
             "repeatable records, issues and discovery readiness, "
-            "snapshot, or pass one (e.g. 'education.cgpa') for that field with "
+            "snapshot, or pass one (e.g. 'education.level') for that field with "
             "its provenance.",
             obj({"field_key": {"type": "string"}, "query": {"type": "string"}, "intent": {"type": "string"}}),
             "memory", ToolRisk.READ, memory.vault_get,

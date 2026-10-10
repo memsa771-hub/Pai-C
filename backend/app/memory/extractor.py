@@ -12,7 +12,7 @@ Two failure modes are handled differently on purpose:
                              not half-parse a broken response into candidates.
     one bad candidate     -> dropped with a logged reason; its valid siblings
                              survive. One hallucinated field must not discard a
-                             correctly extracted CGPA from the same turn.
+                             correctly extracted grade from the same turn.
 """
 
 import json
@@ -55,6 +55,7 @@ class ExtractedCandidate:
 SYSTEM_PROMPT = """You extract durable objective student facts from one counseling turn.
 The student's message is the only evidence. The assistant and earlier context only resolve references. Return JSON {"candidates": [...]} and no prose.
 Use the supplied Vault fields and record schemas. Preserve original qualification wording and reuse exact existing record ids for corrections. Propose only stated fields; never infer dates, scores, currency, institutions or commitment. Every candidate needs a quote copied from the student's message and confidence 0-1.
+For currency, write the ISO 4217 code when the student's currency is clear; otherwise copy it as the student wrote it.
 Candidates: vault_fact with key/proposed_value; student_record with key/proposed_value. All use candidate_type, operation upsert, quote, confidence and optional entities. Existing record patches use entities.record_id; goal replacement uses entities.supersedes_record_id. Course references need an existing education_id.
 Goals record only the student's expressed objective target: stated_preference, target_countries, degree_level, field_of_study, target_intake. Preserve exploratory/considering commitment when stated; never upgrade it. Use attribution.claim_owner student/external/mixed/uncertain; mixed goals need attribution.student_clause_quote. Outside suggestions never become student goals.
 Do not propose student_voice_statement, external_influence, career.primary_interest, or interpretive goal details. Motivations, drivers, underlying objectives, limits and career interpretations belong to the separate Truth Map, not the Vault. Do not invent personality or affiliations. Greetings and transient logistics produce no candidates.
@@ -99,7 +100,7 @@ def _render_field_specs(field_specs) -> str:
     """Render the Vault fields the model is allowed to propose.
 
     Without this the model is asked for "<one of the allowed vault field keys>"
-    and never told what they are, so it guesses (`cgpa`, `ielts`) and every
+    and never told what they are, so it guesses (unsupported field names) and every
     proposal is dropped by `_validate` as an unknown key — the Vault then never
     populates from conversation at all. The key must be exact, so it has to be
     listed; the type has to come with it, because a key the model gets right
@@ -278,30 +279,14 @@ def _drop_unevidenced_dates(value: dict, user_text: str) -> dict:
     return cleaned
 
 
-# A budget is only comparable if its currency is written one way. Models echo
-# whatever the student typed ("EUR", "eur", "€"), and "€" != "EUR" defeats every
-# later comparison, conversion and affordability check. Only unambiguous symbols
-# are mapped; an ambiguous one is left untouched rather than guessed wrong.
-_CURRENCY_SYMBOLS = {
-    "€": "EUR", "£": "GBP", "¥": "JPY", "₹": "INR", "₨": "PKR", "₩": "KRW",
-    "₪": "ILS", "₺": "TRY", "₽": "RUB", "₴": "UAH", "₫": "VND", "฿": "THB",
-    # An unqualified "$" is ambiguous across countries; leave it as written.
-    "US$": "USD", "usd": "USD", "eur": "EUR",
-    "gbp": "GBP", "pkr": "PKR", "inr": "INR",
-}
-
-
 def _normalize_currencies(value):
-    """Rewrite any `currency` field to an ISO-4217-style code, recursively."""
+    """Uppercase three-letter currency values; preserve other trimmed text."""
     if isinstance(value, dict):
         out = {}
         for key, child in value.items():
             if key == "currency" and isinstance(child, str):
                 text = child.strip()
-                mapped = _CURRENCY_SYMBOLS.get(text) or _CURRENCY_SYMBOLS.get(text.casefold())
-                if mapped is None and len(text) == 3 and text.isalpha():
-                    mapped = text.upper()
-                out[key] = mapped or text
+                out[key] = text.upper() if len(text) == 3 and text.isalpha() else text
             else:
                 out[key] = _normalize_currencies(child)
         return out
@@ -351,7 +336,7 @@ def _validate(raw: dict, turn, allowed_vault_keys: set[str]) -> Optional[Extract
     """Validate one proposal. None (with a reason logged) if unusable.
 
     Dropping the individual candidate rather than raising is what lets a good
-    CGPA survive a bad sibling from the same turn.
+    grade survive a bad sibling from the same turn.
     """
     def drop(reason: str) -> None:
         logger.info("memory: dropped candidate — %s", reason)

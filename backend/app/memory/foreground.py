@@ -19,7 +19,7 @@ Precedence, stated in the prompt and enforced by construction:
 
 The current message is the freshest signal in the turn. Stored memory reflects
 *previous* turns, and reconciliation catches up asynchronously afterwards — so
-a student correcting their CGPA must never be argued with using the old value.
+a student correcting their grade must never be argued with using the old value.
 """
 
 import asyncio

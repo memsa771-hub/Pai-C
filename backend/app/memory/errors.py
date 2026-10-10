@@ -11,7 +11,7 @@ The one distinction that matters here:
                       typo'd attribute. Says nothing about the candidate, so it
                       must propagate and let the durable job retry.
 
-Collapsing the two is how a NameError becomes a permanent "your CGPA was
+Collapsing the two is how a NameError becomes a permanent "your grade was
 rejected" on a student's record.
 """
 
