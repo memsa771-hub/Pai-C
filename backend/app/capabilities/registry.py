@@ -23,8 +23,8 @@ class CapabilityRegistry:
     def get(self, capability_id: str) -> CapabilityContract | None:
         return self._items.get(capability_id)
 
-    def all(self) -> tuple[CapabilityContract, ...]:
-        return tuple(self._items.values())
+    def all(self, *, kind: str = "business") -> tuple[CapabilityContract, ...]:
+        return tuple(item for item in self._items.values() if item.kind == kind)
 
     def owner_for_task_type(self, task_type: str | None) -> CapabilityContract | None:
         capability_id = self._task_owners.get(task_type or "")

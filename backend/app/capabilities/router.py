@@ -16,7 +16,7 @@ class CapabilityRouter:
 
     def resolve(self, capability_id: str):
         contract = self.registry.get(capability_id)
-        if contract is None:
+        if contract is None or contract.kind != "business":
             raise CapabilityNotFound(f"unknown capability: {capability_id}")
         return contract
 

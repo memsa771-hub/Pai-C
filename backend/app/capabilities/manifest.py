@@ -16,6 +16,10 @@ class InvalidCapabilityManifest(ValueError):
 
 
 def validate(contract: CapabilityContract) -> None:
+    if contract.kind not in {"business", "system"}:
+        raise InvalidCapabilityManifest("invalid capability kind")
+    if contract.kind == "system" and contract.owns_task_types:
+        raise InvalidCapabilityManifest("system capabilities cannot own agent task types")
     if not _ID.fullmatch(contract.id):
         raise InvalidCapabilityManifest("capability id must be a dotted lowercase identifier")
     if not _SEMVER.fullmatch(contract.version):

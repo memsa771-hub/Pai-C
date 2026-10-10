@@ -1,0 +1,35 @@
+"""Internal job contracts; handlers and queue semantics stay with their owners."""
+from .contract import CapabilityContract
+
+
+def load_system_capabilities(registry):
+    from app.pai_c.deep import analysis, mirror
+    from app.memory import handlers as memory
+    from app.documents import handlers as documents
+
+    string = {"type": "string"}
+    array = {"type": "array"}
+    entries = (
+        (analysis.JOB_ANALYZE, analysis.analyze_job, {"user_event_id": string, "assistant_event_id": string, "source_timestamp": string}),
+        (mirror.JOB_MIRROR, mirror.mirror_job, {"notebook_version": {"type": "integer"}, "journey_id": string, "source_event_id": string, "channel": string, "mirror_attempt": {"type": "integer"}}),
+        (mirror.JOB_RESEARCH, mirror.confirmed_research_job, {"journey_id": string, "version": {"type": "integer"}}),
+        (memory.JOB_EXTRACT, memory.extract_memory, {"source_type": string, "channel": string, "user_event_id": string, "assistant_event_id": string, "agent_name": string, "profile_captured": {"type": "boolean"}, "candidates": array}),
+        (memory.JOB_RECONCILE, memory.reconcile_memory, {"candidate_ids": array}),
+        (memory.JOB_EMBED, memory.embed_memory, {"memory_ids": array, "episode_ids": array}),
+        (memory.JOB_UNINDEX, memory.unindex_memory, {"ids": array}),
+        (memory.JOB_REINDEX, memory.reindex_workspace, {"purge_first": {"type": "boolean"}, "batch_size": {"type": "integer"}}),
+        (memory.JOB_RESUME_RESEARCH, memory.resume_research, {"candidate_id": string}),
+        (memory.JOB_REFRESH_RESEARCH, memory.refresh_stale_research, {"requirement_id": string}),
+        (documents.JOB_DOCUMENT_PARSE, documents.parse_document_job, {"file_id": string}),
+        (documents.JOB_DOCUMENT_EXTRACT, documents.extract_document_job, {"file_id": string}),
+        (documents.JOB_DOCUMENT_INDEX, documents.index_document_job, {"file_id": string}),
+        (documents.JOB_DOCUMENT_UNINDEX, documents.unindex_document_job, {"file_ids": array}),
+        (documents.JOB_DOCUMENT_NOTIFY, documents.notify_document_job, {"file_id": string}),
+    )
+    for job_type, handler, properties in entries:
+        registry.register(CapabilityContract(
+            id=job_type, version="1.0.0", name=job_type,
+            description=f"Internal durable job: {job_type}", kind="system",
+            input_schema={"type": "object", "properties": properties},
+            output_schema={"type": "object"}, handler=handler,
+        ))
