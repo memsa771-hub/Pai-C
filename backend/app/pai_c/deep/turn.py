@@ -10,7 +10,8 @@ from app.config import config
 from app.pai_c.deep.context import DeepContext, build_context
 from app.pai_c.deep.polish import contains_blocked_script, polish_reply
 from app.pai_c.deep.prompts import load_prompt
-from app.pai_c.deep.turn_input import CounselorTurnInput, shared_history
+from app.pai_c.deep.turn_input import CounselorTurnInput
+from app.pai_c.memory import MemoryService
 from app.inference.gateway import complete as chat_completion, resolve_model
 
 logger = logging.getLogger(__name__)
@@ -68,7 +69,7 @@ async def run_deep_turn(db, turn: CounselorTurnInput, *,
     owner_id = turn.source.removeprefix("human:") if turn.source.startswith("human:") else ""
     if history is None:
         history = [{"role": item["role"], "content": item["content"]}
-                   for item in shared_history(db, turn, owner_id,
+                   for item in MemoryService(db).recent_turns(turn, owner_id,
                                               limit=config.PAI_COUNSELOR_HISTORY_SIZE)]
     current = turn.student_text.strip() or "I attached a document."
     messages = [*history, {"role": "user", "content": current}]

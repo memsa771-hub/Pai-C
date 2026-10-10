@@ -10,12 +10,9 @@ from datetime import datetime, timezone
 from sqlalchemy import select
 
 from app.config import config
-from app.pai_c.deep.notebook import NotebookService
+from app.pai_c.memory import MemoryService
 from app.pai_c.deep.turn_input import CounselorTurnInput
 from app.journey import JourneyService
-from app.memory.episodic import EpisodicMemoryService
-from app.memory.foreground import build_foreground_context
-from app.memory.student_snapshot import StudentSnapshotService
 from app.models import Roadmap, User, Workspace
 from app.plugins._shared.sources import public_https
 
@@ -70,7 +67,7 @@ def _trim_notebook(notebook) -> dict:
 def _profile(db, workspace_id: str) -> dict:
     workspace = db.get(Workspace, workspace_id)
     owner = db.get(User, workspace.owner_user_id) if workspace and workspace.owner_user_id else None
-    snapshot = StudentSnapshotService(db).build(workspace_id)
+    snapshot = MemoryService(db).profile(workspace_id)
     identity = {}
     if owner and owner.display_name:
         identity["display_name"] = {"value": owner.display_name, "source": "onboarding"}
@@ -134,18 +131,12 @@ async def build_context(db, workspace_id: str, turn: CounselorTurnInput, *,
         }),
         "profile": _json(_profile(db, workspace_id)),
     }
-    notebook = NotebookService(db).get(workspace_id).notebook
+    notebook = MemoryService(db).truth_map(workspace_id).notebook
     sections["notebook"] = _json(_trim_notebook(notebook))
     journey = next((item for item in JourneyService(db).list(workspace_id, status="active")
                     if item.journey_type == "counselor_decision"), None)
-    memory_block = ""
-    if config.PAI_MEMORY_CONTEXT_ENABLED and turn.student_text:
-        memory = await build_foreground_context(
-            workspace_id, turn.student_text, caller="pai", lexical_only=True)
-        memory_block = memory.block
-    recent = EpisodicMemoryService(db).recent(workspace_id, limit=1)
+    recent = MemoryService(db).latest_episode(workspace_id, limit=1)
     sections["memory"] = _json({
-        "foreground": memory_block,
         "latest_episode_summary": recent[0].summary[:500] if recent else None,
         "open_threads": [item.question_intent for item in notebook.open_questions[:3]],
     })

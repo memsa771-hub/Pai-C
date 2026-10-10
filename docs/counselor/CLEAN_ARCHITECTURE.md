@@ -21,6 +21,8 @@ Every new feature would add one more handler or path. That is how spaghetti grow
 | Messenger | Every outbound message: chat, voice, notifications | Existing posting; the "one voice" rule lives here |
 | Task Runtime | All background work: one queue (existing Postgres jobs), one run record (existing execution runs for tracked tasks), status, retry, budgets, resume | Executes capabilities only |
 
+Decision for P1d: "The PAI C Memory Service lives in backend/app/pai_c/memory.py. It wraps the shared memory services and the Truth Map (notebook). The shared backend/app/memory package never imports pai_c."
+
 ## 3. Plug-ins: two registries, nothing else
 - Capability Registry: every business function is a capability with a typed input/output contract: planner.update, facts.extract, session.summarize, memory.index, documents.read, mirror.build, research.run, roadmaps.build, judge.score, and operator.run (durable execution selecting workflow or the open-ended plan-act-verify loop for PAI OS tasks).
 - Tool Registry: atomic actions used by capabilities: web.search, web.fetch, files, and the rest.
@@ -38,6 +40,8 @@ Decision for P1c: "research.run is the research family program.discover + progra
 4. One writer per data (Truth Map: planner.update; Vault: facts.extract/documents/student edits via reconciler; stage: Journey Service).
 5. No new registry, queue or runtime without an architecture decision.
 6. Everything generic and config-driven.
+
+Decision for P1d: "Shared modules signal PAI C only by enqueueing a named job through the Task Runtime; they never import pai_c." Accepted profile candidates enqueue roadmaps.mark_stale in the reconciliation transaction. The worker invokes the existing RoadmapService.mark_stale unchanged; invalidation is asynchronous.
 
 ## 6. Today -> target mapping
 - 15 job handlers -> capabilities in the Capability Registry run by the Task Runtime.

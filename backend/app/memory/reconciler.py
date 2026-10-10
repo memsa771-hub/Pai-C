@@ -140,9 +140,6 @@ class MemoryReconciler:
             VaultRelationService(self.db).sync_demonstrations(candidate.workspace_id, assertion.id)
         self.assertions.finish(assertion, result, candidate)
         if result.accepted and candidate.candidate_type in {"vault_fact", "student_record"}:
-            from app.pai_c.roadmaps.service import RoadmapService
-            RoadmapService(self.db).mark_stale(
-                candidate.workspace_id, f"Student profile changed: {candidate.key or 'profile'}")
             from app.runtime.task_runtime import enqueue
             self.db.add(EventRecord(
                 id=str(uuid.uuid4()), network_id=candidate.workspace_id,
@@ -151,6 +148,12 @@ class MemoryReconciler:
                          "record_id": result.result_id}, metadata_={},
                 timestamp=int(time.time() * 1000), visibility="private",
             ))
+            enqueue(self.db,
+                job_type="roadmaps.mark_stale", workspace_id=candidate.workspace_id,
+                payload={"workspace_id": candidate.workspace_id,
+                         "reason": f"Student profile changed: {candidate.key or 'profile'}"},
+                idempotency_key=f"roadmap-stale:{candidate.id}",
+            )
             enqueue(self.db,
                 job_type="memory.resume_research", workspace_id=candidate.workspace_id,
                 payload={"candidate_id": candidate.id},

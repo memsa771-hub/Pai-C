@@ -57,12 +57,12 @@ async def _run_turn(db, workspace_id: str, event_data: dict, depth: int) -> None
     """Dispatch a turn, then queue learning only after a successful post."""
     posted = await _run_deep_turn(db, workspace_id, event_data, depth)
     if posted and str(event_data.get("source") or "").startswith("human:"):
-        from app.memory.turn_hook import enqueue_turn_extraction
+        from app.pai_c.memory import MemoryService
         from app.services.pai import PAI_AGENT_NAME
 
         assistant_event_id, channel_target, profile_captured = posted
-        enqueue_turn_extraction(
-            db=db, workspace_id=workspace_id, channel_target=channel_target,
+        MemoryService(db).enqueue_turn_extraction(
+            workspace_id=workspace_id, channel_target=channel_target,
             user_event_id=event_data.get("id"),
             assistant_event_id=assistant_event_id,
             agent_name=PAI_AGENT_NAME,

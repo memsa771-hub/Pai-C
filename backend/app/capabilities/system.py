@@ -4,6 +4,7 @@ from .contract import CapabilityContract
 
 def load_system_capabilities(registry):
     from app.pai_c.deep import analysis, mirror
+    from app.pai_c.roadmaps import jobs as roadmaps
     from app.memory import handlers as memory
     from app.research import jobs as research
     from app.documents import handlers as documents
@@ -33,6 +34,14 @@ def load_system_capabilities(registry):
         description="Internal durable Operator workflow or agent run", kind="system",
         input_schema={"type": "object", "properties": {"run_id": string}, "required": ["run_id"]},
         output_schema={"type": "object"}, handler=run_operator_job,
+    ))
+    registry.register(CapabilityContract(
+        id=roadmaps.JOB_MARK_STALE, version="1.0.0", name=roadmaps.JOB_MARK_STALE,
+        description="Internal durable roadmap invalidation", kind="system",
+        input_schema={"type": "object", "properties": {"workspace_id": string, "reason": string},
+                      "required": ["workspace_id", "reason"]},
+        output_schema={"type": "object", "properties": {"marked_stale": {"type": "integer"}},
+                       "required": ["marked_stale"]}, handler=roadmaps.mark_stale_job,
     ))
     for job_type, handler, properties in entries:
         registry.register(CapabilityContract(

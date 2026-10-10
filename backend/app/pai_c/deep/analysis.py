@@ -12,7 +12,8 @@ from sqlalchemy import select, text
 from app.config import config
 from app.pai_c.deep.context import _json, _profile
 from app.pai_c.deep.coverage import enforce_mirror_readiness
-from app.pai_c.deep.notebook import NotebookService, NotebookVersionConflict
+from app.pai_c.deep.notebook import NotebookVersionConflict
+from app.pai_c.memory import MemoryService
 from app.pai_c.deep.notebook_sanitize import sanitize_notebook
 from app.pai_c.deep.notebook_schema import CounselorNotebookData
 from app.pai_c.deep.prompts import load_prompt
@@ -20,7 +21,6 @@ from app.pai_c.stages import advance_discovery_stage
 from app.inference.gateway import complete as chat_completion, resolve_model
 from app.runtime.task_runtime import enqueue
 from app.journey import JourneyService
-from app.memory.episodic import EpisodicMemoryService
 from app.models import BackgroundJob, CounselorNotebookHistory, EventRecord, User, Workspace
 
 logger = logging.getLogger(__name__)
@@ -128,7 +128,7 @@ def _input(db, workspace_id: str, student: EventRecord, assistant: EventRecord,
         if len(transcript) == config.PAI_ANALYST_HISTORY_SIZE:
             break
     transcript.reverse()
-    episode = EpisodicMemoryService(db).recent(workspace_id, limit=1)
+    episode = MemoryService(db).latest_episode(workspace_id, limit=1)
     return ("<notebook_schema>" + _json(CounselorNotebookData.model_json_schema())
             + "</notebook_schema>\n"
             + "<notebook>" + _json(notebook.model_dump(mode="json")) + "</notebook>\n"
@@ -194,7 +194,7 @@ async def analyze_job(job, db) -> dict:
         ).limit(1)).scalar_one_or_none()
         if duplicate:
             _advance_stage(db, job.workspace_id,
-                           NotebookService(db).get(job.workspace_id).notebook)
+                           MemoryService(db).truth_map(job.workspace_id).notebook)
             return {"status": "duplicate"}
         student = db.execute(select(EventRecord).where(
             EventRecord.id == user_event_id,
@@ -208,13 +208,13 @@ async def analyze_job(job, db) -> dict:
         )).scalar_one_or_none()
         if student is None or assistant is None:
             raise ValueError("analysis source turn is unavailable")
-        service = NotebookService(db)
+        service = MemoryService(db)
         for attempt in range(2):
-            previous = service.get(job.workspace_id)
+            previous = service.truth_map(job.workspace_id)
             candidate, issues, removals = await _candidate(
                 db, job.workspace_id, student, assistant, previous)
             try:
-                snapshot, storage_issues = service.apply(
+                snapshot, storage_issues = service.apply_truth_map(
                     job.workspace_id, candidate, user_event_id,
                     expected_version=previous.version)
                 _advance_stage(db, job.workspace_id, snapshot.notebook)
