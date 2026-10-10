@@ -335,8 +335,6 @@ async def rename_folder(
     new_path = _normalize_folder_path(request.new_path)
     if not path or not new_path:
         return json_response(ResponseCode.BAD_REQUEST, "Invalid folder path")
-    if path == new_path:
-        return success_response({"path": new_path, "updated": 0})
     # Moving a folder inside itself would orphan every record under it
     if new_path.startswith(f"{path}/"):
         return json_response(ResponseCode.BAD_REQUEST, "Cannot move a folder into itself")
@@ -354,6 +352,9 @@ async def rename_folder(
     )
     if not actor_source:
         return json_response(ResponseCode.UNAUTHORIZED, "Unidentified caller")
+
+    if path == new_path:
+        return success_response({"path": new_path, "updated": 0})
 
     records = _folder_records(db, str(workspace.id), path)
     if not records:
