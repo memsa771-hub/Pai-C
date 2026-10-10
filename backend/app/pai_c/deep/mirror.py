@@ -16,7 +16,7 @@ from app.pai_c.deep.sensitive import check_notebook_before_mirror
 from app.pai_c.deep.turn_input import CounselorTurnInput, shared_history
 from app.pai_c.posting import _post_response
 from app.inference.gateway import complete as chat_completion, resolve_model
-from app.jobs.service import BackgroundJobService, job_handlers
+from app.runtime.task_runtime import enqueue
 from app.journey import JourneyService
 from app.models import BackgroundJob, EventRecord, Workspace
 
@@ -50,7 +50,7 @@ def enqueue_mirror(db, turn: CounselorTurnInput) -> str | None:
             return attempts[-1].id
     attempt = len(attempts)
     try:
-        job = BackgroundJobService(db).enqueue(
+        job = enqueue(db,
             JOB_MIRROR, {"notebook_version": snapshot.version, "journey_id": journey.id,
                          "source_event_id": turn.source_event_id, "channel": turn.channel,
                          "mirror_attempt": attempt},
@@ -180,7 +180,7 @@ def _record_failure(db, job, status, notebook_version):
 
 def enqueue_confirmed_research(db, workspace_id: str, journey) -> str:
     version = journey.counselor_summary_draft["version"]
-    job = BackgroundJobService(db).enqueue(
+    job = enqueue(db,
         JOB_RESEARCH, {"journey_id": journey.id, "version": version}, workspace_id=workspace_id,
         idempotency_key=f"counselor:mirror-research:{workspace_id}:{journey.id}:{version}")
     return job.id
@@ -220,5 +220,3 @@ async def confirmed_research_job(job, db) -> dict:
         return {"status": "done", "delegated": bool(outcome)}
 
 
-job_handlers.register(JOB_MIRROR, mirror_job)
-job_handlers.register(JOB_RESEARCH, confirmed_research_job)

@@ -166,8 +166,8 @@ async def propose_profile(context, args: dict) -> dict:
                 source_type=source_type, evidence=evidence,
             )
             ids.append(candidate.id)
-        from app.jobs.service import BackgroundJobService
-        job = BackgroundJobService(db).enqueue(
+        from app.runtime.task_runtime import enqueue
+        job = enqueue(db,
             "memory.reconcile", {"candidate_ids": ids}, context.workspace_id,
             idempotency_key="profile-proposals:" + ":".join(ids),
         )

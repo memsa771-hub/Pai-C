@@ -5,7 +5,7 @@ from datetime import date, datetime, timedelta, timezone
 from sqlalchemy import select
 
 from app.config import config
-from app.jobs.service import BackgroundJobService
+from app.runtime.task_runtime import enqueue
 from app.memory.handlers import JOB_REFRESH_RESEARCH
 from app.models import Opportunity, RequirementSet
 from app.pai_c.roadmaps.service import RoadmapService
@@ -43,7 +43,7 @@ def enqueue_due_verification(db, *, now: datetime | None = None, limit: int = 50
         RoadmapService(db).mark_stale(
             opportunity.workspace_id, "Source verification has expired; this route is being refreshed",
             source_url=row.source_url)
-        BackgroundJobService(db).enqueue(
+        enqueue(db,
             job_type=JOB_REFRESH_RESEARCH, workspace_id=opportunity.workspace_id,
             payload={"requirement_id": row.id},
             idempotency_key=f"research-verify:{row.id}:{now.date()}")

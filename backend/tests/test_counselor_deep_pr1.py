@@ -49,7 +49,7 @@ def test_retry_of_same_student_event_uses_one_extraction_key():
     db = Mock()
     service = Mock()
     service.enqueue.return_value.id = "job-1"
-    with patch("app.memory.turn_hook.BackgroundJobService", return_value=service):
+    with patch("app.memory.turn_hook.enqueue", service.enqueue):
         for assistant_id in ("reply-1", "reply-2"):
             assert enqueue_turn_extraction(
                 db, "workspace", "channel/pai", "student-1", assistant_id, "pai",

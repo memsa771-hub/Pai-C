@@ -36,10 +36,10 @@ def enqueue_unindex(db, workspace_id: str, ids: list[str]) -> Optional[str]:
     if not ids:
         return None
     try:
-        from app.jobs.service import BackgroundJobService
+        from app.runtime.task_runtime import enqueue
         from app.memory.handlers import JOB_UNINDEX
 
-        job = BackgroundJobService(db).enqueue(
+        job = enqueue(db,
             job_type=JOB_UNINDEX,
             workspace_id=workspace_id,
             payload={"ids": sorted(ids)},
@@ -58,10 +58,10 @@ def enqueue_unindex(db, workspace_id: str, ids: list[str]) -> Optional[str]:
 def enqueue_reindex(db, workspace_id: str, purge_first: bool = False) -> Optional[str]:
     """Queue a full rebuild of one workspace's index from PostgreSQL."""
     try:
-        from app.jobs.service import BackgroundJobService
+        from app.runtime.task_runtime import enqueue
         from app.memory.handlers import JOB_REINDEX
 
-        job = BackgroundJobService(db).enqueue(
+        job = enqueue(db,
             job_type=JOB_REINDEX,
             workspace_id=workspace_id,
             payload={"purge_first": purge_first},

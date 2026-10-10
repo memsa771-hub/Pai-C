@@ -18,7 +18,6 @@ a half-tuned prompt silently writing wrong facts is not.
 import logging
 from sqlalchemy import select
 
-from app.jobs.service import job_handlers
 from app.memory.candidates import MemoryCandidateService
 from app.memory.index import MemoryRecord, get_memory_index
 from app.memory.reconciler import MemoryReconciler
@@ -373,9 +372,9 @@ async def extract_memory(job, db) -> dict:
     # if reconciliation fails it retries on its own schedule without re-running
     # extraction, and each job stays independently observable.
     if proposed:
-        from app.jobs.service import BackgroundJobService
+        from app.runtime.task_runtime import enqueue
 
-        BackgroundJobService(db).enqueue(
+        enqueue(db,
             job_type=JOB_RECONCILE,
             workspace_id=workspace_id,
             payload={"candidate_ids": proposed},
@@ -432,9 +431,9 @@ async def reconcile_memory(job, db) -> dict:
             episode_ids.append(r.result_id)
 
     if memory_ids or episode_ids:
-        from app.jobs.service import BackgroundJobService
+        from app.runtime.task_runtime import enqueue
 
-        BackgroundJobService(db).enqueue(
+        enqueue(db,
             job_type=JOB_EMBED,
             workspace_id=workspace_id,
             payload={"memory_ids": memory_ids, "episode_ids": episode_ids},
@@ -619,10 +618,3 @@ def _iter_ids(db, workspace_id: str, model, batch_size: int):
         last_id = batch[-1]
 
 
-job_handlers.register(JOB_EXTRACT, extract_memory)
-job_handlers.register(JOB_RECONCILE, reconcile_memory)
-job_handlers.register(JOB_EMBED, embed_memory)
-job_handlers.register(JOB_UNINDEX, unindex_memory)
-job_handlers.register(JOB_REINDEX, reindex_workspace)
-job_handlers.register(JOB_RESUME_RESEARCH, resume_research)
-job_handlers.register(JOB_REFRESH_RESEARCH, refresh_stale_research)

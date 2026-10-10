@@ -58,26 +58,32 @@ def _worker_id() -> str:
 
 
 class JobHandlerRegistry:
-    """Maps `job_type` -> coroutine handler.
+    """Temporary shared compatibility facade over the capability registry."""
 
-    Handlers register themselves at import time, so adding a job type never
-    means editing the worker.
-    """
+    def __init__(self, registry=None) -> None:
+        self._registry = registry
 
-    def __init__(self) -> None:
-        self._handlers: dict[str, Callable] = {}
+    @property
+    def registry(self):
+        from app.capabilities import get_capability_registry
+        return self._registry if self._registry is not None else get_capability_registry()
 
     def register(self, job_type: str, handler: Callable) -> Callable:
-        if job_type in self._handlers:
-            raise ValueError(f"Duplicate job handler: {job_type}")
-        self._handlers[job_type] = handler
+        from app.capabilities import CapabilityContract
+        self.registry.register(CapabilityContract(
+            id=job_type, version="1.0.0", name=job_type,
+            description=f"Internal durable job: {job_type}", kind="system",
+            input_schema={"type": "object"}, output_schema={"type": "object"},
+            handler=handler,
+        ))
         return handler
 
     def handler_for(self, job_type: str) -> Optional[Callable]:
-        return self._handlers.get(job_type)
+        contract = self.registry.get(job_type)
+        return contract.handler if contract and contract.kind == "system" else None
 
     def registered(self) -> tuple[str, ...]:
-        return tuple(sorted(self._handlers))
+        return tuple(sorted(item.id for item in self.registry.all(kind="system")))
 
 
 job_handlers = JobHandlerRegistry()
@@ -316,11 +322,6 @@ class BackgroundJobService:
 
 
 async def run_job(job: BackgroundJob, db, registry: JobHandlerRegistry = job_handlers) -> Any:
-    """Dispatch one claimed job to its handler.
-
-    Raises if the handler raises; the worker loop turns that into `fail()`.
-    """
-    handler = registry.handler_for(job.job_type)
-    if handler is None:
-        raise LookupError(f"No handler registered for job type: {job.job_type}")
-    return await handler(job, db)
+    """Temporary shared compatibility dispatch; new code uses Task Runtime."""
+    from app.runtime.task_runtime import run
+    return await run(job, db, registry=registry.registry)

@@ -40,9 +40,10 @@ from app.jobs.service import (
     LEASE_RENEW_SECONDS,
     BackgroundJobService,
     _worker_id,
-    job_handlers,
-    run_job,
 )
+
+from app.runtime.task_runtime import run
+from app.capabilities import get_capability_registry
 
 logger = logging.getLogger(__name__)
 
@@ -103,7 +104,7 @@ async def _process_one(job_id: str, worker: str) -> bool:
             )
             return False
         try:
-            result = await run_job(job, db)
+            result = await run(job, db)
             # Re-check ownership before committing. If the lease expired
             # mid-run and another worker took over, completing here would
             # overwrite that worker's outcome with ours.
@@ -146,7 +147,7 @@ async def run_worker_loop(
     worker = _worker_id()
     logger.info(
         "job worker starting id=%s concurrency=%d handlers=%s",
-        worker, concurrency, list(job_handlers.registered()),
+        worker, concurrency, sorted(item.id for item in get_capability_registry().all(kind="system")),
     )
     tick = 0
     next_research_sweep = 0.0
@@ -244,12 +245,7 @@ def main() -> None:
         level=os.environ.get("LOG_LEVEL", "INFO"),
         format="%(asctime)s %(levelname)s %(name)s %(message)s",
     )
-    # Import for side effects: handlers register themselves on import, so the
-    # worker must load them before it starts claiming.
-    import app.memory.handlers  # noqa: F401
-    import app.documents.handlers  # noqa: F401
-    import app.pai_c.deep.analysis  # noqa: F401
-    import app.pai_c.deep.mirror  # noqa: F401
+    get_capability_registry()
 
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)

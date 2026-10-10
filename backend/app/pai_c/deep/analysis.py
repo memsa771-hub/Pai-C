@@ -18,7 +18,7 @@ from app.pai_c.deep.notebook_schema import CounselorNotebookData
 from app.pai_c.deep.prompts import load_prompt
 from app.pai_c.stages import advance_discovery_stage
 from app.inference.gateway import complete as chat_completion, resolve_model
-from app.jobs.service import BackgroundJobService, job_handlers
+from app.runtime.task_runtime import enqueue
 from app.journey import JourneyService
 from app.memory.episodic import EpisodicMemoryService
 from app.models import BackgroundJob, CounselorNotebookHistory, EventRecord, User, Workspace
@@ -45,7 +45,7 @@ def enqueue_turn_analysis(db, workspace_id: str, user_event_id: str,
         )).scalar_one_or_none()
         if student is None:
             return None
-        job = BackgroundJobService(db).enqueue(
+        job = enqueue(db,
             job_type=JOB_ANALYZE, workspace_id=workspace_id,
             payload={"user_event_id": user_event_id,
                      "assistant_event_id": assistant_event_id,
@@ -228,4 +228,3 @@ async def analyze_job(job, db) -> dict:
         raise AssertionError("unreachable analysis retry")
 
 
-job_handlers.register(JOB_ANALYZE, analyze_job)

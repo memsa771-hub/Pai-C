@@ -17,7 +17,6 @@ from __future__ import annotations
 
 import logging
 
-from app.jobs.service import job_handlers
 from app.files.storage import get_file_store
 from .content import ParsedDocument, Segment, segments_from_content
 from .parsers import (
@@ -181,9 +180,9 @@ async def parse_document_job(job, db) -> dict:
 
     # Extraction is its own durable job: parsing succeeded and must not be
     # redone because an LLM call failed.
-    from app.jobs.service import BackgroundJobService
+    from app.runtime.task_runtime import enqueue
 
-    BackgroundJobService(db).enqueue(
+    enqueue(db,
         job_type=JOB_DOCUMENT_EXTRACT,
         workspace_id=workspace_id,
         payload={"file_id": file_id},
@@ -362,9 +361,8 @@ async def extract_document_job(job, db) -> dict:
     }
     db.flush()
 
-    from app.jobs.service import BackgroundJobService
+    from app.runtime.task_runtime import enqueue
 
-    jobs = BackgroundJobService(db)
     if proposed:
         # Reconciliation is the EXISTING durable job — documents converge on
         # the same path as conversation rather than getting their own.
@@ -372,7 +370,7 @@ async def extract_document_job(job, db) -> dict:
         # the completion message describes real outcomes, not proposals.
         from app.memory.handlers import JOB_RECONCILE
 
-        jobs.enqueue(
+        enqueue(db,
             job_type=JOB_RECONCILE,
             workspace_id=workspace_id,
             payload={"candidate_ids": proposed, "document_file_id": file_id},
@@ -384,7 +382,7 @@ async def extract_document_job(job, db) -> dict:
 
     # Indexing is enqueued separately and AFTER extraction, so an index
     # failure can never roll back canonical writes.
-    jobs.enqueue(
+    enqueue(db,
         job_type=JOB_DOCUMENT_INDEX,
         workspace_id=workspace_id,
         payload={"file_id": file_id},
@@ -401,10 +399,10 @@ async def extract_document_job(job, db) -> dict:
 
 def enqueue_document_notify(db, workspace_id: str, file_id: str) -> None:
     """Queue the "I've finished reading your document" chat message."""
-    from app.jobs.service import BackgroundJobService
+    from app.runtime.task_runtime import enqueue
     from .extractor import EXTRACTOR_VERSION
 
-    BackgroundJobService(db).enqueue(
+    enqueue(db,
         job_type=JOB_DOCUMENT_NOTIFY,
         workspace_id=workspace_id,
         payload={"file_id": file_id},
@@ -508,8 +506,3 @@ async def unindex_document_job(job, db) -> dict:
     return {"deleted": deleted}
 
 
-job_handlers.register(JOB_DOCUMENT_PARSE, parse_document_job)
-job_handlers.register(JOB_DOCUMENT_EXTRACT, extract_document_job)
-job_handlers.register(JOB_DOCUMENT_INDEX, index_document_job)
-job_handlers.register(JOB_DOCUMENT_UNINDEX, unindex_document_job)
-job_handlers.register(JOB_DOCUMENT_NOTIFY, notify_document_job)

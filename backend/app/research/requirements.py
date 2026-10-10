@@ -303,9 +303,9 @@ class RequirementStore:
         RoadmapService(self.db).mark_stale(
             workspace_id, "A student reported a source may be wrong; we are checking it",
             source_url=row.source_url)
-        from app.jobs.service import BackgroundJobService
+        from app.runtime.task_runtime import enqueue
         from app.memory.handlers import JOB_REFRESH_RESEARCH
-        BackgroundJobService(self.db).enqueue(
+        enqueue(self.db,
             job_type=JOB_REFRESH_RESEARCH, workspace_id=workspace_id,
             payload={"requirement_id": row.id},
             idempotency_key=f"research-report:{row.id}:{datetime.now(timezone.utc).date()}")

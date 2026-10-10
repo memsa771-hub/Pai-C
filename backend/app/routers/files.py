@@ -108,10 +108,10 @@ def _enqueue_document_unindex(db: Session, workspace_id: str, file_ids: list) ->
     re-checks PostgreSQL — but a stale chunk must not stay searchable.
     """
     from app.documents.service import JOB_DOCUMENT_UNINDEX
-    from app.jobs.service import BackgroundJobService
+    from app.runtime.task_runtime import enqueue
 
     try:
-        BackgroundJobService(db).enqueue(
+        enqueue(db,
             job_type=JOB_DOCUMENT_UNINDEX,
             workspace_id=workspace_id,
             payload={"file_ids": list(file_ids)},

@@ -19,7 +19,7 @@ kind of long-term memory.
 import logging
 from typing import Optional
 
-from app.jobs.service import BackgroundJobService
+from app.runtime.task_runtime import enqueue
 from app.memory.handlers import JOB_EXTRACT
 
 logger = logging.getLogger(__name__)
@@ -53,7 +53,7 @@ def enqueue_turn_extraction(
         return None
 
     try:
-        job = BackgroundJobService(db).enqueue(
+        job = enqueue(db,
             job_type=JOB_EXTRACT,
             workspace_id=workspace_id,
             payload={
