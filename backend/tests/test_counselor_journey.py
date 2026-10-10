@@ -148,7 +148,7 @@ async def test_result_is_interpreted_by_counselor_and_does_not_create_student_fa
             db.add(run)
             db.commit()
             with patch.object(operator, "_baseline_is_current", return_value=True), \
-                 patch("app.pai_c.handoff.explain_result", AsyncMock(
+                 patch("app.pai_c.orchestrator.handle_research_result", AsyncMock(
                     return_value="Given your budget, verify the academic credits before paying an application fee.")) as explain:
                 await operator._post_result(db, student.workspace_id, "channel/pai-counselor", run.id,
                                              "completed", "Found programs.")
@@ -176,7 +176,7 @@ async def test_operator_result_cannot_bypass_unconfirmed_baseline():
             db.add(run)
             db.commit()
             with patch.object(config, "PAI_PROFILE_COMPLETION_ROLLOUT_MODE", "all"), \
-                    patch("app.pai_c.handoff.explain_result", AsyncMock()) as explain:
+                    patch("app.pai_c.orchestrator.handle_research_result", AsyncMock()) as explain:
                 await operator._post_result(
                     db, student.workspace_id, "channel/pai-counselor", run.id,
                     "completed", "Secret personalized ranking",

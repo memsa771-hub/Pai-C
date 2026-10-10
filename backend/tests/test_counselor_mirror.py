@@ -305,7 +305,7 @@ def test_edit_posts_normal_student_event_and_returns_to_discovery():
         try:
             with patch("app.security.event_identity.verify_identity_claims", return_value={"session_user_id": student.user_id}), \
                  patch("app.routers.events.pipeline.process", AsyncMock(side_effect=persist)), \
-                 patch("app.pai_c.runtime.run_counselor", AsyncMock()) as counselor, \
+                 patch("app.pai_c.orchestrator.handle_student_message", AsyncMock()) as counselor, \
                  patch("app.services.workflow.advance_workflow"), patch("app.services.integrations.relay_for_event"), \
                  patch("app.infrastructure.cache.publish_event"), patch("app.routers.events._invalidate_poll_cache"):
                 response = client.post(f"/v1/counselor/summary/edit?network={student.workspace_id}",

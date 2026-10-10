@@ -139,25 +139,9 @@ async def focus_roadmap(roadmap_id: str, network: str = Query(...), db=Depends(g
     title = current.title
     result = _result(lambda: RoadmapService(db).focus(str(workspace.id), roadmap_id), db)
     if first_focus:
-        from app.pai_c.posting import _build_conversation_context, send_to_student
-        from app.pai_c.deep.turn import run_deep_turn
-        from app.pai_c.deep.turn_input import CounselorTurnInput
-        from app.services.pai import PAI_AGENT_NAME, PAI_PRIMARY_CHANNEL
+        from app.pai_c.orchestrator import handle_roadmap_discussion
         try:
-            target = f"channel/{PAI_PRIMARY_CHANNEL}"
-            history = _build_conversation_context(db, str(workspace.id), target,
-                                                  PAI_AGENT_NAME, exclude_event_id="", max_chars=3000)
-            turn = CounselorTurnInput(
-                channel=target, workspace_id=str(workspace.id),
-                student_text=f"I opened the roadmap named {title}.",
-                attachments=(), session_id=None, source_event_id="",
-                timestamp=None, source=f"human:{workspace.owner_user_id}",
-            )
-            response = await run_deep_turn(db, turn, roadmap_id=roadmap_id, history=history)
-            opening = response.reply
-            if opening:
-                await send_to_student(db, str(workspace.id), target,
-                                     PAI_AGENT_NAME, opening, depth=0)
+            await handle_roadmap_discussion(db, workspace, roadmap_id, title)
         except Exception as exc:
             # The persisted focus remains usable on the next ordinary turn.
             db.rollback()

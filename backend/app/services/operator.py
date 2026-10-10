@@ -307,8 +307,8 @@ async def _post_result(
                 )
                 db.rollback()
                 try:
-                    from app.pai_c.handoff import explain_result
-                    explained = await explain_result(workspace_id, history, handoff)
+                    from app.pai_c.orchestrator import handle_research_result
+                    explained = await handle_research_result(workspace_id, history, handoff)
                     if explained:
                         message = explained
                 except Exception:

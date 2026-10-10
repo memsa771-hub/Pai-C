@@ -72,14 +72,14 @@ def _maybe_run_counselor(workspace, channel_name: str, content: str, agent: str)
     from app.services.pai import PAI_AGENT_NAME
     if agent != PAI_AGENT_NAME:
         return
-    from app.pai_c.runtime import run_counselor
+    from app.pai_c.orchestrator import handle_student_message
     snapshot = {
         "target": f"channel/{channel_name}",
         "source": WORKFLOW_SOURCE,
         "payload": {"content": content, "message_type": "chat"},
         "metadata": {"target_agents": [agent]},
     }
-    _spawn(_run_coro, run_counselor, str(workspace.id), snapshot)
+    _spawn(_run_coro, handle_student_message, str(workspace.id), snapshot)
 
 
 # ---------------------------------------------------------------------------

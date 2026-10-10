@@ -386,8 +386,8 @@ def send_event(
 
     # Run the built-in Counselor when this message targets it.
     if result.type == "workspace.message.posted":
-        from app.pai_c.runtime import run_counselor
-        background_tasks.add_task(run_counselor, str(workspace.id), event_snapshot)
+        from app.pai_c.orchestrator import handle_student_message
+        background_tasks.add_task(handle_student_message, str(workspace.id), event_snapshot)
         # Drive any workflow run bound to this channel (advance to the next step).
         from app.services.workflow import advance_workflow
         background_tasks.add_task(advance_workflow, str(workspace.id), event_snapshot)
