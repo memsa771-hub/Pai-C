@@ -252,3 +252,18 @@ async def _post_response(
     # integration relay, which cloud replies reach ONLY from here (they bypass
     # the POST /v1/events route that schedules them for everyone else).
     return event.id
+
+
+async def send_to_student(
+    db, workspace_id: str, channel_target: str, agent_name: str,
+    content: str, depth: int,
+    attachments: Optional[list] = None,
+    message_type: str = "chat",
+    metadata: Optional[dict] = None,
+    extra_payload: Optional[dict] = None,
+) -> Optional[str]:
+    """The public Messenger path; keep every existing delivery hook unchanged."""
+    return await _post_response(
+        db, workspace_id, channel_target, agent_name, content, depth,
+        attachments=attachments, message_type=message_type,
+        metadata=metadata, extra_payload=extra_payload)

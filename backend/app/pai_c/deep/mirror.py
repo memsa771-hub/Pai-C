@@ -14,7 +14,7 @@ from app.pai_c.memory import MemoryService
 from app.pai_c.deep.prompts import load_prompt
 from app.pai_c.deep.sensitive import check_notebook_before_mirror
 from app.pai_c.deep.turn_input import CounselorTurnInput
-from app.pai_c.posting import _post_response
+from app.pai_c.posting import send_to_student
 from app.inference.gateway import complete as chat_completion, resolve_model
 from app.runtime.task_runtime import enqueue
 from app.journey import JourneyService
@@ -80,7 +80,7 @@ async def _publish(db, job, draft) -> dict:
     from app.pai_c.runtime import _voice_reply_metadata
 
     voice_metadata = _voice_reply_metadata({"metadata": source.metadata_}) if source else None
-    message = await _post_response(
+    message = await send_to_student(
         db, job.workspace_id, draft["channel"], "pai", mirror.spoken_reply(), 0,
         message_type="counselor_mirror",
         extra_payload={"mirror": mirror.model_dump(mode="json"), "version": draft["version"]},

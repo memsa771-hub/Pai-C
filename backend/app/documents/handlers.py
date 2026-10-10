@@ -427,7 +427,7 @@ async def notify_document_job(job, db) -> dict:
     from sqlalchemy import select
 
     from app.models import FileRecord
-    from app.pai_c.runtime import _post_response
+    from app.pai_c.posting import send_to_student
     from app.services.pai import PAI_AGENT_NAME
     from .progress import completion_message, learned_summary
 
@@ -449,7 +449,7 @@ async def notify_document_job(job, db) -> dict:
 
     summary = learned_summary(db, artifact)
     message = completion_message(record.filename, artifact.classification or "", summary)
-    event_id = await _post_response(
+    event_id = await send_to_student(
         db, workspace_id, f"channel/{record.channel_name}", PAI_AGENT_NAME,
         message, depth=0, message_type="document_processed",
         metadata={"document_file_id": file_id},

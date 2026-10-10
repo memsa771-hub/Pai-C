@@ -417,7 +417,7 @@ async def complete_mirror_pipeline(student):
         job=db.scalar(select(BackgroundJob).where(BackgroundJob.workspace_id==student.workspace_id,
             BackgroundJob.job_type==JOB_MIRROR,BackgroundJob.status=='pending'))
         if job is None: return {'status':'mirror_not_queued'}
-        with phase('mirror'), patch('app.pai_c.deep.mirror._post_response',student.post_response):
+        with phase('mirror'), patch('app.pai_c.deep.mirror.send_to_student',student.post_response):
             outcome=await mirror_job(job,db)
         job.status='succeeded'; db.commit()
         journey=JourneyService(db).ensure_counselor(student.workspace_id)

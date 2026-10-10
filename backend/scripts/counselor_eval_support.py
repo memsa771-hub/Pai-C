@@ -107,7 +107,7 @@ class StudentSession:
             db.commit()
             self.user_id = str(user.id)
         self.patches = [patch.object(pai, "WorkspaceApi", EvalWorkspaceApi),
-                        patch.object(runtime, "_post_response", self.post_response),
+                        patch.object(runtime, "send_to_student", self.post_response),
                         patch("app.pai_c.posting._post_response", self.post_response)]
         for item in self.patches:
             item.start()

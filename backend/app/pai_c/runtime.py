@@ -9,7 +9,7 @@ from sqlalchemy import select
 
 from app.config import config
 from app.database import SessionLocal
-from app.pai_c.posting import _post_response
+from app.pai_c.posting import send_to_student
 
 logger = logging.getLogger(__name__)
 
@@ -114,7 +114,7 @@ async def _run_deep_turn(db, workspace_id: str, event_data: dict, depth: int):
     if (reply_metadata and result.action.get("type") == "mirror"
             and result.context.notebook.mirror_ready):
         reply_metadata["mirror_pending"] = True
-    assistant_event_id = await _post_response(
+    assistant_event_id = await send_to_student(
         db, workspace_id, turn.channel, PAI_AGENT_NAME, result.reply, depth,
         metadata=reply_metadata,
     )
@@ -166,7 +166,7 @@ async def _post_error_message(
     """
     err_db = SessionLocal()
     try:
-        await _post_response(
+        await send_to_student(
             err_db, workspace_id,
             event_data.get("target", ""),
             agent_name,

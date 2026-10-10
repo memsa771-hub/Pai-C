@@ -159,7 +159,7 @@ async def test_mirror_posts_once_reuses_sensitive_check_and_system_context(inval
 
         with patch("app.pai_c.deep.sensitive.chat_completion", AsyncMock(side_effect=safe_model)) as safety, \
              patch("app.pai_c.deep.mirror.chat_completion", AsyncMock(side_effect=model)) as call, \
-             patch("app.pai_c.deep.mirror._post_response", AsyncMock(side_effect=fake_post(student))) as post:
+             patch("app.pai_c.deep.mirror.send_to_student", AsyncMock(side_effect=fake_post(student))) as post:
             assert (await mirror_job(job, db))["status"] == "posted"
             assert (await mirror_job(job, db))["status"] == "posted"
         assert call.await_count == (2 if invalid_first else 1)
@@ -186,7 +186,7 @@ async def test_second_invalid_generation_keeps_discovery_and_logs_no_text(caplog
         db.commit()
         with patch("app.pai_c.deep.sensitive.chat_completion", AsyncMock(side_effect=safe_model)), \
              patch("app.pai_c.deep.mirror.chat_completion", AsyncMock(return_value="private broken text")) as model, \
-             patch("app.pai_c.deep.mirror._post_response", AsyncMock()) as post:
+             patch("app.pai_c.deep.mirror.send_to_student", AsyncMock()) as post:
             assert (await mirror_job(db.get(BackgroundJob, job_id), db))["status"] == "invalid"
         assert model.await_count == 2
         post.assert_not_awaited()
@@ -236,7 +236,7 @@ async def test_stale_notebook_skips_generation_and_failed_check_never_posts():
         with patch("app.pai_c.deep.mirror.check_notebook_before_mirror",
                    AsyncMock(side_effect=RuntimeError("safety unavailable"))), \
              patch("app.pai_c.deep.mirror.chat_completion", AsyncMock()) as model, \
-             patch("app.pai_c.deep.mirror._post_response", AsyncMock()) as post:
+             patch("app.pai_c.deep.mirror.send_to_student", AsyncMock()) as post:
             with pytest.raises(RuntimeError, match="safety unavailable"):
                 await mirror_job(job, db)
             model.assert_not_awaited()

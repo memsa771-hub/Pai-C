@@ -139,7 +139,7 @@ async def focus_roadmap(roadmap_id: str, network: str = Query(...), db=Depends(g
     title = current.title
     result = _result(lambda: RoadmapService(db).focus(str(workspace.id), roadmap_id), db)
     if first_focus:
-        from app.pai_c.posting import _build_conversation_context, _post_response
+        from app.pai_c.posting import _build_conversation_context, send_to_student
         from app.pai_c.deep.turn import run_deep_turn
         from app.pai_c.deep.turn_input import CounselorTurnInput
         from app.services.pai import PAI_AGENT_NAME, PAI_PRIMARY_CHANNEL
@@ -156,7 +156,7 @@ async def focus_roadmap(roadmap_id: str, network: str = Query(...), db=Depends(g
             response = await run_deep_turn(db, turn, roadmap_id=roadmap_id, history=history)
             opening = response.reply
             if opening:
-                await _post_response(db, str(workspace.id), target,
+                await send_to_student(db, str(workspace.id), target,
                                      PAI_AGENT_NAME, opening, depth=0)
         except Exception as exc:
             # The persisted focus remains usable on the next ordinary turn.

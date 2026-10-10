@@ -264,7 +264,7 @@ async def _post_result(
 ) -> None:
     """Auto-post the finished run's outcome into the thread it was delegated
     from — the same event-pipeline path a Counselor reply already
-    uses (see ``counseling.posting._post_response``), so the student sees the result
+    uses (see ``counseling.posting.send_to_student``), so the student sees the result
     the moment it's ready instead of having to ask "did it work?" in a later
     turn. Posted as PAI Counselor (``pai.PAI_AGENT_NAME``): Operator never
     speaks to the student directly, only Counselor does.
@@ -282,7 +282,7 @@ async def _post_result(
     if not channel_target or not message:
         return
     try:
-        from app.pai_c.posting import _build_conversation_context, _post_response
+        from app.pai_c.posting import _build_conversation_context, send_to_student
         db.rollback()
         run = db.get(ExecutionRun, run_id)
         context_current = bool(run and _result_context_current(db, run))
@@ -326,7 +326,7 @@ async def _post_result(
             if cards:
                 response_metadata["roadmaps"] = cards
                 db.commit()
-        await _post_response(
+        await send_to_student(
             db, workspace_id, channel_target, pai.PAI_AGENT_NAME, message, depth=0,
             message_type="operator_result",
             metadata=response_metadata,
