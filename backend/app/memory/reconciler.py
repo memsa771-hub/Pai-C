@@ -144,7 +144,6 @@ class MemoryReconciler:
             RoadmapService(self.db).mark_stale(
                 candidate.workspace_id, f"Student profile changed: {candidate.key or 'profile'}")
             from app.runtime.task_runtime import enqueue
-            from app.memory.handlers import JOB_RESUME_RESEARCH
             self.db.add(EventRecord(
                 id=str(uuid.uuid4()), network_id=candidate.workspace_id,
                 type="vault.fact_accepted", source="system:reconciler", target="core",
@@ -153,7 +152,7 @@ class MemoryReconciler:
                 timestamp=int(time.time() * 1000), visibility="private",
             ))
             enqueue(self.db,
-                job_type=JOB_RESUME_RESEARCH, workspace_id=candidate.workspace_id,
+                job_type="memory.resume_research", workspace_id=candidate.workspace_id,
                 payload={"candidate_id": candidate.id},
                 idempotency_key=f"research-resume:{candidate.id}",
             )

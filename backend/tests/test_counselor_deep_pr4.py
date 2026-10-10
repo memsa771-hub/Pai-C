@@ -23,7 +23,7 @@ from app.pai_c.stages import advance_discovery_stage
 from app.jobs.service import BackgroundJobService
 from app.inference.client import chat_completion
 from app.journey import JourneyService
-from app.memory.handlers import _research_delegate_allowed
+from app.research.jobs import _research_delegate_allowed
 from app.models import BackgroundJob, EventRecord
 from scripts.counselor_eval_support import StudentSession
 

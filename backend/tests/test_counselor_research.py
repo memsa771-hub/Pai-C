@@ -15,7 +15,7 @@ from app.plugins._shared.institution_registry import registry_identity
 from app.plugins.program_research import research as research_program
 from app.plugins.roadmap_builder import build, on_run_status
 from app.journey import JourneyService
-from app.memory.handlers import resume_research
+from app.research.jobs import resume_research
 from app.models import BackgroundJob, EventRecord, ExecutionRun, Institution, MemoryCandidate
 from app.memory.candidates import MemoryCandidateService
 from app.memory.reconciler import MemoryReconciler
@@ -235,9 +235,7 @@ async def test_accepted_fact_event_resumes_same_paused_run_without_student_conti
         db.add_all((run, candidate))
         db.commit()
         with patch.object(operator, "resume", AsyncMock(return_value={
-                "ok": True, "data": {"resumed": True}})) as resumed, \
-                patch("app.research.gateway.request_research",
-                      AsyncMock(return_value=None)):
+                "ok": True, "data": {"resumed": True}})) as resumed:
             outcome = await resume_research(SimpleNamespace(
                 workspace_id=student.workspace_id, payload={"candidate_id": candidate.id}), db)
         assert outcome["resumed"] == 1

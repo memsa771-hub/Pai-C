@@ -5,6 +5,7 @@ from .contract import CapabilityContract
 def load_system_capabilities(registry):
     from app.pai_c.deep import analysis, mirror
     from app.memory import handlers as memory
+    from app.research import jobs as research
     from app.documents import handlers as documents
     from app.services.operator import run_agent_job
 
@@ -19,8 +20,8 @@ def load_system_capabilities(registry):
         (memory.JOB_EMBED, memory.embed_memory, {"memory_ids": array, "episode_ids": array}),
         (memory.JOB_UNINDEX, memory.unindex_memory, {"ids": array}),
         (memory.JOB_REINDEX, memory.reindex_workspace, {"purge_first": {"type": "boolean"}, "batch_size": {"type": "integer"}}),
-        (memory.JOB_RESUME_RESEARCH, memory.resume_research, {"candidate_id": string}),
-        (memory.JOB_REFRESH_RESEARCH, memory.refresh_stale_research, {"requirement_id": string}),
+        (research.JOB_RESUME_RESEARCH, research.resume_research, {"candidate_id": string}),
+        (research.JOB_REFRESH_RESEARCH, research.refresh_stale_research, {"requirement_id": string}),
         (documents.JOB_DOCUMENT_PARSE, documents.parse_document_job, {"file_id": string}),
         (documents.JOB_DOCUMENT_EXTRACT, documents.extract_document_job, {"file_id": string}),
         (documents.JOB_DOCUMENT_INDEX, documents.index_document_job, {"file_id": string}),

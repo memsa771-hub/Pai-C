@@ -6,7 +6,7 @@ from sqlalchemy import select
 
 from app.config import config
 from app.runtime.task_runtime import enqueue
-from app.memory.handlers import JOB_REFRESH_RESEARCH
+from app.research.jobs import JOB_REFRESH_RESEARCH
 from app.models import Opportunity, RequirementSet
 from app.pai_c.roadmaps.service import RoadmapService
 
