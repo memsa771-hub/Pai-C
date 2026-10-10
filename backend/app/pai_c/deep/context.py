@@ -18,11 +18,10 @@ from app.plugins._shared.sources import public_https
 
 logger = logging.getLogger(__name__)
 _NOTEBOOK_ORDER = (
-    "open_questions", "coverage", "claims", "family", "constraints",
-    "mirror_ready", "depth_mode", "engagement_style", "stated_goal", "person",
-    "strengths", "growth_areas", "drivers", "hypotheses", "goal_history",
-    "values", "learning_style", "work_preferences", "emotional_notes",
-    "mirror_blockers", "chapter",
+    "schema_version", "open_questions", "coverage", "said", "source", "pressures",
+    "self", "sure", "shown", "mirror_ready", "depth_mode", "engagement_style",
+    "hypotheses", "goal_history", "tensions", "identity_status",
+    "decision_difficulties", "private_notes", "mirror_blockers", "chapter",
 )
 
 
@@ -75,7 +74,7 @@ def _profile(db, workspace_id: str) -> dict:
         if key in {"preferred_name", "full_name", "date_of_birth", "current_status", "status_category"}:
             identity[key] = {"value": _short(fact.get("value")),
                              "source": fact.get("source_type") or "unknown"}
-    facts = {key: {"value": _short(fact.get("value")),
+    facts = {key: {"id": fact.get("id"), "value": _short(fact.get("value")),
                    "source": fact.get("source_type") or "unknown",
                    "verification": fact.get("confidence")}
              for key, fact in list(snapshot.facts.items())[:30] if key not in identity}

@@ -23,7 +23,7 @@ from unittest.mock import patch
 from app.config import config
 from app.pai_c.deep.analysis import analyze_job, enqueue_turn_analysis
 from app.pai_c.deep.actions import dispatch_action
-from app.pai_c.deep.notebook import NotebookService
+from app.pai_c.memory import MemoryService
 from app.pai_c.deep.polish import contains_blocked_script
 from app.pai_c.deep.turn import run_deep_turn
 from app.pai_c.deep.turn_input import CounselorTurnInput
@@ -242,7 +242,7 @@ def _metrics(persona: dict, turns: list[dict], notebook: dict, grader: dict | No
         grader["hidden_truths_captured"] = sum(
             item.get("captured") is True for item in grader["hidden_truths"]
             if isinstance(item, dict))
-    claims = notebook.get("claims") or []
+    claims = [item for item in notebook.get("said", []) if item.get("key") == "claim"]
     questions = [len(re.findall(r"[?\u061f]", turn["reply"])) for turn in turns]
     mirror_turn = next((turn["turn"] for turn in turns
                         if turn["action"].get("type") == "mirror"), None)
@@ -253,7 +253,7 @@ def _metrics(persona: dict, turns: list[dict], notebook: dict, grader: dict | No
         "hidden_truth_recall": (round(grader["hidden_truths_captured"] / len(persona["hidden_truths"]), 3)
                                 if grader and persona["hidden_truths"]
                                 and isinstance(grader.get("hidden_truths_captured"), int) else None),
-        "claims_probed_beyond_claimed": sum(item.get("evidence_level") in
+        "claims_probed_beyond_claimed": sum(item.get("level") in
                                              {"tried", "sustained", "proven"} for item in claims),
         "claims_total": (grader or {}).get("claims_total"),
         "goal_tested_before_mirror": (grader or {}).get("goal_tested_before_mirror"),
@@ -359,7 +359,7 @@ async def evaluate_persona(persona: dict, ledger: UsageLedger, *, live: bool,
                     with phase("memory_extractor"):
                         await student.extract_and_reconcile()
                     with student.factory() as db:
-                        notebook = NotebookService(db).get(student.workspace_id).notebook.model_dump(mode="json")
+                        notebook = MemoryService(db).truth_map(student.workspace_id).notebook.model_dump(mode="json")
                     transcript.extend([{"role": "student", "content": message},
                                        {"role": "counselor", "content": answer.reply}])
                     calls = ledger.calls[before:]

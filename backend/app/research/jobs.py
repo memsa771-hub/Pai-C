@@ -1,5 +1,6 @@
 """Research refresh and accepted-evidence resume jobs; queue identifiers retained."""
 from sqlalchemy import select
+from app.pai_c.memory import MemoryService
 
 JOB_RESUME_RESEARCH = "memory.resume_research"
 JOB_REFRESH_RESEARCH = "research.refresh_stale"
@@ -26,6 +27,7 @@ async def refresh_stale_research(job, db) -> dict:
         return {"delegated": False}
     snapshot = StudentSnapshotService(db).build(job.workspace_id)
     goals = snapshot.records.get("goal", [])
+    understanding = MemoryService(db).understanding_summary(job.workspace_id)
     if journey.current_stage == "PROPOSED":
         journey = JourneyService(db).set_counselor_stage(
             job.workspace_id, journey.id, "RESEARCHING", actor="system:source_review")
@@ -58,7 +60,7 @@ async def refresh_stale_research(job, db) -> dict:
                                  "intake": opportunity.intake}
     result = await request_research(
         "stale_refresh", job.workspace_id, trigger="stale_refresh", db=db, journey=journey, goals=goals,
-        snapshot=snapshot, tool_context=context,
+        snapshot=snapshot, understanding=understanding, tool_context=context,
         refresh_key=requirement_id or job.id, refresh_candidate=refresh_candidate)
     return {"delegated": bool(result and result.get("ok"))}
 
@@ -127,7 +129,7 @@ async def resume_research(job, db) -> dict:
     journey = advance_discovery_stage(
         journeys, job.workspace_id, journey,
         identity_ready=bool(owner and owner.onboarded_at),
-        foundation_ready=_deep_foundation_ready(db, job.workspace_id),
+        foundation_ready=MemoryService(db).foundation_ready(MemoryService(db).truth_map(job.workspace_id).notebook),
         goal_records=snapshot.records.get("goal", []), actor="system:reconciliation")
     from app.models import Roadmap
     stale = db.execute(select(Roadmap.id).where(
@@ -157,15 +159,8 @@ async def resume_research(job, db) -> dict:
     delegated = await request_research(
         "stale_refresh" if refresh_key else "roadmap_light", job.workspace_id,
         db=db, journey=journey, goals=snapshot.records.get("goal", []),
-        snapshot=snapshot, tool_context=counselor_ctx, refresh_key=refresh_key, trigger="student_answer")
+        snapshot=snapshot, understanding=MemoryService(db).understanding_summary(job.workspace_id), tool_context=counselor_ctx, refresh_key=refresh_key, trigger="student_answer")
     return {"resumed": resumed, "delegated": bool(delegated and delegated.get("ok"))}
-
-
-def _deep_foundation_ready(db, workspace_id: str) -> bool:
-    from app.pai_c.deep.notebook import NotebookService
-
-    coverage = NotebookService(db).get(workspace_id).notebook.coverage
-    return bool(coverage.person and coverage.education)
 
 
 def _research_delegate_allowed(journey, refresh_key: str | None) -> bool:

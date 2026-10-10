@@ -14,13 +14,13 @@ def mirror_is_current(db, workspace_id, version=None):
                 and (version is None or draft.get("version") == version))
 
 
-def _research_brief(db, workspace_id, journey, snapshot=None):
-    from app.pai_c.deep.notebook import NotebookService
+def _research_brief(db, workspace_id, journey, snapshot=None, understanding=None):
+    from app.pai_c.memory import MemoryService
     from app.memory.student_snapshot import StudentSnapshotService
 
     snapshot = snapshot or StudentSnapshotService(db).build(workspace_id)
     draft = journey.counselor_summary_draft or {}
-    notebook = NotebookService(db).get(workspace_id).notebook.model_dump(mode="json")
+    notebook = understanding if understanding is not None else MemoryService(db).understanding_summary(workspace_id)
     questions = db.scalars(select(CounselorNotedQuestion).where(
         CounselorNotedQuestion.workspace_id == workspace_id,
         CounselorNotedQuestion.status.in_(("open", "unanswered")))).all()
@@ -28,7 +28,7 @@ def _research_brief(db, workspace_id, journey, snapshot=None):
     return {"mirror": draft.get("mirror") or {}, "mirror_version": draft.get("version"),
         "notebook": notebook, "goals": goals, "goal_id": goals[0].get("id") if goals else None,
         "profile": {"facts": snapshot.facts, "records": snapshot.records},
-        "stated_preference": (notebook.get("stated_goal") or {}).get("text") or
+        "stated_preference": next((item["value"] for item in notebook["said"] if item["key"] == "stated_goal" and item["status"] == "active"), "") or
             next((item["picture"] for item in (draft.get("mirror") or {}).get("dimensions", [])
                   if item["key"] == "stated_goal"), ""),
         "questions": [{"id": item.id, "question": item.question_to_research} for item in questions],
@@ -36,7 +36,7 @@ def _research_brief(db, workspace_id, journey, snapshot=None):
 
 
 async def request_research(kind, workspace_id, *, db, journey, tool_context,
-                           goals=None, snapshot=None, refresh_key=None, refresh_candidate=None,
+                           goals=None, snapshot=None, understanding=None, refresh_key=None, refresh_candidate=None,
                            roadmap_id=None, trigger=None, resume_run_id=None, resume_action=None):
     """Serialize gateway requests without holding row locks across Operator calls."""
     from sqlalchemy import text
@@ -51,7 +51,7 @@ async def request_research(kind, workspace_id, *, db, journey, tool_context,
                 lock = None
                 return {"ok": False, "error": {"code": "research_busy"}}
         return await _request_research(kind, workspace_id, db=db, journey=journey,
-            tool_context=tool_context, goals=goals, snapshot=snapshot, refresh_key=refresh_key,
+            tool_context=tool_context, goals=goals, snapshot=snapshot, understanding=understanding, refresh_key=refresh_key,
             refresh_candidate=refresh_candidate, roadmap_id=roadmap_id, trigger=trigger,
             resume_run_id=resume_run_id, resume_action=resume_action)
     finally:
@@ -63,7 +63,7 @@ async def request_research(kind, workspace_id, *, db, journey, tool_context,
 
 
 async def _request_research(kind, workspace_id, *, db, journey, tool_context,
-                           goals=None, snapshot=None, refresh_key=None, refresh_candidate=None,
+                           goals=None, snapshot=None, understanding=None, refresh_key=None, refresh_candidate=None,
                            roadmap_id=None, trigger=None, resume_run_id=None, resume_action=None):
     if kind not in {"roadmap_light", "roadmap_deep", "stale_refresh"}:
         raise ValueError("unknown Counselor research kind")
@@ -113,7 +113,7 @@ async def _request_research(kind, workspace_id, *, db, journey, tool_context,
         if journey.current_stage != "CHOSEN" or not chosen:
             return None
         raise NotImplementedError("chosen roadmap deep research is deferred")
-    brief = _research_brief(db, workspace_id, journey, snapshot)
+    brief = _research_brief(db, workspace_id, journey, snapshot, understanding)
     brief["research_kind"] = kind
     brief["refresh_key"] = refresh_key
     if target and target.origin == "student_added":

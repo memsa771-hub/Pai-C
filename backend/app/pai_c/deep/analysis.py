@@ -129,7 +129,7 @@ def _input(db, workspace_id: str, student: EventRecord, assistant: EventRecord,
             break
     transcript.reverse()
     episode = MemoryService(db).latest_episode(workspace_id, limit=1)
-    return ("<notebook_schema>" + _json(CounselorNotebookData.model_json_schema())
+    return ("<notebook_schema>" + _json(CounselorNotebookData.analyst_schema())
             + "</notebook_schema>\n"
             + "<notebook>" + _json(notebook.model_dump(mode="json")) + "</notebook>\n"
             + "<profile>" + _json(_profile(db, workspace_id)) + "</profile>\n"
@@ -172,7 +172,7 @@ def _advance_stage(db, workspace_id: str, notebook) -> None:
     advance_discovery_stage(
         journeys, workspace_id, journey,
         identity_ready=bool(owner and owner.onboarded_at),
-        foundation_ready=bool(notebook.coverage.person and notebook.coverage.education),
+        foundation_ready=MemoryService(db).foundation_ready(notebook),
         goal_records=[], actor="system:counselor_analyst",
     )
     db.commit()

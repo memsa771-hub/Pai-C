@@ -85,6 +85,8 @@ def _nested_model(annotation: Any) -> type[BaseModel] | None:
 def _changed_entries(old: dict, new: dict, model: type[BaseModel], path: str = "") -> list[ChangedEntry]:
     entries: list[ChangedEntry] = []
     for name, field in model.model_fields.items():
+        if field.exclude:
+            continue
         value, prior = new.get(name), old.get(name)
         if value == prior or value is None:
             continue
@@ -104,6 +106,8 @@ def _changed_entries(old: dict, new: dict, model: type[BaseModel], path: str = "
 def _remove_flagged(new: dict, model: type[BaseModel], flagged: set[str], path: str = "") -> dict | object:
     cleaned = dict(new)
     for name, field in model.model_fields.items():
+        if field.exclude:
+            continue
         value = new.get(name)
         field_path = f"{path}.{name}" if path else name
         if isinstance(value, list):
@@ -175,7 +179,7 @@ async def check_notebook_before_mirror(workspace_id: str, *, db=None,
     if not removals:
         db.rollback()
         return previous, []
-    clean = clean.model_copy(update={"mirror_ready": False})
+    clean = clean.model_copy(update={"mirror_ready": False, "mirror_blockers": [*clean.mirror_blockers, "Removed sensitive entries require further discovery"]})
     snapshot, _ = service.apply_truth_map(workspace_id, clean, previous.last_event_id,
                                 expected_version=previous.version)
     return snapshot, removals

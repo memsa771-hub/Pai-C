@@ -18,8 +18,8 @@ from uuid import UUID
 from sqlalchemy import select, text
 
 from app.database import new_session
-from app.models import (CounselorNotebook, CounselorNotebookHistory,
-                        CounselorNotedQuestion, CounselorTurnDecision,
+from app.pai_c.memory import MemoryService
+from app.models import (CounselorNotedQuestion, CounselorTurnDecision,
                         EventRecord, Roadmap, StudentJourney, Workspace)
 from scripts.eval.cost import load_prices, token_record
 
@@ -116,8 +116,7 @@ def export_session(db, workspace_id, usage_logs=()):
                 message_type=payload.get("message_type", "chat"),
                 actions=[a for a in actions if a["source_event_id"] == event.id],
                 decisions=[row_data(d) for d in decisions if d.source_event_id == event.id]))
-        notebooks = rows(CounselorNotebook)
-        histories = rows(CounselorNotebookHistory, "workspace_id", CounselorNotebookHistory.version)
+        notebook_export = MemoryService(db).export_truth_map(workspace_id)
         journeys = rows(StudentJourney, "workspace_id", StudentJourney.created_at, StudentJourney.id)
         roadmaps = rows(Roadmap, "workspace_id", Roadmap.created_at, Roadmap.id)
         mirrors = [dict(journey_id=j.id, draft=j.counselor_summary_draft)
@@ -130,8 +129,7 @@ def export_session(db, workspace_id, usage_logs=()):
                 facts.append(dict(roadmap_id=roadmap.id, fact=fact))
         result = dict(workspace_id=workspace_id, exported_at=datetime.now(timezone.utc),
             conversation=conversation, actions=actions,
-            notebook=dict(latest=row_data(notebooks[0]) if notebooks else None,
-                          history=[row_data(n) for n in histories]),
+            notebook=notebook_export,
             noted_questions=[row_data(q) for q in rows(CounselorNotedQuestion,
                 "workspace_id", CounselorNotedQuestion.created_at, CounselorNotedQuestion.id)],
             mirror_drafts=mirrors, mirror_history=mirror_events,
