@@ -612,6 +612,7 @@ async def _execute(
     run_id: str, workspace_id: str, api: Any,
     objective: str, constraints: dict, context_refs: list,
     channel_target: Optional[str] = None, resume_payload: Optional[dict] = None,
+    *, _agent_only: bool = False,
 ) -> None:
     db = new_session()
     try:
@@ -631,6 +632,14 @@ async def _execute(
             db.commit()
             db.refresh(run)
             _publish_run_updated(workspace_id, run)
+
+        from app.capabilities import get_capability_registry
+        from app.capabilities.execution_policy import resolve_run_policy
+        workflow_policy = resolve_run_policy(get_capability_registry(), run.task_type, run.resume_input)
+        capability_input = (run.constraints or {}).get("capability_input")
+        if not _agent_only and workflow_policy.owner and isinstance(capability_input, dict):
+            await _execute_workflow(db, run, api, workflow_policy, capability_input, set_status)
+            return
 
         api_key = config.PAI_API_KEY
         # Operator may run a different model from Counselor; empty reuses it.
@@ -1109,3 +1118,98 @@ async def _execute(
             logger.exception("operator: failed to record failure for run %s", run_id)
     finally:
         db.close()
+
+
+async def _execute_workflow(db, run, api, policy, capability_input, set_status):
+    """Fixed input uses the ordinary checked tool path, never an Operator model."""
+    from app.tools import AUDIENCE_OPERATOR, ToolContext, get_tool_executor, get_tool_registry
+    from app.memory.permissions import OPERATOR_CAPABILITIES
+
+    owner = policy.owner
+    registry = get_tool_registry()
+    available = frozenset(tool.name for tool in registry.for_audience(AUDIENCE_OPERATOR)
+                          if registry.permits(tool, OPERATOR_CAPABILITIES))
+    resume_state = run.resume_input or {}
+    pending = resume_state.get("pending_action") or {}
+    response = resume_state.get("response") or {}
+    approved = frozenset({pending["capability_id"]}) if (
+        pending.get("purpose") == "capability_invoke" and response.get("approved") is True
+        and pending.get("capability_id")
+    ) else frozenset()
+    context = ToolContext(
+        workspace_id=run.workspace_id, agent_name=PAI_OPERATOR_AGENT_NAME, api=api,
+        allowed_tools=policy.allowed_tools(available), audience=AUDIENCE_OPERATOR,
+        granted_capabilities=OPERATOR_CAPABILITIES, approved_capabilities=approved,
+        required_capability_id=owner.id,
+    )
+    plan = list(run.plan or []) or [{"id": "objective", "title": run.objective, "status": "working"}]
+    set_status("executing", plan=plan, current_step=plan[0]["title"], pending_action=None)
+    args = {"capability_id": owner.id, "input": capability_input}
+    db.rollback()
+    outcome = await get_tool_executor().execute("capability.invoke", args, context)
+    calls = list(run.tool_calls or []) + [{"tool": "capability.invoke", "arguments": args,
+                                          "ok": bool(outcome.get("ok"))}]
+    observations = list((run.result or {}).get("observations") or []) + [{
+        "tool": "capability.invoke", "ok": bool(outcome.get("ok")), "url": None,
+        "observed_at": _now().isoformat(), "data": _json.dumps(outcome, default=str)[:6000],
+    }]
+    error = outcome.get("error") or {}
+    payload = (outcome.get("data") or {}).get("result") if outcome.get("ok") else None
+    payload = payload if isinstance(payload, dict) else {}
+    pending_action = error.get("pending_action") if error.get("code") == "approval_required" else payload.get("pending_action")
+    summary = payload.get("summary") or payload.get("final_message") or error.get("message")
+    if isinstance(pending_action, dict) and pending_action:
+        status = STATUS_NEEDS_USER_ACTION
+        if pending_action.get("type") == "need_from_student":
+            items = [item for item in pending_action.get("items") or [] if isinstance(item, dict) and item.get("field")]
+            pending_action = {"kind": "fact", "type": "need_from_student", "items": items,
+                              "required": True, "title": "One detail will help me finish the research",
+                              "prompt": str(items[0].get("reason") if items else "Please share the missing detail")}
+            summary = summary or "I need one detail to finish comparing these routes."
+        summary = summary or "Your input is needed to continue."
+    elif not outcome.get("ok") or payload.get("status") == STATUS_FAILED:
+        status = STATUS_FAILED
+        pending_action = None
+        summary = summary or f"{owner.name} could not complete the owned task; generic fallback is forbidden."
+    else:
+        status = STATUS_COMPLETED
+        pending_action = None
+        summary = summary or f"{owner.name} completed the requested work."
+    plan = _mark_plan_progress(plan, None, status == STATUS_COMPLETED)
+    result = {"summary": summary, "final_message": payload.get("final_message"), "plan": plan,
+              "tool_calls": calls, "observations": observations[-12:], "artifact_id": None,
+              "capability_result": payload or None}
+    verification = {"status": status, "summary": summary, "missing": payload.get("missing") or [],
+                    "approval_required_for": pending_action.get("title") if pending_action and pending_action.get("kind") == "approval" else None}
+    set_status(status, current_step=summary, pending_action=pending_action,
+               completed_at=None if status == STATUS_NEEDS_USER_ACTION else _now(),
+               error=str(error.get("message") or payload.get("error") or "owned capability failed")[:500] if status == STATUS_FAILED else None,
+               plan=plan, completed_steps=[item["title"] for item in plan if item["status"] == "completed"],
+               tool_calls=calls, result=result, verification=verification,
+               result_type="research" if pending_action and pending_action.get("type") == "need_from_student" else "text",
+               result_artifact_id=None, missing=verification["missing"],
+               approval_required_for=verification["approval_required_for"])
+    await _post_result(db, run.workspace_id, run.channel_target, run.id, status,
+                       _terminal_message(status, summary, verification["missing"], verification))
+
+
+async def run_agent_job(job, db):
+    """System capability adapter to the unchanged open-ended loop."""
+    from app.models import Workspace
+    run = db.get(ExecutionRun, (job.payload or {}).get("run_id"))
+    if run is None or run.workspace_id != job.workspace_id:
+        raise LookupError("Execution run is unavailable in this workspace")
+    if run.status in _TERMINAL:
+        return {"run_id": run.id, "status": run.status}
+    workspace = db.get(Workspace, job.workspace_id)
+    if workspace is None:
+        raise LookupError("Workspace is unavailable")
+    args = (run.id, run.workspace_id, pai.WorkspaceApi(workspace.id, workspace.password_hash),
+            run.objective, run.constraints or {}, run.context_refs or [], run.channel_target)
+    resume_payload = run.resume_input or None
+    db.rollback()
+    await _execute(*args, resume_payload=resume_payload,
+                   _agent_only=True)
+    db.expire_all()
+    run = db.get(ExecutionRun, job.payload["run_id"])
+    return {"run_id": run.id, "status": run.status}
