@@ -382,12 +382,14 @@ async def extract_document_job(job, db) -> dict:
 
     # Indexing is enqueued separately and AFTER extraction, so an index
     # failure can never roll back canonical writes.
-    enqueue(db,
-        job_type=JOB_DOCUMENT_INDEX,
-        workspace_id=workspace_id,
-        payload={"file_id": file_id},
-        idempotency_key=f"document.index:{file_id}:{artifact.content_sha256}",
-    )
+    from app.config import config
+    if config.PAI_SEMANTIC_RECALL_ENABLED:
+        enqueue(db,
+            job_type=JOB_DOCUMENT_INDEX,
+            workspace_id=workspace_id,
+            payload={"file_id": file_id},
+            idempotency_key=f"document.index:{file_id}:{artifact.content_sha256}",
+        )
 
     return {
         "extracted": True,

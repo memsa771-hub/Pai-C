@@ -57,6 +57,9 @@ def enqueue_unindex(db, workspace_id: str, ids: list[str]) -> Optional[str]:
 
 def enqueue_reindex(db, workspace_id: str, purge_first: bool = False) -> Optional[str]:
     """Queue a full rebuild of one workspace's index from PostgreSQL."""
+    from app.config import config
+    if not config.PAI_SEMANTIC_RECALL_ENABLED:
+        return None
     try:
         from app.runtime.task_runtime import enqueue
         from app.memory.handlers import JOB_REINDEX

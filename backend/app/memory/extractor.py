@@ -27,7 +27,7 @@ from app.inference.gateway import complete as chat_completion, resolve_model
 
 logger = logging.getLogger(__name__)
 
-CANDIDATE_TYPES = ("vault_fact", "semantic_memory", "episode", "student_record")
+CANDIDATE_TYPES = ("vault_fact", "student_record")
 OPERATIONS = ("upsert",)          # extraction may only ADD proposals
 MEMORY_TYPES = ("preference", "goal", "constraint", "interest", "context")
 MAX_CANDIDATES = 16                # allow a useful multi-fact introduction
@@ -55,7 +55,7 @@ class ExtractedCandidate:
 SYSTEM_PROMPT = """You extract durable objective student facts from one counseling turn.
 The student's message is the only evidence. The assistant and earlier context only resolve references. Return JSON {"candidates": [...]} and no prose.
 Use the supplied Vault fields and record schemas. Preserve original qualification wording and reuse exact existing record ids for corrections. Propose only stated fields; never infer dates, scores, currency, institutions or commitment. Every candidate needs a quote copied from the student's message and confidence 0-1.
-Candidates: vault_fact with key/proposed_value; student_record with key/proposed_value; semantic_memory with content/memory_type; episode with content/event_type. All use candidate_type, operation upsert, quote, confidence and optional entities. Existing record patches use entities.record_id; goal replacement uses entities.supersedes_record_id. Course references need an existing education_id.
+Candidates: vault_fact with key/proposed_value; student_record with key/proposed_value. All use candidate_type, operation upsert, quote, confidence and optional entities. Existing record patches use entities.record_id; goal replacement uses entities.supersedes_record_id. Course references need an existing education_id.
 Goals record only the student's expressed objective target: stated_preference, target_countries, degree_level, field_of_study, target_intake. Preserve exploratory/considering commitment when stated; never upgrade it. Use attribution.claim_owner student/external/mixed/uncertain; mixed goals need attribution.student_clause_quote. Outside suggestions never become student goals.
 Do not propose student_voice_statement, external_influence, career.primary_interest, or interpretive goal details. Motivations, drivers, underlying objectives, limits and career interpretations belong to the separate Truth Map, not the Vault. Do not invent personality or affiliations. Greetings and transient logistics produce no candidates.
 For explicit corrections include attribution.correction and correction_quote; for explicit changes over time include attribution.temporal_change and change_quote. Copy their evidence, never infer change from a contradiction. Dates may retain year/month precision; do not invent a date. Nothing already recorded is reproposed unless corrected. No evidence means no candidate.
@@ -125,7 +125,7 @@ def _render_field_specs(field_specs) -> str:
         return ""
     return (
         "VAULT FIELDS YOU MAY PROPOSE (`key` must match one of these EXACTLY; "
-        "if nothing fits, use a semantic_memory instead):\n" + "\n".join(lines)
+        "if nothing fits, propose nothing):\n" + "\n".join(lines)
     )
 
 

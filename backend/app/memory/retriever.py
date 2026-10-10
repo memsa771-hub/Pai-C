@@ -20,6 +20,9 @@ never look like "the student has no memories".
 
 import logging
 import time
+from types import SimpleNamespace
+from sqlalchemy import select
+from .index_sources import canonical_text
 from dataclasses import dataclass, field
 from typing import Any, Optional
 
@@ -51,7 +54,7 @@ class RetrievedItem:
     @property
     def text(self) -> str:
         return (
-            self.record.summary if self.kind == KIND_EPISODE else self.record.content
+            canonical_text(self.record, self.kind)
         ) or ""
 
 
@@ -76,7 +79,7 @@ class RetrievalResult:
     dropped_stale: int = 0
 
     def is_empty(self) -> bool:
-        return not (self.memories or self.episodes)
+        return not self.ordered
 
     def add(self, kind: str, record, score: float = 0.0) -> None:
         """Append preserving global rank and keeping the per-kind views."""
@@ -125,6 +128,8 @@ class MemoryRetriever:
         if not (query or "").strip():
             return self._fallback(workspace_id, "", kinds, memory_types, limit, event_types)
 
+        if not config.PAI_SEMANTIC_RECALL_ENABLED:
+            return self._fallback(workspace_id, query, kinds, memory_types, limit, event_types)
         started = time.monotonic()
         # Separate fields per kind: an episode's `event_type` is not a
         # `memory_type` and storing it under that name made the two
@@ -179,7 +184,7 @@ class MemoryRetriever:
                 # Canonical text/importance, never the indexed copy — payload
                 # can lag an edit, and importance is not on the payload at all
                 # for older points.
-                text=(row.summary if hit.kind == KIND_EPISODE else row.content) or "",
+                text=canonical_text(row, hit.kind),
                 score=hit.score,
                 importance=float(getattr(row, "importance", 0.5) or 0.5),
             ))
@@ -209,10 +214,33 @@ class MemoryRetriever:
 
     def _load_active(self, workspace_id: str, record_id: str, kind: str):
         """Canonical row if it exists and is active, else None."""
-        row = (
-            self.episodes.get(workspace_id, record_id) if kind == KIND_EPISODE
-            else self.memories.get(workspace_id, record_id)
-        )
+        if kind == "vault_fact":
+            from app.models import VaultFact
+            row = self.db.scalar(select(VaultFact).where(VaultFact.workspace_id == workspace_id,
+                VaultFact.id == record_id))
+        elif kind.startswith("student_record:"):
+            from .student_records import ENTITY_MODELS
+            model = ENTITY_MODELS.get(kind.partition(":")[2])
+            row = self.db.scalar(select(model).where(model.workspace_id == workspace_id,
+                model.id == record_id)) if model is not None else None
+        elif kind == "document_chunk":
+            from app.models import FileRecord
+            from app.documents.service import DocumentArtifactService
+            from app.documents.content import segments_from_content
+            from app.documents.retrieval import build_chunks
+            file_id = record_id.split(":", 1)[0]
+            file = self.db.scalar(select(FileRecord).where(FileRecord.workspace_id == workspace_id,
+                FileRecord.id == file_id, FileRecord.status == "active"))
+            artifact = DocumentArtifactService(self.db).get(workspace_id, file_id) if file else None
+            chunk = next((item for item in build_chunks(file_id, segments_from_content(artifact.content),
+                         artifact.document_type or "") if item.chunk_id == record_id), None) if artifact and artifact.status in ("ready", "partial") else None
+            return SimpleNamespace(id=record_id, content=chunk.text, status="active") if chunk else None
+        elif kind == KIND_EPISODE:
+            row = self.episodes.get(workspace_id, record_id)
+        elif kind == KIND_SEMANTIC:
+            row = self.memories.get(workspace_id, record_id)
+        else:
+            row = None
         if row is None or row.status != "active":
             return None
         return row
@@ -253,6 +281,35 @@ class MemoryRetriever:
                 )
             ):
                 result.add(KIND_EPISODE, row)
+
+        from app.models import VaultFact, FileRecord
+        from .student_records import ENTITY_MODELS
+        for kind in kinds:
+            model = VaultFact if kind == "vault_fact" else ENTITY_MODELS.get(kind.partition(":")[2]) if kind.startswith("student_record:") else None
+            if model is not None:
+                rows = self.db.scalars(select(model).where(model.workspace_id == workspace_id,
+                    model.status == "active").order_by(model.id)).all()
+                terms = query.casefold().split()
+                scored = [(sum(term in canonical_text(row, kind).casefold() for term in terms), row) for row in rows]
+                for score, row in sorted(scored, key=lambda pair: pair[0], reverse=True):
+                    if score or not terms:
+                        result.add(kind, row, score)
+            elif kind == "document_chunk":
+                from app.documents.service import DocumentArtifactService
+                from app.documents.content import segments_from_content
+                from app.documents.retrieval import build_chunks
+                files = self.db.scalars(select(FileRecord).where(FileRecord.workspace_id == workspace_id,
+                    FileRecord.status == "active")).all()
+                for file in files:
+                    artifact = DocumentArtifactService(self.db).get(workspace_id, file.id)
+                    if not artifact or artifact.status not in ("ready", "partial"):
+                        continue
+                    for chunk in build_chunks(file.id, segments_from_content(artifact.content), artifact.document_type or ""):
+                        if query.casefold() in chunk.text.casefold():
+                            result.add(kind, SimpleNamespace(id=chunk.chunk_id, content=chunk.text))
+        result.ordered = result.ordered[:limit]
+        result.memories = [item.record for item in result.ordered if item.kind != KIND_EPISODE]
+        result.episodes = [item.record for item in result.ordered if item.kind == KIND_EPISODE]
 
         logger.info(
             "retrieval: workspace=%s mode=%s returned=%d",

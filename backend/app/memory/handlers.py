@@ -242,30 +242,11 @@ async def reconcile_memory(job, db) -> dict:
     #
     # The idempotency key is derived from the memory ids, so a retried
     # reconcile job cannot queue the same embedding work twice.
-    # Both kinds: episodes are retrievable too, so indexing only semantic
-    # memories would leave half the hybrid index permanently empty.
-    from app.memory.episodic import EpisodicMemoryService
-
-    memory_service = MemoryService(db)
-    episode_service = EpisodicMemoryService(db)
-    memory_ids, episode_ids = [], []
-    for r in accepted:
-        if not r.result_id:
-            continue
-        if memory_service.get(workspace_id, r.result_id) is not None:
-            memory_ids.append(r.result_id)
-        elif episode_service.get(workspace_id, r.result_id) is not None:
-            episode_ids.append(r.result_id)
-
-    if memory_ids or episode_ids:
-        from app.runtime.task_runtime import enqueue
-
-        enqueue(db,
-            job_type=JOB_EMBED,
-            workspace_id=workspace_id,
-            payload={"memory_ids": memory_ids, "episode_ids": episode_ids},
-            idempotency_key=f"embed:{job.id}",
-        )
+    # Accepted facts/records queue indexing in the reconciler, including direct calls.
+    from app.config import config
+    embed_count = sum(bool(result.result_id) and
+                      MemoryCandidateService(db).get(workspace_id, result.candidate_id).candidate_type
+                      in {"vault_fact", "student_record"} for result in accepted) if config.PAI_SEMANTIC_RECALL_ENABLED else 0
 
     # A document's candidates are now decided: let the document pipeline tell
     # the student what actually happened. Enqueued in this transaction, so the
@@ -279,12 +260,12 @@ async def reconcile_memory(job, db) -> dict:
         "reconciled": len(results),
         "accepted": len(accepted),
         "rejected": len(results) - len(accepted),
-        "embed_enqueued": len(memory_ids) + len(episode_ids),
+        "embed_enqueued": embed_count,
     }
 
 
 async def embed_memory(job, db) -> dict:
-    """Push memories AND episodes into the retrieval index.
+    """Push accepted facts/records and session summaries into the retrieval index.
 
     Separate from reconciliation because embedding is the part that calls an
     external provider and therefore fails differently — it deserves its own
@@ -298,61 +279,58 @@ async def embed_memory(job, db) -> dict:
     if not workspace_id:
         raise ValueError("memory.embed requires a workspace_id")
 
+    from app.config import config
+    if not config.PAI_SEMANTIC_RECALL_ENABLED:
+        return {"indexed": 0, "reason": "disabled"}
     payload = job.payload or {}
     records = _records_for(
         db, workspace_id,
         memory_ids=payload.get("memory_ids") or [],
         episode_ids=payload.get("episode_ids") or [],
+        fact_ids=payload.get("fact_ids") or [],
+        record_refs=payload.get("record_refs") or [],
     )
 
     indexed = await get_memory_index().index(records) if records else 0
     logger.info(
         "memory.embed: job=%s workspace=%s requested=%d indexed=%d",
         job.id, workspace_id,
-        len(payload.get("memory_ids") or []) + len(payload.get("episode_ids") or []),
+        sum(len(payload.get(key) or []) for key in ("memory_ids", "episode_ids", "fact_ids", "record_refs")),
         indexed,
     )
     return {"indexed": indexed}
 
 
-def _records_for(db, workspace_id: str, memory_ids: list, episode_ids: list) -> list:
-    """Build index records from canonical rows, skipping inactive ones."""
-    from app.memory.episodic import EpisodicMemoryService
-
+def _records_for(db, workspace_id: str, memory_ids: list, episode_ids: list,
+                 fact_ids=None, record_refs=None) -> list:
+    """Only canonical accepted facts/records and session summaries get new vectors."""
+    from app.models import VaultFact
+    from app.memory.student_records import ENTITY_MODELS
+    from app.memory.index_sources import canonical_text
     records = []
-    memories = MemoryService(db)
-    for memory_id in memory_ids:
-        memory = memories.get(workspace_id, memory_id)
-        if memory is not None and memory.status == "active":
-            records.append(MemoryRecord(
-                id=memory.id, workspace_id=workspace_id, kind="semantic_memory",
-                text=memory.content,
-                filters={
-                    "memory_type": memory.memory_type,
-                    "status": memory.status,
-                    "importance": memory.importance,
-                },
-            ))
-
-    episodes = EpisodicMemoryService(db)
+    for fact_id in fact_ids or []:
+        row = db.scalar(select(VaultFact).where(VaultFact.workspace_id == workspace_id,
+            VaultFact.id == fact_id, VaultFact.status == "active"))
+        if row is not None:
+            records.append(MemoryRecord(id=row.id, workspace_id=workspace_id, kind="vault_fact",
+                text=canonical_text(row, "vault_fact"), filters={"status": "active"}))
+    for ref in record_refs or []:
+        model = ENTITY_MODELS.get(ref.get("kind"))
+        if model is None:
+            continue
+        row = db.scalar(select(model).where(model.workspace_id == workspace_id,
+            model.id == ref.get("id"), model.status == "active"))
+        if row is not None:
+            kind = "student_record:" + ref["kind"]
+            records.append(MemoryRecord(id=row.id, workspace_id=workspace_id, kind=kind,
+                text=canonical_text(row, kind), filters={"status": "active"}))
     for episode_id in episode_ids:
-        episode = episodes.get(workspace_id, episode_id)
-        if episode is not None and episode.status == "active":
-            records.append(MemoryRecord(
-                id=episode.id, workspace_id=workspace_id, kind="episode",
-                text=episode.summary,
-                filters={
-                    # `event_type`, NOT `memory_type` — an episode's kind of
-                    # event is a different axis from a memory's type, and
-                    # sharing the field name made them unfilterable apart.
-                    "event_type": episode.event_type,
-                    "status": episode.status,
-                    "importance": episode.importance,
-                    "occurred_at": (
-                        episode.occurred_at.isoformat() if episode.occurred_at else None
-                    ),
-                },
-            ))
+        row = db.scalar(select(PaiEpisode).where(PaiEpisode.workspace_id == workspace_id,
+            PaiEpisode.id == episode_id, PaiEpisode.status == "active",
+            PaiEpisode.event_type == "session_summary"))
+        if row is not None:
+            records.append(MemoryRecord(id=row.id, workspace_id=workspace_id, kind="episode",
+                text=row.summary, filters={"event_type": "session_summary", "status": "active"}))
     return records
 
 
@@ -381,44 +359,35 @@ async def reindex_workspace(job, db) -> dict:
     The recovery path: Qdrant lost, collection dropped, or the embedding model
     changed. Canonical data is untouched, so this is always safe to re-run.
     """
-    from app.memory.episodic import EpisodicMemoryService
-
+    from app.config import config
+    from app.models import VaultFact
+    from app.memory.student_records import ENTITY_MODELS
     workspace_id = job.workspace_id
     if not workspace_id:
         raise ValueError("memory.reindex requires a workspace_id")
-
+    if not config.PAI_SEMANTIC_RECALL_ENABLED:
+        return {"indexed": 0, "reason": "disabled"}
     index = get_memory_index()
     payload = job.payload or {}
-
     if payload.get("purge_first") and hasattr(index, "drop_workspace"):
         await index.drop_workspace(workspace_id)
-
-    # Keyset pagination over ALL active rows. The previous `limit=10000` would
-    # have silently omitted everything beyond it — a rebuild that quietly drops
-    # a student's older memories is worse than one that fails.
     batch_size = max(1, int(payload.get("batch_size") or 64))
-    total = memory_count = episode_count = 0
-
-    for batch in _iter_ids(db, workspace_id, PaiMemory, batch_size):
-        memory_count += len(batch)
-        records = _records_for(db, workspace_id, memory_ids=batch, episode_ids=[])
-        if records:
-            total += await index.index(records)
-
+    total = facts = records_count = episodes = 0
+    for batch in _iter_ids(db, workspace_id, VaultFact, batch_size):
+        facts += len(batch)
+        total += await index.index(_records_for(db, workspace_id, [], [], fact_ids=batch))
+    for kind, model in ENTITY_MODELS.items():
+        for batch in _iter_ids(db, workspace_id, model, batch_size):
+            records_count += len(batch)
+            total += await index.index(_records_for(db, workspace_id, [], [],
+                record_refs=[{"kind": kind, "id": item} for item in batch]))
     for batch in _iter_ids(db, workspace_id, PaiEpisode, batch_size):
-        episode_count += len(batch)
-        records = _records_for(db, workspace_id, memory_ids=[], episode_ids=batch)
+        records = _records_for(db, workspace_id, [], batch)
+        episodes += len(records)
         if records:
             total += await index.index(records)
-
-    logger.info(
-        "memory.reindex: job=%s workspace=%s memories=%d episodes=%d indexed=%d "
-        "batch_size=%d",
-        job.id, workspace_id, memory_count, episode_count, total, batch_size,
-    )
-    return {
-        "indexed": total, "memories": memory_count, "episodes": episode_count,
-    }
+    return {"indexed": total, "facts": facts, "records": records_count,
+            "memories": 0, "episodes": episodes}
 
 
 def _iter_ids(db, workspace_id: str, model, batch_size: int):

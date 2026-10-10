@@ -21,7 +21,7 @@ def load_system_capabilities(registry):
         (mirror.JOB_RESEARCH, mirror.confirmed_research_job, {"journey_id": string, "version": {"type": "integer"}}),
         (memory.JOB_EXTRACT, memory.extract_memory, {"source_type": string, "channel": string, "user_event_id": string, "assistant_event_id": string, "agent_name": string, "profile_captured": {"type": "boolean"}, "candidates": array}),
         (memory.JOB_RECONCILE, memory.reconcile_memory, {"candidate_ids": array}),
-        (memory.JOB_EMBED, memory.embed_memory, {"memory_ids": array, "episode_ids": array}),
+        (memory.JOB_EMBED, memory.embed_memory, {"memory_ids": array, "episode_ids": array, "fact_ids": array, "record_refs": array}),
         (memory.JOB_UNINDEX, memory.unindex_memory, {"ids": array}),
         (memory.JOB_REINDEX, memory.reindex_workspace, {"purge_first": {"type": "boolean"}, "batch_size": {"type": "integer"}}),
         (research.JOB_RESUME_RESEARCH, research.resume_research, {"candidate_id": string}),
@@ -50,6 +50,8 @@ def load_system_capabilities(registry):
         registry.register(CapabilityContract(
             id=job_type, version="1.0.0", name=job_type,
             description=f"Internal durable job: {job_type}", kind="system",
-            input_schema={"type": "object", "properties": properties},
+            input_schema={"type": "object", "properties": properties,
+                          **({"required": ["workspace_id", "first_event_id", "last_event_id"]}
+                             if job_type == sessions.JOB_SUMMARIZE else {})},
             output_schema={"type": "object"}, handler=handler,
         ))

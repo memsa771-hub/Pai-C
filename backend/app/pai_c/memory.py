@@ -21,7 +21,7 @@ class MemoryService:
         return NotebookService(self.db).get(workspace_id)
 
     def latest_episode(self, workspace_id, *, limit=1):
-        return EpisodicMemoryService(self.db).recent(workspace_id, limit=limit)
+        return EpisodicMemoryService(self.db).recent(workspace_id, limit=limit, event_type="session_summary")
 
     def agent_capabilities(self, agent_name):
         return capabilities_for_agent(agent_name)
@@ -89,7 +89,7 @@ class MemoryService:
             last_student = None
             for turn in turns:
                 if turn["role"] == "student":
-                    if last_student is None or turn["timestamp"] - last_student >= gap:
+                    if last_student is None or turn["timestamp"] - last_student > gap:
                         groups.append([])
                     last_student = turn["timestamp"]
                 if groups:
@@ -109,9 +109,21 @@ class MemoryService:
             workspace_id, limit=limit, event_type="session_summary")
 
     def is_return_visit(self, workspace_id):
+        from sqlalchemy import select, func
         from app.config import config
-        students = [row for row in self.session_turns(workspace_id) if row["role"] == "student"]
-        return (len(students) >= 2 and students[-1]["timestamp"] - students[-2]["timestamp"]
+        from app.models import EventRecord, Workspace
+        workspace = self.db.get(Workspace, workspace_id)
+        if workspace is None:
+            return False
+        content = EventRecord.payload["content"].as_string()
+        timestamps = self.db.scalars(select(EventRecord.timestamp).where(
+            EventRecord.network_id == workspace_id,
+            EventRecord.type == "workspace.message.posted",
+            EventRecord.source == f"human:{workspace.owner_user_id}",
+            func.trim(content) != "",
+            func.coalesce(EventRecord.payload["message_type"].as_string(), "chat") == "chat",
+        ).order_by(EventRecord.timestamp.desc(), EventRecord.id.desc()).limit(2)).all()
+        return (len(timestamps) == 2 and timestamps[0] - timestamps[1]
                 > max(1, config.PAI_SESSION_GAP_MINUTES) * 60_000)
 
     def session_input(self, workspace_id, first_event_id, last_event_id):
@@ -165,4 +177,28 @@ class MemoryService:
             fingerprint=episode_fingerprint("session_summary", last_id))
         self.db.add(row)
         self.db.flush()
+        from app.config import config
+        if config.PAI_SEMANTIC_RECALL_ENABLED:
+            from app.runtime.task_runtime import enqueue
+            enqueue(self.db, job_type="memory.embed", workspace_id=workspace_id,
+                    payload={"episode_ids": [row.id]}, idempotency_key=f"embed-session:{last_id}")
         return row
+
+    async def recall(self, workspace_id, query, top_k=None):
+        import asyncio
+        from app.config import config
+        from app.memory.retriever import MemoryRetriever
+        from app.memory.student_records import ENTITY_MODELS
+        if not config.PAI_SEMANTIC_RECALL_ENABLED:
+            return []
+        kinds = ("episode", "vault_fact", "document_chunk") + tuple("student_record:" + kind for kind in ENTITY_MODELS)
+        retriever = MemoryRetriever(self.db)
+        try:
+            result = await asyncio.wait_for(retriever.retrieve(workspace_id, query,
+                kinds=kinds, event_types=("session_summary",),
+                limit=top_k or config.PAI_SEMANTIC_RECALL_TOP_K),
+                timeout=max(0.05, config.PAI_MEMORY_CONTEXT_TIMEOUT_MS / 1000))
+        except (TimeoutError, RuntimeError):
+            result = retriever._fallback(workspace_id, query, kinds, None,
+                top_k or config.PAI_SEMANTIC_RECALL_TOP_K, ("session_summary",))
+        return [{"id": item.id, "kind": item.kind, "text": item.text} for item in result.ordered]

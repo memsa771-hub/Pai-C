@@ -128,7 +128,7 @@ def _input(db, workspace_id: str, student: EventRecord, assistant: EventRecord,
         if len(transcript) == config.PAI_ANALYST_HISTORY_SIZE:
             break
     transcript.reverse()
-    episode = MemoryService(db).latest_episode(workspace_id, limit=1)
+    episode = MemoryService(db).session_summaries(workspace_id, limit=1)
     return ("<notebook_schema>" + _json(CounselorNotebookData.analyst_schema())
             + "</notebook_schema>\n"
             + "<notebook>" + _json(notebook.model_dump(mode="json")) + "</notebook>\n"
@@ -142,8 +142,12 @@ def _input(db, workspace_id: str, student: EventRecord, assistant: EventRecord,
 async def _candidate(db, workspace_id: str, student: EventRecord,
                      assistant: EventRecord, previous):
     student_id = student.id
+    query = (student.payload or {}).get("content", "")
     analyst_input = _input(db, workspace_id, student, assistant, previous.notebook)
     # Do not hold read transactions or database connections across model calls.
+    db.rollback()
+    recalled = await MemoryService(db).recall(workspace_id, query)
+    analyst_input += "\n<semantic_recall>" + _json(recalled) + "</semantic_recall>"
     db.rollback()
     raw = await chat_completion(role="analyst",
         api_key=config.PAI_API_KEY, model=resolve_model("analyst"),

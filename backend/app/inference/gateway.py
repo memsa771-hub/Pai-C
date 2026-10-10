@@ -157,6 +157,8 @@ async def embed(role: str, texts: list[str], *, api_key=None, model=None, base_u
                 phase=None, turn_id='') -> list[list[float]]:
     if role != 'embeddings':
         raise ValueError('Embedding calls require the embeddings role')
+    if not config.PAI_SEMANTIC_RECALL_ENABLED:
+        return []
     model = resolve_model(role) if model is None else model
     # Credential compatibility/Null fallback remains with the existing provider.
     if api_key is None or base_url is _DEFAULT:

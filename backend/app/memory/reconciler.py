@@ -141,6 +141,12 @@ class MemoryReconciler:
         self.assertions.finish(assertion, result, candidate)
         if result.accepted and candidate.candidate_type in {"vault_fact", "student_record"}:
             from app.runtime.task_runtime import enqueue
+            from app.config import config
+            if config.PAI_SEMANTIC_RECALL_ENABLED and result.result_id:
+                payload = ({"fact_ids": [result.result_id]} if candidate.candidate_type == "vault_fact"
+                           else {"record_refs": [{"kind": candidate.key, "id": result.result_id}]})
+                enqueue(self.db, job_type="memory.embed", workspace_id=candidate.workspace_id,
+                        payload=payload, idempotency_key=f"embed-candidate:{candidate.id}")
             self.db.add(EventRecord(
                 id=str(uuid.uuid4()), network_id=candidate.workspace_id,
                 type="vault.fact_accepted", source="system:reconciler", target="core",

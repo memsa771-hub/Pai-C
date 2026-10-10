@@ -185,6 +185,8 @@ class Config:
     PAI_RESEARCH_MAX_CALLS_PER_STUDENT: int = int(os.environ.get("PAI_RESEARCH_MAX_CALLS_PER_STUDENT", "40"))
     PAI_RESEARCH_REFRESH_MAX_CALLS: int = int(os.environ.get("PAI_RESEARCH_REFRESH_MAX_CALLS", "8"))
     PAI_SENSITIVE_CHECK_MODEL: str = os.environ.get("PAI_SENSITIVE_CHECK_MODEL", "") or PAI_ANALYST_MODEL
+    PAI_SEMANTIC_RECALL_ENABLED: bool = os.environ.get("PAI_SEMANTIC_RECALL_ENABLED", "true").lower() == "true"
+    PAI_SEMANTIC_RECALL_TOP_K: int = int(os.environ.get("PAI_SEMANTIC_RECALL_TOP_K", "5"))
     PAI_SUMMARIZER_MODEL: str = os.environ.get("PAI_SUMMARIZER_MODEL", "") or PAI_ANALYST_MODEL
     PAI_SESSION_GAP_MINUTES: int = int(os.environ.get("PAI_SESSION_GAP_MINUTES", "30"))
     PAI_SESSION_SWEEP_SECONDS: int = int(os.environ.get("PAI_SESSION_SWEEP_SECONDS", "300"))
@@ -414,7 +416,8 @@ class Config:
                 raise RuntimeError("PAI_LANGUAGE_BLOCKED_SCRIPTS contains an unknown script") from exc
             if pattern.search(self.PAI_COUNSELOR_FALLBACK_REPLY):
                 raise RuntimeError("PAI_COUNSELOR_FALLBACK_REPLY uses a blocked script")
-        if min(self.PAI_COUNSELOR_RESEARCH_DAILY_LIMIT,
+        if min(self.PAI_SESSION_GAP_MINUTES, self.PAI_SESSION_SWEEP_SECONDS,
+               self.PAI_SEMANTIC_RECALL_TOP_K, self.PAI_COUNSELOR_RESEARCH_DAILY_LIMIT,
                self.PAI_COUNSELOR_NOTEBOOK_CONTEXT_TOKENS,
                self.PAI_COUNSELOR_HISTORY_SIZE,
                self.PAI_ANALYST_HISTORY_SIZE,
