@@ -616,3 +616,128 @@ No live model calls, external test sockets, .env edits, new tables or shared
 profile redesign. Ordinary turn model-call counts are unchanged. Temporary test
 guard/dependency folders are removed before the final commit. The migration is
 verified offline; it has not been applied to the founder's local database.
+
+
+## Episodic and semantic memory (P2b)
+
+| Memory | Writer / trigger | Reader | Owner |
+| --- | --- | --- | --- |
+| Working | Existing chat/voice message events | Counselor and Analyst | Messenger / Memory Service |
+| Vault facts / records | Existing extractor/document candidate -> reconciliation; accepted active rows only are indexed | Snapshot/profile and Analyst recall | Shared memory services |
+| Truth Map | Analyst after each successful turn | Counselor, Mirror, session version diff | PAI C Memory Service |
+| Episodic | session.sweep -> session.summarize after inactivity | First return turn (last 1-2 summaries), Analyst older-session context/recall | PAI C session capabilities via Memory Service |
+| Semantic index | memory.embed for accepted facts/records and session summaries; document.index for chunks | Analyst only in PAI C; existing external readers remain | Existing hybrid index / canonical retriever |
+
+### Session flow
+
+The shared worker periodically enqueues `session.sweep` by name through the
+existing Task Runtime, with a time-bucket idempotency key. It never imports PAI C.
+The PAI C capability groups persisted owner/PAI messages by the configured
+student-message gap. It also detects an older ended session when the student
+has already returned. Covered last student events are skipped.
+
+Each uncovered ended session queues one `session.summarize`, keyed by workspace
+and last student event. The handler waits for pending session Analyst jobs to
+finish, using the existing retry rules. It reads turns and the actual Truth Map
+history diff through Memory Service. Private legacy_v1 archives never enter the
+diff or model input. The summarizer uses the Model Gateway and records usage.
+No database read transaction is held across its model call.
+
+The JSON contains discussed, truth_map_changes, open_threads and commitments.
+Changes must match supplied diff entries exactly; commitments must be verbatim
+student quotations. Invalid shape, invented changes/commitments or blocked
+scripts fail the job for the existing retry policy. Internal prose is English.
+A workspace row lock and a session-specific fingerprint protect storage
+idempotency in existing pai_episodes, event_type session_summary; source ids
+cover student and Counselor turns. Duplicate jobs do not call the model again.
+The write and derived embed enqueue are in the same transaction. No message is
+posted to the student. On the first return turn, context includes the last two
+session summaries; normal turns include none. Legacy episodes stay readable
+by existing shared readers, but are not injected into PAI C context.
+
+### Index boundaries and real reader
+
+Before P2b, reconcile/embed and reindex wrote general semantic memories and
+all episode types; document chunks had their existing separate writer. After
+P2b, new memory vectors represent only active canonical Vault facts/records
+and session summaries. Extractor schema and prompt allow only vault_fact and
+student_record proposals. Existing semantic/episode rows are not deleted.
+Document indexing continues with its existing chunks and capability.
+
+After the reply, the Analyst queries MemoryService.recall with the latest
+student message. It uses the existing dense+sparse hybrid MemoryRetriever,
+existing reranker and existing PAI_MEMORY_CONTEXT_TIMEOUT_MS budget; unavailable
+or timed-out retrieval falls back to workspace-scoped canonical lexical reads.
+Hits are re-read from PostgreSQL. Deleted files, inactive facts/records and
+missing ids cannot become recall results. Document text is reconstructed from
+its canonical artifact rather than trusting stale index text. Recall results
+are supplied as semantic_recall in Analyst input. The Counselor fast path
+never calls recall or embeds the student query.
+
+| New environment variable | Default |
+| --- | --- |
+| PAI_SESSION_GAP_MINUTES | 30 |
+| PAI_SESSION_SWEEP_SECONDS | 300 |
+| PAI_SUMMARIZER_MODEL | PAI_ANALYST_MODEL |
+| PAI_SEMANTIC_RECALL_ENABLED | true |
+| PAI_SEMANTIC_RECALL_TOP_K | 5 |
+
+Summarizer reasoning uses PAI_ANALYST_REASONING_EFFORT. Shared production compose
+passes the new settings to backend and worker; local compose inherits them.
+No .env edits. Disabled semantic recall queues no automatic fact/session embed
+or document index jobs, skips reindex enqueue/handlers and recall, and guards
+Model Gateway embeddings. Existing unindex jobs remain allowed for cleanup.
+
+| Calls per ordinary student turn | Before P2b | After P2b |
+| --- | --- | --- |
+| Counselor, fast path | 1 (optional script retry) | Same |
+| Analyst, background | 1 (optional version-conflict rerun) | Same |
+| Vault extractor, background | Existing per-turn call | Same, objective candidates only |
+| Sensitive check | Before Mirror only | Same |
+| Semantic query embedding | No PAI C reader | Up to 1 per Analyst analysis attempt, never Counselor; 0 disabled/unconfigured |
+| Derived source embeddings | General memory/episode batches + document chunks | Accepted fact/record batches + session summaries + document chunks; 0 disabled |
+| Session summarizer | None | 1 per ended session (existing retry policy on failure), outside per-turn reply |
+
+### P2b open questions / unchanged items
+
+- Summary prose quality and actual embedding-provider latency are not evaluated
+  live; this task explicitly allows only fake models. Grounding of diffs and
+  commitment provenance is verified deterministically and offline.
+- No new retention/deletion policy was specified; existing workspace deletion,
+  episode/index lifecycle and document purge rules remain.
+- No origin/pai-os branch was available at fetch. Existing shared public names,
+  queue/runtime and PAI OS contract behavior remain; architecture/contract suites
+  verify the boundaries. No shared memory module imports PAI C.
+- Reindex rebuilds the memory-source set; existing document.index remains the
+  document recovery path. No new combined reindex workflow was specified.
+
+
+### P2b verification (offline)
+
+| Check | Before (a4ea808, isolated tracked-source baseline) | After |
+| --- | --- | --- |
+| Backend full suite | 885 passed, 3 production-only skips, 8 subtests | 904 passed, same 3 skips, 8 subtests |
+| Production-only security gate | Previously included as skips | Separately: 3 passed, 4 subtests |
+| Frontend full suite | 23 passed | 23 passed |
+| Frontend production build | Existing P2a baseline PASS | PASS |
+| App module import graph | 252 (P2a) | 254/254, zero failures |
+
+Final backend full suite: 170.60 seconds. The 19 P2b tests cover ended-session
+boundaries, job/storage idempotency, actual history diff and archive exclusion,
+student-only commitments, return-visit injection, canonical source filters,
+accepted fact/record enqueue, document canonical revalidation and deletion,
+Analyst-only recall/query, configured latency fallback, disabled zero embeddings,
+summarizer model/reasoning fallback and worker ownership. Existing memory,
+research, roadmap, architecture and PAI OS contracts remain green.
+
+Offline test defaults install a NullMemoryIndex; dedicated retrieval tests supply
+fake hybrid hits. External sockets were blocked during all suite/import runs.
+A declared python-docx dependency was installed in a temporary test folder to
+avoid the older system package's fixture failures. The corrected baseline uses
+the original tracked code and docs, not edited runtime files. Temporary baseline,
+network-guard and dependency folders are removed before the final commit.
+
+No new tables, queue, runtime, .env edits or live calls. No session-specific
+truncation/token budget was specified: session input remains complete, with the
+existing gateway/provider limits. Provider quality and long-session sizing need
+an explicitly authorized later evaluation; neither was invented in this task.
