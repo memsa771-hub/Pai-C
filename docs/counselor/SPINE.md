@@ -100,3 +100,140 @@ moved to the gateway. No model request was sent to a real provider.
 Final document regression: 151 passed plus 8 subtests. Gateway/student-record
 regression: 130 passed. Temporary offline socket guards and parser dependencies
 were removed after testing; no runtime test mode or provider configuration shipped.
+
+
+## P1b: system capabilities and Task Runtime
+
+All existing durable job identifiers now resolve in the existing Capability
+Registry. Every row below has kind `system`; capability id equals job type.
+Registration is centralized in `app/capabilities/system.py`. The original
+handler functions, SQL queue, tables, idempotency keys, priority, leases,
+retry/backoff, per-workspace analysis ordering and locks are preserved.
+
+| Job type / capability id | Handler (unchanged owner) |
+| --- | --- |
+| counselor.analyze | pai_c.deep.analysis.analyze_job |
+| counselor.mirror | pai_c.deep.mirror.mirror_job |
+| counselor.mirror_research | pai_c.deep.mirror.confirmed_research_job |
+| memory.extract | memory.handlers.extract_memory |
+| memory.reconcile | memory.handlers.reconcile_memory |
+| memory.embed | memory.handlers.embed_memory |
+| memory.unindex | memory.handlers.unindex_memory |
+| memory.reindex | memory.handlers.reindex_workspace |
+| memory.resume_research | memory.handlers.resume_research |
+| research.refresh_stale | memory.handlers.refresh_stale_research |
+| document.parse | documents.handlers.parse_document_job |
+| document.extract | documents.handlers.extract_document_job |
+| document.index | documents.handlers.index_document_job |
+| document.unindex | documents.handlers.unindex_document_job |
+| document.notify | documents.handlers.notify_document_job |
+| agent.run (new adapter) | services.operator.run_agent_job -> existing _execute loop |
+
+### Owners and compatibility
+
+| Previous entry / owner | Current owner | Compatibility |
+| --- | --- | --- |
+| Handler modules register on import | Capability Registry system loader | Handler functions and existing job strings retained |
+| BackgroundJobService.enqueue callers | runtime.task_runtime.enqueue | BackgroundJobService public queue API retained |
+| Worker run_job dispatch | runtime.task_runtime.run | jobs.service.run_job forwards to Task Runtime (temporary) |
+| JobHandlerRegistry / job_handlers | Capability Registry | Temporary facade only; no second handler map |
+| Agent business discovery / invocation | Existing CapabilityRouter and capability tools | Registry.all() still means business; all(kind="system") is internal |
+| Owned fixed-input Operator execution | Operator workflow invoking ToolExecutor capability.invoke | Same execution_runs row, resume(), status hooks and handoff |
+| Open-ended Operator execution | Existing five-phase loop; agent.run system adapter | Existing delegate/resume scheduling and _execute public seam retained |
+
+System capability input schemas describe the existing payloads, with optional
+fields and additional properties retained. Optional null fields keep their old
+handler-default behavior; validation checks supplied non-null fields and leaves
+the original job payload untouched. Dispatch does not add a second timeout or
+retry wrapper around handlers; the existing worker owns retries and leases.
+`agent.run` requires a run_id and checks that the run belongs to the job workspace.
+System capabilities cannot own agent task types, be listed, described, invoked,
+or used as nested business capabilities.
+
+`git fetch origin` / `git branch -r`: only origin/dev, origin/main and origin/pai-c
+were present; origin/pai-os was unavailable for importer grep. Shared public job
+names and Operator delegate/resume/_execute are retained. No PAI OS files, tables,
+escalation route or service-token configuration were changed. The temporary
+JobHandlerRegistry/job_handlers/run_job facades should be removed only after
+checking the other developer's branch when it becomes available.
+
+### Workflow mode and result mapping
+
+Workflow selection uses persisted `run.constraints.capability_input` (object)
+and `resolve_run_policy(...).owner`, before generic workspace/context reads or
+any Operator model call. Input is passed unchanged to the owner through the
+ordinary ToolExecutor -> capability.invoke -> CapabilityRouter path. Student
+scopes, permissions, declared tool broker, approval rules, composition depth,
+research-budget propagation and capability validation remain in that path.
+
+| Outcome | Saved status and handoff |
+| --- | --- |
+| Successful capability, no pending action | completed; completed steps; existing result envelope with summary, plan, tool_calls, observations, artifact_id and capability_result (including artifacts); _post_result |
+| approval_required | needs_user_action; original approval payload and purpose/capability_id; no completed_at; unchanged resume() carries host approval |
+| Capability pending_action | needs_user_action; original action; need_from_student translated to the existing fact/items shape; same row and resume() |
+| Capability/tool/schema/permission error | failed; error and completed_at; failed tool observation; _post_result; no generic model fallback |
+| No owner or no fixed object input | Original five-phase loop, including its fallback policy, unchanged |
+
+`run_status_hook` runs on executing and terminal/pause updates as before, so
+roadmap publication, stage transitions and student requests remain owned by the
+existing plugin hook. Existing artifacts stay in capability_result; no new
+artifact writer or result schema was introduced. Unconfirmed non-decisive facts
+alone do not create a pending action or force a completed capability to fail.
+
+| Model calls | Before P1b | After P1b |
+| --- | --- | --- |
+| Operator phases for normal fixed-input roadmap research | 3 plain calls (understand/plan/verify) + E execute calls (normally E=2, total 5; bounded by existing iteration config) | 0 |
+| Research/extraction/roadmap calls inside the owner capability | Existing configured calls and budgets | Unchanged |
+| Counselor result explanation / handoff | Existing path | Unchanged |
+| Open-ended / missing-input Operator run | Existing five-phase calls | Unchanged (offline regression: 3 plain + 2 execute) |
+| Student reply + background Analyst + memory extractor | Existing calls | Unchanged |
+
+No existing test expected roadmap_research model phases. Existing agent-loop
+assertions were left unchanged. Only
+`test_retry_of_same_student_event_uses_one_extraction_key` moved its mock target
+from the old enqueue service constructor to the runtime enqueue seam; its
+idempotency assertions are unchanged. New
+`test_roadmap_research_installed_owner_uses_workflow_without_operator_phases`
+checks the intended behavior change and the actual installed owner's stage hook.
+
+### P1b checks
+
+- test_system_capabilities.py: all 15 contracts and dispatch signatures, hidden
+  list/describe/invoke surface, invalid contracts/payloads, queue idempotency,
+  compatibility forwarding, AST checks for no job_handlers.register calls,
+  no direct enqueue outside Task Runtime, and every enqueued type registered.
+- test_operator_workflow.py: real checked invocation, zero Operator calls,
+  scoped context, permission/schema failures, approval and text resume on the
+  same row, pending fact shape, status hooks, installed roadmap owner, agent.run
+  workspace isolation, and unchanged owned-without-input / unowned phases.
+- App import check: 247/247 modules imported with external sockets blocked.
+
+| Verification | Before P1b (last green P1a baseline) | After P1b |
+| --- | --- | --- |
+| Backend | 781 passed; 3 production-only skips; 8 subtests | 831 passed; same 3 skips; 8 subtests |
+| Frontend | 23 passed | 23 passed |
+| Frontend production build | PASS | PASS |
+| Import every app module | Prior P1a check passed | 247/247 imported |
+
+Full backend run: 178.81 seconds, external socket connections blocked by a
+local-only test guard; no real model calls. PAI OS contract and authorized
+internal escalation regressions are included and passed. Fifty new tests were
+added (38 system/runtime tests and 12 workflow tests). No test expectations
+were weakened. Temporary guards/dependencies were removed before committing.
+
+### P1b open questions
+
+1. origin/pai-os is not present, so cross-branch import evidence cannot be
+   obtained. Shared compatibility facades are kept until that audit is possible.
+2. Existing Operator delegate/resume use in-process scheduling. This task adds
+   the worker-dispatchable agent.run adapter but does not specify migration of
+   scheduling, worker-crash recovery or resume-job deduplication. Scheduling is
+   left unchanged rather than inventing a new policy or job type.
+3. The existing scoped capability context has no text/file/choice resume-input
+   field. Those responses remain saved in run.resume_input; approval and accepted
+   facts use their existing host/context paths. No new context field or input
+   mutation was invented. A capability needing free-text resume data needs an
+   explicit contract decision.
+4. services/workflow.py::_judge and routers/routines.py retain the pre-existing
+   broken helper references documented under P1a; this task explicitly excludes
+   changing them. No live provider calls or end-to-end live evaluation were run.

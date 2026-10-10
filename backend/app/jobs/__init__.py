@@ -2,7 +2,7 @@
 """Durable background jobs backed by PostgreSQL.
 
 Deliberately generic — this is not a memory subsystem. Memory is the first
-consumer (`app/memory/handlers.py` registers `memory.*` job types), but the
+consumer (`memory.*` system capabilities), but the
 queue itself knows nothing about memory and any future job type can use it.
 
 Why not `asyncio.create_task()`, which PAI Operator uses: an in-process task
