@@ -741,3 +741,120 @@ No new tables, queue, runtime, .env edits or live calls. No session-specific
 truncation/token budget was specified: session input remains complete, with the
 existing gateway/provider limits. Provider quality and long-session sizing need
 an explicitly authorized later evaluation; neither was invented in this task.
+
+
+## P2c: Legacy discovery removal and generic field definitions
+
+### Removed modules and callers (Parts 1-2)
+
+| Removed piece | Importer check / change |
+| --- | --- |
+| memory/profile_completion.py, profile_requirements.py, education_journey.py | Removed student_profile completion endpoints and tools/builtin/memory answer_profile_requirement; removed obsolete completion tests and gap assertions |
+| memory/explicit_commands.py, eval_dataset.py, eval_retrieval.py | No production importers; eval_retrieval imported eval_dataset |
+| profile_captured | Removed runtime tuple/payload flag, turn hook argument, extraction skip and capability input property |
+| profile.answer, memory.remember, memory.forget registry entries | No production callers; Counselor-only audience/manage permissions exclude them from Operator's dynamically discovered read tools |
+| CounselorSlotAnswer | Only ORM declaration and offline counselor_eval_support fixture references remained; removed both |
+| FoundationChecklist, completion state/type and API methods | Removed the form-based collection UI; existing Profile sections and canonical edit flow remain |
+
+ReadinessService / STAGES remain. The available origin branches at the audit were
+main, dev and pai-c; there was no pai-os branch to grep. No shared OS contract,
+queue, inference configuration or environment file was changed.
+
+### Migration 102 and pending data check before drop
+
+Migration 102 drops only pai_counselor_slot_answers. Grep found no production
+reader/writer before the migration; the historical migration 085 stays unchanged.
+Downgrade restores the schema and index, not deleted rows. An offline migration
+test proves the other two tables survive.
+
+**Pending data check before drop:** pai_profile_requirements and
+pai_profile_field_responses. Both tables and ORM classes remain. Their legacy
+service users were removed; no data deletion or retention decision was made.
+
+### Decision 1: retire legacy field keys as data
+
+Migration 103 sets enabled=false for all versions of education.cgpa,
+education.backlogs and tests.ielts.score in pai_vault_field_definitions. It deletes
+no definitions or facts. Downgrade sets all matching versions back to true, as
+specified. Migration 055 remains unchanged. The three entries are removed from
+the test seed tuple, rather than relocated into another code/data exclusion list.
+
+| Previous ENTITY_BACKED_LEGACY_FIELDS user | Replacement |
+| --- | --- |
+| plugins/program_research | list_definitions supplies enabled fields; canonical record schemas remain; requirements/unconfirmed output shape unchanged |
+| documents/handlers | list_definitions supplies enabled allowed_keys/field_specs; extraction output shape unchanged |
+| memory/handlers | list_definitions supplies enabled allowed_keys/field_specs |
+| memory/reconciler | Upsert uses the existing Vault apply_fact -> validate path; missing/disabled definition rejects with no enabled field definition for <key>. Retraction bypasses validation and checks get() only on that path |
+
+No ENTITY_BACKED_LEGACY_FIELDS constant remains. Grade/test/backlog canonical
+record schemas and the qualification-recognition plugin contract are unchanged.
+The builtin tool example now uses a generic field example.
+
+### Existing fact reads and stopped reader items
+
+The offline retirement regression checks Vault get_fact, snapshot (safe and
+internal), history, StudentSnapshotService and StudentProfileView facts after a
+definition is disabled. Stored accepted values and provenance are retained.
+Migration tests also prove definition rows/all versions and existing fact rows
+survive. The student_profile/raw export view uses the internal Vault snapshot.
+No reader implementation was changed (only generic wording in Vault comments).
+
+Two boundaries found during the required reader inspection remain unchanged:
+- StudentProfileView._safe_field_key/_safe_values hide **issue** field names and
+  evidence values when get() finds no enabled definition. The accepted fact is
+  still in the Profile facts dictionary. Whether historical issue evidence should
+  use its original definition is an open question; no reader fix was authorized.
+- export_counselor_session.py exports research_facts_used from roadmap payloads,
+  not a standalone Vault snapshot. It has no field-definition filter. Adding a
+  Vault history/snapshot export is unspecified and was not implemented.
+
+### Decision 2: preserve currency schemas and written values
+
+Currency remains a string under the existing schemas. _CURRENCY_SYMBOLS is gone.
+The recursive normalizer uppercases values of exactly three alphabetic characters;
+all other string values are trimmed and preserved, including symbols. It does not
+check membership in an ISO list, infer from a symbol, or write null. Examples:
+trimmed currency symbol -> same symbol; eur -> EUR; US$ -> US$; somecoin -> somecoin.
+The extractor prompt contains the supplied generic ISO 4217 instruction without
+currency/country examples. Existing amount/evidence validation remains unchanged.
+
+### Guard and findings for later
+
+The Python-only guard in tests/test_memory_cleanup.py scans memory, pai_c and
+journey for the specified retired exam/grade/currency tokens and two currency
+symbols, case-insensitively with token boundaries (including identifier separators).
+It excludes prompt/fixture data and does not scan plugins or historical migrations.
+Retired specifics in comments/docstrings were replaced with generic examples;
+there is no additional conversation logic change.
+
+coordinator.py removes only the two exam brands from its language-requirement
+regex. Its English-only intent phrases, English-language requirement wording,
+ASCII place recognizers and degree-name recognizers are unchanged findings for
+later. plugins/qualification_recognition retains its cgpa input key and existing
+output behavior for the PAI OS developer; it is deliberately outside this guard.
+
+### Offline verification (Parts 3-4)
+
+| Check | Before (7633b54, Parts 1-2 green) | After Parts 3-4 |
+| --- | --- | --- |
+| Full backend | 880 passed, 3 production-only skips, 8 subtests | 888 passed, same 3 skips, 8 subtests |
+| Production-only security gate | 3 passed | 3 passed, 4 subtests |
+| Frontend full suite | 23 passed | 23 passed |
+| Frontend production build | PASS | PASS |
+| Every app module imported | 248/248 | 248/248, zero failures |
+| Dedicated architecture/migration/OS checks | Existing boundaries retained | 9 passed, including 2 OS contract regressions |
+
+Final full backend run: 153.44 seconds. The two existing SQLite reflection
+warnings concern an expression index in migration 101. The first full run exposed
+an old lifecycle fixture that still relied on the removed exam recognizer;
+its input now uses language test, with every lifecycle assertion unchanged.
+The final full run includes the disabled-key retraction case as well as upsert.
+The document/research-focused run passed 259 tests and 8 subtests before that
+additional parameter case; the final focused lifecycle/records run passed 94.
+
+Existing document/research tests confirm unchanged output shapes. New/updated
+checks cover disabled-key upsert/retraction rejection, preserved fact reads,
+migration 103 all-version retirement/downgrade, the Python guard and currency
+cases. All tests use fake providers; a temporary socket guard rejects external
+connections. Temporary guard/dependency folders are removed before the last commit.
+No live API calls, .env edits, new queue/runtime or reader refactor.
