@@ -354,10 +354,6 @@ class WorkspaceApi {
     );
   }
 
-  async getProfileCompletion(): Promise<import('./student-profile').ProfileCompletion> {
-    return this.request(`/v1/student-profile/completion?network=${this.requireWorkspace()}`);
-  }
-
   async getRoadmaps(filter: 'all' | 'favorites' | 'exploring' | 'dismissed' = 'all'): Promise<import('./roadmaps').Roadmap[]> {
     const response = await this.request<{ roadmaps: import('./roadmaps').Roadmap[] }>(
       `/v1/roadmaps?network=${this.requireWorkspace()}&filter=${filter}`,
@@ -440,15 +436,6 @@ class WorkspaceApi {
   async addCustomRoadmapGoal(input: import('./roadmaps').CustomRoadmapGoal): Promise<import('./roadmaps').Roadmap> {
     return this.request(`/v1/roadmaps/custom?network=${this.requireWorkspace()}`,
       { method: 'POST', body: JSON.stringify(input) });
-  }
-
-  async respondToProfileField(
-    key: string, status: 'valid_unknown' | 'not_applicable' | 'declined' | 'deferred',
-  ): Promise<import('./student-profile').ProfileCompletion> {
-    return this.request(
-      `/v1/student-profile/completion/fields/${encodeURIComponent(key)}/response?network=${this.requireWorkspace()}`,
-      { method: 'POST', body: JSON.stringify({ status }) },
-    );
   }
 
   // Application workspace: operational plans, separate from the canonical Profile.

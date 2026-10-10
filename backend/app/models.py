@@ -1330,31 +1330,6 @@ class ProfileFieldResponse(Base):
     )
 
 
-class CounselorSlotAnswer(Base):
-    """Recent student-reported slot answer awaiting canonical reconciliation.
-
-    This is shared conversation state, not a second profile or voice memory.
-    Canonical facts still enter Vault only through candidates and reconciliation.
-    """
-    __tablename__ = "pai_counselor_slot_answers"
-
-    id = Column(Text, primary_key=True, default=_uuid)
-    workspace_id = Column(UUID(as_uuid=False), ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False)
-    source_event_id = Column(Text, nullable=False)
-    slot_key = Column(Text, nullable=False)
-    value = Column(JSONB, nullable=True)
-    status = Column(Text, nullable=False, default="pending", server_default=text("'pending'"))
-    confidence = Column(Float, nullable=True)
-    quote = Column(Text, nullable=True)
-    created_at = Column(DateTime(timezone=True), default=_now, server_default=text("NOW()"))
-
-    __table_args__ = (
-        CheckConstraint("status IN ('pending', 'valid_unknown', 'declined')",
-                        name="ck_counselor_slot_answer_status"),
-        UniqueConstraint("workspace_id", "source_event_id", "slot_key",
-                         name="uq_counselor_slot_answer_event"),
-        Index("idx_counselor_slot_answers_recent", "workspace_id", "created_at"),
-    )
 
 
 class CounselorTurnDecision(Base):
