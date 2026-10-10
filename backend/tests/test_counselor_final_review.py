@@ -5,7 +5,7 @@ import pytest
 from app.config import config
 from app.pai_c.deep.roadmaps import ground_roadmap
 from app.plugins._shared.budget import bounded_research, spend
-from app.pai_c.light_research import collect_light_research
+from app.research.light import collect_light_research
 from scripts.counselor_eval_support import StudentSession
 from test_mirror_roadmaps import example
 

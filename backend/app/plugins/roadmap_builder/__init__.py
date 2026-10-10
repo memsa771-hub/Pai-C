@@ -64,7 +64,7 @@ async def build(context, payload):
 
 
 async def _build(context, payload):
-    from app.pai_c.light_research import collect_light_research
+    from app.research.light import collect_light_research
     from app.pai_c.deep.roadmaps import build_mirror_roadmaps, lanes_for_mirror
 
     brief = dict(payload["brief"])
