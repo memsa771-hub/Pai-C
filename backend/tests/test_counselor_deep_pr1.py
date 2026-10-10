@@ -21,7 +21,7 @@ from scripts.counselor_eval_support import StudentSession
 @pytest.mark.asyncio
 async def test_deep_queues_learning_after_successful_human_post():
     event = {"id": "student-event", "source": "human:student", "target": "channel/pai"}
-    deep = AsyncMock(return_value=("assistant-event", "channel/pai", False))
+    deep = AsyncMock(return_value=("assistant-event", "channel/pai"))
     with patch.object(runtime, "_run_deep_turn", deep), \
             patch("app.pai_c.deep.analysis.enqueue_turn_analysis") as analyze, \
             patch("app.memory.turn_hook.enqueue_turn_extraction") as enqueue:
@@ -35,7 +35,7 @@ async def test_deep_queues_learning_after_successful_human_post():
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("source,posted", [
-    ("human:student", None), ("openagents:pai", ("assistant-event", "channel/pai", False)),
+    ("human:student", None), ("openagents:pai", ("assistant-event", "channel/pai")),
 ])
 async def test_extraction_requires_a_successful_human_turn(source, posted):
     with patch.object(runtime, "_run_deep_turn", new=AsyncMock(return_value=posted)), \

@@ -60,13 +60,12 @@ async def _run_turn(db, workspace_id: str, event_data: dict, depth: int) -> None
         from app.pai_c.memory import MemoryService
         from app.services.pai import PAI_AGENT_NAME
 
-        assistant_event_id, channel_target, profile_captured = posted
+        assistant_event_id, channel_target = posted
         MemoryService(db).enqueue_turn_extraction(
             workspace_id=workspace_id, channel_target=channel_target,
             user_event_id=event_data.get("id"),
             assistant_event_id=assistant_event_id,
             agent_name=PAI_AGENT_NAME,
-            profile_captured=profile_captured,
         )
         from app.pai_c.deep.analysis import enqueue_turn_analysis
 
@@ -145,7 +144,7 @@ async def _run_deep_turn(db, workspace_id: str, event_data: dict, depth: int):
         result.context.build_ms, result.model_ms, result.polish_ms, post_ms,
         int((time.monotonic() - started) * 1000), move, status,
     )
-    return assistant_event_id, turn.channel, False
+    return assistant_event_id, turn.channel
 
 
 def _event_order_boundary(event_data: dict) -> Optional[int]:

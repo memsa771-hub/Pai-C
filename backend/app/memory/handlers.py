@@ -150,8 +150,6 @@ async def extract_memory(job, db) -> dict:
         input_channel = "voice" if isinstance(source_metadata, dict) and source_metadata.get("voice_delegation_id") else "conversation"
 
         for item in extracted:
-            if payload.get("profile_captured") and item.candidate_type in {"vault_fact", "student_record"}:
-                continue
             if _is_duplicate(db, workspace_id, item):
                 logger.info(
                     "memory.extract: skipped duplicate %s job=%s", item.candidate_type, job.id

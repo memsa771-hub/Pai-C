@@ -12,9 +12,8 @@ from app.pai_c.stages import (CHOSEN, DIRECTION, FOUNDATION, IDENTITY,
 from app.journey import JourneyError, JourneyService
 from app.memory.candidates import MemoryCandidateService
 from app.memory.reconciler import MemoryReconciler
-from app.memory.profile_requirements import ProfileRequirementRegistry
 from app.memory.student_snapshot import StudentSnapshotService
-from app.models import ProfileRequirement, StudentGoal, StudentJourneyEvent
+from app.models import StudentGoal, StudentJourneyEvent
 from scripts.counselor_eval_support import StudentSession
 
 
@@ -96,13 +95,6 @@ def test_multiturn_goal_details_reconcile_to_one_student_reported_goal():
         service = JourneyService(db)
         journey = service.ensure_counselor(student.workspace_id)
         snapshot = StudentSnapshotService(db).build(student.workspace_id)
-        requirement = ProfileRequirement(
-            key="goal.constraints", tier="important", source_type="record_field",
-            source_key="goal", source_path="details.constraints",
-            selector="any_present", question="What limits matter?", priority=85,
-            version=1, enabled=True)
-        assert ProfileRequirementRegistry(db).evaluate(
-            requirement, snapshot, {}) == (True, True)
         moved = advance_discovery_stage(
             service, student.workspace_id, journey, identity_ready=True,
             foundation_ready=True, goal_records=snapshot.records["goal"])

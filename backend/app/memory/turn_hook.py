@@ -32,7 +32,6 @@ def enqueue_turn_extraction(
     user_event_id: Optional[str],
     assistant_event_id: Optional[str],
     agent_name: str,
-    profile_captured: bool = False,
 ) -> Optional[str]:
     """Queue extraction for one completed turn. Returns the job id, or None.
 
@@ -62,7 +61,6 @@ def enqueue_turn_extraction(
                 "user_event_id": user_event_id,
                 "assistant_event_id": assistant_event_id,
                 "agent_name": agent_name,
-                "profile_captured": profile_captured,
             },
             idempotency_key=f"extract:turn:{user_event_id}",
         )

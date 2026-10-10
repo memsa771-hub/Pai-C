@@ -207,51 +207,6 @@ def register_builtin_tools(registry):
             "memory", ToolRisk.WRITE, memory.propose_profile,
             capabilities=CAP_PROFILE_PROPOSE, audiences=OPERATOR_ONLY,
         ),
-        ToolDefinition(
-            "profile.answer",
-            "Save the student's answer to the one active missing-profile question. "
-            "Use only when collection mode names that exact requirement key. The "
-            "answer is reconciled synchronously and returns updated completion. "
-            "For a whole record or journey gap, pass a canonical record object; "
-            "for a single field or Vault fact, pass that field's value.",
-            obj({"requirement_key": {"type": "string"}, "answer": {
-                "description": "Canonical record object or scalar field value, as required by the active rule",
-            }},
-                ["requirement_key", "answer"]),
-            "memory", ToolRisk.WRITE, memory.answer_profile_requirement,
-            capabilities=CAP_MEMORY_MANAGE | CAP_VAULT_MANAGE,
-            audiences=COUNSELOR_ONLY,
-        ),
-        ToolDefinition(
-            "memory.remember",
-            "Durably record something the student explicitly asked you to "
-            "remember. Pass field_key + value for a structured profile fact "
-            "(e.g. 'finance.budget'), record_type + value for a repeatable record "
-            "(also record_id to correct one returned by vault.get), or content "
-            "for unstructured context. Record schemas are returned by vault.get. Use "
-            "only for explicit instructions — ordinary conversation is captured "
-            "automatically in the background.",
-            obj({
-                "content": {"type": "string"},
-                "field_key": {"type": "string"},
-                "record_type": {"type": "string"},
-                "record_id": {"type": "string"},
-                "value": {},
-                "memory_type": {"type": "string", "enum": [
-                    "preference", "goal", "constraint", "interest", "context",
-                ]},
-            }, ["content"]),
-            "memory", ToolRisk.WRITE, memory.remember,
-            capabilities=CAP_MEMORY_MANAGE | CAP_VAULT_MANAGE, audiences=COUNSELOR_ONLY,
-        ),
-        ToolDefinition(
-            "memory.forget",
-            "Stop using something the student asked you to forget. Pass a query "
-            "to match preferences, or field_key to retract a profile fact.",
-            obj({"query": {"type": "string"}, "field_key": {"type": "string"}}),
-            "memory", ToolRisk.WRITE, memory.forget,
-            capabilities=CAP_MEMORY_MANAGE | CAP_VAULT_MANAGE, audiences=COUNSELOR_ONLY,
-        ),
     ]
     for definition in definitions:
         registry.register(definition)

@@ -19,7 +19,7 @@ def load_system_capabilities(registry):
         (analysis.JOB_ANALYZE, analysis.analyze_job, {"user_event_id": string, "assistant_event_id": string, "source_timestamp": {"type": "number"}}),
         (mirror.JOB_MIRROR, mirror.mirror_job, {"notebook_version": {"type": "integer"}, "journey_id": string, "source_event_id": string, "channel": string, "mirror_attempt": {"type": "integer"}}),
         (mirror.JOB_RESEARCH, mirror.confirmed_research_job, {"journey_id": string, "version": {"type": "integer"}}),
-        (memory.JOB_EXTRACT, memory.extract_memory, {"source_type": string, "channel": string, "user_event_id": string, "assistant_event_id": string, "agent_name": string, "profile_captured": {"type": "boolean"}, "candidates": array}),
+        (memory.JOB_EXTRACT, memory.extract_memory, {"source_type": string, "channel": string, "user_event_id": string, "assistant_event_id": string, "agent_name": string, "candidates": array}),
         (memory.JOB_RECONCILE, memory.reconcile_memory, {"candidate_ids": array}),
         (memory.JOB_EMBED, memory.embed_memory, {"memory_ids": array, "episode_ids": array, "fact_ids": array, "record_refs": array}),
         (memory.JOB_UNINDEX, memory.unindex_memory, {"ids": array}),
