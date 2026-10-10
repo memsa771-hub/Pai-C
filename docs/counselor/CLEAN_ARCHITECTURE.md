@@ -22,9 +22,9 @@ Every new feature would add one more handler or path. That is how spaghetti grow
 | Task Runtime | All background work: one queue (existing Postgres jobs), one run record (existing execution runs for tracked tasks), status, retry, budgets, resume | Executes capabilities only |
 
 ## 3. Plug-ins: two registries, nothing else
-- Capability Registry: every business function is a capability with a typed input/output contract: planner.update, facts.extract, session.summarize, memory.index, documents.read, mirror.build, research.run, roadmaps.build, judge.score, and agent.run (the open-ended plan-act-verify loop for PAI OS tasks).
+- Capability Registry: every business function is a capability with a typed input/output contract: planner.update, facts.extract, session.summarize, memory.index, documents.read, mirror.build, research.run, roadmaps.build, judge.score, and operator.run (durable execution selecting workflow or the open-ended plan-act-verify loop for PAI OS tasks).
 - Tool Registry: atomic actions used by capabilities: web.search, web.fetch, files, and the rest.
-- Rule: a background job is never written as its own handler again; it is a capability invoked by the Task Runtime. Fixed-input capabilities run in workflow mode (no generic LLM phases); only agent.run plans.
+- Rule: a background job is never written as its own handler again; it is a capability invoked by the Task Runtime. Fixed-input capabilities run in workflow mode (no generic LLM phases); only the agent mode of operator.run plans.
 
 ## 4. Research through one door
 All triggers (mirror confirmed, source reported or expired, student answered a request, noted question, chosen route deep research, PAI OS needs a fact) call the Research Gateway (rules, budget per Mirror version, dedupe) -> Task Runtime -> research.run -> evidence cache hit or web.search/web.fetch -> Source Verifier -> cache -> facts with source and label. If it cannot verify: a student request. Roadmaps.build only consumes research.run results.
@@ -41,7 +41,7 @@ Decision for P1c: "research.run is the research family program.discover + progra
 
 ## 6. Today -> target mapping
 - 15 job handlers -> capabilities in the Capability Registry run by the Task Runtime.
-- Operator runs and loop -> Task Runtime (runs) + agent.run capability (loop) + workflow mode.
+- Operator runs and loop -> Task Runtime (runs) + operator.run capability (workflow or agent loop).
 - Research in memory handlers, mirror module, gateway, light_research -> Research Gateway + research.run.
 - Counselor context reading memory twice -> Memory Service read model (one profile block).
 - Direct model calls -> Model Gateway.

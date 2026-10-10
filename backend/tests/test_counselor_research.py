@@ -241,3 +241,6 @@ async def test_accepted_fact_event_resumes_same_paused_run_without_student_conti
         assert outcome["resumed"] == 1
         assert resumed.await_args.args[1] == run.id
         assert resumed.await_args.args[2] == {"candidate_id": candidate.id}
+
+        db.refresh(run)
+        assert run.constraints["trigger"] == "student_answer"

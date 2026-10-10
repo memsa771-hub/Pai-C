@@ -288,6 +288,7 @@ async def test_confirm_is_versioned_scoped_and_hands_off_exactly_once():
                 assert (await confirmed_research_job(jobs[0], db))["status"] == "duplicate"
             research.assert_awaited_once()
             assert research.call_args.args[0] == "roadmap_light"
+            assert research.call_args.kwargs["trigger"] == "mirror_confirmed"
         finally:
             app.dependency_overrides.pop(get_db, None)
 

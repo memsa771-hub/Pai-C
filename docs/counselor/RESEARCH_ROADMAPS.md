@@ -84,7 +84,7 @@ No live model, web search or other paid API evaluation was run for this change.
 - `backend/app/pai_c/deep/prompts/roadmap_builder.md`
 - `backend/app/pai_c/deep/roadmaps.py`
 - `backend/app/pai_c/discovery.py`
-- `backend/app/pai_c/research_gateway.py`
+- `backend/app/research/gateway.py`
 - `backend/app/pai_c/understanding.py`
 - `backend/app/memory/discovery_intake.py`
 - `backend/app/memory/handlers.py`
@@ -93,7 +93,7 @@ No live model, web search or other paid API evaluation was run for this change.
 - `backend/app/plugins/_shared/sources.py`
 - `backend/app/plugins/program_research/__init__.py`
 - `backend/app/plugins/roadmap_builder/__init__.py`
-- `backend/app/pai_c/light_research.py`
+- `backend/app/research/light.py`
 - `backend/app/research/requirements.py`
 - `backend/app/pai_c/roadmaps/service.py`
 - `backend/app/routers/roadmaps.py`

@@ -237,3 +237,127 @@ were weakened. Temporary guards/dependencies were removed before committing.
 4. services/workflow.py::_judge and routers/routines.py retain the pre-existing
    broken helper references documented under P1a; this task explicitly excludes
    changing them. No live provider calls or end-to-end live evaluation were run.
+
+
+## P1c: shared Research Gateway and durable Operator runs
+
+This section supersedes P1b's in-process scheduling open question and agent.run
+adapter name. Source: CLEAN_ARCHITECTURE.md sections 4/5 and FigJam diagram 3,
+https://www.figma.com/board/e3MSmJw0s6wOdGvUubx6SU.
+
+Decision: research.run is the existing program.discover + program.research
+family, RequirementStore evidence cache and Source Verifier. It is an
+architecture label, not a new capability id. roadmap.build still invokes those
+business capabilities through context.capabilities at one level of nesting.
+No search, verifier, cache, budget or roadmap-building behavior was rebuilt.
+
+### Moved owners
+
+| Previous | Current | Change |
+| --- | --- | --- |
+| app/pai_c/research_gateway.py | app/research/gateway.py | Same authorization, Mirror-version budgets, research_key dedupe and workspace lock; trigger attribution added |
+| memory.handlers.resume_research / JOB_RESUME_RESEARCH | research.jobs.resume_research / JOB_RESUME_RESEARCH | Same accepted-fact matching and job string memory.resume_research; resume now enters the gateway |
+| memory.handlers.refresh_stale_research / JOB_REFRESH_RESEARCH | research.jobs.refresh_stale_research / JOB_REFRESH_RESEARCH | Same stale-source handling and job string research.refresh_stale |
+| memory.handlers._deep_foundation_ready / _research_delegate_allowed | research.jobs (private helpers) | Existing research-stage checks moved with their users |
+| app/pai_c/light_research.py | app/research/light.py | Pure move; plugin import updated |
+| services.operator.run_agent_job / agent.run | services.operator.run_operator_job / operator.run | Durable adapter invokes _execute; policy chooses workflow or agent loop |
+| Operator delegate/resume create_task | runtime.task_runtime.enqueue | Same background_jobs and execution_runs tables |
+
+There are no pai_c re-exports for moved research modules. All production/test
+imports were updated. Memory enqueues the existing memory.resume_research job
+identifier without importing the research package; system contracts resolve it
+to research.jobs. scheduler and RequirementStore use the moved refresh constant
+and the existing Task Runtime.
+
+### Trigger -> gateway -> run
+
+| Trigger | Producer | Gateway / run |
+| --- | --- | --- |
+| mirror_confirmed | deep.mirror.confirmed_research_job | request_research(roadmap_light) -> roadmap_research + operator.run |
+| student_route | routers.roadmaps add student route | request_research(roadmap_light, roadmap_id) -> roadmap_research + operator.run |
+| route_retry | routers.roadmaps retry route | request_research(roadmap_light, roadmap_id, refresh_key) -> roadmap_research + operator.run |
+| stale_refresh | research.jobs.refresh_stale_research (reported/expired source queue) | request_research(stale_refresh) -> roadmap_research + operator.run |
+| student_answer | research.jobs.resume_research | request_research(..., resume_run_id, resume_action) -> existing Operator resume + operator.run; otherwise existing gated light/stale research path |
+
+Each newly created research run stores the enum in constraints.trigger. A
+student-answer resume updates that same run's trigger before queueing it;
+accepted-candidate checks remain in Operator.resume. A deduplicated creation
+retains the original run's creation trigger and research_key, rather than
+creating another run. Existing pending requests, source refresh allowances,
+Mirror-confirmation gates and CHOSEN-stage handling are unchanged.
+
+### Durable run lifecycle
+
+- New delegation flushes ExecutionRun, enqueues operator.run with payload
+  {run_id}, then commits both in the same transaction. A queue failure cannot
+  leave an unscheduled run. Repeated delegation reuses the run/job idempotently.
+- The idempotency key is operator:<run_id>:resume:<count>. Initial count is zero;
+  accepted resumes store the incremented count in the existing resume_input JSON.
+  No migration, additional table, queue, registry or runtime was introduced.
+- Resume keeps existing text/file/choice/fact/approval validation and host-approved
+  inputs; it commits saved resume state and the new-generation job atomically.
+  Declines retain existing failure behavior and do not enqueue execution.
+- Worker dispatch reconstructs WorkspaceApi from the scoped workspace row,
+  ends its read transaction, and calls the existing _execute. Owned task + object
+  capability_input chooses workflow mode; other tasks use the existing loop.
+  Resumed execution receives response exactly as before, not the bookkeeping JSON.
+- A claimed job survives a crashed process; existing lease reclamation and retry
+  rules allow a fresh worker to execute the same persisted run. Finished/failed
+  or paused runs are returned without restarting; an old resume-generation job
+  is marked superseded without executing the new generation.
+- Existing Operator failure handling still records failed runs. Queue/dispatch
+  errors retain worker backoff. This does not promise exactly-once external
+  effects after a crash; existing capability/cache/tool behavior is preserved.
+- The evaluation harness now dispatches the persisted Operator job instead of
+  waiting on the removed in-process task set. No live evaluation was run.
+
+### Checks and compatibility
+
+New test_research_spine.py covers atomic scheduling and rollback, queue/run
+idempotency, claimed-worker crash/reclaim/restart, resume generations, replay
+of completed/failed/paused runs, all five trigger values and attribution,
+same-run accepted-fact resume and cross-workspace rejection. AST checks scan all
+app modules: research delegation only in research/gateway.py, no research imports
+from memory, no create_task in Operator, no old module imports. System registration
+checks require operator.run, reject agent.run/research.run, and verify the moved
+research handler owners. Existing research/roadmap/PAI OS regressions remain.
+
+Existing asynchronous tests now dispatch the queued job explicitly:
+- test_delegation_returns_while_execution_is_still_waiting proves delegation does
+  not execute inline and leaves a pending durable job.
+- Workflow approval/text resume tests execute that job on the same run.
+- Adapter test targets operator.run and confirms _agent_only is absent.
+- test_operator_resumes_same_run_and_preserves_completed_actions dispatches the
+  queued job; completed-step/action preservation assertions remain unchanged.
+- Research/mirror tests use new import targets and assert trigger metadata.
+No model-output, permission, research grounding or PAI OS contract assertion was
+weakened. _judge and routers/routines.py were not changed.
+
+| Verification | Before P1c (last green P1b baseline) | After P1c |
+| --- | --- | --- |
+| Backend | 831 passed; 3 production-only skips; 8 subtests | 846 passed; same 3 skips; 8 subtests |
+| Frontend | 23 passed | 23 passed |
+| Frontend production build | PASS | PASS |
+| Import every app module | 247/247 | 248/248 |
+
+Fifteen new research/durability tests passed. Final full backend run: 231.50s.
+External socket connections were blocked by the temporary offline test guard;
+providers in tests were fake. Full suites include PAI OS contract table/token
+checks and the authorized internal-escalation regression. Temporary test guards
+and dependencies were removed before the final commit. No .env edits or real
+model/provider calls were made.
+
+### P1c open questions
+
+1. No origin/pai-os branch exists to audit. Shared Operator delegate/resume/_execute
+   and public queue compatibility names remain; removed private scheduling state
+   has been replaced in repository tests/harness consumers. Cross-repository
+   consumers must use persisted run/job state.
+2. No backfill of pre-existing in-process ExecutionRun rows was specified. New
+   runs/resumes are durable; repeating an identical active delegation queues its
+   missing job. No startup sweep or recovery policy for old unqueued rows was added.
+3. Free-text/file/choice responses remain in run.resume_input. The existing business
+   capability context does not expose them separately; defining that context field
+   remains a later contract decision. Approval and accepted-fact paths are retained.
+4. Chosen-route deep research and the excluded PAI OS broken helpers remain deferred
+   exactly as before. FigJam's other future triggers were not added in this task.
