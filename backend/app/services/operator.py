@@ -489,12 +489,12 @@ async def delegate(ctx, objective: str, constraints: Optional[dict], context_ref
 
 
 def _baseline_is_current(db, workspace_id: str) -> bool:
-    from app.pai_c.research_gateway import mirror_is_current
+    from app.research.gateway import mirror_is_current
     return mirror_is_current(db, workspace_id)
 
 
 def _result_context_current(db, run: ExecutionRun) -> bool:
-    from app.pai_c.research_gateway import mirror_is_current
+    from app.research.gateway import mirror_is_current
     if run.task_type != "roadmap_research":
         return _baseline_is_current(db, run.workspace_id)
     version = (run.constraints or {}).get("mirror_version")

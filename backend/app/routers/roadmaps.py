@@ -108,12 +108,12 @@ async def retry_roadmap(roadmap_id: str, network: str = Query(...), db=Depends(g
         audience=AUDIENCE_COUNSELOR,
         granted_capabilities=capabilities_for_agent(PAI_AGENT_NAME),
     )
-    from app.pai_c.research_gateway import request_research
+    from app.research.gateway import request_research
     from app.journey import JourneyService
     target = db.get(Roadmap, roadmap_id)
     journey = JourneyService(db).get(workspace_id, target.journey_id)
     delegated = await request_research("roadmap_light", workspace_id, db=db,
-        journey=journey, tool_context=context, roadmap_id=roadmap_id,
+        journey=journey, tool_context=context, roadmap_id=roadmap_id, trigger="route_retry",
         refresh_key=constraints["research_key"],
         refresh_candidate=((constraints.get("capability_input") or {}).get("brief") or {}).get("refresh_candidate"))
     row = db.get(Roadmap, roadmap_id)
@@ -228,7 +228,7 @@ async def add_custom_goal(body: CustomGoal, network: str = Query(...), db=Depend
                           x_workspace_token: str | None = Header(None), authorization: str | None = Header(None)):
     workspace = _authorized(db, network, x_workspace_token, authorization)
     workspace_id = str(workspace.id)
-    from app.pai_c.research_gateway import mirror_is_current, request_research
+    from app.research.gateway import mirror_is_current, request_research
     from app.memory.candidates import MemoryCandidateService
     from app.memory.reconciler import MemoryReconciler
     from app.journey import JourneyService
@@ -276,7 +276,7 @@ async def add_custom_goal(body: CustomGoal, network: str = Query(...), db=Depend
         granted_capabilities=capabilities_for_agent(PAI_AGENT_NAME),
     )
     delegated = await request_research("roadmap_light", workspace_id, db=db,
-        journey=journey, tool_context=context, roadmap_id=card["id"])
+        journey=journey, tool_context=context, roadmap_id=card["id"], trigger="student_route")
     row = db.get(Roadmap, card["id"])
     if delegated and delegated.get("ok"):
         row.execution_run_id = delegated["data"]["run_id"]

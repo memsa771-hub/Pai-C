@@ -187,7 +187,7 @@ def enqueue_confirmed_research(db, workspace_id: str, journey) -> str:
 
 
 async def confirmed_research_job(job, db) -> dict:
-    from app.pai_c.research_gateway import request_research
+    from app.research.gateway import request_research
     from app.memory.student_snapshot import StudentSnapshotService
     from app.memory.permissions import capabilities_for_agent
     from app.services.pai import PAI_ALLOWED_TOOLS, WorkspaceApi
@@ -209,7 +209,7 @@ async def confirmed_research_job(job, db) -> dict:
             conversation=draft["channel"].removeprefix("channel/"),
             allowed_tools=frozenset({"operator.delegate"}) & frozenset(PAI_ALLOWED_TOOLS),
             audience=AUDIENCE_COUNSELOR, granted_capabilities=capabilities_for_agent("pai"))
-        outcome = await request_research("roadmap_light", job.workspace_id, db=db, journey=journey,
+        outcome = await request_research("roadmap_light", job.workspace_id, trigger="mirror_confirmed", db=db, journey=journey,
             snapshot=snapshot, tool_context=ctx)
         if outcome is not None and not outcome.get("ok"):
             raise RuntimeError("Confirmed research handoff failed")

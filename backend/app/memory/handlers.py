@@ -37,7 +37,7 @@ JOB_REFRESH_RESEARCH = "research.refresh_stale"
 
 async def refresh_stale_research(job, db) -> dict:
     """A reported or expired source starts a fresh Counselor research run."""
-    from app.pai_c.research_gateway import request_research
+    from app.research.gateway import request_research
     from app.journey import JourneyService
     from app.memory.permissions import capabilities_for_agent
     from app.memory.student_snapshot import StudentSnapshotService
@@ -139,7 +139,7 @@ async def resume_research(job, db) -> dict:
             db.commit()
     # Resume permitted research from the canonical snapshot without a new chat
     # turn; discovery alone must not bypass the mirror-confirmation gate.
-    from app.pai_c.research_gateway import request_research
+    from app.research.gateway import request_research
     from app.pai_c.stages import advance_discovery_stage
     from app.journey import JourneyService
     from app.memory.student_snapshot import StudentSnapshotService

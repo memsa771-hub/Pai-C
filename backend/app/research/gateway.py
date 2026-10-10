@@ -37,7 +37,7 @@ def _research_brief(db, workspace_id, journey, snapshot=None):
 
 async def request_research(kind, workspace_id, *, db, journey, tool_context,
                            goals=None, snapshot=None, refresh_key=None, refresh_candidate=None,
-                           roadmap_id=None):
+                           roadmap_id=None, trigger=None, resume_run_id=None, resume_action=None):
     """Serialize gateway requests without holding row locks across Operator calls."""
     from sqlalchemy import text
     import hashlib
@@ -52,7 +52,8 @@ async def request_research(kind, workspace_id, *, db, journey, tool_context,
                 return {"ok": False, "error": {"code": "research_busy"}}
         return await _request_research(kind, workspace_id, db=db, journey=journey,
             tool_context=tool_context, goals=goals, snapshot=snapshot, refresh_key=refresh_key,
-            refresh_candidate=refresh_candidate, roadmap_id=roadmap_id)
+            refresh_candidate=refresh_candidate, roadmap_id=roadmap_id, trigger=trigger,
+            resume_run_id=resume_run_id, resume_action=resume_action)
     finally:
         if lock is not None:
             try:
@@ -63,9 +64,27 @@ async def request_research(kind, workspace_id, *, db, journey, tool_context,
 
 async def _request_research(kind, workspace_id, *, db, journey, tool_context,
                            goals=None, snapshot=None, refresh_key=None, refresh_candidate=None,
-                           roadmap_id=None):
+                           roadmap_id=None, trigger=None, resume_run_id=None, resume_action=None):
     if kind not in {"roadmap_light", "roadmap_deep", "stale_refresh"}:
         raise ValueError("unknown Counselor research kind")
+    trigger = trigger or ("stale_refresh" if kind == "stale_refresh" else
+                          "route_retry" if roadmap_id and refresh_key else
+                          "student_route" if roadmap_id else "mirror_confirmed")
+    if trigger not in {"mirror_confirmed", "student_route", "route_retry", "stale_refresh", "student_answer"}:
+        raise ValueError("unknown research trigger")
+    if resume_run_id is not None:
+        if trigger != "student_answer" or tool_context is None or tool_context.workspace_id != workspace_id:
+            return None
+        run = db.scalar(select(ExecutionRun).where(ExecutionRun.id == resume_run_id,
+            ExecutionRun.workspace_id == workspace_id, ExecutionRun.status == "needs_user_action"))
+        if run is None:
+            return None
+        # Resume the existing run, preserving its fact/approval checks and input.
+        # The trigger is saved before handing it to Operator/worker dispatch.
+        run.constraints = {**(run.constraints or {}), "trigger": trigger}
+        db.commit()
+        from app.services import operator
+        return await operator.resume(tool_context, resume_run_id, resume_action)
     if tool_context is None or tool_context.workspace_id != workspace_id or journey is None:
         return None
     workspace = db.scalar(select(Workspace.id).where(
@@ -113,7 +132,7 @@ async def _request_research(kind, workspace_id, *, db, journey, tool_context,
     payload = {
         "objective": "Research decisive facts for the confirmed student routes and noted questions",
         "task_type": "roadmap_research", "intent": "academic_planning",
-        "constraints": {"research_key": key, "mirror_version": brief["mirror_version"],
+        "constraints": {"trigger": trigger, "research_key": key, "mirror_version": brief["mirror_version"],
                         **({"roadmap_id": target.id} if target and target.origin == "student_added" else {}),
                         "capability_input": {"brief": brief}},
         "context_refs": ["vault", "memory"]}

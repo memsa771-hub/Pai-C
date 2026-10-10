@@ -283,7 +283,7 @@ async def test_confirm_is_versioned_scoped_and_hands_off_exactly_once():
             assert current.counselor_summary_draft["status"] == "confirmed"
             jobs = db.scalars(select(BackgroundJob).where(BackgroundJob.job_type == JOB_RESEARCH)).all()
             assert len(jobs) == 1
-            with patch("app.pai_c.research_gateway.request_research", AsyncMock(return_value={"ok": True})) as research:
+            with patch("app.research.gateway.request_research", AsyncMock(return_value={"ok": True})) as research:
                 assert (await confirmed_research_job(jobs[0], db))["status"] == "done"
                 assert (await confirmed_research_job(jobs[0], db))["status"] == "duplicate"
             research.assert_awaited_once()

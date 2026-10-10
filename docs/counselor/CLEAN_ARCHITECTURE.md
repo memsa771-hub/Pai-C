@@ -29,6 +29,8 @@ Every new feature would add one more handler or path. That is how spaghetti grow
 ## 4. Research through one door
 All triggers (mirror confirmed, source reported or expired, student answered a request, noted question, chosen route deep research, PAI OS needs a fact) call the Research Gateway (rules, budget per Mirror version, dedupe) -> Task Runtime -> research.run -> evidence cache hit or web.search/web.fetch -> Source Verifier -> cache -> facts with source and label. If it cannot verify: a student request. Roadmaps.build only consumes research.run results.
 
+Decision for P1c: "research.run is the research family program.discover + program.research with the evidence cache (research/requirements.py RequirementStore) and the Source Verifier. No new capability id is created, because capability nesting is limited to one level."
+
 ## 5. Dependency rules (anti-spaghetti)
 1. Inputs only enter through the Orchestrator; output only leaves through the Messenger.
 2. Capabilities talk to memory only through the Memory Service and to models only through the Model Gateway.

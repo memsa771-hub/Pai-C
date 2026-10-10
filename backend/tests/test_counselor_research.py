@@ -236,7 +236,7 @@ async def test_accepted_fact_event_resumes_same_paused_run_without_student_conti
         db.commit()
         with patch.object(operator, "resume", AsyncMock(return_value={
                 "ok": True, "data": {"resumed": True}})) as resumed, \
-                patch("app.pai_c.research_gateway.request_research",
+                patch("app.research.gateway.request_research",
                       AsyncMock(return_value=None)):
             outcome = await resume_research(SimpleNamespace(
                 workspace_id=student.workspace_id, payload={"candidate_id": candidate.id}), db)

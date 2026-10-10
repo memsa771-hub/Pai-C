@@ -18,7 +18,7 @@ from app.pai_c.deep.notebook import NotebookService, NotebookVersionConflict
 from app.pai_c.deep.notebook_schema import CounselorNotebookData
 from app.pai_c.deep.sensitive import check_notebook_before_mirror
 from app.pai_c.deep.turn_input import CounselorTurnInput
-from app.pai_c.research_gateway import request_research
+from app.research.gateway import request_research
 from app.journey import JourneyService
 from app.models import CounselorNotedQuestion, EventRecord, ExecutionRun, Roadmap, StudentJourney
 from scripts.counselor_eval_support import StudentSession
@@ -166,7 +166,7 @@ async def test_gateway_reuses_existing_operator_payload_and_deduplicates_runs():
 
 
 def test_only_research_gateway_directly_calls_operator_delegate():
-    directory = Path(__file__).resolve().parents[1] / "app" / "pai_c"
+    directory = Path(__file__).resolve().parents[1] / "app"
     found = []
     for path in directory.rglob("*.py"):
         for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
@@ -175,7 +175,7 @@ def test_only_research_gateway_directly_calls_operator_delegate():
                     and isinstance(node.args[0], ast.Constant)
                     and node.args[0].value == "operator.delegate"):
                 found.append(path.name)
-    assert found == ["research_gateway.py"]
+    assert found == ["gateway.py"]
 
 
 @pytest.mark.asyncio
