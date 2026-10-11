@@ -862,8 +862,8 @@ No live API calls, .env edits, new queue/runtime or reader refactor.
 
 ## P3 Round 1 - Step A: concurrent safety gate
 
-Step A is implemented. Step B (Planner patches/plans) is pending a decision on
-bounding the growing Truth Map input; it is not implemented by this checkpoint.
+Step A is implemented. At its checkpoint Step B (Planner patches/plans) was pending
+a decision on bounding the growing Truth Map input; Step B is implemented below.
 No existing files were moved, and the Analyst remains unchanged.
 
 ### Flow and ownership
@@ -925,12 +925,12 @@ pre-post concurrency, fallback/resource behavior, the real wellbeing prompt with
 fake models, role fallback resolution, text-only input, and migration roundtrip.
 Test conftest installs a fake safety provider for existing runtime tests.
 
-### Open question for Step B
+### Step B map-budget decision (resolved)
 
-Twelve recent chat entries alone do not bound a growing Truth Map. Approval is
-pending to reuse the existing notebook context token budget for Planner input
-while applying patches to the complete stored map. No trimming design or Planner
-implementation was invented while that decision remains unanswered.
+The founder rejected reusing the Counselor trimming function. Step B uses its own
+4000-token map budget, newest-confirmed items first with round-robin omission,
+and applies patches to the complete stored map. If mandatory content cannot fit,
+the analysis is rejected and the last good map/plan remain unchanged.
 
 
 ### Step A verification results
@@ -951,3 +951,170 @@ were fake; a temporary socket guard rejected external network connections.
 Temporary guard/dependency folders were removed before the documentation commit.
 Fixture checks prove routing and prompt contracts, not live-model classification
 accuracy; no live classification quality or paid latency measurement was run.
+
+
+## P3 Round 1 - Step B: Planner patches and next-turn plans
+
+Sources: ARCHITECTURE sections 1/4/6/7, CORE_V1_SPEC F2/F5,
+CLEAN_ARCHITECTURE, COUNSELING_METHOD, and the approved architecture/core FigJam
+boards wuPJaFgpIJmCfDPI12N1Ed (diagram 3) and 97yQ5hwTjywjMDazpqBUmc.
+No existing module was moved. The existing counselor.analyze capability/job keeps
+its idempotency, ordering, nonblocking locks, queue/backoff and stage advancement.
+Gateway role, model and reasoning remain analyst / PAI_ANALYST_MODEL /
+PAI_ANALYST_REASONING_EFFORT. The background writer is now the Planner.
+
+### Bounded view and complete-map ownership
+
+planner/view.py builds a view independent of Counselor _trim_notebook and
+PAI_COUNSELOR_NOTEBOOK_CONTEXT_TOKENS. It includes active items only, with id,
+key, value, kind, confidence, level, last_confirmed, source category, and evidence
+limited to 200 characters. pressures.people, sure (including history), tensions,
+identity_status, decision_difficulties, hypotheses, open_questions, coverage,
+depth_mode and engagement_style are always included; private_notes is limited to
+1000 characters. Private legacy_v1 is never included, even in model schema.
+
+When over budget, each part (said/shown/source/self/pressures.items) loses its
+oldest-confirmed item in turn, stopping before the part becomes empty. Token
+count uses the existing estimated_tokens over the serialized map plus its tags
+and omitted_items counts. Newest-confirmed items survive. Offset dates are
+compared chronologically; accepted naive historical dates are treated as UTC for
+ordering only, without rewriting stored values.
+
+If mandatory fields plus one item per nonempty part cannot fit, return
+input_rejected without any model call or map/plan write (founder decision).
+Otherwise the Planner receives the bounded view, omitted counts, schemas,
+existing compact profile, latest session summary, semantic recall, and the last
+PAI_PLANNER_HISTORY_TURNS chat entries. Existing 1500-character chat caps remain.
+The fixed schema/profile/summary/recall blocks are separate from the map budget.
+
+### Atomic patch operations
+
+| Operation | Validation and effect |
+| --- | --- |
+| add | Allowed part; required evidence/kind/confidence; category source-only; code assigns UUID and both timestamps |
+| update | Visible id only; required evidence; optional value/confidence/level; code updates last_confirmed |
+| confirm | Visible id only; required evidence; code updates last_confirmed |
+| retire | Visible id only; nonempty reason; status becomes retired, never deleted |
+| upsert_person | Role match case-insensitive; required evidence; first_seen retained on update, dates assigned by code |
+| set_sure | Strict integer 0-10 must appear in latest student message; evidence required; previous rating retained in history; asked_at assigned by code |
+| set_private | Only the eight specified private fields; strict resulting notebook schema |
+| set_coverage | Six parts; true requires active evidence (people count as pressure evidence); sure requires a score |
+
+The patch is applied to a copy of the complete stored map. update/confirm/retire
+cannot reference an unknown, retired/hidden or omitted id. Unmentioned items,
+including omitted items, remain unchanged. Every operation and the whole result
+are validated, then existing sanitize_notebook and enforce_mirror_readiness run.
+No lenient partial patch is saved. Code-generated dates/ids cannot be supplied by
+the model. Existing v2 notebooks and private v1 archives remain readable/lossless.
+Retirement reasons and rating evidence validate their operations; no new item or
+rating fields were invented to store them separately.
+
+Invalid patch/JSON logs only op index and error type, then retries once with that
+safe error appended. A second rejection returns patch_rejected with no writes.
+Provider failures keep existing worker retry behavior. An optimistic version
+conflict still refetches and re-runs once; any uncommitted plan is rolled back.
+
+### Plan contract and storage
+
+Strict TurnPlan: next_move understand/tell/both/care; intent <=200 characters;
+target_gap said/shown/source/pressures/self/sure or null; give <=200 characters;
+avoid_questions up to five strings; playbooks must be []. If the latest causal
+workspace turn decision is wellbeing, code forces care and target_gap=null.
+Invalid plans are not saved and do not discard an otherwise valid patch.
+
+Migration 105 (down_revision 104) creates pai_turn_plans:
+id UUID PK, workspace_id UUID FK workspaces (cascade), source_event_id text FK
+ events (cascade), notebook_version integer, plan JSONB, created_at timestamptz;
+unique(workspace_id, source_event_id). Downgrade drops only pai_turn_plans.
+Migration 104 is unchanged. Plans and notebook versions commit together through
+the existing notebook transaction. Workspace deletion purges plans too.
+MemoryService.latest_plan reads the latest valid stored workspace plan;
+Counselor context includes next_move, intent, give and avoid_questions only.
+The requested one line was appended to counselor.md; no other Voice rewrite.
+
+planner/prompts/planner.md replaces deep/prompts/analyst.md, preserving six-part,
+evidence/levels, Vault, privacy, coverage, rating and student-data rules. Runtime
+loader and prompt-document tests now use planner. Before deletion the importer
+check found only the loader/analysis plus two prompt tests and prompt docs; those
+were updated. Historical architecture/restructure references remain historical.
+COUNSELOR_V3_PROMPTS sections 1/2 match both runtime prompts.
+
+### Config and model-call count
+
+Added PAI_PLANNER_MAP_CONTEXT_TOKENS=4000 and PAI_PLANNER_HISTORY_TURNS=12,
+documented in .env.example only. Removed PAI_ANALYST_HISTORY_SIZE from code and
+startup validation; it was already absent from .env.example. No .env or other
+.env.* file was edited.
+
+| Turn path | Before Step B | After Step B |
+| --- | --- | --- |
+| Normal human turn inline | Counselor + safety | Same |
+| Flagged human turn inline | Counselor + safety + wellbeing Counselor | Same |
+| Background normal turn | Analyst + extractor | Planner (same analyst role) + extractor |
+| Semantic recall embedding | Existing configured reader | Same; disabled switch still makes zero calls |
+
+Patch correction or version conflict can cause exceptional Planner retries;
+existing language repair and provider retry behavior remain unchanged.
+No sensitive-check call was added per turn; existing pre-Mirror checking remains.
+
+### Offline size evidence and fixture changes
+
+Synthetic context-only estimates (UTF-8 bytes/4, excluding fixed system prompts;
+50 active map items; 1500-character student messages):
+
+| Exchanges | Old chat entries | Old context tokens | New chat entries | New context tokens |
+| --- | --- | --- | --- | --- |
+| 12 | 24 | 16371 | 12 | 9954 |
+| 100 | 60 | 23954 | 12 | 9954 |
+
+The map view was 3973 tokens at the 4000 budget, with omitted counts
+said=5, shown=5, source=4, self=4, pressures.items=4. These are estimates from
+fake data, not live provider usage or a cost measurement.
+
+Historical offline full-map recordings remain unchanged as data. The replay-only
+scripts/eval/recorded_planner.py adapter produces valid patches referencing ids
+from the actual bounded view. Fake helper schemas now include pai_turn_plans.
+Tests that previously asserted partial sanitization now assert whole-patch
+rejection. Goal switching is checked in immutable notebook versions; goal_history
+is preserved but is not a writable patch field in this round. Ordering, stage,
+conflict, sensitive-check and PAI OS behavior assertions remain intact.
+
+### Open questions and findings for later
+
+No blocking open questions remain. The impossible-budget case follows the
+founder's explicit rejection decision.
+- Counselor's own _trim_notebook remains unchanged; its selection policy belongs
+  to the later Voice work, not this Planner implementation.
+- Fixed input overhead includes full validation schemas; the independent map
+  budget is not a total request-token budget.
+- The session exporter was not extended to include plans; no export redesign was
+  requested in this round.
+- Historical architecture/restructure docs still mention the deleted Analyst
+  prompt as an old path; runtime imports and current prompt docs do not.
+
+
+### Step B verification results
+
+| Check | Before (5f51b23) | Step B |
+| --- | --- | --- |
+| Full backend | 912 passed; 3 production-only skips; 8 subtests | 962 passed; same 3 skips; 8 subtests |
+| Production-only security | 3 passed; 4 subtests | 3 passed; 4 subtests |
+| Frontend full suite | 23 passed | 23 passed |
+| Frontend production build | PASS | PASS |
+| All app modules imported | 250 | 254; zero failures |
+| Dedicated OS contract/gateway/spine checks | Existing green | 71 passed |
+
+Final full backend run: 245.87 seconds. Two existing migration-101 SQLite
+expression-index reflection warnings are unchanged. No live model/API evaluation
+was performed. All model tests used fake providers; the temporary socket guard
+rejected external connections. Temporary guard and dependency folders were
+removed before the final documentation commit.
+
+The 50 new Planner checks cover all eight ops, atomic rejection and correction,
+unknown/omitted ids, evidence, UUID/date ownership, student certainty, coverage,
+per-part retention/newest-first omission, mandatory-input rejection without calls,
+unchanged omitted items/private archives, bounded 100-exchange input, strict plans,
+care override, previous-plan fallback, workspace deletion, version-conflict plan
+rollback, migration-105 upgrade/downgrade, and accepted mixed-format dates.
+Existing prompt parity, v2 migration/loading, ordering, idempotency, stage,
+sensitive-check, disabled embedding, chat/voice and PAI OS regressions remain green.
