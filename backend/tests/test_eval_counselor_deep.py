@@ -44,12 +44,25 @@ async def test_recorded_persona_runs_deep_turn_analyst_and_memory_end_to_end(tmp
 
 
 @pytest.mark.asyncio
-async def test_recorded_goal_switcher_retains_three_session_goals(tmp_path):
-    result = await run_evaluation(persona_ids={"goal_switcher"}, result_dir=tmp_path)
+async def test_recorded_goal_switcher_retains_three_session_goals_in_versions(tmp_path):
+    from app.pai_c.memory import MemoryService
+    versions=[]
+    original=MemoryService.apply_truth_map
+    def capture(service,*args,**kwargs):
+        result=original(service,*args,**kwargs)
+        versions.append(next(item.value for item in result[0].notebook.said if item.key=="stated_goal"))
+        return result
+    with patch.object(MemoryService,"apply_truth_map",capture):
+        result = await run_evaluation(persona_ids={"goal_switcher"}, result_dir=tmp_path)
+    fixture = next(row for row in load_personas(PERSONAS) if row["id"] == "goal_switcher")
+    expected = [next(item["value"] for item in turn["analyst"]["notebook"]["said"] if item["key"] == "stated_goal") for turn in fixture["recorded_turns"]]
+    assert versions == expected and len(versions) == 3
     person = result["personas"][0]
     assert len(person["turns"]) == 3
-    assert [item["goal"] for item in person["notebook"]["goal_history"]] == [
-        "architecture", "business", "environmental science"]
+    # goal_history is not writable by Round 1 patches. Earlier goal states remain
+    # in immutable notebook versions instead of model-authored history.
+    assert person["notebook"]["goal_history"] == []
+    assert next(item["value"] for item in person["notebook"]["said"] if item["key"] == "stated_goal") == "I now want environmental science."
 
 
 @pytest.mark.asyncio

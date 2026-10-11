@@ -20,6 +20,23 @@ class MemoryService:
     def truth_map(self, workspace_id):
         return NotebookService(self.db).get(workspace_id)
 
+    def latest_plan(self, workspace_id):
+        from sqlalchemy import select
+        from app.models import PaiTurnPlan, EventRecord, Workspace
+        from app.pai_c.planner.plan import validate_plan
+        workspace = self.db.get(Workspace, workspace_id)
+        if workspace is None or workspace.status != "active":
+            return None
+        rows = self.db.scalars(select(PaiTurnPlan).join(EventRecord, PaiTurnPlan.source_event_id == EventRecord.id).where(
+            PaiTurnPlan.workspace_id == workspace_id, EventRecord.network_id == workspace_id
+        ).order_by(EventRecord.timestamp.desc(), EventRecord.id.desc()).limit(1)).all()
+        for row in rows:
+            try:
+                return validate_plan(row.plan)
+            except ValueError:
+                continue
+        return None
+
     def latest_episode(self, workspace_id, *, limit=1):
         return EpisodicMemoryService(self.db).recent(workspace_id, limit=limit, event_type="session_summary")
 
@@ -44,6 +61,9 @@ class MemoryService:
         return foundation_ready(truth_map)
 
     def delete_for_workspace(self, workspace_id):
+        from sqlalchemy import delete
+        from app.models import PaiTurnPlan
+        self.db.execute(delete(PaiTurnPlan).where(PaiTurnPlan.workspace_id == workspace_id))
         return NotebookService(self.db).delete_for_workspace(workspace_id)
 
     def export_truth_map(self, workspace_id):

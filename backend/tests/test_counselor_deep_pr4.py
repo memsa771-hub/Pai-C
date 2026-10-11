@@ -46,7 +46,13 @@ def _turn_job(student, db, text="A private student statement"):
 
 
 def _model_notebook(**updates):
-    return json.dumps({"notebook": {**CounselorNotebookData().model_dump(mode="json"), **v2_fixture(**updates)}})
+    from scripts.eval.recorded_planner import recorded_patch
+    target = {**CounselorNotebookData().model_dump(mode="json"), **v2_fixture(**updates)}
+    if target["coverage"].get("said") and not target["said"]:
+        target["said"] = [item("Student explained a wish", key="wish", id="test-said")]
+    if target["coverage"].get("self") and not target["self"]:
+        target["self"] = [item("Student explained a preference", key="preference", id="test-self")]
+    return json.dumps(recorded_patch(target))
 
 
 async def _no_sensitive(_previous, candidate):
@@ -70,7 +76,7 @@ async def test_analysis_is_idempotent_and_workspace_scoped():
         assert "<notebook_schema>" in model.call_args.kwargs["messages"][0]["content"]
         assert "<profile>" in model.call_args.kwargs["messages"][0]["content"]
         assert "<transcript>" in model.call_args.kwargs["messages"][0]["content"]
-        assert model.call_args.kwargs["system_prompt"].startswith("You are the private note-taker")
+        assert model.call_args.kwargs["system_prompt"].startswith("You are the private Planner")
 
 
 @pytest.mark.asyncio
@@ -282,7 +288,7 @@ async def test_sensitive_content_is_dropped_before_mirror(caplog):
             snapshot, removals = await check_notebook_before_mirror(
                 student.workspace_id, db=db, checker=checker)
         assert len(removals) == 2
-        assert [claim.id for claim in snapshot.notebook.said] == ["b"]
+        assert [claim.value["text"] for claim in snapshot.notebook.said] == ["valid student work"]
         assert "said[0]" in caplog.text
         assert "private flagged text" not in caplog.text
 
@@ -333,7 +339,7 @@ async def test_no_sensitive_call_per_analysis_and_one_batch_before_mirror():
         assert sensitive.await_count == 1
         assert result["sensitive_removed"] == 0
         assert len(removals) == 1
-        assert [claim.id for claim in NotebookService(db).get(student.workspace_id).notebook.said if claim.key == "claim"] == ["b"]
+        assert [claim.value["text"] for claim in NotebookService(db).get(student.workspace_id).notebook.said if claim.key == "claim"] == ["ordinary claim"]
 
 
 @pytest.mark.asyncio

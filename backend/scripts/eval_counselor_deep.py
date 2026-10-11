@@ -91,9 +91,15 @@ class RecordedModels:
         self._record("counselor")
         return json.dumps(self.turn["counselor"], ensure_ascii=False)
 
-    async def analyst(self, **_kwargs):
+    async def analyst(self, **kwargs):
         self._record("analyst")
-        return json.dumps(self.turn["analyst"], ensure_ascii=False)
+        output = self.turn["analyst"]
+        if "notebook" in output:
+            from scripts.eval.recorded_planner import recorded_patch
+            text = kwargs["messages"][0]["content"]
+            view = json.loads(text.split("<notebook>", 1)[1].split("</notebook>", 1)[0])
+            output = recorded_patch(output["notebook"], view)
+        return json.dumps(output, ensure_ascii=False)
 
     async def sensitive(self, **kwargs):
         self._record("sensitive")

@@ -71,3 +71,5 @@ Return ONE JSON object and nothing else:
 
 MIRROR RECOVERY
 If <journey> reports a failed Mirror or one needing discovery, acknowledge naturally that you need a little more understanding and ask one useful question. Do not pretend a Mirror was delivered. Use the student's language; there is no fixed recovery wording.
+
+When a <plan> block is present, follow its next_move and intent, include its give item when natural, and never ask a question listed in avoid_questions.

@@ -149,6 +149,20 @@ class CounselorNotedQuestion(Base):
     )
 
 
+class PaiTurnPlan(Base):
+    """Validated background instructions for the next Counselor turn."""
+    __tablename__ = "pai_turn_plans"
+    id = Column(UUID(as_uuid=False), primary_key=True, default=_uuid)
+    workspace_id = Column(UUID(as_uuid=False), ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False)
+    source_event_id = Column(Text, ForeignKey("events.id", ondelete="CASCADE"), nullable=False)
+    notebook_version = Column(Integer, nullable=False)
+    plan = Column(JSONB, nullable=False)
+    created_at = Column(DateTime(timezone=True), nullable=False, default=_now)
+    __table_args__ = (
+        UniqueConstraint("workspace_id", "source_event_id", name="uq_turn_plan_workspace_event"),
+    )
+
+
 class CounselorNotebook(Base):
     """Private Counselor working notes for one student workspace."""
 

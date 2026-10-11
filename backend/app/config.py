@@ -198,7 +198,8 @@ class Config:
     PAI_SUMMARIZER_MODEL: str = os.environ.get("PAI_SUMMARIZER_MODEL", "") or PAI_ANALYST_MODEL
     PAI_SESSION_GAP_MINUTES: int = int(os.environ.get("PAI_SESSION_GAP_MINUTES", "30"))
     PAI_SESSION_SWEEP_SECONDS: int = int(os.environ.get("PAI_SESSION_SWEEP_SECONDS", "300"))
-    PAI_ANALYST_HISTORY_SIZE: int = int(os.environ.get("PAI_ANALYST_HISTORY_SIZE", "60"))
+    PAI_PLANNER_HISTORY_TURNS: int = int(os.environ.get("PAI_PLANNER_HISTORY_TURNS", "12"))
+    PAI_PLANNER_MAP_CONTEXT_TOKENS: int = int(os.environ.get("PAI_PLANNER_MAP_CONTEXT_TOKENS", "4000"))
     PAI_ANALYST_REASONING_EFFORT: str = os.environ.get("PAI_ANALYST_REASONING_EFFORT", "low")
     PAI_SENSITIVE_CHECK_REASONING_EFFORT: str = os.environ.get(
         "PAI_SENSITIVE_CHECK_REASONING_EFFORT", "low")
@@ -428,7 +429,7 @@ class Config:
                self.PAI_SEMANTIC_RECALL_TOP_K, self.PAI_COUNSELOR_RESEARCH_DAILY_LIMIT,
                self.PAI_COUNSELOR_NOTEBOOK_CONTEXT_TOKENS,
                self.PAI_COUNSELOR_HISTORY_SIZE,
-               self.PAI_ANALYST_HISTORY_SIZE,
+               self.PAI_PLANNER_HISTORY_TURNS, self.PAI_PLANNER_MAP_CONTEXT_TOKENS,
                self.PAI_COUNSELOR_SENSITIVE_CHECK_MAX_TOKENS) < 1:
             raise RuntimeError("Deep Counselor limits must be positive")
         if self.PAI_PROFILE_COMPLETION_ROLLOUT_MODE not in {"off", "shadow", "new", "all"}:

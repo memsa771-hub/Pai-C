@@ -200,7 +200,7 @@ def test_research_brief_uses_public_truth_map_summary():
         assert "private_notes" not in brief["notebook"]
 
 
-@pytest.mark.parametrize("number,name", [(2, "analyst"), (3, "mirror"), (4, "roadmap_builder"), (6, "sensitive_check")])
+@pytest.mark.parametrize("number,name", [(2, "planner"), (3, "mirror"), (4, "roadmap_builder"), (6, "sensitive_check")])
 def test_v2_documented_prompts_match_runtime(number, name):
     backend = Path(__file__).parents[1]
     docs = backend.parent / "docs/counselor/COUNSELOR_V3_PROMPTS.md"
@@ -208,11 +208,12 @@ def test_v2_documented_prompts_match_runtime(number, name):
         docs = Path("/docs/counselor/COUNSELOR_V3_PROMPTS.md")
     section = docs.read_text(encoding="utf-8").split(f"## {number}.", 1)[1].split("\n## ", 1)[0]
     documented = section.split("```text\n", 1)[1].split("\n```", 1)[0]
-    assert documented.rstrip() == (backend / f"app/pai_c/deep/prompts/{name}.md").read_text(encoding="utf-8").rstrip()
+    from app.pai_c.deep.prompts import load_prompt
+    assert documented.rstrip() == load_prompt(name).rstrip()
 
 
 @pytest.mark.asyncio
-async def test_analyst_outputs_v2_and_drops_objective_item_without_reference():
+async def test_planner_rejects_whole_patch_with_objective_item_without_reference():
     from unittest.mock import AsyncMock
     from scripts.counselor_eval_support import StudentSession
     from tests.test_counselor_deep_pr4 import _turn_job
@@ -220,11 +221,12 @@ async def test_analyst_outputs_v2_and_drops_objective_item_without_reference():
     with StudentSession() as student, student.factory() as db:
         job, _ = _turn_job(student, db)
         candidate = {"schema_version": 2, "said": [item("A student wish"), item("An objective copy", key="education", id="bad")]}
-        with patch("app.pai_c.deep.analysis.chat_completion", AsyncMock(return_value=json.dumps({"notebook": candidate}))) as model:
+        from scripts.eval.recorded_planner import recorded_patch
+        with patch("app.pai_c.deep.analysis.chat_completion", AsyncMock(return_value=json.dumps(recorded_patch(candidate)))) as model:
             result = await analyze_job(job, db)
         saved = MemoryService(db).truth_map(student.workspace_id).notebook
-        assert saved.schema_version == 2 and len(saved.said) == 1
-        assert result["sanitized"] >= 1
+        assert saved.schema_version == 2 and not saved.said
+        assert result["status"] == "patch_rejected" and model.await_count == 2
         assert "legacy_v1" not in model.call_args.kwargs["messages"][0]["content"]
 
 

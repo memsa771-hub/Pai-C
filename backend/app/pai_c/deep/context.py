@@ -141,6 +141,9 @@ async def build_context(db, workspace_id: str, turn: CounselorTurnInput, *,
         "session_summaries": [{"summary": row.summary, "entities": row.entities} for row in recent],
         "open_threads": [item.question_intent for item in notebook.open_questions[:3]],
     })
+    plan = memory.latest_plan(workspace_id)
+    if plan is not None:
+        sections["plan"] = _json(plan.model_dump(include={"next_move", "intent", "give", "avoid_questions"}))
     research = _research(db, workspace_id, journey)
     if roadmap_id is not None:
         row = db.scalar(select(Roadmap).where(
