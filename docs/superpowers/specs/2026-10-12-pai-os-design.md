@@ -1,6 +1,6 @@
 # PAI OS v1 — Design Spec
 
-Status: draft for review · 2026-10-12 · Owner: MSAQLAIN
+Status: approved · 2026-10-12 · Owner: MSAQLAIN
 Supersedes: PAI OS Architecture Draft 1 and Draft 2 (HTML page), the first FigJam board, and any conflicting wording in the Build Plan, Explained, Approval and Setup docs. Where those documents disagree with this spec, this spec wins.
 
 ---
@@ -219,10 +219,10 @@ Readers/actors split; per-spec tool allowlists; no submit/pay/login tools; appro
 | # | Decision | Status |
 |---|---|---|
 | D1 | Scope, architecture, technology, same repository | Agreed |
-| D2 | No automatic university-email reading in v1; students report replies via inbox | **Default chosen — confirm** |
-| D3 | Pilot intake chosen after team size is known; if Slice 8 misses the intake's application window, the pilot moves to the next intake | **Default chosen — confirm** |
+| D2 | No automatic university-email reading in v1; students report replies via inbox | Agreed |
+| D3 | Pilot intake: winter semester 2027. Pilot students apply mainly to programmes with June–July deadlines; if the system is not pilot-ready in time, the pilot moves to the next intake | Agreed |
 | D4 | Documents split into tiles before vision reading | Default chosen (technical) |
-| D5 | Fake local route added to Slice 1 tests | **Default chosen — confirm** |
+| D5 | Fake local route added to Slice 1 tests | Agreed |
 | D6 | Playbook upgrades applied to running plans as revisions | Default chosen (technical) |
 
 **Inputs:** team = 2 developers who review each other's work and share playbook, programme-list and document-collection ownership (2026-10-12). Still needed before Slice 0: the Counsellor lead's agreement to repository rules.
