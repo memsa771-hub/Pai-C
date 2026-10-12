@@ -2,15 +2,14 @@
 from copy import deepcopy
 from dataclasses import dataclass
 from datetime import datetime, timezone
+import logging
+
+logger = logging.getLogger(__name__)
 from app.config import config
 
 PARTS = ("said", "shown", "source", "self", "pressures.items")
 MANDATORY = ("sure", "tensions", "identity_status", "decision_difficulties",
              "hypotheses", "open_questions", "coverage", "depth_mode", "engagement_style")
-
-
-class PlannerInputTooLarge(ValueError):
-    """Mandatory content cannot fit; keep the last good map and plan."""
 
 
 @dataclass(frozen=True)
@@ -71,6 +70,22 @@ def build_planner_view(notebook, budget=None):
             if estimated_tokens(text) <= budget:
                 break
         if not removed:
-            raise PlannerInputTooLarge("mandatory Planner content exceeds map budget")
+            break
+    if estimated_tokens(text) > budget:
+        data["hypotheses"] = [row for row in data["hypotheses"] if row["status"] != "rejected"]
+        text = render()
+    for field, limit in (("hypotheses", 8), ("tensions", 6), ("decision_difficulties", 6)):
+        if estimated_tokens(text) > budget:
+            # Founder decision: newest means last in the stored list order.
+            data[field] = data[field][-limit:]
+            text = render()
+    if estimated_tokens(text) > budget:
+        data["open_questions"] = data["open_questions"][:3]
+        text = render()
+    if estimated_tokens(text) > budget:
+        data["private_notes"] = data["private_notes"][:500]
+        text = render()
+    if estimated_tokens(text) > budget:
+        logger.warning("planner_input_over_budget tokens=%d", estimated_tokens(text))
     ids = frozenset(row["id"] for rows in lists.values() for row in rows)
     return PlannerView(data, omitted, ids, text, estimated_tokens(text))

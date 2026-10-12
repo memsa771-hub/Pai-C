@@ -15,7 +15,7 @@ from app.pai_c.deep.notebook import NotebookVersionConflict
 from app.pai_c.deep.notebook_schema import CounselorNotebookData
 from app.pai_c.memory import MemoryService
 from app.pai_c.deep.prompts import load_prompt
-from app.pai_c.planner.view import build_planner_view, PlannerInputTooLarge
+from app.pai_c.planner.view import build_planner_view
 from app.pai_c.planner.patch import apply_patch, PatchRejected, OPERATION
 from app.pai_c.planner.plan import validate_plan, TurnPlan
 from app.pai_c.stages import advance_discovery_stage
@@ -239,12 +239,7 @@ async def analyze_job(job, db) -> dict:
         model_calls = 0
         for attempt in range(2):
             previous = service.truth_map(job.workspace_id)
-            try:
-                candidate, plan, calls = await _candidate(db, job.workspace_id, student, assistant, previous)
-            except PlannerInputTooLarge:
-                db.rollback()
-                logger.warning("planner_input_rejected error_type=PlannerInputTooLarge")
-                return {"status": "input_rejected", "model_calls": model_calls}
+            candidate, plan, calls = await _candidate(db, job.workspace_id, student, assistant, previous)
             model_calls += calls
             if candidate is None:
                 return {"status": "patch_rejected", "model_calls": model_calls}

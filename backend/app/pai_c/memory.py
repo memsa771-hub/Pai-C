@@ -21,7 +21,8 @@ class MemoryService:
         return NotebookService(self.db).get(workspace_id)
 
     def latest_plan(self, workspace_id):
-        from sqlalchemy import select
+        from sqlalchemy import select, func, or_, and_
+        from app.config import config
         from app.models import PaiTurnPlan, EventRecord, Workspace
         from app.pai_c.planner.plan import validate_plan
         workspace = self.db.get(Workspace, workspace_id)
@@ -31,6 +32,16 @@ class MemoryService:
             PaiTurnPlan.workspace_id == workspace_id, EventRecord.network_id == workspace_id
         ).order_by(EventRecord.timestamp.desc(), EventRecord.id.desc()).limit(1)).all()
         for row in rows:
+            event = self.db.get(EventRecord, row.source_event_id)
+            later = self.db.scalar(select(func.count()).select_from(EventRecord).where(
+                EventRecord.network_id == workspace_id,
+                EventRecord.type == "workspace.message.posted",
+                EventRecord.source.like("human:%"),
+                or_(EventRecord.timestamp > event.timestamp,
+                    and_(EventRecord.timestamp == event.timestamp, EventRecord.id > event.id)),
+            ))
+            if later > config.PAI_PLAN_MAX_AGE_TURNS:
+                return None
             try:
                 return validate_plan(row.plan)
             except ValueError:

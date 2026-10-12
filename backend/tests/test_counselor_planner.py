@@ -14,7 +14,7 @@ from app.pai_c.deep.notebook_schema import CounselorNotebookData
 from app.pai_c.deep.analysis import analyze_job, _input
 from app.pai_c.deep.context import build_context, estimated_tokens
 from app.pai_c.deep.turn_input import CounselorTurnInput
-from app.pai_c.planner.view import build_planner_view, PlannerInputTooLarge, PARTS
+from app.pai_c.planner.view import build_planner_view, PARTS
 from app.pai_c.planner.patch import apply_patch, PatchRejected
 from app.pai_c.planner.plan import validate_plan
 from scripts.counselor_eval_support import StudentSession
@@ -160,8 +160,11 @@ def test_patch_applies_to_full_map_preserving_omitted_items_exactly():
         assert [row.model_dump(mode="json") for row in new if row.id not in view.ids] == [row.model_dump(mode="json") for row in old if row.id not in view.ids]
 
 
-def test_mandatory_content_over_budget_is_rejected():
-    with pytest.raises(PlannerInputTooLarge):build_planner_view(notebook(),budget=1)
+def test_mandatory_content_over_budget_proceeds_and_logs_only_size(caplog):
+    view = build_planner_view(notebook(), budget=1)
+    assert view.tokens > 1 and view.ids == frozenset("abcde")
+    assert "planner_input_over_budget tokens=" in caplog.text
+    assert "A student statement" not in caplog.text
 
 
 @pytest.mark.parametrize("change", [{"next_move":"invalid"},{"intent":"x"*201},{"give":"x"*201},
@@ -231,14 +234,13 @@ async def test_invalid_plan_keeps_previous_valid_plan_while_patch_saves():
 
 
 @pytest.mark.asyncio
-async def test_oversize_mandatory_map_makes_zero_model_calls_and_no_writes():
+async def test_oversize_mandatory_map_still_makes_one_planner_call():
     with StudentSession() as student, student.factory() as db:
-        job,_=_turn_job(student,db);before=MemoryService(db).truth_map(student.workspace_id)
-        model=AsyncMock(side_effect=AssertionError("no model call"))
-        with patch.object(config,"PAI_PLANNER_MAP_CONTEXT_TOKENS",1),patch("app.pai_c.deep.analysis.chat_completion",model):result=await analyze_job(job,db)
-        assert result == {"status":"input_rejected","model_calls":0}
-        assert MemoryService(db).truth_map(student.workspace_id) == before
-        assert not db.scalars(select(PaiTurnPlan)).all()
+        job,_=_turn_job(student,db)
+        model=AsyncMock(return_value=json.dumps({"patch":[], "plan":PLAN}))
+        with patch.object(config,"PAI_PLANNER_MAP_CONTEXT_TOKENS",1),patch("app.pai_c.deep.analysis.chat_completion",model):
+            result=await analyze_job(job,db)
+        assert result["status"] == "applied" and result["model_calls"] == model.await_count == 1
 
 
 def test_planner_history_and_input_size_are_flat_at_100_turns():
@@ -321,3 +323,61 @@ def test_view_orders_accepted_naive_and_offset_dates_without_changing_storage():
     view=build_planner_view(before,budget=1800)
     assert "said0" not in view.ids and "said9" in view.ids
     assert before.said[0].model_dump(mode="json")==original
+
+@pytest.mark.parametrize('field,cap,entry', [
+    ('hypotheses', 8, {'text':'Possible pattern','status':'open','evidence_for':'Evidence'}),
+    ('tensions', 6, {'between':['a','b'],'evidence':'Evidence','status':'open'}),
+    ('decision_difficulties', 6, {'category':'information','evidence':'Evidence','status':'open'}),
+    ('open_questions', 3, {'priority':1,'area':'source','question_intent':'Explore source'}),
+])
+def test_private_write_caps_reject_whole_patch(field, cap, entry):
+    before=notebook()
+    operations=[{'op':'confirm','id':'a','evidence':'Changed'},
+                {'op':'set_private','field':field,'value':[entry]*(cap+1)}]
+    with pytest.raises(PatchRejected):
+        apply_patch(before,operations,build_planner_view(before).ids,'')
+    assert before.said[0].evidence == 'Student described this'
+    accepted=apply_patch(before,[operations[-1] | {'value':[entry]*cap}],build_planner_view(before).ids,'')
+    assert len(getattr(accepted,field)) == cap
+
+
+def test_private_trimming_order_and_newest_entries_preserves_stored_map():
+    before=notebook().model_copy(update={'private_notes':'p'*2000})
+    data=before.model_dump(mode='json')
+    data['hypotheses']=[{'text':str(i),'status':'rejected' if i==0 else 'open','evidence_for':'e'*500} for i in range(12)]
+    data['tensions']=[{'between':[str(i)],'status':'open','evidence':'e'*500} for i in range(9)]
+    data['decision_difficulties']=[{'category':'information','status':'open','evidence':str(i)+'e'*500} for i in range(9)]
+    data['open_questions']=[{'priority':i+1,'area':'source','question_intent':str(i)+'x'*500} for i in range(5)]
+    before=CounselorNotebookData.model_validate(data)
+    stored=before.model_dump(mode='json')
+    view=build_planner_view(before,budget=1)
+    assert [row['text'] for row in view.data['hypotheses']]==[str(i) for i in range(4,12)]
+    assert [row['between'][0] for row in view.data['tensions']]==[str(i) for i in range(3,9)]
+    assert len(view.data['decision_difficulties'])==6
+    assert [row['priority'] for row in view.data['open_questions']]==[1,2,3]
+    assert len(view.data['private_notes'])==500
+    assert before.model_dump(mode='json') == stored
+    # A budget that fits after removing rejected hypotheses stops at that step.
+    intermediate=deepcopy(data)
+    intermediate['hypotheses']=intermediate['hypotheses'][1:]
+    intermediate['private_notes']=intermediate['private_notes'][:1000]
+    limit=build_planner_view(CounselorNotebookData.model_validate(intermediate),budget=100000).tokens
+    early=build_planner_view(before,budget=limit)
+    assert len(early.data['hypotheses'])==11 and len(early.data['tensions'])==9
+    assert len(early.data['private_notes'])==1000
+    intermediate['hypotheses']=intermediate['hypotheses'][-8:]
+    limit=build_planner_view(CounselorNotebookData.model_validate(intermediate),budget=100000).tokens
+    early=build_planner_view(before,budget=limit)
+    assert len(early.data['hypotheses'])==8 and len(early.data['tensions'])==9
+
+
+def test_plan_age_counts_only_later_student_messages_in_workspace():
+    with StudentSession() as student, student.factory() as db:
+        job,event_id=_turn_job(student,db)
+        db.add(PaiTurnPlan(workspace_id=student.workspace_id,source_event_id=event_id,notebook_version=1,plan=PLAN))
+        db.commit()
+        for index in range(config.PAI_PLAN_MAX_AGE_TURNS):
+            _turn_job(student,db)
+        assert MemoryService(db).latest_plan(student.workspace_id) is not None
+        _turn_job(student,db)
+        assert MemoryService(db).latest_plan(student.workspace_id) is None

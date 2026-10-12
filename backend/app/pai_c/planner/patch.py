@@ -144,6 +144,10 @@ def apply_patch(notebook, operations, visible_ids, latest_student_text, *, now=N
                     sure["history"].append(Rating.model_validate({key: sure[key] for key in ("score", "reason", "asked_at")}).model_dump(mode="json"))
                 sure.update(score=operation.score, reason=operation.reason, would_raise=operation.would_raise, asked_at=stamp)
             elif isinstance(operation, SetPrivate):
+                caps = {"hypotheses": 8, "tensions": 6, "decision_difficulties": 6, "open_questions": 3}
+                if (operation.field in caps and isinstance(operation.value, list)
+                        and len(operation.value) > caps[operation.field]):
+                    raise ValueError("private list exceeds write cap")
                 data[operation.field] = deepcopy(operation.value)
             elif isinstance(operation, SetCoverage):
                 if operation.value:
