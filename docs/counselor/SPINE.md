@@ -1118,3 +1118,159 @@ care override, previous-plan fallback, workspace deletion, version-conflict plan
 rollback, migration-105 upgrade/downgrade, and accepted mixed-format dates.
 Existing prompt parity, v2 migration/loading, ordering, idempotency, stage,
 sensitive-check, disabled embedding, chat/voice and PAI OS regressions remain green.
+
+## P3 Round 2: Planner fixes, Voice v4 and playbooks
+
+The Round 2 task supersedes Round 1's impossible-budget rejection decision.
+References checked: CORE_V1_SPEC F3/F4, COUNSELING_METHOD, ARCHITECTURE 3/4,
+architecture FigJam diagram 3 and the vision board Planner/Voice/playbooks.
+No live model/API evaluation was performed.
+
+### Fix first
+
+- Active-item omission still takes turns across the five item lists, removes the
+  oldest last_confirmed first and keeps one item in each nonempty part.
+- If mandatory content still exceeds the map budget: remove rejected hypotheses;
+  keep the last 8 hypotheses, last 6 tensions, last 6 decision_difficulties,
+  first 3 open_questions, then cut private_notes to 500 characters. Check the
+  budget after each operation and stop trimming when it fits. The founder
+  confirmed that "newest" private entries means last in stored list order.
+- If still over budget, proceed and log only planner_input_over_budget tokens=N.
+  There is no input_rejected/zero-call path. The view never alters stored data.
+- set_private rejects the whole patch when hypotheses exceeds 8, tensions or
+  decision_difficulties exceeds 6, or open_questions exceeds 3. The Planner prompt
+  states these caps; code owns mirror blockers.
+- PAI_PLAN_MAX_AGE_TURNS=3: latest_plan is absent once more than three later human
+  workspace.message.posted events exist in the workspace. Assistant messages do
+  not age a plan. The latest plan still undergoes strict validation.
+
+### Voice v4 and outbound contract
+
+| Owner | Change |
+| --- | --- |
+| voice/prompts/voice.md | Supplied Voice v4 text verbatim |
+| deep/prompts.py | Registry name voice; Voice path replaces the deleted counselor.md |
+| deep/turn.py | Same gateway counselor role/model; reply, moves, action parsing and guards |
+| runtime.py | Stores moves and guard_violations; logs moves instead of reply_without_question |
+| migration 106 | Nullable JSONB moves on pai_counselor_turn_decisions; downgrade drops only moves |
+
+Moves are reflect/affirm/give/summarize/ask. Missing or malformed moves become [];
+unknown values are dropped. Action handling remains unchanged. The final model's
+moves are stored as its declarations, including when deterministic polish removes
+text; they are not a judge's independent assessment.
+
+Before deleting the old prompt the importer/reference check found the prompt
+registry, deep/turn.py, scripts/eval/counselor_smoke.py, prompt loader/parity tests,
+and current prompt docs. All active loaders now use voice. Historical architecture,
+cleanup and restructuring references remain historical. COUNSELOR_V3_PROMPTS
+sections 1/2 match runtime Voice and Planner text.
+
+Repetition guard: find question sentences with polish._question_positions and
+Unicode sentence terminals; casefold, remove Unicode punctuation, split on
+whitespace; token Jaccard similarity. Compare against the last configured window
+of Counselor questions in recent history and the valid plan's avoid_questions.
+Defaults: PAI_REPEAT_QUESTION_WINDOW=5, PAI_REPEAT_QUESTION_SIMILARITY=0.6.
+On a match, append the reviewer's exact retry line and make one Voice retry.
+If that draft repeats, remove its repeated sentence when other text remains;
+otherwise retain the retry draft as requested. Record repeated_question and,
+when removal happens, repeat_removed. Never run this guard on wellbeing replies.
+
+Language policy, polish and language_retry.md are unchanged. At most one language
+repair is allowed across the whole turn, including repetition repair. A normal
+Voice turn makes one call; repetition adds at most one and language repair adds
+at most one. Combined failures therefore make at most three Voice calls, then use
+the existing configured blocked-script fallback. Every call retains gateway usage
+logging and the same shared chat/voice posting path.
+
+### Playbooks
+
+playbooks/registry.py loads local front matter and bodies at startup (API lifespan
+and the worker's existing system-capability imports). It validates unique nonempty
+ids, version 1, nonempty when/body, and body <=120 whitespace-separated words.
+The loaded registry is immutable. All supplied when/body text is verbatim.
+
+The Planner system input appends <available_playbooks> with id + when. A TurnPlan
+can select at most two installed ids; unknown ids invalidate the plan. Context
+includes full selected bodies in <playbooks>, with no block for an empty selection.
+Explicit wellbeing context and care plans omit playbooks. The standard Voice prompt
+still names the block; wellbeing calls receive none of its selected content.
+
+Replay fixtures (one four-message anonymised English conversation per id):
+
+| Playbook and fixture stem | Moment |
+| --- | --- |
+| impatient | Hurry or frustration with questions |
+| short_answers | Minimal answers |
+| parent_speaking | Another person speaks on the account |
+| sure_not_explored | Commitment without direct experience |
+| no_idea | No clear direction |
+| family_conflict | Student and family wishes differ |
+| setback | Rejection or disappointing result |
+| returning | Return after a gap |
+| facts_only | Wants facts and resists personal exploration |
+| goal_switcher | Changing goals |
+
+Files are playbooks/<id>.md and tests/fixtures/playbooks/<id>.json. The existing
+retired-specific-token and documentation-persona guards now include playbook texts.
+The judge remains deferred; fixtures are stored for replay, not live evaluations.
+
+### Configuration and calls
+
+Only .env.example documents the three requested new settings (3 / 5 / 0.6).
+No .env or any other .env.* file was edited. Settings have env overrides and startup
+validation; role models and other configuration defaults are unchanged.
+
+| Path | Before Round 2 | After Round 2 |
+| --- | --- | --- |
+| Normal human turn inline | Voice + safety | Same |
+| Flagged human turn inline | Normal Voice + safety + wellbeing Voice | Same |
+| Background normal turn | Planner + Vault extractor | Same |
+| Repeated question | No dedicated guard | Up to one extra Voice call |
+| Blocked script | Up to one repair call | Same, shared across all drafts |
+| Planner mandatory input above budget | Zero-call rejection | Trim then one call (normal valid output) |
+| Playbook selection/loading | None | No additional model/embedding call |
+
+### Findings for later
+
+- Token Jaccard at 0.6 can flag different short questions sharing most tokens;
+  it also does not detect every semantic paraphrase. Keep the requested algorithm.
+- Always-retained content can still exceed the map budget. The task explicitly
+  requires proceeding, so this is a soft budget rather than a hard token cap.
+- Counselor _trim_notebook selection is unchanged; Round 2 did not request a
+  replacement for that separate Voice context projection.
+- When removing a repeated question would leave no text, the requested fallback
+  intentionally leaves that question. Moves remain model-declared labels.
+- Conversation quality/OARS cadence needs the later replay judge or an explicitly
+  authorized evaluation. Offline checks prove mechanics, not live counseling quality.
+
+No blocking Open questions remain. Private-list ordering follows the founder's
+explicit answer; .env.example is the task's explicit documentation exception.
+
+### Round 2 verification
+
+| Check | Before (047b638) | After Round 2 |
+| --- | --- | --- |
+| Full backend | 962 passed; 3 production-only skips; 8 subtests | 1003 passed; same 3 skips; 8 subtests |
+| Production-only security | Existing green | 3 passed; 4 subtests |
+| Frontend full suite | 23 passed | 23 passed |
+| Frontend production build | PASS | PASS |
+| All app-module imports | 254 | 258; zero failures |
+| Dedicated OS/gateway/spine checks | Existing green | 71 passed |
+
+Baseline backend duration: 276.84 seconds; final backend: 280.99 seconds.
+The two existing migration-101 SQLite reflection warnings are unchanged. The
+three conditional skips were run separately with APP_ENV=production and passed.
+External connections were blocked by a temporary socket guard; every model test
+used fake providers. No live evaluation, spend or model-quality claim was made.
+
+New regression coverage: ordered private trimming and whole-patch caps; plan
+expiry; oversized private content still produces one Planner call and remains
+unchanged in storage; moves parsing and persistence; Unicode punctuation and
+near-duplicate questions; history window and avoid_questions; one repetition
+retry, removal and empty-result behavior; wellbeing exclusions; combined guards
+with only one language repair; migration-106 upgrade/downgrade; registry validation,
+strict plan selection, actual context bodies, startup loading and ten replay files.
+Existing history/job tests keep their behavior assertions: the repeated-question
+fake was changed to a permitted reflection, and safety fakes gained the new result
+fields. The obsolete missing-question warning test now asserts no such warning.
+Temporary offline/dependency folders were removed before the verification commit.

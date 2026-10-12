@@ -235,12 +235,18 @@ async def test_invalid_plan_keeps_previous_valid_plan_while_patch_saves():
 
 @pytest.mark.asyncio
 async def test_oversize_mandatory_map_still_makes_one_planner_call():
+    from app.models import CounselorNotebook
     with StudentSession() as student, student.factory() as db:
-        job,_=_turn_job(student,db)
+        job,event_id=_turn_job(student,db)
+        original = CounselorNotebookData(private_notes="private interpretation " * 1000)
+        db.add(CounselorNotebook(workspace_id=student.workspace_id,version=1,
+            notebook=original.storage_data(),last_event_id=event_id,updated_at=NOW))
+        db.commit()
         model=AsyncMock(return_value=json.dumps({"patch":[], "plan":PLAN}))
         with patch.object(config,"PAI_PLANNER_MAP_CONTEXT_TOKENS",1),patch("app.pai_c.deep.analysis.chat_completion",model):
             result=await analyze_job(job,db)
         assert result["status"] == "applied" and result["model_calls"] == model.await_count == 1
+        assert MemoryService(db).truth_map(student.workspace_id).notebook.private_notes == original.private_notes
 
 
 def test_planner_history_and_input_size_are_flat_at_100_turns():
