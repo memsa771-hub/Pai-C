@@ -20,7 +20,9 @@ Supersedes: PAI OS Architecture Draft 1 and Draft 2 (HTML page), the first FigJa
 
 **Constraints stated by the owner.** Developers work mostly through Claude; no ongoing operations team; no domain expert on staff; student documents may be sent to the AI provider with consent; the student submits applications (no portal automation); statements are co-written; low budget; open source wherever it saves cost and time without lowering quality; no plan that breaks halfway through implementation.
 
-**Assumptions (correct if wrong).** One shared AWS host today; Counsellor and OS teams are separate; target intake not yet named; team size not yet known.
+**Team.** Two developers (the owner and one other), both working through Claude. Both are reviewers (each reviews the other's pull requests; nobody merges their own), both own the playbook and programme list, both collect test documents.
+
+**Assumptions (correct if wrong).** One shared AWS host today; Counsellor and OS teams are separate; both OS developers work on the OS close to full time; target intake not yet named.
 
 ---
 
@@ -223,4 +225,4 @@ Readers/actors split; per-spec tool allowlists; no submit/pay/login tools; appro
 | D5 | Fake local route added to Slice 1 tests | **Default chosen — confirm** |
 | D6 | Playbook upgrades applied to running plans as revisions | Default chosen (technical) |
 
-**Inputs required before Slice 0 (not design questions):** team size; reviewer and backup reviewer; frontend owner; playbook/programme-list owner; document-collection owner; Counsellor lead's agreement to repository rules.
+**Inputs:** team = 2 developers who review each other's work and share playbook, programme-list and document-collection ownership (2026-10-12). Still needed before Slice 0: the Counsellor lead's agreement to repository rules.
