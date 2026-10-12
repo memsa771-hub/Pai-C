@@ -116,7 +116,7 @@ class DeepContext:
 
 
 async def build_context(db, workspace_id: str, turn: CounselorTurnInput, *,
-                        roadmap_id: str | None = None) -> DeepContext:
+                        roadmap_id: str | None = None, wellbeing: bool = False) -> DeepContext:
     """Build every section from workspace-scoped reads; make no model calls."""
     started = time.monotonic()
     if workspace_id != turn.workspace_id:
@@ -145,6 +145,9 @@ async def build_context(db, workspace_id: str, turn: CounselorTurnInput, *,
     plan = memory.latest_plan(workspace_id)
     if plan is not None:
         sections["plan"] = _json(plan.model_dump(include={"next_move", "intent", "give", "avoid_questions"}))
+        if not wellbeing and plan.next_move != "care" and plan.playbooks:
+            from app.pai_c.playbooks.registry import selected_playbooks
+            sections["playbooks"] = selected_playbooks(plan.playbooks)
     research = _research(db, workspace_id, journey)
     if roadmap_id is not None:
         row = db.scalar(select(Roadmap).where(

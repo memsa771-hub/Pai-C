@@ -1,0 +1,21 @@
+{
+  "playbook": "impatient",
+  "conversation": [
+    {
+      "role": "user",
+      "content": "I only have a little time."
+    },
+    {
+      "role": "assistant",
+      "content": "I will keep this brief. How much time do you have?"
+    },
+    {
+      "role": "user",
+      "content": "Enough for a short conversation."
+    },
+    {
+      "role": "assistant",
+      "content": "We can focus on the biggest missing piece."
+    }
+  ]
+}

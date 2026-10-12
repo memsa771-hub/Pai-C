@@ -1,0 +1,21 @@
+{
+  "playbook": "no_idea",
+  "conversation": [
+    {
+      "role": "user",
+      "content": "I do not know what I want."
+    },
+    {
+      "role": "assistant",
+      "content": "There is no need to force a direction yet. What do you enjoy in a normal week?"
+    },
+    {
+      "role": "user",
+      "content": "Making things with friends."
+    },
+    {
+      "role": "assistant",
+      "content": "You seem to enjoy creating together; we can start there."
+    }
+  ]
+}

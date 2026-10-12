@@ -1,0 +1,21 @@
+{
+  "playbook": "returning",
+  "conversation": [
+    {
+      "role": "user",
+      "content": "I am back after our last conversation."
+    },
+    {
+      "role": "assistant",
+      "content": "Last time you were weighing two paths. What has changed since then?"
+    },
+    {
+      "role": "user",
+      "content": "I tried one and enjoyed it."
+    },
+    {
+      "role": "assistant",
+      "content": "That experience gives us something new to understand."
+    }
+  ]
+}

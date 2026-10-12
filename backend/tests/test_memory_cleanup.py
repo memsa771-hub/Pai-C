@@ -55,7 +55,9 @@ def test_memory_foundation_python_has_no_retired_specific_tokens():
     tokens = re.compile(r"(?<![a-z])(ielts|toefl|cgpa|pkr|inr)(?![a-z])|[\u20b9\u20a8]", re.IGNORECASE)
     violations = []
     for package in ("memory", "pai_c", "journey"):
-        for path in (app / package).rglob("*.py"):
+        for path in (app / package).rglob("*"):
+            if path.suffix != ".py" and not (package == "pai_c" and path.parent.name == "playbooks" and path.suffix == ".md"):
+                continue
             for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
                 if tokens.search(line):
                     violations.append(f"{path.relative_to(app)}:{number}")

@@ -1,0 +1,21 @@
+{
+  "playbook": "goal_switcher",
+  "conversation": [
+    {
+      "role": "user",
+      "content": "Yesterday I wanted one path, now I want another."
+    },
+    {
+      "role": "assistant",
+      "content": "You have been drawn to different paths. What do they have in common for you?"
+    },
+    {
+      "role": "user",
+      "content": "They both seem creative."
+    },
+    {
+      "role": "assistant",
+      "content": "The creative part may be the thread worth exploring."
+    }
+  ]
+}

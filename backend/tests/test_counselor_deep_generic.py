@@ -32,7 +32,7 @@ def test_deep_python_modules_do_not_name_documented_personas():
     assert names, "The documentation persona inventory must be present"
     deep = backend / "app" / "pai_c" / "deep"
     assert list(deep.glob("*.py")), "Deep Counselor source must be present"
-    for source in deep.glob("*.py"):
+    for source in [*deep.glob("*.py"), *(backend / "app/pai_c/playbooks").glob("*.md")]:
         content = source.read_text(encoding="utf-8")
         assert not any(ord(char) > 127 and unicodedata.category(char).startswith("L")
                        for char in content), f"{source.name} embeds a non-ASCII letter"

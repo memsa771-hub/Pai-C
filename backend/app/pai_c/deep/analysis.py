@@ -18,6 +18,7 @@ from app.pai_c.deep.prompts import load_prompt
 from app.pai_c.planner.view import build_planner_view
 from app.pai_c.planner.patch import apply_patch, PatchRejected, OPERATION
 from app.pai_c.planner.plan import validate_plan, TurnPlan
+from app.pai_c.playbooks.registry import available_playbooks
 from app.pai_c.stages import advance_discovery_stage
 from app.inference.gateway import complete as chat_completion, resolve_model
 from app.runtime.task_runtime import enqueue
@@ -164,7 +165,7 @@ async def _candidate(db, workspace_id: str, student: EventRecord,
         raw = await chat_completion(role="analyst",
             api_key=config.PAI_API_KEY, model=resolve_model("analyst"),
             messages=[{"role": "user", "content": analyst_input}],
-            system_prompt=load_prompt("planner") + feedback,
+            system_prompt=load_prompt("planner") + "\n\n" + available_playbooks() + feedback,
             response_format={"type": "json_object"},
             reasoning_effort=config.PAI_ANALYST_REASONING_EFFORT,
             base_url=config.PAI_BASE_URL, turn_id=student_id)

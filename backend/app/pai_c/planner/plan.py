@@ -1,6 +1,7 @@
-"""Validated next-turn instructions; playbooks are deferred."""
+"""Validated next-turn instructions and installed playbook selection."""
 from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field, field_validator
+from app.pai_c.playbooks.registry import BOOKS
 
 
 class TurnPlan(BaseModel):
@@ -10,13 +11,13 @@ class TurnPlan(BaseModel):
     target_gap: Literal["said", "shown", "source", "pressures", "self", "sure"] | None
     give: str = Field(max_length=200)
     avoid_questions: list[str] = Field(max_length=5)
-    playbooks: list[str]
+    playbooks: list[str] = Field(max_length=2)
 
     @field_validator("playbooks")
     @classmethod
     def known_playbooks(cls, value):
-        if value:
-            raise ValueError("no playbooks installed")
+        if any(id not in BOOKS for id in value):
+            raise ValueError("unknown playbook")
         return value
 
 

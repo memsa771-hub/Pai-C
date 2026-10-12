@@ -1,0 +1,21 @@
+{
+  "playbook": "parent_speaking",
+  "conversation": [
+    {
+      "role": "user",
+      "content": "I am their guardian and want stability for them."
+    },
+    {
+      "role": "assistant",
+      "content": "Stability matters to you. What worries you about their current wish?"
+    },
+    {
+      "role": "user",
+      "content": "That they may struggle alone."
+    },
+    {
+      "role": "assistant",
+      "content": "I hear that concern. Could we hear their own view directly?"
+    }
+  ]
+}

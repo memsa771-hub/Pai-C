@@ -71,7 +71,7 @@ async def run_deep_turn(db, turn: CounselorTurnInput, *,
                         history: list[dict] | None = None,
                         instructions: str | None = None,
                         safety_level: str | None = None) -> DeepTurnResult:
-    context = await build_context(db, turn.workspace_id, turn, roadmap_id=roadmap_id)
+    context = await build_context(db, turn.workspace_id, turn, roadmap_id=roadmap_id, wellbeing=instructions == "wellbeing")
     owner_id = turn.source.removeprefix("human:") if turn.source.startswith("human:") else ""
     if history is None:
         history = [{"role": item["role"], "content": item["content"]}

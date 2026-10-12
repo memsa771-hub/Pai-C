@@ -1,0 +1,21 @@
+{
+  "playbook": "sure_not_explored",
+  "conversation": [
+    {
+      "role": "user",
+      "content": "I am certain about this path but have not tried the work."
+    },
+    {
+      "role": "assistant",
+      "content": "The decision feels clear to you. What have you seen of the everyday work?"
+    },
+    {
+      "role": "user",
+      "content": "Only what people describe."
+    },
+    {
+      "role": "assistant",
+      "content": "We can explore that picture gently before judging the fit."
+    }
+  ]
+}

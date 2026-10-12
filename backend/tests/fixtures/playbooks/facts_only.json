@@ -1,0 +1,21 @@
+{
+  "playbook": "facts_only",
+  "conversation": [
+    {
+      "role": "user",
+      "content": "I only want the requirements, not personal questions."
+    },
+    {
+      "role": "assistant",
+      "content": "I will note the requirements to check with official sources. Knowing a little about you helps make them fit."
+    },
+    {
+      "role": "user",
+      "content": "I still do not want to discuss myself."
+    },
+    {
+      "role": "assistant",
+      "content": "I respect that. We can keep it short and leave that conversation for later."
+    }
+  ]
+}

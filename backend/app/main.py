@@ -406,6 +406,8 @@ async def _timer_loop():
 async def lifespan(app: FastAPI):
     logger.info("LIFESPAN: starting")
     config.validate_startup()
+    from app.pai_c.playbooks.registry import BOOKS
+    logger.info("counselor_playbooks_loaded count=%d", len(BOOKS))
 
     # Human sign-in (Supabase) is core, not optional — warn loudly at boot
     # rather than let every login attempt fail with an obscure connection
