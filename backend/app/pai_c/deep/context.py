@@ -112,6 +112,7 @@ class DeepContext:
     notebook: object
     journey: object | None
     build_ms: int
+    plan: object | None = None
 
 
 async def build_context(db, workspace_id: str, turn: CounselorTurnInput, *,
@@ -168,4 +169,4 @@ async def build_context(db, workspace_id: str, turn: CounselorTurnInput, *,
     elapsed = int((time.monotonic() - started) * 1000)
     logger.info("counselor_deep_context tokens=%s total_tokens=%d build_ms=%d",
                 counts, estimated_tokens(text), elapsed)
-    return DeepContext(text, counts, notebook, journey, elapsed)
+    return DeepContext(text, counts, notebook, journey, elapsed, plan)

@@ -198,6 +198,8 @@ class Config:
     PAI_SUMMARIZER_MODEL: str = os.environ.get("PAI_SUMMARIZER_MODEL", "") or PAI_ANALYST_MODEL
     PAI_SESSION_GAP_MINUTES: int = int(os.environ.get("PAI_SESSION_GAP_MINUTES", "30"))
     PAI_SESSION_SWEEP_SECONDS: int = int(os.environ.get("PAI_SESSION_SWEEP_SECONDS", "300"))
+    PAI_REPEAT_QUESTION_WINDOW: int = int(os.environ.get("PAI_REPEAT_QUESTION_WINDOW", "5"))
+    PAI_REPEAT_QUESTION_SIMILARITY: float = float(os.environ.get("PAI_REPEAT_QUESTION_SIMILARITY", "0.6"))
     PAI_PLAN_MAX_AGE_TURNS: int = int(os.environ.get("PAI_PLAN_MAX_AGE_TURNS", "3"))
     PAI_PLANNER_HISTORY_TURNS: int = int(os.environ.get("PAI_PLANNER_HISTORY_TURNS", "12"))
     PAI_PLANNER_MAP_CONTEXT_TOKENS: int = int(os.environ.get("PAI_PLANNER_MAP_CONTEXT_TOKENS", "4000"))
@@ -430,9 +432,11 @@ class Config:
                self.PAI_SEMANTIC_RECALL_TOP_K, self.PAI_COUNSELOR_RESEARCH_DAILY_LIMIT,
                self.PAI_COUNSELOR_NOTEBOOK_CONTEXT_TOKENS,
                self.PAI_COUNSELOR_HISTORY_SIZE,
-               self.PAI_PLAN_MAX_AGE_TURNS, self.PAI_PLANNER_HISTORY_TURNS, self.PAI_PLANNER_MAP_CONTEXT_TOKENS,
+               self.PAI_REPEAT_QUESTION_WINDOW, self.PAI_PLAN_MAX_AGE_TURNS, self.PAI_PLANNER_HISTORY_TURNS, self.PAI_PLANNER_MAP_CONTEXT_TOKENS,
                self.PAI_COUNSELOR_SENSITIVE_CHECK_MAX_TOKENS) < 1:
             raise RuntimeError("Deep Counselor limits must be positive")
+        if not 0 < self.PAI_REPEAT_QUESTION_SIMILARITY <= 1:
+            raise RuntimeError("PAI_REPEAT_QUESTION_SIMILARITY must be in (0, 1]")
         if self.PAI_PROFILE_COMPLETION_ROLLOUT_MODE not in {"off", "shadow", "new", "all"}:
             raise RuntimeError(
                 "PAI_PROFILE_COMPLETION_ROLLOUT_MODE must be off, shadow, new, or all"

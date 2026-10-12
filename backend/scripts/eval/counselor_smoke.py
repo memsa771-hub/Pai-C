@@ -62,7 +62,7 @@ async def run(args) -> dict:
     if price.get("verify_before_live"):
         raise ValueError("price verification required before live")
     fixture = json.loads(Path(args.messages).read_text(encoding="utf-8"))
-    system = load_prompt("counselor") + "\n\n" + _context(fixture.get("profile", {}))
+    system = load_prompt("voice") + "\n\n" + _context(fixture.get("profile", {}))
     client = create_client(config.PAI_API_KEY, base_url=config.PAI_BASE_URL).with_options(max_retries=0)
     effort = _reasoning_effort_for(args.model, args.reasoning_effort, has_tools=False)
     history: list[dict] = []

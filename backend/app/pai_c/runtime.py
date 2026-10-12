@@ -150,11 +150,8 @@ async def _run_deep_turn(db, workspace_id: str, event_data: dict, depth: int):
     reply = fallback_reply if fallback_reply is not None else result.reply
     action = {"type": "wellbeing"} if flagged else result.action
     context = None if isinstance(result, BaseException) else result.context
-    from app.pai_c.deep.polish import question_count
-
-    if (question_count(reply) == 0
-            and action.get("type") not in {"mirror", "wellbeing"}):
-        logger.info("reply_without_question turn_id=%s", turn.source_event_id)
+    moves = [] if fallback_reply is not None or isinstance(result, BaseException) else result.moves
+    violations = [] if fallback_reply is not None or isinstance(result, BaseException) else result.guard_violations
     post_started = time.monotonic()
     reply_metadata = _voice_reply_metadata(event_data)
     if (reply_metadata and action.get("type") == "mirror"
@@ -185,16 +182,17 @@ async def _run_deep_turn(db, workspace_id: str, event_data: dict, depth: int):
             move="wellbeing" if flagged else move,
             safety_level=safety.level if safety else None,
             safety_category=safety.category if safety else None,
-            guard_violations=[] if status != "failed" else ["action_failed"],
+            moves=moves,
+            guard_violations=violations + (["action_failed"] if status == "failed" else []),
         ))
         db.commit()
     logger.info(
         "counselor_deep_turn context_ms=%d model_ms=%d polish_ms=%d "
-        "post_ms=%d safety_ms=%d total_ms=%d action=%s action_status=%s",
+        "post_ms=%d safety_ms=%d total_ms=%d action=%s action_status=%s moves=%s",
         context.build_ms if context else 0,
         result.model_ms if not isinstance(result, BaseException) else 0,
         result.polish_ms if not isinstance(result, BaseException) else 0, post_ms, safety_ms,
-        int((time.monotonic() - started) * 1000), move, status,
+        int((time.monotonic() - started) * 1000), move, status, moves,
     )
     return assistant_event_id, turn.channel
 

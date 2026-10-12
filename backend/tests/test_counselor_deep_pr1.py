@@ -89,7 +89,7 @@ def test_moved_reply_checks_and_prompt_files():
     assert has_list("- A route\n- Another route")
     assert contains_blocked_script("α", "Greek")
     assert not contains_blocked_script("a", "Greek")
-    for name in ("counselor", "planner", "mirror", "roadmap_builder", "sensitive_check", "language_retry"):
+    for name in ("voice", "planner", "mirror", "roadmap_builder", "sensitive_check", "language_retry"):
         assert load_prompt(name).strip()
     with pytest.raises(ValueError, match="Unknown Counselor prompt"):
         load_prompt("other")
@@ -98,7 +98,7 @@ def test_moved_reply_checks_and_prompt_files():
     if source.is_file():
         import re
         document = source.read_text(encoding="utf-8")
-        for name in ("counselor", "planner", "mirror", "roadmap_builder"):
+        for name in ("voice", "planner", "mirror", "roadmap_builder"):
             match = re.search(
                 rf"(?s)## [1-4]\. `{name}\.md`.*?```text\n(.*?)\n```", document,
             )

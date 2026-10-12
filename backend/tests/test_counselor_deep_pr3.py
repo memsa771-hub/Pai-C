@@ -167,12 +167,12 @@ async def test_runtime_posts_and_enqueues_extraction_once():
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("reply,action,expected_log", [
-    ("I heard you.", {"type": "none"}, True),
+    ("I heard you.", {"type": "none"}, False),
     ("I will show your mirror.", {"type": "mirror"}, False),
     ("I am here with you.", {"type": "wellbeing"}, False),
     ("What happened next?", {"type": "none"}, False),
 ])
-async def test_runtime_logs_missing_spoken_question_without_student_text(
+async def test_runtime_allows_replies_without_questions_without_student_text(
     caplog, reply, action, expected_log,
 ):
     with StudentSession() as student, student.factory() as db:

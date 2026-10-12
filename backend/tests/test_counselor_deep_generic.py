@@ -10,7 +10,7 @@ def test_documented_counselor_prompt_matches_runtime_prompt():
     docs = backend.parent / "docs"
     if not docs.exists():
         docs = Path("/docs")
-    runtime = (backend / "app/pai_c/deep/prompts/counselor.md").read_text(encoding="utf-8")
+    runtime = (backend / "app/pai_c/voice/prompts/voice.md").read_text(encoding="utf-8")
     documentation = (docs / "counselor/COUNSELOR_V3_PROMPTS.md").read_text(encoding="utf-8")
     section = documentation.split("## 1.", 1)[1].split("## 2.", 1)[0]
     documented = section.split("```text\n", 1)[1].split("\n```", 1)[0]
