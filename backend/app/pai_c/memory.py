@@ -48,8 +48,6 @@ class MemoryService:
                 continue
         return None
 
-    def latest_episode(self, workspace_id, *, limit=1):
-        return EpisodicMemoryService(self.db).recent(workspace_id, limit=limit, event_type="session_summary")
 
     def agent_capabilities(self, agent_name):
         return capabilities_for_agent(agent_name)

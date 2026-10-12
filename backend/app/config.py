@@ -217,7 +217,6 @@ class Config:
         "PAI_COUNSELOR_FALLBACK_REPLY",
         "I want to understand you properly. Could you tell me a little more?",
     )
-    PAI_COUNSELOR_RESEARCH_DAILY_LIMIT: int = int(os.environ.get("PAI_COUNSELOR_RESEARCH_DAILY_LIMIT", "5"))
     PAI_COUNSELOR_NOTEBOOK_CONTEXT_TOKENS: int = int(os.environ.get("PAI_COUNSELOR_NOTEBOOK_CONTEXT_TOKENS", "1800"))
     PAI_COUNSELOR_HISTORY_SIZE: int = int(os.environ.get("PAI_COUNSELOR_HISTORY_SIZE", "20"))
     PAI_COUNSELOR_SENSITIVE_CHECK_MAX_TOKENS: int = int(os.environ.get("PAI_COUNSELOR_SENSITIVE_CHECK_MAX_TOKENS", "4096"))
@@ -411,7 +410,7 @@ class Config:
             if pattern.search(self.PAI_COUNSELOR_FALLBACK_REPLY):
                 raise RuntimeError("PAI_COUNSELOR_FALLBACK_REPLY uses a blocked script")
         if min(self.PAI_SESSION_GAP_MINUTES, self.PAI_SESSION_SWEEP_SECONDS,
-               self.PAI_SEMANTIC_RECALL_TOP_K, self.PAI_COUNSELOR_RESEARCH_DAILY_LIMIT,
+               self.PAI_SEMANTIC_RECALL_TOP_K,
                self.PAI_COUNSELOR_NOTEBOOK_CONTEXT_TOKENS,
                self.PAI_COUNSELOR_HISTORY_SIZE,
                self.PAI_REPEAT_QUESTION_WINDOW, self.PAI_PLAN_MAX_AGE_TURNS, self.PAI_PLANNER_HISTORY_TURNS, self.PAI_PLANNER_MAP_CONTEXT_TOKENS,
