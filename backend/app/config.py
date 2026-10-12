@@ -284,7 +284,7 @@ class Config:
     MEMORY_RETRIEVAL_LIMIT: int = int(os.environ.get("MEMORY_RETRIEVAL_LIMIT", "8"))
     MEMORY_RERANKER: str = os.environ.get("MEMORY_RERANKER", "")
 
-    # ---- Foreground memory injection (app/memory/foreground.py) -----------
+    # ---- Shared student-context rendering (app/memory/foreground.py) ------
     # Hard ceiling on the rendered student-context block. MemoryContextService
     # already caps per section; this is the backstop so pathological values
     # (a very long free-text Vault field) cannot expand the system prompt.
@@ -321,16 +321,8 @@ class Config:
     # ~60s window; the SDK's default of 2 gives up well before that and the
     # student is told PAI could not reach the language service.
     LLM_MAX_RETRIES: int = int(os.environ.get("LLM_MAX_RETRIES", "4"))
-    # Retrieval is on the response-critical path. Past this, PAI drops to the
-    # PostgreSQL-only fallback rather than making the student wait.
-    #
-    # 1500ms was below the floor for a REMOTE embedding provider and made the
-    # vector index dead weight: measured against OpenAI text-embedding-3-small,
-    # the query embedding alone is ~900-1400ms and a warm hybrid search ~800-1000ms,
-    # while build_foreground_context reserves only 70% of this budget for the
-    # hybrid arm. Every turn timed out into the lexical fallback, so memories
-    # were embedded and never read. Set well above the provider's p95; a
-    # co-located embedding service can safely lower it again.
+    # Semantic recall has a bounded retrieval budget and falls back to
+    # PostgreSQL-only context when vector retrieval exceeds it.
     PAI_MEMORY_CONTEXT_TIMEOUT_MS: int = int(
         os.environ.get("PAI_MEMORY_CONTEXT_TIMEOUT_MS", "3000")
     )
@@ -352,16 +344,6 @@ class Config:
     PAI_PROFILE_COMPLETION_ROLLOUT_AT: str = os.environ.get(
         "PAI_PROFILE_COMPLETION_ROLLOUT_AT", ""
     ).strip()
-    # Foreground retrieval runs on its own small thread pool so a stalled
-    # PostgreSQL cannot block the event loop (see foreground_executor.py).
-    # Threads cannot be killed, so MAX_INFLIGHT — not the pool size — is what
-    # bounds abandoned DB work when the database is slow.
-    PAI_MEMORY_FOREGROUND_WORKERS: int = int(
-        os.environ.get("PAI_MEMORY_FOREGROUND_WORKERS", "4")
-    )
-    PAI_MEMORY_FOREGROUND_MAX_INFLIGHT: int = int(
-        os.environ.get("PAI_MEMORY_FOREGROUND_MAX_INFLIGHT", "8")
-    )
     # Provider-neutral web search. Disabled unless both fields are configured;
     # credentials remain backend-only and are never included in tool results.
     WEB_SEARCH_PROVIDER: str = os.environ.get("WEB_SEARCH_PROVIDER", "")

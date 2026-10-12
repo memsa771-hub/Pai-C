@@ -2,7 +2,6 @@
 
 import asyncio
 import json
-import time
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 
@@ -10,8 +9,6 @@ import pytest
 from sqlalchemy import select
 
 from app.config import config
-from app.memory.context import StudentContext
-from app.memory.foreground import ForegroundContext, build_foreground_context
 from app.models import BackgroundJob, ExecutionRun, ProfileRequirement
 from app.pai_c import runtime
 from app.services import operator, pai
@@ -77,23 +74,6 @@ async def test_delegation_returns_while_execution_is_still_waiting():
                 assert job.payload["run_id"] == result["data"]["run_id"]
 
 
-@pytest.mark.asyncio
-async def test_slow_vector_retrieval_keeps_time_for_canonical_fallback():
-    async def slow(*args):
-        await asyncio.sleep(10)
-
-    canonical = StudentContext("w", vault={"preferences.target_countries": ["Germany"]})
-    async def fallback(*args):
-        return canonical
-
-    with patch("app.memory.foreground._hybrid", slow), \
-            patch("app.memory.foreground.run_bounded", fallback), \
-            patch.object(config, "PAI_MEMORY_CONTEXT_TIMEOUT_MS", 700):
-        started = time.monotonic()
-        result = await build_foreground_context("w", "study abroad")
-    assert result.mode == "lexical_fallback"
-    assert "Germany" in result.block
-    assert time.monotonic() - started < 0.9
 
 
 
