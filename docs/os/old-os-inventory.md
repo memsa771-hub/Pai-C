@@ -111,6 +111,8 @@ Summary (81 modules): keep: 48, read-only: 15, retire: 18, undecided: 0.
 - `app.routers.tasks`: listed on every screen, including Counsellor screens.
 - `app.routers.workflows`: listed on every screen, including Counsellor screens.
 - `app.routers.browser`: tabs and contexts listed on every screen, including Counsellor screens.
+- `app.tools.builtin.tasks`: tasks.list is in the Counsellor's allowed-tool list and the tool is in the shared registry.
+- `app.tools.builtin.browser`: registered in the shared tool registry alongside the Counsellor's tools.
 
 ## Before retiring anything
 
