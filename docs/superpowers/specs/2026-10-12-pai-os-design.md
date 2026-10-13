@@ -15,7 +15,7 @@ Supersedes: PAI OS Architecture Draft 1 and Draft 2 (HTML page), the first FigJa
 1. 10–20 pilot students each have a plan that runs to submission for their chosen programmes, with every failure logged and fixed (Slice 9 gate).
 2. Every outside fact shown to a student carries its official source and a confirmed/unconfirmed label.
 3. No task is lost or duplicated when workers crash (Spike 3 gate holds in production).
-4. AI cost stays within $5 per student per year.
+4. AI cost stays within the per-student ceiling (D7).
 5. The OS runs with the PAI Counsellor switched off, and connects to it through three ports when it is on.
 
 **Constraints stated by the owner.** Developers work mostly through Claude; no ongoing operations team; no domain expert on staff; student documents may be sent to the AI provider with consent; the student submits applications (no portal automation); statements are co-written; low budget; open source wherever it saves cost and time without lowering quality; no plan that breaks halfway through implementation.
@@ -83,7 +83,7 @@ Six layers. Rule-based code wherever there is one right answer; AI only where ju
 
 **Rule-based workers.** Grade converter (modified Bavarian formula; result always labelled *estimated*, inputs and sources shown, never blocks an application — review F9), deadline engine (hourly + on change; raises `slack_low`), funds calculator, checklist validator, renderer (PDF/DOCX), freshness sweeper (daily; deadline facts re-checked 30 and 7 days before).
 
-**Agent harness (Pydantic AI).** Each agent is a YAML spec: id, version, zone (reader/actor), model tier (`cheap` | `strong`), allowed tools, output type, limits (steps, spend, timeout), validators, profile scopes, side-effect level. Model router maps tiers to providers with fallback: `cheap` → DeepSeek `deepseek-flash`, `strong` → `deepseek-v4-pro`, fallback → OpenAI project with a monthly cap. Model names live in settings.
+**Agent harness (Pydantic AI).** Each agent is a YAML spec: id, version, zone (reader/actor), model tier (`cheap` | `strong`), allowed tools, output type, limits (steps, spend, timeout), validators, profile scopes, side-effect level. Model router maps tiers to models with fallback: `cheap` → OpenAI `gpt-5.4-mini`, `strong` → OpenAI `gpt-5.4` (D8). Provider and model names live in settings; switching a tier to another provider (e.g. DeepSeek) is a settings change plus a re-run of the quality test sets, never a code change.
 
 **Tool gateway.** Per-spec allowlist, argument validation, idempotency key, per-domain rate limits, robots.txt respected (review F14), untrusted content fenced, spend charged, audit row written. No submit/pay/login tools exist.
 
@@ -91,19 +91,19 @@ Six layers. Rule-based code wherever there is one right answer; AI only where ju
 
 | Agent | Zone | Model | May change | Checked by |
 |---|---|---|---|---|
-| Research | reader | flash | Knowledge facts as `unconfirmed` | 3 trust checks; Spike 1 answer key |
-| Documents | reader | flash (vision) | profile proposals | student confirmation; Spike 2 set |
-| Writer | actor | v4-pro | new draft versions | Critic, student approval |
-| Critic | actor | v4-pro | nothing | student-rated samples |
-| Pack generator | actor | flash | draft pack | checklist validator, student approval |
-| Compliance | actor | flash | visa/funds file assembly | checklist validator, student approval |
-| Supervisor | actor | v4-pro | typed proposals | kernel validation, student acceptance |
+| Research | reader | cheap | Knowledge facts as `unconfirmed` | 3 trust checks; Spike 1 answer key |
+| Documents | reader | cheap (vision) | profile proposals | student confirmation; Spike 2 set |
+| Writer | actor | strong | new draft versions | Critic, student approval |
+| Critic | actor | strong | nothing | student-rated samples |
+| Pack generator | actor | cheap | draft pack | checklist validator, student approval |
+| Compliance | actor | cheap | visa/funds file assembly | checklist validator, student approval |
+| Supervisor | actor | strong | typed proposals | kernel validation, student acceptance |
 
 The Mail reader agent is **not** in v1 (D2). Students report university replies through inbox items ("Did X reply? Upload the letter"); the Documents agent reads uploaded letters.
 
-**Research trust flow.** A fact is `confirmed` only if (1) it comes from an official source (university domain, uni-assist, DAAD, German mission), (2) two independent readings with different prompts agree, (3) it belongs to the target intake year. Otherwise it is shown as unconfirmed with the source link and a drafted email to admissions. Research and sweeps run outside DeepSeek peak hours where deadlines allow (review F15).
+**Research trust flow.** A fact is `confirmed` only if (1) it comes from an official source (university domain, uni-assist, DAAD, German mission), (2) two independent readings with different prompts agree, (3) it belongs to the target intake year. Otherwise it is shown as unconfirmed with the source link and a drafted email to admissions.
 
-**Documents pipeline (review F1).** Upload (allowed types JPEG/PNG/WebP/PDF, size limit, processing only inside the worker container with timeouts — F13) → classify → text-based PDFs through Docling; scanned PDFs and photos rendered to images and **split into 2–4 tiles per page** before sending to `deepseek-flash` (DeepSeek downscales each image to about 1300×1300 px, max 1024 tokens per image, and accepts no PDFs) → extract fields per document-type config → cross-check across documents → student confirms every value. Images are sent inline; the DeepSeek Files API is not used, so no student files are stored at the provider. The OS checks consistency; it never claims a document is genuine.
+**Documents pipeline (review F1).** Upload (allowed types JPEG/PNG/WebP/PDF, size limit, processing only inside the worker container with timeouts — F13) → classify → text-based PDFs through Docling; scanned PDFs and photos rendered to page images and sent to the `cheap` tier's vision input; Spike 2 compares whole-page against 2–4 tiles per page and the better one is used (providers downscale large images, which can lose small text on dense transcripts) → extract fields per document-type config → cross-check across documents → student confirms every value. Images are sent inline in the request; no provider file-storage API is used, so no student files are stored at the provider. The OS checks consistency; it never claims a document is genuine.
 
 **Co-written statements.** Interview (8–12 questions) → Writer drafts only from answers and confirmed profile → Critic scores against rubric and word limit (max 2 revisions) → student edits → student approves a specific version. Approval binds to the SHA-256 of the approved source text; the renderer is deterministic, so the rendered file is traceable to the approved version.
 
@@ -164,10 +164,10 @@ Plans are pinned to a playbook version, but the pilot will find missing steps. A
 |---|---|---|---|---|
 | 1 | Research on 30 programmes | ≥95% of confirmed facts correct; ≥70% reach confirmed | more shown unconfirmed; fewer programmes | Slice 2 |
 | 2 | Real documents (whole page vs tiled) | ≥90% fields correct; every cross-document mismatch caught | self-hosted OCR, or students type key values | Slice 3 |
-| 3 | DBOS + Pydantic AI + DeepSeek | 100 crash runs: 0 lost, 0 duplicated; ≥99% valid outputs | fix before agent work | in Slice 0 |
+| 3 | DBOS + Pydantic AI + OpenAI | 100 crash runs: 0 lost, 0 duplicated; ≥99% valid outputs | fix before agent work | in Slice 0 |
 | 4 | Co-written statements, 10 students | ≥8/10 usable after one edit; no invented facts | change questions or model | Slice 5 |
 | 5 | Playbook walkthrough | before Slice 1: every step cites an official page, checked by the reviewer; during the pilot: students confirm nothing is missing (gaps applied via 4.3) | revise until it passes | Slice 1 |
-| 6 | Cost on staging | ≤$5 per student per year | cheaper tier for more tasks | pilot |
+| 6 | Cost on staging | within the D7 ceiling | cheaper tier for more tasks | pilot |
 
 ---
 
@@ -198,13 +198,13 @@ Same `Pai-C` repository, new `backend/app/os/`. Old OS frozen, inventoried in Sl
 
 ## 8. Technology
 
-Existing: Python 3.12, FastAPI, SQLAlchemy, Alembic, PostgreSQL 16, Next.js, Docker + Caddy on AWS, S3, Resend, Supabase auth, Brave/Tavily search. New: DBOS Transact, Pydantic AI, DeepSeek (`deepseek-flash`, `deepseek-v4-pro`), OpenAI fallback, Docling, Crawl4AI, Tach, Pydantic Evals, Phoenix (self-hosted). Rejected: LangGraph, CrewAI/AG2, Temporal, Hatchet, OpenAI Agents SDK, DeepSeek Harness, portal automation, GPU OCR (unless Spike 2 fails).
+Existing: Python 3.12, FastAPI, SQLAlchemy, Alembic, PostgreSQL 16, Next.js, Docker + Caddy on AWS, S3, Resend, Supabase auth, Brave/Tavily search. New: DBOS Transact, Pydantic AI, OpenAI (`gpt-5.4-mini`, `gpt-5.4`; DeepSeek remains a configurable cheaper option), Docling, Crawl4AI, Tach, Pydantic Evals, Phoenix (self-hosted). Rejected: LangGraph, CrewAI/AG2, Temporal, Hatchet, OpenAI Agents SDK, DeepSeek Harness, portal automation, GPU OCR (unless Spike 2 fails).
 
 ---
 
 ## 9. Cost
 
-DeepSeek official prices (verified 2026-10-12), per 1M tokens at peak: flash $0.30 in / $1.20 out; v4-pro $1.32 in / $3.96 out; off-peak 50%. Estimate ≈ $1.50 per student per year (≈$3 with 2× margin) + ≈$75/year research for 30 programmes. Ceiling $5 per student, alert at $4. Setup: DeepSeek prepaid $10–20, OpenAI fallback cap ~$20/month, S3 backups, Claude seats, possible staging server and managed database.
+OpenAI prices (official model page, checked 2026-10-13), per 1M tokens: gpt-5.4-mini $0.75 in / $0.075 cached / $4.50 out; gpt-5.4 $2.50 in (output price to confirm). Same token assumptions as before give ≈ $1.40 per student for cheap-tier work and ≈ $1.55 of input for strong-tier work plus its output, so roughly $3.5–4.5 per student per year before a safety margin, and ≈ $190/year to keep 30 programmes researched. Ceiling D7. Setup: OpenAI project for PAI OS with a monthly budget limit, S3 backups, Claude seats, possible staging server and managed database.
 
 ---
 
@@ -224,5 +224,7 @@ Readers/actors split; per-spec tool allowlists; no submit/pay/login tools; appro
 | D4 | Documents split into tiles before vision reading | Default chosen (technical) |
 | D5 | Fake local route added to Slice 1 tests | Agreed |
 | D6 | Playbook upgrades applied to running plans as revisions | Default chosen (technical) |
+| D7 | AI cost ceiling $10 per student per year, alert at $8, re-set from Spike 6 measurements (the $5 ceiling assumed DeepSeek prices) | **Proposed — confirm** |
+| D8 | OpenAI is the v1 provider (already in use by the Counsellor); DeepSeek stays a configurable option | Agreed 2026-10-13 |
 
 **Inputs:** team = 2 developers who review each other's work and share playbook, programme-list and document-collection ownership (2026-10-12). Still needed before Slice 0: the Counsellor lead's agreement to repository rules.

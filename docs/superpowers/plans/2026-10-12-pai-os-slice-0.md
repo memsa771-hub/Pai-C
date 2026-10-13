@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Stand up the empty, guarded `app/os` package (route contract, database area, boundaries, CI, rules files, old-OS inventory) and prove the core loop (DBOS + Pydantic AI + DeepSeek) survives random worker kills with zero lost and zero duplicated tasks.
+**Goal:** Stand up the empty, guarded `app/os` package (route contract, database area, boundaries, CI, rules files, old-OS inventory) and prove the core loop (DBOS + Pydantic AI + OpenAI) survives random worker kills with zero lost and zero duplicated tasks.
 
 **Architecture:** New code lives only in `backend/app/os/` (product), `backend/tests/os/` (tests) and `backend/spikes/spike3/` (throwaway spike). A Tach boundary stops `app/os` importing any other app code. OS tables live in a Postgres schema `os` with their own Alembic branch; DBOS keeps its system tables in schema `dbos` of the same database so the existing backup covers them. Spike 3 uses its own schema `spike3` and is deleted after its report is accepted.
 
@@ -20,7 +20,7 @@
 - Retries (invariant 7): OpenAI-compatible client `max_retries=0`; Pydantic AI `retries={"tools": 0, "output": 2}`; network/service retries only via DBOS step config (`retries_allowed=True, max_attempts=3`).
 - Side effects idempotent (invariant 8): any write a re-run step could repeat uses a unique key and `ON CONFLICT DO NOTHING`.
 - DBOS system tables: `system_database_url` = the app database URL, `dbos_system_schema="dbos"` in production; tests use `dbos_test`.
-- Model names come from settings, never literals in logic: `OS_MODEL_CHEAP` default `deepseek-flash`, `OS_MODEL_STRONG` default `deepseek-v4-pro`.
+- Model names come from settings, never literals in logic: `OS_MODEL_CHEAP` default `gpt-5.4-mini`, `OS_MODEL_STRONG` default `gpt-5.4`. The OS uses its own key `OS_OPENAI_API_KEY` (a separate OpenAI project with a monthly budget), not the Counsellor's key.
 - Postgres-backed tests read `OS_TEST_DATABASE_URL` and are skipped when it is unset; CI always sets it.
 - Before Task 5: the two developers' GitHub handles (for `CODEOWNERS`).
 
@@ -72,7 +72,7 @@ backend/tests/os/                           conftest.py + tests per task
 - Test: `backend/tests/os/test_boundaries.py`, `backend/tests/os/test_settings.py`
 
 **Interfaces:**
-- Produces: `OsSettings` frozen dataclass with fields `database_url: str`, `dbos_system_schema: str = "dbos"`, `model_cheap: str = "deepseek-flash"`, `model_strong: str = "deepseek-v4-pro"`, `deepseek_api_key: str | None`, `os_enabled: bool = False`; `load_settings(env: Mapping[str, str] | None = None) -> OsSettings`. Env names: `OS_DATABASE_URL` (falls back to `DATABASE_URL`), `OS_DBOS_SYSTEM_SCHEMA`, `OS_MODEL_CHEAP`, `OS_MODEL_STRONG`, `DEEPSEEK_API_KEY`, `OS_ENABLED`.
+- Produces: `OsSettings` frozen dataclass with fields `database_url: str`, `dbos_system_schema: str = "dbos"`, `model_cheap: str = "gpt-5.4-mini"`, `model_strong: str = "gpt-5.4"`, `openai_api_key: str | None`, `os_enabled: bool = False`; `load_settings(env: Mapping[str, str] | None = None) -> OsSettings`. Env names: `OS_DATABASE_URL` (falls back to `DATABASE_URL`), `OS_DBOS_SYSTEM_SCHEMA`, `OS_MODEL_CHEAP`, `OS_MODEL_STRONG`, `OS_OPENAI_API_KEY`, `OS_ENABLED`.
 
 - [ ] **Step 1: Write failing tests**
 
@@ -81,7 +81,7 @@ backend/tests/os/                           conftest.py + tests per task
 def test_defaults_and_fallback():
     s = load_settings({"DATABASE_URL": "postgresql://u:p@h/db"})
     assert s.database_url == "postgresql://u:p@h/db"
-    assert (s.model_cheap, s.model_strong, s.dbos_system_schema, s.os_enabled) == ("deepseek-flash", "deepseek-v4-pro", "dbos", False)
+    assert (s.model_cheap, s.model_strong, s.dbos_system_schema, s.os_enabled) == ("gpt-5.4-mini", "gpt-5.4", "dbos", False)
 
 def test_os_database_url_wins():
     s = load_settings({"DATABASE_URL": "a", "OS_DATABASE_URL": "b", "OS_ENABLED": "true"})
@@ -263,7 +263,7 @@ def test_os_base_uses_os_schema():
   - `enqueue_pending(conn) -> int` — for each unsent request: `with SetWorkflowID(f"{task_id}:{attempt}"): queue.enqueue(run_attempt, task_id, attempt)`; then mark sent. Returns count.
   - `reconcile(conn) -> dict` — re-enqueues `ready` tasks whose workflow ID is unknown to DBOS; applies results of `SUCCESS` workflows whose task is not `done`; returns counts.
   - `@DBOS.workflow() async def run_attempt(task_id: str, attempt: int) -> None` — steps: `load_page` → `extract` (DBOSAgent, model step config `StepConfig(retries_allowed=True, max_attempts=3)`) → `record_result` (`INSERT ... ON CONFLICT DO NOTHING`, writes a `step_runs` row first) → `complete_task` (status `done` if still `running`/`ready`). If output retries are exhausted (`UnexpectedModelBehavior`), the workflow sets status `failed`, `failure_reason='invalid_output'` and returns normally (the kernel decides what happens next, not a retry).
-  - `build_agent(model) -> DBOSAgent` — `Agent(model, output_type=ProgrammeFact, retries={"tools": 0, "output": 2})`; DeepSeek via `OpenAIChatModel(settings.model_cheap, provider=DeepSeekProvider(openai_client=AsyncOpenAI(base_url="https://api.deepseek.com", api_key=settings.deepseek_api_key, max_retries=0)))`; tests pass a `TestModel` whose `custom_output_args` is a `ProgrammeFact` dict.
+  - `build_agent(model) -> DBOSAgent` — `Agent(model, output_type=ProgrammeFact, retries={"tools": 0, "output": 2})`; OpenAI via `OpenAIChatModel(settings.model_cheap, provider=OpenAIProvider(openai_client=AsyncOpenAI(api_key=settings.openai_api_key, max_retries=0)))`; tests pass a `TestModel` whose `custom_output_args` is a `ProgrammeFact` dict.
   - DBOS config: `{"name": "pai-os-spike3", "system_database_url": pg_url, "dbos_system_schema": "dbos_test"}`.
 
 - [ ] **Step 1: Write failing tests** (TestModel, real Postgres)
@@ -313,13 +313,13 @@ def test_invalid_quote_is_retried_then_fails(dbos_runtime_bad_quote, conn):
 
 **Interfaces:**
 - Consumes: Task 6 functions.
-- Produces: `run_chaos(tasks: int, workers: int, kill_every_s: float, model: Literal["test", "deepseek"], timeout_s: int) -> ChaosReport` with fields `tasks`, `done`, `failed`, `lost` (= tasks − done − failed), `duplicate_results` (rows beyond one per task/attempt; must be 0 by construction, measured anyway), `step_reruns` (from `step_runs`), `valid_outputs`, `model_calls`, `valid_rate`, `kills`, `elapsed_s`. `worker.py`: `main()` configures DBOS exactly as Task 6, builds the agent for the chosen model, calls `DBOS.launch()` and blocks. Workers are subprocesses `python -m spikes.spike3.worker --model {test|deepseek}` (each calls `DBOS.launch()` and polls the queue); the driver kills a random worker with SIGKILL every `kill_every_s` and starts a replacement; a reconciler runs every 5 s during the test (5 minutes in production; shortened for the spike).
+- Produces: `run_chaos(tasks: int, workers: int, kill_every_s: float, model: Literal["test", "openai"], timeout_s: int) -> ChaosReport` with fields `tasks`, `done`, `failed`, `lost` (= tasks − done − failed), `duplicate_results` (rows beyond one per task/attempt; must be 0 by construction, measured anyway), `step_reruns` (from `step_runs`), `valid_outputs`, `model_calls`, `valid_rate`, `kills`, `elapsed_s`. `worker.py`: `main()` configures DBOS exactly as Task 6, builds the agent for the chosen model, calls `DBOS.launch()` and blocks. Workers are subprocesses `python -m spikes.spike3.worker --model {test|openai}` (each calls `DBOS.launch()` and polls the queue); the driver kills a random worker with SIGKILL every `kill_every_s` and starts a replacement; a reconciler runs every 5 s during the test (5 minutes in production; shortened for the spike).
 
 - [ ] **Step 1: Write failing test** — `run_chaos(tasks=20, workers=3, kill_every_s=2, model="test", timeout_s=180)` → `lost == 0`, `duplicate_results == 0`, `kills >= 3`.
 - [ ] **Step 2: Run, verify failure.**
 - [ ] **Step 3: Implement `chaos.py` and `worker.py`.**
-- [ ] **Step 4: Run** the test → PASS. Then the real pass-bar run on staging (or a laptop with Postgres 16): `python -m spikes.spike3.chaos --tasks 100 --workers 4 --kill-every 3 --model deepseek --timeout 1800` with `DEEPSEEK_API_KEY` set to the dev key.
-- [ ] **Step 5: Write `spike3-report.md`**: the pass bar (100 runs with random worker kills: zero lost, zero duplicated; ≥99% valid structured outputs), the full `ChaosReport` numbers for the DeepSeek run, cost from the DeepSeek usage page, observed step re-runs, any failures and their cause, and a pass/fail verdict. If it fails: stop, fix, re-run; no Slice 1 work starts until the report says PASS and both developers sign it in the PR.
+- [ ] **Step 4: Run** the test → PASS. Then the real pass-bar run on staging (or a laptop with Postgres 16): `python -m spikes.spike3.chaos --tasks 100 --workers 4 --kill-every 3 --model openai --timeout 1800` with `OS_OPENAI_API_KEY` set to the dev key.
+- [ ] **Step 5: Write `spike3-report.md`**: the pass bar (100 runs with random worker kills: zero lost, zero duplicated; ≥99% valid structured outputs), the full `ChaosReport` numbers for the OpenAI run, cost from the OpenAI project's usage page, observed step re-runs, any failures and their cause, and a pass/fail verdict. If it fails: stop, fix, re-run; no Slice 1 work starts until the report says PASS and both developers sign it in the PR.
 - [ ] **Step 6: Commit** `spike(os): spike 3 chaos run and report`
 
 ---
