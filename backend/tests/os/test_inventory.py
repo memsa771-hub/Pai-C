@@ -5,14 +5,11 @@ from scripts.os_inventory import (
     FATE_VALUES,
     FATES,
     Fate,
+    RETIRE_PENDING_COUNSELLOR_LEAD_SIGNOFF,
     InventoryRow,
     build_inventory,
     render_markdown,
 )
-
-# Counsellor-used modules the controller ruled retire anyway: app.pai_c.posting only calls a no-op
-# advance_workflow hook. The Counsellor lead's sign-off is still required in the PR.
-COUNSELLOR_LEAD_SIGNED_OFF = {"app.services.workflow"}
 
 APP = Path(__file__).resolve().parents[2] / "app"
 
@@ -194,14 +191,18 @@ def test_every_row_has_a_fate_and_reason():
     assert missing == []
 
 
-def test_counsellor_used_modules_are_never_retired():
-    """Plan rule: retiring a Counsellor-used module needs the Counsellor lead's sign-off."""
-    bad = [
-        r.module
-        for r in build_inventory(APP)
-        if r.used_by_counsellor and r.fate == "retire" and r.module not in COUNSELLOR_LEAD_SIGNED_OFF
-    ]
-    assert bad == []
+def test_counsellor_used_retires_are_pending_signoff():
+    """Plan rule: retiring a Counsellor-used module needs the Counsellor lead's sign-off in the PR."""
+    rows = {r.module: r for r in build_inventory(APP)}
+    used_retires = {m for m, r in rows.items() if r.used_by_counsellor and r.fate == "retire"}
+    assert used_retires <= set(RETIRE_PENDING_COUNSELLOR_LEAD_SIGNOFF)
+
+
+def test_signoff_set_members_are_retire_rows_with_pending_reason():
+    rows = {r.module: r for r in build_inventory(APP)}
+    for module in RETIRE_PENDING_COUNSELLOR_LEAD_SIGNOFF:
+        assert rows[module].fate == "retire", module
+        assert rows[module].reason.endswith("Pending Counsellor lead sign-off."), module
 
 
 def test_every_fates_key_is_a_real_row():
@@ -213,3 +214,45 @@ def test_render_includes_preserve_notes_after_table():
     md = render_markdown(build_inventory(APP))
     assert md.index("## Before retiring anything") > md.index("| `app.services.operator` |")
     assert "advance_workflow" in md
+
+
+def test_signoff_section_precedes_preserve_notes():
+    md = render_markdown(build_inventory(APP))
+    assert md.index("## Retire pending Counsellor lead sign-off") < md.index("## Before retiring anything")
+    assert "app.services.workflow" in md.split("## Retire pending Counsellor lead sign-off")[1]
+
+
+def test_frontend_calls_follow_one_level_reexport(tmp_path):
+    app = _synthetic_app(tmp_path)
+    _write(app / "routers" / "__init__.py")
+    _write(app / "routers" / "application_workspace.py", "from app.application_workspace import router\n")
+    _write(
+        app / "application_workspace" / "__init__.py",
+        "from fastapi import APIRouter\n"
+        'router = APIRouter(prefix="/v1/application-workspace")\n\n'
+        '@router.get("/plans/{plan_id}")\n'
+        "def get_plan(plan_id): ...\n",
+    )
+    _write(tmp_path / "frontend" / "lib" / "api.ts", "fetch(`${API}/v1/application-workspace/plans/${id}`)\n")
+    rows = {r.module: r for r in build_inventory(app)}
+    assert rows["app.routers.application_workspace"].frontend_calls == ["frontend/lib/api.ts"]
+
+
+def test_router_prefix_alone_is_searchable(tmp_path):
+    app = _synthetic_app(tmp_path)
+    _write(
+        app / "routers" / "escalations.py",
+        "from fastapi import APIRouter\n"
+        'router = APIRouter(prefix="/v1/escalations")\n',
+    )
+    _write(tmp_path / "frontend" / "x.ts", "get('/v1/escalations')\n")
+    rows = {r.module: r for r in build_inventory(app)}
+    assert rows["app.routers.escalations"].frontend_calls == ["frontend/x.ts"]
+
+
+def test_committed_inventory_matches_generator():
+    committed = (APP.parent.parent / "docs" / "os" / "old-os-inventory.md").read_text(encoding="utf-8")
+    assert render_markdown(build_inventory(APP)) == committed, (
+        "docs/os/old-os-inventory.md is stale: regenerate with "
+        "`python scripts/os_inventory.py > ../docs/os/old-os-inventory.md` from backend/"
+    )

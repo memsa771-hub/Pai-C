@@ -12,7 +12,9 @@ from pathlib import Path
 
 try:
     from scripts.import_graph import graph
-except ModuleNotFoundError:  # run as a plain script: scripts/ is on sys.path
+except ModuleNotFoundError as exc:  # run as a plain script: scripts/ is on sys.path
+    if exc.name not in ("scripts", "scripts.import_graph"):
+        raise
     from import_graph import graph
 
 COUNSELLOR_ROOT_PREFIXES = ("app.pai_c",)
@@ -174,22 +176,36 @@ FATES: dict[str, Fate] = {
     "app.routers.escalations": Fate("retire", "Slice 8 EscalationSink (outside slices 0–7)", "Nothing calls it today; it is a tested intake the Slice 8 adapter may reuse from git history, and it is retired only after the pilot."),
     "app.plugins.qualification_recognition": Fate("retire", "Slice 1 playbook (data only)", "Registered but never called; its sourced packs (DAAD, uni-assist, HEC attestation, APS, with official URLs) must be copied into the Slice 1 Germany playbook/Knowledge before deletion."),
     "app.plugins.gap_assessment": Fate("retire", "—", "Registered but never called; its meets / does-not-meet / unknown logic is a reference for the Slice 1 eligibility checks."),
-    # --- retire: agent tools (feature-flagged or Operator-only, no Counsellor use) ---
+    # --- retire: agent tools (Counsellor screens only poll or list them; no Counsellor feature depends on them) ---
     **_entries("retire", "—", {
-        "app.routers.tasks": "The agent Kanban board for handing work to agents, behind the NEXT_PUBLIC_ENABLE_TASKS feature flag, with no Counsellor use.",
-        "app.tools.builtin.tasks": "The agent tool for the Kanban board, used only by the Operator's general loop and never called by the Counsellor.",
-        "app.routers.workflows": "Multi-agent workflow templates, behind the NEXT_PUBLIC_ENABLE_WORKFLOWS feature flag, with no Counsellor use.",
-        "app.services.workflow": "Multi-agent workflow templates behind a feature flag; the Counsellor's only touch is a no-op advance_workflow hook in app.pai_c.posting that must be removed first.",
-        "app.routers.timers": "Agent planning endpoints for timers, with no Counsellor caller.",
-        "app.routers.todos": "Agent planning endpoints for to-do lists, with no Counsellor caller.",
-        "app.routers.browser": "Operator-only browser automation endpoints, with no Counsellor use.",
-        "app.tools.builtin.browser": "Operator-only browser automation tools, with no Counsellor use.",
-        "app.browser": "Operator-only browser automation package, with no Counsellor use.",
-        "app.browser.credentials": "Operator-only browser automation (stored sign-ins), with no Counsellor use.",
-        "app.browser.egress": "Operator-only browser automation (network egress rules), with no Counsellor use.",
-        "app.browser.maintenance": "Operator-only browser automation (cleanup), with no Counsellor use.",
-        "app.browser.manager": "Operator-only browser automation (session manager), with no Counsellor use.",
-    }),
+        "app.routers.timers": "Agent timer endpoints; Counsellor chat screens only poll it every 15 seconds (thread status bar) and the list is always empty for Counsellor sessions, since the Counsellor never creates timers, no Counsellor feature depends on it, and no slice 0–7 builds it.",
+        "app.routers.todos": "Agent to-do endpoints; Counsellor chat screens only list and cancel them (thread status bar, workspace context) and the list is always empty for Counsellor sessions, since the Counsellor never creates todos, no Counsellor feature depends on it, and no slice 0–7 builds it.",
+        "app.routers.tasks": "Agent Kanban board endpoints; every screen only lists tasks (workspace context) and the list is always empty for Counsellor sessions, since the Counsellor never creates tasks, no Counsellor feature depends on it, and no slice 0–7 builds it; only the tasks screen is behind the NEXT_PUBLIC_ENABLE_TASKS frontend flag.",
+        "app.routers.workflows": "Multi-agent workflow template endpoints; every screen only lists workflows (workspace context) and the list is always empty for Counsellor sessions, since the Counsellor never creates workflows, no Counsellor feature depends on it, and no slice 0–7 builds it; only the workflows screen is behind the NEXT_PUBLIC_ENABLE_WORKFLOWS frontend flag.",
+        "app.services.workflow": "Multi-agent workflow engine; the Counsellor only calls its advance_workflow hook from app.pai_c.posting, which does nothing without an active workflow run (always the case for Counsellor sessions), no Counsellor feature depends on it, and no slice 0–7 builds it.",
+        "app.routers.browser": "Operator-only browser automation endpoints; every screen only lists browser tabs and contexts (workspace context) and the list is always empty for Counsellor sessions, since the Counsellor never opens browser tabs, no Counsellor feature depends on it, and no slice 0–7 builds it.",
+    }, " Pending Counsellor lead sign-off."),
+    **_entries("retire", "—", {
+        "app.tools.builtin.tasks": "Agent tools for the Kanban board; tasks.list is also in the Counsellor's allowed-tool list, but the deep Counsellor never calls tools and tasks.create is Operator-only, so no Counsellor feature depends on it, and no slice 0–7 builds it.",
+        "app.tools.builtin.browser": "Operator-only browser automation tools; no Counsellor feature depends on them, and no slice 0–7 builds them.",
+        "app.browser": "Operator-only browser automation package; no Counsellor feature depends on it, and no slice 0–7 builds it.",
+        "app.browser.credentials": "Operator-only browser automation (stored sign-ins); no Counsellor feature depends on it, and no slice 0–7 builds it.",
+        "app.browser.egress": "Operator-only browser automation (network egress rules); no Counsellor feature depends on it, and no slice 0–7 builds it.",
+        "app.browser.maintenance": "Operator-only browser automation (cleanup); no Counsellor feature depends on it, and no slice 0–7 builds it.",
+        "app.browser.manager": "Operator-only browser automation (session manager); no Counsellor feature depends on it, and no slice 0–7 builds it.",
+    }, " Pending Counsellor lead sign-off."),
+}
+
+
+# Retire fates that touch the Counsellor (direct importer, or Counsellor screens call them): each needs the
+# Counsellor lead's sign-off in the PR. module -> why it needs sign-off.
+RETIRE_PENDING_COUNSELLOR_LEAD_SIGNOFF: dict[str, str] = {
+    "app.services.workflow": "imported by app.pai_c.posting for a no-op advance_workflow hook",
+    "app.routers.timers": "polled by the Counsellor chat status bar",
+    "app.routers.todos": "polled and cancelled by the Counsellor chat status bar",
+    "app.routers.tasks": "listed on every screen, including Counsellor screens",
+    "app.routers.workflows": "listed on every screen, including Counsellor screens",
+    "app.routers.browser": "tabs and contexts listed on every screen, including Counsellor screens",
 }
 
 
@@ -245,8 +261,17 @@ def _counsellor_paths(edges: dict[str, set[str]], roots: list[str]) -> dict[str,
     return paths
 
 
-def _router_paths(file: Path) -> list[str]:
-    """Static API paths (no leading slash) served by the routers in `file`."""
+def _static_path(full: str) -> str:
+    """Static part before the first `{`, without leading or trailing `/`."""
+    return full.split("{", 1)[0].rstrip("/").lstrip("/")
+
+
+def _router_paths(file: Path, modules: dict[str, Path] | None = None, name: str = "", follow: bool = True) -> list[str]:
+    """Static API paths (no leading slash) served by the routers in `file`.
+
+    If the file defines no APIRouter but imports `router` from another app module, that module is read
+    instead (one level only).
+    """
     tree = ast.parse(file.read_text(encoding="utf-8-sig"))
     prefixes: dict[str, str] = {}
     for node in ast.walk(tree):
@@ -263,6 +288,20 @@ def _router_paths(file: Path) -> list[str]:
                 if isinstance(target, ast.Name):
                     prefixes[target.id] = prefix
     found: set[str] = set()
+    if not prefixes and follow and modules is not None:
+        package = name.rpartition(".")[0]
+        for node in ast.walk(tree):
+            if isinstance(node, ast.ImportFrom) and any(a.name == "router" for a in node.names):
+                target = node.module or ""
+                if node.level:
+                    parts = package.split(".")
+                    target = ".".join(parts[: len(parts) - node.level + 1] + ([target] if target else []))
+                if target in modules and modules[target] != file:
+                    found.update(_router_paths(modules[target], modules, target, follow=False))
+    for prefix in prefixes.values():
+        static = _static_path(prefix)
+        if static and static != "v1":
+            found.add(static)
     for node in ast.walk(tree):
         if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
             continue
@@ -284,8 +323,7 @@ def _router_paths(file: Path) -> list[str]:
                         path = kw.value.value
             if not isinstance(path, str):
                 continue
-            full = prefixes[dec.func.value.id] + path
-            static = full.split("{", 1)[0].rstrip("/").lstrip("/")
+            static = _static_path(prefixes[dec.func.value.id] + path)
             if static and static != "v1":
                 found.add(static)
     return sorted(found)
@@ -336,7 +374,7 @@ def build_inventory(app_root: Path) -> list[InventoryRow]:
         if _is_watched_router(name) and frontend.is_dir():
             if frontend_files is None:
                 frontend_files = _frontend_files(frontend)
-            api_paths = _router_paths(modules[name])
+            api_paths = _router_paths(modules[name], modules, name)
             row.frontend_calls = sorted(
                 rel for rel, text in frontend_files.items() if any(p in text for p in api_paths)
             )
@@ -359,7 +397,7 @@ Fates live in `FATES` in that script.
 Retire means switched off and deleted later, after the pilot, each removal in its own PR. Nothing is deleted by this inventory.
 A Counsellor-used module cannot be retired without the Counsellor lead's sign-off in the PR.
 
-Limits: reachability follows imports only, and stops at `app.main`. In-process HTTP calls (e.g. `app.services.pai` calling routes through the ASGI app) and frontend calls outside the watched routers are not traced, so those are checked by reading the code when fates are decided.
+Limits: reachability follows imports only, and stops at `app.main`. In-process HTTP calls (e.g. `app.services.pai` calling routes through the ASGI app) and frontend calls outside the watched routers are not traced, so those are checked by reading the code when fates are decided. Frontend matching is also blind to `include_router(prefix=...)`, `api_route` / `add_api_route` and annotated `router: APIRouter = ...` assignments (not traced); the Frontend calls column names the file holding the URL (usually `frontend/lib/api.ts`), not the screens that call it; and a match can come from a comment.
 
 Only watched modules get a row (the `WATCHED_*` constants in the script). "Imported by" and reachability are computed over the whole import graph.
 
@@ -368,9 +406,17 @@ Only watched modules get a row (the `WATCHED_*` constants in the script). "Impor
 
 PRESERVE_NOTES = (
     "`application_workspace/plans.py:111,171,191` (old OS, read-only) imports `deadlines.service.expire_deadline_notices` (read-only): retire the two together, or move that helper first.",
+    "`main.py:110-111` runs the hourly deadlines sweep (`sweep_due_notices`): switch it off only when Slice 1 reminders are live.",
     "`deadlines.service` and `application_workspace` read the `KanbanTask` model: do not drop it when the tasks router and tool are retired.",
     "`PAI_ALLOWED_TOOLS` in `services/pai.py:59` lists `tasks.list` and is guarded by `TestToolBoundary` in `tests/test_pai.py`: remove the entry and update the test together with `tools/builtin/tasks.py`.",
-    "`pai_c/posting.py:224-237` calls `advance_workflow` from `app.services.workflow` after every reply; it is a no-op without an active workflow run (known incidental hook). Remove the call before retiring `app.services.workflow`, and keep `services/integrations.py:237` and `routers/events.py:392` in mind, which also call it.",
+    "`tools/builtin/__init__.py:3,36,51,53-61` imports and registers the `tasks.*` and `browser.*` tools: remove the registrations with the tool modules.",
+    "`pai_c/posting.py:224-237` calls `advance_workflow` from `app.services.workflow` after every reply; it is a no-op without an active workflow run (known incidental hook). Remove the call before retiring `app.services.workflow`; `services/integrations.py:237`, `routers/events.py:392`, `routers/workspaces.py:625` (`get_active_run`, `start_run`) and `routers/tasks.py:256,473,505,717` also use the workflow service.",
+    "`main.py:114-373` `_fire_due` fires timers and routines and imports `routers.routines` (line 127): change it before retiring the timers router or moving routines.",
+    "Counsellor chat renders `ThreadStatusBar` for every session (`frontend/components/chat/chat-view.tsx:983,1000`); it polls `/v1/timers` every 15 seconds (`thread-status-bar.tsx:34-46`) and calls `cancelChannelTodos` on `/v1/todos` (`thread-status-bar.tsx:106`): remove that polling and cancelling before the timers and todos routers go.",
+    "`frontend/lib/workspace-context.tsx:797-804` and `:1245-1250` fetch tasks, workflows, routines, todos and browser tabs on every screen: remove those fetches before the matching routers go.",
+    "`frontend/components/applications/application-operations.tsx:30,36` (read-only application workspace) calls `/v1/tasks` and `/v1/workflows`: those routers must stay up until the application workspace group retires.",
+    "A \"Browser\" nav item exists (`frontend/components/layout/workspace-navigation.tsx:52-54`): check student use before switching the browser router off.",
+    "`plugins/roadmap_builder/__init__.py:5-8` `DEPENDENCIES` names `qualification.recognize`, `scholarship.discover` and `gap.assess`: remove those names before deleting the three plugins.",
     "`app.plugins.qualification_recognition` packs (`packs/de.json`, `pk.json`, `uk.json`: DAAD, uni-assist, HEC attestation, APS, with official URLs) must be copied into the Slice 1 Germany playbook/Knowledge before the plugin is deleted.",
     "`app.plugins.gap_assessment` meets / does-not-meet / unknown logic is a reference for the Slice 1 eligibility checks: read it before deleting.",
     "`routers/escalations.py:109-116` needs `PAI_OS_SERVICE_TOKEN`: the Slice 8 EscalationSink adapter may reuse this tested intake (`tests/test_counselor_escalations.py`) from git history.",
@@ -420,6 +466,8 @@ def render_markdown(rows: list[InventoryRow]) -> str:
             _cell(r.reason),
         ]
         lines.append("| " + " | ".join(cells) + " |")
+    lines += ["", "## Retire pending Counsellor lead sign-off", ""]
+    lines += [f"- `{module}`: {why}." for module, why in RETIRE_PENDING_COUNSELLOR_LEAD_SIGNOFF.items()]
     lines += ["", "## Before retiring anything", ""]
     lines += [f"- {note}" for note in PRESERVE_NOTES]
     return "\n".join(lines) + "\n"
