@@ -1,6 +1,8 @@
-"""Typed private notebook contract from COUNSELOR_V3_PROMPTS.md section 0."""
+"""Strict Truth Map v2 contract. Objective records remain in the Vault."""
 
-from typing import Literal
+from copy import deepcopy
+from datetime import datetime
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
@@ -12,76 +14,72 @@ class Note(BaseModel):
 Source = Literal["reels", "friend", "family", "relative", "need", "own_experience", "unknown"]
 
 
-class StatedGoal(Note):
-    text: str = Field(min_length=1)
-    source_of_goal: Source = "unknown"
-    first_said_turn: int = Field(ge=1)
-
-
-class Person(Note):
-    current_situation: str = ""
-    daily_life: str = ""
-    location_context: str = ""
-
-
-class Claim(Note):
+class Item(Note):
     id: str = Field(min_length=1)
-    claim: str = Field(min_length=1)
-    evidence_level: Literal["claimed", "tried", "sustained", "proven"]
+    key: str = Field(min_length=1)
+    value: Any
     evidence: str = Field(min_length=1)
-    interest_source: Source = "unknown"
-    probed: bool = False
+    kind: Literal["said", "shown", "document", "action"]
+    confidence: Literal["low", "medium", "high"] = "low"
+    level: Literal["claimed", "tried", "sustained", "proven"] | None = None
+    first_seen: datetime
+    last_confirmed: datetime
+    status: Literal["active", "retired"] = "active"
+    vault_fact_ref: str | None = None
 
-    @field_validator("evidence")
-    @classmethod
-    def nonblank_evidence(cls, value: str) -> str:
-        if not value.strip():
-            raise ValueError("evidence is required")
-        return value
-
-
-class Trait(Note):
-    trait: str = Field(min_length=1)
-    evidence: str = Field(min_length=1)
-    confidence: Literal["low", "medium", "high"]
-
-    @field_validator("evidence")
-    @classmethod
-    def nonblank_evidence(cls, value: str) -> str:
-        if not value.strip():
-            raise ValueError("evidence is required")
-        return value
+    @model_validator(mode="after")
+    def objective_reference_required(self):
+        # Structural field families, not matching conversation text or topics.
+        if self.key.split(".", 1)[0] in {"education", "tests", "documents", "money", "places"} and not self.vault_fact_ref:
+            raise ValueError("objective facts require vault_fact_ref")
+        return self
 
 
-class Driver(Note):
-    driver: str = Field(min_length=1)
-    weight: str = Field(min_length=1)
-    evidence: str = Field(min_length=1)
-
-    @field_validator("evidence")
-    @classmethod
-    def nonblank_evidence(cls, value: str) -> str:
-        if not value.strip():
-            raise ValueError("evidence is required")
-        return value
+class SourceItem(Item):
+    category: Literal["self", "family", "peers", "media", "need", "other", "unknown"] = "unknown"
 
 
-class FamilyMember(Note):
+class PersonPressure(Note):
+    role: str = Field(min_length=1)
     wish: str = ""
-    underlying_concern: str = ""
+    concern: str = ""
+    evidence: str = Field(min_length=1)
+    first_seen: datetime
+    last_confirmed: datetime
 
 
-class Family(Note):
-    father: FamilyMember = Field(default_factory=FamilyMember)
-    mother: FamilyMember = Field(default_factory=FamilyMember)
-    others: str = ""
-    pressure_level: str = ""
+class Pressures(Note):
+    items: list[Item] = Field(default_factory=list)
+    people: list[PersonPressure] = Field(default_factory=list)
 
 
-class Constraint(Note):
-    type: str = Field(min_length=1)
-    detail: str = Field(min_length=1)
-    hard: bool
+class Rating(Note):
+    score: int | None = Field(default=None, ge=0, le=10, strict=True)
+    reason: str = ""
+    asked_at: datetime | None = None
+
+
+class Sure(Rating):
+    would_raise: str = ""
+    history: list[Rating] = Field(default_factory=list)
+
+
+class Tension(Note):
+    between: list[str]
+    evidence: str = Field(min_length=1)
+    status: str = Field(min_length=1)
+
+
+class IdentityStatus(Note):
+    exploration: str = ""
+    commitment: str = ""
+    label: Literal["achieved", "foreclosed", "moratorium", "diffused", "unknown"] = "unknown"
+
+
+class DecisionDifficulty(Note):
+    category: Literal["readiness", "information", "inconsistent"]
+    evidence: str = Field(min_length=1)
+    status: str = Field(min_length=1)
 
 
 class Hypothesis(Note):
@@ -109,14 +107,12 @@ class OpenQuestion(Note):
 
 
 class Coverage(Note):
-    person: bool = False
-    education: bool = False
-    claims_probed: bool = False
-    proven_interests: bool = False
-    family: bool = False
-    real_why: bool = False
-    constraints: bool = False
-    goal_tested: bool = False
+    said: bool = False
+    shown: bool = False
+    source: bool = False
+    pressures: bool = False
+    self: bool = False
+    sure: bool = False
 
 
 class GoalHistory(Note):
@@ -126,19 +122,18 @@ class GoalHistory(Note):
 
 
 class CounselorNotebookData(Note):
-    stated_goal: StatedGoal | None = None
-    person: Person = Field(default_factory=Person)
-    claims: list[Claim] = Field(default_factory=list)
-    strengths: list[Trait] = Field(default_factory=list)
-    growth_areas: list[Trait] = Field(default_factory=list)
-    drivers: list[Driver] = Field(default_factory=list)
-    values: list[str] = Field(default_factory=list)
-    family: Family = Field(default_factory=Family)
-    constraints: list[Constraint] = Field(default_factory=list)
-    learning_style: str = ""
-    work_preferences: str = ""
-    emotional_notes: str = ""
+    schema_version: Literal[2] = 2
+    said: list[Item] = Field(default_factory=list)
+    shown: list[Item] = Field(default_factory=list)
+    source: list[SourceItem] = Field(default_factory=list)
+    pressures: Pressures = Field(default_factory=Pressures)
+    self: list[Item] = Field(default_factory=list)
+    sure: Sure = Field(default_factory=Sure)
+    tensions: list[Tension] = Field(default_factory=list)
+    identity_status: IdentityStatus = Field(default_factory=IdentityStatus)
+    decision_difficulties: list[DecisionDifficulty] = Field(default_factory=list)
     hypotheses: list[Hypothesis] = Field(default_factory=list)
+    private_notes: str = ""
     open_questions: list[OpenQuestion] = Field(default_factory=list)
     coverage: Coverage = Field(default_factory=Coverage)
     mirror_ready: bool = False
@@ -147,9 +142,32 @@ class CounselorNotebookData(Note):
     depth_mode: Literal["full", "focused", "light"] = "full"
     chapter: Literal["discovery", "coach", "next_chapter"] = "discovery"
     goal_history: list[GoalHistory] = Field(default_factory=list)
-    coach: dict = Field(default_factory=dict)
+    legacy_v1: dict[str, Any] | None = Field(default=None, exclude=True, repr=False, frozen=True)
 
-    @field_validator("coach")
+    @model_validator(mode="before")
     @classmethod
-    def defer_coach(cls, value: dict) -> dict:
-        return {}
+    def reject_v1(cls, value):
+        if isinstance(value, dict) and (value.get("schema_version", 2) != 2 or
+                any(key in value for key in ("claims", "person", "stated_goal", "strengths", "growth_areas", "drivers", "values", "family", "constraints", "learning_style", "work_preferences", "emotional_notes", "coach"))):
+            raise ValueError("Truth Map v1 must be migrated before use")
+        return value
+
+    @field_validator("legacy_v1")
+    @classmethod
+    def isolate_archive(cls, value):
+        return deepcopy(value)
+
+    @classmethod
+    def analyst_schema(cls):
+        schema = cls.model_json_schema()
+        schema["properties"].pop("legacy_v1", None)
+        return schema
+
+    def storage_data(self):
+        data = self.model_dump(mode="json")
+        if self.legacy_v1 is not None:
+            data["legacy_v1"] = deepcopy(self.legacy_v1)
+        return data
+
+    def export_data(self):
+        return {**self.model_dump(mode="json"), "has_legacy_v1": self.legacy_v1 is not None}

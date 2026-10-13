@@ -16,7 +16,6 @@ from app.database import get_db
 from app.memory.candidates import MemoryCandidateService
 from app.memory.errors import MemoryDataError
 from app.memory.onboarding import OnboardingService
-from app.memory.profile_completion import ProfileCompletionService
 from app.memory.profile_issues import ProfileIssueService
 from app.memory.readiness import ReadinessService, STAGES
 from app.memory.reconciler import MemoryReconciler
@@ -51,8 +50,6 @@ class OnboardingAnswers(BaseModel):
     answers: dict[str, Any] = Field(default_factory=dict)
 
 
-class ProfileFieldResponseRequest(BaseModel):
-    status: Literal["valid_unknown", "not_applicable", "declined", "deferred"]
 
 
 def _workspace(db, network, token, authorization):
@@ -122,35 +119,8 @@ def get_raw_student_profile(
     })
 
 
-@router.get("/completion")
-def get_profile_completion(
-    network: str = Query(...), db: Session = Depends(get_db),
-    x_workspace_token: Optional[str] = Header(None), authorization: Optional[str] = Header(None),
-):
-    """Safe completion counts and the next useful question; never raw values."""
-    workspace, error = _workspace(db, network, x_workspace_token, authorization)
-    if error:
-        return error
-    return success_response(ProfileCompletionService(db).evaluate(str(workspace.id)))
 
 
-@router.post("/completion/fields/{requirement_key}/response")
-def record_profile_field_response(
-    requirement_key: str, body: ProfileFieldResponseRequest,
-    network: str = Query(...), db: Session = Depends(get_db),
-    x_workspace_token: Optional[str] = Header(None), authorization: Optional[str] = Header(None),
-):
-    workspace, error = _workspace(db, network, x_workspace_token, authorization)
-    if error:
-        return error
-    try:
-        result = ProfileCompletionService(db).record_response(
-            str(workspace.id), requirement_key, body.status)
-        db.commit()
-        return success_response(result)
-    except ValueError as exc:
-        db.rollback()
-        return json_response(ResponseCode.BAD_REQUEST, str(exc))
 
 
 @router.get("/history")

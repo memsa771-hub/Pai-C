@@ -82,6 +82,8 @@ class NotebookService:
         raw = new_notebook.model_dump(mode="json") if isinstance(new_notebook, CounselorNotebookData) else new_notebook
         if not isinstance(raw, dict):
             raise ValueError("notebook must be an object")
+        if "legacy_v1" in raw:
+            raise ValueError("legacy_v1 is read-only")
         clean, changes = sanitize_notebook(raw)
         current = self.get(workspace_id)
         empty = CounselorNotebookData().model_dump(mode="json")
@@ -90,6 +92,19 @@ class NotebookService:
             raise ValueError("sanitization would erase the existing notebook")
         if expected_version is not None and current.version != expected_version:
             raise NotebookVersionConflict(f"expected {expected_version}, found {current.version}")
+        # Historical evidence is immutable and is never supplied by a model.
+        clean = clean.model_copy(update={"legacy_v1": current.notebook.legacy_v1})
+        # Retain all earlier certainty ratings, even when the Analyst omits them.
+        old_rating = current.notebook.sure
+        history = list(old_rating.history)
+        if old_rating.score is not None and (old_rating.score, old_rating.reason, old_rating.asked_at) != (clean.sure.score, clean.sure.reason, clean.sure.asked_at):
+            from app.pai_c.deep.notebook_schema import Rating
+            history.append(Rating(score=old_rating.score, reason=old_rating.reason, asked_at=old_rating.asked_at))
+        for rating in clean.sure.history:
+            if rating not in history:
+                history.append(rating)
+        clean = clean.model_copy(update={"sure": clean.sure.model_copy(update={"history": history})})
+        payload = clean.storage_data()
         version = current.version + 1
         now = datetime.now(timezone.utc)
         if current.version:

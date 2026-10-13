@@ -149,6 +149,20 @@ class CounselorNotedQuestion(Base):
     )
 
 
+class PaiTurnPlan(Base):
+    """Validated background instructions for the next Counselor turn."""
+    __tablename__ = "pai_turn_plans"
+    id = Column(UUID(as_uuid=False), primary_key=True, default=_uuid)
+    workspace_id = Column(UUID(as_uuid=False), ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False)
+    source_event_id = Column(Text, ForeignKey("events.id", ondelete="CASCADE"), nullable=False)
+    notebook_version = Column(Integer, nullable=False)
+    plan = Column(JSONB, nullable=False)
+    created_at = Column(DateTime(timezone=True), nullable=False, default=_now)
+    __table_args__ = (
+        UniqueConstraint("workspace_id", "source_event_id", name="uq_turn_plan_workspace_event"),
+    )
+
+
 class CounselorNotebook(Base):
     """Private Counselor working notes for one student workspace."""
 
@@ -1330,31 +1344,6 @@ class ProfileFieldResponse(Base):
     )
 
 
-class CounselorSlotAnswer(Base):
-    """Recent student-reported slot answer awaiting canonical reconciliation.
-
-    This is shared conversation state, not a second profile or voice memory.
-    Canonical facts still enter Vault only through candidates and reconciliation.
-    """
-    __tablename__ = "pai_counselor_slot_answers"
-
-    id = Column(Text, primary_key=True, default=_uuid)
-    workspace_id = Column(UUID(as_uuid=False), ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False)
-    source_event_id = Column(Text, nullable=False)
-    slot_key = Column(Text, nullable=False)
-    value = Column(JSONB, nullable=True)
-    status = Column(Text, nullable=False, default="pending", server_default=text("'pending'"))
-    confidence = Column(Float, nullable=True)
-    quote = Column(Text, nullable=True)
-    created_at = Column(DateTime(timezone=True), default=_now, server_default=text("NOW()"))
-
-    __table_args__ = (
-        CheckConstraint("status IN ('pending', 'valid_unknown', 'declined')",
-                        name="ck_counselor_slot_answer_status"),
-        UniqueConstraint("workspace_id", "source_event_id", "slot_key",
-                         name="uq_counselor_slot_answer_event"),
-        Index("idx_counselor_slot_answers_recent", "workspace_id", "created_at"),
-    )
 
 
 class CounselorTurnDecision(Base):
@@ -1367,6 +1356,9 @@ class CounselorTurnDecision(Base):
     source_timestamp = Column(BigInteger, nullable=False)
     move = Column(Text, nullable=False)
     slot_key = Column(Text, nullable=True)
+    safety_level = Column(Text, nullable=True)
+    safety_category = Column(Text, nullable=True)
+    moves = Column(JSONB, nullable=True)
     guard_violations = Column(JSONB, nullable=False, default=list, server_default=text("'[]'"))
 
     __table_args__ = (
@@ -2132,7 +2124,7 @@ class DocumentArtifact(Base):
 class BackgroundJob(Base):
     """Durable work queue. Deliberately generic — not a memory-only table.
 
-    PAI Operator uses `asyncio.create_task()`, which loses work on restart.
+    PAI Operator uses this same durable queue so work survives restart.
     That is acceptable for a run whose status the user is watching; it is not
     acceptable for memory formation, where silent loss means the student's
     profile quietly drifts from what they told us.

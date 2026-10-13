@@ -89,6 +89,9 @@ async def index_document_chunks(
     """Write a document's chunks into the shared retrieval index."""
     from app.memory.index import MemoryRecord, get_memory_index
 
+    from app.config import config
+    if not config.PAI_SEMANTIC_RECALL_ENABLED:
+        return 0
     chunks = build_chunks(file_id, segments, document_type)
     if not chunks:
         return 0
@@ -139,6 +142,9 @@ async def search_documents(
     """Rank document chunks for a question, within one workspace."""
     from app.memory.index import get_memory_index
 
+    from app.config import config
+    if not config.PAI_SEMANTIC_RECALL_ENABLED:
+        return []
     filters: dict = {"status": "active"}
     if file_id:
         filters["file_id"] = file_id

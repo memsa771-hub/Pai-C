@@ -1,19 +1,8 @@
 # -*- coding: utf-8 -*-
-"""Memory tool handlers.
+"""Registered memory read handlers and the profile-proposal write seam.
 
-Capability declarations live in `app/tools/builtin/__init__.py` alongside the
-other registrations; this module is just the handlers.
-
-The split that matters:
-
-  * read handlers        -> vault.read / memory.read   (Counselor + Operator)
-  * remember / forget    -> vault.manage / memory.manage (Counselor only)
-
-`remember` and `forget` are the explicit-user-command path from requirement #3,
-so they commit synchronously before PAI confirms — the student is told "saved",
-and it is saved. They still go through candidate + reconciler, so even the
-explicit path never lets a model write canonical state directly; it only gets
-to skip the *queue*, not the *gate*.
+Tool declarations live in app/tools/builtin/__init__.py. Profile proposals
+enter the existing candidate and queued reconciliation path.
 """
 
 import logging
@@ -21,7 +10,6 @@ import logging
 from app.database import new_session
 from app.memory.candidates import MemoryCandidateService
 from app.memory.context import MemoryContextService
-from app.memory.reconciler import MemoryReconciler
 from app.memory.vault import VaultService
 from app.memory.field_definitions import usable_in_counseling
 
@@ -166,8 +154,8 @@ async def propose_profile(context, args: dict) -> dict:
                 source_type=source_type, evidence=evidence,
             )
             ids.append(candidate.id)
-        from app.jobs.service import BackgroundJobService
-        job = BackgroundJobService(db).enqueue(
+        from app.runtime.task_runtime import enqueue
+        job = enqueue(db,
             "memory.reconcile", {"candidate_ids": ids}, context.workspace_id,
             idempotency_key="profile-proposals:" + ":".join(ids),
         )
@@ -176,219 +164,6 @@ async def propose_profile(context, args: dict) -> dict:
     except (TypeError, ValueError) as exc:
         db.rollback()
         return {"ok": False, "error": {"code": "invalid_proposal", "message": str(exc)}}
-    except Exception:
-        db.rollback()
-        raise
-    finally:
-        db.close()
-
-
-# -- writes (Counselor only) ----------------------------------------------
-
-
-def _record_patch(path: str | None, answer):
-    if not path:
-        return answer
-    result = answer
-    for part in reversed(path.split(".")):
-        result = {part: result}
-    return result
-
-
-async def answer_profile_requirement(context, args: dict) -> dict:
-    """Save the one active collection question and recalculate immediately."""
-    from app.memory.profile_completion import ProfileCompletionService
-
-    requirement_key = (args.get("requirement_key") or "").strip()
-    if not requirement_key or "answer" not in args:
-        return {"ok": False, "error": {
-            "code": "invalid_arguments", "message": "requirement_key and answer are required",
-        }}
-    db = _session()
-    try:
-        completion_service = ProfileCompletionService(db)
-        snapshot = completion_service.snapshots.build(context.workspace_id)
-        completion = completion_service.evaluate(context.workspace_id, snapshot=snapshot)
-        active = completion.get("nextRequirement")
-        if not active or active.get("key") != requirement_key:
-            return {"ok": False, "error": {
-                "code": "requirement_not_active",
-                "message": "That requirement is not the active missing profile question",
-            }}
-        requirement = completion_service.registry.get(requirement_key)
-        if requirement is None:
-            return {"ok": False, "error": {
-                "code": "requirement_not_found", "message": "Profile requirement not found",
-            }}
-
-        answer = args["answer"]
-        candidate_type = "vault_fact"
-        key = requirement.source_key
-        entities = {}
-        proposed_value = answer
-        if requirement.source_type == "record_presence":
-            if not isinstance(answer, dict):
-                return {"ok": False, "error": {
-                    "code": "invalid_answer", "message": "This answer must be a structured record",
-                }}
-            candidate_type = "student_record"
-        elif requirement.source_type == "record_field":
-            rows = completion_service.registry.select_records(requirement, snapshot)
-            if not rows:
-                return {"ok": False, "error": {
-                    "code": "record_not_found", "message": "The record to update is missing",
-                }}
-            candidate_type = "student_record"
-            entities = {"record_id": rows[0]["id"]}
-            proposed_value = _record_patch(requirement.source_path, answer)
-        elif requirement.source_type == "journey_gap":
-            if not isinstance(answer, dict) or not requirement.source_path:
-                return {"ok": False, "error": {
-                    "code": "invalid_answer", "message": "This answer must describe the missing qualification",
-                }}
-            candidate_type = "student_record"
-            key = requirement.source_path
-        elif requirement.source_type != "vault_fact":
-            return {"ok": False, "error": {
-                "code": "unsupported_requirement", "message": "This requirement cannot be answered here",
-            }}
-
-        candidate = MemoryCandidateService(db).propose(
-            workspace_id=context.workspace_id,
-            candidate_type=candidate_type,
-            key=key,
-            proposed_value=proposed_value,
-            entities=entities,
-            confidence=1.0,
-            source_type="user_explicit",
-            allow_user_explicit=True,
-            evidence={"profile_requirement_key": requirement_key,
-                      "capture": "counselor_collection"},
-            subject_user_id=context.user_id,
-        )
-        result = MemoryReconciler(db).reconcile(candidate)
-        if not result.accepted:
-            db.commit()
-            return {"ok": False, "error": {
-                "code": "answer_rejected", "message": result.reason or "Profile answer rejected",
-            }}
-        recalculated = completion_service.evaluate(context.workspace_id)
-        db.commit()
-        return {"ok": True, "data": {
-            "saved": True, "id": result.result_id, "completion": recalculated,
-        }}
-    except Exception:
-        db.rollback()
-        raise
-    finally:
-        db.close()
-
-
-async def remember(context, args: dict) -> dict:
-    """Explicit "remember that ..." — durably committed before confirming.
-
-    Proposed as a candidate and reconciled inline. `source_type` is
-    `user_explicit`, which is what lets it bypass the confidence floor and
-    outrank previously inferred values.
-    """
-    content = (args.get("content") or "").strip()
-    if not content:
-        return {"ok": False, "error": {"code": "invalid_arguments", "message": "content is required"}}
-
-    db = _session()
-    try:
-        candidates = MemoryCandidateService(db)
-        field_key = args.get("field_key")
-        record_type = args.get("record_type")
-        if record_type and field_key:
-            return {"ok": False, "error": {"code": "invalid_arguments", "message": "Choose a scalar field or a record"}}
-        if record_type:
-            candidate = candidates.propose(
-                workspace_id=context.workspace_id, candidate_type="student_record", key=record_type,
-                proposed_value=args.get("value"),
-                entities={"record_id": args["record_id"]} if args.get("record_id") else {},
-                confidence=1.0, source_type="user_explicit", allow_user_explicit=True,
-                evidence={"quote": content},
-            )
-        elif field_key:
-            candidate = candidates.propose(
-                workspace_id=context.workspace_id,
-                candidate_type="vault_fact",
-                operation="upsert",
-                key=field_key,
-                proposed_value=args.get("value"),
-                confidence=1.0,
-                source_type="user_explicit", allow_user_explicit=True,
-                evidence={"quote": content},
-            )
-        else:
-            candidate = candidates.propose(
-                workspace_id=context.workspace_id,
-                candidate_type="semantic_memory",
-                operation="upsert",
-                content=content,
-                entities={"memory_type": args.get("memory_type", "preference")},
-                confidence=1.0,
-                source_type="user_explicit", allow_user_explicit=True,
-            )
-
-        result = MemoryReconciler(db).reconcile(candidate)
-        if not result.accepted:
-            db.commit()  # keep the rejection record
-            return {"ok": False, "error": {
-                "code": "memory_rejected", "message": result.reason or "rejected"
-            }}
-        db.commit()
-        return {"ok": True, "data": {"remembered": True, "id": result.result_id}}
-    except Exception:
-        db.rollback()
-        raise
-    finally:
-        db.close()
-
-
-async def forget(context, args: dict) -> dict:
-    """Explicit "forget ..." — durably committed before confirming.
-
-    Marks matching memories `forgotten`; they are excluded from every read
-    thereafter. Vault fields are retracted rather than deleted.
-    """
-    target = (args.get("query") or "").strip()
-    field_key = args.get("field_key")
-    if not target and not field_key:
-        return {"ok": False, "error": {
-            "code": "invalid_arguments", "message": "query or field_key is required"
-        }}
-
-    db = _session()
-    try:
-        candidates = MemoryCandidateService(db)
-        if field_key:
-            candidate = candidates.propose(
-                workspace_id=context.workspace_id,
-                candidate_type="vault_fact",
-                operation="retract",
-                key=field_key,
-                confidence=1.0,
-                source_type="user_explicit", allow_user_explicit=True,
-            )
-        else:
-            candidate = candidates.propose(
-                workspace_id=context.workspace_id,
-                candidate_type="semantic_memory",
-                operation="forget",
-                content=target,
-                confidence=1.0,
-                source_type="user_explicit", allow_user_explicit=True,
-            )
-
-        result = MemoryReconciler(db).reconcile(candidate)
-        db.commit()
-        if not result.accepted:
-            return {"ok": False, "error": {
-                "code": "memory_not_found", "message": result.reason or "nothing to forget"
-            }}
-        return {"ok": True, "data": {"forgotten": True}}
     except Exception:
         db.rollback()
         raise

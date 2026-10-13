@@ -11,18 +11,19 @@ from sqlalchemy import select, text
 
 from app.config import config
 from app.pai_c.deep.context import _json, _profile
-from app.pai_c.deep.coverage import enforce_mirror_readiness
-from app.pai_c.deep.notebook import NotebookService, NotebookVersionConflict
-from app.pai_c.deep.notebook_sanitize import sanitize_notebook
+from app.pai_c.deep.notebook import NotebookVersionConflict
 from app.pai_c.deep.notebook_schema import CounselorNotebookData
+from app.pai_c.memory import MemoryService
 from app.pai_c.deep.prompts import load_prompt
-from app.pai_c.deep.usage import usage_callback
+from app.pai_c.planner.view import build_planner_view
+from app.pai_c.planner.patch import apply_patch, PatchRejected, OPERATION
+from app.pai_c.planner.plan import validate_plan, TurnPlan
+from app.pai_c.playbooks.registry import available_playbooks
 from app.pai_c.stages import advance_discovery_stage
-from app.inference.client import chat_completion
-from app.jobs.service import BackgroundJobService, job_handlers
+from app.inference.gateway import complete as chat_completion, resolve_model
+from app.runtime.task_runtime import enqueue
 from app.journey import JourneyService
-from app.memory.episodic import EpisodicMemoryService
-from app.models import BackgroundJob, CounselorNotebookHistory, EventRecord, User, Workspace
+from app.models import BackgroundJob, CounselorNotebookHistory, EventRecord, User, Workspace, CounselorTurnDecision, PaiTurnPlan
 
 logger = logging.getLogger(__name__)
 JOB_ANALYZE = "counselor.analyze"
@@ -46,7 +47,7 @@ def enqueue_turn_analysis(db, workspace_id: str, user_event_id: str,
         )).scalar_one_or_none()
         if student is None:
             return None
-        job = BackgroundJobService(db).enqueue(
+        job = enqueue(db,
             job_type=JOB_ANALYZE, workspace_id=workspace_id,
             payload={"user_event_id": user_event_id,
                      "assistant_event_id": assistant_event_id,
@@ -112,27 +113,28 @@ def _prior_job_pending(db, job) -> bool:
 
 
 def _input(db, workspace_id: str, student: EventRecord, assistant: EventRecord,
-           notebook) -> str:
+           notebook, *, view=None) -> str:
     rows = db.execute(select(EventRecord).where(
         EventRecord.network_id == workspace_id,
         EventRecord.type == "workspace.message.posted",
         EventRecord.source.in_((student.source, "openagents:pai")),
         EventRecord.timestamp <= assistant.timestamp,
     ).order_by(EventRecord.timestamp.desc(), EventRecord.id.desc())
-                      .limit(config.PAI_ANALYST_HISTORY_SIZE * 3)).scalars().all()
+                      .limit(config.PAI_PLANNER_HISTORY_TURNS * 3)).scalars().all()
     transcript = []
     for row in rows:
         content = (row.payload or {}).get("content")
         if isinstance(content, str) and content.strip() and (row.payload or {}).get("message_type", "chat") == "chat":
             transcript.append({"role": "student" if row.source == student.source else "counselor",
                                "content": content[:1500], "event_id": row.id})
-        if len(transcript) == config.PAI_ANALYST_HISTORY_SIZE:
+        if len(transcript) == config.PAI_PLANNER_HISTORY_TURNS:
             break
     transcript.reverse()
-    episode = EpisodicMemoryService(db).recent(workspace_id, limit=1)
-    return ("<notebook_schema>" + _json(CounselorNotebookData.model_json_schema())
+    view = view if view is not None else build_planner_view(notebook)
+    episode = MemoryService(db).session_summaries(workspace_id, limit=1)
+    return ("<notebook_schema>" + _json({"notebook": CounselorNotebookData.analyst_schema(), "patch_operation": OPERATION.json_schema(), "plan": TurnPlan.model_json_schema()})
             + "</notebook_schema>\n"
-            + "<notebook>" + _json(notebook.model_dump(mode="json")) + "</notebook>\n"
+            + view.text + "\n"
             + "<profile>" + _json(_profile(db, workspace_id)) + "</profile>\n"
             + "<older_episode_summary>" + _json(episode[0].summary if episode else "")
             + "</older_episode_summary>\n"
@@ -143,26 +145,51 @@ def _input(db, workspace_id: str, student: EventRecord, assistant: EventRecord,
 async def _candidate(db, workspace_id: str, student: EventRecord,
                      assistant: EventRecord, previous):
     student_id = student.id
-    analyst_input = _input(db, workspace_id, student, assistant, previous.notebook)
-    # Do not hold read transactions or database connections across model calls.
+    query = (student.payload or {}).get("content", "")
+    view = build_planner_view(previous.notebook)
+    analyst_input = _input(db, workspace_id, student, assistant, previous.notebook, view=view)
+    decision = db.scalar(select(CounselorTurnDecision).where(
+        CounselorTurnDecision.workspace_id == workspace_id,
+        CounselorTurnDecision.source_timestamp <= assistant.timestamp,
+    ).order_by(CounselorTurnDecision.source_timestamp.desc(), CounselorTurnDecision.id.desc()).limit(1))
+    wellbeing = decision is not None and decision.move == "wellbeing"
     db.rollback()
-    raw = await chat_completion(
-        api_key=config.PAI_API_KEY, model=config.PAI_ANALYST_MODEL,
-        messages=[{"role": "user", "content": analyst_input}],
-        system_prompt=load_prompt("analyst"),
-        response_format={"type": "json_object"},
-        reasoning_effort=config.PAI_ANALYST_REASONING_EFFORT,
-        base_url=config.PAI_BASE_URL,
-        usage_callback=usage_callback("analyst", config.PAI_ANALYST_MODEL, student_id),
-    )
-    try:
-        parsed = json.loads(raw)
-    except (TypeError, ValueError) as exc:
-        raise ValueError("analyst returned invalid JSON") from exc
-    if not isinstance(parsed, dict) or not isinstance(parsed.get("notebook"), dict):
-        raise ValueError("analyst returned no notebook")
-    candidate, issues = sanitize_notebook(parsed["notebook"])
-    return enforce_mirror_readiness(candidate), issues, []
+    recalled = await MemoryService(db).recall(workspace_id, query)
+    analyst_input += "\n<semantic_recall>" + _json(recalled) + "</semantic_recall>"
+    from app.pai_c.deep.context import estimated_tokens
+    logger.info("planner_input turn_id=%s history_limit=%d map_tokens=%d total_tokens=%d",
+                student_id, config.PAI_PLANNER_HISTORY_TURNS, view.tokens, estimated_tokens(analyst_input))
+    feedback = ""
+    for attempt in range(2):
+        db.rollback()
+        raw = await chat_completion(role="analyst",
+            api_key=config.PAI_API_KEY, model=resolve_model("analyst"),
+            messages=[{"role": "user", "content": analyst_input}],
+            system_prompt=load_prompt("planner") + "\n\n" + available_playbooks() + feedback,
+            response_format={"type": "json_object"},
+            reasoning_effort=config.PAI_ANALYST_REASONING_EFFORT,
+            base_url=config.PAI_BASE_URL, turn_id=student_id)
+        try:
+            try:
+                parsed = json.loads(raw)
+            except (TypeError, ValueError):
+                raise PatchRejected(-1, "InvalidJSON") from None
+            if not isinstance(parsed, dict):
+                raise PatchRejected(-1, "InvalidOutputShape")
+            candidate = apply_patch(previous.notebook, parsed.get("patch"), view.ids, query)
+        except PatchRejected as exc:
+            logger.warning("planner_patch_rejected op_index=%d error_type=%s", exc.index, exc.error_type)
+            if attempt:
+                return None, None, attempt + 1
+            feedback = "\nThe previous patch was rejected: " + str(exc) + ". Return a corrected complete patch and plan."
+            continue
+        try:
+            plan = validate_plan(parsed.get("plan"), wellbeing=wellbeing)
+        except ValueError as exc:
+            logger.warning("planner_plan_rejected error_type=%s", type(exc).__name__)
+            plan = None
+        return candidate, plan, attempt + 1
+    raise AssertionError("unreachable patch retry")
 
 
 def _advance_stage(db, workspace_id: str, notebook) -> None:
@@ -173,7 +200,7 @@ def _advance_stage(db, workspace_id: str, notebook) -> None:
     advance_discovery_stage(
         journeys, workspace_id, journey,
         identity_ready=bool(owner and owner.onboarded_at),
-        foundation_ready=bool(notebook.coverage.person and notebook.coverage.education),
+        foundation_ready=MemoryService(db).foundation_ready(notebook),
         goal_records=[], actor="system:counselor_analyst",
     )
     db.commit()
@@ -195,7 +222,7 @@ async def analyze_job(job, db) -> dict:
         ).limit(1)).scalar_one_or_none()
         if duplicate:
             _advance_stage(db, job.workspace_id,
-                           NotebookService(db).get(job.workspace_id).notebook)
+                           MemoryService(db).truth_map(job.workspace_id).notebook)
             return {"status": "duplicate"}
         student = db.execute(select(EventRecord).where(
             EventRecord.id == user_event_id,
@@ -209,19 +236,25 @@ async def analyze_job(job, db) -> dict:
         )).scalar_one_or_none()
         if student is None or assistant is None:
             raise ValueError("analysis source turn is unavailable")
-        service = NotebookService(db)
+        service = MemoryService(db)
+        model_calls = 0
         for attempt in range(2):
-            previous = service.get(job.workspace_id)
-            candidate, issues, removals = await _candidate(
-                db, job.workspace_id, student, assistant, previous)
+            previous = service.truth_map(job.workspace_id)
+            candidate, plan, calls = await _candidate(db, job.workspace_id, student, assistant, previous)
+            model_calls += calls
+            if candidate is None:
+                return {"status": "patch_rejected", "model_calls": model_calls}
             try:
-                snapshot, storage_issues = service.apply(
+                if plan is not None:
+                    db.add(PaiTurnPlan(workspace_id=job.workspace_id, source_event_id=user_event_id,
+                        notebook_version=previous.version + 1, plan=plan.model_dump(mode="json")))
+                snapshot, storage_issues = service.apply_truth_map(
                     job.workspace_id, candidate, user_event_id,
                     expected_version=previous.version)
                 _advance_stage(db, job.workspace_id, snapshot.notebook)
                 return {"status": "applied", "version": snapshot.version,
-                        "sanitized": len(issues) + len(storage_issues),
-                        "sensitive_removed": len(removals), "model_calls": attempt + 1}
+                        "sanitized": len(storage_issues), "sensitive_removed": 0,
+                        "model_calls": model_calls}
             except NotebookVersionConflict:
                 db.rollback()
                 if attempt:
@@ -229,4 +262,3 @@ async def analyze_job(job, db) -> dict:
         raise AssertionError("unreachable analysis retry")
 
 
-job_handlers.register(JOB_ANALYZE, analyze_job)

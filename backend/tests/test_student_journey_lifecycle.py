@@ -38,7 +38,7 @@ def test_subgoals_independent_journeys_focus_and_dependencies_are_preserved():
         service = JourneyService(db)
         coordinator = JourneyCoordinator(service)
         admission = coordinator.observe_message(student.workspace_id, "I want a master's in Germany.")
-        language = coordinator.observe_message(student.workspace_id, "I want to improve my IELTS.")
+        language = coordinator.observe_message(student.workspace_id, "I want to prepare for a language test.")
         internship = coordinator.observe_message(
             student.workspace_id, "I also want to get an internship while preparing."
         )

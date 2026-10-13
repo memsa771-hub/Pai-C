@@ -372,21 +372,3 @@ class TestNoInference:
         assert len(rows) == 1
         assert rows[0].qualification_name == "MS Computer Science"
 
-    def test_education_journey_still_reports_the_gap(self, db, workspace_id):
-        from app.memory.education_journey import EducationJourneyService
-
-        record = _parsed_transcript(db, workspace_id)
-        _extract(db, workspace_id, record.id, _understanding([
-            _finding("student_record", "education", {
-                "qualification_name": "MS Computer Science",
-                "canonical_level": "master",
-            }),
-        ]))
-        _reconcile_all(db, workspace_id)
-
-        snapshot = StudentSnapshotService(db).build(workspace_id)
-        journey = EducationJourneyService().evaluate(snapshot)
-
-        # The missing undergraduate history is identified by the journey
-        # service from canonical state — not invented by document extraction.
-        assert journey is not None

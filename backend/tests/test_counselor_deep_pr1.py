@@ -21,7 +21,7 @@ from scripts.counselor_eval_support import StudentSession
 @pytest.mark.asyncio
 async def test_deep_queues_learning_after_successful_human_post():
     event = {"id": "student-event", "source": "human:student", "target": "channel/pai"}
-    deep = AsyncMock(return_value=("assistant-event", "channel/pai", False))
+    deep = AsyncMock(return_value=("assistant-event", "channel/pai"))
     with patch.object(runtime, "_run_deep_turn", deep), \
             patch("app.pai_c.deep.analysis.enqueue_turn_analysis") as analyze, \
             patch("app.memory.turn_hook.enqueue_turn_extraction") as enqueue:
@@ -35,7 +35,7 @@ async def test_deep_queues_learning_after_successful_human_post():
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("source,posted", [
-    ("human:student", None), ("openagents:pai", ("assistant-event", "channel/pai", False)),
+    ("human:student", None), ("openagents:pai", ("assistant-event", "channel/pai")),
 ])
 async def test_extraction_requires_a_successful_human_turn(source, posted):
     with patch.object(runtime, "_run_deep_turn", new=AsyncMock(return_value=posted)), \
@@ -49,7 +49,7 @@ def test_retry_of_same_student_event_uses_one_extraction_key():
     db = Mock()
     service = Mock()
     service.enqueue.return_value.id = "job-1"
-    with patch("app.memory.turn_hook.BackgroundJobService", return_value=service):
+    with patch("app.memory.turn_hook.enqueue", service.enqueue):
         for assistant_id in ("reply-1", "reply-2"):
             assert enqueue_turn_extraction(
                 db, "workspace", "channel/pai", "student-1", assistant_id, "pai",
@@ -89,7 +89,7 @@ def test_moved_reply_checks_and_prompt_files():
     assert has_list("- A route\n- Another route")
     assert contains_blocked_script("α", "Greek")
     assert not contains_blocked_script("a", "Greek")
-    for name in ("counselor", "analyst", "mirror", "roadmap_builder", "sensitive_check", "language_retry"):
+    for name in ("voice", "planner", "mirror", "roadmap_builder", "sensitive_check", "language_retry"):
         assert load_prompt(name).strip()
     with pytest.raises(ValueError, match="Unknown Counselor prompt"):
         load_prompt("other")
@@ -98,7 +98,7 @@ def test_moved_reply_checks_and_prompt_files():
     if source.is_file():
         import re
         document = source.read_text(encoding="utf-8")
-        for name in ("counselor", "analyst", "mirror", "roadmap_builder"):
+        for name in ("voice", "planner", "mirror", "roadmap_builder"):
             match = re.search(
                 rf"(?s)## [1-4]\. `{name}\.md`.*?```text\n(.*?)\n```", document,
             )

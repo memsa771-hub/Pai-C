@@ -2,7 +2,6 @@
 
 import asyncio
 import json
-import time
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 
@@ -10,8 +9,6 @@ import pytest
 from sqlalchemy import select
 
 from app.config import config
-from app.memory.context import StudentContext
-from app.memory.foreground import ForegroundContext, build_foreground_context
 from app.models import BackgroundJob, ExecutionRun, ProfileRequirement
 from app.pai_c import runtime
 from app.services import operator, pai
@@ -27,7 +24,7 @@ async def test_multi_turn_history_and_profile_jobs_survive_a_background_result()
 
         async def model(**kwargs):
             received.append(kwargs)
-            return json.dumps({"reply": "What matters most about this route?", "action": {"type": "none"}})
+            return json.dumps({"reply": "I hear what matters to you about this route.", "moves": ["reflect"], "action": {"type": "none"}})
 
         with patch("app.pai_c.deep.turn.chat_completion", model), \
                 patch.object(config, "PAI_API_KEY", "test"), \
@@ -65,33 +62,18 @@ async def test_delegation_returns_while_execution_is_still_waiting():
         with patch.object(operator, "_execute", slow), patch.object(operator, "is_available", return_value=True):
             result = await asyncio.wait_for(operator.delegate(ctx, "Research programs", {}, None,
                                                              "study_abroad_matching"), 0.5)
-            await asyncio.wait_for(started.wait(), 0.5)
+            assert not started.is_set()
             assert result["ok"] and not release.is_set()
             with student.factory() as db:
                 run = db.get(ExecutionRun, result["data"]["run_id"])
                 assert run.context_refs == ["vault", "memory", "episodes"]
                 assert run.constraints["student_intent"] == "study_abroad_matching"
             release.set()
-            await asyncio.gather(*list(operator._running_tasks))
+            with student.factory() as db:
+                job = db.scalar(select(BackgroundJob).where(BackgroundJob.job_type == "operator.run"))
+                assert job.payload["run_id"] == result["data"]["run_id"]
 
 
-@pytest.mark.asyncio
-async def test_slow_vector_retrieval_keeps_time_for_canonical_fallback():
-    async def slow(*args):
-        await asyncio.sleep(10)
-
-    canonical = StudentContext("w", vault={"preferences.target_countries": ["Germany"]})
-    async def fallback(*args):
-        return canonical
-
-    with patch("app.memory.foreground._hybrid", slow), \
-            patch("app.memory.foreground.run_bounded", fallback), \
-            patch.object(config, "PAI_MEMORY_CONTEXT_TIMEOUT_MS", 700):
-        started = time.monotonic()
-        result = await build_foreground_context("w", "study abroad")
-    assert result.mode == "lexical_fallback"
-    assert "Germany" in result.block
-    assert time.monotonic() - started < 0.9
 
 
 
@@ -146,7 +128,7 @@ async def test_result_is_interpreted_by_counselor_and_does_not_create_student_fa
             db.add(run)
             db.commit()
             with patch.object(operator, "_baseline_is_current", return_value=True), \
-                 patch("app.pai_c.handoff.explain_result", AsyncMock(
+                 patch("app.pai_c.orchestrator.handle_research_result", AsyncMock(
                     return_value="Given your budget, verify the academic credits before paying an application fee.")) as explain:
                 await operator._post_result(db, student.workspace_id, "channel/pai-counselor", run.id,
                                              "completed", "Found programs.")
@@ -174,7 +156,7 @@ async def test_operator_result_cannot_bypass_unconfirmed_baseline():
             db.add(run)
             db.commit()
             with patch.object(config, "PAI_PROFILE_COMPLETION_ROLLOUT_MODE", "all"), \
-                    patch("app.pai_c.handoff.explain_result", AsyncMock()) as explain:
+                    patch("app.pai_c.orchestrator.handle_research_result", AsyncMock()) as explain:
                 await operator._post_result(
                     db, student.workspace_id, "channel/pai-counselor", run.id,
                     "completed", "Secret personalized ranking",

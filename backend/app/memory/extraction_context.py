@@ -153,7 +153,7 @@ def build_turn_context(
         context.recent = context.recent[-RECENT_TURN_COUNT:]
 
     # Current canonical state, so the extractor can distinguish a correction
-    # ("actually 3.52") from a restatement ("my CGPA is 3.41" again) and skip
+    # ("actually 3.52") from a restatement ("my grade is 3.41" again) and skip
     # what we already hold.
     from .semantic import MemoryService
     from .vault import VaultService

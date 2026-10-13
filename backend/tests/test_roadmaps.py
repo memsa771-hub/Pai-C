@@ -242,7 +242,7 @@ def test_roadmap_api_is_workspace_scoped_and_choice_requires_presentation():
             assert response.json()["data"]["roadmaps"][0]["id"] == card.id
             with patch("app.pai_c.deep.turn.chat_completion",
                        AsyncMock(return_value='{"reply":"Which part of this route matters most to you?","action":{"type":"none"}}')), \
-                    patch("app.pai_c.posting._post_response", AsyncMock(return_value="event-1")) as posted:
+                    patch("app.pai_c.posting.send_to_student", AsyncMock(return_value="event-1")) as posted:
                 focused = client.post(url + "/focus", params=params, headers=headers)
                 assert focused.status_code == 200
                 assert posted.await_args.args[2] == "channel/pai-counselor"

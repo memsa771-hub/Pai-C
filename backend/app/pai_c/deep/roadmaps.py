@@ -8,8 +8,7 @@ from pydantic import BaseModel, Field, ValidationError
 from app.config import config
 from app.pai_c.deep.polish import contains_blocked_script
 from app.pai_c.deep.prompts import load_prompt
-from app.pai_c.deep.usage import usage_callback
-from app.inference.client import chat_completion
+from app.inference.gateway import complete as chat_completion, resolve_model
 from app.plugins._shared.sources import public_https
 
 logger = logging.getLogger(__name__)
@@ -153,12 +152,9 @@ async def build_mirror_roadmaps(brief, research):
     raw = None
     try:
         from app.plugins._shared.budget import spend, record_model_usage
-        def record_usage(usage):
-            record_model_usage(usage)
-            usage_callback("roadmap", config.PAI_ROADMAP_MODEL)(usage)
         if spend("model"):
             raise ValueError("research_student_budget_exceeded")
-        raw = await chat_completion(api_key=config.PAI_API_KEY, model=config.PAI_ROADMAP_MODEL,
+        raw = await chat_completion(role="roadmap", api_key=config.PAI_API_KEY, model=resolve_model("roadmap"),
             system_prompt=load_prompt("roadmap_builder"), response_format={"type": "json_object"},
             messages=[{"role": "user", "content": json.dumps({
                 "mirror": {**brief["mirror"], "roadmap_lanes": lanes}, "notebook": brief["notebook"],
@@ -166,7 +162,7 @@ async def build_mirror_roadmaps(brief, research):
                 "language_policy": {"blocked_scripts": config.PAI_LANGUAGE_BLOCKED_SCRIPTS,
                     "replacement": config.PAI_LANGUAGE_BLOCKED_SCRIPT_REPLACEMENT}}, default=str)}],
             reasoning_effort=config.PAI_COUNSELOR_REASONING_EFFORT, base_url=config.PAI_BASE_URL,
-            usage_callback=record_usage)
+            usage_callback=record_model_usage)
         parsed = json.loads(raw)
         if not isinstance(parsed, dict): raise ValueError("invalid roadmap object")
     except Exception as exc:

@@ -5,7 +5,7 @@ Two rules this module exists to enforce:
 
 1. **History, not overwrite.** Superseding a fact marks the old row
    `superseded` with a `valid_until` and inserts a new one. Provenance
-   survives, so "who told us their CGPA was 8.1, and when?" stays answerable
+   survives, so "who told us their grade was 8.1, and when?" stays answerable
    after the value changes.
 
 2. **Validated writes only.** Every write goes through the field definition

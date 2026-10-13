@@ -140,11 +140,13 @@ class MemoryReconciler:
             VaultRelationService(self.db).sync_demonstrations(candidate.workspace_id, assertion.id)
         self.assertions.finish(assertion, result, candidate)
         if result.accepted and candidate.candidate_type in {"vault_fact", "student_record"}:
-            from app.pai_c.roadmaps.service import RoadmapService
-            RoadmapService(self.db).mark_stale(
-                candidate.workspace_id, f"Student profile changed: {candidate.key or 'profile'}")
-            from app.jobs.service import BackgroundJobService
-            from app.memory.handlers import JOB_RESUME_RESEARCH
+            from app.runtime.task_runtime import enqueue
+            from app.config import config
+            if config.PAI_SEMANTIC_RECALL_ENABLED and result.result_id:
+                payload = ({"fact_ids": [result.result_id]} if candidate.candidate_type == "vault_fact"
+                           else {"record_refs": [{"kind": candidate.key, "id": result.result_id}]})
+                enqueue(self.db, job_type="memory.embed", workspace_id=candidate.workspace_id,
+                        payload=payload, idempotency_key=f"embed-candidate:{candidate.id}")
             self.db.add(EventRecord(
                 id=str(uuid.uuid4()), network_id=candidate.workspace_id,
                 type="vault.fact_accepted", source="system:reconciler", target="core",
@@ -152,8 +154,14 @@ class MemoryReconciler:
                          "record_id": result.result_id}, metadata_={},
                 timestamp=int(time.time() * 1000), visibility="private",
             ))
-            BackgroundJobService(self.db).enqueue(
-                job_type=JOB_RESUME_RESEARCH, workspace_id=candidate.workspace_id,
+            enqueue(self.db,
+                job_type="roadmaps.mark_stale", workspace_id=candidate.workspace_id,
+                payload={"workspace_id": candidate.workspace_id,
+                         "reason": f"Student profile changed: {candidate.key or 'profile'}"},
+                idempotency_key=f"roadmap-stale:{candidate.id}",
+            )
+            enqueue(self.db,
+                job_type="memory.resume_research", workspace_id=candidate.workspace_id,
                 payload={"candidate_id": candidate.id},
                 idempotency_key=f"research-resume:{candidate.id}",
             )
@@ -193,11 +201,10 @@ class MemoryReconciler:
     def _reconcile_vault(self, candidate: MemoryCandidate) -> ReconcileResult:
         if not candidate.key:
             return self._reject(candidate, "vault_fact candidate requires a key")
-        from .field_definitions import ENTITY_BACKED_LEGACY_FIELDS
-        if candidate.key in ENTITY_BACKED_LEGACY_FIELDS:
-            return self._reject(candidate, f"{candidate.key} is represented by a typed student record")
-
         if candidate.operation == "retract":
+            # Upserts use apply_fact -> validate; retractions bypass that path.
+            if self.vault.fields.get(candidate.key) is None:
+                return self._reject(candidate, f"no enabled field definition for {candidate.key}")
             count = self.vault.retract_fact(candidate.workspace_id, candidate.key)
             if count == 0:
                 return self._reject(candidate, f"no active fact to retract: {candidate.key}")

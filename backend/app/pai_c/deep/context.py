@@ -10,22 +10,18 @@ from datetime import datetime, timezone
 from sqlalchemy import select
 
 from app.config import config
-from app.pai_c.deep.notebook import NotebookService
+from app.pai_c.memory import MemoryService
 from app.pai_c.deep.turn_input import CounselorTurnInput
 from app.journey import JourneyService
-from app.memory.episodic import EpisodicMemoryService
-from app.memory.foreground import build_foreground_context
-from app.memory.student_snapshot import StudentSnapshotService
 from app.models import Roadmap, User, Workspace
 from app.plugins._shared.sources import public_https
 
 logger = logging.getLogger(__name__)
 _NOTEBOOK_ORDER = (
-    "open_questions", "coverage", "claims", "family", "constraints",
-    "mirror_ready", "depth_mode", "engagement_style", "stated_goal", "person",
-    "strengths", "growth_areas", "drivers", "hypotheses", "goal_history",
-    "values", "learning_style", "work_preferences", "emotional_notes",
-    "mirror_blockers", "chapter",
+    "schema_version", "open_questions", "coverage", "said", "source", "pressures",
+    "self", "sure", "shown", "mirror_ready", "depth_mode", "engagement_style",
+    "hypotheses", "goal_history", "tensions", "identity_status",
+    "decision_difficulties", "private_notes", "mirror_blockers", "chapter",
 )
 
 
@@ -70,7 +66,7 @@ def _trim_notebook(notebook) -> dict:
 def _profile(db, workspace_id: str) -> dict:
     workspace = db.get(Workspace, workspace_id)
     owner = db.get(User, workspace.owner_user_id) if workspace and workspace.owner_user_id else None
-    snapshot = StudentSnapshotService(db).build(workspace_id)
+    snapshot = MemoryService(db).profile(workspace_id)
     identity = {}
     if owner and owner.display_name:
         identity["display_name"] = {"value": owner.display_name, "source": "onboarding"}
@@ -78,7 +74,7 @@ def _profile(db, workspace_id: str) -> dict:
         if key in {"preferred_name", "full_name", "date_of_birth", "current_status", "status_category"}:
             identity[key] = {"value": _short(fact.get("value")),
                              "source": fact.get("source_type") or "unknown"}
-    facts = {key: {"value": _short(fact.get("value")),
+    facts = {key: {"id": fact.get("id"), "value": _short(fact.get("value")),
                    "source": fact.get("source_type") or "unknown",
                    "verification": fact.get("confidence")}
              for key, fact in list(snapshot.facts.items())[:30] if key not in identity}
@@ -116,10 +112,11 @@ class DeepContext:
     notebook: object
     journey: object | None
     build_ms: int
+    plan: object | None = None
 
 
 async def build_context(db, workspace_id: str, turn: CounselorTurnInput, *,
-                        roadmap_id: str | None = None) -> DeepContext:
+                        roadmap_id: str | None = None, wellbeing: bool = False) -> DeepContext:
     """Build every section from workspace-scoped reads; make no model calls."""
     started = time.monotonic()
     if workspace_id != turn.workspace_id:
@@ -134,21 +131,23 @@ async def build_context(db, workspace_id: str, turn: CounselorTurnInput, *,
         }),
         "profile": _json(_profile(db, workspace_id)),
     }
-    notebook = NotebookService(db).get(workspace_id).notebook
+    notebook = MemoryService(db).truth_map(workspace_id).notebook
     sections["notebook"] = _json(_trim_notebook(notebook))
     journey = next((item for item in JourneyService(db).list(workspace_id, status="active")
                     if item.journey_type == "counselor_decision"), None)
-    memory_block = ""
-    if config.PAI_MEMORY_CONTEXT_ENABLED and turn.student_text:
-        memory = await build_foreground_context(
-            workspace_id, turn.student_text, caller="pai", lexical_only=True)
-        memory_block = memory.block
-    recent = EpisodicMemoryService(db).recent(workspace_id, limit=1)
+    memory = MemoryService(db)
+    recent = memory.session_summaries(workspace_id, limit=2) if memory.is_return_visit(workspace_id) else []
     sections["memory"] = _json({
-        "foreground": memory_block,
         "latest_episode_summary": recent[0].summary[:500] if recent else None,
+        "session_summaries": [{"summary": row.summary, "entities": row.entities} for row in recent],
         "open_threads": [item.question_intent for item in notebook.open_questions[:3]],
     })
+    plan = memory.latest_plan(workspace_id)
+    if plan is not None:
+        sections["plan"] = _json(plan.model_dump(include={"next_move", "intent", "give", "avoid_questions"}))
+        if not wellbeing and plan.next_move != "care" and plan.playbooks:
+            from app.pai_c.playbooks.registry import selected_playbooks
+            sections["playbooks"] = selected_playbooks(plan.playbooks)
     research = _research(db, workspace_id, journey)
     if roadmap_id is not None:
         row = db.scalar(select(Roadmap).where(
@@ -173,4 +172,4 @@ async def build_context(db, workspace_id: str, turn: CounselorTurnInput, *,
     elapsed = int((time.monotonic() - started) * 1000)
     logger.info("counselor_deep_context tokens=%s total_tokens=%d build_ms=%d",
                 counts, estimated_tokens(text), elapsed)
-    return DeepContext(text, counts, notebook, journey, elapsed)
+    return DeepContext(text, counts, notebook, journey, elapsed, plan)

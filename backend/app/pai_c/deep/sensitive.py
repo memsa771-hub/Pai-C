@@ -13,8 +13,7 @@ from pydantic_core import PydanticUndefined
 from app.config import config
 from app.pai_c.deep.notebook_schema import CounselorNotebookData
 from app.pai_c.deep.prompts import load_prompt
-from app.pai_c.deep.usage import usage_callback
-from app.inference.client import chat_completion
+from app.inference.gateway import complete as chat_completion, resolve_model
 
 logger = logging.getLogger(__name__)
 ChangedEntry = dict[str, str]
@@ -32,15 +31,14 @@ async def model_sensitive_checker(entries: list[ChangedEntry]) -> set[str]:
     """One model call for the batch; require one decision for every submitted path."""
     if not entries:
         return set()
-    raw = await chat_completion(
-        api_key=config.PAI_API_KEY, model=config.PAI_SENSITIVE_CHECK_MODEL,
+    raw = await chat_completion(role="sensitive",
+        api_key=config.PAI_API_KEY, model=resolve_model("sensitive"),
         messages=[{"role": "user", "content": json.dumps(entries, ensure_ascii=False)}],
         system_prompt=load_prompt("sensitive_check"),
         response_format={"type": "json_object"},
         max_tokens=config.PAI_COUNSELOR_SENSITIVE_CHECK_MAX_TOKENS,
         reasoning_effort=config.PAI_SENSITIVE_CHECK_REASONING_EFFORT,
         base_url=config.PAI_BASE_URL,
-        usage_callback=usage_callback("sensitive", config.PAI_SENSITIVE_CHECK_MODEL),
     )
     try:
         answer = json.loads(raw)
@@ -87,6 +85,8 @@ def _nested_model(annotation: Any) -> type[BaseModel] | None:
 def _changed_entries(old: dict, new: dict, model: type[BaseModel], path: str = "") -> list[ChangedEntry]:
     entries: list[ChangedEntry] = []
     for name, field in model.model_fields.items():
+        if field.exclude:
+            continue
         value, prior = new.get(name), old.get(name)
         if value == prior or value is None:
             continue
@@ -106,6 +106,8 @@ def _changed_entries(old: dict, new: dict, model: type[BaseModel], path: str = "
 def _remove_flagged(new: dict, model: type[BaseModel], flagged: set[str], path: str = "") -> dict | object:
     cleaned = dict(new)
     for name, field in model.model_fields.items():
+        if field.exclude:
+            continue
         value = new.get(name)
         field_path = f"{path}.{name}" if path else name
         if isinstance(value, list):
@@ -155,28 +157,29 @@ async def check_notebook_before_mirror(workspace_id: str, *, db=None,
     mirror from an unchecked or stale snapshot. No read transaction is kept
     open during the model call.
     """
-    from app.pai_c.deep.notebook import NotebookService, NotebookVersionConflict
-    from app.pai_c.deep.usage import token_usage_turn
+    from app.pai_c.deep.notebook import NotebookVersionConflict
+    from app.pai_c.memory import MemoryService
+    from app.inference.gateway import token_usage_turn
     from app.database import new_session
 
     if db is None:
         with new_session() as session:
             return await check_notebook_before_mirror(workspace_id, db=session, checker=checker)
-    service = NotebookService(db)
-    previous = service.get(workspace_id)
+    service = MemoryService(db)
+    previous = service.truth_map(workspace_id)
     db.rollback()
     with token_usage_turn(previous.last_event_id):
         clean, removals = await filter_sensitive_changes(
             CounselorNotebookData(), previous.notebook,
             checker=checker or model_sensitive_checker)
-    current = service.get(workspace_id)
+    current = service.truth_map(workspace_id)
     if current.version != previous.version:
         db.rollback()
         raise NotebookVersionConflict("notebook changed during pre-mirror check")
     if not removals:
         db.rollback()
         return previous, []
-    clean = clean.model_copy(update={"mirror_ready": False})
-    snapshot, _ = service.apply(workspace_id, clean, previous.last_event_id,
+    clean = clean.model_copy(update={"mirror_ready": False, "mirror_blockers": [*clean.mirror_blockers, "Removed sensitive entries require further discovery"]})
+    snapshot, _ = service.apply_truth_map(workspace_id, clean, previous.last_event_id,
                                 expected_version=previous.version)
     return snapshot, removals

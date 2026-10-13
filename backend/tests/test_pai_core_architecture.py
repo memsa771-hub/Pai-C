@@ -112,7 +112,14 @@ async def test_operator_resumes_same_run_and_preserves_completed_actions():
         ctx = ToolContext(student.workspace_id, "pai", object())
         with patch.object(operator, "_execute", AsyncMock()) as execute:
             result = await operator.resume(ctx, run_id, {"approved": True})
-            await asyncio.sleep(0)
+            execute.assert_not_awaited()
+            from app.models import BackgroundJob
+            from app.runtime.task_runtime import run as dispatch
+            from sqlalchemy import select
+            with student.factory() as db:
+                job = db.scalar(select(BackgroundJob).where(BackgroundJob.job_type == "operator.run"))
+                assert job.payload == {"run_id": run_id}
+                await dispatch(job, db)
         assert result["data"]["run_id"] == run_id
         assert execute.call_args.args[0] == run_id
         with student.factory() as db:

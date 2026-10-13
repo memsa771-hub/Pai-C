@@ -28,26 +28,9 @@ from app.config import config
 logger = logging.getLogger(__name__)
 
 
-def _warm_sdk_imports() -> None:
-    """Import the OpenAI SDK's lazily-loaded resource modules up front.
+from app.inference.gateway import embed, warm_sdk_imports
 
-    `AsyncOpenAI.embeddings` is a cached_property that imports
-    `openai.resources.embeddings` on first ACCESS, which pulls in the whole
-    `openai.resources` package (including `.chat`). Foreground retrieval
-    reaches that attribute from the bounded worker thread while the request
-    thread may be importing `openai.resources.chat` for the chat call, and two
-    threads walking the same partially-initialized package deadlock on the
-    import lock — a real `_DeadlockError` that killed hybrid retrieval as soon
-    as the budget was large enough for it to get that far. Importing once, at
-    module load on the main thread, means neither thread imports later.
-    """
-    try:
-        import openai.resources  # noqa: F401
-    except Exception:  # SDK absent or restructured: degrade, never break import
-        logger.debug("embeddings: could not pre-import openai resources", exc_info=True)
-
-
-_warm_sdk_imports()
+warm_sdk_imports()
 
 # Endpoints known to expose an OpenAI-compatible /embeddings route. Used only
 # to decide whether reusing PAI credentials is safe.
@@ -133,14 +116,6 @@ class OpenAIEmbeddingProvider(EmbeddingProvider):
     def available(self) -> bool:
         return bool(self._api_key)
 
-    def _client(self):
-        from openai import AsyncOpenAI
-
-        kwargs = {"api_key": self._api_key}
-        if self._base_url:
-            kwargs["base_url"] = self._base_url
-        return AsyncOpenAI(**kwargs)
-
     async def embed_documents(self, texts: list[str]) -> EmbeddingResult:
         """Embed texts, closing the client before returning.
 
@@ -158,15 +133,8 @@ class OpenAIEmbeddingProvider(EmbeddingProvider):
         if not texts:
             return EmbeddingResult([], self.model_id, self._dimensions)
 
-        client = self._client()
-        try:
-            response = await client.embeddings.create(model=self._model, input=texts)
-        finally:
-            # Closed on the error path too: a provider outage must not leak a
-            # client per failed indexing job.
-            await client.close()
-
-        vectors = [item.embedding for item in response.data]
+        vectors = await embed("embeddings", texts, api_key=self._api_key,
+                              model=self._model, base_url=self._base_url)
         actual = len(vectors[0]) if vectors else self._dimensions
         if vectors and actual != self._dimensions:
             # Surfaced rather than silently accepted: a mismatch means the

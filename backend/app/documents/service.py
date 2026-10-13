@@ -207,9 +207,9 @@ class DocumentArtifactService:
         duplicate upload of identical bytes is a no-op while a parser upgrade
         legitimately re-queues the same file.
         """
-        from app.jobs.service import BackgroundJobService
+        from app.runtime.task_runtime import enqueue
 
-        BackgroundJobService(self.db).enqueue(
+        enqueue(self.db,
             job_type=JOB_DOCUMENT_PARSE,
             workspace_id=artifact.workspace_id,
             payload={"file_id": artifact.file_id, "artifact_id": artifact.id},

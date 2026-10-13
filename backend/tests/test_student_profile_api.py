@@ -226,7 +226,6 @@ def test_every_profile_endpoint_requires_credentials(api):
     client, _, network = api
     assert client.get(f"/v1/student-profile?network={network}").status_code == 401
     assert client.get(f"/v1/student-profile/raw?network={network}").status_code == 401
-    assert client.get(f"/v1/student-profile/completion?network={network}").status_code == 401
     assert client.post(f"/v1/student-profile/edits?network={network}",
                        json={"record_type": "skill", "value": {"name": "Python"},
                              "reason": "r"}).status_code == 401
@@ -249,26 +248,11 @@ def test_open_issues_surface_without_their_restricted_evidence(api):
     assert data["meta"]["openIssueCount"] == len(data["issues"])
 
 
-def test_completion_endpoint_never_returns_values_or_evidence(api):
-    client, session, network = api
-    VaultService(session).apply_fact(
-        network, "identity.passport_number", "SECRET-PASSPORT", "user_explicit",
-        evidence={"quote": "My secret passport"},
-    )
-    session.add(ProfileRequirement(
-        key="status", tier="critical", source_type="vault_fact",
-        source_key="identity.current_status", selector="any",
-        question="What is your current study or work status?", priority=100,
-        version=1, enabled=True,
-    ))
-    session.commit()
-    response = client.get(
-        f"/v1/student-profile/completion?network={network}", headers=HEADERS,
-    )
-    assert response.status_code == 200
-    assert "SECRET-PASSPORT" not in response.text
-    assert "My secret passport" not in response.text
-    assert response.json()["data"]["nextRequirement"]["key"] == "status"
+def test_legacy_completion_routes_are_removed(api):
+    client, _, network = api
+    assert client.get(f"/v1/student-profile/completion?network={network}", headers=HEADERS).status_code == 404
+    assert client.post(f"/v1/student-profile/completion/fields/status/response?network={network}",
+                       headers=HEADERS, json={"status": "declined"}).status_code == 404
 
 
 def test_resolving_an_issue_clears_it_from_the_projection(api):

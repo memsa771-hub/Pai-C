@@ -180,12 +180,29 @@ class Config:
     PAI_MODEL: str = os.environ.get("PAI_MODEL", "gpt-5.4-mini")
     PAI_COUNSELOR_MODEL: str = os.environ.get("PAI_COUNSELOR_MODEL", "") or PAI_MODEL
     PAI_ANALYST_MODEL: str = os.environ.get("PAI_ANALYST_MODEL", "") or PAI_COUNSELOR_MODEL
+    PAI_SAFETY_MODEL: str = os.environ.get("PAI_SAFETY_MODEL", "") or PAI_ANALYST_MODEL or PAI_MODEL
+    PAI_SAFETY_REASONING_EFFORT: str = os.environ.get("PAI_SAFETY_REASONING_EFFORT", "low")
+    PAI_SAFETY_TIMEOUT_MS: int = int(os.environ.get("PAI_SAFETY_TIMEOUT_MS", "3000"))
+    PAI_WELLBEING_RESOURCES: str = os.environ.get("PAI_WELLBEING_RESOURCES", "")
+    PAI_WELLBEING_FALLBACK_REPLY: str = os.environ.get(
+        "PAI_WELLBEING_FALLBACK_REPLY",
+        "I'm sorry you're going through this. Please reach out to someone you trust. "
+        "If you are in immediate danger, contact local emergency services.")
     PAI_MIRROR_MODEL: str = os.environ.get("PAI_MIRROR_MODEL", "") or PAI_COUNSELOR_MODEL
     PAI_ROADMAP_MODEL: str = os.environ.get("PAI_ROADMAP_MODEL", "") or PAI_COUNSELOR_MODEL
     PAI_RESEARCH_MAX_CALLS_PER_STUDENT: int = int(os.environ.get("PAI_RESEARCH_MAX_CALLS_PER_STUDENT", "40"))
     PAI_RESEARCH_REFRESH_MAX_CALLS: int = int(os.environ.get("PAI_RESEARCH_REFRESH_MAX_CALLS", "8"))
     PAI_SENSITIVE_CHECK_MODEL: str = os.environ.get("PAI_SENSITIVE_CHECK_MODEL", "") or PAI_ANALYST_MODEL
-    PAI_ANALYST_HISTORY_SIZE: int = int(os.environ.get("PAI_ANALYST_HISTORY_SIZE", "60"))
+    PAI_SEMANTIC_RECALL_ENABLED: bool = os.environ.get("PAI_SEMANTIC_RECALL_ENABLED", "true").lower() == "true"
+    PAI_SEMANTIC_RECALL_TOP_K: int = int(os.environ.get("PAI_SEMANTIC_RECALL_TOP_K", "5"))
+    PAI_SUMMARIZER_MODEL: str = os.environ.get("PAI_SUMMARIZER_MODEL", "") or PAI_ANALYST_MODEL
+    PAI_SESSION_GAP_MINUTES: int = int(os.environ.get("PAI_SESSION_GAP_MINUTES", "30"))
+    PAI_SESSION_SWEEP_SECONDS: int = int(os.environ.get("PAI_SESSION_SWEEP_SECONDS", "300"))
+    PAI_REPEAT_QUESTION_WINDOW: int = int(os.environ.get("PAI_REPEAT_QUESTION_WINDOW", "5"))
+    PAI_REPEAT_QUESTION_SIMILARITY: float = float(os.environ.get("PAI_REPEAT_QUESTION_SIMILARITY", "0.6"))
+    PAI_PLAN_MAX_AGE_TURNS: int = int(os.environ.get("PAI_PLAN_MAX_AGE_TURNS", "3"))
+    PAI_PLANNER_HISTORY_TURNS: int = int(os.environ.get("PAI_PLANNER_HISTORY_TURNS", "12"))
+    PAI_PLANNER_MAP_CONTEXT_TOKENS: int = int(os.environ.get("PAI_PLANNER_MAP_CONTEXT_TOKENS", "4000"))
     PAI_ANALYST_REASONING_EFFORT: str = os.environ.get("PAI_ANALYST_REASONING_EFFORT", "low")
     PAI_SENSITIVE_CHECK_REASONING_EFFORT: str = os.environ.get(
         "PAI_SENSITIVE_CHECK_REASONING_EFFORT", "low")
@@ -200,7 +217,6 @@ class Config:
         "PAI_COUNSELOR_FALLBACK_REPLY",
         "I want to understand you properly. Could you tell me a little more?",
     )
-    PAI_COUNSELOR_RESEARCH_DAILY_LIMIT: int = int(os.environ.get("PAI_COUNSELOR_RESEARCH_DAILY_LIMIT", "5"))
     PAI_COUNSELOR_NOTEBOOK_CONTEXT_TOKENS: int = int(os.environ.get("PAI_COUNSELOR_NOTEBOOK_CONTEXT_TOKENS", "1800"))
     PAI_COUNSELOR_HISTORY_SIZE: int = int(os.environ.get("PAI_COUNSELOR_HISTORY_SIZE", "20"))
     PAI_COUNSELOR_SENSITIVE_CHECK_MAX_TOKENS: int = int(os.environ.get("PAI_COUNSELOR_SENSITIVE_CHECK_MAX_TOKENS", "4096"))
@@ -267,7 +283,7 @@ class Config:
     MEMORY_RETRIEVAL_LIMIT: int = int(os.environ.get("MEMORY_RETRIEVAL_LIMIT", "8"))
     MEMORY_RERANKER: str = os.environ.get("MEMORY_RERANKER", "")
 
-    # ---- Foreground memory injection (app/memory/foreground.py) -----------
+    # ---- Shared student-context rendering (app/memory/foreground.py) ------
     # Hard ceiling on the rendered student-context block. MemoryContextService
     # already caps per section; this is the backstop so pathological values
     # (a very long free-text Vault field) cannot expand the system prompt.
@@ -304,16 +320,8 @@ class Config:
     # ~60s window; the SDK's default of 2 gives up well before that and the
     # student is told PAI could not reach the language service.
     LLM_MAX_RETRIES: int = int(os.environ.get("LLM_MAX_RETRIES", "4"))
-    # Retrieval is on the response-critical path. Past this, PAI drops to the
-    # PostgreSQL-only fallback rather than making the student wait.
-    #
-    # 1500ms was below the floor for a REMOTE embedding provider and made the
-    # vector index dead weight: measured against OpenAI text-embedding-3-small,
-    # the query embedding alone is ~900-1400ms and a warm hybrid search ~800-1000ms,
-    # while build_foreground_context reserves only 70% of this budget for the
-    # hybrid arm. Every turn timed out into the lexical fallback, so memories
-    # were embedded and never read. Set well above the provider's p95; a
-    # co-located embedding service can safely lower it again.
+    # Semantic recall has a bounded retrieval budget and falls back to
+    # PostgreSQL-only context when vector retrieval exceeds it.
     PAI_MEMORY_CONTEXT_TIMEOUT_MS: int = int(
         os.environ.get("PAI_MEMORY_CONTEXT_TIMEOUT_MS", "3000")
     )
@@ -335,16 +343,6 @@ class Config:
     PAI_PROFILE_COMPLETION_ROLLOUT_AT: str = os.environ.get(
         "PAI_PROFILE_COMPLETION_ROLLOUT_AT", ""
     ).strip()
-    # Foreground retrieval runs on its own small thread pool so a stalled
-    # PostgreSQL cannot block the event loop (see foreground_executor.py).
-    # Threads cannot be killed, so MAX_INFLIGHT — not the pool size — is what
-    # bounds abandoned DB work when the database is slow.
-    PAI_MEMORY_FOREGROUND_WORKERS: int = int(
-        os.environ.get("PAI_MEMORY_FOREGROUND_WORKERS", "4")
-    )
-    PAI_MEMORY_FOREGROUND_MAX_INFLIGHT: int = int(
-        os.environ.get("PAI_MEMORY_FOREGROUND_MAX_INFLIGHT", "8")
-    )
     # Provider-neutral web search. Disabled unless both fields are configured;
     # credentials remain backend-only and are never included in tool results.
     WEB_SEARCH_PROVIDER: str = os.environ.get("WEB_SEARCH_PROVIDER", "")
@@ -411,12 +409,15 @@ class Config:
                 raise RuntimeError("PAI_LANGUAGE_BLOCKED_SCRIPTS contains an unknown script") from exc
             if pattern.search(self.PAI_COUNSELOR_FALLBACK_REPLY):
                 raise RuntimeError("PAI_COUNSELOR_FALLBACK_REPLY uses a blocked script")
-        if min(self.PAI_COUNSELOR_RESEARCH_DAILY_LIMIT,
+        if min(self.PAI_SESSION_GAP_MINUTES, self.PAI_SESSION_SWEEP_SECONDS,
+               self.PAI_SEMANTIC_RECALL_TOP_K,
                self.PAI_COUNSELOR_NOTEBOOK_CONTEXT_TOKENS,
                self.PAI_COUNSELOR_HISTORY_SIZE,
-               self.PAI_ANALYST_HISTORY_SIZE,
+               self.PAI_REPEAT_QUESTION_WINDOW, self.PAI_PLAN_MAX_AGE_TURNS, self.PAI_PLANNER_HISTORY_TURNS, self.PAI_PLANNER_MAP_CONTEXT_TOKENS,
                self.PAI_COUNSELOR_SENSITIVE_CHECK_MAX_TOKENS) < 1:
             raise RuntimeError("Deep Counselor limits must be positive")
+        if not 0 < self.PAI_REPEAT_QUESTION_SIMILARITY <= 1:
+            raise RuntimeError("PAI_REPEAT_QUESTION_SIMILARITY must be in (0, 1]")
         if self.PAI_PROFILE_COMPLETION_ROLLOUT_MODE not in {"off", "shadow", "new", "all"}:
             raise RuntimeError(
                 "PAI_PROFILE_COMPLETION_ROLLOUT_MODE must be off, shadow, new, or all"

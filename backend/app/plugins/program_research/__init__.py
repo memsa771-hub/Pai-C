@@ -31,13 +31,13 @@ EXTRACTION_PROMPT = (
 
 async def _extract_page(content, url, payload, comparison_fields, checked_at):
     from app.config import config
-    from app.inference.client import chat_completion
+    from app.inference.gateway import complete as chat_completion, resolve_model
     from app.plugins._shared.budget import spend, record_model_usage
     if spend("model"):
         raise ValueError("research_student_budget_exceeded")
 
-    raw = await chat_completion(
-        api_key=config.PAI_API_KEY, model=config.PAI_MODEL,
+    raw = await chat_completion(role="research_extract",
+        api_key=config.PAI_API_KEY, model=resolve_model("research_extract"),
         system_prompt=EXTRACTION_PROMPT,
         messages=[{"role": "user", "content": json.dumps({
             "country": payload["country"], "level": payload.get("level"),
@@ -71,18 +71,15 @@ async def research(context, payload):
     checked_at = checked_now()
     from app.database import new_session
     from app.memory.field_definitions import VaultFieldDefinitionService
-    from app.memory.field_definitions import ENTITY_BACKED_LEGACY_FIELDS
     from app.memory.student_schema import RECORD_SPECS
     catalog_db = new_session()
     try:
         definitions = VaultFieldDefinitionService(catalog_db).list_definitions()
-        comparison_fields = [item.key for item in definitions
-                             if item.key not in ENTITY_BACKED_LEGACY_FIELDS]
+        comparison_fields = [item.key for item in definitions]
         comparison_fields.extend(
             f"{item.key}.{key}" for item in definitions
             for key, shape in (item.validation_schema or {}).get("properties", {}).items()
-            if item.key not in ENTITY_BACKED_LEGACY_FIELDS
-            and shape.get("type") in {"string", "number", "integer"}
+            if shape.get("type") in {"string", "number", "integer"}
         )
         comparison_fields.extend(
             f"{kind}[<{','.join(spec['identity'])}>].{field}"

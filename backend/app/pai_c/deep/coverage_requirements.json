@@ -1,5 +1,1 @@
-{
-  "full": ["person", "education", "claims_probed", "proven_interests", "family", "real_why", "constraints", "goal_tested"],
-  "focused": ["person", "education", "real_why", "family", "constraints", "goal_tested"],
-  "light": ["person", "education", "real_why", "constraints"]
-}
+{"full":["said","shown","source","pressures","self","sure"],"focused":["said","shown","source","pressures","sure"],"light":["said","source","sure"]}

@@ -1,8 +1,7 @@
 # -*- coding: utf-8 -*-
 """Durable job handlers for memory formation.
 
-Registered on import. `app/jobs/worker.py` imports this module precisely so the
-handlers exist before it starts claiming.
+Registered centrally as system capabilities before the worker starts claiming.
 
 Why these run here and not in the chat path: extraction calls an LLM and
 reconciliation touches several tables. Doing that inline would add seconds to
@@ -18,7 +17,6 @@ a half-tuned prompt silently writing wrong facts is not.
 import logging
 from sqlalchemy import select
 
-from app.jobs.service import job_handlers
 from app.memory.candidates import MemoryCandidateService
 from app.memory.index import MemoryRecord, get_memory_index
 from app.memory.reconciler import MemoryReconciler
@@ -32,182 +30,10 @@ JOB_RECONCILE = "memory.reconcile"
 JOB_EMBED = "memory.embed"
 JOB_UNINDEX = "memory.unindex"
 JOB_REINDEX = "memory.reindex"
-JOB_RESUME_RESEARCH = "memory.resume_research"
-JOB_REFRESH_RESEARCH = "research.refresh_stale"
-
-
-async def refresh_stale_research(job, db) -> dict:
-    """A reported or expired source starts a fresh Counselor research run."""
-    from app.pai_c.research_gateway import request_research
-    from app.journey import JourneyService
-    from app.memory.permissions import capabilities_for_agent
-    from app.memory.student_snapshot import StudentSnapshotService
-    from app.models import Opportunity, RequirementSet, Roadmap, Workspace
-    from app.services.pai import PAI_AGENT_NAME, PAI_ALLOWED_TOOLS, PAI_PRIMARY_CHANNEL, WorkspaceApi
-    from app.tools import AUDIENCE_COUNSELOR, ToolContext
-
-    workspace = db.get(Workspace, job.workspace_id)
-    if workspace is None:
-        return {"delegated": False}
-    journey = JourneyService(db).ensure_counselor(job.workspace_id)
-    stale = db.execute(select(Roadmap.id).where(
-        Roadmap.workspace_id == job.workspace_id, Roadmap.journey_id == journey.id,
-        Roadmap.generation_status == "stale").limit(1)).first()
-    if journey.current_stage not in {"PROPOSED", "CHOSEN"} or not stale:
-        return {"delegated": False}
-    snapshot = StudentSnapshotService(db).build(job.workspace_id)
-    goals = snapshot.records.get("goal", [])
-    if journey.current_stage == "PROPOSED":
-        journey = JourneyService(db).set_counselor_stage(
-            job.workspace_id, journey.id, "RESEARCHING", actor="system:source_review")
-    db.commit()
-    context = ToolContext(
-        workspace_id=job.workspace_id, agent_name=PAI_AGENT_NAME,
-        api=WorkspaceApi(job.workspace_id, workspace.password_hash),
-        conversation=PAI_PRIMARY_CHANNEL,
-        allowed_tools=frozenset({"operator.delegate"}) & frozenset(PAI_ALLOWED_TOOLS),
-        audience=AUDIENCE_COUNSELOR,
-        granted_capabilities=capabilities_for_agent(PAI_AGENT_NAME),
-    )
-    requirement_id = (job.payload or {}).get("requirement_id")
-    refresh_candidate = None
-    if requirement_id:
-        pair = db.execute(select(RequirementSet, Opportunity).join(Opportunity).where(
-            RequirementSet.id == requirement_id,
-            Opportunity.workspace_id == job.workspace_id)).first()
-        if pair:
-            _, opportunity = pair
-            refresh_candidate = {"url": opportunity.url,
-                                 "lanes": [row.lane for row in db.scalars(select(Roadmap).where(
-                                     Roadmap.workspace_id == job.workspace_id,
-                                     Roadmap.journey_id == journey.id,
-                                     Roadmap.generation_status == "stale"))
-                                     if (row.route or {}).get("url") == opportunity.url and row.lane],
-                                 "title": opportunity.route.get("title") or opportunity.institution or "Route",
-                                 "country": opportunity.country,
-                                 "level": opportunity.level,
-                                 "intake": opportunity.intake}
-    result = await request_research(
-        "stale_refresh", job.workspace_id, db=db, journey=journey, goals=goals,
-        snapshot=snapshot, tool_context=context,
-        refresh_key=requirement_id or job.id, refresh_candidate=refresh_candidate)
-    return {"delegated": bool(result and result.get("ok"))}
-
-
-async def resume_research(job, db) -> dict:
-    """Accepted canonical evidence resumes only matching paused runs."""
-    from app.models import ExecutionRun, MemoryCandidate, User, Workspace
-    from app.services import operator
-    from app.services.pai import WorkspaceApi
-    from app.tools import ToolContext
-
-    candidate = db.get(MemoryCandidate, (job.payload or {}).get("candidate_id"))
-    if candidate is None or candidate.workspace_id != job.workspace_id or candidate.status != "accepted":
-        return {"resumed": 0}
-    workspace = db.get(Workspace, job.workspace_id)
-    if workspace is None:
-        return {"resumed": 0}
-    runs = db.execute(select(ExecutionRun).where(
-        ExecutionRun.workspace_id == job.workspace_id,
-        ExecutionRun.status == "needs_user_action",
-    )).scalars().all()
-    matching = []
-    matching_fields = {}
-    for run in runs:
-        pending = run.pending_action or {}
-        fields = {str(item.get("field")) for item in pending.get("items") or []
-                  if isinstance(item, dict)}
-        if (pending.get("kind") == "fact" and candidate.reconciled_at
-                and candidate.reconciled_at >= run.created_at and (candidate.key in fields or
-                any(field.startswith(str(candidate.key) + marker) for field in fields
-                    for marker in (".", "[")))):
-            matching.append(run.id)
-            matching_fields[run.id] = [field for field in fields if candidate.key == field or
-                                        any(field.startswith(str(candidate.key) + marker)
-                                            for marker in (".", "["))]
-    db.rollback()
-    ctx = ToolContext(workspace_id=job.workspace_id, agent_name="pai-operator",
-                      api=WorkspaceApi(job.workspace_id, workspace.password_hash))
-    resumed = 0
-    for run_id in matching:
-        result = await operator.resume(ctx, run_id, {"candidate_id": candidate.id})
-        accepted = bool(result.get("ok") and result.get("data", {}).get("resumed"))
-        resumed += int(accepted)
-        if accepted:
-            from app.pai_c.student_requests import StudentRequestService
-            for field in matching_fields[run_id]:
-                StudentRequestService(db).mark_answered(job.workspace_id, run_id, field)
-            db.commit()
-    # Resume permitted research from the canonical snapshot without a new chat
-    # turn; discovery alone must not bypass the mirror-confirmation gate.
-    from app.pai_c.research_gateway import request_research
-    from app.pai_c.stages import advance_discovery_stage
-    from app.journey import JourneyService
-    from app.memory.student_snapshot import StudentSnapshotService
-    from app.memory.permissions import capabilities_for_agent
-    from app.services.pai import PAI_AGENT_NAME, PAI_ALLOWED_TOOLS, PAI_PRIMARY_CHANNEL
-    from app.tools import AUDIENCE_COUNSELOR
-
-    snapshot = StudentSnapshotService(db).build(job.workspace_id)
-    owner = db.get(User, workspace.owner_user_id) if workspace.owner_user_id else None
-    journeys = JourneyService(db)
-    journey = journeys.ensure_counselor(job.workspace_id, actor="system:reconciliation")
-    journey = advance_discovery_stage(
-        journeys, job.workspace_id, journey,
-        identity_ready=bool(owner and owner.onboarded_at),
-        foundation_ready=_deep_foundation_ready(db, job.workspace_id),
-        goal_records=snapshot.records.get("goal", []), actor="system:reconciliation")
-    from app.models import Roadmap
-    stale = db.execute(select(Roadmap.id).where(
-        Roadmap.workspace_id == job.workspace_id,
-        Roadmap.journey_id == journey.id,
-        Roadmap.generation_status == "stale",
-    ).limit(1)).first() is not None
-    refresh_key = None
-    if journey.current_stage == "PROPOSED" and stale:
-        journey = journeys.set_counselor_stage(
-            job.workspace_id, journey.id, "RESEARCHING", actor="system:reconciliation")
-        refresh_key = candidate.id
-    elif journey.current_stage == "CHOSEN" and stale:
-        refresh_key = candidate.id
-    may_delegate = _research_delegate_allowed(journey, refresh_key)
-    db.commit()
-    if not may_delegate:
-        return {"resumed": resumed, "delegated": False}
-    counselor_ctx = ToolContext(
-        workspace_id=job.workspace_id, agent_name=PAI_AGENT_NAME,
-        api=WorkspaceApi(job.workspace_id, workspace.password_hash),
-        conversation=PAI_PRIMARY_CHANNEL,
-        allowed_tools=frozenset({"operator.delegate"}) & frozenset(PAI_ALLOWED_TOOLS),
-        audience=AUDIENCE_COUNSELOR,
-        granted_capabilities=capabilities_for_agent(PAI_AGENT_NAME),
-    )
-    delegated = await request_research(
-        "stale_refresh" if refresh_key else "roadmap_light", job.workspace_id,
-        db=db, journey=journey, goals=snapshot.records.get("goal", []),
-        snapshot=snapshot, tool_context=counselor_ctx, refresh_key=refresh_key)
-    return {"resumed": resumed, "delegated": bool(delegated and delegated.get("ok"))}
-
-
-def _deep_foundation_ready(db, workspace_id: str) -> bool:
-    from app.pai_c.deep.notebook import NotebookService
-
-    coverage = NotebookService(db).get(workspace_id).notebook.coverage
-    return bool(coverage.person and coverage.education)
-
-
-def _research_delegate_allowed(journey, refresh_key: str | None) -> bool:
-    """PR 6 mirror confirmation must set counselor_summary_draft.status='confirmed'."""
-    if refresh_key is not None or journey.current_stage in {"PROPOSED", "CHOSEN"}:
-        return True
-    return (journey.current_stage == "RESEARCHING"
-            and (journey.counselor_summary_draft or {}).get("status") == "confirmed")
-
-
 def _is_duplicate(db, workspace_id: str, item) -> bool:
     """Already-known memory/episode? Vault handles its own conflicts.
 
-    A Vault fact is never skipped here: "my CGPA is 3.52" restated is harmless
+    A Vault fact is never skipped here: "my grade is 3.52" restated is harmless
     (the reconciler retains the existing row), and a *correction* must always
     reach the reconciler.
     """
@@ -298,8 +124,6 @@ async def extract_memory(job, db) -> dict:
             return {"candidates_proposed": 0, "reason": "source_turn_missing"}
 
         definitions = VaultFieldDefinitionService(db).list_definitions()
-        from app.memory.field_definitions import ENTITY_BACKED_LEGACY_FIELDS
-        definitions = [d for d in definitions if d.key not in ENTITY_BACKED_LEGACY_FIELDS]
         allowed_keys = {d.key for d in definitions}
         # The same set twice, for two different jobs: `allowed_keys` is the
         # authorization filter, `field_specs` is what the model is actually
@@ -324,8 +148,6 @@ async def extract_memory(job, db) -> dict:
         input_channel = "voice" if isinstance(source_metadata, dict) and source_metadata.get("voice_delegation_id") else "conversation"
 
         for item in extracted:
-            if payload.get("profile_captured") and item.candidate_type in {"vault_fact", "student_record"}:
-                continue
             if _is_duplicate(db, workspace_id, item):
                 logger.info(
                     "memory.extract: skipped duplicate %s job=%s", item.candidate_type, job.id
@@ -373,9 +195,9 @@ async def extract_memory(job, db) -> dict:
     # if reconciliation fails it retries on its own schedule without re-running
     # extraction, and each job stays independently observable.
     if proposed:
-        from app.jobs.service import BackgroundJobService
+        from app.runtime.task_runtime import enqueue
 
-        BackgroundJobService(db).enqueue(
+        enqueue(db,
             job_type=JOB_RECONCILE,
             workspace_id=workspace_id,
             payload={"candidate_ids": proposed},
@@ -416,30 +238,11 @@ async def reconcile_memory(job, db) -> dict:
     #
     # The idempotency key is derived from the memory ids, so a retried
     # reconcile job cannot queue the same embedding work twice.
-    # Both kinds: episodes are retrievable too, so indexing only semantic
-    # memories would leave half the hybrid index permanently empty.
-    from app.memory.episodic import EpisodicMemoryService
-
-    memory_service = MemoryService(db)
-    episode_service = EpisodicMemoryService(db)
-    memory_ids, episode_ids = [], []
-    for r in accepted:
-        if not r.result_id:
-            continue
-        if memory_service.get(workspace_id, r.result_id) is not None:
-            memory_ids.append(r.result_id)
-        elif episode_service.get(workspace_id, r.result_id) is not None:
-            episode_ids.append(r.result_id)
-
-    if memory_ids or episode_ids:
-        from app.jobs.service import BackgroundJobService
-
-        BackgroundJobService(db).enqueue(
-            job_type=JOB_EMBED,
-            workspace_id=workspace_id,
-            payload={"memory_ids": memory_ids, "episode_ids": episode_ids},
-            idempotency_key=f"embed:{job.id}",
-        )
+    # Accepted facts/records queue indexing in the reconciler, including direct calls.
+    from app.config import config
+    embed_count = sum(bool(result.result_id) and
+                      MemoryCandidateService(db).get(workspace_id, result.candidate_id).candidate_type
+                      in {"vault_fact", "student_record"} for result in accepted) if config.PAI_SEMANTIC_RECALL_ENABLED else 0
 
     # A document's candidates are now decided: let the document pipeline tell
     # the student what actually happened. Enqueued in this transaction, so the
@@ -453,12 +256,12 @@ async def reconcile_memory(job, db) -> dict:
         "reconciled": len(results),
         "accepted": len(accepted),
         "rejected": len(results) - len(accepted),
-        "embed_enqueued": len(memory_ids) + len(episode_ids),
+        "embed_enqueued": embed_count,
     }
 
 
 async def embed_memory(job, db) -> dict:
-    """Push memories AND episodes into the retrieval index.
+    """Push accepted facts/records and session summaries into the retrieval index.
 
     Separate from reconciliation because embedding is the part that calls an
     external provider and therefore fails differently — it deserves its own
@@ -472,61 +275,58 @@ async def embed_memory(job, db) -> dict:
     if not workspace_id:
         raise ValueError("memory.embed requires a workspace_id")
 
+    from app.config import config
+    if not config.PAI_SEMANTIC_RECALL_ENABLED:
+        return {"indexed": 0, "reason": "disabled"}
     payload = job.payload or {}
     records = _records_for(
         db, workspace_id,
         memory_ids=payload.get("memory_ids") or [],
         episode_ids=payload.get("episode_ids") or [],
+        fact_ids=payload.get("fact_ids") or [],
+        record_refs=payload.get("record_refs") or [],
     )
 
     indexed = await get_memory_index().index(records) if records else 0
     logger.info(
         "memory.embed: job=%s workspace=%s requested=%d indexed=%d",
         job.id, workspace_id,
-        len(payload.get("memory_ids") or []) + len(payload.get("episode_ids") or []),
+        sum(len(payload.get(key) or []) for key in ("memory_ids", "episode_ids", "fact_ids", "record_refs")),
         indexed,
     )
     return {"indexed": indexed}
 
 
-def _records_for(db, workspace_id: str, memory_ids: list, episode_ids: list) -> list:
-    """Build index records from canonical rows, skipping inactive ones."""
-    from app.memory.episodic import EpisodicMemoryService
-
+def _records_for(db, workspace_id: str, memory_ids: list, episode_ids: list,
+                 fact_ids=None, record_refs=None) -> list:
+    """Only canonical accepted facts/records and session summaries get new vectors."""
+    from app.models import VaultFact
+    from app.memory.student_records import ENTITY_MODELS
+    from app.memory.index_sources import canonical_text
     records = []
-    memories = MemoryService(db)
-    for memory_id in memory_ids:
-        memory = memories.get(workspace_id, memory_id)
-        if memory is not None and memory.status == "active":
-            records.append(MemoryRecord(
-                id=memory.id, workspace_id=workspace_id, kind="semantic_memory",
-                text=memory.content,
-                filters={
-                    "memory_type": memory.memory_type,
-                    "status": memory.status,
-                    "importance": memory.importance,
-                },
-            ))
-
-    episodes = EpisodicMemoryService(db)
+    for fact_id in fact_ids or []:
+        row = db.scalar(select(VaultFact).where(VaultFact.workspace_id == workspace_id,
+            VaultFact.id == fact_id, VaultFact.status == "active"))
+        if row is not None:
+            records.append(MemoryRecord(id=row.id, workspace_id=workspace_id, kind="vault_fact",
+                text=canonical_text(row, "vault_fact"), filters={"status": "active"}))
+    for ref in record_refs or []:
+        model = ENTITY_MODELS.get(ref.get("kind"))
+        if model is None:
+            continue
+        row = db.scalar(select(model).where(model.workspace_id == workspace_id,
+            model.id == ref.get("id"), model.status == "active"))
+        if row is not None:
+            kind = "student_record:" + ref["kind"]
+            records.append(MemoryRecord(id=row.id, workspace_id=workspace_id, kind=kind,
+                text=canonical_text(row, kind), filters={"status": "active"}))
     for episode_id in episode_ids:
-        episode = episodes.get(workspace_id, episode_id)
-        if episode is not None and episode.status == "active":
-            records.append(MemoryRecord(
-                id=episode.id, workspace_id=workspace_id, kind="episode",
-                text=episode.summary,
-                filters={
-                    # `event_type`, NOT `memory_type` — an episode's kind of
-                    # event is a different axis from a memory's type, and
-                    # sharing the field name made them unfilterable apart.
-                    "event_type": episode.event_type,
-                    "status": episode.status,
-                    "importance": episode.importance,
-                    "occurred_at": (
-                        episode.occurred_at.isoformat() if episode.occurred_at else None
-                    ),
-                },
-            ))
+        row = db.scalar(select(PaiEpisode).where(PaiEpisode.workspace_id == workspace_id,
+            PaiEpisode.id == episode_id, PaiEpisode.status == "active",
+            PaiEpisode.event_type == "session_summary"))
+        if row is not None:
+            records.append(MemoryRecord(id=row.id, workspace_id=workspace_id, kind="episode",
+                text=row.summary, filters={"event_type": "session_summary", "status": "active"}))
     return records
 
 
@@ -555,44 +355,35 @@ async def reindex_workspace(job, db) -> dict:
     The recovery path: Qdrant lost, collection dropped, or the embedding model
     changed. Canonical data is untouched, so this is always safe to re-run.
     """
-    from app.memory.episodic import EpisodicMemoryService
-
+    from app.config import config
+    from app.models import VaultFact
+    from app.memory.student_records import ENTITY_MODELS
     workspace_id = job.workspace_id
     if not workspace_id:
         raise ValueError("memory.reindex requires a workspace_id")
-
+    if not config.PAI_SEMANTIC_RECALL_ENABLED:
+        return {"indexed": 0, "reason": "disabled"}
     index = get_memory_index()
     payload = job.payload or {}
-
     if payload.get("purge_first") and hasattr(index, "drop_workspace"):
         await index.drop_workspace(workspace_id)
-
-    # Keyset pagination over ALL active rows. The previous `limit=10000` would
-    # have silently omitted everything beyond it — a rebuild that quietly drops
-    # a student's older memories is worse than one that fails.
     batch_size = max(1, int(payload.get("batch_size") or 64))
-    total = memory_count = episode_count = 0
-
-    for batch in _iter_ids(db, workspace_id, PaiMemory, batch_size):
-        memory_count += len(batch)
-        records = _records_for(db, workspace_id, memory_ids=batch, episode_ids=[])
-        if records:
-            total += await index.index(records)
-
+    total = facts = records_count = episodes = 0
+    for batch in _iter_ids(db, workspace_id, VaultFact, batch_size):
+        facts += len(batch)
+        total += await index.index(_records_for(db, workspace_id, [], [], fact_ids=batch))
+    for kind, model in ENTITY_MODELS.items():
+        for batch in _iter_ids(db, workspace_id, model, batch_size):
+            records_count += len(batch)
+            total += await index.index(_records_for(db, workspace_id, [], [],
+                record_refs=[{"kind": kind, "id": item} for item in batch]))
     for batch in _iter_ids(db, workspace_id, PaiEpisode, batch_size):
-        episode_count += len(batch)
-        records = _records_for(db, workspace_id, memory_ids=[], episode_ids=batch)
+        records = _records_for(db, workspace_id, [], batch)
+        episodes += len(records)
         if records:
             total += await index.index(records)
-
-    logger.info(
-        "memory.reindex: job=%s workspace=%s memories=%d episodes=%d indexed=%d "
-        "batch_size=%d",
-        job.id, workspace_id, memory_count, episode_count, total, batch_size,
-    )
-    return {
-        "indexed": total, "memories": memory_count, "episodes": episode_count,
-    }
+    return {"indexed": total, "facts": facts, "records": records_count,
+            "memories": 0, "episodes": episodes}
 
 
 def _iter_ids(db, workspace_id: str, model, batch_size: int):
@@ -619,10 +410,3 @@ def _iter_ids(db, workspace_id: str, model, batch_size: int):
         last_id = batch[-1]
 
 
-job_handlers.register(JOB_EXTRACT, extract_memory)
-job_handlers.register(JOB_RECONCILE, reconcile_memory)
-job_handlers.register(JOB_EMBED, embed_memory)
-job_handlers.register(JOB_UNINDEX, unindex_memory)
-job_handlers.register(JOB_REINDEX, reindex_workspace)
-job_handlers.register(JOB_RESUME_RESEARCH, resume_research)
-job_handlers.register(JOB_REFRESH_RESEARCH, refresh_stale_research)

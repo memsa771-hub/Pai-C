@@ -1,0 +1,21 @@
+{
+  "playbook": "short_answers",
+  "conversation": [
+    {
+      "role": "user",
+      "content": "Not sure."
+    },
+    {
+      "role": "assistant",
+      "content": "It is okay to start small. Do you prefer making something or helping someone?"
+    },
+    {
+      "role": "user",
+      "content": "Making something."
+    },
+    {
+      "role": "assistant",
+      "content": "That gives us a useful starting point."
+    }
+  ]
+}

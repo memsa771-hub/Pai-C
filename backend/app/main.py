@@ -349,8 +349,8 @@ async def _fire_due():
                 # Counselor runtime used by student text and voice turns.
                 from app.services.pai import PAI_AGENT_NAME
                 if application_id and agent_name == PAI_AGENT_NAME and fired is not None:
-                    from app.pai_c.runtime import run_counselor
-                    asyncio.create_task(run_counselor(str(workspace.id), {
+                    from app.pai_c.orchestrator import handle_student_message
+                    asyncio.create_task(handle_student_message(str(workspace.id), {
                         "id": fired.id, "type": fired.type, "source": fired.source,
                         "target": fired.target, "payload": fired.payload,
                         "metadata": fired.metadata, "timestamp": fired.timestamp,
@@ -406,6 +406,8 @@ async def _timer_loop():
 async def lifespan(app: FastAPI):
     logger.info("LIFESPAN: starting")
     config.validate_startup()
+    from app.pai_c.playbooks.registry import BOOKS
+    logger.info("counselor_playbooks_loaded count=%d", len(BOOKS))
 
     # Human sign-in (Supabase) is core, not optional — warn loudly at boot
     # rather than let every login attempt fail with an obscure connection

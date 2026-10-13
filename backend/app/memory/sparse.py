@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """Sparse (lexical) encoding boundary.
 
-Exact terms carry most of the signal in this product: "IELTS 7.5", "TU Munich",
+Exact terms carry most of the signal in this product: "language test 7.5", "Example University",
 a program name, an application id, a date. Dense embeddings blur exactly those
 — two different band scores embed almost identically — so sparse retrieval is
 not an optimisation here, it is the half that gets identifiers right.

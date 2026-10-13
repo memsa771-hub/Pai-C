@@ -17,7 +17,6 @@ from __future__ import annotations
 
 import logging
 
-from app.jobs.service import job_handlers
 from app.files.storage import get_file_store
 from .content import ParsedDocument, Segment, segments_from_content
 from .parsers import (
@@ -181,9 +180,9 @@ async def parse_document_job(job, db) -> dict:
 
     # Extraction is its own durable job: parsing succeeded and must not be
     # redone because an LLM call failed.
-    from app.jobs.service import BackgroundJobService
+    from app.runtime.task_runtime import enqueue
 
-    BackgroundJobService(db).enqueue(
+    enqueue(db,
         job_type=JOB_DOCUMENT_EXTRACT,
         workspace_id=workspace_id,
         payload={"file_id": file_id},
@@ -210,9 +209,7 @@ async def extract_document_job(job, db) -> dict:
     it does for conversation.
     """
     from app.memory.candidates import MemoryCandidateService
-    from app.memory.field_definitions import (
-        ENTITY_BACKED_LEGACY_FIELDS, VaultFieldDefinitionService,
-    )
+    from app.memory.field_definitions import VaultFieldDefinitionService
     from app.memory.student_snapshot import StudentSnapshotService
     from .classify import authority_for, is_journey_document
     from .extractor import EXTRACTOR_VERSION, DocumentExtractionError, understand_document
@@ -240,10 +237,7 @@ async def extract_document_job(job, db) -> dict:
     # Existing state comes from the shared snapshot — never a second view of
     # "what we know", which would drift from the canonical one.
     snapshot = StudentSnapshotService(db).build(workspace_id)
-    definitions = [
-        d for d in VaultFieldDefinitionService(db).list_definitions()
-        if d.key not in ENTITY_BACKED_LEGACY_FIELDS
-    ]
+    definitions = VaultFieldDefinitionService(db).list_definitions()
     allowed_keys = {d.key for d in definitions}
     field_specs = [
         {"key": d.key, "data_type": d.data_type, "description": d.description}
@@ -362,9 +356,8 @@ async def extract_document_job(job, db) -> dict:
     }
     db.flush()
 
-    from app.jobs.service import BackgroundJobService
+    from app.runtime.task_runtime import enqueue
 
-    jobs = BackgroundJobService(db)
     if proposed:
         # Reconciliation is the EXISTING durable job — documents converge on
         # the same path as conversation rather than getting their own.
@@ -372,7 +365,7 @@ async def extract_document_job(job, db) -> dict:
         # the completion message describes real outcomes, not proposals.
         from app.memory.handlers import JOB_RECONCILE
 
-        jobs.enqueue(
+        enqueue(db,
             job_type=JOB_RECONCILE,
             workspace_id=workspace_id,
             payload={"candidate_ids": proposed, "document_file_id": file_id},
@@ -384,12 +377,14 @@ async def extract_document_job(job, db) -> dict:
 
     # Indexing is enqueued separately and AFTER extraction, so an index
     # failure can never roll back canonical writes.
-    jobs.enqueue(
-        job_type=JOB_DOCUMENT_INDEX,
-        workspace_id=workspace_id,
-        payload={"file_id": file_id},
-        idempotency_key=f"document.index:{file_id}:{artifact.content_sha256}",
-    )
+    from app.config import config
+    if config.PAI_SEMANTIC_RECALL_ENABLED:
+        enqueue(db,
+            job_type=JOB_DOCUMENT_INDEX,
+            workspace_id=workspace_id,
+            payload={"file_id": file_id},
+            idempotency_key=f"document.index:{file_id}:{artifact.content_sha256}",
+        )
 
     return {
         "extracted": True,
@@ -401,10 +396,10 @@ async def extract_document_job(job, db) -> dict:
 
 def enqueue_document_notify(db, workspace_id: str, file_id: str) -> None:
     """Queue the "I've finished reading your document" chat message."""
-    from app.jobs.service import BackgroundJobService
+    from app.runtime.task_runtime import enqueue
     from .extractor import EXTRACTOR_VERSION
 
-    BackgroundJobService(db).enqueue(
+    enqueue(db,
         job_type=JOB_DOCUMENT_NOTIFY,
         workspace_id=workspace_id,
         payload={"file_id": file_id},
@@ -429,7 +424,7 @@ async def notify_document_job(job, db) -> dict:
     from sqlalchemy import select
 
     from app.models import FileRecord
-    from app.pai_c.runtime import _post_response
+    from app.pai_c.orchestrator import handle_document_update
     from app.services.pai import PAI_AGENT_NAME
     from .progress import completion_message, learned_summary
 
@@ -451,7 +446,7 @@ async def notify_document_job(job, db) -> dict:
 
     summary = learned_summary(db, artifact)
     message = completion_message(record.filename, artifact.classification or "", summary)
-    event_id = await _post_response(
+    event_id = await handle_document_update(
         db, workspace_id, f"channel/{record.channel_name}", PAI_AGENT_NAME,
         message, depth=0, message_type="document_processed",
         metadata={"document_file_id": file_id},
@@ -508,8 +503,3 @@ async def unindex_document_job(job, db) -> dict:
     return {"deleted": deleted}
 
 
-job_handlers.register(JOB_DOCUMENT_PARSE, parse_document_job)
-job_handlers.register(JOB_DOCUMENT_EXTRACT, extract_document_job)
-job_handlers.register(JOB_DOCUMENT_INDEX, index_document_job)
-job_handlers.register(JOB_DOCUMENT_UNINDEX, unindex_document_job)
-job_handlers.register(JOB_DOCUMENT_NOTIFY, notify_document_job)

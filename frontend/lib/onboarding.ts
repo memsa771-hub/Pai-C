@@ -62,12 +62,12 @@ export interface OnboardingResult {
  * new question is never invisible just because the UI has not caught up.
  */
 export const FIELD_LAYOUT: Record<string, { half?: boolean; placeholder?: string }> = {
-  fullName: { placeholder: 'Ali Ahmed' },
-  preferredName: { placeholder: 'Ali' },
+  fullName: {},
+  preferredName: {},
   statusCategory: {},
-  nationality: { half: true, placeholder: 'Pakistani' },
+  nationality: { half: true },
   gender: { half: true },
   dateOfBirth: { half: true },
-  currentCountry: { half: true, placeholder: 'Pakistan' },
-  currentCity: { half: true, placeholder: 'Islamabad' },
+  currentCountry: { half: true },
+  currentCity: { half: true },
 };

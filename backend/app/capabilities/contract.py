@@ -47,6 +47,7 @@ class CapabilityContract:
     evidence_expectations: dict[str, Any] = field(default_factory=dict)
     run_status_hook: Callable[[Any, Any], None] | None = None
     provider: str = "native"
+    kind: str = "business"
 
     def __post_init__(self):
         object.__setattr__(self, "fallback_policy", FallbackPolicy(self.fallback_policy))

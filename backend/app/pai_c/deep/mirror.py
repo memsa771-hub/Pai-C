@@ -10,14 +10,13 @@ from app.config import config
 from app.pai_c.deep.analysis import _workspace_lock
 from app.pai_c.deep.context import build_context
 from app.pai_c.deep.mirror_schema import CounselorMirror
-from app.pai_c.deep.notebook import NotebookService
+from app.pai_c.memory import MemoryService
 from app.pai_c.deep.prompts import load_prompt
 from app.pai_c.deep.sensitive import check_notebook_before_mirror
-from app.pai_c.deep.turn_input import CounselorTurnInput, shared_history
-from app.pai_c.deep.usage import usage_callback
-from app.pai_c.posting import _post_response
-from app.inference.client import chat_completion
-from app.jobs.service import BackgroundJobService, job_handlers
+from app.pai_c.deep.turn_input import CounselorTurnInput
+from app.pai_c.posting import send_to_student
+from app.inference.gateway import complete as chat_completion, resolve_model
+from app.runtime.task_runtime import enqueue
 from app.journey import JourneyService
 from app.models import BackgroundJob, EventRecord, Workspace
 
@@ -31,7 +30,7 @@ def enqueue_mirror(db, turn: CounselorTurnInput) -> str | None:
         Workspace.id == turn.workspace_id, Workspace.status == "active").with_for_update())
     if workspace is None:
         return None
-    snapshot = NotebookService(db).get(turn.workspace_id)
+    snapshot = MemoryService(db).truth_map(turn.workspace_id)
     journey = JourneyService(db).ensure_counselor(turn.workspace_id)
     if not snapshot.notebook.mirror_ready or journey.current_stage != "DIRECTION":
         return None
@@ -51,7 +50,7 @@ def enqueue_mirror(db, turn: CounselorTurnInput) -> str | None:
             return attempts[-1].id
     attempt = len(attempts)
     try:
-        job = BackgroundJobService(db).enqueue(
+        job = enqueue(db,
             JOB_MIRROR, {"notebook_version": snapshot.version, "journey_id": journey.id,
                          "source_event_id": turn.source_event_id, "channel": turn.channel,
                          "mirror_attempt": attempt},
@@ -81,7 +80,7 @@ async def _publish(db, job, draft) -> dict:
     from app.pai_c.runtime import _voice_reply_metadata
 
     voice_metadata = _voice_reply_metadata({"metadata": source.metadata_}) if source else None
-    message = await _post_response(
+    message = await send_to_student(
         db, job.workspace_id, draft["channel"], "pai", mirror.spoken_reply(), 0,
         message_type="counselor_mirror",
         extra_payload={"mirror": mirror.model_dump(mode="json"), "version": draft["version"]},
@@ -107,7 +106,7 @@ async def mirror_job(job, db) -> dict:
                 return await _publish(db, job, draft)
             if draft.get("status") not in {"failed", "needs_discovery"}:
                 return {"status": "superseded"}
-        snapshot = NotebookService(db).get(job.workspace_id)
+        snapshot = MemoryService(db).truth_map(job.workspace_id)
         if (snapshot.version != payload.get("notebook_version")
                 or not snapshot.notebook.mirror_ready or journey.current_stage != "DIRECTION"):
             return {"status": "not_ready_or_stale"}
@@ -125,18 +124,18 @@ async def mirror_job(job, db) -> dict:
             student.id, student.timestamp, student.source)
         context = await build_context(db, job.workspace_id, turn)
         history = [{"role": item["role"], "content": item["content"]} for item in
-                   shared_history(db, turn, student.source.removeprefix("human:"),
+                   MemoryService(db).recent_turns(turn, student.source.removeprefix("human:"),
                                   limit=config.PAI_COUNSELOR_HISTORY_SIZE)]
         messages = [*history, {"role": "user", "content": turn.student_text}]
         prompt = load_prompt("mirror") + "\n\n" + context.text
         db.rollback()
         for attempt in range(2):
             db.rollback()
-            raw = await chat_completion(
-                api_key=config.PAI_API_KEY, model=config.PAI_MIRROR_MODEL,
+            raw = await chat_completion(role="mirror",
+                api_key=config.PAI_API_KEY, model=resolve_model("mirror"),
                 system_prompt=prompt, messages=messages, response_format={"type": "json_object"},
                 reasoning_effort=config.PAI_COUNSELOR_REASONING_EFFORT, base_url=config.PAI_BASE_URL,
-                usage_callback=usage_callback("mirror", config.PAI_MIRROR_MODEL, turn.source_event_id))
+                turn_id=turn.source_event_id)
             try:
                 mirror = CounselorMirror.model_validate(json.loads(raw))
                 break
@@ -151,7 +150,7 @@ async def mirror_job(job, db) -> dict:
         # Serialize publication with Notebook writes and workspace deletion.
         workspace = db.scalar(select(Workspace).where(
             Workspace.id == job.workspace_id, Workspace.status == "active").with_for_update())
-        current = NotebookService(db).get(job.workspace_id) if workspace else None
+        current = MemoryService(db).truth_map(job.workspace_id) if workspace else None
         journey = journeys.get(job.workspace_id, payload["journey_id"])
         if (current is None or current.version != checked.version or journey is None
                 or journey.current_stage != "DIRECTION"):
@@ -181,16 +180,14 @@ def _record_failure(db, job, status, notebook_version):
 
 def enqueue_confirmed_research(db, workspace_id: str, journey) -> str:
     version = journey.counselor_summary_draft["version"]
-    job = BackgroundJobService(db).enqueue(
+    job = enqueue(db,
         JOB_RESEARCH, {"journey_id": journey.id, "version": version}, workspace_id=workspace_id,
         idempotency_key=f"counselor:mirror-research:{workspace_id}:{journey.id}:{version}")
     return job.id
 
 
 async def confirmed_research_job(job, db) -> dict:
-    from app.pai_c.research_gateway import request_research
-    from app.memory.student_snapshot import StudentSnapshotService
-    from app.memory.permissions import capabilities_for_agent
+    from app.research.gateway import request_research
     from app.services.pai import PAI_ALLOWED_TOOLS, WorkspaceApi
     from app.tools import AUDIENCE_COUNSELOR, ToolContext
 
@@ -203,14 +200,14 @@ async def confirmed_research_job(job, db) -> dict:
         request = journey.research_request or {}
         if request.get("handoff_status") == "done":
             return {"status": "duplicate"}
-        snapshot = StudentSnapshotService(db).build(job.workspace_id)
+        snapshot = MemoryService(db).profile(job.workspace_id)
         workspace = db.get(Workspace, job.workspace_id)
         ctx = ToolContext(workspace_id=job.workspace_id, agent_name="pai",
             api=WorkspaceApi(job.workspace_id, workspace.password_hash),
             conversation=draft["channel"].removeprefix("channel/"),
             allowed_tools=frozenset({"operator.delegate"}) & frozenset(PAI_ALLOWED_TOOLS),
-            audience=AUDIENCE_COUNSELOR, granted_capabilities=capabilities_for_agent("pai"))
-        outcome = await request_research("roadmap_light", job.workspace_id, db=db, journey=journey,
+            audience=AUDIENCE_COUNSELOR, granted_capabilities=MemoryService(db).agent_capabilities("pai"))
+        outcome = await request_research("roadmap_light", job.workspace_id, trigger="mirror_confirmed", db=db, journey=journey,
             snapshot=snapshot, tool_context=ctx)
         if outcome is not None and not outcome.get("ok"):
             raise RuntimeError("Confirmed research handoff failed")
@@ -221,5 +218,3 @@ async def confirmed_research_job(job, db) -> dict:
         return {"status": "done", "delegated": bool(outcome)}
 
 
-job_handlers.register(JOB_MIRROR, mirror_job)
-job_handlers.register(JOB_RESEARCH, confirmed_research_job)

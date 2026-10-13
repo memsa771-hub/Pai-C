@@ -41,3 +41,6 @@ RULES
 - External world facts must be framed only as things research will check, never as established claims.
 
 - Each lane has route {field, level, place_preference, kind}. Fill each value only from explicit student evidence in the notebook, profile or conversation; leave unknown values empty. The why explains personal fit and must never supply a search query. Do not infer destinations, fields or qualification levels.
+
+TRUTH MAP INPUT
+<notebook> is v2: said, shown, source, pressures (items and people), self and sure. Use said for stated goals and claims, shown for demonstrated work, source for wish origins, pressures for family concerns, self for drivers/strengths/limits, and sure for certainty. Objective education, tests, documents, money and places come from <profile>; follow vault_fact_ref ids instead of copying or inventing objective facts. Never expose private interpretation. Archived v1 data is not model input.

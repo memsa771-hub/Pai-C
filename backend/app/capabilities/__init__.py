@@ -14,6 +14,8 @@ def get_capability_registry() -> CapabilityRegistry:
 
         _registry = CapabilityRegistry()
         load_first_party_capabilities(_registry)
+        from .system import load_system_capabilities
+        load_system_capabilities(_registry)
     return _registry
 
 

@@ -1,0 +1,21 @@
+{
+  "playbook": "family_conflict",
+  "conversation": [
+    {
+      "role": "user",
+      "content": "My family wants stability and I want independence."
+    },
+    {
+      "role": "assistant",
+      "content": "Both wishes matter. What does stability mean to them?"
+    },
+    {
+      "role": "user",
+      "content": "Being able to support myself."
+    },
+    {
+      "role": "assistant",
+      "content": "There may be a shared wish underneath: being able to stand on your own."
+    }
+  ]
+}

@@ -269,7 +269,7 @@ class JourneyCoordinator:
                 "title": "Internship search", "target_outcome": "Secure a suitable internship",
                 "current_objective": "Define internship targets and readiness",
             }
-        if re.search(r"\b(ielts|toefl|english requirement|language test)\b", lower):
+        if re.search(r"\b(english requirement|language test)\b", lower):
             return {
                 "journey_type": "skill_development", "relationship": "subgoal",
                 "goal_title": "Meet the English-language requirement",

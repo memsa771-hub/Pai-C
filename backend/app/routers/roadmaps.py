@@ -108,12 +108,12 @@ async def retry_roadmap(roadmap_id: str, network: str = Query(...), db=Depends(g
         audience=AUDIENCE_COUNSELOR,
         granted_capabilities=capabilities_for_agent(PAI_AGENT_NAME),
     )
-    from app.pai_c.research_gateway import request_research
+    from app.research.gateway import request_research
     from app.journey import JourneyService
     target = db.get(Roadmap, roadmap_id)
     journey = JourneyService(db).get(workspace_id, target.journey_id)
     delegated = await request_research("roadmap_light", workspace_id, db=db,
-        journey=journey, tool_context=context, roadmap_id=roadmap_id,
+        journey=journey, tool_context=context, roadmap_id=roadmap_id, trigger="route_retry",
         refresh_key=constraints["research_key"],
         refresh_candidate=((constraints.get("capability_input") or {}).get("brief") or {}).get("refresh_candidate"))
     row = db.get(Roadmap, roadmap_id)
@@ -139,25 +139,9 @@ async def focus_roadmap(roadmap_id: str, network: str = Query(...), db=Depends(g
     title = current.title
     result = _result(lambda: RoadmapService(db).focus(str(workspace.id), roadmap_id), db)
     if first_focus:
-        from app.pai_c.posting import _build_conversation_context, _post_response
-        from app.pai_c.deep.turn import run_deep_turn
-        from app.pai_c.deep.turn_input import CounselorTurnInput
-        from app.services.pai import PAI_AGENT_NAME, PAI_PRIMARY_CHANNEL
+        from app.pai_c.orchestrator import handle_roadmap_discussion
         try:
-            target = f"channel/{PAI_PRIMARY_CHANNEL}"
-            history = _build_conversation_context(db, str(workspace.id), target,
-                                                  PAI_AGENT_NAME, exclude_event_id="", max_chars=3000)
-            turn = CounselorTurnInput(
-                channel=target, workspace_id=str(workspace.id),
-                student_text=f"I opened the roadmap named {title}.",
-                attachments=(), session_id=None, source_event_id="",
-                timestamp=None, source=f"human:{workspace.owner_user_id}",
-            )
-            response = await run_deep_turn(db, turn, roadmap_id=roadmap_id, history=history)
-            opening = response.reply
-            if opening:
-                await _post_response(db, str(workspace.id), target,
-                                     PAI_AGENT_NAME, opening, depth=0)
+            await handle_roadmap_discussion(db, workspace, roadmap_id, title)
         except Exception as exc:
             # The persisted focus remains usable on the next ordinary turn.
             db.rollback()
@@ -228,7 +212,7 @@ async def add_custom_goal(body: CustomGoal, network: str = Query(...), db=Depend
                           x_workspace_token: str | None = Header(None), authorization: str | None = Header(None)):
     workspace = _authorized(db, network, x_workspace_token, authorization)
     workspace_id = str(workspace.id)
-    from app.pai_c.research_gateway import mirror_is_current, request_research
+    from app.research.gateway import mirror_is_current, request_research
     from app.memory.candidates import MemoryCandidateService
     from app.memory.reconciler import MemoryReconciler
     from app.journey import JourneyService
@@ -276,7 +260,7 @@ async def add_custom_goal(body: CustomGoal, network: str = Query(...), db=Depend
         granted_capabilities=capabilities_for_agent(PAI_AGENT_NAME),
     )
     delegated = await request_research("roadmap_light", workspace_id, db=db,
-        journey=journey, tool_context=context, roadmap_id=card["id"])
+        journey=journey, tool_context=context, roadmap_id=card["id"], trigger="student_route")
     row = db.get(Roadmap, card["id"])
     if delegated and delegated.get("ok"):
         row.execution_run_id = delegated["data"]["run_id"]

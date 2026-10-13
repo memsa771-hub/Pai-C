@@ -1,0 +1,21 @@
+{
+  "playbook": "setback",
+  "conversation": [
+    {
+      "role": "user",
+      "content": "I was rejected and feel disappointed."
+    },
+    {
+      "role": "assistant",
+      "content": "That disappointment makes sense. What feels hardest about it right now?"
+    },
+    {
+      "role": "user",
+      "content": "I had worked hard for it."
+    },
+    {
+      "role": "assistant",
+      "content": "Your effort mattered, even while the result hurts. We can take this at your pace."
+    }
+  ]
+}

@@ -627,16 +627,21 @@ def test_journey_intent_selects_relevant_records_and_readiness(db):
     assert career.readiness["stage"] == "career"
 
 
-def test_legacy_scalar_cannot_disagree_with_typed_record(db):
-    propose(db, "education", {"qualification_name": "BS CS", "result": {"gpa": 3.42, "gpa_scale": 4}})
+@pytest.mark.parametrize("operation", ["upsert", "retract"])
+def test_disabled_field_candidate_is_rejected_without_creating_fact(db, operation):
+    key = "synthetic.retired_attribute"
+    definition = VaultFieldDefinitionService(db).upsert_definition({
+        "key": key, "data_type": "number", "validation_schema": {"type": "number"}})
+    definition.enabled = False
+    db.flush()
     candidate = MemoryCandidateService(db).propose(
         workspace_id=db.info["workspace"], candidate_type="vault_fact",
-        key="education.cgpa", proposed_value=3.1, confidence=0.99,
-        source_type="conversation")
+        key=key, proposed_value=3.1, confidence=0.99, source_type="conversation", operation=operation)
     result = MemoryReconciler(db).reconcile(candidate)
     db.commit()
     assert not result.accepted and candidate.status == "rejected"
-    assert VaultService(db).get_fact(db.info["workspace"], "education.cgpa") is None
+    assert result.reason == f"no enabled field definition for {key}"
+    assert VaultService(db).get_fact(db.info["workspace"], key) is None
 
 
 def test_country_alias_has_one_canonical_readiness_requirement(db):
@@ -1014,18 +1019,16 @@ def test_a_graduation_year_the_student_never_stated_is_not_invented():
     assert _validate(raw, stated, set()).proposed_value["graduation_year"] == 2023
 
 
-def test_currency_symbols_are_stored_as_codes_not_glyphs():
-    turn = _turn("My budget is about EUR 12k per year.")
+@pytest.mark.parametrize("currency,expected", [
+    (" \u20ac ", "\u20ac"), ("eur", "EUR"), ("US$", "US$"),
+    (" somecoin ", "somecoin"), ("xyz", "XYZ"),
+])
+def test_currency_values_preserve_symbols_and_uppercase_three_letters(currency, expected):
+    turn = _turn("My budget is about 12k per year.")
     raw = {"candidate_type": "vault_fact", "key": "finance.budget", "quote": turn.user_text,
-           "proposed_value": {"amount": 12000, "currency": "€", "period": "per_year"}}
-    got = _validate(raw, turn, {"finance.budget"})
-    # "€" != "EUR" defeats every later budget comparison.
-    assert got.proposed_value == {"amount": 12000, "currency": "EUR", "period": "per_year"}
-    raw["proposed_value"] = {"amount": 12000, "currency": "eur"}
-    assert _validate(raw, turn, {"finance.budget"}).proposed_value["currency"] == "EUR"
-    # An unrecognized value is preserved, never guessed into a wrong code.
-    raw["proposed_value"] = {"amount": 12000, "currency": "somecoin"}
-    assert _validate(raw, turn, {"finance.budget"}).proposed_value["currency"] == "somecoin"
+           "proposed_value": {"amount": 12000, "currency": currency, "period": "per_year"}}
+    assert _validate(raw, turn, {"finance.budget"}).proposed_value == {
+        "amount": 12000, "currency": expected, "period": "per_year"}
 
 
 def test_a_zero_budget_is_never_stored_as_a_stated_figure():
@@ -1066,3 +1069,26 @@ def test_newer_models_get_the_token_parameter_they_accept():
         assert _token_limit_kwarg(legacy) == "max_tokens"
     for modern in ("gpt-5.4-mini", "gpt-5.5", "gpt-5.6-terra", "gpt-6-astra", "o3", "o4-mini"):
         assert _token_limit_kwarg(modern) == "max_completion_tokens"
+
+
+def test_retired_definition_preserves_vault_snapshot_profile_and_history(db):
+    from app.memory.student_snapshot import StudentSnapshotService
+    from app.memory.student_profile_view import StudentProfileView
+
+    key = "synthetic.retired_attribute"
+    fields = VaultFieldDefinitionService(db)
+    definition = fields.upsert_definition({"key": key, "data_type": "number",
+        "validation_schema": {"type": "number"}, "sensitivity": "normal"})
+    workspace = db.info["workspace"]
+    vault = VaultService(db)
+    vault.apply_fact(workspace, key, 12, "user_explicit")
+    definition.enabled = False
+    db.flush()
+    assert fields.get(key) is None
+    assert key not in fields.keys()
+    assert vault.get_fact(workspace, key).value == {"value": 12}
+    assert vault.snapshot(workspace)[key] == 12
+    assert vault.snapshot(workspace, include_sensitive=True)[key] == 12
+    assert vault.history(workspace, key)[0].value == {"value": 12}
+    assert StudentSnapshotService(db).build(workspace).facts[key]["value"] == 12
+    assert StudentProfileView(db).build(workspace)["facts"][key] == 12

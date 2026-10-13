@@ -23,7 +23,7 @@ from unittest.mock import patch
 from app.config import config
 from app.pai_c.deep.analysis import analyze_job, enqueue_turn_analysis
 from app.pai_c.deep.actions import dispatch_action
-from app.pai_c.deep.notebook import NotebookService
+from app.pai_c.memory import MemoryService
 from app.pai_c.deep.polish import contains_blocked_script
 from app.pai_c.deep.turn import run_deep_turn
 from app.pai_c.deep.turn_input import CounselorTurnInput
@@ -91,9 +91,15 @@ class RecordedModels:
         self._record("counselor")
         return json.dumps(self.turn["counselor"], ensure_ascii=False)
 
-    async def analyst(self, **_kwargs):
+    async def analyst(self, **kwargs):
         self._record("analyst")
-        return json.dumps(self.turn["analyst"], ensure_ascii=False)
+        output = self.turn["analyst"]
+        if "notebook" in output:
+            from scripts.eval.recorded_planner import recorded_patch
+            text = kwargs["messages"][0]["content"]
+            view = json.loads(text.split("<notebook>", 1)[1].split("</notebook>", 1)[0])
+            output = recorded_patch(output["notebook"], view)
+        return json.dumps(output, ensure_ascii=False)
 
     async def sensitive(self, **kwargs):
         self._record("sensitive")
@@ -242,7 +248,7 @@ def _metrics(persona: dict, turns: list[dict], notebook: dict, grader: dict | No
         grader["hidden_truths_captured"] = sum(
             item.get("captured") is True for item in grader["hidden_truths"]
             if isinstance(item, dict))
-    claims = notebook.get("claims") or []
+    claims = [item for item in notebook.get("said", []) if item.get("key") == "claim"]
     questions = [len(re.findall(r"[?\u061f]", turn["reply"])) for turn in turns]
     mirror_turn = next((turn["turn"] for turn in turns
                         if turn["action"].get("type") == "mirror"), None)
@@ -253,7 +259,7 @@ def _metrics(persona: dict, turns: list[dict], notebook: dict, grader: dict | No
         "hidden_truth_recall": (round(grader["hidden_truths_captured"] / len(persona["hidden_truths"]), 3)
                                 if grader and persona["hidden_truths"]
                                 and isinstance(grader.get("hidden_truths_captured"), int) else None),
-        "claims_probed_beyond_claimed": sum(item.get("evidence_level") in
+        "claims_probed_beyond_claimed": sum(item.get("level") in
                                              {"tried", "sustained", "proven"} for item in claims),
         "claims_total": (grader or {}).get("claims_total"),
         "goal_tested_before_mirror": (grader or {}).get("goal_tested_before_mirror"),
@@ -359,7 +365,7 @@ async def evaluate_persona(persona: dict, ledger: UsageLedger, *, live: bool,
                     with phase("memory_extractor"):
                         await student.extract_and_reconcile()
                     with student.factory() as db:
-                        notebook = NotebookService(db).get(student.workspace_id).notebook.model_dump(mode="json")
+                        notebook = MemoryService(db).truth_map(student.workspace_id).notebook.model_dump(mode="json")
                     transcript.extend([{"role": "student", "content": message},
                                        {"role": "counselor", "content": answer.reply}])
                     calls = ledger.calls[before:]
@@ -417,7 +423,7 @@ async def complete_mirror_pipeline(student):
         job=db.scalar(select(BackgroundJob).where(BackgroundJob.workspace_id==student.workspace_id,
             BackgroundJob.job_type==JOB_MIRROR,BackgroundJob.status=='pending'))
         if job is None: return {'status':'mirror_not_queued'}
-        with phase('mirror'), patch('app.pai_c.deep.mirror._post_response',student.post_response):
+        with phase('mirror'), patch('app.pai_c.deep.mirror.send_to_student',student.post_response):
             outcome=await mirror_job(job,db)
         job.status='succeeded'; db.commit()
         journey=JourneyService(db).ensure_counselor(student.workspace_id)
@@ -430,8 +436,13 @@ async def complete_mirror_pipeline(student):
         research_id=enqueue_confirmed_research(db,student.workspace_id,journey);db.commit()
         with phase('light_research'):
             await confirmed_research_job(db.get(BackgroundJob,research_id),db)
-            tasks=list(operator._running_tasks)
-            if tasks: await asyncio.gather(*tasks)
+            from app.runtime.task_runtime import run as dispatch_job
+            operator_jobs=db.scalars(select(BackgroundJob).where(
+                BackgroundJob.workspace_id==student.workspace_id,
+                BackgroundJob.job_type=='operator.run',BackgroundJob.status=='pending')).all()
+            for operator_job in operator_jobs:
+                await dispatch_job(operator_job,db)
+                operator_job.status='succeeded';db.commit()
         db.expire_all()
         rows=db.scalars(select(Roadmap).where(Roadmap.workspace_id==student.workspace_id)).all()
         result['roadmaps']=[{'lane':row.lane,'title':row.title,'status':row.generation_status,

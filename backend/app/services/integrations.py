@@ -229,8 +229,8 @@ def ingest_external_message(
         # The Counselor and workflow runs never poll, so dispatch them after
         # the inbound event is committed.
         try:
-            from app.pai_c.runtime import run_counselor
-            asyncio.run(run_counselor(str(workspace.id), snapshot))
+            from app.pai_c.orchestrator import handle_student_message
+            asyncio.run(handle_student_message(str(workspace.id), snapshot))
         except Exception:
             logger.exception("integrations: counselor invoke failed")
         try:
