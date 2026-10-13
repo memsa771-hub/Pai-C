@@ -35,6 +35,9 @@ WATCHED_PREFIXES = (
     "app.deadlines",
 )
 
+# app.main is the composition root and imports every router; following it would make everything "reachable".
+REACHABILITY_STOPS = ("app.main",)
+
 FATE_VALUES = ("keep", "read-only", "retire")
 
 HTTP_METHODS = {"get", "post", "put", "patch", "delete", "head", "options"}
@@ -90,6 +93,8 @@ def _counsellor_paths(edges: dict[str, set[str]], roots: list[str]) -> dict[str,
     queue = deque(roots)
     while queue:
         current = queue.popleft()
+        if current in REACHABILITY_STOPS:
+            continue  # reachable itself, but its imports are not followed
         for nxt in sorted(edges.get(current, ())):
             if nxt not in parent:
                 parent[nxt] = current
@@ -182,7 +187,7 @@ def build_inventory(app_root: Path) -> list[InventoryRow]:
     frontend_files: dict[str, str] | None = None
 
     rows: list[InventoryRow] = []
-    for name in sorted(modules):
+    for name in sorted(m for m in modules if is_watched(m)):
         imported_by = sorted(importers[name])
         row = InventoryRow(
             module=name,
@@ -216,6 +221,10 @@ Fates live in `FATES` in that script.
 
 Retire means switched off and deleted later, after the pilot, each removal in its own PR. Nothing is deleted by this inventory.
 A Counsellor-used module cannot be retired without the Counsellor lead's sign-off in the PR.
+
+Limits: reachability follows imports only, and stops at `app.main`. In-process HTTP calls (e.g. `app.services.pai` calling routes through the ASGI app) and frontend calls outside the watched routers are not traced, so those are checked by reading the code when fates are decided.
+
+Only watched modules get a row: the PAI-relevant old-OS modules (operator, escalations, deadlines routers and services, capabilities, plugins, jobs, research, documents, deadlines). "Imported by" and reachability are computed over the whole import graph.
 
 "Used by Counsellor" means a direct importer is a Counsellor root (a module under `app.pai_c` or a router named `app.routers.counselor*`). "Reachable from Counsellor" is transitive; "Counsellor path" is one shortest import chain from a root.
 """

@@ -54,27 +54,56 @@ def test_counsellor_reachability_is_transitive(tmp_path):
     _write(app / "memory" / "x.py", "from app.documents import y\n")
     _write(app / "documents" / "__init__.py")
     _write(app / "documents" / "y.py")
-    _write(app / "orphan.py")
+    _write(app / "documents" / "orphan.py")
     rows = {r.module: r for r in build_inventory(app)}
     y = rows["app.documents.y"]
     assert y.used_by_counsellor is False
     assert y.reachable_from_counsellor is True
     assert y.counsellor_path[0].startswith("app.pai_c")
     assert y.counsellor_path[-1] == "app.documents.y"
-    assert rows["app.memory.x"].used_by_counsellor is True
-    orphan = rows["app.orphan"]
+    orphan = rows["app.documents.orphan"]
     assert orphan.reachable_from_counsellor is False
     assert orphan.counsellor_path == []
     assert orphan.used_by_counsellor is False
 
 
+def test_only_watched_modules_get_rows(tmp_path):
+    app = _synthetic_app(tmp_path)
+    _write(app / "pai_c" / "__init__.py", "from app.memory import x\n")
+    _write(app / "memory" / "__init__.py")
+    _write(app / "memory" / "x.py", "from app.documents import y\n")
+    _write(app / "documents" / "__init__.py")
+    _write(app / "documents" / "y.py")
+    _write(app / "deadlines_x.py")
+    rows = {r.module: r for r in build_inventory(app)}
+    assert "app.documents.y" in rows
+    assert "app.memory.x" not in rows and "app.pai_c" not in rows
+    assert "app.deadlines_x" not in rows and "app" not in rows
+    # imported_by still comes from the whole graph, including unwatched importers
+    assert rows["app.documents.y"].imported_by == ["app.memory.x"]
+
+
+def test_reachability_stops_at_app_main(tmp_path):
+    app = _synthetic_app(tmp_path)
+    _write(app / "pai_c" / "__init__.py", "from app import main\n")
+    _write(app / "main.py", "from app.documents import z\n")
+    _write(app / "documents" / "__init__.py")
+    _write(app / "documents" / "z.py")
+    rows = {r.module: r for r in build_inventory(app)}
+    assert rows["app.documents.z"].used_by_counsellor is False
+    assert rows["app.documents.z"].reachable_from_counsellor is False
+    assert rows["app.documents.z"].counsellor_path == []
+    assert "app.main" in os_inventory.REACHABILITY_STOPS
+
+
 def test_counselor_router_is_a_root(tmp_path):
     app = _synthetic_app(tmp_path)
     _write(app / "routers" / "__init__.py")
-    _write(app / "routers" / "counselor_chat.py", "from app import helper\n")
-    _write(app / "helper.py")
+    _write(app / "routers" / "counselor_chat.py", "from app.documents import helper\n")
+    _write(app / "documents" / "__init__.py")
+    _write(app / "documents" / "helper.py")
     rows = {r.module: r for r in build_inventory(app)}
-    assert rows["app.helper"].used_by_counsellor is True
+    assert rows["app.documents.helper"].used_by_counsellor is True
 
 
 def test_frontend_calls_for_watched_router(tmp_path):
@@ -92,7 +121,7 @@ def test_frontend_calls_for_watched_router(tmp_path):
     _write(tmp_path / "frontend" / "node_modules" / "x" / "skip.ts", "v1/deadlines")
     rows = {r.module: r for r in build_inventory(app)}
     assert rows["app.routers.deadlines"].frontend_calls == ["frontend/lib/api.ts"]
-    assert rows["app.routers.other"].frontend_calls == []
+    assert "app.routers.other" not in rows
 
 
 def test_frontend_missing_and_bare_v1(tmp_path):
@@ -122,15 +151,14 @@ def test_prefix_group_does_not_match_lookalike():
 
 def test_fates_are_copied(tmp_path, monkeypatch):
     app = _synthetic_app(tmp_path)
-    _write(app / "thing.py")
-    monkeypatch.setitem(os_inventory.FATES, "app.thing", Fate("retire", "slice 3", "old only"))
+    _write(app / "documents" / "thing.py")
+    monkeypatch.setitem(os_inventory.FATES, "app.documents.thing", Fate("retire", "slice 3", "old only"))
     rows = {r.module: r for r in build_inventory(app)}
-    assert (rows["app.thing"].fate, rows["app.thing"].replaced_by, rows["app.thing"].reason) == (
+    assert (rows["app.documents.thing"].fate, rows["app.documents.thing"].replaced_by, rows["app.documents.thing"].reason) == (
         "retire",
         "slice 3",
         "old only",
     )
-    assert rows["app"].fate == ""
 
 
 def test_render_formats_cells():
