@@ -10,7 +10,7 @@ from sqlalchemy import engine_from_config, pool
 # Import all models so Alembic can detect them
 from app.database import Base
 from app.config import normalize_database_url
-from app.os.db import OsBase
+from app.os.db import OS_SCHEMA, OsBase
 from app.models import (  # noqa: F401
     Agent,
     Channel,
@@ -35,6 +35,13 @@ if config.config_file_name is not None:
 target_metadata = [Base.metadata, OsBase.metadata]
 
 
+def include_name(name, type_, parent_names):
+    # Autogenerate reflects only the default schema (None) and os, not e.g. DBOS's `dbos` schema.
+    if type_ == "schema":
+        return name in (None, OS_SCHEMA)
+    return True
+
+
 def run_migrations_offline() -> None:
     """Run migrations in 'offline' mode — generates SQL without connecting."""
     url = config.get_main_option("sqlalchemy.url")
@@ -43,6 +50,7 @@ def run_migrations_offline() -> None:
         target_metadata=target_metadata,
         literal_binds=True,
         include_schemas=True,
+        include_name=include_name,
         dialect_opts={"paramstyle": "named"},
     )
     with context.begin_transaction():
@@ -61,6 +69,7 @@ def run_migrations_online() -> None:
             connection=connection,
             target_metadata=target_metadata,
             include_schemas=True,
+            include_name=include_name,
         )
         with context.begin_transaction():
             context.run_migrations()
