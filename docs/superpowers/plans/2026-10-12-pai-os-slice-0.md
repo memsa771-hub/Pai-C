@@ -121,7 +121,7 @@ path = "app.os"
 depends_on = []
 ```
 
-Write `backend/app/os/CLAUDE.md` with the 13 invariants from spec 3.1, verbatim, plus: "Done means the task's tests pass and the PR template is complete." Write root `CLAUDE.md`: never paste keys or real student data into Claude; one component per PR; rebase on `dev` before merge; OS code only in `backend/app/os`; shared files need a reviewer from each team; run `tach check` and `pytest tests/os` before pushing. `requirements-dev.txt`: `tach==0.35.3`, `pytest>=8`.
+Write `backend/app/os/CLAUDE.md` with the 13 invariants from spec 3.1, verbatim, plus: "Done means the task's tests pass and the PR template is complete." Write root `CLAUDE.md`: never paste keys or real student data into Claude; one component per PR; task branches start from and rebase on `pai-os`, and `pai-os` merges into `dev` only at slice gates; OS code only in `backend/app/os`; shared files need a reviewer from each team; run `tach check` and `pytest tests/os` before pushing. `requirements-dev.txt`: `tach==0.35.3`, `pytest>=8`.
 
 - [ ] **Step 4: Run tests** → PASS. Also `cd backend && tach check` → "All modules validated".
 - [ ] **Step 5: Commit** `feat(os): package skeleton, settings, tach boundary, CLAUDE.md`

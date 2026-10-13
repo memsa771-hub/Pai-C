@@ -1,0 +1,10 @@
+source_roots = ["."]
+root_module = "dependenciesonly"
+
+[[modules]]
+path = "<root>"
+depends_on = ["app.os"]
+
+[[modules]]
+path = "app.os"
+depends_on = []
