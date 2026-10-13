@@ -12,6 +12,8 @@
 
 ## Global Constraints
 
+- Branches: integration branch `pai-os` (created from `dev`). Each task is built on its own branch `os/s0-tN-<name>` off `pai-os` and merged into `pai-os` by a reviewed pull request. `pai-os` merges into `dev` only after the Slice 0 gate passes; tag that merge `os-slice-0`. Merge `dev` into `pai-os` before starting each task.
+
 - Python 3.12 (matches `backend/Dockerfile`). PostgreSQL 16.
 - Exact pins: `dbos==3.2.0`, `pydantic-ai-slim[openai]==2.55.0`, `tach==0.35.3` (dev).
 - New product code only under `backend/app/os/`. Shared files touched by this plan, each needing one reviewer from each team: `backend/requirements.txt`, `backend/alembic/env.py`, `backend/alembic.ini`, `docker-compose.prod.yml`, root `CLAUDE.md`, `.github/*`.
@@ -184,7 +186,7 @@ def test_schema_is_frozen():
 
 **Files:**
 - Create: `backend/app/os/db.py`, `backend/alembic/versions_os/os_0001_schema.py`, `backend/scripts/check_alembic_heads.py`, `backend/tests/os/conftest.py`
-- Modify: `backend/alembic.ini` (`version_locations = %(here)s/alembic/versions %(here)s/alembic/versions_os`), `backend/alembic/env.py` (target metadata list `[Base.metadata, OsBase.metadata]`, `include_schemas=True`), `docker-compose.prod.yml:115` (`["alembic", "upgrade", "heads"]`)
+- Modify: `backend/alembic.ini` (`version_locations = %(here)s/alembic/versions %(here)s/alembic/versions_os`), `backend/alembic/env.py` (target metadata list `[Base.metadata, OsBase.metadata]`, `include_schemas=True`), `docker-compose.prod.yml` migrate service `entrypoint` → `["alembic", "upgrade", "heads"]`
 - Test: `backend/tests/os/test_db.py`
 
 **Interfaces:**
