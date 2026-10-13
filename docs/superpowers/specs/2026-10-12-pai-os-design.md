@@ -2,6 +2,7 @@
 
 Status: approved · 2026-10-12 · Owner: MSAQLAIN
 Supersedes: PAI OS Architecture Draft 1 and Draft 2 (HTML page), the first FigJam board, and any conflicting wording in the Build Plan, Explained, Approval and Setup docs. Where those documents disagree with this spec, this spec wins.
+Visual plan: "PAI OS Final Plan Review" FigJam board — https://www.figma.com/board/sEWRgciL9Quwmklh492qUW (where it disagrees with this spec, this spec wins).
 
 ---
 
