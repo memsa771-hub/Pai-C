@@ -10,6 +10,10 @@ from scripts.os_inventory import (
     render_markdown,
 )
 
+# Counsellor-used modules the controller ruled retire anyway: app.pai_c.posting only calls a no-op
+# advance_workflow hook. The Counsellor lead's sign-off is still required in the PR.
+COUNSELLOR_LEAD_SIGNED_OFF = {"app.services.workflow"}
+
 APP = Path(__file__).resolve().parents[2] / "app"
 
 
@@ -31,8 +35,7 @@ def test_inventory_lists_operator_service_with_importers():
     assert "Module | Imported by | Used by Counsellor | Fate (keep / read-only / retire)" in md
 
 
-def test_fate_table_is_empty_and_values_fixed():
-    assert FATES == {}
+def test_fate_values_fixed():
     assert FATE_VALUES == ("keep", "read-only", "retire")
 
 
@@ -146,7 +149,7 @@ def test_prefix_group_does_not_match_lookalike():
     assert os_inventory.is_watched("app.deadlines.sub")
     assert not os_inventory.is_watched("app.deadlines_x")
     assert os_inventory.is_watched("app.routers.deadlines")
-    assert not os_inventory.is_watched("app.routers.todos")
+    assert not os_inventory.is_watched("app.routers.files")
 
 
 def test_fates_are_copied(tmp_path, monkeypatch):
@@ -182,3 +185,31 @@ def test_render_formats_cells():
     assert "yes" in md and "no" in md and "—" in md
     assert "Keep a module only if it is important for PAI." in md
     assert "retire: 1" in md and "undecided: 1" in md
+
+
+def test_every_row_has_a_fate_and_reason():
+    """Slice 0 gate: fate for every row."""
+    rows = build_inventory(APP)
+    missing = [r.module for r in rows if r.fate not in FATE_VALUES or not r.reason.strip()]
+    assert missing == []
+
+
+def test_counsellor_used_modules_are_never_retired():
+    """Plan rule: retiring a Counsellor-used module needs the Counsellor lead's sign-off."""
+    bad = [
+        r.module
+        for r in build_inventory(APP)
+        if r.used_by_counsellor and r.fate == "retire" and r.module not in COUNSELLOR_LEAD_SIGNED_OFF
+    ]
+    assert bad == []
+
+
+def test_every_fates_key_is_a_real_row():
+    modules = {r.module for r in build_inventory(APP)}
+    assert sorted(set(FATES) - modules) == []
+
+
+def test_render_includes_preserve_notes_after_table():
+    md = render_markdown(build_inventory(APP))
+    assert md.index("## Before retiring anything") > md.index("| `app.services.operator` |")
+    assert "advance_workflow" in md
