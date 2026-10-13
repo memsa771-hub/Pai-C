@@ -116,7 +116,7 @@ services:
   migrate:
     <<: *backend-image
     environment: *backend-env
-    entrypoint: ["alembic", "upgrade", "head"]
+    entrypoint: ["alembic", "upgrade", "heads"]
     depends_on:
       postgres: {condition: service_healthy}
     restart: "no"

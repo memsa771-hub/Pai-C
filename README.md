@@ -93,7 +93,7 @@ configured, set `BACKEND_IMAGE_TARGET=cloud` in `.env` before building. The
 fallback. Both backend and worker use the same selected image. Revert to
 `BACKEND_IMAGE_TARGET=browser` if local browser execution is needed.
 
-The one-shot `migrate` service runs `alembic upgrade head`. Backend and worker
+The one-shot `migrate` service runs `alembic upgrade heads`. Backend and worker
 start only after PostgreSQL is healthy and the migration succeeds. A failed
 migration therefore stops deployment.
 
