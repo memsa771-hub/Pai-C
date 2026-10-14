@@ -5,7 +5,7 @@ from scripts.os_inventory import (
     FATE_VALUES,
     FATES,
     Fate,
-    RETIRE_PENDING_COUNSELLOR_LEAD_SIGNOFF,
+    COUNSELLOR_TOUCHING_RETIRES,
     InventoryRow,
     build_inventory,
     render_markdown,
@@ -191,18 +191,17 @@ def test_every_row_has_a_fate_and_reason():
     assert missing == []
 
 
-def test_counsellor_used_retires_are_pending_signoff():
+def test_counsellor_used_retires_are_listed_as_signed_off():
     """Plan rule: retiring a Counsellor-used module needs the Counsellor lead's sign-off in the PR."""
     rows = {r.module: r for r in build_inventory(APP)}
     used_retires = {m for m, r in rows.items() if r.used_by_counsellor and r.fate == "retire"}
-    assert used_retires <= set(RETIRE_PENDING_COUNSELLOR_LEAD_SIGNOFF)
+    assert used_retires <= set(COUNSELLOR_TOUCHING_RETIRES)
 
 
-def test_signoff_set_members_are_retire_rows_with_pending_reason():
+def test_touching_retires_members_are_retire_rows():
     rows = {r.module: r for r in build_inventory(APP)}
-    for module in RETIRE_PENDING_COUNSELLOR_LEAD_SIGNOFF:
+    for module in COUNSELLOR_TOUCHING_RETIRES:
         assert rows[module].fate == "retire", module
-        assert rows[module].reason.endswith("Pending Counsellor lead sign-off."), module
 
 
 def test_every_fates_key_is_a_real_row():
@@ -218,8 +217,10 @@ def test_render_includes_preserve_notes_after_table():
 
 def test_signoff_section_precedes_preserve_notes():
     md = render_markdown(build_inventory(APP))
-    assert md.index("## Retire pending Counsellor lead sign-off") < md.index("## Before retiring anything")
-    assert "app.services.workflow" in md.split("## Retire pending Counsellor lead sign-off")[1]
+    heading = "## Retires that touch Counsellor code or screens"
+    assert md.index(heading) < md.index("## Before retiring anything")
+    assert "Signed off 2026-10-14" in md.split(heading)[1]
+    assert "app.routers.timers" in md.split(heading)[1]
 
 
 def test_frontend_calls_follow_one_level_reexport(tmp_path):
