@@ -1452,3 +1452,221 @@ R1 adds only deterministic validation, storage metadata and read-only projection
   separately tracked requests in one message were not specified.
 - Offline tests prove contracts, privacy and mechanics, not live model extraction
   or counseling quality. No live model/API evaluation or paid calls were made.
+
+## Core R2 — Conversation Value Controller and opening
+
+Implemented on `pai-c`, starting at `0d49fb0`. The three supplied FigJam boards
+were read; R2 implements only the boxes below. Mirror v2, possibility discovery,
+exploration roadmaps and OS life events remain outside this round.
+
+| Board box | Owner/code |
+| --- | --- |
+| A: Safety gate / Every turn | `backend/app/pai_c/policy/classifier.py`, `policy/prompts/turn_classifier.md`; replaces the separate safety call |
+| A: Conversation Value Controller; B: What does the student need now? | `policy/controller.py`, `policy/state.py`, `policy/decision_table.json`, `policy/areas_policy.json` |
+| A: Voice LLM writes the reply | `voice/prompts/voice.md` v5, `deep/context.py`, `deep/turn.py` |
+| A: Guards | `deep/turn.py`, existing `voice/guards.py` and `deep/polish.py` |
+| B: Came with a request — help, then invite | Classifier request -> `deep/noted_questions.py`; answer/invite instructions in policy/actions |
+| B: Sharing / gap / pattern / answer / deciding / periodic summary | First-match decision rows below and their action instruction files |
+| B: Picture clear | Controller mirror decision -> existing readiness validation and Mirror job, unchanged |
+| B: Opening — tell me about yourself | `memory/onboarding.py` named enqueue -> `pai_c/opening.py` -> Messenger; existing frontend working indicator |
+| C: Core Truth Map | Existing R1 map, computed coverage and latest valid Planner plan; no R2 map shape change |
+
+### Hermetic tests
+
+`tests/conftest.py` fails an unpatched provider-client creation and a Session bound
+to the application's database engine or a non-test database. Tests bind isolated
+SQLite engines; production-only API surface tests run separately with fake inputs.
+Verification launchers disable dotenv loading and block external socket connections.
+
+The guard exposed two database-dependency leaks:
+`AuthBoundaryTests.test_desktop_session_refresh_rotates_previous_pai_token` and
+`test_voice_route_is_mounted`. Both now override the request DB dependency with a
+test double and restore dependency overrides afterward. The requested
+`test_answered_now_uses_actual_posted_reply_and_is_idempotent` already inherited a
+global safety fake; it now explicitly fakes the classifier at its own call site.
+Three boundary regression tests prove provider rejection, production-session
+rejection, and acceptance of a factory bound to the test database.
+
+### Classifier, latency and request ownership
+
+One sequential classification precedes the controller and Voice. Input is only
+the latest student text plus four prior text turns. Strict, extra-forbidden
+validation covers safety, intent, emotion, request, mentioned areas and declined
+area. Error/invalid JSON/timeout uses the committed `classifier_fallback.json`
+(none/sharing/neutral, no request or areas); logs contain error type, not text.
+The Voice retains its safety instruction. Classified care routes directly to the
+existing wellbeing reply and fallback, with no discarded ordinary Voice call.
+
+| Config | Default / resolution |
+| --- | --- |
+| `PAI_CLASSIFIER_MODEL` | safety -> analyst -> base model fallback |
+| `PAI_CLASSIFIER_REASONING_EFFORT` | low |
+| `PAI_CLASSIFIER_TIMEOUT_MS` | 4000 |
+| `PAI_SUMMARY_EVERY_TURNS` | 4 |
+| `PAI_STATEMENT_FALLBACK_REPLY` | Founder-approved statement below |
+| `PAI_OPENING_FALLBACK_REPLY` | Founder-approved named opening |
+
+`classifier_ms` is logged beside existing turn span timings. The sequential
+classifier can add up to its configured four-second timeout before the Voice.
+No live latency or quality result is claimed. Requests are inserted before Voice
+with source-event uniqueness; after an answer_request reply is actually posted,
+non-research requests become answered_now with that reply's validated event id.
+The Voice's note_question cannot add a second row for the same student event.
+
+### Committed decision and area policy
+
+Authoritative executable data (including the full no_repeat post-check):
+[decision_table.json](../../backend/app/pai_c/policy/decision_table.json) and
+[areas_policy.json](../../backend/app/pai_c/policy/areas_policy.json).
+Tests edit each file in isolation and demonstrate changed decisions with unchanged
+Python code. First match wins in this exact order:
+
+| rule_id | Condition | Action | Question allowed |
+| --- | --- | --- | --- |
+| care | safety concern/urgent | care | false |
+| adjust | pushback | adjust | true |
+| answer | request and asking_info/asking_task | answer_request, topic request | needs_context |
+| guide | deciding | guide | true |
+| mirror | mirror_ready | mirror | false |
+| summarize | summary_due | summarize | true |
+| listen | stressed/frustrated | listen_reflect | false |
+| rest | previous two replies asked questions | insight if available, otherwise listen_reflect | false |
+| choice | short_reply streak >=2 and askable area | ask_choice | true |
+| ask | askable area | ask | true |
+| default | always | insight if available, otherwise listen_reflect | false |
+
+Area priority: status, interests, history, family_social, values, strengths,
+pressures, sure. Choose uncovered candidates: latest mentioned area first,
+previous mentioned area second, then priority. Declined areas cool down for 12
+student messages. Family/social waits for three messages and pressures for four,
+unless mentioned in the latest or previous message. The committed topic texts
+are verbatim. Summary requires two covered areas and the configured cadence;
+invite is once per workspace and only while fewer than three areas are covered.
+Latest plan selection retains the existing validation and expiration checks.
+
+The founder-approved `no_repeat` post-check compares action AND topic (null equals
+null). It never changes question_allowed from false to true. Repeated statement
+reflection becomes insight when available, otherwise remains a reflection;
+repeated insight becomes reflection. Repeated ask/ask_choice uses another askable
+area, or becomes an insight/reflection without a question. Repeated adjust uses
+ask or summary; repeated summary uses ask or insight/reflection. Care, mirror,
+answer_request and guide are exempt. The rule suffix `+no_repeat` is recorded only
+when the decision changes.
+
+### Voice instructions, guards and log
+
+`policy/actions/` contains answer_request, invite, listen_reflect, insight, ask,
+ask_choice, summarize, guide, adjust, mirror, and opening. Care uses the existing
+wellbeing prompt. The insight text uses `insight_candidate` from `<decision>` as
+approved; there is no `<plan>` block. `<decision>` carries the instruction, topic
+text/request, question permission, avoid_questions and insight_candidate.
+Playbooks remain style notes. Voice v5's prefix is verbatim; the scope, grounding,
+language, safety and output sections are preserved. The runtime prompt and prompt
+reference document match.
+
+The controller chooses WHAT; Voice chooses HOW. A prohibited question is removed
+by sentence boundaries; if nothing remains, one retry receives the exact
+question_retry instruction. Language and repetition checks share that same retry
+allowance: at most two Voice calls in total. Care bypasses these guards.
+If both drafts contain only questions, the configured statement is posted:
+
+> Thank you for sharing that with me. I'm taking it in, and I'll keep it in mind as we continue.
+
+Startup rejects an empty statement, Unicode question marks, or blocked script.
+`statement_fallback` is stored both in guard_violations and the decision object;
+it is never used for care. Offline tests verify the actual posted text and log.
+
+Migration **109**, down_revision **108**, adds nullable JSONB `decision` to
+`pai_counselor_turn_decisions`. Downgrade drops only that column. Existing rows
+remain. The decision stores rule/action/topic/flags and the permitted signal
+metadata, never student text; request topic is the literal `request`.
+Session export includes the decision alongside each event's existing decision
+records. Roundtrip migration and exporter tests pass.
+
+### Founder replay (corrected replay semantics)
+
+Fixture: `backend/tests/fixtures/policy/founder_test_1.json`. The initial opening
+counts as a question. Subsequent question history uses replayed decisions, not
+old stored PAI replies. Coverage, signals and insight availability are the
+founder's fixed inputs.
+
+| Turn | rule_id | action | topic | question_allowed |
+| --- | --- | --- | --- | --- |
+| S1 | ask | ask | history | true |
+| S2 | rest | insight | null | false |
+| S3 | ask | ask | interests | true |
+| S4 | summarize | summarize | null | true |
+| S5 | adjust | adjust | null | true |
+| S6 | rest | insight | null | false |
+| S7 | choice | ask_choice | status | true |
+
+S5 is the explicitly permitted adjust exception to the three-question assertion.
+S7 differs from S6; no_repeat unit tests cover statement preservation and all
+action branches, including permitted repeats.
+
+### Opening lifecycle
+
+Workspace creation creates an empty canonical channel, without a seeded greeting
+or suggestion chips. First successful onboarding completion stamps onboarded_at
+and enqueues `counselor.opening` in the same transaction, using a per-workspace
+idempotency key. The existing Task Runtime dispatches the system capability.
+The job uses the existing workspace lock, checks for an existing PAI message,
+builds context, ends the read transaction, and calls the Voice once per attempt.
+It rechecks before posting through Messenger. Existing queue retries apply; the
+last failed attempt posts the configured opening with the onboarding name.
+An existing PAI message suppresses both generation and posting. The frontend
+uses its existing working indicator while the canonical conversation is empty,
+then renders the delivered opening. The identity block now recognizes the real
+`identity.*` Vault keys. Tests cover queue-once, posting-once, existing-message
+suppression, retry/fallback, prefixed identity and empty-to-opening UI.
+
+### Model calls and verification
+
+| Path | Before R2 | After R2 |
+| --- | --- | --- |
+| Normal human foreground | safety + Voice, concurrently | classifier + Voice, sequentially |
+| Care foreground | safety plus discarded normal Voice, then wellbeing Voice | classifier + wellbeing Voice |
+| Guard repair | separate repair paths could reach three Voice calls | at most one shared Voice retry |
+| Background Planner / extractor | existing calls | unchanged |
+| First onboarding opening | static seeded message | one Voice call per job attempt; deterministic final fallback |
+
+| Check | Result |
+| --- | --- |
+| Backend baseline | 1036 passed, 3 skipped, 8 subtests |
+| Hermetic test commit | 1039 passed, 3 skipped, 8 subtests |
+| Step A full backend | 1080 passed, 3 skipped, 8 subtests |
+| Step B final backend | 1088 passed, 3 skipped, 8 subtests |
+| Separate production security | 3 passed, 4 subtests (covers the three skips) |
+| Frontend | 24 passed in 9 files; baseline 23 in 8 |
+| Production frontend build | PASS |
+| Import every app module | 265/265, no unresolved dynamic imports |
+| Dedicated architecture boundaries | 9 passed |
+| Dedicated PAI OS contracts | 2 passed |
+
+Full suite Step A took 228.74s; Step B took 314.82s. The three existing SQLite
+expression-index reflection warnings remain; their migration assertions pass.
+All model providers were fake; no real model calls or live evaluation took place.
+Only the requested settings were appended to `.env.example`; `.env` was untouched.
+
+Commits: `f35e24a` hermetic tests; `89eaab3` Step A; `2fcaf90` Step B.
+The following documentation commit records final verification.
+
+### Open questions and findings for later
+
+- No remaining counseling-policy ambiguity after the founder's clarification of
+  insight_candidate, no_repeat/replay, and the statement fallback.
+- Local startup is blocked: Docker Desktop reports **unable to start**. It was
+  launched from its installed location and rechecked. The requested fresh
+  `pai-c-r2` deployment and migration 109 on that database remain unverified;
+  no existing volumes were removed. Start its Linux engine, then use
+  `docker compose --env-file .env -p pai-c-r2 -f docker-compose.prod.yml -f docker-compose.local.yml up --build -d`.
+- Offline passes do not establish model conversation quality. Founder live testing
+  remains necessary and was not performed by the agent.
+- Opening retries use the existing queue policy. A worker killed on its final
+  leased attempt can still exhaust retries without executing a fallback; no
+  queue lifecycle redesign was specified in R2.
+- Existing compose files enumerate their environment pass-throughs. New R2
+  configuration uses defaults in that deployment until those pass-throughs are
+  explicitly added; R2 only requested new values in config and `.env.example`.
+- Mirror/roadmap World-aware prompts and multi-request intake from the R1
+  findings remain later work. The R1 prefixed-identity finding is fixed here.
