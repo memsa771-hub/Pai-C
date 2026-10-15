@@ -58,13 +58,13 @@ jobs:
         # -rs prints the reason for any skipped test.
         run: python -m pytest tests/os -v -rs
 
-  # Existing (Counsellor) suite. Not blocking yet: it becomes blocking once it
-  # is green on CI twice in a row (per the plan).
+  # Existing (Counsellor) suite. Blocking since it was green on CI twice in a
+  # row (PRs #27 and #28). It only blocks merges once `legacy` is also a
+  # required check in the branch ruleset.
   # No Postgres service: without OS_TEST_DATABASE_URL the DB tests skip.
   legacy:
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
