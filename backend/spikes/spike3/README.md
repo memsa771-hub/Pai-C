@@ -34,6 +34,59 @@ kernel: mark_ready  ->  enqueue_pending  ->  DBOS queue  ->  run_attempt workflo
 
 Task 7 adds the chaos run (workers killed with SIGKILL) on top of these functions.
 
+## Chaos run (Task 7)
+
+`chaos.py` is the driver and `worker.py` is one worker process.
+
+- The driver is the kernel side. It never executes workflows: it enqueues and reads workflow
+  status through a `DBOSClient` (`enqueue_pending(conn, client=...)`, `reconcile(conn, client=...)`).
+- Each worker (`python -m spikes.spike3.worker --model {test|openai}`) configures DBOS as Task 6
+  does (`loop.start`), launches and blocks while DBOS polls the `spike3` queue (`worker_concurrency` 2).
+- Worker slot `i` always has executor ID `spike3-w{i}`. Every `kill_every_s` the driver SIGKILLs a
+  random worker, waits until it is gone, and starts its replacement in the same slot. On launch the
+  replacement's DBOS recovers the workflows its predecessor left `PENDING` (they go back to the queue,
+  and exactly one worker dequeues each). Each process also has a label `w{i}g{generation}`
+  (env `SPIKE3_WORKER`), written to `step_runs.worker` and `model_calls.worker`.
+- `reconcile` runs every 5 s during the run (5 minutes in production). It also fails an open task
+  with `workflow_error` when its workflow ended as ERROR, CANCELLED or MAX_RECOVERY_ATTEMPTS_EXCEEDED.
+- Every process uses application version `spike3`, so every worker dequeues every workflow.
+- The `test` model is a `FunctionModel` that waits `--model-delay` seconds (default 0.5) and answers
+  with a quote copied from the page, so kills hit in-flight model requests.
+- Workers stop on SIGTERM, and on their own when the driver process is gone (no orphans).
+
+What the report measures (`ChaosReport`):
+
+| Field | Meaning | Pass bar |
+|---|---|---|
+| `lost` | tasks − done − failed | 0 |
+| `duplicated` | re-runs not explained by an earlier kill: a step run again, or a model request repeated by another process, when the first run's worker was not killed before the re-run | 0 |
+| `duplicate_results` | `results` rows beyond one per task attempt (0 by the primary key; measured anyway) | 0 |
+| `extra_workflows` | tasks with more than one attempt or more than one workflow ID | 0 |
+| `valid_rate` | valid outputs / tasks | ≥ 0.99 |
+| `step_reruns` | `step_runs` rows beyond one per (task, attempt, step) | reported |
+| `recovered_attempts` | attempts whose rows come from more than one worker process (interrupted, then recovered) | reported |
+| `kills`, `kills_in_flight`, `interrupted_workflows` | kills; kills of a worker that had `PENDING` workflows; those workflows | reported |
+
+Run the small chaos test (20 tasks, 3 workers, a kill every 2 s; about 20 s):
+
+```
+OS_TEST_DATABASE_URL=postgresql://USER@HOST:PORT/DB python -m pytest tests/os/test_spike3_chaos.py -v -s
+```
+
+Run the CLI (prints the `ChaosReport` as JSON and PASS/FAIL against the pass bar; exit code 1 on FAIL):
+
+```
+OS_DATABASE_URL=postgresql://USER@HOST:PORT/DB \
+    python -m spikes.spike3.chaos --tasks 100 --workers 4 --kill-every 3 --model test --timeout 1800
+OS_DATABASE_URL=... OS_OPENAI_API_KEY=<dev key> \
+    python -m spikes.spike3.chaos --tasks 100 --workers 4 --kill-every 3 --model openai --timeout 1800
+```
+
+Both are destructive for that database's `spike3` schema and for the DBOS schema they use
+(`dbos_chaos` by default, `--schema` must start with `dbos_chaos`). Worker logs go to a temporary
+directory whose path is in the report (`log_dir`). `--model openai` stops at once with a clear message
+when `OS_OPENAI_API_KEY` is not set.
+
 ## Run the tests
 
 From `backend/`, with a Postgres 16 database:
