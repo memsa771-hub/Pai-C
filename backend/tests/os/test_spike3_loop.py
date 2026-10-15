@@ -7,12 +7,16 @@ record result, complete). Real Postgres, TestModel instead of a paid model.
 import threading
 import time
 from collections.abc import Callable, Iterator
+from types import SimpleNamespace
 from typing import Any
 
 import psycopg
 import pytest
 from dbos import DBOS
 from psycopg.types.json import Jsonb
+from pydantic_ai.messages import ModelMessage, ModelResponse
+from pydantic_ai.models import Model
+from pydantic_ai.models.function import AgentInfo, FunctionModel
 from pydantic_ai.models.test import TestModel
 
 from spikes.spike3 import loop
@@ -52,14 +56,9 @@ def _wait_no_open_workflows(timeout_s: float = TIMEOUT_S) -> None:
         time.sleep(0.1)
 
 
-def _run_dbos(pg_url: str, output: dict[str, str]) -> Iterator[None]:
+def _run_dbos(pg_url: str, model: Model) -> Iterator[None]:
     try:
-        loop.start(
-            database_url=pg_url,
-            system_database_url=pg_url,
-            schema="dbos_test",
-            model=TestModel(custom_output_args=output),
-        )
+        loop.start(database_url=pg_url, system_database_url=pg_url, schema="dbos_test", model=model)
         yield
         _wait_no_open_workflows()
     finally:
@@ -71,12 +70,21 @@ def dbos_runtime(pg_url: str, conn: psycopg.Connection) -> Iterator[None]:
     # The valid quote must be on whichever page a task loads.
     for path in loop.page_paths():
         assert VALID_QUOTE in path.read_text(encoding="utf-8"), path.name
-    yield from _run_dbos(pg_url, OUTPUT)
+    yield from _run_dbos(pg_url, TestModel(custom_output_args=OUTPUT))
 
 
 @pytest.fixture
 def dbos_runtime_bad_quote(pg_url: str, conn: psycopg.Connection) -> Iterator[None]:
-    yield from _run_dbos(pg_url, BAD_QUOTE_OUTPUT)
+    yield from _run_dbos(pg_url, TestModel(custom_output_args=BAD_QUOTE_OUTPUT))
+
+
+def _always_fails(messages: list[ModelMessage], info: AgentInfo) -> ModelResponse:
+    raise RuntimeError("model service unavailable")
+
+
+@pytest.fixture
+def dbos_runtime_model_down(pg_url: str, conn: psycopg.Connection) -> Iterator[None]:
+    yield from _run_dbos(pg_url, FunctionModel(_always_fails, model_name="always-fails"))
 
 
 # --- helpers --------------------------------------------------------------------------
@@ -111,6 +119,24 @@ def step_run_count(conn: psycopg.Connection, task_id: str, step: str) -> int:
 
 def workflow_count(workflow_id: str) -> int:
     return len(DBOS.list_workflows(workflow_ids=[workflow_id], load_input=False, load_output=False))
+
+
+def wait_workflow_status(workflow_id: str, status: str) -> None:
+    deadline = time.monotonic() + TIMEOUT_S
+    while (wf := DBOS.get_workflow_status(workflow_id)) is None or wf.status != status:
+        if time.monotonic() > deadline:
+            pytest.fail(f"workflow {workflow_id!r} is {wf and wf.status!r}, not {status!r}")
+        time.sleep(0.1)
+
+
+class StatusClient:
+    """Stands in for a DBOSClient: every workflow it is asked about has `status`."""
+
+    def __init__(self, status: str) -> None:
+        self.status = status
+
+    def list_workflows(self, *, workflow_ids: list[str], **_: Any) -> list[SimpleNamespace]:
+        return [SimpleNamespace(workflow_id=wid, status=self.status) for wid in workflow_ids]
 
 
 def unmark_sent(conn: psycopg.Connection, task_id: str) -> None:
@@ -209,3 +235,20 @@ def test_invalid_quote_is_retried_then_fails(dbos_runtime_bad_quote, conn):
     assert task_status(conn, "t4") == "failed"
     assert failure_reason(conn, "t4") == "invalid_output"
     assert model_calls(conn, "t4") == 3   # first try + 2 output retries
+
+@pytest.mark.parametrize("status", ["ERROR", "CANCELLED", "MAX_RECOVERY_ATTEMPTS_EXCEEDED"])
+def test_reconcile_fails_task_whose_workflow_ended_without_success(conn, status):
+    mark_ready(conn, "t5")
+    counts = reconcile(conn, client=StatusClient(status))
+    assert counts["failed_workflows"] == 1 and counts["present"] == 1
+    assert task_status(conn, "t5") == "failed"
+    assert failure_reason(conn, "t5") == "workflow_error"
+    assert reconcile(conn, client=StatusClient(status))["failed_workflows"] == 0   # task no longer open
+
+def test_reconcile_fails_task_of_errored_workflow(dbos_runtime_model_down, conn):
+    mark_ready(conn, "t6"); enqueue_pending(conn)
+    wait_workflow_status("t6:1", "ERROR")   # model step retried, then the workflow raised
+    assert task_status(conn, "t6") == "running"
+    assert model_calls(conn, "t6") == 3     # invariant 7: DBOS step retries (max_attempts=3)
+    assert reconcile(conn)["failed_workflows"] == 1
+    assert task_status(conn, "t6") == "failed" and failure_reason(conn, "t6") == "workflow_error"
