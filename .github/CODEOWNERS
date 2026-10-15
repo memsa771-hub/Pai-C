@@ -4,8 +4,11 @@
 # OS developers:   @10Faheem @MusawirKtk
 # Counsellor lead: @memsa771-hub
 #
-# Shared files need one reviewer from each team (an OS developer and the
-# Counsellor lead).
+# Shared files list both teams, so both are requested as reviewers. GitHub
+# treats several owners on one pattern as alternatives: an approval from any
+# one listed owner satisfies "require review from Code Owners". The rule that
+# shared files need one reviewer from each team is kept by convention and PR
+# review, not enforced by this file.
 
 # OS code, OS tests and the OS boundary file
 /backend/app/os/    @10Faheem @MusawirKtk

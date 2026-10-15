@@ -12,8 +12,8 @@
 
 ## Rules touched
 <!-- Answer yes or no for each. -->
-- [ ] Kernel: yes / no
-- [ ] Tool gateway: yes / no
-- [ ] Agent tools: yes / no
-- [ ] Data format: yes / no
-- [ ] Shared file: yes / no (a shared file needs a reviewer from each team)
+- Kernel: yes / no
+- Tool gateway: yes / no
+- Agent tools: yes / no
+- Data format: yes / no
+- Shared file: yes / no (a shared file needs a reviewer from each team)
