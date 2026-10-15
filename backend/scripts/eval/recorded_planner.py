@@ -30,7 +30,7 @@ def recorded_patch(target, view=None):
                     entry["category"] = row.get("category", "unknown")
                 operations.append({"op": "add", "part": part, "item": entry})
     for person in target.get("pressures", {}).get("people", []):
-        operations.append({"op": "upsert_person", **{key: person[key] for key in ("role", "wish", "concern", "evidence")}})
+        operations.append({"op": "upsert_person", **{key: person[key] for key in ("role", "wish", "evidence")}, "worry": person.get("concern", "")})
     for key in ("tensions", "identity_status", "decision_difficulties", "hypotheses", "open_questions", "private_notes", "engagement_style", "depth_mode"):
         if key in target:
             operations.append({"op": "set_private", "field": key, "value": target[key]})

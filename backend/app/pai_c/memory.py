@@ -20,6 +20,22 @@ class MemoryService:
     def truth_map(self, workspace_id):
         return NotebookService(self.db).get(workspace_id)
 
+    def coverage_areas(self, workspace_id):
+        from app.pai_c.understanding.views import coverage_areas
+        return coverage_areas(self.truth_map(workspace_id).notebook, self.profile(workspace_id))
+
+    def academic_view(self, workspace_id):
+        from app.pai_c.understanding.views import academic_view
+        return academic_view(self.truth_map(workspace_id).notebook, self.profile(workspace_id))
+
+    def personal_view(self, workspace_id):
+        from app.pai_c.understanding.views import personal_view
+        return personal_view(self.truth_map(workspace_id).notebook)
+
+    def capability_view(self, workspace_id):
+        from app.pai_c.understanding.views import capability_view
+        return capability_view(self.truth_map(workspace_id).notebook)
+
     def latest_plan(self, workspace_id):
         from sqlalchemy import select, func, or_, and_
         from app.config import config

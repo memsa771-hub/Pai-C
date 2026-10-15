@@ -1,0 +1,7 @@
+{
+  "demonstrated": {"kinds": ["shown", "document", "action"], "levels": ["sustained", "proven"]},
+  "item_paths": ["said", "shown", "source", "self", "pressures.items", "world.social", "world.daily_life", "world.responsibilities", "world.education_story"],
+  "person_path": "world.people",
+  "academic_records": ["education", "test_attempt", "document"],
+  "capability_statuses": ["demonstrated", "emerging", "untested", "development_need", "blocked"]
+}

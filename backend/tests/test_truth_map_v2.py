@@ -13,6 +13,7 @@ from pydantic import ValidationError
 from sqlalchemy import select
 
 from app.pai_c.deep.migrate_v1 import migrate_v1, MISSING_EVIDENCE
+from app.pai_c.deep.migrate_v2 import migrate_v2
 from app.pai_c.deep.notebook_schema import CounselorNotebookData
 from app.pai_c.deep.notebook_sanitize import sanitize_notebook
 from app.pai_c.deep.coverage import foundation_ready
@@ -46,14 +47,14 @@ def test_migration_preserves_all_original_fields_and_approved_mappings():
     migrated = migrate_v1(original, STAMP, "2026-02-01T00:00:00+00:00")
     assert migrated["legacy_v1"] == original
     assert original == legacy()
-    notebook = CounselorNotebookData.model_validate(migrated)
-    assert notebook.schema_version == 2
+    notebook = CounselorNotebookData.model_validate(migrate_v2(migrated))
+    assert notebook.schema_version == 3
     assert notebook.shown[0].value == {"text": "Built independently", "probed": True}
     assert next(i for i in notebook.self if i.key == "driver").value["weight"] == "strong"
     assert next(i for i in notebook.self if i.key == "strength").confidence == "high"
     assert next(i for i in notebook.self if i.key == "limit").value["hard"] is True
     assert [i.category for i in notebook.source] == ["media", "self"]
-    assert [p.role for p in notebook.pressures.people] == ["father", "mother", "other"]
+    assert [p.role for p in notebook.world.people] == ["father", "mother", "other"]
     assert notebook.private_notes == "Unsure" and not notebook.mirror_ready
     assert next(i for i in notebook.said if i.key == "daily_life").evidence == MISSING_EVIDENCE
     assert next(i for i in notebook.said if i.key == "daily_life").confidence == "low"
@@ -108,7 +109,7 @@ def test_foundation_gate_uses_said_and_self_only():
 def test_archive_is_read_only_and_never_in_context_schema_export(notebook_db):
     db, workspace, _, events = notebook_db
     original = legacy()
-    db.add(CounselorNotebook(workspace_id=workspace, notebook=migrate_v1(original, STAMP), version=1, last_event_id=events[0]))
+    db.add(CounselorNotebook(workspace_id=workspace, notebook=migrate_v2(migrate_v1(original, STAMP)), version=1, last_event_id=events[0]))
     db.commit()
     service = MemoryService(db)
     previous = service.truth_map(workspace)
@@ -132,7 +133,7 @@ def test_archive_is_read_only_and_never_in_context_schema_export(notebook_db):
 
 @pytest.mark.asyncio
 async def test_sensitive_batch_never_receives_archive():
-    notebook = CounselorNotebookData.model_validate(migrate_v1(legacy(), STAMP))
+    notebook = CounselorNotebookData.model_validate(migrate_v2(migrate_v1(legacy(), STAMP)))
     checked = []
     async def checker(entries):
         checked.extend(entries)
@@ -220,12 +221,12 @@ async def test_planner_rejects_whole_patch_with_objective_item_without_reference
     from app.pai_c.deep.analysis import analyze_job
     with StudentSession() as student, student.factory() as db:
         job, _ = _turn_job(student, db)
-        candidate = {"schema_version": 2, "said": [item("A student wish"), item("An objective copy", key="education", id="bad")]}
+        candidate = {"schema_version": 3, "said": [item("A student wish"), item("An objective copy", key="education", id="bad")]}
         from scripts.eval.recorded_planner import recorded_patch
         with patch("app.pai_c.deep.analysis.chat_completion", AsyncMock(return_value=json.dumps(recorded_patch(candidate)))) as model:
             result = await analyze_job(job, db)
         saved = MemoryService(db).truth_map(student.workspace_id).notebook
-        assert saved.schema_version == 2 and not saved.said
+        assert saved.schema_version == 3 and not saved.said
         assert result["status"] == "patch_rejected" and model.await_count == 2
         assert "legacy_v1" not in model.call_args.kwargs["messages"][0]["content"]
 

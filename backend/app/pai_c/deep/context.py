@@ -1,6 +1,8 @@
 """Read-only, channel-neutral context for one deep Counselor turn."""
 
 import json
+from copy import deepcopy
+from app.pai_c.understanding.data import at_path, set_path, load_policy
 import logging
 import math
 import time
@@ -18,7 +20,8 @@ from app.plugins._shared.sources import public_https
 
 logger = logging.getLogger(__name__)
 _NOTEBOOK_ORDER = (
-    "schema_version", "open_questions", "coverage", "said", "source", "pressures",
+    "schema_version", "open_questions", "coverage", "said", "source",
+    "world.people", "world.daily_life", "world.social", "world.responsibilities", "world.education_story", "pressures",
     "self", "sure", "shown", "mirror_ready", "depth_mode", "engagement_style",
     "hypotheses", "goal_history", "tensions", "identity_status",
     "decision_difficulties", "private_notes", "mirror_blockers", "chapter",
@@ -47,19 +50,26 @@ def _short(value: object, limit: int = 350) -> object:
 def _trim_notebook(notebook) -> dict:
     source = notebook.model_dump(mode="json")
     selected: dict = {}
+    active_paths = (*load_policy()["item_paths"], load_policy()["person_path"])
     for key in _NOTEBOOK_ORDER:
-        value = _short(source[key])
+        value = _short(at_path(source, key))
+        if key in active_paths:
+            value = [item for item in value if item.get("status", "active") == "active"]
+        if key == "pressures":
+            value["items"] = [item for item in value["items"] if item.get("status", "active") == "active"]
         if isinstance(value, list):
             kept = []
             for item in value:
-                candidate = {**selected, key: [*kept, item]}
+                candidate = deepcopy(selected)
+                set_path(candidate, key, [*kept, item])
                 if estimated_tokens(_json(candidate)) > config.PAI_COUNSELOR_NOTEBOOK_CONTEXT_TOKENS:
                     break
                 kept.append(item)
             value = kept
-        candidate = {**selected, key: value}
+        candidate = deepcopy(selected)
+        set_path(candidate, key, value)
         if estimated_tokens(_json(candidate)) <= config.PAI_COUNSELOR_NOTEBOOK_CONTEXT_TOKENS:
-            selected[key] = value
+            selected = candidate
     return selected
 
 

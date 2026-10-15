@@ -7,7 +7,9 @@ import logging
 logger = logging.getLogger(__name__)
 from app.config import config
 
-PARTS = ("said", "shown", "source", "self", "pressures.items")
+from app.pai_c.understanding.data import load_policy, at_path, set_path
+
+PARTS = tuple(load_policy()["item_paths"])
 MANDATORY = ("sure", "tensions", "identity_status", "decision_difficulties",
              "hypotheses", "open_questions", "coverage", "depth_mode", "engagement_style")
 
@@ -28,16 +30,18 @@ def build_planner_view(notebook, budget=None):
     original = notebook.model_dump(mode="json")
     data = {key: deepcopy(original[key]) for key in MANDATORY}
     data["private_notes"] = original["private_notes"][:1000]
-    data["pressures"] = {"people": deepcopy(original["pressures"]["people"])}
+    parts = (*load_policy()["item_paths"], load_policy()["person_path"])
     lists = {}
     omitted = {}
-    for part in PARTS:
-        rows = original["pressures"]["items"] if part == "pressures.items" else original[part]
+    for part in parts:
+        rows = at_path(original, part)
         selected = []
         for row in rows:
             if row.get("status", "active") != "active":
                 continue
-            fields = ("id", "key", "value", "kind", "confidence", "level", "last_confirmed")
+            fields = ("id", "key", "value", "kind", "confidence", "level", "capability_status", "last_confirmed")
+            if part == load_policy()["person_path"]:
+                fields = tuple(key for key in row if key != "evidence")
             entry = {key: deepcopy(row.get(key)) for key in fields}
             entry["evidence"] = row["evidence"][:200]
             if part == "source":
@@ -45,10 +49,7 @@ def build_planner_view(notebook, budget=None):
             selected.append(entry)
         lists[part] = selected
         omitted[part] = 0
-        if part == "pressures.items":
-            data["pressures"]["items"] = selected
-        else:
-            data[part] = selected
+        set_path(data, part, selected)
     def render():
         return "<notebook>" + _json(data) + "</notebook>\n<omitted_items>" + _json(omitted) + "</omitted_items>"
     def confirmed_at(row):
@@ -57,7 +58,7 @@ def build_planner_view(notebook, budget=None):
     text = render()
     while estimated_tokens(text) > budget:
         removed = False
-        for part in PARTS:
+        for part in parts:
             rows = lists[part]
             if len(rows) <= 1:
                 continue

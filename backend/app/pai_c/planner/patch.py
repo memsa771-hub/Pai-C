@@ -8,7 +8,7 @@ from pydantic import BaseModel, ConfigDict, Field, TypeAdapter
 from app.pai_c.deep.notebook_schema import CounselorNotebookData, Item, SourceItem, Rating
 from app.pai_c.deep.notebook_sanitize import sanitize_notebook
 from app.pai_c.deep.coverage import enforce_mirror_readiness
-from app.pai_c.planner.view import PARTS
+from app.pai_c.understanding.data import load_policy, at_path
 
 
 class Contract(BaseModel):
@@ -24,11 +24,12 @@ class NewItem(Contract):
     level: Literal["claimed", "tried", "sustained", "proven"] | None = None
     category: Literal["self", "family", "peers", "media", "need", "other", "unknown"] | None = None
     vault_fact_ref: str | None = None
+    capability_status: Literal["demonstrated", "emerging", "untested", "development_need", "blocked"] | None = None
 
 
 class Add(Contract):
     op: Literal["add"]
-    part: Literal["said", "shown", "source", "self", "pressures.items"]
+    part: Literal["said", "shown", "source", "self", "pressures.items", "world.social", "world.daily_life", "world.responsibilities", "world.education_story"]
     item: NewItem
 
 
@@ -37,12 +38,29 @@ class UpdateFields(Contract):
     evidence: str = Field(min_length=1)
     confidence: Literal["low", "medium", "high"] | None = None
     level: Literal["claimed", "tried", "sustained", "proven"] | None = None
+    capability_status: Literal["demonstrated", "emerging", "untested", "development_need", "blocked"] | None = None
+
+
+class PersonFields(Contract):
+    evidence: str = Field(min_length=1)
+    role: str = Field(min_length=1)
+    relation: Literal["parent", "sibling", "relative", "partner", "friend", "mentor", "other"] = "other"
+    occupation: str | None = None
+    relationship_note: str = ""
+    wish: str = ""
+    worry: str = ""
+    influence: Literal["low", "medium", "high", "unknown"] = "unknown"
+    supportive: bool | None = None
+
+
+class PersonUpdate(PersonFields):
+    role: str | None = Field(default=None, min_length=1)
 
 
 class Update(Contract):
     op: Literal["update"]
     id: str
-    fields: UpdateFields
+    fields: UpdateFields | PersonUpdate
 
 
 class Confirm(Contract):
@@ -57,12 +75,8 @@ class Retire(Contract):
     reason: str = Field(min_length=1)
 
 
-class UpsertPerson(Contract):
+class UpsertPerson(PersonFields):
     op: Literal["upsert_person"]
-    role: str = Field(min_length=1)
-    wish: str
-    concern: str
-    evidence: str = Field(min_length=1)
 
 
 class SetSure(Contract):
@@ -100,12 +114,14 @@ def apply_patch(notebook, operations, visible_ids, latest_student_text, *, now=N
     data = deepcopy(notebook.model_dump(mode="json"))
     now = now or datetime.now(timezone.utc)
     stamp = now.isoformat()
+    parts = (*load_policy()["item_paths"], load_policy()["person_path"])
+    added_people = set()
     def items(part):
-        return data["pressures"]["items"] if part == "pressures.items" else data[part]
+        return at_path(data, part)
     def find(item_id):
         if item_id not in visible_ids:
             raise ValueError("id not present in Planner view")
-        matches = [row for part in PARTS for row in items(part) if row["id"] == item_id]
+        matches = [row for part in parts for row in items(part) if row["id"] == item_id]
         if len(matches) != 1:
             raise ValueError("id must identify exactly one stored item")
         return matches[0]
@@ -129,12 +145,16 @@ def apply_patch(notebook, operations, visible_ids, latest_student_text, *, now=N
             elif isinstance(operation, Retire):
                 find(operation.id)["status"] = "retired"
             elif isinstance(operation, UpsertPerson):
-                people = data["pressures"]["people"]
+                people = items(load_policy()["person_path"])
                 person = next((row for row in people if row["role"].casefold() == operation.role.casefold()), None)
-                values = operation.model_dump(exclude={"op"})
+                values = operation.model_dump(exclude={"op"}, exclude_unset=True)
                 if person is None:
-                    people.append({**values, "first_seen": stamp, "last_confirmed": stamp})
+                    person_id = str(uuid4())
+                    added_people.add(person_id)
+                    people.append({**values, "id": person_id, "first_seen": stamp, "last_confirmed": stamp})
                 else:
+                    if person["id"] not in visible_ids and person["id"] not in added_people:
+                        raise ValueError("person not present in Planner view")
                     person.update(**values, last_confirmed=stamp)
             elif isinstance(operation, SetSure):
                 if not re.search(r"(?<![\w.+-])" + str(operation.score) + r"(?![\w.]|\s*\.\d)", latest_student_text):
@@ -154,7 +174,7 @@ def apply_patch(notebook, operations, visible_ids, latest_student_text, *, now=N
                     if operation.part == "sure":
                         supported = data["sure"]["score"] is not None
                     elif operation.part == "pressures":
-                        supported = any(row["status"] == "active" for row in items("pressures.items")) or bool(data["pressures"]["people"])
+                        supported = any(row["status"] == "active" for row in items("pressures.items")) or any(row.get("status", "active") == "active" for row in items(load_policy()["person_path"]))
                     else:
                         supported = any(row["status"] == "active" for row in items(operation.part))
                     if not supported:

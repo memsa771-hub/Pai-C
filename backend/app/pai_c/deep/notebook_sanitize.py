@@ -108,8 +108,8 @@ def _clean_model(value: Any, model: type[BaseModel], path: str,
 
 
 def sanitize_notebook(raw: dict[str, Any]) -> tuple[CounselorNotebookData, list[SanitizationIssue]]:
-    if "legacy_v1" in raw:
-        raise ValueError("legacy_v1 is read-only")
+    if any(key in raw for key in ("legacy_v1", "legacy_v2")):
+        raise ValueError("legacy archives are read-only")
     CounselorNotebookData.reject_v1(raw)
     issues: list[SanitizationIssue] = []
     cleaned = _clean_model(raw, CounselorNotebookData, "", issues)

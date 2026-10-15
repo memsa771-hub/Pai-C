@@ -1,4 +1,4 @@
-"""Strict Truth Map v2 contract. Objective records remain in the Vault."""
+"""Strict Truth Map v3 contract. Objective records remain in the Vault."""
 
 from copy import deepcopy
 from datetime import datetime
@@ -26,6 +26,16 @@ class Item(Note):
     last_confirmed: datetime
     status: Literal["active", "retired"] = "active"
     vault_fact_ref: str | None = None
+    capability_status: Literal["demonstrated", "emerging", "untested", "development_need", "blocked"] | None = None
+
+    @model_validator(mode="after")
+    def capability_evidence_required(self):
+        from app.pai_c.understanding.data import load_policy
+        rule = load_policy()["demonstrated"]
+        if (self.capability_status == "demonstrated" and
+                self.kind not in rule["kinds"] and self.level not in rule["levels"]):
+            raise ValueError("demonstrated capability requires behavioral evidence")
+        return self
 
     @model_validator(mode="after")
     def objective_reference_required(self):
@@ -39,18 +49,32 @@ class SourceItem(Item):
     category: Literal["self", "family", "peers", "media", "need", "other", "unknown"] = "unknown"
 
 
-class PersonPressure(Note):
+class Person(Note):
+    id: str = Field(min_length=1)
     role: str = Field(min_length=1)
+    relation: Literal["parent", "sibling", "relative", "partner", "friend", "mentor", "other"] = "other"
+    occupation: str | None = None
+    relationship_note: str = ""
     wish: str = ""
-    concern: str = ""
+    worry: str = ""
+    influence: Literal["low", "medium", "high", "unknown"] = "unknown"
+    supportive: bool | None = Field(default=None, strict=True)
     evidence: str = Field(min_length=1)
     first_seen: datetime
     last_confirmed: datetime
+    status: Literal["active", "retired"] = "active"
 
 
 class Pressures(Note):
     items: list[Item] = Field(default_factory=list)
-    people: list[PersonPressure] = Field(default_factory=list)
+
+
+class World(Note):
+    people: list[Person] = Field(default_factory=list)
+    social: list[Item] = Field(default_factory=list)
+    daily_life: list[Item] = Field(default_factory=list)
+    responsibilities: list[Item] = Field(default_factory=list)
+    education_story: list[Item] = Field(default_factory=list)
 
 
 class Rating(Note):
@@ -122,11 +146,12 @@ class GoalHistory(Note):
 
 
 class CounselorNotebookData(Note):
-    schema_version: Literal[2] = 2
+    schema_version: Literal[3] = 3
     said: list[Item] = Field(default_factory=list)
     shown: list[Item] = Field(default_factory=list)
     source: list[SourceItem] = Field(default_factory=list)
     pressures: Pressures = Field(default_factory=Pressures)
+    world: World = Field(default_factory=World)
     self: list[Item] = Field(default_factory=list)
     sure: Sure = Field(default_factory=Sure)
     tensions: list[Tension] = Field(default_factory=list)
@@ -143,16 +168,17 @@ class CounselorNotebookData(Note):
     chapter: Literal["discovery", "coach", "next_chapter"] = "discovery"
     goal_history: list[GoalHistory] = Field(default_factory=list)
     legacy_v1: dict[str, Any] | None = Field(default=None, exclude=True, repr=False, frozen=True)
+    legacy_v2: dict[str, Any] | None = Field(default=None, exclude=True, repr=False, frozen=True)
 
     @model_validator(mode="before")
     @classmethod
     def reject_v1(cls, value):
-        if isinstance(value, dict) and (value.get("schema_version", 2) != 2 or
+        if isinstance(value, dict) and (value.get("schema_version", 3) != 3 or
                 any(key in value for key in ("claims", "person", "stated_goal", "strengths", "growth_areas", "drivers", "values", "family", "constraints", "learning_style", "work_preferences", "emotional_notes", "coach"))):
-            raise ValueError("Truth Map v1 must be migrated before use")
+            raise ValueError("Earlier Truth Maps must be migrated before use")
         return value
 
-    @field_validator("legacy_v1")
+    @field_validator("legacy_v1", "legacy_v2")
     @classmethod
     def isolate_archive(cls, value):
         return deepcopy(value)
@@ -161,13 +187,17 @@ class CounselorNotebookData(Note):
     def analyst_schema(cls):
         schema = cls.model_json_schema()
         schema["properties"].pop("legacy_v1", None)
+        schema["properties"].pop("legacy_v2", None)
         return schema
 
     def storage_data(self):
         data = self.model_dump(mode="json")
         if self.legacy_v1 is not None:
             data["legacy_v1"] = deepcopy(self.legacy_v1)
+        if self.legacy_v2 is not None:
+            data["legacy_v2"] = deepcopy(self.legacy_v2)
         return data
 
     def export_data(self):
-        return {**self.model_dump(mode="json"), "has_legacy_v1": self.legacy_v1 is not None}
+        return {**self.model_dump(mode="json"), "has_legacy_v1": self.legacy_v1 is not None,
+                "has_legacy_v2": self.legacy_v2 is not None}

@@ -1,5 +1,6 @@
 """Factories for current Truth Map fixtures and explicitly historical examples."""
 from app.pai_c.deep.migrate_v1 import migrate_v1
+from app.pai_c.deep.migrate_v2 import migrate_v2
 
 STAMP = "2026-01-01T00:00:00+00:00"
 
@@ -9,7 +10,8 @@ def item(value="A student statement", *, key="claim", id="c1", evidence="Student
 
 
 def v2_fixture(**old):
-    data = migrate_v1(old, STAMP)
+    data = migrate_v2(migrate_v1(old, STAMP))
+    data.pop("legacy_v2", None)
     data.pop("legacy_v1", None)
     # Migration deliberately clears readiness; runtime test fixtures set it explicitly.
     if "mirror_ready" in old:

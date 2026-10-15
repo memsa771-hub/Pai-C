@@ -15,6 +15,7 @@ from app.pai_c.deep.analysis import analyze_job, _input
 from app.pai_c.deep.context import build_context, estimated_tokens
 from app.pai_c.deep.turn_input import CounselorTurnInput
 from app.pai_c.planner.view import build_planner_view, PARTS
+from app.pai_c.understanding.data import at_path, set_path
 from app.pai_c.planner.patch import apply_patch, PatchRejected
 from app.pai_c.planner.plan import validate_plan
 from scripts.counselor_eval_support import StudentSession
@@ -29,7 +30,7 @@ def notebook():
     return CounselorNotebookData.model_validate({
         "said": [item(id="a")], "shown": [item(id="b")],
         "source": [item(id="c", category="self")], "self": [item(id="d")],
-        "pressures": {"items": [item(id="e")], "people": []},
+        "pressures": {"items": [item(id="e")]},
         "sure": {"score": 3, "reason": "Earlier rating", "asked_at": STAMP},
     })
 
@@ -44,7 +45,7 @@ def new_item(**changes):
     {"op":"update","id":"a","fields":{"value":"Changed","evidence":"New statement"}},
     {"op":"confirm","id":"a","evidence":"Confirmed statement"},
     {"op":"retire","id":"a","reason":"Student corrected it"},
-    {"op":"upsert_person","role":"Guardian","wish":"Security","concern":"Stability","evidence":"Student explanation"},
+    {"op":"upsert_person","role":"Guardian","wish":"Security","worry":"Stability","evidence":"Student explanation"},
     {"op":"set_sure","score":7,"reason":"Explored","would_raise":"Try it","evidence":"I rate it 7"},
     {"op":"set_private","field":"private_notes","value":"Tentative interpretation"},
     {"op":"set_coverage","part":"said","value":True},
@@ -97,13 +98,13 @@ def test_coverage_true_requires_active_evidence(part):
 
 
 def test_person_upsert_matches_role_case_insensitively_and_preserves_first_seen():
-    before=notebook(); op={"op":"upsert_person","role":"Guardian","wish":"Security","concern":"Stability","evidence":"Evidence"}
+    before=notebook(); op={"op":"upsert_person","role":"Guardian","wish":"Security","worry":"Stability","evidence":"Evidence"}
     first=apply_patch(before,[op],build_planner_view(before).ids,"",now=NOW)
-    second=apply_patch(first,[{**op,"role":"guardian","concern":"Distance"}],build_planner_view(first).ids,"",now=NOW+timedelta(days=1))
-    assert len(second.pressures.people)==1
-    assert second.pressures.people[0].first_seen == NOW
-    assert second.pressures.people[0].last_confirmed == NOW+timedelta(days=1)
-    assert second.pressures.people[0].concern == "Distance"
+    second=apply_patch(first,[{**op,"role":"guardian","worry":"Distance"}],build_planner_view(first).ids,"",now=NOW+timedelta(days=1))
+    assert len(second.world.people)==1
+    assert second.world.people[0].first_seen == NOW
+    assert second.world.people[0].last_confirmed == NOW+timedelta(days=1)
+    assert second.world.people[0].worry == "Distance"
 
 
 def large_map():
@@ -113,19 +114,18 @@ def large_map():
              last_confirmed=(NOW+timedelta(days=i)).isoformat()) for i in range(10)]
         if part=="source":
             for row in rows:row["category"]="self"
-        if part=="pressures.items":data["pressures"]["items"]=rows
-        else:data[part]=rows
+        set_path(data, part, rows)
     return CounselorNotebookData.model_validate(data)
 
 
 def test_view_is_within_budget_keeps_newest_and_each_nonempty_part():
-    before=large_map(); view=build_planner_view(before,budget=1800)
-    assert view.tokens == estimated_tokens(view.text) <= 1800
+    before=large_map(); view=build_planner_view(before,budget=4000)
+    assert view.tokens == estimated_tokens(view.text) <= 4000
     assert "<omitted_items>" in view.text
     for part in PARTS:
         assert part+"9" in view.ids and part+"0" not in view.ids
         assert view.omitted[part] > 0
-        rows=view.data["pressures"]["items"] if part=="pressures.items" else view.data[part]
+        rows=at_path(view.data,part)
         assert rows and len(rows)+view.omitted[part]==10
         assert all(len(row["evidence"]) == 200 for row in rows)
 
@@ -137,12 +137,12 @@ def test_retired_and_archive_excluded_private_notes_cut_and_mandatory_included()
     assert "a" not in view.ids and "never sent" not in view.text
     assert len(view.data["private_notes"]) == 1000
     assert all(key in view.data for key in ("sure","tensions","identity_status","decision_difficulties","hypotheses","open_questions","coverage","depth_mode","engagement_style"))
-    assert "people" in view.data["pressures"]
+    assert "people" in view.data["world"]
 
 
 @pytest.mark.parametrize("op", ["update","confirm","retire"])
 def test_omitted_id_rejects_whole_patch(op):
-    before=large_map(); view=build_planner_view(before,budget=1800)
+    before=large_map(); view=build_planner_view(before,budget=4000)
     operation={"op":op,"id":"said0"}
     operation.update({"fields":{"evidence":"New"}} if op=="update" else {"evidence":"New"} if op=="confirm" else {"reason":"Changed"})
     with pytest.raises(PatchRejected):
@@ -151,13 +151,13 @@ def test_omitted_id_rejects_whole_patch(op):
 
 
 def test_patch_applies_to_full_map_preserving_omitted_items_exactly():
-    before=large_map(); view=build_planner_view(before,budget=1800)
+    before=large_map(); view=build_planner_view(before,budget=4000)
     after=apply_patch(before,[{"op":"confirm","id":"said9","evidence":"Reconfirmed"}],view.ids,"",now=NOW)
     assert len(after.said)==10
     for part in PARTS:
-        old=before.pressures.items if part=="pressures.items" else getattr(before,part)
-        new=after.pressures.items if part=="pressures.items" else getattr(after,part)
-        assert [row.model_dump(mode="json") for row in new if row.id not in view.ids] == [row.model_dump(mode="json") for row in old if row.id not in view.ids]
+        old=at_path(before.model_dump(mode="json"),part)
+        new=at_path(after.model_dump(mode="json"),part)
+        assert [row for row in new if row["id"] not in view.ids] == [row for row in old if row["id"] not in view.ids]
 
 
 def test_mandatory_content_over_budget_proceeds_and_logs_only_size(caplog):
@@ -326,7 +326,7 @@ def test_view_orders_accepted_naive_and_offset_dates_without_changing_storage():
     before=large_map()
     before.said[0].last_confirmed=NOW.replace(tzinfo=None)
     original=before.said[0].model_dump(mode="json")
-    view=build_planner_view(before,budget=1800)
+    view=build_planner_view(before,budget=4000)
     assert "said0" not in view.ids and "said9" in view.ids
     assert before.said[0].model_dump(mode="json")==original
 

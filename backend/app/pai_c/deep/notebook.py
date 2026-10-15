@@ -82,8 +82,8 @@ class NotebookService:
         raw = new_notebook.model_dump(mode="json") if isinstance(new_notebook, CounselorNotebookData) else new_notebook
         if not isinstance(raw, dict):
             raise ValueError("notebook must be an object")
-        if "legacy_v1" in raw:
-            raise ValueError("legacy_v1 is read-only")
+        if any(key in raw for key in ("legacy_v1", "legacy_v2")):
+            raise ValueError("legacy archives are read-only")
         clean, changes = sanitize_notebook(raw)
         current = self.get(workspace_id)
         empty = CounselorNotebookData().model_dump(mode="json")
@@ -93,7 +93,7 @@ class NotebookService:
         if expected_version is not None and current.version != expected_version:
             raise NotebookVersionConflict(f"expected {expected_version}, found {current.version}")
         # Historical evidence is immutable and is never supplied by a model.
-        clean = clean.model_copy(update={"legacy_v1": current.notebook.legacy_v1})
+        clean = clean.model_copy(update={"legacy_v1": current.notebook.legacy_v1, "legacy_v2": current.notebook.legacy_v2})
         # Retain all earlier certainty ratings, even when the Analyst omits them.
         old_rating = current.notebook.sure
         history = list(old_rating.history)
