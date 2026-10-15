@@ -218,6 +218,9 @@ class OnboardingService:
                 user.display_name = cleaned["preferredName"]
                 if user.onboarded_at is None:
                     user.onboarded_at = datetime.now(timezone.utc)
+                    from app.runtime.task_runtime import enqueue
+                    enqueue(self.db, job_type="counselor.opening", workspace_id=workspace_id,
+                            payload={}, idempotency_key=f"counselor:opening:{workspace_id}")
 
         return {"saved": saved, "rejected": rejected,
                 "completed": bool(user and user.onboarded_at)}

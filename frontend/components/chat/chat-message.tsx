@@ -193,13 +193,10 @@ function Attachments({ items }: { items: Attachment[] }) {
 interface ChatMessageProps {
   message: WorkspaceMessage;
   agents?: WorkspaceAgent[];
-  /** True only for the trailing message — gates the suggestion chips. */
-  isLast?: boolean;
-  /** Send a suggested prompt as the user's message (tap-to-ask chips). */
-  onSuggestion?: (text: string) => void;
+
 }
 
-export const ChatMessage = memo(function ChatMessage({ message, agents = [], isLast = false, onSuggestion }: ChatMessageProps) {
+export const ChatMessage = memo(function ChatMessage({ message, agents = [] }: ChatMessageProps) {
   const { currentUser } = useWorkspace();
   const t = useT();
   const { formatTime } = useFormatters();
@@ -310,22 +307,6 @@ export const ChatMessage = memo(function ChatMessage({ message, agents = [], isL
             <MarkdownContent content={message.content} agentNames={agentNames} agentLabels={agentLabels} />
             <Attachments items={attachments} />
             {Array.isArray(message.metadata?.roadmaps) && <RoadmapComparison initial={message.metadata.roadmaps as unknown as Roadmap[]} />}
-
-            {/* Tap-to-ask chips (e.g. PAI Counselor's seeded welcome). Only on the
-                trailing message: once the user replies, the moment is over. */}
-            {isLast && onSuggestion && Array.isArray(message.metadata?.suggestions) && (
-              <div className="mt-2.5 flex flex-wrap gap-2">
-                {(message.metadata.suggestions as string[]).slice(0, 4).map((s) => (
-                  <button
-                    key={s}
-                    onClick={() => onSuggestion(s)}
-                    className="rounded-full border border-primary/30 bg-primary/[0.04] px-3.5 py-2 text-[13px] font-medium text-primary hover:bg-primary/10 active:scale-[0.98] transition"
-                  >
-                    {s}
-                  </button>
-                ))}
-              </div>
-            )}
 
             {/* Action bar — revealed on hover, as in ChatGPT */}
             <div className="mt-1 flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100">

@@ -164,36 +164,13 @@ def provision_pai(db, workspace) -> bool:
     return True
 
 
-# Tappable prompts shown under the seeded greeting (frontend renders
-# ``metadata.suggestions`` as one-tap chips — typing on a phone is the most
-# expensive thing we can ask of a brand-new user).
-WELCOME_SUGGESTIONS = [
-    "Help me plan my education journey",
-    "Help me explore my options",
-    "What should I do next?",
-]
-
-WELCOME_GREETING = (
-    "Hi, I'm PAI Counselor — your personal education counselor inside Placement AI.\n\n"
-    "Tell me where you are in your education journey, or what you want to achieve, "
-    "and I'll help you figure out the best next step."
-)
-
-
 def ensure_primary_conversation(db, workspace) -> bool:
-    """Idempotently create the workspace's canonical PAI conversation.
+    """Create the canonical empty channel; onboarding queues its opening.
 
-    Identity-created workspaces get zero channels and PAI Counselor only ever *reacts*,
-    so a brand-new user lands in an empty room — a dead end on mobile, where
-    the launcher can't be installed. Seed one PAI Counselor-led thread with a greeting
-    and tappable suggestions so the first minute delivers a working agent
-    conversation instead. Caller commits; call inside try/except — this must
-    never block workspace creation.
+    Caller commits. Channel creation remains idempotent and independent of
+    model availability.
     """
-    import time
-    import uuid
-
-    from app.models import Channel, ChannelMember, EventRecord, Workspace
+    from app.models import Channel, ChannelMember, Workspace
 
     # Serialize first-time creation on PostgreSQL so simultaneous discovery
     # requests cannot race between the existence check and insert.
@@ -235,25 +212,8 @@ def ensure_primary_conversation(db, workspace) -> bool:
     db.flush()
     db.add(ChannelMember(channel_id=channel.id, agent_name=PAI_AGENT_NAME))
 
-    # Persist the greeting directly (same shape as a pipeline-posted PAI Counselor chat
-    # message). No SSE publish needed: the workspace was created milliseconds
-    # ago, nobody is subscribed yet — the first page load reads it from the DB.
-    db.add(EventRecord(
-        id=str(uuid.uuid4()),
-        network_id=workspace.id,
-        type="workspace.message.posted",
-        source=f"openagents:{PAI_AGENT_NAME}",
-        target=f"channel/{channel.name}",
-        payload={"content": WELCOME_GREETING, "message_type": "chat"},
-        metadata_={
-            "target_agents": ["__no_response__"],
-            "suggestions": WELCOME_SUGGESTIONS,
-        },
-        timestamp=int(time.time() * 1000),
-        visibility="channel",
-    ))
     db.flush()
-    logger.info("pai: seeded welcome thread in workspace %s", workspace.id)
+    logger.info("pai: created primary conversation in workspace %s", workspace.id)
     return True
 
 

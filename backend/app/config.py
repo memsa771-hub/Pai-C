@@ -190,6 +190,9 @@ class Config:
     PAI_STATEMENT_FALLBACK_REPLY: str = os.environ.get(
         "PAI_STATEMENT_FALLBACK_REPLY",
         "Thank you for sharing that with me. I'm taking it in, and I'll keep it in mind as we continue.")
+    PAI_OPENING_FALLBACK_REPLY: str = os.environ.get(
+        "PAI_OPENING_FALLBACK_REPLY",
+        "Hi {name}, I'm PAI, your counselor. Before anything else, I'd like to get to know you a little, so that my help fits you. Tell me about yourself, whatever you feel is important for me to know.")
     PAI_WELLBEING_RESOURCES: str = os.environ.get("PAI_WELLBEING_RESOURCES", "")
     PAI_WELLBEING_FALLBACK_REPLY: str = os.environ.get(
         "PAI_WELLBEING_FALLBACK_REPLY",

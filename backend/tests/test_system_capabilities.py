@@ -6,6 +6,7 @@ from app.capabilities.router import CapabilityNotFound
 from app.tools.builtin import capabilities
 
 JOB_TYPES = (
+    "counselor.opening",
     "counselor.analyze", "counselor.mirror", "counselor.mirror_research", "roadmaps.mark_stale",
     "memory.extract", "memory.reconcile", "memory.embed", "memory.unindex",
     "memory.reindex", "memory.resume_research", "research.refresh_stale",

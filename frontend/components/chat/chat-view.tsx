@@ -2,6 +2,7 @@
 
 import { useCallback, useRef, useState, useEffect, useMemo } from 'react';
 import { ChatMessages } from './chat-messages';
+import { WorkingIndicator } from './working-indicator';
 import { PaiDmIntro } from './pai-dm-intro';
 import { ChatInput, type PendingFile } from './chat-input';
 import { CounselorVoiceControl } from './counselor-voice-control';
@@ -938,6 +939,9 @@ export function ChatView() {
           </div>
         ) : displayMessages.length === 0 ? (
           (() => {
+            if (currentSessionId === 'pai-counselor') {
+              return <div className="px-4 lg:px-8 py-3"><WorkingIndicator /></div>;
+            }
             // A fresh DM with the built-in assistant opens on her intro (what
             // she can do + the connect steps) instead of a blank thread.
             const dmBuiltin = isDM
@@ -965,10 +969,6 @@ export function ChatView() {
             loadOlder={loadOlder}
             hasOlder={hasOlder}
             loadingOlder={loadingOlder}
-            onSuggestion={(text) => {
-              capture('suggestion_chip_tapped', { text });
-              void handleSend(text);
-            }}
             className="flex-1 overflow-y-auto px-4 lg:px-8 py-3"
           />
         )}

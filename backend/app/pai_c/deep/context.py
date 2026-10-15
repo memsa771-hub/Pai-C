@@ -81,7 +81,7 @@ def _profile(db, workspace_id: str) -> dict:
     if owner and owner.display_name:
         identity["display_name"] = {"value": owner.display_name, "source": "onboarding"}
     for key, fact in snapshot.facts.items():
-        if key in {"preferred_name", "full_name", "date_of_birth", "current_status", "status_category"}:
+        if key in {"identity.preferred_name", "identity.full_name", "identity.date_of_birth", "identity.current_status", "identity.status_category"}:
             identity[key] = {"value": _short(fact.get("value")),
                              "source": fact.get("source_type") or "unknown"}
     facts = {key: {"id": fact.get("id"), "value": _short(fact.get("value")),

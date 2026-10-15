@@ -1,0 +1,70 @@
+"""One durable opening after onboarding, delivered through the Messenger."""
+import json
+import logging
+from pathlib import Path
+
+from sqlalchemy import select
+
+from app.config import config
+from app.inference.gateway import complete
+from app.models import EventRecord, User, Workspace
+from app.pai_c.deep.analysis import _workspace_lock
+from app.pai_c.deep.context import build_context
+from app.pai_c.deep.polish import contains_blocked_script
+from app.pai_c.deep.prompts import load_prompt
+from app.pai_c.deep.turn_input import CounselorTurnInput
+from app.pai_c.posting import send_to_student
+from app.services.pai import PAI_AGENT_NAME, PAI_PRIMARY_CHANNEL
+
+JOB_OPENING = "counselor.opening"
+logger = logging.getLogger(__name__)
+
+
+def _already_posted(db, workspace_id, channel):
+    return db.scalar(select(EventRecord.id).where(
+        EventRecord.network_id == workspace_id,
+        EventRecord.target == channel,
+        EventRecord.source == f"openagents:{PAI_AGENT_NAME}",
+        EventRecord.type == "workspace.message.posted",
+    ).limit(1)) is not None
+
+
+async def opening_job(job, db):
+    workspace_id, job_id = job.workspace_id, job.id
+    final_attempt = job.attempts >= job.max_attempts
+    channel = f"channel/{PAI_PRIMARY_CHANNEL}"
+    async with _workspace_lock(db, workspace_id):
+        if _already_posted(db, workspace_id, channel):
+            return {"status": "already_posted"}
+        workspace = db.get(Workspace, workspace_id)
+        user = db.get(User, workspace.owner_user_id) if workspace else None
+        if user is None or user.onboarded_at is None:
+            return {"status": "not_onboarded"}
+        name = user.display_name or ""
+        turn = CounselorTurnInput(channel, workspace_id, "", (), None,
+                                  job_id, None, "system:opening")
+        context = await build_context(db, workspace_id, turn)
+        instruction = (Path(__file__).parent / "policy/actions/opening.md").read_text(encoding="utf-8")
+        db.rollback()
+        try:
+            raw = await complete("counselor", messages=[],
+                system_prompt=load_prompt("voice") + "\n\n" + context.text + "\n\n" + instruction,
+                response_format={"type": "json_object"}, phase="opening", turn_id=job_id)
+            data = json.loads(raw)
+            reply = data.get("reply") if isinstance(data, dict) else None
+            if not isinstance(reply, str) or not reply.strip() or contains_blocked_script(
+                    reply, config.PAI_LANGUAGE_BLOCKED_SCRIPTS):
+                raise ValueError("Invalid opening reply")
+        except Exception as exc:
+            logger.warning("counselor_opening_error job_id=%s error_type=%s", job_id, type(exc).__name__)
+            if not final_attempt:
+                raise
+            reply = config.PAI_OPENING_FALLBACK_REPLY.replace("{name}", name)
+        # Another normal reply may have arrived while the model was running.
+        if _already_posted(db, workspace_id, channel):
+            return {"status": "already_posted"}
+        posted = await send_to_student(db, workspace_id, channel, PAI_AGENT_NAME,
+                                       reply.strip(), 0)
+        if not posted:
+            raise RuntimeError("Opening was not posted")
+        return {"status": "posted", "event_id": posted}
