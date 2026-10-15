@@ -75,7 +75,9 @@ jobs:
             backend/requirements.txt
             backend/requirements-dev.txt
       - name: Install dependencies
-        run: pip install -r backend/requirements.txt -r backend/requirements-dev.txt
+        # The Counsellor suite marks async tests with @pytest.mark.asyncio, which
+        # needs pytest-asyncio; no requirements file declares it yet.
+        run: pip install -r backend/requirements.txt -r backend/requirements-dev.txt pytest-asyncio==1.4.0
       - name: Existing test suite
         working-directory: backend
         run: python -m pytest
