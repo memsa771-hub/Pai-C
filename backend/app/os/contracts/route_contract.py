@@ -9,6 +9,8 @@ _COUNTRY_RE = re.compile(r"^[A-Z]{2}$")
 
 
 class ProgrammeChoice(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     programme_ref: str = Field(min_length=1)
     rank: int = Field(ge=1)
 
@@ -19,6 +21,8 @@ class ProgrammeChoice(BaseModel):
 
 
 class IntakeRef(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     term: str = Field(pattern=r"^[a-z_]+$")
     year: int = Field(ge=2025, le=2100)
 
@@ -28,13 +32,18 @@ class RouteContract(BaseModel):
 
     contract_version: Literal["1"]
     source: Literal["self_serve", "counsellor"]
-    external_ref: str
-    student_ref: str
+    external_ref: str = Field(min_length=1)
+    student_ref: str = Field(min_length=1)
     origin_country: str
     destination_country: str
     level: Literal["foundation", "bachelor", "master", "phd"]
     programmes: list[ProgrammeChoice] = Field(min_length=1, max_length=10)
     target_intake: IntakeRef
+
+    @field_validator("external_ref", "student_ref", mode="before")
+    @classmethod
+    def _strip_refs(cls, value: object) -> object:
+        return value.strip() if isinstance(value, str) else value
 
     @field_validator("origin_country", "destination_country", mode="before")
     @classmethod
