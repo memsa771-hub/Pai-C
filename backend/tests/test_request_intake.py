@@ -61,7 +61,7 @@ async def test_answered_now_uses_actual_posted_reply_and_is_idempotent():
             "action": {"type": "note_question", "question_to_research": "Help with this task",
                        "kind": "task", "needs_research": False}})
         with patch("app.pai_c.deep.turn.chat_completion", AsyncMock(return_value=output)), \
-             patch("app.pai_c.safety.gate.complete", AsyncMock(return_value='{"level":"none","category":null}')):
+             patch("app.pai_c.policy.classifier.complete", AsyncMock(return_value='{"safety":{"level":"none","category":null},"intent":"sharing","emotion":"neutral","request":null,"mentioned_areas":[],"declined_area":null}')):
             posted = await runtime._run_deep_turn(db, student.workspace_id, event_data, 0)
         row = db.scalar(sa.select(CounselorNotedQuestion))
         assert row.status == "answered_now" and not row.needs_research and row.kind == "task"

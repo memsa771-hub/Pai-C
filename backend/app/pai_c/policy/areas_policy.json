@@ -1,0 +1,33 @@
+{
+  "priority": [
+    "status",
+    "interests",
+    "history",
+    "family_social",
+    "values",
+    "strengths",
+    "pressures",
+    "sure"
+  ],
+  "sensitive": {
+    "family_social": {
+      "min_student_messages": 3,
+      "unless_mentioned": true
+    },
+    "pressures": {
+      "min_student_messages": 4,
+      "unless_mentioned": true
+    }
+  },
+  "declined_cooldown_student_messages": 12,
+  "topic_text": {
+    "status": "what they are doing these days",
+    "history": "their journey so far in studies and experiences",
+    "interests": "what they enjoy, in or outside their studies",
+    "family_social": "the people around them, their family and friends, and how those people see the student's path",
+    "values": "what matters most to them when they choose",
+    "strengths": "what they have done well, or what others come to them for",
+    "pressures": "what makes their choices hard: expectations, money, time or comparison",
+    "sure": "how sure they feel about their direction, on a scale from 0 to 10"
+  }
+}

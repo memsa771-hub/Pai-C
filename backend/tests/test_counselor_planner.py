@@ -213,8 +213,11 @@ async def test_plan_saved_with_map_version_context_and_wellbeing_forces_care():
         assert service.latest_plan(student.workspace_id).next_move == "care"
         assert service.latest_plan(str(uuid4())) is None
         turn=CounselorTurnInput("chat",student.workspace_id,"Next",(),None,event_id,None,f"human:{student.user_id}")
-        context=await build_context(db,student.workspace_id,turn)
-        assert "<plan>" in context.text and "Some reflection" in context.text and "Already answered?" in context.text
+        from app.pai_c.policy.controller import Decision
+        context=await build_context(db,student.workspace_id,turn,
+            decision=Decision("default","insight",None,False,False,False))
+        assert "<plan>" not in context.text and "<decision>" in context.text
+        assert "Some reflection" in context.text and "Already answered?" in context.text
         assert '"playbooks"' not in context.text
         service.delete_for_workspace(student.workspace_id);db.commit()
         assert not db.scalars(select(PaiTurnPlan)).all()

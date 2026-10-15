@@ -48,7 +48,7 @@ def offline_memory_index():
 
 
 @pytest.fixture(autouse=True)
-def offline_safety_model(monkeypatch):
+def offline_classifier_model(monkeypatch):
     from unittest.mock import AsyncMock
-    from app.pai_c.safety import gate
-    monkeypatch.setattr(gate, "complete", AsyncMock(return_value='{"level":"none","category":null}'))
+    from app.pai_c.policy import classifier as gate
+    monkeypatch.setattr(gate, "complete", AsyncMock(return_value='{"safety":{"level":"none","category":null},"intent":"sharing","emotion":"neutral","request":null,"mentioned_areas":[],"declined_area":null}'))

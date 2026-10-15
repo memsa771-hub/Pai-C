@@ -4,6 +4,7 @@ import json
 import logging
 import re
 import time
+from pathlib import Path
 from dataclasses import dataclass, field
 
 from app.config import config
@@ -70,8 +71,9 @@ async def run_deep_turn(db, turn: CounselorTurnInput, *,
                         roadmap_id: str | None = None,
                         history: list[dict] | None = None,
                         instructions: str | None = None,
-                        safety_level: str | None = None) -> DeepTurnResult:
-    context = await build_context(db, turn.workspace_id, turn, roadmap_id=roadmap_id, wellbeing=instructions == "wellbeing")
+                        safety_level: str | None = None,
+                        decision=None, signals=None) -> DeepTurnResult:
+    context = await build_context(db, turn.workspace_id, turn, roadmap_id=roadmap_id, wellbeing=instructions == "wellbeing", decision=decision, signals=signals)
     owner_id = turn.source.removeprefix("human:") if turn.source.startswith("human:") else ""
     if history is None:
         history = [{"role": item["role"], "content": item["content"]}
@@ -90,51 +92,59 @@ async def run_deep_turn(db, turn: CounselorTurnInput, *,
                 prompt += "\n<wellbeing_resources>" + config.PAI_WELLBEING_RESOURCES + "</wellbeing_resources>"
     model_ms = 0
     polish_ms = 0
-    language_retried = False
-    async def generate(system_prompt, phase):
-        nonlocal model_ms, polish_ms, language_retried
-        for attempt in range(2):
-            started = time.monotonic()
-            raw = await chat_completion(role="counselor",
-                api_key=config.PAI_API_KEY, model=resolve_model("counselor"),
-                messages=messages,
-                system_prompt=system_prompt + ("\n\n" + load_prompt("language_retry") if attempt else ""),
-                response_format={"type": "json_object"},
-                reasoning_effort=config.PAI_COUNSELOR_REASONING_EFFORT,
-                base_url=config.PAI_BASE_URL,
-                phase="counselor_retry" if attempt else phase, turn_id=turn.source_event_id)
-            model_ms += int((time.monotonic() - started) * 1000)
-            started = time.monotonic()
-            reply, action, moves = _parse_response(raw)
-            reply = polish_reply(reply)
-            blocked = contains_blocked_script(reply, config.PAI_LANGUAGE_BLOCKED_SCRIPTS)
-            polish_ms += int((time.monotonic() - started) * 1000)
-            if not blocked:
-                return (reply, action, moves) if reply else (config.PAI_COUNSELOR_FALLBACK_REPLY, {"type":"none"}, [])
-            if language_retried:
-                break
-            language_retried = True
-        return config.PAI_COUNSELOR_FALLBACK_REPLY, {"type":"none"}, []
-
-    reply, action, moves = await generate(prompt, "counselor")
     violations = []
-    if instructions != "wellbeing" and action.get("type") != "wellbeing":
-        from app.pai_c.voice.guards import repeated_questions, remove_repeated
-        avoid = context.plan.avoid_questions if context.plan is not None else []
+    retry_line = ""
+    from app.pai_c.voice.guards import repeated_questions, remove_repeated, question_sentences
+    for attempt in range(2):
         started = time.monotonic()
-        repeated = repeated_questions(reply, history, avoid)
-        polish_ms += int((time.monotonic() - started) * 1000)
-        if repeated:
-            violations.append("repeated_question")
-            line = ("Your draft repeated a question already asked: " + repeated[0][2]
-                    + ". Do not ask it again. Reflect what you know or ask about something new.")
-            reply, action, moves = await generate(prompt + "\n\n" + line, "counselor_repeat_retry")
-            started = time.monotonic()
-            if action.get("type") != "wellbeing":
-                repeated = repeated_questions(reply, history, avoid)
-                cleaned = remove_repeated(reply, repeated)
-                if repeated and cleaned:
+        raw = await chat_completion(role="counselor",
+            api_key=config.PAI_API_KEY, model=resolve_model("counselor"), messages=messages,
+            system_prompt=prompt + ("\n\n" + retry_line if retry_line else ""),
+            response_format={"type": "json_object"},
+            reasoning_effort=config.PAI_COUNSELOR_REASONING_EFFORT,
+            base_url=config.PAI_BASE_URL,
+            phase="counselor_retry" if attempt else "counselor", turn_id=turn.source_event_id)
+        model_ms += int((time.monotonic() - started) * 1000)
+        started = time.monotonic()
+        reply, action, moves = _parse_response(raw)
+        if instructions == "wellbeing" or action.get("type") == "wellbeing":
+            break
+        if contains_blocked_script(reply, config.PAI_LANGUAGE_BLOCKED_SCRIPTS):
+            if attempt == 0:
+                retry_line = load_prompt("language_retry")
+                polish_ms += int((time.monotonic() - started) * 1000)
+                continue
+            reply, action, moves = config.PAI_COUNSELOR_FALLBACK_REPLY, {"type": "none"}, []
+        if decision is not None and not decision.question_allowed:
+            questions = list(question_sentences(reply))
+            if questions:
+                cleaned = remove_repeated(reply, questions)
+                if cleaned:
                     reply = cleaned
-                    violations.append("repeat_removed")
-            polish_ms += int((time.monotonic() - started) * 1000)
+                    violations.append("question_removed")
+                elif attempt == 0:
+                    violations.append("question_retry")
+                    retry_line = (Path(__file__).parent.parent / "policy/prompts/question_retry.md").read_text(encoding="utf-8").strip()
+                    polish_ms += int((time.monotonic() - started) * 1000)
+                    continue
+                else:
+                    reply = config.PAI_STATEMENT_FALLBACK_REPLY
+                    violations.append("statement_fallback")
+        reply = polish_reply(reply)
+        avoid = context.plan.avoid_questions if context.plan is not None else []
+        repeated = repeated_questions(reply, history, avoid)
+        if repeated:
+            if "repeated_question" not in violations:
+                violations.append("repeated_question")
+            if attempt == 0:
+                retry_line = ("Your draft repeated a question already asked: " + repeated[0][2]
+                    + ". Do not ask it again. Reflect what you know or ask about something new.")
+                polish_ms += int((time.monotonic() - started) * 1000)
+                continue
+            cleaned = remove_repeated(reply, repeated)
+            if cleaned:
+                reply = cleaned
+                violations.append("repeat_removed")
+        polish_ms += int((time.monotonic() - started) * 1000)
+        break
     return DeepTurnResult(reply, action, context, model_ms, polish_ms, moves, violations)

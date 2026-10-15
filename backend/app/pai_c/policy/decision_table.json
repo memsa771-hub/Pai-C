@@ -1,0 +1,472 @@
+{
+  "derived": {
+    "summary_min_covered": 2,
+    "invite_max_covered": 3,
+    "question_window": 2,
+    "short_reply_intent": "short_reply",
+    "summary_action": "summarize"
+  },
+  "rows": [
+    {
+      "id": "care",
+      "when": {
+        "in": [
+          {
+            "ref": "safety.level"
+          },
+          [
+            "concern",
+            "urgent"
+          ]
+        ]
+      },
+      "set": {
+        "action": "care",
+        "question_allowed": false,
+        "topic": null,
+        "invite": false
+      }
+    },
+    {
+      "id": "adjust",
+      "when": {
+        "eq": [
+          {
+            "ref": "intent"
+          },
+          "pushback"
+        ]
+      },
+      "set": {
+        "action": "adjust",
+        "question_allowed": true,
+        "topic": null,
+        "invite": false
+      }
+    },
+    {
+      "id": "answer",
+      "when": {
+        "all": [
+          {
+            "ne": [
+              {
+                "ref": "request"
+              },
+              null
+            ]
+          },
+          {
+            "in": [
+              {
+                "ref": "intent"
+              },
+              [
+                "asking_info",
+                "asking_task"
+              ]
+            ]
+          }
+        ]
+      },
+      "set": {
+        "action": "answer_request",
+        "question_allowed": {
+          "ref": "request.needs_context"
+        },
+        "topic": "request",
+        "invite": {
+          "ref": "invite_pending"
+        }
+      }
+    },
+    {
+      "id": "guide",
+      "when": {
+        "eq": [
+          {
+            "ref": "intent"
+          },
+          "deciding"
+        ]
+      },
+      "set": {
+        "action": "guide",
+        "question_allowed": true,
+        "topic": null,
+        "invite": false
+      }
+    },
+    {
+      "id": "mirror",
+      "when": {
+        "ref": "mirror_ready"
+      },
+      "set": {
+        "action": "mirror",
+        "question_allowed": false,
+        "topic": null,
+        "invite": false
+      }
+    },
+    {
+      "id": "summarize",
+      "when": {
+        "ref": "summary_due"
+      },
+      "set": {
+        "action": "summarize",
+        "question_allowed": true,
+        "topic": null,
+        "invite": false
+      }
+    },
+    {
+      "id": "listen",
+      "when": {
+        "in": [
+          {
+            "ref": "emotion"
+          },
+          [
+            "stressed",
+            "frustrated"
+          ]
+        ]
+      },
+      "set": {
+        "action": "listen_reflect",
+        "question_allowed": false,
+        "topic": null,
+        "invite": false
+      }
+    },
+    {
+      "id": "rest",
+      "when": {
+        "ref": "questions_in_last_two"
+      },
+      "set": {
+        "action": {
+          "if": [
+            {
+              "ref": "insight_available"
+            },
+            "insight",
+            "listen_reflect"
+          ]
+        },
+        "question_allowed": false,
+        "topic": null,
+        "invite": false
+      }
+    },
+    {
+      "id": "choice",
+      "when": {
+        "all": [
+          {
+            "gte": [
+              {
+                "ref": "short_reply_streak"
+              },
+              2
+            ]
+          },
+          {
+            "ne": [
+              {
+                "ref": "askable_area"
+              },
+              null
+            ]
+          }
+        ]
+      },
+      "set": {
+        "action": "ask_choice",
+        "question_allowed": true,
+        "topic": {
+          "ref": "askable_area"
+        },
+        "invite": false
+      }
+    },
+    {
+      "id": "ask",
+      "when": {
+        "ne": [
+          {
+            "ref": "askable_area"
+          },
+          null
+        ]
+      },
+      "set": {
+        "action": "ask",
+        "question_allowed": true,
+        "topic": {
+          "ref": "askable_area"
+        },
+        "invite": false
+      }
+    },
+    {
+      "id": "default",
+      "when": true,
+      "set": {
+        "action": {
+          "if": [
+            {
+              "ref": "insight_available"
+            },
+            "insight",
+            "listen_reflect"
+          ]
+        },
+        "question_allowed": false,
+        "topic": null,
+        "invite": false
+      }
+    }
+  ],
+  "post_checks": [
+    {
+      "id": "no_repeat",
+      "when": {
+        "all": [
+          {
+            "eq": [
+              {
+                "ref": "chosen.action"
+              },
+              {
+                "ref": "previous.action"
+              }
+            ]
+          },
+          {
+            "eq": [
+              {
+                "ref": "chosen.topic"
+              },
+              {
+                "ref": "previous.topic"
+              }
+            ]
+          }
+        ]
+      },
+      "branches": [
+        {
+          "when": {
+            "all": [
+              {
+                "eq": [
+                  {
+                    "ref": "chosen.question_allowed"
+                  },
+                  false
+                ]
+              },
+              {
+                "eq": [
+                  {
+                    "ref": "chosen.action"
+                  },
+                  "listen_reflect"
+                ]
+              },
+              {
+                "ref": "insight_available"
+              }
+            ]
+          },
+          "set": {
+            "action": "insight",
+            "question_allowed": false,
+            "topic": null,
+            "invite": false
+          }
+        },
+        {
+          "when": {
+            "all": [
+              {
+                "eq": [
+                  {
+                    "ref": "chosen.question_allowed"
+                  },
+                  false
+                ]
+              },
+              {
+                "eq": [
+                  {
+                    "ref": "chosen.action"
+                  },
+                  "insight"
+                ]
+              }
+            ]
+          },
+          "set": {
+            "action": "listen_reflect",
+            "question_allowed": false,
+            "topic": null,
+            "invite": false
+          }
+        },
+        {
+          "when": {
+            "all": [
+              {
+                "ref": "chosen.question_allowed"
+              },
+              {
+                "in": [
+                  {
+                    "ref": "chosen.action"
+                  },
+                  [
+                    "ask",
+                    "ask_choice"
+                  ]
+                ]
+              }
+            ]
+          },
+          "set": {
+            "action": {
+              "if": [
+                {
+                  "ne": [
+                    {
+                      "ref": "next_askable_area"
+                    },
+                    null
+                  ]
+                },
+                {
+                  "ref": "chosen.action"
+                },
+                {
+                  "if": [
+                    {
+                      "ref": "insight_available"
+                    },
+                    "insight",
+                    "listen_reflect"
+                  ]
+                }
+              ]
+            },
+            "question_allowed": {
+              "ne": [
+                {
+                  "ref": "next_askable_area"
+                },
+                null
+              ]
+            },
+            "topic": {
+              "ref": "next_askable_area"
+            },
+            "invite": false
+          }
+        },
+        {
+          "when": {
+            "all": [
+              {
+                "ref": "chosen.question_allowed"
+              },
+              {
+                "eq": [
+                  {
+                    "ref": "chosen.action"
+                  },
+                  "adjust"
+                ]
+              }
+            ]
+          },
+          "set": {
+            "action": {
+              "if": [
+                {
+                  "ne": [
+                    {
+                      "ref": "askable_area"
+                    },
+                    null
+                  ]
+                },
+                "ask",
+                "summarize"
+              ]
+            },
+            "question_allowed": true,
+            "topic": {
+              "ref": "askable_area"
+            },
+            "invite": false
+          }
+        },
+        {
+          "when": {
+            "all": [
+              {
+                "ref": "chosen.question_allowed"
+              },
+              {
+                "eq": [
+                  {
+                    "ref": "chosen.action"
+                  },
+                  "summarize"
+                ]
+              }
+            ]
+          },
+          "set": {
+            "action": {
+              "if": [
+                {
+                  "ne": [
+                    {
+                      "ref": "askable_area"
+                    },
+                    null
+                  ]
+                },
+                "ask",
+                {
+                  "if": [
+                    {
+                      "ref": "insight_available"
+                    },
+                    "insight",
+                    "listen_reflect"
+                  ]
+                }
+              ]
+            },
+            "question_allowed": {
+              "ne": [
+                {
+                  "ref": "askable_area"
+                },
+                null
+              ]
+            },
+            "topic": {
+              "ref": "askable_area"
+            },
+            "invite": false
+          }
+        }
+      ]
+    }
+  ]
+}

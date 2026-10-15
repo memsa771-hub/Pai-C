@@ -31,7 +31,7 @@ class NotedQuestionService:
 
     def record(self, workspace_id: str, source_event_id: str, question: object, *,
                kind: object = _UNSET, needs_research: object = _UNSET,
-               answered_event_id: str | None = None) -> str:
+               answered_event_id: str | None = None, pending: bool = False) -> str:
         if not isinstance(question, str) or not question.strip() or not source_event_id:
             return "ignored"
         policy = request_policy()
@@ -57,7 +57,7 @@ class NotedQuestionService:
         if self.db.scalar(existing):
             self.db.rollback()
             return "duplicate"
-        if not needs_research:
+        if not needs_research and not pending:
             reply = self.db.scalar(select(EventRecord.id).where(
                 EventRecord.id == answered_event_id, EventRecord.network_id == workspace_id,
                 EventRecord.source == "openagents:pai", EventRecord.type == "workspace.message.posted"))
@@ -67,7 +67,7 @@ class NotedQuestionService:
         self.db.add(CounselorNotedQuestion(
             workspace_id=workspace_id, source_event_id=source_event_id,
             question_to_research=question.strip(), kind=kind, needs_research=needs_research,
-            status=policy["pending_status"] if needs_research else policy["immediate_status"],
+            status=policy["pending_status"] if needs_research or pending else policy["immediate_status"],
             answered_event_id=None if needs_research else answered_event_id))
         try:
             self.db.commit()
@@ -77,3 +77,19 @@ class NotedQuestionService:
                 return "duplicate"
             raise
         return "recorded"
+
+    def mark_answered_now(self, workspace_id, source_event_id, answered_event_id):
+        policy = request_policy()
+        row = self.db.scalar(select(CounselorNotedQuestion).where(
+            CounselorNotedQuestion.workspace_id == workspace_id,
+            CounselorNotedQuestion.source_event_id == source_event_id).with_for_update())
+        reply = self.db.scalar(select(EventRecord.id).where(
+            EventRecord.id == answered_event_id, EventRecord.network_id == workspace_id,
+            EventRecord.source == "openagents:pai", EventRecord.type == "workspace.message.posted"))
+        if row is None or reply is None or row.needs_research or row.status != policy["pending_status"]:
+            self.db.rollback()
+            return False
+        row.status = policy["immediate_status"]
+        row.answered_event_id = answered_event_id
+        self.db.commit()
+        return True

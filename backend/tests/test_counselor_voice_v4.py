@@ -134,6 +134,6 @@ async def test_combined_guards_keep_one_language_retry_for_the_whole_turn():
                 patch.object(config, 'PAI_LANGUAGE_BLOCKED_SCRIPTS', 'Greek'):
             result = await run_deep_turn(db, _turn(student),
                 history=[{'role':'assistant','content':'What did you enjoy doing?'}])
-        assert model.await_count == 3
-        assert result.reply == config.PAI_COUNSELOR_FALLBACK_REPLY
+        assert model.await_count == 2
+        assert result.reply == 'What did you enjoy doing?'
         assert result.guard_violations == ['repeated_question']

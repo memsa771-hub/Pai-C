@@ -1,0 +1,11 @@
+{
+  "safety": {
+    "level": "none",
+    "category": null
+  },
+  "intent": "sharing",
+  "emotion": "neutral",
+  "request": null,
+  "mentioned_areas": [],
+  "declined_area": null
+}

@@ -1361,6 +1361,7 @@ class CounselorTurnDecision(Base):
     slot_key = Column(Text, nullable=True)
     safety_level = Column(Text, nullable=True)
     safety_category = Column(Text, nullable=True)
+    decision = Column(JSONB, nullable=True)
     moves = Column(JSONB, nullable=True)
     guard_violations = Column(JSONB, nullable=False, default=list, server_default=text("'[]'"))
 

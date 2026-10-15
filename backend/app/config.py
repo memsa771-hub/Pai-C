@@ -183,6 +183,13 @@ class Config:
     PAI_SAFETY_MODEL: str = os.environ.get("PAI_SAFETY_MODEL", "") or PAI_ANALYST_MODEL or PAI_MODEL
     PAI_SAFETY_REASONING_EFFORT: str = os.environ.get("PAI_SAFETY_REASONING_EFFORT", "low")
     PAI_SAFETY_TIMEOUT_MS: int = int(os.environ.get("PAI_SAFETY_TIMEOUT_MS", "3000"))
+    PAI_CLASSIFIER_MODEL: str = os.environ.get("PAI_CLASSIFIER_MODEL", "") or PAI_SAFETY_MODEL or PAI_ANALYST_MODEL or PAI_MODEL
+    PAI_CLASSIFIER_REASONING_EFFORT: str = os.environ.get("PAI_CLASSIFIER_REASONING_EFFORT", "low")
+    PAI_CLASSIFIER_TIMEOUT_MS: int = int(os.environ.get("PAI_CLASSIFIER_TIMEOUT_MS", "4000"))
+    PAI_SUMMARY_EVERY_TURNS: int = int(os.environ.get("PAI_SUMMARY_EVERY_TURNS", "4"))
+    PAI_STATEMENT_FALLBACK_REPLY: str = os.environ.get(
+        "PAI_STATEMENT_FALLBACK_REPLY",
+        "Thank you for sharing that with me. I'm taking it in, and I'll keep it in mind as we continue.")
     PAI_WELLBEING_RESOURCES: str = os.environ.get("PAI_WELLBEING_RESOURCES", "")
     PAI_WELLBEING_FALLBACK_REPLY: str = os.environ.get(
         "PAI_WELLBEING_FALLBACK_REPLY",
@@ -396,6 +403,11 @@ class Config:
             raise RuntimeError("PAI_COUNSELOR_FALLBACK_REPLY must not be empty")
         import re
         import regex as unicode_regex
+        import unicodedata
+        if not self.PAI_STATEMENT_FALLBACK_REPLY.strip() or any(
+            "QUESTION MARK" in unicodedata.name(char, "") for char in self.PAI_STATEMENT_FALLBACK_REPLY
+        ):
+            raise RuntimeError("PAI_STATEMENT_FALLBACK_REPLY must be a nonempty statement without question marks")
 
         for script in self.PAI_LANGUAGE_BLOCKED_SCRIPTS.split(","):
             name = script.strip()
@@ -409,7 +421,10 @@ class Config:
                 raise RuntimeError("PAI_LANGUAGE_BLOCKED_SCRIPTS contains an unknown script") from exc
             if pattern.search(self.PAI_COUNSELOR_FALLBACK_REPLY):
                 raise RuntimeError("PAI_COUNSELOR_FALLBACK_REPLY uses a blocked script")
-        if min(self.PAI_SESSION_GAP_MINUTES, self.PAI_SESSION_SWEEP_SECONDS,
+            if pattern.search(self.PAI_STATEMENT_FALLBACK_REPLY):
+                raise RuntimeError("PAI_STATEMENT_FALLBACK_REPLY uses a blocked script")
+        if min(self.PAI_CLASSIFIER_TIMEOUT_MS, self.PAI_SUMMARY_EVERY_TURNS,
+               self.PAI_SESSION_GAP_MINUTES, self.PAI_SESSION_SWEEP_SECONDS,
                self.PAI_SEMANTIC_RECALL_TOP_K,
                self.PAI_COUNSELOR_NOTEBOOK_CONTEXT_TOKENS,
                self.PAI_COUNSELOR_HISTORY_SIZE,

@@ -1,0 +1,1 @@
+They are weighing options. Lay out the trade-offs using only what they told you and <research>, and connect each option to what matters to them. Then ask which of those matters most to them, or which way they lean.

@@ -1,0 +1,1 @@
+Share one observation that connects what they just said with something they told you earlier. You may use the insight_candidate from <decision> if it fits. Offer it as something they can correct. Do not ask a question.

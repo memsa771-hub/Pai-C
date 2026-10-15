@@ -73,18 +73,6 @@ async def _run_turn(db, workspace_id: str, event_data: dict, depth: int) -> None
         enqueue_turn_analysis(db, workspace_id, event_data.get("id"), assistant_event_id)
 
 
-async def _check_safety(student_text, history):
-    from app.pai_c.safety.gate import check_message
-    started = time.monotonic()
-    try:
-        result = await asyncio.wait_for(check_message(student_text, history),
-            timeout=config.PAI_SAFETY_TIMEOUT_MS / 1000)
-    except Exception as exc:
-        logger.warning("safety_gate_error error_type=%s", type(exc).__name__)
-        result = None
-    return result, int((time.monotonic() - started) * 1000)
-
-
 async def _run_deep_turn(db, workspace_id: str, event_data: dict, depth: int):
     """One deep Counselor response, posted through the shared chat/voice path."""
     from app.pai_c.deep.actions import dispatch_action
@@ -116,42 +104,57 @@ async def _run_deep_turn(db, workspace_id: str, event_data: dict, depth: int):
     )
     started = time.monotonic()
     safety = None
-    safety_ms = 0
+    classifier_ms = 0
+    decision = signals = None
+    history = None
     if turn.source.startswith("human:"):
         from app.pai_c.memory import MemoryService
         from app.inference.gateway import token_usage_turn
-        owner_id = turn.source.removeprefix("human:")
-        recent = MemoryService(db).recent_turns(turn, owner_id,
+        from app.pai_c.policy.classifier import classify
+        from app.pai_c.policy.controller import decide
+        from app.pai_c.policy.state import build_state
+        from app.pai_c.deep.noted_questions import NotedQuestionService
+        recent = MemoryService(db).recent_turns(turn, turn.source.removeprefix("human:"),
             limit=max(4, config.PAI_COUNSELOR_HISTORY_SIZE))
         history = [{"role": row["role"], "content": row["content"]}
                    for row in recent[-config.PAI_COUNSELOR_HISTORY_SIZE:]]
+        db.rollback()
+        classified_at = time.monotonic()
         with token_usage_turn(turn.source_event_id):
-            checked, normal = await asyncio.gather(
-                _check_safety(turn.student_text, recent),
-                run_deep_turn(db, turn, history=history), return_exceptions=True)
-        safety, safety_ms = checked
-        result = normal
-    else:
-        result = await run_deep_turn(db, turn)
-    flagged = safety is not None and safety.level in {"concern", "urgent"}
+            signals = await classify(turn.student_text, recent)
+        classifier_ms = int((time.monotonic() - classified_at) * 1000)
+        safety = signals.safety
+        if signals.request:
+            request = signals.request
+            NotedQuestionService(db).record(workspace_id, turn.source_event_id, request.text,
+                kind=request.kind, needs_research=request.needs_research, pending=True)
+        decision = decide(build_state(db, turn, signals, recent))
+    flagged = decision is not None and decision.action == "care"
     fallback_reply = None
-    if flagged:
-        try:
-            result = await run_deep_turn(db, turn, history=history,
-                instructions="wellbeing", safety_level=safety.level)
-        except Exception as exc:
-            db.rollback()
-            logger.warning("wellbeing_reply_error error_type=%s", type(exc).__name__)
-            fallback_reply = config.PAI_WELLBEING_FALLBACK_REPLY
-            if config.PAI_WELLBEING_RESOURCES:
-                fallback_reply += "\n\n" + config.PAI_WELLBEING_RESOURCES
-    elif isinstance(result, BaseException):
-        raise result
+    result = None
+    try:
+        result = await run_deep_turn(db, turn, history=history,
+            decision=decision, signals=signals,
+            instructions="wellbeing" if flagged else None,
+            safety_level=safety.level if flagged else None)
+    except Exception as exc:
+        if not flagged:
+            raise
+        db.rollback()
+        logger.warning("wellbeing_reply_error error_type=%s", type(exc).__name__)
+        fallback_reply = config.PAI_WELLBEING_FALLBACK_REPLY
+        if config.PAI_WELLBEING_RESOURCES:
+            fallback_reply += "\n\n" + config.PAI_WELLBEING_RESOURCES
     reply = fallback_reply if fallback_reply is not None else result.reply
     action = {"type": "wellbeing"} if flagged else result.action
-    context = None if isinstance(result, BaseException) else result.context
-    moves = [] if fallback_reply is not None or isinstance(result, BaseException) else result.moves
-    violations = [] if fallback_reply is not None or isinstance(result, BaseException) else result.guard_violations
+    if decision is not None and not flagged and action.get("type") != "wellbeing":
+        if decision.action == "mirror":
+            action = {"type": "mirror"}
+        elif action.get("type") == "mirror":
+            action = {"type": "none"}
+    context = result.context if result is not None else None
+    moves = [] if fallback_reply is not None or result is None else result.moves
+    violations = [] if fallback_reply is not None or result is None else result.guard_violations
     post_started = time.monotonic()
     reply_metadata = _voice_reply_metadata(event_data)
     if (reply_metadata and action.get("type") == "mirror"
@@ -164,6 +167,8 @@ async def _run_deep_turn(db, workspace_id: str, event_data: dict, depth: int):
     post_ms = int((time.monotonic() - post_started) * 1000)
     if not assistant_event_id:
         return None
+    if decision is not None and decision.action == "answer_request" and signals.request is not None and not signals.request.needs_research and action.get("type") != "wellbeing":
+        NotedQuestionService(db).mark_answered_now(workspace_id, turn.source_event_id, assistant_event_id)
     move = "none"
     status = "none"
     try:
@@ -176,22 +181,26 @@ async def _run_deep_turn(db, workspace_id: str, event_data: dict, depth: int):
         CounselorTurnDecision.workspace_id == workspace_id,
         CounselorTurnDecision.source_event_id == turn.source_event_id,
     )).scalar_one_or_none():
+        from app.pai_c.policy.state import decision_log
+        logged_decision = decision_log(decision, signals) if decision is not None else None
+        if logged_decision is not None and "statement_fallback" in violations:
+            logged_decision["statement_fallback"] = True
         db.add(CounselorTurnDecision(
             workspace_id=workspace_id, source_event_id=turn.source_event_id,
             source_timestamp=turn.timestamp or int(time.time() * 1000),
             move="wellbeing" if flagged else move,
             safety_level=safety.level if safety else None,
             safety_category=safety.category if safety else None,
-            moves=moves,
+            moves=moves, decision=logged_decision,
             guard_violations=violations + (["action_failed"] if status == "failed" else []),
         ))
         db.commit()
     logger.info(
         "counselor_deep_turn context_ms=%d model_ms=%d polish_ms=%d "
-        "post_ms=%d safety_ms=%d total_ms=%d action=%s action_status=%s moves=%s",
+        "post_ms=%d classifier_ms=%d total_ms=%d action=%s action_status=%s moves=%s",
         context.build_ms if context else 0,
-        result.model_ms if not isinstance(result, BaseException) else 0,
-        result.polish_ms if not isinstance(result, BaseException) else 0, post_ms, safety_ms,
+        result.model_ms if result is not None else 0,
+        result.polish_ms if result is not None else 0, post_ms, classifier_ms,
         int((time.monotonic() - started) * 1000), move, status, moves,
     )
     return assistant_event_id, turn.channel

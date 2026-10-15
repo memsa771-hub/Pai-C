@@ -26,7 +26,7 @@ def test_export_order_redaction_isolation_and_no_writes(tmp_path):
             source="openagents:pai", target="channel/pai", timestamp=11,
             metadata_={"trigger_event_id": "earlier"}, payload={"status": "recorded"}))
         db.add(CounselorTurnDecision(workspace_id=workspace, source_event_id="earlier",
-            source_timestamp=10, move="note_question"))
+            source_timestamp=10, move="note_question", decision={"rule_id":"answer","action":"answer_request","topic":"request"}))
         db.add(CounselorNotebook(workspace_id=workspace, notebook={"schema_version": 3, "private_notes": "deployment-secret", "legacy_v1": {"note": "private archival payload"}},
             version=2, last_event_id="earlier"))
         db.add(CounselorNotebookHistory(workspace_id=workspace, notebook={"schema_version": 3, "private_notes": "older", "legacy_v1": {"note": "private archival payload"}},
@@ -55,6 +55,8 @@ def test_export_order_redaction_isolation_and_no_writes(tmp_path):
         assert [m["id"] for m in result["conversation"]] == ["earlier", "later"]
         assert result["conversation"][0]["actions"][0]["type"] == "counselor.action.note_question"
         assert result["conversation"][0]["decisions"][0]["move"] == "note_question"
+        assert result["conversation"][0]["decisions"][0]["decision"] == {
+            "rule_id": "answer", "action": "answer_request", "topic": "request"}
         assert result["notebook"]["latest"]["version"] == 2
         assert result["notebook"]["history"][0]["version"] == 1
         for version in [result["notebook"]["latest"], *result["notebook"]["history"]]:

@@ -9,7 +9,7 @@ from sqlalchemy import select
 from app.config import config
 from app.inference import gateway
 from app.pai_c import runtime
-from app.pai_c.safety import gate
+from app.pai_c.policy import classifier as gate
 from app.models import CounselorTurnDecision
 from scripts.counselor_eval_support import StudentSession
 
@@ -33,7 +33,7 @@ def answer(reply):
     ("I'm confused about my career.", "none", None),
 ])
 async def test_safety_routes_fixtures_before_post(text, level, category):
-    model = AsyncMock(return_value=json.dumps({"level":level,"category":category}))
+    model = AsyncMock(return_value=json.dumps({**gate.fallback_signals().model_dump(), "safety":{"level":level,"category":category}}))
     voice = AsyncMock(side_effect=lambda *a, **kw: answer(
         "That sounds difficult. Please reach out to someone you trust." if kw.get("instructions") else "Which degree interests you?"))
     with StudentSession() as student, patch.object(config,"PAI_API_KEY","fake-only"), \
@@ -41,7 +41,7 @@ async def test_safety_routes_fixtures_before_post(text, level, category):
         await student.turn(text)
         replies = [r for r in student.transcript if r["role"]=="assistant"]
         assert len(replies)==1
-        assert voice.await_count == (1 if level=="none" else 2)
+        assert voice.await_count == 1
         assert replies[0]["content"] == ("Which degree interests you?" if level=="none" else
             "That sounds difficult. Please reach out to someone you trust.")
         with student.factory() as db:
@@ -49,7 +49,7 @@ async def test_safety_routes_fixtures_before_post(text, level, category):
             assert row.safety_level == level and row.safety_category == category
             assert row.move == ("none" if level=="none" else "wellbeing")
             assert "safety_reason" not in row.__table__.columns
-    assert model.await_args.kwargs["role"] == "safety"
+    assert model.await_args.kwargs["role"] == "classifier"
 
 
 @pytest.mark.asyncio
@@ -61,7 +61,7 @@ async def test_invalid_safety_json_fails_open_without_text_logs(response, caplog
             patch("app.pai_c.deep.turn.run_deep_turn",AsyncMock(return_value=answer("Normal reply?"))):
         await student.turn("private student content")
         assert student.transcript[-1]["content"] == "Normal reply?"
-    assert "safety_gate_error" in caplog.text
+    assert "classifier_error" in caplog.text
     assert "private student content" not in caplog.text
     assert "reason" not in caplog.text
 
@@ -73,27 +73,27 @@ async def test_safety_error_and_timeout_fail_open(mode, caplog):
         if mode=="error":raise RuntimeError("private student content")
         await asyncio.sleep(1)
     with StudentSession() as student, patch.object(config,"PAI_API_KEY","fake-only"), \
-            patch.object(config,"PAI_SAFETY_TIMEOUT_MS",5), patch.object(gate,"complete",fake), \
+            patch.object(config,"PAI_CLASSIFIER_TIMEOUT_MS",5), patch.object(gate,"complete",fake), \
             patch("app.pai_c.deep.turn.run_deep_turn",AsyncMock(return_value=answer("Normal reply?"))):
         await student.turn("private student content")
         assert student.transcript[-1]["content"] == "Normal reply?"
-    assert "safety_gate_error" in caplog.text and "private student content" not in caplog.text
+    assert "classifier_error" in caplog.text and "private student content" not in caplog.text
 
 
 @pytest.mark.asyncio
-async def test_concurrent_normal_completion_is_not_posted_before_gate_finishes():
-    normal_finished=asyncio.Event()
+async def test_classifier_finishes_before_voice_and_no_discarded_normal_call():
+    classified = False
     with StudentSession() as student, patch.object(config,"PAI_API_KEY","fake-only"):
-        async def safety(**kwargs):
-            await asyncio.wait_for(normal_finished.wait(),1)
-            assert not any(r["role"]=="assistant" for r in student.transcript)
-            return '{"level":"urgent","category":"self_harm"}'
-        async def voice(*args,**kwargs):
-            if not kwargs.get("instructions"):
-                normal_finished.set()
-                return answer("Discard this normal reply?")
+        async def classify(**kwargs):
+            nonlocal classified
+            assert not any(row["role"] == "assistant" for row in student.transcript)
+            classified = True
+            return json.dumps({**gate.fallback_signals().model_dump(),
+                               "safety":{"level":"urgent","category":"self_harm"}})
+        async def voice(*args, **kwargs):
+            assert classified and kwargs["instructions"] == "wellbeing"
             return answer("Please reach out to someone you trust.")
-        with patch.object(gate,"complete",safety), patch("app.pai_c.deep.turn.run_deep_turn",voice):
+        with patch.object(gate,"complete",classify), patch("app.pai_c.deep.turn.run_deep_turn",voice):
             await student.turn("fixture")
         assert student.transcript[-1]["content"] == "Please reach out to someone you trust."
 
@@ -103,8 +103,8 @@ async def test_wellbeing_failure_uses_configured_fallback_and_resources(caplog):
     with StudentSession() as student, patch.object(config,"PAI_API_KEY","fake-only"), \
             patch.object(config,"PAI_WELLBEING_FALLBACK_REPLY","Please speak to someone you trust."), \
             patch.object(config,"PAI_WELLBEING_RESOURCES","Configured resource"), \
-            patch.object(gate,"complete",AsyncMock(return_value='{"level":"urgent","category":"self_harm"}')), \
-            patch("app.pai_c.deep.turn.run_deep_turn",AsyncMock(side_effect=[answer("Discard?"),RuntimeError("private text")])):
+            patch.object(gate,"complete",AsyncMock(return_value='{"safety":{"level":"urgent","category":"self_harm"},"intent":"sharing","emotion":"neutral","request":null,"mentioned_areas":[],"declined_area":null}')), \
+            patch("app.pai_c.deep.turn.run_deep_turn",AsyncMock(side_effect=RuntimeError("private text"))):
         await student.turn("private text")
         assert student.transcript[-1]["content"] == "Please speak to someone you trust.\n\nConfigured resource"
         assert "private text" not in caplog.text
@@ -112,9 +112,9 @@ async def test_wellbeing_failure_uses_configured_fallback_and_resources(caplog):
 
 @pytest.mark.asyncio
 async def test_safety_input_is_text_only_and_last_four_messages():
-    model=AsyncMock(return_value='{"level":"none","category":null}')
+    model=AsyncMock(return_value='{"safety":{"level":"none","category":null},"intent":"sharing","emotion":"neutral","request":null,"mentioned_areas":[],"declined_area":null}')
     turns=[{"role":"user","content":str(i),"event_id":"private-id"} for i in range(10)]
-    with patch.object(gate,"complete",model):await gate.check_message("current",turns)
+    with patch.object(gate,"complete",model):await gate.classify("current",turns)
     data=json.loads(model.await_args.kwargs["messages"][0]["content"])
     assert data=={"recent_turns":[{"role":"user","text":str(i)} for i in range(6,10)],"student_message":"current"}
 
