@@ -1,0 +1,21 @@
+# Code owners. The last matching pattern wins, so general rules come first
+# and specific ones after.
+#
+# OS developers:   @10Faheem @MusawirKtk
+# Counsellor lead: @memsa771-hub
+#
+# Shared files need one reviewer from each team (an OS developer and the
+# Counsellor lead).
+
+# OS code, OS tests and the OS boundary file
+/backend/app/os/    @10Faheem @MusawirKtk
+/backend/tests/os/  @10Faheem @MusawirKtk
+/backend/tach.toml  @10Faheem @MusawirKtk
+
+# Shared files
+/backend/requirements*.txt  @10Faheem @MusawirKtk @memsa771-hub
+/backend/alembic/           @10Faheem @MusawirKtk @memsa771-hub
+/backend/alembic.ini        @10Faheem @MusawirKtk @memsa771-hub
+/docker-compose*.yml        @10Faheem @MusawirKtk @memsa771-hub
+/CLAUDE.md                  @10Faheem @MusawirKtk @memsa771-hub
+/.github/                   @10Faheem @MusawirKtk @memsa771-hub
