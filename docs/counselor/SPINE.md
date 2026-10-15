@@ -1274,3 +1274,181 @@ Existing history/job tests keep their behavior assertions: the repeated-question
 fake was changed to a permitted reflection, and safety fakes gained the new result
 fields. The obsolete missing-question warning test now asserts no such warning.
 Temporary offline/dependency folders were removed before the verification commit.
+
+
+## Core R1: Living Student Model v3 and Request Intake
+
+Scope: Board A `tyIdCoQrgJxPOcIvFWNt1L`, Board B `MOJ1Efh5LWzYDZFy0W3VsX`,
+and Board C `97yQ5hwTjywjMDazpqBUmc`. One Counselor retains UNDERSTAND ->
+DISCOVER -> GUIDE; execution remains PAI OS. R1 adds storage and read-only
+projections, not a controller, opening rewrite, new Mirror, discovery pipeline,
+roadmaps, UI pages or OS life events. No model calls or environment changes added.
+
+### Approved R1 boxes -> code
+
+Paths are relative to `backend/app/` unless stated otherwise.
+
+| Board / R1 box | Code owner |
+| --- | --- |
+| A Every turn: Request Intake, store request | pai_c/deep/actions.py, noted_questions.py; runtime.py supplies the committed reply event id |
+| A Background: Understanding Engine, Truth Map patches | pai_c/planner/patch.py, view.py, prompts/planner.md |
+| A Background: Evidence and hypothesis levels | pai_c/deep/notebook_schema.py; understanding/policy.json; existing private hypothesis contract retained |
+| A Living Student Model: six parts + WORLD; B Living Student Model; C same six parts | pai_c/deep/notebook_schema.py, migrate_v2.py; alembic/versions/107_truth_map_v3.py |
+| A Living Student Model: Requests and noted questions | models.CounselorNotedQuestion; pai_c/deep/noted_questions.py; alembic/versions/108_counselor_request_intake.py |
+| A Academic profile | pai_c/understanding/views.py academic_view; MemoryService.academic_view |
+| A Personal profile | pai_c/understanding/views.py personal_view; MemoryService.personal_view |
+| A Capability and development profile | pai_c/understanding/views.py capability_view; MemoryService.capability_view |
+| B Current status; Background/history; Interests/hobbies; Strengths/difficulties | understanding/areas.json; views.coverage_areas; MemoryService.coverage_areas |
+| B Family/social/support; Motivations/values; Pressures/constraints; Certainty | Same data-driven coverage reader |
+| B Came with a request: storage side only | noted_questions.py; deep/context.py open_requests; reply-choice policy deferred to R2 |
+
+### Schema and evidence
+
+| Field | Stored shape / validation |
+| --- | --- |
+| schema_version | 3 |
+| said, shown, source, self, sure | Existing shapes; source categories and certainty 0-10/history unchanged |
+| pressures | items only; people moved into world.people |
+| world | people, social, daily_life, responsibilities, education_story |
+| world.people | Person: id, role, relation, occupation, relationship_note, wish, worry, influence, supportive, evidence, first_seen, last_confirmed, status |
+| Person enums | relation parent/sibling/relative/partner/friend/mentor/other; influence low/medium/high/unknown; supportive true/false/null; status active/retired |
+| Person provenance | Required nonempty role/evidence; Planner code assigns UUID/dates; upsert matches role case-insensitively; existing person must be visible |
+| Other four World lists | Existing Item schema, including evidence/kind/confidence/level/dates/status and Vault references |
+| Item.capability_status | Optional demonstrated/emerging/untested/development_need/blocked |
+| Demonstrated rule | kind shown/document/action OR level sustained/proven, loaded from understanding/policy.json. Said with absent/claimed/tried level is rejected. This is the prompt's explicit OR rule, not a new ability score. |
+| Values / motivations | SELF key prefixes value. and motivation., described in Planner prompt |
+| Private interpretation / readiness | Existing fields and six coverage flags unchanged; new eight areas do not drive readiness |
+| Private archives | legacy_v1 and legacy_v2 are read-only, excluded from model schema/input and views; exporter exposes only presence flags |
+
+Planner adds the four World item paths and people to its bounded view. It keeps
+newest-confirmed entries, omits oldest round-robin, and retains at least one per
+nonempty part, including people. The existing Round 2 soft-budget behavior and
+private-field trimming remain unchanged. update/confirm/retire require visible
+ids and apply atomically to the complete map. Hidden/unmentioned items survive.
+The prompt includes the required invented-person prohibition verbatim.
+
+Founder clarification: Voice's existing notebook block includes world.people at
+the former pressures position, followed by daily_life, social, responsibilities,
+education_story, then pressure items. The same _trim_notebook function, budget,
+shortening and existing private-field selection remain; retired items are excluded.
+No Voice prompt text changed. A migrated role/wish/concern remains visible as
+role/wish/worry. This does not guarantee retention of every item when the existing
+context budget is exhausted; context redesign remains R2.
+
+### Migration behavior
+
+- 107, down_revision 106: converts every current notebook and history row, moves
+  concern to worry, assigns stable person ids, sets relation other/influence
+  unknown/supportive null, and stores the complete original JSON in legacy_v2.
+  Earlier legacy_v1 remains private and lossless. All other v2 fields are retained.
+  Downgrade restores each archived original exactly. As with migration 101,
+  downgrading a newly created notebook with no prior-version archive fails rather
+  than silently discarding data; no new reverse-conversion policy was invented.
+- 108, down_revision 107: adds kind (default information), needs_research (default
+  true), answered_event_id (nullable text) to counselor_noted_questions. Existing
+  rows and status strings remain unchanged. Downgrade removes only the three
+  new columns; rows/statuses survive, but their new metadata is lost.
+- Both revisions are tested offline. The founder's local database was not migrated
+  or rebuilt during this task.
+
+### Computed coverage: committed areas.json
+
+```json
+{
+  "status": [{"vault_field_prefixes": ["identity."]}, {"path": "world.daily_life"}],
+  "history": [{"path": "world.education_story"}, {"path": "shown"}, {"vault_records": ["education", "test_attempt", "document"]}],
+  "interests": [{"path": "self", "key_prefixes": ["interest."]}, {"path": "world.daily_life"}],
+  "strengths": [{"path": "self", "nonempty": "capability_status"}, {"path": "shown", "nonempty": "capability_status"}],
+  "family_social": [{"path": "world.people"}, {"path": "world.social"}],
+  "values": [{"path": "self", "key_prefixes": ["value.", "motivation."]}, {"path": "source"}],
+  "pressures": [{"path": "pressures.items"}, {"path": "world.people", "nonempty": "worry"}],
+  "sure": [{"path": "sure", "not_null": "score", "timestamp": "asked_at"}]
+}
+```
+
+The reader loads this JSON at use time. It counts distinct active items in any
+listed location; Vault data comes from the existing accepted/active snapshot.
+identity.* is the actual Vault field family. A non-null certainty score, including
+zero, counts. Each area returns covered, item_count and the latest last_confirmed
+(or Vault updated_at/valid_from/created_at or certainty asked_at), otherwise null.
+Editing the mapping changes results without changing code. No model writes these
+computed fields; they are evidence coverage, not a questionnaire or completion gate.
+
+### Derived views (no tables, no writes)
+
+| View | Exact field selection |
+| --- | --- |
+| academic_view | records.education, records.test_attempt, records.document; education_story from world |
+| personal_view | world (all five active lists); self items without capability_status; source; pressures.items; sure including history |
+| capability_view | All active items with capability_status across policy item_paths, grouped under the five status keys; full item evidence/kind/level preserved |
+
+Views return copies. No tensions, hypotheses, identity_status,
+decision_difficulties, private_notes or legacy archives are included. Profile
+queries remain behind MemoryService; shared memory never imports PAI C.
+
+### Request lifecycle (founder-corrected vocabulary)
+
+Policy: deep/request_policy.json. Kinds: information, task, decision_help, other.
+Statuses: open, answered_now, answered, unanswered, handed_off, dropped.
+There is no researched status and no rename/migration of existing research statuses.
+
+- note_question defaults to information + needs_research true -> open.
+- needs_research false -> answered_now, only with the actual posted PAI reply id
+  validated against the same workspace and assistant-message source/type.
+- Existing source-event dedupe and student ownership checks remain.
+- open_requests contains newest five open rows only, text + kind, workspace scoped.
+- Research still selects open/unanswered; additionally needs_research must be true.
+  Existing roadmap publication still writes answered/unanswered with sourced facts.
+- answered_now never enters research. handed_off/dropped are vocabulary only;
+  R1 adds no code that writes them. pai_student_requests remains untouched.
+
+### Verification
+
+| Check | Before R1 | Step A | Final Step B |
+| --- | --- | --- | --- |
+| Full backend | 1002 passed, 3 skipped, 8 subtests | 1021 passed, 3 skipped, 8 subtests | 1036 passed, 3 skipped, 8 subtests |
+| Production-only security (separate environment) | Conditional in baseline | 3 passed, 4 subtests | 3 passed, 4 subtests |
+| Frontend | Unchanged source | 23 passed | Same verified frontend source: 23 passed |
+| Production frontend build | Unchanged source | PASS | Same verified frontend source: PASS |
+| Import every app module | Existing source baseline | 261/261 | 261/261, no failures |
+| Architecture boundary regressions | Existing checks | Included in full suite | Dedicated 9 passed |
+| PAI OS contracts | Existing checks | Included in full suite | Dedicated 2 passed |
+
+Baseline backend duration: 251.71s; final Step A: 231.44s; Step B: 249.42s.
+Three SQLite reflection warnings concern the existing expression-based user index
+in migration tests (101 and 107); all migration assertions passed. The three
+production-only skips were separately executed and passed. External network
+connections were blocked for every backend/import run; providers were fake.
+Frontend tests and build ran after Step A; Step B changes no frontend source or
+configuration. No temporary repository test folders or environment edits.
+
+Nineteen new Step A cases cover migration/history roundtrip, immutable archives,
+capability policy and atomic rejection, data-edited coverage, view field/privacy
+selection, all World patch paths, people visibility/omission, preserved family
+context and unchanged readiness/private interpretation selection. Fifteen Step B
+cases cover kinds/defaults, real posted-event binding, dedupe, invalid metadata
+and reply provenance, scoped newest-five context, research exclusion and migration
+108 roundtrip. Existing research publication additionally checks both answered
+and unanswered writes; PAI OS table names, service-token authentication and
+escalation behavior remain green.
+
+Commits: Step A `934b580`; Step B `412e7f4`. The final documentation commit records
+these results. Normal/exceptional model and embedding call counts are unchanged;
+R1 adds only deterministic validation, storage metadata and read-only projections.
+
+### Open questions / findings for later
+
+- No blocking implementation question remains after the two founder decisions.
+- A downgrade policy for notebooks created entirely under v3 (no legacy_v2)
+  was not specified; downgrade refuses those rows, following the existing safe
+  archive-only migration pattern. A future reverse mapping needs approval.
+- Existing Mirror/roadmap prompts still describe v2, and the research
+  understanding_summary keeps its existing five-part selection. Updating these
+  readers/prompts to explicitly use World is outside R1's permitted changes.
+- Existing Voice identity formatting checks unprefixed field names, while the
+  Vault stores identity.*. R1 coverage uses the actual keys; the separate Voice
+  formatting issue is left unchanged for the context redesign.
+- Existing one-noted-request-per-source-event uniqueness remains; multiple
+  separately tracked requests in one message were not specified.
+- Offline tests prove contracts, privacy and mechanics, not live model extraction
+  or counseling quality. No live model/API evaluation or paid calls were made.
