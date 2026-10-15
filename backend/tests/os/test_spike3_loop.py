@@ -7,6 +7,7 @@ record result, complete). Real Postgres, TestModel instead of a paid model.
 import threading
 import time
 from collections.abc import Callable, Iterator
+from typing import Any
 
 import psycopg
 import pytest
@@ -36,15 +37,31 @@ def conn(pg_url: str, fresh_db: None) -> Iterator[psycopg.Connection]:
         yield connection
 
 
+def _wait_no_open_workflows(timeout_s: float = TIMEOUT_S) -> None:
+    """Lets the test's workflows finish (a task is settled before its workflow returns)."""
+    deadline = time.monotonic() + timeout_s
+    while True:
+        open_ids = [
+            wf.workflow_id
+            for wf in DBOS.list_workflows(status=["PENDING", "ENQUEUED"], load_input=False, load_output=False)
+        ]
+        if not open_ids:
+            return
+        if time.monotonic() > deadline:
+            pytest.fail(f"workflows still open after {timeout_s:.0f}s: {open_ids}")
+        time.sleep(0.1)
+
+
 def _run_dbos(pg_url: str, output: dict[str, str]) -> Iterator[None]:
-    loop.start(
-        database_url=pg_url,
-        system_database_url=pg_url,
-        schema="dbos_test",
-        model=TestModel(custom_output_args=output),
-    )
     try:
+        loop.start(
+            database_url=pg_url,
+            system_database_url=pg_url,
+            schema="dbos_test",
+            model=TestModel(custom_output_args=output),
+        )
         yield
+        _wait_no_open_workflows()
     finally:
         loop.shutdown()
 
@@ -86,6 +103,12 @@ def model_calls(conn: psycopg.Connection, task_id: str) -> int:
     return _scalar(conn, "SELECT count(*) FROM spike3.model_calls WHERE task_id = %s", (task_id,))
 
 
+def step_run_count(conn: psycopg.Connection, task_id: str, step: str) -> int:
+    return _scalar(
+        conn, "SELECT count(*) FROM spike3.step_runs WHERE task_id = %s AND step = %s", (task_id, step)
+    )
+
+
 def workflow_count(workflow_id: str) -> int:
     return len(DBOS.list_workflows(workflow_ids=[workflow_id], load_input=False, load_output=False))
 
@@ -119,19 +142,23 @@ def wait_done(conn: psycopg.Connection, task_id: str) -> None:
     assert status == "done", f"task {task_id!r} settled as {status!r} ({failure_reason(conn, task_id)!r})"
 
 
-def run_concurrently(*fns: Callable[[], object]) -> None:
-    """Starts every function at the same moment on its own thread; re-raises the first error."""
+def run_concurrently(*fns: Callable[[], Any]) -> list[Any]:
+    """Starts every function at the same moment on its own thread.
+
+    Returns their results in argument order; re-raises the first error.
+    """
     barrier = threading.Barrier(len(fns))
     errors: list[BaseException] = []
+    results: list[Any] = [None] * len(fns)
 
-    def runner(fn: Callable[[], object]) -> None:
+    def runner(index: int, fn: Callable[[], Any]) -> None:
         barrier.wait()
         try:
-            fn()
+            results[index] = fn()
         except BaseException as exc:  # re-raised on the test thread below
             errors.append(exc)
 
-    threads = [threading.Thread(target=runner, args=(fn,)) for fn in fns]
+    threads = [threading.Thread(target=runner, args=(i, fn)) for i, fn in enumerate(fns)]
     for thread in threads:
         thread.start()
     for thread in threads:
@@ -139,6 +166,7 @@ def run_concurrently(*fns: Callable[[], object]) -> None:
         assert not thread.is_alive(), "concurrent call did not finish"
     if errors:
         raise errors[0]
+    return results
 
 
 # --- tests ----------------------------------------------------------------------------
@@ -157,12 +185,22 @@ def test_enqueue_twice_runs_once(dbos_runtime, conn):
     unmark_sent(conn, "t2")              # simulate crash before marking sent
     enqueue_pending(conn); wait_done(conn, "t2")
     assert workflow_count("t2:1") == 1 and result_count(conn, "t2") == 1
+    assert model_calls(conn, "t2") == 1
+    assert step_run_count(conn, "t2", "load_page") == 1
 
 def test_reconciler_and_enqueuer_race(dbos_runtime, conn):
     mark_ready(conn, "t3")
-    run_concurrently(lambda: enqueue_pending(conn), lambda: reconcile(conn))
+    enqueued, reconciled = run_concurrently(lambda: enqueue_pending(conn), lambda: reconcile(conn))
     wait_done(conn, "t3")
     assert workflow_count("t3:1") == 1 and result_count(conn, "t3") == 1
+    assert model_calls(conn, "t3") == 1
+    assert step_run_count(conn, "t3", "load_page") == 1
+    # enqueue_pending returns 0 only if reconcile enqueued t3:1 and marked it sent before
+    # enqueue_pending's first SELECT, so which side enqueues is timing; that one did is not.
+    assert enqueued == 1 or reconciled["reenqueued"] == 1
+    # reconcile reads the task while it is still open (its workflow cannot finish before the
+    # queue picks it up), so it either enqueued t3:1 itself or found DBOS already had it.
+    assert reconciled["reenqueued"] + reconciled["present"] == 1
 
 def test_invalid_quote_is_retried_then_fails(dbos_runtime_bad_quote, conn):
     # fixture builds the agent with TestModel(custom_output_args={"field": "deadline",

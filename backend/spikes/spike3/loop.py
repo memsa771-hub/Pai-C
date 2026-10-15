@@ -1,7 +1,8 @@
 """Spike 3 (throwaway): the PAI OS core loop.
 
 kernel `mark_ready` -> `enqueue_pending` -> DBOS queue -> `run_attempt` workflow:
-load_page -> extract (DBOSAgent) -> record_result -> complete_task.
+load_page -> extract (Pydantic AI agent with DBOSDurability) -> record_result -> complete_task.
+The agent's model requests are DBOS steps of `run_attempt` itself (no child workflow).
 
 Importing this module has no side effects. A process uses it like this (Task 7's worker
 does the same):
@@ -13,10 +14,10 @@ does the same):
 All functions that take `conn` expect a psycopg connection in autocommit mode.
 """
 
-import warnings
 import zlib
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from contextvars import ContextVar
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Literal
@@ -27,8 +28,7 @@ from openai import AsyncOpenAI
 from psycopg.types.json import Jsonb
 from pydantic import BaseModel
 from pydantic_ai import Agent, ModelRetry, RunContext
-from pydantic_ai._run_context import get_current_run_context
-from pydantic_ai.durable_exec.dbos import DBOSAgent, StepConfig
+from pydantic_ai.durable_exec.dbos import DBOSDurability, StepConfig
 from pydantic_ai.exceptions import UnexpectedModelBehavior
 from pydantic_ai.messages import ModelMessage, ModelResponse
 from pydantic_ai.models import Model, ModelRequestParameters
@@ -102,11 +102,15 @@ class ProgrammeFact(BaseModel):
 
 @dataclass(frozen=True)
 class ExtractDeps:
-    """Agent deps. DBOS checkpoints them as the agent workflow's input, so they survive recovery."""
+    """Agent deps: the page the output validator checks quotes against."""
 
-    task_id: str
-    attempt: int
     page_text: str
+
+
+# (task_id, attempt) of the running attempt, for the model_calls counter. run_attempt sets it
+# from its own arguments, which DBOS checkpoints, so every execution of the workflow body
+# (first run or recovery) sets it before any model step runs.
+current_attempt: ContextVar[tuple[str, int] | None] = ContextVar("spike3_current_attempt", default=None)
 
 
 def quote_on_page(ctx: RunContext[ExtractDeps], output: ProgrammeFact) -> ProgrammeFact:
@@ -134,7 +138,7 @@ def page_for(task_id: str) -> Path:
 @dataclass
 class _Runtime:
     database_url: str
-    agent: DBOSAgent
+    agent: Agent[ExtractDeps, ProgrammeFact]
     load_page: Any
     record_result: Any
     complete_task: Any
@@ -178,11 +182,11 @@ class CountingModel(WrapperModel):
         model_settings: ModelSettings | None,
         model_request_parameters: ModelRequestParameters,
     ) -> ModelResponse:
-        ctx = get_current_run_context()
-        if ctx is None or not isinstance(ctx.deps, ExtractDeps):
-            raise RuntimeError("CountingModel needs an agent run with ExtractDeps")
+        attempt = current_attempt.get()
+        if attempt is None:
+            raise RuntimeError("CountingModel runs only inside run_attempt")
         async with _connect() as conn:
-            await conn.execute(MODEL_CALL_SQL, (ctx.deps.task_id, ctx.deps.attempt))
+            await conn.execute(MODEL_CALL_SQL, attempt)
         return await super().request(messages, model_settings, model_request_parameters)
 
 
@@ -192,21 +196,18 @@ def openai_model(settings: OsSettings) -> OpenAIChatModel:
     return OpenAIChatModel(settings.model_cheap, provider=OpenAIProvider(openai_client=client))
 
 
-def build_agent(model: Model) -> DBOSAgent:
-    """Must run before DBOS.launch(): DBOSAgent registers its workflow and steps."""
+def build_agent(model: Model) -> Agent[ExtractDeps, ProgrammeFact]:
+    """Must run before DBOS.launch(): DBOSDurability registers the model steps when bound."""
     agent = Agent(
         CountingModel(model),
         output_type=ProgrammeFact,
         deps_type=ExtractDeps,
         retries=AGENT_RETRIES,
         name=AGENT_NAME,
+        capabilities=[DBOSDurability(model_step_config=STEP_CONFIG)],
     )
     agent.output_validator(quote_on_page)
-    with warnings.catch_warnings():
-        # pydantic-ai 2.55 deprecates DBOSAgent in favour of the DBOSDurability capability.
-        # The spike brief fixes DBOSAgent; see README "Known limits".
-        warnings.filterwarnings("ignore", message="`DBOSAgent` is deprecated", category=UserWarning)
-        return DBOSAgent(agent, name=AGENT_NAME, model_step_config=STEP_CONFIG)
+    return agent
 
 
 # --- workflow steps -------------------------------------------------------------------
@@ -243,14 +244,16 @@ async def run_attempt(task_id: str, attempt: int) -> None:
     """Workflow body, registered as `spike3.run_attempt` by register()."""
     rt = _rt()
     page = await rt.load_page(task_id, attempt)
-    deps = ExtractDeps(task_id=task_id, attempt=attempt, page_text=page)
+    token = current_attempt.set((task_id, attempt))
     try:
-        result = await rt.agent.run(PROMPT.format(page=page), deps=deps)
+        result = await rt.agent.run(PROMPT.format(page=page), deps=ExtractDeps(page_text=page))
     except UnexpectedModelBehavior:
         # Output retries are used up. Record it and stop; the kernel decides what happens next.
         await rt.record_result(task_id, attempt, None, False)
         await rt.fail_task(task_id, attempt, "invalid_output")
         return
+    finally:
+        current_attempt.reset(token)
     await rt.record_result(task_id, attempt, result.output.model_dump(), True)
     await rt.complete_task(task_id, attempt)
 
@@ -262,12 +265,13 @@ def dbos_config(system_database_url: str, schema: str) -> DBOSConfig:
     return {"name": APP_NAME, "system_database_url": system_database_url, "dbos_system_schema": schema}
 
 
-def register(database_url: str, agent: DBOSAgent) -> None:
+def register(database_url: str, agent: Agent[ExtractDeps, ProgrammeFact]) -> None:
     """Registers the steps and the workflow with the current DBOS registry (before launch).
 
     Done here, not with module-level decorators: DBOS wrappers keep a reference to the
     registry they were made in, and shutdown() destroys that registry so a second runtime
-    (another model) can start in the same process.
+    (another model) can start in the same process. The agent's model steps were registered
+    by build_agent() in the same registry.
     """
     global _runtime
 
@@ -351,14 +355,18 @@ def reconcile(conn: psycopg.Connection) -> dict[str, int]:
 
     - a `ready` task whose workflow DBOS has never seen: enqueue it (same workflow ID);
     - a `ready`/`running` task whose workflow succeeded: apply its recorded result.
+
+    `present` counts open tasks whose workflow DBOS already knows (in any status).
     """
-    counts = {"reenqueued": 0, "applied": 0}
+    counts = {"reenqueued": 0, "present": 0, "applied": 0}
     for task_id, attempt, status in conn.execute(OPEN_TASKS_SQL).fetchall():
         wf = DBOS.get_workflow_status(workflow_id(task_id, attempt))
         if wf is None:
             if status == "ready":
                 _enqueue(conn, task_id, attempt)
                 counts["reenqueued"] += 1
-        elif wf.status == "SUCCESS" and _apply_result(conn, task_id, attempt):
-            counts["applied"] += 1
+        else:
+            counts["present"] += 1
+            if wf.status == "SUCCESS" and _apply_result(conn, task_id, attempt):
+                counts["applied"] += 1
     return counts

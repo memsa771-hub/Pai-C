@@ -10,7 +10,7 @@ The PAI OS core loop runs every task attempt exactly once, even when parts of it
 ```
 kernel: mark_ready  ->  enqueue_pending  ->  DBOS queue  ->  run_attempt workflow
                                                               load_page
-                                                              extract (DBOSAgent, Pydantic AI)
+                                                              extract (Pydantic AI + DBOSDurability)
                                                               record_result
                                                               complete_task
 ```
@@ -21,6 +21,8 @@ kernel: mark_ready  ->  enqueue_pending  ->  DBOS queue  ->  run_attempt workflo
   workflow, so it runs once.
 - `reconcile` re-enqueues `ready` tasks that DBOS has never seen, and applies the result of
   workflows that succeeded while their task is still open.
+- The agent uses the `DBOSDurability` capability, so each model request is a DBOS step of
+  `run_attempt` itself. No child workflow is created.
 - Every write a re-run step could repeat is idempotent: `results` has one row per task attempt
   (`ON CONFLICT DO NOTHING`), and status changes only apply to their own attempt while the task is open.
 - `step_runs` (one row per step execution) and `model_calls` (one row per model request) are
@@ -58,10 +60,10 @@ the DAAD listings (DAAD International Programmes 2026/2027) on 2026-10-15.
 | `rptu-computer-science.txt` | RPTU Kaiserslautern-Landau, Computer Science (M.Sc.) | https://www2.daad.de/deutschland/studienangebote/international-programmes/en/detail/3629/ |
 | `saarland-visual-computing.txt` | Saarland University, Visual Computing (M.Sc.) | https://www2.daad.de/deutschland/studienangebote/international-programmes/en/detail/3827/ |
 
-## Known limits
+## Notes
 
-- `DBOSAgent` is deprecated in pydantic-ai 2.55 in favour of the `DBOSDurability` capability.
-  The spike uses `DBOSAgent` as specified and silences only that deprecation warning. Production
-  code should use `DBOSDurability`.
-- The counting model reads the run's deps through `pydantic_ai._run_context.get_current_run_context`,
-  a private helper.
+- The Task 6 brief named `DBOSAgent`. It is deprecated in pydantic-ai 2.55, so the spike uses its
+  replacement, the `DBOSDurability` capability: the shape production code will use.
+- The `model_calls` counter gets `(task_id, attempt)` from a contextvar that `run_attempt` sets from
+  its own (checkpointed) arguments before the agent runs. Every execution of the workflow body,
+  including recovery, sets it again before any model step.
