@@ -16,7 +16,9 @@ How to run everything: `backend/spikes/spike3/README.md`.
 - at least 99% valid structured outputs (`valid_rate >= 0.99`).
 
 The CLI checks these itself and prints `pass bar: PASS` or `pass bar: FAIL (...)` (exit code 1 on FAIL).
-It also fails a run that timed out.
+It also fails a run that timed out, and a run without real chaos: the bar is about runs *with* kills,
+so it needs `kills >= 1` and `recovered_attempts >= 1` (at least one kill interrupted in-flight work
+that another process then finished).
 
 ## Method
 
@@ -34,15 +36,15 @@ It also fails a run that timed out.
   including recovered ones.
 - **Reconcile** fails an open task with `workflow_error` when its workflow ended as ERROR, CANCELLED or
   MAX_RECOVERY_ATTEMPTS_EXCEEDED. Without this, such a task would count as lost.
-- **Test model.** A `FunctionModel` waits `--model-delay` seconds and answers with a quote copied from
-  the page in the prompt. The delay makes kills land on in-flight model requests.
+- **Test model.** A `FunctionModel` waits `--model-delay` seconds (default 1.5) and answers with a quote
+  copied from the page in the prompt. The delay makes kills land on in-flight model requests.
 
 ### What is measured (`ChaosReport`)
 
 | Field | Meaning |
 |---|---|
 | `tasks`, `done`, `failed`, `lost` | `lost` = tasks − done − failed |
-| `duplicated` | re-runs not explained by an earlier kill: a spike step run again, or a model request repeated by another process, when the first run's worker had not been killed before the re-run started (kill time read from the database clock) |
+| `duplicated` | re-runs not explained by an earlier kill: a spike step run again, or a model request repeated by another process, when the first run's worker had not been killed before the re-run started (kill time read from the database clock). See the note below on step retries. |
 | `duplicate_results` | `results` rows beyond one per task attempt. This is 0 by the primary key, but measured anyway. |
 | `extra_workflows` | tasks with more than one attempt or more than one DBOS workflow ID |
 | `step_reruns` | `step_runs` rows beyond one per (task, attempt, step) |
@@ -53,16 +55,27 @@ It also fails a run that timed out.
 | `unexpected_exits` | workers that exited without being killed (they are restarted in place) |
 | `workflows`, `open_workflows`, `timed_out`, `elapsed_s` | how the run ended |
 
+**`duplicated` and legal step retries.** A spike step that fails inside one process (for example a
+transient database error) is retried by DBOS in that same process, as invariant 7 allows. That retry
+writes a second `step_runs` row by a worker that was not killed, so `duplicated` counts it. The metric
+can therefore produce a false FAIL, never a false PASS. To tell the two apart, look at the first
+row's `worker` label in `spike3.step_runs` and open `<log_dir>/<label>.log`. A legal retry shows
+DBOS's `Step being automatically retried` warning, with the exception, in that log, and the re-run row has the same `worker`
+label. A real duplicate has a re-run row from a different label with no kill in between.
+
 ## Results
 
 Environment: Postgres 16.15, Python 3.13 locally (CI uses 3.12), DBOS 3.2.0, pydantic-ai 2.55.0.
 
 ### CI chaos test (`tests/os/test_spike3_chaos.py`, marker `chaos`, part of the default suite)
 
-The test runs 20 tasks with 3 workers, a kill every 2 s, the test model at 1.5 s and a 180 s timeout.
-It asserts `lost == 0`, `done == 20`, `duplicated == 0`, `duplicate_results == 0`,
-`extra_workflows == 0`, `unexpected_exits == 0`, `kills >= 3`, `recovered_attempts >= 1` and a
-`valid_rate` of 1.0. These are three consecutive runs on the final code:
+The test runs 20 tasks with 3 workers, a kill every 2 s, the test model at 1.5 s, seed 7 and a 180 s
+timeout. The seed fixes which slots are killed; timing still varies from run to run. The test asserts
+`lost == 0`, `done == 20`, `duplicated == 0`, `duplicate_results == 0`, `extra_workflows == 0`,
+`workflows == 20`, `open_workflows == 0`, `unexpected_exits == 0`, `kills >= 3`,
+`recovered_attempts >= 1` and a `valid_rate` of 1.0. A second test checks that the pass bar fails a
+run with no kills or no recovered attempts. These are three consecutive runs from the first
+submission:
 
 | Run | done | lost | duplicated | dup. results | extra wf | kills | in flight | recovered attempts | model calls | elapsed |
 |---|---|---|---|---|---|---|---|---|---|---|
@@ -70,11 +83,18 @@ It asserts `lost == 0`, `done == 20`, `duplicated == 0`, `duplicate_results == 0
 | 2 | 20 | 0 | 0 | 0 | 0 | 7 | 5 | 6 | 26 | 19.0 s |
 | 3 | 20 | 0 | 0 | 0 | 0 | 7 | 6 | 6 | 26 | 19.9 s |
 
+After the review fixes, with seed 7, two more runs gave kills 8 and 12, recovered attempts 8 and 4,
+and `lost = duplicated = 0`, `workflows = 20` in both.
+
 ### Rehearsal: 100 tasks, test model (not the pass-bar run)
 
-`python -m spikes.spike3.chaos --tasks 100 --workers 4 --kill-every 3 --model test --timeout 1800 --seed 7`
+`python -m spikes.spike3.chaos --tasks 100 --workers 4 --kill-every 3 --model test --timeout 1800 --seed 7 --model-delay D`
 
-| Field | Model delay 0.5 s (default) | Model delay 3 s (`--model-delay 3`, closer to real latency) |
+Both rehearsals ran before the review changes. One used `D = 0.5` (the CLI default at the time; the
+default is now 1.5 s), the other `D = 3` (closer to real model latency). Both still meet the current
+pass bar, including `kills >= 1` and `recovered_attempts >= 1`.
+
+| Field | `--model-delay 0.5` | `--model-delay 3` |
 |---|---|---|
 | tasks | 100 | 100 |
 | done | 100 | 100 |
@@ -102,8 +122,9 @@ It asserts `lost == 0`, `done == 20`, `duplicated == 0`, `duplicate_results == 0
 | pass bar (CLI) | PASS | PASS |
 
 With a 0.5 s model the 100 tasks finish in about 15 s, so only 5 kills happen and 1 of them hits
-work. The 3 s run is the meaningful rehearsal: 20 of 28 kills hit in-flight work, and 40
-interrupted workflows were recovered. All 100 tasks finished, each exactly once.
+work. That is why the default is now 1.5 s. The 3 s run is the meaningful rehearsal: 20 of 28 kills
+hit in-flight work, and 29 attempts were finished by a different process than the one that started
+them. All 100 tasks finished with one result per task.
 
 ### Negative control: the measurement catches duplicates
 
@@ -117,9 +138,13 @@ This setup is not part of the code. It shows why R1 (one stable executor ID per 
 
 `step_reruns` was 0 in every run. The spike steps (`load_page`, `record_result`, `complete_task`) are
 millisecond database writes, while the model step takes seconds, so the kills landed in the model
-step. Those re-runs show up as model requests instead: in the 3 s rehearsal, `model_calls = 140` =
-100 needed + 40 re-run after the 40 interrupted workflows were recovered. Every one of them came
-after the kill of the worker that started it (`duplicated = 0`). A kill between a step's `step_runs`
+step. Those re-runs show up as extra model requests instead. In the 3 s rehearsal we measured
+`model_calls = 140` for 100 tasks (each needs one request with the test model), `recovered_attempts =
+29` and `interrupted_workflows = 40`. These numbers are consistent, but they are not an exact
+accounting. `interrupted_workflows` is approximate: it counts `PENDING` workflows under the killed
+slot's executor ID, which can include workflows of an earlier dead generation not yet re-enqueued.
+Also, an attempt can be interrupted more than once. What is exact is that every repeated request came
+from a different process only after the earlier process had been killed (`duplicated = 0`). A kill between a step's `step_runs`
 insert and its DBOS checkpoint would re-run that step. That is safe because every write a step makes
 is idempotent (invariant 8), but this run did not hit that window.
 

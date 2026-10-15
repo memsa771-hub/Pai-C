@@ -52,6 +52,7 @@ FAILED_WORKFLOW_STATUSES = frozenset({"ERROR", "CANCELLED", "MAX_RECOVERY_ATTEMP
 AGENT_NAME = "spike3_extractor"
 SPIKE_DIR = Path(__file__).resolve().parent
 SCHEMA_PATH = SPIKE_DIR / "schema.sql"
+SPIKE3_TABLES = ("tasks", "model_calls", "enqueue_requests", "results", "step_runs")
 PAGES_DIR = SPIKE_DIR / "pages"
 
 # Invariant 7: network/service retries happen only here, as DBOS step retries.

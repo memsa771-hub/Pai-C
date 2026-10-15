@@ -1,7 +1,7 @@
 """Spike 3 (throwaway): one chaos worker process.
 
-    python -m spikes.spike3.worker --model {test|openai} [--model-delay 0.5]
-        [--executor-id spike3-w0] [--worker-concurrency 2]
+    python -m spikes.spike3.worker --model {test|openai} --executor-id spike3-w0
+        [--model-delay 1.5] [--worker-concurrency 2]
 
 Configures DBOS exactly as Task 6 (`loop.start`), then blocks while DBOS polls the `spike3`
 queue. The chaos driver starts one worker per slot with a fixed executor ID (`spike3-w{slot}`),
@@ -26,7 +26,8 @@ from pydantic_ai.models.function import AgentInfo, FunctionModel
 from app.os.settings import OsSettings, load_settings
 from spikes.spike3 import loop
 
-DEFAULT_MODEL_DELAY_S = 0.5
+# Long enough that kills every few seconds land on in-flight model requests (also the CI test's value).
+DEFAULT_MODEL_DELAY_S = 1.5
 DEFAULT_WORKER_CONCURRENCY = 2
 PAGE_RE = re.compile(r"<page>\n(.*)\n</page>", re.DOTALL)
 
@@ -66,7 +67,9 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--model", choices=["test", "openai"], required=True)
     parser.add_argument("--model-delay", type=float, default=DEFAULT_MODEL_DELAY_S, help="test model only (s)")
-    parser.add_argument("--executor-id", default=None, help="DBOS executor ID (one per worker slot)")
+    # Required: DBOS's default ("local") would be shared by every worker, and each new worker would
+    # then "recover" workflows still running on live ones.
+    parser.add_argument("--executor-id", required=True, help="DBOS executor ID, one per worker slot")
     parser.add_argument("--worker-concurrency", type=int, default=DEFAULT_WORKER_CONCURRENCY)
     return parser.parse_args(argv)
 

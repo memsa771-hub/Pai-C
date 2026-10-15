@@ -26,7 +26,6 @@ VALID_QUOTE = "Language requirements: English at level"
 OUTPUT = {"field": "language_requirement", "value": "English certificate required", "quote": VALID_QUOTE}
 BAD_QUOTE_OUTPUT = {"field": "deadline", "value": "15 July", "quote": "text that is not on the page"}
 TIMEOUT_S = 30.0
-SPIKE3_TABLES = ("tasks", "model_calls", "enqueue_requests", "results", "step_runs")
 
 
 # --- fixtures -------------------------------------------------------------------------
@@ -36,7 +35,7 @@ SPIKE3_TABLES = ("tasks", "model_calls", "enqueue_requests", "results", "step_ru
 def conn(pg_url: str, fresh_db: None) -> Iterator[psycopg.Connection]:
     with psycopg.connect(pg_url, autocommit=True) as connection:
         loop.apply_schema(connection)
-        tables = ", ".join(f"spike3.{name}" for name in SPIKE3_TABLES)
+        tables = ", ".join(f"spike3.{name}" for name in loop.SPIKE3_TABLES)
         connection.execute(f"TRUNCATE {tables} RESTART IDENTITY")
         yield connection
 

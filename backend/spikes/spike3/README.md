@@ -50,7 +50,7 @@ Task 7 adds the chaos run (workers killed with SIGKILL) on top of these function
 - `reconcile` runs every 5 s during the run (5 minutes in production). It also fails an open task
   with `workflow_error` when its workflow ended as ERROR, CANCELLED or MAX_RECOVERY_ATTEMPTS_EXCEEDED.
 - Every process uses application version `spike3`, so every worker dequeues every workflow.
-- The `test` model is a `FunctionModel` that waits `--model-delay` seconds (default 0.5) and answers
+- The `test` model is a `FunctionModel` that waits `--model-delay` seconds (default 1.5) and answers
   with a quote copied from the page, so kills hit in-flight model requests.
 - Workers stop on SIGTERM, and on their own when the driver process is gone (no orphans).
 
@@ -63,9 +63,17 @@ What the report measures (`ChaosReport`):
 | `duplicate_results` | `results` rows beyond one per task attempt (0 by the primary key; measured anyway) | 0 |
 | `extra_workflows` | tasks with more than one attempt or more than one workflow ID | 0 |
 | `valid_rate` | valid outputs / tasks | ≥ 0.99 |
+| `kills` | worker processes SIGKILLed | ≥ 1 |
+| `recovered_attempts` | attempts whose rows come from more than one worker process (interrupted, then recovered) | ≥ 1 |
 | `step_reruns` | `step_runs` rows beyond one per (task, attempt, step) | reported |
-| `recovered_attempts` | attempts whose rows come from more than one worker process (interrupted, then recovered) | reported |
-| `kills`, `kills_in_flight`, `interrupted_workflows` | kills; kills of a worker that had `PENDING` workflows; those workflows | reported |
+| `kills_in_flight`, `interrupted_workflows` | kills of a worker that had `PENDING` workflows; those workflows (approximate) | reported |
+
+A run that timed out also fails.
+
+`duplicated` also counts a legal same-process DBOS step retry (for example after a transient database
+error; invariant 7), because the first run's worker was not killed. It can only cause a false FAIL,
+never a false PASS. A legal retry has the same `worker` label on both `step_runs` rows, and the step's
+exception appears with DBOS's `Step being automatically retried` warning in that worker's log (`<log_dir>/<label>.log`).
 
 Run the small chaos test (20 tasks, 3 workers, a kill every 2 s; about 20 s):
 
@@ -84,7 +92,8 @@ OS_DATABASE_URL=... OS_OPENAI_API_KEY=<dev key> \
 
 Both are destructive for that database's `spike3` schema and for the DBOS schema they use
 (`dbos_chaos` by default, `--schema` must start with `dbos_chaos`). Worker logs go to a temporary
-directory whose path is in the report (`log_dir`). `--model openai` stops at once with a clear message
+directory whose path is in the report (`log_dir`). The CLI deletes it after a passing run, and keeps it
+(and prints its path) after a failing or timed-out run. Workers need `--executor-id` (no default). `--model openai` stops at once with a clear message
 when `OS_OPENAI_API_KEY` is not set.
 
 ## Run the tests

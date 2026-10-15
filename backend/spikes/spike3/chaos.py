@@ -22,6 +22,7 @@ import argparse
 import json
 import os
 import random
+import shutil
 import signal
 import subprocess
 import sys
@@ -43,7 +44,6 @@ from spikes.spike3.worker import DEFAULT_MODEL_DELAY_S, DEFAULT_WORKER_CONCURREN
 
 BACKEND_DIR = loop.SPIKE_DIR.parents[1]
 DEFAULT_SCHEMA = "dbos_chaos"
-SPIKE3_TABLES = ("tasks", "model_calls", "enqueue_requests", "results", "step_runs")
 STARTUP_TIMEOUT_S = 60.0
 DRAIN_TIMEOUT_S = 30.0
 STOP_TIMEOUT_S = 15.0
@@ -137,7 +137,8 @@ class ChaosReport:
 
 
 def pass_bar_failures(report: ChaosReport) -> list[str]:
-    """Spike 3 pass bar: zero lost, zero duplicated; at least 99% valid structured outputs."""
+    """Spike 3 pass bar: runs WITH random worker kills; zero lost, zero duplicated; at least
+    99% valid structured outputs. A run in which no kill interrupted work proves nothing."""
     checks = {
         "lost == 0": report.lost == 0,
         "duplicated == 0": report.duplicated == 0,
@@ -145,8 +146,18 @@ def pass_bar_failures(report: ChaosReport) -> list[str]:
         "extra_workflows == 0": report.extra_workflows == 0,
         f"valid_rate >= {PASS_BAR_VALID_RATE}": report.valid_rate >= PASS_BAR_VALID_RATE,
         "not timed_out": not report.timed_out,
+        "kills >= 1 (no worker was killed)": report.kills >= 1,
+        "recovered_attempts >= 1 (no kill interrupted in-flight work)": report.recovered_attempts >= 1,
     }
     return [name for name, ok in checks.items() if not ok]
+
+
+def validate_args(model: str, schema: str) -> None:
+    """Raises ValueError for arguments the run must refuse before it touches anything."""
+    if model == "openai" and not os.environ.get("OS_OPENAI_API_KEY"):
+        raise ValueError("model 'openai' needs OS_OPENAI_API_KEY (the dev key); it is not set")
+    if not schema.startswith(DEFAULT_SCHEMA):
+        raise ValueError(f"schema must start with {DEFAULT_SCHEMA!r}: the run drops it")
 
 
 def executor_id(slot: int) -> str:
@@ -187,13 +198,17 @@ class _Workers:
         self.generations[slot] += 1
         label = f"w{slot}g{generation}"
         log = open(self.log_dir / f"{label}.log", "wb")
-        proc = subprocess.Popen(
-            [sys.executable, "-m", "spikes.spike3.worker", *self.worker_args, "--executor-id", executor_id(slot)],
-            cwd=BACKEND_DIR,
-            env={**self.env, "SPIKE3_WORKER": label},
-            stdout=log,
-            stderr=subprocess.STDOUT,
-        )
+        try:
+            proc = subprocess.Popen(
+                [sys.executable, "-m", "spikes.spike3.worker", *self.worker_args, "--executor-id", executor_id(slot)],
+                cwd=BACKEND_DIR,
+                env={**self.env, "SPIKE3_WORKER": label},
+                stdout=log,
+                stderr=subprocess.STDOUT,
+            )
+        except BaseException:
+            log.close()
+            raise
         worker = self.slots[slot] = _Worker(slot, generation, proc, log)
         return worker
 
@@ -238,7 +253,7 @@ class _Workers:
 def _reset(conn: psycopg.Connection, schema: str) -> None:
     conn.execute(sql.SQL("DROP SCHEMA IF EXISTS {} CASCADE").format(sql.Identifier(schema)))
     loop.apply_schema(conn)
-    conn.execute(f"TRUNCATE {', '.join(f'spike3.{name}' for name in SPIKE3_TABLES)} RESTART IDENTITY")
+    conn.execute(f"TRUNCATE {', '.join(f'spike3.{name}' for name in loop.SPIKE3_TABLES)} RESTART IDENTITY")
 
 
 def _wait_ready(client: DBOSClient, workers: _Workers) -> None:
@@ -288,6 +303,61 @@ def _scalar(conn: psycopg.Connection, query: str, params: tuple = ()) -> int:
     return int(row[0])
 
 
+@dataclass
+class _RunState:
+    """What the run loop observes; _measure() turns it and the tables into a ChaosReport."""
+
+    killed: list[str] = field(default_factory=list)  # labels of SIGKILLed worker processes
+    killed_at: list[datetime] = field(default_factory=list)  # DB time once each was gone
+    kills_in_flight: int = 0
+    interrupted: int = 0
+    unexpected_exits: int = 0
+    reconciled: Counter[str] = field(default_factory=Counter)
+    timed_out: bool = False
+    open_workflows: int = 0
+
+
+def _measure(
+    conn: psycopg.Connection, client: DBOSClient, state: _RunState, *, tasks: int, elapsed_s: float,
+    model: str, workers: int, kill_every_s: float, log_dir: Path,
+) -> ChaosReport:
+    done, failed, _ = conn.execute(TASK_COUNTS_SQL).fetchone() or (0, 0, 0)
+    duplicate_results, valid_outputs = conn.execute(RESULT_COUNTS_SQL).fetchone() or (0, 0)
+    wf_tasks = Counter(wf.workflow_id.rsplit(":", 1)[0] for wf in _list_workflows(client))
+    extra = {t for t, n in wf_tasks.items() if n > 1}
+    extra |= {row[0] for row in conn.execute(MULTI_ATTEMPT_TASKS_SQL).fetchall()}
+    kills = (state.killed, state.killed_at)
+    return ChaosReport(
+        tasks=tasks,
+        done=done,
+        failed=failed,
+        lost=tasks - done - failed,
+        duplicate_results=duplicate_results,
+        duplicated=_scalar(conn, DUPLICATED_STEPS_SQL, kills) + _scalar(conn, DUPLICATED_MODEL_CALLS_SQL, kills),
+        extra_workflows=len(extra),
+        step_reruns=_scalar(conn, STEP_RERUNS_SQL),
+        recovered_attempts=_scalar(conn, RECOVERED_ATTEMPTS_SQL),
+        valid_outputs=valid_outputs,
+        model_calls=_scalar(conn, MODEL_CALLS_SQL),
+        valid_rate=valid_outputs / tasks if tasks else 0.0,
+        kills=len(state.killed),
+        kills_in_flight=state.kills_in_flight,
+        interrupted_workflows=state.interrupted,
+        unexpected_exits=state.unexpected_exits,
+        failed_workflows=state.reconciled["failed_workflows"],
+        reconcile_reenqueued=state.reconciled["reenqueued"],
+        reconcile_applied=state.reconciled["applied"],
+        workflows=sum(wf_tasks.values()),
+        open_workflows=state.open_workflows,
+        timed_out=state.timed_out,
+        elapsed_s=elapsed_s,
+        model=model,
+        workers=workers,
+        kill_every_s=kill_every_s,
+        log_dir=str(log_dir),
+    )
+
+
 def run_chaos(
     tasks: int,
     workers: int,
@@ -303,10 +373,7 @@ def run_chaos(
     seed: int | None = None,
     log_dir: Path | None = None,
 ) -> ChaosReport:
-    if model == "openai" and not os.environ.get("OS_OPENAI_API_KEY"):
-        raise ValueError("model 'openai' needs OS_OPENAI_API_KEY (the dev key); it is not set")
-    if not schema.startswith(DEFAULT_SCHEMA):
-        raise ValueError(f"schema must start with {DEFAULT_SCHEMA!r}: the run drops it")
+    validate_args(model, schema)
     database_url = database_url or load_settings().database_url
     log_dir = log_dir or Path(tempfile.mkdtemp(prefix="spike3-chaos-"))
     log_dir.mkdir(parents=True, exist_ok=True)
@@ -321,12 +388,7 @@ def run_chaos(
              "SPIKE3_DRIVER_PID": str(os.getpid()), "PYTHONUNBUFFERED": "1"},
         log_dir=log_dir,
     )
-    killed: list[str] = []
-    killed_at: list[datetime] = []
-    kills_in_flight = interrupted = unexpected_exits = 0
-    reconciled: Counter[str] = Counter()
-    timed_out = False
-    open_workflows = 0
+    state = _RunState()
 
     with psycopg.connect(database_url, autocommit=True) as conn:
         _reset(conn, schema)
@@ -348,61 +410,28 @@ def run_chaos(
                 while _open_tasks(conn) > 0:
                     now = time.monotonic()
                     if now > deadline:
-                        timed_out = True
+                        state.timed_out = True
                         break
-                    unexpected_exits += len(pool.restart_exited())
+                    state.unexpected_exits += len(pool.restart_exited())
                     if now >= next_kill:
                         slot = rng.randrange(workers)
                         pending = len(_list_workflows(client, status="PENDING", executor_id=executor_id(slot)))
-                        kills_in_flight += pending > 0
-                        interrupted += pending
-                        killed.append(pool.kill(slot))
-                        killed_at.append(_db_now(conn))
+                        state.kills_in_flight += pending > 0
+                        state.interrupted += pending
+                        state.killed.append(pool.kill(slot))
+                        state.killed_at.append(_db_now(conn))
                         pool.start(slot)
                         next_kill = time.monotonic() + kill_every_s
                     if now >= next_reconcile:
-                        reconciled.update(loop.reconcile(conn, client=client))
+                        state.reconciled.update(loop.reconcile(conn, client=client))
                         next_reconcile = time.monotonic() + reconcile_every_s
                     time.sleep(0.1)
-                open_workflows = _wait_drained(client, 0 if timed_out else DRAIN_TIMEOUT_S)
+                state.open_workflows = _wait_drained(client, 0 if state.timed_out else DRAIN_TIMEOUT_S)
             finally:
                 pool.stop()
-
-            done, failed, _ = conn.execute(TASK_COUNTS_SQL).fetchone() or (0, 0, 0)
-            duplicate_results, valid_outputs = conn.execute(RESULT_COUNTS_SQL).fetchone() or (0, 0)
-            assert client is not None
-            wf_tasks = Counter(wf.workflow_id.rsplit(":", 1)[0] for wf in _list_workflows(client))
-            extra = {t for t, n in wf_tasks.items() if n > 1}
-            extra |= {row[0] for row in conn.execute(MULTI_ATTEMPT_TASKS_SQL).fetchall()}
-            return ChaosReport(
-                tasks=tasks,
-                done=done,
-                failed=failed,
-                lost=tasks - done - failed,
-                duplicate_results=duplicate_results,
-                duplicated=_scalar(conn, DUPLICATED_STEPS_SQL, (killed, killed_at))
-                + _scalar(conn, DUPLICATED_MODEL_CALLS_SQL, (killed, killed_at)),
-                extra_workflows=len(extra),
-                step_reruns=_scalar(conn, STEP_RERUNS_SQL),
-                recovered_attempts=_scalar(conn, RECOVERED_ATTEMPTS_SQL),
-                valid_outputs=valid_outputs,
-                model_calls=_scalar(conn, MODEL_CALLS_SQL),
-                valid_rate=valid_outputs / tasks if tasks else 0.0,
-                kills=len(killed),
-                kills_in_flight=kills_in_flight,
-                interrupted_workflows=interrupted,
-                unexpected_exits=unexpected_exits,
-                failed_workflows=reconciled["failed_workflows"],
-                reconcile_reenqueued=reconciled["reenqueued"],
-                reconcile_applied=reconciled["applied"],
-                workflows=sum(wf_tasks.values()),
-                open_workflows=open_workflows,
-                timed_out=timed_out,
-                elapsed_s=round(time.monotonic() - started, 1),
-                model=model,
-                workers=workers,
-                kill_every_s=kill_every_s,
-                log_dir=str(log_dir),
+            return _measure(
+                conn, client, state, tasks=tasks, elapsed_s=round(time.monotonic() - started, 1),
+                model=model, workers=workers, kill_every_s=kill_every_s, log_dir=log_dir,
             )
         finally:
             if client is not None:
@@ -422,16 +451,21 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument("--seed", type=int, default=None)
     args = parser.parse_args(argv)
     try:
-        report = run_chaos(
-            args.tasks, args.workers, args.kill_every, args.model, args.timeout,
-            schema=args.schema, model_delay_s=args.model_delay,
-            worker_concurrency=args.worker_concurrency, seed=args.seed,
-        )
+        validate_args(args.model, args.schema)
     except ValueError as exc:
         parser.error(str(exc))
+    report = run_chaos(
+        args.tasks, args.workers, args.kill_every, args.model, args.timeout,
+        schema=args.schema, model_delay_s=args.model_delay,
+        worker_concurrency=args.worker_concurrency, seed=args.seed,
+    )
     print(json.dumps(asdict(report), indent=2))
     failures = pass_bar_failures(report)
     print("pass bar: " + ("PASS" if not failures else "FAIL (" + ", ".join(failures) + ")"))
+    if failures:
+        print(f"worker logs kept in {report.log_dir}")
+    else:
+        shutil.rmtree(report.log_dir, ignore_errors=True)  # a passing run's logs are not needed
     sys.exit(1 if failures else 0)
 
 
