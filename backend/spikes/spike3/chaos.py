@@ -429,6 +429,7 @@ def run_chaos(
                 state.open_workflows = _wait_drained(client, 0 if state.timed_out else DRAIN_TIMEOUT_S)
             finally:
                 pool.stop()
+            assert client is not None  # the loop raised before the client existed otherwise
             return _measure(
                 conn, client, state, tasks=tasks, elapsed_s=round(time.monotonic() - started, 1),
                 model=model, workers=workers, kill_every_s=kill_every_s, log_dir=log_dir,
@@ -454,11 +455,17 @@ def main(argv: list[str] | None = None) -> None:
         validate_args(args.model, args.schema)
     except ValueError as exc:
         parser.error(str(exc))
-    report = run_chaos(
-        args.tasks, args.workers, args.kill_every, args.model, args.timeout,
-        schema=args.schema, model_delay_s=args.model_delay,
-        worker_concurrency=args.worker_concurrency, seed=args.seed,
-    )
+    log_dir = Path(tempfile.mkdtemp(prefix="spike3-chaos-"))
+    try:
+        report = run_chaos(
+            args.tasks, args.workers, args.kill_every, args.model, args.timeout,
+            schema=args.schema, model_delay_s=args.model_delay,
+            worker_concurrency=args.worker_concurrency, seed=args.seed, log_dir=log_dir,
+        )
+    except BaseException:
+        # e.g. a worker that cannot start: its log says why.
+        print(f"chaos run crashed; worker logs kept in {log_dir}", file=sys.stderr)
+        raise
     print(json.dumps(asdict(report), indent=2))
     failures = pass_bar_failures(report)
     print("pass bar: " + ("PASS" if not failures else "FAIL (" + ", ".join(failures) + ")"))
