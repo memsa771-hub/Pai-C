@@ -16,7 +16,9 @@ WORKSPACE_ID = "11111111-1111-4111-8111-111111111111"
 def test_voice_route_is_mounted():
     from fastapi.testclient import TestClient
     from app.main import app
-    assert TestClient(app).post("/v1/counselor/voice/session", json={}).status_code == 422
+    from app.database import get_db
+    with patch.dict(app.dependency_overrides, {get_db: lambda: Mock()}):
+        assert TestClient(app).post("/v1/counselor/voice/session", json={}).status_code == 422
 
 
 def test_counselor_reply_keeps_only_bounded_voice_correlation():

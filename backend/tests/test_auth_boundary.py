@@ -2,7 +2,7 @@
 
 import unittest
 from types import SimpleNamespace
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 from fastapi import Header
 from fastapi.testclient import TestClient
@@ -24,6 +24,13 @@ def _auth_test_mutation():
 
 class AuthBoundaryTests(unittest.TestCase):
     def setUp(self):
+        from app.database import get_db
+        overrides = dict(app.dependency_overrides)
+        app.dependency_overrides[get_db] = lambda: Mock()
+        def restore_overrides():
+            app.dependency_overrides.clear()
+            app.dependency_overrides.update(overrides)
+        self.addCleanup(restore_overrides)
         self.client = TestClient(app, raise_server_exceptions=False)
 
     def test_old_supabase_jwt_never_authorizes_protected_route(self):
