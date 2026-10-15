@@ -47,3 +47,26 @@ def test_rejections(bad, msg):
 def test_schema_is_frozen():
     committed = json.loads(SCHEMA_PATH.read_text())
     assert export_json_schema() == committed, "Contract changed: bump contract_version and add a new schema file"
+
+
+@pytest.mark.parametrize("field", ["external_ref", "student_ref"])
+@pytest.mark.parametrize("value", ["", "   "])
+def test_refs_must_be_non_empty_after_strip(field, value):
+    with pytest.raises(ValidationError):
+        RouteContract.model_validate(valid(**{field: value}))
+
+
+def test_refs_are_stripped_and_dedupe_key_uses_stripped_value():
+    c = RouteContract.model_validate(valid(external_ref=" ext-1 ", student_ref=" stu-1 "))
+    assert (c.external_ref, c.student_ref) == ("ext-1", "stu-1")
+    assert c.dedupe_key == "self_serve:ext-1:1"
+
+
+def test_unknown_key_in_programme_item_rejected():
+    with pytest.raises(ValidationError, match="Extra inputs"):
+        RouteContract.model_validate(valid(programmes=[{"programme_ref": "a", "rank": 1, "x": 1}]))
+
+
+def test_unknown_key_in_target_intake_rejected():
+    with pytest.raises(ValidationError, match="Extra inputs"):
+        RouteContract.model_validate(valid(target_intake={"term": "winter", "year": 2027, "x": 1}))
