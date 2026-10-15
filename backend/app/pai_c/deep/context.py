@@ -143,6 +143,8 @@ async def build_context(db, workspace_id: str, turn: CounselorTurnInput, *,
     }
     notebook = MemoryService(db).truth_map(workspace_id).notebook
     sections["notebook"] = _json(_trim_notebook(notebook))
+    from app.pai_c.deep.noted_questions import NotedQuestionService
+    sections["open_requests"] = _json(NotedQuestionService(db).open_requests(workspace_id))
     journey = next((item for item in JourneyService(db).list(workspace_id, status="active")
                     if item.journey_type == "counselor_decision"), None)
     memory = MemoryService(db)

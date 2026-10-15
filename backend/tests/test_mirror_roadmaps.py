@@ -61,6 +61,13 @@ async def test_one_grounded_card_per_lane_questions_sourced_and_publication_idem
         question = CounselorNotedQuestion(workspace_id=student.workspace_id, source_event_id=event.id,
                                           question_to_research="What is needed?")
         db.add(question); db.flush()
+        other_event = EventRecord(id=str(uuid4()), network_id=student.workspace_id,
+            type="workspace.message.posted", source=f"human:{student.user_id}",
+            target="channel/pai-counselor", payload={"content": "Another question"}, timestamp=2)
+        db.add(other_event); db.flush()
+        unanswered = CounselorNotedQuestion(workspace_id=student.workspace_id,
+            source_event_id=other_event.id, question_to_research="An unverified question", needs_research=True)
+        db.add(unanswered); db.flush()
         opportunity = Opportunity(id=str(uuid4()), workspace_id=student.workspace_id, route={}, country="fixture", url="https://official.example/route")
         evidence = RequirementSet(id=str(uuid4()), opportunity_id=opportunity.id,
             source_url=opportunity.url, checked_at=datetime.now(timezone.utc), status="verified", version=1,
@@ -71,7 +78,8 @@ async def test_one_grounded_card_per_lane_questions_sourced_and_publication_idem
                  for item in RequirementStore.payload(opportunity, evidence)["rules"]]
         for card in cards: card["citations"]["gap.0.need"] = [item["fact_id"] for item in facts]
         brief = {"mirror": mirror, "mirror_version": 1, "notebook": {}, "profile": {},
-                 "questions": [{"id": question.id, "question": question.question_to_research}]}
+                 "questions": [{"id": question.id, "question": question.question_to_research},
+                               {"id": unanswered.id, "question": unanswered.question_to_research}]}
         research = {"lanes": [{"lane": item["lane"], "facts": facts} for item in mirror["roadmap_lanes"]],
                     "decisive_fields": [item["field"] for item in facts]}
         raw = {"roadmaps": cards, "question_answers": [{"question_id": question.id, "fact_id": facts[0]["fact_id"]}]}
@@ -91,6 +99,8 @@ async def test_one_grounded_card_per_lane_questions_sourced_and_publication_idem
         db.refresh(question)
         assert question.status == "answered" and question.fact_id == facts[0]["fact_id"]
         assert question.answer["source_url"] == opportunity.url
+        db.refresh(unanswered)
+        assert unanswered.status == "unanswered" and unanswered.needs_research
         serialized = service.get(student.workspace_id, ids[0])
         assert serialized["why_for_you"] and serialized["test_30_days"]
         assert serialized["your_questions"][0]["answer"] == facts[0]["quote"]

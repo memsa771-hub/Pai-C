@@ -131,12 +131,15 @@ class Workspace(Base):
 
 
 class CounselorNotedQuestion(Base):
-    """A student fact question deferred until roadmap research."""
+    """A student request, answered immediately or deferred to research."""
 
     __tablename__ = "counselor_noted_questions"
     id = Column(UUID(as_uuid=False), primary_key=True, default=_uuid)
     workspace_id = Column(UUID(as_uuid=False), ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False)
     question_to_research = Column(Text, nullable=False)
+    kind = Column(Text, nullable=False, default="information", server_default=text("'information'"))
+    needs_research = Column(Boolean, nullable=False, default=True, server_default=text("true"))
+    answered_event_id = Column(Text, nullable=True)
     fact_id = Column(Text, nullable=True)
     answer = Column(JSONB, nullable=True)
     source_event_id = Column(Text, ForeignKey("events.id", ondelete="CASCADE"), nullable=False)

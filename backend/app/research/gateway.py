@@ -23,6 +23,7 @@ def _research_brief(db, workspace_id, journey, snapshot=None, understanding=None
     notebook = understanding if understanding is not None else MemoryService(db).understanding_summary(workspace_id)
     questions = db.scalars(select(CounselorNotedQuestion).where(
         CounselorNotedQuestion.workspace_id == workspace_id,
+        CounselorNotedQuestion.needs_research.is_(True),
         CounselorNotedQuestion.status.in_(("open", "unanswered")))).all()
     goals = snapshot.records.get("goal", [])
     return {"mirror": draft.get("mirror") or {}, "mirror_version": draft.get("version"),

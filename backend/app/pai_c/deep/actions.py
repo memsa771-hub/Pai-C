@@ -26,7 +26,7 @@ def _record(db, turn: CounselorTurnInput, name: str, status: str, **details) -> 
 
 
 async def dispatch_action(db, turn: CounselorTurnInput, action: dict,
-                          context: DeepContext) -> tuple[str, str]:
+                          context: DeepContext, *, reply_event_id: str | None = None) -> tuple[str, str]:
     kind = action.get("type") if isinstance(action, dict) else None
     if kind == "ask_research":
         kind = "note_question"
@@ -46,12 +46,16 @@ async def dispatch_action(db, turn: CounselorTurnInput, action: dict,
                 reason=None if ready else "not_ready")
         return kind, "requested" if ready else "ignored"
     if kind == "note_question":
-        from app.pai_c.deep.noted_questions import NotedQuestionService
+        from app.pai_c.deep.noted_questions import NotedQuestionService, request_policy
 
         question = (action.get("question_to_research") or action.get("research_question")
                     or action.get("question"))
+        policy = request_policy()
         status = NotedQuestionService(db).record(
-            turn.workspace_id, turn.source_event_id, question)
+            turn.workspace_id, turn.source_event_id, question,
+            kind=action.get("kind", policy["default_kind"]),
+            needs_research=action.get("needs_research", policy["default_needs_research"]),
+            answered_event_id=reply_event_id)
         if status == "recorded":
             _record(db, turn, kind, status)
         return kind, status

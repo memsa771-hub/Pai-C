@@ -1,0 +1,10 @@
+{
+  "kinds": ["information", "task", "decision_help", "other"],
+  "statuses": ["open", "answered_now", "answered", "unanswered", "handed_off", "dropped"],
+  "default_kind": "information",
+  "default_needs_research": true,
+  "pending_status": "open",
+  "immediate_status": "answered_now",
+  "context_status": "open",
+  "context_limit": 5
+}

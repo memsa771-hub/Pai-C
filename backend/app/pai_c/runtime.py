@@ -167,7 +167,7 @@ async def _run_deep_turn(db, workspace_id: str, event_data: dict, depth: int):
     move = "none"
     status = "none"
     try:
-        move, status = await dispatch_action(db, turn, action, context)
+        move, status = await dispatch_action(db, turn, action, context, reply_event_id=assistant_event_id)
     except Exception:
         db.rollback()
         logger.exception("counselor: deep action failed after reply was posted")
