@@ -4,6 +4,12 @@ from app.memory import index
 
 
 @pytest.fixture(autouse=True)
+def offline_api_key(monkeypatch):
+    from app.config import config
+    monkeypatch.setattr(config, "PAI_API_KEY", "offline-test-key")
+
+
+@pytest.fixture(autouse=True)
 def hermetic_providers_and_database(monkeypatch):
     """Fail at the boundary, even when application code catches Exception.
 
