@@ -1670,3 +1670,165 @@ The following documentation commit records final verification.
   explicitly added; R2 only requested new values in config and `.env.example`.
 - Mirror/roadmap World-aware prompts and multi-request intake from the R1
   findings remain later work. The R1 prefixed-identity finding is fixed here.
+
+## Core R3 — Picture review and Agree / Changes loop
+
+Implemented on `pai-c` from `ccd333c`. All three supplied FigJam boards were
+read. R3 reuses the existing Mirror job, Journey transitions, summary endpoints,
+Messenger and review card. Possibility discovery and exploration roadmaps remain
+R4; PAI OS life events remain R5.
+
+### Board box -> code
+
+| Board box | Owner/code |
+| --- | --- |
+| B: Every few turns, summary / picture clear | Existing R2 summary row retained; `policy/state.py` computes Mirror eligibility |
+| B/C: You say / life shows / pressure / you want | `deep/mirror_schema.py` CorePicture; `deep/prompts/mirror.md`; `deep/context.py` public Mirror views |
+| C: Gap between stated wishes and lived evidence | Tensions-only `<private_gap_context>`; generation validation rejects verbatim private quotations |
+| B/C: Picture review | `counselor-mirror-card.tsx`: four labelled lines before collapsed Details |
+| B/C: Student agrees? Yes | Existing confirm path in `journey/service.py`, durable confirmation proof, feedback endpoint |
+| B/C: Changes / talk more on that gap | Existing edit message metadata -> `mirror_changes` -> `explore_correction.md`; two-message + applied-patch gate |
+| C: Routes built on the truth | Existing confirmed research handoff retained; no R4 possibility changes |
+
+### FIX FIRST
+
+Autouse `offline_api_key` sets a fake config key without weakening the provider
+and database hermetic guards. The suite also runs with the process key unset.
+Both Compose files pass through 16 settings: classifier model/effort/timeout,
+opening and statement fallback, summary cadence, safety model/effort/timeout,
+wellbeing resources/fallback, repeat window/similarity, plan max age, Planner
+history and map budgets. Bare environment mappings preserve config.py defaults
+when a setting is absent. Synthetic Compose checks verified both absent and
+supplied values for backend and worker. No dotenv file was opened or edited.
+
+### Mirror v2 contract and privacy
+
+`CounselorMirror` is the GENERATE contract: `core_picture` is required and has
+exactly `you_say`, `life_shows`, `pressure`, `you_want`. Each is
+`{text: string, evidence: string, unknown: boolean}`; text is nonempty and
+evidence is nonempty unless unknown is true. Nine dimensions, blockers, opinion,
+final question and roadmap lanes retain their existing contracts.
+
+Spoken order: intro -> you_say -> life_shows -> pressure -> you_want -> opinion
+-> final confirmation question. Validation requires exactly one question.
+The prompt includes the founder's CORE PICTURE and v3 TRUTH MAP INPUT verbatim,
+plus the approved private-gap instruction; the runtime and reference document
+match.
+
+The Mirror context reads MemoryService personal_view and capability_view, active
+said/shown items, world.people (including role/wish/worry), and Vault profile.
+Only tensions' between/evidence/status enter the separate private gap block.
+private_notes, hypotheses, identity_status, decision_difficulties and both legacy
+archives are excluded. Free-text tension quotations in spoken or card fields
+reject generation: regenerate once, then keep discovery and the existing failed
+draft path, without posting a broken card. No sensitive-check rebuild or extra
+per-turn check was added.
+
+`SavedCounselorMirror` is the READ contract: missing core_picture remains valid.
+Old cards show existing details with no empty section or invented lines, and
+saved spoken text is preserved. A new generation after an older draft must pass
+v2. Delivery recovery of an already saved draft remains a read/repost operation,
+not a model generation or database rewrite.
+
+### Correction policy and Mirror eligibility
+
+`mirror_allowed` requires mirror_ready, DIRECTION, no pending/running
+counselor.mirror job, and either no edit or both:
+- at least `derived.mirror_after_edit_min_student_messages = 2` later student
+  messages (the correction itself is excluded);
+- accepted Truth Map history for the edit or a later student event, read through
+  MemoryService.patch_applied_since. Rejected patches create no accepted version.
+  The existing sensitive pass retains its old source event and cannot advance
+  this boundary by itself.
+
+The mirror row now reads mirror_allowed. Immediately after care, the data-driven
+mirror_changes row selects explore_correction for a mirror_edit_version message:
+one question, first mentioned area or null, no invitation. The action instruction
+is verbatim, with the optional topic clause. Existing no_repeat branches do not
+apply to this action. Care retains priority. Policy tests use the new eligibility
+signal rather than raw readiness.
+
+### Confirmation proof, feedback and migration 110
+
+Generation stores sure.score as certainty_before in the draft. Actual confirmation
+appends a `counselor.mirror.confirmed` StudentJourneyEvent in the same transaction,
+containing workspace_id, mirror_version, confirmed_at and certainty_before (null
+when absent). The existing Journey row lock and confirmed-path return prevent
+duplicate confirmation events. No historical proof is inferred or backfilled.
+
+`POST /v1/counselor/summary/feedback` uses the confirm authentication boundary.
+Only an exact workspace/version proof permits rating; otherwise it returns 409,
+`This Mirror version cannot be rated`. This continues to work after the current
+draft changes. A workspace lock and unique constraint make repeated submissions
+idempotent: the first saved response is returned, never overwritten. Feedback
+does not write the Truth Map.
+
+Migration `110_counselor_mirror_feedback.py`, down_revision `109`, adds
+`pai_counselor_mirror_feedback`: id, workspace_id, mirror_version, understood
+(1..5), certainty_after (nullable 0..10), certainty_before (nullable 0..10),
+created_at. Unique(workspace_id, mirror_version), range checks and workspace
+cascade are database-enforced. Downgrade drops only this new table; the existing
+Journey event log remains. Soft workspace deletion also purges feedback.
+
+The frontend offers feedback only immediately after a successful Confirm, for
+that exact version. Understood is required; certainty is optional; Send persists
+and Skip writes nothing. All labels use the existing i18n mechanism. The card
+retains its responsive width, scrolling and wrapping. Session export now includes
+feedback and explicit confirmation proofs per version.
+
+### Verification
+
+
+| Check | Result |
+| --- | --- |
+| FIX FIRST / pre-R3 behavior count, key unset | 1088 passed, 3 skipped, 8 subtests |
+| Step A full backend, key unset | 1093 passed, 3 skipped, 8 subtests |
+| Final Step B backend, key unset | 1108 passed, 3 skipped, 8 subtests; 499.01s |
+| Final Step B backend, fake key supplied | 1108 passed, 3 skipped, 8 subtests; 497.87s |
+| Production-only security (separate synthetic config) | 3 passed, 4 subtests; covers the three skips |
+| Frontend | 24 before -> 25 Step A -> 28 final, 9 files |
+| Production frontend build | PASS after Step A and Step B |
+| Import every app module | 265/265; no unresolved dynamic imports |
+| Dedicated architecture checks | 9 passed |
+| Dedicated PAI OS contract checks | 2 passed |
+| Compose pass-through checks | All 16 settings, supplied and unset, backend and worker |
+| Migration 110 | Offline upgrade/downgrade, uniqueness, ranges and workspace cascade passed |
+
+The first Step B full run found one older isolated deletion fixture missing the
+new table (1107 passed, one failed). Its schema now includes feedback and the
+test explicitly verifies feedback is purged. Both final full runs above pass.
+Three existing SQLite reflection warnings for expression indexes remain; the
+migration assertions pass.
+
+Additional coverage includes new-generation requirements, unknown evidence,
+spoken order, private-gap exclusions/quotation retry, old draft read/retry,
+draft certainty capture, correction policy priority and no_repeat exemption,
+pending/stage/edit gating, exact-version durable proof, missing-proof 409,
+historical proof after draft replacement, null certainty, authentication and
+workspace isolation, rating validation/idempotency, exporter contents, feedback
+Send/Skip/retry, and old-card rendering without placeholder lines.
+
+Commits:
+- `80779dd` — core R3: test key and compose config
+- `3ae1038` — core R3 step A: mirror v2 picture from truth map v3
+- `6f276f6` — core R3 step B: picture review loop and feedback
+- The following documentation commit records verification.
+
+### Open questions
+
+None remain within R3 after the founder's private-gap, READ/GENERATE and durable
+confirmation-proof decisions. Historical versions without proof intentionally
+cannot be rated; the endpoint does not infer evidence from old status events.
+
+### Findings for later
+
+- No live model quality, latency or acceptance-rate claim is made. All model
+  tests used fakes; no live API calls or founder conversation was run.
+- Migration 110 was exercised offline, not applied to the founder's running
+  database. Deploy the migration before using the feedback endpoint.
+- Existing Mirror generation retry limits and sensitive-check behavior remain;
+  R3 does not redesign their lifecycle.
+- No dotenv files were opened or edited. Existing example-file documentation was
+  left unchanged under the explicit rule; Compose behavior was verified using an
+  empty temporary environment file and synthetic values.
+- R4 possibilities/exploration and R5 OS events remain out of scope.
