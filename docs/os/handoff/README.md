@@ -89,7 +89,36 @@ Source documents (authority order: spec > plan > rulings):
   - **To do:** add `legacy` as a required check on `pai-os`.
   - `os` must not be required on `dev`/`main`, because they have no `tests/os`; the user fixed this.
 
-## 3. Environment (cloud container)
+## 3. Environment
+
+### 3a. Local session (the user's machine) — the next session runs here
+The next session is a **local** Claude Code session on the user's computer, not the cloud.
+OpenAI is reachable there, so that session can run the Spike 3 OpenAI pass-bar run itself (§4.2).
+
+**OS:** macOS or Linux. On Windows, use **WSL2** (Ubuntu): the chaos harness uses `signal.SIGKILL` and
+`os.getppid()`, and Windows has neither, so the chaos test and run fail on native Windows.
+
+One-time setup, done by the user in a terminal **before** starting `claude`:
+1. **Repo:** `git clone https://github.com/memsa771-hub/Pai-C.git` (or `git pull` in an existing clone), then
+   `git fetch origin pai-os chore/s0-handoff`.
+2. **Python 3.12** (CI's version; 3.13 also works). In `backend/`, make a virtual env:
+   `python -m venv .venv`, then activate it (`source .venv/bin/activate`), then
+   `pip install -r requirements.txt -r requirements-dev.txt`.
+3. **Postgres 16**, local or Docker. The simplest is Docker:
+   `docker run -d --name os-pg -p 5433:5432 -e POSTGRES_PASSWORD=os -e POSTGRES_DB=os_test postgres:16`.
+   - Test database: `OS_TEST_DATABASE_URL=postgresql://postgres:os@127.0.0.1:5433/os_test`
+   - Scratch database for the chaos run: `OS_DATABASE_URL=postgresql://postgres:os@127.0.0.1:5433/os_test`.
+     The run drops schema `dbos_chaos` and empties `spike3`, so never point it at a real database.
+4. **Key:** set `OS_OPENAI_API_KEY` in that same terminal (`export OS_OPENAI_API_KEY=...`), then start `claude` from the repo root.
+   The session inherits the variable. **Never paste the key into the chat.** Ideally use a key from
+   a separate PAI OS OpenAI project that has a budget limit.
+5. Optional: `export OS_MODEL_CHEAP=gpt-5.4-mini`. This is already the default.
+
+Checks the session runs before anything else, from `backend/` with the venv active:
+`tach check`, `python scripts/check_alembic_heads.py`, `python -m pytest tests/os -v -rs`.
+All must pass (57 tests on `pai-os` at `f1e9e96`).
+
+### 3b. Cloud container (where Slice 0 was built), for reference
 
 - **Postgres 16:** the `postgresql-16` package is in the image. The data directory is not, so a fresh container needs:
   ```
@@ -198,9 +227,14 @@ Before any Slice 1 code:
 - [ ] Delete branch `os/s0-t7-spike3-chaos` now, and `chore/s0-handoff` once this folder is merged into `pai-os` (other leftover branches are already gone; `dev-backup` and `pai-c-backup` are kept on purpose).
 - [ ] Confirm D7.
 
-## 9. Prompt for the next session
+## 9. Prompt for the next session (local)
+
+Do the §3a setup first. Then start `claude` in the repo root and paste:
 
 > Continue PAI OS. First run `git fetch origin pai-os chore/s0-handoff` and read
-> `docs/os/handoff/README.md` on branch `chore/s0-handoff`, all of it. Then read
+> `docs/os/handoff/README.md` from branch `chore/s0-handoff`
+> (`git show origin/chore/s0-handoff:docs/os/handoff/README.md`), all of it. Read
 > `slice-0-sdd-ledger.md` in the same folder when you need history. Follow the working rules in §2
-> exactly. Then tell me in a few lines where Slice 0 stands and what the next step is, and wait for my go.
+> exactly. This is a local session: check the §3a setup (venv, Postgres, `OS_TEST_DATABASE_URL`,
+> `OS_DATABASE_URL`, and whether `OS_OPENAI_API_KEY` is set, without printing it), run the §3a checks,
+> then tell me in a few lines where Slice 0 stands and what the next step is, and wait for my go.
