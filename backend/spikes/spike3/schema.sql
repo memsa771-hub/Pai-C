@@ -41,3 +41,7 @@ CREATE TABLE IF NOT EXISTS spike3.step_runs (
     step text NOT NULL,
     at timestamptz NOT NULL DEFAULT now()
 );
+
+-- Task 7: which worker process wrote the row (env SPIKE3_WORKER, e.g. `w1g3`; NULL in-process).
+ALTER TABLE spike3.step_runs ADD COLUMN IF NOT EXISTS worker text;
+ALTER TABLE spike3.model_calls ADD COLUMN IF NOT EXISTS worker text;
