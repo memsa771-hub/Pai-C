@@ -11,9 +11,12 @@ does the same):
     ...                                   # enqueue_pending / reconcile / wait
     shutdown()
 
-All functions that take `conn` expect a psycopg connection in autocommit mode.
+All functions that take `conn` expect a psycopg connection in autocommit mode. The kernel
+side (`enqueue_pending`, `reconcile`) runs either in a launched DBOS process (Task 6 tests)
+or, given a `DBOSClient`, in a process that never executes workflows (Task 7 chaos driver).
 """
 
+import os
 import zlib
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
@@ -23,7 +26,7 @@ from pathlib import Path
 from typing import Any, Literal
 
 import psycopg
-from dbos import DBOS, DBOSConfig, Queue, SetWorkflowID
+from dbos import DBOS, DBOSClient, DBOSConfig, EnqueueOptions, Queue, SetWorkflowID
 from openai import AsyncOpenAI
 from psycopg.types.json import Jsonb
 from pydantic import BaseModel
@@ -40,10 +43,16 @@ from pydantic_ai.settings import ModelSettings
 from app.os.settings import OsSettings
 
 APP_NAME = "pai-os-spike3"
+# One fixed version for every process, so any worker dequeues client-enqueued and recovered workflows.
+APP_VERSION = "spike3"
 QUEUE_NAME = "spike3"
+WORKFLOW_NAME = "spike3.run_attempt"
+# Workflow statuses that end an attempt without a recorded result (reconcile fails the task).
+FAILED_WORKFLOW_STATUSES = frozenset({"ERROR", "CANCELLED", "MAX_RECOVERY_ATTEMPTS_EXCEEDED"})
 AGENT_NAME = "spike3_extractor"
 SPIKE_DIR = Path(__file__).resolve().parent
 SCHEMA_PATH = SPIKE_DIR / "schema.sql"
+SPIKE3_TABLES = ("tasks", "model_calls", "enqueue_requests", "results", "step_runs")
 PAGES_DIR = SPIKE_DIR / "pages"
 
 # Invariant 7: network/service retries happen only here, as DBOS step retries.
@@ -68,8 +77,8 @@ RETURNING attempt
 INSERT_ENQUEUE_REQUEST_SQL = "INSERT INTO spike3.enqueue_requests (task_id, attempt) VALUES (%s, %s)"
 UNSENT_REQUESTS_SQL = "SELECT task_id, attempt FROM spike3.enqueue_requests WHERE NOT sent ORDER BY task_id, attempt"
 MARK_SENT_SQL = "UPDATE spike3.enqueue_requests SET sent = true WHERE task_id = %s AND attempt = %s"
-STEP_RUN_SQL = "INSERT INTO spike3.step_runs (task_id, attempt, step) VALUES (%s, %s, %s)"
-MODEL_CALL_SQL = "INSERT INTO spike3.model_calls (task_id, attempt) VALUES (%s, %s)"
+STEP_RUN_SQL = "INSERT INTO spike3.step_runs (task_id, attempt, step, worker) VALUES (%s, %s, %s, %s)"
+MODEL_CALL_SQL = "INSERT INTO spike3.model_calls (task_id, attempt, worker) VALUES (%s, %s, %s)"
 MARK_RUNNING_SQL = (
     "UPDATE spike3.tasks SET status = 'running' WHERE id = %s AND attempt = %s AND status = 'ready'"
 )
@@ -166,6 +175,11 @@ def workflow_id(task_id: str, attempt: int) -> str:
     return f"{task_id}:{attempt}"
 
 
+def worker_label() -> str | None:
+    """The worker process label set by the chaos driver (`w{slot}g{generation}`); None in-process."""
+    return os.environ.get("SPIKE3_WORKER")
+
+
 # --- model and agent ------------------------------------------------------------------
 
 
@@ -186,7 +200,7 @@ class CountingModel(WrapperModel):
         if attempt is None:
             raise RuntimeError("CountingModel runs only inside run_attempt")
         async with _connect() as conn:
-            await conn.execute(MODEL_CALL_SQL, attempt)
+            await conn.execute(MODEL_CALL_SQL, (*attempt, worker_label()))
         return await super().request(messages, model_settings, model_request_parameters)
 
 
@@ -216,27 +230,27 @@ def build_agent(model: Model) -> Agent[ExtractDeps, ProgrammeFact]:
 
 async def load_page(task_id: str, attempt: int) -> str:
     async with _connect() as conn:
-        await conn.execute(STEP_RUN_SQL, (task_id, attempt, "load_page"))
+        await conn.execute(STEP_RUN_SQL, (task_id, attempt, "load_page", worker_label()))
         await conn.execute(MARK_RUNNING_SQL, (task_id, attempt))
     return page_for(task_id).read_text(encoding="utf-8")
 
 
 async def record_result(task_id: str, attempt: int, output: dict[str, Any] | None, valid: bool) -> None:
     async with _connect() as conn:
-        await conn.execute(STEP_RUN_SQL, (task_id, attempt, "record_result"))
+        await conn.execute(STEP_RUN_SQL, (task_id, attempt, "record_result", worker_label()))
         stored = None if output is None else Jsonb(output)
         await conn.execute(RECORD_RESULT_SQL, (task_id, attempt, stored, valid))
 
 
 async def complete_task(task_id: str, attempt: int) -> None:
     async with _connect() as conn:
-        await conn.execute(STEP_RUN_SQL, (task_id, attempt, "complete_task"))
+        await conn.execute(STEP_RUN_SQL, (task_id, attempt, "complete_task", worker_label()))
         await conn.execute(COMPLETE_TASK_SQL, (task_id, attempt))
 
 
 async def fail_task(task_id: str, attempt: int, reason: str) -> None:
     async with _connect() as conn:
-        await conn.execute(STEP_RUN_SQL, (task_id, attempt, "fail_task"))
+        await conn.execute(STEP_RUN_SQL, (task_id, attempt, "fail_task", worker_label()))
         await conn.execute(FAIL_TASK_SQL, (reason, task_id, attempt))
 
 
@@ -261,8 +275,15 @@ async def run_attempt(task_id: str, attempt: int) -> None:
 # --- DBOS lifecycle -------------------------------------------------------------------
 
 
-def dbos_config(system_database_url: str, schema: str) -> DBOSConfig:
-    return {"name": APP_NAME, "system_database_url": system_database_url, "dbos_system_schema": schema}
+def dbos_config(system_database_url: str, schema: str, executor_id: str | None = None) -> DBOSConfig:
+    """`executor_id` None keeps DBOS's default ("local"); chaos workers pass a per-slot ID."""
+    return {
+        "name": APP_NAME,
+        "system_database_url": system_database_url,
+        "dbos_system_schema": schema,
+        "application_version": APP_VERSION,
+        "executor_id": executor_id,
+    }
 
 
 def register(database_url: str, agent: Agent[ExtractDeps, ProgrammeFact]) -> None:
@@ -285,20 +306,28 @@ def register(database_url: str, agent: Agent[ExtractDeps, ProgrammeFact]) -> Non
         record_result=step(record_result),
         complete_task=step(complete_task),
         fail_task=step(fail_task),
-        run_attempt=DBOS.workflow(name="spike3.run_attempt")(run_attempt),
+        run_attempt=DBOS.workflow(name=WORKFLOW_NAME)(run_attempt),
     )
 
 
-def launch() -> None:
+def launch(worker_concurrency: int | None = None) -> None:
     DBOS.launch()
-    _rt().queue = DBOS.register_queue(QUEUE_NAME)
+    _rt().queue = DBOS.register_queue(QUEUE_NAME, worker_concurrency=worker_concurrency)
 
 
-def start(*, database_url: str, system_database_url: str, schema: str, model: Model) -> None:
+def start(
+    *,
+    database_url: str,
+    system_database_url: str,
+    schema: str,
+    model: Model,
+    executor_id: str | None = None,
+    worker_concurrency: int | None = None,
+) -> None:
     """Configures DBOS, builds the agent, registers everything and launches."""
-    DBOS(config=dbos_config(system_database_url, schema))
+    DBOS(config=dbos_config(system_database_url, schema, executor_id))
     register(database_url, build_agent(model))
-    launch()
+    launch(worker_concurrency)
 
 
 def shutdown() -> None:
@@ -322,20 +351,33 @@ def mark_ready(conn: psycopg.Connection, task_id: str) -> None:
         conn.execute(INSERT_ENQUEUE_REQUEST_SQL, (task_id, row[0]))
 
 
-def _enqueue(conn: psycopg.Connection, task_id: str, attempt: int) -> None:
-    rt = _rt()
-    assert rt.queue is not None, "launch() registers the queue"
+def _enqueue(conn: psycopg.Connection, task_id: str, attempt: int, client: DBOSClient | None) -> None:
     # The workflow ID is the idempotency key: a second enqueue of it is the same workflow.
-    with SetWorkflowID(workflow_id(task_id, attempt)):
-        rt.queue.enqueue(rt.run_attempt, task_id, attempt)
+    wid = workflow_id(task_id, attempt)
+    if client is None:
+        rt = _rt()
+        assert rt.queue is not None, "launch() registers the queue"
+        with SetWorkflowID(wid):
+            rt.queue.enqueue(rt.run_attempt, task_id, attempt)
+    else:
+        options: EnqueueOptions = {
+            "queue_name": QUEUE_NAME,
+            "workflow_name": WORKFLOW_NAME,
+            "workflow_id": wid,
+            "app_version": APP_VERSION,
+        }
+        client.enqueue(options, task_id, attempt)
     conn.execute(MARK_SENT_SQL, (task_id, attempt))
 
 
-def enqueue_pending(conn: psycopg.Connection) -> int:
-    """Enqueues every unsent request. A crash before `sent` is set only causes a harmless re-enqueue."""
+def enqueue_pending(conn: psycopg.Connection, client: DBOSClient | None = None) -> int:
+    """Enqueues every unsent request. A crash before `sent` is set only causes a harmless re-enqueue.
+
+    `client` None enqueues through this process's launched DBOS; otherwise through the client.
+    """
     rows = conn.execute(UNSENT_REQUESTS_SQL).fetchall()
     for task_id, attempt in rows:
-        _enqueue(conn, task_id, attempt)
+        _enqueue(conn, task_id, attempt, client)
     return len(rows)
 
 
@@ -350,23 +392,37 @@ def _apply_result(conn: psycopg.Connection, task_id: str, attempt: int) -> bool:
     return cur.rowcount == 1
 
 
-def reconcile(conn: psycopg.Connection) -> dict[str, int]:
+def _workflow_status(wid: str, client: DBOSClient | None) -> str | None:
+    if client is None:
+        wf = DBOS.get_workflow_status(wid)
+        return None if wf is None else wf.status
+    found = client.list_workflows(workflow_ids=[wid], load_input=False, load_output=False)
+    return found[0].status if found else None
+
+
+def reconcile(conn: psycopg.Connection, client: DBOSClient | None = None) -> dict[str, int]:
     """Repairs what a crash between the loop's steps can leave behind.
 
     - a `ready` task whose workflow DBOS has never seen: enqueue it (same workflow ID);
-    - a `ready`/`running` task whose workflow succeeded: apply its recorded result.
+    - a `ready`/`running` task whose workflow succeeded: apply its recorded result;
+    - a `ready`/`running` task whose workflow ended without success (ERROR, CANCELLED,
+      MAX_RECOVERY_ATTEMPTS_EXCEEDED): fail it with reason `workflow_error`.
 
     `present` counts open tasks whose workflow DBOS already knows (in any status).
+    `client` None reads and enqueues through this process's launched DBOS.
     """
-    counts = {"reenqueued": 0, "present": 0, "applied": 0}
+    counts = {"reenqueued": 0, "present": 0, "applied": 0, "failed_workflows": 0}
     for task_id, attempt, status in conn.execute(OPEN_TASKS_SQL).fetchall():
-        wf = DBOS.get_workflow_status(workflow_id(task_id, attempt))
-        if wf is None:
+        wf_status = _workflow_status(workflow_id(task_id, attempt), client)
+        if wf_status is None:
             if status == "ready":
-                _enqueue(conn, task_id, attempt)
+                _enqueue(conn, task_id, attempt, client)
                 counts["reenqueued"] += 1
-        else:
-            counts["present"] += 1
-            if wf.status == "SUCCESS" and _apply_result(conn, task_id, attempt):
-                counts["applied"] += 1
+            continue
+        counts["present"] += 1
+        if wf_status == "SUCCESS" and _apply_result(conn, task_id, attempt):
+            counts["applied"] += 1
+        elif wf_status in FAILED_WORKFLOW_STATUSES:
+            if conn.execute(FAIL_TASK_SQL, ("workflow_error", task_id, attempt)).rowcount == 1:
+                counts["failed_workflows"] += 1
     return counts
