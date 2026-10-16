@@ -22,11 +22,12 @@ def grounded_case(label='unconfirmed'):
 
 def test_student_numbers_and_self_targets_need_no_research_citation():
     card,lane,facts,research=grounded_case()
-    card.update(constraints_fit='You have 12 hours available',test_30_days='Build 3 projects in 30 days')
+    card.update(constraints_fit='You have 12 hours available',try_it={
+        'kind':'taste_the_work','what':'Build 3 small examples','time_needed':'2 evenings','questions':[]})
     result=ground_roadmap(card,lane,facts,research,{'notebook':{'constraints':'12 hours'}})
     assert result['generation_status']=='ready'
     assert result['constraints_fit']==card['constraints_fit']
-    assert result['test_30_days']==card['test_30_days']
+    assert result['try_it']==card['try_it']
     assert result['sources'][0]['status']=='unconfirmed'
 
 

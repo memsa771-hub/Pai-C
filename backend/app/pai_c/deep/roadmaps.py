@@ -3,7 +3,8 @@
 import json
 import logging
 import re
-from pydantic import BaseModel, Field, ValidationError
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
+from typing import Literal
 
 from app.config import config
 from app.pai_c.deep.polish import contains_blocked_script
@@ -14,7 +15,24 @@ from app.plugins._shared.sources import public_https
 logger = logging.getLogger(__name__)
 _NUMBER = re.compile(r"\d+(?:[.,]\d+)?")
 FIT_FIELDS = ("why_for_you", "strengths_used", "weakness_guarded", "family_fit",
-              "real_why_fit", "constraints_fit", "test_30_days")
+              "real_why_fit", "constraints_fit", "try_it")
+
+
+class TryIt(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    kind: Literal["talk_to_someone", "taste_the_work"]
+    what: str = Field(min_length=1)
+    time_needed: str = Field(min_length=1)
+    questions: list[str]
+
+    @model_validator(mode="after")
+    def valid_questions(self):
+        expected = 3 if self.kind == "talk_to_someone" else 0
+        if len(self.questions) != expected or any(not question.strip() for question in self.questions):
+            raise ValueError("Try-it questions do not match its kind")
+        if not self.what.strip() or not self.time_needed.strip():
+            raise ValueError("Try-it needs an activity and time")
+        return self
 
 
 class RoadmapCandidate(BaseModel):
@@ -25,7 +43,7 @@ class RoadmapCandidate(BaseModel):
     family_fit: str = ""
     real_why_fit: str = ""
     constraints_fit: str = ""
-    test_30_days: str = ""
+    try_it: TryIt
     gap: list[dict[str, str]] = Field(default_factory=list)
     steps: list[dict] = Field(default_factory=list)
     risks: list[str] = Field(default_factory=list)
@@ -65,7 +83,7 @@ def ground_roadmap(candidate, lane, facts, research, student_data=None):
     try:
         candidate = RoadmapCandidate.model_validate(candidate).model_dump()
     except ValidationError:
-        candidate = RoadmapCandidate().model_dump()
+        candidate = {}
         missing.append({"field": "roadmap", "reason": "invalid_schema"})
     citations = candidate.get("citations") or {}
     if not isinstance(citations, dict):
@@ -77,7 +95,10 @@ def ground_roadmap(candidate, lane, facts, research, student_data=None):
         gap=candidate.get("gap") or [], steps=candidate.get("steps") or [],
         risks=candidate.get("risks") or [], facts=candidate.get("facts") or [])
     for key in FIT_FIELDS:
-        if key != "strengths_used" and not fields[key].strip():
+        if key == "try_it":
+            if not fields[key]:
+                missing.append({"field": key, "reason": "missing_student_fit"})
+        elif key != "strengths_used" and not fields[key].strip():
             missing.append({"field": key, "reason": "missing_student_fit"})
     for path, text in _strings(fields):
         ids = citations.get(path) or []
@@ -90,7 +111,7 @@ def ground_roadmap(candidate, lane, facts, research, student_data=None):
             path.startswith("gap.") and path.endswith(".have"))
         numbers = set(_NUMBER.findall(text))
         external_numbers = numbers if world_field or not personal_field else numbers - own_numbers
-        if path == "test_30_days":
+        if path.startswith("try_it."):
             external_numbers = set()  # Self-set action targets, never outside-world requirements.
         required = world_field or bool(external_numbers)
         if required and not refs:

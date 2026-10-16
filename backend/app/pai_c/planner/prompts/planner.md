@@ -59,3 +59,5 @@ OUTPUT
 
 POSSIBILITIES
 Only when the student's own evidence clearly points to a direction they have not mentioned, add possibility: {title, why, evidence_item_ids} to the plan. The title names a field, kind of work or kind of study in general words, never an institution or place. why is one sentence tied to their evidence. evidence_item_ids lists at least two visible item ids, at least one of them shown or action. If you are not sure, leave possibility out. Never suggest something the student already dismissed.
+
+When the student reports on a Try it, record what they did in shown with kind action and what they felt in self, tied to that route; update sure only if they give a number.

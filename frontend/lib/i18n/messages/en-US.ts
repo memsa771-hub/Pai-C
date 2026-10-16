@@ -11,6 +11,13 @@
  */
 
 export const messages = {
+  tryIt: {
+    title: 'Try it', talk_to_someone: 'Talk to someone in it', taste_the_work: 'Taste the real work',
+    tried: 'I tried it', feeling: 'How did it feel?', more: 'I want more', okay: 'It was okay', notForMe: 'Not for me',
+    note: 'What was the best part? What drained you?', send: 'Send', cancel: 'Cancel',
+    sent: 'Shared with PAI', error: 'Could not send your feedback. Please try again.',
+    message: '{title}, Try it: {feeling}. {note}',
+  },
   possibilities: {
     title: 'Possibilities', explore: 'Explore it', save: 'Save for later', dismiss: 'Not for me',
     suggested: 'Suggested', exploring: 'Exploring', saved: 'Saved for later', dismissed: 'Dismissed', chosen: 'Chosen',

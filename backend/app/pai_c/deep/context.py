@@ -196,6 +196,27 @@ async def build_context(db, workspace_id: str, turn: CounselorTurnInput, *,
         }}
     if research is not None:
         sections["research"] = _json(research)
+    if decision is not None and decision.action == "guide" and journey is not None:
+        from app.pai_c.roadmaps.service import RoadmapService
+        from app.pai_c.policy.controller import load_data
+        ready = [row for row in RoadmapService(db).list(workspace_id)
+                 if row["journey_id"] == journey.id and row["generation_status"] == "ready"]
+        compare = []
+        for row in ready[:load_data("guide.json")["compare_max_roadmaps"]]:
+            entry = {key: row.get(key) for key in ("title", "origin", "why_for_you", "strengths_used",
+                "family_fit", "constraints_fit", "risks")}
+            entry["gaps"] = [{key: gap.get(key) for key in ("need", "have", "gap")} for gap in row["gaps"]]
+            trial = row.get("try_it")
+            entry["try_it"] = {key: trial.get(key) for key in ("kind", "what", "time_needed")} if isinstance(trial, dict) else None
+            entry["favorite"] = row["favorite"]
+            entry["focused"] = bool(row["focused_at"])
+            entry["facts"] = row.get("facts") or []
+            entry["source_labels"] = [{"url": source.get("url"), "label": source.get("status")} for source in row["sources"]]
+            compare.append(entry)
+        if compare:
+            # The Guide prompt's existing <research> grounding rule also covers
+            # this nested view of already-published artifacts.
+            sections["research"] = sections.get("research", "") + "\n<compare>" + _json(compare) + "</compare>"
     draft = (journey.counselor_summary_draft or {}) if journey else {}
     sections["journey"] = _json({"stage": journey.current_stage if journey else "IDENTITY",
         "mirror_status": draft.get("status"), "mirror_notebook_version": draft.get("notebook_version")})

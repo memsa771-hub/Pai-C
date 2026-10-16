@@ -23,6 +23,7 @@ export interface Roadmap {
   real_why_fit?: string;
   constraints_fit?: string;
   test_30_days?: string;
+  try_it?: { kind: 'talk_to_someone' | 'taste_the_work'; what: string; time_needed: string; questions: string[] };
   gap?: RoadmapGap[];
   missing_facts?: Array<{ field: string; reason: string }>;
   your_questions?: Array<{ id: string; question: string; status: string;

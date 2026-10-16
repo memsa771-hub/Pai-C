@@ -20,7 +20,9 @@ from datetime import datetime, timezone
 def example():
     mirror = json.loads((Path(__file__).parent / "fixtures/mirror/valid.json").read_text())
     roadmaps = [{"lane": lane["lane"], "title": lane["why"],
-        **{key: ["Practical work"] if key == "strengths_used" else "Based on your described experience"
+        **{key: (["Practical work"] if key == "strengths_used" else
+           {"kind": "taste_the_work", "what": "Try a small practical task", "time_needed": "One evening", "questions": []}
+           if key == "try_it" else "Based on your described experience")
            for key in FIT_FIELDS}, "gap": [{"need": "Completed study", "have": "Student-reported study", "gap": "Check documents"}],
         "steps": [], "risks": [], "facts": [], "citations": {"gap.0.need": ["fact"]}, "status": "ready"}
         for lane in mirror["roadmap_lanes"]]
@@ -102,7 +104,7 @@ async def test_one_grounded_card_per_lane_questions_sourced_and_publication_idem
         db.refresh(unanswered)
         assert unanswered.status == "unanswered" and unanswered.needs_research
         serialized = service.get(student.workspace_id, ids[0])
-        assert serialized["why_for_you"] and serialized["test_30_days"]
+        assert serialized["why_for_you"] and serialized["try_it"]
         assert serialized["your_questions"][0]["answer"] == facts[0]["quote"]
         from app.plugins.roadmap_builder import on_run_status
         on_run_status(db, run)

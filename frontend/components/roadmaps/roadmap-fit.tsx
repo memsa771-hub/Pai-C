@@ -2,6 +2,7 @@
 
 import { useT } from '@/lib/i18n';
 import type { Roadmap } from '@/lib/roadmaps';
+import { TryItFeedback } from './try-it-feedback';
 
 const missingFieldLabels = {
   eligibility: 'roadmapFit.missingEligibility', required_tests: 'roadmapFit.missingTests',
@@ -12,9 +13,11 @@ export function RoadmapFit({ roadmap, compact = false }: { roadmap: Roadmap; com
   const t = useT();
   if (!roadmap.lane) return null;
   const content = <div className="min-w-0 space-y-3 break-words text-sm">
-    {(['why_for_you', 'weakness_guarded', 'family_fit', 'real_why_fit', 'constraints_fit', 'test_30_days'] as const)
+    {(['why_for_you', 'weakness_guarded', 'family_fit', 'real_why_fit', 'constraints_fit'] as const)
       .map((key) => <section key={key}><h4 className="font-medium">{t(`roadmapFit.${key}`)}</h4>
         <p className="whitespace-pre-wrap text-muted-foreground">{roadmap[key] || t('roadmapFit.unknown')}</p></section>)}
+    {roadmap.try_it ? <TryItFeedback roadmap={roadmap} /> : roadmap.test_30_days && <section>
+      <h4 className="font-medium">{t('roadmapFit.test_30_days')}</h4><p>{roadmap.test_30_days}</p></section>}
     <section><h4 className="font-medium">{t('roadmapFit.strengths_used')}</h4>
       <ul className="list-inside list-disc">{(roadmap.strengths_used || []).map((value, index) => <li key={index}>{value}</li>)}</ul></section>
     {(roadmap.gap || roadmap.gaps).map((gap, index) => <dl key={index} className="rounded-lg border p-2">
