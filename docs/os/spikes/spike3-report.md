@@ -1,8 +1,8 @@
 # Spike 3 report: core loop under random worker kills
 
-**Verdict: PENDING the OpenAI run.** The harness, the CI chaos test and a 100-task rehearsal with
-the test model all pass. The pass bar is defined for the real model, so this report cannot say PASS
-until the OpenAI run below is done and its numbers are filled in. No Slice 1 work starts before then.
+**Verdict: PASS.** The harness, the CI chaos test, a 100-task rehearsal with the test model and the
+100-task OpenAI pass-bar run below all pass. No Slice 1 work starts until both developers have signed
+this report.
 
 Code: `backend/spikes/spike3/` (`loop.py` from Task 6; `chaos.py` and `worker.py` from Task 7).
 How to run everything: `backend/spikes/spike3/README.md`.
@@ -174,41 +174,52 @@ OS_DATABASE_URL=postgresql://USER@HOST:PORT/DB OS_OPENAI_API_KEY=<dev key> \
 It uses `OS_MODEL_CHEAP` (default `gpt-5.4-mini`). It drops and recreates schema `dbos_chaos` and
 empties schema `spike3` in that database. Without the key it stops at once with a clear message.
 
-Paste the printed JSON here:
+Run on 2026-10-16, model `gpt-5.4-mini` (`OS_MODEL_CHEAP`, default), local WSL2 Ubuntu 24.04,
+Postgres 16 in Docker, Python 3.12.3.
 
 | Field | Value |
 |---|---|
-| tasks | |
-| done | |
-| failed | |
-| lost | |
-| duplicated | |
-| duplicate_results | |
-| extra_workflows | |
-| step_reruns | |
-| recovered_attempts | |
-| valid_outputs | |
-| model_calls | |
-| valid_rate | |
-| kills | |
-| kills_in_flight | |
-| interrupted_workflows | |
-| unexpected_exits | |
-| failed_workflows | |
-| workflows | |
-| open_workflows | |
-| timed_out | |
-| elapsed_s | |
-| CLI pass bar line | |
+| tasks | 100 |
+| done | 100 |
+| failed | 0 |
+| lost | 0 |
+| duplicated | 0 |
+| duplicate_results | 0 |
+| extra_workflows | 0 |
+| step_reruns | 1 |
+| recovered_attempts | 17 |
+| valid_outputs | 100 |
+| model_calls | 118 |
+| valid_rate | 1.0 |
+| kills | 12 |
+| kills_in_flight | 10 |
+| interrupted_workflows | 19 |
+| unexpected_exits | 0 |
+| failed_workflows | 0 |
+| reconcile_reenqueued | 0 |
+| reconcile_applied | 0 |
+| workflows | 100 |
+| open_workflows | 0 |
+| timed_out | false |
+| elapsed_s | 42.3 |
+| model | openai |
+| workers | 4 |
+| kill_every_s | 3.0 |
+| log_dir | /tmp/spike3-chaos-hx5a_zul |
+| CLI pass bar line | `pass bar: PASS` |
 
-- Cost (from the OpenAI project's usage page, for the run's time window): ______
-- Failures and their cause (from `failure_reason` in `spike3.tasks` and the worker logs in `log_dir`): ______
-- Verdict against the pass bar: ______ (PASS / FAIL)
+- Cost: <fill from OpenAI usage page>
+- Failures and their cause: none. All 100 tasks in `spike3.tasks` are `done` with no `failure_reason`.
+  The one step re-run has `duplicated = 0`, so it came after a kill of the first run's worker.
+- Verdict against the pass bar: PASS
 
 If it fails: stop, fix, re-run, and update this report. No Slice 1 work starts until this report says
 PASS and both developers have signed it.
 
 ## Sign-off
+
+- [ ] @10Faheem
+- [ ] @MusawirKtk
 
 | Developer | Verdict | Date |
 |---|---|---|
