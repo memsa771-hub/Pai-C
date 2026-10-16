@@ -14,7 +14,7 @@ from app.pai_c.policy.state import derive_state, decision_log
 def state(**changes):
     base = {**classifier.fallback_signals().model_dump(), "coverage": {
         area: {"covered": True} for area in controller.load_data("areas_policy.json")["priority"]},
-        "student_count": 10, "mirror_ready": False, "summary_due": False,
+        "student_count": 10, "mirror_allowed": False, "summary_due": False,
         "invite_pending": False, "insight_available": False,
         "questions_in_last_two": False, "short_reply_streak": 0, "previous": {}}
     return {**base, **changes}
@@ -22,10 +22,10 @@ def state(**changes):
 
 @pytest.mark.parametrize("changes,rule,action,question", [
     ({"safety":{"level":"concern"},"intent":"pushback"}, "care", "care", False),
-    ({"intent":"pushback","mirror_ready":True}, "adjust", "adjust", True),
+    ({"intent":"pushback","mirror_allowed":True}, "adjust", "adjust", True),
     ({"intent":"asking_info","request":{"needs_context":False}}, "answer", "answer_request", False),
-    ({"intent":"deciding","mirror_ready":True}, "guide", "guide", True),
-    ({"mirror_ready":True,"summary_due":True}, "mirror", "mirror", False),
+    ({"intent":"deciding","mirror_allowed":True}, "guide", "guide", True),
+    ({"mirror_allowed":True,"summary_due":True}, "mirror", "mirror", False),
     ({"summary_due":True,"emotion":"stressed"}, "summarize", "summarize", True),
     ({"emotion":"stressed","questions_in_last_two":True}, "listen", "listen_reflect", False),
     ({"questions_in_last_two":True,"coverage":{}}, "rest", "listen_reflect", False),
@@ -88,7 +88,7 @@ def test_repeated_ask_changes_area_then_falls_back_without_question(action):
 
 
 @pytest.mark.parametrize("action,changes",[("care",{"safety":{"level":"urgent"}}),
-    ("mirror",{"mirror_ready":True}),("guide",{"intent":"deciding"}),
+    ("mirror",{"mirror_allowed":True}),("guide",{"intent":"deciding"}),
     ("answer_request",{"intent":"asking_task","request":{"needs_context":True}})])
 def test_no_repeat_exemptions(action,changes):
     result=controller.decide(state(**changes,previous={"action":action,"topic":"request" if action=="answer_request" else None}))

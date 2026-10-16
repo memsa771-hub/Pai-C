@@ -4,7 +4,8 @@
     "invite_max_covered": 3,
     "question_window": 2,
     "short_reply_intent": "short_reply",
-    "summary_action": "summarize"
+    "summary_action": "summarize",
+    "mirror_after_edit_min_student_messages": 2
   },
   "rows": [
     {
@@ -24,6 +25,22 @@
         "action": "care",
         "question_allowed": false,
         "topic": null,
+        "invite": false
+      }
+    },
+    {
+      "id": "mirror_changes",
+      "when": {
+        "ref": "mirror_correction"
+      },
+      "set": {
+        "action": "explore_correction",
+        "question_allowed": true,
+        "topic": {
+          "first": {
+            "ref": "mentioned_areas"
+          }
+        },
         "invite": false
       }
     },
@@ -100,7 +117,7 @@
     {
       "id": "mirror",
       "when": {
-        "ref": "mirror_ready"
+        "ref": "mirror_allowed"
       },
       "set": {
         "action": "mirror",

@@ -68,6 +68,27 @@ class MemoryService:
     def agent_capabilities(self, agent_name):
         return capabilities_for_agent(agent_name)
 
+    def patch_applied_since(self, workspace_id, event_id):
+        """Accepted map history, including a patch for the edit itself.
+
+        A rejected Planner patch never creates history. The pre-Mirror sensitive
+        check reuses the existing source event, so cannot advance this boundary.
+        """
+        from sqlalchemy import select, or_, and_
+        from app.models import CounselorNotebookHistory, EventRecord
+        boundary = self.db.scalar(select(EventRecord).where(
+            EventRecord.network_id == workspace_id, EventRecord.id == event_id))
+        if boundary is None:
+            return False
+        return self.db.scalar(select(CounselorNotebookHistory.id).join(
+            EventRecord, EventRecord.id == CounselorNotebookHistory.source_event_id).where(
+                CounselorNotebookHistory.workspace_id == workspace_id,
+                EventRecord.network_id == workspace_id,
+                EventRecord.source.like("human:%"),
+                or_(EventRecord.timestamp > boundary.timestamp,
+                    and_(EventRecord.timestamp == boundary.timestamp, EventRecord.id >= boundary.id)),
+            ).limit(1)) is not None
+
     def apply_truth_map(self, workspace_id, new_notebook, source_event_id, *, expected_version=None):
         return NotebookService(self.db).apply(
             workspace_id, new_notebook, source_event_id, expected_version=expected_version)
@@ -87,8 +108,9 @@ class MemoryService:
 
     def delete_for_workspace(self, workspace_id):
         from sqlalchemy import delete
-        from app.models import PaiTurnPlan
+        from app.models import PaiTurnPlan, CounselorMirrorFeedback
         self.db.execute(delete(PaiTurnPlan).where(PaiTurnPlan.workspace_id == workspace_id))
+        self.db.execute(delete(CounselorMirrorFeedback).where(CounselorMirrorFeedback.workspace_id == workspace_id))
         return NotebookService(self.db).delete_for_workspace(workspace_id)
 
     def export_truth_map(self, workspace_id):

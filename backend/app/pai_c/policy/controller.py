@@ -26,6 +26,8 @@ def evaluate(expression, state):
         return evaluate(value[1] if evaluate(value[0], state) else value[2], state)
     if operation == "all":
         return all(evaluate(item, state) for item in value)
+    if operation == "first":
+        return next(iter(evaluate(value, state) or []), None)
     left, right = (evaluate(item, state) for item in value)
     if operation == "eq":
         return left == right
@@ -102,6 +104,7 @@ def decision_context(decision, signals, plan):
     topic_text = request.text if decision.topic == "request" and request else areas["topic_text"].get(decision.topic, "")
     instruction = (POLICY_DIR / "actions" / (decision.action + ".md")).read_text(encoding="utf-8")
     instruction = instruction.replace("{topic_text}", topic_text)
+    instruction = instruction.replace("{topic_clause}", " (about " + topic_text + ")" if topic_text else "")
     if decision.invite:
         instruction += "\n" + (POLICY_DIR / "actions/invite.md").read_text(encoding="utf-8")
     return {"action": decision.action, "topic_text": topic_text,

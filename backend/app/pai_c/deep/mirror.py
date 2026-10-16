@@ -161,7 +161,8 @@ async def mirror_job(job, db) -> dict:
             return {"status": "superseded"}
         journey = journeys.set_counselor_summary(
             job.workspace_id, journey.id, mirror.model_dump(mode="json"), mirror.spoken_reply(),
-            turn.source_event_id, notebook_version=checked.version, channel=turn.channel)
+            turn.source_event_id, notebook_version=checked.version, channel=turn.channel,
+            certainty_before=checked.notebook.sure.score)
         # The draft is durable before posting so a worker retry can publish it
         # without making another model/sensitivity call.
         db.commit()

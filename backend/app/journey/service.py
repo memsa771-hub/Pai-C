@@ -164,7 +164,8 @@ class JourneyService:
                               summary: dict, reply: str, source_event_id: str,
                               *, actor: str = "openagents:pai",
                               notebook_version: int | None = None,
-                              channel: str | None = None) -> JourneyView:
+                              channel: str | None = None,
+                              certainty_before: int | None = None) -> JourneyView:
         """Keep the reviewed draft on the student's Counselor Journey."""
         row = self.db.execute(select(StudentJourney).where(
             StudentJourney.workspace_id == workspace_id,
@@ -187,6 +188,7 @@ class JourneyService:
             row.counselor_summary_draft = {
                 **row.counselor_summary_draft, "type": "mirror", "mirror": summary,
                 "notebook_version": notebook_version, "channel": channel,
+                "certainty_before": certainty_before,
             }
             self.set_counselor_stage(workspace_id, journey_id, "MIRROR", actor=actor)
         row.updated_at = datetime.now(timezone.utc)
@@ -221,6 +223,11 @@ class JourneyService:
         row.counselor_summary_draft = {**draft, "status": "confirmed",
                                        "confirmation_event_id": confirmation_event_id}
         row.updated_at = datetime.now(timezone.utc)
+        self._event(row, "counselor.mirror.confirmed", {
+            "workspace_id": workspace_id, "mirror_version": draft["version"],
+            "confirmed_at": row.updated_at.isoformat(),
+            "certainty_before": draft.get("certainty_before"),
+        }, actor)
         self._event(row, JOURNEY_UPDATED,
                     {"changed": ["counselor_summary_draft", "research_request"]}, actor)
         return self.set_counselor_stage(workspace_id, journey_id, "RESEARCHING", actor=actor)

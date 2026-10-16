@@ -143,6 +143,10 @@ async def test_no_job_without_readiness_and_one_job_across_versions():
 async def test_mirror_posts_once_reuses_sensitive_check_and_system_context(invalid_first):
     with StudentSession() as student, student.factory() as db:
         turn, journey, snapshot = prepare(student, db)
+        data = snapshot.notebook.model_dump(mode="json")
+        data["sure"]["score"] = 6
+        snapshot, _ = NotebookService(db).apply(student.workspace_id, data, turn.source_event_id,
+                                               expected_version=snapshot.version)
         job_id = enqueue_mirror(db, turn)
         db.commit()
         job = db.get(BackgroundJob, job_id)
@@ -167,6 +171,7 @@ async def test_mirror_posts_once_reuses_sensitive_check_and_system_context(inval
         draft = JourneyService(db).get(student.workspace_id, journey.id).counselor_summary_draft
         assert draft["type"] == "mirror" and draft["notebook_version"] == snapshot.version
         assert draft["status"] == "awaiting_confirmation"
+        assert draft["certainty_before"] == 6
         assert JourneyService(db).get(student.workspace_id, journey.id).current_stage == "MIRROR"
         event = db.scalar(select(EventRecord).where(EventRecord.source == "openagents:pai"))
         assert event.payload["message_type"] == "counselor_mirror"

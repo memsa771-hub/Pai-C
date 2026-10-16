@@ -19,7 +19,7 @@ from sqlalchemy import select, text
 
 from app.database import new_session
 from app.pai_c.memory import MemoryService
-from app.models import (CounselorNotedQuestion, CounselorTurnDecision,
+from app.models import (CounselorNotedQuestion, CounselorTurnDecision, CounselorMirrorFeedback, StudentJourneyEvent,
                         EventRecord, Roadmap, StudentJourney, Workspace)
 from scripts.eval.cost import load_prices, token_record
 
@@ -133,7 +133,12 @@ def export_session(db, workspace_id, usage_logs=()):
             noted_questions=[row_data(q) for q in rows(CounselorNotedQuestion,
                 "workspace_id", CounselorNotedQuestion.created_at, CounselorNotedQuestion.id)],
             mirror_drafts=mirrors, mirror_history=mirror_events,
-            mirror_history_coverage="Posted payloads plus current draft; historical confirmation/edit statuses are not stored",
+            mirror_feedback=[row_data(row) for row in rows(CounselorMirrorFeedback,
+                "workspace_id", CounselorMirrorFeedback.mirror_version)],
+            mirror_confirmations=[row_data(row) for row in rows(StudentJourneyEvent,
+                "workspace_id", StudentJourneyEvent.created_at, StudentJourneyEvent.id)
+                if row.event_type == "counselor.mirror.confirmed"],
+            mirror_history_coverage="Posted payloads, current draft and explicit confirmation proofs; older confirmations without proof remain unknown",
             research_facts_used=facts,
             roadmaps=[{**row_data(r), "status": r.generation_status,
                        "missing_facts": (r.fit_dimensions or {}).get("missing_facts", []),

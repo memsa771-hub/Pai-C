@@ -15,6 +15,9 @@ export function CounselorMirrorCard({ refreshKey, onUpdated }: {
   const [text, setText] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(false);
+  const [feedbackVersion, setFeedbackVersion] = useState<number | null>(null);
+  const [understood, setUnderstood] = useState('');
+  const [certainty, setCertainty] = useState('');
   const version = useRef<number | null>(null);
 
   useEffect(() => {
@@ -25,6 +28,7 @@ export function CounselorMirrorCard({ refreshKey, onUpdated }: {
       if (version.current !== result.version) {
         version.current = result.version;
         setEditing(false); setText(''); setError(false);
+        setFeedbackVersion(null); setUnderstood(''); setCertainty('');
       }
     }).catch(() => { if (active) setError(true); });
     return () => { active = false; };
@@ -38,7 +42,19 @@ export function CounselorMirrorCard({ refreshKey, onUpdated }: {
       if (edit) await workspaceApi.editCounselorMirror(draft.version!, text.trim());
       else await workspaceApi.confirmCounselorMirror(draft.version!);
       setDraft({ ...draft, status: edit ? 'needs_changes' : 'confirmed' });
+      if (!edit) setFeedbackVersion(draft.version);
       setEditing(false); setText(''); onUpdated?.();
+    } catch { setError(true); }
+    finally { setBusy(false); }
+  };
+
+  const sendFeedback = async () => {
+    if (feedbackVersion === null || !understood) return;
+    setBusy(true); setError(false);
+    try {
+      await workspaceApi.submitCounselorMirrorFeedback(feedbackVersion, Number(understood),
+        certainty === '' ? undefined : Number(certainty));
+      setFeedbackVersion(null);
     } catch { setError(true); }
     finally { setBusy(false); }
   };
@@ -74,6 +90,25 @@ export function CounselorMirrorCard({ refreshKey, onUpdated }: {
     {draft.status === 'confirmed' && <p role="status" className="mt-3 text-muted-foreground">{t('counselorMirror.confirmed')}</p>}
     {draft.status === 'needs_changes' && <p role="status" className="mt-3 text-muted-foreground">{t('counselorMirror.sent')}</p>}
     {error && <p role="alert" className="mt-2 text-destructive">{t('counselorMirror.error')}</p>}
+    {feedbackVersion === draft.version && <form className="mt-3 space-y-3" onSubmit={(event) => {
+      event.preventDefault(); void sendFeedback();
+    }}>
+      <label className="block">{t('counselorMirror.understood')}
+        <input type="number" min={1} max={5} step={1} required disabled={busy} value={understood}
+          onChange={(event) => setUnderstood(event.target.value)}
+          className="mt-1 block w-full rounded-lg border bg-background p-2" />
+      </label>
+      <label className="block">{t('counselorMirror.certaintyAfter')} ({t('counselorMirror.optional')})
+        <input type="number" min={0} max={10} step={1} disabled={busy} value={certainty}
+          onChange={(event) => setCertainty(event.target.value)}
+          className="mt-1 block w-full rounded-lg border bg-background p-2" />
+      </label>
+      <div className="flex flex-wrap gap-2">
+        <button disabled={busy || !understood} className="rounded-lg bg-primary px-3 py-2 text-primary-foreground disabled:opacity-50">{t('counselorMirror.sendFeedback')}</button>
+        <button type="button" disabled={busy} onClick={() => { setFeedbackVersion(null); setError(false); }}
+          className="rounded-lg border px-3 py-2">{t('counselorMirror.skipFeedback')}</button>
+      </div>
+    </form>}
     {draft.status === 'awaiting_confirmation' && <div className="mt-3">
       {editing ? <form onSubmit={(event) => { event.preventDefault(); void act(true); }}>
         <label className="block text-xs font-medium">{t('counselorMirror.editHint')}

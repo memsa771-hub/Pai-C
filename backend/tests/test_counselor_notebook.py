@@ -16,7 +16,7 @@ from app.pai_c.deep.notebook import (
 )
 from app.pai_c.deep.notebook_sanitize import sanitize_notebook
 from app.pai_c.deep.sensitive import filter_sensitive_changes, model_sensitive_checker
-from app.models import CounselorNotebook, CounselorNotebookHistory, CounselorNotedQuestion, PaiTurnPlan, EventRecord, User, Workspace
+from app.models import CounselorNotebook, CounselorNotebookHistory, CounselorNotedQuestion, PaiTurnPlan, CounselorMirrorFeedback, EventRecord, User, Workspace
 from app.routers.workspaces import delete_workspace
 
 
@@ -40,7 +40,7 @@ def notebook_db():
 
     Base.metadata.create_all(engine, tables=[
         User.__table__, Workspace.__table__, EventRecord.__table__,
-        CounselorNotebook.__table__, CounselorNotebookHistory.__table__, CounselorNotedQuestion.__table__, PaiTurnPlan.__table__,
+        CounselorNotebook.__table__, CounselorNotebookHistory.__table__, CounselorNotedQuestion.__table__, PaiTurnPlan.__table__, CounselorMirrorFeedback.__table__,
     ])
     with Session(engine) as db:
         first, second = str(uuid4()), str(uuid4())
@@ -184,11 +184,14 @@ def test_notebook_workspace_isolation_and_deletion(notebook_db):
     db, first, second, events = notebook_db
     service = NotebookService(db)
     service.apply(first, _note(), events[0])
+    db.add(CounselorMirrorFeedback(workspace_id=first, mirror_version=1, understood=4))
+    db.commit()
     assert service.get(second).version == 0
     with pytest.raises(ValueError, match="student event"):
         service.apply(second, _note(), events[0])
     with patch("app.routers.workspaces._verify_workspace_access", return_value=True):
         delete_workspace(first, db, x_workspace_token="test-token")
+    assert db.scalar(select(CounselorMirrorFeedback.id)) is None
     with pytest.raises(NotebookWorkspaceNotFound):
         service.get(first)
     assert db.scalar(select(CounselorNotebookHistory).where(CounselorNotebookHistory.workspace_id == first)) is None

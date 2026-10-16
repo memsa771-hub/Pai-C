@@ -2,7 +2,7 @@
 from sqlalchemy import select
 
 from app.config import config
-from app.models import CounselorTurnDecision
+from app.models import CounselorTurnDecision, EventRecord, BackgroundJob, StudentJourney
 from app.pai_c.memory import MemoryService
 from app.pai_c.policy.controller import load_data
 from app.pai_c.voice.guards import question_sentences
@@ -68,6 +68,25 @@ def build_state(db, turn, signals, history):
         student_ordinals=ordinals, current_event_id=turn.source_event_id)
     from app.pai_c.deep.noted_questions import NotedQuestionService
     state["open_requests"] = NotedQuestionService(db).open_requests(turn.workspace_id)
+    current = db.scalar(select(EventRecord).where(
+        EventRecord.network_id == turn.workspace_id, EventRecord.id == turn.source_event_id))
+    edits = db.scalars(select(EventRecord).where(
+        EventRecord.network_id == turn.workspace_id, EventRecord.id.in_(list(ordinals)),
+        EventRecord.metadata_["mirror_edit_version"].as_string().is_not(None),
+    ).order_by(EventRecord.timestamp.desc(), EventRecord.id.desc())).all()
+    last_edit = edits[0] if edits else None
+    journey = db.scalar(select(StudentJourney).where(
+        StudentJourney.workspace_id == turn.workspace_id,
+        StudentJourney.journey_type == "counselor_decision", StudentJourney.status == "active"))
+    pending = db.scalar(select(BackgroundJob.id).where(
+        BackgroundJob.workspace_id == turn.workspace_id, BackgroundJob.job_type == "counselor.mirror",
+        BackgroundJob.status.in_(("pending", "running"))).limit(1))
+    enough_after_edit = last_edit is None or (
+        len(ordinals) - ordinals[last_edit.id] >= load_data("decision_table.json")["derived"]["mirror_after_edit_min_student_messages"]
+        and memory.patch_applied_since(turn.workspace_id, last_edit.id))
+    state["mirror_correction"] = bool(current and (current.metadata_ or {}).get("mirror_edit_version") is not None)
+    state["mirror_allowed"] = bool(state["mirror_ready"] and journey
+        and journey.current_stage == "DIRECTION" and pending is None and enough_after_edit)
     return state
 
 

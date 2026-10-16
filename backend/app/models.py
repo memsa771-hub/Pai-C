@@ -152,6 +152,25 @@ class CounselorNotedQuestion(Base):
     )
 
 
+class CounselorMirrorFeedback(Base):
+    """A student's optional rating of an exactly confirmed Mirror version."""
+    __tablename__ = "pai_counselor_mirror_feedback"
+    id = Column(UUID(as_uuid=False), primary_key=True, default=_uuid)
+    workspace_id = Column(UUID(as_uuid=False), ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False)
+    mirror_version = Column(Integer, nullable=False)
+    understood = Column(Integer, nullable=False)
+    certainty_after = Column(Integer, nullable=True)
+    certainty_before = Column(Integer, nullable=True)
+    created_at = Column(DateTime(timezone=True), nullable=False, default=_now, server_default=text("NOW()"))
+    __table_args__ = (
+        UniqueConstraint("workspace_id", "mirror_version", name="uq_mirror_feedback_version"),
+        CheckConstraint("mirror_version >= 1", name="ck_mirror_feedback_version"),
+        CheckConstraint("understood BETWEEN 1 AND 5", name="ck_mirror_feedback_understood"),
+        CheckConstraint("certainty_after BETWEEN 0 AND 10", name="ck_mirror_feedback_after"),
+        CheckConstraint("certainty_before BETWEEN 0 AND 10", name="ck_mirror_feedback_before"),
+    )
+
+
 class PaiTurnPlan(Base):
     """Validated background instructions for the next Counselor turn."""
     __tablename__ = "pai_turn_plans"

@@ -8,7 +8,7 @@ from sqlalchemy import select
 
 from app.api.response import success_response
 from app.database import get_db
-from app.models import StudentJourney
+from app.models import StudentJourney, StudentJourneyEvent, CounselorMirrorFeedback, Workspace
 from app.journey import JourneyService, JourneyError
 from app.routers.roadmaps import _authorized
 from app.pai_c.summary_access import _journey
@@ -40,6 +40,40 @@ class MirrorAction(BaseModel):
 
 class MirrorEdit(MirrorAction):
     text: str = Field(min_length=1, max_length=8000)
+
+
+class MirrorFeedback(MirrorAction):
+    version: int = Field(ge=1, strict=True)
+    understood: int = Field(ge=1, le=5, strict=True)
+    certainty_after: int | None = Field(default=None, ge=0, le=10, strict=True)
+
+
+@router.post("/summary/feedback")
+def mirror_feedback(body: MirrorFeedback, network: str = Query(...), db=Depends(get_db),
+                    x_workspace_token: str | None = Header(None),
+                    authorization: str | None = Header(None)):
+    workspace = _authorized(db, network, x_workspace_token, authorization)
+    workspace_id = str(workspace.id)
+    # Serialize duplicate submissions; confirmation history survives draft changes.
+    db.scalar(select(Workspace.id).where(Workspace.id == workspace_id).with_for_update())
+    proof = db.scalar(select(StudentJourneyEvent).where(
+        StudentJourneyEvent.workspace_id == workspace_id,
+        StudentJourneyEvent.event_type == "counselor.mirror.confirmed",
+        StudentJourneyEvent.payload["mirror_version"].as_integer() == body.version,
+    ).order_by(StudentJourneyEvent.created_at, StudentJourneyEvent.id).limit(1))
+    if proof is None:
+        raise HTTPException(409, "This Mirror version cannot be rated")
+    row = db.scalar(select(CounselorMirrorFeedback).where(
+        CounselorMirrorFeedback.workspace_id == workspace_id,
+        CounselorMirrorFeedback.mirror_version == body.version))
+    if row is None:
+        row = CounselorMirrorFeedback(workspace_id=workspace_id, mirror_version=body.version,
+            understood=body.understood, certainty_after=body.certainty_after,
+            certainty_before=proof.payload.get("certainty_before"))
+        db.add(row)
+    db.commit()
+    return success_response({"version": row.mirror_version, "understood": row.understood,
+        "certainty_after": row.certainty_after, "certainty_before": row.certainty_before})
 
 
 @router.post("/summary/confirm")

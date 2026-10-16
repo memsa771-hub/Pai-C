@@ -417,6 +417,11 @@ class WorkspaceApi {
       { method: 'POST', body: JSON.stringify({ version, text }) });
   }
 
+  async submitCounselorMirrorFeedback(version: number, understood: number, certainty_after?: number): Promise<void> {
+    await this.request(`/v1/counselor/summary/feedback?network=${this.requireWorkspace()}`,
+      { method: 'POST', body: JSON.stringify({ version, understood, certainty_after }) });
+  }
+
   async getStudentRequests(): Promise<import('./roadmaps').StudentRequest[]> {
     const response = await this.request<{ requests: import('./roadmaps').StudentRequest[] }>(
       `/v1/student-requests?network=${this.requireWorkspace()}`);
