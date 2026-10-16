@@ -23,7 +23,7 @@ Source documents (authority order: spec > plan > rulings):
 - **Slice 0 Tasks 1–6 are merged into `pai-os`.** Head `da38f02`.
 - **Task 7 is built, reviewed and pushed, but not merged.**
   - Branch: `os/s0-t7-spike3-chaos`, head `2256b45`, cut from `da38f02`.
-  - No PR is open yet; the user opens and merges PRs.
+  - PR: https://github.com/memsa771-hub/Pai-C/pull/36 (→ `pai-os`, reviewers @10Faheem @MusawirKtk). Check its CI and merge state first.
   - Checks: tach ✅, single Alembic head check ✅, `tests/os` 57 passed, no orphan worker processes.
 - **The Spike 3 report says "PENDING the OpenAI run".** The billed pass-bar run has not been done (§4).
 - All follow-up PRs are merged:
@@ -44,7 +44,7 @@ Source documents (authority order: spec > plan > rulings):
 | 4 | #26 | `scripts/os_inventory.py`, which generates `docs/os/old-os-inventory.md`. It gives a fate to all 81 old-OS modules (keep 54, read-only 18, retire 9); a drift test keeps the markdown current |
 | 5 | #27 | `.github/workflows/ci.yml`: job `os` (Python 3.12, postgres:16, tach, heads check, `pytest tests/os`, guard against silent DB skips) and job `legacy` (the Counsellor suite, blocking since #35). Also `.github/pull_request_template.md` and `.github/CODEOWNERS`. A deliberate boundary violation was blocked by CI (PR #28, closed) |
 | 6 | #29 | `spikes/spike3/loop.py` + `schema.sql` + `pages/`: the core loop. Kernel `mark_ready` → outbox → enqueue (`task_id:attempt`) → DBOS queue → `run_attempt` workflow (`load_page` → Pydantic AI agent with `DBOSDurability` → `record_result` → `complete_task`) → `reconcile` |
-| 7 | not merged | `spikes/spike3/chaos.py` (driver) and `worker.py`, `tests/os/test_spike3_chaos.py` (marker `chaos`, runs in CI), `docs/os/spikes/spike3-report.md`. `loop.py` changes: kernel side through `DBOSClient`, `worker` column, terminal workflow statuses → `failed/workflow_error`, `application_version="spike3"` |
+| 7 | #36 (open) | `spikes/spike3/chaos.py` (driver) and `worker.py`, `tests/os/test_spike3_chaos.py` (marker `chaos`, runs in CI), `docs/os/spikes/spike3-report.md`. `loop.py` changes: kernel side through `DBOSClient`, `worker` column, terminal workflow statuses → `failed/workflow_error`, `application_version="spike3"` |
 
 ### Slice 0 gate (spec §6, plan "Done when")
 
@@ -113,7 +113,7 @@ Source documents (authority order: spec > plan > rulings):
 
 ## 4. Next steps to finish Slice 0 (in order)
 
-1. **User: open a PR `os/s0-t7-spike3-chaos` → `pai-os` and merge it** (squash) once CI is green and an OS developer approves. If CI fails, fix it per the drive-to-green rules.
+1. **Merge PR #36 (`os/s0-t7-spike3-chaos` → `pai-os`)** (squash) once CI is green and an OS developer approves. If CI fails, fix it per the drive-to-green rules.
    - The chaos test takes about 30–60 s in CI.
    - If CI shows flaky kill timing, check `kills >= 3` and the 1.5 s model delay in the test.
 2. **User: run the OpenAI pass-bar run** on a machine that can reach OpenAI, with Postgres 16 and the requirements installed. From `backend/`:
@@ -191,7 +191,7 @@ Before any Slice 1 code:
 
 ## 8. Open items for the user
 
-- [ ] Open and merge the Task 7 PR (`os/s0-t7-spike3-chaos` → `pai-os`).
+- [ ] Merge the Task 7 PR #36 once CI is green and approved.
 - [ ] Run the OpenAI pass-bar run (§4.2), fill in the report, and get both developers' sign-off.
 - [ ] Add `legacy` as a required status check in the `pai-os` ruleset.
 - [ ] Create the PAI OS OpenAI project with a budget and set `OS_OPENAI_API_KEY` (never in chat).
