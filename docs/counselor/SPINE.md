@@ -1832,3 +1832,137 @@ cannot be rated; the endpoint does not infer evidence from old status events.
   left unchanged under the explicit rule; Compose behavior was verified using an
   empty temporary environment file and synthetic values.
 - R4 possibilities/exploration and R5 OS events remain out of scope.
+
+## Core R4: Discover and Guide
+
+R4 follows the two approved boards and the founder's title, lifecycle and spacing
+decisions. R5 life events and OS outcomes remain outside this change.
+
+### Board box to code
+
+| Board box | Implementation |
+| --- | --- |
+| A: Possibility Discovery; B: PAI-found possibilities with evidence | Planner optional possibility, visible-evidence validation, `pai_c/possibilities.py` |
+| A: Possibility candidates | `pai_possibilities`, migration 111, workspace-scoped router, inline and Roadmaps Possibilities cards |
+| B: Student's own goals | Mirror lane conversion and existing `RoadmapService.create_custom` linked to student-added possibilities |
+| A/B: Exploration roadmaps and research | Existing `research/gateway.py`, light research and roadmap builder; Explore uses `student_route` |
+| B: Compare trade-offs and fit | Guide-only `<compare>` inside `<research>` in `deep/context.py` |
+| A: Student chooses roadmap; B: Ready to choose / Confirm / OS executes | Existing choose and decision-record path; linked possibility becomes chosen; OS contract unchanged |
+
+### Storage and lifecycle
+
+Migration `111_possibilities.py` follows 110 and creates `pai_possibilities` with
+id, workspace_id, journey_id, title, normalized_title, kind, why, evidence,
+unknowns, status, source, roadmap_id, mirror_versions, mentioned_at, created_at
+and updated_at. Evidence, unknowns and processed Mirror versions use JSONB.
+Workspace/title uniqueness and status/source/kind checks are database constraints.
+Workspace and journey deletion cascade; roadmap deletion clears the link.
+Downgrade drops only this table. No existing records are rewritten.
+
+| Trigger | From | To / effect |
+| --- | --- | --- |
+| Explore | suggested, saved, dismissed | exploring; research starts once through the gateway |
+| Explore | exploring | 200 no-op; no research restart |
+| Save | suggested, dismissed | saved |
+| Save | saved | 200 no-op |
+| Dismiss | suggested, saved, exploring | dismissed; existing RoadmapService dismisses any linked roadmap |
+| Dismiss | dismissed | 200 no-op |
+| Existing roadmap choose | linked possibility | chosen; existing decision record retained |
+| Existing roadmap restore | linked dismissed possibility | exploring |
+| New confirmed Mirror version | suggested, saved | exploring |
+| New confirmed Mirror version | exploring, chosen | unchanged |
+| New confirmed Mirror version | dismissed | remains dismissed; new linked roadmap also dismissed |
+| Reprocessed Mirror version | any | no change |
+
+All unlisted Explore/Save/Dismiss transitions return 409 without changing state.
+Chosen cannot be changed through these endpoints. Titles are unique per workspace
+after whitespace normalization and case folding. Later Mirrors reuse that row,
+keep title/why/kind, and append evidence deduplicated by text and the new version.
+Bindings in the draft keep lane-to-possibility links stable across publication.
+
+New Mirror lanes require a 2-8 word title, no URLs or digits. Strength-based and
+test-the-dream lanes require evidence. Saved old Mirrors remain readable.
+Old lane title fallback is published roadmap title, then route.field, then
+`policy/lane_labels.json`. Later publication updates that legacy title unless it
+collides: the old title remains, rows are not merged, and
+`possibility_title_collision` logs both IDs without student text.
+
+### Planner and discovery
+
+Optional Planner possibilities need two distinct IDs visible in its bounded map,
+including at least one shown/action item, and a structurally valid title. Invalid
+possibilities are dropped without rejecting the rest of the plan. Duplicate and
+dismissed titles are not re-added. Stored titles are present in the plan and
+possibility logs for review. Institution/place exclusion is a prompt rule; no
+entity model or word list was introduced, as explicitly agreed.
+
+Research routes never use a possibility title: field uses student goal data or
+the stored student evidence; level/place use student goal records, otherwise
+remain empty. The invented-place-title isolation test verifies this boundary.
+
+The data-driven `discover` row sits immediately after summarize:
+`discover_available AND NOT questions_in_last_two` -> discover, topic possibility
+ID, question_allowed true, invite false. `discover_min_student_messages_between`
+is 6. Count from the later of current Mirror confirmation and the last discover
+decision: first discovery is eligible at six messages, not immediately after
+confirmation. The next requires six more. Existing no_repeat leaves discover
+unchanged. Successful posting adds possibility_id metadata and sets mentioned_at
+once. A failed post cannot consume the suggestion.
+
+### Try-it and comparison
+
+New roadmap output requires `try_it: {kind, what, time_needed, questions}`.
+Kinds are talk_to_someone (exactly three nonempty questions) and taste_the_work
+(empty questions). What and time_needed must be nonempty. The roadmap prompt uses
+the exact requested TRY IT paragraph and Mirror v3 Truth Map input, and exempts
+self-set Try-it action targets from external fact citations. Existing citation
+requirements and research labels remain. Old test_30_days cards still render
+their saved text without a database rewrite.
+
+The localized I tried it form sends one normal student event with
+try_it_roadmap_id and the requested title/feeling/note text. The normal event and
+Planner input paths handle it. Not for me does not dismiss the roadmap. The
+Planner prompt records reported action in shown, feelings in self, and certainty
+only when the student provides a number.
+
+For Guide only, comparison includes up to five ready, non-dismissed roadmaps from
+the current journey: title, origin, why_for_you, strengths_used, family_fit,
+constraints_fit, gaps (need/have/gap), risks, Try-it kind/what/time, favorite/focus
+flags, stored facts and source labels. It introduces no facts or model calls.
+The five-card limit lives in `policy/guide.json`; guide.md is unchanged.
+
+### Verification and limits
+
+Offline providers only; PAI_API_KEY unset, dotenv loading disabled and external
+socket connections blocked in the backend test launcher. No dotenv file was
+opened or edited. No founder conversation or live evaluation was run.
+
+| Check | Result |
+| --- | --- |
+| Baseline backend | 1108 passed, 3 skipped, 8 subtests |
+| Step A backend | 1142 passed, 3 skipped, 8 subtests |
+| Step B backend | 1151 passed, 3 skipped, 8 subtests; 647.34s |
+| Production security checks | 3 passed, 4 subtests; covers conditional baseline skips |
+| Frontend | 28 baseline -> 30 Step A -> 32 Step B, 11 files |
+| Frontend production build | PASS after both steps |
+| Imports | 268/268, no unresolved dynamic imports |
+| Architecture | 9 passed |
+| PAI OS contracts | 2 passed; new choose test additionally preserves decision record |
+| Focused Step B backend | 41 passed |
+
+Migration upgrade/downgrade and title uniqueness were tested offline. Migration
+111 has not been applied to the founder database. All lifecycle transitions,
+Mirror version idempotency, collision handling, discovery spacing, auth/scoping,
+Planner evidence validation, Explore dedupe, old/new artifacts and feedback
+intake have offline coverage. An initial Step A run found a missing requested_by
+value in a new test fixture; the fixture was corrected before the passing run.
+
+Open questions: none remain within R4 after the founder's explicit decisions.
+
+Findings for later: real-model quality and title-policy adherence are not proven
+by fake tests; no live claim is made. R5 integration remains separate. Existing
+SQLite expression-index reflection warnings are unchanged. Deploy migration 111
+before enabling these endpoints in a running stack.
+
+Commits: `98c09b3` (Step A), `28ba6f5` (Step B); the following documentation
+commit records the final verification. All work remains on pai-c.
