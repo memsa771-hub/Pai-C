@@ -10,7 +10,12 @@
         "level": "",
         "place_preference": "",
         "kind": ""
-      }
+      },
+      "title": "Your own goal",
+      "evidence": [
+        "I study and work on practical projects."
+      ],
+      "unknowns": []
     },
     {
       "why": "Explore demonstrated strengths.",
@@ -20,7 +25,12 @@
         "level": "",
         "place_preference": "",
         "kind": ""
-      }
+      },
+      "title": "Built on your strengths",
+      "evidence": [
+        "I study and work on practical projects."
+      ],
+      "unknowns": []
     },
     {
       "why": "Respect current constraints.",
@@ -30,7 +40,12 @@
         "level": "",
         "place_preference": "",
         "kind": ""
-      }
+      },
+      "title": "A safer path",
+      "evidence": [
+        "I study and work on practical projects."
+      ],
+      "unknowns": []
     },
     {
       "why": "Test the wish through experience.",
@@ -40,7 +55,12 @@
         "level": "",
         "place_preference": "",
         "kind": ""
-      }
+      },
+      "title": "Testing your dream",
+      "evidence": [
+        "I study and work on practical projects."
+      ],
+      "unknowns": []
     }
   ],
   "dimensions": [

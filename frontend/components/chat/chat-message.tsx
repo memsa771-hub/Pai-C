@@ -1,6 +1,7 @@
 'use client';
 
 import { cn } from '@/lib/utils';
+import { Possibilities } from '@/components/counselor/possibilities';
 import { Button } from '@/components/ui/button';
 import { Copy, Check, User, FileIcon, Download, Eye, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -307,6 +308,7 @@ export const ChatMessage = memo(function ChatMessage({ message, agents = [] }: C
             <MarkdownContent content={message.content} agentNames={agentNames} agentLabels={agentLabels} />
             <Attachments items={attachments} />
             {Array.isArray(message.metadata?.roadmaps) && <RoadmapComparison initial={message.metadata.roadmaps as unknown as Roadmap[]} />}
+            {typeof message.metadata?.possibility_id === 'string' && <Possibilities id={message.metadata.possibility_id} />}
 
             {/* Action bar — revealed on hover, as in ChatGPT */}
             <div className="mt-1 flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100">

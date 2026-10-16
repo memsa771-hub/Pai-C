@@ -53,7 +53,10 @@ class MirrorRoute(MirrorPart):
 
 class MirrorLane(MirrorPart):
     lane: Text
+    title: str = ""
     why: Text
+    evidence: list[Text] = Field(default_factory=list)
+    unknowns: list[Text] = Field(default_factory=list)
     strengths: list[Text] = Field(default_factory=list)
     route: MirrorRoute = Field(default_factory=MirrorRoute)
 
@@ -120,6 +123,16 @@ class CounselorMirror(SavedCounselorMirror):
     core_picture: CorePicture
 
     @model_validator(mode="after")
+    def evidenced_lanes(self):
+        from app.pai_c.possibility_titles import valid_title
+        for lane in self.roadmap_lanes:
+            if not valid_title(lane.title):
+                raise ValueError("lane requires a structurally valid direction title")
+            if lane.lane in {"strength_based", "test_the_dream"} and not lane.evidence:
+                raise ValueError("lane requires student evidence")
+        return self
+
+    @model_validator(mode="after")
     def no_private_quotes(self, info: ValidationInfo):
         context = info.context or {}
         # Compare free text, not the tension's status metadata.
@@ -128,6 +141,8 @@ class CounselorMirror(SavedCounselorMirror):
                      for value in (line["text"], line["evidence"]))
         texts.extend(value for part in self.dimensions
                      for value in (part.name, part.picture, part.evidence))
+        texts.extend(value for lane in self.roadmap_lanes
+                     for value in (lane.title, lane.why, *lane.evidence, *lane.unknowns))
         for tension in context.get("private_gap_context", []):
             for private in (*tension["between"], tension["evidence"]):
                 if private.strip() and any(private in text for text in texts):

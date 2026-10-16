@@ -157,6 +157,8 @@ async def _run_deep_turn(db, workspace_id: str, event_data: dict, depth: int):
     violations = [] if fallback_reply is not None or result is None else result.guard_violations
     post_started = time.monotonic()
     reply_metadata = _voice_reply_metadata(event_data)
+    if decision is not None and decision.action == "discover":
+        reply_metadata = {**(reply_metadata or {}), "possibility_id": decision.topic}
     if (reply_metadata and action.get("type") == "mirror"
             and context.notebook.mirror_ready):
         reply_metadata["mirror_pending"] = True
@@ -167,6 +169,10 @@ async def _run_deep_turn(db, workspace_id: str, event_data: dict, depth: int):
     post_ms = int((time.monotonic() - post_started) * 1000)
     if not assistant_event_id:
         return None
+    if decision is not None and decision.action == "discover":
+        from app.pai_c.possibilities import PossibilityService
+        PossibilityService(db).mark_mentioned(workspace_id, decision.topic)
+        db.commit()
     if decision is not None and decision.action == "answer_request" and signals.request is not None and not signals.request.needs_research and action.get("type") != "wellbeing":
         NotedQuestionService(db).mark_answered_now(workspace_id, turn.source_event_id, assistant_event_id)
     move = "none"

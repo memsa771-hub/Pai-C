@@ -364,7 +364,7 @@ class RoadmapService:
         by_lane = {item.get("lane"): item for item in artifact.get("roadmaps") or [] if isinstance(item, dict)}
         custom_id = (run.constraints or {}).get("roadmap_id")
         lanes = ([{"lane": "student_added", "why": (brief.get("custom_roadmap") or {}).get("title", "")}]
-                 if custom_id else lanes_for_mirror(brief.get("mirror") or {}))
+                 if brief.get("custom_roadmap") else lanes_for_mirror(brief.get("mirror") or {}))
         for lane in lanes:
             candidate = by_lane.get(lane["lane"], {})
             # Revalidate at publication, not only at generation. Translate the
@@ -387,7 +387,7 @@ class RoadmapService:
             elif roadmap.execution_run_id != run.id:
                 roadmap.version += 1
             fit = {key: item.get(key) for key in FIT_FIELDS}
-            if custom_id: fit["lane"] = "student_added"
+            if custom_id: fit["lane"] = roadmap.lane or "student_added"
             fit.update(missing_facts=item["missing_facts"], mirror_version=version,
                        facts=item.get("facts") or [], citations=item.get("citations") or {})
             fit["your_questions"] = [{"id": question["id"], "question": question["question"],
@@ -406,6 +406,9 @@ class RoadmapService:
             if item["generation_status"] == "ready" and previous_status != "ready":
                 self._notify_ready(run.workspace_id, roadmap, refreshed=previous_status == "stale")
             changed.append(roadmap.id)
+            from app.pai_c.possibilities import PossibilityService
+            if not custom_id:
+                PossibilityService(self.db).link_lane(journey, lane, roadmap)
         for question in brief.get("questions") or []:
             row = self.db.scalar(select(CounselorNotedQuestion).where(
                 CounselorNotedQuestion.id == question["id"], CounselorNotedQuestion.workspace_id == run.workspace_id))
@@ -460,6 +463,10 @@ class RoadmapService:
         if state.chosen_at and dismissed:
             raise RoadmapError("Chosen roadmap cannot be dismissed")
         state.dismissed_at = _now() if dismissed else None
+        from app.models import PaiPossibility
+        for possibility in self.db.scalars(select(PaiPossibility).where(
+                PaiPossibility.workspace_id == workspace_id, PaiPossibility.roadmap_id == roadmap_id)):
+            possibility.status = "dismissed" if dismissed else "exploring"
         if dismissed:
             state.focused_at = None
         self.db.flush()
@@ -484,6 +491,10 @@ class RoadmapService:
         state = RoadmapStudentState(roadmap_id=roadmap.id, journey_id=journey_id)
         self.db.add(state)
         self.db.flush()
+        from app.pai_c.possibilities import PossibilityService
+        possibility = PossibilityService(self.db).add(workspace_id, journey_id,
+            title=title, why=title, kind="student_added", source="student", status="exploring", roadmap_id=roadmap.id)
+        possibility.roadmap_id = roadmap.id
         return self.serialize(roadmap, state)
 
     def focus(self, workspace_id: str, roadmap_id: str) -> dict:
@@ -565,6 +576,10 @@ class RoadmapService:
         JourneyService(self.db).set_counselor_stage(
             workspace_id, journey.id, "CHOSEN", actor="human:student", validated_choice=True)
         state.chosen_at = _now()
+        from app.models import PaiPossibility
+        for possibility in self.db.scalars(select(PaiPossibility).where(
+                PaiPossibility.workspace_id == workspace_id, PaiPossibility.roadmap_id == roadmap_id)):
+            possibility.status = "chosen"
         draft = journey.counselor_summary_draft or {}
         confirmed_summary = (draft.get("mirror") or draft.get("summary") if draft.get("status") == "confirmed"
                              else None)

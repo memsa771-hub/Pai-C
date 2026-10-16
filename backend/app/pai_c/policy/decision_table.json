@@ -5,7 +5,8 @@
     "question_window": 2,
     "short_reply_intent": "short_reply",
     "summary_action": "summarize",
-    "mirror_after_edit_min_student_messages": 2
+    "mirror_after_edit_min_student_messages": 2,
+    "discover_min_student_messages_between": 6
   },
   "rows": [
     {
@@ -137,6 +138,11 @@
         "topic": null,
         "invite": false
       }
+    },
+    {
+      "id": "discover",
+      "when": {"all": [{"ref": "discover_available"}, {"eq": [{"ref": "questions_in_last_two"}, false]}]},
+      "set": {"action": "discover", "topic": {"ref": "possibility_id"}, "question_allowed": true, "invite": false}
     },
     {
       "id": "listen",

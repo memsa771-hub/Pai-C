@@ -177,7 +177,11 @@ async def build_context(db, workspace_id: str, turn: CounselorTurnInput, *,
             sections["playbooks"] = selected_playbooks(plan.playbooks)
     if decision is not None and not wellbeing:
         from app.pai_c.policy.controller import decision_context
-        sections["decision"] = _json(decision_context(decision, signals, plan))
+        possibility = None
+        if decision.action == "discover":
+            from app.pai_c.possibilities import PossibilityService
+            possibility = PossibilityService(db).get(workspace_id, decision.topic)
+        sections["decision"] = _json(decision_context(decision, signals, plan, possibility))
     research = _research(db, workspace_id, journey)
     if roadmap_id is not None:
         row = db.scalar(select(Roadmap).where(

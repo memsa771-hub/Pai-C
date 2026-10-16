@@ -2,7 +2,8 @@
 from sqlalchemy import select
 
 from app.config import config
-from app.models import CounselorTurnDecision, EventRecord, BackgroundJob, StudentJourney
+from app.models import CounselorTurnDecision, EventRecord, BackgroundJob, StudentJourney, StudentJourneyEvent, PaiPossibility
+from datetime import timezone
 from app.pai_c.memory import MemoryService
 from app.pai_c.policy.controller import load_data
 from app.pai_c.voice.guards import question_sentences
@@ -87,6 +88,25 @@ def build_state(db, turn, signals, history):
     state["mirror_correction"] = bool(current and (current.metadata_ or {}).get("mirror_edit_version") is not None)
     state["mirror_allowed"] = bool(state["mirror_ready"] and journey
         and journey.current_stage == "DIRECTION" and pending is None and enough_after_edit)
+    state["discover_available"] = False
+    state["possibility_id"] = None
+    draft = (journey.counselor_summary_draft or {}) if journey else {}
+    if draft.get("status") == "confirmed":
+        proof = db.scalar(select(StudentJourneyEvent).where(
+            StudentJourneyEvent.workspace_id == turn.workspace_id,
+            StudentJourneyEvent.event_type == "counselor.mirror.confirmed",
+            StudentJourneyEvent.payload["mirror_version"].as_integer() == draft.get("version")
+        ).order_by(StudentJourneyEvent.created_at.desc()).limit(1))
+        possibility = db.scalar(select(PaiPossibility).where(
+            PaiPossibility.workspace_id == turn.workspace_id, PaiPossibility.status == "suggested",
+            PaiPossibility.mentioned_at.is_(None)).order_by(PaiPossibility.created_at, PaiPossibility.id).limit(1))
+        if proof and possibility:
+            confirmed = proof.created_at.replace(tzinfo=timezone.utc) if proof.created_at.tzinfo is None else proof.created_at
+            boundary = max([int(confirmed.timestamp() * 1000), *[
+                row.source_timestamp for row in rows if (row.decision or {}).get("action") == "discover"]])
+            count = sum(row["timestamp"] > boundary for row in students)
+            state["discover_available"] = count >= load_data("decision_table.json")["derived"]["discover_min_student_messages_between"]
+            state["possibility_id"] = possibility.id
     return state
 
 

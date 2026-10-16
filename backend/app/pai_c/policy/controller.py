@@ -98,13 +98,15 @@ def decide(state):
     return Decision(rule_id=rule_id, summary_due=state["summary_due"], **chosen)
 
 
-def decision_context(decision, signals, plan):
+def decision_context(decision, signals, plan, possibility=None):
     areas = load_data("areas_policy.json")
     request = signals.request if signals is not None else None
     topic_text = request.text if decision.topic == "request" and request else areas["topic_text"].get(decision.topic, "")
     instruction = (POLICY_DIR / "actions" / (decision.action + ".md")).read_text(encoding="utf-8")
     instruction = instruction.replace("{topic_text}", topic_text)
     instruction = instruction.replace("{topic_clause}", " (about " + topic_text + ")" if topic_text else "")
+    if possibility is not None:
+        instruction = instruction.replace("{possibility_title}", possibility.title).replace("{possibility_why}", possibility.why)
     if decision.invite:
         instruction += "\n" + (POLICY_DIR / "actions/invite.md").read_text(encoding="utf-8")
     return {"action": decision.action, "topic_text": topic_text,

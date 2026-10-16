@@ -56,3 +56,6 @@ next_move: understand/tell/both/care. intent: one short next-turn intention, at 
 
 OUTPUT
 {"patch": [...operations...], "plan": {"next_move":"understand", "intent":"...", "target_gap":null, "give":"...", "avoid_questions":[], "playbooks":[]}}
+
+POSSIBILITIES
+Only when the student's own evidence clearly points to a direction they have not mentioned, add possibility: {title, why, evidence_item_ids} to the plan. The title names a field, kind of work or kind of study in general words, never an institution or place. why is one sentence tied to their evidence. evidence_item_ids lists at least two visible item ids, at least one of them shown or action. If you are not sure, leave possibility out. Never suggest something the student already dismissed.

@@ -407,6 +407,17 @@ class WorkspaceApi {
     return this.request(`/v1/counselor/summary?network=${this.requireWorkspace()}`);
   }
 
+  async getPossibilities(): Promise<import('./possibilities').Possibility[]> {
+    const result = await this.request<{ possibilities: import('./possibilities').Possibility[] }>(
+      `/v1/counselor/possibilities?network=${this.requireWorkspace()}`);
+    return result.possibilities;
+  }
+
+  async changePossibility(id: string, action: 'explore' | 'save' | 'dismiss'): Promise<import('./possibilities').Possibility> {
+    return this.request(`/v1/counselor/possibilities/${encodeURIComponent(id)}/${action}?network=${this.requireWorkspace()}`,
+      { method: 'POST' });
+  }
+
   async confirmCounselorMirror(version: number): Promise<void> {
     await this.request(`/v1/counselor/summary/confirm?network=${this.requireWorkspace()}`,
       { method: 'POST', body: JSON.stringify({ version }) });

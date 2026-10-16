@@ -123,6 +123,9 @@ next_move: understand/tell/both/care. intent: one short next-turn intention, at 
 
 OUTPUT
 {"patch": [...operations...], "plan": {"next_move":"understand", "intent":"...", "target_gap":null, "give":"...", "avoid_questions":[], "playbooks":[]}}
+
+POSSIBILITIES
+Only when the student's own evidence clearly points to a direction they have not mentioned, add possibility: {title, why, evidence_item_ids} to the plan. The title names a field, kind of work or kind of study in general words, never an institution or place. why is one sentence tied to their evidence. evidence_item_ids lists at least two visible item ids, at least one of them shown or action. If you are not sure, leave possibility out. Never suggest something the student already dismissed.
 ```
 
 ---
@@ -159,11 +162,11 @@ Return one JSON object, with this structure:
   "opinion": "Three to six sentences interpreting the student's actions and evidence. Be specific and kind. Respect the original dream and describe how it could be tested without closing it, promising outcomes or giving an admission verdict. No world facts, fees, scores, percentages or external requirements.",
   "question": "One question inviting confirmation or a correction, phrased naturally in the student's language.",
   "roadmap_lanes": [
-    {"lane":"stated_goal","why":"Why this route deserves later research","route":{"field":"","level":"","place_preference":"","kind":""}},
-    {"lane":"family_wish","why":"Why the family's distinct wish deserves later research","route":{"field":"","level":"","place_preference":"","kind":""}},
-    {"lane":"strength_based","why":"Why this route fits demonstrated strengths","route":{"field":"","level":"","place_preference":"","kind":""},"strengths":["Specific demonstrated strength"]},
-    {"lane":"safe_or_local","why":"Why this route respects the student's limits","route":{"field":"","level":"","place_preference":"","kind":""}},
-    {"lane":"test_the_dream","why":"How this route could test the original dream","route":{"field":"","level":"","place_preference":"","kind":""}}
+    {"lane":"stated_goal","title":"General direction title","evidence":["Student evidence"],"unknowns":[],"why":"Why this route deserves later research","route":{"field":"","level":"","place_preference":"","kind":""}},
+    {"lane":"family_wish","title":"General direction title","evidence":["Student evidence"],"unknowns":[],"why":"Why the family's distinct wish deserves later research","route":{"field":"","level":"","place_preference":"","kind":""}},
+    {"lane":"strength_based","title":"General direction title","evidence":["Student evidence"],"unknowns":[],"why":"Why this route fits demonstrated strengths","route":{"field":"","level":"","place_preference":"","kind":""},"strengths":["Specific demonstrated strength"]},
+    {"lane":"safe_or_local","title":"General direction title","evidence":["Student evidence"],"unknowns":[],"why":"Why this route respects the student's limits","route":{"field":"","level":"","place_preference":"","kind":""}},
+    {"lane":"test_the_dream","title":"General direction title","evidence":["Student evidence"],"unknowns":[],"why":"How this route could test the original dream","route":{"field":"","level":"","place_preference":"","kind":""}}
   ]
 }
 
@@ -178,6 +181,8 @@ RULES
 
 - External world facts must be framed only as things research will check, never as established claims.
 
+Give each lane a short title of two to eight words that names the direction in general words, never an institution or place.
+
 - Each lane has route {field, level, place_preference, kind}. Fill each value only from explicit student evidence in the notebook, profile or conversation; leave unknown values empty. The why explains personal fit and must never supply a search query. Do not infer destinations, fields or qualification levels.
 
 CORE PICTURE
@@ -189,6 +194,8 @@ Before the details, write the four-line picture the student will see first. Each
 If there is no evidence for a line, set unknown to true and say honestly that you do not know this yet. Never fill a line with a guess.
 
 <private_gap_context> is private. Use it only to notice a gap between what the student says and what their life shows. Never quote it, never call it a tension, and never mention that it exists; describe only what the student's own evidence shows.
+
+For each roadmap lane, list the student's own evidence that makes it worth exploring (short quotes or paraphrases from what they said or did) and what is still unknown about it. A lane without evidence is only allowed for the student's own stated goal or the family's wish.
 
 TRUTH MAP INPUT
 <notebook> is v3: said, shown, source, pressures (items), self, sure and world (people with role, wish and worry; social; daily life; responsibilities; education story). Capability levels: demonstrated, emerging, untested, development need, blocked; describe a strength as demonstrated only when its level says so. Objective education, tests, documents, money and places come from <profile>; follow vault_fact_ref ids instead of copying or inventing objective facts. Never expose private interpretation or archived data.

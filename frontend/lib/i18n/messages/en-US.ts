@@ -11,6 +11,11 @@
  */
 
 export const messages = {
+  possibilities: {
+    title: 'Possibilities', explore: 'Explore it', save: 'Save for later', dismiss: 'Not for me',
+    suggested: 'Suggested', exploring: 'Exploring', saved: 'Saved for later', dismissed: 'Dismissed', chosen: 'Chosen',
+    error: 'Could not update possibilities. Please try again.',
+  },
   roadmapFit: {
     routeTitle: 'Route to review',
     title: 'How this route fits you', why_for_you: 'Why this route',

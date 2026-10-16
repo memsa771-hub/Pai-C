@@ -132,9 +132,11 @@ def _input(db, workspace_id: str, student: EventRecord, assistant: EventRecord,
     transcript.reverse()
     view = view if view is not None else build_planner_view(notebook)
     episode = MemoryService(db).session_summaries(workspace_id, limit=1)
+    from app.pai_c.possibilities import PossibilityService
+    dismissed = [row.title for row in PossibilityService(db).list(workspace_id) if row.status == "dismissed"]
     return ("<notebook_schema>" + _json({"notebook": CounselorNotebookData.analyst_schema(), "patch_operation": OPERATION.json_schema(), "plan": TurnPlan.model_json_schema()})
             + "</notebook_schema>\n"
-            + view.text + "\n"
+            + view.text + "\n<dismissed_possibilities>" + _json(dismissed) + "</dismissed_possibilities>\n"
             + "<profile>" + _json(_profile(db, workspace_id)) + "</profile>\n"
             + "<older_episode_summary>" + _json(episode[0].summary if episode else "")
             + "</older_episode_summary>\n"
@@ -184,7 +186,7 @@ async def _candidate(db, workspace_id: str, student: EventRecord,
             feedback = "\nThe previous patch was rejected: " + str(exc) + ". Return a corrected complete patch and plan."
             continue
         try:
-            plan = validate_plan(parsed.get("plan"), wellbeing=wellbeing)
+            plan = validate_plan(parsed.get("plan"), wellbeing=wellbeing, view=view)
         except ValueError as exc:
             logger.warning("planner_plan_rejected error_type=%s", type(exc).__name__)
             plan = None
@@ -248,6 +250,16 @@ async def analyze_job(job, db) -> dict:
                 if plan is not None:
                     db.add(PaiTurnPlan(workspace_id=job.workspace_id, source_event_id=user_event_id,
                         notebook_version=previous.version + 1, plan=plan.model_dump(mode="json")))
+                if plan is not None and plan.possibility is not None:
+                    from app.pai_c.possibilities import PossibilityService
+                    from app.pai_c.understanding.data import load_policy, at_path
+                    stored = previous.notebook.model_dump(mode="json")
+                    items = {row["id"]: row for path in load_policy()["item_paths"] for row in at_path(stored, path)}
+                    journey = JourneyService(db).ensure_counselor(job.workspace_id)
+                    proposed = plan.possibility
+                    PossibilityService(db).add(job.workspace_id, journey.id,
+                        title=proposed.title, why=proposed.why, kind="discovered", source="planner", status="suggested",
+                        evidence=[{"text": items[id]["evidence"], "item_id": id} for id in dict.fromkeys(proposed.evidence_item_ids)])
                 snapshot, storage_issues = service.apply_truth_map(
                     job.workspace_id, candidate, user_event_id,
                     expected_version=previous.version)

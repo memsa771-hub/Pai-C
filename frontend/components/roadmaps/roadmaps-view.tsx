@@ -15,6 +15,7 @@ import { RoadmapCard } from './roadmap-card';
 import { RoadmapChoiceDialog } from './roadmap-choice-dialog';
 import { RoadmapDetailDialog } from './roadmap-detail-dialog';
 import { StudentRequestCard } from './student-request-card';
+import { Possibilities } from '@/components/counselor/possibilities';
 
 type Filter = 'all' | 'favorites' | 'exploring' | 'dismissed';
 
@@ -104,6 +105,7 @@ export function RoadmapsView() {
         <div className="flex gap-2"><button type="button" onClick={() => void refresh()} aria-label="Refresh roadmaps" className="rounded-lg border p-2 hover:bg-muted"><RefreshCw className="size-4" /></button>
           <button type="button" onClick={() => setAdding(!adding)} className="inline-flex items-center gap-1 rounded-lg bg-primary px-3 py-2 text-sm text-primary-foreground"><Plus className="size-4" /> Add goal</button></div>
       </div>
+      <Possibilities refreshKey={roadmaps} onUpdated={() => void refresh()} />
       {adding && <form onSubmit={addGoal} className="mt-5 rounded-xl border bg-card p-4">
         <label htmlFor="roadmap-goal" className="text-sm font-medium">{t('counselorRoadmaps.customGoalTitle')}</label>
         <input id="roadmap-goal" value={title} onChange={(event) => setTitle(event.target.value)} maxLength={240} required

@@ -1,0 +1,9 @@
+{
+  "title_min_words": 2,
+  "title_max_words": 8,
+  "transitions": {
+    "explore": {"suggested": "exploring", "saved": "exploring", "dismissed": "exploring", "exploring": "exploring"},
+    "save": {"suggested": "saved", "dismissed": "saved", "saved": "saved"},
+    "dismiss": {"suggested": "dismissed", "saved": "dismissed", "exploring": "dismissed", "dismissed": "dismissed"}
+  }
+}

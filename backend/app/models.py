@@ -152,6 +152,33 @@ class CounselorNotedQuestion(Base):
     )
 
 
+class PaiPossibility(Base):
+    """Student-controlled, evidence-backed exploration directions."""
+    __tablename__ = "pai_possibilities"
+    id = Column(UUID(as_uuid=False), primary_key=True, default=_uuid)
+    workspace_id = Column(UUID(as_uuid=False), ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False)
+    journey_id = Column(Text, ForeignKey("pai_student_journeys.id", ondelete="CASCADE"), nullable=False)
+    title = Column(Text, nullable=False)
+    normalized_title = Column(Text, nullable=False)
+    kind = Column(Text, nullable=False)
+    why = Column(Text, nullable=False)
+    evidence = Column(JSONB, nullable=False, default=list)
+    unknowns = Column(JSONB, nullable=False, default=list)
+    status = Column(Text, nullable=False)
+    source = Column(Text, nullable=False)
+    roadmap_id = Column(Text, ForeignKey("pai_roadmaps.id", ondelete="SET NULL"), nullable=True)
+    mirror_versions = Column(JSONB, nullable=False, default=list)
+    mentioned_at = Column(DateTime(timezone=True), nullable=True)
+    created_at = Column(DateTime(timezone=True), nullable=False, default=_now)
+    updated_at = Column(DateTime(timezone=True), nullable=False, default=_now)
+    __table_args__ = (
+        UniqueConstraint("workspace_id", "normalized_title", name="uq_possibility_title"),
+        CheckConstraint("status IN ('suggested','exploring','saved','dismissed','chosen')", name="ck_possibility_status"),
+        CheckConstraint("source IN ('mirror','planner','student')", name="ck_possibility_source"),
+        CheckConstraint("kind IN ('stated_goal','family_wish','strength_based','safe_or_local','test_the_dream','discovered','student_added')", name="ck_possibility_kind"),
+    )
+
+
 class CounselorMirrorFeedback(Base):
     """A student's optional rating of an exactly confirmed Mirror version."""
     __tablename__ = "pai_counselor_mirror_feedback"

@@ -119,6 +119,17 @@ async def _request_research(kind, workspace_id, *, db, journey, tool_context,
     brief["refresh_key"] = refresh_key
     if target and target.origin == "student_added":
         brief["custom_roadmap"] = {"id": target.id, "title": target.title, "route": target.route or {}}
+    if target and target.origin == "operator_suggested":
+        from app.models import PaiPossibility
+        from app.pai_c.possibilities import PossibilityService
+        possibility = db.scalar(select(PaiPossibility).where(
+            PaiPossibility.workspace_id == workspace_id, PaiPossibility.roadmap_id == target.id))
+        if possibility is None:
+            return None
+        brief["mirror"] = {**brief["mirror"], "roadmap_lanes": [{"lane": target.lane,
+            "why": possibility.why, "route": PossibilityService(db).research_route(possibility),
+            "evidence": [item["text"] for item in possibility.evidence]}]}
+        brief["possibility_id"] = possibility.id
     key = f"{journey.id}:mirror:{brief['mirror_version']}" + (f":refresh:{refresh_key}" if refresh_key else "")
     if target:
         key += f":route:{target.id}"
@@ -134,7 +145,7 @@ async def _request_research(kind, workspace_id, *, db, journey, tool_context,
         "objective": "Research decisive facts for the confirmed student routes and noted questions",
         "task_type": "roadmap_research", "intent": "academic_planning",
         "constraints": {"trigger": trigger, "research_key": key, "mirror_version": brief["mirror_version"],
-                        **({"roadmap_id": target.id} if target and target.origin == "student_added" else {}),
+                        **({"roadmap_id": target.id} if target and target.origin in {"student_added", "operator_suggested"} else {}),
                         "capability_input": {"brief": brief}},
         "context_refs": ["vault", "memory"]}
     db.commit()

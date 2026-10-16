@@ -88,6 +88,8 @@ def confirm_summary(body: MirrorAction, network: str = Query(...), db=Depends(ge
         journey = JourneyService(db).queue_counselor_research(
             str(workspace.id), row.id, str(uuid4()), actor="human:mirror_confirmation",
             expected_version=body.version)
+        from app.pai_c.possibilities import PossibilityService
+        PossibilityService(db).from_mirror(journey)
         enqueue_confirmed_research(db, str(workspace.id), journey)
         db.commit()
     except JourneyError as exc:
