@@ -20,10 +20,9 @@ Source documents (authority order: spec > plan > rulings):
 
 ## 1. Where things stand
 
-- **Slice 0 Tasks 1–6 are merged into `pai-os`.** Head `da38f02`.
-- **Task 7 is built, reviewed and pushed, but not merged.**
-  - Branch: `os/s0-t7-spike3-chaos`, head `2256b45`, cut from `da38f02`.
-  - PR: https://github.com/memsa771-hub/Pai-C/pull/36 (→ `pai-os`, reviewers @10Faheem @MusawirKtk). Check its CI and merge state first.
+- **Slice 0 Tasks 1–7 are merged into `pai-os`.** Head `f1e9e96` (Task 7 = PR #36, merged 2026-10-16, CI green, approved by @MusawirKtk).
+- **Task 7 is merged** (PR #36).
+  - PR: https://github.com/memsa771-hub/Pai-C/pull/36.
   - Checks: tach ✅, single Alembic head check ✅, `tests/os` 57 passed, no orphan worker processes.
 - **The Spike 3 report says "PENDING the OpenAI run".** The billed pass-bar run has not been done (§4).
 - All follow-up PRs are merged:
@@ -44,13 +43,13 @@ Source documents (authority order: spec > plan > rulings):
 | 4 | #26 | `scripts/os_inventory.py`, which generates `docs/os/old-os-inventory.md`. It gives a fate to all 81 old-OS modules (keep 54, read-only 18, retire 9); a drift test keeps the markdown current |
 | 5 | #27 | `.github/workflows/ci.yml`: job `os` (Python 3.12, postgres:16, tach, heads check, `pytest tests/os`, guard against silent DB skips) and job `legacy` (the Counsellor suite, blocking since #35). Also `.github/pull_request_template.md` and `.github/CODEOWNERS`. A deliberate boundary violation was blocked by CI (PR #28, closed) |
 | 6 | #29 | `spikes/spike3/loop.py` + `schema.sql` + `pages/`: the core loop. Kernel `mark_ready` → outbox → enqueue (`task_id:attempt`) → DBOS queue → `run_attempt` workflow (`load_page` → Pydantic AI agent with `DBOSDurability` → `record_result` → `complete_task`) → `reconcile` |
-| 7 | #36 (open) | `spikes/spike3/chaos.py` (driver) and `worker.py`, `tests/os/test_spike3_chaos.py` (marker `chaos`, runs in CI), `docs/os/spikes/spike3-report.md`. `loop.py` changes: kernel side through `DBOSClient`, `worker` column, terminal workflow statuses → `failed/workflow_error`, `application_version="spike3"` |
+| 7 | #36 | `spikes/spike3/chaos.py` (driver) and `worker.py`, `tests/os/test_spike3_chaos.py` (marker `chaos`, runs in CI), `docs/os/spikes/spike3-report.md`. `loop.py` changes: kernel side through `DBOSClient`, `worker` column, terminal workflow statuses → `failed/workflow_error`, `application_version="spike3"` |
 
 ### Slice 0 gate (spec §6, plan "Done when")
 
 | Gate item | Status |
 |---|---|
-| `pytest tests/os` green in CI, `tach check` green, heads check green | ✅ on `pai-os`; Task 7 branch green locally, CI runs when its PR opens |
+| `pytest tests/os` green in CI, `tach check` green, heads check green | ✅ on `pai-os` including Task 7 (PR #36 CI: `os` + `legacy` green) |
 | CI demonstrably blocked a deliberate boundary violation | ✅ PR #28 (tach failed on `app.os` → `<root>`) |
 | Old-OS inventory has a fate for every row | ✅ 81/81, sign-off recorded in `os_inventory.py` |
 | `spike3-report.md` says PASS against the pass bar, signed by both developers | ❌ **open**: OpenAI run + sign-off (§4) |
@@ -113,7 +112,7 @@ Source documents (authority order: spec > plan > rulings):
 
 ## 4. Next steps to finish Slice 0 (in order)
 
-1. **Merge PR #36 (`os/s0-t7-spike3-chaos` → `pai-os`)** (squash) once CI is green and an OS developer approves. If CI fails, fix it per the drive-to-green rules.
+1. ~~Merge PR #36~~ — done 2026-10-16 (`f1e9e96`). If CI fails, fix it per the drive-to-green rules.
    - The chaos test takes about 30–60 s in CI.
    - If CI shows flaky kill timing, check `kills >= 3` and the 1.5 s model delay in the test.
 2. **User: run the OpenAI pass-bar run** on a machine that can reach OpenAI, with Postgres 16 and the requirements installed. From `backend/`:
@@ -191,17 +190,17 @@ Before any Slice 1 code:
 
 ## 8. Open items for the user
 
-- [ ] Merge the Task 7 PR #36 once CI is green and approved.
+- [x] Merge the Task 7 PR #36 (done).
 - [ ] Run the OpenAI pass-bar run (§4.2), fill in the report, and get both developers' sign-off.
 - [ ] Add `legacy` as a required status check in the `pai-os` ruleset.
 - [ ] Create the PAI OS OpenAI project with a budget and set `OS_OPENAI_API_KEY` (never in chat).
 - [ ] Rotate the keys from the `.env` pasted in chat (OpenAI, Tavily, Supabase, Resend, DB password).
-- [ ] After merging: delete `os/s0-t7-spike3-chaos` and `chore/s0-handoff` (other leftover branches are already gone; `dev-backup` and `pai-c-backup` are kept on purpose).
+- [ ] Delete branch `os/s0-t7-spike3-chaos` now, and `chore/s0-handoff` once this folder is merged into `pai-os` (other leftover branches are already gone; `dev-backup` and `pai-c-backup` are kept on purpose).
 - [ ] Confirm D7.
 
 ## 9. Prompt for the next session
 
-> Continue PAI OS. First run `git fetch origin pai-os chore/s0-handoff os/s0-t7-spike3-chaos` and read
+> Continue PAI OS. First run `git fetch origin pai-os chore/s0-handoff` and read
 > `docs/os/handoff/README.md` on branch `chore/s0-handoff`, all of it. Then read
 > `slice-0-sdd-ledger.md` in the same folder when you need history. Follow the working rules in §2
 > exactly. Then tell me in a few lines where Slice 0 stands and what the next step is, and wait for my go.
