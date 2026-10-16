@@ -9,7 +9,7 @@ from sqlalchemy.exc import IntegrityError
 from app.config import config
 from app.pai_c.deep.analysis import _workspace_lock
 from app.pai_c.deep.context import build_context
-from app.pai_c.deep.mirror_schema import CounselorMirror
+from app.pai_c.deep.mirror_schema import CounselorMirror, SavedCounselorMirror
 from app.pai_c.memory import MemoryService
 from app.pai_c.deep.prompts import load_prompt
 from app.pai_c.deep.sensitive import check_notebook_before_mirror
@@ -73,7 +73,7 @@ async def _publish(db, job, draft) -> dict:
         EventRecord.source == "openagents:pai"))
     if message:
         return {"status": "posted", "message_id": message}
-    mirror = CounselorMirror.model_validate(draft["mirror"])
+    mirror = SavedCounselorMirror.model_validate(draft["mirror"])
     source = db.scalar(select(EventRecord).where(
         EventRecord.id == job.payload.get("source_event_id"),
         EventRecord.network_id == job.workspace_id))
@@ -81,9 +81,9 @@ async def _publish(db, job, draft) -> dict:
 
     voice_metadata = _voice_reply_metadata({"metadata": source.metadata_}) if source else None
     message = await send_to_student(
-        db, job.workspace_id, draft["channel"], "pai", mirror.spoken_reply(), 0,
+        db, job.workspace_id, draft["channel"], "pai", draft.get("spoken_reply") or draft.get("reply") or mirror.spoken_reply(), 0,
         message_type="counselor_mirror",
-        extra_payload={"mirror": mirror.model_dump(mode="json"), "version": draft["version"]},
+        extra_payload={"mirror": draft["mirror"], "version": draft["version"]},
         metadata={**(voice_metadata or {}), "mirror_job_id": job.id, "mirror_version": draft["version"]})
     if not message:
         raise RuntimeError("Mirror post was rejected")
@@ -122,7 +122,9 @@ async def mirror_job(job, db) -> dict:
         turn = CounselorTurnInput(payload["channel"], job.workspace_id,
             str((student.payload or {}).get("content") or ""), (), None,
             student.id, student.timestamp, student.source)
-        context = await build_context(db, job.workspace_id, turn)
+        context = await build_context(db, job.workspace_id, turn, mirror=True)
+        private_gaps = [{"between": item.between, "evidence": item.evidence, "status": item.status}
+                        for item in checked.notebook.tensions]
         history = [{"role": item["role"], "content": item["content"]} for item in
                    MemoryService(db).recent_turns(turn, student.source.removeprefix("human:"),
                                   limit=config.PAI_COUNSELOR_HISTORY_SIZE)]
@@ -137,7 +139,8 @@ async def mirror_job(job, db) -> dict:
                 reasoning_effort=config.PAI_COUNSELOR_REASONING_EFFORT, base_url=config.PAI_BASE_URL,
                 turn_id=turn.source_event_id)
             try:
-                mirror = CounselorMirror.model_validate(json.loads(raw))
+                mirror = CounselorMirror.model_validate(json.loads(raw),
+                    context={"private_gap_context": private_gaps})
                 break
             except (TypeError, ValueError):
                 logger.warning("counselor_mirror_invalid job_id=%s attempt=%d", job_id, attempt + 1)

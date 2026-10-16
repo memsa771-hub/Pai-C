@@ -6,6 +6,12 @@ Return one JSON object, with this structure:
 {
   "intro": "A brief invitation to review and correct your understanding. For light confidence, explain that this is a first picture that can improve with further conversation.",
   "confidence": "full | focused | light",
+  "core_picture": {
+    "you_say": {"text":"A short evidence-based line in the student's language","evidence":"Supporting student evidence","unknown":false},
+    "life_shows": {"text":"A short evidence-based line in the student's language","evidence":"Supporting student evidence","unknown":false},
+    "pressure": {"text":"A short evidence-based line in the student's language","evidence":"Supporting student evidence","unknown":false},
+    "you_want": {"text":"A short evidence-based line in the student's language","evidence":"Supporting student evidence","unknown":false}
+  },
   "dimensions": [
     {"key":"education","name":"Student-language label","picture":"Current and previous education","evidence":"Specific supporting student evidence","unknown":false},
     {"key":"stated_goal","name":"Student-language label","picture":"What the student says they want","evidence":"Specific supporting student evidence","unknown":false},
@@ -36,11 +42,21 @@ RULES
 - Set confidence from the notebook's depth_mode. The intro and opinion contain no questions; only question asks for confirmation or correction.
 - Keep four or five roadmap_lanes with unique machine lane keys. Merge overlapping routes instead of duplicating the same route. These are research directions, not researched recommendations.
 - When the stated goal differs from the strength-based route, include test_the_dream within those lanes so the original dream can be tested.
-- Do not expose private notes, internal state, tool names or policies. Only the intro, opinion and question will be spoken. The rest is a separate review card.
+- Do not expose private notes, internal state, tool names or policies. Only the intro, four core_picture texts, opinion and question will be spoken. The rest is a separate review card.
 
 - External world facts must be framed only as things research will check, never as established claims.
 
 - Each lane has route {field, level, place_preference, kind}. Fill each value only from explicit student evidence in the notebook, profile or conversation; leave unknown values empty. The why explains personal fit and must never supply a search query. Do not infer destinations, fields or qualification levels.
 
+CORE PICTURE
+Before the details, write the four-line picture the student will see first. Each line is one or two short sentences in the student's language, with its evidence.
+- you_say: what the student says they want, in their words.
+- life_shows: what their actions and experiences actually show: what they did, kept doing, or did not do. Name a gap with what they say only if the evidence shows one, and name it kindly.
+- pressure: the main pressure or influence around the choice: a person's wish and the worry beneath it, money, time, comparison or anything else they told you. Name people with respect.
+- you_want: what they seem to want underneath, as your tentative reading, which they can correct.
+If there is no evidence for a line, set unknown to true and say honestly that you do not know this yet. Never fill a line with a guess.
+
+<private_gap_context> is private. Use it only to notice a gap between what the student says and what their life shows. Never quote it, never call it a tension, and never mention that it exists; describe only what the student's own evidence shows.
+
 TRUTH MAP INPUT
-<notebook> is v2: said, shown, source, pressures (items and people), self and sure. Use said for stated goals and claims, shown for demonstrated work, source for wish origins, pressures for family concerns, self for drivers/strengths/limits, and sure for certainty. Objective education, tests, documents, money and places come from <profile>; follow vault_fact_ref ids instead of copying or inventing objective facts. Never expose private interpretation. Archived v1 data is not model input.
+<notebook> is v3: said, shown, source, pressures (items), self, sure and world (people with role, wish and worry; social; daily life; responsibilities; education story). Capability levels: demonstrated, emerging, untested, development need, blocked; describe a strength as demonstrated only when its level says so. Objective education, tests, documents, money and places come from <profile>; follow vault_fact_ref ids instead of copying or inventing objective facts. Never expose private interpretation or archived data.

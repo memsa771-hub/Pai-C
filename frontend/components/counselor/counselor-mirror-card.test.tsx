@@ -66,3 +66,26 @@ it('keeps the review actionable after an API error and shows a translated error'
   expect((await screen.findByRole('alert')).textContent).toBe('We could not complete that action. Please try again.');
   expect(document.body.textContent).not.toContain('internal details');
 });
+
+it('renders v2 picture before collapsed details, while old drafts have no placeholder picture', async () => {
+  const modern = structuredClone(draft);
+  modern.mirror!.core_picture = {
+    you_say: {text: 'My stated wish.', evidence: 'Student statement', unknown: false},
+    life_shows: {text: 'My completed work.', evidence: 'Student experience', unknown: false},
+    pressure: {text: 'We have not explored this yet.', evidence: '', unknown: true},
+    you_want: {text: 'My tentative wish.', evidence: 'Student statement', unknown: false},
+  };
+  vi.mocked(workspaceApi.getCounselorSummary).mockResolvedValue(modern);
+  show();
+  const first = await screen.findByText('You say');
+  const details = screen.getByText('Details').closest('details')!;
+  expect(details.open).toBe(false);
+  expect(first.compareDocumentPosition(details) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  expect(screen.getByText('We have not explored this yet.')).toBeTruthy();
+  cleanup();
+  vi.mocked(workspaceApi.getCounselorSummary).mockResolvedValue(draft);
+  show();
+  await screen.findByText('Your learning');
+  expect(screen.queryByText('You say')).toBeNull();
+  expect(screen.queryByText('Details')).toBeNull();
+});

@@ -1,4 +1,7 @@
 export interface CounselorMirror {
+  core_picture?: Record<'you_say' | 'life_shows' | 'pressure' | 'you_want', {
+    text: string; evidence: string; unknown: boolean;
+  }>;
   intro: string;
   confidence: 'full' | 'focused' | 'light';
   dimensions: { key: string; name: string; picture: string; evidence: string; unknown: boolean }[];

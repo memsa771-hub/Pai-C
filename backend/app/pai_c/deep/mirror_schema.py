@@ -4,7 +4,7 @@ import json
 from typing import Literal
 
 import regex
-from pydantic import BaseModel, ConfigDict, Field, StringConstraints, model_validator
+from pydantic import BaseModel, ConfigDict, Field, StringConstraints, ValidationInfo, model_validator
 from typing_extensions import Annotated
 
 from app.config import config
@@ -58,7 +58,28 @@ class MirrorLane(MirrorPart):
     route: MirrorRoute = Field(default_factory=MirrorRoute)
 
 
-class CounselorMirror(MirrorPart):
+class PictureLine(MirrorPart):
+    text: Text
+    evidence: str
+    unknown: bool
+
+    @model_validator(mode="after")
+    def evidenced(self):
+        if not self.unknown and not self.evidence.strip():
+            raise ValueError("picture line requires evidence or unknown=true")
+        return self
+
+
+class CorePicture(MirrorPart):
+    you_say: PictureLine
+    life_shows: PictureLine
+    pressure: PictureLine
+    you_want: PictureLine
+
+
+class SavedCounselorMirror(MirrorPart):
+    """READ contract: historical drafts remain readable without invented lines."""
+    core_picture: CorePicture | None = None
     intro: Text
     confidence: Literal["full", "focused", "light"]
     dimensions: list[MirrorDimension]
@@ -87,4 +108,28 @@ class CounselorMirror(MirrorPart):
         return self
 
     def spoken_reply(self) -> str:
-        return "\n\n".join((self.intro, self.opinion, self.question))
+        picture = [line.text for line in (
+            self.core_picture.you_say, self.core_picture.life_shows,
+            self.core_picture.pressure, self.core_picture.you_want,
+        )] if self.core_picture else []
+        return "\n\n".join((self.intro, *picture, self.opinion, self.question))
+
+
+class CounselorMirror(SavedCounselorMirror):
+    """GENERATE contract: every new generation, including retries, must be v2."""
+    core_picture: CorePicture
+
+    @model_validator(mode="after")
+    def no_private_quotes(self, info: ValidationInfo):
+        context = info.context or {}
+        # Compare free text, not the tension's status metadata.
+        texts = [self.intro, self.opinion, self.question, *self.blockers]
+        texts.extend(value for line in self.core_picture.model_dump().values()
+                     for value in (line["text"], line["evidence"]))
+        texts.extend(value for part in self.dimensions
+                     for value in (part.name, part.picture, part.evidence))
+        for tension in context.get("private_gap_context", []):
+            for private in (*tension["between"], tension["evidence"]):
+                if private.strip() and any(private in text for text in texts):
+                    raise ValueError("mirror quotes private gap context")
+        return self

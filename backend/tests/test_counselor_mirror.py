@@ -341,3 +341,112 @@ def test_mirror_stage_requires_explicit_mirror_step_and_migration():
         assert op.create_index.call_args.args[0] == "uq_counselor_mirror_pending"
         module.downgrade()
         assert "MIRROR" not in op.create_check_constraint.call_args.args[2]
+
+def test_v2_picture_required_evidence_unknown_and_spoken_order():
+    from app.pai_c.deep.mirror_schema import SavedCounselorMirror
+    data = mirror_data()
+    old = {key: value for key, value in data.items() if key != "core_picture"}
+    assert SavedCounselorMirror.model_validate(old).spoken_reply() == "\n\n".join(
+        (old["intro"], old["opinion"], old["question"]))
+    with pytest.raises(ValueError):
+        CounselorMirror.model_validate(old)
+    data["core_picture"]["pressure"]["evidence"] = ""
+    with pytest.raises(ValueError):
+        CounselorMirror.model_validate(data)
+    data["core_picture"]["pressure"]["unknown"] = True
+    result = CounselorMirror.model_validate(data)
+    assert result.spoken_reply().split("\n\n") == [
+        data["intro"], *[data["core_picture"][key]["text"] for key in
+        ("you_say", "life_shows", "pressure", "you_want")], data["opinion"], data["question"]]
+    data["core_picture"]["you_say"]["text"] += " Another question?"
+    with pytest.raises(ValueError):
+        CounselorMirror.model_validate(data)
+
+
+@pytest.mark.asyncio
+async def test_mirror_context_public_views_and_private_gap_allowlist():
+    from app.pai_c.deep.context import build_context
+    with StudentSession() as student, student.factory() as db:
+        turn, _, snapshot = prepare(student, db)
+        data = snapshot.notebook.model_dump(mode="json")
+        data["private_notes"] = "Excluded private interpretation"
+        data["tensions"] = [{"between": ["Stated ambition", "Observed practice"],
+                            "evidence": "Private gap evidence", "status": "open"}]
+        data["world"]["people"] = [{"id": "person1", "role": "parent", "wish": "a stable direction",
+            "worry": "lost time", "evidence": "Student described the concern",
+            "first_seen": "2026-01-01T00:00:00+00:00", "last_confirmed": "2026-01-01T00:00:00+00:00"}]
+        NotebookService(db).apply(student.workspace_id, data, turn.source_event_id,
+                                 expected_version=snapshot.version)
+        context = await build_context(db, student.workspace_id, turn, mirror=True)
+        assert "<personal_view>" in context.text and "<capability_view>" in context.text
+        assert "<private_gap_context>" in context.text and "Private gap evidence" in context.text
+        assert "a stable direction" in context.text and "lost time" in context.text
+        for excluded in ("private_notes", "hypotheses", "identity_status", "decision_difficulties",
+                         "legacy_v1", "legacy_v2", "Excluded private interpretation"):
+            assert excluded not in context.text
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("repaired", [False, True])
+async def test_private_gap_quote_rejected_once_then_repair_or_discovery(repaired):
+    with StudentSession() as student, student.factory() as db:
+        turn, journey, snapshot = prepare(student, db)
+        gaps = [{"between": ["A private comparison", "Another private comparison"],
+                 "evidence": "Private interpretation must not be copied", "status": "open"}]
+        data = snapshot.notebook.model_dump(mode="json")
+        data["tensions"] = gaps
+        NotebookService(db).apply(student.workspace_id, data, turn.source_event_id,
+                                 expected_version=snapshot.version)
+        job_id = enqueue_mirror(db, turn)
+        db.commit()
+        broken = mirror_data()
+        broken["dimensions"][0]["picture"] = gaps[0]["evidence"]
+        replies = [json.dumps(broken), json.dumps(mirror_data() if repaired else broken)]
+        with patch("app.pai_c.deep.sensitive.chat_completion", AsyncMock(side_effect=safe_model)), \
+             patch("app.pai_c.deep.mirror.chat_completion", AsyncMock(side_effect=replies)) as model, \
+             patch("app.pai_c.deep.mirror.send_to_student", AsyncMock(side_effect=fake_post(student))) as post:
+            result = await mirror_job(db.get(BackgroundJob, job_id), db)
+        assert model.await_count == 2
+        assert result["status"] == ("posted" if repaired else "invalid")
+        assert post.await_count == int(repaired)
+
+
+@pytest.mark.asyncio
+async def test_old_draft_publication_preserves_saved_speech_and_generation_retry_requires_v2():
+    from app.pai_c.deep.mirror import _publish
+    with StudentSession() as student, student.factory() as db:
+        turn, journey, snapshot = prepare(student, db)
+        old = mirror_data()
+        old.pop("core_picture")
+        old_reply = "The original spoken text."
+        saved = JourneyService(db).set_counselor_summary(student.workspace_id, journey.id,
+            old, old_reply, turn.source_event_id, notebook_version=snapshot.version, channel=turn.channel)
+        db.commit()
+        original = dict(saved.counselor_summary_draft)
+        job = BackgroundJob(id=str(uuid4()), workspace_id=student.workspace_id,
+                            job_type=JOB_MIRROR, payload={"source_event_id": turn.source_event_id})
+        with patch("app.pai_c.deep.mirror.send_to_student", AsyncMock(side_effect=fake_post(student))) as post:
+            await _publish(db, job, original)
+        assert post.call_args.args[4] == old_reply
+        assert "core_picture" not in original["mirror"]
+        # A fresh generation following correction uses the strict v2 contract.
+        JourneyService(db).request_counselor_summary_changes(student.workspace_id, journey.id, expected_version=1, actor="human:test")
+        db.commit()
+        next_event = str(uuid4())
+        db.add(EventRecord(id=next_event, network_id=student.workspace_id,
+            source=turn.source, target=turn.channel, type="workspace.message.posted",
+            timestamp=student.next_timestamp(), payload={"content": "Please try the picture again."}))
+        db.commit()
+        fresh = BackgroundJob(id=str(uuid4()), workspace_id=student.workspace_id, job_type=JOB_MIRROR,
+            payload={"source_event_id": next_event, "channel": turn.channel,
+                     "journey_id": journey.id, "notebook_version": snapshot.version + 1})
+        NotebookService(db).apply(student.workspace_id, snapshot.notebook, turn.source_event_id,
+                                 expected_version=snapshot.version)
+        db.add(fresh)
+        db.commit()
+        with patch("app.pai_c.deep.sensitive.chat_completion", AsyncMock(side_effect=safe_model)), \
+             patch("app.pai_c.deep.mirror.chat_completion", AsyncMock(side_effect=[json.dumps(old), json.dumps(mirror_data())])) as model, \
+             patch("app.pai_c.deep.mirror.send_to_student", AsyncMock(side_effect=fake_post(student))):
+            assert (await mirror_job(fresh, db))["status"] == "posted"
+        assert model.await_count == 2
+        assert "core_picture" in JourneyService(db).get(student.workspace_id, journey.id).counselor_summary_draft["mirror"]

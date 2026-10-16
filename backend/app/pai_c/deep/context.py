@@ -127,7 +127,7 @@ class DeepContext:
 
 async def build_context(db, workspace_id: str, turn: CounselorTurnInput, *,
                         roadmap_id: str | None = None, wellbeing: bool = False,
-                        decision=None, signals=None) -> DeepContext:
+                        decision=None, signals=None, mirror: bool = False) -> DeepContext:
     """Build every section from workspace-scoped reads; make no model calls."""
     started = time.monotonic()
     if workspace_id != turn.workspace_id:
@@ -142,8 +142,23 @@ async def build_context(db, workspace_id: str, turn: CounselorTurnInput, *,
         }),
         "profile": _json(_profile(db, workspace_id)),
     }
-    notebook = MemoryService(db).truth_map(workspace_id).notebook
-    sections["notebook"] = _json(_trim_notebook(notebook))
+    memory = MemoryService(db)
+    notebook = memory.truth_map(workspace_id).notebook
+    if mirror:
+        # Allowlist public views before serialization; private interpretation is
+        # never carried through the general Voice notebook projection.
+        public = memory.personal_view(workspace_id)
+        public.update({key: [item.model_dump(mode="json") for item in getattr(notebook, key)
+                             if item.status == "active"] for key in ("said", "shown")})
+        public["depth_mode"] = notebook.depth_mode
+        sections["notebook"] = _json(public)
+        sections["personal_view"] = _json(memory.personal_view(workspace_id))
+        sections["capability_view"] = _json(memory.capability_view(workspace_id))
+        sections["private_gap_context"] = _json([
+            {"between": item.between, "evidence": item.evidence, "status": item.status}
+            for item in notebook.tensions])
+    else:
+        sections["notebook"] = _json(_trim_notebook(notebook))
     from app.pai_c.deep.noted_questions import NotedQuestionService
     sections["open_requests"] = _json(NotedQuestionService(db).open_requests(workspace_id))
     journey = next((item for item in JourneyService(db).list(workspace_id, status="active")
@@ -156,7 +171,7 @@ async def build_context(db, workspace_id: str, turn: CounselorTurnInput, *,
         "open_threads": [item.question_intent for item in notebook.open_questions[:3]],
     })
     plan = memory.latest_plan(workspace_id)
-    if plan is not None:
+    if plan is not None and not mirror:
         if not wellbeing and plan.next_move != "care" and plan.playbooks:
             from app.pai_c.playbooks.registry import selected_playbooks
             sections["playbooks"] = selected_playbooks(plan.playbooks)

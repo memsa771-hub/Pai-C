@@ -1463,6 +1463,11 @@ export const messages = {
   },
 
   counselorMirror: {
+    you_say: 'You say',
+    life_shows: 'Your life shows',
+    pressure: 'The pressure',
+    you_want: 'You seem to want',
+    details: 'Details',
     title: 'Your 360-degree picture',
     confirm: 'Yes, that is right',
     edit: 'Edit',

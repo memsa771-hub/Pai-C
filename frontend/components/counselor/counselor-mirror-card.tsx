@@ -43,10 +43,7 @@ export function CounselorMirrorCard({ refreshKey, onUpdated }: {
     finally { setBusy(false); }
   };
 
-  return <section className="max-h-[55dvh] min-w-0 overflow-y-auto rounded-xl border bg-card p-3 text-sm" aria-label={t('counselorMirror.title')}>
-    <h3 className="font-semibold">{t('counselorMirror.title')}</h3>
-    <p className="mt-2 whitespace-pre-wrap break-words">{mirror.intro}</p>
-    <div className="mt-3 divide-y rounded-lg border px-3">
+  const renderDimensions = () => (<div className="mt-3 divide-y rounded-lg border px-3">
       {mirror.dimensions.map((dimension) => <details key={dimension.key} className="py-2">
         <summary className="cursor-pointer font-medium break-words">{dimension.name}</summary>
         <p className="mt-2 whitespace-pre-wrap break-words">{dimension.picture}</p>
@@ -54,7 +51,21 @@ export function CounselorMirrorCard({ refreshKey, onUpdated }: {
           {dimension.unknown ? t('counselorMirror.unknown') : `${t('counselorMirror.evidence')}: ${dimension.evidence}`}
         </p>
       </details>)}
-    </div>
+    </div>);
+
+  return <section className="max-h-[55dvh] min-w-0 overflow-y-auto rounded-xl border bg-card p-3 text-sm" aria-label={t('counselorMirror.title')}>
+    <h3 className="font-semibold">{t('counselorMirror.title')}</h3>
+    <p className="mt-2 whitespace-pre-wrap break-words">{mirror.intro}</p>
+    {mirror.core_picture && <dl className="mt-3 space-y-3">
+      {(['you_say', 'life_shows', 'pressure', 'you_want'] as const).map((key) => <div key={key}>
+        <dt className="font-medium">{t(`counselorMirror.${key}`)}</dt>
+        <dd className="whitespace-pre-wrap break-words">{mirror.core_picture![key].text}</dd>
+      </div>)}
+    </dl>}
+    {mirror.core_picture ? <details className="mt-3">
+      <summary className="cursor-pointer font-medium">{t('counselorMirror.details')}</summary>
+      {renderDimensions()}
+    </details> : renderDimensions()}
     <h4 className="mt-3 font-medium">{t('counselorMirror.blockers')}</h4>
     <ul className="mt-1 list-disc space-y-1 pl-5 break-words">{mirror.blockers.map((blocker, index) => <li key={index}>{blocker}</li>)}</ul>
     <h4 className="mt-3 font-medium">{t('counselorMirror.opinion')}</h4>
