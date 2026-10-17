@@ -1,0 +1,90 @@
+{
+ "id": "impatient",
+ "kind": "impatient",
+ "turns": [
+  {
+   "student": "I need a course choice today; please be quick.",
+   "intent": "deciding",
+   "mentioned_areas": [],
+   "covered": [],
+   "emotion": "frustrated",
+   "request": {
+    "text": "Which course should I choose today?",
+    "kind": "decision_help",
+    "needs_research": false,
+    "needs_context": true
+   }
+  },
+  {
+   "student": "Business or computing.",
+   "intent": "sharing",
+   "mentioned_areas": [
+    "values"
+   ],
+   "covered": [],
+   "emotion": "frustrated"
+  },
+  {
+   "student": "Just pick one.",
+   "intent": "pushback",
+   "mentioned_areas": [],
+   "covered": [],
+   "emotion": "frustrated",
+   "request": {
+    "text": "Pick one for me",
+    "kind": "decision_help",
+    "needs_research": false,
+    "needs_context": true
+   }
+  },
+  {
+   "student": "I'm okay at maths.",
+   "intent": "sharing",
+   "mentioned_areas": [
+    "strengths"
+   ],
+   "covered": [
+    "strengths"
+   ]
+  },
+  {
+   "student": "The form closes tonight.",
+   "intent": "sharing",
+   "mentioned_areas": [
+    "pressures"
+   ],
+   "covered": [
+    "strengths",
+    "pressures"
+   ],
+   "emotion": "stressed"
+  },
+  {
+   "student": "I like making things work on a computer.",
+   "intent": "sharing",
+   "mentioned_areas": [
+    "interests"
+   ],
+   "covered": [
+    "strengths",
+    "pressures"
+   ]
+  },
+  {
+   "student": "Fine, computing?",
+   "intent": "deciding",
+   "mentioned_areas": [],
+   "covered": [
+    "strengths",
+    "pressures",
+    "interests"
+   ],
+   "request": {
+    "text": "Should I choose computing?",
+    "kind": "decision_help",
+    "needs_research": false,
+    "needs_context": true
+   }
+  }
+ ]
+}

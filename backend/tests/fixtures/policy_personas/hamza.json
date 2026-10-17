@@ -1,0 +1,144 @@
+{
+ "id": "hamza",
+ "kind": "confused school leaver with a family wish",
+ "turns": [
+  {
+   "student": "My family wants medicine, but I keep thinking about music.",
+   "intent": "sharing",
+   "mentioned_areas": [
+    "family_social",
+    "interests"
+   ],
+   "covered": []
+  },
+  {
+   "student": "I play in a small group with friends every week.",
+   "intent": "sharing",
+   "mentioned_areas": [
+    "interests",
+    "history"
+   ],
+   "covered": [
+    "interests"
+   ]
+  },
+  {
+   "student": "Medicine was always the plan at home.",
+   "intent": "sharing",
+   "mentioned_areas": [
+    "family_social"
+   ],
+   "covered": [
+    "interests"
+   ]
+  },
+  {
+   "student": "I don't know what to do honestly.",
+   "intent": "deciding",
+   "mentioned_areas": [],
+   "covered": [
+    "interests",
+    "family_social"
+   ],
+   "request": {
+    "text": "What should I do?",
+    "kind": "decision_help",
+    "needs_research": false,
+    "needs_context": true
+   }
+  },
+  {
+   "student": "I finished my exams last month.",
+   "intent": "sharing",
+   "mentioned_areas": [
+    "status",
+    "history"
+   ],
+   "covered": [
+    "interests",
+    "family_social",
+    "status"
+   ]
+  },
+  {
+   "student": "My grades in biology were fine, not great.",
+   "intent": "sharing",
+   "mentioned_areas": [
+    "history",
+    "strengths"
+   ],
+   "covered": [
+    "interests",
+    "family_social",
+    "status",
+    "history"
+   ]
+  },
+  {
+   "student": "They worry music won't pay.",
+   "intent": "sharing",
+   "mentioned_areas": [
+    "pressures",
+    "family_social"
+   ],
+   "covered": [
+    "interests",
+    "family_social",
+    "status",
+    "history",
+    "pressures"
+   ]
+  },
+  {
+   "student": "I organize our rehearsals.",
+   "intent": "sharing",
+   "mentioned_areas": [
+    "strengths"
+   ],
+   "covered": [
+    "interests",
+    "family_social",
+    "status",
+    "history",
+    "pressures",
+    "strengths"
+   ]
+  },
+  {
+   "student": "I just want them to be okay with it.",
+   "intent": "sharing",
+   "mentioned_areas": [
+    "values"
+   ],
+   "covered": [
+    "interests",
+    "family_social",
+    "status",
+    "history",
+    "pressures",
+    "strengths",
+    "values"
+   ]
+  },
+  {
+   "student": "So what do you think?",
+   "intent": "deciding",
+   "mentioned_areas": [],
+   "covered": [
+    "interests",
+    "family_social",
+    "status",
+    "history",
+    "pressures",
+    "strengths",
+    "values"
+   ],
+   "request": {
+    "text": "What do you think I should choose?",
+    "kind": "decision_help",
+    "needs_research": false,
+    "needs_context": true
+   }
+  }
+ ]
+}

@@ -1,0 +1,125 @@
+{
+ "id": "danish",
+ "kind": "goal stated but unexplored, wish partly from a relative",
+ "turns": [
+  {
+   "student": "I want to become an AI engineer and study abroad.",
+   "intent": "sharing",
+   "mentioned_areas": [
+    "status",
+    "values"
+   ],
+   "covered": []
+  },
+  {
+   "student": "I learned some Python online.",
+   "intent": "sharing",
+   "mentioned_areas": [
+    "history"
+   ],
+   "covered": []
+  },
+  {
+   "student": "My cousin said AI is the future.",
+   "intent": "sharing",
+   "mentioned_areas": [
+    "family_social",
+    "values"
+   ],
+   "covered": [
+    "values"
+   ]
+  },
+  {
+   "student": "I also ran an online shop for a while.",
+   "intent": "sharing",
+   "mentioned_areas": [
+    "history",
+    "strengths"
+   ],
+   "covered": [
+    "values"
+   ]
+  },
+  {
+   "student": "Which country is best for AI?",
+   "intent": "asking_info",
+   "mentioned_areas": [],
+   "covered": [
+    "values",
+    "history"
+   ],
+   "request": {
+    "text": "Which country is best for AI?",
+    "kind": "information",
+    "needs_research": true,
+    "needs_context": false
+   }
+  },
+  {
+   "student": "My father works away from home.",
+   "intent": "sharing",
+   "mentioned_areas": [
+    "family_social"
+   ],
+   "covered": [
+    "values",
+    "history"
+   ]
+  },
+  {
+   "student": "I can't leave my mother alone for long.",
+   "intent": "sharing",
+   "mentioned_areas": [
+    "pressures",
+    "family_social"
+   ],
+   "covered": [
+    "values",
+    "history",
+    "family_social",
+    "pressures"
+   ]
+  },
+  {
+   "student": "The shop had many orders.",
+   "intent": "sharing",
+   "mentioned_areas": [
+    "strengths"
+   ],
+   "covered": [
+    "values",
+    "history",
+    "family_social",
+    "pressures",
+    "strengths"
+   ]
+  },
+  {
+   "student": "I like dealing with customers.",
+   "intent": "sharing",
+   "mentioned_areas": [
+    "interests"
+   ],
+   "covered": [
+    "values",
+    "history",
+    "family_social",
+    "pressures",
+    "strengths"
+   ]
+  },
+  {
+   "student": "Okay.",
+   "intent": "short_reply",
+   "mentioned_areas": [],
+   "covered": [
+    "values",
+    "history",
+    "family_social",
+    "pressures",
+    "strengths"
+   ]
+  }
+ ]
+}

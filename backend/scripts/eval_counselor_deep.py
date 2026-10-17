@@ -288,7 +288,7 @@ def _metrics(persona: dict, turns: list[dict], notebook: dict, grader: dict | No
 async def evaluate_persona(persona: dict, ledger: UsageLedger, *, live: bool,
                            max_turns: int, simulator_model: str = "",
                            grader_model: str = "", end_to_end: bool = False,
-                           progress_dir: Path | None = None) -> dict:
+                           progress_dir: Path | None = None, policy_mode: str | None = None) -> dict:
     result = {"persona": persona["id"], "turns": [], "status": "complete", "grader": None}
     recorded = RecordedModels(ledger)
     transcript: list[dict] = []
@@ -337,13 +337,23 @@ async def evaluate_persona(persona: dict, ledger: UsageLedger, *, live: bool,
                                                   message, (), session_id, event_id, timestamp,
                                                   f"human:{student.user_id}",
                                                   persona.get("channel") == "voice")
-                        with phase("counselor"):
-                            answer = await run_deep_turn(db, turn)
-                        action_kind, action_status = await dispatch_action(
-                            db, turn, answer.action, answer.context)
-                        counselor_latency_ms = round((time.monotonic() - start) * 1000)
-                        assistant_id = await student.post_response(
-                            db, student.workspace_id, turn.channel, "pai", answer.reply, 0)
+                        decision_row = None
+                        if policy_mode:
+                            # Production path: classifier, controller, Voice, guards,
+                            # posting, action dispatch and decision log.
+                            with phase("counselor"):
+                                posted = await _policy_turn(db, student, turn, session_id)
+                            counselor_latency_ms = round((time.monotonic() - start) * 1000)
+                            assistant_id, answer, decision_row = posted
+                            action_kind, action_status = answer.action["type"], "logged"
+                        else:
+                            with phase("counselor"):
+                                answer = await run_deep_turn(db, turn)
+                            action_kind, action_status = await dispatch_action(
+                                db, turn, answer.action, answer.context)
+                            counselor_latency_ms = round((time.monotonic() - start) * 1000)
+                            assistant_id = await student.post_response(
+                                db, student.workspace_id, turn.channel, "pai", answer.reply, 0)
                         if live and progress_dir:
                             progress_dir.mkdir(parents=True, exist_ok=True)
                             (progress_dir / f"partial_{persona['id']}.json").write_text(json.dumps({
@@ -376,6 +386,10 @@ async def evaluate_persona(persona: dict, ledger: UsageLedger, *, live: bool,
                         "pipeline_ms": round((time.monotonic() - start) * 1000),
                         "model_calls": len(calls), "usage": calls,
                         "cost_usd": round(sum(call["cost_usd"] for call in calls), 8),
+                        **({"decision": {key: decision_row["decision"].get(key) for key in
+                                         ("rule_id", "action", "question_allowed")},
+                            "guard_violations": decision_row["guard_violations"]}
+                           if decision_row is not None else {}),
                     })
                     result["notebook"] = notebook
                     if answer.action.get("type") == "mirror" and (not end_to_end or action_status == "requested"):
@@ -406,6 +420,28 @@ async def evaluate_persona(persona: dict, ledger: UsageLedger, *, live: bool,
     result["metrics"] = _metrics(persona, result["turns"], result.get("notebook") or {}, result["grader"])
     return result
 
+
+
+async def _policy_turn(db, student, turn, session_id):
+    """Run one turn through the production runtime and read back what it did."""
+    from sqlalchemy import select
+    from app.models import CounselorTurnDecision
+    from app.pai_c import runtime
+    event_data = {"id": turn.source_event_id, "source": turn.source, "target": turn.channel,
+                  "payload": {"content": turn.student_text}, "timestamp": turn.timestamp,
+                  "metadata": {"session_id": session_id}}
+    posted = await runtime._run_deep_turn(db, student.workspace_id, event_data, 0)
+    if not posted:
+        raise RuntimeError("policy turn was not posted")
+    assistant_id = posted[0]
+    reply = db.get(EventRecord, assistant_id).payload.get("content", "")
+    row = db.scalar(select(CounselorTurnDecision).where(
+        CounselorTurnDecision.workspace_id == student.workspace_id,
+        CounselorTurnDecision.source_event_id == turn.source_event_id))
+    logged = {"move": row.move if row is not None else "none",
+              "decision": dict((row.decision or {}) if row is not None else {}),
+              "guard_violations": list((row.guard_violations or []) if row is not None else [])}
+    return assistant_id, SimpleNamespace(reply=reply, action={"type": logged["move"]}), logged
 
 
 async def complete_mirror_pipeline(student):
@@ -510,11 +546,14 @@ async def run_evaluation(*, live: bool = False, max_cost_usd: float | None = Non
                          max_turns: int = 40, persona_ids: set[str] | None = None,
                          fixture_dir: Path = PERSONAS, price_file: Path = PRICES,
                          result_dir: Path = RESULTS, simulator_model: str = "",
-                         grader_model: str = "", end_to_end: bool = False) -> dict:
+                         grader_model: str = "", end_to_end: bool = False,
+                         policy_mode: str | None = None) -> dict:
     if live and (max_cost_usd is None or max_cost_usd <= 0):
         raise ValueError("--live requires a positive --max-cost-usd")
     if max_turns < 1:
         raise ValueError("--max-turns must be positive")
+    if policy_mode not in (None, "guided", "strict"):
+        raise ValueError("--policy-mode must be guided or strict")
     if live and not config.PAI_API_KEY:
         raise ValueError("--live requires the configured backend model key")
     personas = [item for item in load_personas(fixture_dir)
@@ -529,20 +568,34 @@ async def run_evaluation(*, live: bool = False, max_cost_usd: float | None = Non
                       config.PAI_SENSITIVE_CHECK_MODEL,
                       *({config.PAI_MIRROR_MODEL, config.PAI_ROADMAP_MODEL, config.PAI_OPERATOR_MODEL or config.PAI_MODEL} if end_to_end else set()),
                       config.MEMORY_EXTRACTOR_MODEL or config.PAI_MODEL,
+                      *({config.PAI_CLASSIFIER_MODEL} if policy_mode else set()),
                       simulator_model or config.PAI_MODEL,
                       grader_model or config.PAI_COUNSELOR_MODEL}:
             ledger.before_call(model)
             if ledger.prices[model].get("verify_before_live"):
                 raise ValueError(f"price verification required before live: {model}")
-    result = {"mode": "live" if live else "offline", "status": "complete", "personas": [],
-              "cost_usd": 0.0, "all_calls": []}
+    result = {"mode": "live" if live else "offline", "policy_mode": policy_mode, "status": "complete",
+              "personas": [], "cost_usd": 0.0, "all_calls": []}
+    with ExitStack() as stack:
+        if policy_mode:
+            stack.enter_context(patch.object(config, "PAI_POLICY_MODE", policy_mode))
+        await _evaluate_all(result, personas, ledger, live=live, max_turns=max_turns,
+            simulator_model=simulator_model, grader_model=grader_model,
+            end_to_end=end_to_end, result_dir=result_dir, policy_mode=policy_mode)
+    paths = write_report(result, result_dir)
+    result["paths"] = [str(path) for path in paths]
+    return result
+
+
+async def _evaluate_all(result, personas, ledger, *, live, max_turns, simulator_model,
+                        grader_model, end_to_end, result_dir, policy_mode):
     for persona in personas:
         persona_start = len(ledger.calls)
         item = await evaluate_persona(
             persona, ledger, live=live, max_turns=max_turns,
             simulator_model=simulator_model or config.PAI_MODEL,
             grader_model=grader_model or config.PAI_COUNSELOR_MODEL, end_to_end=end_to_end,
-            progress_dir=result_dir if live else None)
+            progress_dir=result_dir if live else None, policy_mode=policy_mode)
         persona_calls = ledger.calls[persona_start:]
         item["total_cost_usd"] = round(sum(call["cost_usd"] for call in persona_calls), 8)
         item["usage_by_phase"] = {
@@ -557,9 +610,6 @@ async def run_evaluation(*, live: bool = False, max_cost_usd: float | None = Non
         if item["status"] == "budget_reached":
             result["status"] = "budget_reached"
             break
-    paths = write_report(result, result_dir)
-    result["paths"] = [str(path) for path in paths]
-    return result
 
 
 def main() -> None:
@@ -574,6 +624,8 @@ def main() -> None:
     parser.add_argument("--simulator-model", default="")
     parser.add_argument("--grader-model", default="")
     parser.add_argument("--result-dir", type=Path, default=RESULTS)
+    parser.add_argument("--policy-mode", choices=("guided", "strict"),
+                        help="Run turns through the production classifier, controller and Voice in this mode")
     args = parser.parse_args()
     if args.live and (args.max_cost_usd is None or args.max_cost_usd <= 0):
         parser.error("--live requires --max-cost-usd greater than zero")
@@ -581,7 +633,7 @@ def main() -> None:
         live=args.live, max_cost_usd=args.max_cost_usd, max_turns=args.max_turns,
         persona_ids=set(args.personas) if args.personas else None,
         result_dir=args.result_dir, simulator_model=args.simulator_model,
-        grader_model=args.grader_model, end_to_end=args.end_to_end))
+        grader_model=args.grader_model, end_to_end=args.end_to_end, policy_mode=args.policy_mode))
     print(json.dumps({"status": result["status"], "personas": len(result["personas"]),
                       "cost_usd": result["cost_usd"], "paths": result["paths"]}))
 

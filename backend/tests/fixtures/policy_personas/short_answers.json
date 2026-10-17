@@ -1,0 +1,85 @@
+{
+ "id": "short_answers",
+ "kind": "short answers",
+ "turns": [
+  {
+   "student": "Agriculture diploma maybe.",
+   "intent": "sharing",
+   "mentioned_areas": [
+    "status"
+   ],
+   "covered": []
+  },
+  {
+   "student": "Yes.",
+   "intent": "short_reply",
+   "mentioned_areas": [],
+   "covered": []
+  },
+  {
+   "student": "Farm.",
+   "intent": "short_reply",
+   "mentioned_areas": [
+    "history"
+   ],
+   "covered": []
+  },
+  {
+   "student": "Father.",
+   "intent": "short_reply",
+   "mentioned_areas": [
+    "family_social"
+   ],
+   "covered": []
+  },
+  {
+   "student": "Okay.",
+   "intent": "short_reply",
+   "mentioned_areas": [],
+   "covered": []
+  },
+  {
+   "student": "Machines.",
+   "intent": "short_reply",
+   "mentioned_areas": [
+    "interests"
+   ],
+   "covered": [
+    "interests"
+   ]
+  },
+  {
+   "student": "Near home.",
+   "intent": "short_reply",
+   "mentioned_areas": [
+    "pressures"
+   ],
+   "covered": [
+    "interests",
+    "pressures"
+   ]
+  },
+  {
+   "student": "Fixing tractors.",
+   "intent": "short_reply",
+   "mentioned_areas": [
+    "strengths"
+   ],
+   "covered": [
+    "interests",
+    "pressures",
+    "strengths"
+   ]
+  },
+  {
+   "student": "Maybe.",
+   "intent": "short_reply",
+   "mentioned_areas": [],
+   "covered": [
+    "interests",
+    "pressures",
+    "strengths"
+   ]
+  }
+ ]
+}

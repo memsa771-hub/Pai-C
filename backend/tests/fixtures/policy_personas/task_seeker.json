@@ -1,0 +1,118 @@
+{
+ "id": "task_seeker",
+ "kind": "task seeker wanting a list",
+ "turns": [
+  {
+   "student": "Just give me a scholarship list and help with my essay.",
+   "intent": "asking_task",
+   "mentioned_areas": [],
+   "covered": [],
+   "request": {
+    "text": "Give me a scholarship list",
+    "kind": "task",
+    "needs_research": true,
+    "needs_context": true
+   }
+  },
+  {
+   "student": "Engineering, abroad.",
+   "intent": "short_reply",
+   "mentioned_areas": [
+    "values"
+   ],
+   "covered": []
+  },
+  {
+   "student": "Help me start the essay.",
+   "intent": "asking_task",
+   "mentioned_areas": [],
+   "covered": [],
+   "request": {
+    "text": "Help me start my essay",
+    "kind": "task",
+    "needs_research": false,
+    "needs_context": true
+   }
+  },
+  {
+   "student": "It's about why I want engineering.",
+   "intent": "sharing",
+   "mentioned_areas": [
+    "values"
+   ],
+   "covered": [
+    "values"
+   ]
+  },
+  {
+   "student": "I built a small robot in school.",
+   "intent": "sharing",
+   "mentioned_areas": [
+    "history",
+    "strengths"
+   ],
+   "covered": [
+    "values",
+    "history"
+   ]
+  },
+  {
+   "student": "Can you just write the first line?",
+   "intent": "asking_task",
+   "mentioned_areas": [],
+   "covered": [
+    "values",
+    "history"
+   ],
+   "request": {
+    "text": "Write the first line of my essay",
+    "kind": "task",
+    "needs_research": false,
+    "needs_context": false
+   }
+  },
+  {
+   "student": "I finished school this year.",
+   "intent": "sharing",
+   "mentioned_areas": [
+    "status"
+   ],
+   "covered": [
+    "values",
+    "history",
+    "status"
+   ]
+  },
+  {
+   "student": "My parents will pay half.",
+   "intent": "sharing",
+   "mentioned_areas": [
+    "family_social",
+    "pressures"
+   ],
+   "covered": [
+    "values",
+    "history",
+    "status",
+    "pressures"
+   ]
+  },
+  {
+   "student": "Now the list please.",
+   "intent": "asking_task",
+   "mentioned_areas": [],
+   "covered": [
+    "values",
+    "history",
+    "status",
+    "pressures"
+   ],
+   "request": {
+    "text": "Give me the scholarship list now",
+    "kind": "task",
+    "needs_research": true,
+    "needs_context": false
+   }
+  }
+ ]
+}

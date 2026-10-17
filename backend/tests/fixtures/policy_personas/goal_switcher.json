@@ -1,0 +1,119 @@
+{
+ "id": "goal_switcher",
+ "kind": "returning after a gap with a changed goal",
+ "turns": [
+  {
+   "student": "I want to study architecture after school.",
+   "intent": "sharing",
+   "mentioned_areas": [
+    "status"
+   ],
+   "covered": [
+    "status"
+   ]
+  },
+  {
+   "student": "My uncle is an architect.",
+   "intent": "sharing",
+   "mentioned_areas": [
+    "family_social"
+   ],
+   "covered": [
+    "status"
+   ]
+  },
+  {
+   "student": "I like drawing buildings.",
+   "intent": "sharing",
+   "mentioned_areas": [
+    "interests"
+   ],
+   "covered": [
+    "status"
+   ]
+  },
+  {
+   "student": "After talking with family, I now want business.",
+   "intent": "sharing",
+   "mentioned_areas": [
+    "family_social",
+    "values"
+   ],
+   "covered": [
+    "status",
+    "family_social"
+   ]
+  },
+  {
+   "student": "A friend makes money online.",
+   "intent": "sharing",
+   "mentioned_areas": [
+    "family_social"
+   ],
+   "covered": [
+    "status",
+    "family_social"
+   ]
+  },
+  {
+   "student": "I have to stay near home.",
+   "intent": "sharing",
+   "mentioned_areas": [
+    "pressures"
+   ],
+   "covered": [
+    "status",
+    "family_social",
+    "pressures"
+   ]
+  },
+  {
+   "student": "I volunteer in a conservation group.",
+   "intent": "sharing",
+   "mentioned_areas": [
+    "history",
+    "interests"
+   ],
+   "covered": [
+    "status",
+    "family_social",
+    "pressures",
+    "history"
+   ]
+  },
+  {
+   "student": "I volunteered more and now want environmental science.",
+   "intent": "sharing",
+   "mentioned_areas": [
+    "values",
+    "interests"
+   ],
+   "covered": [
+    "status",
+    "family_social",
+    "pressures",
+    "history",
+    "interests"
+   ]
+  },
+  {
+   "student": "I keep changing my mind, is that bad?",
+   "intent": "asking_info",
+   "mentioned_areas": [],
+   "covered": [
+    "status",
+    "family_social",
+    "pressures",
+    "history",
+    "interests",
+    "values"
+   ],
+   "request": {
+    "text": "Is it bad that I keep changing my mind?",
+    "kind": "information",
+    "needs_research": false,
+    "needs_context": false
+   }
+  }
+ ]
+}

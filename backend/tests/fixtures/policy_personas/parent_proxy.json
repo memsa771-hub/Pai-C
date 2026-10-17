@@ -1,0 +1,105 @@
+{
+ "id": "parent_proxy",
+ "kind": "parent writing for a child",
+ "turns": [
+  {
+   "student": "I am using my daughter's account; which subject should she choose?",
+   "intent": "deciding",
+   "mentioned_areas": [
+    "family_social"
+   ],
+   "covered": [],
+   "request": {
+    "text": "Which subject should my daughter choose?",
+    "kind": "decision_help",
+    "needs_research": false,
+    "needs_context": true
+   }
+  },
+  {
+   "student": "She is in her final school year.",
+   "intent": "sharing",
+   "mentioned_areas": [
+    "status"
+   ],
+   "covered": [
+    "status"
+   ]
+  },
+  {
+   "student": "She likes drawing but we think it's not practical.",
+   "intent": "sharing",
+   "mentioned_areas": [
+    "interests",
+    "family_social"
+   ],
+   "covered": [
+    "status"
+   ]
+  },
+  {
+   "student": "Her marks are best in maths.",
+   "intent": "sharing",
+   "mentioned_areas": [
+    "strengths",
+    "history"
+   ],
+   "covered": [
+    "status"
+   ]
+  },
+  {
+   "student": "We want her to be secure.",
+   "intent": "sharing",
+   "mentioned_areas": [
+    "values",
+    "pressures"
+   ],
+   "covered": [
+    "status",
+    "strengths"
+   ]
+  },
+  {
+   "student": "Just tell me the best subject.",
+   "intent": "pushback",
+   "mentioned_areas": [],
+   "covered": [
+    "status",
+    "strengths",
+    "values"
+   ],
+   "request": {
+    "text": "Tell me the best subject",
+    "kind": "decision_help",
+    "needs_research": false,
+    "needs_context": true
+   }
+  },
+  {
+   "student": "She will talk to you later.",
+   "intent": "sharing",
+   "mentioned_areas": [],
+   "covered": [
+    "status",
+    "strengths",
+    "values",
+    "family_social"
+   ]
+  },
+  {
+   "student": "She draws every evening.",
+   "intent": "sharing",
+   "mentioned_areas": [
+    "interests"
+   ],
+   "covered": [
+    "status",
+    "strengths",
+    "values",
+    "family_social",
+    "interests"
+   ]
+  }
+ ]
+}

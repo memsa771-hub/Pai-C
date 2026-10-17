@@ -1,0 +1,124 @@
+{
+ "id": "clear_decided",
+ "kind": "decided with evidence",
+ "turns": [
+  {
+   "student": "I have done conservation fieldwork and have chosen environmental science.",
+   "intent": "sharing",
+   "mentioned_areas": [
+    "history",
+    "status"
+   ],
+   "covered": [
+    "status"
+   ]
+  },
+  {
+   "student": "Two summers in the field.",
+   "intent": "sharing",
+   "mentioned_areas": [
+    "history"
+   ],
+   "covered": [
+    "status",
+    "history"
+   ]
+  },
+  {
+   "student": "I like the data side most.",
+   "intent": "sharing",
+   "mentioned_areas": [
+    "interests"
+   ],
+   "covered": [
+    "status",
+    "history"
+   ]
+  },
+  {
+   "student": "My parents support it.",
+   "intent": "sharing",
+   "mentioned_areas": [
+    "family_social"
+   ],
+   "covered": [
+    "status",
+    "history"
+   ]
+  },
+  {
+   "student": "What do these programs usually require?",
+   "intent": "asking_info",
+   "mentioned_areas": [],
+   "covered": [
+    "status",
+    "history"
+   ],
+   "request": {
+    "text": "What do environmental science programs require?",
+    "kind": "information",
+    "needs_research": true,
+    "needs_context": false
+   }
+  },
+  {
+   "student": "I want to work on water quality.",
+   "intent": "sharing",
+   "mentioned_areas": [
+    "values",
+    "interests"
+   ],
+   "covered": [
+    "status",
+    "history",
+    "interests",
+    "values"
+   ]
+  },
+  {
+   "student": "Budget is limited.",
+   "intent": "sharing",
+   "mentioned_areas": [
+    "pressures"
+   ],
+   "covered": [
+    "status",
+    "history",
+    "interests",
+    "values",
+    "pressures"
+   ]
+  },
+  {
+   "student": "I'm sure about this.",
+   "intent": "sharing",
+   "mentioned_areas": [
+    "sure"
+   ],
+   "covered": [
+    "status",
+    "history",
+    "interests",
+    "values",
+    "pressures",
+    "sure"
+   ]
+  },
+  {
+   "student": "I'm good at statistics.",
+   "intent": "sharing",
+   "mentioned_areas": [
+    "strengths"
+   ],
+   "covered": [
+    "status",
+    "history",
+    "interests",
+    "values",
+    "pressures",
+    "sure",
+    "strengths"
+   ]
+  }
+ ]
+}

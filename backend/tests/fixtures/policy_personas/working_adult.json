@@ -1,0 +1,122 @@
+{
+ "id": "working_adult",
+ "kind": "working adult switching field",
+ "turns": [
+  {
+   "student": "I work full time and want to retrain for nursing.",
+   "intent": "sharing",
+   "mentioned_areas": [
+    "status",
+    "values"
+   ],
+   "covered": [
+    "status"
+   ]
+  },
+  {
+   "student": "I've been in retail for six years.",
+   "intent": "sharing",
+   "mentioned_areas": [
+    "history"
+   ],
+   "covered": [
+    "status"
+   ]
+  },
+  {
+   "student": "I cared for my grandmother last year.",
+   "intent": "sharing",
+   "mentioned_areas": [
+    "history",
+    "values"
+   ],
+   "covered": [
+    "status",
+    "history"
+   ]
+  },
+  {
+   "student": "I can only study evenings.",
+   "intent": "sharing",
+   "mentioned_areas": [
+    "pressures"
+   ],
+   "covered": [
+    "status",
+    "history",
+    "pressures"
+   ]
+  },
+  {
+   "student": "What are part-time nursing options like?",
+   "intent": "asking_info",
+   "mentioned_areas": [],
+   "covered": [
+    "status",
+    "history",
+    "pressures"
+   ],
+   "request": {
+    "text": "What are part-time nursing options?",
+    "kind": "information",
+    "needs_research": true,
+    "needs_context": false
+   }
+  },
+  {
+   "student": "I'm calm under pressure.",
+   "intent": "sharing",
+   "mentioned_areas": [
+    "strengths"
+   ],
+   "covered": [
+    "status",
+    "history",
+    "pressures",
+    "strengths"
+   ]
+  },
+  {
+   "student": "My partner supports this.",
+   "intent": "sharing",
+   "mentioned_areas": [
+    "family_social"
+   ],
+   "covered": [
+    "status",
+    "history",
+    "pressures",
+    "strengths"
+   ]
+  },
+  {
+   "student": "I want work that matters.",
+   "intent": "sharing",
+   "mentioned_areas": [
+    "values"
+   ],
+   "covered": [
+    "status",
+    "history",
+    "pressures",
+    "strengths",
+    "values"
+   ]
+  },
+  {
+   "student": "I'm fairly sure.",
+   "intent": "sharing",
+   "mentioned_areas": [
+    "sure"
+   ],
+   "covered": [
+    "status",
+    "history",
+    "pressures",
+    "strengths",
+    "values",
+    "sure"
+   ]
+  }
+ ]
+}
