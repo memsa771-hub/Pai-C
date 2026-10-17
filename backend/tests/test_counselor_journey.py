@@ -24,7 +24,9 @@ async def test_multi_turn_history_and_profile_jobs_survive_a_background_result()
 
         async def model(**kwargs):
             received.append(kwargs)
-            return json.dumps({"reply": "I hear what matters to you about this route.", "moves": ["reflect"], "action": {"type": "none"}})
+            replies = ["I hear what matters to you about this route.", "Germany gives your plan a clear place to start.",
+                       "That finding gives us a concrete next check."]
+            return json.dumps({"reply": replies[len(received) - 1], "moves": ["reflect"], "action": {"type": "none"}})
 
         with patch("app.pai_c.deep.turn.chat_completion", model), \
                 patch.object(config, "PAI_API_KEY", "test"), \

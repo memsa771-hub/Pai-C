@@ -83,7 +83,8 @@ async def run_deep_turn(db, turn: CounselorTurnInput, *,
     messages = [*history, {"role": "user", "content": current}]
     # Read transactions must not remain open over the network call.
     db.rollback()
-    prompt = load_prompt("voice") + "\n\n" + context.text
+    voice_prompt = "voice_guided" if config.PAI_POLICY_MODE == "guided" and decision is not None else "voice"
+    prompt = load_prompt(voice_prompt) + "\n\n" + context.text
     if instructions:
         prompt += "\n\n" + load_prompt(instructions)
         if instructions == "wellbeing":
@@ -94,7 +95,7 @@ async def run_deep_turn(db, turn: CounselorTurnInput, *,
     polish_ms = 0
     violations = []
     retry_line = ""
-    from app.pai_c.voice.guards import repeated_questions, remove_repeated, question_sentences
+    from app.pai_c.voice.guards import repeated_questions, remove_repeated, question_sentences, repeats_previous_reply
     for attempt in range(2):
         started = time.monotonic()
         raw = await chat_completion(role="counselor",
@@ -145,6 +146,13 @@ async def run_deep_turn(db, turn: CounselorTurnInput, *,
             if cleaned:
                 reply = cleaned
                 violations.append("repeat_removed")
+        if not repeated and repeats_previous_reply(reply, history):
+            if "repeated_reply" not in violations:
+                violations.append("repeated_reply")
+            if attempt == 0:
+                retry_line = (Path(__file__).parent.parent / "policy/prompts/reply_retry.md").read_text(encoding="utf-8").strip()
+                polish_ms += int((time.monotonic() - started) * 1000)
+                continue
         polish_ms += int((time.monotonic() - started) * 1000)
         break
     return DeepTurnResult(reply, action, context, model_ms, polish_ms, moves, violations)

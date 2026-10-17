@@ -43,3 +43,9 @@ def remove_repeated(reply, matches):
     for start, end, _ in reversed(matches):
         reply = reply[:start] + reply[end:]
     return reply.strip()
+
+
+def repeats_previous_reply(reply, history):
+    """True when the draft restates the previous counselor reply (token Jaccard)."""
+    previous = next((row.get("content", "") for row in reversed(history) if row.get("role") == "assistant"), "")
+    return bool(previous.strip()) and similarity(reply, previous) >= config.PAI_REPEAT_REPLY_SIMILARITY

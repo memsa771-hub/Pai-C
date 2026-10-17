@@ -125,6 +125,32 @@ class DeepContext:
     plan: object | None = None
 
 
+def guided_state(db, workspace_id, notebook, draft, decision, coverage, open_requests):
+    """Compact counseling state for the guided Voice: what is known, missing and recent."""
+    from app.models import CounselorTurnDecision, PaiPossibility
+    chosen = db.scalar(select(PaiPossibility.id).where(
+        PaiPossibility.workspace_id == workspace_id, PaiPossibility.status == "chosen").limit(1))
+    if chosen is not None:
+        stage = "chosen"
+    elif draft.get("status") == "confirmed":
+        stage = "options_ready"
+    elif notebook.mirror_ready:
+        stage = "mirror_ready"
+    elif decision.action == "first_picture":
+        stage = "first_picture_due"
+    else:
+        stage = "getting_to_know"
+    rows = db.scalars(select(CounselorTurnDecision).where(CounselorTurnDecision.workspace_id == workspace_id)
+        .order_by(CounselorTurnDecision.source_timestamp.desc(), CounselorTurnDecision.id.desc()).limit(3)).all()
+    return {"stage": stage,
+            "areas": {area: {key: row.get(key) for key in ("covered", "item_count", "min_items")}
+                      for area, row in coverage.items()},
+            "open_requests": open_requests[:5],
+            "last_moves": [{"action": (row.decision or {}).get("action") or row.move, "moves": row.moves or []}
+                           for row in reversed(rows)],
+            "question_allowed": decision.question_allowed}
+
+
 async def build_context(db, workspace_id: str, turn: CounselorTurnInput, *,
                         roadmap_id: str | None = None, wellbeing: bool = False,
                         decision=None, signals=None, mirror: bool = False) -> DeepContext:
@@ -218,6 +244,9 @@ async def build_context(db, workspace_id: str, turn: CounselorTurnInput, *,
             # this nested view of already-published artifacts.
             sections["research"] = sections.get("research", "") + "\n<compare>" + _json(compare) + "</compare>"
     draft = (journey.counselor_summary_draft or {}) if journey else {}
+    if decision is not None and not wellbeing and not mirror and config.PAI_POLICY_MODE == "guided":
+        sections["state"] = _json(guided_state(db, workspace_id, notebook, draft, decision,
+            memory.coverage_areas(workspace_id), NotedQuestionService(db).open_requests(workspace_id)))
     sections["journey"] = _json({"stage": journey.current_stage if journey else "IDENTITY",
         "mirror_status": draft.get("status"), "mirror_notebook_version": draft.get("notebook_version")})
     text = "<context>\n" + "\n".join(

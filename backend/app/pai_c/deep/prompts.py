@@ -5,12 +5,13 @@ from pathlib import Path
 
 
 _PROMPT_DIR = Path(__file__).with_name("prompts")
-_NAMES = frozenset({"voice", "planner", "mirror", "roadmap_builder", "sensitive_check", "language_retry", "handoff", "session_summary", "wellbeing"})
+_NAMES = frozenset({"voice", "voice_guided", "planner", "mirror", "roadmap_builder", "sensitive_check", "language_retry", "handoff", "session_summary", "wellbeing"})
 
 
 @lru_cache(maxsize=len(_NAMES))
 def load_prompt(name: str) -> str:
     if name not in _NAMES:
         raise ValueError(f"Unknown Counselor prompt: {name}")
-    directory = _PROMPT_DIR.parent.parent / f"{name}/prompts" if name in {"planner", "voice"} else _PROMPT_DIR
+    folder = {"planner": "planner", "voice": "voice", "voice_guided": "voice"}.get(name)
+    directory = _PROMPT_DIR.parent.parent / folder / "prompts" if folder else _PROMPT_DIR
     return (directory / f"{name}.md").read_text(encoding="utf-8")
