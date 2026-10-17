@@ -59,6 +59,8 @@ def coverage(covered):
     ({}, True),
     ({"student_count": 7}, False),
     ({"coverage": coverage(3)}, False),
+    ({"coverage": {**coverage(5), "history": {"covered": False}}}, False),
+    ({"coverage": {**coverage(5), "status": {"covered": False}}}, False),
     ({"summary_confirmed": True}, False),
     ({"prior_decisions": [{"event_id": "e1", "decision": {"action": "first_picture"}}]}, False),
     ({"prior_decisions": [{"event_id": "e1", "decision": {"action": "counsel"}}]}, True),

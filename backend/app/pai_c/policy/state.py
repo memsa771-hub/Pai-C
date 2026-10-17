@@ -10,13 +10,15 @@ from app.pai_c.voice.guards import question_sentences
 
 
 def first_picture_due(*, coverage, student_count, prior_decisions, summary_confirmed):
-    """Once per workspace, before confirmation, after enough messages and coverage."""
+    """Once per workspace, before confirmation, after enough messages and coverage,
+    and only when the required areas (where they are now and their story so far) are covered."""
     rules = load_data("guided_table.json")["derived"]
     covered = sum(bool(area.get("covered")) for area in coverage.values())
     return (not summary_confirmed
             and not any(row["decision"].get("action") == rules["first_picture_action"] for row in prior_decisions)
             and student_count >= rules["first_picture_min_student_messages"]
-            and covered >= rules["first_picture_min_covered_areas"])
+            and covered >= rules["first_picture_min_covered_areas"]
+            and all(coverage.get(area, {}).get("covered") for area in rules["first_picture_required_areas"]))
 
 
 def derive_state(signals, *, coverage, mirror_ready, plan, student_count,
