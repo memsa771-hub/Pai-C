@@ -184,6 +184,7 @@ def test_vault_extractor_stops_interpretation_but_preserves_objective_targets():
     assert "career.primary_interest" not in prompt
     assert "identity.preferred_name" in prompt
     assert "Truth Map" in SYSTEM_PROMPT
+    assert "certainty rating" in SYSTEM_PROMPT and "is never a goal" in SYSTEM_PROMPT
 
 
 def test_research_brief_uses_public_truth_map_summary():
