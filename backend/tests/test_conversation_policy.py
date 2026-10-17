@@ -11,6 +11,12 @@ from app.pai_c.policy import controller, classifier
 from app.pai_c.policy.state import derive_state, decision_log
 
 
+@pytest.fixture(autouse=True)
+def strict_policy_mode(monkeypatch):
+    """These contracts describe the strict decision table."""
+    monkeypatch.setattr(config, "PAI_POLICY_MODE", "strict")
+
+
 def state(**changes):
     base = {**classifier.fallback_signals().model_dump(), "coverage": {
         area: {"covered": True} for area in controller.load_data("areas_policy.json")["priority"]},

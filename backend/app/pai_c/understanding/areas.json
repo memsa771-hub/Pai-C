@@ -1,10 +1,10 @@
 {
-  "status": [{"vault_field_prefixes": ["identity."]}, {"path": "world.daily_life"}],
-  "history": [{"path": "world.education_story"}, {"path": "shown"}, {"vault_records": ["education", "test_attempt", "document"]}],
-  "interests": [{"path": "self", "key_prefixes": ["interest."]}, {"path": "world.daily_life"}],
-  "strengths": [{"path": "self", "nonempty": "capability_status"}, {"path": "shown", "nonempty": "capability_status"}],
-  "family_social": [{"path": "world.people"}, {"path": "world.social"}],
-  "values": [{"path": "self", "key_prefixes": ["value.", "motivation."]}, {"path": "source"}],
-  "pressures": [{"path": "pressures.items"}, {"path": "world.people", "nonempty": "worry"}],
-  "sure": [{"path": "sure", "not_null": "score", "timestamp": "asked_at"}]
+  "status": {"min_items": 1, "sources": [{"vault_field_prefixes": ["identity."]}, {"path": "world.daily_life"}]},
+  "history": {"min_items": 2, "sources": [{"path": "world.education_story"}, {"path": "shown"}, {"vault_records": ["education", "test_attempt", "document"]}]},
+  "interests": {"min_items": 2, "sources": [{"path": "self", "key_prefixes": ["interest."]}, {"path": "world.daily_life"}]},
+  "strengths": {"min_items": 1, "sources": [{"path": "self", "nonempty": "capability_status"}, {"path": "shown", "nonempty": "capability_status"}]},
+  "family_social": {"min_items": 2, "sources": [{"path": "world.people"}, {"path": "world.social"}]},
+  "values": {"min_items": 1, "sources": [{"path": "self", "key_prefixes": ["value.", "motivation."]}, {"path": "source"}]},
+  "pressures": {"min_items": 1, "sources": [{"path": "pressures.items"}, {"path": "world.people", "nonempty": "worry"}]},
+  "sure": {"min_items": 1, "sources": [{"path": "sure", "not_null": "score", "timestamp": "asked_at"}]}
 }

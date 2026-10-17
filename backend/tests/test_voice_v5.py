@@ -13,6 +13,12 @@ from scripts.counselor_eval_support import StudentSession
 from tests.test_counselor_deep_pr3 import _turn
 
 
+@pytest.fixture(autouse=True)
+def strict_policy_mode(monkeypatch):
+    """These contracts describe the strict decision table."""
+    monkeypatch.setattr(config, "PAI_POLICY_MODE", "strict")
+
+
 def output(reply, action=None):
     return json.dumps({"reply":reply,"moves":["reflect"],"action":action or {"type":"none"}})
 

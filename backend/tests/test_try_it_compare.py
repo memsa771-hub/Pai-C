@@ -43,7 +43,9 @@ def test_old_saved_roadmap_remains_readable_without_rewrite():
 
 
 @pytest.mark.asyncio
-async def test_guide_compare_contains_published_fit_only_with_limit_and_exclusions():
+async def test_guide_compare_contains_published_fit_only_with_limit_and_exclusions(monkeypatch):
+    from app.config import config
+    monkeypatch.setattr(config, "PAI_POLICY_MODE", "strict")
     with StudentSession() as student,student.factory() as db:
         journey=_journey(db,student.workspace_id)
         for index in range(8):

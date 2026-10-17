@@ -21,7 +21,8 @@ def coverage_areas(notebook, snapshot):
     data = notebook.model_dump(mode="json")
     areas = json.loads((DATA_DIR / "areas.json").read_text(encoding="utf-8"))
     result = {}
-    for area, locations in areas.items():
+    for area, spec in areas.items():
+        locations, min_items = (spec["sources"], spec.get("min_items", 1)) if isinstance(spec, dict) else (spec, 1)
         evidence = {}
         for location in locations:
             if "vault_fields" in location or "vault_field_prefixes" in location:
@@ -46,7 +47,8 @@ def coverage_areas(notebook, snapshot):
                 stamp = row.get(location.get("timestamp", "last_confirmed")) or row.get("updated_at") or row.get("valid_from") or row.get("created_at")
                 evidence[identity] = _date(stamp)
         dates = [stamp for stamp in evidence.values() if stamp is not None]
-        result[area] = {"covered": bool(evidence), "item_count": len(evidence), "last_confirmed": max(dates) if dates else None}
+        result[area] = {"covered": len(evidence) >= min_items, "item_count": len(evidence),
+                        "min_items": min_items, "last_confirmed": max(dates) if dates else None}
     return result
 
 

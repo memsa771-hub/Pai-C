@@ -134,13 +134,14 @@ def test_areas_use_active_evidence_and_json_mapping_changes_result(tmp_path, mon
     snapshot = SimpleNamespace(facts={"identity.current_status": {"value": "In transition", "valid_from": STAMP}},
                                records={"education": [{"id": "education", "updated_at": STAMP}]})
     result = views.coverage_areas(notebook, snapshot)
-    assert all(row["covered"] for row in result.values())
+    assert all(row["covered"] == (row["item_count"] >= row["min_items"]) for row in result.values())
+    assert not result["family_social"]["covered"] and result["history"]["covered"]
     assert result["status"]["item_count"] == 2 and result["history"]["item_count"] == 3
     assert result["family_social"]["item_count"] == 1
     assert result["strengths"]["item_count"] == 2 and result["sure"]["last_confirmed"] == NOW
     (tmp_path / "areas.json").write_text(json.dumps({"changed": [{"path": "world.social"}]}))
     monkeypatch.setattr(views, "DATA_DIR", tmp_path)
-    assert views.coverage_areas(notebook, snapshot) == {"changed": {"covered": False, "item_count": 0, "last_confirmed": None}}
+    assert views.coverage_areas(notebook, snapshot) == {"changed": {"covered": False, "item_count": 0, "min_items": 1, "last_confirmed": None}}
 
 
 def test_views_only_expose_approved_fields_and_do_not_mutate():

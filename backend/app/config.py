@@ -187,6 +187,7 @@ class Config:
     PAI_CLASSIFIER_REASONING_EFFORT: str = os.environ.get("PAI_CLASSIFIER_REASONING_EFFORT", "low")
     PAI_CLASSIFIER_TIMEOUT_MS: int = int(os.environ.get("PAI_CLASSIFIER_TIMEOUT_MS", "4000"))
     PAI_SUMMARY_EVERY_TURNS: int = int(os.environ.get("PAI_SUMMARY_EVERY_TURNS", "4"))
+    PAI_POLICY_MODE: str = os.environ.get("PAI_POLICY_MODE", "guided").strip().lower()
     PAI_STATEMENT_FALLBACK_REPLY: str = os.environ.get(
         "PAI_STATEMENT_FALLBACK_REPLY",
         "Thank you for sharing that with me. I'm taking it in, and I'll keep it in mind as we continue.")
@@ -210,6 +211,7 @@ class Config:
     PAI_SESSION_SWEEP_SECONDS: int = int(os.environ.get("PAI_SESSION_SWEEP_SECONDS", "300"))
     PAI_REPEAT_QUESTION_WINDOW: int = int(os.environ.get("PAI_REPEAT_QUESTION_WINDOW", "5"))
     PAI_REPEAT_QUESTION_SIMILARITY: float = float(os.environ.get("PAI_REPEAT_QUESTION_SIMILARITY", "0.6"))
+    PAI_REPEAT_REPLY_SIMILARITY: float = float(os.environ.get("PAI_REPEAT_REPLY_SIMILARITY", "0.5"))
     PAI_PLAN_MAX_AGE_TURNS: int = int(os.environ.get("PAI_PLAN_MAX_AGE_TURNS", "3"))
     PAI_PLANNER_HISTORY_TURNS: int = int(os.environ.get("PAI_PLANNER_HISTORY_TURNS", "12"))
     PAI_PLANNER_MAP_CONTEXT_TOKENS: int = int(os.environ.get("PAI_PLANNER_MAP_CONTEXT_TOKENS", "4000"))
@@ -436,6 +438,10 @@ class Config:
             raise RuntimeError("Deep Counselor limits must be positive")
         if not 0 < self.PAI_REPEAT_QUESTION_SIMILARITY <= 1:
             raise RuntimeError("PAI_REPEAT_QUESTION_SIMILARITY must be in (0, 1]")
+        if not 0 < self.PAI_REPEAT_REPLY_SIMILARITY <= 1:
+            raise RuntimeError("PAI_REPEAT_REPLY_SIMILARITY must be in (0, 1]")
+        if self.PAI_POLICY_MODE not in {"guided", "strict"}:
+            raise RuntimeError("PAI_POLICY_MODE must be guided or strict")
         if self.PAI_PROFILE_COMPLETION_ROLLOUT_MODE not in {"off", "shadow", "new", "all"}:
             raise RuntimeError(
                 "PAI_PROFILE_COMPLETION_ROLLOUT_MODE must be off, shadow, new, or all"

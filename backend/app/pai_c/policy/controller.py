@@ -75,8 +75,16 @@ def askable_areas(state, policy=None, excluded=()):
         policy["priority"].index(area)))
 
 
-def decide(state):
-    table = load_data("decision_table.json")
+TABLES = {"strict": "decision_table.json", "guided": "guided_table.json"}
+
+
+def policy_mode(mode=None):
+    from app.config import config
+    return mode or config.PAI_POLICY_MODE
+
+
+def decide(state, mode=None):
+    table = load_data(TABLES[policy_mode(mode)])
     state = dict(state)
     candidates = askable_areas(state)
     previous = state.get("previous") or {}

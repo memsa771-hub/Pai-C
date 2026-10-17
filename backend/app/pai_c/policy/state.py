@@ -9,8 +9,19 @@ from app.pai_c.policy.controller import load_data
 from app.pai_c.voice.guards import question_sentences
 
 
+def first_picture_due(*, coverage, student_count, prior_decisions, summary_confirmed):
+    """Once per workspace, before confirmation, after enough messages and coverage."""
+    rules = load_data("guided_table.json")["derived"]
+    covered = sum(bool(area.get("covered")) for area in coverage.values())
+    return (not summary_confirmed
+            and not any(row["decision"].get("action") == rules["first_picture_action"] for row in prior_decisions)
+            and student_count >= rules["first_picture_min_student_messages"]
+            and covered >= rules["first_picture_min_covered_areas"])
+
+
 def derive_state(signals, *, coverage, mirror_ready, plan, student_count,
-                 prior_decisions, replies, student_ordinals, current_event_id):
+                 prior_decisions, replies, student_ordinals, current_event_id,
+                 summary_confirmed=False):
     policy = load_data("decision_table.json")["derived"]
     data = signals.model_dump()
     previous = prior_decisions[-1]["decision"] if prior_decisions else {}
@@ -43,6 +54,9 @@ def derive_state(signals, *, coverage, mirror_ready, plan, student_count,
             "summary_due": student_count - max(summaries, default=0) >= config.PAI_SUMMARY_EVERY_TURNS
                 and covered >= policy["summary_min_covered"],
             "insight_available": bool(plan and plan.give.strip()),
+            "summary_confirmed": summary_confirmed,
+            "first_picture_due": first_picture_due(coverage=coverage, student_count=student_count,
+                prior_decisions=prior_decisions, summary_confirmed=summary_confirmed),
             "invite_pending": covered < policy["invite_max_covered"] and not any(
                 row["decision"].get("invite") for row in prior_decisions)}
 
@@ -91,7 +105,9 @@ def build_state(db, turn, signals, history):
     state["discover_available"] = False
     state["possibility_id"] = None
     draft = (journey.counselor_summary_draft or {}) if journey else {}
-    if draft.get("status") == "confirmed":
+    state["summary_confirmed"] = draft.get("status") == "confirmed"
+    if state["summary_confirmed"]:
+        state["first_picture_due"] = False
         proof = db.scalar(select(StudentJourneyEvent).where(
             StudentJourneyEvent.workspace_id == turn.workspace_id,
             StudentJourneyEvent.event_type == "counselor.mirror.confirmed",

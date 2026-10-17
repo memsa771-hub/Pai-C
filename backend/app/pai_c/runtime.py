@@ -173,7 +173,7 @@ async def _run_deep_turn(db, workspace_id: str, event_data: dict, depth: int):
         from app.pai_c.possibilities import PossibilityService
         PossibilityService(db).mark_mentioned(workspace_id, decision.topic)
         db.commit()
-    if decision is not None and decision.action == "answer_request" and signals.request is not None and not signals.request.needs_research and action.get("type") != "wellbeing":
+    if decision is not None and decision.action in {"answer_request", "counsel"} and signals.request is not None and not signals.request.needs_research and action.get("type") != "wellbeing":
         NotedQuestionService(db).mark_answered_now(workspace_id, turn.source_event_id, assistant_event_id)
     move = "none"
     status = "none"
