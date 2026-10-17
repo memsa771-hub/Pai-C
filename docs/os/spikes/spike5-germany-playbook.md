@@ -59,6 +59,10 @@ Who: student (online), after the degree or transcript is issued. Depends on: non
   **conflict** with S1's "attestation stamps". It is not clear whether uni-assist accepts the HEC
   e-Attestation Certificate in place of stamps. Resolve this by asking uni-assist or a uni-assist
   university before the playbook is final.
+  - Update 2026-10-17: the developers report that uni-assist now accepts the HEC e-Attestation
+    Certificate. No official page saying so was found (search of uni-assist.de, pakistan.diplo.de
+    and hec.gov.pk). This stays **unconfirmed** until the source is attached here, for example the
+    uni-assist reply or page.
 - Transcripts can be attested before the degree: "Transcripts (complete or incomplete) can be
   attested even if the final degree has not been issued." (S8). **confirmed**
 - Data must match: "their personal details on the CNIC and all educational documents are identical"
@@ -327,7 +331,8 @@ Checked 2026-10-17. "Undated" means the page shows no date.
 ## 6. Open points for the reviewer and the Slice 1 spec
 
 1. **A1 conflict:** does uni-assist accept the HEC e-Attestation Certificate in place of "attestation
-   stamps"? Ask uni-assist or one uni-assist university.
+   stamps"? The developers report yes (2026-10-17). Attach the source (the uni-assist reply or page)
+   to close it.
 2. **Unknown lead times:** HEC attestation (A1) and the visa (C5). The visa backlog is the largest
    planning risk, because a winter start with June–July deadlines leaves little time.
 3. **Amounts for 2027** (blocked account, fees) are unconfirmed until 2027 pages exist. The freshness
