@@ -49,6 +49,14 @@ STALE_LOCK_SECONDS = LEASE_SECONDS
 RETRY_BACKOFF_SECONDS = (10, 60, 300, 1800)
 
 
+class JobDeferred(Exception):
+    """Not a failure: the job must wait (e.g. an earlier job for the same
+    workspace has to finish first). The worker reschedules it shortly without
+    using up an attempt, so ordering waits can never exhaust max_attempts."""
+
+    delay_seconds = 5
+
+
 def _now() -> datetime:
     return datetime.now(timezone.utc)
 
@@ -283,6 +291,16 @@ class BackgroundJobService:
         job.locked_by = None
         job.last_error = None
         job.completed_at = _now()
+        self.db.flush()
+        return job
+
+    def defer(self, job: BackgroundJob, delay_seconds: float) -> BackgroundJob:
+        """Put a claimed job back without counting the claim as an attempt."""
+        job.status = "pending"
+        job.attempts = max((job.attempts or 0) - 1, 0)
+        job.locked_at = None
+        job.locked_by = None
+        job.available_at = _now() + timedelta(seconds=delay_seconds)
         self.db.flush()
         return job
 

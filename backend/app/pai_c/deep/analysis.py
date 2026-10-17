@@ -22,6 +22,7 @@ from app.pai_c.playbooks.registry import available_playbooks
 from app.pai_c.stages import advance_discovery_stage
 from app.inference.gateway import complete as chat_completion, resolve_model
 from app.runtime.task_runtime import enqueue
+from app.jobs.service import JobDeferred
 from app.journey import JourneyService
 from app.models import BackgroundJob, CounselorNotebookHistory, EventRecord, User, Workspace, CounselorTurnDecision, PaiTurnPlan
 
@@ -30,7 +31,7 @@ JOB_ANALYZE = "counselor.analyze"
 _locks: weakref.WeakValueDictionary[str, asyncio.Lock] = weakref.WeakValueDictionary()
 
 
-class AnalysisOrderPending(Exception):
+class AnalysisOrderPending(JobDeferred):
     """An older turn must finish its analysis before this one can apply."""
 
 
@@ -215,6 +216,10 @@ async def analyze_job(job, db) -> dict:
     payload = job.payload or {}
     user_event_id = payload.get("user_event_id")
     assistant_event_id = payload.get("assistant_event_id")
+    # Check order before taking the lock: a later turn must never hold the
+    # workspace lock while an earlier turn is waiting for it.
+    if _prior_job_pending(db, job):
+        raise AnalysisOrderPending("earlier analysis pending")
     async with _workspace_lock(db, job.workspace_id):
         if _prior_job_pending(db, job):
             raise AnalysisOrderPending("earlier analysis pending")

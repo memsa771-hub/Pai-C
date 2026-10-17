@@ -31,6 +31,7 @@ handler. `JOB_WORKER_CONCURRENCY` slots are the only jobs in flight, and
 import asyncio
 import logging
 import os
+import random
 import signal
 import time
 
@@ -39,6 +40,7 @@ from app.config import config
 from app.jobs.service import (
     LEASE_RENEW_SECONDS,
     BackgroundJobService,
+    JobDeferred,
     _worker_id,
 )
 
@@ -120,6 +122,15 @@ async def _process_one(job_id: str, worker: str) -> bool:
             db.commit()
             logger.info("job succeeded id=%s type=%s worker=%s", job.id, job.job_type, worker)
             return True
+        except JobDeferred as exc:
+            db.rollback()
+            job = service.get(job_id)
+            if job is not None and job.locked_by == worker:
+                delay = exc.delay_seconds + random.uniform(0, exc.delay_seconds)
+                service.defer(job, delay)
+                db.commit()
+            logger.info("job deferred id=%s type=%s reason=%s", job_id, getattr(job, "job_type", "?"), exc)
+            return False
         except Exception as exc:
             db.rollback()
             # Re-fetch: the rollback detached whatever we had.

@@ -142,7 +142,7 @@ async def test_second_workspace_analysis_retries_immediately_while_first_is_runn
             first = asyncio.create_task(analyze_job(first_job, db))
             await asyncio.wait_for(entered.wait(), 1)
             try:
-                with pytest.raises(AnalysisOrderPending, match="already running"):
+                with pytest.raises(AnalysisOrderPending, match="earlier analysis pending|already running"):
                     await asyncio.wait_for(analyze_job(second_job, db), 0.1)
             finally:
                 release.set()
@@ -452,3 +452,28 @@ async def test_failed_analysis_preserves_last_good_notebook_and_reply():
         assert NotebookService(db).get(student.workspace_id) == before
         assert db.execute(select(EventRecord.id).where(
             EventRecord.id == job.payload["assistant_event_id"])).scalar_one_or_none()
+
+
+@pytest.mark.asyncio
+async def test_later_turn_is_deferred_by_worker_without_using_attempts():
+    """Live failure 17 Oct: concurrent workers raced for the workspace lock and every
+    analysis job failed with 'earlier analysis pending' until attempts ran out."""
+    from app.jobs.worker import _process_one
+    with StudentSession() as student:
+        with student.factory() as db:
+            first_job, _ = _turn_job(student, db, "First private event")
+            second_job, _ = _turn_job(student, db, "Second private event")
+            first_id, second_id = first_job.id, second_job.id
+            claimed = BackgroundJobService(db).claim(limit=2, worker_id="w1")
+            assert {job.id for job in claimed} == {first_id, second_id}
+        model = AsyncMock(return_value=_model_notebook(person={"daily_life": "Known"}))
+        with patch("app.pai_c.deep.analysis.chat_completion", model):
+            assert not await _process_one(second_id, "w1")
+            assert model.await_count == 0
+            with student.factory() as db:
+                later = db.get(BackgroundJob, second_id)
+                assert later.status == "pending" and later.attempts == 0 and later.locked_by is None
+                assert later.last_error is None
+            assert await _process_one(first_id, "w1")
+        with student.factory() as db:
+            assert db.get(BackgroundJob, first_id).status == "succeeded"
