@@ -1966,3 +1966,66 @@ before enabling these endpoints in a running stack.
 
 Commits: `98c09b3` (Step A), `28ba6f5` (Step B); the following documentation
 commit records the final verification. All work remains on pai-c.
+
+## Policy v2 (Core R2.3): one universal counseling policy
+
+Source of truth: `docs/counselor/COUNSELING_POLICY.md` (v2). Built directly in Cowork (no Codex round).
+
+### Modes
+- `PAI_POLICY_MODE` = `guided` (default) | `strict`. Validated at startup.
+- `strict` uses `policy/decision_table.json` and `voice/prompts/voice.md`, both unchanged.
+- `guided` uses `policy/guided_table.json` and `voice/prompts/voice_guided.md`.
+- Both modes keep the same classifier, request intake, decision log, Mirror, Discover and Try-it.
+
+### Guided guardrail table (first match wins, no post-check)
+| id | when | action | question |
+|---|---|---|---|
+| care | safety concern/urgent | care | no |
+| mirror_changes | student sent a Mirror correction | explore_correction | yes |
+| mirror | mirror_allowed | mirror | no |
+| first_picture | first_picture_due | first_picture | yes |
+| guide | intent deciding AND picture confirmed | guide | yes |
+| discover | discover_available and no two-question run | discover | yes |
+| rest | questions in the last two replies | counsel | no |
+| counsel | always | counsel | yes |
+
+- Two rows were added beyond the R2.3 draft: guide and discover. Without them, guided mode would lose the Discover card and the Guide `<compare>` block.
+- In guided mode, guide is gated on confirmation. This fixes test 2's premature guide binary: "what should I do" before the picture is confirmed goes to counsel.
+- `first_picture_due`: no earlier first_picture decision in the workspace, ≥ 8 student messages, ≥ 4 covered areas, and the picture is not yet confirmed. Thresholds live in `guided_table.json` under "derived".
+- Requests: in guided mode, a request that needs no research and is answered in a counsel reply is marked `answered_now`, the same as with `answer_request`.
+
+### Coverage depth (both modes)
+- `understanding/areas.json` is now `{area: {min_items, sources}}`. min_items: status 1, history 2, interests 2, strengths 1, family_social 2, values 1, pressures 1, sure 1.
+- An area counts as covered only when its active items reach min_items.
+- Coverage rows now carry `min_items`.
+
+### Voice (guided)
+- `voice_guided.md` = the universal loop text, verbatim from the R2.3 prompt, followed by the five sections copied unchanged from `voice.md`: WHAT YOU ANSWER AND WHAT YOU DO NOT, GROUNDING, LANGUAGE, SAFETY, OUTPUT.
+- The `<state>` block is guided mode only. It carries:
+  - stage: getting_to_know | first_picture_due | mirror_ready | options_ready | chosen
+  - per-area {covered, item_count, min_items}
+  - open requests (≤ 5)
+  - the last 3 decisions with their moves
+  - question_allowed
+- Prompt lines added:
+  - planner.md: key prefixes and world.people.
+  - turn_classifier.md: confusion counts as neutral emotion.
+- Action files added: actions/counsel.md and actions/first_picture.md.
+
+### Reply repetition guard (both modes)
+- Compares the draft with the previous counselor reply by token Jaccard; the threshold is `PAI_REPEAT_REPLY_SIMILARITY` (0.5).
+- On a match it retries once, using `policy/prompts/reply_retry.md`. This shares the single retry per turn with the other guards.
+- Logged as `repeated_reply`.
+- Skipped for care replies, and skipped when the repeated-question guard already fired on the same draft.
+
+### Measurement
+- `scripts/eval_policy_modes.py`: an offline, deterministic replay of 10 scripted personas (`tests/fixtures/policy_personas/`) through the real `derive_state` and `decide`, in both modes.
+- The 10 personas map onto existing live deep personas, so no new deep persona was needed: confused with a family wish (hamza), relative's wish (danish), decided (clear_decided), task seeker, parent proxy, returning after a gap (goal_switcher), short answers, impatient, working adult, distress (mild_distress).
+- Offline result: across all 10 personas, guided mode never allows a third question in a row, serves every request, routes every safety turn to care, and never guides before confirmation. Strict allows question runs of 3–4 (summarize and adjust come before rest), guides early on hamza, impatient, parent_proxy and mild_distress, and misses one request each on impatient and parent_proxy.
+- `eval_counselor_deep.py --policy-mode guided|strict` runs each turn through the production runtime (classifier → controller → Voice → guards → decision log).
+- Finding: the old deep eval called `run_deep_turn` without a decision, so it never measured either policy.
+- The capped live commands (not run) are printed by `eval_policy_modes.py`.
+
+### Open questions
+- With $3 per mode, 10 personas × 12 turns may hit the budget before the last personas. Run fewer personas per command if needed.
+- Prompt slimming (planner 1174 words, mirror 953) waits for the live baseline.
