@@ -125,9 +125,43 @@ def test_planner_optional_validation_and_dismissed_title_not_readded():
         assert again.id == row.id and again.status == 'dismissed'
         row.title='Inventedplace practical work'
         assert service.research_route(row)['place_preference'] == ''
-        assert 'Inventedplace' not in str(service.research_route(row))
+        assert service.research_route(row)['field'] == row.title
         service.mark_mentioned(student.workspace_id,row.id); stamp=row.mentioned_at
         service.mark_mentioned(student.workspace_id,row.id); assert row.mentioned_at == stamp
+
+
+@pytest.mark.parametrize('kind', ['discovered', 'student_added'])
+@pytest.mark.parametrize('places,expected', [([], ''), (['Student place'], 'Student place'),
+                                           (['First place', 'Second place'], '')])
+def test_explore_route_uses_possibility_not_old_goal_or_evidence(kind, places, expected):
+    from types import SimpleNamespace
+    with StudentSession() as student, student.factory() as db:
+        _, journey, _ = prepare(student, db)
+        service = PossibilityService(db)
+        row = service.add(student.workspace_id, journey.id, title='Data engineering', why='Student evidence',
+            kind=kind, source='planner' if kind == 'discovered' else 'student', status='suggested',
+            evidence=[{'text':'An evidence quote that must never become the research field', 'item_id':None}])
+        profile = SimpleNamespace(records={'goal':[{'details':{'field_of_study':'Computer science',
+            'degree_level':'Student level', 'target_countries':places}}]})
+        with patch('app.pai_c.memory.MemoryService.profile', return_value=profile):
+            assert service.research_route(row) == {'field':'Data engineering', 'level':'Student level',
+                'place_preference':expected, 'kind':''}
+
+
+@pytest.mark.parametrize('lane_field,expected', [('Lane direction','Lane direction'), ('','Data engineering')])
+def test_mirror_explore_route_uses_lane_field_then_title(lane_field, expected):
+    from types import SimpleNamespace
+    with StudentSession() as student, student.factory() as db:
+        _, journey, _ = prepare(student, db)
+        journey = db.get(StudentJourney, journey.id)
+        journey.counselor_summary_draft = {'mirror':{'roadmap_lanes':[
+            {'lane':'strength_based','route':{'field':lane_field}}]}}
+        service = PossibilityService(db)
+        row = service.add(student.workspace_id, journey.id, title='Data engineering', why='Evidence',
+            kind='strength_based', source='mirror', status='saved',
+            evidence=[{'text':'Private evidence quote', 'item_id':None}])
+        with patch('app.pai_c.memory.MemoryService.profile', return_value=SimpleNamespace(records={})):
+            assert service.research_route(row) == {'field':expected, 'level':'', 'place_preference':'', 'kind':''}
 
 
 def test_discover_policy_and_text():

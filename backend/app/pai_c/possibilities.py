@@ -142,7 +142,15 @@ class PossibilityService:
         goals = profile.records.get("goal", [])
         details = (goals[0].get("details") or {}) if goals else {}
         countries = details.get("target_countries") or []
-        return {"field": details.get("field_of_study") or " ".join(item["text"] for item in row.evidence),
+        field = row.title
+        if row.kind not in {"discovered", "student_added"}:
+            journey = self.db.scalar(select(StudentJourney).where(
+                StudentJourney.workspace_id == row.workspace_id, StudentJourney.id == row.journey_id))
+            draft = (journey.counselor_summary_draft or {}) if journey else {}
+            lane = next((lane for lane in (draft.get("mirror") or {}).get("roadmap_lanes", [])
+                         if lane.get("lane") == row.kind), {})
+            field = (lane.get("route") or {}).get("field") or row.title
+        return {"field": field,
                 "level": details.get("degree_level") or "",
                 "place_preference": countries[0] if len(countries) == 1 else "", "kind": ""}
 
