@@ -363,6 +363,20 @@ This pre-check does not replace the human reviewer below.
 For each source, open the URL, find the quoted text, and confirm it is the official body named. Tick
 it, or write what differs.
 
-- [ ] S1 · [ ] S2 · [ ] S3 · [ ] S4 · [ ] S5 · [ ] S6 · [ ] S7 · [ ] S8 · [ ] S9
-- [ ] S10 · [ ] S11 · [ ] S12 · [ ] S13 · [ ] S14 · [ ] S15 · [ ] S16 · [ ] S17 · [ ] S18
-- Reviewer: ______ · Date: ______ · Verdict (every step cites an official page): ______
+- [x] S1 · [x] S2 · [x] S3 · [x] S4 · [x] S5 · [x] S6 · [x] S7 · [ ] S8 · [x] S9
+- [x] S10 · [x] S11 · [x] S12 · [ ] S13 · [ ] S14 · [x] S15 · [x] S16 · [ ] S17 · [ ] S18
+
+Notes on unticked sources:
+- S8: not verified. The HEC page blocks automated access. The online system, Rs. 3,000 fee and SMS/email notice match. Not seen: "incomplete transcripts can be attested", "CNIC details identical", "photocopies no longer offered".
+- S13: the quote "992 euros per month" is not confirmed. A copy of the page showed 11,208 per year (as of 2024). 992/month is supported by S9 and another German mission page, but the quote needs a browser check.
+- S14: not checked. It is used only in §4, not in any step.
+- S17: not verified (DAAD blocks automated access). DAAD's own study-in-germany page says address registration is usually within one week, or one to two weeks depending on the local office. D1's "within two weeks" should stay unconfirmed and be reworded.
+- S18: not verified (DAAD blocks automated access). D2 stays unconfirmed.
+
+Notes on the doc:
+- C5 and the "technical difficulties" note in C4 are temporary notices (27.11.2025). Mark them unconfirmed for WS 2027/28, per §1.
+- A5: "translator in Germany" comes from S10, not S2. Cite S2 + S10.
+- A8, B3, D3 have no citation (per-programme placeholders), so "every step cites an official page" does not apply to them.
+- A1: S1 still says "attestation stamps". The conflict stays open until uni-assist confirms the HEC e-Attestation Certificate.
+
+Reviewer: @10Faheem · Date: 2026-10-17 · Verdict (every step cites an official page): PASS with notes (S8, S13, S14, S17, S18 not verified; see notes)
