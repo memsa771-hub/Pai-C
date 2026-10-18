@@ -52,6 +52,7 @@ RECORD_SPECS = {
             "academic_status": {"type": "string", "enum": ["current", "completed", "incomplete", "planned"]},
             "result": RESULT_SCHEMA,
             "details": obj({"institution_country": string(), "institution_city": string(),
+                "awarding_body": string(),
                 "framework": string(), "major": string(), "minor": string(),
                 "specialization": string(), "study_mode": string(), "thesis_title": string(),
                 "prerequisites": strings(), "distinctions": strings()}),

@@ -69,7 +69,7 @@ async def test_state_block_content(monkeypatch):
         state = section(prompts[-1], "state")
         assert state["stage"] == "getting_to_know"
         assert set(state["areas"]) == {"status", "history", "interests", "strengths",
-                                       "family_social", "values", "pressures", "sure"}
+                                       "family_social", "values", "pressures", "sure", "goals", "options"}
         assert state["areas"]["history"] == {"covered": False, "item_count": 0, "min_items": 2}
         assert state["question_allowed"] is True and len(state["open_requests"]) <= 5
         assert state["last_moves"] and state["last_moves"][-1]["action"] == "counsel"
