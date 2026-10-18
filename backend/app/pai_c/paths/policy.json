@@ -1,0 +1,11 @@
+{
+  "query": "{field} occupational work skills careers outlook official",
+  "search_limit": 4,
+  "fetch_limit": 2,
+  "page_chars": 8000,
+  "trusted_domains": [],
+  "objective": "Explain the student-selected path without institutions or admission advice",
+  "summary": "Your path explanation is ready to explore.",
+  "missing_sources": "Reliable sources are still needed for myths, jobs and future outlook.",
+  "max_tokens": 3500
+}

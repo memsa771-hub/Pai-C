@@ -227,10 +227,11 @@ def test_possibility_endpoints_auth_scope_and_explore_once():
                 first=client.post(url,headers=headers)
                 assert first.status_code==200,first.text
                 assert client.post(url,headers=headers).status_code==200
-                research.assert_awaited_once()
+                assert research.await_count == 2
+                assert research.call_args.args[0] == "path_explain"
                 assert research.call_args.kwargs['trigger']=='student_route'
             db.expire_all(); row=service.get(student.workspace_id,row.id)
-            assert db.get(Roadmap,row.roadmap_id).origin=='operator_suggested'
+            assert row.roadmap_id is None  # Places require a separate, explicit step.
             assert client.post(f'/v1/counselor/possibilities/{row.id}/save?network={student.workspace_id}',headers=headers).status_code==409
             assert client.post(f'/v1/counselor/possibilities/{row.id}/dismiss?network={student.workspace_id}',headers=headers).status_code==200
             assert client.post(f'/v1/counselor/possibilities/{row.id}/save?network={student.workspace_id}',headers=headers).status_code==200

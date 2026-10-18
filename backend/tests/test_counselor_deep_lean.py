@@ -100,7 +100,8 @@ async def test_deep_context_has_only_roadmaps_after_mirror_confirmation():
         research_journey(student, db, confirmed=True)
         text = (await build_context(db, student.workspace_id, turn)).text
         research = json.loads(text.split("<research>")[1].split("</research>")[0])
-        assert set(research) == {"roadmaps"}
+        assert set(research) == {"roadmaps", "facts"}
+        assert research["facts"] == []
         assert research["roadmaps"][0]["title"] == "Existing route"
 
 
@@ -115,7 +116,8 @@ async def test_research_gateway_always_enforces_confirmation():
             assert await request_research("roadmap_light", student.workspace_id, **kwargs) is None
             delegate.assert_not_awaited()
             kwargs["journey"] = research_journey(student, db, confirmed=True)
-            assert await request_research("roadmap_light", student.workspace_id, **kwargs) == {"ok": True}
+            assert (await request_research("roadmap_light", student.workspace_id, **kwargs))["data"]["status"] == "paths_ready"
+            delegate.assert_not_awaited()
             kwargs["tool_context"] = SimpleNamespace(workspace_id="another-workspace")
             assert await request_research("roadmap_light", student.workspace_id, **kwargs) is None
             with pytest.raises(ValueError, match="unknown"):
@@ -151,7 +153,7 @@ async def test_gateway_reuses_existing_operator_payload_and_deduplicates_runs():
             "underlying_objective": "An education goal", "constraints": []}}]
         with patch("app.tools.get_tool_executor", return_value=executor):
             assert await request_research("roadmap_light", student.workspace_id,
-                db=db, journey=journey, snapshot=SimpleNamespace(facts={}, records={"goal":goals}), tool_context=ctx) == {"ok": True}
+                db=db, journey=journey, snapshot=SimpleNamespace(facts={}, records={"goal":goals}), tool_context=ctx, trigger="student_answer") == {"ok": True}
             name, payload, used_ctx = executor.execute.call_args.args
             assert name == "operator.delegate" and used_ctx is ctx
             assert payload["task_type"] == "roadmap_research"
@@ -161,7 +163,7 @@ async def test_gateway_reuses_existing_operator_payload_and_deduplicates_runs():
                 constraints=payload["constraints"]))
             db.commit()
             duplicate = await request_research("roadmap_light", student.workspace_id,
-                db=db, journey=journey, snapshot=SimpleNamespace(facts={}, records={"goal":goals}), tool_context=ctx)
+                db=db, journey=journey, snapshot=SimpleNamespace(facts={}, records={"goal":goals}), tool_context=ctx, trigger="student_answer")
             assert duplicate["ok"] and duplicate["data"]["resumed"]
         executor.execute.assert_awaited_once()
 

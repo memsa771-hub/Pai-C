@@ -16,3 +16,6 @@ claims. An unannotated qualitative assertion can evade deterministic detection;
 the prompt prohibits it, but this is not a proof of semantic truth. No live
 quality evaluation has been run. Program assertions are separately sourced and
 validated; generic explanatory prose remains a model-quality limitation.
+
+## Reviewed career sources
+No reviewed occupational-source domain pack is supplied. The path workflow performs existing SourceVerifier checks but will not label unreviewed sources verified. General path explanations remain available; sourced myths/jobs/outlook show missing information until authoritative sources are configured. This is deliberately not replaced by model guesses. Semantic institution-name absence in general prose still needs a quality evaluation; no live call was authorized.

@@ -111,7 +111,13 @@ def _research(db, workspace_id: str, journey) -> dict | None:
     rows = db.execute(select(Roadmap).where(
         Roadmap.workspace_id == workspace_id, Roadmap.journey_id == journey.id,
     ).order_by(Roadmap.created_at.desc()).limit(5)).scalars().all()
-    return {"facts": [fact for row in rows for fact in (row.facts or []) if isinstance(fact, dict)][:20],
+    from app.models import RequirementSet, Opportunity
+    requirements = db.scalars(select(RequirementSet).join(Opportunity).where(
+        Opportunity.workspace_id == workspace_id,
+        RequirementSet.id.in_([row.requirement_set_id for row in rows if row.requirement_set_id]))).all()
+    facts = [{**fact, "status": requirement.status} for requirement in requirements
+             for fact in (requirement.rules or []) if isinstance(fact, dict)]
+    return {"facts": facts[:20],
             "roadmaps": [{"id": row.id, "title": row.title,
                           "status": row.generation_status,
                           "sources": [item for item in (row.sources or [])[:5]

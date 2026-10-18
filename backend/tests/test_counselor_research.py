@@ -32,7 +32,8 @@ def test_six_research_capabilities_register_with_single_owners():
     registry = get_capability_registry()
     expected = {"program.discover", "program.research", "qualification.recognize",
                 "scholarship.discover", "gap.assess", "roadmap.build"}
-    assert {item.id for item in registry.all()} == expected
+    assert {item.id for item in registry.all()} == expected | {"path.explain"}
+    assert registry.owner_for_task_type("path_explain").id == "path.explain"
     assert registry.owner_for_task_type("roadmap_research").id == "roadmap.build"
     assert registry.get("roadmap.build").uses_capabilities == expected - {"roadmap.build"}
 

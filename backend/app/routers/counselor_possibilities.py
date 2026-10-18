@@ -25,27 +25,9 @@ async def change_possibility(possibility_id: str, action: str, network: str = Qu
     previous_status = None
     try:
         if action == "explore":
-            previous_status = service.get(workspace_id, possibility_id).status
-            row, changed = service.prepare_explore(workspace_id, possibility_id)
-            if changed:
-                from app.journey import JourneyService
-                from app.models import Roadmap
-                from app.pai_c.memory import MemoryService
-                from app.services.pai import PAI_AGENT_NAME, PAI_PRIMARY_CHANNEL, WorkspaceApi
-                from app.tools import AUDIENCE_COUNSELOR, ToolContext
-                from app.research.gateway import request_research
-                roadmap = db.get(Roadmap, row.roadmap_id)
-                if not roadmap.execution_run_id:
-                    context = ToolContext(workspace_id=workspace_id, agent_name=PAI_AGENT_NAME,
-                        api=WorkspaceApi(workspace_id, workspace.password_hash), conversation=PAI_PRIMARY_CHANNEL,
-                        allowed_tools=frozenset({"operator.delegate"}), audience=AUDIENCE_COUNSELOR,
-                        granted_capabilities=MemoryService(db).agent_capabilities(PAI_AGENT_NAME))
-                    delegated = await request_research("roadmap_light", workspace_id, db=db,
-                        journey=JourneyService(db).get(workspace_id, row.journey_id), tool_context=context,
-                        roadmap_id=row.roadmap_id, trigger="student_route")
-                    if not delegated or not delegated.get("ok"):
-                        raise HTTPException(503, "Research could not start")
-                    roadmap.execution_run_id = delegated["data"]["run_id"]
+            from app.routers.counselor_paths import explore
+            await explore(possibility_id, network, db, x_workspace_token, authorization)
+            row = service.get(workspace_id, possibility_id)
         else:
             row, _ = service.transition(workspace_id, possibility_id, action)
         db.commit()

@@ -38,7 +38,7 @@ def _research_brief(db, workspace_id, journey, snapshot=None, understanding=None
 
 async def request_research(kind, workspace_id, *, db, journey, tool_context,
                            goals=None, snapshot=None, understanding=None, refresh_key=None, refresh_candidate=None,
-                           roadmap_id=None, trigger=None, resume_run_id=None, resume_action=None):
+                           roadmap_id=None, trigger=None, resume_run_id=None, resume_action=None, possibility_id=None):
     """Serialize gateway requests without holding row locks across Operator calls."""
     from sqlalchemy import text
     import hashlib
@@ -54,7 +54,7 @@ async def request_research(kind, workspace_id, *, db, journey, tool_context,
         return await _request_research(kind, workspace_id, db=db, journey=journey,
             tool_context=tool_context, goals=goals, snapshot=snapshot, understanding=understanding, refresh_key=refresh_key,
             refresh_candidate=refresh_candidate, roadmap_id=roadmap_id, trigger=trigger,
-            resume_run_id=resume_run_id, resume_action=resume_action)
+            resume_run_id=resume_run_id, resume_action=resume_action, possibility_id=possibility_id)
     finally:
         if lock is not None:
             try:
@@ -65,7 +65,9 @@ async def request_research(kind, workspace_id, *, db, journey, tool_context,
 
 async def _request_research(kind, workspace_id, *, db, journey, tool_context,
                            goals=None, snapshot=None, understanding=None, refresh_key=None, refresh_candidate=None,
-                           roadmap_id=None, trigger=None, resume_run_id=None, resume_action=None):
+                           roadmap_id=None, trigger=None, resume_run_id=None, resume_action=None, possibility_id=None):
+    if kind == "path_explain":
+        return await _request_path(db, workspace_id, journey, tool_context, possibility_id)
     if kind not in {"roadmap_light", "roadmap_deep", "stale_refresh"}:
         raise ValueError("unknown Counselor research kind")
     trigger = trigger or ("stale_refresh" if kind == "stale_refresh" else
@@ -114,6 +116,13 @@ async def _request_research(kind, workspace_id, *, db, journey, tool_context,
         if journey.current_stage != "CHOSEN" or not chosen:
             return None
         raise NotImplementedError("chosen roadmap deep research is deferred")
+    if kind == "roadmap_light" and trigger == "mirror_confirmed":
+        # Confirmation creates paths; institution research requires a separate
+        # explicit path-scoped where-to-study request.
+        from app.pai_c.possibilities import PossibilityService
+        PossibilityService(db).from_mirror(journey)
+        db.commit()
+        return {"ok": True, "data": {"status": "paths_ready", "mirror_version": (journey.counselor_summary_draft or {}).get("version")}}
     brief = _research_brief(db, workspace_id, journey, snapshot, understanding)
     brief["research_kind"] = kind
     brief["refresh_key"] = refresh_key
@@ -149,4 +158,34 @@ async def _request_research(kind, workspace_id, *, db, journey, tool_context,
                         "capability_input": {"brief": brief}},
         "context_refs": ["vault", "memory"]}
     db.commit()
+    return await _delegate(payload, tool_context)
+
+
+async def _request_path(db, workspace_id, journey, tool_context, possibility_id):
+    from app.pai_c.possibilities import PossibilityService
+    from app.pai_c.paths.explain import policy
+    from app.tools import get_tool_executor
+    if not tool_context or tool_context.workspace_id != workspace_id or not journey or not mirror_is_current(db, workspace_id):
+        return None
+    row = PossibilityService(db).get(workspace_id, possibility_id)
+    if row.journey_id != journey.id or row.status == "dismissed":
+        return None
+    version = journey.counselor_summary_draft["version"]
+    key = f"path:{row.id}:mirror:{version}"
+    runs = db.scalars(select(ExecutionRun).where(ExecutionRun.workspace_id == workspace_id,
+        ExecutionRun.task_type == "path_explain")).all()
+    previous = next((run for run in runs if (run.constraints or {}).get("research_key") == key and run.status != "failed"), None)
+    if previous:
+        return {"ok": True, "data": {"run_id": previous.id, "status": previous.status, "resumed": True}}
+    brief = {"possibility_id": row.id, "title": row.title, "why": row.why,
+        "evidence": row.evidence or [], "mirror_version": version}
+    payload = {"objective": policy()["objective"], "task_type": "path_explain",
+        "constraints": {"trigger": "student_route", "research_key": key, "mirror_version": version,
+            "possibility_id": row.id, "capability_input": {"brief": brief}}, "context_refs": []}
+    db.commit()
+    return await _delegate(payload, tool_context)
+
+
+async def _delegate(payload, tool_context):
+    from app.tools import get_tool_executor
     return await get_tool_executor().execute("operator.delegate", payload, tool_context)

@@ -151,6 +151,11 @@ async def test_each_research_trigger_uses_gateway_and_persists_attribution(trigg
                                             tool_context=ctx, trigger=trigger, **kwargs)
             duplicate = await request_research(kind, student.workspace_id, db=db, journey=journey,
                                                tool_context=ctx, trigger=trigger, **kwargs)
+        if trigger == "mirror_confirmed":
+            assert result == duplicate
+            assert result["data"]["status"] == "paths_ready"
+            assert not db.scalars(select(ExecutionRun)).all()
+            return
         assert result["ok"] and duplicate["data"]["run_id"] == result["data"]["run_id"]
         db.expire_all()
         run = db.get(ExecutionRun, result["data"]["run_id"])
