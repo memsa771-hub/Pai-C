@@ -11,7 +11,7 @@ from app.pai_c.deep.turn_input import CounselorTurnInput
 from app.models import EventRecord, Roadmap
 
 logger = logging.getLogger(__name__)
-_KNOWN = frozenset({"none", "mirror", "note_question", "wellbeing", "rethink"})
+_KNOWN = frozenset({"none", "mirror", "note_question", "wellbeing", "rethink", "collect_fact"})
 
 
 def _record(db, turn: CounselorTurnInput, name: str, status: str, **details) -> None:
@@ -35,6 +35,11 @@ async def dispatch_action(db, turn: CounselorTurnInput, action: dict,
         return "none", "ignored"
     if kind == "none":
         return kind, "none"
+    if kind == "collect_fact":
+        from app.pai_c.fact_cards import validated_card
+        status = "offered" if validated_card(action, context.fact_cards, turn.student_text) else "ignored"
+        _record(db, turn, kind, status)
+        return kind, status
     if kind == "mirror":
         ready = bool(context.notebook.mirror_ready)
         logger.info("counselor: mirror requested ready=%s", ready)

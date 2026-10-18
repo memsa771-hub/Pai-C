@@ -3,31 +3,240 @@
     "first_picture_action": "first_picture",
     "first_picture_min_student_messages": 8,
     "first_picture_min_covered_areas": 4,
-    "first_picture_required_areas": ["status", "history"]
+    "first_picture_required_areas": [
+      "status",
+      "history"
+    ]
   },
   "rows": [
-    {"id": "care", "when": {"in": [{"ref": "safety.level"}, ["concern", "urgent"]]},
-     "set": {"action": "care", "question_allowed": false, "topic": null, "invite": false}},
-    {"id": "mirror_changes", "when": {"ref": "mirror_correction"},
-     "set": {"action": "explore_correction", "question_allowed": true, "topic": {"first": {"ref": "mentioned_areas"}}, "invite": false}},
-    {"id": "mirror", "when": {"ref": "mirror_allowed"},
-     "set": {"action": "mirror", "question_allowed": false, "topic": null, "invite": false}},
-    {"id": "first_picture", "when": {"ref": "first_picture_due"},
-     "set": {"action": "first_picture", "question_allowed": true, "topic": null, "invite": false}},
-    {"id": "guide", "when": {"all": [{"eq": [{"ref": "intent"}, "deciding"]}, {"ref": "summary_confirmed"}]},
-     "set": {"action": "guide", "question_allowed": true, "topic": null, "invite": false}},
-    {"id": "discover", "when": {"all": [{"ref": "discover_available"}, {"eq": [{"ref": "questions_in_last_two"}, false]}]},
-     "set": {"action": "discover", "question_allowed": true, "topic": {"ref": "possibility_id"}, "invite": false}},
-    {"id": "rest", "when": {"ref": "questions_in_last_two"},
-     "set": {"action": "counsel", "question_allowed": false, "topic": null, "invite": false}},
-    {"id": "counsel", "when": true,
-     "set": {"action": "counsel", "question_allowed": true, "topic": null, "invite": false}}
+    {
+      "id": "care",
+      "when": {
+        "in": [
+          {
+            "ref": "safety.level"
+          },
+          [
+            "concern",
+            "urgent"
+          ]
+        ]
+      },
+      "set": {
+        "action": "care",
+        "question_allowed": false,
+        "topic": null,
+        "invite": false
+      }
+    },
+    {
+      "id": "answer",
+      "when": {
+        "ne": [
+          {
+            "ref": "request"
+          },
+          null
+        ]
+      },
+      "set": {
+        "action": "answer_request",
+        "question_allowed": {
+          "ref": "request.needs_context"
+        },
+        "topic": "request",
+        "invite": false
+      }
+    },
+    {
+      "id": "follow_thread",
+      "when": {
+        "ne": [
+          {
+            "ref": "opened_thread"
+          },
+          null
+        ]
+      },
+      "set": {
+        "action": "follow_thread",
+        "question_allowed": true,
+        "topic": {
+          "ref": "opened_thread"
+        },
+        "invite": false
+      }
+    },
+    {
+      "id": "mirror_changes",
+      "when": {
+        "ref": "mirror_correction"
+      },
+      "set": {
+        "action": "explore_correction",
+        "question_allowed": true,
+        "topic": {
+          "first": {
+            "ref": "mentioned_areas"
+          }
+        },
+        "invite": false
+      }
+    },
+    {
+      "id": "mirror",
+      "when": {
+        "ref": "mirror_allowed"
+      },
+      "set": {
+        "action": "mirror",
+        "question_allowed": false,
+        "topic": null,
+        "invite": false
+      }
+    },
+    {
+      "id": "first_picture",
+      "when": {
+        "ref": "first_picture_due"
+      },
+      "set": {
+        "action": "first_picture",
+        "question_allowed": true,
+        "topic": null,
+        "invite": false
+      }
+    },
+    {
+      "id": "guide",
+      "when": {
+        "all": [
+          {
+            "eq": [
+              {
+                "ref": "intent"
+              },
+              "deciding"
+            ]
+          },
+          {
+            "ref": "summary_confirmed"
+          }
+        ]
+      },
+      "set": {
+        "action": "guide",
+        "question_allowed": true,
+        "topic": null,
+        "invite": false
+      }
+    },
+    {
+      "id": "discover",
+      "when": {
+        "all": [
+          {
+            "ref": "discover_available"
+          },
+          {
+            "eq": [
+              {
+                "ref": "questions_in_last_two"
+              },
+              false
+            ]
+          }
+        ]
+      },
+      "set": {
+        "action": "discover",
+        "question_allowed": true,
+        "topic": {
+          "ref": "possibility_id"
+        },
+        "invite": false
+      }
+    },
+    {
+      "id": "rest",
+      "when": {
+        "ref": "questions_in_last_two"
+      },
+      "set": {
+        "action": "counsel",
+        "question_allowed": false,
+        "topic": null,
+        "invite": false
+      }
+    },
+    {
+      "id": "explore_area",
+      "when": {
+        "ne": [
+          {
+            "ref": "askable_area"
+          },
+          null
+        ]
+      },
+      "set": {
+        "action": "explore_area",
+        "question_allowed": true,
+        "topic": {
+          "ref": "askable_area"
+        },
+        "invite": false
+      }
+    },
+    {
+      "id": "counsel",
+      "when": true,
+      "set": {
+        "action": "counsel",
+        "question_allowed": true,
+        "topic": null,
+        "invite": false
+      }
+    }
   ],
   "post_checks": [
-    {"id": "question_cap",
-     "when": {"all": [{"ref": "questions_in_last_two"}, {"ref": "chosen.question_allowed"}, {"ne": [{"ref": "chosen.action"}, "care"]}]},
-     "branches": [{"when": true,
-       "set": {"action": {"ref": "chosen.action"}, "question_allowed": false,
-               "topic": {"ref": "chosen.topic"}, "invite": {"ref": "chosen.invite"}}}]}
+    {
+      "id": "question_cap",
+      "when": {
+        "all": [
+          {
+            "ref": "questions_in_last_two"
+          },
+          {
+            "ref": "chosen.question_allowed"
+          },
+          {
+            "ne": [
+              {
+                "ref": "chosen.action"
+              },
+              "care"
+            ]
+          }
+        ]
+      },
+      "branches": [
+        {
+          "when": true,
+          "set": {
+            "action": {
+              "ref": "chosen.action"
+            },
+            "question_allowed": false,
+            "topic": {
+              "ref": "chosen.topic"
+            },
+            "invite": {
+              "ref": "chosen.invite"
+            }
+          }
+        }
+      ]
+    }
   ]
 }

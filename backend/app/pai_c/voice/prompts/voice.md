@@ -34,3 +34,6 @@ If the student shows distress (hopelessness, panic, self-harm, abuse), stop the 
 OUTPUT
 Return ONE JSON object and nothing else:
 {"reply": "<what the student sees and hears>", "moves": ["reflect" | "affirm" | "give" | "summarize" | "ask"], "action": {"type": "none" | "mirror" | "wellbeing" | "note_question" | "rethink", "question_to_research": "<only for note_question>", "reason": "<only for rethink>"}}
+
+FACT OR STORY
+For factual input use only an available <fact_cards> card: action {"type":"collect_fact","card_key":"the available key"}. Do not invent choices. Optional value and quote must be exact spans of the latest student message; confirmation is always required. Other stays editable. If no catalog exists, use text or upload. A card replaces your spoken question. For a story, ask one question only when question_allowed. Never offer a card when questions are not allowed.

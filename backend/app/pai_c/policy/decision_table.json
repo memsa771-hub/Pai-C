@@ -30,6 +30,46 @@
       }
     },
     {
+      "id": "answer",
+      "when": {
+        "ne": [
+          {
+            "ref": "request"
+          },
+          null
+        ]
+      },
+      "set": {
+        "action": "answer_request",
+        "question_allowed": {
+          "ref": "request.needs_context"
+        },
+        "topic": "request",
+        "invite": {
+          "ref": "invite_pending"
+        }
+      }
+    },
+    {
+      "id": "follow_thread",
+      "when": {
+        "ne": [
+          {
+            "ref": "opened_thread"
+          },
+          null
+        ]
+      },
+      "set": {
+        "action": "follow_thread",
+        "question_allowed": true,
+        "topic": {
+          "ref": "opened_thread"
+        },
+        "invite": false
+      }
+    },
+    {
       "id": "mirror_changes",
       "when": {
         "ref": "mirror_correction"
@@ -60,42 +100,6 @@
         "question_allowed": true,
         "topic": null,
         "invite": false
-      }
-    },
-    {
-      "id": "answer",
-      "when": {
-        "all": [
-          {
-            "ne": [
-              {
-                "ref": "request"
-              },
-              null
-            ]
-          },
-          {
-            "in": [
-              {
-                "ref": "intent"
-              },
-              [
-                "asking_info",
-                "asking_task"
-              ]
-            ]
-          }
-        ]
-      },
-      "set": {
-        "action": "answer_request",
-        "question_allowed": {
-          "ref": "request.needs_context"
-        },
-        "topic": "request",
-        "invite": {
-          "ref": "invite_pending"
-        }
       }
     },
     {
@@ -141,8 +145,29 @@
     },
     {
       "id": "discover",
-      "when": {"all": [{"ref": "discover_available"}, {"eq": [{"ref": "questions_in_last_two"}, false]}]},
-      "set": {"action": "discover", "topic": {"ref": "possibility_id"}, "question_allowed": true, "invite": false}
+      "when": {
+        "all": [
+          {
+            "ref": "discover_available"
+          },
+          {
+            "eq": [
+              {
+                "ref": "questions_in_last_two"
+              },
+              false
+            ]
+          }
+        ]
+      },
+      "set": {
+        "action": "discover",
+        "topic": {
+          "ref": "possibility_id"
+        },
+        "question_allowed": true,
+        "invite": false
+      }
     },
     {
       "id": "listen",
@@ -491,10 +516,43 @@
         }
       ]
     },
-    {"id": "question_cap",
-     "when": {"all": [{"ref": "questions_in_last_two"}, {"ref": "chosen.question_allowed"}, {"ne": [{"ref": "chosen.action"}, "care"]}]},
-     "branches": [{"when": true,
-       "set": {"action": {"ref": "chosen.action"}, "question_allowed": false,
-               "topic": {"ref": "chosen.topic"}, "invite": {"ref": "chosen.invite"}}}]}
+    {
+      "id": "question_cap",
+      "when": {
+        "all": [
+          {
+            "ref": "questions_in_last_two"
+          },
+          {
+            "ref": "chosen.question_allowed"
+          },
+          {
+            "ne": [
+              {
+                "ref": "chosen.action"
+              },
+              "care"
+            ]
+          }
+        ]
+      },
+      "branches": [
+        {
+          "when": true,
+          "set": {
+            "action": {
+              "ref": "chosen.action"
+            },
+            "question_allowed": false,
+            "topic": {
+              "ref": "chosen.topic"
+            },
+            "invite": {
+              "ref": "chosen.invite"
+            }
+          }
+        }
+      ]
+    }
   ]
 }

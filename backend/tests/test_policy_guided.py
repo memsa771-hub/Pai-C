@@ -27,7 +27,7 @@ def state(**changes):
     ({"discover_available": True, "possibility_id": "p1"}, "discover", "discover", True),
     ({"questions_in_last_two": True, "discover_available": True}, "rest", "counsel", False),
     ({"intent": "deciding"}, "counsel", "counsel", True),
-    ({"intent": "asking_task", "request": {"needs_context": False}}, "counsel", "counsel", True),
+    ({"intent": "asking_task", "request": {"needs_context": False}}, "answer", "answer_request", False),
     ({}, "counsel", "counsel", True),
 ])
 def test_guided_rows_first_match(changes, rule, action, question):

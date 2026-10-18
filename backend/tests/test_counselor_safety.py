@@ -16,7 +16,7 @@ from scripts.counselor_eval_support import StudentSession
 
 def answer(reply):
     return SimpleNamespace(reply=reply, action={"type":"none"},
-        context=SimpleNamespace(build_ms=1, notebook=SimpleNamespace(mirror_ready=False)),
+        context=SimpleNamespace(build_ms=1, notebook=SimpleNamespace(mirror_ready=False), fact_cards=()),
         model_ms=1, polish_ms=1, moves=[], guard_violations=[])
 
 

@@ -43,7 +43,7 @@ async def test_deep_eval_policy_mode_uses_production_runtime(tmp_path):
         result = await run_evaluation(persona_ids={"danish"}, result_dir=tmp_path, policy_mode="guided")
     assert result["policy_mode"] == "guided"
     turns = result["personas"][0]["turns"]
-    assert turns and all(turn["decision"]["action"] == "counsel" for turn in turns)
+    assert turns and all(turn["decision"]["action"] == "explore_area" for turn in turns)
     assert all(turn["reply"] for turn in turns)
 
 

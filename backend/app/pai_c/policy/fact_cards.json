@@ -1,0 +1,58 @@
+{
+  "copy": {
+    "other": "Other",
+    "confirm": "Confirm",
+    "upload": "Upload a result card or certificate",
+    "text": "Your answer"
+  },
+  "catalogs": {
+    "levels": [],
+    "boards": [],
+    "subjects": [],
+    "skills": [],
+    "cities": []
+  },
+  "cards": {
+    "qualification": {
+      "area": "status",
+      "label": "Current or latest qualification",
+      "record_type": "education",
+      "field": "qualification_name",
+      "catalog": "levels",
+      "upload": true
+    },
+    "board": {
+      "area": "history",
+      "label": "Awarding board",
+      "record_type": "education",
+      "field": "details.awarding_body",
+      "requires_record": true,
+      "catalog": "boards",
+      "upload": true
+    },
+    "subject": {
+      "area": "history",
+      "label": "Subject",
+      "record_type": "course",
+      "field": "name",
+      "parent_type": "education",
+      "catalog": "subjects",
+      "upload": true
+    },
+    "skill": {
+      "area": "strengths",
+      "label": "A skill you use",
+      "record_type": "skill",
+      "field": "name",
+      "catalog": "skills",
+      "upload": true
+    },
+    "city": {
+      "area": "status",
+      "label": "City",
+      "field_key": "location.current_city",
+      "catalog": "cities",
+      "upload": false
+    }
+  }
+}

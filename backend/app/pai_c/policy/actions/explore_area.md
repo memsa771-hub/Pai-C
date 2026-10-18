@@ -1,0 +1,1 @@
+Explore {topic_text}. If this needs a fact and an available card fits, offer that card. If it is a story, ask one natural question when allowed. Use what is already known; never repeat an answered question.

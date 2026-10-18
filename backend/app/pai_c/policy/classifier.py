@@ -38,6 +38,7 @@ class Signals(StrictModel):
     request: Request | None
     mentioned_areas: list[Area]
     declined_area: Area | None
+    opened_thread: Area | None = None
 
 
 def fallback_signals():

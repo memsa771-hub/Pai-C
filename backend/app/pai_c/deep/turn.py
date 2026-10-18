@@ -131,6 +131,11 @@ async def run_deep_turn(db, turn: CounselorTurnInput, *,
                 else:
                     reply = config.PAI_STATEMENT_FALLBACK_REPLY
                     violations.append("statement_fallback")
+        from app.pai_c.fact_cards import validated_card
+        card = validated_card(action, context.fact_cards, turn.student_text) if decision is not None and decision.question_allowed else None
+        if card is not None and list(question_sentences(reply)):
+            reply = remove_repeated(reply, list(question_sentences(reply))) or config.PAI_STATEMENT_FALLBACK_REPLY
+            violations.append("card_question_removed")
         reply = polish_reply(reply)
         avoid = context.plan.avoid_questions if context.plan is not None else []
         repeated = repeated_questions(reply, history, avoid)

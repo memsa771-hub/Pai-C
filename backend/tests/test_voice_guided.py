@@ -71,11 +71,11 @@ async def test_state_block_content(monkeypatch):
         assert set(state["areas"]) == {"status", "history", "interests", "strengths",
                                        "family_social", "values", "pressures", "sure", "goals", "options"}
         assert state["areas"]["history"] == {"covered": False, "item_count": 0, "min_items": 2}
-        assert state["question_allowed"] is True and len(state["open_requests"]) <= 5
-        assert state["last_moves"] and state["last_moves"][-1]["action"] == "counsel"
+        assert state["question_allowed"] is False and len(state["open_requests"]) <= 5
+        assert state["last_moves"] and state["last_moves"][-1]["action"] == "answer_request"
         decision = section(prompts[-1], "decision")
-        assert decision["action"] == "counsel"
-        assert decision["instruction"].strip() == "Follow the counseling loop for this reply."
+        assert decision["action"] == "answer_request"
+        assert decision["topic_text"] == "What does a data analyst do"
         with student.factory() as db:
             row = db.scalar(select(CounselorNotedQuestion))
             assert row.status == "answered_now"

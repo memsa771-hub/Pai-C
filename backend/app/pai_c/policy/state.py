@@ -23,7 +23,7 @@ def first_picture_due(*, coverage, student_count, prior_decisions, summary_confi
 
 def derive_state(signals, *, coverage, mirror_ready, plan, student_count,
                  prior_decisions, replies, student_ordinals, current_event_id,
-                 summary_confirmed=False):
+                 summary_confirmed=False, reply_requested_input=None):
     policy = load_data("decision_table.json")["derived"]
     data = signals.model_dump()
     previous = prior_decisions[-1]["decision"] if prior_decisions else {}
@@ -47,12 +47,13 @@ def derive_state(signals, *, coverage, mirror_ready, plan, student_count,
     if data["declined_area"]:
         declines[data["declined_area"]] = student_count
     window = policy["question_window"]
+    requested = reply_requested_input or [False] * len(replies)
+    asking = [requested[i] or any(question_sentences(reply)) for i, reply in enumerate(replies)]
     return {**data, "coverage": coverage, "mirror_ready": mirror_ready,
             "student_count": student_count, "previous": previous,
             "previous_mentioned_areas": previous.get("signals", {}).get("mentioned_areas", []),
             "declined_at": declines, "short_reply_streak": streak,
-            "questions_in_last_two": len(replies) >= window and all(
-                any(question_sentences(reply)) for reply in replies[-window:]),
+            "questions_in_last_two": len(asking) >= window and all(asking[-window:]),
             "summary_due": student_count - max(summaries, default=0) >= config.PAI_SUMMARY_EVERY_TURNS
                 and covered >= policy["summary_min_covered"],
             "insight_available": bool(plan and plan.give.strip()),
@@ -82,6 +83,7 @@ def build_state(db, turn, signals, history):
         mirror_ready=memory.truth_map(turn.workspace_id).notebook.mirror_ready,
         plan=plan, student_count=len(ordinals), prior_decisions=prior,
         replies=[row["content"] for row in history if row["role"] == "assistant"],
+        reply_requested_input=[bool(row.get("requested_input")) for row in history if row["role"] == "assistant"],
         student_ordinals=ordinals, current_event_id=turn.source_event_id)
     from app.pai_c.deep.noted_questions import NotedQuestionService
     state["open_requests"] = NotedQuestionService(db).open_requests(turn.workspace_id)

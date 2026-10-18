@@ -97,6 +97,10 @@ def test_verified_identity_to_onboarding_refresh_logout_and_expiry():
 
 
 def sample(schema, schemas):
+    if 'const' in schema:
+        return schema['const']
+    if schema.get('format') == 'uuid':
+        return str(uuid4())
     if '$ref' in schema:
         return sample(schemas[schema['$ref'].split('/')[-1]], schemas)
     if 'anyOf' in schema:
@@ -167,7 +171,11 @@ def test_all_pai_c_routes_reject_anonymous_and_other_workspace(path, method, spe
         if 'application/json' in content:
             body = sample(content['application/json']['schema'], schemas)
             if isinstance(body, dict):
-                body['network'] = foreign_id
+                body_schema = content['application/json']['schema']
+                if '$ref' in body_schema:
+                    body_schema = schemas[body_schema['$ref'].split('/')[-1]]
+                if body_schema.get('additionalProperties') is not False or 'network' in body_schema.get('properties', {}):
+                    body['network'] = foreign_id
                 if path.startswith('/v1/files/trash'):
                     body['file_ids'] = [foreign_file]
                 if 'url' in body:

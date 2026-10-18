@@ -11,6 +11,29 @@ class MemoryService:
     def __init__(self, db):
         self.db = db
 
+    def save_fact_card(self, workspace_id, spec, value, evidence, record_id=None):
+        from sqlalchemy import select
+        from app.models import MemoryCandidate, Workspace
+        from app.memory.candidates import MemoryCandidateService
+        from app.memory.reconciler import MemoryReconciler
+        self.db.get(Workspace, workspace_id, with_for_update=True)
+        previous = self.db.scalar(select(MemoryCandidate).where(
+            MemoryCandidate.workspace_id == workspace_id,
+            MemoryCandidate.evidence["capture"].as_string() == "fact_card",
+            MemoryCandidate.evidence["submission_id"].as_string() == evidence["submission_id"]))
+        key = spec.get("record_type") or spec["field_key"]
+        if previous:
+            if previous.key != key or previous.proposed_value != {"value": value} or (previous.entities or {}).get("record_id") != record_id:
+                raise ValueError("Submission id already used for another answer")
+            return {"saved": previous.status == "accepted", "candidate_id": previous.id}
+        candidate = MemoryCandidateService(self.db).propose(workspace_id,
+            candidate_type="student_record" if spec.get("record_type") else "vault_fact",
+            key=key, proposed_value=value, entities={"record_id": record_id} if record_id else {},
+            source_type="user_explicit", allow_user_explicit=True, confidence=1,
+            input_channel="profile", evidence=evidence)
+        result = MemoryReconciler(self.db).reconcile(candidate)
+        return {"saved": result.accepted, "id": result.result_id, "candidate_id": candidate.id}
+
     def recent_turns(self, turn, owner_id, *, limit=24):
         return shared_history(self.db, turn, owner_id, limit=limit)
 

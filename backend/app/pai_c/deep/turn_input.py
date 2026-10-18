@@ -48,6 +48,7 @@ def shared_history(db, turn: CounselorTurnInput, owner_id: str,
             continue
         history.append({"role": "assistant" if row.source == "openagents:pai" else "user",
                         "content": text[:1500], "target": row.target,
+                        "requested_input": row.source == "openagents:pai" and bool(payload.get("fact_card")),
                         "session_id": (row.metadata_ or {}).get("voice_session_id")
                         or (row.metadata_ or {}).get("session_id")})
         if len(history) == limit:

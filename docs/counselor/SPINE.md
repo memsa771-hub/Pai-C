@@ -2136,3 +2136,22 @@ The founder replaced the old immediate-revert rule: clear implementation/test
 fixes get up to two attempts inside the step; product decisions, board conflicts,
 or failure after two attempts require stopping. Tasks tools and workflow
 advancement remain on the OS developer's contract open list.
+
+## Locked workflow Phase 2, step 2
+
+Care and recorded requests precede a classifier-identified student thread.
+Uncovered-area prompts distinguish a story from a factual card. Cards are data
+in policy/fact_cards.json, with catalog-only choices, editable Other, and a
+text/upload fallback for missing catalogs. Exact quoted prefills need student
+confirmation. Card requests count toward the same question cap as speech.
+
+Authenticated /v1/counselor/fact-cards endpoints read the snapshot and write via
+MemoryService -> candidate -> reconciler. Submission ids are workspace-locked
+and idempotent. Other carries stated evidence and catalog_review metadata.
+No new model calls, tables, queue or direct canonical writes were introduced.
+
+Existing test changes preserve assertions while matching the intended request
+action and uncovered-area action. The auth fixture now respects const/UUID and
+strict object schemas while retaining network for unrestricted /events bodies.
+Authorization expectations remain 401/403/404. The one-time strict invitation
+and all existing safety, request persistence and contract tests remain intact.

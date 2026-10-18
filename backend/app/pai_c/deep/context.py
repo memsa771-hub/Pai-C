@@ -73,10 +73,10 @@ def _trim_notebook(notebook) -> dict:
     return selected
 
 
-def _profile(db, workspace_id: str) -> dict:
+def _profile(db, workspace_id: str, snapshot=None) -> dict:
     workspace = db.get(Workspace, workspace_id)
     owner = db.get(User, workspace.owner_user_id) if workspace and workspace.owner_user_id else None
-    snapshot = MemoryService(db).profile(workspace_id)
+    snapshot = snapshot if snapshot is not None else MemoryService(db).profile(workspace_id)
     identity = {}
     if owner and owner.display_name:
         identity["display_name"] = {"value": owner.display_name, "source": "onboarding"}
@@ -123,6 +123,7 @@ class DeepContext:
     journey: object | None
     build_ms: int
     plan: object | None = None
+    fact_cards: tuple = ()
 
 
 def guided_state(db, workspace_id, notebook, draft, decision, coverage, open_requests):
@@ -158,6 +159,7 @@ async def build_context(db, workspace_id: str, turn: CounselorTurnInput, *,
     started = time.monotonic()
     if workspace_id != turn.workspace_id:
         raise ValueError("turn belongs to another workspace")
+    snapshot = MemoryService(db).profile(workspace_id)
     sections: dict[str, str] = {
         "today": datetime.now(timezone.utc).date().isoformat(),
         "language_policy": _json({
@@ -166,7 +168,7 @@ async def build_context(db, workspace_id: str, turn: CounselorTurnInput, *,
             "replacement": config.PAI_LANGUAGE_BLOCKED_SCRIPT_REPLACEMENT,
             "fallback_reply": config.PAI_COUNSELOR_FALLBACK_REPLY,
         }),
-        "profile": _json(_profile(db, workspace_id)),
+        "profile": _json(_profile(db, workspace_id, snapshot)),
     }
     memory = MemoryService(db)
     notebook = memory.truth_map(workspace_id).notebook
@@ -249,6 +251,11 @@ async def build_context(db, workspace_id: str, turn: CounselorTurnInput, *,
             memory.coverage_areas(workspace_id), NotedQuestionService(db).open_requests(workspace_id)))
     sections["journey"] = _json({"stage": journey.current_stage if journey else "IDENTITY",
         "mirror_status": draft.get("status"), "mirror_notebook_version": draft.get("notebook_version")})
+    from app.pai_c.fact_cards import available_cards
+    cards = ()
+    if decision is not None and decision.question_allowed and not wellbeing and not mirror and decision.action in {"explore_area", "ask", "ask_choice", "answer_request", "counsel"}:
+        cards = tuple(available_cards(snapshot, None if decision.topic == "request" else decision.topic))
+        sections["fact_cards"] = _json(cards)
     text = "<context>\n" + "\n".join(
         f"<{name}>{value}</{name}>" for name, value in sections.items()
     ) + "\n</context>"
@@ -256,4 +263,4 @@ async def build_context(db, workspace_id: str, turn: CounselorTurnInput, *,
     elapsed = int((time.monotonic() - started) * 1000)
     logger.info("counselor_deep_context tokens=%s total_tokens=%d build_ms=%d",
                 counts, estimated_tokens(text), elapsed)
-    return DeepContext(text, counts, notebook, journey, elapsed, plan)
+    return DeepContext(text, counts, notebook, journey, elapsed, plan, cards)
