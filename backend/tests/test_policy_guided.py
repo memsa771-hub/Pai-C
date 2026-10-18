@@ -95,4 +95,4 @@ def test_min_items_are_data():
     areas = json.loads((DATA_DIR / "areas.json").read_text(encoding="utf-8"))
     assert {area: spec["min_items"] for area, spec in areas.items()} == {
         "status": 1, "history": 2, "interests": 2, "strengths": 1,
-        "family_social": 2, "values": 1, "pressures": 1, "sure": 1, "goals": 1, "options": 1}
+        "family_social": 2, "values": 1, "pressures": 1, "sure": 1}

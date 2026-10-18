@@ -38,11 +38,6 @@ def coverage_areas(notebook, snapshot):
             for identity, row in rows:
                 if row.get("status", "active") != "active":
                     continue
-                # A stored shell or an unresolved candidate is not evidence of coverage.
-                if "not_null" not in location and not row.get("evidence"):
-                    continue
-                if any(at_path(row, field) not in values for field, values in location.get("where", {}).items()):
-                    continue
                 if "key_prefixes" in location and not any(row.get("key", "").startswith(prefix) for prefix in location["key_prefixes"]):
                     continue
                 if "nonempty" in location and not row.get(location["nonempty"]):

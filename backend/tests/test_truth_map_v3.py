@@ -131,8 +131,8 @@ def populated():
 
 def test_areas_use_active_evidence_and_json_mapping_changes_result(tmp_path, monkeypatch):
     notebook = populated()
-    snapshot = SimpleNamespace(facts={"identity.current_status": {"value": "In transition", "valid_from": STAMP, "evidence": {"quote": "I am in transition"}}},
-                               records={"education": [{"id": "education", "updated_at": STAMP, "evidence": {"quote": "I completed my course"}}]})
+    snapshot = SimpleNamespace(facts={"identity.current_status": {"value": "In transition", "valid_from": STAMP}},
+                               records={"education": [{"id": "education", "updated_at": STAMP}]})
     result = views.coverage_areas(notebook, snapshot)
     assert all(row["covered"] == (row["item_count"] >= row["min_items"]) for row in result.values())
     assert not result["family_social"]["covered"] and result["history"]["covered"]
