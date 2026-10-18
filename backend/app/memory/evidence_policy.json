@@ -1,0 +1,7 @@
+{
+  "confirmation_capture": "profile_confirmation",
+  "shown_verification": ["document_supported", "externally_verified", "verified"],
+  "shown_authorities": ["institution_issued", "test_provider_issued", "government_issued"],
+  "source_fields": ["quote", "file_id", "locator", "authority", "source_event_id"],
+  "merit_levels": ["shown", "confirmed"]
+}

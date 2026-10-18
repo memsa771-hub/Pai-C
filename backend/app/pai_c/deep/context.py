@@ -88,10 +88,13 @@ def _profile(db, workspace_id: str, snapshot=None) -> dict:
                    "source": fact.get("source_type") or "unknown",
                    "verification": fact.get("confidence")}
              for key, fact in list(snapshot.facts.items())[:30] if key not in identity}
+    for key, fact in facts.items():
+        fact["evidence_level"] = snapshot.facts[key].get("evidence_level", "stated")
     records = {kind: [{"value": _short({field: value for field, value in row.items()
                                         if field not in {"evidence", "created_at", "updated_at"}}),
                        "source": row.get("source_type") or "unknown",
-                       "verification": row.get("verification_status") or "unknown"}
+                       "verification": row.get("verification_status") or "unknown",
+                       "evidence_level": row.get("evidence_level", "stated")}
                       for row in rows[:5]]
                for kind, rows in snapshot.records.items() if rows and kind in {
                    "education", "course", "certification", "test_attempt", "goal",

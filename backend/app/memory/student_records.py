@@ -243,6 +243,12 @@ class StudentRecordService:
                 current.source_type = source_type
                 current.claim_origin = claim_origin
                 current.capture_method = capture_method
+            # Reviewing the same value changes provenance, not the factual data.
+            if source_type == "user_explicit" and capture_method == "profile_confirmation":
+                current.source_type = source_type
+                current.capture_method = capture_method
+                current.claim_origin = claim_origin
+                current.updated_at = datetime.now(timezone.utc)
             row = current
         else:
             row = ENTITY_MODELS[kind](workspace_id=workspace_id, subject_user_id=subject_user_id,

@@ -65,6 +65,13 @@ def provenance_for(candidate: MemoryCandidate) -> tuple[str, str, Optional[str]]
         authority = str((candidate.evidence or {}).get("authority") or "")
         origin, verification = _DOCUMENT_PROVENANCE.get(authority, _UNKNOWN_DOCUMENT_PROVENANCE)
         return origin, "document_extraction", verification
+    if source == "user_explicit" and candidate.input_channel == "profile":
+        evidence = candidate.evidence or {}
+        if evidence.get("capture") == "profile_review" and evidence.get("action") == "confirm":
+            from .evidence import value_digest, evidence_policy
+            value = MemoryReconciler._unwrap(candidate.proposed_value)
+            if (evidence.get("confirmation") or {}).get("value_digest") == value_digest(value):
+                return "student", evidence_policy()["confirmation_capture"], None
     if source in ("conversation", "user_explicit"):
         return (
             "student",

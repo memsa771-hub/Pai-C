@@ -34,6 +34,71 @@ class MemoryService:
         result = MemoryReconciler(self.db).reconcile(candidate)
         return {"saved": result.accepted, "id": result.result_id, "candidate_id": candidate.id}
 
+    def profile_cards(self, workspace_id):
+        from app.memory.student_profile_view import StudentProfileView, PROFILE_SECTIONS
+        from app.memory.student_records import StudentRecordService
+        from app.memory.evidence import evidence_level, evidence_policy, value_digest
+        snapshot = self.profile(workspace_id)
+        safe = StudentProfileView(self.db).safe_facts(workspace_id)
+        cards = []
+        def append(kind, key, row, value):
+            evidence = row.get("evidence") or {}
+            cards.append({"kind": kind, "key": key, "id": row["id"], "value": value,
+                "digest": value_digest(value), "evidence_level": evidence_level(row, value),
+                "source": {name: evidence[name] for name in evidence_policy()["source_fields"] if name in evidence},
+                "source_type": row.get("source_type"),
+                "updated_at": row.get("updated_at") or row.get("valid_from")})
+        for key in safe:
+            if key in snapshot.facts:
+                append("vault_fact", key, snapshot.facts[key], snapshot.facts[key]["value"])
+        records = StudentRecordService(self.db)
+        for kind in dict.fromkeys(kind for _, kinds in PROFILE_SECTIONS for kind in kinds):
+            metadata = {row["id"]: row for row in snapshot.records.get(kind, [])}
+            for row in records.list(workspace_id, kind):
+                append(kind, kind, metadata[row.id], records._values(kind, row))
+        return cards
+
+    def review_profile_card(self, workspace_id, kind, record_id, review):
+        import json
+        from datetime import datetime, timezone
+        from sqlalchemy import select
+        from app.models import MemoryCandidate, Workspace
+        from app.memory.candidates import MemoryCandidateService
+        from app.memory.reconciler import MemoryReconciler
+        from app.memory.evidence import value_digest
+        self.db.get(Workspace, workspace_id, with_for_update=True)
+        prior = self.db.scalar(select(MemoryCandidate).where(
+            MemoryCandidate.workspace_id == workspace_id,
+            MemoryCandidate.evidence["capture"].as_string() == "profile_review",
+            MemoryCandidate.evidence["submission_id"].as_string() == str(review.submission_id)))
+        request = {"kind": kind, "id": record_id, "action": review.action,
+                   "digest": review.expected_digest, "value": review.value, "text": review.text}
+        if prior:
+            if (prior.evidence or {}).get("request_digest") != value_digest(request):
+                raise ValueError("Submission id already used for another review")
+            return {"saved": prior.status == "accepted", "candidate_id": prior.id}
+        card = next((row for row in self.profile_cards(workspace_id) if row["kind"] == kind and row["id"] == record_id), None)
+        if card is None or card["digest"] != review.expected_digest:
+            raise ValueError("This fact changed. Reload it before reviewing")
+        value = card["value"] if review.action == "confirm" else review.value
+        if value is None or (review.action == "edit" and not review.text.strip()):
+            raise ValueError("An edited value and your explanation are required")
+        evidence = {"capture": "profile_review", "action": review.action,
+            "submission_id": str(review.submission_id), "request_digest": value_digest(request),
+            "quote": review.text.strip() or json.dumps(value, ensure_ascii=False, default=str),
+            "previous_source": card["source"], "semantic_correction": review.action == "edit"}
+        if review.action == "confirm":
+            evidence["confirmation"] = {"value_digest": card["digest"],
+                "confirmed_at": datetime.now(timezone.utc).isoformat()}
+        candidate = MemoryCandidateService(self.db).propose(workspace_id,
+            candidate_type="vault_fact" if kind == "vault_fact" else "student_record",
+            key=card["key"], proposed_value=value,
+            entities={"record_id": record_id} if kind != "vault_fact" else {},
+            source_type="user_explicit", allow_user_explicit=True, input_channel="profile",
+            confidence=1, evidence=evidence)
+        result = MemoryReconciler(self.db).reconcile(candidate)
+        return {"saved": result.accepted, "id": result.result_id, "candidate_id": candidate.id}
+
     def recent_turns(self, turn, owner_id, *, limit=24):
         return shared_history(self.db, turn, owner_id, limit=limit)
 

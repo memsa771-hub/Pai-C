@@ -21,3 +21,13 @@ question-intent repetition guard remains responsible for repeated questions.
 tasks.list, tasks.create and workflow advancement stay pending OS developer
 agreement. Browser backend, integration relay/settings, notifications, all
 models/tables and shared registries remain.
+
+## Evidence confirmation
+
+Confirmation reviews the exact active value, protected by a digest and a
+workspace lock. A stale card requires reload. Idempotent reviews use existing
+candidate evidence; no table is added. Confirmed is a separate evidence label,
+not an external credential-verification claim. Record reviews cover the complete
+displayed record; changing it invalidates the digest. Edits return to stated.
+Document-supported/externally verified provenance remains shown. Restricted
+Vault fields are excluded using the existing safe profile projection.

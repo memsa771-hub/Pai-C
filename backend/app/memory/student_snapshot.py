@@ -9,6 +9,7 @@ from sqlalchemy import select
 from app.models import VaultFact
 from .student_records import ENTITY_MODELS, StudentRecordService
 from .vault import _unwrap
+from .evidence import evidence_level
 
 
 @dataclass(frozen=True)
@@ -53,6 +54,8 @@ class StudentSnapshotService:
                 "valid_from": row.valid_from,
             })
 
+        for fact in facts.values():
+            fact["evidence_level"] = evidence_level(fact, fact["value"])
         records: dict[str, list[dict[str, Any]]] = {}
         for kind in ENTITY_MODELS:
             rows = []
@@ -68,6 +71,7 @@ class StudentSnapshotService:
                     "created_at": row.created_at,
                     "updated_at": row.updated_at,
                 })
+                rows[-1]["evidence_level"] = evidence_level(rows[-1], self.record_service._values(kind, row))
             records[kind] = rows
 
         issues = tuple({

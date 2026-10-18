@@ -2155,3 +2155,14 @@ action and uncovered-area action. The auth fixture now respects const/UUID and
 strict object schemas while retaining network for unrestricted /events bodies.
 Authorization expectations remain 401/403/404. The one-time strict invitation
 and all existing safety, request persistence and contract tests remain intact.
+
+## Locked workflow Phase 2, step 3
+
+GET /v1/counselor/profile-cards exposes safe active facts/records, provenance,
+evidence labels and a value digest. POST /{kind}/{id} confirms or edits through
+MemoryService and the reconciler. A server-created, value-bound confirmation
+proof is accepted only from the explicit profile channel. Model evidence cannot
+self-promote. Existing revisions preserve history; changes invalidate review.
+Snapshots and Counselor context carry stated/shown/confirmed labels. No database
+schema change is required. Tests cover fact/record reviews, duplicate submissions,
+stale values, edits, source spoofing, privacy and existing memory boundaries.
