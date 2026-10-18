@@ -1,0 +1,21 @@
+# Fake local route (spec D5): entry test, merit-list round, no visa.
+key: pakistan_bs
+version: 1
+route: {origin: PK, destination: PK, level: bachelor}
+default_timezone: Asia/Karachi
+tasks:
+  - template_key: entry_test
+    task_type: student.act
+    title: Sit the entry test
+    kind: student
+    inbox_kind: act
+    duration_days: 1
+  - template_key: merit_list
+    task_type: student.choose
+    title: Choose from the merit-list offers
+    kind: student
+    inbox_kind: choose
+    fan_out: programme
+    depends_on: [{key: entry_test}]
+    anchor: {fact: merit_list_date}
+    duration_days: 2

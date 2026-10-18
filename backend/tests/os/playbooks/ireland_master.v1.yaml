@@ -1,0 +1,21 @@
+# Fake route (spec D5): proves a second destination runs with no code change.
+key: ireland_master
+version: 1
+route: {origin: PK, destination: IE, level: master}
+default_timezone: Europe/Dublin
+tasks:
+  - template_key: apply
+    task_type: student.act
+    title: Apply to the programme
+    kind: student
+    inbox_kind: act
+    fan_out: programme
+    anchor: {fact: deadline_close}
+    duration_days: 3
+  - template_key: visa
+    task_type: student.act
+    title: Apply for the student visa
+    kind: student
+    inbox_kind: act
+    depends_on: [{key: apply}]
+    duration_days: 10
