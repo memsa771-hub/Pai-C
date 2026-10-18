@@ -17,13 +17,9 @@ import { BrowserTabList } from '@/components/browser/browser-tab-list';
 import { BrowserView } from '@/components/browser/browser-view';
 import { AgentProfilePanel } from '@/components/agents/agent-profile-panel';
 import { MonitorGrid } from '@/components/monitor/monitor-grid';
-import { TasksView } from '@/components/tasks/tasks-view';
-import { WorkflowsView } from '@/components/workflows/workflows-view';
 import { RoutineList } from '@/components/routines/routine-list';
 import { ProfileView } from '@/components/profile/profile-view';
 import { RoadmapsView } from '@/components/roadmaps/roadmaps-view';
-import { ApplicationsView } from '@/components/applications/applications-view';
-import { DeadlinesView } from '@/components/deadlines/deadlines-view';
 import { NotificationsCenterView } from '@/components/notifications/notifications-center-view';
 import { OnboardingView } from '@/components/onboarding/onboarding-view';
 import { KnowledgeView } from '@/components/knowledge/knowledge-view';
@@ -180,20 +176,8 @@ export function Wrapper() {
             </div>
           ) : viewMode === 'roadmaps' ? (
             <div className="h-full bg-background overflow-hidden"><RoadmapsView /></div>
-          ) : viewMode === 'applications' ? (
-            <div className="h-full bg-background overflow-hidden"><ApplicationsView /></div>
-          ) : viewMode === 'deadlines' ? (
-            <div className="h-full bg-background overflow-hidden"><DeadlinesView /></div>
           ) : viewMode === 'notifications' ? (
             <div className="h-full bg-background overflow-hidden"><NotificationsCenterView /></div>
-          ) : viewMode === 'tasks' ? (
-            <div className="h-full bg-background overflow-hidden">
-              <TasksView />
-            </div>
-          ) : viewMode === 'workflows' ? (
-            <div className="h-full bg-background overflow-hidden">
-              <WorkflowsView />
-            </div>
           ) : mobilePane === 'list' ? (
             /* List pane — full width */
             <div className="flex h-full flex-col bg-background overflow-hidden">
@@ -307,11 +291,7 @@ export function Wrapper() {
               {viewMode === 'browser' && <BrowserView />}
               {viewMode === 'profile' && <ProfileView />}
               {viewMode === 'roadmaps' && <RoadmapsView />}
-              {viewMode === 'applications' && <ApplicationsView />}
-              {viewMode === 'deadlines' && <DeadlinesView />}
               {viewMode === 'notifications' && <NotificationsCenterView />}
-              {viewMode === 'tasks' && <TasksView />}
-              {viewMode === 'workflows' && <WorkflowsView />}
               {viewMode === 'knowledge' && <KnowledgeView />}
 
               {/* Agent profile slide-over (non-chat views keep the overlay) */}

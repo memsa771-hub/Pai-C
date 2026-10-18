@@ -6,7 +6,17 @@ Phase 0 commit: `abf1eef` (`fix: cap questions after two asking replies`).
 Remote ownership cross-check: `origin/pai-os` at `de5c70e8426a0b8fe3a5c857484ac682c076dfa0` after fetch. No checkout or edit of that branch.
 Sources: locked FigJam `NjVJfdxERWfRHPycy1wDkF`, sections 00–12; `PAI_C_WORKFLOW_LOCK_V1.md`, `COUNSELING_POLICY.md`, `SPINE.md`, and the historical `CLEANUP_AUDIT.md`.
 
-**Audit only: nothing below has been removed, moved, disabled, or migrated.** This document is the Phase 1 approval gate. Phase 2 backend and Phase 3 UI work have not started. Existing tests remain.
+The inventory below records the pre-removal audit. The founder approved the scoped changes on 2026-10-18; execution is tracked below. Existing tests remain.
+
+## Approved execution
+
+- UI removal: nine listed Applications/Deadlines/Tasks/Workflows components, their desktop/mobile mounts and navigation, and task/workflow UI flags plus Docker/Next/Compose build settings. Browser is removed from student navigation only. Shared shell, API, workspace context and notification infrastructure remain.
+- Pre-deletion evidence: `rg -n 'ApplicationsView|ApplicationCalendar|ApplicationOperations|DeadlinesView|WorkflowsView|WorkflowBuilderDialog|TasksView|NewTaskDialog|TaskChatPopup' frontend --glob '*.tsx'` found wrapper imports of the four views, application view imports of calendar/operations, operations imports of builder/task popup, workflow view import of builder, and task view imports of dialog/popup. No other component consumer. After removal the same symbol search has no production matches. Calendar API types remain deliberately.
+- Regression coverage: `frontend/components/layout/os-ui-removal.test.tsx` checks remaining shared navigation, old desktop view preferences, historical OS notification read behavior, and retained Counselor/roadmap notification destinations.
+- Next approved commit: detach Application Workspace/deadline routers and their scheduler blocks only. Keep ASGI transport, backend files, tables and models.
+- Keep browser backend and integration backend/settings/relay. Defer monitor, threads, orchestration controls, routines, knowledge and agent-profile cleanup until the Phase 3 shell proves they have no importers.
+- Open for OS developer: retain `tasks.list` / `tasks.create` and workflow advancement until their shared contract is agreed. No removal of them is authorized.
+- Tables: no drops. Section 12 now correctly names `operator.run`; board re-read after approval confirms it supports workflow mode and the retained generic engine.
 
 ## Classification and evidence
 

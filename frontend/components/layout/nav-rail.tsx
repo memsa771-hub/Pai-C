@@ -300,7 +300,6 @@ export function NavRail() {
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
-        {showLabels && <div className="px-3 pt-3 text-[10px] font-semibold uppercase tracking-[0.14em] text-foreground">{t('nav.paiOs')}</div>}
         {groups.map((group) => <SidebarGroup key={group.label} className="px-1.5 pt-1">
           {showLabels ? <SidebarGroupLabel>{group.label}</SidebarGroupLabel> : <div className="mb-2 px-2"><Separator /></div>}
           <SidebarGroupContent><SidebarMenu className="gap-0.5">

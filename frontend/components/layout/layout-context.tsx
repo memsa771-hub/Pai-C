@@ -10,22 +10,10 @@ import {
   useState
 } from 'react';
 import { useIsMobile } from '@/hooks/use-mobile';
-import { TASKS_UI_ENABLED, WORKFLOWS_UI_ENABLED } from '@/lib/config';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import type { FileSortKey, FileTypeFilter } from '@/components/files/file-utils';
 
-export type ViewMode = 'threads' | 'roadmaps' | 'profile' | 'applications' | 'deadlines' | 'notifications' | 'files' | 'knowledge' | 'browser' | 'tasks' | 'workflows' | 'routines' | 'inbox';
-
-/**
- * Views whose implementation ships but whose entry points are held back for a
- * later release. The nav lists drop them, and every other way in — the desktop
- * view restore, a notification hand-off, a stale saved preference — is folded
- * back to threads here rather than at each call site.
- */
-const HIDDEN_VIEWS: ReadonlySet<ViewMode> = new Set<ViewMode>([
-  ...(TASKS_UI_ENABLED ? [] : ['tasks' as const]),
-  ...(WORKFLOWS_UI_ENABLED ? [] : ['workflows' as const]),
-]);
+export type ViewMode = 'threads' | 'roadmaps' | 'profile' | 'notifications' | 'files' | 'knowledge' | 'browser' | 'routines' | 'inbox';
 
 /** The Files view has two halves the folder panel switches between. */
 export type FilesSection = 'folders' | 'trash';
@@ -190,13 +178,6 @@ interface LayoutState {
   filesBrowse: FilesBrowseState;
   /** Patch one part of it and leave the rest alone. */
   setFilesBrowse: (updates: Partial<FilesBrowseState>) => void;
-  /**
-   * Hand-off from other views (e.g. an Inbox notification) into the Tasks
-   * board: a `task:<id>` channel whose chat popup should open on arrival.
-   * TasksView consumes and clears it.
-   */
-  pendingTaskChannel: string | null;
-  setPendingTaskChannel: (channel: string | null) => void;
 }
 
 const LayoutContext = createContext<LayoutState | undefined>(undefined);
@@ -211,7 +192,6 @@ export function LayoutProvider({ children }: { children: ReactNode }) {
   }, []);
   const [listPrefs, setListPrefs] = useState<ListPrefs>({});
   const [selectedAgentName, setSelectedAgentName] = useState<string | null>(null);
-  const [pendingTaskChannel, setPendingTaskChannel] = useState<string | null>(null);
   const [mobilePane, setMobilePane] = useState<MobilePane>('list');
   const [splitBrowser, setSplitBrowser] = useState(() => {
     if (typeof window === 'undefined') return false;
@@ -282,7 +262,7 @@ export function LayoutProvider({ children }: { children: ReactNode }) {
 
   // Switching views keeps whatever the user last chose for the target view.
   const openView = (mode: ViewMode) => {
-    const nextMode = mode === 'inbox' ? 'notifications' : HIDDEN_VIEWS.has(mode) ? 'threads' : mode;
+    const nextMode = mode === 'inbox' ? 'notifications' : mode;
     setViewMode(nextMode);
     // Files is the exception: its list pane is a folder tree, and what you want
     // on opening it is usually the file you or an agent just added — which is
@@ -328,8 +308,6 @@ export function LayoutProvider({ children }: { children: ReactNode }) {
       setFilesSection,
       filesBrowse,
       setFilesBrowse,
-      pendingTaskChannel,
-      setPendingTaskChannel,
       openView,
       selectedAgentName,
       setSelectedAgentName,

@@ -39,7 +39,6 @@ export function NavMain({ onNavigate }: { onNavigate?: () => void }) {
         </SidebarMenuButton>
       </SidebarMenuItem></SidebarMenu></SidebarGroupContent>
     </SidebarGroup>
-    <div className="px-4 pt-4 text-[11px] font-semibold uppercase tracking-[0.14em] text-foreground">{t('nav.paiOs')}</div>
     {groups.map((group) => <SidebarGroup key={group.label}>
       <SidebarGroupLabel>{group.label}</SidebarGroupLabel>
       <SidebarGroupContent><SidebarMenu className="gap-0.5">
