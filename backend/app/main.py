@@ -22,7 +22,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from app.config import config
 from app.security.errors import IdentityUnavailable
 from app.api.response import ResponseCode, json_response
-from app.routers import counselor_possibilities, account, app_version, application_workspace, auth, browser, counselor_summary, counselor_voice, deadlines, decision_records, escalations, events, feedback, fetch, files, integrations, knowledge, network, notifications, operator, roadmaps, routines, search, shares, student_profile, student_requests, tasks, timers, todos, workflows, workspaces
+from app.routers import counselor_possibilities, account, app_version, auth, browser, counselor_summary, counselor_voice, decision_records, escalations, events, feedback, fetch, files, integrations, knowledge, network, notifications, operator, roadmaps, routines, search, shares, student_profile, student_requests, tasks, timers, todos, workflows, workspaces
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -106,9 +106,6 @@ def _run_maintenance():
         db.commit()
     finally:
         db.close()
-
-    from app.deadlines.service import sweep_due_notices
-    sweep_due_notices()
 
 
 async def _fire_due():
@@ -323,12 +320,6 @@ async def _fire_due():
             )
             try:
                 content = f"Routine \"{r_name}\" fired: {r_message}"
-                from app.models import ApplicationRoutine
-                from app.application_workspace.context import build_review_context
-                application_id = db.execute(select(ApplicationRoutine.application_id).where(
-                    ApplicationRoutine.routine_id == routine_id)).scalar_one_or_none()
-                if application_id:
-                    content += "\n\n" + build_review_context(db, str(workspace.id), application_id)
                 if r_context:
                     content = f"**Routine Context for \"{r_name}\"**\n\n{r_context}\n\n---\n\n{content}"
 
@@ -342,19 +333,8 @@ async def _fire_due():
                     },
                     metadata={"target_agents": [agent_name]},
                 )
-                fired = await pipeline.process(fire_event, ctx)
+                await pipeline.process(fire_event, ctx)
                 db.commit()
-                # The built-in Counselor has no external polling daemon. An
-                # application review scheduled for PAI must enter the same
-                # Counselor runtime used by student text and voice turns.
-                from app.services.pai import PAI_AGENT_NAME
-                if application_id and agent_name == PAI_AGENT_NAME and fired is not None:
-                    from app.pai_c.orchestrator import handle_student_message
-                    asyncio.create_task(handle_student_message(str(workspace.id), {
-                        "id": fired.id, "type": fired.type, "source": fired.source,
-                        "target": fired.target, "payload": fired.payload,
-                        "metadata": fired.metadata, "timestamp": fired.timestamp,
-                    }))
             except Exception:
                 logger.exception("Routine fire failed for %s", routine_id)
 
@@ -717,8 +697,6 @@ if IS_PRODUCTION:
 # Routers
 app.include_router(account.router)
 app.include_router(app_version.router)
-app.include_router(application_workspace.router)
-app.include_router(deadlines.router)
 app.include_router(decision_records.router)
 app.include_router(escalations.router)
 app.include_router(auth.router)

@@ -3,6 +3,7 @@ from datetime import datetime, timezone
 from urllib.parse import parse_qsl
 
 import pytest
+from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, event
 from sqlalchemy.dialects.postgresql import JSONB
@@ -11,7 +12,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy.pool import StaticPool
 
 from app.database import Base, get_db
-from app.main import app
+from app.routers import application_workspace, deadlines
 from app.models import (ApplicationPlan, ApplicationRequirement, ApplicationRoutine,
                         Channel, ChannelMember, DeadlineSettings, FileRecord, Institution,
                         KanbanTask, NotificationRecord, RoutineRecord, SavedInstitution,
@@ -27,6 +28,10 @@ def _compile_jsonb(type_, compiler, **kw):
 
 @pytest.fixture
 def api(monkeypatch):
+    # Retain router/security coverage without mounting OS routes in the PAI C app.
+    app = FastAPI()
+    app.include_router(application_workspace.router)
+    app.include_router(deadlines.router)
     engine = create_engine("sqlite://", poolclass=StaticPool,
                            connect_args={"check_same_thread": False})
 
