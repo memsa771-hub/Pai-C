@@ -4,7 +4,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass, field
 
 from app.os.compiler import DraftTask
-from app.os.kernel.states import UNSTARTED, TaskState
+from app.os.kernel.states import TaskState, is_started
 
 NOTICE_PREFIX = "plan_updated@"
 
@@ -49,7 +49,7 @@ def diff(stored: Mapping[str, Mapping], draft_tasks: Mapping[str, DraftTask],
     for key, row in stored.items():
         if key.startswith(NOTICE_PREFIX):
             continue
-        started = TaskState(row["state"]) not in UNSTARTED
+        started = is_started(row["state"], row["kind"])
         if key not in draft_tasks:
             if row["protected"]:
                 d.kept_protected.append(key)

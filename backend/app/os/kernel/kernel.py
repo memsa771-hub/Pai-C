@@ -21,10 +21,10 @@ from app.os.kernel.revisions import NOTICE_PREFIX, diff
 from app.os.kernel.states import (
     SATISFIES_DEPENDENCY,
     TERMINAL,
-    UNSTARTED,
     IllegalTransition,
     TaskState,
     check_transition,
+    is_started,
 )
 
 P, T, E = models.plans, models.tasks, models.task_edges
@@ -267,7 +267,7 @@ class Kernel:
         if contract_update:
             conn.execute(update(P).where(P.c.id == plan_id).values(**contract_update, updated_at=self.clock()))
         for key, t in new.items():  # drift fields: refreshed in place, never a revision on their own
-            if key in stored and S(stored[key]["state"]) in UNSTARTED:
+            if key in stored and not is_started(stored[key]["state"], stored[key]["kind"]):
                 conn.execute(update(T).where(T.c.id == ids[key]).values(
                     earliest_start=t.earliest_start, slack_days=t.slack_days, critical=t.critical,
                     citations=list(t.citations), fact_refs=[list(f) for f in t.fact_refs]))
@@ -276,7 +276,7 @@ class Kernel:
             return None
         for key in d.added:
             ids[key] = self._insert_task(conn, plan_id, new[key], draft.playbook_version)
-        for key in d.removed:
+        for key in d.removed:  # unstarted, including open inbox items: all may move to cancelled
             row = conn.execute(select(T).where(T.c.id == ids[key])).one()
             self._transition(conn, row, S.CANCELLED, cause=cause)
         for key in d.changed:

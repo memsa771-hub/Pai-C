@@ -10,9 +10,10 @@ from app.os.kernel.states import (
     IllegalTransition,
     TaskState,
     check_transition,
+    is_started,
 )
 
 __all__ = [
     "ALLOWED", "SATISFIES_DEPENDENCY", "TERMINAL", "UNSTARTED", "IllegalTransition", "Kernel", "Outcome",
-    "PlanRef", "RevisionDiff", "TaskState", "check_transition", "contract_sha256", "diff",
+    "PlanRef", "RevisionDiff", "TaskState", "check_transition", "contract_sha256", "diff", "is_started",
 ]

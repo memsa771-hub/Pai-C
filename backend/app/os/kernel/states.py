@@ -35,6 +35,16 @@ SATISFIES_DEPENDENCY = frozenset({S.DONE, S.SKIPPED})
 UNSTARTED = frozenset({S.PENDING, S.READY, S.BLOCKED})
 
 
+def is_started(state: TaskState | str, kind: str) -> bool:
+    """Revisions only change tasks that have not started. An open inbox item (a student task waiting for
+    the student) has not started: its dates still follow the facts. A work task waiting for the student
+    (input missing) has started."""
+    state = TaskState(state)
+    if state in UNSTARTED:
+        return False
+    return not (kind == "student" and state == S.WAITING_STUDENT)
+
+
 class IllegalTransition(ValueError):
     pass
 

@@ -45,7 +45,9 @@ def build(settings: OsSettings) -> tuple[Registry, Kernel, DBOSClient]:
     client = DBOSClient(system_database_url=settings.database_url, dbos_system_schema=settings.dbos_system_schema,
                         application_name=APP_NAME, lazy=True)
     register_job("reconcile", "*/5 * * * *", lambda: reconcile(engine, client, kernel))
-    for name, cron, factory in JOB_FACTORIES:
+    from app.os.workers.jobs import JOB_FACTORIES as worker_jobs  # imported late: workers depend on the runner
+
+    for name, cron, factory in [*worker_jobs, *JOB_FACTORIES]:
         register_job(name, cron, factory(settings, engine, kernel, client))
     return registry, kernel, client
 
