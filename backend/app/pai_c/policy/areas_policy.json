@@ -7,7 +7,9 @@
     "values",
     "strengths",
     "pressures",
-    "sure"
+    "sure",
+    "goals",
+    "options"
   ],
   "sensitive": {
     "family_social": {
@@ -28,6 +30,8 @@
     "values": "what matters most to them when they choose",
     "strengths": "what they have done well, or what others come to them for",
     "pressures": "what makes their choices hard: expectations, money, time or comparison",
-    "sure": "how sure they feel about their direction, on a scale from 0 to 10"
+    "sure": "how sure they feel about their direction, on a scale from 0 to 10",
+    "goals": "what they want and whose wish that direction is",
+    "options": "the fields and kinds of work they know, and beliefs they want to check"
   }
 }

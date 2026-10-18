@@ -8,9 +8,11 @@ import json
 from pydantic import BaseModel, ConfigDict
 from app.config import config
 from app.inference.gateway import complete
+from app.pai_c.understanding.data import DATA_DIR
 
 logger = logging.getLogger(__name__)
-Area = Literal["status", "history", "interests", "family_social", "values", "strengths", "pressures", "sure"]
+
+Area = Literal[tuple(json.loads((DATA_DIR / "areas.json").read_text(encoding="utf-8")))]
 
 
 class StrictModel(BaseModel):

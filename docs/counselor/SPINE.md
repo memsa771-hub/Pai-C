@@ -2085,3 +2085,54 @@ passed without source changes. No live quality or latency claim is made.
 Phase 0 has no open product decision. Phase 1 remains audit-only; its approval
 boundary and shared-module findings are in `OS_REMOVAL_AUDIT.md`. No OS file,
 table, test or contract was removed. No dotenv file was edited.
+
+
+## Locked workflow Phase 2, step 1: ten-area evidence spine
+
+The locked board's ten areas use `pai_c/understanding/areas.json`: status,
+history, interests, strengths, family_social, values, pressures, sure, goals,
+and options. Thresholds remain data. The classifier's enum reads this same
+area file; the existing policy priority/topic text includes both new areas.
+The six internal Truth Map coverage keys and Mirror readiness are unchanged.
+
+- Goals use evidenced source items with `goal.` keys and known wish ownership
+  (`category`), or a person's evidenced wish. Unknown ownership is retained but
+  does not claim that this area is complete. Own/family wishes stay separate.
+- Known options and reported myths use evidenced `said` items (`option.` / `myth.`).
+  A student's belief does not become a verified world fact.
+- Current status uses current-status/category/city facts, current education, and
+  daily-life evidence. A name alone is not status evidence.
+- Tap cards reuse `POST /v1/student-profile/edits`: level -> education record,
+  board -> `education.details.awarding_body`, subjects -> linked course records,
+  city -> the existing location fact, skills -> skill records. No parallel write
+  endpoint, storage, queue or direct table write was added. Awarding body is an
+  optional backward-compatible field in the existing JSON details schema.
+- Uploads retain document extraction -> candidate -> reconciliation. Accepted
+  education/course/test/document records feed history; skills/certifications/
+  achievements feed strengths. Pending/conflicting candidates are not counted.
+- Coverage requires evidence; retired items and empty record shells do not count.
+  This is coverage of what is known, not a score of the student's ability.
+
+New tests live in `tests/test_spine_areas.py`: empty profile, ownership, reported
+myths, retired/unevidenced data, mixed-language fake classification, real tap
+writes through the existing API, and document candidates before/after the real
+reconciler. Existing tests that explicitly expected eight areas now expect ten;
+their other assertions remain. No migration or live provider call is needed.
+
+Step 1 verification (restored after `150d690`): guided and strict each passed
+1260 tests, with 3 production-only skips and 8 passing subtests. Frontend: 41
+tests passed; production build passed. All 268 modules imported; 11 architecture
+and OS-contract checks passed. The runtime Planner text and section 2 of
+`COUNSELOR_V3_PROMPTS.md` now match exactly; the existing consistency tests are
+unchanged. No live provider or dotenv access was used.
+
+Existing-test changes: `test_conversation_policy.py` includes the two new areas
+in priority/reversed-priority expectations; `test_policy_guided.py` includes
+their data thresholds; `test_voice_guided.py` expects all ten context areas;
+`test_truth_map_v3.py` supplies actual quotes in its previously bare evidence
+fixtures. No assertion was removed or relaxed.
+
+The founder replaced the old immediate-revert rule: clear implementation/test
+fixes get up to two attempts inside the step; product decisions, board conflicts,
+or failure after two attempts require stopping. Tasks tools and workflow
+advancement remain on the OS developer's contract open list.
