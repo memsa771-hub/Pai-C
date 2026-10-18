@@ -24,6 +24,8 @@ the date checked, the intake year, and a status.
   - **Amounts of money, dates and processing times** count only if the page names WS 2027/28 or
     2027. Otherwise they stay `unconfirmed` and are re-checked before use: the freshness sweeper
     re-checks 30 and 7 days before a deadline (spec §3.2).
+  - **Temporary notices** (for example a backlog warning or a "technical difficulties" note) stay
+    `unconfirmed` for WS 2027/28, even on a current page.
 - **Status** is one of three values:
   - `confirmed`: an exact quote from an official page that applies to WS 2027/28 under the rule above.
   - `unconfirmed`: the page is old or undated, the fact is not tied to 2027/28, it is only a lead,
@@ -95,8 +97,10 @@ Who: student. Depends on: none.
   need a translation (exceptions are listed under Info country by country)." (S2). **confirmed**. S1
   lists no translation exception for Pakistan.
 - If a document is in Urdu: "There are no sworn translators in Paksitan." (S10). **confirmed**. The
-  translation must then come from a translator in Germany, or from the issuing institution's
-  authorised department (S2).
+  translation must then come from a translator in Germany: "You can find a translator in Germany via
+  the Databank of interpreters and translators of the individual states of the Federal Republic of
+  Germany" (S10). Or it comes from the issuing institution's authorised department (S2).
+  **confirmed**
 
 **A6. Certified paper copies, only if a programme asks for them.**
 Condition: `[certified_copies_required]`. uni-assist itself is digital (S6).
@@ -118,6 +122,7 @@ Who: student. Depends on: none. The minimum score is per programme `[english_req
 **A8. Admission test (GRE, GATE or TestAS), only if a programme asks for one.**
 Condition: `[admission_test]`. No route-level rule exists. The shortlist shows that some programmes
 require one for non-EHEA degrees. Each such requirement is a per-programme fact.
+*Per-programme step:* it has no route-level citation and is cited per programme in Spike 1 (§3).
 
 **A9. CV, motivation letter and references.**
 - The visa needs a CV, "Curriculum Vitae" (S15, 10/2023), and a "Motivation letter" (S16, undated).
@@ -163,6 +168,7 @@ Depends on: A1–A5, A7. Condition: the route uses uni-assist.
 **B3. Direct application in the university portal.**
 Condition: the route is direct, or VPD then direct. The portal and the documents are per programme
 `[portal_url]`, `[required_documents]`, `[deadline_close]`. There is no route-level source beyond B1.
+*Per-programme step:* it has no route-level citation and is cited per programme in Spike 1 (§3).
 
 **B4. Admission letter received; accept and enrol.**
 The decision date, the acceptance deadline and the enrolment rules are per programme
@@ -217,7 +223,8 @@ Depends on: B4, C2, C3.
     link:" (S11, Karachi). **confirmed**
 - Mandatory from the start: "Past degree certificates (school, bachelor or past master degrees)",
   "Degree transcripts" and "Proof of payment of tuition fees (if applicable to the course of study)"
-  "are mandatory documents and must be submitted from the outset." (S11). **confirmed**
+  "are mandatory documents and must be submitted from the outset." (S11). **unconfirmed** for
+  WS 2027/28: it sits in a temporary "technical difficulties" notice dated 27.11.2025.
 - Passport: "validity of passport: at least one year plus three months" (S15, 10/2023).
   **unconfirmed**: the leaflet is old.
 - Visa fee: "in the amount of 75 EUR, to be paid in PKR" (S15, 10/2023). **unconfirmed**: this is an
@@ -225,17 +232,23 @@ Depends on: B4, C2, C3.
 
 **C5. Visa lead time: the biggest open risk.**
 - "While the Consular Services Portal has led to an overall increase in finalized applications, we
-  are aware that ongoing demand still exceeds our capacity." (S11). **confirmed** as a statement.
-  The page gives no waiting time, so the lead time is **unconfirmed** and needs a research task.
+  are aware that ongoing demand still exceeds our capacity." (S11). **unconfirmed** for WS 2027/28:
+  this is a temporary notice dated 27.11.2025. The page gives no waiting time, so the lead time also
+  needs a research task.
 - Mitigation from the same page: "However, every student can actively assist the process by
   submitting either proof of acceptance of late arrival at your university or an enrollment letter
-  for next semester." (S11). **confirmed**. This makes `[late_arrival_policy]` a planning field.
+  for next semester." (S11). **unconfirmed** for WS 2027/28 (same temporary notice). It still makes
+  `[late_arrival_policy]` a planning field.
 
 ### Phase D: after arrival
 
-**D1. Register the address.**
-- "you have to go to the Einwohnermeldeamt (residents' registration office) within two weeks." (S17,
-  *via fetch tool*). **unconfirmed** until the reviewer reads the page directly.
+**D1. Register the address soon after moving in.**
+- The deadline is set by the local registration office, and DAAD pages differ:
+  - S17 (*via fetch tool*): "you have to go to the Einwohnermeldeamt (residents' registration office)
+    within two weeks."
+  - The reviewer found another DAAD page (study-in-germany) giving "within one week", or one to two
+    weeks depending on the office.
+  - **unconfirmed**. The plan should use the student's local office's deadline, found per city.
 
 **D2. Health insurance for enrolment.**
 - "International students have to prove equivalent health insurance coverage that meets German
@@ -243,6 +256,7 @@ Depends on: B4, C2, C3.
 
 **D3. Enrol at the university.** The documents and the deadline are per programme
 `[enrolment_deadline]`, `[required_documents]`.
+*Per-programme step:* it has no route-level citation and is cited per programme in Spike 1 (§3).
 
 **D4. Residence permit before the visa expires.**
 - "you must report to the Ausländerbehörde (foreigners' office) and apply for a residence permit."
@@ -380,3 +394,21 @@ Notes on the doc:
 - A1: S1 still says "attestation stamps". The conflict stays open until uni-assist confirms the HEC e-Attestation Certificate.
 
 Reviewer: @10Faheem · Date: 2026-10-17 · Verdict (every step cites an official page): PASS with notes (S8, S13, S14, S17, S18 not verified; see notes)
+
+Author's response (2026-10-18):
+- **Notes on the doc:** all applied.
+  - C4's mandatory-documents notice and both C5 items are now `unconfirmed` for WS 2027/28, and §1
+    gains the temporary-notice rule.
+  - A5 cites S10 for the translator in Germany.
+  - A8, B3 and D3 are marked as per-programme steps.
+  - D1 is reworded and stays `unconfirmed`.
+  - The A1 conflict stays open.
+- **S8 re-checked:** a fresh raw fetch of the HEC page (HTTP 200, 2026-10-17 11:34Z) contains all
+  three quotes word for word: "Transcripts (complete or incomplete) can be attested even if the final
+  degree has not been issued.", "their personal details on the CNIC and all educational documents
+  are identical" and "Attestation of photocopies is no longer offered."
+- **S13 re-checked:** the live page, read in a browser on 2026-10-17, contains "To commence studying,
+  you must prove that you have at your disposal at least 992 euros per month". The 11,208 figure came
+  from an older copy of the page.
+- **S14, S17, S18:** S14 is cited only in §4. S17 and S18 stay `unconfirmed` (D1, D2, D4), as the doc
+  already says.
