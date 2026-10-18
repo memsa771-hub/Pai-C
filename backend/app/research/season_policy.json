@@ -1,0 +1,5 @@
+{
+  "seasons": [],
+  "rules": [],
+  "description": "Reviewed source data only. A season has key, starts_on, ends_on. A rule has season, program_id, source_url, checked_at, comparator, threshold, field, unit and verification_status. No guessed entries."
+}

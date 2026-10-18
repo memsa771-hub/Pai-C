@@ -31,3 +31,15 @@ not an external credential-verification claim. Record reviews cover the complete
 displayed record; changing it invalidates the digest. Edits return to stated.
 Document-supported/externally verified provenance remains shown. Restricted
 Vault fields are excluded using the existing safe profile projection.
+
+## Knowledge
+
+The existing RequirementStore remains the cache. Authoritative season bounds
+supplement its TTL; absent calendars do not invent a season. Merit rules require
+an explicit reviewed program/season rule. The shipped catalog is empty.
+Voice declares specific world assertions with fact ids. The guard requires an
+exact current sourced value/quote, appends source/date, and removes unsupported
+assertions and numeric currency/percentage claims. Student evidence is exempt.
+No extra foreground model call is introduced. General explanations remain model
+generated; deterministic validation cannot identify every unannotated qualitative
+claim. That residual quality limitation is recorded for the founder evaluation.

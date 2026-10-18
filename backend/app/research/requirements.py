@@ -208,6 +208,9 @@ class RequirementStore:
     def is_fresh(row):
         from app.config import config
         from app.research.scheduler import _near_deadline
+        from app.research.seasons import season_current
+        if not season_current(row.cycle_label):
+            return False
         now = datetime.now(timezone.utc)
         checked = row.checked_at.replace(tzinfo=timezone.utc) if row.checked_at.tzinfo is None else row.checked_at
         window = (config.PAI_RESEARCH_DEADLINE_FRESHNESS_DAYS if _near_deadline(row, now.date())

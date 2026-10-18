@@ -1,0 +1,6 @@
+{
+  "checking_reply": "I'll check a reliable source before giving you that detail.",
+  "source_statuses": ["verified", "confirmed"],
+  "source_date_fields": ["checked_at", "verified_at"],
+  "numeric_world_pattern": "(?:[$€£¥]\\s*\\d[\\d,.]*|\\d[\\d,.]*\\s*[%％])"
+}

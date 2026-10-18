@@ -2166,3 +2166,14 @@ self-promote. Existing revisions preserve history; changes invalidate review.
 Snapshots and Counselor context carry stated/shown/confirmed labels. No database
 schema change is required. Tests cover fact/record reviews, duplicate submissions,
 stale values, edits, source spoofing, privacy and existing memory boundaries.
+
+## Locked workflow Phase 2, step 4
+
+RequirementStore cache hits remain first, public/source scoped and TTL checked.
+research/season_policy.json adds reviewed season bounds and program rules;
+expired configured seasons cannot be reused. No world thresholds are invented.
+Voice world_claims reference the workspace's published facts. A deterministic
+guard requires exact current sourced assertions, adds date/link and removes
+unsupported claims/numbers with a checking response. Student numbers remain.
+Both runtime prompts and their documented copies are synchronized. New tests
+are in test_world_knowledge.py; remaining semantic limits are in BLOCKERS.md.

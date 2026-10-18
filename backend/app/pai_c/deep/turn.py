@@ -136,6 +136,10 @@ async def run_deep_turn(db, turn: CounselorTurnInput, *,
         if card is not None and list(question_sentences(reply)):
             reply = remove_repeated(reply, list(question_sentences(reply))) or config.PAI_STATEMENT_FALLBACK_REPLY
             violations.append("card_question_removed")
+        from app.pai_c.deep.grounding import guard_reply
+        student_sections = " ".join(re.findall(r"<(?:profile|notebook|memory)>(.*?)</(?:profile|notebook|memory)>", context.text, flags=re.DOTALL))
+        reply, grounding_violations = guard_reply(reply, raw, context.world_facts, student_sections + turn.student_text)
+        violations.extend(grounding_violations)
         reply = polish_reply(reply)
         avoid = context.plan.avoid_questions if context.plan is not None else []
         repeated = repeated_questions(reply, history, avoid)

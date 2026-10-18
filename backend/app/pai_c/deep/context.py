@@ -111,7 +111,8 @@ def _research(db, workspace_id: str, journey) -> dict | None:
     rows = db.execute(select(Roadmap).where(
         Roadmap.workspace_id == workspace_id, Roadmap.journey_id == journey.id,
     ).order_by(Roadmap.created_at.desc()).limit(5)).scalars().all()
-    return {"roadmaps": [{"id": row.id, "title": row.title,
+    return {"facts": [fact for row in rows for fact in (row.facts or []) if isinstance(fact, dict)][:20],
+            "roadmaps": [{"id": row.id, "title": row.title,
                           "status": row.generation_status,
                           "sources": [item for item in (row.sources or [])[:5]
                                       if public_https(item.get("url") if isinstance(item, dict) else None)]}
@@ -127,6 +128,7 @@ class DeepContext:
     build_ms: int
     plan: object | None = None
     fact_cards: tuple = ()
+    world_facts: tuple = ()
 
 
 def guided_state(db, workspace_id, notebook, draft, decision, coverage, open_requests):
@@ -266,4 +268,4 @@ async def build_context(db, workspace_id: str, turn: CounselorTurnInput, *,
     elapsed = int((time.monotonic() - started) * 1000)
     logger.info("counselor_deep_context tokens=%s total_tokens=%d build_ms=%d",
                 counts, estimated_tokens(text), elapsed)
-    return DeepContext(text, counts, notebook, journey, elapsed, plan, cards)
+    return DeepContext(text, counts, notebook, journey, elapsed, plan, cards, tuple((research or {}).get("facts", [])))
