@@ -1,7 +1,7 @@
 # PAI C engineering workflow — LOCKED v1 (18 Oct 2026)
 
 Figma board (source of truth): https://www.figma.com/board/NjVJfdxERWfRHPycy1wDkF
-Sections: header (6 principles, legend), 00 A to K, 01 what the student sees, 02 one turn, 03 spine (10 areas), 04 evidence, 05 next move, 06 stages, 07 failures, 08 vs Kollegio, 09 world knowledge, 10 paths to a decision, 11 PAI C and PAI OS contract. White card = built in code; orange border "NEW" = new work.
+Sections: header (6 principles, legend), 00 A to K, 01 what the student sees, 02 one turn, 03 spine (10 areas), 04 evidence, 05 next move, 06 stages, 07 failures, 08 vs Kollegio, 09 world knowledge, 10 paths to a decision, 11 PAI C and PAI OS contract, 12 Operator and background work. White card = built in code; orange border "NEW" = new work.
 
 ## What PAI C is
 An AI counselor for Matric/O-level and FSc/A-level students (Pakistan first, generic by design): knows the student deeply, shows them the paths they could take, helps them understand a path, and helps them reach their own decision. Stays with them. Applications, test prep, deadlines = PAI OS.
@@ -31,3 +31,8 @@ Open, to agree with the PAI OS developer: decision record field list v1, event t
 
 ## New work (orange "NEW")
 Tap cards + uploads into profile; areas 9 and 10; profile confirm card; follow-their-thread + fact-vs-story; myth correction; path explainer (G); program search + eligibility + labels + not-eligible route (H); family talk help; cache-first + season expiry + grounding guard; health checks, Planner lag alert, fallback counts; OS contract items above; check-ins later.
+
+## Behind the counselor: Operator and background work (section 12)
+The counselor talks; the Operator and the Task Runtime do the heavy work. Triggers -> jobs: turn finished -> analysis + facts.extract (in message order); Mirror allowed -> mirror.build; upload -> documents.read; Explore a path -> path.explain (NEW, Operator workflow mode: model for general understanding + research.run with cache, web.search, web.fetch, SourceVerifier); places for a path -> program.search (NEW, research.run + requirements plugin + per-season rules + merit calculator); student chooses -> roadmaps.build + decision record; return after a gap -> session.summarize; OS update/request -> contract.intake (NEW).
+KEEP as PAI C core (never delete in the OS removal): Model Gateway, Task Runtime, Operator + operator.run, agent.run (generic engine), Capability and Tool Registries, capabilities used by C, research plugins and SourceVerifier, workflow and posting code the counselor imports, Messenger. Rule: if PAI C imports it, calls it, or a PAI C job runs through it, it stays. Mixed modules are "shared - split later". OS-only (removable after a proven audit): OS pages, routines, OS task templates, OS-specific agents.
+Operator rules: fixed workflows only for PAI C, budget per student, every run logged with its trigger, results written back only through the Memory Service and reconciler, the student never waits for a background job.
