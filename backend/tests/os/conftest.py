@@ -50,7 +50,7 @@ def fresh_db(pg_url: str) -> None:
             conn.execute(text("DROP SCHEMA IF EXISTS os CASCADE"))
             if conn.execute(text("SELECT to_regclass('public.alembic_version')")).scalar() is not None:
                 conn.execute(text(r"DELETE FROM public.alembic_version WHERE version_num LIKE 'os\_%'"))
-            for schema in ("dbos_test", "spike3"):
+            for schema in ("dbos_os_test",):
                 conn.execute(text(f"DROP SCHEMA IF EXISTS {schema} CASCADE"))
                 conn.execute(text(f"CREATE SCHEMA {schema}"))
     finally:
