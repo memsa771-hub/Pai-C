@@ -8,8 +8,15 @@ from app.models import ExecutionRun
 from app.pai_c.memory import MemoryService
 from app.pai_c.possibilities import PossibilityService, PossibilityError
 from app.routers.roadmaps import _authorized
+from pydantic import BaseModel, ConfigDict
+from typing import Literal
 
 router = APIRouter(prefix="/v1/counselor/paths", tags=["Counselor"])
+
+
+class ProgramConsent(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+    explore_places: Literal[True]
 
 
 def path_row(db, workspace_id, path_id):
@@ -64,3 +71,35 @@ async def explore(path_id: str, network: str = Query(...), db=Depends(get_db), x
         raise HTTPException(503, "Path explanation could not start. Try again")
     db.commit()
     return success_response(outcome["data"])
+
+
+@router.post('/{path_id}/programs')
+async def search_programs(path_id: str, body: ProgramConsent, network: str = Query(...), db=Depends(get_db),
+    x_workspace_token: str | None = Header(None), authorization: str | None = Header(None)):
+    workspace = _authorized(db, network, x_workspace_token, authorization)
+    row = path_row(db, str(workspace.id), path_id)
+    from app.research.gateway import request_research
+    outcome = await request_research('program_search', str(workspace.id), db=db,
+        journey=JourneyService(db).get(str(workspace.id), row.journey_id),
+        tool_context=tool_context(workspace, db), possibility_id=path_id, trigger='student_route')
+    if outcome is None:
+        raise HTTPException(409, 'Explore this path and confirm your current Mirror first')
+    if not outcome.get('ok'):
+        raise HTTPException(503, 'Program search could not start. Try again')
+    return success_response(outcome['data'])
+
+
+@router.get('/{path_id}/programs')
+def get_programs(path_id: str, network: str = Query(...), db=Depends(get_db),
+    x_workspace_token: str | None = Header(None), authorization: str | None = Header(None)):
+    workspace = _authorized(db, network, x_workspace_token, authorization)
+    row = path_row(db, str(workspace.id), path_id)
+    journey = JourneyService(db).get(str(workspace.id), row.journey_id)
+    version = (journey.counselor_summary_draft or {}).get('version')
+    runs = db.scalars(select(ExecutionRun).where(ExecutionRun.workspace_id == str(workspace.id),
+        ExecutionRun.task_type == 'program_search').order_by(ExecutionRun.created_at.desc())).all()
+    run = next((run for run in runs if (run.constraints or {}).get('possibility_id') == row.id
+        and (run.constraints or {}).get('mirror_version') == version), None)
+    result = ((run.result or {}).get('capability_result') or {}) if run and run.status == 'completed' else {}
+    return success_response({'status': run.status if run else 'not_started',
+        'programs': result.get('programs', []), 'missing': result.get('missing', [])})

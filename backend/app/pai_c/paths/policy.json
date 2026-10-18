@@ -7,5 +7,7 @@
   "objective": "Explain the student-selected path without institutions or admission advice",
   "summary": "Your path explanation is ready to explore.",
   "missing_sources": "Reliable sources are still needed for myths, jobs and future outlook.",
-  "max_tokens": 3500
+  "max_tokens": 3500,
+  "program_limit": 3,
+  "program_objective": "Research programs for the path the student explicitly selected"
 }

@@ -66,8 +66,8 @@ async def request_research(kind, workspace_id, *, db, journey, tool_context,
 async def _request_research(kind, workspace_id, *, db, journey, tool_context,
                            goals=None, snapshot=None, understanding=None, refresh_key=None, refresh_candidate=None,
                            roadmap_id=None, trigger=None, resume_run_id=None, resume_action=None, possibility_id=None):
-    if kind == "path_explain":
-        return await _request_path(db, workspace_id, journey, tool_context, possibility_id)
+    if kind in {"path_explain", "program_search"}:
+        return await _request_path(db, workspace_id, journey, tool_context, possibility_id, kind)
     if kind not in {"roadmap_light", "roadmap_deep", "stale_refresh"}:
         raise ValueError("unknown Counselor research kind")
     trigger = trigger or ("stale_refresh" if kind == "stale_refresh" else
@@ -161,7 +161,7 @@ async def _request_research(kind, workspace_id, *, db, journey, tool_context,
     return await _delegate(payload, tool_context)
 
 
-async def _request_path(db, workspace_id, journey, tool_context, possibility_id):
+async def _request_path(db, workspace_id, journey, tool_context, possibility_id, kind):
     from app.pai_c.possibilities import PossibilityService
     from app.pai_c.paths.explain import policy
     from app.tools import get_tool_executor
@@ -171,15 +171,25 @@ async def _request_path(db, workspace_id, journey, tool_context, possibility_id)
     if row.journey_id != journey.id or row.status == "dismissed":
         return None
     version = journey.counselor_summary_draft["version"]
-    key = f"path:{row.id}:mirror:{version}"
+    key = f"{kind}:{row.id}:mirror:{version}"
+    if kind == "program_search":
+        explanations = db.scalars(select(ExecutionRun).where(ExecutionRun.workspace_id == workspace_id,
+            ExecutionRun.task_type == "path_explain", ExecutionRun.status == "completed")).all()
+        if not any((run.constraints or {}).get("possibility_id") == row.id and
+                   (run.constraints or {}).get("mirror_version") == version for run in explanations):
+            return None
     runs = db.scalars(select(ExecutionRun).where(ExecutionRun.workspace_id == workspace_id,
-        ExecutionRun.task_type == "path_explain")).all()
+        ExecutionRun.task_type == kind)).all()
     previous = next((run for run in runs if (run.constraints or {}).get("research_key") == key and run.status != "failed"), None)
     if previous:
         return {"ok": True, "data": {"run_id": previous.id, "status": previous.status, "resumed": True}}
     brief = {"possibility_id": row.id, "title": row.title, "why": row.why,
         "evidence": row.evidence or [], "mirror_version": version}
-    payload = {"objective": policy()["objective"], "task_type": "path_explain",
+    if kind == "program_search":
+        from app.pai_c.memory import MemoryService
+        brief["route"] = PossibilityService(db).research_route(row)
+        brief["facts"] = MemoryService(db).comparable_facts(workspace_id)
+    payload = {"objective": policy()["program_objective" if kind == "program_search" else "objective"], "task_type": kind,
         "constraints": {"trigger": "student_route", "research_key": key, "mirror_version": version,
             "possibility_id": row.id, "capability_input": {"brief": brief}}, "context_refs": []}
     db.commit()

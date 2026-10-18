@@ -19,3 +19,6 @@ validated; generic explanatory prose remains a model-quality limitation.
 
 ## Reviewed career sources
 No reviewed occupational-source domain pack is supplied. The path workflow performs existing SourceVerifier checks but will not label unreviewed sources verified. General path explanations remain available; sourced myths/jobs/outlook show missing information until authoritative sources are configured. This is deliberately not replaced by model guesses. Semantic institution-name absence in general prose still needs a quality evaluation; no live call was authorized.
+
+## Seasonal merit data and record matching
+No reviewed seasonal entry/merit data was supplied. Safe/realistic/stretch therefore remain unknown unless verified program+season rules exist; minimum entry eligibility is separate. Record comparisons use exact canonical identities. Ambiguous record identities or mismatched units need reviewed mapping and remain unknown; the implementation does not guess equivalences or calculate admission probabilities.

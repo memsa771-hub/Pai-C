@@ -105,6 +105,22 @@ class MemoryService:
     def profile(self, workspace_id):
         return StudentSnapshotService(self.db).build(workspace_id)
 
+    def comparable_facts(self, workspace_id):
+        from app.memory.student_schema import RECORD_SPECS
+        snapshot = self.profile(workspace_id)
+        facts = {key: row for key, row in snapshot.facts.items() if row.get("evidence_level") in {"shown", "confirmed"}}
+        for kind, rows in snapshot.records.items():
+            spec = RECORD_SPECS.get(kind, {})
+            for row in rows:
+                if row.get("evidence_level") not in {"shown", "confirmed"}:
+                    continue
+                identity = ",".join(str(row.get(key) or "") for key in spec.get("identity", []))
+                for key, value in row.items():
+                    if key in spec.get("identity", []) or not isinstance(value, (str, int, float)):
+                        continue
+                    facts[f"{kind}[{identity}].{key}"] = {"value": value, "evidence_level": row["evidence_level"]}
+        return facts
+
     def truth_map(self, workspace_id):
         return NotebookService(self.db).get(workspace_id)
 
