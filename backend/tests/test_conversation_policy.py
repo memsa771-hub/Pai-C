@@ -164,13 +164,13 @@ def replay_founder():
 def test_founder_replay_uses_replayed_question_cadence():
     rows=replay_founder()
     assert rows[1].rule_id=="rest" and not rows[1].question_allowed
-    assert rows[4].rule_id=="adjust"
+    assert rows[4].rule_id=="adjust+question_cap"
     assert (rows[5].action,rows[5].topic)!=(rows[6].action,rows[6].topic)
     for index,row in enumerate(rows):
-        if index>=2 and all(item.question_allowed for item in rows[index-2:index+1]):
-            assert row.action in {"adjust","answer_request"}
+        if index>=2:
+            assert not all(item.question_allowed for item in rows[index-2:index+1])
     assert [(row.rule_id,row.action,row.topic,row.question_allowed) for row in rows]==[
         ("ask","ask","history",True), ("rest","insight",None,False),
         ("ask","ask","interests",True), ("summarize","summarize",None,True),
-        ("adjust","adjust",None,True), ("rest","insight",None,False),
+        ("adjust+question_cap","adjust",None,False), ("ask","ask","status",True),
         ("choice","ask_choice","status",True)]

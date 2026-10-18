@@ -2029,3 +2029,59 @@ Source of truth: `docs/counselor/COUNSELING_POLICY.md` (v2). Built directly in C
 ### Open questions
 - With $3 per mode, 10 personas × 12 turns may hit the budget before the last personas. Run fewer personas per command if needed.
 - Prompt slimming (planner 1174 words, mirror 953) waits for the live baseline.
+
+## Locked workflow Phase 0: final question cap (2026-10-18)
+
+The locked workflow and founder's Phase 0 decision supersede the earlier
+strict-mode exceptions for adjust/answer and the guided table's lack of a
+post-check. Both tables now end with the same data-driven `question_cap`:
+after two asking replies, a selected non-care action keeps its action, topic and
+invitation, but `question_allowed` becomes false. The strict cap runs after
+`no_repeat`, so a replacement cannot re-enable a third question. Already-false
+permissions remain unchanged; care is exempt. The decision log adds
+`+question_cap` only when the check changes the selected permission.
+
+First-picture instructions end with an invitation to correct the picture,
+not a question. There is no new selector, Python conversation rule, model call,
+queue, schema or config. Existing Voice guards remove question sentences;
+their existing bounded retry and statement fallback still apply. Requests
+remain selected/stored; first picture and guide are not postponed to rest.
+
+Changed runtime data:
+- `backend/app/pai_c/policy/guided_table.json`
+- `backend/app/pai_c/policy/decision_table.json`
+- `backend/app/pai_c/policy/actions/first_picture.md`
+
+New feature test file: `backend/tests/test_question_cap.py` (44 cases).
+Existing guided-policy and founder-replay tests retain their coverage with
+expected results updated for the explicitly changed behavior. No test was deleted.
+`COUNSELING_POLICY.md` documents the final cap. No new data file was needed.
+
+Coverage includes first picture/guide after two questions, every action and
+care exemption, request and pushback priority, cap after no_repeat, zero/one/two
+actual asking replies, preserved topic/invite, empty-profile fake Voice turns
+with romanized input, and removal of the third question without another model
+call when useful text remains. Existing suites retain timeout/bad-JSON,
+statement-fallback, duplicate-job, return-visit, evidence and contract checks.
+
+| Verification | Result |
+| --- | --- |
+| Before change, full backend (guided) | 1196 passed, 3 production-only skips, 8 subtests |
+| After change, full backend (guided), PAI_API_KEY unset | 1240 passed, 3 production-only skips, 8 subtests |
+| After change, full backend (strict), PAI_API_KEY unset | 1240 passed, 3 production-only skips, 8 subtests |
+| Production-only security cases, separate synthetic configuration | 3 passed, 4 subtests |
+| Focused policy/Voice/replay checks | 103 passed |
+| Architecture + C–OS contract checks | 9 + 2 passed |
+| All app modules imported | 268/268, zero unresolved dynamic imports |
+| Frontend full suite | 32 passed, 11 files |
+| Frontend production build | PASS |
+
+Backend launchers disable dotenv loading and external socket connections;
+providers are fake and test databases are disposable SQLite. Existing three
+SQLite expression-index reflection warnings remain. The first frontend run
+hit five worker-startup timeouts; rerunning the same suite with one Vitest worker
+passed without source changes. No live quality or latency claim is made.
+
+Phase 0 has no open product decision. Phase 1 remains audit-only; its approval
+boundary and shared-module findings are in `OS_REMOVAL_AUDIT.md`. No OS file,
+table, test or contract was removed. No dotenv file was edited.

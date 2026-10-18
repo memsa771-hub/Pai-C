@@ -10,7 +10,7 @@ Decision: no separate code path per student type. One universal counseling loop 
 ## Hard guardrails (code, always enforced)
 1. Safety: classifier -> care path.
 2. Requests are stored and never blocked.
-3. Questions: at most one per reply; no question after two asking replies in a row.
+3. Questions: at most one per reply; no question after two asking replies in a row, except care. Both tables apply a final data-driven question cap after action selection: the action, topic and invitation stay selected, but question_allowed becomes false. First picture ends with an invitation to correct it, not a question.
 4. No repeated question or repeated reply.
 5. Mirror only when allowed (stage, no pending job, corrections absorbed); a correction is explored first.
 6. First picture due (once, around student message 8 with at least 4 areas covered, status and history covered): state tells the model; reply must share understanding + 3-4 directions in general words (fields, kinds of work, never institutions) with evidence.

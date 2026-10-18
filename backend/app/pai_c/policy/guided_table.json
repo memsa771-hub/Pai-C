@@ -22,5 +22,12 @@
      "set": {"action": "counsel", "question_allowed": false, "topic": null, "invite": false}},
     {"id": "counsel", "when": true,
      "set": {"action": "counsel", "question_allowed": true, "topic": null, "invite": false}}
+  ],
+  "post_checks": [
+    {"id": "question_cap",
+     "when": {"all": [{"ref": "questions_in_last_two"}, {"ref": "chosen.question_allowed"}, {"ne": [{"ref": "chosen.action"}, "care"]}]},
+     "branches": [{"when": true,
+       "set": {"action": {"ref": "chosen.action"}, "question_allowed": false,
+               "topic": {"ref": "chosen.topic"}, "invite": {"ref": "chosen.invite"}}}]}
   ]
 }

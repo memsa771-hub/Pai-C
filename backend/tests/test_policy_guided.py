@@ -22,7 +22,7 @@ def state(**changes):
     ({"safety": {"level": "urgent"}, "mirror_allowed": True}, "care", "care", False),
     ({"mirror_correction": True, "mirror_allowed": True}, "mirror_changes", "explore_correction", True),
     ({"mirror_allowed": True, "first_picture_due": True}, "mirror", "mirror", False),
-    ({"first_picture_due": True, "questions_in_last_two": True}, "first_picture", "first_picture", True),
+    ({"first_picture_due": True, "questions_in_last_two": True}, "first_picture+question_cap", "first_picture", False),
     ({"intent": "deciding", "summary_confirmed": True}, "guide", "guide", True),
     ({"discover_available": True, "possibility_id": "p1"}, "discover", "discover", True),
     ({"questions_in_last_two": True, "discover_available": True}, "rest", "counsel", False),
@@ -35,8 +35,8 @@ def test_guided_rows_first_match(changes, rule, action, question):
     assert (result.rule_id, result.action, result.question_allowed) == (rule, action, question)
 
 
-def test_guided_has_no_post_check_and_mode_comes_from_config(monkeypatch):
-    assert "post_checks" not in controller.load_data("guided_table.json")
+def test_guided_has_only_question_cap_and_mode_comes_from_config(monkeypatch):
+    assert [check["id"] for check in controller.load_data("guided_table.json")["post_checks"]] == ["question_cap"]
     previous = controller.decide(state(), mode="guided").as_dict()
     assert controller.decide(state(previous=previous), mode="guided").rule_id == "counsel"
     monkeypatch.setattr(config, "PAI_POLICY_MODE", "strict")
@@ -86,7 +86,7 @@ def test_action_texts_for_guided_mode():
     assert text.strip() == "Follow the counseling loop for this reply."
     picture = controller.decide(state(first_picture_due=True), mode="guided")
     text = controller.decision_context(picture, None, None)["instruction"]
-    assert text.startswith("Share your first picture of them.") and "ask what feels right" in text
+    assert text.startswith("Share your first picture of them.") and "Tell me what feels right and what feels wrong." in text
 
 
 def test_min_items_are_data():

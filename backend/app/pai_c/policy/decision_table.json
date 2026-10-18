@@ -490,6 +490,11 @@
           }
         }
       ]
-    }
+    },
+    {"id": "question_cap",
+     "when": {"all": [{"ref": "questions_in_last_two"}, {"ref": "chosen.question_allowed"}, {"ne": [{"ref": "chosen.action"}, "care"]}]},
+     "branches": [{"when": true,
+       "set": {"action": {"ref": "chosen.action"}, "question_allowed": false,
+               "topic": {"ref": "chosen.topic"}, "invite": {"ref": "chosen.invite"}}}]}
   ]
 }
