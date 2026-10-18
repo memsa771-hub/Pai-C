@@ -14,6 +14,16 @@ def test_os_database_url_wins():
     assert s.database_url == "b" and s.os_enabled is True
 
 
+def test_tenant_and_admin_settings():
+    s = load_settings({"DATABASE_URL": "x", "OS_ADMIN_TOKEN": "t"})
+    assert (s.tenant_id, s.admin_token, s.email_sender, s.worker_id) == ("pai", "t", "log", None)
+
+
+def test_worker_and_tenant_from_env():
+    s = load_settings({"DATABASE_URL": "x", "OS_TENANT_ID": "t2", "OS_WORKER_ID": "w1", "OS_EMAIL_SENDER": "log"})
+    assert (s.tenant_id, s.worker_id) == ("t2", "w1")
+
+
 def test_missing_database_url_raises():
     with pytest.raises(ValueError, match="OS_DATABASE_URL or DATABASE_URL"):
         load_settings({})

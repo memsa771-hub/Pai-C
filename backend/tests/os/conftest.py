@@ -42,6 +42,31 @@ def pg_url() -> str:
 
 
 @pytest.fixture(scope="session")
+def os_db(pg_url: str, fresh_db: None) -> str:
+    """A database with the os Alembic branch at head."""
+    run_alembic(["upgrade", "os@head"], pg_url)
+    return pg_url
+
+
+@pytest.fixture(scope="session")
+def engine(os_db: str):
+    eng = create_engine(os_db, pool_pre_ping=True)
+    yield eng
+    eng.dispose()
+
+
+@pytest.fixture
+def clean(engine) -> None:
+    """Empty every os_* table before the test."""
+    with engine.begin() as conn:
+        names = conn.execute(text(
+            "SELECT tablename FROM pg_tables WHERE schemaname = 'os' AND tablename LIKE 'os\\_%'"
+        )).scalars().all()
+        if names:
+            conn.execute(text("TRUNCATE " + ", ".join(f"os.{n}" for n in names) + " RESTART IDENTITY CASCADE"))
+
+
+@pytest.fixture(scope="session")
 def fresh_db(pg_url: str) -> None:
     """Reset the OS schemas so the os migration really runs again. `os` is left for the migration to create."""
     engine = create_engine(pg_url)
