@@ -11,6 +11,7 @@ Work in `workspace` on branch `pai-c`. `pai-os` is the PAI OS developer's branch
 
 ## Working files
 - `CLEANUP_AUDIT.md` - starting point for removing PAI OS from `pai-c`
+- `OS_REMOVAL_AUDIT.md` - current dependency/ownership inventory; deletion requires approval
 - `COUNSELOR_V3_PROMPTS.md` - copy of the runtime prompts; tests check it matches the prompt files
 - `COUNSELING_CONVERSATIONS.md`, `DEEP_COUNSELING_DANISH.md` - persona examples; a test uses them to make sure no persona name is hardcoded in code
 
