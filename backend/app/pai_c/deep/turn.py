@@ -116,6 +116,7 @@ async def run_deep_turn(db, turn: CounselorTurnInput, *,
                 polish_ms += int((time.monotonic() - started) * 1000)
                 continue
             reply, action, moves = config.PAI_COUNSELOR_FALLBACK_REPLY, {"type": "none"}, []
+            violations.append("language_fallback")
         if decision is not None and not decision.question_allowed:
             questions = list(question_sentences(reply))
             if questions:

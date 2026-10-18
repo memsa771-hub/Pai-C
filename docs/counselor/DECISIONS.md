@@ -52,3 +52,6 @@ Regression tests for confirmation now assert no Operator run; the old payload/de
 ## Phase 2, step 6: explicit program search
 `program.search` is a native workflow composing existing `program.discover` and `program.research`, one capability nesting level. A POST with explicit consent and a completed current-Mirror path run is required; GET never initiates research. Runs reuse the path+Mirror key and student budget. Missing destination evidence produces a missing-information result, not a guessed country.
 Eligibility uses shown/confirmed values only. Meeting entry rules is labelled eligible, not safe: safe/realistic/stretch require an independently reviewed program+season rule. Not-yet routes use only cited remediation. Existing research cache and SourceVerifier remain the source of facts.
+
+## Phase 2, step 7: private reliability surface
+An authenticated workspace health endpoint checks database-backed analysis backlog, a data-configured lag threshold, failed jobs and daily guard/fallback counts. Counts use existing durable turn decisions, with idempotent provider/unconfigured records; no text or credentials are returned. The existing public liveness endpoint is unchanged. Planner lag is an in-app attention state, not a new notification channel or scheduler. There is no provider ping and no paid health call.

@@ -11,6 +11,7 @@ from sqlalchemy import select
 from app.config import config
 from app.database import SessionLocal
 from app.pai_c.posting import send_to_student
+from app.pai_c.reliability import policy as reliability_policy, record_fallback
 
 logger = logging.getLogger(__name__)
 
@@ -45,10 +46,11 @@ async def run_counselor(workspace_id: str, event_data: dict) -> None:
                 "counselor: invocation failed: error_type=%s status=%s",
                 type(exc).__name__, getattr(exc, "status_code", None) or "unknown",
             )
+            db.rollback()
+            record_fallback(db, workspace_id, event_data, "provider_fallback")
             await _post_error_message(
                 workspace_id, event_data, PAI_AGENT_NAME,
-                "PAI Counselor could not reach the language service right now. "
-                "Please try again shortly.",
+                reliability_policy()["provider_error"],
             )
     finally:
         db.close()
@@ -83,9 +85,10 @@ async def _run_deep_turn(db, workspace_id: str, event_data: dict, depth: int):
     from app.services.pai import PAI_AGENT_NAME
 
     if not config.PAI_API_KEY:
+        record_fallback(db, workspace_id, event_data, "unconfigured_fallback")
         await _post_error_message(
             workspace_id, event_data, PAI_AGENT_NAME,
-            "This assistant isn't configured on the server yet (missing key).",
+            reliability_policy()["unconfigured"],
         )
         return None
     payload = event_data.get("payload") or {}
@@ -154,7 +157,9 @@ async def _run_deep_turn(db, workspace_id: str, event_data: dict, depth: int):
             action = {"type": "none"}
     context = result.context if result is not None else None
     moves = [] if fallback_reply is not None or result is None else result.moves
-    violations = [] if fallback_reply is not None or result is None else result.guard_violations
+    violations = ["wellbeing_fallback"] if fallback_reply is not None else list(result.guard_violations) if result else []
+    if signals is not None and getattr(signals, "_fallback", False):
+        violations.append("classifier_fallback")
     post_started = time.monotonic()
     reply_metadata = _voice_reply_metadata(event_data)
     if decision is not None and decision.action == "discover":

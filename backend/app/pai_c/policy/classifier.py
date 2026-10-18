@@ -31,7 +31,11 @@ class Request(StrictModel):
     needs_context: bool
 
 
+from pydantic import PrivateAttr
+
+
 class Signals(StrictModel):
+    _fallback: bool = PrivateAttr(default=False)
     safety: SafetyResult
     intent: Literal["sharing", "asking_info", "asking_task", "deciding", "pushback", "short_reply", "greeting", "other"]
     emotion: Literal["neutral", "positive", "stressed", "frustrated", "distressed"]
@@ -42,7 +46,9 @@ class Signals(StrictModel):
 
 
 def fallback_signals():
-    return Signals.model_validate_json(Path(__file__).with_name("classifier_fallback.json").read_text(encoding="utf-8"))
+    result = Signals.model_validate_json(Path(__file__).with_name("classifier_fallback.json").read_text(encoding="utf-8"))
+    result._fallback = True
+    return result
 
 
 async def classify(student_text, recent_turns):
@@ -58,4 +64,6 @@ async def classify(student_text, recent_turns):
         return Signals.model_validate_json(raw)
     except Exception as exc:
         logger.warning("classifier_error error_type=%s", type(exc).__name__)
-        return fallback_signals()
+        signals = fallback_signals()
+        signals._fallback = True
+        return signals

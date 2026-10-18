@@ -703,10 +703,11 @@ app.include_router(auth.router)
 app.include_router(browser.router)
 app.include_router(counselor_voice.router)
 app.include_router(counselor_summary.router)
-from app.routers import counselor_fact_cards, counselor_profile_cards, counselor_paths
+from app.routers import counselor_fact_cards, counselor_profile_cards, counselor_paths, counselor_health
 app.include_router(counselor_fact_cards.router)
 app.include_router(counselor_profile_cards.router)
 app.include_router(counselor_paths.router)
+app.include_router(counselor_health.router)
 app.include_router(counselor_possibilities.router)
 app.include_router(events.router)
 app.include_router(feedback.router)

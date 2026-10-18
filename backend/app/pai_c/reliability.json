@@ -1,0 +1,5 @@
+{
+  "planner_lag_seconds": 120,
+  "provider_error": "I couldn't complete that reply just now. Your message is still here. Please try again.",
+  "unconfigured": "PAI is temporarily unavailable. Please try again shortly."
+}
