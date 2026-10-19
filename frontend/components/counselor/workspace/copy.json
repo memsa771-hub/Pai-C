@@ -239,5 +239,6 @@
   },
   "stalePath": "Some sources need a fresh check. The older claims are hidden until they are checked again.",
   "acceptActivity": "I'll try this",
-  "activityScheduled": "PAI will check in here"
+  "activityScheduled": "PAI will check in here",
+  "emptyTitle": "Nothing here yet"
 }

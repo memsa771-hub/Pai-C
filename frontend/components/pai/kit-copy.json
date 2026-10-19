@@ -1,0 +1,22 @@
+{
+  "retry": "Try again",
+  "loading": "Loading",
+  "errorTitle": "Something did not load",
+  "errorBody": "Your information has not changed. Please try again.",
+  "evidence": {
+    "none": "Not yet",
+    "stated": "Stated",
+    "shown": "Shown",
+    "confirmed": "Confirmed"
+  },
+  "evidenceHelp": {
+    "none": "Nothing shared yet",
+    "stated": "You said it",
+    "shown": "You showed it, for example with a document or something you did",
+    "confirmed": "You confirmed it"
+  },
+  "heatmapLegend": "Colour shows how strong the evidence is. Dots show how much there is. This is never a score.",
+  "heatmapItems": { "one": "{count} piece of evidence", "other": "{count} pieces of evidence" },
+  "heatmapFilter": "Show details for {area}",
+  "heatmapClear": "Show all areas"
+}

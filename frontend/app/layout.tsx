@@ -81,7 +81,7 @@ export default async function RootLayout({
           that buries real warnings. Scoped to this element — children still
           report normally. */}
       <body
-        className="font-sans bg-zinc-100 dark:bg-zinc-900"
+        className="font-sans bg-background text-foreground antialiased"
         suppressHydrationWarning
       >
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>

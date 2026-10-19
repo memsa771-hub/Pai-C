@@ -6,51 +6,114 @@
 /** Dark Mode Variant **/
 @custom-variant dark (&:is(.dark *));
 
-/** Colors - https://tailwindcss.com/docs/colors **/
-:root {
-  --background: var(--color-white);
-  --foreground: var(--color-zinc-950);
-  --card: var(--color-white);
-  --card-foreground: var(--color-zinc-950);
-  --popover: var(--color-white);
-  --popover-foreground: var(--color-zinc-950);
-  /* app-shell-4 runs a neutral brand: black in light, near-white in dark */
-  --primary: var(--color-zinc-950);
-  --primary-foreground: var(--color-zinc-50);
-  --secondary: var(--color-zinc-100);
-  --secondary-foreground: var(--color-zinc-900);
-  --muted: var(--color-zinc-100);
-  --muted-foreground: var(--color-zinc-500);
-  --accent: var(--color-zinc-100);
-  --accent-foreground: var(--color-zinc-900);
-  --destructive: var(--color-red-600);
-  --destructive-foreground: var(--color-white);
-  --chart-1: var(--color-blue-500);
-  --chart-2: var(--color-green-500);
-  --chart-3: var(--color-yellow-500);
-  --chart-4: var(--color-red-500);
-  --chart-5: var(--color-purple-500);
-  --border: oklch(
-    94% 0.004 286.32
-  ); /* between --color-zinc-100 and --color-zinc-200 */
-  --input: var(--color-zinc-200);
-  --ring: var(--color-zinc-400);
-  --radius: 0.5rem;
+/** PAI design tokens: the single source for colour, radius, shadow and type.
+    Light and dark are tuned separately (not inverted). Text/background pairs
+    are checked for WCAG AA (4.5:1 body text, 3:1 large text and UI). **/
+@font-face {
+  font-family: 'Plus Jakarta Sans';
+  font-style: normal;
+  font-weight: 200 800;
+  font-display: swap;
+  src: url('/fonts/plus-jakarta-sans-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'Plus Jakarta Sans';
+  font-style: normal;
+  font-weight: 200 800;
+  font-display: swap;
+  src: url('/fonts/plus-jakarta-sans-latin-ext.woff2') format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
 
-  /** Sidebar (app-shell) — translucent rail over the page background **/
-  --sidebar: color-mix(in oklab, var(--color-zinc-100) 60%, transparent);
+:root {
+  /* Brand: the logo blue. White on it is 4.96:1. */
+  --brand: #2f63f6;
+  --brand-strong: #1d4fd8;
+  --brand-soft: #e8eeff;
+  --brand-ink: #1a3fb0;
+
+  /* Neutrals: cool and slightly blue so the brand feels at home. */
+  --background: #f5f7fc;
+  --foreground: #121a33;
+  --card: #ffffff;
+  --card-foreground: #121a33;
+  --popover: #ffffff;
+  --popover-foreground: #121a33;
+  --primary: var(--brand);
+  --primary-foreground: #ffffff;
+  --secondary: #eef1f8;
+  --secondary-foreground: #1e2742;
+  --muted: #eef1f8;
+  --muted-foreground: #556079; /* 5.9:1 on card */
+  --accent: #eef1f8;
+  --accent-foreground: #1e2742;
+  --destructive: #c8283b;
+  --destructive-foreground: #ffffff;
+  --border: #e2e7f2;
+  --input: #cfd7e8;
+  --ring: var(--brand);
+  --radius: 0.75rem;
+
+  /* Status: calm, never alarming. `*-ink` is text on `*-soft`. */
+  --success: #16a36a;
+  --success-soft: #e3f7ee;
+  --success-ink: #0b6b45;
+  --warning: #e5900b;
+  --warning-soft: #fff3dc;
+  --warning-ink: #8a4f00;
+  --danger: #c8283b;
+  --danger-soft: #fde8eb;
+  --danger-ink: #9b1528;
+  --info: #2f63f6;
+  --info-soft: #e8eeff;
+  --info-ink: #1a3fb0;
+
+  /* Five accents for areas and paths: solid / soft fill / ink text. */
+  --tone-blue: #2f63f6;   --tone-blue-soft: #e8eeff;   --tone-blue-ink: #1a3fb0;
+  --tone-violet: #7c4dff; --tone-violet-soft: #f0eaff; --tone-violet-ink: #5223c9;
+  --tone-teal: #0f9f8f;   --tone-teal-soft: #ddf6f2;   --tone-teal-ink: #0a6359;
+  --tone-amber: #f29a0c;  --tone-amber-soft: #fff1d6;  --tone-amber-ink: #8a4f00;
+  --tone-rose: #e5487a;   --tone-rose-soft: #fde7ef;   --tone-rose-ink: #a31a4b;
+  --tone-sky: #0ea5e9;    --tone-sky-soft: #e0f4fd;    --tone-sky-ink: #075985;
+
+  /* Evidence strength: none, stated, shown, confirmed. Never a score. */
+  --evidence-0: #eef1f8;
+  --evidence-1: #c9d6ff;
+  --evidence-2: #7f9dfa;
+  --evidence-3: #2f63f6;
+  --evidence-0-ink: #556079;
+  --evidence-1-ink: #1a3fb0;
+  --evidence-2-ink: #0b1f66;
+  --evidence-3-ink: #ffffff;
+
+  /* Elevation */
+  --elev-soft: 0 1px 2px rgb(18 26 51 / 0.04), 0 2px 8px rgb(18 26 51 / 0.04);
+  --elev-card: 0 1px 2px rgb(18 26 51 / 0.05), 0 8px 24px -8px rgb(18 26 51 / 0.10);
+  --elev-lift: 0 2px 4px rgb(18 26 51 / 0.06), 0 18px 40px -12px rgb(47 99 246 / 0.28);
+
+  /* Hero gradient for auth, onboarding and the profile header. */
+  --hero-from: #2f63f6;
+  --hero-via: #6a4dff;
+  --hero-to: #0ea5e9;
+
+  /** Sidebar **/
+  --sidebar: #ffffff;
   --sidebar-foreground: var(--foreground);
   --sidebar-primary: var(--primary);
   --sidebar-primary-foreground: var(--primary-foreground);
-  --sidebar-accent: color-mix(in oklab, var(--primary) 5%, transparent);
-  --sidebar-accent-foreground: var(--primary);
-  --sidebar-border: transparent;
+  --sidebar-accent: var(--brand-soft);
+  --sidebar-accent-foreground: var(--brand-ink);
+  --sidebar-border: var(--border);
   --sidebar-ring: var(--ring);
 
-  /** File type accents — a folder of uploads is a wall of near-identical
-      names, so the glyph colour carries the type and the eye can sort the
-      list before reading a single filename. One hue per kind, shared by the
-      grid tiles, the list rows, the ⌘K palette and the preview header. **/
+  --chart-1: var(--tone-blue);
+  --chart-2: var(--tone-teal);
+  --chart-3: var(--tone-amber);
+  --chart-4: var(--tone-rose);
+  --chart-5: var(--tone-violet);
+
+  /** File type accents: one hue per kind, shared by grid, list and preview. **/
   --file-pdf: hsl(350 75% 55%);
   --file-doc: hsl(220 85% 58%);
   --file-sheet: hsl(150 70% 35%);
@@ -66,43 +129,80 @@
   --file-unknown: hsl(0 0% 48%);
 }
 
+/* Dark is deep navy, not inverted grey. The brand lifts to a lighter blue
+   with dark ink so filled buttons keep about 7:1 contrast. */
 .dark {
-  --background: var(--color-zinc-950);
-  --foreground: var(--color-zinc-50);
-  --card: var(--color-zinc-950);
-  --card-foreground: var(--color-zinc-50);
-  --popover: var(--color-zinc-950);
-  --popover-foreground: var(--color-zinc-50);
-  --primary: var(--color-zinc-50);
-  --primary-foreground: var(--color-zinc-900);
-  --secondary: var(--color-zinc-800);
-  --secondary-foreground: var(--color-zinc-50);
-  --muted: var(--color-zinc-900);
-  --muted-foreground: var(--color-zinc-500);
-  --accent: var(--color-zinc-900);
-  --accent-foreground: var(--color-zinc-50);
-  --destructive: var(--color-red-600);
-  --destructive-foreground: var(--color-white);
-  --chart-1: var(--color-blue-500);
-  --chart-2: var(--color-green-500);
-  --chart-3: var(--color-yellow-500);
-  --chart-4: var(--color-red-500);
-  --chart-5: var(--color-purple-500);
-  --border: var(--color-zinc-800);
-  --input: var(--color-zinc-800);
-  --ring: var(--color-zinc-600);
+  --brand: #7c9cff;
+  --brand-strong: #a3bbff;
+  --brand-soft: #1c2650;
+  --brand-ink: #b8c9ff;
 
-  /** Sidebar (app-shell) **/
-  --sidebar: color-mix(in oklab, var(--color-zinc-900) 60%, transparent);
+  --background: #0a0f1f;
+  --foreground: #e8ecf8;
+  --card: #121a30;
+  --card-foreground: #e8ecf8;
+  --popover: #161f39;
+  --popover-foreground: #e8ecf8;
+  --primary: var(--brand);
+  --primary-foreground: #0a1028;
+  --secondary: #1b2440;
+  --secondary-foreground: #e8ecf8;
+  --muted: #1b2440;
+  --muted-foreground: #a3abbf; /* 7.6:1 on card */
+  --accent: #1b2440;
+  --accent-foreground: #e8ecf8;
+  --destructive: #ff6b7d;
+  --destructive-foreground: #2a0710;
+  --border: #243052;
+  --input: #34426d;
+  --ring: var(--brand);
+
+  --success: #3ddc97;
+  --success-soft: #0f2e25;
+  --success-ink: #7ff0bf;
+  --warning: #ffb547;
+  --warning-soft: #33250c;
+  --warning-ink: #ffd28a;
+  --danger: #ff6b7d;
+  --danger-soft: #361420;
+  --danger-ink: #ffadb7;
+  --info: #7c9cff;
+  --info-soft: #1c2650;
+  --info-ink: #b8c9ff;
+
+  --tone-blue: #7c9cff;   --tone-blue-soft: #1c2650;   --tone-blue-ink: #b8c9ff;
+  --tone-violet: #a78bff; --tone-violet-soft: #261d4d; --tone-violet-ink: #d2c4ff;
+  --tone-teal: #3dd6c3;   --tone-teal-soft: #0e2f2e;   --tone-teal-ink: #93efe3;
+  --tone-amber: #ffb547;  --tone-amber-soft: #33250c;  --tone-amber-ink: #ffd28a;
+  --tone-rose: #ff7aa5;   --tone-rose-soft: #3a1528;   --tone-rose-ink: #ffb8cf;
+  --tone-sky: #4cc3f5;    --tone-sky-soft: #0c2a3d;    --tone-sky-ink: #a3e2fb;
+
+  --evidence-0: #1b2440;
+  --evidence-1: #253a7a;
+  --evidence-2: #3f62d4;
+  --evidence-3: #7c9cff;
+  --evidence-0-ink: #a3abbf;
+  --evidence-1-ink: #c9d6ff;
+  --evidence-2-ink: #ffffff;
+  --evidence-3-ink: #0a1028;
+
+  --elev-soft: 0 1px 2px rgb(0 0 0 / 0.30);
+  --elev-card: 0 1px 0 rgb(255 255 255 / 0.03) inset, 0 10px 30px -12px rgb(0 0 0 / 0.55);
+  --elev-lift: 0 1px 0 rgb(255 255 255 / 0.05) inset, 0 18px 40px -14px rgb(124 156 255 / 0.35);
+
+  --hero-from: #2a4fd6;
+  --hero-via: #5b3fd9;
+  --hero-to: #0b7fb8;
+
+  --sidebar: #0e1428;
   --sidebar-foreground: var(--foreground);
   --sidebar-primary: var(--primary);
   --sidebar-primary-foreground: var(--primary-foreground);
-  --sidebar-accent: color-mix(in oklab, var(--primary) 12%, transparent);
-  --sidebar-accent-foreground: var(--color-zinc-50);
-  --sidebar-border: transparent;
+  --sidebar-accent: var(--brand-soft);
+  --sidebar-accent-foreground: var(--brand-ink);
+  --sidebar-border: var(--border);
   --sidebar-ring: var(--ring);
 
-  /** File type accents — same hues, lifted so they hold up on zinc-950. **/
   --file-pdf: hsl(350 80% 68%);
   --file-doc: hsl(220 90% 70%);
   --file-sheet: hsl(150 60% 50%);
@@ -120,6 +220,62 @@
 
 /** Theme Setup **/
 @theme inline {
+  /** Type: one family across the app **/
+  --font-sans: 'Plus Jakarta Sans', ui-sans-serif, system-ui, 'Segoe UI', Roboto, sans-serif;
+
+  /** PAI semantic colours **/
+  --color-brand: var(--brand);
+  --color-brand-strong: var(--brand-strong);
+  --color-brand-soft: var(--brand-soft);
+  --color-brand-ink: var(--brand-ink);
+  --color-success: var(--success);
+  --color-success-soft: var(--success-soft);
+  --color-success-ink: var(--success-ink);
+  --color-warning: var(--warning);
+  --color-warning-soft: var(--warning-soft);
+  --color-warning-ink: var(--warning-ink);
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+  --color-danger-ink: var(--danger-ink);
+  --color-info: var(--info);
+  --color-info-soft: var(--info-soft);
+  --color-info-ink: var(--info-ink);
+  --color-tone-blue: var(--tone-blue);
+  --color-tone-blue-soft: var(--tone-blue-soft);
+  --color-tone-blue-ink: var(--tone-blue-ink);
+  --color-tone-violet: var(--tone-violet);
+  --color-tone-violet-soft: var(--tone-violet-soft);
+  --color-tone-violet-ink: var(--tone-violet-ink);
+  --color-tone-teal: var(--tone-teal);
+  --color-tone-teal-soft: var(--tone-teal-soft);
+  --color-tone-teal-ink: var(--tone-teal-ink);
+  --color-tone-amber: var(--tone-amber);
+  --color-tone-amber-soft: var(--tone-amber-soft);
+  --color-tone-amber-ink: var(--tone-amber-ink);
+  --color-tone-rose: var(--tone-rose);
+  --color-tone-rose-soft: var(--tone-rose-soft);
+  --color-tone-rose-ink: var(--tone-rose-ink);
+  --color-tone-sky: var(--tone-sky);
+  --color-tone-sky-soft: var(--tone-sky-soft);
+  --color-tone-sky-ink: var(--tone-sky-ink);
+  --color-evidence-0: var(--evidence-0);
+  --color-evidence-0-ink: var(--evidence-0-ink);
+  --color-evidence-1: var(--evidence-1);
+  --color-evidence-1-ink: var(--evidence-1-ink);
+  --color-evidence-2: var(--evidence-2);
+  --color-evidence-2-ink: var(--evidence-2-ink);
+  --color-evidence-3: var(--evidence-3);
+  --color-evidence-3-ink: var(--evidence-3-ink);
+
+  /** Elevation **/
+  --shadow-soft: var(--elev-soft);
+  --shadow-card: var(--elev-card);
+  --shadow-lift: var(--elev-lift);
+
+  /** Radius **/
+  --radius-2xl: calc(var(--radius) + 6px);
+  --radius-3xl: calc(var(--radius) + 12px);
+
   /** Base Colors **/
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -222,7 +378,16 @@
   }
 
   *:focus-visible {
-    @apply outline-ring rounded-xs shadow-none outline-2 outline-offset-3 transition-none!;
+    @apply outline-ring outline-2 outline-offset-2;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
   }
 
   /** Agent activity dot animation **/

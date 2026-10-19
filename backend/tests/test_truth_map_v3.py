@@ -141,7 +141,7 @@ def test_areas_use_active_evidence_and_json_mapping_changes_result(tmp_path, mon
     assert result["strengths"]["item_count"] == 2 and result["sure"]["last_confirmed"] == NOW
     (tmp_path / "areas.json").write_text(json.dumps({"changed": [{"path": "world.social"}]}))
     monkeypatch.setattr(views, "DATA_DIR", tmp_path)
-    assert views.coverage_areas(notebook, snapshot) == {"changed": {"covered": False, "item_count": 0, "min_items": 1, "last_confirmed": None}}
+    assert views.coverage_areas(notebook, snapshot) == {"changed": {"covered": False, "item_count": 0, "min_items": 1, "last_confirmed": None, "evidence": None}}
 
 
 def test_views_only_expose_approved_fields_and_do_not_mutate():

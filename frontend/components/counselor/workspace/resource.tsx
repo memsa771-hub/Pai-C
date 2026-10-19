@@ -1,7 +1,8 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
+import type { LucideIcon } from "lucide-react";
 import copy from "./copy.json";
-import { Button } from "@/components/ui/button";
+import { EmptyState, ErrorState, PageHeader, Skeletons, type Tone } from "@/components/pai";
 export { evidenceText as human, evidenceLabel } from "@/lib/evidence-text";
 
 export function useResource<T>(load: () => Promise<T>) {
@@ -46,50 +47,32 @@ export function LoadState({
   error,
   busy,
   retry,
+  skeleton = "cards",
+  empty,
 }: {
   error: boolean;
   busy: boolean;
   retry: () => void;
+  skeleton?: "cards" | "list" | "profile" | "chat";
+  empty?: { title: string; description?: string; icon?: LucideIcon; action?: React.ReactNode };
 }) {
-  return (
-    <div
-      className="rounded-2xl border bg-card p-8 text-center"
-      role={error ? "alert" : "status"}
-    >
-      <p className="text-muted-foreground">
-        {error ? copy.error : busy ? copy.loading : copy.empty}
-      </p>
-      {error && (
-        <Button className="mt-4" variant="outline" onClick={retry}>
-          {copy.retry}
-        </Button>
-      )}
-    </div>
-  );
+  if (error) return <ErrorState description={copy.error} retryLabel={copy.retry} onRetry={retry} />;
+  if (busy) return <Skeletons variant={skeleton} label={copy.loading} />;
+  return <EmptyState title={empty?.title || copy.emptyTitle} description={empty?.description || copy.empty}
+    icon={empty?.icon} action={empty?.action} />;
 }
 export function Heading({
   title,
   description,
   action,
+  icon,
+  tone,
 }: {
   title: string;
   description: string;
   action?: React.ReactNode;
+  icon?: LucideIcon;
+  tone?: Tone;
 }) {
-  return (
-    <header className="mb-8 flex flex-wrap items-start justify-between gap-4">
-      <div className="max-w-2xl">
-        <p className="mb-2 text-xs font-semibold tracking-widest text-primary">
-          {copy.eyebrow}
-        </p>
-        <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">
-          {title}
-        </h1>
-        <p className="mt-3 leading-relaxed text-muted-foreground">
-          {description}
-        </p>
-      </div>
-      {action}
-    </header>
-  );
+  return <PageHeader title={title} description={description} action={action} icon={icon} tone={tone} />;
 }

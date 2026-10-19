@@ -23,6 +23,7 @@ const buttonVariants = cva(
         ghost:
           'text-accent-foreground hover:bg-accent hover:text-accent-foreground data-[state=open]:bg-accent data-[state=open]:text-accent-foreground',
         dim: 'text-muted-foreground hover:text-foreground data-[state=open]:text-foreground',
+        soft: 'bg-brand-soft text-brand-ink hover:bg-brand-soft/70 data-[state=open]:bg-brand-soft/70',
         foreground: '',
         inverse: '',
       },
@@ -43,6 +44,9 @@ const buttonVariants = cva(
         md: 'h-8.5 rounded-md px-3 gap-1.5 text-[0.8125rem] leading-(--text-sm--line-height) [&_svg:not([class*=size-])]:size-4',
         sm: 'h-7 rounded-md px-2.5 gap-1.25 text-xs [&_svg:not([class*=size-])]:size-3.5',
         icon: 'size-8.5 rounded-md [&_svg:not([class*=size-])]:size-4 shrink-0',
+        /** Touch-first sizes for student screens: 44px minimum target. **/
+        tap: 'min-h-11 rounded-xl px-5 py-2 gap-2 text-sm font-semibold [&_svg:not([class*=size-])]:size-4',
+        'tap-icon': 'size-11 rounded-xl [&_svg:not([class*=size-])]:size-5 shrink-0',
       },
       autoHeight: {
         true: '',

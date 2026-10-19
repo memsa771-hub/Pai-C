@@ -108,3 +108,13 @@ def test_upload_candidates_count_only_after_reconciliation(api):
         assert result.accepted, result.reason
     after = coverage_areas(CounselorNotebookData(), MemoryService(db).profile(workspace_id))
     assert all(after[key]["covered"] for key in ("status", "history", "strengths"))
+
+
+def test_coverage_reports_strongest_public_evidence_level_per_area():
+    assert coverage()["interests"]["evidence"] is None
+    said = item(id="said", key="interest.making", evidence="I like making things")
+    shown = item(id="shown", key="interest.repair", evidence="Photo of my repair", kind="shown")
+    assert coverage({"self": [said]})["interests"]["evidence"] == "stated"
+    assert coverage({"self": [said, shown]})["interests"]["evidence"] == "shown"
+    confirmed = {"value": "Studying", "evidence": {"quote": "I study"}, "evidence_level": "confirmed"}
+    assert coverage(facts={"identity.current_status": confirmed})["status"]["evidence"] == "confirmed"

@@ -17,13 +17,26 @@ def _date(value):
     return date if date.tzinfo else date.replace(tzinfo=timezone.utc)
 
 
+EVIDENCE_ORDER = ("stated", "shown", "confirmed")
+# Notebook item kinds map onto the same public evidence ladder as Vault facts.
+_KIND_LEVEL = {"said": "stated", "shown": "shown", "document": "shown", "action": "shown"}
+
+
+def _strength(row):
+    """Strongest public evidence level of one row; read-only, never a score."""
+    level = row.get("evidence_level")
+    if level in EVIDENCE_ORDER:
+        return level
+    return _KIND_LEVEL.get(row.get("kind"), "stated")
+
+
 def coverage_areas(notebook, snapshot):
     data = notebook.model_dump(mode="json")
     areas = json.loads((DATA_DIR / "areas.json").read_text(encoding="utf-8"))
     result = {}
     for area, spec in areas.items():
         locations, min_items = (spec["sources"], spec.get("min_items", 1)) if isinstance(spec, dict) else (spec, 1)
-        evidence = {}
+        evidence, strength = {}, {}
         for location in locations:
             if "vault_fields" in location or "vault_field_prefixes" in location:
                 rows = [("fact:" + key, row) for key, row in snapshot.facts.items()
@@ -51,9 +64,12 @@ def coverage_areas(notebook, snapshot):
                     continue
                 stamp = row.get(location.get("timestamp", "last_confirmed")) or row.get("updated_at") or row.get("valid_from") or row.get("created_at")
                 evidence[identity] = _date(stamp)
+                strength[identity] = _strength(row)
         dates = [stamp for stamp in evidence.values() if stamp is not None]
+        levels = [level for level in strength.values() if level]
         result[area] = {"covered": len(evidence) >= min_items, "item_count": len(evidence),
-                        "min_items": min_items, "last_confirmed": max(dates) if dates else None}
+                        "min_items": min_items, "last_confirmed": max(dates) if dates else None,
+                        "evidence": max(levels, key=EVIDENCE_ORDER.index) if levels else None}
     return result
 
 
