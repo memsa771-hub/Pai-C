@@ -22,6 +22,7 @@ from sqlalchemy import Engine
 
 from app.os.db import make_engine
 from app.os.kernel import Kernel
+from app.os.knowledge.profile import PROFILE_DIR, load_profile_dir
 from app.os.playbooks import PLAYBOOK_DIR, load_playbook_dir
 from app.os.runner.enqueue import enqueue_pending
 from app.os.runner.modules import default_registry
@@ -35,6 +36,7 @@ log = logging.getLogger("app.os.worker")
 # Extra scheduled jobs (name, cron, factory(settings, engine, kernel, client) -> fn).
 JOB_FACTORIES: list[tuple[str, str, Callable]] = []
 PLAYBOOK_SOURCE: Path = PLAYBOOK_DIR  # the playbooks every task type must have an owner for
+PROFILE_SOURCE: Path = PROFILE_DIR  # the research profiles, validated at startup
 ENQUEUE_EVERY_S = 1.0
 
 
@@ -51,6 +53,7 @@ def build(settings: OsSettings) -> tuple[Registry, Kernel, DBOSClient, Engine]:
     for module in _extra_modules(os.environ.get("OS_EXTRA_MODULES", "")):
         registry.register(module)
     registry.validate(load_playbook_dir(PLAYBOOK_SOURCE).values())  # fail at startup, not on a task (I7)
+    load_profile_dir(PROFILE_SOURCE)  # an invalid research profile stops startup too (Slice 2 spec §4.2)
     engine = make_engine(settings)
     kernel = Kernel(engine, settings.tenant_id)
     DBOS(config=dbos_config(settings, settings.worker_id))
