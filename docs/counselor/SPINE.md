@@ -2177,3 +2177,53 @@ guard requires exact current sourced assertions, adds date/link and removes
 unsupported claims/numbers with a checking response. Student numbers remain.
 Both runtime prompts and their documented copies are synchronized. New tests
 are in test_world_knowledge.py; remaining semantic limits are in BLOCKERS.md.
+
+## Locked workflow Phase 2, steps 5–7 and Phase 3
+
+The later autonomous instruction superseded the historical two-attempt/stop
+rule above. Clear implementation and fixture defects were fixed; unresolved
+product/deployment limitations are recorded in BLOCKERS.md and DECISIONS.md.
+
+| Trigger / reader | Owner / path | Boundary |
+| --- | --- | --- |
+| Mirror confirmation | Existing Mirror/possibility service | Materializes paths; no institutional research on confirmation. |
+| Explore a path | Research Gateway -> durable operator.run -> path.explain | Model Gateway, existing web tools, SourceVerifier; exact student fit evidence; no verified world claims without sources. |
+| Explicit Where to study consent | Research Gateway -> program.search -> program.discover/program.research | Completed current-Mirror path, student destination evidence, existing per-Mirror budget and dedupe. |
+| Program results read | RequirementStore + current shown/confirmed profile | Rechecks source freshness and student evidence; unknown comparisons stay unknown; admission bands require reviewed seasonal data. |
+| Prepare reviewed roadmap | Path-scoped router -> existing roadmap builder | Completed program check and explicit consent; existing choice token remains separate. |
+| Profile Confirm/Edit/Remove | MemoryService -> candidate -> reconciler | Value digest, idempotency, ownership and history; no direct canonical table edits by the frontend. |
+| Public profile / export | MemoryService projections + existing serializers/redactor | Excludes private interpretation/archives/credentials; export is read-only and owner-only. |
+| Reliability UI | Owner-only counselor/health | Existing durable decisions/jobs provide daily fallback, backlog, open-request and failed-job counts; no model ping. |
+| Check-in | Existing chat draft -> normal orchestrator | No auto-send, new queue or OS reminder scheduler. |
+
+Added data: paths/policy.json, reliability.json, policy/inline_cards.json,
+understanding/profile_sections.json and frontend workspace copy/settings data.
+The entry-level catalog supplied by the board is in memory/entry_fields.json;
+Other is editable. Missing board/subject catalogs use text/upload, never invented
+options. The seasonal rules and reviewed occupational-source packs have no
+invented authoritative entries. See BUILD_REPORT_V1.md for partial board items.
+
+The frontend mounts Counselor, Journey, Paths, Profile, Compare, Plan, Documents,
+Settings and the existing central notifications. Existing integration settings
+remain. It reuses auth/workspaces, chat/voice, files, roadmap choice and deletion
+contracts. The exported data and all new routes are workspace-scoped.
+
+The Counselor's normal foreground model-call architecture is unchanged by this
+build; the grounding guard, fact cards, profile review and reliability reads add
+no model calls. Analyst/session/extraction cadence remains unchanged. Path
+explanation adds background workflow calls only on explicit Explore; program
+search reuses the existing research family only after stage-H consent. Existing
+retry limits and usage accounting remain. No live provider calls verified these
+workflows in this run.
+
+Deferred UI cleanup (131decb): twelve no-longer-imported files removed, with
+evidence in UI_CLEANUP_V1.md. Shared controls/services and tasks tools remain.
+New bilateral OS intake/outcome contracts are blocked on joint agreement; no
+tables or shared KEEP code were deleted.
+
+Final production-code head 2cc212e: backend guided and strict each **1324 passed,
+3 skipped, 8 subtests**; the skipped production class separately **3 passed,
+4 subtests**. Frontend **60 passed / 18 files**, production build passed.
+**285/285** app modules imported. Network-blocked browser A–K UI replay passed,
+with 32 light/dark desktop captures plus one mobile capture. Full results,
+limitations, every orange board card and founder command: BUILD_REPORT_V1.md.

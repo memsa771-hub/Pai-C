@@ -71,10 +71,14 @@ const base='http://127.0.0.1:4173/student';
   assert.equal(choiceCalls.filter(call=>call.method==='getRoadmapChoiceToken').length,1);
   assert.equal(choiceCalls.filter(call=>call.method==='chooseRoadmap').length,1);
   for(const theme of ['light','dark']){
-    await page.evaluate(theme=>document.documentElement.className=theme,theme);
+    await page.goto(`${base}?view=compare&roadmap=1&theme=${theme}`);
+    await page.getByRole('button',{name:'Choose route',exact:true}).click();
+    await page.getByRole('dialog').getByRole('button',{name:'Choose route',exact:true}).click();
+    await page.getByRole('dialog').getByRole('status').waitFor();
+    await page.waitForTimeout(300);
     await page.screenshot({path:path.join(screenshots,`decision-${theme}.png`)});
+    await page.getByRole('dialog').getByRole('button',{name:'Close',exact:true}).first().click();
   }
-  await dialog.getByRole('button',{name:'Close',exact:true}).first().click();
   await page.getByRole('button',{name:'Plan & check-ins',exact:true}).click();
   await page.getByRole('heading',{name:'Small next steps'}).waitFor();
   // K: return to the same conversation with a check-in draft, not an auto-send.

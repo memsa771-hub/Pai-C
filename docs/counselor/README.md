@@ -10,6 +10,9 @@ Work in `workspace` on branch `pai-c`. `pai-os` is the PAI OS developer's branch
 5. `SPINE.md` - how the code is built (services, jobs, policy modes)
 
 ## Working files
+- `BUILD_REPORT_V1.md` - current locked-workflow implementation, card checklist, screenshots, tests and founder start command
+- `DECISIONS.md`, `BLOCKERS.md` - implementation choices and safely unavailable/deferred items
+- `UI_CLEANUP_V1.md` - importer evidence for the approved deferred UI deletion
 - `CLEANUP_AUDIT.md` - starting point for removing PAI OS from `pai-c`
 - `OS_REMOVAL_AUDIT.md` - current dependency/ownership inventory; deletion requires approval
 - `COUNSELOR_V3_PROMPTS.md` - copy of the runtime prompts; tests check it matches the prompt files
