@@ -1,6 +1,7 @@
 """Offline safety contracts and pre-post routing, with fake providers only."""
 import asyncio
 import json
+import logging
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 
@@ -61,7 +62,7 @@ async def test_invalid_safety_json_fails_open_without_text_logs(response, caplog
             patch("app.pai_c.deep.turn.run_deep_turn",AsyncMock(return_value=answer("Normal reply?"))):
         await student.turn("private student content")
         assert student.transcript[-1]["content"] == "Normal reply?"
-    assert "classifier_error" in caplog.text
+    assert "classifier_result status=fallback" in caplog.text
     assert "private student content" not in caplog.text
     assert "reason" not in caplog.text
 
@@ -77,7 +78,7 @@ async def test_safety_error_and_timeout_fail_open(mode, caplog):
             patch("app.pai_c.deep.turn.run_deep_turn",AsyncMock(return_value=answer("Normal reply?"))):
         await student.turn("private student content")
         assert student.transcript[-1]["content"] == "Normal reply?"
-    assert "classifier_error" in caplog.text and "private student content" not in caplog.text
+    assert "classifier_result status=fallback" in caplog.text and "private student content" not in caplog.text
 
 
 @pytest.mark.asyncio
@@ -96,6 +97,22 @@ async def test_classifier_finishes_before_voice_and_no_discarded_normal_call():
         with patch.object(gate,"complete",classify), patch("app.pai_c.deep.turn.run_deep_turn",voice):
             await student.turn("fixture")
         assert student.transcript[-1]["content"] == "Please reach out to someone you trust."
+
+
+@pytest.mark.asyncio
+async def test_classifier_logs_success_and_fallback_without_student_text(caplog):
+    from app.pai_c.policy.classifier import classify, fallback_signals
+    private = 'private student content'
+    with caplog.at_level(logging.INFO, logger='app.pai_c.policy.classifier'), \
+            patch.object(gate, 'complete', AsyncMock(return_value=fallback_signals().model_dump_json())):
+        result = await classify(private, [])
+    assert result._fallback is False
+    assert 'classifier_result status=success latency_ms=' in caplog.text
+    with patch.object(gate, 'complete', AsyncMock(side_effect=TimeoutError())):
+        result = await classify(private, [])
+    assert result._fallback is True
+    assert 'classifier_result status=fallback error_type=TimeoutError latency_ms=' in caplog.text
+    assert private not in caplog.text
 
 
 @pytest.mark.asyncio

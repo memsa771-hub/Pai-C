@@ -4,6 +4,7 @@ import logging
 from pathlib import Path
 from typing import Literal
 import json
+import time
 
 from pydantic import BaseModel, ConfigDict
 from app.config import config
@@ -54,6 +55,7 @@ def fallback_signals():
 
 async def classify(student_text, recent_turns):
     history = [{"role": row["role"], "text": row["content"]} for row in recent_turns[-4:]]
+    started = time.monotonic()
     try:
         raw = await asyncio.wait_for(complete(
             role="classifier", phase="classifier",
@@ -62,9 +64,12 @@ async def classify(student_text, recent_turns):
                 "recent_turns": history, "student_message": student_text}, ensure_ascii=False)}],
             response_format={"type": "json_object"}),
             timeout=config.PAI_CLASSIFIER_TIMEOUT_MS / 1000)
-        return Signals.model_validate_json(raw)
+        result = Signals.model_validate_json(raw)
+        logger.info("classifier_result status=success latency_ms=%d", int((time.monotonic() - started) * 1000))
+        return result
     except Exception as exc:
-        logger.warning("classifier_error error_type=%s", type(exc).__name__)
+        logger.warning("classifier_result status=fallback error_type=%s latency_ms=%d timeout_ms=%d",
+                       type(exc).__name__, int((time.monotonic() - started) * 1000), config.PAI_CLASSIFIER_TIMEOUT_MS)
         signals = fallback_signals()
         signals._fallback = True
         return signals

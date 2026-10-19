@@ -88,7 +88,7 @@ async def test_complete_resolves_role_and_preserves_request_and_usage_format(cap
             max_tokens=40, temperature=0.2, turn_id='turn-id', api_key='fake-key')
     assert result == 'reply'
     assert client.chat.completions.create.call_args.kwargs == {
-        'model': 'gpt-6-sol', 'messages': [{'role': 'system', 'content': 'instructions'},
+        'model': 'gpt-6-sol', 'messages': [{'role': 'system', 'content': 'instructions\nReturn a valid JSON object.'},
             {'role': 'user', 'content': 'private input'}], 'reasoning_effort': 'low',
         'max_completion_tokens': 40, 'response_format': {'type': 'json_object'}, 'temperature': 0.2}
     assert caplog.records[-1].getMessage() == (
@@ -96,6 +96,19 @@ async def test_complete_resolves_role_and_preserves_request_and_usage_format(cap
         'input=31 cached_input=7 output=12 reasoning=3')
     assert 'private input' not in caplog.text and 'fake-key' not in caplog.text
     client.close.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize('role', ['analyst', 'mirror', 'roadmap', 'sensitive', 'classifier'])
+async def test_json_mode_always_contains_provider_required_instruction(role):
+    client = fake_client('{}')
+    with patch.object(gateway.transport, 'create_client', return_value=client):
+        await gateway.complete(role, [{'role': 'user', 'content': 'Student evidence'}],
+                               system_prompt='Return a patch and plan.',
+                               response_format={'type': 'json_object'}, api_key='fake')
+    request = client.chat.completions.create.call_args.kwargs
+    assert request['response_format'] == {'type': 'json_object'}
+    assert 'json' in ' '.join(str(message['content']).lower() for message in request['messages'])
 
 
 @pytest.mark.asyncio

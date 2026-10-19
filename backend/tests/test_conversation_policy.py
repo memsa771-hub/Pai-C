@@ -134,7 +134,8 @@ def test_derived_cadence_streak_invite_decline_and_plan():
 async def test_classifier_strict_fallback_and_private_logging(raw,caplog):
     with patch.object(classifier,"complete",AsyncMock(return_value=raw)):
         assert await classifier.classify("private student text",[])==classifier.fallback_signals()
-    assert "classifier_error" in caplog.text and "private" not in caplog.text
+    assert "classifier_result status=fallback error_type=ValidationError" in caplog.text
+    assert "private" not in caplog.text
 
 
 def test_decision_log_never_contains_request_text():

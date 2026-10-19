@@ -225,10 +225,12 @@ async def test_planner_rejects_whole_patch_with_objective_item_without_reference
         candidate = {"schema_version": 3, "said": [item("A student wish"), item("An objective copy", key="education", id="bad")]}
         from scripts.eval.recorded_planner import recorded_patch
         with patch("app.pai_c.deep.analysis.chat_completion", AsyncMock(return_value=json.dumps(recorded_patch(candidate)))) as model:
-            result = await analyze_job(job, db)
+            from app.pai_c.deep.analysis import AnalysisPatchRejected
+            with pytest.raises(AnalysisPatchRejected):
+                await analyze_job(job, db)
         saved = MemoryService(db).truth_map(student.workspace_id).notebook
         assert saved.schema_version == 3 and not saved.said
-        assert result["status"] == "patch_rejected" and model.await_count == 2
+        assert model.await_count == 2
         assert "legacy_v1" not in model.call_args.kwargs["messages"][0]["content"]
 
 

@@ -467,7 +467,7 @@ export function LivingProfile({
             .filter(([key]) => !picture.coverage[key]?.covered)
             .map(([key, label]) => (
               <Button key={key} variant="outline" onClick={() => onChat(label)}>
-                {label}
+                {label}{picture.coverage[key]?.item_count ? ` · ${copy.partialArea}` : ""}
               </Button>
             ))}
         </div>

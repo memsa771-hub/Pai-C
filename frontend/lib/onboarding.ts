@@ -57,6 +57,14 @@ export interface OnboardingResult {
   completed: boolean;
 }
 
+/** Include only fields rendered to the student, even when the prefill has
+ * older answers or a generated account handle. */
+export function visibleOnboardingAnswers(
+  fields: OnboardingFieldSpec[], answers: OnboardingAnswers,
+): OnboardingAnswers {
+  return Object.fromEntries(fields.map((field) => [field.name, answers[field.name] || ''])) as OnboardingAnswers;
+}
+
 /**
  * The order the form asks in, and how each field is rendered.
  *

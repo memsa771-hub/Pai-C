@@ -41,7 +41,7 @@ it("renders all public profile sections without interpretation scores", async ()
     "Pressures & limits",
     "Options you know & myths to check",
     "Goals & whose wish",
-    "PAI still wants to know",
+    "More to explore with PAI",
   ])
     expect(screen.getByRole("heading", { name: title })).toBeTruthy();
   expect(document.body.textContent).not.toContain("private_notes");
@@ -50,6 +50,17 @@ it("renders all public profile sections without interpretation scores", async ()
       .getByRole("img", { name: "What PAI knows so far" })
       .querySelectorAll("path"),
   ).toHaveLength(10);
+});
+it("explains that an area can have saved evidence and still invite deeper discussion", async () => {
+  vi.mocked(workspaceApi.getCounselorWorkspace).mockResolvedValue({
+    ...picture,
+    coverage: { ...picture.coverage, history: { covered: false, item_count: 1 } },
+  });
+  vi.mocked(workspaceApi.getProfileCards).mockResolvedValue({ cards });
+  render(<LivingProfile onChat={vi.fn()} />);
+  expect(await screen.findByRole("button", {
+    name: "Education & experience · Some details saved; explore further",
+  })).toBeTruthy();
 });
 it("confirms the exact digest; edits require an explanation", async () => {
   const done = vi.fn();

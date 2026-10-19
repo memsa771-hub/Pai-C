@@ -185,7 +185,7 @@ class Config:
     PAI_SAFETY_TIMEOUT_MS: int = int(os.environ.get("PAI_SAFETY_TIMEOUT_MS", "3000"))
     PAI_CLASSIFIER_MODEL: str = os.environ.get("PAI_CLASSIFIER_MODEL", "") or PAI_SAFETY_MODEL or PAI_ANALYST_MODEL or PAI_MODEL
     PAI_CLASSIFIER_REASONING_EFFORT: str = os.environ.get("PAI_CLASSIFIER_REASONING_EFFORT", "low")
-    PAI_CLASSIFIER_TIMEOUT_MS: int = int(os.environ.get("PAI_CLASSIFIER_TIMEOUT_MS", "4000"))
+    PAI_CLASSIFIER_TIMEOUT_MS: int = int(os.environ.get("PAI_CLASSIFIER_TIMEOUT_MS", "8000"))
     PAI_SUMMARY_EVERY_TURNS: int = int(os.environ.get("PAI_SUMMARY_EVERY_TURNS", "4"))
     PAI_POLICY_MODE: str = os.environ.get("PAI_POLICY_MODE", "guided").strip().lower()
     PAI_STATEMENT_FALLBACK_REPLY: str = os.environ.get(

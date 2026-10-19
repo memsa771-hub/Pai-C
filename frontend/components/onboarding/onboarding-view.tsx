@@ -12,7 +12,7 @@ import { Label } from '@/components/ui/label';
 import { workspaceApi } from '@/lib/api';
 import { useT, type MessageKey } from '@/lib/i18n';
 import {
-  FIELD_LAYOUT,
+  FIELD_LAYOUT, visibleOnboardingAnswers,
   type OnboardingAnswers, type OnboardingFieldSpec, type OnboardingState,
 } from '@/lib/onboarding';
 
@@ -53,7 +53,9 @@ export function OnboardingView({ state, onDone }: {
   const submit = async () => {
     setBusy(true);
     try {
-      const result = await workspaceApi.submitOnboarding(answers);
+      // The prefill may contain legacy fields absent from the four visible
+      // cards. Submit only answers the student had an opportunity to review.
+      const result = await workspaceApi.submitOnboarding(visibleOnboardingAnswers(state.fields, answers));
       // The backend reports per-field rejections rather than failing the whole
       // call. Saying "saved" over a rejected field would be a lie about
       // canonical state, so surface it.

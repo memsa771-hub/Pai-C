@@ -119,6 +119,19 @@ def test_onboarding_is_required_until_it_is_completed(db):
     assert state["completedAt"]
 
 
+def test_four_visible_cards_make_name_the_greeting_name(db):
+    workspace = db.info['workspace']
+    user = db.info['user']
+    answers = {'fullName': 'Student Name', 'level': 'fsc',
+               'currentCity': 'Student City', 'replyLanguage': 'english'}
+    result = OnboardingService(db).apply(workspace, answers)
+    db.commit()
+    assert result['completed'] and not result['rejected']
+    assert user.display_name == 'Student Name'
+    assert VaultService(db).snapshot(str(workspace.id), include_sensitive=True).get(
+        'identity.preferred_name') is None
+
+
 def test_answers_land_in_the_vault_as_first_hand_claims(db):
     workspace = db.info["workspace"]
     result = OnboardingService(db).apply(workspace, ANSWERS)

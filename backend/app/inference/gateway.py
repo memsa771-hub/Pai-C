@@ -109,6 +109,10 @@ async def complete(role: str, messages: list[dict], system_prompt=None, response
                    reasoning_effort=_DEFAULT, max_tokens=None, temperature=None,
                    phase=None, turn_id='', usage_callback=None, tool_response=False):
     api_key, model, base_url, effort = _settings(role, api_key, model, base_url, reasoning_effort)
+    if response_format and response_format.get('type') == 'json_object':
+        # Chat Completions rejects JSON mode unless a message explicitly asks
+        # for JSON. Keep this at the provider boundary for every role.
+        system_prompt = (system_prompt or '') + '\nReturn a valid JSON object.'
     record = _usage_callback(phase or role, model, turn_id)
     def on_usage(usage):
         record(usage)

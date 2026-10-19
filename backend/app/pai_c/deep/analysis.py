@@ -6,6 +6,7 @@ import json
 import logging
 import weakref
 from contextlib import asynccontextmanager
+from datetime import datetime, timezone
 
 from sqlalchemy import select, text
 
@@ -33,6 +34,14 @@ _locks: weakref.WeakValueDictionary[str, asyncio.Lock] = weakref.WeakValueDictio
 
 class AnalysisOrderPending(JobDeferred):
     """An older turn must finish its analysis before this one can apply."""
+
+
+class AnalysisPredecessorFailed(RuntimeError):
+    """A prior turn needs replay before later evidence can be interpreted."""
+
+
+class AnalysisPatchRejected(RuntimeError):
+    """Both model attempts failed validation; preserve this job for replay."""
 
 
 def enqueue_turn_analysis(db, workspace_id: str, user_event_id: str,
@@ -103,14 +112,47 @@ def _prior_job_pending(db, job) -> bool:
         BackgroundJob.workspace_id == job.workspace_id,
         BackgroundJob.job_type == JOB_ANALYZE,
         BackgroundJob.id != job.id,
-        BackgroundJob.status.in_(("pending", "running")),
+        BackgroundJob.status.in_(("pending", "running", "failed")),
     )).scalars().all()
     for other in rows:
         item = other.payload or {}
         earlier = (item.get("source_timestamp"), item.get("user_event_id"))
         if isinstance(earlier[0], int) and isinstance(earlier[1], str) and earlier < current_order:
+            if other.status == "failed":
+                raise AnalysisPredecessorFailed("earlier analysis failed; replay required")
             return True
     return False
+
+
+def replay_failed_analyses(db, workspace_id: str) -> int:
+    """Operator recovery after fixing a permanent failure; retain original order.
+
+    Reuse the existing rows and idempotency keys. Successful turns are never
+    replayed, and live analyses cannot be reset beneath another worker.
+    """
+    workspace = db.scalar(select(Workspace).where(
+        Workspace.id == workspace_id, Workspace.status == "active").with_for_update())
+    if workspace is None:
+        raise ValueError("active workspace required")
+    jobs = db.scalars(select(BackgroundJob).where(
+        BackgroundJob.workspace_id == workspace_id,
+        BackgroundJob.job_type == JOB_ANALYZE,
+        BackgroundJob.status.in_(("failed", "running")),
+    ).with_for_update()).all()
+    if any(job.status == "running" for job in jobs):
+        raise RuntimeError("analysis is currently running")
+    failed = [job for job in jobs if job.status == "failed"]
+    for job in failed:
+        job.status = "pending"
+        job.attempts = 0
+        job.available_at = datetime.now(timezone.utc)
+        job.completed_at = None
+        job.last_error = None
+        job.locked_at = None
+        job.locked_by = None
+    db.flush()
+    logger.info("counselor_analysis_replayed workspace_id=%s count=%d", workspace_id, len(failed))
+    return len(failed)
 
 
 def _input(db, workspace_id: str, student: EventRecord, assistant: EventRecord,
@@ -190,7 +232,7 @@ async def _candidate(db, workspace_id: str, student: EventRecord,
         except PatchRejected as exc:
             logger.warning("planner_patch_rejected op_index=%d error_type=%s", exc.index, exc.error_type)
             if attempt:
-                return None, None, attempt + 1
+                raise AnalysisPatchRejected("planner patch rejected after correction") from None
             feedback = "\nThe previous patch was rejected: " + str(exc) + ". Return a corrected complete patch and plan."
             continue
         try:
