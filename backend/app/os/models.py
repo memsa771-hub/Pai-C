@@ -1,4 +1,4 @@
-"""Slice 1 tables of the PAI OS, all in schema `os` (SQLAlchemy Core).
+"""Tables of the PAI OS, all in schema `os` (SQLAlchemy Core): Slice 1, and Slice 2's Knowledge tables.
 
 Only `app.os.kernel` writes os_plans, os_tasks, os_task_edges and os_plan_revisions (invariant 1).
 Every timestamp is timezone-aware (invariant 13) and every table carries tenant_id.
@@ -14,6 +14,7 @@ from sqlalchemy import (
     Identity,
     Index,
     Integer,
+    Numeric,
     Table,
     Text,
     UniqueConstraint,
@@ -28,6 +29,8 @@ TASK_STATES = (
     "pending", "ready", "running", "waiting_student", "waiting_review",
     "done", "failed", "skipped", "cancelled", "blocked",
 )
+
+FACT_SOURCES = ("seed", "manual", "research")
 
 md = OsBase.metadata
 
@@ -204,7 +207,78 @@ knowledge_facts = Table(
     Column("status", Text, nullable=False),
     Column("conflict_note", Text),
     Column("updated_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
+    # Slice 2 (os_0003): where the fact came from, the research run that set it, and its evidence.
+    Column("source", Text, nullable=False, server_default="seed"),
+    Column("research_run_id", BigInteger, ForeignKey("os.os_research_runs.id", ondelete="SET NULL")),
+    Column("evidence", JSONB),
     UniqueConstraint("tenant_id", "scope", "ref", "field", "intake_year", name="uq_os_knowledge_facts"),
     _in("scope", ("route", "programme"), "ck_os_knowledge_facts_scope"),
     _in("status", ("confirmed", "unconfirmed", "stale"), "ck_os_knowledge_facts_status"),
+    _in("source", FACT_SOURCES, "ck_os_knowledge_facts_source"),
+)
+
+# --- Slice 2: Knowledge (spec 2026-10-19 §5) -------------------------------------------------------
+
+programmes = Table(
+    "os_programmes", md,
+    _id(), _tenant(),
+    Column("ref", Text, nullable=False),
+    Column("route_key", Text, nullable=False),
+    Column("university", Text, nullable=False),
+    Column("name", Text, nullable=False),
+    Column("aliases", JSONB, nullable=False, server_default=text("'[]'::jsonb")),
+    Column("start_urls", JSONB, nullable=False, server_default=text("'[]'::jsonb")),
+    Column("official_domains", JSONB, nullable=False, server_default=text("'[]'::jsonb")),
+    Column("status", Text, nullable=False, server_default="active"),
+    Column("notes", Text),
+    Column("updated_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
+    UniqueConstraint("tenant_id", "ref", name="uq_os_programmes_ref"),
+    _in("status", ("active", "excluded"), "ck_os_programmes_status"),
+)
+
+pages = Table(
+    "os_pages", md,
+    _id(), _tenant(),
+    Column("url", Text, nullable=False),
+    Column("final_url", Text),
+    Column("http_status", Integer),
+    Column("text", Text, nullable=False, server_default=""),
+    Column("links", JSONB, nullable=False, server_default=text("'[]'::jsonb")),
+    Column("blocked", Text),
+    Column("fetched_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
+    UniqueConstraint("tenant_id", "url", name="uq_os_pages_url"),
+)
+
+research_runs = Table(
+    "os_research_runs", md,
+    _id(), _tenant(),
+    Column("programme_ref", Text, nullable=False),
+    Column("intake_year", Integer, nullable=False),
+    Column("workflow_id", Text, nullable=False),
+    Column("status", Text, nullable=False, server_default="running"),
+    Column("started_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
+    Column("ended_at", DateTime(timezone=True)),
+    Column("pages", Integer, nullable=False, server_default="0"),
+    Column("confirmed", Integer, nullable=False, server_default="0"),
+    Column("unconfirmed", Integer, nullable=False, server_default="0"),
+    Column("cost_usd", Numeric(12, 6), nullable=False, server_default="0"),
+    UniqueConstraint("tenant_id", "workflow_id", name="uq_os_research_runs_workflow"),
+    _in("status", ("running", "done", "failed", "skipped_budget"), "ck_os_research_runs_status"),
+)
+
+agent_runs = Table(
+    "os_agent_runs", md,
+    _id(), _tenant(),
+    Column("research_run_id", BigInteger, ForeignKey("os.os_research_runs.id", ondelete="CASCADE"), nullable=False),
+    Column("reading", Text, nullable=False),
+    Column("agent", Text, nullable=False),
+    Column("agent_version", Integer, nullable=False),
+    Column("model", Text, nullable=False),
+    Column("input_tokens", Integer, nullable=False, server_default="0"),
+    Column("cached_tokens", Integer, nullable=False, server_default="0"),
+    Column("output_tokens", Integer, nullable=False, server_default="0"),
+    Column("cost_usd", Numeric(12, 6), nullable=False, server_default="0"),
+    Column("error", Text),
+    Column("at", DateTime(timezone=True), nullable=False, server_default=func.now()),
+    UniqueConstraint("research_run_id", "reading", name="uq_os_agent_runs_reading"),
 )
