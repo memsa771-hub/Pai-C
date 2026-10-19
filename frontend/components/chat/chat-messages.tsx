@@ -4,7 +4,7 @@ import { cn } from '@/lib/utils';
 import { ChatMessage } from './chat-message';
 import { IntermediateSteps } from './intermediate-steps';
 import { ThinkingMessage } from './thinking-message';
-import { WorkingIndicator } from './working-indicator';
+import { TypingBubble } from './working-indicator';
 import { Button } from '@/components/ui/button';
 import { ArrowDown } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -446,14 +446,7 @@ export function ChatMessages({ messages, agents, showAllSteps, className, scroll
                     transform: `translateY(${virtualRow.start}px)`,
                   }}
                 >
-                  <div className="w-full">
-                    <div className="flex items-start gap-3 py-1">
-                      <div className="size-7 shrink-0" />
-                      <div className="py-1.5">
-                        <WorkingIndicator />
-                      </div>
-                    </div>
-                  </div>
+                  <TypingBubble />
                 </div>
               );
             }

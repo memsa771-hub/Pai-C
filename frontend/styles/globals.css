@@ -404,8 +404,16 @@
   .working-bar {
     animation: working-bar 1.6s ease-in-out infinite;
   }
+  @keyframes typing-dot {
+    0%, 60%, 100% { transform: translateY(0); opacity: 0.45; }
+    30%           { transform: translateY(-4px); opacity: 1; }
+  }
+  .typing-dot {
+    animation: typing-dot 1.2s ease-in-out infinite;
+  }
   @media (prefers-reduced-motion: reduce) {
     .working-bar { animation: none; opacity: 0.7; transform: scaleY(0.8); }
+    .typing-dot { animation: none; opacity: 0.7; }
   }
 }
 

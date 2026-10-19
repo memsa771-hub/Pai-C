@@ -300,5 +300,19 @@
     "now": "You are here",
     "next": "Coming up"
   },
-  "documentsTitle": "Your documents"
+  "documentsTitle": "Your documents",
+  "ratingLow": "Not sure at all",
+  "ratingHigh": "Very sure",
+  "ratingSent": "Thanks. PAI has your rating.",
+  "checkinCard": {
+    "title": "Check-in",
+    "body": "What happened since you last talked with PAI? Pick one to start, then add your own words.",
+    "options": [
+      "I tried something",
+      "I got a result",
+      "I changed my mind",
+      "I feel stuck"
+    ]
+  },
+  "ratingTitle": "Quick rating"
 }

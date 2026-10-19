@@ -49,26 +49,33 @@ export function CounselorVoiceControl({
     setPaiCaption('');
   };
 
+  const live = status !== 'idle' && status !== 'error';
   return (
-    <div className="mb-2 rounded-xl border border-border/70 bg-background/70 px-3 py-2" aria-live="polite">
-      <div className="flex items-center gap-2">
-        {status === 'idle' || status === 'error' ? (
-          <Button type="button" size="sm" variant="outline" onClick={() => void start()} disabled={!senderId || !senderName.trim()}>
-            {status === 'error' ? <RotateCcw className="mr-2 size-4" /> : <Mic className="mr-2 size-4" />}
-            {status === 'error' ? copy.retry : copy.start}
+    <div className="mb-2" aria-live="polite">
+      <div className="flex flex-wrap items-center gap-2">
+        {live ? (
+          <Button type="button" size="tap" variant="soft" onClick={() => void stop()} className="rounded-full ps-1.5">
+            <span className="relative flex size-8 items-center justify-center rounded-full bg-danger text-white">
+              <span aria-hidden className="absolute inset-0 animate-ping rounded-full bg-danger/40" />
+              <PhoneOff className="relative size-4" />
+            </span>
+            {copy.end}
           </Button>
         ) : (
-          <Button type="button" size="sm" variant="outline" onClick={() => void stop()}>
-            <PhoneOff className="mr-2 size-4" /> {copy.end}
+          <Button type="button" size="tap" variant="soft" onClick={() => void start()} disabled={!senderId || !senderName.trim()} className="rounded-full ps-1.5">
+            <span className="flex size-8 items-center justify-center rounded-full bg-gradient-to-br from-[var(--hero-from)] to-[var(--hero-via)] text-white">
+              {status === 'error' ? <RotateCcw className="size-4" /> : <Mic className="size-4" />}
+            </span>
+            {status === 'error' ? copy.retry : copy.start}
           </Button>
         )}
-        {status !== 'idle' && <span className="text-xs text-muted-foreground" role="status">{labels[status]}</span>}
+        {status !== 'idle' && <span className="text-sm font-medium text-muted-foreground" role="status">{labels[status]}</span>}
       </div>
-      {detail && <p className="mt-1 text-xs text-destructive">{detail}</p>}
+      {detail && <p className="mt-1 text-xs font-medium text-danger-ink">{detail}</p>}
       {(studentCaption || paiCaption) && status !== 'idle' && (
-        <div className="mt-2 max-h-20 overflow-y-auto text-xs text-muted-foreground">
-          {studentCaption && <p><span className="font-medium">{copy.student}:</span> {studentCaption}</p>}
-          {paiCaption && <p><span className="font-medium">{copy.counselor}:</span> {paiCaption}</p>}
+        <div className="mt-2 max-h-24 space-y-1 overflow-y-auto rounded-2xl bg-muted/60 px-3 py-2 text-sm">
+          {studentCaption && <p><span className="font-semibold">{copy.student}:</span> {studentCaption}</p>}
+          {paiCaption && <p><span className="font-semibold text-brand-ink">{copy.counselor}:</span> {paiCaption}</p>}
         </div>
       )}
     </div>

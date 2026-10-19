@@ -68,4 +68,20 @@ module.exports = [
   { id: 'profile-details-row-open', path: '/student?view=profile&tab=details', ready: 'main h1', full: true, crawl: false, setup: async (page) => {
     await page.getByRole('button', { name: 'Show source and actions for Education' }).first().click();
   } },
+
+  { id: 'chat', path: '/student?view=threads', ready: 'main textarea' },
+  { id: 'chat-empty', path: '/student?view=threads&card=empty', ready: 'main textarea', crawl: false },
+  { id: 'chat-typing', path: '/student?view=threads&card=typing', ready: 'main textarea', crawl: false },
+  { id: 'chat-first-picture', path: '/student?view=threads&card=picture', ready: 'main textarea', crawl: false },
+  { id: 'chat-rating', path: '/student?view=threads&card=rating', ready: 'main textarea' },
+  { id: 'chat-fact-upload', path: '/student?view=threads&card=fact', ready: 'main textarea' },
+  { id: 'chat-path-card', path: '/student?view=threads&card=paths', ready: 'main textarea' },
+  { id: 'chat-mirror', path: '/student?view=threads&mirror=1', ready: 'main textarea' },
+  { id: 'chat-mirror-rate', path: '/student?view=threads&mirror=1', ready: 'main textarea', crawl: false, setup: async (page) => {
+    await page.getByRole('button', { name: 'Yes, that is right' }).click(); await page.getByRole('radiogroup').waitFor();
+  } },
+  { id: 'chat-check-in', path: '/student?view=plan', ready: 'main h1', crawl: false, setup: async (page) => {
+    await page.getByRole('button', { name: 'Open conversation' }).first().click();
+    await page.getByRole('region', { name: 'Check-in' }).waitFor();
+  } },
 ];

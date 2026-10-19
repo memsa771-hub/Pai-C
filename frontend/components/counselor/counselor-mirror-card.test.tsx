@@ -94,15 +94,15 @@ it('renders v2 picture before collapsed details, while old drafts have no placeh
 it('offers feedback only after confirmation and sends the exact confirmed version', async () => {
   show();
   await screen.findByText('Your learning');
-  expect(screen.queryByRole('spinbutton')).toBeNull();
+  expect(screen.queryByRole('radiogroup')).toBeNull();
   fireEvent.click(screen.getByRole('button', {name: 'Yes, that is right'}));
-  fireEvent.change(await screen.findByRole('spinbutton', {name: 'Did PAI understand you?'}),
-    {target: {value: '4'}});
-  fireEvent.change(screen.getByRole('spinbutton', {name: /How sure do you feel/}),
+  expect(await screen.findByRole('radiogroup', {name: 'Did PAI understand you?'})).toBeTruthy();
+  fireEvent.click(screen.getByRole('radio', {name: '4: Mostly'}));
+  fireEvent.change(screen.getByRole('slider', {name: /How sure do you feel/}),
     {target: {value: '0'}});
   fireEvent.click(screen.getByRole('button', {name: 'Send'}));
   await waitFor(() => expect(workspaceApi.submitCounselorMirrorFeedback).toHaveBeenCalledExactlyOnceWith(3, 4, 0));
-  await waitFor(() => expect(screen.queryByRole('spinbutton')).toBeNull());
+  await waitFor(() => expect(screen.queryByRole('radiogroup')).toBeNull());
 });
 
 it('Skip records no feedback and historical confirmed cards do not show the feedback step', async () => {
@@ -110,23 +110,22 @@ it('Skip records no feedback and historical confirmed cards do not show the feed
   fireEvent.click(await screen.findByRole('button', {name: 'Yes, that is right'}));
   fireEvent.click(await screen.findByRole('button', {name: 'Skip'}));
   expect(workspaceApi.submitCounselorMirrorFeedback).not.toHaveBeenCalled();
-  expect(screen.queryByRole('spinbutton')).toBeNull();
+  expect(screen.queryByRole('radiogroup')).toBeNull();
   cleanup();
   vi.mocked(workspaceApi.getCounselorSummary).mockResolvedValue({...draft, status: 'confirmed'});
   show();
   await screen.findByRole('status');
-  expect(screen.queryByRole('spinbutton')).toBeNull();
+  expect(screen.queryByRole('radiogroup')).toBeNull();
 });
 
 it('allows omission of optional certainty and keeps feedback retryable after failure', async () => {
   vi.mocked(workspaceApi.submitCounselorMirrorFeedback).mockRejectedValueOnce(new Error('internal'));
   show();
   fireEvent.click(await screen.findByRole('button', {name: 'Yes, that is right'}));
-  fireEvent.change(await screen.findByRole('spinbutton', {name: 'Did PAI understand you?'}),
-    {target: {value: '5'}});
+  fireEvent.click(await screen.findByRole('radio', {name: '5: Completely'}));
   fireEvent.click(screen.getByRole('button', {name: 'Send'}));
   await screen.findByRole('alert');
   expect(workspaceApi.submitCounselorMirrorFeedback).toHaveBeenCalledWith(3, 5, undefined);
   fireEvent.click(screen.getByRole('button', {name: 'Send'}));
-  await waitFor(() => expect(screen.queryByRole('spinbutton')).toBeNull());
+  await waitFor(() => expect(screen.queryByRole('radiogroup')).toBeNull());
 });

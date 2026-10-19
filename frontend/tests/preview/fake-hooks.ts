@@ -7,6 +7,9 @@ const card=new URLSearchParams(location.search).get('card');
 if(card==='picture') {messages[1].metadata={counselor_card:{kind:'first_picture'}};messages[1].content='You enjoy figuring out how parts work together, and you have tested that by repairing something. We can look at practical design and computing as possibilities. What should I correct in that picture?';}
 if(card==='rating') {messages[1].metadata={counselor_card:{kind:'rating',min:0,max:10}};messages[1].content='How sure do you feel about your direction right now?';}
 if(card==='fact') {messages[1].metadata={fact_card:{key:'board',label:'Awarding board',kind:'choice',choices:[{value:'Reviewed catalog entry',label:'Reviewed catalog entry'}],upload_invite:'Upload a result card',record_id:'education-one'}};messages[1].content='You can choose the awarding board or use the wording on your result card.';}
+if(card==='paths') {messages[1].metadata={possibility_id:'path-one'};messages[1].content='Here is one direction worth exploring, based on what you told me.';}
+if(card==='typing') messages.push({messageId:'m3',sessionId:'pai-counselor',senderType:'agent',senderName:'pai',content:'',mentions:[],targetAgents:null,messageType:'loading',metadata:{},createdAt:'2026-10-18T12:02:00Z'});
+if(card==='empty') messages.splice(0,messages.length);
 const noop=()=>{};
 const polling={messages,loading:false,forceRefresh:noop,generation:1,loadOlder:async()=>{},hasOlder:false,loadingOlder:false};
 export const useMessagePolling=()=>polling;

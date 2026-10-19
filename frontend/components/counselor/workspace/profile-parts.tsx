@@ -308,13 +308,18 @@ function FeltValue({ value }: { value: number }) {
   );
 }
 
-/** One rating per Mirror version: 1-5 understood, optional 0-10 certainty. */
-export function FeltUnderstood({ version, onSaved }: { version: number; onSaved: () => void }) {
+type FeltLabels = { legend: string; certainty: string; send: string; saved: string; skip?: string };
+/** One rating per Mirror version: 1-5 understood, optional 0-10 certainty.
+ * Shared by the profile and the Mirror card in the conversation. */
+export function FeltUnderstood({ version, onSaved, onSkip, labels }: {
+  version: number; onSaved: () => void; onSkip?: () => void; labels?: Partial<FeltLabels>;
+}) {
+  const l: FeltLabels = { legend: text.feltUnderstood, certainty: text.certaintyAfter, send: text.sendRating, saved: text.ratingSaved, ...labels };
   const [understood, setUnderstood] = useState<number | null>(null);
   const [certainty, setCertainty] = useState<number | null>(null);
   const [busy, setBusy] = useState(false), [error, setError] = useState(false), [saved, setSaved] = useState(false);
   const name = useId();
-  if (saved) return <p role="status" className="mt-4 text-sm font-medium text-success-ink">{text.ratingSaved}</p>;
+  if (saved) return <p role="status" className="mt-4 text-sm font-medium text-success-ink">{l.saved}</p>;
   async function send() {
     if (understood === null) return;
     setBusy(true); setError(false);
@@ -323,28 +328,32 @@ export function FeltUnderstood({ version, onSaved }: { version: number; onSaved:
   }
   return (
     <form className="mt-5 rounded-2xl bg-muted/60 p-4" onSubmit={(e) => { e.preventDefault(); void send(); }}>
-      <fieldset>
-        <legend className="text-sm font-semibold">{text.feltUnderstood}</legend>
-        <div className="mt-3 grid grid-cols-5 gap-2">
+      <fieldset disabled={busy}>
+        <legend className="text-sm font-semibold">{l.legend}</legend>
+        <div role="radiogroup" aria-label={l.legend} className="mt-3 grid grid-cols-5 gap-2">
           {text.feltScale.map((label, i) => (
-            <label key={label} className={cn("flex min-h-14 cursor-pointer flex-col items-center justify-center gap-0.5 rounded-xl border-2 bg-card px-1 text-center text-xs font-medium transition-colors",
+            <label key={label} className={cn("flex min-h-14 cursor-pointer flex-col items-center justify-center gap-0.5 rounded-xl border-2 bg-card px-1 text-center text-xs font-medium transition-colors has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-ring",
               understood === i + 1 ? "border-brand bg-brand-soft text-brand-ink" : "border-transparent hover:border-border")}>
-              <input type="radio" name={name} value={i + 1} checked={understood === i + 1} onChange={() => setUnderstood(i + 1)} className="sr-only" />
-              <span className="text-base font-bold">{i + 1}</span><span className="leading-tight">{label}</span>
+              <input type="radio" name={name} value={i + 1} checked={understood === i + 1} onChange={() => setUnderstood(i + 1)}
+                aria-label={`${i + 1}: ${label}`} className="sr-only" />
+              <span aria-hidden className="text-base font-bold">{i + 1}</span><span aria-hidden className="leading-tight">{label}</span>
             </label>
           ))}
         </div>
       </fieldset>
       <label className="mt-4 block text-sm font-medium">
-        {text.certaintyAfter}
+        {l.certainty}
         <span className="mt-2 flex items-center gap-3">
-          <input type="range" min={0} max={10} step={1} value={certainty ?? 5} onChange={(e) => setCertainty(Number(e.target.value))}
-            className="h-11 flex-1 accent-[var(--brand)]" aria-valuetext={certainty === null ? undefined : `${certainty} / 10`} />
-          <span className="w-12 text-right font-bold tabular-nums">{certainty === null ? "–" : `${certainty}/10`}</span>
+          <input type="range" min={0} max={10} step={1} value={certainty ?? 5} disabled={busy} onChange={(e) => setCertainty(Number(e.target.value))}
+            className="h-11 flex-1 accent-[var(--brand)]" aria-valuetext={certainty === null ? "-" : `${certainty} / 10`} />
+          <span aria-hidden className="w-12 text-right font-bold tabular-nums">{certainty === null ? "–" : `${certainty}/10`}</span>
         </span>
       </label>
       {error && <p role="alert" className="mt-2 text-sm font-medium text-danger-ink">{copy.error}</p>}
-      <Button size="tap" type="submit" className="mt-3" disabled={busy || understood === null}>{text.sendRating}</Button>
+      <div className="mt-3 flex flex-wrap gap-2">
+        <Button size="tap" type="submit" disabled={busy || understood === null}>{l.send}</Button>
+        {onSkip && <Button size="tap" type="button" variant="ghost" disabled={busy} onClick={onSkip}>{l.skip}</Button>}
+      </div>
     </form>
   );
 }

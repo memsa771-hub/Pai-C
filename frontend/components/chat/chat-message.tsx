@@ -5,7 +5,7 @@ import { FactCard, type OfferedFact } from '@/components/counselor/workspace/fac
 import { cn } from '@/lib/utils';
 import { Possibilities } from '@/components/counselor/possibilities';
 import { Button } from '@/components/ui/button';
-import { Copy, Check, User, FileIcon, Download, Eye, Loader2 } from 'lucide-react';
+import { Copy, Check, FileIcon, Download, Eye, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { memo, useCallback, useEffect, useMemo, useState } from 'react';
 import {
@@ -29,14 +29,6 @@ interface Attachment {
   filename: string;
   contentType: string;
   url: string;
-}
-
-function humanColor(seed: string): string {
-  let hash = 0;
-  for (let i = 0; i < seed.length; i++) {
-    hash = (hash * 31 + seed.charCodeAt(i)) >>> 0;
-  }
-  return `hsl(${hash % 360} 55% 82%)`;
 }
 
 function isPreviewable(contentType: string, filename: string): boolean {
@@ -255,78 +247,59 @@ export const ChatMessage = memo(function ChatMessage({ message, agents = [] }: C
 
   // ── Human message ──
   // The workspace has exactly one human (its owner), so this is always "your"
-  // turn — right-aligned bubble, like an ordinary chat app, with the agent's
-  // reply below it on the left.
+  // turn: a right-aligned brand bubble. The name is for screen readers only,
+  // so the student never sees their own name repeated on every line.
   if (isHuman) {
     const isCurrentUser = !!message.senderId && message.senderId === currentUser.id;
-    const seed = message.senderId || message.senderName || 'human';
     const displayName = isCurrentUser
-      ? 'You'
-      : (message.senderName && message.senderName !== 'user' ? message.senderName : 'User');
+      ? t('chat.you')
+      : (message.senderName && message.senderName !== 'user' ? message.senderName : t('chat.you'));
 
     return (
-      <div className="py-2">
-        <div className="flex items-start justify-end gap-3">
-          <div className="flex min-w-0 max-w-[75%] flex-col items-end">
-            <div className="flex items-baseline gap-2">
-              {timestamp && (
-                <span className="text-[11px] text-muted-foreground">{timestamp}</span>
-              )}
-              <span className="text-sm font-semibold text-foreground">{displayName}</span>
-            </div>
-            <div className="mt-0.5 rounded-2xl rounded-tr-sm bg-primary/10 px-3.5 py-2 text-left text-sm leading-relaxed">
-              <ConversationCard card={message.metadata?.counselor_card as InlineCard | undefined} channel={message.sessionId}><MarkdownContent content={message.content} agentNames={agentNames} agentLabels={agentLabels} /></ConversationCard>
-              <Attachments items={attachments} />
-            {!!message.metadata?.fact_card && <FactCard card={message.metadata.fact_card as OfferedFact}/>}
-            </div>
+      <div className="mx-auto w-full max-w-3xl py-2">
+        <div className="flex flex-col items-end">
+          <span className="sr-only">{displayName}:</span>
+          <div className="max-w-[85%] rounded-3xl rounded-br-md bg-gradient-to-br from-[var(--hero-from)] to-[var(--hero-via)] px-4 py-2.5 text-left text-[15px] leading-relaxed text-white shadow-soft sm:max-w-[75%] [&_a]:text-white [&_a]:underline [&_code]:bg-white/20">
+            <ConversationCard card={message.metadata?.counselor_card as InlineCard | undefined} channel={message.sessionId}><MarkdownContent content={message.content} agentNames={agentNames} agentLabels={agentLabels} /></ConversationCard>
+            <Attachments items={attachments} />
           </div>
-          <div
-            className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-full"
-            style={{ backgroundColor: humanColor(seed) }}
-          >
-            <User className="size-3.5 text-zinc-700" />
-          </div>
+          {!!message.metadata?.fact_card && <div className="w-full max-w-lg"><FactCard card={message.metadata.fact_card as OfferedFact}/></div>}
+          {timestamp && <span className="mt-1 px-1 text-[11px] text-muted-foreground">{timestamp}</span>}
         </div>
       </div>
     );
   }
 
   // ── Agent message ──
-  // Full-bleed, no bubble — ChatGPT's assistant turn. The avatar and name stay:
-  // a thread can have several agents, so the author still has to be readable.
+  // PAI's reply sits in a card bubble beside its avatar. Rich cards (fact,
+  // rating, paths, roadmaps) follow the text at full reading width.
   return (
-    <div className="group py-2">
-      <div className="flex items-start gap-3">
-        <AgentAvatar name={message.senderName} size={28} className="mt-0.5" />
+    <div className="group mx-auto w-full max-w-3xl py-2">
+      <div className="flex items-start gap-2.5">
+        <AgentAvatar name={message.senderName} size={32} className="mt-0.5" />
         <div className="min-w-0 flex-1">
-          <div className="flex items-baseline gap-2">
-            <span className="truncate text-sm font-semibold text-foreground">
-              {agent ? agentLabel(agent) : message.senderName}
-            </span>
-            {timestamp && (
-              <span className="text-[11px] text-muted-foreground">{timestamp}</span>
-            )}
-          </div>
-          <div className="mt-0.5 text-sm leading-relaxed">
+          <span className="sr-only">{agent ? agentLabel(agent) : message.senderName}:</span>
+          <div className="w-fit max-w-full rounded-3xl rounded-tl-md border bg-card px-4 py-3 text-[15px] leading-relaxed shadow-soft">
             <ConversationCard card={message.metadata?.counselor_card as InlineCard | undefined} channel={message.sessionId}><MarkdownContent content={message.content} agentNames={agentNames} agentLabels={agentLabels} /></ConversationCard>
             <Attachments items={attachments} />
-            {!!message.metadata?.fact_card && <FactCard card={message.metadata.fact_card as OfferedFact}/>}
-            {Array.isArray(message.metadata?.roadmaps) && <RoadmapComparison initial={message.metadata.roadmaps as unknown as Roadmap[]} />}
-            {typeof message.metadata?.possibility_id === 'string' && <Possibilities id={message.metadata.possibility_id} />}
+          </div>
+          {!!message.metadata?.fact_card && <FactCard card={message.metadata.fact_card as OfferedFact}/>}
+          {Array.isArray(message.metadata?.roadmaps) && <RoadmapComparison initial={message.metadata.roadmaps as unknown as Roadmap[]} />}
+          {typeof message.metadata?.possibility_id === 'string' && <Possibilities id={message.metadata.possibility_id} />}
 
-            {/* Action bar — revealed on hover, as in ChatGPT */}
-            <div className="mt-1 flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100">
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-6 gap-1 px-1.5 text-xs text-muted-foreground hover:text-foreground"
-                onClick={handleCopy}
-                aria-label={t('chat.copyMessage')}
-              >
-                {copied ? <Check className="size-3" /> : <Copy className="size-3" />}
-                {copied ? t('common.copied') : t('common.copy')}
-              </Button>
-            </div>
+          <div className="mt-1 flex min-h-8 items-center gap-2 px-1">
+            {timestamp && <span className="text-[11px] text-muted-foreground">{timestamp}</span>}
+            {/* Copy is revealed on hover or focus, and always on touch screens. */}
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-8 gap-1 px-2 text-xs text-muted-foreground opacity-100 transition-opacity hover:text-foreground sm:opacity-0 sm:group-hover:opacity-100 sm:focus-visible:opacity-100"
+              onClick={handleCopy}
+              aria-label={t('chat.copyMessage')}
+            >
+              {copied ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
+              {copied ? t('common.copied') : t('common.copy')}
+            </Button>
           </div>
         </div>
       </div>

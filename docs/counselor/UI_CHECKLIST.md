@@ -12,7 +12,7 @@ and the link crawler (no dead buttons, no 404 links, no console errors, no page 
 | 2 | Onboarding (4 tap steps) | [x] | `onboarding-*` |
 | 3 | App shell (sidebar, bottom tabs, top bar) | [x] | `shell-*` |
 | 4 | Profile: Visual and Details | [x] | `profile-*` |
-| 5 | Counselor chat and inline cards | [ ] | `chat-*` |
+| 5 | Counselor chat and inline cards | [x] | `chat-*` |
 | 6 | Journey A-K | [x] | `journey-*` |
 | 7 | Paths | [ ] | `paths-*` |
 | 8 | Path page (G) | [ ] | `path-*` |

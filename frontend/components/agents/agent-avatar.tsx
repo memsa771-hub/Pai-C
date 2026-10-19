@@ -7,7 +7,7 @@ const AGENT_PALETTE = ['#315CFD', '#6D7CFF', '#06B6D4', '#10B981', '#F59E0B'];
 // one. Its internal agent name is reserved/unique, so matching
 // on the name is sufficient to identify it wherever an avatar is rendered.
 const PAI_AVATAR_SRC = '/pai-emblem.png';
-const isPai = (name: string) => (name || '').toLowerCase() === 'pai';
+const isPai = (name: string) => ['pai', 'pai counselor'].includes((name || '').toLowerCase());
 
 interface AgentAvatarProps {
   name: string;
@@ -28,7 +28,7 @@ export function AgentAvatar({ name, size = 28, status, showStatus = false, class
             alt="PAI Counselor"
             width={size}
             height={size}
-            className="size-full bg-white object-contain p-[2px]"
+            className="size-full bg-white object-contain p-[18%] ring-1 ring-border"
             draggable={false}
           />
         ) : (

@@ -269,6 +269,9 @@ export const messages = {
   },
 
   chat: {
+    you: 'You',
+    welcomeTitle: 'Hi, I am PAI',
+    welcomeBody: 'Tell me a little about your life right now. There are no wrong answers, and we will not decide your future today.',
     documentReading: 'Reading document…',
     documentUnderstanding: 'Adding to your profile…',
     documentDone: 'Added to your profile',

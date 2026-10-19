@@ -446,9 +446,9 @@ export function ChatInput({ onSend, disabled, className, agents = [], knowledge 
           row — the `+` menu on the left, the growing textarea in the middle and
           the send button on the right. Attachments stack above that row. */}
       <div className={cn(
-        'relative flex flex-col gap-1.5 rounded-2xl border border-input bg-background px-2.5 py-2.5 shadow-xs transition-colors',
+        'relative flex flex-col gap-1.5 rounded-3xl border border-input bg-card px-2 py-2 shadow-card transition-colors',
         isDragging && 'border-primary border-dashed bg-primary/5',
-        isFocused && !isDragging && 'border-foreground/25 shadow-sm'
+        isFocused && !isDragging && 'border-brand/50 ring-4 ring-brand/10'
       )}>
         {/* Drag overlay */}
         {isDragging && (
@@ -505,7 +505,7 @@ export function ChatInput({ onSend, disabled, className, agents = [], knowledge 
             <DropdownMenuTrigger asChild>
               <button
                 type="button"
-                className="mb-0.5 flex size-8 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                className="flex size-11 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
                 title={t('chatInput.addAttachments')}
                 aria-label={t('chatInput.addAttachments')}
               >
@@ -542,20 +542,20 @@ export function ChatInput({ onSend, disabled, className, agents = [], knowledge 
             rows={1}
             disabled={disabled}
             data-chat-input
-            className="min-w-0 flex-1 resize-none border-0 bg-transparent px-1 py-2 text-sm shadow-none placeholder:text-muted-foreground focus:outline-none"
+            className="min-w-0 flex-1 resize-none border-0 bg-transparent px-1 py-2.5 text-base shadow-none placeholder:text-muted-foreground focus:outline-none sm:text-[15px]"
           />
 
           {/* Keyboard affordance for the global 'type anywhere' shortcut */}
           {isFocused ? (
             <kbd
-              className="pointer-events-none mb-2.5 hidden h-4 shrink-0 items-center justify-center rounded border border-input bg-muted px-1 font-mono text-[9px] font-medium text-muted-foreground sm:flex"
+              className="pointer-events-none mb-3.5 hidden h-4 shrink-0 items-center justify-center rounded border border-input bg-muted px-1 font-mono text-[9px] font-medium text-muted-foreground sm:flex"
               title={t('chatInput.escHint')}
             >
               esc
             </kbd>
           ) : !message ? (
             <kbd
-              className="pointer-events-none mb-2.5 hidden size-4 shrink-0 items-center justify-center rounded border border-input bg-muted font-mono text-[9px] font-medium text-muted-foreground sm:flex"
+              className="pointer-events-none mb-3.5 hidden size-4 shrink-0 items-center justify-center rounded border border-input bg-muted font-mono text-[9px] font-medium text-muted-foreground sm:flex"
               title={t('chatInput.typeHint')}
             >
               i
@@ -566,14 +566,14 @@ export function ChatInput({ onSend, disabled, className, agents = [], knowledge 
             variant={hasContent ? 'primary' : 'secondary'}
             size="icon"
             className={cn(
-              'mb-0.5 size-8 shrink-0 rounded-full transition-all',
-              hasContent ? 'opacity-100' : 'opacity-50'
+              'size-11 shrink-0 rounded-full transition-all',
+              hasContent ? 'opacity-100 shadow-lift' : 'opacity-50'
             )}
             onClick={handleSend}
             disabled={!hasContent || disabled}
             aria-label={t('chatInput.sendMessage')}
           >
-            <ArrowUp className="size-4" />
+            <ArrowUp className="size-5" />
           </Button>
         </div>
       </div>

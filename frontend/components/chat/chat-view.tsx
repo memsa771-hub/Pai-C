@@ -2,11 +2,12 @@
 
 import { useCallback, useRef, useState, useEffect, useMemo } from 'react';
 import { ChatMessages } from './chat-messages';
-import { WorkingIndicator } from './working-indicator';
+import { TypingBubble } from './working-indicator';
 import { PaiDmIntro } from './pai-dm-intro';
 import { ChatInput, type PendingFile } from './chat-input';
 import { CounselorVoiceControl } from './counselor-voice-control';
 import { CounselorMirrorCard } from '@/components/counselor/counselor-mirror-card';
+import counselorCopy from '@/components/counselor/workspace/copy.json';
 import { CounselorRequestPanel } from './counselor-request-panel';
 import { CounselorResearchStatus } from './counselor-research-status';
 import { ThreadStatusBar } from './thread-status-bar';
@@ -24,7 +25,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { ListTree, MessageSquare, CalendarClock, Square, ChevronLeft, X, Plus, Globe, Share2, Crown, AlertTriangle, RefreshCw, Sparkles, Cog } from 'lucide-react';
+import { ListTree, MessageSquare, CalendarClock, Square, ChevronLeft, X, Plus, Globe, Share2, Crown, AlertTriangle, RefreshCw, Sparkles, Cog, CalendarCheck } from 'lucide-react';
 import { ShareDialog } from './share-dialog';
 import { OrchestrationControl } from './orchestration-control';
 import { useLayout } from '@/components/layout/layout-context';
@@ -133,6 +134,21 @@ async function refreshCachedSession(sessionId: string): Promise<void> {
   } catch {
     // Best-effort
   }
+}
+
+/** A check-in opened from the plan: quick starts that only fill the draft.
+ * Nothing is sent until the student presses send. */
+function CheckInCard({ onPick }: { onPick: (text: string) => void }) {
+  return <section aria-label={counselorCopy.checkinCard.title} className="mb-2 rounded-3xl border bg-card p-4 shadow-card">
+    <h3 className="flex items-center gap-2.5 font-bold">
+      <span aria-hidden className="flex size-9 items-center justify-center rounded-xl bg-tone-sky-soft text-tone-sky-ink"><CalendarCheck className="size-[18px]" /></span>
+      {counselorCopy.checkinCard.title}
+    </h3>
+    <p className="mt-2 text-sm text-muted-foreground">{counselorCopy.checkinCard.body}</p>
+    <div className="mt-3 flex flex-wrap gap-2">
+      {counselorCopy.checkinCard.options.map((option) => <Button key={option} size="tap" variant="soft" className="rounded-full" onClick={() => onPick(option)}>{option}</Button>)}
+    </div>
+  </section>;
 }
 
 export function ChatView({counselorOnly=false,initialDraft=""}:{counselorOnly?:boolean;initialDraft?:string}) {
@@ -941,7 +957,18 @@ export function ChatView({counselorOnly=false,initialDraft=""}:{counselorOnly?:b
         ) : displayMessages.length === 0 ? (
           (() => {
             if (currentSessionId === 'pai-counselor') {
-              return <div className="px-4 lg:px-8 py-3"><WorkingIndicator /></div>;
+              // PAI opens the conversation; until its first words arrive the
+              // student sees a warm welcome and PAI typing, not a blank pane.
+              return <div className="flex-1 overflow-y-auto px-4 py-8 lg:px-8">
+                <div className="mx-auto flex max-w-3xl flex-col items-center text-center">
+                  <span className="flex size-16 items-center justify-center rounded-3xl bg-card shadow-lift ring-1 ring-border">
+                    <img src="/pai-emblem.png" alt="" className="size-9" />
+                  </span>
+                  <h2 className="mt-4 text-2xl font-bold tracking-tight">{t('chat.welcomeTitle')}</h2>
+                  <p className="mt-2 max-w-md text-pretty text-muted-foreground">{t('chat.welcomeBody')}</p>
+                </div>
+                <div className="mt-6"><TypingBubble /></div>
+              </div>;
             }
             // A fresh DM with the built-in assistant opens on her intro (what
             // she can do + the connect steps) instead of a blank thread.
@@ -970,7 +997,7 @@ export function ChatView({counselorOnly=false,initialDraft=""}:{counselorOnly?:b
             loadOlder={loadOlder}
             hasOlder={hasOlder}
             loadingOlder={loadingOlder}
-            className="flex-1 overflow-y-auto px-4 lg:px-8 py-3"
+            className="flex-1 overflow-y-auto px-4 lg:px-8 py-4"
           />
         )}
 
@@ -980,7 +1007,8 @@ export function ChatView({counselorOnly=false,initialDraft=""}:{counselorOnly?:b
             tracking the pane, but the cap steps up on large displays: 768px is
             cramped on a 27" 4K, where the pane itself is 2000px+ wide. */}
         {(!isDM || dmWritable) && (
-          <div className="mx-auto w-full max-w-3xl px-3 lg:px-5 pt-1 pb-2 xl:max-w-4xl 2xl:max-w-6xl lg:pb-3">
+          <div className="mx-auto w-full max-w-3xl px-3 pt-1 pb-3 lg:px-5 lg:pb-4">
+            {counselorOnly && initialDraft === counselorCopy.checkin && <CheckInCard onPick={(text) => setCurrentDraft(`${text}. `)} />}
             {currentSessionId === 'pai-counselor' && <div className="mb-2">
               <CounselorResearchStatus />
               <CounselorMirrorCard refreshKey={`${currentSessionId}:${displayMessages.length}`}
