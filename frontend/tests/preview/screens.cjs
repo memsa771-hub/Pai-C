@@ -29,4 +29,16 @@ module.exports = [
   { id: 'auth-reset', path: '/auth/reset-password?code=offline' },
   { id: 'auth-reset-expired', path: '/auth/reset-password', ready: 'h1' },
   { id: 'auth-callback-failed', path: '/auth/callback?error=access_denied', ready: 'h1' },
+
+  { id: 'onboarding-name', path: '/student?onboarding=1' },
+  { id: 'onboarding-level', path: '/student?onboarding=1', setup: async (page) => {
+    await page.getByLabel('Your name').fill('Sam Taylor'); await submit(page, 'Next');
+    await submit(page, 'Other'); await page.getByPlaceholder('Type it in your own words').fill('Secondary education');
+  } },
+  { id: 'onboarding-language', path: '/student?onboarding=1', setup: async (page) => {
+    await page.getByLabel('Your name').fill('Sam Taylor'); await submit(page, 'Next');
+    await submit(page, 'Catalog level'); await submit(page, 'Next');
+    await page.getByLabel('City').fill('My city'); await submit(page, 'Next');
+    await submit(page, 'English');
+  } },
 ];

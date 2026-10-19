@@ -928,6 +928,18 @@ export const messages = {
     saved: 'Welcome to Placement AI',
     partial: "Saved, but {count} answer(s) need a second look on your profile.",
     failed: "Couldn't save that — please try again.",
+    step: 'Step {current} of {total}',
+    back: 'Back',
+    next: 'Next',
+    finish: 'Start talking with PAI',
+    required: 'This one helps PAI get started. You can change it later.',
+    otherPlaceholder: 'Type it in your own words',
+    help: {
+      fullName: 'This is how PAI will greet you.',
+      level: 'Pick the closest one. Your own words are fine too.',
+      currentCity: 'Where you live now. It helps PAI talk about real options later.',
+      replyLanguage: 'PAI will reply in this language. You can switch any time.',
+    },
 
     field: {
       fullName: 'Your name',

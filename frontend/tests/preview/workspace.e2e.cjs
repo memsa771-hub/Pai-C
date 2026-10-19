@@ -95,6 +95,9 @@ async function crawl(browser) {
           const control = page.locator('button:not([disabled]):visible, a[href]:visible').nth(i);
           if (!(await control.count())) continue;
           const name = ((await control.getAttribute('aria-label')) || (await control.innerText()).trim() || '(icon)').slice(0, 40);
+          // Re-selecting the selected chip or the current page is a correct no-op.
+          if ((await control.getAttribute('aria-pressed')) === 'true' || (await control.getAttribute('aria-current')) === 'page'
+            || (await control.getAttribute('aria-selected')) === 'true') continue;
           const href = await control.getAttribute('href');
           if (href !== null) {
             const target = new URL(href, page.url());

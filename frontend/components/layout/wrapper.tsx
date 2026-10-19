@@ -8,26 +8,19 @@ import { useWorkspace } from "@/lib/workspace-context";
 import { workspaceApi } from "@/lib/api";
 import type { OnboardingState } from "@/lib/onboarding";
 import { useT } from "@/lib/i18n";
-import { Button } from "@/components/ui/button";
+import { ErrorState } from "@/components/pai";
 function WorkspaceLoadingScreen() {
   const t = useT();
 
   return (
     <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-background">
-      <div className="flex flex-col items-center gap-5">
-        <img
-          src="/pai-emblem.png"
-          alt="Placement AI"
-          className="size-16 animate-[pulse_2s_ease-in-out_infinite] dark:hidden"
-        />
-        <img
-          src="/pai-emblem.png"
-          alt="Placement AI"
-          className="size-16 animate-[pulse_2s_ease-in-out_infinite] hidden dark:block"
-        />
+      <div role="status" className="flex flex-col items-center gap-5">
+        <span className="flex size-20 animate-[pulse_2s_ease-in-out_infinite] items-center justify-center rounded-3xl bg-card shadow-lift">
+          <img src="/pai-emblem.png" alt="Placement AI" className="size-12" />
+        </span>
         <div className="text-center">
-          <h1 className="text-xl font-semibold tracking-tight">Placement AI</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">
+          <h1 className="text-xl font-bold tracking-tight">Placement AI</h1>
+          <p className="mt-0.5 text-sm text-muted-foreground">
             {t("nav.workspaceFallback")}
           </p>
         </div>
@@ -48,15 +41,9 @@ function WorkspaceLoadingScreen() {
 
 function OnboardingLoadError({ retry }: { retry: () => void }) {
   return (
-    <div className="fixed inset-0 z-50 flex flex-col items-center justify-center gap-4 bg-background p-6 text-center">
-      <img src="/pai-emblem.png" alt="Placement AI" className="size-14" />
-      <div>
-        <h1 className="font-semibold">{copy.onboardingError}</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          {copy.onboardingRetry}
-        </p>
-      </div>
-      <Button onClick={retry}>{copy.retry}</Button>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-background p-4">
+      <ErrorState className="w-full max-w-md" title={copy.onboardingError}
+        description={copy.onboardingRetry} retryLabel={copy.retry} onRetry={retry} />
     </div>
   );
 }
