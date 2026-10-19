@@ -4,6 +4,8 @@ import { RoadmapsView } from "@/components/roadmaps/roadmaps-view";
 import { Button } from "@/components/ui/button";
 import { Heading, LoadState, useResource } from "./resource";
 import copy from "./copy.json";
+import { useState } from "react";
+import { FamilyTalk } from "./family-talk";
 const load = () => workspaceApi.getPossibilities();
 export function Compare({
   onChat,
@@ -13,6 +15,7 @@ export function Compare({
   onOpen: (id: string) => void;
 }) {
   const resource = useResource(load);
+  const [familyOpen, setFamilyOpen] = useState(false);
   return (
     <>
       <Heading title={copy.compare} description={copy.chooseHelp} />
@@ -55,10 +58,11 @@ export function Compare({
       <Button
         variant="outline"
         className="my-6"
-        onClick={() => onChat(copy.family)}
+        onClick={() => setFamilyOpen(!familyOpen)}
       >
         {copy.family}
       </Button>
+      {familyOpen && <FamilyTalk />}
       <p className="mb-6 text-sm text-muted-foreground">
         {copy.decisionPending}
       </p>

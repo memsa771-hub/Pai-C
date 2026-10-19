@@ -1,0 +1,13 @@
+{
+  "not_ready": "Choose a path and complete its study check before preparing this conversation.",
+  "care": "Let's focus on how you are feeling before preparing a difficult conversation.",
+  "missing_family": "Tell PAI who you want to talk to and what they are worried about.",
+  "missing_evidence": "There is no first-hand evidence linked to this path yet. Talk with PAI about what you have tried.",
+  "intro": "Here is a way to prepare. These are your own words, not a claim that every concern is solved.",
+  "worry": "You described {role}'s concern as: {worry}",
+  "wish": "Their wish for you: {wish}",
+  "evidence": "Something you can bring into the conversation: {quote}",
+  "script": "I understand that you are worried about {worry}. I have chosen {path}. Something I can show you from my own experience is: {quote}. I would like us to look at what this answers and what still needs checking, together.",
+  "unknown_worry": "There is no recorded concern yet; ask them what matters most before assuming.",
+  "max_evidence": 5
+}

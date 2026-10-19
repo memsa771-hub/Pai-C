@@ -410,6 +410,12 @@ class WorkspaceApi {
   async getCounselorWorkspace(): Promise<import('./counselor-workspace').LivingPicture> {
     return this.request(`/v1/counselor/workspace?network=${this.requireWorkspace()}`);
   }
+  async getFamilyTalk(): Promise<{ready:boolean;message:string;path_id?:string;path?:string;family:{id:string;role:string;wish:string;worry:string;evidence:string}[];evidence:{id:string;quote:string}[]}> {
+    return this.request(`/v1/counselor/family-talk?network=${this.requireWorkspace()}`);
+  }
+  async prepareFamilyTalk(body:{submission_id:string;path_id:string;person_id:string;evidence_ids:string[]}):Promise<{event_id:string;script:string}> {
+    return this.request(`/v1/counselor/family-talk?network=${this.requireWorkspace()}`,{method:'POST',body:JSON.stringify(body)});
+  }
   async exportCounselorData(): Promise<Record<string, unknown>> {
     return this.request(`/v1/counselor/export?network=${this.requireWorkspace()}`);
   }

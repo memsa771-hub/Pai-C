@@ -6,8 +6,38 @@ from app.api.response import success_response
 from app.routers.roadmaps import _authorized
 from app.models import CounselorMirrorFeedback, StudentJourney, CounselorTurnDecision
 from app.pai_c.memory import MemoryService
+from pydantic import BaseModel, ConfigDict, Field
+from uuid import UUID
+from fastapi import HTTPException
 
 router=APIRouter(prefix='/v1/counselor',tags=['Counselor'])
+
+
+class FamilyPreparation(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+    submission_id: UUID
+    path_id: str = Field(min_length=1)
+    person_id: str = Field(min_length=1)
+    evidence_ids: list[str] = Field(min_length=1, max_length=5)
+
+
+@router.get('/family-talk')
+def family_talk(network: str=Query(...), db=Depends(get_db),
+    x_workspace_token: str | None=Header(None), authorization: str | None=Header(None)):
+    from app.pai_c.family_talk import prepare
+    workspace = _authorized(db, network, x_workspace_token, authorization)
+    return success_response(prepare(db, str(workspace.id)))
+
+
+@router.post('/family-talk')
+async def send_family_talk(body: FamilyPreparation, network: str=Query(...), db=Depends(get_db),
+    x_workspace_token: str | None=Header(None), authorization: str | None=Header(None)):
+    from app.pai_c.family_talk import deliver
+    workspace = _authorized(db, network, x_workspace_token, authorization)
+    try:
+        return success_response(await deliver(db, str(workspace.id), body))
+    except ValueError as exc:
+        raise HTTPException(409, str(exc)) from None
 
 
 @router.get('/workspace')

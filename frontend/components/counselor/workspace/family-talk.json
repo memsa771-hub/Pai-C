@@ -1,0 +1,12 @@
+{
+  "title": "Prepare a family conversation",
+  "person": "Who would you like to talk with?",
+  "concern": "What matters to them",
+  "wish": "What they hope for you",
+  "evidence": "Choose your own evidence to discuss",
+  "evidenceHelp": "Pick what you think connects to their concern. PAI will not assume that it resolves the concern.",
+  "prepare": "Prepare with PAI",
+  "prepared": "Your preparation is saved in the conversation",
+  "close": "Close",
+  "noWorry": "The concern is not recorded yet. Talk with PAI before assuming what they worry about."
+}
