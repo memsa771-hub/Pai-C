@@ -95,3 +95,11 @@ async def explain(context, payload):
             "facts": sources, "unconfirmed": unconfirmed,
             "missing": [] if sources else [rules["missing_sources"]],
             "summary": rules["summary"], "research_metrics": budget.usage()}
+
+
+def current_path_result(result):
+    from app.pai_c.deep.grounding import current_fact
+    facts = [fact for fact in result.get('facts', []) if current_fact(fact)]
+    expired = len(facts) != len(result.get('facts', []))
+    return {**result, 'facts': facts,
+        'missing': list(dict.fromkeys([*result.get('missing', []), *([policy()['missing_sources']] if expired else [])]))}, expired

@@ -114,7 +114,7 @@ export function PathPage({
   useEffect(() => {
     if (
       !resource.data ||
-      !["queued", "executing", "planning", "verifying", "running"].includes(
+      !["pending", "queued", "executing", "planning", "verifying", "running"].includes(
         resource.data.status,
       )
     )
@@ -152,6 +152,7 @@ export function PathPage({
         title={result.possibility.title}
         description={result.possibility.why}
       />
+      {result.status === "stale" && <section className="mb-5 rounded-xl border p-4"><p>{copy.stalePath}</p><Button disabled={busy} onClick={start} className="mt-3">{copy.refresh}</Button>{error && <p role="alert">{copy.error}</p>}</section>}
       {!result.path ? (
         <section className="rounded-2xl border bg-card p-8">
           <p>
@@ -178,7 +179,7 @@ export function PathPage({
                 <h2 className="mb-3 text-lg font-semibold">{label}</h2>
                 {human(result.path?.[key]).trim() ? (
                   <p className="whitespace-pre-line text-sm leading-relaxed text-muted-foreground">
-                    {human(result.path[key])}
+                    {human(result.path?.[key])}
                   </p>
                 ) : result.facts.filter((f) => f.field === key).length ? (
                   result.facts
@@ -255,7 +256,7 @@ export function ProgramPage({
   useEffect(() => {
     if (
       !resource.data ||
-      ["not_started", "completed", "failed"].includes(resource.data.status)
+      ["not_started", "completed", "failed", "stale"].includes(resource.data.status)
     )
       return;
     const timer = setInterval(resource.refresh, 5000);
@@ -300,7 +301,7 @@ export function ProgramPage({
       ) : (
         <>
           {resource.data.status === "not_started" ||
-          resource.data.status === "failed" ? (
+          ["failed", "stale"].includes(resource.data.status) ? (
             <section className="rounded-2xl border bg-card p-6">
               <label className="flex items-center gap-3">
                 <input

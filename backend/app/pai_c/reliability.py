@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 import json
 from pathlib import Path
 from sqlalchemy import select, func
-from app.models import BackgroundJob, CounselorTurnDecision
+from app.models import BackgroundJob, CounselorTurnDecision, StudentRequest, CounselorNotedQuestion
 
 
 def policy():
@@ -42,6 +42,10 @@ def health(db, workspace_id, *, now=None):
     lag=max((age(job) for job in jobs),default=0)
     failed=db.scalar(select(func.count()).select_from(BackgroundJob).where(
         BackgroundJob.workspace_id == workspace_id, BackgroundJob.status == 'failed')) or 0
-    return {'database':'ok','planner_pending':len(jobs),'planner_lag_seconds':lag,
+    requests = db.scalar(select(func.count()).select_from(StudentRequest).where(
+        StudentRequest.workspace_id == workspace_id, StudentRequest.status == 'open')) or 0
+    questions = db.scalar(select(func.count()).select_from(CounselorNotedQuestion).where(
+        CounselorNotedQuestion.workspace_id == workspace_id, CounselorNotedQuestion.status.in_(['open','unanswered']))) or 0
+    return {'open_requests': requests, 'open_questions': questions, 'database':'ok','planner_pending':len(jobs),'planner_lag_seconds':lag,
         'planner_lag_alert':lag > policy()['planner_lag_seconds'], 'failed_jobs':failed,
         'day':midnight.date().isoformat(),'fallbacks':dict(counts)}

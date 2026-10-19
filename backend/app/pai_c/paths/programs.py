@@ -49,3 +49,42 @@ async def search(context, payload):
                     'eligibility': eligibility(requirement, brief['facts'])})
         return {'programs': programs, 'missing': [] if programs else ['verified_program_sources'],
             'research_metrics': budget.usage()}
+
+
+def current_programs(db, workspace_id, result, facts):
+    """Recheck persisted sources and current student evidence on every read."""
+    from sqlalchemy import select
+    from app.models import Opportunity
+    from app.research.requirements import RequirementStore
+    store = RequirementStore(db)
+    programs, expired = [], False
+    for item in result.get('programs', []):
+        opportunity = db.scalar(select(Opportunity).where(Opportunity.id == item.get('opportunity_id'),
+            Opportunity.workspace_id == workspace_id))
+        row = store.preferred(workspace_id, opportunity.id) if opportunity else None
+        if row is None or not store.is_fresh(row):
+            expired = True
+            continue
+        current = {**store.payload(opportunity, row), 'title': item.get('title', '')}
+        current['eligibility'] = eligibility(current, facts)
+        programs.append(current)
+    return {**result, 'programs': programs,
+        'missing': list(dict.fromkeys([*result.get('missing', []), *(['expired_sources'] if expired else [])]))}, expired
+
+
+def reusable_program_run(db, run, route):
+    from datetime import datetime, timezone, timedelta
+    saved_route = ((run.constraints or {}).get('capability_input') or {}).get('brief', {}).get('route')
+    if saved_route != route:
+        return False
+    created = run.created_at
+    if created is None:
+        return False
+    if created.tzinfo is None:
+        created = created.replace(tzinfo=timezone.utc)
+    now = datetime.now(timezone.utc)
+    if not now - timedelta(days=max(1, config.PAI_RESEARCH_FRESHNESS_DAYS)) <= created <= now:
+        return False
+    result = (run.result or {}).get('capability_result') or {}
+    _, expired = current_programs(db, run.workspace_id, result, {})
+    return not expired

@@ -381,8 +381,8 @@ def delete_account(
     db.commit()
 
     logger.info(
-        "account: erased %s (workspaces=%s files=%s events=%s channel_members=%s)",
-        email_lower, len(erased),
+        "account: erased (workspaces=%s files=%s events=%s channel_members=%s)",
+        len(erased),
         sum(e["files"] for e in erased), sum(e["events"] for e in erased),
         channel_memberships_deleted,
     )

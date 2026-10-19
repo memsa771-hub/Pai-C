@@ -35,8 +35,11 @@ it("renders all public profile sections without interpretation scores", async ()
     "Who I am",
     "Education timeline",
     "People around me",
-    "Interests & strengths",
-    "Values, pressures & limits",
+    "Interests",
+    "Strengths & capabilities",
+    "Values",
+    "Pressures & limits",
+    "Options you know & myths to check",
     "Goals & whose wish",
     "PAI still wants to know",
   ])

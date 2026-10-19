@@ -80,3 +80,21 @@ def capability_view(notebook):
             if status is not None:
                 grouped[status].append(row)
     return grouped
+
+
+def profile_sections(notebook):
+    """Explicit public evidence selectors; private interpretation is never traversed."""
+    data = notebook.model_dump(mode='json')
+    selectors = json.loads((DATA_DIR / 'profile_sections.json').read_text(encoding='utf-8'))
+    result = {}
+    for section, sources in selectors.items():
+        selected = {}
+        for spec in sources:
+            for row in _active(at_path(data, spec['path'])):
+                if not row.get('evidence'):
+                    continue
+                if spec.get('prefixes') and not any(row.get('key','').startswith(prefix) for prefix in spec['prefixes']):
+                    continue
+                selected[row['id']] = row
+        result[section] = list(selected.values())
+    return result

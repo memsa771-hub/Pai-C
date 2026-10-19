@@ -102,3 +102,15 @@ def submit_answer(db, workspace_id, key, answer):
     if not known:
         evidence["catalog_review"] = {"catalog": spec["catalog"], "status": "pending", "student_text": value}
     return memory.save_fact_card(workspace_id, spec, proposed, evidence, answer.record_id)
+
+
+def presentation_card(decision, *, safety_flagged=False):
+    """Presentation follows the policy decision; it never selects a next move."""
+    if decision is None or safety_flagged:
+        return None
+    data = load_data('inline_cards.json')
+    if decision.action == data['picture_action']:
+        return {'kind': 'first_picture'}
+    if decision.question_allowed and decision.topic == data['rating_topic'] and decision.action in data['rating_actions']:
+        return {'kind': 'rating', 'min': data['rating_min'], 'max': data['rating_max']}
+    return None

@@ -6,6 +6,7 @@ import {
   fireEvent,
   waitFor,
   cleanup,
+  act,
 } from "@testing-library/react";
 import { Paths, PathPage, ProgramPage } from "./paths";
 import { workspaceApi } from "@/lib/api";
@@ -72,4 +73,24 @@ it("H requires explicit consent, preserves no-source state", async () => {
   expect(
     await screen.findByText(/No verified program information/),
   ).toBeTruthy();
+});
+
+it('expired evidence requires fresh consent and cannot prepare a roadmap',async()=>{
+ vi.mocked(workspaceApi.getPrograms).mockResolvedValue({status:'stale',programs:[],missing:['expired_sources']});
+ render(<ProgramPage id='path-one' onBack={vi.fn()}/>);
+ const button=await screen.findByRole('button',{name:'Look at programs'});
+ expect((button as HTMLButtonElement).disabled).toBe(true);
+ expect(screen.queryByRole('button',{name:'Prepare a reviewed roadmap'})).toBeNull();
+ expect(workspaceApi.searchPrograms).not.toHaveBeenCalled();
+});
+
+it('polls durable pending jobs until a result exists',async()=>{
+ vi.useFakeTimers();
+ try {
+  vi.mocked(workspaceApi.getPath).mockResolvedValue({...pathResult,status:'pending',path:null});
+  await act(async()=>{render(<PathPage id='path-one' onBack={vi.fn()} onPlaces={vi.fn()} onChat={vi.fn()}/>);});
+  expect(workspaceApi.getPath).toHaveBeenCalledTimes(1);
+  await act(async()=>{await vi.advanceTimersByTimeAsync(5000);});
+  expect(workspaceApi.getPath).toHaveBeenCalledTimes(2);
+ } finally {cleanup();vi.useRealTimers();}
 });

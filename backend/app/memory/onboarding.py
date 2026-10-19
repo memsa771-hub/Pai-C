@@ -55,6 +55,7 @@ class OnboardingField:
     # YYYY, YYYY-MM or YYYY-MM-DD, matching the rest of the student schema.
     is_date: bool = False
     record_field: str | None = None
+    allow_other: bool = False
 
 
 # The order here is the order the form asks them in.
@@ -96,9 +97,9 @@ def _clean(value: Any, field: OnboardingField) -> Optional[str]:
         return None
     if len(text) > field.max_length:
         raise MemoryDataError(f"{field.name} is too long")
-    if field.choices and text.casefold() not in field.choices:
+    if field.choices and text.casefold() not in field.choices and not field.allow_other:
         raise MemoryDataError(f"{field.name} must be one of: {', '.join(field.choices)}")
-    if field.choices:
+    if field.choices and text.casefold() in field.choices:
         text = text.casefold()
     if field.is_date:
         import re
@@ -161,7 +162,7 @@ class OnboardingService:
             if user is not None and user.onboarded_at else None,
             "fields": [
                 {"name": f.name, "fieldKey": f.field_key, "required": f.required,
-                 "choices": list(f.choices), "isDate": f.is_date}
+                 "choices": list(f.choices), "isDate": f.is_date, "allowOther": f.allow_other}
                 for f in ONBOARDING_FIELDS
             ],
             "prefill": {k: v for k, v in prefill.items() if v},
@@ -212,7 +213,9 @@ class OnboardingService:
                 source_type="user_explicit", allow_user_explicit=True,
                 input_channel="profile",
                 subject_user_id=str(user.id) if user else None,
-                evidence={"reason": "Stated during onboarding", "capture": "onboarding"},
+                evidence={"reason": "Stated during onboarding", "capture": "onboarding", "quote": value,
+                    **({"catalog_review": {"catalog": field.name, "status": "pending", "student_text": value}}
+                       if field.allow_other and value.casefold() not in field.choices else {})},
             )
             result = MemoryReconciler(self.db).reconcile(candidate)
             if result.accepted:

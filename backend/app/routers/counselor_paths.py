@@ -46,7 +46,9 @@ def get_path(path_id: str, network: str = Query(...), db=Depends(get_db), x_work
     run = next((item for item in runs if (item.constraints or {}).get("possibility_id") == row.id
                 and (item.constraints or {}).get("mirror_version") == version), None)
     result = ((run.result or {}).get("capability_result") or {}) if run and run.status == "completed" else {}
-    return success_response({"possibility": PossibilityService.serialize(row), "status": run.status if run else "not_started",
+    from app.pai_c.paths.explain import current_path_result
+    result, expired = current_path_result(result)
+    return success_response({"possibility": PossibilityService.serialize(row), "status": "stale" if expired else run.status if run else "not_started",
         "path": result.get("path"), "facts": result.get("facts", []), "missing": result.get("missing", []),
         "run_id": run.id if run else None})
 
@@ -101,7 +103,15 @@ def get_programs(path_id: str, network: str = Query(...), db=Depends(get_db),
     run = next((run for run in runs if (run.constraints or {}).get('possibility_id') == row.id
         and (run.constraints or {}).get('mirror_version') == version), None)
     result = ((run.result or {}).get('capability_result') or {}) if run and run.status == 'completed' else {}
-    return success_response({'status': run.status if run else 'not_started',
+    from app.pai_c.paths.programs import current_programs, reusable_program_run
+    result, _ = current_programs(db, str(workspace.id), result,
+        MemoryService(db).comparable_facts(str(workspace.id)))
+    status = run.status if run else 'not_started'
+    if run and run.status == 'completed' and not reusable_program_run(db, run, PossibilityService(db).research_route(row)):
+        status = 'stale'
+        # A changed destination/level must not display the previous route's programs.
+        result['programs'] = []
+    return success_response({'status': status,
         'programs': result.get('programs', []), 'missing': result.get('missing', [])})
 
 

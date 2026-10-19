@@ -179,10 +179,22 @@ async def _request_path(db, workspace_id, journey, tool_context, possibility_id,
                    (run.constraints or {}).get("mirror_version") == version for run in explanations):
             return None
     runs = db.scalars(select(ExecutionRun).where(ExecutionRun.workspace_id == workspace_id,
-        ExecutionRun.task_type == kind)).all()
-    previous = next((run for run in runs if (run.constraints or {}).get("research_key") == key and run.status != "failed"), None)
+        ExecutionRun.task_type == kind).order_by(ExecutionRun.created_at.desc())).all()
+    previous = next((run for run in runs if (run.constraints or {}).get("possibility_id") == row.id
+        and (run.constraints or {}).get("mirror_version") == version and run.status != "failed"), None)
     if previous:
-        return {"ok": True, "data": {"run_id": previous.id, "status": previous.status, "resumed": True}}
+        reusable = True
+        if kind == "program_search" and previous.status == "completed":
+            from app.pai_c.paths.programs import reusable_program_run
+            reusable = reusable_program_run(db, previous, PossibilityService(db).research_route(row))
+        if kind == "path_explain" and previous.status == "completed":
+            from app.pai_c.paths.explain import current_path_result
+            _, expired = current_path_result((previous.result or {}).get('capability_result') or {})
+            reusable = not expired
+        if reusable:
+            return {"ok": True, "data": {"run_id": previous.id, "status": previous.status, "resumed": True}}
+        # A new explicit request may refresh expired evidence; GET never queues work.
+        key += f":refresh:{previous.id}"
     brief = {"possibility_id": row.id, "title": row.title, "why": row.why,
         "evidence": row.evidence or [], "mirror_version": version}
     if kind == "program_search":

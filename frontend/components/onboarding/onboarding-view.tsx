@@ -9,9 +9,6 @@ import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from '@/components/ui/select';
 import { workspaceApi } from '@/lib/api';
 import { useT, type MessageKey } from '@/lib/i18n';
 import {
@@ -139,6 +136,12 @@ function Field({ field, label, value, onChange }: {
   // Explicitly tied to the control: tapping the label focuses it, and a screen
   // reader announces the two together instead of reading an unlabelled box.
   const id = React.useId();
+  const [other, setOther] = React.useState(!!value && !!field.allowOther && !field.choices.includes(value));
+  const choiceLabel = (choice: string) => {
+    const key = `onboarding.choice.${choice}`;
+    const translated = t(key as MessageKey);
+    return translated === key ? choice : translated;
+  };
 
   return (
     <div className="col-span-2 space-y-3 rounded-xl border bg-card p-5 shadow-sm">
@@ -149,9 +152,11 @@ function Field({ field, label, value, onChange }: {
 
       {field.choices.length > 0 ? (
         <div role="group" aria-label={label} className="flex flex-wrap gap-2">
-          {field.choices.map(choice => <Button key={choice} type="button" variant={value === choice ? 'primary' : 'outline'} aria-pressed={value === choice} onClick={() => onChange(choice)}>
-            {t(`onboarding.choice.${choice}` as MessageKey)}
+          {field.choices.map(choice => <Button key={choice} type="button" variant={value === choice ? 'primary' : 'outline'} aria-pressed={value === choice} onClick={() => {setOther(false);onChange(choice);}}>
+            {choiceLabel(choice)}
           </Button>)}
+          {field.allowOther && <Button type="button" variant={other?'primary':'outline'} aria-pressed={other} onClick={()=>{setOther(true);onChange('');}}>{choiceLabel('other')}</Button>}
+          {other && <Input id={id} aria-label={label} value={value} onChange={event=>onChange(event.target.value)}/>}
         </div>
       ) : field.isDate ? (
         <Input

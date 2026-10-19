@@ -311,3 +311,16 @@ def test_four_card_entry_writes_education_through_reconciler(db):
     db.commit()
     assert result["completed"] and not result["rejected"]
     assert service.state(workspace)["prefill"]["level"]=="Secondary education"
+
+
+def test_entry_other_preserves_student_words_and_requests_catalog_review(db):
+    from app.models import MemoryCandidate
+    from sqlalchemy import select
+    service=OnboardingService(db)
+    workspace=db.info['workspace']
+    service.apply(workspace,{'fullName':'A Student','level':'My education system','currentCity':'My city','replyLanguage':'english'})
+    db.commit()
+    candidate=db.scalar(select(MemoryCandidate).where(MemoryCandidate.workspace_id==workspace.id,MemoryCandidate.key=='education'))
+    assert candidate.evidence['quote']=='My education system'
+    assert candidate.evidence['catalog_review']['status']=='pending'
+    assert service.state(workspace)['fields'][1]['allowOther'] is True

@@ -12,7 +12,7 @@ window.fetch=async()=>{throw new Error('Network disabled in offline UI review');
 const q=new URLSearchParams(location.search);
 const entry={required:true,completedAt:null,prefill:{},fields:[
   {name:'fullName',fieldKey:'identity.full_name',required:true,choices:[],isDate:false},
-  {name:'level',fieldKey:'education',required:true,choices:[],isDate:false},
+  {name:'level',fieldKey:'education',required:true,choices:['Catalog level'],allowOther:true,isDate:false},
   {name:'currentCity',fieldKey:'location.current_city',required:true,choices:[],isDate:false},
   {name:'replyLanguage',fieldKey:'preferences.preferred_language',required:true,choices:['english','roman urdu'],isDate:false},
 ]};

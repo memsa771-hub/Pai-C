@@ -882,6 +882,7 @@ export const messages = {
     choice: {
       english: 'English',
       'roman urdu': 'Roman Urdu',
+      matric: 'Matric', 'o-level': 'O-level', fsc: 'FSc', 'a-level': 'A-level',
       student: 'Student',
       professional: 'Working professional',
       other: 'Other',
@@ -1435,6 +1436,7 @@ export const messages = {
     custom_field: 'Field (optional)',
     custom_why: 'Why this matters to you (optional)',
     customResearch: 'Research',
+    pathFirstEmpty: 'Explore a path, then explicitly check places to study before preparing a roadmap.',
     customGoalHint: 'PAI will check this against your profile and show sourced evidence and gaps before you decide.',
     loading: 'Loading route details…',
     familyWish: 'Family suggestion',

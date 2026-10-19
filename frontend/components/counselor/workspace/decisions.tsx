@@ -63,7 +63,7 @@ export function Compare({
         {copy.decisionPending}
       </p>
       <section className="min-h-[400px] rounded-2xl border bg-card">
-        <RoadmapsView />
+        <RoadmapsView pathOnly />
       </section>
     </>
   );
@@ -78,7 +78,7 @@ export function Plan({ onChat }: { onChat: (text: string) => void }) {
         <Button onClick={() => onChat(copy.checkin)}>{copy.moment}</Button>
       </section>
       <section className="min-h-[500px] rounded-2xl border bg-card">
-        <RoadmapsView />
+        <RoadmapsView pathOnly />
       </section>
     </>
   );

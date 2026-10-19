@@ -30,3 +30,17 @@ def test_parse_fallback_is_countable_but_fences_are_not_a_fallback():
     violations=[]
     _parse_response('```json\n{"reply":"A reply","action":{}}\n```', violations=violations)
     assert violations == []
+
+
+def test_health_counts_unanswered_requests_without_returning_text():
+    from app.models import CounselorNotedQuestion, EventRecord
+    with StudentSession() as student, student.factory() as db:
+        for event_id in ['event', 'event2']:
+            db.add(EventRecord(id=event_id,network_id=student.workspace_id,type='workspace.message.posted',source='human:student',target='channel/pai',timestamp=1,payload={'content':'Question'}))
+        db.flush()
+        db.add(CounselorNotedQuestion(workspace_id=student.workspace_id,source_event_id='event',question_to_research='Private question',status='open'))
+        db.add(CounselorNotedQuestion(workspace_id=student.workspace_id,source_event_id='event2',question_to_research='Answered',status='answered_now'))
+        db.commit()
+        result=health(db,student.workspace_id)
+        assert result['open_questions']==1 and result['open_requests']==0
+        assert 'Private question' not in str(result)

@@ -28,9 +28,17 @@ def counselor_workspace(network: str=Query(...),db=Depends(get_db),
     for turn in turns:
         action=(turn.decision or {}).get('action')
         if action and action not in moments: moments[action]=turn.source_event_id
-    return success_response({'coverage':memory.coverage_areas(wid),'personal':personal,
+    return success_response({'coverage':memory.coverage_areas(wid),'personal':personal, 'sections':memory.profile_sections(wid),
         'capabilities':memory.capability_view(wid),'academic':memory.academic_view(wid),
         'picture':(draft.get('mirror') or {}).get('core_picture') if draft.get('status')=='confirmed' else None,
         'mirror_status':draft.get('status'),'moments':moments,
         'ratings':[{'version':r.mirror_version,'understood':r.understood,'before':r.certainty_before,
                     'after':r.certainty_after} for r in feedback]})
+
+
+@router.get('/export')
+def export_data(network: str=Query(...), db=Depends(get_db),
+    x_workspace_token: str | None=Header(None), authorization: str | None=Header(None)):
+    from app.pai_c.data_export import export_student_data
+    workspace = _authorized(db, network, x_workspace_token, authorization)
+    return success_response(export_student_data(db, str(workspace.id)))

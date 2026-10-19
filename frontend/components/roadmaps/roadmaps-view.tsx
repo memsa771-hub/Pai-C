@@ -19,7 +19,7 @@ import { Possibilities } from '@/components/counselor/possibilities';
 
 type Filter = 'all' | 'favorites' | 'exploring' | 'dismissed';
 
-export function RoadmapsView() {
+export function RoadmapsView({ pathOnly = false }: { pathOnly?: boolean }) {
   const [filter, setFilter] = useState<Filter>('all');
   const [roadmaps, setRoadmaps] = useState<Roadmap[]>([]);
   const [requests, setRequests] = useState<StudentRequest[]>([]);
@@ -103,10 +103,10 @@ export function RoadmapsView() {
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div><h1 className="text-2xl font-semibold">Roadmaps</h1><p className="mt-1 text-sm text-muted-foreground">Compare possible directions, discuss them with PAI, and choose when you are ready.</p></div>
         <div className="flex gap-2"><button type="button" onClick={() => void refresh()} aria-label="Refresh roadmaps" className="rounded-lg border p-2 hover:bg-muted"><RefreshCw className="size-4" /></button>
-          <button type="button" onClick={() => setAdding(!adding)} className="inline-flex items-center gap-1 rounded-lg bg-primary px-3 py-2 text-sm text-primary-foreground"><Plus className="size-4" /> Add goal</button></div>
+          {!pathOnly && <button type="button" onClick={() => setAdding(!adding)} className="inline-flex items-center gap-1 rounded-lg bg-primary px-3 py-2 text-sm text-primary-foreground"><Plus className="size-4" /> Add goal</button>}</div>
       </div>
-      <Possibilities refreshKey={roadmaps} onUpdated={() => void refresh()} />
-      {adding && <form onSubmit={addGoal} className="mt-5 rounded-xl border bg-card p-4">
+      {!pathOnly && <Possibilities refreshKey={roadmaps} onUpdated={() => void refresh()} />}
+      {!pathOnly && adding && <form onSubmit={addGoal} className="mt-5 rounded-xl border bg-card p-4">
         <label htmlFor="roadmap-goal" className="text-sm font-medium">{t('counselorRoadmaps.customGoalTitle')}</label>
         <input id="roadmap-goal" value={title} onChange={(event) => setTitle(event.target.value)} maxLength={240} required
           placeholder={t('counselorRoadmaps.customGoalExample')} className="mt-2 w-full rounded-lg border bg-background px-3 py-2 text-sm" />
@@ -133,7 +133,7 @@ export function RoadmapsView() {
         <p role="status" className="mt-4 rounded-lg border bg-muted/30 p-3 text-sm">{t('counselorRoadmaps.researchRunning')}</p>}
       {requests[0] && <div className="mt-4"><StudentRequestCard key={requests[0].id} request={requests[0]} onSent={() => void refresh()} /></div>}
       {loading ? <p className="mt-8 text-sm text-muted-foreground">Loading roadmaps…</p> : roadmaps.length === 0 ?
-        <div className="mt-8 rounded-2xl border border-dashed p-8 text-center"><p className="font-medium">No roadmaps here yet</p><p className="mt-2 text-sm text-muted-foreground">Tell PAI about your goals and complete your profile foundation, or add a goal to research.</p></div> :
+        <div className="mt-8 rounded-2xl border border-dashed p-8 text-center"><p className="font-medium">No roadmaps here yet</p><p className="mt-2 text-sm text-muted-foreground">{pathOnly ? t('counselorRoadmaps.pathFirstEmpty') : t('counselorRoadmaps.customGoalHint')}</p></div> :
         <div className="mt-5 grid gap-4 md:grid-cols-2">{roadmaps.map((roadmap) => <RoadmapCard key={roadmap.id} roadmap={roadmap} busy={busy} onAction={action} onDetails={(item) => setDetailId(item.id)} />)}</div>}
       <RoadmapChoiceDialog roadmap={choice} channel="roadmaps" onClose={() => setChoice(null)} onChosen={() => void refresh()} />
       <RoadmapDetailDialog roadmapId={detailId} onClose={() => setDetailId(null)} onReported={() => void refresh()} />

@@ -37,6 +37,7 @@ export interface OnboardingFieldSpec {
   /** Non-empty for the dropdowns. */
   choices: string[];
   isDate: boolean;
+  allowOther?: boolean;
 }
 
 export interface OnboardingState {

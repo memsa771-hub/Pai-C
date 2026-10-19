@@ -1,0 +1,11 @@
+{
+  "picture_action": "first_picture",
+  "rating_topic": "sure",
+  "rating_min": 0,
+  "rating_max": 10,
+  "rating_actions": [
+    "ask",
+    "ask_choice",
+    "explore_area"
+  ]
+}

@@ -316,9 +316,11 @@ function Items({ title, items }: { title: string; items: EvidenceItem[] }) {
                   “{item.evidence}”
                 </p>
               )}
+              {item.kind && <span className="mt-2 mr-2 inline-block rounded-full border px-2 py-1 text-xs">{copy.evidenceKinds[item.kind as keyof typeof copy.evidenceKinds]}</span>}
+              {item.category && <p className="mt-1 text-xs text-muted-foreground">{copy.whoseWish}: {copy.wishSources[item.category as keyof typeof copy.wishSources] || item.category}</p>}
               {item.capability_status && (
                 <span className="mt-2 inline-block rounded-full bg-muted px-2 py-1 text-xs">
-                  {item.capability_status.replaceAll("_", " ")}
+                  {copy.capabilityLabels[item.capability_status as keyof typeof copy.capabilityLabels]}
                 </span>
               )}
             </li>
@@ -349,6 +351,16 @@ export function LivingProfile({
   const identity = cards.filter((card) =>
     ["identity.full_name", "location.current_city"].includes(card.key),
   );
+  const education = cards.filter(c => c.kind === 'education');
+  const currentEducation = education.find(c => (c.value as Record<string, unknown>)?.academic_status === 'current') || education[0];
+  const level = (currentEducation?.value as Record<string, unknown>)?.qualification_name;
+  const datedCards = [...cards].sort((a,b)=>{
+    const date = (card: ProfileCard) => {
+      const value = card.value as Record<string, unknown> | null;
+      return typeof value?.start_date === 'string' ? value.start_date : typeof value?.end_date === 'string' ? value.end_date : '9999';
+    };
+    return date(a).localeCompare(date(b));
+  });
   return (
     <>
       <Heading
@@ -361,6 +373,7 @@ export function LivingProfile({
         }
       />
       <div className="mb-6 flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
+        {typeof level === "string" && <span className="rounded-full border bg-card px-4 py-2">{level}</span>}
         {identity.map((card) => (
           <span key={card.id} className="rounded-full border bg-card px-4 py-2">
             {human(card.value)}
@@ -402,17 +415,17 @@ export function LivingProfile({
       )}
       <section className="my-6">
         <h2 className="mb-4 text-xl font-semibold">{copy.education}</h2>
-        <div className="grid gap-3 md:grid-cols-2">
-          {cards
+        <ol className="space-y-3 border-l-2 border-primary/20 pl-5">
+          {datedCards
             .filter((c) =>
               ["education", "course", "test_attempt", "certification"].includes(
                 c.key,
               ),
             )
             .map((c) => (
-              <EvidenceCard key={c.id} card={c} onSaved={resource.refresh} />
+              <li key={c.id}><EvidenceCard card={c} onSaved={resource.refresh} /></li>
             ))}
-        </div>
+        </ol>
       </section>
       <div className="grid gap-5 md:grid-cols-2">
         <Items
@@ -423,8 +436,11 @@ export function LivingProfile({
           title={copy.strengths}
           items={[...picture.personal.self, ...skills]}
         />
-        <Items title={copy.values} items={picture.personal.pressures.items} />
-        <Items title={copy.goals} items={picture.personal.source} />
+        <Items title={copy.interests} items={picture.sections?.interests || []} />
+        <Items title={copy.values} items={picture.sections?.values || []} />
+        <Items title={copy.limits} items={picture.personal.pressures.items} />
+        <Items title={copy.options} items={picture.sections?.options || []} />
+        <Items title={copy.goals} items={picture.sections?.goals || picture.personal.source} />
       </div>
       <section className="my-6">
         <h2 className="mb-4 text-xl font-semibold">{copy.review}</h2>

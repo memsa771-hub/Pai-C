@@ -41,13 +41,13 @@ export function CounselorSettings({ base }: { base: string }) {
   }
   async function download() {
     try {
-      const data = await workspaceApi.getProfileCards();
+      const data = await workspaceApi.exportCounselorData();
       const url = URL.createObjectURL(
         new Blob([JSON.stringify(data, null, 2)], { type: "application/json" }),
       );
       const link = document.createElement("a");
       link.href = url;
-      link.download = "my-profile.json";
+      link.download = "my-counselor-data.json";
       link.click();
       URL.revokeObjectURL(url);
     } catch {
@@ -97,6 +97,7 @@ export function CounselorSettings({ base }: { base: string }) {
         <h2 className="mb-3 text-xl font-semibold">{copy.privacy}</h2>
         <p className="max-w-2xl text-sm leading-relaxed text-muted-foreground">
           {copy.privacyHelp}
+          <span className="mt-2 block">{copy.exportScope}</span>
         </p>
         <div className="mt-5 flex flex-wrap gap-3">
           <Button variant="outline" onClick={download}>

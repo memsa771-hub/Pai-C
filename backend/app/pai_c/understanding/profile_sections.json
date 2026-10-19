@@ -1,0 +1,39 @@
+{
+  "interests": [
+    {
+      "path": "self",
+      "prefixes": [
+        "interest."
+      ]
+    },
+    {
+      "path": "world.daily_life"
+    }
+  ],
+  "values": [
+    {
+      "path": "self",
+      "prefixes": [
+        "value.",
+        "motivation."
+      ]
+    }
+  ],
+  "goals": [
+    {
+      "path": "source",
+      "prefixes": [
+        "goal."
+      ]
+    }
+  ],
+  "options": [
+    {
+      "path": "said",
+      "prefixes": [
+        "option.",
+        "myth."
+      ]
+    }
+  ]
+}

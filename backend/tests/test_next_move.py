@@ -81,3 +81,14 @@ async def test_card_replaces_spoken_question_without_writing():
         assert result.reply == "Let's capture that." and model.await_count == 1
         assert "card_question_removed" in result.guard_violations
         assert not db.scalars(select(MemoryCandidate)).all()
+
+
+def test_inline_presentation_obeys_policy_and_care_priority():
+    from app.pai_c.fact_cards import presentation_card
+    decision=SimpleNamespace(action='ask',topic='sure',question_allowed=True)
+    assert presentation_card(decision)=={'kind':'rating','min':0,'max':10}
+    assert presentation_card(decision,safety_flagged=True) is None
+    decision.question_allowed=False
+    assert presentation_card(decision) is None
+    decision.action='first_picture'
+    assert presentation_card(decision)=={'kind':'first_picture'}

@@ -136,6 +136,10 @@ class MemoryService:
         from app.pai_c.understanding.views import personal_view
         return personal_view(self.truth_map(workspace_id).notebook)
 
+    def profile_sections(self, workspace_id):
+        from app.pai_c.understanding.views import profile_sections
+        return profile_sections(self.truth_map(workspace_id).notebook)
+
     def capability_view(self, workspace_id):
         from app.pai_c.understanding.views import capability_view
         return capability_view(self.truth_map(workspace_id).notebook)

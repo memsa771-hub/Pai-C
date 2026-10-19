@@ -13,9 +13,9 @@ const base='http://127.0.0.1:4173/student';
   const page=await context.newPage();const errors=[];
   page.on('pageerror',error=>errors.push(error.message));
   const shots=[['onboarding','onboarding=1'],['chat','view=threads'],['mirror','view=threads&mirror=1'],
-    ['journey','view=journey'],['paths','view=paths'],['path','view=paths&path=path-one'],
-    ['programs','view=paths&path=path-one&stage=H'],['compare','view=compare'],
-    ['plan','view=plan'],['profile','view=profile'],['documents','view=files'],['settings','view=settings']];
+    ['first-picture','view=threads&card=picture'],['rating','view=threads&card=rating'],['fact-card','view=threads&card=fact'],['journey','view=journey'],['paths','view=paths'],['path','view=paths&path=path-one'],
+    ['programs','view=paths&path=path-one&stage=H'],['compare','view=compare&roadmap=1'],
+    ['plan','view=plan&roadmap=1'],['profile','view=profile'],['documents','view=files'],['settings','view=settings']];
   for(const theme of ['light','dark'])for(const [name,query] of shots){
     await page.goto(`${base}?${query}&theme=${theme}`);
     await page.locator('button').first().waitFor({timeout:10000}).catch(error=>{throw new Error(name+': '+errors.join('; ')+' '+error.message)});
@@ -26,6 +26,8 @@ const base='http://127.0.0.1:4173/student';
   }
   // A: four entry cards. No hidden extra fields or provider call.
   await page.goto(`${base}?onboarding=1`);
+  assert.equal(await page.locator('input').count(),2);
+  await page.getByRole('button',{name:'Other',exact:true}).click();
   assert.equal(await page.locator('input').count(),3);
   await page.locator('input').nth(0).fill('Sam Taylor');
   await page.locator('input').nth(1).fill('Secondary education');
@@ -59,6 +61,20 @@ const base='http://127.0.0.1:4173/student';
   // I-J: reviewed roadmap handoff; no automatic choice is fabricated.
   await page.getByRole('button',{name:'Prepare a reviewed roadmap'}).click();
   await page.getByRole('heading',{name:'Compare paths',exact:true}).waitFor();
+  assert(!(await page.evaluate(()=>window.__offlineCalls)).some(call=>call.method==='chooseRoadmap'));
+  const choose=page.getByRole('button',{name:'Choose route',exact:true});
+  await choose.click();
+  const dialog=page.getByRole('dialog');
+  await dialog.getByRole('button',{name:'Choose route',exact:true}).click();
+  await dialog.getByRole('status').waitFor();
+  const choiceCalls=(await page.evaluate(()=>window.__offlineCalls));
+  assert.equal(choiceCalls.filter(call=>call.method==='getRoadmapChoiceToken').length,1);
+  assert.equal(choiceCalls.filter(call=>call.method==='chooseRoadmap').length,1);
+  for(const theme of ['light','dark']){
+    await page.evaluate(theme=>document.documentElement.className=theme,theme);
+    await page.screenshot({path:path.join(screenshots,`decision-${theme}.png`)});
+  }
+  await dialog.getByRole('button',{name:'Close',exact:true}).first().click();
   await page.getByRole('button',{name:'Plan & check-ins',exact:true}).click();
   await page.getByRole('heading',{name:'Small next steps'}).waitFor();
   // K: return to the same conversation with a check-in draft, not an auto-send.
@@ -70,6 +86,6 @@ const base='http://127.0.0.1:4173/student';
   assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
   await page.screenshot({path:path.join(screenshots,'profile-mobile-dark.png')});
   assert.equal(errors.length,0,errors.join('; '));
-  console.log('PASS: 24 light/dark screens, mobile overflow, A-K UI navigation and consent boundaries. Synthetic backend; no live calls.');
+  console.log('PASS: 32 light/dark screens, mobile overflow, A-K UI flow including explicit choice and consent boundaries. Synthetic backend; no live calls.');
   await browser.close();
 })().catch(error=>{console.error(error);process.exit(1);});

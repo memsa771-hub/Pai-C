@@ -167,8 +167,11 @@ async def _run_deep_turn(db, workspace_id: str, event_data: dict, depth: int):
     if (reply_metadata and action.get("type") == "mirror"
             and context.notebook.mirror_ready):
         reply_metadata["mirror_pending"] = True
-    from app.pai_c.fact_cards import validated_card
+    from app.pai_c.fact_cards import validated_card, presentation_card
     card = validated_card(action, context.fact_cards, turn.student_text) if context and decision and decision.question_allowed and not flagged else None
+    inline_card = presentation_card(decision, safety_flagged=flagged)
+    if inline_card:
+        reply_metadata = {**(reply_metadata or {}), "counselor_card": inline_card}
     assistant_event_id = await send_to_student(
         db, workspace_id, turn.channel, PAI_AGENT_NAME, reply, depth,
         metadata=reply_metadata, extra_payload={"fact_card": card} if card else None,

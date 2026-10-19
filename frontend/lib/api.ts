@@ -410,6 +410,9 @@ class WorkspaceApi {
   async getCounselorWorkspace(): Promise<import('./counselor-workspace').LivingPicture> {
     return this.request(`/v1/counselor/workspace?network=${this.requireWorkspace()}`);
   }
+  async exportCounselorData(): Promise<Record<string, unknown>> {
+    return this.request(`/v1/counselor/export?network=${this.requireWorkspace()}`);
+  }
   async deleteMyAccount(): Promise<void> {
     await this.request('/v1/account', {method:'DELETE'});
   }

@@ -24,34 +24,11 @@ from app.models import (CounselorNotedQuestion, CounselorTurnDecision, Counselor
 from scripts.eval.cost import load_prices, token_record
 
 ROOT = Path(__file__).resolve().parents[2]
-_PRIVATE_KEY = re.compile(r"email|password|secret|token|credential|authorization|api[_-]?key", re.I)
-_ENV_SECRET = re.compile(r"(?:^|_)(?:KEY|TOKEN|PASSWORD|SECRET|EMAIL)$", re.I)
-_EMAIL = re.compile(r"[\w.!#$%&'*+/=?^`{|}~-]+@[\w.-]+\.[a-zA-Z]{2,}")
-_CREDENTIAL = re.compile(
-    r"(?i)\b(?:password|secret|(?:access[_ -]?|refresh[_ -]?)?token|api[_ -]?key|authorization)"
-    r"\s*(?:[:=]|\bis\b)\s*(?:\"[^\"]*\"|'[^']*'|\S+)|\bBearer\s+\S+|"
-    r"\bsk-[\w-]+|\beyJ[\w-]+\.[\w-]+\.[\w-]+|"
-    r"[a-z][a-z0-9+.-]*://[^\s/@:]+:[^\s/@]+@|"
-    r"-----BEGIN [^-]*PRIVATE KEY-----[\s\S]*?-----END [^-]*PRIVATE KEY-----")
+from app.pai_c.redaction import redact, _ENV_SECRET
 _USAGE = re.compile(
     r"counselor_token_usage phase=(\S+) turn_id=(\S+) model=(\S+) "
     r"input=(\d+) cached_input=(\d+) output=(\d+) reasoning=(\d+)")
 
-
-def redact(value, secrets=()):
-    if isinstance(value, dict):
-        return {str(k): redact(v, secrets) for k, v in value.items()
-                if not _PRIVATE_KEY.search(str(k))}
-    if isinstance(value, (list, tuple)):
-        return [redact(v, secrets) for v in value]
-    if isinstance(value, (datetime, date)):
-        return value.isoformat()
-    if isinstance(value, str):
-        for secret in sorted(secrets, key=len, reverse=True):
-            if secret:
-                value = value.replace(secret, "[REDACTED]")
-        return _EMAIL.sub("[REDACTED]", _CREDENTIAL.sub("[REDACTED]", value))
-    return value
 
 
 def row_data(row):

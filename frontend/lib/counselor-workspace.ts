@@ -9,9 +9,12 @@ export type EvidenceItem = {
   worry?: string;
   concern?: string;
   capability_status?: string;
+  kind?: string;
   level?: string;
+  category?: string;
 };
 export type LivingPicture = {
+  sections?: Record<string, EvidenceItem[]>;
   coverage: Record<string, { covered: boolean; item_count: number }>;
   personal: {
     world: Record<string, EvidenceItem[]>;

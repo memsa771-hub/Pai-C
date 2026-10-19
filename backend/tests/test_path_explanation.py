@@ -51,3 +51,13 @@ async def test_path_workflow_queued_once_and_confirmation_does_not_search_places
         assert run.task_type=='path_explain'
         assert run.constraints['capability_input']['brief']['title']==row.title
         assert len(db.scalars(select(BackgroundJob).where(BackgroundJob.job_type=='operator.run')).all())==1
+
+
+def test_cached_path_hides_expired_world_facts_but_keeps_general_explanation():
+    from datetime import datetime, timedelta, timezone
+    from app.pai_c.paths.explain import current_path_result
+    old={'status':'verified','source_url':'https://example.test/career','checked_at':(datetime.now(timezone.utc)-timedelta(days=1000)).isoformat(),'value':'Old claim'}
+    current={**old,'checked_at':datetime.now(timezone.utc).isoformat(),'value':'Current claim'}
+    result,expired=current_path_result({'path':{'what_it_is':'A general description'},'facts':[old,current]})
+    assert expired and result['facts']==[current] and result['missing']
+    assert result['path']=={'what_it_is':'A general description'}

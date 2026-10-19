@@ -1,5 +1,6 @@
 'use client';
 
+import { ConversationCard, type InlineCard } from '@/components/counselor/workspace/inline-card';
 import { FactCard, type OfferedFact } from '@/components/counselor/workspace/fact-card';
 import { cn } from '@/lib/utils';
 import { Possibilities } from '@/components/counselor/possibilities';
@@ -274,7 +275,7 @@ export const ChatMessage = memo(function ChatMessage({ message, agents = [] }: C
               <span className="text-sm font-semibold text-foreground">{displayName}</span>
             </div>
             <div className="mt-0.5 rounded-2xl rounded-tr-sm bg-primary/10 px-3.5 py-2 text-left text-sm leading-relaxed">
-              <MarkdownContent content={message.content} agentNames={agentNames} agentLabels={agentLabels} />
+              <ConversationCard card={message.metadata?.counselor_card as InlineCard | undefined} channel={message.sessionId}><MarkdownContent content={message.content} agentNames={agentNames} agentLabels={agentLabels} /></ConversationCard>
               <Attachments items={attachments} />
             {!!message.metadata?.fact_card && <FactCard card={message.metadata.fact_card as OfferedFact}/>}
             </div>
@@ -307,7 +308,7 @@ export const ChatMessage = memo(function ChatMessage({ message, agents = [] }: C
             )}
           </div>
           <div className="mt-0.5 text-sm leading-relaxed">
-            <MarkdownContent content={message.content} agentNames={agentNames} agentLabels={agentLabels} />
+            <ConversationCard card={message.metadata?.counselor_card as InlineCard | undefined} channel={message.sessionId}><MarkdownContent content={message.content} agentNames={agentNames} agentLabels={agentLabels} /></ConversationCard>
             <Attachments items={attachments} />
             {!!message.metadata?.fact_card && <FactCard card={message.metadata.fact_card as OfferedFact}/>}
             {Array.isArray(message.metadata?.roadmaps) && <RoadmapComparison initial={message.metadata.roadmaps as unknown as Roadmap[]} />}
