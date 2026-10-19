@@ -6,6 +6,7 @@ A workspace is an ONM network with workspace-specific mods loaded.
 """
 
 import asyncio
+import json
 import logging
 import os
 import re
@@ -14,12 +15,16 @@ import uuid
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 
-from fastapi import FastAPI, Request
+from fastapi import Depends, FastAPI, Header, HTTPException, Request
+from sqlalchemy.orm import Session
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
 
+from app.application_workspace.access import _auth as _workspace_auth
 from app.config import config
+from app.database import get_db
+from app.os.api import mount_os
 from app.security.errors import IdentityUnavailable
 from app.api.response import ResponseCode, json_response
 from app.routers import account, app_version, application_workspace, auth, browser, counselor_summary, counselor_voice, deadlines, decision_records, escalations, events, feedback, fetch, files, integrations, knowledge, network, notifications, operator, roadmaps, routines, search, shares, student_profile, student_requests, tasks, timers, todos, workflows, workspaces
@@ -745,6 +750,41 @@ app.include_router(todos.router)
 app.include_router(workflows.router)
 app.include_router(timers.router)
 app.include_router(workspaces.router)
+
+
+# PAI OS (backend/app/os): mounted under /v1/os only when OS_ENABLED is set. The OS never imports
+# Counsellor code, so the signed-in student is passed in here: the student's workspace is their ref.
+def _os_student(db, network, x_workspace_token, authorization, *, write: bool) -> str:
+    workspace, error = _workspace_auth(db, network, x_workspace_token, authorization, write=write)
+    if error is not None:  # keep the host's status and message (e.g. 403 "Student account required")
+        try:
+            message = json.loads(error.body).get("message")
+        except (ValueError, AttributeError):
+            message = None
+        raise HTTPException(status_code=error.status_code or 401, detail=message)
+    return str(workspace.id)
+
+
+def _os_student_ref(
+    network: str,
+    x_workspace_token: str | None = Header(None),
+    authorization: str | None = Header(None),
+    db: Session = Depends(get_db),
+) -> str:
+    return _os_student(db, network, x_workspace_token, authorization, write=False)
+
+
+def _os_student_ref_for_write(
+    network: str,
+    x_workspace_token: str | None = Header(None),
+    authorization: str | None = Header(None),
+    db: Session = Depends(get_db),
+) -> str:
+    """Completing an inbox item changes the plan: the signed-in student account is required."""
+    return _os_student(db, network, x_workspace_token, authorization, write=True)
+
+
+mount_os(app, student_dependency=_os_student_ref, student_write_dependency=_os_student_ref_for_write)
 
 
 @app.get("/health")

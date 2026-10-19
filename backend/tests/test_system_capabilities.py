@@ -96,11 +96,17 @@ def test_task_runtime_enqueue_preserves_queue_idempotency_and_options():
             enqueue(db, "missing.job", {})
 
 
+def _counsellor_sources(app):
+    """Every app module except PAI OS (app/os), which has its own DBOS task runner and is
+    kept separate by Tach; these guards are about Counsellor background jobs."""
+    return (p for p in app.rglob("*.py") if p.relative_to(app).parts[0] != "os")
+
+
 def test_no_background_registrations_or_enqueue_outside_runtime():
     import ast
     from pathlib import Path
     app = Path(__file__).resolve().parents[1] / "app"
-    for path in app.rglob("*.py"):
+    for path in _counsellor_sources(app):
         tree = ast.parse(path.read_text(encoding="utf-8"))
         for node in ast.walk(tree):
             if not isinstance(node, ast.Call) or not isinstance(node.func, ast.Attribute):
@@ -117,7 +123,7 @@ def test_every_enqueued_job_type_has_system_contract():
     from pathlib import Path
     app = Path(__file__).resolve().parents[1] / "app"
     seen = set()
-    for path in app.rglob("*.py"):
+    for path in _counsellor_sources(app):
         if path.name == "task_runtime.py":
             continue
         tree = ast.parse(path.read_text(encoding="utf-8"))

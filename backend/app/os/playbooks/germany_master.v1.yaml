@@ -1,0 +1,251 @@
+# Germany master's route for Pakistani bachelor's graduates, winter semester intakes.
+# Source walkthrough: docs/os/spikes/spike5-germany-playbook.md (Spike 5 part 1). Citation `source` values
+# are that document's source IDs (S1-S18). Durations without an official figure are planning estimates
+# (constants with estimate: true) and the inbox labels them "estimated".
+key: germany_master
+version: 1
+route: {origin: PK, destination: DE, level: master}
+default_timezone: Europe/Berlin
+require_citations: true
+
+constants:
+  uni_assist_lead_days:
+    value: 56
+    estimate: true   # S6: "at least 8 weeks before the application deadline" (a recommendation)
+    citations:
+      - {source: S6, url: "https://www.uni-assist.de/en/faqs/apply-online/"}
+  hec_attestation_days:
+    value: 14
+    estimate: true   # no official processing time found on S8 (Spike 5 A1)
+    citations:
+      - {source: S8, url: "https://www.hec.gov.pk/english/services/students/das/Pages/Degree-Attestation.aspx"}
+  english_test_days:
+    value: 30
+    estimate: true   # booking plus results; the score itself is per programme
+    citations:
+      - {source: S13, url: "https://digital.diplo.de/studium"}
+  blocked_account_days:
+    value: 21
+    estimate: true   # includes the separate signature-attestation appointment (S9)
+    citations:
+      - {source: S9, url: "https://pakistan.diplo.de/pk-en/service/1995528-1995528"}
+  visa_processing_days:
+    value: 90
+    estimate: true   # planning buffer chosen by the developers; S11 gives no waiting time (Spike 5 C5)
+    citations:
+      - {source: S11, url: "https://pakistan.diplo.de/pk-en/service/2-study-visa-seite-1676104"}
+
+tasks:
+  # ---- Phase A: documents --------------------------------------------------------------------
+  - template_key: choose_programmes
+    task_type: student.choose
+    title: Confirm the programmes you will apply to
+    kind: student
+    inbox_kind: choose
+    duration_days: 3
+    citations:
+      - {source: S4, url: "https://www.uni-assist.de/en/faqs/plan-your-application/"}
+
+  - template_key: hec_attestation
+    task_type: student.provide
+    title: Get your degree and transcripts attested by HEC (online e-Attestation)
+    kind: student
+    inbox_kind: provide
+    duration_constant: hec_attestation_days
+    citations:
+      - {source: S1, url: "https://www.uni-assist.de/en/tools/info-country-by-country/details-country/country/pk/"}
+      - {source: S8, url: "https://www.hec.gov.pk/english/services/students/das/Pages/Degree-Attestation.aspx"}
+
+  - template_key: school_certificates
+    task_type: student.provide
+    title: Upload your SSC and HSSC certificates with subjects and grades
+    kind: student
+    inbox_kind: provide
+    duration_days: 2
+    citations:
+      - {source: S1, url: "https://www.uni-assist.de/en/tools/info-country-by-country/details-country/country/pk/"}
+
+  - template_key: min_passing_grade_letter
+    task_type: student.provide
+    title: Get a statement of your university's minimum passing grade for the degree
+    kind: student
+    inbox_kind: provide
+    duration_days: 7
+    citations:
+      - {source: S1, url: "https://www.uni-assist.de/en/tools/info-country-by-country/details-country/country/pk/"}
+
+  - template_key: grading_system_doc
+    task_type: student.provide
+    title: Upload your university's official grading system
+    kind: student
+    inbox_kind: provide
+    duration_days: 2
+    citations:
+      - {source: S2, url: "https://www.uni-assist.de/en/how-to-apply/plan-your-application/educational-certificates-translations/"}
+
+  - template_key: english_test
+    task_type: student.act
+    title: Take a recognised English test (score per programme)
+    kind: student
+    inbox_kind: act
+    duration_constant: english_test_days
+    citations:
+      - {source: S13, url: "https://digital.diplo.de/studium"}
+
+  - template_key: admission_test
+    task_type: student.act
+    title: Take the admission test this programme asks for (GRE / GATE / TestAS)
+    kind: student
+    inbox_kind: act
+    fan_out: programme
+    condition: {fact: admission_test, present: true}
+    duration_days: 30
+    citation_from_fact: admission_test
+
+  - template_key: application_documents
+    task_type: student.provide
+    title: Prepare this programme's application documents (CV, letters, module descriptions)
+    kind: student
+    inbox_kind: provide
+    fan_out: programme
+    depends_on: [{key: choose_programmes}]
+    duration_days: 7
+    citation_from_fact: required_documents
+
+  # ---- Phase B: application ------------------------------------------------------------------
+  - template_key: uni_assist_apply
+    task_type: student.act
+    title: Submit the uni-assist application and pay the handling fee
+    kind: student
+    inbox_kind: act
+    fan_out: programme
+    condition: {fact: application_route, in: [uni_assist, uni_assist_vpd]}
+    anchor: {fact: deadline_close}
+    lead_time: {constant: uni_assist_lead_days}
+    duration_days: 2
+    depends_on:
+      - {key: hec_attestation}
+      - {key: school_certificates}
+      - {key: min_passing_grade_letter}
+      - {key: grading_system_doc}
+      - {key: english_test}
+      - {key: admission_test}
+      - {key: application_documents}
+    citations:
+      - {source: S4, url: "https://www.uni-assist.de/en/faqs/plan-your-application/"}
+      - {source: S5, url: "https://www.uni-assist.de/en/how-to-apply/apply-online/pay-submit/"}
+      - {source: S6, url: "https://www.uni-assist.de/en/faqs/apply-online/"}
+
+  - template_key: direct_apply
+    task_type: student.act
+    title: Apply in the university's own portal
+    kind: student
+    inbox_kind: act
+    fan_out: programme
+    condition: {fact: application_route, in: [direct, uni_assist_vpd]}
+    anchor: {fact: deadline_close}
+    duration_days: 2
+    depends_on:
+      - {key: uni_assist_apply}
+      - {key: application_documents}
+      - {key: english_test}
+      - {key: hec_attestation}
+    citation_from_fact: portal_url
+
+  - template_key: applications_submitted
+    task_type: system.milestone
+    title: All applications submitted
+    kind: work
+    depends_on:
+      - {key: uni_assist_apply}
+      - {key: direct_apply}
+    duration_days: 0
+    citations:
+      - {source: S6, url: "https://www.uni-assist.de/en/faqs/apply-online/"}
+
+  - template_key: admission_result
+    task_type: student.choose
+    title: Tell us this programme's admission result
+    kind: student
+    inbox_kind: choose
+    fan_out: programme
+    depends_on: [{key: applications_submitted}]
+    duration_days: 1
+    citation_from_fact: decision_date
+
+  # ---- Phase C: visa (Islamabad or Karachi) --------------------------------------------------
+  - template_key: blocked_account
+    task_type: student.act
+    title: Open a blocked account (or arrange another proof of funds)
+    kind: student
+    inbox_kind: act
+    duration_constant: blocked_account_days
+    citations:
+      - {source: S9, url: "https://pakistan.diplo.de/pk-en/service/1995528-1995528"}
+
+  - template_key: travel_insurance
+    task_type: student.act
+    title: Buy travel health insurance from your travel date
+    kind: student
+    inbox_kind: act
+    duration_days: 2
+    citations:
+      - {source: S15, url: "https://pakistan.diplo.de/resource/blob/2208710/4a44b499964d27c04ecb6e5770fdb824/study-visa---leaflet-data.pdf"}
+
+  - template_key: visa_apply
+    task_type: student.act
+    title: Apply for the student visa on the Consular Services Portal
+    kind: student
+    inbox_kind: act
+    anchor: {fact: visa_target_date}
+    duration_constant: visa_processing_days
+    depends_on:
+      - {key: admission_result}
+      - {key: blocked_account}
+      - {key: travel_insurance}
+    citations:
+      - {source: S11, url: "https://pakistan.diplo.de/pk-en/service/2-study-visa-seite-1676104"}
+      - {source: S13, url: "https://digital.diplo.de/studium"}
+
+  # ---- Phase D: after arrival ----------------------------------------------------------------
+  - template_key: register_address
+    task_type: student.act
+    title: Register your address at the local registration office
+    kind: student
+    inbox_kind: act
+    depends_on: [{key: visa_apply}]
+    duration_days: 7
+    citations:
+      - {source: S17, url: "https://www.daad.de/en/studying-in-germany/living-in-germany/registering/"}
+
+  - template_key: health_insurance
+    task_type: student.act
+    title: Get health insurance that the university accepts for enrolment
+    kind: student
+    inbox_kind: act
+    depends_on: [{key: visa_apply}]
+    duration_days: 7
+    citations:
+      - {source: S18, url: "https://www.daad.de/deutschland/nach-deutschland/bewerbung/en/58221-health-insurance/"}
+
+  - template_key: enrol
+    task_type: student.act
+    title: Enrol at your university
+    kind: student
+    inbox_kind: act
+    depends_on:
+      - {key: register_address}
+      - {key: health_insurance}
+    duration_days: 3
+    citations:
+      - {source: S18, url: "https://www.daad.de/deutschland/nach-deutschland/bewerbung/en/58221-health-insurance/"}
+
+  - template_key: residence_permit
+    task_type: student.act
+    title: Apply for your residence permit before the visa expires
+    kind: student
+    inbox_kind: act
+    depends_on: [{key: enrol}]
+    duration_days: 14
+    citations:
+      - {source: S17, url: "https://www.daad.de/en/studying-in-germany/living-in-germany/registering/"}

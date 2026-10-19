@@ -46,6 +46,12 @@ export const TASKS_UI_ENABLED = process.env.NEXT_PUBLIC_ENABLE_TASKS === 'true';
 export const WORKFLOWS_UI_ENABLED = process.env.NEXT_PUBLIC_ENABLE_WORKFLOWS === 'true';
 
 /**
+ * PAI OS student inbox (backend/app/os). Off unless the build sets NEXT_PUBLIC_OS_ENABLED=true,
+ * matching the backend's OS_ENABLED switch.
+ */
+export const OS_UI_ENABLED = process.env.NEXT_PUBLIC_OS_ENABLED === 'true';
+
+/**
  * The sign-in page, on this origin.
  *
  * Deliberately a path, not an absolute URL: hosted web, localhost and any

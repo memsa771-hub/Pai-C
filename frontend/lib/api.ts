@@ -158,6 +158,12 @@ class WorkspaceApi {
   }
 
   private async request<T>(path: string, options: RequestInit = {}): Promise<T> {
+    const json: ApiResponse<T> = await this.requestJson<ApiResponse<T>>(path, options);
+    return json.data;
+  }
+
+  /** Like request(), but returns the body as-is (the PAI OS API has no {data} envelope). */
+  private async requestJson<T>(path: string, options: RequestInit = {}): Promise<T> {
     const authHeaders: Record<string, string> = {};
     if (this.token) {
       authHeaders['X-Workspace-Token'] = this.token;
@@ -186,8 +192,24 @@ class WorkspaceApi {
       throw new Error(`API ${res.status}: ${body}`);
     }
 
-    const json: ApiResponse<T> = await res.json();
-    return json.data;
+    return (await res.json()) as T;
+  }
+
+  // ---------------------------------------------------------------------------
+  // PAI OS student inbox (backend/app/os, mounted only when OS_ENABLED)
+  // ---------------------------------------------------------------------------
+
+  async getOsInbox(): Promise<import('./os-inbox').OsInboxItem[]> {
+    const params = new URLSearchParams({ network: this.requireWorkspace() });
+    const body = await this.requestJson<{ items: import('./os-inbox').OsInboxItem[] }>(`/v1/os/inbox?${params}`);
+    return body.items;
+  }
+
+  async completeOsInboxItem(id: number, payload: Record<string, unknown> = {}): Promise<{ completed: boolean }> {
+    const params = new URLSearchParams({ network: this.requireWorkspace() });
+    return this.requestJson(`/v1/os/inbox/${id}/complete?${params}`, {
+      method: 'POST', body: JSON.stringify({ payload }),
+    });
   }
 
   // ---------------------------------------------------------------------------
