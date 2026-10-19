@@ -54,4 +54,18 @@ module.exports = [
     if (await more.isVisible()) { await more.click(); await page.getByRole('dialog').waitFor(); }
   } },
   { id: 'journey', path: '/student?view=journey', ready: 'main h1', full: true },
+
+  { id: 'profile', path: '/student?view=profile', ready: 'main h1', full: true },
+  { id: 'profile-mirror-check', path: '/student?view=profile&mirror=1', ready: 'main h1', full: true, crawl: false },
+  { id: 'profile-private-shown', path: '/student?view=profile', ready: 'main h1', full: true, crawl: false, setup: async (page) => {
+    await page.getByRole('button', { name: 'Show private details' }).click();
+  } },
+  { id: 'profile-details', path: '/student?view=profile&tab=details', ready: 'main h1', full: true },
+  { id: 'profile-details-filtered', path: '/student?view=profile', ready: 'main h1', full: true, crawl: false, setup: async (page) => {
+    await page.getByRole('button', { name: /^Education & experience:/ }).click();
+    await page.getByText('Showing: Education & experience').waitFor();
+  } },
+  { id: 'profile-details-row-open', path: '/student?view=profile&tab=details', ready: 'main h1', full: true, crawl: false, setup: async (page) => {
+    await page.getByRole('button', { name: 'Show source and actions for Education' }).first().click();
+  } },
 ];

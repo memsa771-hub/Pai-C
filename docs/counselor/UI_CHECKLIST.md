@@ -11,7 +11,7 @@ and the link crawler (no dead buttons, no 404 links, no console errors, no page 
 | 1 | Auth: sign in, sign up, forgot, reset, email check | [x] | `auth-*` |
 | 2 | Onboarding (4 tap steps) | [x] | `onboarding-*` |
 | 3 | App shell (sidebar, bottom tabs, top bar) | [x] | `shell-*` |
-| 4 | Profile: Visual and Details | [ ] | `profile-*` |
+| 4 | Profile: Visual and Details | [x] | `profile-*` |
 | 5 | Counselor chat and inline cards | [ ] | `chat-*` |
 | 6 | Journey A-K | [x] | `journey-*` |
 | 7 | Paths | [ ] | `paths-*` |

@@ -31,8 +31,8 @@ export function SectionCard({ title, description, icon: Icon, tone = 'blue', act
       {...props}
     >
       {(title || action) && (
-        <div className="mb-4 flex items-start justify-between gap-3">
-          <div className="flex min-w-0 items-center gap-3">
+        <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+          <div className="flex min-w-[min(100%,14rem)] flex-1 items-center gap-3">
             {Icon && (
               <span aria-hidden className={cn('flex size-9 shrink-0 items-center justify-center rounded-xl',
                 variant === 'tinted' ? 'bg-card/70' : toneClass[tone].soft, toneClass[tone].ink)}>
@@ -44,7 +44,7 @@ export function SectionCard({ title, description, icon: Icon, tone = 'blue', act
               {description && <p className="mt-0.5 text-sm text-muted-foreground">{description}</p>}
             </div>
           </div>
-          {action}
+          {action && <div className="flex shrink-0 flex-wrap items-center gap-2">{action}</div>}
         </div>
       )}
       <div className={bodyClassName}>{children}</div>

@@ -417,6 +417,8 @@
     "strong": "Strong fit",
     "partial": "Partial fit",
     "weak": "Needs review",
-    "unknown": "Not known yet"
+    "unknown": "Not known yet",
+    "english": "English",
+    "roman urdu": "Roman Urdu"
   }
 }

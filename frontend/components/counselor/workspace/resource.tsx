@@ -2,6 +2,8 @@
 import { useCallback, useEffect, useState } from "react";
 import type { LucideIcon } from "lucide-react";
 import copy from "./copy.json";
+import { formatDate } from "@/lib/i18n/format";
+import { DEFAULT_LOCALE } from "@/lib/i18n/locales";
 import { EmptyState, ErrorState, PageHeader, Skeletons, type Tone } from "@/components/pai";
 export { evidenceText as human, evidenceLabel } from "@/lib/evidence-text";
 
@@ -75,4 +77,9 @@ export function Heading({
   tone?: Tone;
 }) {
   return <PageHeader title={title} description={description} action={action} icon={icon} tone={tone} />;
+}
+/** "12 Oct 2026" in the app locale; empty for a missing or invalid date. */
+export function shortDate(value: string | null | undefined) {
+  return formatDate(value, DEFAULT_LOCALE, { day: "numeric", month: "short", year: "numeric",
+    ...(value?.length === 10 ? { timeZone: "UTC" } : {}) });
 }

@@ -1,513 +1,1697 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
-exports[`keeps evidence and certainty accessible in dark 1`] = `
+exports[`labels evidence in words, not colour alone, in dark 1`] = `
 <div>
   <div
     class="dark"
   >
-    <div
-      class="flex flex-wrap items-center gap-6"
-    >
-      <svg
-        aria-label="What PAI knows so far"
-        class="size-40 shrink-0"
-        role="img"
-        viewBox="0 0 160 160"
+    <div>
+      <ul
+        aria-label="What PAI understands so far"
+        class="grid grid-cols-2 gap-2 sm:grid-cols-5 sm:gap-3"
       >
-        <path
-          class="text-primary"
-          d="M 80 20 A 60 60 0 0 1 112.67834210090163 29.679765923274566"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="18"
+        <li
+          class="min-w-0"
         >
-          <title>
-            Current life
-          </title>
-        </path>
-        <path
-          class="text-primary"
-          d="M 115.26711513754839 31.45898033750315 A 60 60 0 0 1 136.0148255898321 58.497923027281985"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="18"
+          <button
+            aria-label="Current life: Confirmed, 2 pieces of evidence. Show details for Current life"
+            aria-pressed="false"
+            class="group flex h-full min-h-[92px] w-full flex-col justify-between gap-2 rounded-2xl p-3 text-left transition-[transform,box-shadow] duration-200 hover:-translate-y-0.5 hover:shadow-card focus-visible:-translate-y-0.5 bg-evidence-3 text-evidence-3-ink"
+            type="button"
+          >
+            <span
+              class="flex items-center justify-between gap-2"
+            >
+              <svg
+                aria-hidden="true"
+                class="lucide lucide-house size-5 shrink-0"
+                fill="none"
+                height="24"
+                stroke="currentColor"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                viewBox="0 0 24 24"
+                width="24"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8"
+                />
+                <path
+                  d="M3 10a2 2 0 0 1 .709-1.528l7-5.999a2 2 0 0 1 2.582 0l7 5.999A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"
+                />
+              </svg>
+              <span
+                aria-hidden="true"
+                class="flex gap-1"
+              >
+                <span
+                  class="size-1.5 rounded-full bg-current opacity-100"
+                />
+                <span
+                  class="size-1.5 rounded-full bg-current opacity-100"
+                />
+                <span
+                  class="size-1.5 rounded-full bg-current opacity-25"
+                />
+              </span>
+            </span>
+            <span
+              class="text-sm font-semibold leading-tight"
+            >
+              Current life
+            </span>
+          </button>
+        </li>
+        <li
+          class="min-w-0"
         >
-          <title>
-            Education & experience
-          </title>
-        </path>
-        <path
-          class="text-primary"
-          d="M 137.06339097770922 61.45898033750316 A 60 60 0 0 1 137.9555495773441 95.52914270615125"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="18"
+          <button
+            aria-label="Education & experience: Shown, 3 pieces of evidence. Show details for Education & experience"
+            aria-pressed="false"
+            class="group flex h-full min-h-[92px] w-full flex-col justify-between gap-2 rounded-2xl p-3 text-left transition-[transform,box-shadow] duration-200 hover:-translate-y-0.5 hover:shadow-card focus-visible:-translate-y-0.5 bg-evidence-2 text-evidence-2-ink"
+            type="button"
+          >
+            <span
+              class="flex items-center justify-between gap-2"
+            >
+              <svg
+                aria-hidden="true"
+                class="lucide lucide-graduation-cap size-5 shrink-0"
+                fill="none"
+                height="24"
+                stroke="currentColor"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                viewBox="0 0 24 24"
+                width="24"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  d="M21.42 10.922a1 1 0 0 0-.019-1.838L12.83 5.18a2 2 0 0 0-1.66 0L2.6 9.08a1 1 0 0 0 0 1.832l8.57 3.908a2 2 0 0 0 1.66 0z"
+                />
+                <path
+                  d="M22 10v6"
+                />
+                <path
+                  d="M6 12.5V16a6 3 0 0 0 12 0v-3.5"
+                />
+              </svg>
+              <span
+                aria-hidden="true"
+                class="flex gap-1"
+              >
+                <span
+                  class="size-1.5 rounded-full bg-current opacity-100"
+                />
+                <span
+                  class="size-1.5 rounded-full bg-current opacity-100"
+                />
+                <span
+                  class="size-1.5 rounded-full bg-current opacity-100"
+                />
+              </span>
+            </span>
+            <span
+              class="text-sm font-semibold leading-tight"
+            >
+              Education & experience
+            </span>
+          </button>
+        </li>
+        <li
+          class="min-w-0"
         >
-          <title>
-            Interests
-          </title>
-        </path>
-        <path
-          class="text-primary"
-          d="M 137.06339097770922 98.54101966249684 A 60 60 0 0 1 117.75922346299025 126.62875768741824"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="18"
+          <button
+            aria-label="Interests: Stated, 2 pieces of evidence. Show details for Interests"
+            aria-pressed="false"
+            class="group flex h-full min-h-[92px] w-full flex-col justify-between gap-2 rounded-2xl p-3 text-left transition-[transform,box-shadow] duration-200 hover:-translate-y-0.5 hover:shadow-card focus-visible:-translate-y-0.5 bg-evidence-1 text-evidence-1-ink"
+            type="button"
+          >
+            <span
+              class="flex items-center justify-between gap-2"
+            >
+              <svg
+                aria-hidden="true"
+                class="lucide lucide-heart size-5 shrink-0"
+                fill="none"
+                height="24"
+                stroke="currentColor"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                viewBox="0 0 24 24"
+                width="24"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  d="M2 9.5a5.5 5.5 0 0 1 9.591-3.676.56.56 0 0 0 .818 0A5.49 5.49 0 0 1 22 9.5c0 2.29-1.5 4-3 5.5l-5.492 5.313a2 2 0 0 1-3 .019L5 15c-1.5-1.5-3-3.2-3-5.5"
+                />
+              </svg>
+              <span
+                aria-hidden="true"
+                class="flex gap-1"
+              >
+                <span
+                  class="size-1.5 rounded-full bg-current opacity-100"
+                />
+                <span
+                  class="size-1.5 rounded-full bg-current opacity-100"
+                />
+                <span
+                  class="size-1.5 rounded-full bg-current opacity-25"
+                />
+              </span>
+            </span>
+            <span
+              class="text-sm font-semibold leading-tight"
+            >
+              Interests
+            </span>
+          </button>
+        </li>
+        <li
+          class="min-w-0"
         >
-          <title>
-            Strengths
-          </title>
-        </path>
-        <path
-          class="text-primary"
-          d="M 115.26711513754839 128.54101966249686 A 60 60 0 0 1 83.14015737457663 139.91777208527444"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="18"
+          <button
+            aria-label="Strengths: Shown, 2 pieces of evidence. Show details for Strengths"
+            aria-pressed="false"
+            class="group flex h-full min-h-[92px] w-full flex-col justify-between gap-2 rounded-2xl p-3 text-left transition-[transform,box-shadow] duration-200 hover:-translate-y-0.5 hover:shadow-card focus-visible:-translate-y-0.5 bg-evidence-2 text-evidence-2-ink"
+            type="button"
+          >
+            <span
+              class="flex items-center justify-between gap-2"
+            >
+              <svg
+                aria-hidden="true"
+                class="lucide lucide-lightbulb size-5 shrink-0"
+                fill="none"
+                height="24"
+                stroke="currentColor"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                viewBox="0 0 24 24"
+                width="24"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5"
+                />
+                <path
+                  d="M9 18h6"
+                />
+                <path
+                  d="M10 22h4"
+                />
+              </svg>
+              <span
+                aria-hidden="true"
+                class="flex gap-1"
+              >
+                <span
+                  class="size-1.5 rounded-full bg-current opacity-100"
+                />
+                <span
+                  class="size-1.5 rounded-full bg-current opacity-100"
+                />
+                <span
+                  class="size-1.5 rounded-full bg-current opacity-25"
+                />
+              </span>
+            </span>
+            <span
+              class="text-sm font-semibold leading-tight"
+            >
+              Strengths
+            </span>
+          </button>
+        </li>
+        <li
+          class="min-w-0"
         >
-          <title>
-            Family
-          </title>
-        </path>
-        <path
-          class="text-primary"
-          d="M 80 140 A 60 60 0 0 1 47.321657899098376 130.32023407672546"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="18"
+          <button
+            aria-label="Family: Stated, 2 pieces of evidence. Show details for Family"
+            aria-pressed="false"
+            class="group flex h-full min-h-[92px] w-full flex-col justify-between gap-2 rounded-2xl p-3 text-left transition-[transform,box-shadow] duration-200 hover:-translate-y-0.5 hover:shadow-card focus-visible:-translate-y-0.5 bg-evidence-1 text-evidence-1-ink"
+            type="button"
+          >
+            <span
+              class="flex items-center justify-between gap-2"
+            >
+              <svg
+                aria-hidden="true"
+                class="lucide lucide-users size-5 shrink-0"
+                fill="none"
+                height="24"
+                stroke="currentColor"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                viewBox="0 0 24 24"
+                width="24"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"
+                />
+                <path
+                  d="M16 3.128a4 4 0 0 1 0 7.744"
+                />
+                <path
+                  d="M22 21v-2a4 4 0 0 0-3-3.87"
+                />
+                <circle
+                  cx="9"
+                  cy="7"
+                  r="4"
+                />
+              </svg>
+              <span
+                aria-hidden="true"
+                class="flex gap-1"
+              >
+                <span
+                  class="size-1.5 rounded-full bg-current opacity-100"
+                />
+                <span
+                  class="size-1.5 rounded-full bg-current opacity-100"
+                />
+                <span
+                  class="size-1.5 rounded-full bg-current opacity-25"
+                />
+              </span>
+            </span>
+            <span
+              class="text-sm font-semibold leading-tight"
+            >
+              Family
+            </span>
+          </button>
+        </li>
+        <li
+          class="min-w-0"
         >
-          <title>
-            Values
-          </title>
-        </path>
-        <path
-          class="text-primary"
-          d="M 44.73288486245162 128.54101966249686 A 60 60 0 0 1 23.985174410167893 101.50207697271802"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="18"
+          <button
+            aria-label="Values: Stated, 1 piece of evidence. Show details for Values"
+            aria-pressed="false"
+            class="group flex h-full min-h-[92px] w-full flex-col justify-between gap-2 rounded-2xl p-3 text-left transition-[transform,box-shadow] duration-200 hover:-translate-y-0.5 hover:shadow-card focus-visible:-translate-y-0.5 bg-evidence-1 text-evidence-1-ink"
+            type="button"
+          >
+            <span
+              class="flex items-center justify-between gap-2"
+            >
+              <svg
+                aria-hidden="true"
+                class="lucide lucide-gem size-5 shrink-0"
+                fill="none"
+                height="24"
+                stroke="currentColor"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                viewBox="0 0 24 24"
+                width="24"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  d="M10.5 3 8 9l4 13 4-13-2.5-6"
+                />
+                <path
+                  d="M17 3a2 2 0 0 1 1.6.8l3 4a2 2 0 0 1 .013 2.382l-7.99 10.986a2 2 0 0 1-3.247 0l-7.99-10.986A2 2 0 0 1 2.4 7.8l2.998-3.997A2 2 0 0 1 7 3z"
+                />
+                <path
+                  d="M2 9h20"
+                />
+              </svg>
+              <span
+                aria-hidden="true"
+                class="flex gap-1"
+              >
+                <span
+                  class="size-1.5 rounded-full bg-current opacity-100"
+                />
+                <span
+                  class="size-1.5 rounded-full bg-current opacity-25"
+                />
+                <span
+                  class="size-1.5 rounded-full bg-current opacity-25"
+                />
+              </span>
+            </span>
+            <span
+              class="text-sm font-semibold leading-tight"
+            >
+              Values
+            </span>
+          </button>
+        </li>
+        <li
+          class="min-w-0"
         >
-          <title>
-            Pressures & limits
-          </title>
-        </path>
-        <path
-          class="text-muted"
-          d="M 22.93660902229079 98.54101966249685 A 60 60 0 0 1 22.044450422655892 64.47085729384878"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="18"
+          <button
+            aria-label="Pressures & limits: Stated, 1 piece of evidence. Show details for Pressures & limits"
+            aria-pressed="false"
+            class="group flex h-full min-h-[92px] w-full flex-col justify-between gap-2 rounded-2xl p-3 text-left transition-[transform,box-shadow] duration-200 hover:-translate-y-0.5 hover:shadow-card focus-visible:-translate-y-0.5 bg-evidence-1 text-evidence-1-ink"
+            type="button"
+          >
+            <span
+              class="flex items-center justify-between gap-2"
+            >
+              <svg
+                aria-hidden="true"
+                class="lucide lucide-scale size-5 shrink-0"
+                fill="none"
+                height="24"
+                stroke="currentColor"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                viewBox="0 0 24 24"
+                width="24"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  d="m16 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z"
+                />
+                <path
+                  d="m2 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z"
+                />
+                <path
+                  d="M7 21h10"
+                />
+                <path
+                  d="M12 3v18"
+                />
+                <path
+                  d="M3 7h2c2 0 5-1 7-2 2 1 5 2 7 2h2"
+                />
+              </svg>
+              <span
+                aria-hidden="true"
+                class="flex gap-1"
+              >
+                <span
+                  class="size-1.5 rounded-full bg-current opacity-100"
+                />
+                <span
+                  class="size-1.5 rounded-full bg-current opacity-25"
+                />
+                <span
+                  class="size-1.5 rounded-full bg-current opacity-25"
+                />
+              </span>
+            </span>
+            <span
+              class="text-sm font-semibold leading-tight"
+            >
+              Pressures & limits
+            </span>
+          </button>
+        </li>
+        <li
+          class="min-w-0"
         >
-          <title>
-            Certainty
-          </title>
-        </path>
-        <path
-          class="text-muted"
-          d="M 22.93660902229079 61.458980337503135 A 60 60 0 0 1 42.24077653700978 33.371242312581735"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="18"
+          <button
+            aria-label="Certainty: Not yet, 0 pieces of evidence. Show details for Certainty"
+            aria-pressed="false"
+            class="group flex h-full min-h-[92px] w-full flex-col justify-between gap-2 rounded-2xl p-3 text-left transition-[transform,box-shadow] duration-200 hover:-translate-y-0.5 hover:shadow-card focus-visible:-translate-y-0.5 bg-evidence-0 text-evidence-0-ink"
+            type="button"
+          >
+            <span
+              class="flex items-center justify-between gap-2"
+            >
+              <svg
+                aria-hidden="true"
+                class="lucide lucide-gauge size-5 shrink-0"
+                fill="none"
+                height="24"
+                stroke="currentColor"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                viewBox="0 0 24 24"
+                width="24"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  d="m12 14 4-4"
+                />
+                <path
+                  d="M3.34 19a10 10 0 1 1 17.32 0"
+                />
+              </svg>
+              <span
+                aria-hidden="true"
+                class="flex gap-1"
+              >
+                <span
+                  class="size-1.5 rounded-full bg-current opacity-25"
+                />
+                <span
+                  class="size-1.5 rounded-full bg-current opacity-25"
+                />
+                <span
+                  class="size-1.5 rounded-full bg-current opacity-25"
+                />
+              </span>
+            </span>
+            <span
+              class="text-sm font-semibold leading-tight"
+            >
+              Certainty
+            </span>
+          </button>
+        </li>
+        <li
+          class="min-w-0"
         >
-          <title>
-            Goals & whose wish
-          </title>
-        </path>
-        <path
-          class="text-muted"
-          d="M 44.732884862451606 31.458980337503156 A 60 60 0 0 1 76.85984262542334 20.08222791472557"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="18"
+          <button
+            aria-label="Goals & whose wish: Not yet, 0 pieces of evidence. Show details for Goals & whose wish"
+            aria-pressed="false"
+            class="group flex h-full min-h-[92px] w-full flex-col justify-between gap-2 rounded-2xl p-3 text-left transition-[transform,box-shadow] duration-200 hover:-translate-y-0.5 hover:shadow-card focus-visible:-translate-y-0.5 bg-evidence-0 text-evidence-0-ink"
+            type="button"
+          >
+            <span
+              class="flex items-center justify-between gap-2"
+            >
+              <svg
+                aria-hidden="true"
+                class="lucide lucide-target size-5 shrink-0"
+                fill="none"
+                height="24"
+                stroke="currentColor"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                viewBox="0 0 24 24"
+                width="24"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <circle
+                  cx="12"
+                  cy="12"
+                  r="10"
+                />
+                <circle
+                  cx="12"
+                  cy="12"
+                  r="6"
+                />
+                <circle
+                  cx="12"
+                  cy="12"
+                  r="2"
+                />
+              </svg>
+              <span
+                aria-hidden="true"
+                class="flex gap-1"
+              >
+                <span
+                  class="size-1.5 rounded-full bg-current opacity-25"
+                />
+                <span
+                  class="size-1.5 rounded-full bg-current opacity-25"
+                />
+                <span
+                  class="size-1.5 rounded-full bg-current opacity-25"
+                />
+              </span>
+            </span>
+            <span
+              class="text-sm font-semibold leading-tight"
+            >
+              Goals & whose wish
+            </span>
+          </button>
+        </li>
+        <li
+          class="min-w-0"
         >
-          <title>
-            Options & myths
-          </title>
-        </path>
-        <circle
-          class="text-primary/20"
-          cx="80"
-          cy="80"
-          fill="none"
-          r="25"
-          stroke="currentColor"
-        />
-      </svg>
+          <button
+            aria-label="Options & myths: Not yet, 0 pieces of evidence. Show details for Options & myths"
+            aria-pressed="false"
+            class="group flex h-full min-h-[92px] w-full flex-col justify-between gap-2 rounded-2xl p-3 text-left transition-[transform,box-shadow] duration-200 hover:-translate-y-0.5 hover:shadow-card focus-visible:-translate-y-0.5 bg-evidence-0 text-evidence-0-ink"
+            type="button"
+          >
+            <span
+              class="flex items-center justify-between gap-2"
+            >
+              <svg
+                aria-hidden="true"
+                class="lucide lucide-signpost size-5 shrink-0"
+                fill="none"
+                height="24"
+                stroke="currentColor"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                viewBox="0 0 24 24"
+                width="24"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  d="M12 13v8"
+                />
+                <path
+                  d="M12 3v3"
+                />
+                <path
+                  d="M18 6a2 2 0 0 1 1.387.56l2.307 2.22a1 1 0 0 1 0 1.44l-2.307 2.22A2 2 0 0 1 18 13H6a2 2 0 0 1-1.387-.56l-2.306-2.22a1 1 0 0 1 0-1.44l2.306-2.22A2 2 0 0 1 6 6z"
+                />
+              </svg>
+              <span
+                aria-hidden="true"
+                class="flex gap-1"
+              >
+                <span
+                  class="size-1.5 rounded-full bg-current opacity-25"
+                />
+                <span
+                  class="size-1.5 rounded-full bg-current opacity-25"
+                />
+                <span
+                  class="size-1.5 rounded-full bg-current opacity-25"
+                />
+              </span>
+            </span>
+            <span
+              class="text-sm font-semibold leading-tight"
+            >
+              Options & myths
+            </span>
+          </button>
+        </li>
+      </ul>
       <div
-        class="grid grid-cols-2 gap-x-6 gap-y-2"
+        aria-hidden="true"
+        class="mt-4 flex flex-wrap items-center gap-2"
       >
-        <div
-          class="flex items-center gap-2 text-xs"
+        <span
+          class="inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold bg-evidence-0 text-evidence-0-ink"
+          title="Nothing shared yet"
         >
-          <span
-            class="size-2 rounded-full bg-primary"
-          />
-          Current life
-        </div>
-        <div
-          class="flex items-center gap-2 text-xs"
+          <svg
+            aria-hidden="true"
+            class="lucide lucide-circle size-3.5"
+            fill="none"
+            height="24"
+            stroke="currentColor"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            viewBox="0 0 24 24"
+            width="24"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <circle
+              cx="12"
+              cy="12"
+              r="10"
+            />
+          </svg>
+          Not yet
+        </span>
+        <span
+          class="inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold bg-evidence-1 text-evidence-1-ink"
+          title="You said it"
         >
-          <span
-            class="size-2 rounded-full bg-primary"
-          />
-          Education & experience
-        </div>
-        <div
-          class="flex items-center gap-2 text-xs"
+          <svg
+            aria-hidden="true"
+            class="lucide lucide-message-circle size-3.5"
+            fill="none"
+            height="24"
+            stroke="currentColor"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            viewBox="0 0 24 24"
+            width="24"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <path
+              d="M2.992 16.342a2 2 0 0 1 .094 1.167l-1.065 3.29a1 1 0 0 0 1.236 1.168l3.413-.998a2 2 0 0 1 1.099.092 10 10 0 1 0-4.777-4.719"
+            />
+          </svg>
+          Stated
+        </span>
+        <span
+          class="inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold bg-evidence-2 text-evidence-2-ink"
+          title="You showed it, for example with a document or something you did"
         >
-          <span
-            class="size-2 rounded-full bg-primary"
-          />
-          Interests
-        </div>
-        <div
-          class="flex items-center gap-2 text-xs"
+          <svg
+            aria-hidden="true"
+            class="lucide lucide-eye size-3.5"
+            fill="none"
+            height="24"
+            stroke="currentColor"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            viewBox="0 0 24 24"
+            width="24"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <path
+              d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"
+            />
+            <circle
+              cx="12"
+              cy="12"
+              r="3"
+            />
+          </svg>
+          Shown
+        </span>
+        <span
+          class="inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold bg-evidence-3 text-evidence-3-ink"
+          title="You confirmed it"
         >
-          <span
-            class="size-2 rounded-full bg-primary"
-          />
-          Strengths
-        </div>
-        <div
-          class="flex items-center gap-2 text-xs"
-        >
-          <span
-            class="size-2 rounded-full bg-primary"
-          />
-          Family
-        </div>
-        <div
-          class="flex items-center gap-2 text-xs"
-        >
-          <span
-            class="size-2 rounded-full bg-primary"
-          />
-          Values
-        </div>
-        <div
-          class="flex items-center gap-2 text-xs"
-        >
-          <span
-            class="size-2 rounded-full bg-primary"
-          />
-          Pressures & limits
-        </div>
-        <div
-          class="flex items-center gap-2 text-xs"
-        >
-          <span
-            class="size-2 rounded-full bg-muted"
-          />
-          Certainty
-        </div>
-        <div
-          class="flex items-center gap-2 text-xs"
-        >
-          <span
-            class="size-2 rounded-full bg-muted"
-          />
-          Goals & whose wish
-        </div>
-        <div
-          class="flex items-center gap-2 text-xs"
-        >
-          <span
-            class="size-2 rounded-full bg-muted"
-          />
-          Options & myths
-        </div>
+          <svg
+            aria-hidden="true"
+            class="lucide lucide-badge-check size-3.5"
+            fill="none"
+            height="24"
+            stroke="currentColor"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            viewBox="0 0 24 24"
+            width="24"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <path
+              d="M3.85 8.62a4 4 0 0 1 4.78-4.77 4 4 0 0 1 6.74 0 4 4 0 0 1 4.78 4.78 4 4 0 0 1 0 6.74 4 4 0 0 1-4.77 4.78 4 4 0 0 1-6.75 0 4 4 0 0 1-4.78-4.77 4 4 0 0 1 0-6.76Z"
+            />
+            <path
+              d="m9 12 2 2 4-4"
+            />
+          </svg>
+          Confirmed
+        </span>
       </div>
+      <p
+        class="mt-2 text-xs text-muted-foreground"
+      >
+        Colour shows how strong the evidence is. Dots show how much there is. This is never a score.
+      </p>
     </div>
-    <svg
-      aria-label="Your certainty over time: 3, 6"
-      class="h-28 w-full"
-      role="img"
-      viewBox="0 0 300 110"
-    >
-      <path
-        class="text-muted"
-        d="M10 10 V95 H290"
-        fill="none"
-        stroke="currentColor"
-      />
-      <polyline
-        class="text-primary"
-        fill="none"
-        points="10,71 290,47"
-        stroke="currentColor"
-        stroke-width="3"
-      />
-      <circle
-        class="text-primary"
-        cx="10"
-        cy="71"
-        fill="currentColor"
-        r="4"
-      />
-      <circle
-        class="text-primary"
-        cx="290"
-        cy="47"
-        fill="currentColor"
-        r="4"
-      />
-    </svg>
+    <div>
+      <p
+        class="flex items-baseline gap-1.5"
+      >
+        <span
+          class="text-4xl font-bold tracking-tight text-brand-ink"
+        >
+          6
+        </span>
+        <span
+          class="text-sm text-muted-foreground"
+        >
+          / 10 · 
+          After Mirror 1
+        </span>
+      </p>
+      <svg
+        aria-label="Your certainty over time. Before Mirror 1: 3 of 10. After Mirror 1: 6 of 10"
+        class="mt-2 h-40 w-full overflow-visible"
+        role="img"
+        viewBox="0 0 320 150"
+      >
+        <defs>
+          <lineargradient
+            id="_r_8_"
+            x1="0"
+            x2="0"
+            y1="0"
+            y2="1"
+          >
+            <stop
+              offset="0%"
+              stop-color="var(--brand)"
+              stop-opacity="0.28"
+            />
+            <stop
+              offset="100%"
+              stop-color="var(--brand)"
+              stop-opacity="0"
+            />
+          </lineargradient>
+        </defs>
+        <g>
+          <line
+            stroke="var(--border)"
+            x1="26"
+            x2="308"
+            y1="132"
+            y2="132"
+          />
+          <text
+            fill="var(--muted-foreground)"
+            font-size="10"
+            text-anchor="end"
+            x="18"
+            y="136"
+          >
+            0
+          </text>
+        </g>
+        <g>
+          <line
+            stroke="var(--border)"
+            stroke-dasharray="4 4"
+            x1="26"
+            x2="308"
+            y1="73"
+            y2="73"
+          />
+          <text
+            fill="var(--muted-foreground)"
+            font-size="10"
+            text-anchor="end"
+            x="18"
+            y="77"
+          >
+            5
+          </text>
+        </g>
+        <g>
+          <line
+            stroke="var(--border)"
+            stroke-dasharray="4 4"
+            x1="26"
+            x2="308"
+            y1="14"
+            y2="14"
+          />
+          <text
+            fill="var(--muted-foreground)"
+            font-size="10"
+            text-anchor="end"
+            x="18"
+            y="18"
+          >
+            10
+          </text>
+        </g>
+        <path
+          d="M26 96.6 L308 61.2 L308 132 L26 132 Z"
+          fill="url(#_r_8_)"
+        />
+        <path
+          d="M26 96.6 L308 61.2"
+          fill="none"
+          stroke="var(--brand)"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          stroke-width="3"
+        />
+        <g>
+          <circle
+            cx="26"
+            cy="96.6"
+            fill="var(--card)"
+            r="6"
+            stroke="var(--brand)"
+            stroke-width="3"
+          >
+            <title>
+              Before Mirror 1: 3 of 10
+            </title>
+          </circle>
+        </g>
+        <g>
+          <circle
+            cx="308"
+            cy="61.2"
+            fill="var(--card)"
+            r="6"
+            stroke="var(--brand)"
+            stroke-width="3"
+          >
+            <title>
+              After Mirror 1: 6 of 10
+            </title>
+          </circle>
+        </g>
+      </svg>
+      <p
+        class="sr-only"
+      >
+        How sure, 0 to 10
+      </p>
+    </div>
   </div>
 </div>
 `;
 
-exports[`keeps evidence and certainty accessible in light 1`] = `
+exports[`labels evidence in words, not colour alone, in light 1`] = `
 <div>
   <div
     class="light"
   >
-    <div
-      class="flex flex-wrap items-center gap-6"
-    >
-      <svg
-        aria-label="What PAI knows so far"
-        class="size-40 shrink-0"
-        role="img"
-        viewBox="0 0 160 160"
+    <div>
+      <ul
+        aria-label="What PAI understands so far"
+        class="grid grid-cols-2 gap-2 sm:grid-cols-5 sm:gap-3"
       >
-        <path
-          class="text-primary"
-          d="M 80 20 A 60 60 0 0 1 112.67834210090163 29.679765923274566"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="18"
+        <li
+          class="min-w-0"
         >
-          <title>
-            Current life
-          </title>
-        </path>
-        <path
-          class="text-primary"
-          d="M 115.26711513754839 31.45898033750315 A 60 60 0 0 1 136.0148255898321 58.497923027281985"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="18"
+          <button
+            aria-label="Current life: Confirmed, 2 pieces of evidence. Show details for Current life"
+            aria-pressed="false"
+            class="group flex h-full min-h-[92px] w-full flex-col justify-between gap-2 rounded-2xl p-3 text-left transition-[transform,box-shadow] duration-200 hover:-translate-y-0.5 hover:shadow-card focus-visible:-translate-y-0.5 bg-evidence-3 text-evidence-3-ink"
+            type="button"
+          >
+            <span
+              class="flex items-center justify-between gap-2"
+            >
+              <svg
+                aria-hidden="true"
+                class="lucide lucide-house size-5 shrink-0"
+                fill="none"
+                height="24"
+                stroke="currentColor"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                viewBox="0 0 24 24"
+                width="24"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8"
+                />
+                <path
+                  d="M3 10a2 2 0 0 1 .709-1.528l7-5.999a2 2 0 0 1 2.582 0l7 5.999A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"
+                />
+              </svg>
+              <span
+                aria-hidden="true"
+                class="flex gap-1"
+              >
+                <span
+                  class="size-1.5 rounded-full bg-current opacity-100"
+                />
+                <span
+                  class="size-1.5 rounded-full bg-current opacity-100"
+                />
+                <span
+                  class="size-1.5 rounded-full bg-current opacity-25"
+                />
+              </span>
+            </span>
+            <span
+              class="text-sm font-semibold leading-tight"
+            >
+              Current life
+            </span>
+          </button>
+        </li>
+        <li
+          class="min-w-0"
         >
-          <title>
-            Education & experience
-          </title>
-        </path>
-        <path
-          class="text-primary"
-          d="M 137.06339097770922 61.45898033750316 A 60 60 0 0 1 137.9555495773441 95.52914270615125"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="18"
+          <button
+            aria-label="Education & experience: Shown, 3 pieces of evidence. Show details for Education & experience"
+            aria-pressed="false"
+            class="group flex h-full min-h-[92px] w-full flex-col justify-between gap-2 rounded-2xl p-3 text-left transition-[transform,box-shadow] duration-200 hover:-translate-y-0.5 hover:shadow-card focus-visible:-translate-y-0.5 bg-evidence-2 text-evidence-2-ink"
+            type="button"
+          >
+            <span
+              class="flex items-center justify-between gap-2"
+            >
+              <svg
+                aria-hidden="true"
+                class="lucide lucide-graduation-cap size-5 shrink-0"
+                fill="none"
+                height="24"
+                stroke="currentColor"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                viewBox="0 0 24 24"
+                width="24"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  d="M21.42 10.922a1 1 0 0 0-.019-1.838L12.83 5.18a2 2 0 0 0-1.66 0L2.6 9.08a1 1 0 0 0 0 1.832l8.57 3.908a2 2 0 0 0 1.66 0z"
+                />
+                <path
+                  d="M22 10v6"
+                />
+                <path
+                  d="M6 12.5V16a6 3 0 0 0 12 0v-3.5"
+                />
+              </svg>
+              <span
+                aria-hidden="true"
+                class="flex gap-1"
+              >
+                <span
+                  class="size-1.5 rounded-full bg-current opacity-100"
+                />
+                <span
+                  class="size-1.5 rounded-full bg-current opacity-100"
+                />
+                <span
+                  class="size-1.5 rounded-full bg-current opacity-100"
+                />
+              </span>
+            </span>
+            <span
+              class="text-sm font-semibold leading-tight"
+            >
+              Education & experience
+            </span>
+          </button>
+        </li>
+        <li
+          class="min-w-0"
         >
-          <title>
-            Interests
-          </title>
-        </path>
-        <path
-          class="text-primary"
-          d="M 137.06339097770922 98.54101966249684 A 60 60 0 0 1 117.75922346299025 126.62875768741824"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="18"
+          <button
+            aria-label="Interests: Stated, 2 pieces of evidence. Show details for Interests"
+            aria-pressed="false"
+            class="group flex h-full min-h-[92px] w-full flex-col justify-between gap-2 rounded-2xl p-3 text-left transition-[transform,box-shadow] duration-200 hover:-translate-y-0.5 hover:shadow-card focus-visible:-translate-y-0.5 bg-evidence-1 text-evidence-1-ink"
+            type="button"
+          >
+            <span
+              class="flex items-center justify-between gap-2"
+            >
+              <svg
+                aria-hidden="true"
+                class="lucide lucide-heart size-5 shrink-0"
+                fill="none"
+                height="24"
+                stroke="currentColor"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                viewBox="0 0 24 24"
+                width="24"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  d="M2 9.5a5.5 5.5 0 0 1 9.591-3.676.56.56 0 0 0 .818 0A5.49 5.49 0 0 1 22 9.5c0 2.29-1.5 4-3 5.5l-5.492 5.313a2 2 0 0 1-3 .019L5 15c-1.5-1.5-3-3.2-3-5.5"
+                />
+              </svg>
+              <span
+                aria-hidden="true"
+                class="flex gap-1"
+              >
+                <span
+                  class="size-1.5 rounded-full bg-current opacity-100"
+                />
+                <span
+                  class="size-1.5 rounded-full bg-current opacity-100"
+                />
+                <span
+                  class="size-1.5 rounded-full bg-current opacity-25"
+                />
+              </span>
+            </span>
+            <span
+              class="text-sm font-semibold leading-tight"
+            >
+              Interests
+            </span>
+          </button>
+        </li>
+        <li
+          class="min-w-0"
         >
-          <title>
-            Strengths
-          </title>
-        </path>
-        <path
-          class="text-primary"
-          d="M 115.26711513754839 128.54101966249686 A 60 60 0 0 1 83.14015737457663 139.91777208527444"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="18"
+          <button
+            aria-label="Strengths: Shown, 2 pieces of evidence. Show details for Strengths"
+            aria-pressed="false"
+            class="group flex h-full min-h-[92px] w-full flex-col justify-between gap-2 rounded-2xl p-3 text-left transition-[transform,box-shadow] duration-200 hover:-translate-y-0.5 hover:shadow-card focus-visible:-translate-y-0.5 bg-evidence-2 text-evidence-2-ink"
+            type="button"
+          >
+            <span
+              class="flex items-center justify-between gap-2"
+            >
+              <svg
+                aria-hidden="true"
+                class="lucide lucide-lightbulb size-5 shrink-0"
+                fill="none"
+                height="24"
+                stroke="currentColor"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                viewBox="0 0 24 24"
+                width="24"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5"
+                />
+                <path
+                  d="M9 18h6"
+                />
+                <path
+                  d="M10 22h4"
+                />
+              </svg>
+              <span
+                aria-hidden="true"
+                class="flex gap-1"
+              >
+                <span
+                  class="size-1.5 rounded-full bg-current opacity-100"
+                />
+                <span
+                  class="size-1.5 rounded-full bg-current opacity-100"
+                />
+                <span
+                  class="size-1.5 rounded-full bg-current opacity-25"
+                />
+              </span>
+            </span>
+            <span
+              class="text-sm font-semibold leading-tight"
+            >
+              Strengths
+            </span>
+          </button>
+        </li>
+        <li
+          class="min-w-0"
         >
-          <title>
-            Family
-          </title>
-        </path>
-        <path
-          class="text-primary"
-          d="M 80 140 A 60 60 0 0 1 47.321657899098376 130.32023407672546"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="18"
+          <button
+            aria-label="Family: Stated, 2 pieces of evidence. Show details for Family"
+            aria-pressed="false"
+            class="group flex h-full min-h-[92px] w-full flex-col justify-between gap-2 rounded-2xl p-3 text-left transition-[transform,box-shadow] duration-200 hover:-translate-y-0.5 hover:shadow-card focus-visible:-translate-y-0.5 bg-evidence-1 text-evidence-1-ink"
+            type="button"
+          >
+            <span
+              class="flex items-center justify-between gap-2"
+            >
+              <svg
+                aria-hidden="true"
+                class="lucide lucide-users size-5 shrink-0"
+                fill="none"
+                height="24"
+                stroke="currentColor"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                viewBox="0 0 24 24"
+                width="24"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"
+                />
+                <path
+                  d="M16 3.128a4 4 0 0 1 0 7.744"
+                />
+                <path
+                  d="M22 21v-2a4 4 0 0 0-3-3.87"
+                />
+                <circle
+                  cx="9"
+                  cy="7"
+                  r="4"
+                />
+              </svg>
+              <span
+                aria-hidden="true"
+                class="flex gap-1"
+              >
+                <span
+                  class="size-1.5 rounded-full bg-current opacity-100"
+                />
+                <span
+                  class="size-1.5 rounded-full bg-current opacity-100"
+                />
+                <span
+                  class="size-1.5 rounded-full bg-current opacity-25"
+                />
+              </span>
+            </span>
+            <span
+              class="text-sm font-semibold leading-tight"
+            >
+              Family
+            </span>
+          </button>
+        </li>
+        <li
+          class="min-w-0"
         >
-          <title>
-            Values
-          </title>
-        </path>
-        <path
-          class="text-primary"
-          d="M 44.73288486245162 128.54101966249686 A 60 60 0 0 1 23.985174410167893 101.50207697271802"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="18"
+          <button
+            aria-label="Values: Stated, 1 piece of evidence. Show details for Values"
+            aria-pressed="false"
+            class="group flex h-full min-h-[92px] w-full flex-col justify-between gap-2 rounded-2xl p-3 text-left transition-[transform,box-shadow] duration-200 hover:-translate-y-0.5 hover:shadow-card focus-visible:-translate-y-0.5 bg-evidence-1 text-evidence-1-ink"
+            type="button"
+          >
+            <span
+              class="flex items-center justify-between gap-2"
+            >
+              <svg
+                aria-hidden="true"
+                class="lucide lucide-gem size-5 shrink-0"
+                fill="none"
+                height="24"
+                stroke="currentColor"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                viewBox="0 0 24 24"
+                width="24"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  d="M10.5 3 8 9l4 13 4-13-2.5-6"
+                />
+                <path
+                  d="M17 3a2 2 0 0 1 1.6.8l3 4a2 2 0 0 1 .013 2.382l-7.99 10.986a2 2 0 0 1-3.247 0l-7.99-10.986A2 2 0 0 1 2.4 7.8l2.998-3.997A2 2 0 0 1 7 3z"
+                />
+                <path
+                  d="M2 9h20"
+                />
+              </svg>
+              <span
+                aria-hidden="true"
+                class="flex gap-1"
+              >
+                <span
+                  class="size-1.5 rounded-full bg-current opacity-100"
+                />
+                <span
+                  class="size-1.5 rounded-full bg-current opacity-25"
+                />
+                <span
+                  class="size-1.5 rounded-full bg-current opacity-25"
+                />
+              </span>
+            </span>
+            <span
+              class="text-sm font-semibold leading-tight"
+            >
+              Values
+            </span>
+          </button>
+        </li>
+        <li
+          class="min-w-0"
         >
-          <title>
-            Pressures & limits
-          </title>
-        </path>
-        <path
-          class="text-muted"
-          d="M 22.93660902229079 98.54101966249685 A 60 60 0 0 1 22.044450422655892 64.47085729384878"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="18"
+          <button
+            aria-label="Pressures & limits: Stated, 1 piece of evidence. Show details for Pressures & limits"
+            aria-pressed="false"
+            class="group flex h-full min-h-[92px] w-full flex-col justify-between gap-2 rounded-2xl p-3 text-left transition-[transform,box-shadow] duration-200 hover:-translate-y-0.5 hover:shadow-card focus-visible:-translate-y-0.5 bg-evidence-1 text-evidence-1-ink"
+            type="button"
+          >
+            <span
+              class="flex items-center justify-between gap-2"
+            >
+              <svg
+                aria-hidden="true"
+                class="lucide lucide-scale size-5 shrink-0"
+                fill="none"
+                height="24"
+                stroke="currentColor"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                viewBox="0 0 24 24"
+                width="24"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  d="m16 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z"
+                />
+                <path
+                  d="m2 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z"
+                />
+                <path
+                  d="M7 21h10"
+                />
+                <path
+                  d="M12 3v18"
+                />
+                <path
+                  d="M3 7h2c2 0 5-1 7-2 2 1 5 2 7 2h2"
+                />
+              </svg>
+              <span
+                aria-hidden="true"
+                class="flex gap-1"
+              >
+                <span
+                  class="size-1.5 rounded-full bg-current opacity-100"
+                />
+                <span
+                  class="size-1.5 rounded-full bg-current opacity-25"
+                />
+                <span
+                  class="size-1.5 rounded-full bg-current opacity-25"
+                />
+              </span>
+            </span>
+            <span
+              class="text-sm font-semibold leading-tight"
+            >
+              Pressures & limits
+            </span>
+          </button>
+        </li>
+        <li
+          class="min-w-0"
         >
-          <title>
-            Certainty
-          </title>
-        </path>
-        <path
-          class="text-muted"
-          d="M 22.93660902229079 61.458980337503135 A 60 60 0 0 1 42.24077653700978 33.371242312581735"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="18"
+          <button
+            aria-label="Certainty: Not yet, 0 pieces of evidence. Show details for Certainty"
+            aria-pressed="false"
+            class="group flex h-full min-h-[92px] w-full flex-col justify-between gap-2 rounded-2xl p-3 text-left transition-[transform,box-shadow] duration-200 hover:-translate-y-0.5 hover:shadow-card focus-visible:-translate-y-0.5 bg-evidence-0 text-evidence-0-ink"
+            type="button"
+          >
+            <span
+              class="flex items-center justify-between gap-2"
+            >
+              <svg
+                aria-hidden="true"
+                class="lucide lucide-gauge size-5 shrink-0"
+                fill="none"
+                height="24"
+                stroke="currentColor"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                viewBox="0 0 24 24"
+                width="24"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  d="m12 14 4-4"
+                />
+                <path
+                  d="M3.34 19a10 10 0 1 1 17.32 0"
+                />
+              </svg>
+              <span
+                aria-hidden="true"
+                class="flex gap-1"
+              >
+                <span
+                  class="size-1.5 rounded-full bg-current opacity-25"
+                />
+                <span
+                  class="size-1.5 rounded-full bg-current opacity-25"
+                />
+                <span
+                  class="size-1.5 rounded-full bg-current opacity-25"
+                />
+              </span>
+            </span>
+            <span
+              class="text-sm font-semibold leading-tight"
+            >
+              Certainty
+            </span>
+          </button>
+        </li>
+        <li
+          class="min-w-0"
         >
-          <title>
-            Goals & whose wish
-          </title>
-        </path>
-        <path
-          class="text-muted"
-          d="M 44.732884862451606 31.458980337503156 A 60 60 0 0 1 76.85984262542334 20.08222791472557"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="18"
+          <button
+            aria-label="Goals & whose wish: Not yet, 0 pieces of evidence. Show details for Goals & whose wish"
+            aria-pressed="false"
+            class="group flex h-full min-h-[92px] w-full flex-col justify-between gap-2 rounded-2xl p-3 text-left transition-[transform,box-shadow] duration-200 hover:-translate-y-0.5 hover:shadow-card focus-visible:-translate-y-0.5 bg-evidence-0 text-evidence-0-ink"
+            type="button"
+          >
+            <span
+              class="flex items-center justify-between gap-2"
+            >
+              <svg
+                aria-hidden="true"
+                class="lucide lucide-target size-5 shrink-0"
+                fill="none"
+                height="24"
+                stroke="currentColor"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                viewBox="0 0 24 24"
+                width="24"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <circle
+                  cx="12"
+                  cy="12"
+                  r="10"
+                />
+                <circle
+                  cx="12"
+                  cy="12"
+                  r="6"
+                />
+                <circle
+                  cx="12"
+                  cy="12"
+                  r="2"
+                />
+              </svg>
+              <span
+                aria-hidden="true"
+                class="flex gap-1"
+              >
+                <span
+                  class="size-1.5 rounded-full bg-current opacity-25"
+                />
+                <span
+                  class="size-1.5 rounded-full bg-current opacity-25"
+                />
+                <span
+                  class="size-1.5 rounded-full bg-current opacity-25"
+                />
+              </span>
+            </span>
+            <span
+              class="text-sm font-semibold leading-tight"
+            >
+              Goals & whose wish
+            </span>
+          </button>
+        </li>
+        <li
+          class="min-w-0"
         >
-          <title>
-            Options & myths
-          </title>
-        </path>
-        <circle
-          class="text-primary/20"
-          cx="80"
-          cy="80"
-          fill="none"
-          r="25"
-          stroke="currentColor"
-        />
-      </svg>
+          <button
+            aria-label="Options & myths: Not yet, 0 pieces of evidence. Show details for Options & myths"
+            aria-pressed="false"
+            class="group flex h-full min-h-[92px] w-full flex-col justify-between gap-2 rounded-2xl p-3 text-left transition-[transform,box-shadow] duration-200 hover:-translate-y-0.5 hover:shadow-card focus-visible:-translate-y-0.5 bg-evidence-0 text-evidence-0-ink"
+            type="button"
+          >
+            <span
+              class="flex items-center justify-between gap-2"
+            >
+              <svg
+                aria-hidden="true"
+                class="lucide lucide-signpost size-5 shrink-0"
+                fill="none"
+                height="24"
+                stroke="currentColor"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                viewBox="0 0 24 24"
+                width="24"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  d="M12 13v8"
+                />
+                <path
+                  d="M12 3v3"
+                />
+                <path
+                  d="M18 6a2 2 0 0 1 1.387.56l2.307 2.22a1 1 0 0 1 0 1.44l-2.307 2.22A2 2 0 0 1 18 13H6a2 2 0 0 1-1.387-.56l-2.306-2.22a1 1 0 0 1 0-1.44l2.306-2.22A2 2 0 0 1 6 6z"
+                />
+              </svg>
+              <span
+                aria-hidden="true"
+                class="flex gap-1"
+              >
+                <span
+                  class="size-1.5 rounded-full bg-current opacity-25"
+                />
+                <span
+                  class="size-1.5 rounded-full bg-current opacity-25"
+                />
+                <span
+                  class="size-1.5 rounded-full bg-current opacity-25"
+                />
+              </span>
+            </span>
+            <span
+              class="text-sm font-semibold leading-tight"
+            >
+              Options & myths
+            </span>
+          </button>
+        </li>
+      </ul>
       <div
-        class="grid grid-cols-2 gap-x-6 gap-y-2"
+        aria-hidden="true"
+        class="mt-4 flex flex-wrap items-center gap-2"
       >
-        <div
-          class="flex items-center gap-2 text-xs"
+        <span
+          class="inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold bg-evidence-0 text-evidence-0-ink"
+          title="Nothing shared yet"
         >
-          <span
-            class="size-2 rounded-full bg-primary"
-          />
-          Current life
-        </div>
-        <div
-          class="flex items-center gap-2 text-xs"
+          <svg
+            aria-hidden="true"
+            class="lucide lucide-circle size-3.5"
+            fill="none"
+            height="24"
+            stroke="currentColor"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            viewBox="0 0 24 24"
+            width="24"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <circle
+              cx="12"
+              cy="12"
+              r="10"
+            />
+          </svg>
+          Not yet
+        </span>
+        <span
+          class="inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold bg-evidence-1 text-evidence-1-ink"
+          title="You said it"
         >
-          <span
-            class="size-2 rounded-full bg-primary"
-          />
-          Education & experience
-        </div>
-        <div
-          class="flex items-center gap-2 text-xs"
+          <svg
+            aria-hidden="true"
+            class="lucide lucide-message-circle size-3.5"
+            fill="none"
+            height="24"
+            stroke="currentColor"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            viewBox="0 0 24 24"
+            width="24"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <path
+              d="M2.992 16.342a2 2 0 0 1 .094 1.167l-1.065 3.29a1 1 0 0 0 1.236 1.168l3.413-.998a2 2 0 0 1 1.099.092 10 10 0 1 0-4.777-4.719"
+            />
+          </svg>
+          Stated
+        </span>
+        <span
+          class="inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold bg-evidence-2 text-evidence-2-ink"
+          title="You showed it, for example with a document or something you did"
         >
-          <span
-            class="size-2 rounded-full bg-primary"
-          />
-          Interests
-        </div>
-        <div
-          class="flex items-center gap-2 text-xs"
+          <svg
+            aria-hidden="true"
+            class="lucide lucide-eye size-3.5"
+            fill="none"
+            height="24"
+            stroke="currentColor"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            viewBox="0 0 24 24"
+            width="24"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <path
+              d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"
+            />
+            <circle
+              cx="12"
+              cy="12"
+              r="3"
+            />
+          </svg>
+          Shown
+        </span>
+        <span
+          class="inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold bg-evidence-3 text-evidence-3-ink"
+          title="You confirmed it"
         >
-          <span
-            class="size-2 rounded-full bg-primary"
-          />
-          Strengths
-        </div>
-        <div
-          class="flex items-center gap-2 text-xs"
-        >
-          <span
-            class="size-2 rounded-full bg-primary"
-          />
-          Family
-        </div>
-        <div
-          class="flex items-center gap-2 text-xs"
-        >
-          <span
-            class="size-2 rounded-full bg-primary"
-          />
-          Values
-        </div>
-        <div
-          class="flex items-center gap-2 text-xs"
-        >
-          <span
-            class="size-2 rounded-full bg-primary"
-          />
-          Pressures & limits
-        </div>
-        <div
-          class="flex items-center gap-2 text-xs"
-        >
-          <span
-            class="size-2 rounded-full bg-muted"
-          />
-          Certainty
-        </div>
-        <div
-          class="flex items-center gap-2 text-xs"
-        >
-          <span
-            class="size-2 rounded-full bg-muted"
-          />
-          Goals & whose wish
-        </div>
-        <div
-          class="flex items-center gap-2 text-xs"
-        >
-          <span
-            class="size-2 rounded-full bg-muted"
-          />
-          Options & myths
-        </div>
+          <svg
+            aria-hidden="true"
+            class="lucide lucide-badge-check size-3.5"
+            fill="none"
+            height="24"
+            stroke="currentColor"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            viewBox="0 0 24 24"
+            width="24"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <path
+              d="M3.85 8.62a4 4 0 0 1 4.78-4.77 4 4 0 0 1 6.74 0 4 4 0 0 1 4.78 4.78 4 4 0 0 1 0 6.74 4 4 0 0 1-4.77 4.78 4 4 0 0 1-6.75 0 4 4 0 0 1-4.78-4.77 4 4 0 0 1 0-6.76Z"
+            />
+            <path
+              d="m9 12 2 2 4-4"
+            />
+          </svg>
+          Confirmed
+        </span>
       </div>
+      <p
+        class="mt-2 text-xs text-muted-foreground"
+      >
+        Colour shows how strong the evidence is. Dots show how much there is. This is never a score.
+      </p>
     </div>
-    <svg
-      aria-label="Your certainty over time: 3, 6"
-      class="h-28 w-full"
-      role="img"
-      viewBox="0 0 300 110"
-    >
-      <path
-        class="text-muted"
-        d="M10 10 V95 H290"
-        fill="none"
-        stroke="currentColor"
-      />
-      <polyline
-        class="text-primary"
-        fill="none"
-        points="10,71 290,47"
-        stroke="currentColor"
-        stroke-width="3"
-      />
-      <circle
-        class="text-primary"
-        cx="10"
-        cy="71"
-        fill="currentColor"
-        r="4"
-      />
-      <circle
-        class="text-primary"
-        cx="290"
-        cy="47"
-        fill="currentColor"
-        r="4"
-      />
-    </svg>
+    <div>
+      <p
+        class="flex items-baseline gap-1.5"
+      >
+        <span
+          class="text-4xl font-bold tracking-tight text-brand-ink"
+        >
+          6
+        </span>
+        <span
+          class="text-sm text-muted-foreground"
+        >
+          / 10 · 
+          After Mirror 1
+        </span>
+      </p>
+      <svg
+        aria-label="Your certainty over time. Before Mirror 1: 3 of 10. After Mirror 1: 6 of 10"
+        class="mt-2 h-40 w-full overflow-visible"
+        role="img"
+        viewBox="0 0 320 150"
+      >
+        <defs>
+          <lineargradient
+            id="_r_7_"
+            x1="0"
+            x2="0"
+            y1="0"
+            y2="1"
+          >
+            <stop
+              offset="0%"
+              stop-color="var(--brand)"
+              stop-opacity="0.28"
+            />
+            <stop
+              offset="100%"
+              stop-color="var(--brand)"
+              stop-opacity="0"
+            />
+          </lineargradient>
+        </defs>
+        <g>
+          <line
+            stroke="var(--border)"
+            x1="26"
+            x2="308"
+            y1="132"
+            y2="132"
+          />
+          <text
+            fill="var(--muted-foreground)"
+            font-size="10"
+            text-anchor="end"
+            x="18"
+            y="136"
+          >
+            0
+          </text>
+        </g>
+        <g>
+          <line
+            stroke="var(--border)"
+            stroke-dasharray="4 4"
+            x1="26"
+            x2="308"
+            y1="73"
+            y2="73"
+          />
+          <text
+            fill="var(--muted-foreground)"
+            font-size="10"
+            text-anchor="end"
+            x="18"
+            y="77"
+          >
+            5
+          </text>
+        </g>
+        <g>
+          <line
+            stroke="var(--border)"
+            stroke-dasharray="4 4"
+            x1="26"
+            x2="308"
+            y1="14"
+            y2="14"
+          />
+          <text
+            fill="var(--muted-foreground)"
+            font-size="10"
+            text-anchor="end"
+            x="18"
+            y="18"
+          >
+            10
+          </text>
+        </g>
+        <path
+          d="M26 96.6 L308 61.2 L308 132 L26 132 Z"
+          fill="url(#_r_7_)"
+        />
+        <path
+          d="M26 96.6 L308 61.2"
+          fill="none"
+          stroke="var(--brand)"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          stroke-width="3"
+        />
+        <g>
+          <circle
+            cx="26"
+            cy="96.6"
+            fill="var(--card)"
+            r="6"
+            stroke="var(--brand)"
+            stroke-width="3"
+          >
+            <title>
+              Before Mirror 1: 3 of 10
+            </title>
+          </circle>
+        </g>
+        <g>
+          <circle
+            cx="308"
+            cy="61.2"
+            fill="var(--card)"
+            r="6"
+            stroke="var(--brand)"
+            stroke-width="3"
+          >
+            <title>
+              After Mirror 1: 6 of 10
+            </title>
+          </circle>
+        </g>
+      </svg>
+      <p
+        class="sr-only"
+      >
+        How sure, 0 to 10
+      </p>
+    </div>
   </div>
 </div>
 `;

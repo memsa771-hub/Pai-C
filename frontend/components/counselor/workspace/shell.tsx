@@ -158,7 +158,7 @@ export function CounselorShell() {
     ) : (
       <div data-scroll-area className="min-h-0 flex-1 overflow-y-auto">
         <div className="mx-auto max-w-6xl px-4 pb-16 pt-6 sm:px-8 sm:pt-9">
-          {active === "profile" && <LivingProfile onChat={chat} />}
+          {active === "profile" && <LivingProfile onChat={chat} stage={journey.progress?.stage} />}
           {active === "journey" && <Journey navigate={navigate} journey={journey} />}
           {active === "paths" &&
             (path ? (

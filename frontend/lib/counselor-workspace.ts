@@ -15,7 +15,14 @@ export type EvidenceItem = {
 };
 export type LivingPicture = {
   sections?: Record<string, EvidenceItem[]>;
-  coverage: Record<string, { covered: boolean; item_count: number }>;
+  coverage: Record<string, {
+    covered: boolean;
+    item_count: number;
+    min_items?: number;
+    last_confirmed?: string | null;
+    /** Strongest public evidence level in the area; null when there is none. */
+    evidence?: "stated" | "shown" | "confirmed" | null;
+  }>;
   personal: {
     world: Record<string, EvidenceItem[]>;
     self: EvidenceItem[];

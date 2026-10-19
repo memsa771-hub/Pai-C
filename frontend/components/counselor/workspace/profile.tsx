@@ -1,16 +1,20 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { Eye, EyeOff, Flag, GraduationCap, LayoutGrid, List, MapPin, MessageCircle, RefreshCw, ShieldCheck, TrendingUp, Users } from "lucide-react";
 import { workspaceApi } from "@/lib/api";
-import type {
-  LivingPicture,
-  ProfileCard,
-  EvidenceItem,
-} from "@/lib/counselor-workspace";
+import type { LivingPicture, ProfileCard } from "@/lib/counselor-workspace";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
+import { AreaHeatmap, SectionCard, evidenceLevel, toneClass, type HeatmapArea } from "@/components/pai";
+import { cn } from "@/lib/utils";
 import copy from "./copy.json";
-import { Heading, LoadState, useResource, human, evidenceLabel } from "./resource";
+import { LoadState, useResource, human, shortDate } from "./resource";
+import {
+  CertaintyChart, ChipCloud, EducationTimeline, MirrorPanel, PeopleMap, areaIcon, areaTone, fill, text,
+} from "./profile-parts";
+import { DetailsView } from "./profile-details";
+export { CertaintyChart } from "./profile-parts";
+export { FactRow as EvidenceCard } from "./profile-details";
+
 const load = async () => {
   const [picture, cards] = await Promise.all([
     workspaceApi.getCounselorWorkspace(),
@@ -18,460 +22,170 @@ const load = async () => {
   ]);
   return { picture, cards: cards.cards };
 };
-export function CoverageWheel({
-  coverage,
-}: {
-  coverage: LivingPicture["coverage"];
+const EDUCATION = ["education", "course", "test_attempt", "certification"];
+type Tab = "visual" | "details";
+
+export function heatmapAreas(coverage: LivingPicture["coverage"]): HeatmapArea[] {
+  return Object.entries(copy.areas).map(([key, label]) => {
+    const area = coverage[key];
+    const count = area?.item_count || 0;
+    return { key, label, icon: areaIcon(key), count, level: count ? evidenceLevel(area?.evidence || "stated") : "none" };
+  });
+}
+
+/** Ten areas as a heatmap: fill = strength of evidence, dots = amount. */
+export function CoverageHeatmap({ coverage, selected, onSelect }: {
+  coverage: LivingPicture["coverage"]; selected?: string | null; onSelect?: (area: string | null) => void;
 }) {
-  const areas = Object.entries(copy.areas);
+  return <AreaHeatmap title={text.heatmapTitle} areas={heatmapAreas(coverage)} selected={selected} onSelect={onSelect} />;
+}
+
+function ProfileHeader({ name, level, city, stage, updated }: { name: string; level?: string; city?: string; stage?: { id: string; title: string }; updated?: string }) {
+  const initials = name.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]?.toUpperCase()).join("") || "?";
+  const chip = "inline-flex min-h-8 items-center gap-1.5 rounded-full bg-white/20 px-3 text-sm font-medium backdrop-blur";
   return (
-    <div className="flex flex-wrap items-center gap-6">
-      <svg
-        viewBox="0 0 160 160"
-        className="size-40 shrink-0"
-        role="img"
-        aria-label={copy.coverage}
-      >
-        {areas.map(([key, label], index) => {
-          const start = ((index * 36 - 90) * Math.PI) / 180,
-            end = (((index + 1) * 36 - 93) * Math.PI) / 180;
-          return (
-            <path
-              key={key}
-              d={`M ${80 + 60 * Math.cos(start)} ${80 + 60 * Math.sin(start)} A 60 60 0 0 1 ${80 + 60 * Math.cos(end)} ${80 + 60 * Math.sin(end)}`}
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="18"
-              className={coverage[key]?.covered ? "text-primary" : "text-muted"}
-            >
-              <title>{label}</title>
-            </path>
-          );
-        })}
-        <circle
-          cx="80"
-          cy="80"
-          r="25"
-          fill="none"
-          stroke="currentColor"
-          className="text-primary/20"
-        />
-      </svg>
-      <div className="grid grid-cols-2 gap-x-6 gap-y-2">
-        {areas.map(([key, label]) => (
-          <div key={key} className="flex items-center gap-2 text-xs">
-            <span
-              className={`size-2 rounded-full ${coverage[key]?.covered ? "bg-primary" : "bg-muted"}`}
-            />
-            {label}
+    <section className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[var(--hero-from)] via-[var(--hero-via)] to-[var(--hero-to)] p-5 text-white shadow-lift sm:p-7">
+      <span aria-hidden className="absolute -right-10 -top-12 size-48 rounded-full bg-white/10" />
+      <span aria-hidden className="absolute -bottom-16 right-24 size-36 rounded-full bg-white/10" />
+      <div className="relative flex flex-wrap items-center gap-4 sm:gap-5">
+        <span aria-hidden className="flex size-16 shrink-0 items-center justify-center rounded-full bg-white text-xl font-bold text-[#2a3fb8] shadow-lift sm:size-20 sm:text-2xl">{initials}</span>
+        <div className="min-w-0 flex-1">
+          <p className="text-xs font-semibold uppercase tracking-wider text-white/85">{copy.profileTitle}</p>
+          <h1 className="mt-0.5 break-words text-2xl font-bold tracking-tight sm:text-3xl">{name}</h1>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {level && <span className={chip}><GraduationCap aria-hidden className="size-4" />{level}</span>}
+            {city && <span className={chip}><MapPin aria-hidden className="size-4" />{city}</span>}
+            {stage && <span className={cn(chip, "max-sm:hidden")}><Flag aria-hidden className="size-4" />{copy.shell.stage.replace("{id}", stage.id)} · {stage.title}</span>}
           </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-export function CertaintyChart({
-  ratings,
-}: {
-  ratings: LivingPicture["ratings"];
-}) {
-  const points = ratings
-    .flatMap((row) => [row.before, row.after])
-    .filter((n): n is number => n !== null);
-  if (!points.length)
-    return <p className="text-sm text-muted-foreground">{copy.empty}</p>;
-  return (
-    <svg
-      viewBox="0 0 300 110"
-      role="img"
-      aria-label={`${copy.certainty}: ${points.join(", ")}`}
-      className="h-28 w-full"
-    >
-      <path
-        d="M10 10 V95 H290"
-        stroke="currentColor"
-        fill="none"
-        className="text-muted"
-      />
-      <polyline
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="3"
-        className="text-primary"
-        points={points
-          .map(
-            (n, i) =>
-              `${10 + (i * 280) / Math.max(1, points.length - 1)},${95 - n * 8}`,
-          )
-          .join(" ")}
-      />
-      {points.map((n, i) => (
-        <circle
-          key={i}
-          cx={10 + (i * 280) / Math.max(1, points.length - 1)}
-          cy={95 - n * 8}
-          r="4"
-          fill="currentColor"
-          className="text-primary"
-        />
-      ))}
-    </svg>
-  );
-}
-function ValueEditor({
-  value,
-  onChange,
-  label,
-}: {
-  value: unknown;
-  onChange: (value: unknown) => void;
-  label: string;
-}) {
-  if (value && typeof value === "object")
-    return (
-      <div className="space-y-2">
-        {Object.entries(value).map(([key, item]) => (
-          <ValueEditor
-            key={key}
-            label={evidenceLabel(key)}
-            value={item}
-            onChange={(next) =>
-              onChange(
-                Array.isArray(value)
-                  ? value.map((v, i) => (String(i) === key ? next : v))
-                  : { ...value, [key]: next },
-              )
-            }
-          />
-        ))}
-      </div>
-    );
-  if (typeof value === "boolean")
-    return (
-      <label className="flex items-center gap-2 text-xs">
-        <input
-          type="checkbox"
-          checked={value}
-          onChange={(e) => onChange(e.target.checked)}
-        />
-        {label}
-      </label>
-    );
-  return (
-    <label className="block text-xs text-muted-foreground">
-      {label}
-      <Input
-        className="mt-1"
-        value={value === null ? "" : String(value)}
-        type={typeof value === "number" ? "number" : "text"}
-        onChange={(e) =>
-          onChange(
-            typeof value === "number" ? Number(e.target.value) : e.target.value,
-          )
-        }
-      />
-    </label>
-  );
-}
-export function EvidenceCard({
-  card,
-  onSaved,
-}: {
-  card: ProfileCard;
-  onSaved: () => void;
-}) {
-  const [editing, setEditing] = useState(false),
-    [removing, setRemoving] = useState(false),
-    [value, setValue] = useState(card.value),
-    [text, setText] = useState(""),
-    [busy, setBusy] = useState(false),
-    [error, setError] = useState(false);
-  async function review(action: "confirm" | "edit" | "remove") {
-    setBusy(true);
-    setError(false);
-    try {
-      await workspaceApi.reviewProfileCard(card, {
-        submission_id: crypto.randomUUID(),
-        action,
-        expected_digest: card.digest,
-        value: action === "edit" ? value : null,
-        text,
-      });
-      setEditing(false);
-      onSaved();
-    } catch {
-      setError(true);
-    } finally {
-      setBusy(false);
-    }
-  }
-  return (
-    <details className="rounded-xl border bg-card p-4">
-      <summary className="cursor-pointer list-none">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <p className="text-xs capitalize text-muted-foreground">
-              {evidenceLabel(card.key)}
-            </p>
-            <p className="mt-2 break-words text-sm leading-relaxed">
-              {human(card.value)}
-            </p>
-          </div>
-          <span className="rounded-full bg-primary/10 px-2 py-1 text-xs text-primary">
-            {copy.evidence[card.evidence_level]}
-          </span>
         </div>
-      </summary>
-      <div className="mt-4 space-y-3 border-t pt-4">
-        <p className="text-xs font-medium">{copy.source}</p>
-        <p className="break-words text-xs text-muted-foreground">
-          {human(card.source)}
-        </p>
-        {editing && (
-          <>
-            <ValueEditor value={value} onChange={setValue} label={evidenceLabel(card.key)} />
-            <Textarea
-              aria-label={copy.explainEdit}
-              placeholder={copy.explainEdit}
-              value={text}
-              onChange={(e) => setText(e.target.value)}
-            />
-          </>
-        )}
-        {removing && (
-          <div className="rounded-lg border border-destructive/30 p-3">
-            <p className="mb-3 text-sm">{copy.removeHelp}</p>
-            <Button
-              disabled={busy}
-              variant="outline"
-              onClick={() => review("remove")}
-            >
-              {copy.removeConfirm}
-            </Button>
-            <Button variant="ghost" onClick={() => setRemoving(false)}>
-              {copy.cancel}
-            </Button>
-          </div>
-        )}
-        {error && (
-          <p role="alert" className="text-sm text-destructive">
-            {copy.error}
-          </p>
-        )}
-        <div className="flex gap-2">
-          {editing ? (
-            <>
-              <Button
-                disabled={busy || !text.trim()}
-                onClick={() => review("edit")}
-              >
-                {copy.save}
-              </Button>
-              <Button variant="ghost" onClick={() => setEditing(false)}>
-                {copy.cancel}
-              </Button>
-            </>
-          ) : (
-            <>
-              <Button disabled={busy} onClick={() => review("confirm")}>
-                {copy.confirm}
-              </Button>
-              <Button variant="outline" onClick={() => setEditing(true)}>
-                {copy.edit}
-              </Button>
-              <Button variant="ghost" onClick={() => setRemoving(true)}>
-                {copy.remove}
-              </Button>
-            </>
-          )}
-        </div>
+        {updated && <p className="w-full text-xs text-white/85 sm:w-auto sm:self-start">{fill(text.updated, { date: updated })}</p>}
       </div>
-    </details>
-  );
-}
-function Items({ title, items }: { title: string; items: EvidenceItem[] }) {
-  return (
-    <section className="rounded-2xl border bg-card p-6">
-      <h2 className="mb-4 text-lg font-semibold">{title}</h2>
-      {!items.length ? (
-        <p className="text-sm text-muted-foreground">{copy.empty}</p>
-      ) : (
-        <ul className="space-y-4">
-          {items.map((item, i) => (
-            <li
-              key={item.id || i}
-              className="border-l-2 border-primary/30 pl-3"
-            >
-              <p className="text-sm">
-                {human(
-                  item.value || [
-                    item.role,
-                    item.wish,
-                    item.worry || item.concern,
-                  ],
-                )}
-              </p>
-              {item.evidence && (
-                <p className="mt-1 text-xs text-muted-foreground">
-                  “{item.evidence}”
-                </p>
-              )}
-              {item.kind && <span className="mt-2 mr-2 inline-block rounded-full border px-2 py-1 text-xs">{copy.evidenceKinds[item.kind as keyof typeof copy.evidenceKinds]}</span>}
-              {item.category && <p className="mt-1 text-xs text-muted-foreground">{copy.whoseWish}: {copy.wishSources[item.category as keyof typeof copy.wishSources] || copy.wishSources.other}</p>}
-              {item.capability_status && (
-                <span className="mt-2 inline-block rounded-full bg-muted px-2 py-1 text-xs">
-                  {copy.capabilityLabels[item.capability_status as keyof typeof copy.capabilityLabels]}
-                </span>
-              )}
-            </li>
-          ))}
-        </ul>
-      )}
     </section>
   );
 }
+
 export function LivingProfile({
   onChat,
+  stage,
 }: {
   onChat: (topic?: string) => void;
+  stage?: { id: string; title: string };
 }) {
   const resource = useResource(load);
+  const [tab, setTab] = useState<Tab>("visual");
+  const [filter, setFilter] = useState<string | null>(null);
+  const [showPrivate, setShowPrivate] = useState(false);
+  const top = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get("tab") === "details") setTab("details");
+  }, []);
+  const switchTab = (next: Tab) => {
+    setTab(next);
+    const q = new URLSearchParams(window.location.search);
+    if (next === "details") q.set("tab", "details"); else q.delete("tab");
+    window.history.replaceState({}, "", `${window.location.pathname}?${q}`);
+  };
   if (!resource.data || resource.error)
-    return (
-      <LoadState
-        error={resource.error}
-        busy={resource.busy}
-        retry={resource.refresh}
-      />
-    );
+    return <LoadState error={resource.error} busy={resource.busy} retry={resource.refresh} skeleton="profile" />;
   const { picture, cards } = resource.data;
-  const skills = Array.isArray(picture.capabilities)
-    ? picture.capabilities
-    : Object.values(picture.capabilities).flat();
-  const identity = cards.filter((card) =>
-    ["identity.full_name", "location.current_city"].includes(card.key),
-  );
-  const education = cards.filter(c => c.kind === 'education');
-  const currentEducation = education.find(c => (c.value as Record<string, unknown>)?.academic_status === 'current') || education[0];
-  const level = (currentEducation?.value as Record<string, unknown>)?.qualification_name;
-  const datedCards = [...cards].sort((a,b)=>{
+  const value = (key: string) => human(cards.find((c) => c.key === key)?.value) || undefined;
+  const education = cards.filter((c) => EDUCATION.includes(c.key));
+  const current = education.find((c) => (c.value as Record<string, unknown>)?.academic_status === "current") || education[0];
+  const level = human((current?.value as Record<string, unknown>)?.qualification_name) || undefined;
+  const name = value("identity.preferred_name") || value("identity.full_name") || copy.nav.profile;
+  const dates = [...cards.map((c) => c.updated_at), ...Object.values(picture.coverage).map((c) => c.last_confirmed || "")].filter(Boolean).sort();
+  const skills = Array.isArray(picture.capabilities) ? picture.capabilities : Object.values(picture.capabilities).flat();
+  const datedEducation = [...education].sort((a, b) => {
     const date = (card: ProfileCard) => {
-      const value = card.value as Record<string, unknown> | null;
-      return typeof value?.start_date === 'string' ? value.start_date : typeof value?.end_date === 'string' ? value.end_date : '9999';
+      const v = card.value as Record<string, unknown> | null;
+      return String(v?.start_date || v?.end_date || v?.completion_date || "9999");
     };
     return date(a).localeCompare(date(b));
   });
+  const initials = name.split(/\s+/).filter(Boolean).slice(0, 2).map((p) => p[0]?.toUpperCase()).join("");
+  const missing = Object.entries(copy.areas).filter(([key]) => !picture.coverage[key]?.covered);
+  const selectArea = (area: string | null) => {
+    setFilter(area);
+    if (area) { switchTab("details"); top.current?.scrollIntoView?.({ block: "start" }); }
+  };
+  const tabs: { id: Tab; label: string; icon: typeof LayoutGrid }[] = [
+    { id: "visual", label: text.visual, icon: LayoutGrid },
+    { id: "details", label: text.details, icon: List },
+  ];
   return (
-    <>
-      <Heading
-        title={copy.profileTitle}
-        description={copy.profileIntro}
-        action={
-          <Button variant="outline" onClick={resource.refresh}>
-            {copy.refresh}
+    <div className="space-y-5">
+      <ProfileHeader name={name} level={level} city={value("location.current_city")} stage={stage} updated={shortDate(dates.at(-1))} />
+      <div ref={top} className="flex scroll-mt-4 flex-wrap items-center justify-between gap-3">
+        <div role="tablist" aria-label={text.viewLabel} className="inline-flex rounded-2xl bg-muted p-1">
+          {tabs.map(({ id, label, icon: Icon }) => (
+            <button key={id} role="tab" id={`profile-tab-${id}`} aria-selected={tab === id} aria-controls={`profile-panel-${id}`}
+              onClick={() => switchTab(id)}
+              className={cn("inline-flex min-h-11 items-center gap-2 rounded-xl px-4 text-sm font-semibold transition-colors",
+                tab === id ? "bg-card text-foreground shadow-soft" : "text-muted-foreground hover:text-foreground")}>
+              <Icon aria-hidden className="size-4" />{label}
+            </button>
+          ))}
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <Button size="tap" variant="ghost" aria-pressed={showPrivate} onClick={() => setShowPrivate(!showPrivate)}>
+            {showPrivate ? <EyeOff aria-hidden /> : <Eye aria-hidden />}{showPrivate ? text.hideSensitive : text.showSensitive}
           </Button>
-        }
-      />
-      <div className="mb-6 flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
-        {typeof level === "string" && <span className="rounded-full border bg-card px-4 py-2">{level}</span>}
-        {identity.map((card) => (
-          <span key={card.id} className="rounded-full border bg-card px-4 py-2">
-            {human(card.value)}
-          </span>
-        ))}
+          <Button size="tap" variant="ghost" onClick={resource.refresh} aria-label={copy.refresh} aria-busy={resource.busy}><RefreshCw aria-hidden className={cn(resource.busy && "animate-spin")} /><span className="hidden sm:inline">{copy.refresh}</span></Button>
+        </div>
       </div>
-      <div className="grid gap-5 lg:grid-cols-[1.3fr_1fr]">
-        <section className="rounded-2xl border bg-card p-6">
-          <h2 className="mb-4 font-semibold">{copy.coverage}</h2>
-          <CoverageWheel coverage={picture.coverage} />
-          <p className="mt-4 text-xs text-muted-foreground">
-            {copy.coverageHelp}
-          </p>
-        </section>
-        <section className="rounded-2xl border bg-card p-6">
-          <h2 className="font-semibold">{copy.certainty}</h2>
-          <CertaintyChart ratings={picture.ratings} />
-          {picture.ratings.length > 0 && (
-            <p className="text-sm text-muted-foreground">
-              {copy.understood}: {picture.ratings.at(-1)?.understood}/5
-            </p>
-          )}
-        </section>
-      </div>
-      {picture.picture && (
-        <section className="my-5 rounded-2xl border border-primary/20 bg-primary/5 p-6">
-          <h2 className="mb-4 text-xl font-semibold">{copy.picture}</h2>
-          <div className="grid gap-4 sm:grid-cols-2">
-            {Object.entries(picture.picture).map(([key, line]) => (
-              <div key={key}>
-                <p className="text-xs font-medium text-primary">
-                  {copy.pictureLabels[key as keyof typeof copy.pictureLabels]}
-                </p>
-                <p className="mt-1 leading-relaxed">{line.text}</p>
-              </div>
-            ))}
+
+      <div role="tabpanel" id={`profile-panel-${tab}`} aria-labelledby={`profile-tab-${tab}`}>
+        {tab === "details" ? (
+          <DetailsView picture={picture} cards={cards} filter={filter} onFilter={setFilter} showPrivate={showPrivate}
+            onSaved={resource.refresh} onChat={onChat} />
+        ) : (
+          <div className="space-y-5">
+            <MirrorPanel picture={picture} onChat={onChat} onChanged={resource.refresh} />
+            <div className="grid gap-5 lg:grid-cols-3">
+              <SectionCard className="lg:col-span-2" title={text.heatmapTitle} description={text.heatmapIntro} icon={LayoutGrid} tone="blue">
+                <CoverageHeatmap coverage={picture.coverage} selected={filter} onSelect={selectArea} />
+              </SectionCard>
+              <SectionCard title={text.certaintyTitle} icon={TrendingUp} tone="sky">
+                <CertaintyChart ratings={picture.ratings} />
+              </SectionCard>
+            </div>
+            <div className="grid gap-5 md:grid-cols-2">
+              <SectionCard title={text.interestsTitle} icon={areaIcon("interests")} tone="rose">
+                <ChipCloud items={picture.sections?.interests || []} tone="rose" />
+              </SectionCard>
+              <SectionCard title={text.strengthsTitle} icon={areaIcon("strengths")} tone="amber">
+                <ChipCloud items={[...picture.personal.self, ...skills]} tone="amber" />
+              </SectionCard>
+            </div>
+            <SectionCard title={text.peopleTitle} icon={Users} tone="teal">
+              <PeopleMap people={picture.personal.world.people || []} showPrivate={showPrivate} initials={initials} />
+            </SectionCard>
+            <div className="grid gap-5 lg:grid-cols-3">
+              <SectionCard className="lg:col-span-2" title={text.educationTitle} icon={GraduationCap} tone="violet">
+                <EducationTimeline cards={datedEducation} />
+              </SectionCard>
+              <SectionCard title={text.stillWants} description={text.stillWantsIntro} icon={MessageCircle} tone="blue" variant="dashed">
+                {missing.length ? (
+                  <div className="flex flex-wrap gap-2">
+                    {missing.map(([key, label]) => {
+                      const Icon = areaIcon(key);
+                      const tone = areaTone(key);
+                      return (
+                        <button key={key} onClick={() => onChat(label)}
+                          className={cn("inline-flex min-h-11 items-center gap-2 rounded-full px-4 text-left text-sm font-semibold transition-transform hover:-translate-y-0.5", toneClass[tone].soft, toneClass[tone].ink)}>
+                          <Icon aria-hidden className="size-4 shrink-0" />
+                          {label}{picture.coverage[key]?.item_count ? ` · ${copy.partialArea}` : ""}
+                        </button>
+                      );
+                    })}
+                  </div>
+                ) : <p className="text-sm text-muted-foreground">{copy.empty}</p>}
+              </SectionCard>
+            </div>
+            <p className="flex items-start gap-2 text-xs text-muted-foreground"><ShieldCheck aria-hidden className="mt-0.5 size-4 shrink-0 text-success" />{text.privacyNote}</p>
           </div>
-        </section>
-      )}
-      <section className="my-6">
-        <h2 className="mb-4 text-xl font-semibold">{copy.education}</h2>
-        <ol className="space-y-3 border-l-2 border-primary/20 pl-5">
-          {datedCards
-            .filter((c) =>
-              ["education", "course", "test_attempt", "certification"].includes(
-                c.key,
-              ),
-            )
-            .map((c) => (
-              <li key={c.id}><EvidenceCard card={c} onSaved={resource.refresh} /></li>
-            ))}
-        </ol>
-      </section>
-      <div className="grid gap-5 md:grid-cols-2">
-        <Items
-          title={copy.people}
-          items={picture.personal.world.people || []}
-        />
-        <Items
-          title={copy.strengths}
-          items={[...picture.personal.self, ...skills]}
-        />
-        <Items title={copy.interests} items={picture.sections?.interests || []} />
-        <Items title={copy.values} items={picture.sections?.values || []} />
-        <Items title={copy.limits} items={picture.personal.pressures.items} />
-        <Items title={copy.options} items={picture.sections?.options || []} />
-        <Items title={copy.goals} items={picture.sections?.goals || picture.personal.source} />
+        )}
       </div>
-      <section className="my-6">
-        <h2 className="mb-4 text-xl font-semibold">{copy.review}</h2>
-        <div className="grid gap-3 md:grid-cols-2">
-          {cards
-            .filter(
-              (c) =>
-                ![
-                  "education",
-                  "course",
-                  "test_attempt",
-                  "certification",
-                ].includes(c.key),
-            )
-            .map((c) => (
-              <EvidenceCard key={c.id} card={c} onSaved={resource.refresh} />
-            ))}
-        </div>
-      </section>
-      <section className="rounded-2xl border border-dashed p-6">
-        <h2 className="font-semibold">{copy.missing}</h2>
-        <div className="mt-4 flex flex-wrap gap-2">
-          {Object.entries(copy.areas)
-            .filter(([key]) => !picture.coverage[key]?.covered)
-            .map(([key, label]) => (
-              <Button key={key} variant="outline" onClick={() => onChat(label)}>
-                {label}{picture.coverage[key]?.item_count ? ` · ${copy.partialArea}` : ""}
-              </Button>
-            ))}
-        </div>
-      </section>
-    </>
+    </div>
   );
 }
