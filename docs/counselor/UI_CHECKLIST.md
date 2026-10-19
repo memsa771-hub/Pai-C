@@ -14,9 +14,9 @@ and the link crawler (no dead buttons, no 404 links, no console errors, no page 
 | 4 | Profile: Visual and Details | [x] | `profile-*` |
 | 5 | Counselor chat and inline cards | [x] | `chat-*` |
 | 6 | Journey A-K | [x] | `journey-*` |
-| 7 | Paths | [ ] | `paths-*` |
-| 8 | Path page (G) | [ ] | `path-*` |
-| 9 | Where to study (H) | [ ] | `programs-*` |
+| 7 | Paths | [x] | `paths-*` |
+| 8 | Path page (G) | [x] | `path-*` |
+| 9 | Where to study (H) | [x] | `programs-*` |
 | 10 | Compare and choose | [ ] | `compare-*`, `decision-*` |
 | 11 | Plan and check-ins | [ ] | `plan-*` |
 | 12 | Documents | [ ] | `documents-*` |

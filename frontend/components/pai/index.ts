@@ -6,4 +6,4 @@ export { AreaHeatmap, type HeatmapArea } from './area-heatmap';
 export { Timeline, type TimelineItem, type TimelineState } from './timeline';
 export { QuadrantCard, type Quadrant } from './quadrant-card';
 export { EmptyState, ErrorState, Skeletons } from './states';
-export { toneClass, toneFor, TONES, type Tone } from './tone';
+export { toneClass, toneFor, tonesByOrder, TONES, type Tone } from './tone';

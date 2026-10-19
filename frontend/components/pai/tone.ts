@@ -12,9 +12,15 @@ export const toneClass: Record<Tone, { solid: string; soft: string; ink: string;
   sky: { solid: 'bg-tone-sky text-[#03263a]', soft: 'bg-tone-sky-soft', ink: 'text-tone-sky-ink', ring: 'ring-tone-sky/40', bar: 'bg-tone-sky' },
 };
 
-/** A stable tone for any id (paths, people), so a path keeps its colour. */
+/** A stable tone for any id (FNV-1a), for things without a list order. */
 export function toneFor(seed: string): Tone {
-  let hash = 0;
-  for (let i = 0; i < seed.length; i++) hash = (hash * 31 + seed.charCodeAt(i)) >>> 0;
+  let hash = 0x811c9dc5;
+  for (let i = 0; i < seed.length; i++) hash = Math.imul(hash ^ seed.charCodeAt(i), 0x01000193) >>> 0;
   return TONES[hash % TONES.length];
+}
+
+/** Distinct tones for a list (up to six), by position in the student's own
+ * list, so two paths side by side never share a colour. */
+export function tonesByOrder(ids: string[]): Record<string, Tone> {
+  return Object.fromEntries(ids.map((id, i) => [id, TONES[(i + 1) % TONES.length]]));
 }

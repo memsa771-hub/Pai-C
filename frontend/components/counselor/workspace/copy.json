@@ -314,5 +314,32 @@
       "I feel stuck"
     ]
   },
-  "ratingTitle": "Quick rating"
+  "ratingTitle": "Quick rating",
+  "pathsEmptyTitle": "No paths yet",
+  "pathsEmptyBody": "PAI suggests paths once it understands you a little. Keep talking, or tell PAI about a direction you are curious about.",
+  "openChat": "Talk with PAI",
+  "dismissedTitle": "Not for me ({count})",
+  "pathIntro": "What this path involves, in plain words. Places come later, only when you ask.",
+  "needsChecking": "Needs checking",
+  "needsCheckingBody": "PAI has not found a trusted source for this yet. It stays unknown rather than guessed.",
+  "placesCta": "Ready to look at places?",
+  "consentTitle": "Before PAI looks at places",
+  "consentBody": "PAI will search for programs for this path only. Each result shows its source and the date it was checked. Nothing about you is shared with any university.",
+  "programsLoading": "PAI is checking programs for this path. You can keep chatting meanwhile.",
+  "eligibilityTitle": "Your fit",
+  "rulesTitle": "Entry rules",
+  "programsFound": "{count} programs with sources",
+  "nextStepTitle": "Next: a reviewed roadmap",
+  "pathSectionIcons": {
+    "what_it_is": "book",
+    "what_you_study": "graduation",
+    "work_day": "sun",
+    "skills": "wrench",
+    "fit_for": "thumbs",
+    "fit_against": "flask",
+    "ways_in": "door",
+    "myths": "help",
+    "jobs": "briefcase",
+    "future": "telescope"
+  }
 }

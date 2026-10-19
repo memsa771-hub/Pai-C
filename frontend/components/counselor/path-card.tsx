@@ -1,12 +1,14 @@
 'use client';
 import { Compass, Quote } from 'lucide-react';
-import { StatChip, toneClass, toneFor } from '@/components/pai';
+import { StatChip, toneClass, toneFor, type Tone } from '@/components/pai';
 import { cn } from '@/lib/utils';
 
 /** The one path card: a colour accent per path (stable by id), the reason it
  * fits in the student's own words, and the actions the caller provides. */
-export function PathCardView({ id, title, whyLabel, why, quote, status, statusTone = 'neutral', actions, error, compact = false, headingLevel = 2 }: {
+export function PathCardView({ id, tone: given, title, whyLabel, why, quote, status, statusTone = 'neutral', actions, error, compact = false, headingLevel = 2 }: {
   id: string;
+  /** From tonesByOrder; falls back to a hash of the id. */
+  tone?: Tone;
   title: string;
   whyLabel: string;
   why: string;
@@ -18,7 +20,7 @@ export function PathCardView({ id, title, whyLabel, why, quote, status, statusTo
   compact?: boolean;
   headingLevel?: 2 | 3;
 }) {
-  const tone = toneFor(id);
+  const tone = given || toneFor(id);
   const Heading = `h${headingLevel}` as const;
   return (
     <article className={cn('relative flex min-w-0 flex-col overflow-hidden rounded-3xl border bg-card shadow-card transition-shadow hover:shadow-lift', compact ? 'my-3 max-w-lg' : 'h-full')}>

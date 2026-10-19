@@ -184,7 +184,7 @@ export function CounselorShell() {
                 />
               )
             ) : (
-              <Paths onOpen={openPath} />
+              <Paths onOpen={openPath} onChat={chat} />
             ))}
           {active === "compare" && (
             <Compare onChat={chat} onOpen={openPath} />

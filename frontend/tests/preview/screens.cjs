@@ -84,4 +84,13 @@ module.exports = [
     await page.getByRole('button', { name: 'Open conversation' }).first().click();
     await page.getByRole('region', { name: 'Check-in' }).waitFor();
   } },
+
+  { id: 'paths', path: '/student?view=paths', ready: 'main h1', full: true },
+  { id: 'path', path: '/student?view=paths&path=path-one', ready: 'main h1', full: true },
+  { id: 'programs-consent', path: '/student?view=paths&path=path-one&stage=H', ready: 'main h1', full: true },
+  { id: 'programs', path: '/student?view=paths&path=path-one&stage=H&programs=1', ready: 'main h1', full: true },
+  { id: 'programs-none-verified', path: '/student?view=paths&path=path-one&stage=H', ready: 'main h1', full: true, crawl: false, setup: async (page) => {
+    await page.getByRole('checkbox').check(); await page.getByRole('button', { name: 'Look at programs' }).click();
+    await page.getByText('No verified program information', { exact: false }).waitFor();
+  } },
 ];

@@ -6,11 +6,12 @@ import { useT } from '@/lib/i18n';
 import type { Possibility } from '@/lib/possibilities';
 import { Button } from '@/components/ui/button';
 import { PathCardView } from './path-card';
+import { tonesByOrder, type Tone } from '@/components/pai';
 import copy from './workspace/copy.json';
 
 const statusTone = { suggested: 'blue', exploring: 'blue', saved: 'success', dismissed: 'neutral', chosen: 'success' } as const;
 
-export function PossibilityCard({ value, onChange }: { value: Possibility; onChange: (value: Possibility) => void }) {
+export function PossibilityCard({ value, onChange, tone }: { value: Possibility; onChange: (value: Possibility) => void; tone?: Tone }) {
   const t = useT();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -21,7 +22,7 @@ export function PossibilityCard({ value, onChange }: { value: Possibility; onCha
     catch { setError(t('possibilities.error')); }
     finally { setBusy(false); }
   };
-  return <PathCardView compact headingLevel={3} id={value.id} title={value.title} whyLabel={copy.why} why={value.why}
+  return <PathCardView compact headingLevel={3} id={value.id} tone={tone} title={value.title} whyLabel={copy.why} why={value.why}
     quote={value.evidence[0]?.text} status={t(`possibilities.${value.status}`)} statusTone={statusTone[value.status]} error={error}
     actions={<>
       {(['suggested', 'saved', 'dismissed'].includes(value.status)) && <Button size="tap" disabled={busy} onClick={() => void action('explore')}><Compass aria-hidden />{t('possibilities.explore')}</Button>}
@@ -41,10 +42,11 @@ export function Possibilities({ id, refreshKey, onUpdated }: { id?: string; refr
     return () => { active = false; };
   }, [id, refreshKey]);
   const selected = rows.filter(row => id ? row.id === id : row.status !== 'chosen');
+  const tones = tonesByOrder(rows.map(row => row.id));
   if (failed) return <p role="alert" className="text-sm font-medium text-danger-ink">{t('possibilities.error')}</p>;
   if (!selected.length) return null;
   return <section>{!id && <h2 className="mt-5 text-lg font-bold">{t('possibilities.title')}</h2>}
-    {selected.map(row => <PossibilityCard key={row.id} value={row}
+    {selected.map(row => <PossibilityCard key={row.id} value={row} tone={tones[row.id]}
       onChange={updated => { setRows(current => current.map(item => item.id === updated.id ? updated : item)); onUpdated?.(); }} />)}
   </section>;
 }
