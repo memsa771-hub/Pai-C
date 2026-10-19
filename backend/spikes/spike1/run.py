@@ -26,14 +26,14 @@ from spikes.spike1.agent import build_agents, openai_model, read, user_prompt
 from spikes.spike1.pages import Fetcher, collect
 from spikes.spike1.programmes import Programme, load_key, load_programmes
 from spikes.spike1.score import score
-from spikes.spike1.trust import judge_programme
+from spikes.spike1.trust import Verdict, judge_programme, needs_third_reading
 
 # Parent §9 prices for gpt-5.4-mini, USD per 1M tokens (checked 2026-10-13).
 PRICE_IN, PRICE_OUT = 0.75, 4.50
 
 
 async def research(programmes: list[Programme], fetcher: Fetcher, model: Model, min_cycle: int,
-                   concurrency: int = 4) -> dict:
+                   concurrency: int = 4, third: bool = True) -> dict:
     agents = build_agents(model)
     sem = asyncio.Semaphore(concurrency)
 
@@ -42,12 +42,16 @@ async def research(programmes: list[Programme], fetcher: Fetcher, model: Model, 
         prompt = user_prompt(p, pages)
         async with sem:
             ra, rb = await asyncio.gather(read(agents["A"], prompt), read(agents["B"], prompt))
-        verdicts = judge_programme(ra.reading, rb.reading, pages, p.domains, min_cycle)
+            done = [("A", ra), ("B", rb)]
+            if third and needs_third_reading(ra.reading, rb.reading, pages, p.domains):
+                done.append(("C", await read(agents["C"], prompt)))
+        rc = dict(done).get("C")
+        verdicts = judge_programme(ra.reading, rb.reading, pages, p.domains, min_cycle, rc.reading if rc else None)
         return p.ref, {
             "pages": [{"url": x.url, "ok": x.ok, "blocked": x.blocked, "chars": len(x.text)} for x in pages],
             "readings": {n: {"error": r.error, "input_tokens": r.input_tokens, "output_tokens": r.output_tokens,
                              "requests": r.requests, "output": r.reading.model_dump() if r.reading else None}
-                         for n, r in (("A", ra), ("B", rb))},
+                         for n, r in done},
             "verdicts": verdicts,
         }
 
@@ -70,6 +74,7 @@ def report(results: dict, key: dict, elapsed: float, model_name: str, min_cycle:
         "fabricated_quotes": s.reasons.get("quote_not_on_page", 0),
         "reading_errors": [f"{ref}/{n}: {rd['error']}" for ref, r in results.items()
                            for n, rd in r["readings"].items() if rd["error"]],
+        "third_readings": sum("C" in r["readings"] for r in results.values()),
         "pages_read": sum(p["ok"] for p in pages), "pages_blocked": sorted({f"{p['url']} ({p['blocked']})" for p in pages if p["blocked"]}),
         "input_tokens": tin, "output_tokens": tout,
         "cost_usd": round(tin / 1e6 * PRICE_IN + tout / 1e6 * PRICE_OUT, 4),
@@ -85,7 +90,21 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--min-cycle", type=int, default=2026)
     ap.add_argument("--only", nargs="*", help="programme refs to run (default: all 30)")
     ap.add_argument("--concurrency", type=int, default=4)
+    ap.add_argument("--no-third", action="store_true", help="two readings only (runs 1-8)")
+    ap.add_argument("--rescore", type=Path, help="score an earlier --out file against the current key (no fetch, no model)")
     args = ap.parse_args(argv)
+
+    if args.rescore:
+        old = json.loads(args.rescore.read_text(encoding="utf-8"))
+        results = {ref: {**r, "verdicts": {f: Verdict(**v) for f, v in r["verdicts"].items()}}
+                   for ref, r in old["results"].items()}
+        key = {ref: row for ref, row in load_key().items() if ref in results}
+        rep = report(results, key, old["report"]["elapsed_s"], old["report"]["model"], old["report"]["min_cycle"])
+        args.out.write_text(json.dumps({"report": rep, "results": old["results"]}, indent=2, ensure_ascii=False,
+                                       default=str), encoding="utf-8")
+        print(json.dumps({k: rep[k] for k in ("scored", "confirmed", "correct", "correct_rate", "confirmed_rate")}))
+        print("pass bar: PASS" if rep["pass"] else f"pass bar: FAIL ({'; '.join(rep['fails'])})")
+        return 0 if rep["pass"] else 1
 
     settings = load_settings({"DATABASE_URL": "unused-by-spike1", **os.environ})  # no database here
     if args.model == "openai":
@@ -98,7 +117,7 @@ def main(argv: list[str] | None = None) -> int:
 
     programmes = [p for p in load_programmes() if not args.only or p.ref in args.only]
     t0 = time.monotonic()
-    results = asyncio.run(research(programmes, Fetcher(args.cache), model, args.min_cycle, args.concurrency))
+    results = asyncio.run(research(programmes, Fetcher(args.cache), model, args.min_cycle, args.concurrency, not args.no_third))
     key = {ref: row for ref, row in load_key().items() if ref in results}
     rep = report(results, key, time.monotonic() - t0, model_name, args.min_cycle)
 

@@ -129,11 +129,40 @@ def test_judge(a, b, field, min_cycle, status, reason):
         assert reason in v.reasons
 
 
+@pytest.mark.parametrize("a,b,c,status,reason", [
+    (fact("07-15"), None, fact("07-15"), "confirmed", None),                            # C stands in for missing B
+    (fact("07-15"), fact("07-15", quote="invented"), fact("07-15"), "confirmed", None),  # ... or for rejected B
+    (fact("07-15"), None, fact("07-01"), "unconfirmed", "readings_disagree"),
+    (fact("07-15"), fact("07-15"), fact("07-01"), "unconfirmed", "readings_disagree"),   # C never outvoted
+    (fact("07-15"), fact("07-01"), fact("07-15"), "unconfirmed", "readings_disagree"),   # nor outvotes
+    (None, None, fact("07-15"), "unconfirmed", "single_reading"),
+])
+def test_judge_third_reading(a, b, c, status, reason):
+    v = judge("deadline_close", a, b, PAGE_TEXT, ("uni-x.de",), 2026, c)
+    assert v.status == status
+    if reason:
+        assert reason in v.reasons
+
+
 def test_judge_not_official_even_if_quote_matches():
     pages = {"https://agency.com/p": PAGE_TEXT[UNI + "/p"]}
     v = judge("application_route", fact("uni_assist", url="https://agency.com/p"),
               fact("uni_assist", url="https://agency.com/p"), pages, ("uni-x.de",), 2026)
     assert v.status == "unconfirmed" and "A:not_official" in v.reasons
+
+
+@pytest.mark.parametrize("quote,ok", [
+    ("Application deadline\n31 May 2027", True),             # table label and value, other text between
+    ("Application deadline ... 31 May 2027", True),          # a cut passage
+    ("31 May 2027\nApplication deadline", False),            # pieces out of order
+    ("Application deadline\n15 January 2027", False),        # the value sits far away on the page
+    ("Application deadline 31 May 2027", False),             # merged into one sentence the page never has
+    ("Application\x00a0deadline", True),                     # a garbled non-breaking space
+])
+def test_quote_pieces_must_be_close_and_in_order(quote, ok):
+    from spikes.spike1.trust import quote_on_page
+    page = normalise("Application deadline\nFor applicants with a foreign degree: 31 May 2027\n" + "x " * 300 + "15 January 2027")
+    assert quote_on_page(quote, page) is ok
 
 
 def test_quote_match_ignores_case_and_whitespace():
@@ -231,20 +260,27 @@ def test_research_end_to_end(tmp_path):
                   "language_of_instruction": {**language, "quote": "Taught entirely in English"} if is_b else language}
         return canned(info, values)
 
-    results = asyncio.run(research([prog], f, FunctionModel(model_fn), min_cycle=2026))
-    v = results["uni-x-data"]["verdicts"]
+    two = asyncio.run(research([prog], f, FunctionModel(model_fn), min_cycle=2026, third=False))
+    v = two["uni-x-data"]["verdicts"]
+    assert set(two["uni-x-data"]["readings"]) == {"A", "B"}
     assert v["deadline_close"].status == "confirmed" and v["deadline_close"].cycle_year == 2026
     assert v["application_route"].status == "confirmed"
     assert v["language_of_instruction"].status == "unconfirmed" and "B:quote_not_on_page" in v["language_of_instruction"].reasons
     assert v["deadline_open"].status == "not_found"
+
+    # With reading C (the default), B's rejected language quote is replaced by C's valid one.
+    results = asyncio.run(research([prog], f, FunctionModel(model_fn), min_cycle=2026))
+    assert set(results["uni-x-data"]["readings"]) == {"A", "B", "C"}
+    lang = results["uni-x-data"]["verdicts"]["language_of_instruction"]
+    assert lang.status == "confirmed" and "B:quote_not_on_page" in lang.reasons
 
     key = {"uni-x-data": {"key_status": "confirmed", "facts": {
         "deadline_close": "07-15", "application_route": "direct", "language_of_instruction": "english",
         "deadline_open": "04-01", **{k: None for k in ("tuition_fee_non_eu_eur", "semester_contribution_eur",
         "english_requirement", "german_requirement", "grade_requirement", "admission_test", "intakes")}}}}
     rep = report(results, key, 1.0, "fake", 2026)
-    assert (rep["scored"], rep["confirmed"], rep["correct"]) == (4, 2, 1)
-    assert rep["pass"] is False and rep["fabricated_quotes"] == 1
+    assert (rep["scored"], rep["confirmed"], rep["correct"]) == (4, 3, 2)
+    assert rep["pass"] is False and rep["fabricated_quotes"] == 1 and rep["third_readings"] == 1
     assert rep["wrong"][0]["field"] == "application_route" and rep["pages_read"] == 2
 
 

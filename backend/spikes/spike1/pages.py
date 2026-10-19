@@ -68,7 +68,7 @@ class _TextAndLinks(HTMLParser):
 
 def normalise(text: str) -> str:
     """Whitespace collapsed and case folded; quotes are matched in this form (SP1-D7 b)."""
-    text = text.replace(" ", " ").replace("–", "-").replace("—", "-")
+    text = text.replace("\x00a0", " ").replace(" ", " ").replace("–", "-").replace("—", "-")
     text = text.replace("’", "'").replace("“", '"').replace("”", '"')
     return re.sub(r"\s+", " ", text).strip().casefold()
 

@@ -52,7 +52,7 @@ def score(key: dict, verdicts: dict[str, dict[str, Verdict]]) -> Score:
             v = got.get(f) or Verdict("not_found")
             expected = row["facts"][f]
             for r in v.reasons:
-                r = r[2:] if r[:2] in ("A:", "B:") else r
+                r = r[2:] if r[:2] in ("A:", "B:", "C:") else r
                 s.reasons[r.split(":")[0]] += 1
             item = {"ref": ref, "field": f, "expected": expected, "got": v.value, "status": v.status,
                     "url": v.url, "quote": v.quote, "reasons": v.reasons}

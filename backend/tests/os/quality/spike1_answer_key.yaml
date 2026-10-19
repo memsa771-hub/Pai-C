@@ -7,6 +7,12 @@
 # This is a quality set kept forever (parent spec §5): it is re-run on any change to the research
 # agent's prompts, models or specs. Update it only with a cited reason.
 #
+# Corrections after Spike 1 run 1 (2026-10-19), each from an official quote the run verified on the page;
+# details in docs/os/spikes/spike1-report.md: intakes set to null where the developers' check is silent
+# (the transcription had defaulted them to winter only); OVGU semester fee 311.30 and Saarland 394.30
+# (current DAAD pages); TU Chemnitz Automotive Software Engineering and Web Engineering need German A1
+# with the application (TU Chemnitz application page).
+#
 # `cycle` is the intake the developers' check refers to. Most pages show WS 2026/27 or older; only rows
 # that say WS 2027/28 are for the pilot intake (see the Spike 1 design, SP1-D1).
 #
@@ -43,10 +49,10 @@ programmes:
       deadline_close: "07-15"
       application_route: direct
       english_requirement: {cefr: B2, ielts: 5.5, toefl_ibt: 72, pte: 59}
-      german_requirement: null
+      german_requirement: {level: A1, when: application}  # corrected, see the Web Engineering note
       grade_requirement: null
       admission_test: null
-      intakes: [winter]
+      intakes: null  # not stated in the developers' check (corrected 2026-10-19, see the Spike 1 report)
     notes: "Direct via the TU Chemnitz EduApplication Portal. Needs a CS or closely related bachelor."
 
   tu-chemnitz-embedded-systems:
@@ -69,7 +75,7 @@ programmes:
       german_requirement: {level: A1, when: application, then: "A2 by the end of semester 3"}
       grade_requirement: null
       admission_test: null
-      intakes: [winter]
+      intakes: null  # not stated in the developers' check (corrected 2026-10-19, see the Spike 1 report)
     notes: "Bachelor in Electrical Engineering & IT or equivalent. The DAAD fee (~296) is old."
 
   tu-chemnitz-web-engineering:
@@ -89,11 +95,16 @@ programmes:
       deadline_close: "07-15"
       application_route: direct
       english_requirement: {ielts: 5.5, toefl_ibt: 72, pte: 59}
-      german_requirement: {level: A2, when: before_semester_3}
+      german_requirement: {level: A1, when: application, then: "A2 by the end of semester 3"}  # corrected, see below
       grade_requirement: null
       admission_test: null
-      intakes: [winter]
-    notes: "Shortlist said uni-assist; the check found a direct application (EduApplication Portal)."
+      intakes: null  # not stated in the developers' check (corrected 2026-10-19, see the Spike 1 report)
+    notes: >-
+      Shortlist said uni-assist; the check found a direct application (EduApplication Portal).
+      German corrected 2026-10-19 (Spike 1 run 1): TU Chemnitz's application page says "Applicants applying
+      for a degree programme offered in English language need to show a German language proof at minimum
+      level A1 ... at the time of application." The developers' note said no German was needed to apply;
+      developers to confirm.
 
   tu-chemnitz-micro-and-nano-systems:
     row: 4
@@ -115,7 +126,7 @@ programmes:
       german_requirement: {level: A1, when: application}
       grade_requirement: null
       admission_test: null
-      intakes: [winter]
+      intakes: null  # not stated in the developers' check (corrected 2026-10-19, see the Spike 1 report)
 
   ovgu-eeit:
     row: 5
@@ -130,7 +141,7 @@ programmes:
     facts:
       language_of_instruction: english
       tuition_fee_non_eu_eur: 0
-      semester_contribution_eur: {value: 277.90, approx: true}
+      semester_contribution_eur: {value: 311.30, approx: true}  # corrected: DAAD "Currently, the semester fee is 311.30 EUR."
       deadline_open: null
       deadline_close: "07-15"
       application_route: uni_assist
@@ -203,7 +214,7 @@ programmes:
       german_requirement: null
       grade_requirement: null
       admission_test: null
-      intakes: [winter]
+      intakes: null  # not stated in the developers' check (corrected 2026-10-19, see the Spike 1 report)
     notes: "Shortlist said 15 Jul (third-party). Tier B."
 
   btu-environmental-resource-management:
@@ -225,7 +236,7 @@ programmes:
       german_requirement: null
       grade_requirement: null
       admission_test: null
-      intakes: [winter]
+      intakes: null  # not stated in the developers' check (corrected 2026-10-19, see the Spike 1 report)
     notes: "The DAAD page (1 Jun) is the 2021/22 cycle. Tier B."
 
   hsrw-mechanical-engineering:
@@ -250,7 +261,7 @@ programmes:
       admission_test:
         applies_to: non_ehea_degree
         any_of: ["TestAS Core + Engineering >= 100", "GATE (no threshold published)", "GRE Q160 V145 AW4.5"]
-      intakes: [winter]
+      intakes: null  # not stated in the developers' check (corrected 2026-10-19, see the Spike 1 report)
 
   hsrw-information-engineering-computer-science:
     row: 11
@@ -274,7 +285,7 @@ programmes:
       admission_test:
         applies_to: non_ehea_degree
         any_of: ["TestAS >= 100", "GATE", "GRE Q160 V145 AW4.5"]
-      intakes: [winter]
+      intakes: null  # not stated in the developers' check (corrected 2026-10-19, see the Spike 1 report)
 
   hildesheim-data-analytics:
     row: 12
@@ -378,7 +389,7 @@ programmes:
     facts:
       language_of_instruction: english_or_german
       tuition_fee_non_eu_eur: 0
-      semester_contribution_eur: {value: 277.90, approx: true}
+      semester_contribution_eur: {value: 311.30, approx: true}  # corrected: DAAD "Currently, the semester fee is 311.30 EUR."
       deadline_open: "04-15"
       deadline_close: "05-15"
       application_route: uni_assist
@@ -386,7 +397,7 @@ programmes:
       german_requirement: null
       grade_requirement: null
       admission_test: null
-      intakes: [winter]
+      intakes: null  # not stated in the developers' check (corrected 2026-10-19, see the Spike 1 report)
     notes: "C1 in the chosen language of study."
 
   ovgu-digital-engineering:
@@ -401,7 +412,7 @@ programmes:
     facts:
       language_of_instruction: english_or_german
       tuition_fee_non_eu_eur: 0
-      semester_contribution_eur: {value: 277.90, approx: true}
+      semester_contribution_eur: {value: 311.30, approx: true}  # corrected: DAAD "Currently, the semester fee is 311.30 EUR."
       deadline_open: "04-15"
       deadline_close: "05-15"
       application_route: uni_assist
@@ -409,7 +420,7 @@ programmes:
       german_requirement: null
       grade_requirement: null
       admission_test: null
-      intakes: [winter]
+      intakes: null  # not stated in the developers' check (corrected 2026-10-19, see the Spike 1 report)
 
   btu-power-engineering:
     row: 18
@@ -452,7 +463,7 @@ programmes:
       german_requirement: null
       grade_requirement: {note: "bachelor in CS or computer engineering, >= 180 credits"}
       admission_test: null
-      intakes: [winter]
+      intakes: null  # not stated in the developers' check (corrected 2026-10-19, see the Spike 1 report)
     notes: "TU Ilmenau's site blocks automated reading; only DAAD was checked. Visa applicants should apply 3 months before the deadline."
 
   paderborn-computer-science:
@@ -516,7 +527,7 @@ programmes:
     facts:
       language_of_instruction: english
       tuition_fee_non_eu_eur: 0
-      semester_contribution_eur: {value: 280, approx: true}
+      semester_contribution_eur: {value: 394.30}  # corrected: DAAD "an administrative fee of 394.30 EUR per semester"
       deadline_open: null
       deadline_close: "05-15"
       application_route: direct
@@ -524,7 +535,7 @@ programmes:
       german_requirement: null
       grade_requirement: {percent_min: 75, note: "2 recommendation letters; GRE recommended, not mandatory"}
       admission_test: null
-      intakes: [winter]
+      intakes: null  # not stated in the developers' check (corrected 2026-10-19, see the Spike 1 report)
     notes: "Direct via apply.cs.uni-saarland.de. Early deadline 15 Nov, normal 15 May. The check used myGUIDE/DAAD only."
 
   tu-dortmund-automation-robotics:
@@ -546,7 +557,7 @@ programmes:
       german_requirement: null
       grade_requirement: null
       admission_test: null
-      intakes: [winter]
+      intakes: null  # not stated in the developers' check (corrected 2026-10-19, see the Spike 1 report)
     notes: "uni-assist opens in early February (exact day not given). TU Dortmund's own page showed no admission details."
 
   passau-computer-science:
@@ -569,7 +580,7 @@ programmes:
       german_requirement: null
       grade_requirement: {german_max: 2.7, note: "or top 70%; >= 110 ECTS of CS"}
       admission_test: null
-      intakes: [winter]
+      intakes: null  # not stated in the developers' check (corrected 2026-10-19, see the Spike 1 report)
     notes: "No tuition 'at this time'; Bavaria lets universities charge non-EU students, so re-check before 2027."
 
   siegen-computer-science:
@@ -614,7 +625,7 @@ programmes:
       german_requirement: null
       grade_requirement: null
       admission_test: null
-      intakes: [winter]
+      intakes: null  # not stated in the developers' check (corrected 2026-10-19, see the Spike 1 report)
     notes: "Separate direct application (faculty + unisono). Open admission; engineering bachelor required."
 
   rptu-commercial-vehicle-technology:
@@ -658,7 +669,7 @@ programmes:
       german_requirement: null
       grade_requirement: {percent_min: 75}
       admission_test: null
-      intakes: [winter]
+      intakes: null  # not stated in the developers' check (corrected 2026-10-19, see the Spike 1 report)
 
   hof-software-engineering-industrial-applications:
     row: 29
@@ -679,7 +690,7 @@ programmes:
       german_requirement: {level: A2, when: "before the internship"}
       grade_requirement: {note: "1 year of work experience after graduating"}
       admission_test: null
-      intakes: [winter]
+      intakes: null  # not stated in the developers' check (corrected 2026-10-19, see the Spike 1 report)
     notes: "Excluded: fails the no-tuition criterion (EUR 3,300 per semester for all students). The Hof website could not be loaded."
 
   koblenz-web-data-science:

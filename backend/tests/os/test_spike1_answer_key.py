@@ -41,7 +41,7 @@ def test_enums_and_shapes(programmes):
         assert p["key_status"] in STATUSES, ref
         assert f["application_route"] in ROUTES, ref
         assert f["language_of_instruction"] in LANGUAGES, ref
-        assert set(f["intakes"]) <= {"winter", "summer"} and "winter" in f["intakes"], ref
+        assert f["intakes"] is None or (set(f["intakes"]) <= {"winter", "summer"} and "winter" in f["intakes"]), ref
         for d in ("deadline_open", "deadline_close"):
             v = f[d]
             assert v is None or (len(v) == 5 and v[2] == "-" and 1 <= int(v[:2]) <= 12 and 1 <= int(v[3:]) <= 31), (ref, d)
