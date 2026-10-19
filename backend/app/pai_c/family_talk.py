@@ -1,5 +1,6 @@
 """Student-selected family preparation, using only existing quoted evidence."""
 import json
+import hashlib
 from pathlib import Path
 from sqlalchemy import select
 from app.models import PaiPossibility, ExecutionRun, CounselorTurnDecision, EventRecord
@@ -27,8 +28,9 @@ def prepare(db, workspace_id):
     family = [{key: person.get(key, '') for key in ('id', 'role', 'wish', 'worry', 'evidence')}
               for person in people if person.get('evidence')]
     # The student chooses the connection; code never claims a quote answers a worry.
-    evidence = [{'id': str(index), 'quote': row['text']} for index, row in enumerate(path.evidence or [])
+    evidence = [{'id': hashlib.sha256(row['text'].encode()).hexdigest(), 'quote': row['text']} for row in path.evidence or []
                 if isinstance(row, dict) and isinstance(row.get('text'), str) and row['text'].strip()]
+    evidence = list({row['id']: row for row in evidence}.values())
     return {'ready': bool(family and evidence), 'path_id': path.id, 'path': path.title,
         'family': family, 'evidence': evidence,
         'message': rules['intro'] if family and evidence else rules['missing_family'] if not family else rules['missing_evidence']}

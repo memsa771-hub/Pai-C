@@ -6,7 +6,7 @@ from datetime import datetime, timedelta, timezone
 from pydantic import BaseModel, ConfigDict
 from sqlalchemy import select
 from app.config import config
-from app.models import BackgroundJob, CounselorTurnDecision, Workspace
+from app.models import BackgroundJob, CounselorTurnDecision, CounselorNotedQuestion, Workspace
 from app.pai_c.memory import MemoryService
 from app.pai_c.policy.controller import load_data
 
@@ -67,6 +67,24 @@ def reply(db, workspace_id, topic):
     return policy()["source_reply"].format(quote=fact["quote"], date=fact["checked_at"][:10], url=fact["source_url"])
 
 
+def record_answer(db, workspace_id, topic, source_event_id, reply_event_id):
+    """Close only the requests whose exact checked claim was actually posted."""
+    item = selected(db, workspace_id, topic)
+    job = latest_check(db, workspace_id, item) if item else None
+    fact = checked_fact(job)
+    if not fact:
+        return
+    for row in db.scalars(select(CounselorNotedQuestion).where(
+            CounselorNotedQuestion.workspace_id == workspace_id,
+            CounselorNotedQuestion.source_event_id.in_([source_event_id, job.payload.get('source_event_id')]),
+            CounselorNotedQuestion.question_to_research == item.value,
+            CounselorNotedQuestion.status.in_(['open', 'unanswered']))):
+        row.status = 'answered'
+        row.answered_event_id = reply_event_id
+        row.answer = fact
+    db.commit()
+
+
 def enqueue_check(db, workspace_id, topic, source_event_id):
     from app.runtime.task_runtime import enqueue
     from app.pai_c.deep.noted_questions import NotedQuestionService
@@ -115,8 +133,11 @@ async def check_job(job, db):
         granted_capabilities=MemoryService(db).agent_capabilities(PAI_AGENT_NAME))
     db.rollback()
     pages = []
+    # A separate bounded window avoids consuming a future Mirror's allowance or
+    # locking the student out of belief checks for the lifetime of the workspace.
+    period = int(datetime.now(timezone.utc).timestamp() // (rules['budget_period_days'] * 86400))
     with bounded_research(queries=1, fetches=rules["fetch_limit"], seconds=config.PAI_RESEARCH_MAX_SECONDS,
-            workspace_id=job.workspace_id, mirror_version="belief_checks") as budget:
+            workspace_id=job.workspace_id, mirror_version=f"belief_checks:{period}") as budget:
         found = data(await get_tool_executor().execute("web.search", {"query": rules["query"].format(claim=claim), "limit": rules["search_limit"]}, ctx))
         for hit in (found.get("results") or [])[:rules["fetch_limit"]]:
             if not public_https(hit.get("url")):

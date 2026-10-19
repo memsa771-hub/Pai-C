@@ -189,6 +189,9 @@ async def _run_deep_turn(db, workspace_id: str, event_data: dict, depth: int):
     post_ms = int((time.monotonic() - post_started) * 1000)
     if not assistant_event_id:
         return None
+    if decision is not None and decision.action == "clear_myth":
+        from app.pai_c.myths import record_answer
+        record_answer(db, workspace_id, decision.topic, turn.source_event_id, assistant_event_id)
     if decision is not None and decision.action == "discover":
         from app.pai_c.possibilities import PossibilityService
         PossibilityService(db).mark_mentioned(workspace_id, decision.topic)

@@ -4,6 +4,7 @@
   "item_paths": ["said", "source", "self"],
   "cache_days": 30,
   "retry_hours": 24,
+  "budget_period_days": 30,
   "search_limit": 4,
   "fetch_limit": 3,
   "page_chars": 12000,
