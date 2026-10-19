@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { workspaceApi } from '@/lib/api';
 import { useT } from '@/lib/i18n';
+import { evidenceLabel } from '@/lib/evidence-text';
 import type { DecisionRecord, Roadmap } from '@/lib/roadmaps';
 import {
   Dialog, DialogBody, DialogContent, DialogDescription, DialogFooter,
@@ -55,7 +56,7 @@ export function RoadmapChoiceDialog({ roadmap, channel, onClose, onChosen }: {
           <section aria-label={t('counselorRoadmaps.acceptedGaps')}>
             <h3 className="font-semibold">{t('counselorRoadmaps.acceptedGaps')}</h3>
             {gaps.length ? <ul className="mt-1 list-disc space-y-1 pl-5">{gaps.map((gap, index) =>
-              <li key={`${gap.field || 'gap'}-${index}`}>{gap.reason || gap.field}</li>)}</ul>
+              <li key={`${gap.field || 'gap'}-${index}`}>{gap.reason || evidenceLabel(gap.field || '')}</li>)}</ul>
               : <p className="mt-1 text-muted-foreground">{t('counselorRoadmaps.noGaps')}</p>}
           </section>
           <section aria-label={t('counselorRoadmaps.acceptedRisks')}>

@@ -31,7 +31,7 @@ export function PathCard({
   return (
     <article className="flex flex-col rounded-2xl border bg-card p-6 shadow-sm">
       <p className="mb-3 text-xs capitalize text-muted-foreground">
-        {path.status}
+          {human(path.status)}
       </p>
       <h2 className="text-xl font-semibold">{path.title}</h2>
       <p className="mt-4 text-xs font-medium text-primary">{copy.why}</p>

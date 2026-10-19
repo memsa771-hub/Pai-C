@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useState } from "react";
 import copy from "./copy.json";
 import { Button } from "@/components/ui/button";
+export { evidenceText as human, evidenceLabel } from "@/lib/evidence-text";
 
 export function useResource<T>(load: () => Promise<T>) {
   const [data, setData] = useState<T | null>(null),
@@ -91,13 +92,4 @@ export function Heading({
       {action}
     </header>
   );
-}
-export function human(value: unknown): string {
-  if (value === null || value === undefined) return "";
-  if (Array.isArray(value)) return value.map(human).filter(Boolean).join(" · ");
-  if (typeof value === "object")
-    return Object.entries(value as Record<string, unknown>)
-      .map(([key, item]) => `${key.replaceAll("_", " ")}: ${human(item)}`)
-      .join(" · ");
-  return String(value);
 }

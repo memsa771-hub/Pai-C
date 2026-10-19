@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import copy from "./copy.json";
-import { Heading, LoadState, useResource, human } from "./resource";
+import { Heading, LoadState, useResource, human, evidenceLabel } from "./resource";
 const load = async () => {
   const [picture, cards] = await Promise.all([
     workspaceApi.getCounselorWorkspace(),
@@ -133,7 +133,7 @@ function ValueEditor({
         {Object.entries(value).map(([key, item]) => (
           <ValueEditor
             key={key}
-            label={key.replaceAll("_", " ")}
+            label={evidenceLabel(key)}
             value={item}
             onChange={(next) =>
               onChange(
@@ -211,7 +211,7 @@ export function EvidenceCard({
         <div className="flex items-start justify-between gap-3">
           <div>
             <p className="text-xs capitalize text-muted-foreground">
-              {card.key.replaceAll("_", " ").replaceAll(".", " · ")}
+              {evidenceLabel(card.key)}
             </p>
             <p className="mt-2 break-words text-sm leading-relaxed">
               {human(card.value)}
@@ -229,7 +229,7 @@ export function EvidenceCard({
         </p>
         {editing && (
           <>
-            <ValueEditor value={value} onChange={setValue} label={card.key} />
+            <ValueEditor value={value} onChange={setValue} label={evidenceLabel(card.key)} />
             <Textarea
               aria-label={copy.explainEdit}
               placeholder={copy.explainEdit}
@@ -317,7 +317,7 @@ function Items({ title, items }: { title: string; items: EvidenceItem[] }) {
                 </p>
               )}
               {item.kind && <span className="mt-2 mr-2 inline-block rounded-full border px-2 py-1 text-xs">{copy.evidenceKinds[item.kind as keyof typeof copy.evidenceKinds]}</span>}
-              {item.category && <p className="mt-1 text-xs text-muted-foreground">{copy.whoseWish}: {copy.wishSources[item.category as keyof typeof copy.wishSources] || item.category}</p>}
+              {item.category && <p className="mt-1 text-xs text-muted-foreground">{copy.whoseWish}: {copy.wishSources[item.category as keyof typeof copy.wishSources] || copy.wishSources.other}</p>}
               {item.capability_status && (
                 <span className="mt-2 inline-block rounded-full bg-muted px-2 py-1 text-xs">
                   {copy.capabilityLabels[item.capability_status as keyof typeof copy.capabilityLabels]}

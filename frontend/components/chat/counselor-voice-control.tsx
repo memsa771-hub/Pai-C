@@ -4,17 +4,9 @@ import { useEffect, useRef, useState } from 'react';
 import { Mic, PhoneOff, RotateCcw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { CounselorVoiceSession, type VoiceStatus } from '@/lib/counselor-voice';
+import copy from './counselor-voice-copy.json';
 
-const labels: Record<VoiceStatus, string> = {
-  idle: 'Talk to PAI',
-  permission: 'Allow microphone…',
-  connecting: 'Connecting…',
-  listening: 'Listening',
-  speaking: 'PAI is speaking',
-  interrupted: 'Listening to you',
-  reconnecting: 'Reconnecting…',
-  error: 'Voice unavailable',
-};
+const labels: Record<VoiceStatus, string> = copy.status;
 
 export function CounselorVoiceControl({
   conversation, senderName, senderId, onMessagePosted,
@@ -63,20 +55,20 @@ export function CounselorVoiceControl({
         {status === 'idle' || status === 'error' ? (
           <Button type="button" size="sm" variant="outline" onClick={() => void start()} disabled={!senderId || !senderName.trim()}>
             {status === 'error' ? <RotateCcw className="mr-2 size-4" /> : <Mic className="mr-2 size-4" />}
-            {status === 'error' ? 'Retry voice' : 'Talk to PAI'}
+            {status === 'error' ? copy.retry : copy.start}
           </Button>
         ) : (
           <Button type="button" size="sm" variant="outline" onClick={() => void stop()}>
-            <PhoneOff className="mr-2 size-4" /> End voice session
+            <PhoneOff className="mr-2 size-4" /> {copy.end}
           </Button>
         )}
-        <span className="text-xs text-muted-foreground" role="status">{labels[status]}</span>
+        {status !== 'idle' && <span className="text-xs text-muted-foreground" role="status">{labels[status]}</span>}
       </div>
       {detail && <p className="mt-1 text-xs text-destructive">{detail}</p>}
       {(studentCaption || paiCaption) && status !== 'idle' && (
         <div className="mt-2 max-h-20 overflow-y-auto text-xs text-muted-foreground">
-          {studentCaption && <p><span className="font-medium">You:</span> {studentCaption}</p>}
-          {paiCaption && <p><span className="font-medium">PAI:</span> {paiCaption}</p>}
+          {studentCaption && <p><span className="font-medium">{copy.student}:</span> {studentCaption}</p>}
+          {paiCaption && <p><span className="font-medium">{copy.counselor}:</span> {paiCaption}</p>}
         </div>
       )}
     </div>

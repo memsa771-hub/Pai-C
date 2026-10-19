@@ -1,4 +1,5 @@
 'use client';
+import { evidenceLabel, evidenceText } from '@/lib/evidence-text';
 import { RoadmapFit } from './roadmap-fit';
 
 import { useEffect, useState } from 'react';
@@ -13,12 +14,12 @@ import {
 
 function readable(value: unknown): string {
   if (value == null) return '';
-  if (typeof value === 'string' || typeof value === 'number') return String(value);
+  if (typeof value === 'string' || typeof value === 'number') return evidenceText(value);
   if (Array.isArray(value)) return value.map(readable).filter(Boolean).join(', ');
   if (typeof value === 'object') {
     const item = value as Record<string, unknown>;
-    if (item.amount != null && item.currency) return `${item.currency} ${item.amount} ${String(item.basis || '').replaceAll('_', ' ')}`.trim();
-    return Object.values(item).map(readable).filter(Boolean).join(', ');
+    if (item.amount != null && item.currency) return `${item.currency} ${item.amount} ${evidenceText(item.basis)}`.trim();
+    return evidenceText(item);
   }
   return '';
 }
@@ -84,12 +85,12 @@ export function RoadmapDetailDialog({ roadmapId, onClose, onReported }: {
           {Object.keys(detail.fit_dimensions || {}).length > 0 && <section>
             <h3 className="font-semibold">{t('counselorRoadmaps.fitByArea')}</h3>
             <ul className="mt-1 space-y-1">{Object.entries(detail.fit_dimensions).map(([name, item]) =>
-              <li key={name}><strong>{name}:</strong> {item.level} — {item.reason}</li>)}</ul>
+              <li key={name}><strong>{evidenceLabel(name)}</strong> — {evidenceText(item.level)} — {item.reason}</li>)}</ul>
           </section>}
           {!detail.lane && detail.gaps.length > 0 && <section>
             <h3 className="font-semibold">{t('counselorRoadmaps.gaps')}</h3>
             <ul className="mt-1 space-y-2">{detail.gaps.map((gap, index) =>
-              <li key={`${gap.field || 'gap'}-${index}`}>{gap.reason || gap.status}
+              <li key={`${gap.field || 'gap'}-${index}`}>{gap.reason || evidenceText(gap.status)}
                 {gap.remediation?.action && <span> — {gap.remediation.action}</span>}
                 {gap.time_to_fix && <span> ({gap.time_to_fix})</span>}
               </li>)}</ul>

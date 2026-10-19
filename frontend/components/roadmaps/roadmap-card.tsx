@@ -1,4 +1,5 @@
 'use client';
+import { evidenceLabel, evidenceText } from '@/lib/evidence-text';
 import { RoadmapFit } from './roadmap-fit';
 
 import { ExternalLink, Heart, MessageCircle, X } from 'lucide-react';
@@ -45,7 +46,7 @@ export function RoadmapCard({ roadmap, busy, onAction, onDetails }: {
       {roadmap.generation_status === 'stale' && <span className="rounded-full bg-amber-100 px-2.5 py-1 text-amber-800">{t('counselorRoadmaps.needsReview')}</span>}
       {roadmap.exploring && <span className="rounded-full bg-primary/10 px-2.5 py-1 text-primary">{t('counselorRoadmaps.exploring')}</span>}
       {roadmap.total_cost?.status === 'verified' && roadmap.total_cost.amount != null &&
-        <span className="rounded-full bg-muted px-2.5 py-1">{roadmap.total_cost.currency} {roadmap.total_cost.amount} {roadmap.total_cost.basis}</span>}
+        <span className="rounded-full bg-muted px-2.5 py-1">{roadmap.total_cost.currency} {roadmap.total_cost.amount} {evidenceText(roadmap.total_cost.basis)}</span>}
       {roadmap.total_cost?.status !== 'verified' &&
         <span className="rounded-full bg-muted px-2.5 py-1">{t('counselorRoadmaps.costUnknown')}</span>}
       {roadmap.time_to_start && <span className="rounded-full bg-muted px-2.5 py-1">{t('counselorRoadmaps.start', { date: roadmap.time_to_start })}</span>}
@@ -54,14 +55,14 @@ export function RoadmapCard({ roadmap, busy, onAction, onDetails }: {
     {Object.keys(roadmap.fit_dimensions || {}).length > 0 && <div className="mt-3 text-xs">
       <p className="font-medium">{t('counselorRoadmaps.fitByArea')}</p>
       <div className="mt-1 flex flex-wrap gap-1.5">{Object.entries(roadmap.fit_dimensions).map(([area, fit]) =>
-        <span key={area} title={fit.reason || undefined} className="rounded-full border px-2 py-1">{area}: {fit.level}</span>)}</div>
+        <span key={area} title={fit.reason || undefined} className="rounded-full border px-2 py-1">{evidenceLabel(area)} — {evidenceText(fit.level)}</span>)}</div>
     </div>}
     <RoadmapFit roadmap={roadmap} compact />
     {!roadmap.lane && roadmap.gaps.length > 0 && <div className="mt-3 text-sm">
       <p className="font-medium">{t('counselorRoadmaps.gaps')}</p>
       <ul className="mt-1 list-disc space-y-1 pl-5 text-muted-foreground">
         {roadmap.gaps.slice(0, 3).map((gap, index) => <li key={`${gap.field || 'gap'}-${index}`}>
-          {gap.reason || gap.field || t('counselorRoadmaps.requirementToCheck')}
+          {gap.reason || (gap.field ? evidenceLabel(gap.field) : t('counselorRoadmaps.requirementToCheck'))}
           {gap.remediation?.action ? ` - ${gap.remediation.action}` : ''}</li>)}
       </ul>
     </div>}

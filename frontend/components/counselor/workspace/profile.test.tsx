@@ -66,7 +66,7 @@ it("confirms the exact digest; edits require an explanation", async () => {
   );
   fireEvent.click(screen.getByText("Edit"));
   fireEvent.change(
-    screen.getByRole("textbox", { name: "identity.full_name" }),
+    screen.getByRole("textbox", { name: "Name" }),
     { target: { value: "New name" } },
   );
   fireEvent.change(

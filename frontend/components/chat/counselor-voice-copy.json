@@ -1,0 +1,17 @@
+{
+  "start": "Talk to PAI",
+  "retry": "Retry voice",
+  "end": "End voice session",
+  "student": "You",
+  "counselor": "PAI",
+  "status": {
+    "idle": "Voice ready",
+    "permission": "Allow microphone…",
+    "connecting": "Connecting…",
+    "listening": "Listening",
+    "speaking": "PAI is speaking",
+    "interrupted": "Listening to you",
+    "reconnecting": "Reconnecting…",
+    "error": "Voice unavailable"
+  }
+}
