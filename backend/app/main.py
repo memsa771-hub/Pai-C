@@ -14,12 +14,16 @@ import uuid
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 
-from fastapi import FastAPI, Request
+from fastapi import Depends, FastAPI, Header, HTTPException, Request
+from sqlalchemy.orm import Session
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
 
+from app.application_workspace.access import _auth as _workspace_auth
 from app.config import config
+from app.database import get_db
+from app.os.api import mount_os
 from app.security.errors import IdentityUnavailable
 from app.api.response import ResponseCode, json_response
 from app.routers import account, app_version, application_workspace, auth, browser, counselor_summary, counselor_voice, deadlines, decision_records, escalations, events, feedback, fetch, files, integrations, knowledge, network, notifications, operator, roadmaps, routines, search, shares, student_profile, student_requests, tasks, timers, todos, workflows, workspaces
@@ -745,6 +749,23 @@ app.include_router(todos.router)
 app.include_router(workflows.router)
 app.include_router(timers.router)
 app.include_router(workspaces.router)
+
+
+# PAI OS (backend/app/os): mounted under /v1/os only when OS_ENABLED is set. The OS never imports
+# Counsellor code, so the signed-in student is passed in here: the student's workspace is their ref.
+def _os_student_ref(
+    network: str,
+    x_workspace_token: str | None = Header(None),
+    authorization: str | None = Header(None),
+    db: Session = Depends(get_db),
+) -> str:
+    workspace, error = _workspace_auth(db, network, x_workspace_token, authorization)
+    if error is not None:
+        raise HTTPException(status_code=error.status_code or 401)
+    return str(workspace.id)
+
+
+mount_os(app, student_dependency=_os_student_ref)
 
 
 @app.get("/health")
