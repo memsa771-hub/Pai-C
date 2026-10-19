@@ -447,6 +447,9 @@ class WorkspaceApi {
   async preparePathRoadmap(id:string):Promise<unknown> {
     return this.request(`/v1/counselor/paths/${encodeURIComponent(id)}/roadmap?network=${this.requireWorkspace()}`,{method:'POST',body:JSON.stringify({explore_places:true})});
   }
+  async acceptPathActivity(id:string):Promise<{status:string;available_at:string}> {
+    return this.request(`/v1/counselor/paths/${encodeURIComponent(id)}/try-it?network=${this.requireWorkspace()}`,{method:'POST',body:JSON.stringify({accepted:true})});
+  }
   async getPossibilities(): Promise<import('./possibilities').Possibility[]> {
     const result = await this.request<{ possibilities: import('./possibilities').Possibility[] }>(
       `/v1/counselor/possibilities?network=${this.requireWorkspace()}`);

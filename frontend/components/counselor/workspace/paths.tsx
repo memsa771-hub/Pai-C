@@ -109,6 +109,7 @@ export function PathPage({
 }) {
   const load = useCallback(() => workspaceApi.getPath(id), [id]);
   const resource = useResource(load);
+  const [activityScheduled, setActivityScheduled] = useState(false);
   const [busy, setBusy] = useState(false),
     [error, setError] = useState(false);
   useEffect(() => {
@@ -201,6 +202,11 @@ export function PathPage({
           <section className="my-6 rounded-2xl border border-primary/20 bg-primary/5 p-6">
             <h2 className="text-lg font-semibold">{copy.tryIt}</h2>
             <p className="my-3">{human(result.path.try_it)}</p>
+            <Button className="mr-3" disabled={busy || activityScheduled} onClick={async()=>{
+              setBusy(true);setError(false);
+              try {await workspaceApi.acceptPathActivity(id);setActivityScheduled(true);} catch {setError(true);} finally {setBusy(false);}
+            }}>{activityScheduled ? copy.activityScheduled : copy.acceptActivity}</Button>
+            {error && <p role="alert" className="my-2 text-destructive">{copy.error}</p>}
             <Button variant="outline" onClick={() => onChat(copy.reflection)}>
               {copy.reflection}
             </Button>

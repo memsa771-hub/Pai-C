@@ -526,6 +526,8 @@ class RoadmapService:
                           "at": _now().isoformat()})
         journey.decisions = decisions
         self.db.flush()
+        from app.pai_c.checkins import schedule
+        schedule(self.db, workspace_id, "chosen_path", roadmap.id, at=state.chosen_at)
         return self.serialize(roadmap, state)
 
     def focused(self, workspace_id: str) -> dict | None:

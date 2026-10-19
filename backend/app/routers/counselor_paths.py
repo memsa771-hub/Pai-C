@@ -19,6 +19,31 @@ class ProgramConsent(BaseModel):
     explore_places: Literal[True]
 
 
+class TryItConsent(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+    accepted: Literal[True]
+
+
+@router.post('/{path_id}/try-it')
+def accept_try_it(path_id: str, body: TryItConsent, network: str=Query(...), db=Depends(get_db),
+    x_workspace_token: str | None=Header(None), authorization: str | None=Header(None)):
+    from app.pai_c.checkins import schedule
+    from app.research.gateway import mirror_is_current
+    workspace = _authorized(db, network, x_workspace_token, authorization)
+    wid = str(workspace.id)
+    path = path_row(db, wid, path_id)
+    runs = db.scalars(select(ExecutionRun).where(ExecutionRun.workspace_id == wid,
+        ExecutionRun.task_type == 'path_explain', ExecutionRun.status == 'completed')
+        .order_by(ExecutionRun.created_at.desc())).all()
+    run = next((run for run in runs if (run.constraints or {}).get('possibility_id') == path.id
+        and mirror_is_current(db, wid, (run.constraints or {}).get('mirror_version'))), None)
+    if path.status == 'dismissed' or not run or not (((run.result or {}).get('capability_result') or {}).get('path') or {}).get('try_it'):
+        raise HTTPException(409, 'A current path activity is required')
+    job = schedule(db, wid, 'try_it', run.id)
+    db.commit()
+    return success_response({'status': 'scheduled', 'available_at': job.available_at.isoformat()})
+
+
 def path_row(db, workspace_id, path_id):
     try:
         return PossibilityService(db).get(workspace_id, path_id)

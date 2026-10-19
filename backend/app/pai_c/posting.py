@@ -241,9 +241,10 @@ async def _post_response(
     # relay hook never sees them either â€” schedule it here the same way.
     try:
         from app.services.integrations import relay_for_event
-        asyncio.get_running_loop().run_in_executor(
-            None, relay_for_event, workspace_id, snapshot,
-        )
+        if not (metadata or {}).get("in_app_only"):
+            asyncio.get_running_loop().run_in_executor(
+                None, relay_for_event, workspace_id, snapshot,
+            )
     except Exception:
         logger.warning("counselor: failed to schedule integration relay", exc_info=True)
 

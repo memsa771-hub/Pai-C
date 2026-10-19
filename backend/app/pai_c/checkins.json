@@ -1,0 +1,10 @@
+{
+  "delay_days": {"chosen_path": 7, "try_it": 3},
+  "quiet_hours": 12,
+  "minimum_spacing_hours": 24,
+  "care_retry_hours": 24,
+  "chosen_path": "How does the path you chose feel now that you've had some time with it? We can keep the plan or revisit anything that no longer fits.",
+  "try_it": "How did the small activity you chose to try go? What you noticed can help us understand the path better.",
+  "try_it_button": "I'll try this",
+  "try_it_scheduled": "PAI will check in with you here."
+}

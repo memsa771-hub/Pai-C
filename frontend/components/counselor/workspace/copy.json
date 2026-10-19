@@ -236,5 +236,7 @@
     "development_need": "Development need",
     "blocked": "Blocked"
   },
-  "stalePath": "Some sources need a fresh check. The older claims are hidden until they are checked again."
+  "stalePath": "Some sources need a fresh check. The older claims are hidden until they are checked again.",
+  "acceptActivity": "I'll try this",
+  "activityScheduled": "PAI will check in here"
 }
