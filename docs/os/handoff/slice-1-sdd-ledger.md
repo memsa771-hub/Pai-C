@@ -70,3 +70,11 @@ Final: minor (deferred): M18 reminder recipient is a workspace id, not an email 
 Final: minor (deferred): M19 at the gate merge, keep 'alembic upgrade heads' (dev still says head)
 Final: Ruling: reviewer's "declined to judge" items (email delivery, multi-tenant, frontend re-run, content accuracy, host auth internals, scale, crash flakiness, guard scoping) stand as declined: each is out of Slice 1 scope or already verified elsewhere (frontend 29/29 + build, crash 3/3, guard probe) — cost if wrong: surfaced at the Slice 1 gate review.
 Final: legacy Counsellor suite after the fix pass: 1002 passed, 3 skipped (app.main imports; /v1/os not mounted without OS_ENABLED).
+
+Post-review work (2026-10-19, user request):
+Final: review of main.py and tests/test_system_capabilities.py: guard scoping correct (probe proves it still catches Counsellor code); main.py bridge had no test and dropped the host's error message -> tests/test_os_bridge.py RED->GREEN; notes: depends on private access._auth (read-only module), OS engine ignores the Counsellor's Supabase-pooler engine options.
+Final: fixed M3 tenant filters (service pin lookup, enqueue_pending, worker task load) — tests/os/test_tenancy.py RED->GREEN; plan upgrade on an unknown plan is 404.
+Final: added M14 schedule-fires test — tests/os/test_schedule.py (once-a-second DBOS schedule via register_job; a mutation that skips apply_schedules makes it fail).
+Final: integrated tree found 2 real bugs, both fixed: (1) tests/os/runner_helpers.py read OS_DATABASE_URL, which CI never sets -> fixed on Task 7 (f03ae23), checks now run with CI's env only; (2) PaiSessionBoundaryMiddleware rewrites Authorization on every /v1/ request, so the OS admin bearer never arrived -> admin token moved to header X-OS-Admin-Token, test through the real middleware RED->GREEN.
+Final: Ruling: the guard-test fix and the helper fix were moved into the Task 7 branch and t8..t12 rebased (force-with-lease; content identical apart from the fixes; local backup tags backup/pre-restack*) so every stacked PR is green — cost if wrong: none (no PRs existed yet).
+Final: PRs #40..#52 opened as a stack (each based on the previous branch); merge plan in docs/os/handoff/slice-1-handoff.md §2.
