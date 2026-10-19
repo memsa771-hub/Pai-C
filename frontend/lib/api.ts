@@ -407,6 +407,37 @@ class WorkspaceApi {
     return this.request(`/v1/counselor/summary?network=${this.requireWorkspace()}`);
   }
 
+  async getCounselorWorkspace(): Promise<import('./counselor-workspace').LivingPicture> {
+    return this.request(`/v1/counselor/workspace?network=${this.requireWorkspace()}`);
+  }
+  async deleteMyAccount(): Promise<void> {
+    await this.request('/v1/account', {method:'DELETE'});
+  }
+
+  async getCounselorHealth(): Promise<import('./counselor-workspace').CounselorHealth> {
+    return this.request(`/v1/counselor/health?network=${this.requireWorkspace()}`);
+  }
+  async getProfileCards(): Promise<{cards:import('./counselor-workspace').ProfileCard[]}> {
+    return this.request(`/v1/counselor/profile-cards?network=${this.requireWorkspace()}`);
+  }
+  async reviewProfileCard(card:import('./counselor-workspace').ProfileCard,body:Record<string,unknown>):Promise<unknown> {
+    return this.request(`/v1/counselor/profile-cards/${encodeURIComponent(card.kind)}/${encodeURIComponent(card.id)}?network=${this.requireWorkspace()}`,{method:'POST',body:JSON.stringify(body)});
+  }
+  async answerFactCard(id:string,body:Record<string,unknown>):Promise<unknown> {
+    return this.request(`/v1/counselor/fact-cards/${encodeURIComponent(id)}?network=${this.requireWorkspace()}`,{method:'POST',body:JSON.stringify(body)});
+  }
+  async getPath(id:string):Promise<import('./counselor-workspace').PathResult> {
+    return this.request(`/v1/counselor/paths/${encodeURIComponent(id)}?network=${this.requireWorkspace()}`);
+  }
+  async getPrograms(id:string):Promise<import('./counselor-workspace').Programs> {
+    return this.request(`/v1/counselor/paths/${encodeURIComponent(id)}/programs?network=${this.requireWorkspace()}`);
+  }
+  async searchPrograms(id:string):Promise<unknown> {
+    return this.request(`/v1/counselor/paths/${encodeURIComponent(id)}/programs?network=${this.requireWorkspace()}`,{method:'POST',body:JSON.stringify({explore_places:true})});
+  }
+  async preparePathRoadmap(id:string):Promise<unknown> {
+    return this.request(`/v1/counselor/paths/${encodeURIComponent(id)}/roadmap?network=${this.requireWorkspace()}`,{method:'POST',body:JSON.stringify({explore_places:true})});
+  }
   async getPossibilities(): Promise<import('./possibilities').Possibility[]> {
     const result = await this.request<{ possibilities: import('./possibilities').Possibility[] }>(
       `/v1/counselor/possibilities?network=${this.requireWorkspace()}`);

@@ -14,7 +14,7 @@ router = APIRouter(prefix="/v1/counselor/profile-cards", tags=["Counselor"])
 class Review(BaseModel):
     model_config = ConfigDict(extra="forbid")
     submission_id: UUID
-    action: Literal["confirm", "edit"]
+    action: Literal["confirm", "edit", "remove"]
     expected_digest: str = Field(min_length=64, max_length=64)
     value: Any = None
     text: str = Field(default="", max_length=4000)

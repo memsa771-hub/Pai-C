@@ -1,22 +1,6 @@
 'use client';
 
-/**
- * The first thing a new student sees.
- *
- * One page, eight required identity fields. The point is not to collect a
- * profile — PAI builds that over time — it is to make the FIRST conversation
- * useful: knowing someone's name, whether they study or work, and where they
- * are turns a cold "tell me about yourself" into real advice straight away.
- *
- * Everything here is rendered from the field list the backend sends, so
- * adding a question is a backend change alone. The layout hints in
- * FIELD_LAYOUT are the only thing this file owns, and a field missing from
- * them still renders as a text box rather than disappearing.
- *
- * Visually it is the workspace's own language — same tokens, same Input /
- * Select / Button components, same muted surfaces — so it reads as PAI
- * opening a conversation, not as a signup wall bolted on in front of it.
- */
+/** Four schema-driven entry cards; deeper discovery stays in the conversation. */
 
 import * as React from 'react';
 import Image from 'next/image';
@@ -157,29 +141,18 @@ function Field({ field, label, value, onChange }: {
   const id = React.useId();
 
   return (
-    <div className={layout.half ? 'col-span-1 space-y-1.5' : 'col-span-2 space-y-1.5'}>
+    <div className="col-span-2 space-y-3 rounded-xl border bg-card p-5 shadow-sm">
       <Label htmlFor={id} className="text-xs">
         {label}
         {field.required && <span className="ms-1 text-destructive">*</span>}
       </Label>
 
       {field.choices.length > 0 ? (
-        <Select value={value} onValueChange={onChange}>
-          <SelectTrigger id={id} className="w-full">
-            <SelectValue placeholder={t('onboarding.choose')} />
-          </SelectTrigger>
-          <SelectContent>
-            {field.choices.map((choice) => {
-              const key = `onboarding.choice.${choice}`;
-              const text = t(key as MessageKey);
-              return (
-                <SelectItem key={choice} value={choice}>
-                  {text === key ? choice : text}
-                </SelectItem>
-              );
-            })}
-          </SelectContent>
-        </Select>
+        <div role="group" aria-label={label} className="flex flex-wrap gap-2">
+          {field.choices.map(choice => <Button key={choice} type="button" variant={value === choice ? 'primary' : 'outline'} aria-pressed={value === choice} onClick={() => onChange(choice)}>
+            {t(`onboarding.choice.${choice}` as MessageKey)}
+          </Button>)}
+        </div>
       ) : field.isDate ? (
         <Input
           id={id}

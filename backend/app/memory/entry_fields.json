@@ -1,0 +1,6 @@
+[
+  {"name":"fullName","field_key":"identity.full_name","required":true,"choices":[]},
+  {"name":"level","field_key":"education","required":true,"choices":[],"record_field":"qualification_name"},
+  {"name":"currentCity","field_key":"location.current_city","required":true,"choices":[]},
+  {"name":"replyLanguage","field_key":"preferences.preferred_language","required":true,"choices":["english","roman urdu"]}
+]

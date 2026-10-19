@@ -28,6 +28,8 @@ one source — a first-hand statement. Asking the student directly is that
 statement, so the answer applies immediately instead of parking as an issue.
 """
 
+import json
+from pathlib import Path
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any, Optional
@@ -52,10 +54,11 @@ class OnboardingField:
     max_length: int = 200
     # YYYY, YYYY-MM or YYYY-MM-DD, matching the rest of the student schema.
     is_date: bool = False
+    record_field: str | None = None
 
 
 # The order here is the order the form asks them in.
-ONBOARDING_FIELDS: tuple[OnboardingField, ...] = (
+LEGACY_FIELDS: tuple[OnboardingField, ...] = (
     OnboardingField("fullName", "identity.full_name", required=True),
     OnboardingField("preferredName", "identity.preferred_name", required=True),
     OnboardingField(
@@ -72,7 +75,9 @@ ONBOARDING_FIELDS: tuple[OnboardingField, ...] = (
     OnboardingField("currentCity", "location.current_city", required=True),
 )
 
-FIELDS_BY_NAME = {field.name: field for field in ONBOARDING_FIELDS}
+ONBOARDING_FIELDS = tuple(OnboardingField(**{**entry, "choices": tuple(entry["choices"])})
+    for entry in json.loads(Path(__file__).with_name("entry_fields.json").read_text(encoding="utf-8")))
+FIELDS_BY_NAME = {field.name: field for field in (*LEGACY_FIELDS, *ONBOARDING_FIELDS)}
 
 
 def _clean(value: Any, field: OnboardingField) -> Optional[str]:
@@ -136,9 +141,15 @@ class OnboardingService:
         facts = self.vault.snapshot(str(workspace.id), include_sensitive=True)
         prefill = {
             field.name: facts[field.field_key]
-            for field in ONBOARDING_FIELDS
+            for field in FIELDS_BY_NAME.values()
             if isinstance(facts.get(field.field_key), str)
         }
+        from .student_records import StudentRecordService
+        for field in ONBOARDING_FIELDS:
+            if field.record_field:
+                rows = StudentRecordService(self.db).list(str(workspace.id), field.field_key)
+                if rows:
+                    prefill[field.name] = getattr(rows[0], field.record_field, "")
         # Full name is deliberately collected here, not at signup, and must
         # never be guessed from an account handle or OAuth display name.
         # Preferred name starts as the signup username but remains editable.
@@ -175,7 +186,11 @@ class OnboardingService:
             value = _clean(answers.get(name), field)
             if value is not None:
                 cleaned[name] = value
-        missing = [f.name for f in ONBOARDING_FIELDS if f.required and f.name not in cleaned]
+        # Old clients may finish an in-flight eight-field submission. Only the
+        # four-card contract is advertised to new clients; old facts are retained.
+        legacy = "level" not in answers and "replyLanguage" not in answers
+        required = LEGACY_FIELDS if legacy else ONBOARDING_FIELDS
+        missing = [f.name for f in required if f.required and f.name not in cleaned]
         if missing:
             raise MemoryDataError(f"Missing required answer: {', '.join(missing)}")
 
@@ -192,8 +207,8 @@ class OnboardingService:
                 saved.append(field.field_key)
                 continue
             candidate = MemoryCandidateService(self.db).propose(
-                workspace_id=workspace_id, candidate_type="vault_fact",
-                key=field.field_key, proposed_value=value, confidence=1.0,
+                workspace_id=workspace_id, candidate_type="student_record" if field.record_field else "vault_fact",
+                key=field.field_key, proposed_value={field.record_field: value} if field.record_field else value, confidence=1.0,
                 source_type="user_explicit", allow_user_explicit=True,
                 input_channel="profile",
                 subject_user_id=str(user.id) if user else None,
@@ -215,7 +230,7 @@ class OnboardingService:
                 # Account/workspace surfaces still read this row. Mirror the
                 # successfully reconciled canonical preferred name so the
                 # student's chosen name is consistent everywhere immediately.
-                user.display_name = cleaned["preferredName"]
+                user.display_name = cleaned.get("preferredName") or cleaned["fullName"]
                 if user.onboarded_at is None:
                     user.onboarded_at = datetime.now(timezone.utc)
                     from app.runtime.task_runtime import enqueue

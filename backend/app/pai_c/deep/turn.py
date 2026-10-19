@@ -29,7 +29,7 @@ class DeepTurnResult:
     guard_violations: list[str] = field(default_factory=list)
 
 
-def _parse_response(raw: str) -> tuple[str, dict, list[str]]:
+def _parse_response(raw: str, *, violations=None) -> tuple[str, dict, list[str]]:
     def valid(text: str) -> tuple[str, dict, list[str]] | None:
         try:
             parsed = json.loads(text)
@@ -50,6 +50,8 @@ def _parse_response(raw: str) -> tuple[str, dict, list[str]]:
     second = valid(unfenced)
     if second is not None:
         return second
+    if violations is not None and "invalid_json_fallback" not in violations:
+        violations.append("invalid_json_fallback")
     # Do not display malformed JSON or internal action keys to the student.
     stripped = raw.strip()
     if stripped.startswith(("{", "[", "```")) or not stripped:
@@ -107,7 +109,7 @@ async def run_deep_turn(db, turn: CounselorTurnInput, *,
             phase="counselor_retry" if attempt else "counselor", turn_id=turn.source_event_id)
         model_ms += int((time.monotonic() - started) * 1000)
         started = time.monotonic()
-        reply, action, moves = _parse_response(raw)
+        reply, action, moves = _parse_response(raw, violations=violations)
         if instructions == "wellbeing" or action.get("type") == "wellbeing":
             break
         if contains_blocked_script(reply, config.PAI_LANGUAGE_BLOCKED_SCRIPTS):

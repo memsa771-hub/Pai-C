@@ -80,7 +80,7 @@ class MemoryService:
         card = next((row for row in self.profile_cards(workspace_id) if row["kind"] == kind and row["id"] == record_id), None)
         if card is None or card["digest"] != review.expected_digest:
             raise ValueError("This fact changed. Reload it before reviewing")
-        value = card["value"] if review.action == "confirm" else review.value
+        value = card["value"] if review.action in {"confirm", "remove"} else review.value
         if value is None or (review.action == "edit" and not review.text.strip()):
             raise ValueError("An edited value and your explanation are required")
         evidence = {"capture": "profile_review", "action": review.action,
@@ -92,7 +92,7 @@ class MemoryService:
                 "confirmed_at": datetime.now(timezone.utc).isoformat()}
         candidate = MemoryCandidateService(self.db).propose(workspace_id,
             candidate_type="vault_fact" if kind == "vault_fact" else "student_record",
-            key=card["key"], proposed_value=value,
+            key=card["key"], proposed_value=value, operation="retract" if review.action == "remove" else "upsert",
             entities={"record_id": record_id} if kind != "vault_fact" else {},
             source_type="user_explicit", allow_user_explicit=True, input_channel="profile",
             confidence=1, evidence=evidence)

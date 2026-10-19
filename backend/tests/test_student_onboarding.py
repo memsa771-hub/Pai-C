@@ -40,6 +40,7 @@ def _compile_jsonb(type_, compiler, **kw):
 # Mirrors migrations 063 and 066 — one field of each sensitivity class, plus
 # the two the onboarding flow introduces.
 FIELD_SPECS = (
+    ("preferences.preferred_language", "normal", None),
     ("identity.full_name", "sensitive", None),
     ("identity.preferred_name", "normal", None),
     ("identity.current_status", "normal", None),
@@ -295,4 +296,18 @@ def test_every_declared_field_maps_to_a_real_vault_key(db):
     """A question with no field definition would fail silently at reconcile."""
     fields = VaultFieldDefinitionService(db)
     for field in ONBOARDING_FIELDS:
-        assert fields.get(field.field_key) is not None, field.field_key
+        if field.record_field:
+            assert field.field_key in ENTITY_MODELS
+            assert hasattr(ENTITY_MODELS[field.field_key], field.record_field)
+        else:
+            assert fields.get(field.field_key) is not None, field.field_key
+
+
+def test_four_card_entry_writes_education_through_reconciler(db):
+    workspace=db.info["workspace"]
+    service=OnboardingService(db)
+    assert [field["name"] for field in service.state(workspace)["fields"]]==["fullName","level","currentCity","replyLanguage"]
+    result=service.apply(workspace,{"fullName":"A Student","level":"Secondary education","currentCity":"My city","replyLanguage":"english"})
+    db.commit()
+    assert result["completed"] and not result["rejected"]
+    assert service.state(workspace)["prefill"]["level"]=="Secondary education"

@@ -53,3 +53,12 @@ def test_no_merit_rule_is_invented_without_verified_source(monkeypatch):
     assert seasons.verified_rules("p", "s") == []
     data["rules"][0].update(source_url="https://catalog.example.test/rules", checked_at=datetime.now(timezone.utc).isoformat(), verification_status="verified")
     assert len(seasons.verified_rules("p", "s")) == 1
+
+
+def test_merit_rules_need_a_current_valid_date(monkeypatch):
+    row={'program_id':'p','season':'s','source_url':'https://catalog.example.test/rules',
+         'verification_status':'verified','checked_at':'2000-01-01'}
+    monkeypatch.setattr(seasons,'policy',lambda:{'seasons':[],'rules':[row]})
+    for stamp in ('2000-01-01','invalid',(datetime.now(timezone.utc)+timedelta(days=1)).isoformat()):
+        row['checked_at']=stamp
+        assert seasons.verified_rules('p','s') == []

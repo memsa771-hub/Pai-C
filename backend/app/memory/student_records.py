@@ -113,6 +113,21 @@ class StudentRecordService:
         return self.db.execute(select(model).where(model.workspace_id == workspace_id,
             model.id == record_id, model.status == "active")).scalar_one_or_none()
 
+    def retract(self, workspace_id, kind, record_id, evidence):
+        """Keep the original evidence and append a student-requested retirement."""
+        if kind not in ENTITY_MODELS:
+            raise MemoryDataError("Unknown record kind")
+        row = self.get(workspace_id, kind, record_id)
+        if row is None:
+            raise MemoryDataError("No active record in this workspace")
+        before = {**self._values(kind, row), "status": row.status}
+        row.status = "retracted"
+        row.updated_at = datetime.now(timezone.utc)
+        self._revision(workspace_id, kind, row, before, "user_explicit", "student",
+                       "explicit_correction", evidence)
+        self.db.flush()
+        return row
+
     def _values(self, kind, row):
         return {key: deepcopy(getattr(row, key)) for key in ALLOWED[kind] if getattr(row, key) is not None}
 

@@ -12,9 +12,8 @@ Choices come only from schema/catalog data. Every catalog card supports editable
 Other. Missing catalogs use text or an upload invitation; no invented options are
 seeded. Prefills require an exact quote from the current student message and
 explicit confirmation. Other values retain stated evidence and a review flag.
-Already-asked means the previous requested area, not permanent closure of an
-entire area: coverage may still require several distinct facts. The existing
-question-intent repetition guard remains responsible for repeated questions.
+Coverage may require several distinct facts in one area. The existing
+question-intent and policy repetition guards remain responsible for repeated questions.
 
 ## Shared OS contract
 
@@ -55,3 +54,21 @@ Eligibility uses shown/confirmed values only. Meeting entry rules is labelled el
 
 ## Phase 2, step 7: private reliability surface
 An authenticated workspace health endpoint checks database-backed analysis backlog, a data-configured lag threshold, failed jobs and daily guard/fallback counts. Counts use existing durable turn decisions, with idempotent provider/unconfigured records; no text or credentials are returned. The existing public liveness endpoint is unchanged. Planner lag is an in-app attention state, not a new notification channel or scheduler. There is no provider ping and no paid health call.
+
+## Phase 3: one student shell and existing contracts
+The main workspace mounts only Counselor, Journey, Paths, Profile, Compare, Plan,
+Documents, Settings and the existing notification center. Four entry cards are
+advertised by the backend; old eight-field submissions remain accepted for old
+clients. No new institution or exam catalog is invented.
+Profile confirmation, editing and removal all create reconciled candidates.
+Removal retires an active record with an audit revision; it does not erase its
+history. No database table or schema is removed. The existing account-erasure
+endpoint is available only after a separate explicit irreversible-deletion
+confirmation. Profile export is labelled accurately; it is not a full data export.
+A completed current-Mirror program check may explicitly request a reviewed
+roadmap through the existing builder. It does not choose the path. Existing
+roadmap choice, decision records and planning remain the authority for I/J.
+Check-ins open a draft in the same Counselor; no OS reminder scheduler is added.
+Journey links use durable event ids and page older chat history when necessary.
+Screenshots and browser navigation use a separate test-only Vite entry with fake
+API/workspace adapters and blocked network access; no fake data is in app routes.

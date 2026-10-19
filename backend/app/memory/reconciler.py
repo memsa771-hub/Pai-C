@@ -149,7 +149,7 @@ class MemoryReconciler:
         if result.accepted and candidate.candidate_type in {"vault_fact", "student_record"}:
             from app.runtime.task_runtime import enqueue
             from app.config import config
-            if config.PAI_SEMANTIC_RECALL_ENABLED and result.result_id:
+            if config.PAI_SEMANTIC_RECALL_ENABLED and result.result_id and candidate.operation != "retract":
                 payload = ({"fact_ids": [result.result_id]} if candidate.candidate_type == "vault_fact"
                            else {"record_refs": [{"kind": candidate.key, "id": result.result_id}]})
                 enqueue(self.db, job_type="memory.embed", workspace_id=candidate.workspace_id,
@@ -180,6 +180,13 @@ class MemoryReconciler:
     # -- per-type handling -------------------------------------------------
 
     def _reconcile_student_record(self, candidate: MemoryCandidate) -> ReconcileResult:
+        if candidate.operation == "retract":
+            if candidate.source_type != "user_explicit" or candidate.input_channel != "profile":
+                return self._reject(candidate, "Only an explicit profile review may retract a record")
+            row = self.records.retract(candidate.workspace_id, candidate.key,
+                (candidate.entities or {}).get("record_id"), candidate.evidence)
+            self.candidates.mark_accepted(candidate, row.id)
+            return ReconcileResult(True, candidate.id, result_id=row.id)
         if candidate.operation != "upsert" or not self._confident_enough(candidate):
             return self._reject(candidate, "invalid operation or insufficient confidence")
         values = self._unwrap(candidate.proposed_value)

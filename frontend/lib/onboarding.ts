@@ -14,6 +14,8 @@
 
 /** Names match `ONBOARDING_FIELDS` in the backend, which is the source. */
 export interface OnboardingAnswers {
+  level?: string;
+  replyLanguage?: string;
   fullName?: string;
   preferredName?: string;
   statusCategory?: string;

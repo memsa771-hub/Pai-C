@@ -77,6 +77,7 @@ export const messages = {
 
   /** View names. Shared by the sidebar, the nav rail and the app header. */
   views: {
+    journey: "Your journey", paths: "Paths", compare: "Compare & choose", plan: "Plan & check-ins", settings: "Settings",
     paiCounselor: 'PAI Counselor',
     roadmaps: 'Roadmaps',
     profile: 'Profile',
@@ -858,7 +859,7 @@ export const messages = {
   onboarding: {
     title: 'Tell PAI about yourself',
     subtitle: 'A few basics so your first conversation is useful. PAI fills in the rest as you talk.',
-    privacy: 'Only you can see this. Your date of birth is kept private and never shown on your profile.',
+    privacy: 'Your profile grows through conversation. Nothing is shared with a university without your permission.',
     choose: 'Select…',
     continue: 'Continue',
     saved: 'Welcome to Placement AI',
@@ -866,7 +867,9 @@ export const messages = {
     failed: "Couldn't save that — please try again.",
 
     field: {
-      fullName: 'Full name',
+      fullName: 'Your name',
+      level: 'Current or most recent education level',
+      replyLanguage: 'Reply language',
       preferredName: 'What should PAI call you?',
       statusCategory: 'Current status',
       nationality: 'Nationality',
@@ -877,6 +880,8 @@ export const messages = {
     },
 
     choice: {
+      english: 'English',
+      'roman urdu': 'Roman Urdu',
       student: 'Student',
       professional: 'Working professional',
       other: 'Other',

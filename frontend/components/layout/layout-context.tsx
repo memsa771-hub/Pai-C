@@ -13,7 +13,7 @@ import { useIsMobile } from '@/hooks/use-mobile';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import type { FileSortKey, FileTypeFilter } from '@/components/files/file-utils';
 
-export type ViewMode = 'threads' | 'roadmaps' | 'profile' | 'notifications' | 'files' | 'knowledge' | 'browser' | 'routines' | 'inbox';
+export type ViewMode = 'journey' | 'paths' | 'compare' | 'plan' | 'settings' | 'threads' | 'roadmaps' | 'profile' | 'notifications' | 'files' | 'knowledge' | 'browser' | 'routines' | 'inbox';
 
 /** The Files view has two halves the folder panel switches between. */
 export type FilesSection = 'folders' | 'trash';
@@ -65,7 +65,7 @@ export const VIEWS_WITH_LIST: ReadonlySet<ViewMode> = new Set<ViewMode>([
  * allow-list rather than "any ViewMode": the query string is attacker-supplied
  * in principle, and only the views something actually links to belong here.
  */
-export const ROUTABLE_VIEWS: ReadonlySet<ViewMode> = new Set<ViewMode>(['profile', 'roadmaps']);
+export const ROUTABLE_VIEWS: ReadonlySet<ViewMode> = new Set<ViewMode>(['profile', 'roadmaps', 'journey', 'paths', 'compare', 'plan', 'settings']);
 
 /**
  * Per-view list-panel preference, persisted in a cookie so it survives reloads

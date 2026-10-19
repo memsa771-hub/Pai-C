@@ -20,3 +20,13 @@ def test_daily_counts_are_idempotent_scoped_and_detect_lag():
         assert result['planner_lag_alert'] and result['planner_lag_seconds']==300
         assert health(db,'00000000-0000-0000-0000-000000000000',now=now)['fallbacks']=={}
         assert 'test-event' not in str(result)
+
+
+def test_parse_fallback_is_countable_but_fences_are_not_a_fallback():
+    from app.pai_c.deep.turn import _parse_response
+    violations=[]
+    _parse_response('{broken', violations=violations)
+    assert violations == ['invalid_json_fallback']
+    violations=[]
+    _parse_response('```json\n{"reply":"A reply","action":{}}\n```', violations=violations)
+    assert violations == []

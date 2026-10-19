@@ -1,0 +1,513 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`keeps evidence and certainty accessible in dark 1`] = `
+<div>
+  <div
+    class="dark"
+  >
+    <div
+      class="flex flex-wrap items-center gap-6"
+    >
+      <svg
+        aria-label="What PAI knows so far"
+        class="size-40 shrink-0"
+        role="img"
+        viewBox="0 0 160 160"
+      >
+        <path
+          class="text-primary"
+          d="M 80 20 A 60 60 0 0 1 112.67834210090163 29.679765923274566"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="18"
+        >
+          <title>
+            Current life
+          </title>
+        </path>
+        <path
+          class="text-primary"
+          d="M 115.26711513754839 31.45898033750315 A 60 60 0 0 1 136.0148255898321 58.497923027281985"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="18"
+        >
+          <title>
+            Education & experience
+          </title>
+        </path>
+        <path
+          class="text-primary"
+          d="M 137.06339097770922 61.45898033750316 A 60 60 0 0 1 137.9555495773441 95.52914270615125"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="18"
+        >
+          <title>
+            Interests
+          </title>
+        </path>
+        <path
+          class="text-primary"
+          d="M 137.06339097770922 98.54101966249684 A 60 60 0 0 1 117.75922346299025 126.62875768741824"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="18"
+        >
+          <title>
+            Strengths
+          </title>
+        </path>
+        <path
+          class="text-primary"
+          d="M 115.26711513754839 128.54101966249686 A 60 60 0 0 1 83.14015737457663 139.91777208527444"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="18"
+        >
+          <title>
+            Family
+          </title>
+        </path>
+        <path
+          class="text-primary"
+          d="M 80 140 A 60 60 0 0 1 47.321657899098376 130.32023407672546"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="18"
+        >
+          <title>
+            Values
+          </title>
+        </path>
+        <path
+          class="text-primary"
+          d="M 44.73288486245162 128.54101966249686 A 60 60 0 0 1 23.985174410167893 101.50207697271802"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="18"
+        >
+          <title>
+            Pressures & limits
+          </title>
+        </path>
+        <path
+          class="text-muted"
+          d="M 22.93660902229079 98.54101966249685 A 60 60 0 0 1 22.044450422655892 64.47085729384878"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="18"
+        >
+          <title>
+            Certainty
+          </title>
+        </path>
+        <path
+          class="text-muted"
+          d="M 22.93660902229079 61.458980337503135 A 60 60 0 0 1 42.24077653700978 33.371242312581735"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="18"
+        >
+          <title>
+            Goals & whose wish
+          </title>
+        </path>
+        <path
+          class="text-muted"
+          d="M 44.732884862451606 31.458980337503156 A 60 60 0 0 1 76.85984262542334 20.08222791472557"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="18"
+        >
+          <title>
+            Options & myths
+          </title>
+        </path>
+        <circle
+          class="text-primary/20"
+          cx="80"
+          cy="80"
+          fill="none"
+          r="25"
+          stroke="currentColor"
+        />
+      </svg>
+      <div
+        class="grid grid-cols-2 gap-x-6 gap-y-2"
+      >
+        <div
+          class="flex items-center gap-2 text-xs"
+        >
+          <span
+            class="size-2 rounded-full bg-primary"
+          />
+          Current life
+        </div>
+        <div
+          class="flex items-center gap-2 text-xs"
+        >
+          <span
+            class="size-2 rounded-full bg-primary"
+          />
+          Education & experience
+        </div>
+        <div
+          class="flex items-center gap-2 text-xs"
+        >
+          <span
+            class="size-2 rounded-full bg-primary"
+          />
+          Interests
+        </div>
+        <div
+          class="flex items-center gap-2 text-xs"
+        >
+          <span
+            class="size-2 rounded-full bg-primary"
+          />
+          Strengths
+        </div>
+        <div
+          class="flex items-center gap-2 text-xs"
+        >
+          <span
+            class="size-2 rounded-full bg-primary"
+          />
+          Family
+        </div>
+        <div
+          class="flex items-center gap-2 text-xs"
+        >
+          <span
+            class="size-2 rounded-full bg-primary"
+          />
+          Values
+        </div>
+        <div
+          class="flex items-center gap-2 text-xs"
+        >
+          <span
+            class="size-2 rounded-full bg-primary"
+          />
+          Pressures & limits
+        </div>
+        <div
+          class="flex items-center gap-2 text-xs"
+        >
+          <span
+            class="size-2 rounded-full bg-muted"
+          />
+          Certainty
+        </div>
+        <div
+          class="flex items-center gap-2 text-xs"
+        >
+          <span
+            class="size-2 rounded-full bg-muted"
+          />
+          Goals & whose wish
+        </div>
+        <div
+          class="flex items-center gap-2 text-xs"
+        >
+          <span
+            class="size-2 rounded-full bg-muted"
+          />
+          Options & myths
+        </div>
+      </div>
+    </div>
+    <svg
+      aria-label="Your certainty over time: 3, 6"
+      class="h-28 w-full"
+      role="img"
+      viewBox="0 0 300 110"
+    >
+      <path
+        class="text-muted"
+        d="M10 10 V95 H290"
+        fill="none"
+        stroke="currentColor"
+      />
+      <polyline
+        class="text-primary"
+        fill="none"
+        points="10,71 290,47"
+        stroke="currentColor"
+        stroke-width="3"
+      />
+      <circle
+        class="text-primary"
+        cx="10"
+        cy="71"
+        fill="currentColor"
+        r="4"
+      />
+      <circle
+        class="text-primary"
+        cx="290"
+        cy="47"
+        fill="currentColor"
+        r="4"
+      />
+    </svg>
+  </div>
+</div>
+`;
+
+exports[`keeps evidence and certainty accessible in light 1`] = `
+<div>
+  <div
+    class="light"
+  >
+    <div
+      class="flex flex-wrap items-center gap-6"
+    >
+      <svg
+        aria-label="What PAI knows so far"
+        class="size-40 shrink-0"
+        role="img"
+        viewBox="0 0 160 160"
+      >
+        <path
+          class="text-primary"
+          d="M 80 20 A 60 60 0 0 1 112.67834210090163 29.679765923274566"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="18"
+        >
+          <title>
+            Current life
+          </title>
+        </path>
+        <path
+          class="text-primary"
+          d="M 115.26711513754839 31.45898033750315 A 60 60 0 0 1 136.0148255898321 58.497923027281985"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="18"
+        >
+          <title>
+            Education & experience
+          </title>
+        </path>
+        <path
+          class="text-primary"
+          d="M 137.06339097770922 61.45898033750316 A 60 60 0 0 1 137.9555495773441 95.52914270615125"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="18"
+        >
+          <title>
+            Interests
+          </title>
+        </path>
+        <path
+          class="text-primary"
+          d="M 137.06339097770922 98.54101966249684 A 60 60 0 0 1 117.75922346299025 126.62875768741824"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="18"
+        >
+          <title>
+            Strengths
+          </title>
+        </path>
+        <path
+          class="text-primary"
+          d="M 115.26711513754839 128.54101966249686 A 60 60 0 0 1 83.14015737457663 139.91777208527444"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="18"
+        >
+          <title>
+            Family
+          </title>
+        </path>
+        <path
+          class="text-primary"
+          d="M 80 140 A 60 60 0 0 1 47.321657899098376 130.32023407672546"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="18"
+        >
+          <title>
+            Values
+          </title>
+        </path>
+        <path
+          class="text-primary"
+          d="M 44.73288486245162 128.54101966249686 A 60 60 0 0 1 23.985174410167893 101.50207697271802"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="18"
+        >
+          <title>
+            Pressures & limits
+          </title>
+        </path>
+        <path
+          class="text-muted"
+          d="M 22.93660902229079 98.54101966249685 A 60 60 0 0 1 22.044450422655892 64.47085729384878"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="18"
+        >
+          <title>
+            Certainty
+          </title>
+        </path>
+        <path
+          class="text-muted"
+          d="M 22.93660902229079 61.458980337503135 A 60 60 0 0 1 42.24077653700978 33.371242312581735"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="18"
+        >
+          <title>
+            Goals & whose wish
+          </title>
+        </path>
+        <path
+          class="text-muted"
+          d="M 44.732884862451606 31.458980337503156 A 60 60 0 0 1 76.85984262542334 20.08222791472557"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="18"
+        >
+          <title>
+            Options & myths
+          </title>
+        </path>
+        <circle
+          class="text-primary/20"
+          cx="80"
+          cy="80"
+          fill="none"
+          r="25"
+          stroke="currentColor"
+        />
+      </svg>
+      <div
+        class="grid grid-cols-2 gap-x-6 gap-y-2"
+      >
+        <div
+          class="flex items-center gap-2 text-xs"
+        >
+          <span
+            class="size-2 rounded-full bg-primary"
+          />
+          Current life
+        </div>
+        <div
+          class="flex items-center gap-2 text-xs"
+        >
+          <span
+            class="size-2 rounded-full bg-primary"
+          />
+          Education & experience
+        </div>
+        <div
+          class="flex items-center gap-2 text-xs"
+        >
+          <span
+            class="size-2 rounded-full bg-primary"
+          />
+          Interests
+        </div>
+        <div
+          class="flex items-center gap-2 text-xs"
+        >
+          <span
+            class="size-2 rounded-full bg-primary"
+          />
+          Strengths
+        </div>
+        <div
+          class="flex items-center gap-2 text-xs"
+        >
+          <span
+            class="size-2 rounded-full bg-primary"
+          />
+          Family
+        </div>
+        <div
+          class="flex items-center gap-2 text-xs"
+        >
+          <span
+            class="size-2 rounded-full bg-primary"
+          />
+          Values
+        </div>
+        <div
+          class="flex items-center gap-2 text-xs"
+        >
+          <span
+            class="size-2 rounded-full bg-primary"
+          />
+          Pressures & limits
+        </div>
+        <div
+          class="flex items-center gap-2 text-xs"
+        >
+          <span
+            class="size-2 rounded-full bg-muted"
+          />
+          Certainty
+        </div>
+        <div
+          class="flex items-center gap-2 text-xs"
+        >
+          <span
+            class="size-2 rounded-full bg-muted"
+          />
+          Goals & whose wish
+        </div>
+        <div
+          class="flex items-center gap-2 text-xs"
+        >
+          <span
+            class="size-2 rounded-full bg-muted"
+          />
+          Options & myths
+        </div>
+      </div>
+    </div>
+    <svg
+      aria-label="Your certainty over time: 3, 6"
+      class="h-28 w-full"
+      role="img"
+      viewBox="0 0 300 110"
+    >
+      <path
+        class="text-muted"
+        d="M10 10 V95 H290"
+        fill="none"
+        stroke="currentColor"
+      />
+      <polyline
+        class="text-primary"
+        fill="none"
+        points="10,71 290,47"
+        stroke="currentColor"
+        stroke-width="3"
+      />
+      <circle
+        class="text-primary"
+        cx="10"
+        cy="71"
+        fill="currentColor"
+        r="4"
+      />
+      <circle
+        class="text-primary"
+        cx="290"
+        cy="47"
+        fill="currentColor"
+        r="4"
+      />
+    </svg>
+  </div>
+</div>
+`;

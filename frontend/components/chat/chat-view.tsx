@@ -135,7 +135,7 @@ async function refreshCachedSession(sessionId: string): Promise<void> {
   }
 }
 
-export function ChatView() {
+export function ChatView({counselorOnly=false,initialDraft=""}:{counselorOnly?:boolean;initialDraft?:string}) {
   const { agents, currentUser, currentSessionId, sessions, updateLastMessage, setSessionActive, updateAgentMode, stopAllAgents, activeSessionIds, stoppingSessionIds, renameSession, addParticipant, removeParticipant, setSessionMaster, setSessionOrchestration, consumeSkipFocus, createRoutine, knowledge } = useWorkspace();
   const t = useT();
   const [showCreateRoutine, setShowCreateRoutine] = useState(false);
@@ -154,6 +154,7 @@ export function ChatView() {
 
   // Continuously refresh message caches for top recent sessions in the background.
   // This ensures clicking any recent thread shows messages instantly and up-to-date.
+  useEffect(()=>{if(initialDraft)setCurrentDraft(initialDraft);},[initialDraft]);
   const currentSessionIdRef = useRef<string | null>(currentSessionId);
   currentSessionIdRef.current = currentSessionId;
 
@@ -556,7 +557,7 @@ export function ChatView() {
   return (
     <div className="flex flex-col h-full">
       {/* Thread header — title on desktop lives in the shell's app header */}
-      <DetailHeader
+      {!counselorOnly && <DetailHeader
         title={<>
           {/* Back button — mobile only */}
           {isMobile && (
@@ -827,7 +828,7 @@ export function ChatView() {
           >
             <Share2 className="size-3.5" />
           </Button>
-      </DetailHeader>
+      </DetailHeader>}
 
       {/* Agent roster bar — thin strip listing who's in the thread + a hint of
           their responsibility. Only shown for group threads (>1 agent), never DMs. */}
@@ -997,7 +998,7 @@ export function ChatView() {
                 onMessagePosted={forceRefresh}
               />
             )}
-            {currentSessionId && <ThreadStatusBar channelName={currentSessionId} messages={displayMessages} />}
+            {!counselorOnly && currentSessionId && <ThreadStatusBar channelName={currentSessionId} messages={displayMessages} />}
             <ChatInput
               onSend={handleSend}
               agents={agents}

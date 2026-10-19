@@ -533,6 +533,7 @@ export function eventToMessage(event: ONMEvent): WorkspaceMessage {
     messageType: (payload.message_type as string) || 'chat',
     metadata: {
       ...(event.metadata || {}),
+      ...(payload.fact_card ? { fact_card: payload.fact_card } : {}),
       ...(payload.attachments ? { attachments: payload.attachments } : {}),
       ...(payload.todos ? { todos: payload.todos } : {}),
     },

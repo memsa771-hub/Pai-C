@@ -1,0 +1,25 @@
+// @vitest-environment jsdom
+import {it,expect,vi,afterEach} from 'vitest';
+import {render,screen,fireEvent,cleanup,waitFor} from '@testing-library/react';
+import {CounselorSettings} from './settings';
+import {workspaceApi} from '@/lib/api';
+const theme=vi.hoisted(()=>({setTheme:vi.fn(),theme:'light'}));
+vi.mock('next-themes',()=>({useTheme:()=>theme}));
+vi.mock('@/lib/api',()=>({workspaceApi:{deleteMyAccount:vi.fn(),editStudentProfile:vi.fn(),getProfileCards:vi.fn()}}));
+afterEach(()=>{cleanup();vi.clearAllMocks();});
+it('changes theme locally and saves reply language through the profile API',async()=>{
+  vi.mocked(workspaceApi.editStudentProfile).mockResolvedValue({saved:true} as never);
+  render(<CounselorSettings base='/student'/>);
+  fireEvent.click(screen.getByRole('button',{name:'Dark',exact:true}));expect(theme.setTheme).toHaveBeenCalledWith('dark');
+  fireEvent.click(screen.getByRole('button',{name:'English',exact:true}));
+  await waitFor(()=>expect(workspaceApi.editStudentProfile).toHaveBeenCalledWith(expect.objectContaining({fieldKey:'preferences.preferred_language',value:'english'})));
+});
+it('requires an explicit irreversible-deletion acknowledgement and surfaces failure',async()=>{
+  vi.mocked(workspaceApi.deleteMyAccount).mockRejectedValue(new Error());
+  render(<CounselorSettings base='/student'/>);
+  fireEvent.click(screen.getByRole('button',{name:'Delete my app data',exact:true}));
+  const submit=screen.getByRole('button',{name:'Permanently delete my app data'});
+  expect((submit as HTMLButtonElement).disabled).toBe(true);expect(workspaceApi.deleteMyAccount).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByRole('checkbox'));fireEvent.click(submit);
+  expect(await screen.findByRole('alert')).toBeTruthy();expect(workspaceApi.deleteMyAccount).toHaveBeenCalledTimes(1);
+});

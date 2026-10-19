@@ -1,6 +1,6 @@
 """Optional authoritative season bounds supplement the existing freshness TTL."""
 import json
-from datetime import date
+from datetime import date, datetime, timezone
 from pathlib import Path
 
 
@@ -30,6 +30,16 @@ def verified_rules(program_id, season):
         if row.get("program_id") != program_id or row.get("season") != season or row.get("verification_status") != "verified":
             continue
         if not public_https(row.get("source_url")) or not row.get("checked_at"):
+            continue
+        from app.config import config
+        try:
+            checked = datetime.fromisoformat(row['checked_at'].replace('Z', '+00:00'))
+            if checked.tzinfo is None:
+                checked = checked.replace(tzinfo=timezone.utc)
+            age = (datetime.now(timezone.utc) - checked).total_seconds()
+            if age < 0 or age > config.PAI_RESEARCH_FRESHNESS_DAYS * 86400:
+                continue
+        except (TypeError, ValueError):
             continue
         result.append(dict(row))
     return result

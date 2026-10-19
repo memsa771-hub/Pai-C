@@ -322,6 +322,25 @@ export function ChatMessages({ messages, agents, showAllSteps, className, scroll
     }
   }, [scrollKey, scrollToBottom]);
 
+  // Journey links point to durable message ids, including older paged history.
+  const visitedMoment = useRef<string | null>(null);
+  useEffect(() => {
+    const moment = new URLSearchParams(window.location.search).get('moment');
+    if (!moment || visitedMoment.current === moment) return;
+    const index = groups.findIndex(group => group.type === 'chat' && group.message.messageId === moment);
+    if (index < 0) {
+      if (hasOlder && !loadingOlder && loadOlder) void loadOlder();
+      return;
+    }
+    visitedMoment.current = moment;
+    userScrolledUpRef.current = true;
+    const frame = requestAnimationFrame(() => {
+      settlingRef.current = false;
+      virtualizer.scrollToIndex(index, {align:'center'});
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [groups, hasOlder, loadingOlder, loadOlder, virtualizer]);
+
   // Track scroll position for "scroll to bottom" button + infinite scroll upward
   const loadingOlderInternalRef = useRef(false);
   useEffect(() => {
