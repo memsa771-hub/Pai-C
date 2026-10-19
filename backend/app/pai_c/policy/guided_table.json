@@ -1,7 +1,6 @@
 {
   "derived": {
     "first_picture_action": "first_picture",
-    "first_picture_min_student_messages": 8,
     "first_picture_min_covered_areas": 4,
     "first_picture_required_areas": [
       "status",
@@ -79,7 +78,9 @@
       },
       "set": {
         "action": "follow_thread",
-        "question_allowed": true,
+        "question_allowed": {
+          "ref": "question_needed"
+        },
         "topic": {
           "ref": "opened_thread"
         },
@@ -129,23 +130,18 @@
     {
       "id": "guide",
       "when": {
-        "all": [
+        "eq": [
           {
-            "eq": [
-              {
-                "ref": "intent"
-              },
-              "deciding"
-            ]
+            "ref": "intent"
           },
-          {
-            "ref": "summary_confirmed"
-          }
+          "deciding"
         ]
       },
       "set": {
         "action": "guide",
-        "question_allowed": true,
+        "question_allowed": {
+          "ref": "question_needed"
+        },
         "topic": null,
         "invite": false
       }
@@ -153,23 +149,13 @@
     {
       "id": "discover",
       "when": {
-        "all": [
-          {
-            "ref": "discover_available"
-          },
-          {
-            "eq": [
-              {
-                "ref": "questions_in_last_two"
-              },
-              false
-            ]
-          }
-        ]
+        "ref": "discover_available"
       },
       "set": {
         "action": "discover",
-        "question_allowed": true,
+        "question_allowed": {
+          "ref": "question_needed"
+        },
         "topic": {
           "ref": "possibility_id"
         },
@@ -177,30 +163,27 @@
       }
     },
     {
-      "id": "rest",
-      "when": {
-        "ref": "questions_in_last_two"
-      },
-      "set": {
-        "action": "counsel",
-        "question_allowed": false,
-        "topic": null,
-        "invite": false
-      }
-    },
-    {
       "id": "explore_area",
       "when": {
-        "ne": [
+        "all": [
           {
-            "ref": "askable_area"
+            "ne": [
+              {
+                "ref": "askable_area"
+              },
+              null
+            ]
           },
-          null
+          {
+            "ref": "question_needed"
+          }
         ]
       },
       "set": {
         "action": "explore_area",
-        "question_allowed": true,
+        "question_allowed": {
+          "ref": "question_needed"
+        },
         "topic": {
           "ref": "askable_area"
         },
@@ -212,7 +195,9 @@
       "when": true,
       "set": {
         "action": "counsel",
-        "question_allowed": true,
+        "question_allowed": {
+          "ref": "question_needed"
+        },
         "topic": null,
         "invite": false
       }
@@ -220,14 +205,43 @@
   ],
   "post_checks": [
     {
-      "id": "question_cap",
+      "id": "useful_question",
       "when": {
         "all": [
           {
-            "ref": "questions_in_last_two"
+            "ref": "chosen.question_allowed"
           },
           {
-            "ref": "chosen.question_allowed"
+            "eq": [
+              {
+                "ref": "question_needed"
+              },
+              false
+            ]
+          },
+          {
+            "ne": [
+              {
+                "ref": "chosen.action"
+              },
+              "answer_request"
+            ]
+          },
+          {
+            "ne": [
+              {
+                "ref": "chosen.action"
+              },
+              "first_picture"
+            ]
+          },
+          {
+            "ne": [
+              {
+                "ref": "chosen.action"
+              },
+              "explore_correction"
+            ]
           },
           {
             "ne": [

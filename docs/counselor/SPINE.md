@@ -2247,3 +2247,15 @@ Final continuation results and screenshots: BUILD_REPORT_V1.md (38 captures afte
 Continuation code head eb1db6c: guided and strict each **1330 passed, 3 skipped,
 8 subtests**; production class separately **3 passed, 4 subtests**. Frontend
 **60 passed / 18 files**, build green, **288/288** application modules imported.
+# Adaptive person-first amendment (19 Oct 2026)
+
+No owner, queue, model gateway, table, route or OS contract is replaced. Both policy tables now use the classifier's optional `question_needed` signal, not a fixed question cadence. The canonical ten areas remain unchanged; `understanding/capability_mapping.json` supplies the broader whole-person interpretation to the Planner. Reported experience can support a tentative possibility without being promoted to independently demonstrated ability.
+
+| Trigger | Existing owner/path | Boundary |
+| --- | --- | --- |
+| Direct information request, including before Mirror | runtime -> research.gateway (`information`) -> existing `research.claim` system capability in `pai_c/myths.py` | Saved request, workspace scope, bounded tools, exact source passage, SourceVerifier, date/expiry; no selection |
+| Completed information job | Messenger -> request receipt -> Counselor context | Dedupe by job/event receipt; care defers posting; unverified stays unanswered |
+| Planner patch | MemoryService -> atomic patch -> Truth Map | New independent evidence requires a shown/confirmed profile reference; readiness uses active evidence |
+| First picture / tentative discovery | Existing policy controller | No fixed message count; evidence and student correction remain essential |
+
+Foreground model calls are unchanged (classifier + Voice, existing bounded retries). Planner cadence is unchanged. A direct research request can now initiate the existing bounded researcher before Mirror; this adds asynchronous tool/extraction work only when requested, with cache-first reuse. No live calls were used to validate this amendment. Full detail: [ADAPTIVE_COUNSELING_REPORT.md](ADAPTIVE_COUNSELING_REPORT.md).

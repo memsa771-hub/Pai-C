@@ -7,7 +7,7 @@ from uuid import uuid4
 from pydantic import BaseModel, ConfigDict, Field, TypeAdapter
 from app.pai_c.deep.notebook_schema import CounselorNotebookData, Item, SourceItem, Rating
 from app.pai_c.deep.notebook_sanitize import sanitize_notebook
-from app.pai_c.deep.coverage import enforce_mirror_readiness
+from app.pai_c.deep.coverage import enforce_mirror_readiness, requirements
 from app.pai_c.understanding.data import load_policy, at_path
 
 
@@ -108,7 +108,7 @@ class PatchRejected(ValueError):
         super().__init__(f"op_index={index} error_type={error_type}")
 
 
-def apply_patch(notebook, operations, visible_ids, latest_student_text, *, now=None):
+def apply_patch(notebook, operations, visible_ids, latest_student_text, *, now=None, evidence_refs=()):
     if not isinstance(operations, list):
         raise PatchRejected(-1, "InvalidPatchShape")
     data = deepcopy(notebook.model_dump(mode="json"))
@@ -131,6 +131,9 @@ def apply_patch(notebook, operations, visible_ids, latest_student_text, *, now=N
             operation = OPERATION.validate_python(raw)
             if isinstance(operation, Add):
                 entry = operation.item.model_dump(exclude_unset=True)
+                # A model cannot promote a report into independent evidence.
+                if (entry.get("kind") != "said" or entry.get("capability_status") == "demonstrated" or entry.get("level") == "proven") and entry.get("vault_fact_ref") not in evidence_refs:
+                    raise ValueError("independent evidence requires a supported profile reference")
                 if operation.part != "source" and "category" in entry:
                     raise ValueError("category is source-only")
                 if operation.part == "source" and entry.get("category") is None:
@@ -139,7 +142,10 @@ def apply_patch(notebook, operations, visible_ids, latest_student_text, *, now=N
                 kind = SourceItem if operation.part == "source" else Item
                 items(operation.part).append(kind.model_validate(entry).model_dump(mode="json"))
             elif isinstance(operation, Update):
-                find(operation.id).update(**operation.fields.model_dump(exclude_unset=True), last_confirmed=stamp)
+                target = find(operation.id)
+                if (getattr(operation.fields, "capability_status", None) == "demonstrated" or getattr(operation.fields, "level", None) == "proven") and target.get("vault_fact_ref") not in evidence_refs:
+                    raise ValueError("demonstrated capability requires a supported profile reference")
+                target.update(**operation.fields.model_dump(exclude_unset=True), last_confirmed=stamp)
             elif isinstance(operation, Confirm):
                 find(operation.id).update(evidence=operation.evidence, last_confirmed=stamp)
             elif isinstance(operation, Retire):
@@ -186,6 +192,15 @@ def apply_patch(notebook, operations, visible_ids, latest_student_text, *, now=N
         cleaned, issues = sanitize_notebook(validated.model_dump(mode="json"))
         if issues:
             raise ValueError("patch required sanitization")
-        return enforce_mirror_readiness(cleaned)
+        # The Planner writes coverage, not mirror_ready. Recompute readiness so
+        # new workspaces can become reviewable and retired evidence cannot keep
+        # an old readiness flag alive indefinitely.
+        support = {part: any(row.status == "active" for row in getattr(cleaned, part))
+                   for part in ("said", "shown", "source", "self")}
+        support["pressures"] = any(row.status == "active" for row in cleaned.pressures.items)
+        support["sure"] = cleaned.sure.score is not None
+        ready = all(getattr(cleaned.coverage, key) and support[key]
+                    for key in requirements()[cleaned.depth_mode])
+        return enforce_mirror_readiness(cleaned.model_copy(update={"mirror_ready": ready}))
     except Exception as exc:
         raise PatchRejected(index, type(exc).__name__) from None

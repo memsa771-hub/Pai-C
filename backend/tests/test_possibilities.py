@@ -174,12 +174,12 @@ def test_discover_policy_and_text():
     text=decision_context(result,None,None,SimpleNamespace(title='Practical work',why='Your project experience'))['instruction']
     assert 'Practical work' in text and 'Your project experience' in text
     inputs['questions_in_last_two']=True
-    assert decide(inputs).action != 'discover'
+    assert decide(inputs).action == 'discover'  # Cadence is not a readiness gate.
     inputs.update(questions_in_last_two=False,discover_available=False)
     assert decide(inputs).action != 'discover'
 
 
-def test_discover_spacing_from_confirmation_and_previous_discover():
+def test_discover_uses_evidence_and_mention_receipt_not_message_count():
     from uuid import uuid4
     from app.models import EventRecord, StudentJourneyEvent, CounselorTurnDecision
     from app.pai_c.policy.state import build_state
@@ -190,7 +190,7 @@ def test_discover_spacing_from_confirmation_and_previous_discover():
         journey = db.get(StudentJourney, journey.id)
         journey.counselor_summary_draft = {'status':'confirmed','version':1,'mirror':mirror_data()}
         service=PossibilityService(db)
-        service.add(student.workspace_id,journey.id,title='Practical direction',why='Evidence',kind='discovered',source='planner',status='suggested')
+        possibility=service.add(student.workspace_id,journey.id,title='Practical direction',why='Evidence',kind='discovered',source='planner',status='suggested', evidence=[{'text':'Student experience','item_id':'experience'}])
         stamp=student.next_timestamp()
         db.add(StudentJourneyEvent(workspace_id=student.workspace_id,journey_id=journey.id,
             event_type='counselor.mirror.confirmed',payload={'mirror_version':1},
@@ -200,8 +200,9 @@ def test_discover_spacing_from_confirmation_and_previous_discover():
                 source=f'human:{student.user_id}',target='channel/pai-counselor',payload={'content':'Student evidence'},timestamp=stamp+number)
             db.add(event); db.commit()
             turn=CounselorTurnInput(event.target,student.workspace_id,'Student evidence',(),None,event.id,event.timestamp,event.source)
-            assert build_state(db,turn,fallback_signals(),[])['discover_available'] is (number in {6,12})
-            if number == 6:
+            assert build_state(db,turn,fallback_signals(),[])['discover_available'] is (number == 1)
+            if number == 1:
+                service.mark_mentioned(student.workspace_id,possibility.id)
                 db.add(CounselorTurnDecision(workspace_id=student.workspace_id,source_event_id=event.id,
                     source_timestamp=event.timestamp,move='none',decision={'action':'discover'})); db.commit()
 

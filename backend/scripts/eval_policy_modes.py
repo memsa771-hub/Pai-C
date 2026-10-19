@@ -37,7 +37,7 @@ def load_scripts(directory: Path = FIXTURES) -> list[dict]:
 def _signals(turn: dict) -> Signals:
     data = fallback_signals().model_dump()
     data.update({key: turn[key] for key in ("intent", "emotion", "request", "safety",
-                                            "mentioned_areas", "declined_area") if key in turn})
+                                            "mentioned_areas", "declined_area", "question_needed") if key in turn})
     return Signals.model_validate(data)
 
 
@@ -107,7 +107,7 @@ def markdown(report: dict) -> str:
             values = entry["modes"][mode]["metrics"]
             lines.append(f"| {entry['id']} | {mode} | " + " | ".join(str(values[key]) for key in keys) + " |")
     lines += ["", "question_turns_max is an upper bound: it assumes every allowed question is asked.",
-              "guide_before_picture counts guide decisions; guided mode allows guide only after confirmation.",
+              "guide_before_picture counts guide decisions; general decision help does not require Mirror confirmation.",
               "", "Live comparison (needs approval, capped at $3 per mode):", ""]
     lines += [f"    {command}" for command in report["live_commands"]]
     return "\n".join(lines) + "\n"

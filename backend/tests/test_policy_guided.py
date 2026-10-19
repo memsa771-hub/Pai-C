@@ -22,21 +22,21 @@ def state(**changes):
     ({"safety": {"level": "urgent"}, "mirror_allowed": True}, "care", "care", False),
     ({"mirror_correction": True, "mirror_allowed": True}, "mirror_changes", "explore_correction", True),
     ({"mirror_allowed": True, "first_picture_due": True}, "mirror", "mirror", False),
-    ({"first_picture_due": True, "questions_in_last_two": True}, "first_picture+question_cap", "first_picture", False),
-    ({"intent": "deciding", "summary_confirmed": True}, "guide", "guide", True),
-    ({"discover_available": True, "possibility_id": "p1"}, "discover", "discover", True),
-    ({"questions_in_last_two": True, "discover_available": True}, "rest", "counsel", False),
-    ({"intent": "deciding"}, "counsel", "counsel", True),
+    ({"first_picture_due": True, "questions_in_last_two": True}, "first_picture", "first_picture", True),
+    ({"intent": "deciding", "summary_confirmed": True}, "guide", "guide", False),
+    ({"discover_available": True, "possibility_id": "p1"}, "discover", "discover", False),
+    ({"questions_in_last_two": True, "discover_available": True}, "discover", "discover", False),
+    ({"intent": "deciding"}, "guide", "guide", False),
     ({"intent": "asking_task", "request": {"needs_context": False}}, "answer", "answer_request", False),
-    ({}, "counsel", "counsel", True),
+    ({}, "counsel", "counsel", False),
 ])
 def test_guided_rows_first_match(changes, rule, action, question):
     result = controller.decide(state(**changes), mode="guided")
     assert (result.rule_id, result.action, result.question_allowed) == (rule, action, question)
 
 
-def test_guided_has_only_question_cap_and_mode_comes_from_config(monkeypatch):
-    assert [check["id"] for check in controller.load_data("guided_table.json")["post_checks"]] == ["question_cap"]
+def test_guided_has_usefulness_guard_and_mode_comes_from_config(monkeypatch):
+    assert [check["id"] for check in controller.load_data("guided_table.json")["post_checks"]] == ["useful_question"]
     previous = controller.decide(state(), mode="guided").as_dict()
     assert controller.decide(state(previous=previous), mode="guided").rule_id == "counsel"
     monkeypatch.setattr(config, "PAI_POLICY_MODE", "strict")
@@ -57,7 +57,7 @@ def coverage(covered):
 
 @pytest.mark.parametrize("kwargs,expected", [
     ({}, True),
-    ({"student_count": 7}, False),
+    ({"student_count": 2}, True),
     ({"coverage": coverage(3)}, False),
     ({"coverage": {**coverage(5), "history": {"covered": False}}}, False),
     ({"coverage": {**coverage(5), "status": {"covered": False}}}, False),

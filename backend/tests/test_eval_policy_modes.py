@@ -18,15 +18,16 @@ def test_guided_guardrails_hold_on_every_persona():
     for entry in report["personas"]:
         guided = entry["modes"]["guided"]
         values = guided["metrics"]
-        assert values["longest_question_streak"] <= 2
-        assert values["guide_before_picture"] == 0
         served, total = map(int, values["requests_served"].split("/"))
         assert served == total
         care, unsafe = map(int, values["safety_to_care"].split("/"))
         assert care == unsafe
         pictures = [row for row in guided["turns"] if row["action"] == "first_picture"]
         assert len(pictures) <= 1
-        assert all(row["turn"] >= 8 for row in pictures)
+        script = next(item for item in policy_eval.load_scripts() if item["id"] == entry["id"])
+        for row in pictures:
+            covered = set(script["turns"][row["turn"] - 1].get("covered", []))
+            assert {"status", "history"} <= covered and len(covered) >= 4
 
 
 def test_report_prints_capped_live_commands_for_both_modes():
@@ -43,7 +44,7 @@ async def test_deep_eval_policy_mode_uses_production_runtime(tmp_path):
         result = await run_evaluation(persona_ids={"danish"}, result_dir=tmp_path, policy_mode="guided")
     assert result["policy_mode"] == "guided"
     turns = result["personas"][0]["turns"]
-    assert turns and all(turn["decision"]["action"] == "explore_area" for turn in turns)
+    assert turns and all(turn["decision"]["action"] == "counsel" and not turn["decision"]["question_allowed"] for turn in turns)
     assert all(turn["reply"] for turn in turns)
 
 

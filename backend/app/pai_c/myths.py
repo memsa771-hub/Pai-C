@@ -6,7 +6,7 @@ from datetime import datetime, timedelta, timezone
 from pydantic import BaseModel, ConfigDict
 from sqlalchemy import select
 from app.config import config
-from app.models import BackgroundJob, CounselorTurnDecision, CounselorNotedQuestion, Workspace
+from app.models import BackgroundJob, CounselorTurnDecision, CounselorNotedQuestion, Workspace, EventRecord
 from app.pai_c.memory import MemoryService
 from app.pai_c.policy.controller import load_data
 
@@ -111,7 +111,86 @@ class ClaimPassage(BaseModel):
     source_url: str
 
 
+def enqueue_information(db, workspace_id, source_event_id):
+    """Use the existing bounded claim researcher for a saved direct request."""
+    from app.runtime.task_runtime import enqueue
+    request = db.scalar(select(CounselorNotedQuestion).where(
+        CounselorNotedQuestion.workspace_id == workspace_id,
+        CounselorNotedQuestion.source_event_id == source_event_id,
+        CounselorNotedQuestion.kind == "information",
+        CounselorNotedQuestion.needs_research.is_(True),
+        CounselorNotedQuestion.status.in_(("open", "unanswered"))))
+    if request is None:
+        return None
+    job = enqueue(db, job_type=JOB_CHECK, workspace_id=workspace_id,
+        payload={"request_id": request.id, "source_event_id": source_event_id},
+        idempotency_key=f"information:{workspace_id}:{request.id}")
+    db.commit()
+    return job
+
+
+def information_facts(db, workspace_id):
+    """Only current, verified receipts from this workspace enter Voice context."""
+    from app.pai_c.deep.grounding import current_fact
+    rows = db.scalars(select(CounselorNotedQuestion).where(
+        CounselorNotedQuestion.workspace_id == workspace_id,
+        CounselorNotedQuestion.kind == "information",
+        CounselorNotedQuestion.status == "answered").order_by(
+        CounselorNotedQuestion.created_at.desc()).limit(policy()["context_limit"])).all()
+    return [row.answer for row in rows if isinstance(row.answer, dict) and current_fact(row.answer)]
+
+
 async def check_job(job, db):
+    result = job.result if job.payload.get("request_id") and job.result else await _check_job(job, db)
+    if job.payload.get("request_id"):
+        job.result = result
+        db.commit()
+        await _deliver_information(job, db, result)
+    return result
+
+
+async def _deliver_information(job, db, result):
+    from app.pai_c.posting import send_to_student
+    from app.services.pai import PAI_AGENT_NAME
+    from app.pai_c.deep.grounding import current_fact
+    from app.jobs.service import JobDeferred
+    if result.get("status") == "superseded":
+        return
+    request = db.scalar(select(CounselorNotedQuestion).where(
+        CounselorNotedQuestion.workspace_id == job.workspace_id,
+        CounselorNotedQuestion.id == job.payload["request_id"]))
+    source = db.scalar(select(EventRecord).where(EventRecord.network_id == job.workspace_id,
+        EventRecord.id == job.payload.get("source_event_id")))
+    if request is None or source is None or request.status not in {"open", "unanswered"}:
+        return
+    last = db.scalar(select(CounselorTurnDecision).where(CounselorTurnDecision.workspace_id == job.workspace_id)
+        .order_by(CounselorTurnDecision.source_timestamp.desc()).limit(1))
+    if last and (last.move == "wellbeing" or (last.decision or {}).get("action") == "care"):
+        deferred = JobDeferred("Information delivery waits for care")
+        deferred.delay_seconds = policy()["care_retry_seconds"]
+        raise deferred
+    fact = result.get("fact")
+    if fact and not current_fact(fact):
+        fact = None
+    reply = policy()["information_unanswered"]
+    if fact:
+        fact = {**fact, "fact_id": job.id}
+        reply = policy()["information_source_reply"].format(quote=fact["quote"],
+            date=fact["checked_at"][:10], url=fact["source_url"])
+    existing = db.scalar(select(EventRecord.id).where(EventRecord.network_id == job.workspace_id,
+        EventRecord.source == f"openagents:{PAI_AGENT_NAME}",
+        EventRecord.metadata_["information_job_id"].as_string() == job.id))
+    event_id = existing or await send_to_student(db, job.workspace_id, source.target,
+        PAI_AGENT_NAME, reply, 0, metadata={"information_job_id": job.id})
+    if not event_id:
+        raise RuntimeError("information reply was not persisted")
+    request.status = "answered" if fact else "unanswered"
+    request.answered_event_id = event_id
+    request.answer = fact
+    db.commit()
+
+
+async def _check_job(job, db):
     from app.inference.gateway import complete
     from app.pai_c.deep.prompts import load_prompt
     from app.pai_c.deep.polish import contains_blocked_script
@@ -121,12 +200,22 @@ async def check_job(job, db):
     from app.tools import ToolContext, AUDIENCE_COUNSELOR, get_tool_executor
     from app.services.pai import PAI_AGENT_NAME, WorkspaceApi
     from app.research.requirements import RequirementStore
-    item = next((item for item in items(db, job.workspace_id) if fingerprint(item) == job.payload.get("fingerprint")), None)
+    request = db.scalar(select(CounselorNotedQuestion).where(
+        CounselorNotedQuestion.workspace_id == job.workspace_id,
+        CounselorNotedQuestion.id == job.payload.get("request_id"),
+        CounselorNotedQuestion.needs_research.is_(True),
+        CounselorNotedQuestion.status.in_(("open", "unanswered")))) if job.payload.get("request_id") else None
+    item = next((item for item in items(db, job.workspace_id) if fingerprint(item) == job.payload.get("fingerprint")), None) if not job.payload.get("request_id") else None
     workspace = db.get(Workspace, job.workspace_id)
-    if not item or not workspace or workspace.status != "active":
+    if (not item and not request) or not workspace or workspace.status != "active":
         return {"status": "superseded"}
     rules = policy()
-    claim = item.value
+    claim = request.question_to_research if request else item.value
+    if request:
+        cached = next((fact for fact in information_facts(db, job.workspace_id)
+                       if fact.get("question") == claim), None)
+        if cached:
+            return {"status": "sourced", "fact": cached, "cache_hit": True}
     ctx = ToolContext(workspace_id=job.workspace_id, agent_name=PAI_AGENT_NAME,
         api=WorkspaceApi(job.workspace_id, workspace.password_hash), audience=AUDIENCE_COUNSELOR,
         allowed_tools=frozenset({"web.search", "web.fetch"}),
@@ -166,6 +255,8 @@ async def check_job(job, db):
         checked = datetime.now(timezone.utc)
         fact = {"field": "belief", "value": passage.quote, "quote": passage.quote,
             "source_url": passage.source_url, "checked_at": checked.isoformat(), "kind": "explanation"}
+        if job.payload.get("request_id"):
+            fact.update(field="information", question=claim)
         store = RequirementStore(db)
         institution = store.institution_for_url(passage.source_url)
         domains = set(rules["trusted_domains"]) | store.official_domains(institution)

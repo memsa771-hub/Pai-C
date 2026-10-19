@@ -224,6 +224,19 @@ async def _run_deep_turn(db, workspace_id: str, event_data: dict, depth: int):
             guard_violations=violations + (["action_failed"] if status == "failed" else []),
         ))
         db.commit()
+    # Queue after the reply and its decision are durable: a cache hit must not
+    # overtake the acknowledgment, and a Voice safety override must win.
+    if (decision is not None and decision.action == "answer_request" and signals.request
+            and signals.request.needs_research and action.get("type") != "wellbeing"):
+        from app.research.gateway import request_research
+        from app.tools import ToolContext
+        try:
+            await request_research("information", workspace_id, db=db, journey=None,
+                tool_context=ToolContext(workspace_id=workspace_id, agent_name=PAI_AGENT_NAME, api=None),
+                refresh_key=turn.source_event_id)
+        except Exception as exc:
+            db.rollback()
+            logger.warning("information_enqueue_failed error_type=%s", type(exc).__name__)
     logger.info(
         "counselor_deep_turn context_ms=%d model_ms=%d polish_ms=%d "
         "post_ms=%d classifier_ms=%d total_ms=%d action=%s action_status=%s moves=%s",

@@ -38,7 +38,11 @@
           "education",
           "test_attempt",
           "document",
-          "course"
+          "course",
+          "project",
+          "achievement",
+          "activity",
+          "work_experience"
         ]
       }
     ]

@@ -1,6 +1,8 @@
 # PAI C engineering workflow — LOCKED v1 (18 Oct 2026)
 
 Figma board (source of truth): https://www.figma.com/board/NjVJfdxERWfRHPycy1wDkF
+
+**19 Oct 2026 amendment:** the approved adaptive person-first task supersedes the original fixed message gates, two-question cadence and absolute institution-information restriction below. Sections 03/05/06/10 now describe adaptive evidence-based counseling. The A-K sequence remains a decision strategy and integrity boundary, not an interview prerequisite. Direct sourced information is available before Mirror; personalized conclusions and selection retain evidence/review/authorization requirements. Current operational rules: [COUNSELING_POLICY.md](COUNSELING_POLICY.md). Original wording below is retained as historical context, not a conflicting runtime requirement.
 Sections: header (6 principles, legend), 00 A to K, 01 what the student sees, 02 one turn, 03 spine (10 areas), 04 evidence, 05 next move, 06 stages, 07 failures, 08 vs Kollegio, 09 world knowledge, 10 paths to a decision, 11 PAI C and PAI OS contract, 12 Operator and background work. White card = built in code; orange border "NEW" = new work.
 
 ## What PAI C is

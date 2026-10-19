@@ -7,6 +7,7 @@ from uuid import uuid4
 import pytest
 from sqlalchemy import select
 
+from app.pai_c.policy.classifier import fallback_signals
 from app.config import config
 from app.pai_c import runtime
 from app.pai_c.deep.actions import dispatch_action
@@ -158,7 +159,8 @@ async def test_runtime_posts_and_enqueues_extraction_once():
         with patch.object(config, "PAI_API_KEY", "fake"), \
                 patch("app.pai_c.deep.turn.chat_completion",
                       new=AsyncMock(return_value=_answer("What are you doing now?"))) as model, \
-                patch("app.memory.turn_hook.enqueue_turn_extraction") as enqueue:
+                patch("app.memory.turn_hook.enqueue_turn_extraction") as enqueue, \
+                patch("app.pai_c.policy.classifier.classify", AsyncMock(return_value=fallback_signals().model_copy(update={"question_needed": True}))):
             await runtime._run_turn(db, student.workspace_id, event_data, 0)
         assert student.transcript[-1]["content"] == "What are you doing now?"
         assert model.await_count == 1

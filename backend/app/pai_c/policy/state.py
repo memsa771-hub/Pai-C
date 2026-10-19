@@ -2,21 +2,18 @@
 from sqlalchemy import select
 
 from app.config import config
-from app.models import CounselorTurnDecision, EventRecord, BackgroundJob, StudentJourney, StudentJourneyEvent, PaiPossibility
-from datetime import timezone
+from app.models import CounselorTurnDecision, EventRecord, BackgroundJob, StudentJourney, PaiPossibility
 from app.pai_c.memory import MemoryService
 from app.pai_c.policy.controller import load_data
 from app.pai_c.voice.guards import question_sentences
 
 
 def first_picture_due(*, coverage, student_count, prior_decisions, summary_confirmed):
-    """Once per workspace, before confirmation, after enough messages and coverage,
-    and only when the required areas (where they are now and their story so far) are covered."""
+    """A provisional picture uses evidence coverage, never elapsed turn count."""
     rules = load_data("guided_table.json")["derived"]
     covered = sum(bool(area.get("covered")) for area in coverage.values())
     return (not summary_confirmed
             and not any(row["decision"].get("action") == rules["first_picture_action"] for row in prior_decisions)
-            and student_count >= rules["first_picture_min_student_messages"]
             and covered >= rules["first_picture_min_covered_areas"]
             and all(coverage.get(area, {}).get("covered") for area in rules["first_picture_required_areas"]))
 
@@ -100,9 +97,7 @@ def build_state(db, turn, signals, history):
     pending = db.scalar(select(BackgroundJob.id).where(
         BackgroundJob.workspace_id == turn.workspace_id, BackgroundJob.job_type == "counselor.mirror",
         BackgroundJob.status.in_(("pending", "running"))).limit(1))
-    enough_after_edit = last_edit is None or (
-        len(ordinals) - ordinals[last_edit.id] >= load_data("decision_table.json")["derived"]["mirror_after_edit_min_student_messages"]
-        and memory.patch_applied_since(turn.workspace_id, last_edit.id))
+    enough_after_edit = last_edit is None or memory.patch_applied_since(turn.workspace_id, last_edit.id)
     state["mirror_correction"] = bool(current and (current.metadata_ or {}).get("mirror_edit_version") is not None)
     state["mirror_allowed"] = bool(state["mirror_ready"] and journey
         and journey.current_stage == "DIRECTION" and pending is None and enough_after_edit)
@@ -112,21 +107,14 @@ def build_state(db, turn, signals, history):
     state["summary_confirmed"] = draft.get("status") == "confirmed"
     if state["summary_confirmed"]:
         state["first_picture_due"] = False
-        proof = db.scalar(select(StudentJourneyEvent).where(
-            StudentJourneyEvent.workspace_id == turn.workspace_id,
-            StudentJourneyEvent.event_type == "counselor.mirror.confirmed",
-            StudentJourneyEvent.payload["mirror_version"].as_integer() == draft.get("version")
-        ).order_by(StudentJourneyEvent.created_at.desc()).limit(1))
-        possibility = db.scalar(select(PaiPossibility).where(
-            PaiPossibility.workspace_id == turn.workspace_id, PaiPossibility.status == "suggested",
-            PaiPossibility.mentioned_at.is_(None)).order_by(PaiPossibility.created_at, PaiPossibility.id).limit(1))
-        if proof and possibility:
-            confirmed = proof.created_at.replace(tzinfo=timezone.utc) if proof.created_at.tzinfo is None else proof.created_at
-            boundary = max([int(confirmed.timestamp() * 1000), *[
-                row.source_timestamp for row in rows if (row.decision or {}).get("action") == "discover"]])
-            count = sum(row["timestamp"] > boundary for row in students)
-            state["discover_available"] = count >= load_data("decision_table.json")["derived"]["discover_min_student_messages_between"]
-            state["possibility_id"] = possibility.id
+    # Evidence-validated possibilities can be offered tentatively before a Mirror.
+    # Being offered one does not select it, authorize execution, or assert eligibility.
+    possibility = db.scalar(select(PaiPossibility).where(
+        PaiPossibility.workspace_id == turn.workspace_id, PaiPossibility.status == "suggested",
+        PaiPossibility.mentioned_at.is_(None)).order_by(PaiPossibility.created_at, PaiPossibility.id).limit(1))
+    if possibility and possibility.evidence:
+        state["discover_available"] = True
+        state["possibility_id"] = possibility.id
     from app.pai_c.myths import relevant_myth
     state["relevant_myth"] = relevant_myth(db, turn.workspace_id, signals)
     return state

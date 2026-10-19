@@ -10,10 +10,10 @@ Decision: no separate code path per student type. One universal counseling loop 
 ## Hard guardrails (code, always enforced)
 1. Safety: classifier -> care path.
 2. Requests are stored and never blocked.
-3. Questions: at most one per reply; no question after two asking replies in a row, except care. Both tables apply a final data-driven question cap after action selection: the action, topic and invitation stay selected, but question_allowed becomes false. First picture ends with an invitation to correct it, not a question.
+3. Questions: at most one meaningful question per reply, never a required ending. The classifier supplies `question_needed` (default false); both tables use it instead of a fixed question ratio. Requests may ask for necessary context, and a picture may invite correction. Several helpful statements may follow each other. Missing areas alone do not justify questions.
 4. No repeated question or repeated reply.
 5. Mirror only when allowed (stage, no pending job, corrections absorbed); a correction is explored first.
-6. First picture due (once, around student message 8 with at least 4 areas covered, status and history covered): state tells the model; reply must share understanding + 3-4 directions in general words (fields, kinds of work, never institutions) with evidence.
+6. A first picture is provisional and shared once: at least 4 evidence-covered areas including status and history support it; there is no minimum message count. Coverage is a supporting indicator, not proof of understanding. Mirror readiness is recomputed from active evidence and depth-specific coverage; corrections require an applied Planner patch, not two extra turns. Student review remains required for confirmation.
 7. Coverage depth tracked in code (min items per area) and shown to the model as known/missing.
 8. Every turn logged (model moves + guardrail flags) for evaluation.
 
@@ -21,6 +21,14 @@ Decision: no separate code path per student type. One universal counseling loop 
 PAI_POLICY_MODE = guided (universal loop + guardrails, default for strong models) | strict (full decision table, kept as fallback). Choose by measured results on the same persona set and live tests.
 
 ## Success measures
-Reflections >= questions; felt understood >= 4/5; certainty before -> after; first picture by message 12; no repeated question; Gate 1: 7 of 10 real students reach the Mirror.
+Measure felt understood, appropriate questions, corrections respected, source accuracy, and informed student choice. Do not optimize a reflection/question ratio or a fixed picture deadline. Offline tests demonstrate routing and guards; counseling quality needs reviewed student conversations.
+
+## Adaptive whole-person counseling (19 Oct 2026)
+
+The ten canonical areas stay stable. `understanding/capability_mapping.json` maps them to daily life, experiences, accomplishments, relationships, values and changing aspirations. These are in-domain even without an immediate application task. Self-description and reported projects remain `said`; new independently evidenced items or demonstrated capabilities require a shown/confirmed profile reference. Interpretations remain correctable and private; a family preference does not establish pressure or a controlling relationship.
+
+Paths-first is the default decision strategy, not an information gate. A direct information request can use `research.gateway` -> the existing bounded `research.claim` job -> SourceVerifier -> Messenger at any stage. Current source receipts enter the same Counselor context. Missing sources leave the request unanswered with an honest response. Care defers delivery. Information never chooses a roadmap or authorizes OS execution. Personal recommendations still need relevant student evidence, current world evidence and uncertainty; selection keeps the existing confirmation and authorization gates.
+
+See [ADAPTIVE_COUNSELING_REPORT.md](ADAPTIVE_COUNSELING_REPORT.md) for implementation evidence, scenario coverage and limitations.
 
 See also PAI_C_WORKFLOW_LOCK_V1.md (locked engineering workflow, 18 Oct 2026) and the Figma board https://www.figma.com/board/NjVJfdxERWfRHPycy1wDkF

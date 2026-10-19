@@ -51,6 +51,7 @@ def validate_plan(raw, wellbeing=False, *, view=None):
         from app.pai_c.understanding.data import load_policy, at_path
         items = {row["id"]: row for path in load_policy()["item_paths"] for row in at_path(view.data, path)}
         ids = set(plan.possibility.evidence_item_ids)
-        if len(ids) < 2 or not ids <= items.keys() or not any(items[id]["kind"] in {"shown", "action"} for id in ids):
+        experiences = {row["id"] for row in at_path(view.data, "shown")}
+        if len(ids) < 2 or not ids <= items.keys() or not any(items[id]["kind"] in {"shown", "action"} or id in experiences for id in ids):
             plan = plan.model_copy(update={"possibility": None})
     return plan.model_copy(update={"next_move": "care", "target_gap": None}) if wellbeing else plan

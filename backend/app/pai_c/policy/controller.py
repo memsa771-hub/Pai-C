@@ -85,7 +85,7 @@ def policy_mode(mode=None):
 
 def decide(state, mode=None):
     table = load_data(TABLES[policy_mode(mode)])
-    state = dict(state)
+    state = {"question_needed": False, **state}
     candidates = askable_areas(state)
     previous = state.get("previous") or {}
     alternatives = askable_areas(state, excluded=(previous.get("topic"),))

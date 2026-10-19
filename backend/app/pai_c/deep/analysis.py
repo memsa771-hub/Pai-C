@@ -135,8 +135,11 @@ def _input(db, workspace_id: str, student: EventRecord, assistant: EventRecord,
     episode = MemoryService(db).session_summaries(workspace_id, limit=1)
     from app.pai_c.possibilities import PossibilityService
     dismissed = [row.title for row in PossibilityService(db).list(workspace_id) if row.status == "dismissed"]
+    from app.pai_c.understanding.data import DATA_DIR
+    capabilities = (DATA_DIR / "capability_mapping.json").read_text(encoding="utf-8")
     return ("<notebook_schema>" + _json({"notebook": CounselorNotebookData.analyst_schema(), "patch_operation": OPERATION.json_schema(), "plan": TurnPlan.model_json_schema()})
             + "</notebook_schema>\n"
+            + "<understanding_spine>" + capabilities + "</understanding_spine>\n"
             + view.text + "\n<dismissed_possibilities>" + _json(dismissed) + "</dismissed_possibilities>\n"
             + "<profile>" + _json(_profile(db, workspace_id)) + "</profile>\n"
             + "<older_episode_summary>" + _json(episode[0].summary if episode else "")
@@ -151,6 +154,10 @@ async def _candidate(db, workspace_id: str, student: EventRecord,
     query = (student.payload or {}).get("content", "")
     view = build_planner_view(previous.notebook)
     analyst_input = _input(db, workspace_id, student, assistant, previous.notebook, view=view)
+    profile = MemoryService(db).profile(workspace_id)
+    evidence_refs = {row["id"] for row in [*profile.facts.values(),
+        *(row for rows in profile.records.values() for row in rows)]
+        if row.get("id") and row.get("evidence_level") in {"shown", "confirmed"}}
     decision = db.scalar(select(CounselorTurnDecision).where(
         CounselorTurnDecision.workspace_id == workspace_id,
         CounselorTurnDecision.source_timestamp <= assistant.timestamp,
@@ -179,7 +186,7 @@ async def _candidate(db, workspace_id: str, student: EventRecord,
                 raise PatchRejected(-1, "InvalidJSON") from None
             if not isinstance(parsed, dict):
                 raise PatchRejected(-1, "InvalidOutputShape")
-            candidate = apply_patch(previous.notebook, parsed.get("patch"), view.ids, query)
+            candidate = apply_patch(previous.notebook, parsed.get("patch"), view.ids, query, evidence_refs=evidence_refs)
         except PatchRejected as exc:
             logger.warning("planner_patch_rejected op_index=%d error_type=%s", exc.index, exc.error_type)
             if attempt:

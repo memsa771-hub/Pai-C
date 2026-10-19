@@ -92,7 +92,9 @@ async def test_successful_deep_turn_enqueues_one_analysis_after_reply():
         event_data = {"id": event_id, "source": f"human:{student.user_id}",
                       "target": "channel/pai-counselor", "payload": {"content": "I need guidance"},
                       "timestamp": timestamp, "metadata": {}}
+        from app.pai_c.policy.classifier import fallback_signals
         with patch.object(config, "PAI_API_KEY", "fake"), \
+                patch("app.pai_c.policy.classifier.classify", AsyncMock(return_value=fallback_signals().model_copy(update={"question_needed": True}))), \
                 patch("app.pai_c.deep.turn.chat_completion",
                       new=AsyncMock(return_value=json.dumps({
                           "reply": "What matters most to you?", "action": {"type": "none"}}))):
@@ -403,8 +405,8 @@ async def test_chat_completion_invokes_per_call_usage_callback():
 
 @pytest.mark.parametrize("mode,keys", [
     ("full", ("said", "shown", "source", "pressures", "self", "sure")),
-    ("focused", ("said", "shown", "source", "pressures", "sure")),
-    ("light", ("said", "source", "sure")),
+    ("focused", ("said", "shown", "source", "self")),
+    ("light", ("said", "self")),
 ])
 def test_mirror_ready_is_forced_false_until_configured_coverage_is_complete(mode, keys):
     missing = CounselorNotebookData.model_validate({

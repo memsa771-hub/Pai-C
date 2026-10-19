@@ -52,7 +52,7 @@ async def test_classifier_request_is_stored_before_voice_and_answered_once_after
             context=kwargs["system_prompt"]
             decision=json.loads(context.rsplit("<context>",1)[1].split("<decision>",1)[1].split("</decision>")[0])
             assert decision["action"]=="answer_request" and not decision["question_allowed"]
-            assert "invite them once" in decision["instruction"]
+            assert "invite them once" not in decision["instruction"]
             assert decision["insight_candidate"]=="" and "<plan>" not in context
             return output("Group your notes by topic.",{"type":"note_question","question_to_research":"duplicate","needs_research":False})
         with patch("app.pai_c.policy.classifier.complete",AsyncMock(return_value=json.dumps(signals))),patch("app.pai_c.deep.turn.chat_completion",voice):

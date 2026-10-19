@@ -222,6 +222,10 @@ async def build_context(db, workspace_id: str, turn: CounselorTurnInput, *,
             possibility = PossibilityService(db).get(workspace_id, decision.topic)
         sections["decision"] = _json(decision_context(decision, signals, plan, possibility))
     research = _research(db, workspace_id, journey)
+    from app.pai_c.myths import information_facts
+    requested_facts = information_facts(db, workspace_id)
+    if requested_facts:
+        research = {**(research or {}), "facts": [*(research or {}).get("facts", []), *requested_facts]}
     if roadmap_id is not None:
         row = db.scalar(select(Roadmap).where(
             Roadmap.id == roadmap_id, Roadmap.workspace_id == workspace_id))

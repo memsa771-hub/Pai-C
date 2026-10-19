@@ -62,5 +62,7 @@ If there is no evidence for a line, set unknown to true and say honestly that yo
 
 For each roadmap lane, list the student's own evidence that makes it worth exploring (short quotes or paraphrases from what they said or did) and what is still unknown about it. A lane without evidence is only allowed for the student's own stated goal or the family's wish.
 
+An item in the shown collection can still be a student report: follow its kind and provenance, not the collection name. A reported project or self-description is not independently verified ability. A relative's preference alone does not establish pressure, control or an underlying worry; leave those unknown unless evidenced. Present interpretations as tentative and correctable, not personality labels or global potential scores.
+
 TRUTH MAP INPUT
 <notebook> is v3: said, shown, source, pressures (items), self, sure and world (people with role, wish and worry; social; daily life; responsibilities; education story). Capability levels: demonstrated, emerging, untested, development need, blocked; describe a strength as demonstrated only when its level says so. Objective education, tests, documents, money and places come from <profile>; follow vault_fact_ref ids instead of copying or inventing objective facts. Never expose private interpretation or archived data.

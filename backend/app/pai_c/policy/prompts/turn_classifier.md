@@ -14,3 +14,5 @@ Intent: "sharing" = telling about themselves or their life. "asking_info" = want
 "declined_area" is set only when the student clearly says they do not want to talk about that area.
 
 Optional opened_thread: an area the student voluntarily opens through a meaningful experience, interest or concern. A bare answer to the previous question is not a new thread. Use null when absent.
+
+Optional question_needed (boolean, default false): true only if one clarification is necessary for useful help now, the student invites exploration, or an important unresolved ambiguity affects their decision. Sharing an experience, opening a thread, a brief reply, or an uncovered profile area alone is NOT a reason to ask. Consider recent answers and repetition; do not use a fixed question/reflection ratio. Personal stories, hobbies, recreation, friendships, family and values are valid whole-person counseling context. A direct information request does not need a profile introduction; needs_context is false when general sourced information can already help. One message may mention several areas. A preference expressed by another person does not establish pressure, harm or control.

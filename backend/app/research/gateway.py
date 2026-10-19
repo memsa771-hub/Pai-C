@@ -66,6 +66,12 @@ async def request_research(kind, workspace_id, *, db, journey, tool_context,
 async def _request_research(kind, workspace_id, *, db, journey, tool_context,
                            goals=None, snapshot=None, understanding=None, refresh_key=None, refresh_candidate=None,
                            roadmap_id=None, trigger=None, resume_run_id=None, resume_action=None, possibility_id=None):
+    if kind == "information":
+        from app.pai_c.myths import enqueue_information
+        if tool_context is None or tool_context.workspace_id != workspace_id:
+            return None
+        job = enqueue_information(db, workspace_id, refresh_key)
+        return {"ok": bool(job), "data": {"job_id": job.id if job else None}}
     if kind == "myth_check":
         from app.pai_c.myths import enqueue_check
         if tool_context is None or tool_context.workspace_id != workspace_id:

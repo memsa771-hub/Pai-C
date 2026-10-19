@@ -22,7 +22,7 @@ def state(**changes):
         area: {"covered": True} for area in controller.load_data("areas_policy.json")["priority"]},
         "student_count": 10, "mirror_allowed": False, "summary_due": False,
         "invite_pending": False, "insight_available": False,
-        "questions_in_last_two": False, "short_reply_streak": 0, "previous": {}}
+        "questions_in_last_two": False, "short_reply_streak": 0, "previous": {}, "question_needed": True}
     return {**base, **changes}
 
 
@@ -34,7 +34,7 @@ def state(**changes):
     ({"mirror_allowed":True,"summary_due":True}, "mirror", "mirror", False),
     ({"summary_due":True,"emotion":"stressed"}, "summarize", "summarize", True),
     ({"emotion":"stressed","questions_in_last_two":True}, "listen", "listen_reflect", False),
-    ({"questions_in_last_two":True,"coverage":{}}, "rest", "listen_reflect", False),
+    ({"questions_in_last_two":True,"coverage":{},"question_needed":False}, "default", "listen_reflect", False),
     ({"short_reply_streak":2,"coverage":{}}, "choice", "ask_choice", True),
     ({"coverage":{}}, "ask", "ask", True),
     ({}, "default", "listen_reflect", False),
@@ -73,7 +73,7 @@ def test_area_gating_mentions_priority_and_decline_cooldown():
     ("insight",True,"listen_reflect")])
 def test_no_repeat_never_turns_a_statement_into_question(action,available,expected):
     sample=state(coverage={},questions_in_last_two=True,insight_available=available,
-                 previous={"action":action,"topic":None})
+                 previous={"action":action,"topic":None}, question_needed=False)
     if action=="listen_reflect":sample["emotion"]="stressed"
     result=controller.decide(sample)
     assert result.action==expected and not result.question_allowed
@@ -161,16 +161,14 @@ def replay_founder():
     return results
 
 
-def test_founder_replay_uses_replayed_question_cadence():
+def test_founder_replay_does_not_force_question_cadence():
+    # Old recorded signals do not establish a necessary follow-up. The new policy
+    # must not turn uncovered fields or short replies into compulsory questions.
     rows=replay_founder()
-    assert rows[1].rule_id=="rest" and not rows[1].question_allowed
-    assert rows[4].rule_id=="adjust+question_cap"
-    assert (rows[5].action,rows[5].topic)!=(rows[6].action,rows[6].topic)
-    for index,row in enumerate(rows):
-        if index>=2:
-            assert not all(item.question_allowed for item in rows[index-2:index+1])
+    assert rows[4].rule_id=="adjust" and not rows[4].question_allowed
+    assert all(not row.question_allowed for row in rows)
     assert [(row.rule_id,row.action,row.topic,row.question_allowed) for row in rows]==[
-        ("ask","ask","history",True), ("rest","insight",None,False),
-        ("ask","ask","interests",True), ("summarize","summarize",None,True),
-        ("adjust+question_cap","adjust",None,False), ("ask","ask","status",True),
-        ("choice","ask_choice","status",True)]
+        ("default","listen_reflect",None,False), ("default","insight",None,False),
+        ("default+no_repeat","listen_reflect",None,False), ("summarize","summarize",None,False),
+        ("adjust","adjust",None,False), ("default","insight",None,False),
+        ("default+no_repeat","listen_reflect",None,False)]
