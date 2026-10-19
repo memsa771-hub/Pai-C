@@ -2,6 +2,7 @@
 
 import ast
 import json
+from datetime import datetime, timezone
 from dataclasses import replace
 from pathlib import Path
 from types import SimpleNamespace
@@ -166,6 +167,23 @@ async def test_gateway_reuses_existing_operator_payload_and_deduplicates_runs():
                 db=db, journey=journey, snapshot=SimpleNamespace(facts={}, records={"goal":goals}), tool_context=ctx, trigger="student_answer")
             assert duplicate["ok"] and duplicate["data"]["resumed"]
         executor.execute.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_gateway_serializes_snapshot_timestamps_before_operator_run():
+    with StudentSession() as student, student.factory() as db:
+        journey = research_journey(student, db, confirmed=True)
+        ctx = SimpleNamespace(workspace_id=student.workspace_id)
+        executor = SimpleNamespace(execute=AsyncMock(return_value={"ok": True}))
+        observed_at = datetime(2026, 10, 19, 12, 30, tzinfo=timezone.utc)
+        snapshot = SimpleNamespace(facts={"education": [{"observed_at": observed_at}]}, records={"goal": []})
+        with patch("app.tools.get_tool_executor", return_value=executor):
+            assert await request_research("roadmap_light", student.workspace_id,
+                db=db, journey=journey, snapshot=snapshot, tool_context=ctx,
+                trigger="student_answer") == {"ok": True}
+        payload = executor.execute.call_args.args[1]
+        json.dumps(payload["constraints"])
+        assert payload["constraints"]["capability_input"]["brief"]["profile"]["facts"]["education"][0]["observed_at"] == observed_at.isoformat()
 
 
 def test_only_research_gateway_directly_calls_operator_delegate():

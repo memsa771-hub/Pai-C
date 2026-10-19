@@ -1,6 +1,7 @@
 """One research gateway, authorized by a versioned confirmed Mirror."""
 
 from sqlalchemy import select
+from fastapi.encoders import jsonable_encoder
 
 from app.journey import JourneyService
 from app.models import CounselorNotedQuestion, ExecutionRun, Roadmap, RoadmapStudentState, Workspace
@@ -167,7 +168,7 @@ async def _request_research(kind, workspace_id, *, db, journey, tool_context,
         "task_type": "roadmap_research", "intent": "academic_planning",
         "constraints": {"trigger": trigger, "research_key": key, "mirror_version": brief["mirror_version"],
                         **({"roadmap_id": target.id} if target and target.origin in {"student_added", "operator_suggested"} else {}),
-                        "capability_input": {"brief": brief}},
+                        "capability_input": {"brief": jsonable_encoder(brief)}},
         "context_refs": ["vault", "memory"]}
     db.commit()
     return await _delegate(payload, tool_context)
