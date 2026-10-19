@@ -30,6 +30,8 @@ import { FeedbackDialog } from '@/components/feedback/feedback-dialog';
 interface UserMenuProps {
   side?: 'top' | 'right' | 'bottom' | 'left';
   align?: 'start' | 'center' | 'end';
+  showIdentity?: boolean;
+  profileAction?: { label: string; onSelect: () => void };
 }
 
 // System first — it is the default, and the one most people leave it on.
@@ -39,7 +41,7 @@ const THEME_OPTIONS = [
   { value: 'dark', labelKey: 'theme.dark', icon: Moon },
 ] as const;
 
-export function UserMenu({ side, align = 'end' }: UserMenuProps = {}) {
+export function UserMenu({ side, align = 'end', showIdentity = false, profileAction }: UserMenuProps = {}) {
   const { workspace, token } = useWorkspace();
   const { user, isPaiDeployment, signIn, signOut } = usePaiAuth();
   const [showFeedback, setShowFeedback] = useState(false);
@@ -113,16 +115,20 @@ export function UserMenu({ side, align = 'end' }: UserMenuProps = {}) {
         <DropdownMenuTrigger asChild>
           <button
             type="button"
+            aria-label={t('userMenu.account')}
             title={user?.email || t('userMenu.account')}
-            className="flex size-8 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+            className={`${showIdentity ? 'min-w-0 flex-1 gap-3 rounded-md px-2 py-2 text-left' : 'size-8 justify-center rounded-full'} flex items-center text-muted-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring`}
           >
             {user ? (
-              <span className="flex size-6 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-primary-foreground">
-                {user.email[0].toUpperCase()}
+              <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground">
+                {(user.displayName || user.email).charAt(0).toUpperCase()}
               </span>
             ) : (
               <User className="size-4" />
             )}
+            {showIdentity && <span className="min-w-0 truncate text-sm font-medium text-sidebar-foreground">
+              {user?.displayName || user?.email || t('userMenu.account')}
+            </span>}
           </button>
         </DropdownMenuTrigger>
 
@@ -135,6 +141,10 @@ export function UserMenu({ side, align = 'end' }: UserMenuProps = {}) {
               <DropdownMenuSeparator />
             </>
           )}
+
+          {profileAction && <DropdownMenuItem onSelect={profileAction.onSelect}>
+            <User />{profileAction.label}
+          </DropdownMenuItem>}
 
           <DropdownMenuSub>
             <DropdownMenuSubTrigger>

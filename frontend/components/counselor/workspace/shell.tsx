@@ -18,6 +18,7 @@ import { ChatView } from "@/components/chat/chat-view";
 import { FileList } from "@/components/files/file-list";
 import { FilePreview } from "@/components/files/file-preview";
 import { NotificationsMenu } from "@/components/layout/notifications-menu";
+import { UserMenu } from "@/components/layout/user-menu";
 import { NotificationsCenterView } from "@/components/notifications/notifications-center-view";
 import { Button } from "@/components/ui/button";
 import { SidebarProvider } from "@/components/ui/sidebar";
@@ -42,7 +43,7 @@ const icons = {
 const health = () => workspaceApi.getCounselorHealth();
 export function CounselorShell() {
   const { viewMode, openView } = useLayout();
-  const { currentSessionId, setCurrentSessionId } = useWorkspace();
+  const { workspace, currentSessionId, setCurrentSessionId } = useWorkspace();
   const [draft, setDraft] = useState("");
   const [mobile, setMobile] = useState(false),
     [path, setPath] = useState<string | null>(null),
@@ -110,35 +111,32 @@ export function CounselorShell() {
           />
         )}
         <aside
-          className={`${mobile ? "translate-x-0" : "-translate-x-full"} fixed inset-y-0 left-0 z-50 flex w-64 flex-col border-r bg-card transition-transform md:static md:translate-x-0`}
+          className={`${mobile ? "translate-x-0" : "-translate-x-full"} fixed inset-y-0 left-0 z-50 flex w-64 flex-col border-r bg-background text-sidebar-foreground transition-transform md:static md:translate-x-0 md:bg-sidebar`}
         >
-          <a href={base || "#"} className="flex items-center gap-3 px-6 py-7">
+          <a href={base || "#"} className="flex shrink-0 items-center gap-3 px-4 py-5">
             <img src="/pai-emblem.png" alt="" className="size-9" />
             <div>
-              <p className="font-semibold tracking-tight">{copy.brand}</p>
-              <p className="mt-0.5 text-[10px] text-muted-foreground">
-                {copy.tagline}
-              </p>
+              <p className="font-semibold tracking-tight">{workspace?.name || copy.brand}</p>
             </div>
           </a>
-          <nav className="flex-1 space-y-1 px-3" aria-label={copy.brand}>
+          <nav className="min-h-0 flex-1 space-y-1 overflow-y-auto px-2" aria-label={copy.brand}>
             {Object.entries(icons).map(([key, Icon]) => (
               <button
                 key={key}
                 onClick={() => navigate(key)}
                 aria-current={active === key ? "page" : undefined}
-                className={`flex min-h-11 w-full items-center gap-3 rounded-xl px-4 text-left text-sm transition-colors ${active === key ? "bg-primary/10 font-semibold text-primary" : "text-muted-foreground hover:bg-muted hover:text-foreground"} ${key === "files" ? "mt-5" : ""}`}
+                className={`flex min-h-11 w-full items-center gap-3 rounded-md px-3 text-left text-sm transition-colors ${active === key ? "bg-sidebar-accent font-semibold text-sidebar-accent-foreground" : "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"} ${key === "files" ? "mt-5" : ""}`}
               >
                 <Icon className="size-[18px]" />
                 {copy.nav[key as keyof typeof copy.nav]}
               </button>
             ))}
           </nav>
-          <div className="m-4 rounded-xl border border-primary/10 bg-primary/5 p-4">
-            <p className="text-xs leading-relaxed text-muted-foreground">
-              {copy.privacyHelp}
-            </p>
-          </div>
+          <footer className="mx-3 mt-3 flex shrink-0 items-center gap-2 border-t py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+            <UserMenu side="top" align="start" showIdentity
+              profileAction={{label: copy.nav.profile, onSelect: () => navigate("profile")}} />
+            <NotificationsMenu side="top" align="end" />
+          </footer>
         </aside>
         <main className="flex min-w-0 flex-1 flex-col">
           <header className="flex h-16 shrink-0 items-center justify-between border-b px-4 sm:px-8">
@@ -164,7 +162,6 @@ export function CounselorShell() {
                   ? copy.loading
                   : copy.healthy}
               </span>
-              <NotificationsMenu />
             </div>
           </header>
           {diagnostic.data?.planner_lag_alert && (

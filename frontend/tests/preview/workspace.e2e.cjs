@@ -31,6 +31,18 @@ const base='http://127.0.0.1:4173/student';
     await page.screenshot({path:path.join(screenshots,`${name}-${theme}.png`)});
   }
   // A: four entry cards. No hidden extra fields or provider call.
+  // Restored sidebar account controls use the real menu and confirmation UI.
+  for(const theme of ['light','dark']) {
+    await page.goto(`${base}?view=threads&theme=${theme}`);
+    const account=page.locator('aside footer').getByRole('button',{name:'Account',exact:true});
+    await account.click();
+    await page.getByRole('menuitem',{name:'Sign out',exact:true}).waitFor();
+    await page.waitForTimeout(250);
+    await page.screenshot({path:path.join(screenshots,`account-menu-${theme}.png`)});
+    await page.getByRole('menuitem',{name:'Your profile',exact:true}).click();
+    await page.getByRole('heading',{name:'A living picture of you'}).waitFor();
+    assert(new URL(page.url()).searchParams.get('view')==='profile');
+  }
   await page.goto(`${base}?onboarding=1`);
   assert.equal(await page.locator('input').count(),2);
   await page.getByRole('button',{name:'Other',exact:true}).click();
@@ -95,7 +107,26 @@ const base='http://127.0.0.1:4173/student';
   await page.goto(`${base}?view=profile&theme=dark`);await page.getByRole('heading',{name:'A living picture of you'}).waitFor();
   assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
   await page.screenshot({path:path.join(screenshots,'profile-mobile-dark.png')});
+  await page.getByRole('button',{name:'Placement AI',exact:true}).click();
+  const mobileAccount=page.locator('aside footer').getByRole('button',{name:'Account',exact:true});
+  await mobileAccount.waitFor({state:'visible'});
+  await page.waitForTimeout(250);
+  const accountBox=await mobileAccount.boundingBox();
+  assert(accountBox && accountBox.x>=0 && accountBox.y>=0 && accountBox.y+accountBox.height<=844);
+  await mobileAccount.click();
+  await page.getByRole('menuitem',{name:'Sign out',exact:true}).waitFor();
+  await page.waitForTimeout(250);
+  await page.screenshot({path:path.join(screenshots,'account-menu-mobile-dark.png')});
+  await page.getByRole('menuitem',{name:'Sign out',exact:true}).click();
+  const signout=page.getByRole('dialog');
+  await signout.getByRole('button',{name:'Cancel',exact:true}).click();
+  assert.equal(await page.evaluate(()=>sessionStorage.getItem('offline-sign-out')),null);
+  await mobileAccount.click();
+  await page.getByRole('menuitem',{name:'Sign out',exact:true}).click();
+  await page.getByRole('dialog').getByRole('button',{name:'Sign out',exact:true}).click();
+  await page.waitForURL('**/sign-in');
+  assert.equal(await page.evaluate(()=>sessionStorage.getItem('offline-sign-out')),'done');
   assert.equal(errors.length,0,errors.join('; '));
-  console.log('PASS: 34 light/dark screens, mobile overflow, A-K UI flow including explicit choice and consent boundaries. Synthetic backend; no live calls.');
+  console.log('PASS: 38 screenshots, mobile overflow, A-K flow, sidebar profile navigation and cancel/confirm sign-out using fake auth. No live calls.');
   await browser.close();
 })().catch(error=>{console.error(error);process.exit(1);});

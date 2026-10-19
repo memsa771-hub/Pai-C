@@ -5,6 +5,7 @@ export default defineConfig({root:local('.'),envDir:local('.'),publicDir:local('
   resolve:{alias:[
     {find:'@/lib/api',replacement:local('fake-api.ts')},
     {find:'@/lib/workspace-context',replacement:local('fake-workspace.ts')},
+    {find:'@/lib/pai-auth-context',replacement:local('fake-auth.ts')},
     {find:'@/hooks/use-polling',replacement:local('fake-hooks.ts')},
     {find:'@/hooks/use-operator-status',replacement:local('fake-hooks.ts')},
     {find:'@/hooks/use-composing-signal',replacement:local('fake-hooks.ts')},

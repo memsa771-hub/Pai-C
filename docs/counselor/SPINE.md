@@ -2243,7 +2243,7 @@ source/checking reply, without a Voice model call. A fresh background check uses
 at most one passage-extraction call per attempt under the existing budget.
 Family preparation, delayed follow-ups and reliability alerts make no model calls.
 Timing, thresholds, copy and trust-domain extension points live in data files.
-Final continuation results and 35 synthetic screenshots: BUILD_REPORT_V1.md.
+Final continuation results and screenshots: BUILD_REPORT_V1.md (38 captures after the account-footer correction).
 Continuation code head eb1db6c: guided and strict each **1330 passed, 3 skipped,
 8 subtests**; production class separately **3 passed, 4 subtests**. Frontend
 **60 passed / 18 files**, build green, **288/288** application modules imported.

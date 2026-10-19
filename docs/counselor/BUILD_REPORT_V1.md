@@ -4,6 +4,8 @@
 
 Implementation head: **eb1db6c**, branch **pai-c** (backend fixes through **61e9c19**). This report's commit contains documentation and refreshed synthetic screenshots.
 
+**19 October UI correction:** the new shell had omitted the existing UserMenu, hiding the account/logout controls. The sidebar now reuses it at bottom left with the signed-in name/avatar, Profile shortcut, existing settings/theme/feedback and confirmed sign-out behavior. The existing notification bell is beside it. Workspace heading, sidebar tokens and compact navigation styling are restored; the large footer privacy notice is removed (privacy remains in Settings). The mobile drawer is opaque and keeps the footer visible while navigation scrolls. No authentication/backend behavior changed. Frontend: 60 existing tests passed; production build and offline desktop/mobile Profile + cancel/confirm sign-out checks passed using fake auth. Backend results below are unchanged from the preceding run, not rerun for this frontend-only correction.
+
 The Counselor-only workspace, evidence review, paths-first workflow, explicit place-search consent and deferred UI cleanup are implemented. This continuation adds sourced myth checks, guided family preparation, scheduled check-ins, daily reliability notifications and readable evidence labels. **The complete board is not yet production-complete:** the checklist records **24 done, 13 partial, 7 not done** work cards. Missing authoritative data, semantic grounding limits and the joint OS contract remain explicit below. Nothing is represented as verified merely because a model produced it.
 
 No live model, search, OCR, voice or other provider API calls were made. Provider spend in this build: **0**. Tests use fake providers and block external socket connections. No database tables were dropped, no migrations were added, and no .env settings were edited. dev and pai-os were not changed.
@@ -116,12 +118,13 @@ These are updates to the locked workflow, not additional invented orange cards. 
 
 ## Phase 3 screens and screenshots
 
-Screenshots use real production components with synthetic, network-blocked backend/workspace adapters. They are **not** screenshots of a live student account. There are **34 desktop captures plus one mobile capture**. Light/dark theme tokens, accessible controls and mobile overflow were checked; existing unit snapshots remain. Chat now shows one Talk to PAI label; profile/evidence and roadmap labels come from data.
+Screenshots use real production components with synthetic, network-blocked backend/workspace/auth adapters. They are **not** screenshots of a live student account. There are **36 desktop captures plus two mobile captures**. Light/dark theme tokens, accessible controls and mobile overflow were checked; existing unit snapshots remain. Chat shows one Talk to PAI label; profile/evidence and roadmap labels come from data. The bottom-left account menu and notification bell are restored.
 
 | Screen / stage | Light | Dark |
 | --- | --- | --- |
 | Onboarding (A) | [Light](screenshots/onboarding-light.png) | [Dark](screenshots/onboarding-dark.png) |
 | Chat (B-D) | [Light](screenshots/chat-light.png) | [Dark](screenshots/chat-dark.png) |
+| Bottom-left account / Profile / Sign out | [Light](screenshots/account-menu-light.png) | [Dark](screenshots/account-menu-dark.png) |
 | First picture (C) | [Light](screenshots/first-picture-light.png) | [Dark](screenshots/first-picture-dark.png) |
 | Fact / upload invitation | [Light](screenshots/fact-card-light.png) | [Dark](screenshots/fact-card-dark.png) |
 | Certainty rating | [Light](screenshots/rating-light.png) | [Dark](screenshots/rating-dark.png) |
@@ -139,6 +142,7 @@ Screenshots use real production components with synthetic, network-blocked backe
 | Settings / privacy | [Light](screenshots/settings-light.png) | [Dark](screenshots/settings-dark.png) |
 
 [Mobile profile, dark](screenshots/profile-mobile-dark.png).
+[Mobile account menu, dark](screenshots/account-menu-mobile-dark.png).
 
 ### Routes, components and APIs
 
@@ -176,7 +180,7 @@ Final production-code head tested: **eb1db6c** (backend **61e9c19**). Baseline w
 | Import every app module | **288/288 imported**, no unresolved dynamic imports |
 | Architecture / PAI OS contracts | **PASS**, included in both full backend suites; existing gateway, runtime, memory, Messenger, orchestrator, research and escalation contracts retained |
 | Offline browser A–K UI flow | **PASS**; onboarding, Mirror feedback, Explore, explicit H consent, roadmap preparation/choice, plan and check-in draft |
-| Browser screenshots | **34 desktop + 1 mobile**; both themes; guided family panel, readable profile/roadmaps, single voice label; no page errors; mobile profile no horizontal overflow |
+| Browser screenshots | **36 desktop + 2 mobile**; both themes; family panel, readable evidence, single voice label, restored account menu; no page errors; mobile profile no horizontal overflow |
 | Live providers / live conversations | **Not run**, as required |
 
 The three default-suite skips are the production-only security class, run separately above with its required public production origin, without changing code or .env. Three SQLAlchemy warnings concern SQLite reflection of an existing expression index in migration tests. The test-only Vite preview also warns about the existing highlight.js CSS import order; the production build passes and browser captures have no page errors.
