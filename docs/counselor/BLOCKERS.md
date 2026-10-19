@@ -30,4 +30,14 @@ The locked board requires both developers to sign off on versioned contract chan
 ## Founder verification limits
 The browser flow uses real components with synthetic, network-blocked adapters, including explicit Mirror feedback and the existing choice-token dialog. It is not a live Supabase/WebRTC/provider test. No production conversation quality, institutional search coverage, microphone, upload/OCR provider, or paid health check was exercised. Existing offline route/security/document/voice tests remain.
 No university-sharing interface is enabled in the new shell. A later institution-sharing flow must present exact data and obtain per-institution consent; generic file sharing remains a separately authorized shared feature, not institutional consent.
-Health counts and Planner lag are visible when the owner opens the app; there is no independent daily operator alert delivery. The daily aggregation is implemented, while proactive operational notification remains a deployment integration.
+Health thresholds now enqueue a deduplicated daily alert through the existing workspace notification service. Delivery depends on the existing worker/session sweep running; there is no new external notification channel or provider ping.
+
+## Core continuation verification limits
+
+The five requested engineering items are implemented. Extensive new feature testing is deferred as instructed; the existing suites, import check and synthetic browser flow are retained. Real provider/source coverage, delayed delivery on a deployed worker and live conversation quality have not been exercised.
+
+Myth correction requires an existing official registry domain or a reviewed trusted-domain entry in `policy/myths.json`. Without one the safe result is a saved question, not a correction. Exact source quotation prevents invented paraphrases but cannot prove semantic relevance to every belief; that remains a quality-review item. The source prompt and existing policy are not a complete semantic detector of institution names in unstructured prose.
+
+Guided family preparation intentionally requires completed stage-H results for the chosen path. Earlier family discussion stays in chat; legacy choices without H proof cannot produce a potentially institution-bearing preparation. A person without a recorded concern or a path without student evidence is shown the missing-information state. No concern or evidence is invented.
+
+New check-ins are scheduled by new explicit choices/try-it acceptance only; existing historical choices are not backfilled. Continued care defers an unrelated follow-up. The in-app notification service retains its workspace visibility rules; separate cross-workspace operator/admin alert routing was not introduced.

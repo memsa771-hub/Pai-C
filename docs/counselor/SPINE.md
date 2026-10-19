@@ -2221,9 +2221,29 @@ evidence in UI_CLEANUP_V1.md. Shared controls/services and tasks tools remain.
 New bilateral OS intake/outcome contracts are blocked on joint agreement; no
 tables or shared KEEP code were deleted.
 
-Final production-code head 2cc212e: backend guided and strict each **1324 passed,
+Previous production-code head 2cc212e: backend guided and strict each **1324 passed,
 3 skipped, 8 subtests**; the skipped production class separately **3 passed,
 4 subtests**. Frontend **60 passed / 18 files**, production build passed.
 **285/285** app modules imported. Network-blocked browser A–K UI replay passed,
 with 32 light/dark desktop captures plus one mobile capture. Full results,
 limitations, every orange board card and founder command: BUILD_REPORT_V1.md.
+
+### Core continuation: source checks and proactive in-app work
+
+| Trigger | Existing boundary | Named capability / owner | Outbound path |
+| --- | --- | --- | --- |
+| Relevant evidenced myth, after care/request priority | Research Gateway `myth_check` | `research.claim` / pai_c/myths.py; existing web tools, SourceVerifier and Model Gateway | Exact checked source on a later relevant Counselor turn, through Messenger |
+| Explicit chosen roadmap or accepted try-it | Task Runtime delayed enqueue | `counselor.checkin` / pai_c/checkins.py | Messenger, in-app only; posted-event and queue dedupe |
+| Existing session sweep, threshold crossed | Task Runtime daily key | `counselor.health_alert` / pai_c/reliability.py | Existing notify_once workspace inbox, counts only |
+| Student prepares a family conversation | Authorized Counselor API, current chosen path and own evidence | pai_c/family_talk.py; no model or background agent | Messenger, idempotent submission |
+
+No new queue, runtime, table or PAI OS dependency. Normal foreground model calls
+are unchanged; clear_myth uses the existing classifier then an exact cached
+source/checking reply, without a Voice model call. A fresh background check uses
+at most one passage-extraction call per attempt under the existing budget.
+Family preparation, delayed follow-ups and reliability alerts make no model calls.
+Timing, thresholds, copy and trust-domain extension points live in data files.
+Final continuation results and 35 synthetic screenshots: BUILD_REPORT_V1.md.
+Continuation code head eb1db6c: guided and strict each **1330 passed, 3 skipped,
+8 subtests**; production class separately **3 passed, 4 subtests**. Frontend
+**60 passed / 18 files**, build green, **288/288** application modules imported.

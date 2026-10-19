@@ -14,12 +14,18 @@ const base='http://127.0.0.1:4173/student';
   page.on('pageerror',error=>errors.push(error.message));
   const shots=[['onboarding','onboarding=1'],['chat','view=threads'],['mirror','view=threads&mirror=1'],
     ['first-picture','view=threads&card=picture'],['rating','view=threads&card=rating'],['fact-card','view=threads&card=fact'],['journey','view=journey'],['paths','view=paths'],['path','view=paths&path=path-one'],
-    ['programs','view=paths&path=path-one&stage=H'],['compare','view=compare&roadmap=1'],
+    ['programs','view=paths&path=path-one&stage=H'],['compare','view=compare&roadmap=1'],['family-talk','view=compare&roadmap=1&family=1'],
     ['plan','view=plan&roadmap=1'],['profile','view=profile'],['documents','view=files'],['settings','view=settings']];
   for(const theme of ['light','dark'])for(const [name,query] of shots){
     await page.goto(`${base}?${query}&theme=${theme}`);
     await page.locator('button').first().waitFor({timeout:10000}).catch(error=>{throw new Error(name+': '+errors.join('; ')+' '+error.message)});
     await page.waitForTimeout(350);
+    if(name==='family-talk') {
+      await page.getByRole('button',{name:'Help me talk this through with my family',exact:true}).click();
+      await page.getByRole('radio',{name:'Parent',exact:true}).check();
+      await page.getByRole('checkbox').check();
+      await page.getByRole('heading',{name:'Prepare a family conversation',exact:true}).evaluate(el=>el.scrollIntoView({block:'start'}));
+    }
     assert.equal(errors.length,0,`${name}: ${errors.join('; ')}`);
     assert((await page.locator('body').innerText()).length>150,`${name} must render content`);
     await page.screenshot({path:path.join(screenshots,`${name}-${theme}.png`)});
@@ -90,6 +96,6 @@ const base='http://127.0.0.1:4173/student';
   assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
   await page.screenshot({path:path.join(screenshots,'profile-mobile-dark.png')});
   assert.equal(errors.length,0,errors.join('; '));
-  console.log('PASS: 32 light/dark screens, mobile overflow, A-K UI flow including explicit choice and consent boundaries. Synthetic backend; no live calls.');
+  console.log('PASS: 34 light/dark screens, mobile overflow, A-K UI flow including explicit choice and consent boundaries. Synthetic backend; no live calls.');
   await browser.close();
 })().catch(error=>{console.error(error);process.exit(1);});

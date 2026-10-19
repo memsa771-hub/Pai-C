@@ -2,9 +2,9 @@
 
 ## Result and scope
 
-Implementation head: **2cc212e**, branch **pai-c**. This report's commit also contains the final screenshot-test adjustment and regenerated screenshots; production code is unchanged from the tested head.
+Implementation head: **eb1db6c**, branch **pai-c** (backend fixes through **61e9c19**). This report's commit contains documentation and refreshed synthetic screenshots.
 
-The Counselor-only workspace, evidence review, paths-first workflow, explicit place-search consent and deferred UI cleanup are implemented. **The complete board is not yet production-complete:** the checklist records **21 done, 16 partial, 7 not done** work cards. Missing authoritative data, semantic grounding limits and the joint OS contract are explicit below. Nothing is represented as verified merely because a model produced it.
+The Counselor-only workspace, evidence review, paths-first workflow, explicit place-search consent and deferred UI cleanup are implemented. This continuation adds sourced myth checks, guided family preparation, scheduled check-ins, daily reliability notifications and readable evidence labels. **The complete board is not yet production-complete:** the checklist records **24 done, 13 partial, 7 not done** work cards. Missing authoritative data, semantic grounding limits and the joint OS contract remain explicit below. Nothing is represented as verified merely because a model produced it.
 
 No live model, search, OCR, voice or other provider API calls were made. Provider spend in this build: **0**. Tests use fake providers and block external socket connections. No database tables were dropped, no migrations were added, and no .env settings were edited. dev and pai-os were not changed.
 
@@ -26,13 +26,20 @@ Sources: [locked workflow](PAI_C_WORKFLOW_LOCK_V1.md), [SPINE](SPINE.md), [Couns
 | Phase 3 | e361e7e | Counselor shell and screens, canonical fact removal, public workspace projection, existing reviewed-roadmap/choice flow; workspace copy.json/settings-data.json. |
 | Deferred UI cleanup | 131decb | Twelve unmounted OS UI files removed after importer checks; shared branches retained. |
 | Final engineering review | 2cc212e | Evidence freshness/current facts, pending polling, consent bypass closure, safe owner export, inline cards, public profile selectors, board-supplied entry choices, open-request health counts. |
-| Final verification | This report's commit | Report, SPINE updates, screenshot harness uses real theme provider for the choice dialog; final light/dark captures. |
+| Previous final verification | a92168a | Report, SPINE updates, real theme provider for the choice dialog; prior captures. |
+| Myth correction | c7820bf | clear_myth selector/action, research.claim capability, source quotation, myths.json and myth_check.md. |
+| Family preparation | d9827e1 | Guided family/evidence selection, authenticated API, idempotent Messenger delivery; family_talk.json and family-talk.json. |
+| Scheduled check-ins | b035e23 | counselor.checkin, delayed chosen-path and accepted-try-it triggers; checkins.json. |
+| Daily health alert | 907e965 | Existing sweep and notification service; counselor.health_alert and reliability.json thresholds. |
+| Reliability review | 61e9c19 | Bounded belief-check budget windows, answered-request receipts, stable family evidence ids; exact capability inventory updated. |
+| Readable UI | eb1db6c | Evidence/field/enum label data; one idle Talk to PAI label; readable profile and roadmap cards. |
+| Continuation verification | This report's commit | Updated board checklist, decisions/blockers, refreshed light/dark screenshots and existing offline preview fixtures. |
 
 Final data files also include pai_c/policy/inline_cards.json and pai_c/understanding/profile_sections.json. Catalog content remains data, and no authoritative board/subject or merit threshold was invented. Prompts remain Markdown; runtime/document consistency tests pass.
 
 ## Every orange NEW card, sections 00–12
 
-**B/** means backend/app/; **F/** means frontend/. “Done” means implementation and offline regression coverage, not a live quality certification. “Partial” names the missing element. Blocking evidence and safe behavior are detailed in [BLOCKERS](BLOCKERS.md).
+**B/** means backend/app/; **F/** means frontend/. “Done” means implementation with retained offline regression checks, not a live quality certification or exhaustive new feature coverage. Extensive new tests are deferred per the latest instruction. “Partial” names the missing element. Blocking evidence and safe behavior are detailed in [BLOCKERS](BLOCKERS.md).
 
 Sections **00 and 08 contain no orange work cards** in the inspected board. Card **35:219** is the orange legend, not a feature; it is accounted for here and excluded from the 44-work-card count. The remaining cards are listed individually by Figma node id.
 
@@ -43,9 +50,9 @@ Sections **00 and 08 contain no orange work cards** in the inspected board. Card
 | 01 What the student sees / `36:240` | Path page: what it is, what you study, a normal work day, skills needed, fit with you, myths vs reality, jobs and future, ways in. | **partial** | 56dcf66, e361e7e, 2cc212e | B/pai_c/paths/explain.py; F/components/counselor/workspace/paths.tsx | All sections render; verified jobs/myths/outlook need a reviewed career-source pack. |
 | 01 What the student sees / `36:248` | Programs for this path: entry rules, merit, fee, scholarships - each with source and date. | **partial** | a49802b, e361e7e, 2cc212e | B/pai_c/paths/programs.py; F/components/counselor/workspace/paths.tsx | Dated sources and verification labels supported; no live search or comprehensive institutional data verified. |
 | 01 What the student sees / `36:252` | Labels: safe / realistic / stretch / not yet - not yet shows the route to get there. | **partial** | a49802b, 2cc212e | B/research/seasons.py; B/pai_c/paths/programs.py | Bands require reviewed seasonal rules; not-yet route requires cited remediation. Unknown stays unknown. |
-| 01 What the student sees / `36:268` | Check-in: how did the test go? A new result updates the profile. | **partial** | e361e7e | F/components/counselor/workspace/decisions.tsx | Check-in opens the same chat with a draft; normal extraction updates facts. No proactive reminder or new OS outcome intake. |
+| 01 What the student sees / `36:268` | Check-in: how did the test go? A new result updates the profile. | **done** | b035e23 | B/pai_c/checkins.py; B/pai_c/roadmaps/service.py; B/routers/counselor_paths.py; F/components/counselor/workspace/paths.tsx | Delayed in-app check-in after choice or explicit try-it acceptance; same conversation/extraction updates facts. No new OS outcome intake. |
 | 02 One turn - the engine / `36:389` | Grounding guard: no fact about an institution without a source | **partial** | b10b8ae, 2cc212e | B/pai_c/deep/grounding.py; B/pai_c/policy/grounding.json | Declared world claims and numeric assertions checked. Unannotated qualitative institutional claims remain a semantic limitation. |
-| 02 One turn - the engine / `36:429` | Health checks: Planner lag alert, count of every fallback per day | **partial** | 94767d9, e361e7e, 2cc212e | B/pai_c/reliability.py; B/routers/counselor_health.py; F/components/counselor/workspace/shell.tsx | Daily counts and in-app lag alert; no independent daily alert delivery. |
+| 02 One turn - the engine / `36:429` | Health checks: Planner lag alert, count of every fallback per day | **done** | 94767d9, 907e965 | B/pai_c/reliability.py; B/pai_c/reliability.json; B/pai_c/sessions.py | Daily counts and in-app lag state; threshold crossings enqueue one existing-inbox alert per workspace/day. |
 | 03 Understanding spine / `37:396` | Tap cards: level, board, subjects, 0-10 rating | **done** | f46a39e, 2cc212e | B/pai_c/policy/fact_cards.json; F/components/counselor/workspace/{fact-card,inline-card}.tsx | No generated catalogs; approved text/upload fallback and Other review metadata. |
 | 03 Understanding spine / `37:400` | Upload: result card, transcript, certificates | **done** | f46e9d7, e361e7e | B/documents/handlers.py (existing); F/components/counselor/workspace/fact-card.tsx | Reuses Documents and validated document extraction; no live OCR call. |
 | 03 Understanding spine / `37:436` | 9  Goals and dreams - what they say they want, and whose wish it is.  Min 1 | **done** | f46e9d7, 2cc212e | B/pai_c/policy/areas_policy.json; B/pai_c/planner/prompts/planner.md; B/pai_c/understanding/profile_sections.json | Goals and whose wish included in the same evidence spine. |
@@ -57,7 +64,7 @@ Sections **00 and 08 contain no orange work cards** in the inspected board. Card
 | 05 Next move / `37:650` | Fact - tap card or upload invite | **done** | f46a39e, e361e7e | B/pai_c/policy/fact_cards.json; F/components/counselor/workspace/fact-card.tsx | Exact-quote prefill requires confirmation; no model-created choices. |
 | 06 Counseling stages / `38:611` | Where to study | **done** | a49802b, e361e7e, 2cc212e | B/routers/counselor_paths.py; F/components/counselor/workspace/paths.tsx | Stage H only from a completed current-Mirror path plus explicit consent; GET does not research. |
 | 07 Failures / `38:740` | Lag alert when the Planner falls behind | **done** | 94767d9, e361e7e | B/pai_c/reliability.json; F/components/counselor/workspace/shell.tsx | Private workspace-scoped lag state; data-defined threshold. |
-| 07 Failures / `38:804` | Daily health check: count of every fallback, Planner lag, open requests, failed jobs - so problems show up before students feel them | **partial** | 94767d9, 2cc212e | B/pai_c/reliability.py; B/routers/counselor_health.py | Counts fallback events, lag, open requests and failed jobs. No independent daily scheduled notification. |
+| 07 Failures / `38:804` | Daily health check: count of every fallback, Planner lag, open requests, failed jobs - so problems show up before students feel them | **done** | 907e965 | B/pai_c/reliability.py; B/pai_c/reliability.json; B/capabilities/system.py | Existing worker sweep, durable daily dedupe and notification service; failed-job counts scoped to UTC day; no provider ping. |
 | 09 World knowledge / `39:850` | Entry and merit rules for programs a student is looking at - checked once per season | **partial** | b10b8ae, a49802b | B/research/{seasons.py,season_policy.json}; B/research/requirements.py | Cache and seasonal expiry implemented; authoritative seasonal rule pack is empty. |
 | 09 World knowledge / `39:854` | Merit calculator with the student's shown or confirmed marks | **partial** | a49802b, 2cc212e | B/pai_c/paths/programs.py; B/plugins/gap_assessment/__init__.py (reused) | Shown/confirmed threshold comparisons and reviewed bands; no invented weighted merit formula or admission probability. |
 | 09 World knowledge / `39:858` | Reply has an institution fact without a source? | **partial** | b10b8ae, 2cc212e | B/pai_c/deep/grounding.py | Same deterministic limitation as 36:389; no additional model verifier added. |
@@ -95,9 +102,21 @@ Sections **00 and 08 contain no orange work cards** in the inspected board. Card
 - Certainty visualization uses durable Mirror before/after feedback. It does not fabricate a continuous time series from missing measurements.
 - No university-sharing flow is enabled. A later sharing flow needs exact-data, per-university consent.
 
+### Five requested continuation items
+
+| Item | Engineering status | Entry point / data | Remaining verification or data dependency |
+| --- | --- | --- | --- |
+| Stage D myth correction | Implemented | policy/state.py -> clear_myth -> research/gateway.py -> research.claim; myths.json, myth_check.md | Exact source quotation and date; reviewed domain/registry required. No source means an open request. Live relevance/source coverage untested. |
+| Stage I family talk | Implemented | Compare panel -> GET/POST /v1/counselor/family-talk -> Messenger; family_talk.json | Student selects a recorded concern and evidence; chosen path with H proof required. No guarantee that the selected evidence resolves the concern. |
+| Stage K proactive check-ins | Implemented | Explicit roadmap choice or POST /paths/{id}/try-it -> counselor.checkin -> Messenger; checkins.json | Existing delayed queue; care/quiet-time/spacing deferral; no historical backfill or OS dependency. Real worker delay not live-tested. |
+| Daily health alert | Implemented | session.sweep -> counselor.health_alert -> notify_once; reliability.json | At most one workspace/UTC-day alert after threshold crossing; existing worker and inbox required. |
+| Readable evidence and voice control | Implemented | evidence-labels.json, evidence-text.ts, profile/roadmap renderers, counselor-voice-copy.json | Unknown schema keys omitted rather than exposed. Synthetic light/dark screenshots; no live microphone session. |
+
+These are updates to the locked workflow, not additional invented orange cards. Full new feature testing is deferred by instruction; retained regression suites and the browser fixture remain the acceptance checks for this run.
+
 ## Phase 3 screens and screenshots
 
-Screenshots use real production components with synthetic, network-blocked backend/workspace adapters. They are **not** screenshots of a live student account. There are **32 desktop captures plus one mobile capture**. Light/dark theme tokens, accessible controls and mobile overflow were checked; existing unit snapshots remain.
+Screenshots use real production components with synthetic, network-blocked backend/workspace adapters. They are **not** screenshots of a live student account. There are **34 desktop captures plus one mobile capture**. Light/dark theme tokens, accessible controls and mobile overflow were checked; existing unit snapshots remain. Chat now shows one Talk to PAI label; profile/evidence and roadmap labels come from data.
 
 | Screen / stage | Light | Dark |
 | --- | --- | --- |
@@ -112,6 +131,7 @@ Screenshots use real production components with synthetic, network-blocked backe
 | Path explanation / try-it (G) | [Light](screenshots/path-light.png) | [Dark](screenshots/path-dark.png) |
 | Where to study / consent (H) | [Light](screenshots/programs-light.png) | [Dark](screenshots/programs-dark.png) |
 | Compare (I) | [Light](screenshots/compare-light.png) | [Dark](screenshots/compare-dark.png) |
+| Guided family preparation (I) | [Light](screenshots/family-talk-light.png) | [Dark](screenshots/family-talk-dark.png) |
 | Explicit choice confirmation (I) | [Light](screenshots/decision-light.png) | [Dark](screenshots/decision-dark.png) |
 | Plan and check-ins (J-K) | [Light](screenshots/plan-light.png) | [Dark](screenshots/plan-dark.png) |
 | Living profile | [Light](screenshots/profile-light.png) | [Dark](screenshots/profile-dark.png) |
@@ -131,7 +151,8 @@ All workspace pages reuse the existing /[workspaceId] route and query navigation
 | Paths / explanation | view=paths, path=<id>; workspace/paths.tsx | Existing possibilities save/dismiss; added GET /v1/counselor/paths/{id}, POST /explore. |
 | Where to study | view=paths&path=<id>&stage=H | Added GET/POST /v1/counselor/paths/{id}/programs; POST requires explore_places consent. |
 | Compare / choose | view=compare; workspace/decisions.tsx, existing RoadmapsView | Added path-scoped POST /roadmap after completed program check; existing roadmap choice-token and choose endpoints. |
-| Plan / check-ins | view=plan; workspace/decisions.tsx | Existing chosen roadmaps; check-in creates a chat draft, not an automatic message or OS task. |
+| Plan / check-ins | view=plan; workspace/decisions.tsx | Existing chosen roadmaps and manual check-in draft; new delayed counselor.checkin posts in-app after choice/accepted try-it. POST /v1/counselor/paths/{id}/try-it requires acceptance. |
+| Family preparation | view=compare; workspace/family-talk.tsx | GET/POST /v1/counselor/family-talk, existing access checks; selected own evidence and submission idempotency, posted through Messenger. |
 | Profile | view=profile; workspace/profile.tsx | Existing student profile; added profile-cards read/review and public workspace projection. Confirm/Edit/Remove use the reconciler. |
 | Documents | view=files; existing document components | Existing authenticated files/document pipeline; no alternate uploader or store. |
 | Settings | view=settings; workspace/settings.tsx | Existing language/preferences, notification center and integration settings; added owner-only GET /v1/counselor/export; existing explicit account deletion. |
@@ -143,22 +164,22 @@ Empty, pending/loading, error and missing-evidence states are present. Pending p
 
 ## Tests and verification
 
-Final production-code head tested: **2cc212e**.
+Final production-code head tested: **eb1db6c** (backend **61e9c19**). Baseline was **a92168a**, with 1,324 backend tests passing in each mode and 60 frontend tests.
 
 | Check | Result |
 | --- | --- |
-| Full backend, guided | **1,324 passed, 3 skipped, 8 subtests passed**, 524.58 seconds |
-| Full backend, strict | **1,324 passed, 3 skipped, 8 subtests passed**, 523.17 seconds |
-| Production-only security tests | **3 passed, 4 subtests passed**, 1.77 seconds |
-| Full frontend | **60 passed in 18 files**, 74.69 seconds |
+| Full backend, guided | **1,330 passed, 3 skipped, 8 subtests passed**, 488.83 seconds |
+| Full backend, strict | **1,330 passed, 3 skipped, 8 subtests passed**, 483.66 seconds; PAI_POLICY_MODE=strict asserted before collection |
+| Production-only security tests | **3 passed, 4 subtests passed**, 1.39 seconds |
+| Full frontend | **60 passed in 18 files**, 24.39 seconds |
 | Frontend production build | **PASS**; TypeScript, lint/build checks and static page generation completed |
-| Import every app module | **285/285 imported**, no unresolved dynamic imports |
+| Import every app module | **288/288 imported**, no unresolved dynamic imports |
 | Architecture / PAI OS contracts | **PASS**, included in both full backend suites; existing gateway, runtime, memory, Messenger, orchestrator, research and escalation contracts retained |
 | Offline browser A–K UI flow | **PASS**; onboarding, Mirror feedback, Explore, explicit H consent, roadmap preparation/choice, plan and check-in draft |
-| Browser screenshots | **32 desktop + 1 mobile**; both themes; no page errors; mobile profile no horizontal overflow |
+| Browser screenshots | **34 desktop + 1 mobile**; both themes; guided family panel, readable profile/roadmaps, single voice label; no page errors; mobile profile no horizontal overflow |
 | Live providers / live conversations | **Not run**, as required |
 
-The three default-suite skips are the production-only security class, run separately above. Its first invocation correctly refused development CORS settings; the separate test was rerun with its required public production origin, without changing code or .env. Three SQLAlchemy warnings concern SQLite reflection of an existing expression index in migration tests; neither suite failed. The test-only Vite preview also warns about the existing highlight.js CSS import order; the production build passes and browser captures have no page errors.
+The three default-suite skips are the production-only security class, run separately above with its required public production origin, without changing code or .env. Three SQLAlchemy warnings concern SQLite reflection of an existing expression index in migration tests. The test-only Vite preview also warns about the existing highlight.js CSS import order; the production build passes and browser captures have no page errors.
 
 ### Before / intermediate / after
 
@@ -167,7 +188,11 @@ The three default-suite skips are the production-only security class, run separa
 - Step 4 exposed an incorrect published-fact lookup (1,283 passed, 1 failed); fixed against the actual model in 56dcf66, not bypassed.
 - Steps 5–7 integrated checkpoint: 1,302 passed per mode, 3 skips, 8 subtests.
 - Phase 3 checkpoint: 1,313 passed per mode, 3 skips, 8 subtests.
-- Final: 1,324 per mode and 60 frontend tests. These checkpoints do not claim an independent full-suite run at every historical intermediate commit.
+- Previous final: 1,324 per mode and 60 frontend tests. These checkpoints do not claim an independent full-suite run at every historical intermediate commit.
+
+Continuation: the first complete run found one outdated capability inventory assertion (1,329 passed, one failed, three production-only skips). Its exact expected job set now includes research.claim, counselor.checkin and counselor.health_alert; the test still requires every enqueue to resolve to a system contract. The P0 route matrix automatically covers six additional anonymous/cross-workspace cases for the new endpoints. No new test file was added. TypeScript found a missing fallback label; it now uses the existing Other copy, and the production build passes. No regression/security/contract assertion was weakened.
+
+Final continuation: **1,330 passed per mode, 60 frontend tests, production build green, 288 imports**. An initial shell wrapper used an unused mode-variable name; the reported strict result above is the subsequent explicit PAI_POLICY_MODE=strict run with a config assertion, not that wrapper's run. Provider keys were unset, dotenv loading disabled and external sockets blocked throughout verification.
 
 ### Coverage and test changes
 
@@ -183,6 +208,8 @@ The three default-suite skips are the production-only security class, run separa
 | A–K and consent boundaries | frontend/tests/preview/workspace.e2e.cjs with explicit network blocking and synthetic fixtures |
 
 Existing test changes match intended behavior: ten areas instead of eight; no research on Mirror confirmation; valid auth fixtures now contain required network/UUID/const values; durable fixture foreign keys are present; profile assertions cover the new separate sections. The choice-dialog test selects the footer Close explicitly because its X control has the same accessible name. The final capture change uses the actual theme provider and waits for dialog animation. No security/contract expectation was weakened and no failing assertion was deleted.
+
+In this continuation the only unit-test edits are the exact registered-job inventory and the existing profile editor test's public label (Name instead of identity.full_name). The screenshot adapter supplies synthetic family/evidence and accepted-activity responses. These are fixture updates, not live calls. New extensive tests for the new behaviors remain explicitly deferred as requested.
 
 ## Deferred UI cleanup and shared code kept
 
@@ -200,9 +227,12 @@ The import graph still reaches services.workflow from Counselor dependencies; it
 2. Confirmation is value-bound and audited; editing returns to stated; removal reconciles and preserves history.
 3. Paths before places; explicit program-search consent; current evidence revalidated on reads; no GET-triggered research.
 4. Eligibility is distinct from admission bands; no guessed equivalence, threshold or probability.
-5. Existing shell/services/contracts reused. Check-ins are conversation drafts; no new OS scheduler.
-6. Reliability is private daily aggregation plus in-app lag. Export is public student data only.
+5. Existing shell/services/contracts reused. Delayed in-app check-ins reuse Task Runtime; no OS scheduler. Manual drafts remain available.
+6. Reliability is private daily aggregation, in-app lag and threshold-based existing-inbox delivery. Export is public student data only.
 7. Board-supplied entry choices are data; family/interpretation remain safe projections.
+8. Myth checks quote only current trusted sources; missing verification leaves the question open. Care and requests take priority.
+9. Guided family preparation uses a chosen path, recorded family concern and student-selected evidence. No invented resolution or guaranteed outcome.
+10. Display labels/enum text live in data, technical ids stay hidden, and the voice control has one idle label.
 
 [BLOCKERS.md](BLOCKERS.md):
 
@@ -211,7 +241,8 @@ The import graph still reaches services.workflow from Counselor dependencies; it
 - Deterministic grounding cannot prove all free prose true or detect every unsourced qualitative institutional claim.
 - Exact fact/rule identity or unit ambiguities stay unknown.
 - Board 11/contract.intake needs bilateral versioned schema agreement and both developers' tests. Existing contract remains; no pai-os edits.
-- No independent daily alert transport, no proactive check-in scheduler, no new university-sharing flow.
+- Daily alerts/check-ins reuse the existing worker and inbox; no new university-sharing flow. Historical choices are not backfilled.
+- New feature depth/quality testing is deferred as instructed. Delayed delivery and live source coverage have not been exercised on a real configured deployment.
 - No live Supabase, microphone, OCR, search-provider or conversation-quality validation was authorized.
 
 ## Founder local test
@@ -231,8 +262,9 @@ Open **http://localhost:3000**. If another Compose project owns ports 3000/8000/
 3. Confirm/edit the Mirror and submit feedback. Inspect Journey and Profile.
 4. Explore a path. Its page has general explanation, evidence for/against and a try-it; programs require the separate Where to study consent.
 5. Missing verified sources/rules show missing information. They must not turn into invented eligibility or admission chances.
-6. Where a verified program check supports a reviewed roadmap, prepare it and use the existing explicit choice dialog. Open Plan/check-in; the draft remains yours to send.
-7. Check light/dark, phone layout, export and privacy settings. Account deletion has a separate explicit destructive confirmation.
+6. Where a verified program check supports a reviewed roadmap, prepare it and use the existing explicit choice dialog. Open family preparation in Compare, select the recorded concern and evidence, then save it to the same conversation. Missing evidence stays a visible missing-information state.
+7. Explicitly accept a try-it to schedule its in-app follow-up (default three days); a chosen path schedules one after seven days. Data files control timing; care/recent conversation defers delivery. Plan's manual check-in draft remains yours to send. Daily reliability thresholds use the existing notification bell.
+8. Check light/dark, phone layout, export and privacy settings. Account deletion has a separate explicit destructive confirmation.
 
 The stack was **not started as part of this autonomous verification**, to avoid waking real configured provider jobs. The command above starts normal founder use, which can incur the founder's configured provider costs. The offline test preview is not a substitute for that live acceptance test.
 
