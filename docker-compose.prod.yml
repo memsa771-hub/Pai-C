@@ -82,6 +82,12 @@ x-backend-env: &backend-env
   WEB_SEARCH_PROVIDER: ${WEB_SEARCH_PROVIDER:-}
   WEB_SEARCH_API_KEY: ${WEB_SEARCH_API_KEY:-}
   WEB_SEARCH_BASE_URL: ${WEB_SEARCH_BASE_URL:-}
+  # PAI OS (backend/app/os). Off unless OS_ENABLED=true; the os-worker service runs only with
+  # `--profile os`. OS_WORKER_ID is set per service below (one stable ID per replica).
+  OS_ENABLED: ${OS_ENABLED:-false}
+  OS_ADMIN_TOKEN: ${OS_ADMIN_TOKEN:-}
+  OS_EMAIL_SENDER: ${OS_EMAIL_SENDER:-log}
+  OS_OPENAI_API_KEY: ${OS_OPENAI_API_KEY:-}
 
 x-backend-image: &backend-image
   image: placement-ai-backend:prod
@@ -139,6 +145,20 @@ services:
       timeout: 5s
       retries: 5
       start_period: 20s
+    logging: *default-logging
+
+  os-worker:
+    <<: *backend-image
+    profiles: ["os"]
+    environment:
+      <<: *backend-env
+      OS_WORKER_ID: os-worker-1
+    entrypoint: ["python", "-m", "app.os.runner.worker"]
+    depends_on:
+      postgres: {condition: service_healthy}
+      migrate: {condition: service_completed_successfully}
+    restart: unless-stopped
+    networks: [private]
     logging: *default-logging
 
   worker:

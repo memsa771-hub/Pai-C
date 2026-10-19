@@ -30,3 +30,5 @@ pypdf>=5.1.0
 pypdfium2>=4.30.0
 python-docx>=1.1.2
 tzdata
+# PAI OS playbooks and Knowledge seeds are YAML (app/os/playbooks).
+pyyaml>=6.0
