@@ -1,5 +1,9 @@
 {
   "planner_lag_seconds": 120,
+  "alert_thresholds": {"fallback_total": 3, "planner_lag_seconds": 120, "failed_jobs": 1, "open_requests": 10},
+  "alert_title": "PAI daily reliability summary",
+  "alert_message": "Today's reliability check needs attention: {fallback_total} fallback events, {planner_lag_seconds}s Planner lag, {failed_jobs} failed jobs, {open_requests} open requests and {open_questions} open questions. Your messages and saved work remain available.",
+  "alert_priority": "high",
   "provider_error": "I couldn't complete that reply just now. Your message is still here. Please try again.",
   "unconfigured": "PAI is temporarily unavailable. Please try again shortly."
 }

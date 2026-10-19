@@ -14,6 +14,8 @@ async def sweep_job(job, db):
         enqueue(db, job_type=JOB_SUMMARIZE, workspace_id=session["workspace_id"],
                 payload=session,
                 idempotency_key=f"session-summary:{session['workspace_id']}:{session['last_event_id']}")
+    from app.pai_c.reliability import enqueue_alerts
+    enqueue_alerts(db)
     return {"sessions_enqueued": len(sessions)}
 
 

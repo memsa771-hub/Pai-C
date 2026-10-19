@@ -4,7 +4,7 @@ from .contract import CapabilityContract
 
 def load_system_capabilities(registry):
     from app.pai_c.deep import analysis, mirror
-    from app.pai_c import sessions, opening, myths, checkins
+    from app.pai_c import sessions, opening, myths, checkins, reliability
     from app.pai_c.roadmaps import jobs as roadmaps
     from app.memory import handlers as memory
     from app.research import jobs as research
@@ -14,6 +14,7 @@ def load_system_capabilities(registry):
     string = {"type": "string"}
     array = {"type": "array"}
     entries = (
+        (reliability.JOB_HEALTH_ALERT, reliability.alert_job, {"summary": {"type": "object"}}),
         (checkins.JOB_CHECKIN, checkins.checkin_job, {"kind": string, "reference_id": string}),
         (myths.JOB_CHECK, myths.check_job, {"fingerprint": string, "source_event_id": string}),
         (opening.JOB_OPENING, opening.opening_job, {}),
