@@ -2,13 +2,15 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import Image from 'next/image';
+import { ArrowLeft, Send } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import { AuthAlert, AuthField, AuthShell, AuthStatus, SubmitButton, authInputClass } from '@/components/auth/auth-shell';
 import { requestPasswordReset } from '@/lib/auth/service';
+import { useT } from '@/lib/i18n';
 
 export default function ForgotPasswordPage() {
+  const t = useT();
   const [email, setEmail] = useState('');
   const [sent, setSent] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -22,37 +24,32 @@ export default function ForgotPasswordPage() {
       await requestPasswordReset(email.trim());
       setSent(true);
     } catch {
-      setError('Password recovery is temporarily unavailable. Please try again.');
+      setError(t('auth.errorRecovery'));
     } finally {
       setBusy(false);
     }
   };
 
+  const back = <Link href="/sign-in" className="inline-flex min-h-11 items-center gap-1.5 font-semibold text-brand-ink underline-offset-4 hover:underline"><ArrowLeft aria-hidden className="size-4" />{t('auth.backToSignIn')}</Link>;
+  if (sent) {
+    return (
+      <AuthShell>
+        <AuthStatus icon={Send} tone="success" title={t('auth.resetSentTitle')} body={t('auth.resetSentBody', { email: email.trim() })}>
+          <Button asChild size="tap" className="h-12"><Link href="/sign-in">{t('auth.backToSignIn')}</Link></Button>
+        </AuthStatus>
+      </AuthShell>
+    );
+  }
   return (
-    <div className="flex min-h-screen items-center justify-center p-8">
-      <div className="w-full max-w-sm space-y-5">
-        <div className="text-center">
-          <Image src="/pai-emblem.png" alt="Placement AI" width={40} height={40}
-            className="mx-auto mb-3" />
-          <h1 className="text-xl font-semibold">Reset password</h1>
-        </div>
-        {sent ? (
-          <p className="text-sm text-muted-foreground">
-            If an account exists for that email, we sent reset instructions.
-          </p>
-        ) : (
-          <form onSubmit={submit} className="grid gap-4">
-            <div className="grid gap-1.5">
-              <Label htmlFor="email">Email</Label>
-              <Input id="email" type="email" autoComplete="email" required
-                value={email} onChange={(event) => setEmail(event.target.value)} />
-            </div>
-            {error && <p className="text-sm text-destructive">{error}</p>}
-            <Button type="submit" disabled={busy}>{busy ? 'Sending…' : 'Send reset instructions'}</Button>
-          </form>
-        )}
-        <p className="text-center text-sm"><Link href="/sign-in" className="hover:underline">Back to sign in</Link></p>
-      </div>
-    </div>
+    <AuthShell title={t('auth.forgotTitle')} subtitle={t('auth.forgotSubtitle')} footer={back}>
+      <form onSubmit={submit} className="grid gap-4">
+        <AuthField label={t('auth.email')}>
+          {(props) => <Input {...props} className={authInputClass} type="email" autoComplete="email" required autoFocus
+            value={email} onChange={(event) => setEmail(event.target.value)} disabled={busy} />}
+        </AuthField>
+        {error && <AuthAlert>{error}</AuthAlert>}
+        <SubmitButton busy={busy} busyLabel={t('auth.sending')} disabled={!email.trim()}>{t('auth.sendReset')}</SubmitButton>
+      </form>
+    </AuthShell>
   );
 }

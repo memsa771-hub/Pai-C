@@ -2,18 +2,18 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import Image from 'next/image';
 import Link from 'next/link';
-import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import { AuthAlert, AuthField, AuthShell, OAuthButtons, PasswordInput, SubmitButton, authInputClass } from '@/components/auth/auth-shell';
 import { usePaiAuth } from '@/lib/pai-auth-context';
 import { signInWithPassword, signInWithOAuth } from '@/lib/auth/service';
-import { OAUTH_PROVIDERS, type OAuthProvider } from '@/lib/auth/oauth-providers';
+import type { OAuthProvider } from '@/lib/auth/oauth-providers';
 import { desktopHost } from '@/lib/desktop-host';
+import { useT } from '@/lib/i18n';
 
 export default function SignInPage() {
   const router = useRouter();
+  const t = useT();
   const { applySession, user, loading } = usePaiAuth();
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
@@ -33,7 +33,7 @@ export default function SignInPage() {
       await applySession(session);
       router.replace('/');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Sign-in failed');
+      setError(err instanceof Error && err.message ? err.message : t('auth.errorSignIn'));
     } finally {
       setBusy(false);
     }
@@ -50,79 +50,29 @@ export default function SignInPage() {
     try {
       await signInWithOAuth(provider);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not start sign-in');
+      setError(err instanceof Error && err.message ? err.message : t('auth.errorOAuth'));
     }
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center p-8">
-      <div className="w-full max-w-sm">
-        <div className="mb-6 flex flex-col items-center gap-3 text-center">
-          <Image src="/pai-emblem.png" alt="Placement AI" width={40} height={40} />
-          <h1 className="text-xl font-semibold tracking-tight">Sign in</h1>
+    <AuthShell title={t('auth.signInTitle')} subtitle={t('auth.signInSubtitle')}
+      footer={<>{t('auth.noAccount')}{' '}<Link href="/sign-up" className="font-semibold text-brand-ink underline-offset-4 hover:underline">{t('auth.signUp')}</Link></>}>
+      <form onSubmit={submit} className="grid gap-4" noValidate>
+        <AuthField label={t('auth.identifier')}>
+          {(field) => <Input {...field} className={authInputClass} autoComplete="username" autoCapitalize="none" spellCheck={false}
+            autoFocus required value={identifier} onChange={(e) => setIdentifier(e.target.value)} disabled={busy} />}
+        </AuthField>
+        <AuthField label={t('auth.password')}>
+          {(field) => <PasswordInput {...field} autoComplete="current-password" required value={password}
+            onChange={(e) => setPassword(e.target.value)} disabled={busy} />}
+        </AuthField>
+        <div className="-mt-1 text-right text-sm">
+          <Link href="/forgot-password" className="inline-flex min-h-11 items-center font-semibold text-brand-ink underline-offset-4 hover:underline">{t('auth.forgot')}</Link>
         </div>
-
-        <form onSubmit={submit} className="grid gap-4">
-          <div className="grid gap-1.5">
-            <Label htmlFor="identifier">Email or Username</Label>
-            <Input
-              id="identifier"
-              autoComplete="username"
-              autoCapitalize="none"
-              spellCheck={false}
-              autoFocus
-              required
-              value={identifier}
-              onChange={(e) => setIdentifier(e.target.value)}
-              disabled={busy}
-            />
-          </div>
-          <div className="grid gap-1.5">
-            <Label htmlFor="password">Password</Label>
-            <Input
-              id="password"
-              type="password"
-              autoComplete="current-password"
-              required
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              disabled={busy}
-            />
-          </div>
-
-          {error && <p className="text-sm text-destructive">{error}</p>}
-
-          <Button type="submit" disabled={busy || !identifier.trim() || !password}>
-            {busy ? 'Signing in…' : 'Sign In'}
-          </Button>
-        </form>
-
-        <p className="mt-3 text-right text-sm">
-          <Link href="/forgot-password" className="text-primary hover:underline">Forgot password?</Link>
-        </p>
-
-        <div className="my-5 flex items-center gap-3 text-xs text-muted-foreground">
-          <div className="h-px flex-1 bg-border" />
-          OR
-          <div className="h-px flex-1 bg-border" />
-        </div>
-
-        <div className="grid gap-2">
-          {(Object.keys(OAUTH_PROVIDERS) as OAuthProvider[]).map((provider) => (
-            <Button key={provider} type="button" variant="outline"
-              onClick={() => oauth(provider)} disabled={busy}>
-              Continue with {OAUTH_PROVIDERS[provider].label}
-            </Button>
-          ))}
-        </div>
-
-        <p className="mt-6 text-center text-sm text-muted-foreground">
-          Don&apos;t have an account?{' '}
-          <Link href="/sign-up" className="font-medium text-foreground underline-offset-4 hover:underline">
-            Create account
-          </Link>
-        </p>
-      </div>
-    </div>
+        {error && <AuthAlert>{error}</AuthAlert>}
+        <SubmitButton busy={busy} busyLabel={t('auth.signingIn')} disabled={!identifier.trim() || !password}>{t('auth.signIn')}</SubmitButton>
+      </form>
+      <OAuthButtons onSelect={(provider) => void oauth(provider)} disabled={busy} />
+    </AuthShell>
   );
 }

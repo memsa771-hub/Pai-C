@@ -1,132 +1,133 @@
-/* Run against the fixture Vite server only. No real API or identity is used. */
-const assert=require('node:assert/strict');
-const path=require('node:path');
-const fs=require('node:fs');
-const {chromium}=require(process.argv[2]||'playwright');
-const screenshots=path.resolve(__dirname,'../../../docs/counselor/screenshots');
-const base='http://127.0.0.1:4173/student';
-(async()=>{
-  fs.mkdirSync(screenshots,{recursive:true});
-  const browser=await chromium.launch({channel:'msedge'});
-  const context=await browser.newContext({viewport:{width:1440,height:1000}});
-  await context.route('**/*',route=>new URL(route.request().url()).hostname==='127.0.0.1'?route.continue():route.abort());
-  const page=await context.newPage();const errors=[];
-  page.on('pageerror',error=>errors.push(error.message));
-  const shots=[['onboarding','onboarding=1'],['chat','view=threads'],['mirror','view=threads&mirror=1'],
-    ['first-picture','view=threads&card=picture'],['rating','view=threads&card=rating'],['fact-card','view=threads&card=fact'],['journey','view=journey'],['paths','view=paths'],['path','view=paths&path=path-one'],
-    ['programs','view=paths&path=path-one&stage=H'],['compare','view=compare&roadmap=1'],['family-talk','view=compare&roadmap=1&family=1'],
-    ['plan','view=plan&roadmap=1'],['profile','view=profile'],['documents','view=files'],['settings','view=settings']];
-  for(const theme of ['light','dark'])for(const [name,query] of shots){
-    await page.goto(`${base}?${query}&theme=${theme}`);
-    await page.locator('button').first().waitFor({timeout:10000}).catch(error=>{throw new Error(name+': '+errors.join('; ')+' '+error.message)});
-    await page.waitForTimeout(350);
-    if(name==='family-talk') {
-      await page.getByRole('button',{name:'Help me talk this through with my family',exact:true}).click();
-      await page.getByRole('radio',{name:'Parent',exact:true}).check();
-      await page.getByRole('checkbox').check();
-      await page.getByRole('heading',{name:'Prepare a family conversation',exact:true}).evaluate(el=>el.scrollIntoView({block:'start'}));
+/* Offline UI review harness. Runs against the fixture Vite server only
+ * (`npx vite --config tests/preview/vite.config.mjs`). No real API, identity
+ * or provider is used: every non-local request is aborted.
+ *
+ *   node tests/preview/workspace.e2e.cjs <playwright-module-path> [--only=a,b] [--skip-crawl] [--skip-flow]
+ *
+ * For every screen: light and dark at 375, 768 and 1440 px. It fails on page
+ * errors, console errors, horizontal overflow and raw schema keys in visible
+ * text, and saves screenshots (375 and 1440) to docs/counselor/screenshots/v2.
+ * The crawler clicks every enabled control and fails on dead buttons and on
+ * links to routes the app does not have. The flow section checks A-K
+ * boundaries (consent, no automatic choice, no auto-send). */
+const assert = require('node:assert/strict');
+const path = require('node:path');
+const fs = require('node:fs');
+const { chromium } = require(process.argv[2] || 'playwright');
+const args = process.argv.slice(3);
+const only = (args.find((a) => a.startsWith('--only=')) || '').slice(7).split(',').filter(Boolean);
+const OUT = path.resolve(__dirname, '../../../docs/counselor/screenshots/v2');
+const ORIGIN = 'http://127.0.0.1:4173';
+const WIDTHS = [375, 768, 1440];
+const SHOT_WIDTHS = [375, 1440];
+const THEMES = ['light', 'dark'];
+
+/* Screens. `full` expands the app's scroll container so the whole page is
+ * captured; `ready` is a locator that must appear; `setup` drives a state. */
+const SCREENS = require('./screens.cjs');
+
+/* Next.js routes that exist in app/. Links must resolve to one of these. */
+const ROUTES = [/^\/$/, /^\/sign-in$/, /^\/sign-up$/, /^\/forgot-password$/, /^\/auth\/(callback|desktop|reset-password)$/,
+  /^\/share\/[^/]+$/, /^\/[^/]+$/, /^\/[^/]+\/settings(\/(general|integrations|preferences|profile|security))?$/];
+const RAW_KEY = /\b(?:identity|location|preferences|education|language|communication)\.[a-z_]+\b|\b[a-z]{2,}_[a-z_]{2,}\b/;
+const EXPAND = '[data-scroll-root]{height:auto!important;min-height:100svh;overflow:visible!important}'
+  + '[data-scroll-root] [data-scroll-area]{overflow:visible!important;height:auto!important}';
+
+async function open(browser, width, theme) {
+  const context = await browser.newContext({ viewport: { width, height: width < 500 ? 812 : width < 1000 ? 1024 : 900 } });
+  await context.route('**/*', (route) => new URL(route.request().url()).hostname === '127.0.0.1' ? route.continue() : route.abort());
+  const page = await context.newPage();
+  const errors = [];
+  page.on('pageerror', (error) => errors.push('page error: ' + error.message));
+  page.on('console', (message) => { if (message.type() === 'error') errors.push('console: ' + message.text()); });
+  page.theme = theme;
+  return { context, page, errors };
+}
+const url = (screen, theme) => `${ORIGIN}${screen.path}${screen.path.includes('?') ? '&' : '?'}theme=${theme}`;
+async function load(page, screen) {
+  await page.goto(url(screen, page.theme));
+  await page.locator(screen.ready || 'button').first().waitFor({ timeout: 10000 });
+  if (screen.setup) await screen.setup(page);
+  await page.waitForTimeout(screen.settle || 350);
+}
+
+async function checkScreens(browser) {
+  fs.mkdirSync(OUT, { recursive: true });
+  let shots = 0;
+  for (const screen of SCREENS.filter((s) => !only.length || only.some((o) => s.id.startsWith(o)))) {
+    for (const theme of THEMES) for (const width of WIDTHS) {
+      const { context, page, errors } = await open(browser, width, theme);
+      const where = `${screen.id} ${theme} ${width}px`;
+      try {
+        await load(page, screen);
+        const text = await page.locator('body').innerText();
+        assert(text.length > 60, `${where}: renders content`);
+        const raw = text.match(RAW_KEY);
+        assert(!raw, `${where}: raw key visible: ${raw && raw[0]}`);
+        const [scrollWidth, innerWidth] = await page.evaluate(() => [document.documentElement.scrollWidth, innerWidth]);
+        assert(scrollWidth <= innerWidth, `${where}: horizontal overflow ${scrollWidth} > ${innerWidth}`);
+        if (SHOT_WIDTHS.includes(width)) {
+          if (screen.full) { await page.addStyleTag({ content: EXPAND }); await page.waitForTimeout(150); }
+          const device = width < 500 ? 'phone' : 'desktop';
+          await page.screenshot({ path: path.join(OUT, `${screen.id}-${theme}-${device}.png`), fullPage: !!screen.full });
+          shots++;
+        }
+        assert.equal(errors.length, 0, `${where}: ${errors.join(' | ')}`);
+      } finally { await context.close(); }
     }
-    assert.equal(errors.length,0,`${name}: ${errors.join('; ')}`);
-    assert((await page.locator('body').innerText()).length>150,`${name} must render content`);
-    await page.screenshot({path:path.join(screenshots,`${name}-${theme}.png`)});
   }
-  // A: four entry cards. No hidden extra fields or provider call.
-  // Restored sidebar account controls use the real menu and confirmation UI.
-  for(const theme of ['light','dark']) {
-    await page.goto(`${base}?view=threads&theme=${theme}`);
-    const account=page.locator('aside footer').getByRole('button',{name:'Account',exact:true});
-    await account.click();
-    await page.getByRole('menuitem',{name:'Sign out',exact:true}).waitFor();
-    await page.waitForTimeout(250);
-    await page.screenshot({path:path.join(screenshots,`account-menu-${theme}.png`)});
-    await page.getByRole('menuitem',{name:'Your profile',exact:true}).click();
-    await page.getByRole('heading',{name:'A living picture of you'}).waitFor();
-    assert(new URL(page.url()).searchParams.get('view')==='profile');
+  return shots;
+}
+
+/* Click every enabled button and link in a screen and prove it does something:
+ * the URL changes, the DOM changes, or focus moves into a new layer. */
+async function crawl(browser) {
+  const dead = [], badLinks = [], failures = [];
+  let clicks = 0;
+  for (const screen of SCREENS.filter((s) => s.crawl !== false && (!only.length || only.some((o) => s.id.startsWith(o))))) {
+    for (const width of [1440, 375]) {
+      const { context, page, errors } = await open(browser, width, 'light');
+      try {
+        await load(page, screen);
+        const count = await page.locator('button:not([disabled]):visible, a[href]:visible').count();
+        for (let i = 0; i < count; i++) {
+          await load(page, screen);
+          const control = page.locator('button:not([disabled]):visible, a[href]:visible').nth(i);
+          if (!(await control.count())) continue;
+          const name = ((await control.getAttribute('aria-label')) || (await control.innerText()).trim() || '(icon)').slice(0, 40);
+          const href = await control.getAttribute('href');
+          if (href !== null) {
+            const target = new URL(href, page.url());
+            if (target.origin === ORIGIN && !ROUTES.some((route) => route.test(target.pathname))) badLinks.push(`${screen.id}: "${name}" -> ${target.pathname}`);
+            continue; // In-app links leave the preview; their target route is what matters.
+          }
+          const before = page.url();
+          await page.evaluate(() => {
+            window.__mutations = 0;
+            new MutationObserver((list) => { window.__mutations += list.length; })
+              .observe(document.body, { subtree: true, childList: true, attributes: true, characterData: true });
+          });
+          try { await control.click({ timeout: 3000 }); } catch (error) { failures.push(`${screen.id} ${width}: "${name}": ${error.message.split('\n')[0]}`); continue; }
+          clicks++;
+          await page.waitForTimeout(400);
+          const changed = page.url() !== before || (await page.evaluate(() => window.__mutations || 0)) > 0;
+          if (!changed) dead.push(`${screen.id} ${width}px: "${name}"`);
+        }
+        if (errors.length) failures.push(`${screen.id} ${width}: ${errors.join(' | ')}`);
+      } finally { await context.close(); }
+    }
   }
-  await page.goto(`${base}?onboarding=1`);
-  assert.equal(await page.locator('input').count(),2);
-  await page.getByRole('button',{name:'Other',exact:true}).click();
-  assert.equal(await page.locator('input').count(),3);
-  await page.locator('input').nth(0).fill('Sam Taylor');
-  await page.locator('input').nth(1).fill('Secondary education');
-  await page.locator('input').nth(2).fill('My city');
-  await page.getByRole('button',{name:'English',exact:true}).click();
-  const submit=page.getByRole('button',{name:'Continue',exact:true});
-  await submit.click();
-  await page.waitForURL('**view=threads');
-  // B-D: conversation and the calm journey, with every A-K stage present.
-  await page.getByRole('button',{name:'Your journey',exact:true}).click();
-  await page.getByRole('heading',{name:'Your journey, at your pace'}).waitFor();
-  assert.equal(await page.locator('main ol > li').count(),11);
-  // E: the actual Mirror control requires agreement then accepts ratings.
-  await page.goto(`${base}?view=threads&mirror=1`);
-  await page.getByRole('button',{name:'Yes, that is right',exact:true}).click();
-  const ratings=page.locator('input[type="number"]');
-  await ratings.nth(0).fill('5');await ratings.nth(1).fill('7');
-  await page.getByRole('button',{name:'Send',exact:true}).click();
-  assert((await page.evaluate(()=>window.__offlineCalls)).some(call=>call.method==='submitCounselorMirrorFeedback'));
-  // F-G: paths first. Merely viewing a path must not search programs.
-  await page.getByRole('button',{name:'Paths',exact:true}).click();
-  await page.getByRole('button',{name:'Explore',exact:true}).first().click();
-  await page.getByRole('heading',{name:'What it is',exact:true}).waitFor();
-  assert(!(await page.evaluate(()=>window.__offlineCalls)).some(call=>call.method==='searchPrograms'));
-  // H: the student explicitly opens places and confirms the search.
-  await page.getByRole('button',{name:'Where could I study this?',exact:true}).click();
-  const search=page.getByRole('button',{name:'Look at programs',exact:true});
-  assert(await search.isDisabled());
-  await page.getByRole('checkbox').check();await search.click();
-  await page.getByText('No verified program information is available yet.',{exact:false}).waitFor();
-  // I-J: reviewed roadmap handoff; no automatic choice is fabricated.
-  await page.getByRole('button',{name:'Prepare a reviewed roadmap'}).click();
-  await page.getByRole('heading',{name:'Compare paths',exact:true}).waitFor();
-  assert(!(await page.evaluate(()=>window.__offlineCalls)).some(call=>call.method==='chooseRoadmap'));
-  const choose=page.getByRole('button',{name:'Choose route',exact:true});
-  await choose.click();
-  const dialog=page.getByRole('dialog');
-  await dialog.getByRole('button',{name:'Choose route',exact:true}).click();
-  await dialog.getByRole('status').waitFor();
-  const choiceCalls=(await page.evaluate(()=>window.__offlineCalls));
-  assert.equal(choiceCalls.filter(call=>call.method==='getRoadmapChoiceToken').length,1);
-  assert.equal(choiceCalls.filter(call=>call.method==='chooseRoadmap').length,1);
-  for(const theme of ['light','dark']){
-    await page.goto(`${base}?view=compare&roadmap=1&theme=${theme}`);
-    await page.getByRole('button',{name:'Choose route',exact:true}).click();
-    await page.getByRole('dialog').getByRole('button',{name:'Choose route',exact:true}).click();
-    await page.getByRole('dialog').getByRole('status').waitFor();
-    await page.waitForTimeout(300);
-    await page.screenshot({path:path.join(screenshots,`decision-${theme}.png`)});
-    await page.getByRole('dialog').getByRole('button',{name:'Close',exact:true}).first().click();
-  }
-  await page.getByRole('button',{name:'Plan & check-ins',exact:true}).click();
-  await page.getByRole('heading',{name:'Small next steps'}).waitFor();
-  // K: return to the same conversation with a check-in draft, not an auto-send.
-  await page.getByRole('button',{name:'Open conversation',exact:true}).click();
-  assert(!(await page.evaluate(()=>window.__offlineCalls)).some(call=>call.method==='sendMessage'));
-  // Privacy and theme controls render on a phone without horizontal overflow.
-  await page.setViewportSize({width:390,height:844});
-  await page.goto(`${base}?view=profile&theme=dark`);await page.getByRole('heading',{name:'A living picture of you'}).waitFor();
-  assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
-  await page.screenshot({path:path.join(screenshots,'profile-mobile-dark.png')});
-  await page.getByRole('button',{name:'Placement AI',exact:true}).click();
-  const mobileAccount=page.locator('aside footer').getByRole('button',{name:'Account',exact:true});
-  await mobileAccount.waitFor({state:'visible'});
-  await page.waitForTimeout(250);
-  const accountBox=await mobileAccount.boundingBox();
-  assert(accountBox && accountBox.x>=0 && accountBox.y>=0 && accountBox.y+accountBox.height<=844);
-  await mobileAccount.click();
-  await page.getByRole('menuitem',{name:'Sign out',exact:true}).waitFor();
-  await page.waitForTimeout(250);
-  await page.screenshot({path:path.join(screenshots,'account-menu-mobile-dark.png')});
-  await page.getByRole('menuitem',{name:'Sign out',exact:true}).click();
-  const signout=page.getByRole('dialog');
-  await signout.getByRole('button',{name:'Cancel',exact:true}).click();
-  assert.equal(await page.evaluate(()=>sessionStorage.getItem('offline-sign-out')),null);
-  await mobileAccount.click();
-  await page.getByRole('menuitem',{name:'Sign out',exact:true}).click();
-  await page.getByRole('dialog').getByRole('button',{name:'Sign out',exact:true}).click();
-  await page.waitForURL('**/sign-in');
-  assert.equal(await page.evaluate(()=>sessionStorage.getItem('offline-sign-out')),'done');
-  assert.equal(errors.length,0,errors.join('; '));
-  console.log('PASS: 38 screenshots, mobile overflow, A-K flow, sidebar profile navigation and cancel/confirm sign-out using fake auth. No live calls.');
+  assert.equal(badLinks.length, 0, 'Links to missing routes:\n' + badLinks.join('\n'));
+  assert.equal(dead.length, 0, 'Dead buttons:\n' + dead.join('\n'));
+  assert.equal(failures.length, 0, 'Crawler failures:\n' + failures.join('\n'));
+  return clicks;
+}
+
+(async () => {
+  const browser = await chromium.launch({ channel: 'msedge' });
+  const shots = await checkScreens(browser);
+  const clicks = args.includes('--skip-crawl') ? 0 : await crawl(browser);
+  if (!args.includes('--skip-flow') && !only.length) await require('./flow.cjs')(browser, open, ORIGIN, OUT);
+  console.log(`PASS: ${shots} screenshots, ${clicks} crawled clicks, no overflow, raw keys or console errors. No live calls.`);
   await browser.close();
-})().catch(error=>{console.error(error);process.exit(1);});
+})().catch((error) => { console.error(error); process.exit(1); });
