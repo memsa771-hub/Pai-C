@@ -94,6 +94,7 @@ class ReadingResult:
     input_tokens: int
     output_tokens: int
     requests: int
+    cache_read_tokens: int = 0  # input tokens the API served from its prompt cache (billed lower)
 
 
 async def read(agent: Agent[None, Reading], prompt: str) -> ReadingResult:
@@ -102,4 +103,5 @@ async def read(agent: Agent[None, Reading], prompt: str) -> ReadingResult:
     except Exception as e:  # recorded, not retried (invariant 7)
         return ReadingResult(None, f"{type(e).__name__}: {e}"[:300], 0, 0, 0)
     u = r.usage
-    return ReadingResult(r.output, None, u.input_tokens or 0, u.output_tokens or 0, u.requests or 0)
+    return ReadingResult(r.output, None, u.input_tokens or 0, u.output_tokens or 0, u.requests or 0,
+                         u.cache_read_tokens or 0)

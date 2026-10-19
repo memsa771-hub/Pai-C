@@ -28,7 +28,9 @@ OS_OPENAI_API_KEY=... python -m spikes.spike1.run --model openai \
 - No database is needed. `OS_MODEL_CHEAP` picks the model (default `gpt-5.4-mini`).
 - Reuse the same `--cache` for the billed run, so it reads the same pages as the dry run. Use a new
   cache directory to re-fetch.
-- `--no-third` skips reading C (runs 1–8); `--rescore <out.json>` scores an earlier run against the current key with no API calls.
+- `--no-third` skips reading C (runs 1–8); `--rescore <out.json>` scores an earlier run with no API calls;
+  `--key <yaml>` picks the answer key (default: the current one; older versions are in
+  `docs/os/spikes/spike1-key-history/`).
 - `--only <ref> ...` runs some programmes; `--min-cycle 2027` is the re-run once WS 2027/28 is published.
 - The command prints the summary JSON and `pass bar: PASS|FAIL (...)` (exit 1 on FAIL). The `--out` file
   has every fact's verdict, quote, URL and reasons, plus `wrong`, `extras_for_review` and

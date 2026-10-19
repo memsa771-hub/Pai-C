@@ -24,12 +24,12 @@ from pydantic_ai.models.test import TestModel
 from app.os.settings import load_settings
 from spikes.spike1.agent import build_agents, openai_model, read, user_prompt
 from spikes.spike1.pages import Fetcher, collect
-from spikes.spike1.programmes import Programme, load_key, load_programmes
+from spikes.spike1.programmes import KEY_PATH, Programme, load_key, load_programmes
 from spikes.spike1.score import score
 from spikes.spike1.trust import Verdict, judge_programme, needs_third_reading
 
 # Parent §9 prices for gpt-5.4-mini, USD per 1M tokens (checked 2026-10-13).
-PRICE_IN, PRICE_OUT = 0.75, 4.50
+PRICE_IN, PRICE_CACHED, PRICE_OUT = 0.75, 0.075, 4.50
 
 
 async def research(programmes: list[Programme], fetcher: Fetcher, model: Model, min_cycle: int,
@@ -50,7 +50,7 @@ async def research(programmes: list[Programme], fetcher: Fetcher, model: Model, 
         return p.ref, {
             "pages": [{"url": x.url, "ok": x.ok, "blocked": x.blocked, "chars": len(x.text)} for x in pages],
             "readings": {n: {"error": r.error, "input_tokens": r.input_tokens, "output_tokens": r.output_tokens,
-                             "requests": r.requests, "output": r.reading.model_dump() if r.reading else None}
+                             "requests": r.requests, "cache_read_tokens": r.cache_read_tokens, "output": r.reading.model_dump() if r.reading else None}
                          for n, r in done},
             "verdicts": verdicts,
         }
@@ -62,6 +62,7 @@ def report(results: dict, key: dict, elapsed: float, model_name: str, min_cycle:
     s = score(key, {ref: r["verdicts"] for ref, r in results.items()})
     passed, fails = s.verdict()
     tin = sum(rd["input_tokens"] for r in results.values() for rd in r["readings"].values())
+    tcache = sum(rd.get("cache_read_tokens", 0) for r in results.values() for rd in r["readings"].values())
     tout = sum(rd["output_tokens"] for r in results.values() for rd in r["readings"].values())
     pages = [pg for r in results.values() for pg in r["pages"]]
     return {
@@ -76,8 +77,8 @@ def report(results: dict, key: dict, elapsed: float, model_name: str, min_cycle:
                            for n, rd in r["readings"].items() if rd["error"]],
         "third_readings": sum("C" in r["readings"] for r in results.values()),
         "pages_read": sum(p["ok"] for p in pages), "pages_blocked": sorted({f"{p['url']} ({p['blocked']})" for p in pages if p["blocked"]}),
-        "input_tokens": tin, "output_tokens": tout,
-        "cost_usd": round(tin / 1e6 * PRICE_IN + tout / 1e6 * PRICE_OUT, 4),
+        "input_tokens": tin, "cache_read_tokens": tcache, "output_tokens": tout,
+        "cost_usd": round((tin - tcache) / 1e6 * PRICE_IN + tcache / 1e6 * PRICE_CACHED + tout / 1e6 * PRICE_OUT, 4),
         "wrong": s.wrong, "extras_for_review": s.extras, "unsettled_for_review": s.unsettled,
     }
 
@@ -91,14 +92,15 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--only", nargs="*", help="programme refs to run (default: all 30)")
     ap.add_argument("--concurrency", type=int, default=4)
     ap.add_argument("--no-third", action="store_true", help="two readings only (runs 1-8)")
-    ap.add_argument("--rescore", type=Path, help="score an earlier --out file against the current key (no fetch, no model)")
+    ap.add_argument("--rescore", type=Path, help="score an earlier --out file against the key (no fetch, no model)")
+    ap.add_argument("--key", type=Path, default=KEY_PATH, help="answer key to score against (default: the current key)")
     args = ap.parse_args(argv)
 
     if args.rescore:
         old = json.loads(args.rescore.read_text(encoding="utf-8"))
         results = {ref: {**r, "verdicts": {f: Verdict(**v) for f, v in r["verdicts"].items()}}
                    for ref, r in old["results"].items()}
-        key = {ref: row for ref, row in load_key().items() if ref in results}
+        key = {ref: row for ref, row in load_key(args.key).items() if ref in results}
         rep = report(results, key, old["report"]["elapsed_s"], old["report"]["model"], old["report"]["min_cycle"])
         args.out.write_text(json.dumps({"report": rep, "results": old["results"]}, indent=2, ensure_ascii=False,
                                        default=str), encoding="utf-8")
@@ -118,7 +120,7 @@ def main(argv: list[str] | None = None) -> int:
     programmes = [p for p in load_programmes() if not args.only or p.ref in args.only]
     t0 = time.monotonic()
     results = asyncio.run(research(programmes, Fetcher(args.cache), model, args.min_cycle, args.concurrency, not args.no_third))
-    key = {ref: row for ref, row in load_key().items() if ref in results}
+    key = {ref: row for ref, row in load_key(args.key).items() if ref in results}
     rep = report(results, key, time.monotonic() - t0, model_name, args.min_cycle)
 
     full = {"report": rep, "results": {ref: {**r, "verdicts": {f: asdict(v) for f, v in r["verdicts"].items()}}
