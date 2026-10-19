@@ -18,7 +18,9 @@ CREATE TABLE IF NOT EXISTS public.os_test_runs (
 
 @cache
 def _engine():
-    return create_engine(os.environ["OS_DATABASE_URL"], pool_pre_ping=True)
+    # Worker subprocesses get OS_DATABASE_URL; in-process tests (and CI) only set OS_TEST_DATABASE_URL.
+    url = os.environ.get("OS_DATABASE_URL") or os.environ["OS_TEST_DATABASE_URL"]
+    return create_engine(url, pool_pre_ping=True)
 
 
 def _sleep(ctx: TaskContext) -> Outcome:
