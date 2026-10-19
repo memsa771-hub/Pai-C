@@ -80,5 +80,5 @@ def test_upgrade_unknown_plan_is_404(engine, clean, os_db):
     services = make_services(settings, engine=engine, playbooks=load_playbook_dir(FAKE), today=lambda: date(2027, 3, 1))
     app = FastAPI()
     app.include_router(build_router(lambda: services), prefix="/v1/os")
-    r = TestClient(app).post("/v1/os/plans/999/upgrade", headers={"Authorization": "Bearer t"})
+    r = TestClient(app).post("/v1/os/plans/999/upgrade", headers={"X-OS-Admin-Token": "t"})
     assert r.status_code == 404

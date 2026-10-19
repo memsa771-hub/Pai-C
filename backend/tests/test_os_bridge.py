@@ -46,3 +46,22 @@ def test_unknown_workspace_is_404_with_host_message(calls):
     with pytest.raises(HTTPException) as e:
         main._os_student_ref("missing", None, None, db=None)
     assert (e.value.status_code, e.value.detail) == (404, "Workspace not found")
+
+
+def test_os_admin_token_survives_the_session_middleware():
+    """PaiSessionBoundaryMiddleware rewrites Authorization on every /v1/ request (only PAI session tokens
+    survive), so the OS admin token must travel in its own header. Through the real middleware: the
+    admin check passes (the empty body then fails validation, 422) and a missing token is still 401."""
+    from fastapi import FastAPI
+    from fastapi.testclient import TestClient
+
+    from app.os.api import mount_os
+
+    app = FastAPI()
+    app.add_middleware(main.PaiSessionBoundaryMiddleware)
+    env = {"DATABASE_URL": "postgresql://x/y", "OS_ENABLED": "true", "OS_ADMIN_TOKEN": "admin-secret"}
+    assert mount_os(app, env=env)
+    client = TestClient(app)
+    assert client.post("/v1/os/plans", json={}, headers={"X-OS-Admin-Token": "admin-secret"}).status_code == 422
+    assert client.post("/v1/os/plans", json={}, headers={"X-OS-Admin-Token": "wrong"}).status_code == 401
+    assert client.post("/v1/os/plans", json={}).status_code == 401

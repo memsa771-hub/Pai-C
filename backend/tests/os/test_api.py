@@ -44,7 +44,7 @@ def client(engine, clean, os_db):
     return TestClient(app)
 
 
-ADMIN = {"Authorization": f"Bearer {TOKEN}"}
+ADMIN = {"X-OS-Admin-Token": TOKEN}
 
 
 def as_student(name="stu-1") -> dict:
@@ -53,7 +53,9 @@ def as_student(name="stu-1") -> dict:
 
 def test_post_plan_requires_admin_token(client):
     assert client.post("/v1/os/plans", json=contract()).status_code == 401
-    assert client.post("/v1/os/plans", json=contract(), headers={"Authorization": "Bearer wrong"}).status_code == 401
+    assert client.post("/v1/os/plans", json=contract(), headers={"X-OS-Admin-Token": "wrong"}).status_code == 401
+    # A bearer is not the admin channel (the host's session middleware rewrites Authorization anyway).
+    assert client.post("/v1/os/plans", json=contract(), headers={"Authorization": f"Bearer {TOKEN}"}).status_code == 401
 
 
 def test_post_plan_invalid_contract_422(client):

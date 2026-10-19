@@ -17,8 +17,13 @@ def current_student_ref_for_write() -> str:
     raise HTTPException(status_code=401, detail="student sign-in required")
 
 
-def check_admin(settings: OsSettings, authorization: str | None) -> None:
+ADMIN_HEADER = "X-OS-Admin-Token"
+
+
+def check_admin(settings: OsSettings, given: str | None) -> None:
+    """The admin token travels in its own header (ADMIN_HEADER), not Authorization: the host app's
+    session middleware rewrites Authorization on every /v1/ request, so a bearer would never arrive."""
     token = settings.admin_token
-    given = authorization[7:].strip() if authorization and authorization.startswith("Bearer ") else ""
+    given = (given or "").strip()
     if not token or not given or not hmac.compare_digest(given.encode(), token.encode()):
         raise HTTPException(status_code=401, detail="admin token required")

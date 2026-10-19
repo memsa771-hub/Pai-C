@@ -31,8 +31,8 @@ def build_router(get_services: Callable[[], Services]) -> APIRouter:
     def services() -> Services:
         return get_services()
 
-    def require_admin(authorization: str | None = Header(None), svc: Services = Depends(services)) -> None:
-        check_admin(svc.settings, authorization)
+    def require_admin(x_os_admin_token: str | None = Header(None), svc: Services = Depends(services)) -> None:
+        check_admin(svc.settings, x_os_admin_token)
 
     @router.post("/plans", status_code=201, response_model=PlanOut, dependencies=[Depends(require_admin)])
     def post_plan(contract: RouteContract, response: Response, svc: Services = Depends(services)) -> dict:

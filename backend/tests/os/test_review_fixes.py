@@ -166,7 +166,7 @@ def api(engine, clean, os_db):
     return TestClient(app)
 
 
-ADMIN = {"Authorization": f"Bearer {TOKEN}"}
+ADMIN = {"X-OS-Admin-Token": TOKEN}
 
 
 def _contract_json(refs) -> dict:
