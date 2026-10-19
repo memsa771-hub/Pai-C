@@ -79,7 +79,7 @@ def test_local_executor_id_refused():
 def test_milestone_runs_to_done(dbos_worker, engine, clean):
     client, kernel = dbos_worker
     plan_id = start_plan(kernel, "system.milestone")
-    assert enqueue_pending(engine, client) == 1
+    assert enqueue_pending(engine, client, "pai") == 1
     assert wait_states(engine, plan_id, {"done"}) == ["done"]
     with engine.connect() as conn:
         att = conn.execute(select(models.task_attempts)).one()
@@ -90,10 +90,10 @@ def test_milestone_runs_to_done(dbos_worker, engine, clean):
 def test_enqueue_twice_runs_once(dbos_worker, engine, clean):
     client, kernel = dbos_worker
     plan_id = start_plan(kernel, "test.sleep")
-    enqueue_pending(engine, client)
+    enqueue_pending(engine, client, "pai")
     with engine.begin() as conn:  # crash before 'sent' was recorded: the request is sent again
         conn.execute(update(models.enqueue_requests).values(sent=False))
-    assert enqueue_pending(engine, client) == 1
+    assert enqueue_pending(engine, client, "pai") == 1
     wait_states(engine, plan_id, {"done"})
     with engine.connect() as conn:
         runs = conn.execute(select(func.count()).select_from(models.task_attempts)).scalar_one()
@@ -114,7 +114,7 @@ def test_reconcile_reenqueues_lost_request(dbos_worker, engine, clean):
 def test_reconcile_fails_errored_workflow(dbos_worker, engine, clean):
     client, kernel = dbos_worker
     plan_id = start_plan(kernel, "test.fail")
-    enqueue_pending(engine, client)
+    enqueue_pending(engine, client, "pai")
     deadline = time.monotonic() + 60
     while not client.list_workflows(workflow_ids=["1:1"], status="ERROR", load_input=False, load_output=False):
         assert time.monotonic() < deadline, "workflow never errored"

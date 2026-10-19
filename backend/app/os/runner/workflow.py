@@ -55,9 +55,9 @@ def register_workflow(engine: Engine, settings: OsSettings, registry: Registry, 
 
     def load(task_id: int, attempt: int) -> dict | None:
         with engine.connect() as conn:
-            row = conn.execute(select(T).where(T.c.id == task_id)).first()
+            row = conn.execute(select(T).where(T.c.id == task_id, T.c.tenant_id == kernel.tenant_id)).first()
         if row is None or row.attempt != attempt or not kernel.mark_running(task_id, attempt):
-            return None  # superseded or already settled: nothing to run
+            return None  # another tenant's task, superseded, or already settled: nothing to run
         return asdict(TaskContext(task_id=task_id, attempt=attempt, task_type=row.task_type, plan_id=row.plan_id,
                                   programme_ref=row.programme_ref, payload=row.result or {}))
 

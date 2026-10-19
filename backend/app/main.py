@@ -6,6 +6,7 @@ A workspace is an ONM network with workspace-specific mods loaded.
 """
 
 import asyncio
+import json
 import logging
 import os
 import re
@@ -755,8 +756,12 @@ app.include_router(workspaces.router)
 # Counsellor code, so the signed-in student is passed in here: the student's workspace is their ref.
 def _os_student(db, network, x_workspace_token, authorization, *, write: bool) -> str:
     workspace, error = _workspace_auth(db, network, x_workspace_token, authorization, write=write)
-    if error is not None:
-        raise HTTPException(status_code=error.status_code or 401)
+    if error is not None:  # keep the host's status and message (e.g. 403 "Student account required")
+        try:
+            message = json.loads(error.body).get("message")
+        except (ValueError, AttributeError):
+            message = None
+        raise HTTPException(status_code=error.status_code or 401, detail=message)
     return str(workspace.id)
 
 

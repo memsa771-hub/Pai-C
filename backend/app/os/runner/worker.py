@@ -81,7 +81,7 @@ def main(argv: list[str] | None = None) -> int:
             if parent is not None and os.getppid() != parent:
                 break  # the parent died without stopping us: do not linger
             try:
-                enqueue_pending(engine, client)
+                enqueue_pending(engine, client, settings.tenant_id)
             except Exception:  # noqa: BLE001  (a database blip must not kill the worker; next tick retries)
                 log.exception("enqueue_pending failed")
     finally:

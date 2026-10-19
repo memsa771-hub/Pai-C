@@ -35,8 +35,12 @@ class PlanService:
         return self.registry.types_of(names)
 
     def _pinned(self, plan_id: int) -> Playbook:
+        pins = models.playbook_pins
         with self.engine.connect() as conn:
-            pin = conn.execute(select(models.playbook_pins).where(models.playbook_pins.c.plan_id == plan_id)).one()
+            pin = conn.execute(select(pins).where(
+                pins.c.plan_id == plan_id, pins.c.tenant_id == self.kernel.tenant_id)).first()
+        if pin is None:
+            raise KeyError(f"plan {plan_id}")
         try:
             return self.playbooks[(pin.playbook_key, pin.version)]
         except KeyError:
