@@ -1,6 +1,6 @@
 # Spike 1: research of the 30 shortlist programmes — design
 
-Status: approved (owner: "ok carry on", option A) · 2026-10-19 · Result: PASS, see `spike1-report.md` · Parent spec: `docs/superpowers/specs/2026-10-12-pai-os-design.md`
+Status: approved (owner: "ok carry on", option A) · 2026-10-19 · Result: not a clean pass (correct rate 6/6, confirmed rate 5/6 final runs), see `spike1-report.md` · Parent spec: `docs/superpowers/specs/2026-10-12-pai-os-design.md`
 (the parent wins on any conflict). Comes before the Slice 2 spec (parent §5: Spike 1 runs before Slice 2).
 
 ## 1. What the spike must show
