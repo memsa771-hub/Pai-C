@@ -51,6 +51,25 @@
       }
     },
     {
+      "id": "clear_myth",
+      "when": {
+        "ne": [
+          {
+            "ref": "relevant_myth"
+          },
+          null
+        ]
+      },
+      "set": {
+        "action": "clear_myth",
+        "question_allowed": false,
+        "topic": {
+          "ref": "relevant_myth"
+        },
+        "invite": false
+      }
+    },
+    {
       "id": "follow_thread",
       "when": {
         "ne": [

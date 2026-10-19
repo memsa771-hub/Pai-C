@@ -127,6 +127,8 @@ def build_state(db, turn, signals, history):
             count = sum(row["timestamp"] > boundary for row in students)
             state["discover_available"] = count >= load_data("decision_table.json")["derived"]["discover_min_student_messages_between"]
             state["possibility_id"] = possibility.id
+    from app.pai_c.myths import relevant_myth
+    state["relevant_myth"] = relevant_myth(db, turn.workspace_id, signals)
     return state
 
 

@@ -1,0 +1,16 @@
+{
+  "item_prefix": "myth.",
+  "relevant_areas": ["options", "goals"],
+  "item_paths": ["said", "source", "self"],
+  "cache_days": 30,
+  "retry_hours": 24,
+  "search_limit": 4,
+  "fetch_limit": 3,
+  "page_chars": 12000,
+  "max_tokens": 1200,
+  "trusted_domains": [],
+  "required_checks": ["official_source", "current_cycle", "schema", "freshness"],
+  "checking_reply": "I want to check that belief against a reliable source before correcting it. I've saved it as a question to check.",
+  "source_reply": "Here is what the source says: {quote}\n\n[Source · checked {date}]({url})\n\nThis is the source's wording, rather than an assumption about your situation.",
+  "query": "{claim} evidence explanation"
+}

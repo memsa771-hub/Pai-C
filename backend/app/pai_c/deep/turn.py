@@ -76,6 +76,9 @@ async def run_deep_turn(db, turn: CounselorTurnInput, *,
                         safety_level: str | None = None,
                         decision=None, signals=None) -> DeepTurnResult:
     context = await build_context(db, turn.workspace_id, turn, roadmap_id=roadmap_id, wellbeing=instructions == "wellbeing", decision=decision, signals=signals)
+    if decision is not None and decision.action == "clear_myth" and instructions != "wellbeing":
+        from app.pai_c.myths import reply
+        return DeepTurnResult(reply(db, turn.workspace_id, decision.topic), {"type": "none"}, context, 0, 0)
     owner_id = turn.source.removeprefix("human:") if turn.source.startswith("human:") else ""
     if history is None:
         history = [{"role": item["role"], "content": item["content"]}

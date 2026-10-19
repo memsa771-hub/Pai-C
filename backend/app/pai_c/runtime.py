@@ -132,6 +132,16 @@ async def _run_deep_turn(db, workspace_id: str, event_data: dict, depth: int):
             NotedQuestionService(db).record(workspace_id, turn.source_event_id, request.text,
                 kind=request.kind, needs_research=request.needs_research, pending=True)
         decision = decide(build_state(db, turn, signals, recent))
+        if decision.action == "clear_myth":
+            from app.research.gateway import request_research
+            from app.tools import ToolContext
+            try:
+                await request_research("myth_check", workspace_id, db=db, journey=None,
+                    tool_context=ToolContext(workspace_id=workspace_id, agent_name=PAI_AGENT_NAME, api=None),
+                    possibility_id=decision.topic, refresh_key=turn.source_event_id)
+            except Exception as exc:
+                db.rollback()
+                logger.warning("myth_enqueue_failed error_type=%s", type(exc).__name__)
     flagged = decision is not None and decision.action == "care"
     fallback_reply = None
     result = None

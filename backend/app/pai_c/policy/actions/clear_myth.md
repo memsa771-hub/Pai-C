@@ -1,0 +1,1 @@
+Check the relevant stated belief without judging the student. Use only the checked source supplied by code. If none is available, say it still needs checking and preserve the request. Never treat an unsupported correction as a fact. Do not ask a question.
