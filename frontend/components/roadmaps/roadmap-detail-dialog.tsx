@@ -4,6 +4,7 @@ import { RoadmapFit } from './roadmap-fit';
 
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
+import { Button } from '@/components/ui/button';
 import { workspaceApi } from '@/lib/api';
 import { useT } from '@/lib/i18n';
 import type { RoadmapDetail } from '@/lib/roadmaps';
@@ -115,7 +116,7 @@ export function RoadmapDetailDialog({ roadmapId, onClose, onReported }: {
           {claimGroups.map((group) => group.values.length > 0 && <section key={group.label}>
             <h3 className="font-semibold">{group.label}</h3>
             <ul className="mt-1 space-y-2">{group.values.map((claim, index) =>
-              <li key={index} className="rounded-lg border p-2">
+              <li key={index} className="rounded-xl border p-3">
                 <p>{claim.quote || readable(claim.value)}</p>
                 <p className="mt-1 text-xs text-muted-foreground">{evidence?.status === 'verified'
                   ? t('counselorRoadmaps.verified') : t('counselorRoadmaps.unconfirmed')}</p>
@@ -134,9 +135,8 @@ export function RoadmapDetailDialog({ roadmapId, onClose, onReported }: {
         </>}
       </DialogBody>
       <DialogFooter>
-        {evidence && <button type="button" disabled={reporting} onClick={() => void report()}
-          className="rounded-lg border px-4 py-2 text-sm disabled:opacity-50">{t('counselorRoadmaps.report')}</button>}
-        <button type="button" onClick={onClose} className="rounded-lg bg-primary px-4 py-2 text-sm text-primary-foreground">{t('counselorRoadmaps.close')}</button>
+        {evidence && <Button type="button" size="tap" variant="outline" disabled={reporting} onClick={() => void report()}>{t('counselorRoadmaps.report')}</Button>}
+        <Button type="button" size="tap" onClick={onClose}>{t('counselorRoadmaps.close')}</Button>
       </DialogFooter>
     </DialogContent>
   </Dialog>;

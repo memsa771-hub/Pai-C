@@ -93,4 +93,23 @@ module.exports = [
     await page.getByRole('checkbox').check(); await page.getByRole('button', { name: 'Look at programs' }).click();
     await page.getByText('No verified program information', { exact: false }).waitFor();
   } },
+
+  { id: 'compare', path: '/student?view=compare&roadmap=1', ready: 'main h1', full: true },
+  { id: 'compare-family', path: '/student?view=compare&roadmap=1', ready: 'main h1', full: true, crawl: false, setup: async (page) => {
+    await page.getByRole('button', { name: 'Help me talk this through with my family', exact: true }).click();
+    await page.locator('label', { hasText: 'Parent' }).first().click();
+    await page.getByRole('radio', { name: 'Parent', exact: true }).isChecked();
+    await page.getByRole('checkbox').first().check();
+  } },
+  { id: 'decision', path: '/student?view=compare&roadmap=1', ready: 'main h1', crawl: false, setup: async (page) => {
+    await page.getByRole('button', { name: 'Choose route', exact: true }).click();
+    await page.getByRole('dialog').getByRole('button', { name: 'Choose route', exact: true }).click();
+    await page.getByRole('dialog').getByRole('status').waitFor();
+  } },
+  { id: 'compare-chosen', path: '/student?view=compare&roadmap=1&family=1', ready: 'main h1', full: true },
+  { id: 'plan-empty', path: '/student?view=plan', ready: 'main h1', full: true },
+  { id: 'plan', path: '/student?view=plan&roadmap=1&family=1', ready: 'main h1', full: true },
+  { id: 'roadmap-details', path: '/student?view=compare&roadmap=1', ready: 'main h1', crawl: false, setup: async (page) => {
+    await page.getByRole('button', { name: 'View details' }).click(); await page.getByRole('dialog').waitFor();
+  } },
 ];

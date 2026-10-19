@@ -1,7 +1,9 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { Plus, RefreshCw } from 'lucide-react';
+import { Map as MapIcon, Plus, RefreshCw } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { EmptyState, Skeletons } from '@/components/pai';
 import { toast } from 'sonner';
 import { workspaceApi } from '@/lib/api';
 import type { Roadmap } from '@/lib/roadmaps';
@@ -19,7 +21,9 @@ import { Possibilities } from '@/components/counselor/possibilities';
 
 type Filter = 'all' | 'favorites' | 'exploring' | 'dismissed';
 
-export function RoadmapsView({ pathOnly = false }: { pathOnly?: boolean }) {
+/** `pathOnly` embeds the list inside a counselor page (no own heading or
+ * scroll area, no free-form goals); `onChanged` lets the page refresh. */
+export function RoadmapsView({ pathOnly = false, onChanged }: { pathOnly?: boolean; onChanged?: () => void }) {
   const [filter, setFilter] = useState<Filter>('all');
   const [roadmaps, setRoadmaps] = useState<Roadmap[]>([]);
   const [requests, setRequests] = useState<StudentRequest[]>([]);
@@ -28,6 +32,7 @@ export function RoadmapsView({ pathOnly = false }: { pathOnly?: boolean }) {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [adding, setAdding] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const [title, setTitle] = useState('');
   const [country, setCountry] = useState('');
   const [level, setLevel] = useState('');
@@ -44,9 +49,9 @@ export function RoadmapsView({ pathOnly = false }: { pathOnly?: boolean }) {
       ]);
       setRoadmaps(cards); setRequests(openRequests);
     }
-    catch (error) { toast.error(error instanceof Error ? error.message : 'Could not load roadmaps'); }
+    catch (error) { toast.error(error instanceof Error && error.message ? error.message : t('counselorRoadmaps.errorLoad')); }
     finally { setLoading(false); }
-  }, [filter]);
+  }, [filter, t]);
 
   useEffect(() => { void refresh(); }, [refresh, run?.updatedAt]);
   useEffect(() => {
@@ -78,7 +83,7 @@ export function RoadmapsView({ pathOnly = false }: { pathOnly?: boolean }) {
         await workspaceApi.setRoadmapDismissed(roadmap.id, kind === 'dismiss');
       }
       await refresh();
-    } catch (error) { toast.error(error instanceof Error ? error.message : 'Could not update roadmap'); }
+    } catch (error) { toast.error(error instanceof Error && error.message ? error.message : t('counselorRoadmaps.errorUpdate')); }
     finally { setBusy(false); }
   };
 
@@ -94,17 +99,22 @@ export function RoadmapsView({ pathOnly = false }: { pathOnly?: boolean }) {
       setAdding(false); setFilter('all');
       toast.success(t('counselorRoadmaps.researchRunning'));
       await refresh();
-    } catch (error) { toast.error(error instanceof Error ? error.message : 'Could not add goal'); }
+    } catch (error) { toast.error(error instanceof Error && error.message ? error.message : t('counselorRoadmaps.errorAdd')); }
     finally { setBusy(false); }
   };
 
-  return <div className="h-full overflow-y-auto bg-background">
-    <div className="mx-auto max-w-5xl px-4 py-6 sm:px-8">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div><h1 className="text-2xl font-semibold">Roadmaps</h1><p className="mt-1 text-sm text-muted-foreground">Compare possible directions, discuss them with PAI, and choose when you are ready.</p></div>
-        <div className="flex gap-2"><button type="button" onClick={() => void refresh()} aria-label="Refresh roadmaps" className="rounded-lg border p-2 hover:bg-muted"><RefreshCw className="size-4" /></button>
-          {!pathOnly && <button type="button" onClick={() => setAdding(!adding)} className="inline-flex items-center gap-1 rounded-lg bg-primary px-3 py-2 text-sm text-primary-foreground"><Plus className="size-4" /> Add goal</button>}</div>
-      </div>
+  const refreshButton = <Button type="button" size="tap-icon" variant="outline" onClick={() => { setRefreshing(true); void refresh().finally(() => setRefreshing(false)); }}
+    aria-label={t('counselorRoadmaps.refreshList')} aria-busy={refreshing}>
+    <RefreshCw aria-hidden className={refreshing ? 'animate-spin' : ''} /></Button>;
+  const header = pathOnly ? null : <div className="flex flex-wrap items-start justify-between gap-3">
+    <div><h1 className="text-2xl font-bold">{t('counselorRoadmaps.viewTitle')}</h1><p className="mt-1 text-sm text-muted-foreground">{t('counselorRoadmaps.viewIntro')}</p></div>
+    <div className="ms-auto flex gap-2">
+      {refreshButton}
+      <Button type="button" size="tap" onClick={() => setAdding(!adding)}><Plus aria-hidden /> {t('counselorRoadmaps.addGoal')}</Button>
+    </div>
+  </div>;
+  const body = <>
+      {header}
       {!pathOnly && <Possibilities refreshKey={roadmaps} onUpdated={() => void refresh()} />}
       {!pathOnly && adding && <form onSubmit={addGoal} className="mt-5 rounded-xl border bg-card p-4">
         <label htmlFor="roadmap-goal" className="text-sm font-medium">{t('counselorRoadmaps.customGoalTitle')}</label>
@@ -127,16 +137,22 @@ export function RoadmapsView({ pathOnly = false }: { pathOnly?: boolean }) {
           {t('counselorRoadmaps.customResearch')}</button></div>
         <p className="mt-2 text-xs text-muted-foreground">{t('counselorRoadmaps.customGoalHint')}</p>
       </form>}
-      <div className="mt-6 flex flex-wrap gap-2" aria-label="Roadmap filters">{(['all', 'favorites', 'exploring', 'dismissed'] as const).map((option) => <button type="button" key={option} onClick={() => setFilter(option)}
-        className={`rounded-full px-3 py-1.5 text-xs capitalize ${filter === option ? 'bg-primary text-primary-foreground' : 'border hover:bg-muted'}`}>{option}</button>)}</div>
+      <div className={`flex flex-wrap items-center gap-2 ${pathOnly ? '' : 'mt-4'}`}>
+        <div className="flex flex-wrap gap-2" role="group" aria-label={t('counselorRoadmaps.filtersLabel')}>{(['all', 'favorites', 'exploring', 'dismissed'] as const).map((option) => <button type="button" key={option} onClick={() => setFilter(option)} aria-pressed={filter === option}
+          className={`min-h-11 rounded-full px-4 text-sm font-semibold transition-colors ${filter === option ? 'bg-brand text-primary-foreground' : 'bg-muted text-foreground hover:bg-brand-soft'}`}>{t(`counselorRoadmaps.filter_${option}`)}</button>)}</div>
+        {pathOnly && <div className="ms-auto">{refreshButton}</div>}
+      </div>
       {run?.taskType === 'roadmap_research' && !['completed', 'failed', 'needs_user_action'].includes(run.status) &&
-        <p role="status" className="mt-4 rounded-lg border bg-muted/30 p-3 text-sm">{t('counselorRoadmaps.researchRunning')}</p>}
+        <p role="status" className="mt-4 rounded-2xl bg-info-soft px-4 py-3 text-sm font-medium text-info-ink">{t('counselorRoadmaps.researchRunning')}</p>}
       {requests[0] && <div className="mt-4"><StudentRequestCard key={requests[0].id} request={requests[0]} onSent={() => void refresh()} /></div>}
-      {loading ? <p className="mt-8 text-sm text-muted-foreground">Loading roadmaps…</p> : roadmaps.length === 0 ?
-        <div className="mt-8 rounded-2xl border border-dashed p-8 text-center"><p className="font-medium">No roadmaps here yet</p><p className="mt-2 text-sm text-muted-foreground">{pathOnly ? t('counselorRoadmaps.pathFirstEmpty') : t('counselorRoadmaps.customGoalHint')}</p></div> :
-        <div className="mt-5 grid gap-4 md:grid-cols-2">{roadmaps.map((roadmap) => <RoadmapCard key={roadmap.id} roadmap={roadmap} busy={busy} onAction={action} onDetails={(item) => setDetailId(item.id)} />)}</div>}
-      <RoadmapChoiceDialog roadmap={choice} channel="roadmaps" onClose={() => setChoice(null)} onChosen={() => void refresh()} />
+      {loading ? <div className="mt-5"><Skeletons count={2} label={t('counselorRoadmaps.loadingList')} /></div> : roadmaps.length === 0 ?
+        <EmptyState className="mt-5" icon={MapIcon} tone="amber" title={t('counselorRoadmaps.emptyTitle')} description={pathOnly ? t('counselorRoadmaps.pathFirstEmpty') : t('counselorRoadmaps.customGoalHint')} /> :
+        <div className="mt-5 grid gap-5 md:grid-cols-2">{roadmaps.map((roadmap) => <RoadmapCard key={roadmap.id} roadmap={roadmap} busy={busy} onAction={action} onDetails={(item) => setDetailId(item.id)} />)}</div>}
+      <RoadmapChoiceDialog roadmap={choice} channel="roadmaps" onClose={() => setChoice(null)} onChosen={() => { void refresh(); onChanged?.(); }} />
       <RoadmapDetailDialog roadmapId={detailId} onClose={() => setDetailId(null)} onReported={() => void refresh()} />
-    </div>
+  </>;
+  if (pathOnly) return <div>{body}</div>;
+  return <div className="h-full overflow-y-auto bg-background">
+    <div className="mx-auto max-w-5xl px-4 py-6 sm:px-8">{body}</div>
   </div>;
 }

@@ -293,6 +293,17 @@
       "journey": "Journey",
       "paths": "Paths",
       "profile": "Profile"
+    },
+    "short": {
+      "threads": "Chat",
+      "journey": "Journey",
+      "paths": "Paths",
+      "profile": "Profile",
+      "compare": "Compare",
+      "plan": "Plan",
+      "files": "Documents",
+      "settings": "Settings",
+      "notifications": "Notifications"
     }
   },
   "journeyStates": {
@@ -341,5 +352,37 @@
     "myths": "help",
     "jobs": "briefcase",
     "future": "telescope"
-  }
+  },
+  "compareRows": {
+    "why": "Why it fits you",
+    "words": "In your own words",
+    "fit": "Roadmap fit",
+    "risks": "What to test first",
+    "next": "First step"
+  },
+  "noRoadmapYet": "No reviewed roadmap yet",
+  "nothingRecorded": "Nothing recorded yet",
+  "openPath": "Open path",
+  "compareEmptyTitle": "Nothing to compare yet",
+  "compareEmptyBody": "Save or explore at least one path first. Then you can compare them side by side here.",
+  "decisionTitle": "Your decision",
+  "decisionChosen": "You chose: {title}",
+  "decisionNone": "You have not chosen a route yet. That is fine; take the time you need.",
+  "decisionWhy": "What you are really aiming for",
+  "decisionCertainty": "How sure do you feel about this choice?",
+  "decisionCertaintyNone": "How sure do you feel about your direction right now?",
+  "decisionCertaintyReply": "My certainty about my choice is {value} out of {max}.",
+  "decisionShare": "Share with PAI",
+  "decisionShared": "Shared with PAI. You can talk it through in the conversation.",
+  "decisionHint": "Moving the slider sends nothing. PAI only sees it when you press Share.",
+  "roadmapsTitle": "Reviewed roadmaps",
+  "roadmapsIntro": "Routes PAI has checked against sources. Choosing one is always your call.",
+  "familyIntro": "Prepare a calm conversation with someone whose opinion matters to you.",
+  "planRouteTitle": "Your route",
+  "planStepsTitle": "Small next steps",
+  "planRisks": "Keep an eye on",
+  "planNoRouteTitle": "No route chosen yet",
+  "planNoRouteBody": "When you choose a route in Compare & choose, its small next steps appear here.",
+  "planGoCompare": "Go to Compare & choose",
+  "stepLabel": "Step {n}"
 }

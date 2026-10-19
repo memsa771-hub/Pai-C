@@ -189,7 +189,7 @@ export function CounselorShell() {
           {active === "compare" && (
             <Compare onChat={chat} onOpen={openPath} />
           )}
-          {active === "plan" && <Plan onChat={chat} />}
+          {active === "plan" && <Plan onChat={chat} onNavigate={navigate} />}
           {active === "settings" && <CounselorSettings base={base} />}
         </div>
       </div>
@@ -233,7 +233,7 @@ export function CounselorShell() {
           <header className="flex h-16 shrink-0 items-center justify-between gap-3 border-b bg-background/85 px-4 backdrop-blur sm:px-6 lg:px-8">
             <div className="flex min-w-0 items-center gap-3">
               <span className="lg:hidden"><span className="flex size-10 items-center justify-center rounded-xl bg-white shadow-soft ring-1 ring-border"><img src="/pai-emblem.png" alt={copy.brand} className="size-6 object-contain" /></span></span>
-              <p className="truncate text-base font-semibold">{copy.nav[active as NavKey]}</p>
+              <p className="truncate text-base font-semibold"><span className="sm:hidden">{copy.shell.short[active as NavKey]}</span><span className="max-sm:hidden">{copy.nav[active as NavKey]}</span></p>
             </div>
             <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
               {stage && (

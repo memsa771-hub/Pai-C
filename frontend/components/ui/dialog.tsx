@@ -11,7 +11,7 @@ const dialogContentVariants = cva(
   // it's a flex column so <DialogHeader> and <DialogFooter> stay pinned while the
   // scrollable middle lives in <DialogBody>. This keeps the title/footer fixed and
   // avoids the white overscroll strip you get when the whole padded box scrolls.
-  'flex flex-col fixed outline-0 z-60 overflow-hidden border border-border bg-background shadow-lg shadow-black/5 duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 sm:rounded-lg',
+  'flex flex-col fixed outline-0 z-60 overflow-hidden border border-border bg-card shadow-lift duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 sm:rounded-3xl',
   {
     variants: {
       variant: {
@@ -88,7 +88,7 @@ function DialogContent({
       >
         {children}
         {showCloseButton && (
-          <DialogClose className="cursor-pointer outline-0 absolute end-5 top-5 rounded-sm opacity-60 ring-offset-background transition-opacity hover:opacity-100 focus:outline-hidden disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground">
+          <DialogClose className="cursor-pointer outline-0 absolute end-3 top-3 flex size-11 items-center justify-center rounded-full opacity-70 hover:bg-muted ring-offset-background transition-opacity hover:opacity-100 focus-visible:outline-2 focus-visible:outline-ring disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground">
             <X className="size-4" />
             <span className="sr-only">Close</span>
           </DialogClose>

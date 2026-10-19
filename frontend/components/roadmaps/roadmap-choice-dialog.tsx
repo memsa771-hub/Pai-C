@@ -1,6 +1,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { Check } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { workspaceApi } from '@/lib/api';
 import { useT } from '@/lib/i18n';
 import { evidenceLabel } from '@/lib/evidence-text';
@@ -49,17 +51,18 @@ export function RoadmapChoiceDialog({ roadmap, channel, onClose, onChosen }: {
         <DialogDescription>{roadmap?.title}</DialogDescription>
       </DialogHeader>
       <DialogBody className="space-y-4 py-3 text-sm">
-        {chosen ? <section role="status"><p>{t('counselorRoadmaps.decisionSaved')}</p>
-          {decision?.real_objective && <p className="mt-2">{decision.real_objective}</p>}
+        {chosen ? <section role="status" className="rounded-2xl bg-success-soft p-4 text-success-ink">
+          <p className="flex items-start gap-2 font-medium"><Check aria-hidden className="mt-0.5 size-4 shrink-0" />{t('counselorRoadmaps.decisionSaved')}</p>
+          {decision?.real_objective && <p className="mt-2 text-foreground">{decision.real_objective}</p>}
         </section> : <>
           <p>{t('counselorRoadmaps.chooseIntro')}</p>
-          <section aria-label={t('counselorRoadmaps.acceptedGaps')}>
+          <section aria-label={t('counselorRoadmaps.acceptedGaps')} className="rounded-2xl bg-muted/60 p-4">
             <h3 className="font-semibold">{t('counselorRoadmaps.acceptedGaps')}</h3>
             {gaps.length ? <ul className="mt-1 list-disc space-y-1 pl-5">{gaps.map((gap, index) =>
               <li key={`${gap.field || 'gap'}-${index}`}>{gap.reason || evidenceLabel(gap.field || '')}</li>)}</ul>
               : <p className="mt-1 text-muted-foreground">{t('counselorRoadmaps.noGaps')}</p>}
           </section>
-          <section aria-label={t('counselorRoadmaps.acceptedRisks')}>
+          <section aria-label={t('counselorRoadmaps.acceptedRisks')} className="rounded-2xl bg-warning-soft p-4 text-warning-ink">
             <h3 className="font-semibold">{t('counselorRoadmaps.acceptedRisks')}</h3>
             {roadmap?.risks.length ? <ul className="mt-1 list-disc space-y-1 pl-5">{roadmap.risks.map((risk, index) =>
               <li key={`${risk}-${index}`}>{risk}</li>)}</ul>
@@ -69,13 +72,12 @@ export function RoadmapChoiceDialog({ roadmap, channel, onClose, onChosen }: {
         {error && <p role="alert" className="text-destructive">{error}</p>}
       </DialogBody>
       <DialogFooter>
-        <button type="button" onClick={onClose} disabled={busy} className="rounded-lg border px-4 py-2 text-sm">
+        <Button type="button" size="tap" variant={chosen ? 'primary' : 'ghost'} onClick={onClose} disabled={busy}>
           {chosen ? t('counselorRoadmaps.close') : t('common.cancel')}
-        </button>
-        {!chosen && <button type="button" onClick={() => void confirm()} disabled={busy}
-          className="rounded-lg bg-primary px-4 py-2 text-sm text-primary-foreground disabled:opacity-50">
-          {t('counselorRoadmaps.chooseConfirm')}
-        </button>}
+        </Button>
+        {!chosen && <Button type="button" size="tap" onClick={() => void confirm()} disabled={busy}>
+          <Check aria-hidden />{t('counselorRoadmaps.chooseConfirm')}
+        </Button>}
       </DialogFooter>
     </DialogContent>
   </Dialog>;
