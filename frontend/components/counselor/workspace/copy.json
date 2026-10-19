@@ -143,61 +143,83 @@
     {
       "id": "A",
       "title": "A few basics",
-      "view": "profile"
+      "view": "profile",
+      "signal": "onboarded",
+      "tone": "blue"
     },
     {
       "id": "B",
       "title": "Getting to know you",
       "view": "threads",
-      "action": "explore_area"
+      "action": "explore_area",
+      "signal": "moment:explore_area",
+      "tone": "violet"
     },
     {
       "id": "C",
       "title": "Your first picture",
       "view": "threads",
-      "action": "first_picture"
+      "action": "first_picture",
+      "signal": "moment:first_picture",
+      "tone": "teal"
     },
     {
       "id": "D",
       "title": "Understanding more deeply",
       "view": "threads",
-      "action": "follow_thread"
+      "action": "follow_thread",
+      "signal": "moment:follow_thread",
+      "tone": "sky"
     },
     {
       "id": "E",
       "title": "Check your Mirror",
       "view": "threads",
-      "action": "mirror"
+      "action": "mirror",
+      "signal": "mirror_confirmed",
+      "tone": "rose"
     },
     {
       "id": "F",
       "title": "Find your paths",
-      "view": "paths"
+      "view": "paths",
+      "signal": "paths_found",
+      "tone": "amber"
     },
     {
       "id": "G",
       "title": "Understand a path",
-      "view": "paths"
+      "view": "paths",
+      "signal": "path_explored",
+      "tone": "teal"
     },
     {
       "id": "H",
       "title": "Where to study",
-      "view": "paths"
+      "view": "paths",
+      "signal": "roadmap_prepared",
+      "tone": "blue"
     },
     {
       "id": "I",
       "title": "Compare & choose",
-      "view": "compare"
+      "view": "compare",
+      "signal": "roadmap_chosen",
+      "tone": "violet"
     },
     {
       "id": "J",
       "title": "Make a plan",
-      "view": "plan"
+      "view": "plan",
+      "signal": "decision_recorded",
+      "tone": "amber"
     },
     {
       "id": "K",
       "title": "Stay in touch",
-      "view": "plan"
+      "view": "plan",
+      "signal": "never",
+      "tone": "rose"
     }
   ],
   "removeHelp": "Remove this active fact from your profile? Its evidence remains in your private history.",
@@ -240,5 +262,43 @@
   "stalePath": "Some sources need a fresh check. The older claims are hidden until they are checked again.",
   "acceptActivity": "I'll try this",
   "activityScheduled": "PAI will check in here",
-  "emptyTitle": "Nothing here yet"
+  "emptyTitle": "Nothing here yet",
+  "stageDescriptions": {
+    "A": "Your name, level, city and reply language.",
+    "B": "PAI asks about your life, interests and the people around you.",
+    "C": "PAI shares a first picture of you, and you correct it.",
+    "D": "You go deeper on what matters most.",
+    "E": "You check the Mirror: what you say, what your life shows, the pressure and what you want.",
+    "F": "Directions worth exploring, each with a reason from your own words.",
+    "G": "What a path involves, a day at work, and a small way to try it.",
+    "H": "Places to study this path, with sources and dates.",
+    "I": "Compare the trade-offs and make a choice that is yours.",
+    "J": "Small next steps for the route you chose.",
+    "K": "Check in when you try something, get a result or change your mind."
+  },
+  "shell": {
+    "more": "More",
+    "moreTitle": "More places",
+    "stage": "Stage {id}",
+    "progress": "{done} of {total} steps done",
+    "seeJourney": "See your journey",
+    "groups": {
+      "main": "Your counselor",
+      "decide": "Decide",
+      "yours": "Yours"
+    },
+    "skip": "Skip to content",
+    "tabs": {
+      "threads": "Chat",
+      "journey": "Journey",
+      "paths": "Paths",
+      "profile": "Profile"
+    }
+  },
+  "journeyStates": {
+    "done": "Done",
+    "now": "You are here",
+    "next": "Coming up"
+  },
+  "documentsTitle": "Your documents"
 }

@@ -9,7 +9,7 @@ afterEach(()=>{cleanup();vi.clearAllMocks();});
 it('gives all A-K stages a home and links known conversation moments',async()=>{
   vi.mocked(workspaceApi.getCounselorWorkspace).mockResolvedValue(picture);
   const navigate=vi.fn();render(<Journey navigate={navigate}/>);
-  await screen.findByRole('heading',{name:'Check your Mirror'});
+  await screen.findByRole('heading',{name:/Check your Mirror/});
   expect(screen.getAllByRole('listitem')).toHaveLength(11);
   fireEvent.click(screen.getAllByRole('button',{name:'Open conversation'})[0]);
   expect(navigate).toHaveBeenCalledWith('threads','m1');

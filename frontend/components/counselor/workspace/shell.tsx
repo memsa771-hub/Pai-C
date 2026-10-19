@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
+import { AnimatePresence, MotionConfig, motion } from "motion/react";
 import {
   MessageCircle,
   Route,
@@ -9,8 +10,9 @@ import {
   ListChecks,
   Files,
   Settings,
-  Menu,
-  X,
+  Ellipsis,
+  Flag,
+  type LucideIcon,
 } from "lucide-react";
 import { useLayout, type ViewMode } from "@/components/layout/layout-context";
 import { useWorkspace } from "@/lib/workspace-context";
@@ -20,36 +22,57 @@ import { FilePreview } from "@/components/files/file-preview";
 import { NotificationsMenu } from "@/components/layout/notifications-menu";
 import { UserMenu } from "@/components/layout/user-menu";
 import { NotificationsCenterView } from "@/components/notifications/notifications-center-view";
-import { Button } from "@/components/ui/button";
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { SidebarProvider } from "@/components/ui/sidebar";
+import { StatChip, toneClass, type Tone } from "@/components/pai";
+import { cn } from "@/lib/utils";
 import { LivingProfile } from "./profile";
 import { Journey } from "./journey";
 import { Paths, PathPage, ProgramPage } from "./paths";
 import { Compare, Plan } from "./decisions";
 import { CounselorSettings } from "./settings";
+import { DocumentsView } from "./documents";
 import { workspaceApi } from "@/lib/api";
 import { useResource } from "./resource";
+import { useJourney } from "./use-journey";
 import copy from "./copy.json";
-const icons = {
-  threads: MessageCircle,
-  journey: Route,
-  paths: Compass,
-  profile: UserRound,
-  compare: Columns2,
-  plan: ListChecks,
-  files: Files,
-  settings: Settings,
-};
+
+type NavKey = keyof typeof copy.nav;
+const NAV: { key: NavKey; icon: LucideIcon; tone: Tone; group: keyof typeof copy.shell.groups }[] = [
+  { key: "threads", icon: MessageCircle, tone: "blue", group: "main" },
+  { key: "journey", icon: Route, tone: "violet", group: "main" },
+  { key: "paths", icon: Compass, tone: "teal", group: "main" },
+  { key: "profile", icon: UserRound, tone: "rose", group: "main" },
+  { key: "compare", icon: Columns2, tone: "amber", group: "decide" },
+  { key: "plan", icon: ListChecks, tone: "sky", group: "decide" },
+  { key: "files", icon: Files, tone: "blue", group: "yours" },
+  { key: "settings", icon: Settings, tone: "violet", group: "yours" },
+];
+/** Phone tab bar: four destinations plus More (bottom-nav limit of five). */
+const TABS: NavKey[] = ["threads", "journey", "paths", "profile"];
 const health = () => workspaceApi.getCounselorHealth();
+
+function Brand() {
+  return (
+    <span className="flex items-center gap-3">
+      <span className="flex size-10 items-center justify-center rounded-xl bg-white shadow-soft ring-1 ring-border">
+        <img src="/pai-emblem.png" alt="" className="size-6 object-contain" />
+      </span>
+      <span className="text-base font-bold tracking-tight">{copy.brand}</span>
+    </span>
+  );
+}
+
 export function CounselorShell() {
   const { viewMode, openView } = useLayout();
-  const { workspace, currentSessionId, setCurrentSessionId } = useWorkspace();
+  const { currentSessionId, setCurrentSessionId } = useWorkspace();
   const [draft, setDraft] = useState("");
-  const [mobile, setMobile] = useState(false),
+  const [more, setMore] = useState(false),
     [path, setPath] = useState<string | null>(null),
     [places, setPlaces] = useState(false),
     [base, setBase] = useState("");
   const diagnostic = useResource(health);
+  const journey = useJourney();
   useEffect(() => {
     if (currentSessionId !== "pai-counselor")
       setCurrentSessionId("pai-counselor");
@@ -73,7 +96,7 @@ export function CounselorShell() {
   }, []); // URL restored only on navigation, not each render.
   const navigate = (view: string, event?: string) => {
     openView(view as ViewMode);
-    setMobile(false);
+    setMore(false);
     setPath(null);
     setPlaces(false);
     const q = new URLSearchParams({ view });
@@ -100,131 +123,182 @@ export function CounselorShell() {
       : Object.hasOwn(copy.nav, viewMode)
         ? viewMode
         : "threads";
-  return (
-    <SidebarProvider>
-      <div className="flex h-svh w-full overflow-hidden bg-background text-foreground">
-        {mobile && (
-          <button
-            className="fixed inset-0 z-40 bg-black/40 md:hidden"
-            aria-label={copy.cancel}
-            onClick={() => setMobile(false)}
-          />
+  const stage = journey.progress?.stage;
+  const doneCount = journey.progress?.current ?? 0;
+  const navButton = (item: (typeof NAV)[number]) => {
+    const Icon = item.icon;
+    const current = active === item.key;
+    return (
+      <button
+        key={item.key}
+        onClick={() => navigate(item.key)}
+        aria-current={current ? "page" : undefined}
+        className={cn(
+          "group flex min-h-11 w-full items-center gap-3 rounded-xl px-3 text-left text-sm font-medium transition-colors",
+          current ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-foreground/80 hover:bg-muted hover:text-foreground",
         )}
-        <aside
-          className={`${mobile ? "translate-x-0" : "-translate-x-full"} fixed inset-y-0 left-0 z-50 flex w-64 flex-col border-r bg-background text-sidebar-foreground transition-transform md:static md:translate-x-0 md:bg-sidebar`}
-        >
-          <a href={base || "#"} className="flex shrink-0 items-center gap-3 px-4 py-5">
-            <img src="/pai-emblem.png" alt="" className="size-9" />
-            <div>
-              <p className="font-semibold tracking-tight">{workspace?.name || copy.brand}</p>
-            </div>
+      >
+        <span className={cn("flex size-8 items-center justify-center rounded-lg transition-colors",
+          current ? cn(toneClass[item.tone].solid) : cn(toneClass[item.tone].soft, toneClass[item.tone].ink))}>
+          <Icon aria-hidden className="size-[18px]" />
+        </span>
+        {copy.nav[item.key]}
+      </button>
+    );
+  };
+  const content =
+    active === "threads" ? (
+      <div className="min-h-0 flex-1">
+        <ChatView counselorOnly initialDraft={draft} />
+      </div>
+    ) : active === "files" ? (
+      <DocumentsView list={<FileList />} preview={<FilePreview />} />
+    ) : active === "notifications" ? (
+      <NotificationsCenterView />
+    ) : (
+      <div data-scroll-area className="min-h-0 flex-1 overflow-y-auto">
+        <div className="mx-auto max-w-6xl px-4 pb-16 pt-6 sm:px-8 sm:pt-9">
+          {active === "profile" && <LivingProfile onChat={chat} />}
+          {active === "journey" && <Journey navigate={navigate} journey={journey} />}
+          {active === "paths" &&
+            (path ? (
+              places ? (
+                <ProgramPage
+                  id={path}
+                  onBack={() => setPlaces(false)}
+                  onCompare={() => navigate("compare")}
+                />
+              ) : (
+                <PathPage
+                  id={path}
+                  onBack={() => navigate("paths")}
+                  onPlaces={() => {
+                    setPlaces(true);
+                    window.history.pushState(
+                      {},
+                      "",
+                      `${base}?view=paths&path=${encodeURIComponent(path)}&stage=H`,
+                    );
+                  }}
+                  onChat={chat}
+                />
+              )
+            ) : (
+              <Paths onOpen={openPath} />
+            ))}
+          {active === "compare" && (
+            <Compare onChat={chat} onOpen={openPath} />
+          )}
+          {active === "plan" && <Plan onChat={chat} />}
+          {active === "settings" && <CounselorSettings base={base} />}
+        </div>
+      </div>
+    );
+  return (
+    <MotionConfig reducedMotion="user">
+    <SidebarProvider>
+      <div data-scroll-root className="flex h-svh w-full overflow-hidden bg-background text-foreground">
+        <a href="#pai-main" className="sr-only focus:not-sr-only focus:fixed focus:left-3 focus:top-3 focus:z-[60] focus:rounded-lg focus:bg-card focus:px-4 focus:py-2 focus:shadow-lift">
+          {copy.shell.skip}
+        </a>
+        <aside className="hidden w-72 shrink-0 flex-col border-r bg-sidebar lg:flex">
+          <a href={base || "#"} className="flex shrink-0 items-center px-5 py-5" aria-label={copy.brand}>
+            <Brand />
           </a>
-          <nav className="min-h-0 flex-1 space-y-1 overflow-y-auto px-2" aria-label={copy.brand}>
-            {Object.entries(icons).map(([key, Icon]) => (
-              <button
-                key={key}
-                onClick={() => navigate(key)}
-                aria-current={active === key ? "page" : undefined}
-                className={`flex min-h-11 w-full items-center gap-3 rounded-md px-3 text-left text-sm transition-colors ${active === key ? "bg-sidebar-accent font-semibold text-sidebar-accent-foreground" : "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"} ${key === "files" ? "mt-5" : ""}`}
-              >
-                <Icon className="size-[18px]" />
-                {copy.nav[key as keyof typeof copy.nav]}
-              </button>
+          <nav className="min-h-0 flex-1 space-y-5 overflow-y-auto px-3 pb-4" aria-label={copy.brand}>
+            {(Object.keys(copy.shell.groups) as (keyof typeof copy.shell.groups)[]).map((group) => (
+              <div key={group}>
+                <p className="mb-1.5 px-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">{copy.shell.groups[group]}</p>
+                <div className="space-y-0.5">{NAV.filter((item) => item.group === group).map(navButton)}</div>
+              </div>
             ))}
           </nav>
-          <footer className="mx-3 mt-3 flex shrink-0 items-center gap-2 border-t py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
-            <UserMenu side="top" align="start" showIdentity
-              profileAction={{label: copy.nav.profile, onSelect: () => navigate("profile")}} />
-            <NotificationsMenu side="top" align="end" />
-          </footer>
-        </aside>
-        <main className="flex min-w-0 flex-1 flex-col">
-          <header className="flex h-16 shrink-0 items-center justify-between border-b px-4 sm:px-8">
-            <div className="flex items-center gap-3">
-              <Button
-                variant="ghost"
-                className="md:hidden"
-                aria-label={copy.brand}
-                onClick={() => setMobile(!mobile)}
-              >
-                {mobile ? <X /> : <Menu />}
-              </Button>
-              <span className="text-sm font-medium">
-                {copy.nav[active as keyof typeof copy.nav]}
-              </span>
+          {stage && (
+            <div className="m-3 rounded-2xl bg-gradient-to-br from-[var(--hero-from)] via-[var(--hero-via)] to-[var(--hero-to)] p-4 text-white">
+              <p className="text-xs font-semibold uppercase tracking-wider text-white/85">{copy.shell.stage.replace("{id}", stage.id)}</p>
+              <p className="mt-0.5 font-bold">{stage.title}</p>
+              <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-white/25" role="progressbar" aria-valuemin={0}
+                aria-valuemax={copy.stages.length} aria-valuenow={doneCount} aria-label={copy.shell.progress.replace("{done}", String(doneCount)).replace("{total}", String(copy.stages.length))}>
+                <div className="h-full rounded-full bg-white" style={{ width: `${(doneCount / copy.stages.length) * 100}%` }} />
+              </div>
+              <p className="mt-1.5 text-xs text-white/85">{copy.shell.progress.replace("{done}", String(doneCount)).replace("{total}", String(copy.stages.length))}</p>
+              <button onClick={() => navigate("journey")}
+                className="mt-3 min-h-11 w-full rounded-xl bg-white/95 px-3 text-sm font-semibold text-[#1a2a6c] transition-colors hover:bg-white">
+                {copy.shell.seeJourney}
+              </button>
             </div>
-            <div className="flex items-center gap-3">
-              <span className="hidden items-center gap-2 text-xs text-muted-foreground sm:flex">
-                <span
-                  className={`size-1.5 rounded-full ${diagnostic.data?.planner_lag_alert ? "bg-amber-500" : "bg-primary"}`}
-                />
-                {diagnostic.data?.planner_lag_alert
-                  ? copy.loading
-                  : copy.healthy}
-              </span>
+          )}
+        </aside>
+        <div className="flex min-w-0 flex-1 flex-col">
+          <header className="flex h-16 shrink-0 items-center justify-between gap-3 border-b bg-background/85 px-4 backdrop-blur sm:px-6 lg:px-8">
+            <div className="flex min-w-0 items-center gap-3">
+              <span className="lg:hidden"><span className="flex size-10 items-center justify-center rounded-xl bg-white shadow-soft ring-1 ring-border"><img src="/pai-emblem.png" alt={copy.brand} className="size-6 object-contain" /></span></span>
+              <p className="truncate text-base font-semibold">{copy.nav[active as NavKey]}</p>
+            </div>
+            <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
+              {stage && (
+                <button onClick={() => navigate("journey")} className="rounded-full" aria-label={`${copy.shell.stage.replace("{id}", stage.id)}: ${stage.title}`}>
+                  <StatChip tone="blue" icon={Flag} className="min-h-9">
+                    <span className="sm:hidden">{stage.id}</span>
+                    <span className="hidden sm:inline">{copy.shell.stage.replace("{id}", stage.id)} · {stage.title}</span>
+                  </StatChip>
+                </button>
+              )}
+              <NotificationsMenu side="bottom" align="end" />
+              <UserMenu side="bottom" align="end" variant="avatar"
+                profileAction={{ label: copy.nav.profile, onSelect: () => navigate("profile") }} />
             </div>
           </header>
           {diagnostic.data?.planner_lag_alert && (
-            <p role="status" className="border-b bg-muted px-6 py-2 text-xs">
+            <p role="status" className="shrink-0 border-b bg-warning-soft px-6 py-2 text-xs font-medium text-warning-ink">
               {copy.lag}
             </p>
           )}
-          {active === "threads" ? (
-            <div className="min-h-0 flex-1">
-              <ChatView counselorOnly initialDraft={draft} />
-            </div>
-          ) : active === "files" ? (
-            <div className="flex min-h-0 flex-1">
-              <div className="hidden w-56 shrink-0 border-r sm:block">
-                <FileList />
-              </div>
-              <div className="min-w-0 flex-1">
-                <FilePreview />
-              </div>
-            </div>
-          ) : active === "notifications" ? (
-            <NotificationsCenterView />
-          ) : (
-            <div className="min-h-0 flex-1 overflow-y-auto">
-              <div className="mx-auto max-w-6xl p-5 pb-16 sm:p-9">
-                {active === "profile" && <LivingProfile onChat={chat} />}
-                {active === "journey" && <Journey navigate={navigate} />}
-                {active === "paths" &&
-                  (path ? (
-                    places ? (
-                      <ProgramPage
-                        id={path}
-                        onBack={() => setPlaces(false)}
-                        onCompare={() => navigate("compare")}
-                      />
-                    ) : (
-                      <PathPage
-                        id={path}
-                        onBack={() => navigate("paths")}
-                        onPlaces={() => {
-                          setPlaces(true);
-                          window.history.pushState(
-                            {},
-                            "",
-                            `${base}?view=paths&path=${encodeURIComponent(path)}&stage=H`,
-                          );
-                        }}
-                        onChat={chat}
-                      />
-                    )
-                  ) : (
-                    <Paths onOpen={openPath} />
-                  ))}
-                {active === "compare" && (
-                  <Compare onChat={chat} onOpen={openPath} />
-                )}
-                {active === "plan" && <Plan onChat={chat} />}
-                {active === "settings" && <CounselorSettings base={base} />}
-              </div>
-            </div>
-          )}
-        </main>
+          <main id="pai-main" className="flex min-h-0 flex-1 flex-col">
+            <AnimatePresence mode="wait" initial={false}>
+              <motion.div key={`${active}:${path || ""}:${places}`} className="flex min-h-0 flex-1 flex-col"
+                initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }}
+                transition={{ duration: 0.18, ease: "easeOut" }}>
+                {content}
+              </motion.div>
+            </AnimatePresence>
+          </main>
+          <nav aria-label={copy.brand} className="grid shrink-0 grid-cols-5 border-t bg-card/95 px-1 pb-[env(safe-area-inset-bottom)] backdrop-blur lg:hidden">
+            {TABS.map((key) => {
+              const item = NAV.find((n) => n.key === key)!;
+              const Icon = item.icon;
+              const current = active === key;
+              return (
+                <button key={key} onClick={() => navigate(key)} aria-current={current ? "page" : undefined}
+                  className={cn("flex min-h-16 flex-col items-center justify-center gap-1 text-[11px] font-semibold", current ? "text-brand-ink" : "text-muted-foreground")}>
+                  <span className={cn("flex h-7 w-12 items-center justify-center rounded-full transition-colors", current && "bg-brand-soft")}>
+                    <Icon aria-hidden className="size-5" />
+                  </span>
+                  <span className="max-w-full truncate px-0.5">{copy.shell.tabs[key as keyof typeof copy.shell.tabs]}</span>
+                </button>
+              );
+            })}
+            <button onClick={() => setMore(true)} aria-haspopup="dialog" aria-expanded={more}
+              aria-current={!TABS.includes(active as NavKey) ? "page" : undefined}
+              className={cn("flex min-h-16 flex-col items-center justify-center gap-1 text-[11px] font-semibold", !TABS.includes(active as NavKey) ? "text-brand-ink" : "text-muted-foreground")}>
+              <span className={cn("flex h-7 w-12 items-center justify-center rounded-full", !TABS.includes(active as NavKey) && "bg-brand-soft")}>
+                <Ellipsis aria-hidden className="size-5" />
+              </span>
+              {copy.shell.more}
+            </button>
+          </nav>
+        </div>
+        <Sheet open={more} onOpenChange={setMore}>
+          <SheetContent side="bottom" className="rounded-t-3xl pb-[max(1.5rem,env(safe-area-inset-bottom))]">
+            <SheetHeader>
+              <SheetTitle>{copy.shell.moreTitle}</SheetTitle>
+              <SheetDescription className="sr-only">{copy.shell.moreTitle}</SheetDescription>
+            </SheetHeader>
+            <div className="grid gap-1">{NAV.filter((item) => !TABS.includes(item.key)).map(navButton)}</div>
+          </SheetContent>
+        </Sheet>
       </div>
     </SidebarProvider>
+    </MotionConfig>
   );
 }

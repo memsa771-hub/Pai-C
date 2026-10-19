@@ -768,6 +768,7 @@ export const messages = {
   },
 
   userMenu: {
+    signOutFailed: 'Could not sign out right now. Please try again.',
     account: 'Account',
     copyToken: 'Copy workspace token',
     tokenCopied: 'Copied!',

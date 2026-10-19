@@ -32,6 +32,8 @@ interface UserMenuProps {
   align?: 'start' | 'center' | 'end';
   showIdentity?: boolean;
   profileAction?: { label: string; onSelect: () => void };
+  /** `avatar`: a 44px initials button for the top bar. */
+  variant?: 'default' | 'avatar';
 }
 
 // System first — it is the default, and the one most people leave it on.
@@ -41,7 +43,7 @@ const THEME_OPTIONS = [
   { value: 'dark', labelKey: 'theme.dark', icon: Moon },
 ] as const;
 
-export function UserMenu({ side, align = 'end', showIdentity = false, profileAction }: UserMenuProps = {}) {
+export function UserMenu({ side, align = 'end', showIdentity = false, profileAction, variant = 'default' }: UserMenuProps = {}) {
   const { workspace, token } = useWorkspace();
   const { user, isPaiDeployment, signIn, signOut } = usePaiAuth();
   const [showFeedback, setShowFeedback] = useState(false);
@@ -105,7 +107,7 @@ export function UserMenu({ side, align = 'end', showIdentity = false, profileAct
     });
     if (ok) {
       try { await signOutAndReturnToSignIn(signOut); }
-      catch { toast.error('Could not sign out right now. Please try again.'); }
+      catch { toast.error(t('userMenu.signOutFailed')); }
     }
   };
 
@@ -117,10 +119,10 @@ export function UserMenu({ side, align = 'end', showIdentity = false, profileAct
             type="button"
             aria-label={t('userMenu.account')}
             title={user?.email || t('userMenu.account')}
-            className={`${showIdentity ? 'min-w-0 flex-1 gap-3 rounded-md px-2 py-2 text-left' : 'size-8 justify-center rounded-full'} flex items-center text-muted-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring`}
+            className={`${showIdentity ? 'min-w-0 flex-1 gap-3 rounded-md px-2 py-2 text-left' : variant === 'avatar' ? 'size-11 justify-center rounded-full' : 'size-8 justify-center rounded-full'} flex items-center text-muted-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring`}
           >
             {user ? (
-              <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground">
+              <span className={`flex shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[var(--hero-from)] to-[var(--hero-via)] font-bold text-white ${variant === 'avatar' ? 'size-9 text-sm' : 'size-7 text-xs'}`}>
                 {(user.displayName || user.email).charAt(0).toUpperCase()}
               </span>
             ) : (
@@ -136,7 +138,8 @@ export function UserMenu({ side, align = 'end', showIdentity = false, profileAct
           {user && (
             <>
               <DropdownMenuLabel className="flex flex-col gap-0.5">
-                <span className="truncate text-sm font-medium">{user.email}</span>
+                {user.displayName && <span className="truncate text-sm font-semibold">{user.displayName}</span>}
+                <span className="truncate text-xs font-normal text-muted-foreground">{user.email}</span>
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
             </>

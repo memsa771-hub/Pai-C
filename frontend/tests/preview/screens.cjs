@@ -41,4 +41,17 @@ module.exports = [
     await page.getByLabel('City').fill('My city'); await submit(page, 'Next');
     await submit(page, 'English');
   } },
+
+  { id: 'shell', path: '/student?view=journey', ready: 'main h1' },
+  { id: 'shell-account-menu', path: '/student?view=journey', ready: 'main h1', crawl: false, setup: async (page) => {
+    await page.getByRole('button', { name: 'Account', exact: true }).click(); await page.getByRole('menuitem', { name: 'Sign out' }).waitFor();
+  } },
+  { id: 'shell-notifications', path: '/student?view=journey', ready: 'main h1', crawl: false, setup: async (page) => {
+    await page.getByRole('button', { name: 'Notifications', exact: true }).click(); await page.waitForTimeout(250);
+  } },
+  { id: 'shell-more', path: '/student?view=journey', ready: 'main h1', crawl: false, setup: async (page) => {
+    const more = page.getByRole('button', { name: 'More', exact: true });
+    if (await more.isVisible()) { await more.click(); await page.getByRole('dialog').waitFor(); }
+  } },
+  { id: 'journey', path: '/student?view=journey', ready: 'main h1', full: true },
 ];

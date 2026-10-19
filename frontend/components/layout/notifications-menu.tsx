@@ -63,9 +63,9 @@ export function NotificationsMenu({ side, align = 'end' }: NotificationsMenuProp
       <PopoverTrigger asChild>
         <button
           type="button"
-          title={unreadNotificationCount > 0 ? `${unreadNotificationCount} unread notifications` : t('notifications.title')}
-          aria-label={unreadNotificationCount > 0 ? `${t('notifications.title')}: ${unreadNotificationCount} unread` : t('notifications.title')}
-          className="relative flex size-9 shrink-0 items-center justify-center overflow-visible rounded-md text-muted-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:outline-2 focus-visible:outline-primary"
+          title={unreadNotificationCount > 0 ? `${t('notifications.title')}: ${t('notifications.unreadCount', { count: unreadNotificationCount })}` : t('notifications.title')}
+          aria-label={unreadNotificationCount > 0 ? `${t('notifications.title')}: ${t('notifications.unreadCount', { count: unreadNotificationCount })}` : t('notifications.title')}
+          className="relative flex size-11 shrink-0 items-center justify-center overflow-visible rounded-full text-muted-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:outline-2 focus-visible:outline-primary"
         >
           <Bell className="size-5" />
           {unreadNotificationCount > 0 && (
@@ -76,7 +76,7 @@ export function NotificationsMenu({ side, align = 'end' }: NotificationsMenuProp
         </button>
       </PopoverTrigger>
 
-      <PopoverContent side={side} align={align} sideOffset={8} className="w-[380px] p-0">
+      <PopoverContent side={side} align={align} sideOffset={8} className="w-[min(380px,calc(100vw-1.5rem))] p-0">
         <div className="flex shrink-0 items-center justify-between border-b border-border px-3 py-2">
           <div className="flex items-center gap-2">
             <span className="text-sm font-semibold">{t('notifications.title')}</span>
