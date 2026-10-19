@@ -17,6 +17,9 @@ class OsSettings:
     admin_token: str | None = None
     email_sender: str = "log"
     worker_id: str | None = None
+    fetch_host_interval_s: float = 2.0  # research: minimum seconds between requests to one host
+    page_ttl_h: float = 24.0  # research: how long a fetched page is reused
+    page_max_bytes: int = 5_000_000  # research: larger pages are refused
 
 
 def load_settings(env: Mapping[str, str] | None = None) -> OsSettings:
@@ -35,4 +38,7 @@ def load_settings(env: Mapping[str, str] | None = None) -> OsSettings:
         admin_token=env.get("OS_ADMIN_TOKEN") or None,
         email_sender=env.get("OS_EMAIL_SENDER") or "log",
         worker_id=env.get("OS_WORKER_ID") or None,
+        fetch_host_interval_s=float(env.get("OS_FETCH_HOST_INTERVAL_S") or 2.0),
+        page_ttl_h=float(env.get("OS_PAGE_TTL_H") or 24.0),
+        page_max_bytes=int(env.get("OS_PAGE_MAX_BYTES") or 5_000_000),
     )
