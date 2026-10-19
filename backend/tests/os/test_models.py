@@ -22,12 +22,14 @@ def test_every_table_has_tenant_id():
     assert all("tenant_id" in t.c for t in OsBase.metadata.tables.values())
 
 
-def test_slice1_tables_present():
+def test_os_tables_present():
     names = {t.name for t in OsBase.metadata.tables.values()}
     assert names == {
         "os_plans", "os_tasks", "os_task_edges", "os_plan_revisions", "os_playbook_pins",
         "os_enqueue_requests", "os_task_attempts", "os_events", "os_modules", "os_outbox",
         "os_knowledge_facts",
+        # Slice 2 (os_0003)
+        "os_programmes", "os_pages", "os_research_runs", "os_agent_runs",
     }
 
 
@@ -56,3 +58,26 @@ def test_task_state_check_rejects_unknown_state(engine, clean):
                 task_type="t", kind="work", title="t", state="sleeping", due_tz="UTC",
                 playbook_version=1,
             ))
+
+
+def test_downgrade_then_upgrade_slice2(os_db):
+    """os_0003 can be taken back and re-applied; the models still match afterwards."""
+    from sqlalchemy import create_engine, inspect
+
+    from tests.os.conftest import run_alembic
+
+    run_alembic(["downgrade", "os@-1"], os_db)
+    eng = create_engine(os_db)
+    try:
+        assert "os_programmes" not in inspect(eng).get_table_names(schema=OS_SCHEMA)
+        assert "source" not in {c["name"] for c in inspect(eng).get_columns("os_knowledge_facts", schema=OS_SCHEMA)}
+    finally:
+        eng.dispose()
+    run_alembic(["upgrade", "os@head"], os_db)
+    eng = create_engine(os_db)
+    try:
+        with eng.connect() as conn:
+            mc = MigrationContext.configure(conn, opts={"include_schemas": True, "include_name": _only_os_schema})
+            assert compare_metadata(mc, OsBase.metadata) == []
+    finally:
+        eng.dispose()

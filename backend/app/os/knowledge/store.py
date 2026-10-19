@@ -11,6 +11,7 @@ from app.os.knowledge.port import Fact
 
 T = models.knowledge_facts
 Scope = Literal["route", "programme"]
+Source = Literal["seed", "manual", "research"]
 
 
 def _fact(row) -> Fact:
@@ -47,11 +48,17 @@ class SqlKnowledge:
             rows = conn.execute(self._select("route", [route_key], fields, intake_year)).all()
         return {r.field: _fact(r) for r in rows}
 
-    def upsert(self, scope: Scope, ref: str, field: str, fact: Fact) -> int:
-        values = {
+    def _values(self, fact: Fact, source: Source) -> dict:
+        if source not in models.FACT_SOURCES:
+            raise ValueError(f"unknown fact source '{source}'")
+        return {
             "value": fact.value, "quote": fact.quote, "url": fact.url, "checked_at": fact.checked_at,
-            "status": fact.status, "conflict_note": fact.conflict_note,
+            "status": fact.status, "conflict_note": fact.conflict_note, "source": source,
         }
+
+    def upsert(self, scope: Scope, ref: str, field: str, fact: Fact, source: Source = "manual") -> int:
+        """Adds or replaces a fact. An admin's fact is `manual` (the default); research passes `research`."""
+        values = self._values(fact, source)
         stmt = insert(T).values(
             tenant_id=self.tenant_id, scope=scope, ref=ref, field=field, intake_year=fact.intake_year, **values
         )
@@ -60,6 +67,15 @@ class SqlKnowledge:
         ).returning(T.c.id)
         with self.engine.begin() as conn:
             return conn.execute(stmt).scalar_one()
+
+    def insert_if_absent(self, scope: Scope, ref: str, field: str, fact: Fact, source: Source = "seed") -> None:
+        """Adds a fact only if its key is new: re-seeding never overwrites a confirmed or researched fact (M6)."""
+        stmt = insert(T).values(
+            tenant_id=self.tenant_id, scope=scope, ref=ref, field=field, intake_year=fact.intake_year,
+            **self._values(fact, source),
+        ).on_conflict_do_nothing(constraint="uq_os_knowledge_facts")
+        with self.engine.begin() as conn:
+            conn.execute(stmt)
 
     def get(self, fact_id: int) -> tuple[Scope, str, str, Fact]:
         with self.engine.connect() as conn:
@@ -76,6 +92,6 @@ class SqlKnowledge:
         with self.engine.begin() as conn:
             conn.execute(update(T).where(T.c.id == fact_id).values(
                 value=value, quote=quote, url=url, status=status, conflict_note=conflict_note,
-                checked_at=func.now(), updated_at=func.now(),
+                checked_at=func.now(), updated_at=func.now(), source="manual",
             ))
         return new

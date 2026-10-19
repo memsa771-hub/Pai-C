@@ -1,4 +1,5 @@
-"""Loads a hand-written Knowledge seed (YAML). Re-running it leaves the table unchanged."""
+"""Loads a hand-written Knowledge seed (YAML). Insert-only: re-running it never changes an existing fact
+(handoff M6), so a confirmed or researched fact survives a re-seed."""
 
 from datetime import date, datetime, time, timezone
 from pathlib import Path
@@ -32,10 +33,10 @@ def load_seed(path: Path, store: SqlKnowledge) -> int:
     year = int(data["intake_year"])
     count = 0
     for field, raw in (data.get("route") or {}).items():
-        store.upsert("route", data["route_key"], field, _fact(raw, year))
+        store.insert_if_absent("route", data["route_key"], field, _fact(raw, year))
         count += 1
     for ref, fields in (data.get("programmes") or {}).items():
         for field, raw in fields.items():
-            store.upsert("programme", ref, field, _fact(raw, year))
+            store.insert_if_absent("programme", ref, field, _fact(raw, year))
             count += 1
     return count
