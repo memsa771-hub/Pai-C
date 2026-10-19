@@ -7,11 +7,13 @@
 # This is a quality set kept forever (parent spec §5): it is re-run on any change to the research
 # agent's prompts, models or specs. Update it only with a cited reason.
 #
-# Corrections after Spike 1 run 1 (2026-10-19), each from an official quote the run verified on the page;
-# details in docs/os/spikes/spike1-report.md: intakes set to null where the developers' check is silent
-# (the transcription had defaulted them to winter only); OVGU semester fee 311.30 and Saarland 394.30
-# (current DAAD pages); TU Chemnitz Automotive Software Engineering and Web Engineering need German A1
-# with the application (TU Chemnitz application page).
+# Version 3 (2026-10-19). Every change is listed, with its source and quote, in
+# docs/os/spikes/spike1-report.md ("Answer-key changes"); earlier versions are kept in
+# docs/os/spikes/spike1-key-history/ (v1 = the original transcription, v2 = after run 1).
+# v2: intakes set to null where the developers' check is silent (the transcription had defaulted them to
+# winter only). v3: the other v2 changes were re-checked against the universities' own pages; the TU Chemnitz
+# German change was wrong and is replaced, and the OVGU and Saarland fees are the official WS 2026/27 figures.
+# v3 also settles OVGU EEIT English, HSRW Mechanical Engineering English and Paderborn CS language.
 #
 # `cycle` is the intake the developers' check refers to. Most pages show WS 2026/27 or older; only rows
 # that say WS 2027/28 are for the pilot intake (see the Spike 1 design, SP1-D1).
@@ -49,11 +51,13 @@ programmes:
       deadline_close: "07-15"
       application_route: direct
       english_requirement: {cefr: B2, ielts: 5.5, toefl_ibt: 72, pte: 59}
-      german_requirement: {level: A1, when: application}  # corrected, see the Web Engineering note
+      german_requirement: {level: none, when: application}  # v3, see notes (v1: null, v2: A1 - wrong)
       grade_requirement: null
       admission_test: null
       intakes: null  # not stated in the developers' check (corrected 2026-10-19, see the Spike 1 report)
-    notes: "Direct via the TU Chemnitz EduApplication Portal. Needs a CS or closely related bachelor."
+    notes: >-
+      Direct via the TU Chemnitz EduApplication Portal. Needs a CS or closely related bachelor.
+      German (v3): TU Chemnitz bew_bamala.php.en (checked 2026-10-19): the A1-at-application rule lists Embedded Systems and Micro and Nano Systems, then says "In case of the following degree programmes, the applicants do not need to show a proof of German proficiency at time of application as German language education is already part of these degree programmes: ... Master Automotive Software Engineering ... Master Web Engineering". DAAD 4122: "German language skills | No minimum language level required".
 
   tu-chemnitz-embedded-systems:
     row: 2
@@ -95,16 +99,16 @@ programmes:
       deadline_close: "07-15"
       application_route: direct
       english_requirement: {ielts: 5.5, toefl_ibt: 72, pte: 59}
-      german_requirement: {level: A1, when: application, then: "A2 by the end of semester 3"}  # corrected, see below
+      german_requirement: {level: none, when: application}  # v3, see notes (v1: A2 before semester 3, v2: A1 - wrong)
       grade_requirement: null
       admission_test: null
       intakes: null  # not stated in the developers' check (corrected 2026-10-19, see the Spike 1 report)
     notes: >-
       Shortlist said uni-assist; the check found a direct application (EduApplication Portal).
-      German corrected 2026-10-19 (Spike 1 run 1): TU Chemnitz's application page says "Applicants applying
-      for a degree programme offered in English language need to show a German language proof at minimum
-      level A1 ... at the time of application." The developers' note said no German was needed to apply;
-      developers to confirm.
+      German (v3): TU Chemnitz bew_bamala.php.en (checked 2026-10-19): the A1-at-application rule lists Embedded Systems and Micro and Nano Systems, then says "In case of the following degree programmes, the applicants do not need to show a proof of German proficiency at time of application as German language education is already part of these degree programmes: ... Master Automotive Software Engineering ... Master Web Engineering". DAAD 4655: "German language skills | No minimum language level required" and German
+      as a foreign language (A1/A2) modules "may be mandatory depending on their prior level". The v1 value
+      "A2 by the end of semester 3" has no official source found (that sentence on the TU Chemnitz page belongs
+      to the other list): unresolved for after admission; the key scores the application stage only.
 
   tu-chemnitz-micro-and-nano-systems:
     row: 4
@@ -141,11 +145,11 @@ programmes:
     facts:
       language_of_instruction: english
       tuition_fee_non_eu_eur: 0
-      semester_contribution_eur: {value: 311.30, approx: true}  # corrected: DAAD "Currently, the semester fee is 311.30 EUR."
+      semester_contribution_eur: {value: 329.30, approx: true}  # v3: OVGU fees page, WS 2026/27 (v1: ~277.90, v2: 311.30)
       deadline_open: null
       deadline_close: "07-15"
       application_route: uni_assist
-      english_requirement: {cefr: B2, ielts: 6.0, toefl_ibt: 80, other: [Cambridge FCE]}
+      english_requirement: {cefr: B2, ielts: 6.5, toefl_ibt: 85, pte: 70, other: [Cambridge B2 First, "TOEFL 85 is on the scale before 21 Jan 2026"]}  # v3 (v1/v2: IELTS 6.0, TOEFL 80)
       german_requirement: null
       grade_requirement: {german_max: 2.0}
       admission_test: null
@@ -255,13 +259,21 @@ programmes:
       deadline_open: null
       deadline_close: "07-15"
       application_route: uni_assist
-      english_requirement: {cefr: C1}
+      english_requirement: {cefr: B2}  # v3 (v1/v2: C1 from DAAD 4492, which now returns 404)
       german_requirement: null
       grade_requirement: {german_max: 2.5, note: "210 ECTS (7 semesters)"}
       admission_test:
         applies_to: non_ehea_degree
         any_of: ["TestAS Core + Engineering >= 100", "GATE (no threshold published)", "GRE Q160 V145 AW4.5"]
       intakes: null  # not stated in the developers' check (corrected 2026-10-19, see the Spike 1 report)
+    notes: >-
+      English (v3): HSRW's master's application page (checked 2026-10-19), table of English-taught programmes:
+      "Mechanical Engineering, M.Sc. | 2.5 | B2" (minimum bachelor's grade, English level). Undated page, applies
+      to current applications. Admission-test thresholds UNRESOLVED (not scored: the matcher compares test names):
+      the same HSRW page says "A TestAS certificate relevant to the degree programme (minimum 100 points) or,
+      alternatively, a Graduate Aptitude Test (GATE) with a score of at least 80 per cent or a Graduate Record
+      Examination (GRE) with a score of at least 60 per cent"; the developers' note gives DAAD's GRE Q160 V145 AW4.5
+      and no GATE threshold.
 
   hsrw-information-engineering-computer-science:
     row: 11
@@ -389,7 +401,7 @@ programmes:
     facts:
       language_of_instruction: english_or_german
       tuition_fee_non_eu_eur: 0
-      semester_contribution_eur: {value: 311.30, approx: true}  # corrected: DAAD "Currently, the semester fee is 311.30 EUR."
+      semester_contribution_eur: {value: 329.30, approx: true}  # v3: OVGU fees page, WS 2026/27 (v1: ~277.90, v2: 311.30)
       deadline_open: "04-15"
       deadline_close: "05-15"
       application_route: uni_assist
@@ -412,7 +424,7 @@ programmes:
     facts:
       language_of_instruction: english_or_german
       tuition_fee_non_eu_eur: 0
-      semester_contribution_eur: {value: 311.30, approx: true}  # corrected: DAAD "Currently, the semester fee is 311.30 EUR."
+      semester_contribution_eur: {value: 329.30, approx: true}  # v3: OVGU fees page, WS 2026/27 (v1: ~277.90, v2: 311.30)
       deadline_open: "04-15"
       deadline_close: "05-15"
       application_route: uni_assist
@@ -476,7 +488,7 @@ programmes:
       - https://cs.uni-paderborn.de/en/studies/getting-started/information-for-international-students
       - https://www2.daad.de/deutschland/studienangebote/international-programmes/en/detail/5616
     facts:
-      language_of_instruction: mostly_english
+      language_of_instruction: english  # v3 (v1/v2: mostly_english)
       tuition_fee_non_eu_eur: 0
       semester_contribution_eur: null
       deadline_open: null
@@ -490,6 +502,10 @@ programmes:
         any_of: ["GRE General Q >= 157 AW >= 4.0", "dMat CS >= 50%"]
         waived_if: "bachelor grade better than 1.8 (German scale)"
       intakes: [winter, summer]
+    notes: >-
+      Language (v3): uni-paderborn.de/en/studyoffer/course_of_study/computer-science-master (checked 2026-10-19):
+      "Language of Study: | English"; DAAD 5616: "All courses are held in English." No official source found for
+      "mostly English".
 
   paderborn-computer-engineering:
     row: 21
@@ -527,7 +543,7 @@ programmes:
     facts:
       language_of_instruction: english
       tuition_fee_non_eu_eur: 0
-      semester_contribution_eur: {value: 394.30}  # corrected: DAAD "an administrative fee of 394.30 EUR per semester"
+      semester_contribution_eur: {value: 412.30, approx: true}  # v3: Saarland fees page, WS 2026/27 (v1: ~280, v2: 394.30)
       deadline_open: null
       deadline_close: "05-15"
       application_route: direct
