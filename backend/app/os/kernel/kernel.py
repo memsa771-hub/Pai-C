@@ -17,7 +17,7 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from app.os import models
 from app.os.compiler import DraftTask, PlanDraft
 from app.os.contracts.route_contract import RouteContract
-from app.os.kernel.revisions import NOTICE_PREFIX, diff
+from app.os.kernel.revisions import CANCELLED_MARK, NOTICE_PREFIX, diff
 from app.os.kernel.states import (
     SATISFIES_DEPENDENCY,
     TERMINAL,
@@ -30,6 +30,10 @@ from app.os.kernel.states import (
 P, T, E = models.plans, models.tasks, models.task_edges
 S = TaskState
 NOTICE_TYPE = "student.act"
+
+
+class StaleDraft(RuntimeError):
+    """The draft was compiled from a contract that is no longer the plan's current one: recompile."""
 
 
 @dataclass(frozen=True)
@@ -98,17 +102,30 @@ class Kernel:
             self._promote(conn, plan_id)
             return PlanRef(plan_id, 1, True)
 
-    def revise(self, plan_id: int, cause: str, draft: PlanDraft) -> int | None:
-        """Applies a new draft as a numbered revision. Returns None when nothing structural changed."""
+    def revise(self, plan_id: int, cause: str, draft: PlanDraft, based_on: str | None = None) -> int | None:
+        """Applies a new draft as a numbered revision. Returns None when nothing structural changed.
+
+        `based_on` is the contract_sha256 the draft was compiled from; if the plan's contract changed
+        since, StaleDraft is raised (under the plan lock) and the caller recompiles.
+        """
         with self.engine.begin() as conn:
             self._lock_plan(conn, plan_id)
+            self._check_current(conn, plan_id, based_on)
             return self._revise(conn, plan_id, cause, draft)
 
-    def upgrade_playbook(self, plan_id: int, draft: PlanDraft) -> int:
+    def upgrade_playbook(self, plan_id: int, draft: PlanDraft, based_on: str | None = None) -> int:
         with self.engine.begin() as conn:
             self._lock_plan(conn, plan_id)
+            self._check_current(conn, plan_id, based_on)
             cause = f"playbook_upgrade:{draft.playbook_key}@{draft.playbook_version}"
             return self._revise(conn, plan_id, cause, draft, pin_version=draft.playbook_version)
+
+    def _check_current(self, conn: Connection, plan_id: int, based_on: str | None) -> None:
+        if based_on is None:
+            return
+        current = conn.execute(select(P.c.contract_sha256).where(P.c.id == plan_id)).scalar_one()
+        if current != based_on:
+            raise StaleDraft(f"plan {plan_id} changed since the draft was compiled")
 
     # ---------------------------------------------------------------- tasks
 
@@ -274,11 +291,17 @@ class Kernel:
         if d.empty and pin_version is None:
             self._set_risk(conn, plan_id, draft.at_risk)
             return None
+        number = conn.execute(select(P.c.current_revision).where(P.c.id == plan_id)).scalar_one() + 1
         for key in d.added:
             ids[key] = self._insert_task(conn, plan_id, new[key], draft.playbook_version)
         for key in d.removed:  # unstarted, including open inbox items: all may move to cancelled
             row = conn.execute(select(T).where(T.c.id == ids[key])).one()
-            self._transition(conn, row, S.CANCELLED, cause=cause)
+            # Renamed so the key is free: if the task comes back later it is a fresh task (review C2).
+            self._transition(conn, row, S.CANCELLED, cause=cause,
+                             instance_key=f"{key}{CANCELLED_MARK}{number}")
+            del ids[key]
+        for key, token in d.tokens.items():  # report each started/protected difference only once (C1)
+            conn.execute(update(T).where(T.c.id == ids[key]).values(skipped_draft=token))
         for key in d.changed:
             row = conn.execute(select(T).where(T.c.id == ids[key])).one()
             values = self._task_values(new[key], draft.playbook_version)
@@ -288,7 +311,6 @@ class Kernel:
                 self._transition(conn, row, S.BLOCKED, cause=cause)
         live = {k: v for k, v in ids.items() if k in new}
         self._rebuild_edges(conn, plan_id, draft.tasks, live)
-        number = conn.execute(select(P.c.current_revision).where(P.c.id == plan_id)).scalar_one() + 1
         conn.execute(insert(models.plan_revisions).values(
             tenant_id=self.tenant_id, plan_id=plan_id, number=number, cause=cause, diff=d.as_json()))
         conn.execute(update(P).where(P.c.id == plan_id).values(current_revision=number, updated_at=self.clock()))

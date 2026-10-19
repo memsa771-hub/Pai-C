@@ -753,19 +753,33 @@ app.include_router(workspaces.router)
 
 # PAI OS (backend/app/os): mounted under /v1/os only when OS_ENABLED is set. The OS never imports
 # Counsellor code, so the signed-in student is passed in here: the student's workspace is their ref.
+def _os_student(db, network, x_workspace_token, authorization, *, write: bool) -> str:
+    workspace, error = _workspace_auth(db, network, x_workspace_token, authorization, write=write)
+    if error is not None:
+        raise HTTPException(status_code=error.status_code or 401)
+    return str(workspace.id)
+
+
 def _os_student_ref(
     network: str,
     x_workspace_token: str | None = Header(None),
     authorization: str | None = Header(None),
     db: Session = Depends(get_db),
 ) -> str:
-    workspace, error = _workspace_auth(db, network, x_workspace_token, authorization)
-    if error is not None:
-        raise HTTPException(status_code=error.status_code or 401)
-    return str(workspace.id)
+    return _os_student(db, network, x_workspace_token, authorization, write=False)
 
 
-mount_os(app, student_dependency=_os_student_ref)
+def _os_student_ref_for_write(
+    network: str,
+    x_workspace_token: str | None = Header(None),
+    authorization: str | None = Header(None),
+    db: Session = Depends(get_db),
+) -> str:
+    """Completing an inbox item changes the plan: the signed-in student account is required."""
+    return _os_student(db, network, x_workspace_token, authorization, write=True)
+
+
+mount_os(app, student_dependency=_os_student_ref, student_write_dependency=_os_student_ref_for_write)
 
 
 @app.get("/health")

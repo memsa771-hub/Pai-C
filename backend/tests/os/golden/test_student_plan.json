@@ -683,6 +683,10 @@
    "blocked_reason": null,
    "citations": [
     {
+     "source": "fact:deadline_close",
+     "url": "https://www.b-tu.de/en/artificial-intelligence-ms/faq"
+    },
+    {
      "source": "S4",
      "url": "https://www.uni-assist.de/en/faqs/plan-your-application/"
     },
@@ -712,6 +716,10 @@
    "blocked_reason": null,
    "citations": [
     {
+     "source": "fact:deadline_close",
+     "url": "https://www2.daad.de/deutschland/studienangebote/international-programmes/en/detail/6091"
+    },
+    {
      "source": "S4",
      "url": "https://www.uni-assist.de/en/faqs/plan-your-application/"
     },
@@ -740,6 +748,10 @@
   {
    "blocked_reason": null,
    "citations": [
+    {
+     "source": "fact:deadline_close",
+     "url": "https://www2.daad.de/deutschland/studienangebote/international-programmes/en/detail/4493"
+    },
     {
      "source": "S4",
      "url": "https://www.uni-assist.de/en/faqs/plan-your-application/"

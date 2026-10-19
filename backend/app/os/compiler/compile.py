@@ -6,6 +6,7 @@ Pure: no database, no clock, no randomness. The same input always gives the same
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from app.os.compiler.conditions import evaluate
 from app.os.compiler.schedule import Node, end_of_day, schedule
@@ -83,12 +84,16 @@ def needed_fields(playbook: Playbook) -> tuple[set[str], set[str]]:
     return route, programme
 
 
-def _date_of(value, label: str) -> tuple[date, str | None]:
+def date_of(value, label: str) -> tuple[date, str | None]:
+    """A date fact: "YYYY-MM-DD", or {"date": "YYYY-MM-DD", "tz": "Area/City"}. CompileError otherwise."""
     raw, tz = (value.get("date"), value.get("tz")) if isinstance(value, dict) else (value, None)
     try:
-        return date.fromisoformat(str(raw)), tz
-    except (TypeError, ValueError):
-        raise CompileError(f"fact {label} is not a date: {value!r}") from None
+        parsed = date.fromisoformat(str(raw))
+        if tz is not None:
+            ZoneInfo(str(tz))
+    except (TypeError, ValueError, ZoneInfoNotFoundError):
+        raise CompileError(f"fact {label} is not a date (YYYY-MM-DD, optional tz): {value!r}") from None
+    return parsed, tz
 
 
 def _find_cycle(keys: list[str], edges: dict[str, list[str]]) -> list[str]:
@@ -196,8 +201,10 @@ def compile_plan(
                     inst.blocked_reason = f"fact_missing:{t.anchor.fact}"
                     need_confirm(fref)
                 else:
-                    d, tz = _date_of(fact.value, f"{fref[1]}:{fref[2]}")
+                    d, tz = date_of(fact.value, f"{fref[1]}:{fref[2]}")
                     inst.tz = tz or playbook.default_timezone
+                    if fact.url:  # the date comes from this page: cite it first (invariant 3, review I5)
+                        inst.citations.insert(0, {"source": f"fact:{t.anchor.fact}", "url": fact.url})
                     inst.deadline = end_of_day(d, inst.tz) - timedelta(days=lead_days)
                     if not fact.confirmed:
                         inst.provisional = True

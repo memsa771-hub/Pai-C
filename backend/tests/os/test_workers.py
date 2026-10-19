@@ -110,7 +110,7 @@ def test_module_disabled_applies_fallback(engine, clean):
     with engine.begin() as conn:
         conn.execute(insert(models.modules).values(module="milestone", tenant_id="pai", enabled=False))
     assert svc.recompile(ref.plan_id, "module_disabled") == 2
-    assert task(engine, ref.plan_id, "m@p1").state == "cancelled"
+    assert task(engine, ref.plan_id, "m@p1#c2").state == "cancelled"  # renamed so the key can return
 
 
 def test_reminders_rerun_same_slot_no_new_rows(engine, clean):

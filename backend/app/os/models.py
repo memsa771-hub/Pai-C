@@ -94,6 +94,9 @@ tasks = Table(
     Column("fact_refs", JSONB, nullable=False, server_default=text("'[]'::jsonb")),
     Column("playbook_version", Integer, nullable=False),
     Column("result", JSONB),
+    # Token of the draft version last reported as skipped for this started/protected task, so a
+    # revision reports the same difference once instead of on every recompute.
+    Column("skipped_draft", Text),
     _created(),
     Column("updated_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
     UniqueConstraint("plan_id", "instance_key", name="uq_os_tasks_instance"),

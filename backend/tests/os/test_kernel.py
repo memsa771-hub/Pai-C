@@ -192,7 +192,7 @@ def test_revise_cancels_removed_unstarted(engine, clean):
     ref = k.create_plan(contract(["p1", "p2"]), draft(refs=("p1", "p2")))
     rev = k.revise(ref.plan_id, "programme_dropped", draft(refs=("p1",)))
     assert rev == 2
-    assert _task(engine, ref.plan_id, "apply@p2").state == "cancelled"
+    assert _task(engine, ref.plan_id, "apply@p2#c2").state == "cancelled"  # renamed so the key can return
 
 
 def test_at_risk_plan_emits_slack_low(engine, clean):

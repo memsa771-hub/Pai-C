@@ -20,7 +20,7 @@ from sqlalchemy import func, select, text
 from app.os import models
 from app.os.compiler import compile_plan
 from app.os.kernel import Kernel
-from app.os.runner import APP_NAME, QUEUE_NAME, enqueue_pending, reconcile
+from app.os.runner import APP_NAME, QUEUE_NAME
 from tests.os.conftest import TEST_DBOS_SCHEMA, reset_dbos_schema
 from tests.os.kernel_helpers import contract
 from tests.os.runner_helpers import RUNS_DDL
@@ -83,6 +83,33 @@ def _wait_queue(client: DBOSClient, pool: Pool) -> None:
     raise TimeoutError("no worker registered the queue")
 
 
+def test_worker_enqueues_by_itself(os_db, engine, clean, tmp_path):
+    """Review I1: production has no test loop calling enqueue_pending; the worker must send requests itself."""
+    reset_dbos_schema(os_db)
+    pool = Pool(os_db, tmp_path)
+    client = None
+    try:
+        pool.start(0)
+        client = DBOSClient(system_database_url=os_db, dbos_system_schema=TEST_DBOS_SCHEMA, application_name=APP_NAME)
+        _wait_queue(client, pool)
+        kernel = Kernel(engine, "pai")
+        draft = compile_plan(contract(), work_playbook("system.milestone", 3), {}, {}, date(2027, 3, 1))
+        plan_id = kernel.create_plan(contract(), draft).plan_id
+        deadline = time.monotonic() + 30  # far below the 5-minute reconciler period
+        while True:
+            with engine.connect() as conn:
+                states = conn.execute(select(models.tasks.c.state).where(models.tasks.c.plan_id == plan_id)
+                                      ).scalars().all()
+            if states == ["done"] * 3:
+                break
+            assert time.monotonic() < deadline, f"tasks not picked up by the worker: {states} (logs: {tmp_path})"
+            time.sleep(0.3)
+    finally:
+        pool.stop_all()
+        if client is not None:
+            client.destroy()
+
+
 def test_crash_no_lost_or_duplicated(os_db, engine, clean, tmp_path):
     reset_dbos_schema(os_db)
     with engine.begin() as conn:
@@ -99,8 +126,7 @@ def test_crash_no_lost_or_duplicated(os_db, engine, clean, tmp_path):
         client = DBOSClient(system_database_url=os_db, dbos_system_schema=TEST_DBOS_SCHEMA, application_name=APP_NAME)
         _wait_queue(client, pool)
         draft = compile_plan(contract(), work_playbook("test.sleep", TASKS), {}, {}, date(2027, 3, 1))
-        plan_id = kernel.create_plan(contract(), draft).plan_id
-        enqueue_pending(engine, client)
+        plan_id = kernel.create_plan(contract(), draft).plan_id  # the workers enqueue it themselves (I1)
         deadline = time.monotonic() + TIMEOUT_S
         next_kill = time.monotonic() + KILL_EVERY_S
         while True:
@@ -117,8 +143,6 @@ def test_crash_no_lost_or_duplicated(os_db, engine, clean, tmp_path):
                     kills.append((label, conn.execute(text("SELECT clock_timestamp()")).scalar_one()))
                 pool.start(slot)
                 next_kill = time.monotonic() + KILL_EVERY_S
-                reconcile(engine, client, kernel)
-                enqueue_pending(engine, client)
             time.sleep(0.2)
     finally:
         pool.stop_all()

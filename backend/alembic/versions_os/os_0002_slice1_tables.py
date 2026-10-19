@@ -84,6 +84,7 @@ def upgrade() -> None:
         sa.Column("fact_refs", JSONB, nullable=False, server_default=sa.text("'[]'::jsonb")),
         sa.Column("playbook_version", sa.Integer, nullable=False),
         sa.Column("result", JSONB),
+        sa.Column("skipped_draft", sa.Text),
         sa.Column("created_at", TS, nullable=False, server_default=NOW),
         sa.Column("updated_at", TS, nullable=False, server_default=NOW),
         sa.UniqueConstraint("plan_id", "instance_key", name="uq_os_tasks_instance"),

@@ -53,8 +53,30 @@ class ConfirmIn(BaseModel):
     conflict_note: str | None = None
 
 
+class SupplyIn(ConfirmIn):
+    """A fact keyed by (scope, ref, field, intake_year): adds one that was never seeded (review I2)."""
+    scope: Literal["route", "programme"]
+    ref: str
+    field: str
+    intake_year: int
+
+
 class ConfirmOut(BaseModel):
     revised_plans: list[int]
+
+
+class OpenFact(BaseModel):
+    task_id: int
+    plan_id: int
+    instance_key: str
+    state: str
+    scope: str
+    ref: str
+    field: str
+
+
+class OpenFactsOut(BaseModel):
+    items: list[OpenFact]
 
 
 class UpgradeOut(BaseModel):

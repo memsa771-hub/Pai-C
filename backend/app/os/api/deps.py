@@ -12,6 +12,11 @@ def current_student_ref() -> str:
     raise HTTPException(status_code=401, detail="student sign-in required")
 
 
+def current_student_ref_for_write() -> str:
+    """Like current_student_ref, for calls that change something; the host maps it with write access."""
+    raise HTTPException(status_code=401, detail="student sign-in required")
+
+
 def check_admin(settings: OsSettings, authorization: str | None) -> None:
     token = settings.admin_token
     given = authorization[7:].strip() if authorization and authorization.startswith("Bearer ") else ""

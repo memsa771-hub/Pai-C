@@ -4,15 +4,25 @@ from collections.abc import Callable
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Response
 
-from app.os.api.deps import check_admin, current_student_ref
+from app.os.api.deps import check_admin, current_student_ref, current_student_ref_for_write
 from app.os.api.queries import inbox_items, plan_out
-from app.os.api.schemas import CompleteIn, CompleteOut, ConfirmIn, ConfirmOut, InboxOut, PlanOut, UpgradeOut
+from app.os.api.schemas import (
+    CompleteIn,
+    CompleteOut,
+    ConfirmIn,
+    ConfirmOut,
+    InboxOut,
+    OpenFactsOut,
+    PlanOut,
+    SupplyIn,
+    UpgradeOut,
+)
 from app.os.api.services import Services
 from app.os.compiler import CompileError
 from app.os.contracts.route_contract import RouteContract
 from app.os.kernel import IllegalTransition
 from app.os.playbooks import PlaybookError
-from app.os.workers import confirm_fact
+from app.os.workers import confirm_fact, open_confirm_tasks, supply_fact
 
 
 def build_router(get_services: Callable[[], Services]) -> APIRouter:
@@ -53,7 +63,8 @@ def build_router(get_services: Callable[[], Services]) -> APIRouter:
         return {"items": inbox_items(svc.engine, svc.settings.tenant_id, student)}
 
     @router.post("/inbox/{task_id}/complete", response_model=CompleteOut)
-    def complete(task_id: int, body: CompleteIn | None = None, student: str = Depends(current_student_ref),
+    def complete(task_id: int, body: CompleteIn | None = None,
+                 student: str = Depends(current_student_ref_for_write),  # a write: needs write access (I6)
                  svc: Services = Depends(services)) -> dict:
         try:
             done = svc.kernel.complete_student_task(task_id, student, (body or CompleteIn()).payload)
@@ -72,5 +83,17 @@ def build_router(get_services: Callable[[], Services]) -> APIRouter:
         except ValueError as e:
             raise HTTPException(status_code=422, detail=str(e)) from None
         return {"revised_plans": revised}
+
+    @router.post("/facts", response_model=ConfirmOut, dependencies=[Depends(require_admin)])
+    def supply(body: SupplyIn, svc: Services = Depends(services)) -> dict:
+        try:
+            revised = supply_fact(svc.plans, svc.knowledge, svc.kernel, **body.model_dump())
+        except ValueError as e:
+            raise HTTPException(status_code=422, detail=str(e)) from None
+        return {"revised_plans": revised}
+
+    @router.get("/facts/open", response_model=OpenFactsOut, dependencies=[Depends(require_admin)])
+    def open_facts(svc: Services = Depends(services)) -> dict:
+        return {"items": open_confirm_tasks(svc.engine, svc.settings.tenant_id)}
 
     return router

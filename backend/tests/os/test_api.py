@@ -5,7 +5,7 @@ import pytest
 from fastapi import FastAPI, Header
 from fastapi.testclient import TestClient
 
-from app.os.api import build_router, current_student_ref, make_services
+from app.os.api import build_router, current_student_ref, current_student_ref_for_write, make_services
 from app.os.knowledge import Fact, SqlKnowledge
 from app.os.playbooks import load_playbook_dir
 from app.os.settings import load_settings
@@ -40,6 +40,7 @@ def client(engine, clean, os_db):
         return x_test_student
 
     app.dependency_overrides[current_student_ref] = student
+    app.dependency_overrides[current_student_ref_for_write] = student  # write access is tested elsewhere
     return TestClient(app)
 
 
@@ -94,7 +95,8 @@ def test_student_sees_only_own_inbox(client):
     client.post("/v1/os/plans", json=contract(student="stu-2", external_ref="ext-2"), headers=ADMIN)
     mine = client.get("/v1/os/inbox", headers=as_student("stu-1")).json()["items"]
     assert [i["instance_key"] for i in mine] == ["apply@p1"]
-    assert mine[0]["citations"] == [] and mine[0]["due_tz"] == "Europe/Dublin"
+    assert mine[0]["citations"] == [{"source": "fact:deadline_close", "url": "https://uni.example/apply"}]
+    assert mine[0]["due_tz"] == "Europe/Dublin"
     assert client.get("/v1/os/inbox").status_code == 401
 
 

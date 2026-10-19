@@ -6,9 +6,9 @@ from datetime import date
 from sqlalchemy import Engine, and_, select
 
 from app.os import models
-from app.os.compiler import PlanDraft, compile_plan, needed_fields
+from app.os.compiler import PlanDraft, compile_plan, date_of, needed_fields
 from app.os.contracts.route_contract import RouteContract
-from app.os.kernel import Kernel, PlanRef
+from app.os.kernel import Kernel, PlanRef, StaleDraft
 from app.os.knowledge import KnowledgePort
 from app.os.playbooks import Playbook, PlaybookError, select_playbook
 from app.os.runner import Registry, default_registry
@@ -67,15 +67,37 @@ class PlanService:
             self.playbooks, contract.origin_country, contract.destination_country, contract.level))
         return self.kernel.create_plan(contract, self.compile(contract, playbook))
 
-    def recompile(self, plan_id: int, cause: str) -> int | None:
+    def _contract(self, plan_id: int) -> tuple[RouteContract, str]:
+        P = models.plans
         with self.engine.connect() as conn:
-            raw = conn.execute(select(models.plans.c.contract).where(models.plans.c.id == plan_id)).scalar_one()
-        return self.kernel.revise(plan_id, cause, self.compile(RouteContract.model_validate(raw), self._pinned(plan_id)))
+            row = conn.execute(select(P.c.contract, P.c.contract_sha256).where(
+                P.c.id == plan_id, P.c.tenant_id == self.kernel.tenant_id)).first()
+        if row is None:
+            raise KeyError(f"plan {plan_id}")
+        return RouteContract.model_validate(row.contract), row.contract_sha256
+
+    def recompile(self, plan_id: int, cause: str) -> int | None:
+        """Compiles outside the lock, then revises only if the contract is still the one compiled from
+        (StaleDraft otherwise: recompile from the new contract, a few times at most)."""
+        for _ in range(3):
+            contract, sha = self._contract(plan_id)
+            draft = self.compile(contract, self._pinned(plan_id))
+            try:
+                return self.kernel.revise(plan_id, cause, draft, based_on=sha)
+            except StaleDraft:
+                continue
+        raise StaleDraft(f"plan {plan_id} kept changing during recompile")
 
     def upgrade(self, plan_id: int) -> int:
         """Moves a running plan to the newest playbook for its route (parent §4.3)."""
-        with self.engine.connect() as conn:
-            raw = conn.execute(select(models.plans.c.contract).where(models.plans.c.id == plan_id)).scalar_one()
-        contract = RouteContract.model_validate(raw)
+        contract, sha = self._contract(plan_id)
         newest = select_playbook(self.playbooks, contract.origin_country, contract.destination_country, contract.level)
-        return self.kernel.upgrade_playbook(plan_id, self.compile(contract, newest))
+        return self.kernel.upgrade_playbook(plan_id, self.compile(contract, newest), based_on=sha)
+
+    def anchor_fields(self) -> set[str]:
+        return {t.anchor.fact for book in self.playbooks.values() for t in book.tasks if t.anchor}
+
+    def check_fact_value(self, field: str, value) -> None:
+        """A fact the compiler uses as a date must parse as one, before it is stored (review I3)."""
+        if field in self.anchor_fields():
+            date_of(value, field)
