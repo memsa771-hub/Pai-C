@@ -1,6 +1,12 @@
 {
   "interests": [
     {
+      "path": "said",
+      "prefixes": [
+        "interest."
+      ]
+    },
+    {
       "path": "self",
       "prefixes": [
         "interest."

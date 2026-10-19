@@ -96,11 +96,11 @@ def test_profile_sections_are_evidence_only_and_retirement_aware():
     from app.pai_c.deep.notebook_schema import CounselorNotebookData
     from tests.truth_map_fixtures import item
     data=CounselorNotebookData.model_validate({'schema_version':3,
-        'said':[item(id='option',key='option.path',value='A direction'),item(id='old',key='myth.old',value='Retired',status='retired')],
+        'said':[item(id='option',key='option.path',value='A direction'),item(id='said-interest',key='interest.activity',value='A stated interest'),item(id='old',key='myth.old',value='Retired',status='retired')],
         'self':[item(id='interest',key='interest.work',value='Making things'),item(id='value',key='value.security',value='Stability')],
         'private_notes':'Do not expose this'})
     result=profile_sections(data)
     assert [row['id'] for row in result['options']]==['option']
-    assert result['interests'][0]['value']=='Making things'
+    assert [row['value'] for row in result['interests']]==['A stated interest', 'Making things']
     assert result['values'][0]['value']=='Stability'
     assert 'Do not expose' not in str(result) and 'Retired' not in str(result)
