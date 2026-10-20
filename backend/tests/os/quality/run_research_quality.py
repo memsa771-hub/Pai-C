@@ -2,8 +2,8 @@
 
 Runs the production pipeline per programme: the page gateway's `collect`, readings A and B (C when a field has
 one valid reading), and `trust.judge`. No plans and no store. Scores each run with the Spike 1 matching rules and
-prints both rates and the pass line. The gate passes only if every run reaches correct >= 0.95 and
-confirmed >= 0.70.
+prints both rates and the pass line. The gate passes only if every run reaches the bars in scoring.py
+(correct >= 0.95; confirmed >= 0.45, the owners' pilot bar of 2026-10-20, was 0.70).
 
     # the billed gate (about $1 a run; needs OS_OPENAI_API_KEY and OS_DATABASE_URL for the page cache)
     python -m tests.os.quality.run_research_quality --model openai --runs 3 --min-cycle 2026 --out gate.json
@@ -27,27 +27,26 @@ import yaml
 
 from app.os.agents.spec import AGENT_DIR, load_agent_spec
 from app.os.knowledge.profile import load_profile_dir
-from app.os.knowledge.programmes import PROGRAMME_SEED, Programme
+from app.os.knowledge.programmes import PROGRAMME_SEED, Programme, with_own_pages
 from app.os.knowledge.research.pages import Page, PageGateway
 from app.os.knowledge.research.readings import build_readers, cost, model_for, run_reading, user_prompt
 from app.os.knowledge.research.trust import judge
 from app.os.settings import load_settings
-from tests.os.quality.scoring import load_key, score
+from tests.os.quality.scoring import PASS_CONFIRMED, PASS_CORRECT, load_key, score
 
 SNAPSHOT = Path(__file__).resolve().parents[1] / "fixtures" / "research" / "spike1-pages-2026-10-19.json.gz"
 ROUTE = "germany_master"
 
 
 def _programmes(only: list[str] | None) -> list[Programme]:
+    """The seed's programmes with their own pages (worked out over the whole registry, as the store does)."""
     seed = yaml.safe_load(PROGRAMME_SEED.read_text(encoding="utf-8"))
-    out = []
-    for ref, p in seed["programmes"].items():
-        if p.get("status", "active") != "active" or (only and ref not in only):
-            continue
-        out.append(Programme(ref=ref, route_key=seed["route_key"], university=p["university"], name=p["name"],
-                             aliases=tuple(p.get("aliases", ())), start_urls=tuple(p["start_urls"]),
-                             official_domains=tuple(p["official_domains"])))
-    return out
+    every = with_own_pages([
+        Programme(ref=ref, route_key=seed["route_key"], university=p["university"], name=p["name"],
+                  aliases=tuple(p.get("aliases", ())), start_urls=tuple(p["start_urls"]),
+                  official_domains=tuple(p["official_domains"]), status=p.get("status", "active"))
+        for ref, p in seed["programmes"].items()])
+    return [p for p in every if p.status == "active" and (not only or p.ref in only)]
 
 
 def _snapshot_fetch():
@@ -156,7 +155,7 @@ def main(argv: list[str] | None = None) -> int:
                                     "min_cycle": args.min_cycle, "snapshot": args.snapshot, "runs": runs,
                                     "gate_passed": gate}, indent=1, default=str), encoding="utf-8")
     print(f"GATE {'PASS' if gate else 'FAIL'}: {sum(r['passed'] for r in runs)}/{len(runs)} runs passed "
-          f"(correct >= 0.95 and confirmed >= 0.70 in every run). Full results: {args.out}")
+          f"(correct >= {PASS_CORRECT} and confirmed >= {PASS_CONFIRMED} in every run). Full results: {args.out}")
     return 0 if gate else 1
 
 

@@ -32,6 +32,18 @@ class Programme:
     official_domains: tuple[str, ...]  # the university's own; the route's shared sources are in its profile
     status: Literal["active", "excluded"] = "active"
     notes: str | None = None
+    # Start URLs no other programme of the tenant uses: pages about this programme (the trust rules' scope
+    # check). Filled by `with_own_pages` / the store; a shared start page (a university-wide page) is not one.
+    own_pages: tuple[str, ...] = ()
+
+
+def with_own_pages(programmes: list[Programme]) -> list[Programme]:
+    """Each programme with `own_pages`: its start URLs that appear in no other programme's start URLs."""
+    from collections import Counter
+    from dataclasses import replace
+
+    uses = Counter(u for p in programmes for u in set(p.start_urls))
+    return [replace(p, own_pages=tuple(u for u in p.start_urls if uses[u] == 1)) for p in programmes]
 
 
 class _SeedProgramme(BaseModel):
@@ -87,17 +99,17 @@ class ProgrammeStore:
         with self.engine.begin() as conn:
             return conn.execute(stmt).scalar_one()
 
-    def get(self, ref: str) -> Programme | None:
+    def _all(self) -> list[Programme]:
         with self.engine.connect() as conn:
-            row = conn.execute(select(T).where(T.c.tenant_id == self.tenant_id, T.c.ref == ref)).first()
-        return None if row is None else _programme(row)
+            rows = conn.execute(select(T).where(T.c.tenant_id == self.tenant_id).order_by(T.c.ref)).all()
+        return with_own_pages([_programme(r) for r in rows])
+
+    def get(self, ref: str) -> Programme | None:
+        """The programme with its own pages (start URLs no other programme of the tenant uses)."""
+        return next((p for p in self._all() if p.ref == ref), None)
 
     def active(self, route_key: str) -> list[Programme]:
-        with self.engine.connect() as conn:
-            rows = conn.execute(select(T).where(
-                T.c.tenant_id == self.tenant_id, T.c.route_key == route_key, T.c.status == "active",
-            ).order_by(T.c.ref)).all()
-        return [_programme(r) for r in rows]
+        return [p for p in self._all() if p.route_key == route_key and p.status == "active"]
 
 
 def load_programme_seed(path: Path, store: ProgrammeStore | None) -> int:

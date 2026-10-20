@@ -282,6 +282,10 @@ Tests are written first (TDD). From `backend/`: `tach check`, the heads check, a
   and run by a developer, and the results are recorded in a report.
 - **If the gate fails** (the new validators can lower the confirmed rate): stop and report. The parent's
   fallback (show more facts unconfirmed, use fewer programmes) is the owners' call (Q1).
+- **Q1 decided (2026-10-20):** the gate failed twice at about 0.50 confirmed, with correct at 0.99
+  (`docs/os/slice-2-quality-report.md`). For the pilot, the owners set **confirmed rate ≥ 0.45 in each run**
+  and kept correct rate ≥ 0.95. Both gates pass at these bars. Raise the confirmed bar again once the programme
+  start pages are improved.
 - Once WS 2027/28 is published, the same run with `min_cycle 2027` gates real pilot data.
 
 ## 10. Build order (for the plan; one branch and PR per task, off `pai-os`, not stacked)

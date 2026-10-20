@@ -237,6 +237,14 @@ def test_confirmed_fact_completes_task_and_redates_plan(research):
     assert row.quote == DEADLINE and row.url == PAGES["ovgu-eeit"][0] and row.research_run_id is not None
     assert {e["reading"] for e in row.evidence} == {"A", "B"} and all(e["reasons"] == [] for e in row.evidence)
     assert fact(research.engine, "ovgu-eeit", "admission_test").value == []  # an empty list: no test step
+    # every model request was a DBOS step of its research workflow (DBOSDurability), so a crash replays it
+    from sqlalchemy import text
+
+    with research.engine.connect() as conn:
+        steps = conn.execute(text(
+            f"SELECT o.workflow_uuid, o.function_name FROM {TEST_DBOS_SCHEMA}.operation_outputs o "
+            f"WHERE o.function_name LIKE '%model.request%' AND o.workflow_uuid LIKE 'research:%'")).all()
+    assert len(steps) == 6 and len({s.workflow_uuid for s in steps}) == 3  # A and B in each of the 3 runs
     tasks = confirm_tasks(research.engine, plan_id)
     assert tasks["confirm_fact@ovgu-eeit:deadline_close"]["state"] == "done"
     assert tasks["confirm_fact@ovgu-eeit:application_route"]["state"] == "done"

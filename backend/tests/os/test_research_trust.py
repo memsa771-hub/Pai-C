@@ -8,7 +8,7 @@ import pytest
 import yaml
 
 from app.os.knowledge.profile import load_profile_dir, reading_model
-from app.os.knowledge.programmes import PROGRAMME_SEED, Programme
+from app.os.knowledge.programmes import PROGRAMME_SEED, Programme, with_own_pages
 from app.os.knowledge.research.pages import Page
 from app.os.knowledge.research.text import normalise
 from app.os.knowledge.research.trust import (
@@ -301,10 +301,10 @@ def _fixture_pages():
 
 def _seed_programme(ref):
     seed = yaml.safe_load(PROGRAMME_SEED.read_text(encoding="utf-8"))
-    p = seed["programmes"][ref]
-    return Programme(ref=ref, route_key=seed["route_key"], university=p["university"], name=p["name"],
-                     aliases=tuple(p.get("aliases", ())), start_urls=tuple(p["start_urls"]),
-                     official_domains=tuple(p["official_domains"]))
+    progs = [Programme(ref=r, route_key=seed["route_key"], university=p["university"], name=p["name"],
+                       aliases=tuple(p.get("aliases", ())), start_urls=tuple(p["start_urls"]),
+                       official_domains=tuple(p["official_domains"])) for r, p in seed["programmes"].items()]
+    return next(p for p in with_own_pages(progs) if p.ref == ref)
 
 
 CASES = yaml.safe_load((FIXTURES / "regressions.yaml").read_text(encoding="utf-8"))["cases"]
@@ -324,3 +324,28 @@ def test_spike1_regressions(case):
     wrong = value_of(field, case["wrong_value"])
     dumped = wrong.model_dump() if hasattr(wrong, "model_dump") else wrong
     assert not (v.status == "confirmed" and v.value == dumped), v.reasons
+
+
+def test_scope_programme_own_pages_are_specific():
+    """A start page only this programme uses, and the pages under it, are about this programme even when
+    the title does not repeat the name (the gate's largest scope_unclear group). A start page that several
+    programmes share stays general, so D3 still holds."""
+    own = "https://www.uni-x.de/studies/ds-msc/info.html"
+    prog = Programme(ref="uni-x-ds", route_key="germany_master", university="Uni X", name="Data Science",
+                     aliases=(), start_urls=(own, UNI + "/apply/all"), official_domains=("uni-x.de",),
+                     own_pages=(own,))
+    q = "Taught in English."
+    assert scope_ok(page(own, "Info - Uni X\nTaught in English."), prog, q, None, PROFILE)
+    assert scope_ok(page(UNI + "/studies/ds-msc/faq", "FAQ - Uni X\nTaught in English."), prog, q, None, PROFILE)
+    assert not scope_ok(page(UNI + "/studies/other/faq", "FAQ - Uni X\nTaught in English."), prog, q, None, PROFILE)
+    assert not scope_ok(page(UNI + "/apply/all", "Apply - Uni X\nTaught in English."), prog, q, None, PROFILE)
+    shallow = Programme(ref="uni-x-ds", route_key="germany_master", university="Uni X", name="Data Science",
+                        aliases=(), start_urls=(UNI + "/en/ds",), official_domains=("uni-x.de",),
+                        own_pages=(UNI + "/en/ds",))
+    assert not scope_ok(page(UNI + "/en/faq", "FAQ - Uni X\nTaught in English."), shallow, q, None, PROFILE)
+
+
+def test_seed_own_pages_leave_out_shared_start_pages():
+    chemnitz = _seed_programme("tu-chemnitz-web-engineering")
+    shared = "https://www.tu-chemnitz.de/studierendenservice/studserv/bewerbung/bew_bamala.php.en"
+    assert shared in chemnitz.start_urls and shared not in chemnitz.own_pages
