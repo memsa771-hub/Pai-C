@@ -105,6 +105,9 @@ async function crawl(browser) {
             continue; // In-app links leave the preview; their target route is what matters.
           }
           const before = page.url();
+          let chooser = false;
+          page.once('filechooser', () => { chooser = true; });
+          page.once('download', () => { chooser = true; });
           await page.evaluate(() => {
             window.__mutations = 0;
             new MutationObserver((list) => { window.__mutations += list.length; })
@@ -113,7 +116,8 @@ async function crawl(browser) {
           try { await control.click({ timeout: 3000 }); } catch (error) { failures.push(`${screen.id} ${width}: "${name}": ${error.message.split('\n')[0]}`); continue; }
           clicks++;
           await page.waitForTimeout(400);
-          const changed = page.url() !== before || (await page.evaluate(() => window.__mutations || 0)) > 0;
+          // Opening the file chooser or starting a download is a real response.
+          const changed = chooser || page.url() !== before || (await page.evaluate(() => window.__mutations || 0)) > 0;
           if (!changed) dead.push(`${screen.id} ${width}px: "${name}"`);
         }
         if (errors.length) failures.push(`${screen.id} ${width}: ${errors.join(' | ')}`);

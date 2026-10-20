@@ -384,5 +384,28 @@
   "planNoRouteTitle": "No route chosen yet",
   "planNoRouteBody": "When you choose a route in Compare & choose, its small next steps appear here.",
   "planGoCompare": "Go to Compare & choose",
-  "stepLabel": "Step {n}"
+  "stepLabel": "Step {n}",
+  "documents": {
+    "upload": "Upload a document",
+    "whyTitle": "Why upload?",
+    "whyBody": "A document turns something you said into something you showed. PAI reads it and adds it to your profile.",
+    "examples": [
+      "Result cards",
+      "Certificates",
+      "Test scores",
+      "Letters"
+    ],
+    "privacy": "Only you and PAI can see your documents. Nothing is shared with a university."
+  },
+  "settings": {
+    "intro": "Appearance, language, notifications and your data, in one place.",
+    "themeHelp": "Choose how PAI looks on this device.",
+    "languageHelp": "PAI replies in this language. You can switch any time.",
+    "notificationsTitle": "Notifications and channels",
+    "notificationsHelp": "Choose what PAI tells you about, and where.",
+    "dangerTitle": "Delete your data",
+    "dangerHelp": "This cannot be undone.",
+    "languageSaved": "Saved. PAI will reply in {language}.",
+    "exported": "Your download has started. Keep the file somewhere private."
+  }
 }

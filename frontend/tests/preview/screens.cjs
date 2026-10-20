@@ -112,4 +112,10 @@ module.exports = [
   { id: 'roadmap-details', path: '/student?view=compare&roadmap=1', ready: 'main h1', crawl: false, setup: async (page) => {
     await page.getByRole('button', { name: 'View details' }).click(); await page.getByRole('dialog').waitFor();
   } },
+
+  { id: 'documents', path: '/student?view=files', ready: 'main h1' },
+  { id: 'settings', path: '/student?view=settings', ready: 'main h1', full: true },
+  { id: 'settings-delete', path: '/student?view=settings', ready: 'main h1', full: true, crawl: false, setup: async (page) => {
+    await page.getByRole('button', { name: 'Delete my app data' }).click(); await page.getByRole('checkbox').waitFor();
+  } },
 ];

@@ -335,13 +335,14 @@ export function FileList() {
           <button
             type="button"
             onClick={() => openFolder("")}
+            aria-current={isFoldersSection && !currentFilePath && !selectedFileId ? "page" : undefined}
             className={cn(
               // pr-9 for the same reason as the trash row: it lines this row's
               // right edge up with the folder counts above it.
-              "w-full flex items-center gap-2.5 py-2 pl-2 pr-9 rounded-lg text-left transition-colors cursor-pointer",
+              "w-full min-h-11 flex items-center gap-2.5 py-2 pl-2 pr-9 rounded-xl text-left transition-colors cursor-pointer",
               isFoldersSection && !currentFilePath && !selectedFileId
-                ? "bg-zinc-100 dark:bg-zinc-800"
-                : "hover:bg-zinc-50 dark:hover:bg-zinc-800/50",
+                ? "bg-brand-soft text-brand-ink"
+                : "hover:bg-muted",
             )}
           >
             <Clock className="size-4 shrink-0 text-muted-foreground" />

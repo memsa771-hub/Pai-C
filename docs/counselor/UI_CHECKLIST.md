@@ -19,6 +19,6 @@ and the link crawler (no dead buttons, no 404 links, no console errors, no page 
 | 9 | Where to study (H) | [x] | `programs-*` |
 | 10 | Compare and choose | [x] | `compare-*`, `decision-*` |
 | 11 | Plan and check-ins | [x] | `plan-*` |
-| 12 | Documents | [ ] | `documents-*` |
-| 13 | Settings | [ ] | `settings-*` |
+| 12 | Documents | [x] | `documents-*` |
+| 13 | Settings | [x] | `settings-*` |
 | 14 | Empty, loading and error states | [ ] | `states-*` |
