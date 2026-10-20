@@ -86,6 +86,7 @@ programmes:
     name: Micro- and Nanoelectronics
     aliases:
     - Micro- and Nanoelectronics
+    - micro-nano-electronics  # the programme's URL path (www.b-tu.de/en/micro-nano-electronics-ms/...)
     start_urls:
     - https://www.b-tu.de/micro-nano-electronics-ms/faq
     official_domains:
@@ -96,6 +97,7 @@ programmes:
     name: Environmental and Resource Management
     aliases:
     - Environmental and Resource Management
+    - environment-ms  # the programme's URL path (www.b-tu.de/en/environment-ms/...)
     start_urls:
     - https://www.b-tu.de/en/environment-ms/prospective-students/how-to-apply
     official_domains:
@@ -287,6 +289,7 @@ programmes:
     name: Commercial Vehicle Technology
     aliases:
     - Commercial Vehicle Technology
+    - CVT  # the programme's abbreviation and URL path (rptu.de/en/cvt/...)
     start_urls:
     - https://rptu.de/en/cvt/master-program-cvt/application-admission-requirements
     official_domains:
