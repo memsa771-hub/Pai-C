@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import type * as React from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Check, KeyRound, LogIn, LogOut, Monitor, Moon, Settings, Sun, User, MessageSquarePlus } from 'lucide-react';
@@ -31,7 +32,7 @@ interface UserMenuProps {
   side?: 'top' | 'right' | 'bottom' | 'left';
   align?: 'start' | 'center' | 'end';
   showIdentity?: boolean;
-  profileAction?: { label: string; onSelect: () => void };
+  profileAction?: { label: string; onSelect: () => void; icon?: React.ComponentType };
   /** `avatar`: a 44px initials button for the top bar. */
   variant?: 'default' | 'avatar';
 }
@@ -146,7 +147,7 @@ export function UserMenu({ side, align = 'end', showIdentity = false, profileAct
           )}
 
           {profileAction && <DropdownMenuItem onSelect={profileAction.onSelect}>
-            <User />{profileAction.label}
+            {profileAction.icon ? <profileAction.icon /> : <User />}{profileAction.label}
           </DropdownMenuItem>}
 
           <DropdownMenuSub>

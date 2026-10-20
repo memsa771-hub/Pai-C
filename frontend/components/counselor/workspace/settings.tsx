@@ -16,7 +16,7 @@ const THEMES = [
 ] as const;
 const option = (on: boolean) => cn(
   "flex min-h-12 items-center gap-2.5 rounded-2xl border-2 px-4 py-3 text-sm font-semibold transition-colors",
-  on ? "border-brand bg-brand-soft text-brand-ink" : "border-border bg-card hover:border-brand/40",
+  on ? "border-foreground bg-secondary text-foreground ring-1 ring-foreground" : "border-border bg-card hover:border-foreground/30",
 );
 
 export function CounselorSettings({ base }: { base: string }) {

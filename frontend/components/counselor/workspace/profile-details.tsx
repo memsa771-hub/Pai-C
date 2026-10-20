@@ -50,7 +50,7 @@ function ValueEditor({ value, onChange, label }: { value: unknown; onChange: (va
 }
 
 /** "Qualification: FSc" rows for an object value; the plain value otherwise. */
-function ReadableValue({ value }: { value: unknown }) {
+export function ReadableValue({ value }: { value: unknown }) {
   if (value && typeof value === "object" && !Array.isArray(value)) {
     const rows = Object.entries(value as Record<string, unknown>).filter(([key, v]) => !labels.hidden.includes(key) && human(v));
     return (
@@ -74,17 +74,15 @@ function sourceLine(card: ProfileCard) {
   return date ? fill(template, { date }) : text.sourceNoDate;
 }
 
-/** One Vault fact as a readable row. Tap for the source and the existing
- * Confirm / Edit / Remove review actions (exact digest, never a guess). */
-export function FactRow({ card, onSaved, hidden = false }: { card: ProfileCard; onSaved: () => void; hidden?: boolean }) {
-  const [open, setOpen] = useState(false),
-    [editing, setEditing] = useState(false),
+/** The source of one Vault fact and the existing Confirm / Edit / Remove
+ * review actions (exact digest, never a guess). */
+export function FactReview({ card, onSaved, hidden = false }: { card: ProfileCard; onSaved: () => void; hidden?: boolean }) {
+  const [editing, setEditing] = useState(false),
     [removing, setRemoving] = useState(false),
     [value, setValue] = useState(card.value),
     [note, setNote] = useState(""),
     [busy, setBusy] = useState(false),
     [error, setError] = useState(false);
-  const panel = useId();
   const label = evidenceLabel(card.key);
   async function review(action: "confirm" | "edit" | "remove") {
     setBusy(true);
@@ -108,6 +106,55 @@ export function FactRow({ card, onSaved, hidden = false }: { card: ProfileCard; 
   }
   const quote = typeof card.source?.quote === "string" ? card.source.quote : "";
   return (
+    <div className="space-y-3">
+      <div className="rounded-xl bg-muted/60 px-4 py-3 text-sm">
+        <p className="text-xs font-semibold text-muted-foreground">{sourceLine(card)}</p>
+        {quote && !hidden && <p className="mt-1">“{quote}”</p>}
+      </div>
+      {editing && (
+        <div className="space-y-3">
+          <ValueEditor value={value} onChange={setValue} label={label} />
+          <label className="block text-sm font-medium">{copy.explainEdit}
+            <Textarea className="mt-1 rounded-xl" value={note} onChange={(e) => setNote(e.target.value)} />
+          </label>
+        </div>
+      )}
+      {removing && (
+        <div className="rounded-xl border border-danger/30 bg-danger-soft p-4 text-sm text-danger-ink">
+          <p>{copy.removeHelp}</p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Button size="tap" variant="destructive" disabled={busy} onClick={() => review("remove")}>{copy.removeConfirm}</Button>
+            <Button size="tap" variant="ghost" onClick={() => setRemoving(false)}>{copy.cancel}</Button>
+          </div>
+        </div>
+      )}
+      {error && <p role="alert" className="text-sm font-medium text-danger-ink">{copy.error}</p>}
+      {!removing && (
+        <div className="flex flex-wrap gap-2">
+          {editing ? (
+            <>
+              <Button size="tap" disabled={busy || !note.trim()} onClick={() => review("edit")}>{copy.save}</Button>
+              <Button size="tap" variant="ghost" onClick={() => setEditing(false)}>{copy.cancel}</Button>
+            </>
+          ) : (
+            <>
+              <Button size="tap" disabled={busy} onClick={() => review("confirm")}>{copy.confirm}</Button>
+              <Button size="tap" variant="outline" onClick={() => setEditing(true)}>{copy.edit}</Button>
+              <Button size="tap" variant="ghost" onClick={() => setRemoving(true)}>{copy.remove}</Button>
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** One Vault fact as a readable row. Tap for its source and review actions. */
+export function FactRow({ card, onSaved, hidden = false }: { card: ProfileCard; onSaved: () => void; hidden?: boolean }) {
+  const [open, setOpen] = useState(false);
+  const panel = useId();
+  const label = evidenceLabel(card.key);
+  return (
     <li className="border-b last:border-b-0">
       <button type="button" onClick={() => setOpen(!open)} aria-expanded={open} aria-controls={panel}
         className="flex min-h-14 w-full items-start gap-3 py-3 text-left">
@@ -120,51 +167,14 @@ export function FactRow({ card, onSaved, hidden = false }: { card: ProfileCard; 
         <EvidenceBadge level={evidenceLevel(card.evidence_level)} />
         <ChevronDown aria-hidden className={cn("mt-0.5 size-5 shrink-0 text-muted-foreground transition-transform", open && "rotate-180")} />
       </button>
-      <div id={panel} hidden={!open} className="space-y-3 pb-4 sm:ps-[calc(14rem+1rem)]">
-        <div className="rounded-xl bg-muted/60 px-4 py-3 text-sm">
-          <p className="text-xs font-semibold text-muted-foreground">{sourceLine(card)}</p>
-          {quote && !hidden && <p className="mt-1">“{quote}”</p>}
-        </div>
-        {editing && (
-          <div className="space-y-3">
-            <ValueEditor value={value} onChange={setValue} label={label} />
-            <label className="block text-sm font-medium">{copy.explainEdit}
-              <Textarea className="mt-1 rounded-xl" value={note} onChange={(e) => setNote(e.target.value)} />
-            </label>
-          </div>
-        )}
-        {removing && (
-          <div className="rounded-xl border border-danger/30 bg-danger-soft p-4 text-sm text-danger-ink">
-            <p>{copy.removeHelp}</p>
-            <div className="mt-3 flex flex-wrap gap-2">
-              <Button size="tap" variant="destructive" disabled={busy} onClick={() => review("remove")}>{copy.removeConfirm}</Button>
-              <Button size="tap" variant="ghost" onClick={() => setRemoving(false)}>{copy.cancel}</Button>
-            </div>
-          </div>
-        )}
-        {error && <p role="alert" className="text-sm font-medium text-danger-ink">{copy.error}</p>}
-        {!removing && (
-          <div className="flex flex-wrap gap-2">
-            {editing ? (
-              <>
-                <Button size="tap" disabled={busy || !note.trim()} onClick={() => review("edit")}>{copy.save}</Button>
-                <Button size="tap" variant="ghost" onClick={() => setEditing(false)}>{copy.cancel}</Button>
-              </>
-            ) : (
-              <>
-                <Button size="tap" disabled={busy} onClick={() => review("confirm")}>{copy.confirm}</Button>
-                <Button size="tap" variant="outline" onClick={() => setEditing(true)}>{copy.edit}</Button>
-                <Button size="tap" variant="ghost" onClick={() => setRemoving(true)}>{copy.remove}</Button>
-              </>
-            )}
-          </div>
-        )}
+      <div id={panel} hidden={!open} className="pb-4 sm:ps-[calc(14rem+1rem)]">
+        {open && <FactReview card={card} onSaved={onSaved} hidden={hidden} />}
       </div>
     </li>
   );
 }
 
-const at = (data: unknown, path: string): EvidenceItem[] => {
+export const at = (data: unknown, path: string): EvidenceItem[] => {
   const value = path.split(".").reduce<unknown>((node, key) => (node && typeof node === "object" ? (node as Record<string, unknown>)[key] : undefined), data);
   return Array.isArray(value) ? value as EvidenceItem[] : [];
 };

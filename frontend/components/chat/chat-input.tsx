@@ -448,7 +448,7 @@ export function ChatInput({ onSend, disabled, className, agents = [], knowledge 
       <div className={cn(
         'relative flex flex-col gap-1.5 rounded-3xl border border-input bg-card px-2 py-2 shadow-card transition-colors',
         isDragging && 'border-primary border-dashed bg-primary/5',
-        isFocused && !isDragging && 'border-brand/50 ring-4 ring-brand/10'
+        isFocused && !isDragging && 'border-primary/45 ring-4 ring-primary/10'
       )}>
         {/* Drag overlay */}
         {isDragging && (

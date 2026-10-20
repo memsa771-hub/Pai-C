@@ -1,17 +1,18 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
-import { Eye, EyeOff, Flag, UserRound, GraduationCap, LayoutGrid, List, MapPin, MessageCircle, RefreshCw, ShieldCheck, TrendingUp, Users } from "lucide-react";
+import { useEffect, useState } from "react";
+import { AlertCircle, Eye, EyeOff, Lock, MessageCircle, PencilLine } from "lucide-react";
 import { workspaceApi } from "@/lib/api";
 import type { LivingPicture, ProfileCard } from "@/lib/counselor-workspace";
 import { Button } from "@/components/ui/button";
-import { AreaHeatmap, SectionCard, evidenceLevel, toneClass, type HeatmapArea } from "@/components/pai";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { AreaHeatmap, EvidenceBadge, evidenceLevel, type HeatmapArea } from "@/components/pai";
 import { cn } from "@/lib/utils";
 import copy from "./copy.json";
-import { LoadState, useResource, human, shortDate } from "./resource";
-import {
-  CertaintyChart, ChipCloud, EducationTimeline, MirrorPanel, PeopleMap, areaIcon, areaTone, fill, text,
-} from "./profile-parts";
-import { DetailsView } from "./profile-details";
+import layout from "./profile-layout.json";
+import labels from "@/lib/evidence-labels.json";
+import { LoadState, useResource, human, evidenceLabel } from "./resource";
+import { MirrorPanel, areaIcon, fill, text } from "./profile-parts";
+import { FactReview, ReadableValue, at, groupOf, isSensitive } from "./profile-details";
 export { CertaintyChart } from "./profile-parts";
 export { FactRow as EvidenceCard } from "./profile-details";
 
@@ -23,7 +24,7 @@ const load = async () => {
   return { picture, cards: cards.cards };
 };
 const EDUCATION = ["education", "course", "test_attempt", "certification"];
-type Tab = "visual" | "details";
+type Tab = "details" | "background";
 
 export function heatmapAreas(coverage: LivingPicture["coverage"]): HeatmapArea[] {
   return Object.entries(copy.areas).map(([key, label]) => {
@@ -40,49 +41,79 @@ export function CoverageHeatmap({ coverage, selected, onSelect }: {
   return <AreaHeatmap title={text.heatmapTitle} areas={heatmapAreas(coverage)} selected={selected} onSelect={onSelect} />;
 }
 
-function ProfileHeader({ name, named, level, city, stage, updated }: { name: string; named: boolean; level?: string; city?: string; stage?: { id: string; title: string }; updated?: string }) {
-  const initials = named ? name.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]?.toUpperCase()).join("") : "";
-  const chip = "inline-flex min-h-8 items-center gap-1.5 rounded-full bg-white/20 px-3 text-sm font-medium backdrop-blur";
+/** A record's headline: its title field, then up to two other values. */
+function summary(value: unknown): { title: string; sub: string } {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return { title: human(value), sub: "" };
+  const record = value as Record<string, unknown>;
+  const titleKey = layout.titleFields.find((key) => human(record[key]));
+  const rest = Object.entries(record)
+    .filter(([key, v]) => key !== titleKey && !labels.hidden.includes(key) && human(v))
+    .slice(0, 2).map(([, v]) => human(v));
+  return { title: titleKey ? human(record[titleKey]) : rest.shift() || "", sub: rest.join(" · ") };
+}
+
+/** One saved fact as a form-like field: the label above, the value in a box.
+ * Opening it shows the source and the Confirm / Edit / Remove review. */
+function FactField({ card, hidden, onOpen }: { card: ProfileCard; hidden: boolean; onOpen: () => void }) {
+  const label = evidenceLabel(card.key);
+  const { title, sub } = summary(card.value);
   return (
-    <section className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[var(--hero-from)] via-[var(--hero-via)] to-[var(--hero-to)] p-5 text-white shadow-lift sm:p-7">
-      <span aria-hidden className="absolute -right-10 -top-12 size-48 rounded-full bg-white/10" />
-      <span aria-hidden className="absolute -bottom-16 right-24 size-36 rounded-full bg-white/10" />
-      <div className="relative flex flex-wrap items-center gap-4 sm:gap-5">
-        <span aria-hidden className="flex size-16 shrink-0 items-center justify-center rounded-full bg-white text-xl font-bold text-[#2a3fb8] shadow-lift sm:size-20 sm:text-2xl">{initials || <UserRound className="size-8" />}</span>
-        <div className="min-w-0 flex-1">
-          <p className="text-xs font-semibold uppercase tracking-wider text-white/85">{copy.profileTitle}</p>
-          <h1 className="mt-0.5 break-words text-2xl font-bold tracking-tight sm:text-3xl">{name}</h1>
-          <div className="mt-3 flex flex-wrap gap-2">
-            {level && <span className={chip}><GraduationCap aria-hidden className="size-4" />{level}</span>}
-            {city && <span className={chip}><MapPin aria-hidden className="size-4" />{city}</span>}
-            {stage && <span className={cn(chip, "max-sm:hidden")}><Flag aria-hidden className="size-4" />{copy.shell.stage.replace("{id}", stage.id)} · {stage.title}</span>}
-          </div>
-        </div>
-        {updated && <p className="w-full text-xs text-white/85 sm:w-auto sm:self-start">{fill(text.updated, { date: updated })}</p>}
-      </div>
-    </section>
+    <div className="min-w-0">
+      <p className="mb-1.5 text-sm font-semibold">{label}</p>
+      <button type="button" onClick={onOpen} aria-haspopup="dialog"
+        aria-label={`${fill(text.expand, { label })}: ${hidden ? text.sensitiveHidden : title}`}
+        className="group flex min-h-12 w-full items-center gap-3 rounded-xl border bg-card px-4 py-2.5 text-left shadow-[inset_0_1px_2px_rgb(22_34_75/0.04)] transition-colors hover:border-primary/50">
+        <span className="min-w-0 flex-1">
+          {hidden ? (
+            <span className="flex items-center gap-1.5 text-sm italic text-muted-foreground"><Lock aria-hidden className="size-3.5" />{text.sensitiveHidden}</span>
+          ) : (
+            <>
+              <span className="block truncate text-[15px] font-semibold">{title}</span>
+              {sub && <span className="block truncate text-xs text-muted-foreground">{sub}</span>}
+            </>
+          )}
+        </span>
+        <EvidenceBadge compact level={evidenceLevel(card.evidence_level)} />
+        <PencilLine aria-hidden className="size-4 shrink-0 text-muted-foreground transition-colors group-hover:text-primary" />
+      </button>
+    </div>
   );
 }
 
+function Ring({ pct }: { pct: number }) {
+  const r = 26, c = 2 * Math.PI * r;
+  return (
+    <span className="relative flex size-16 shrink-0 items-center justify-center sm:size-[72px]" role="img" aria-label={fill(text.complete, { pct })}>
+      <svg viewBox="0 0 64 64" className="absolute inset-0 size-full -rotate-90" aria-hidden>
+        <circle cx="32" cy="32" r={r} fill="none" stroke="var(--border)" strokeWidth="6" />
+        <circle cx="32" cy="32" r={r} fill="none" stroke="var(--primary)" strokeWidth="6" strokeLinecap="round"
+          strokeDasharray={c} strokeDashoffset={c * (1 - pct / 100)} className="transition-[stroke-dashoffset] duration-700" />
+      </svg>
+      <span className="text-sm font-bold tabular-nums">{pct}%</span>
+    </span>
+  );
+}
+
+/** The student's profile, laid out like a record they own (the founder's
+ * Kollegio reference): a header with how complete the basics are, then
+ * Details as fields and Background as their story with PAI. */
 export function LivingProfile({
   onChat,
-  stage,
 }: {
   onChat: (topic?: string) => void;
   stage?: { id: string; title: string };
 }) {
   const resource = useResource(load);
-  const [tab, setTab] = useState<Tab>("visual");
-  const [filter, setFilter] = useState<string | null>(null);
+  const [tab, setTab] = useState<Tab>("details");
   const [showPrivate, setShowPrivate] = useState(false);
-  const top = useRef<HTMLDivElement>(null);
+  const [openId, setOpenId] = useState<string | null>(null);
   useEffect(() => {
-    if (new URLSearchParams(window.location.search).get("tab") === "details") setTab("details");
+    if (new URLSearchParams(window.location.search).get("tab") === "background") setTab("background");
   }, []);
   const switchTab = (next: Tab) => {
     setTab(next);
     const q = new URLSearchParams(window.location.search);
-    if (next === "details") q.set("tab", "details"); else q.delete("tab");
+    if (next === "background") q.set("tab", "background"); else q.delete("tab");
     window.history.replaceState({}, "", `${window.location.pathname}?${q}`);
   };
   if (!resource.data || resource.error)
@@ -92,112 +123,159 @@ export function LivingProfile({
   const education = cards.filter((c) => EDUCATION.includes(c.key));
   const current = education.find((c) => (c.value as Record<string, unknown>)?.academic_status === "current") || education[0];
   const level = human((current?.value as Record<string, unknown>)?.qualification_name) || undefined;
-  const realName = value("identity.preferred_name") || value("identity.full_name");
-  const name = realName || copy.nav.profile;
-  const dates = [...cards.map((c) => c.updated_at), ...Object.values(picture.coverage).map((c) => c.last_confirmed || "")].filter(Boolean).sort();
-  const skills = Array.isArray(picture.capabilities) ? picture.capabilities : Object.values(picture.capabilities).flat();
-  const datedEducation = [...education].sort((a, b) => {
-    const date = (card: ProfileCard) => {
-      const v = card.value as Record<string, unknown> | null;
-      return String(v?.start_date || v?.end_date || v?.completion_date || "9999");
-    };
-    return date(a).localeCompare(date(b));
-  });
-  const initials = realName ? realName.split(/\s+/).filter(Boolean).slice(0, 2).map((p) => p[0]?.toUpperCase()).join("") : "";
-  const missing = Object.entries(copy.areas).filter(([key]) => !picture.coverage[key]?.covered);
-  const selectArea = (area: string | null) => {
-    setFilter(area);
-    if (area) { switchTab("details"); top.current?.scrollIntoView?.({ block: "start" }); }
-  };
-  const tabs: { id: Tab; label: string; icon: typeof LayoutGrid }[] = [
-    { id: "visual", label: text.visual, icon: LayoutGrid },
-    { id: "details", label: text.details, icon: List },
+  const name = value("identity.full_name") || value("identity.preferred_name") || copy.nav.profile;
+  const has = (key: string) => cards.some((c) => c.key === key || c.key.startsWith(key + "."));
+  const missing = layout.basics.filter((b) => !has(b.key));
+  const pct = Math.round(((layout.basics.length - missing.length) / layout.basics.length) * 100);
+  const groups = layout.detailGroups
+    .map((group) => ({ group, rows: cards.filter((card: ProfileCard) => groupOf(card).id === group.id) }))
+    .filter(({ rows }) => rows.length);
+  const opened = cards.find((c) => c.id === openId) || null;
+  const tabs: { id: Tab; label: string }[] = [
+    { id: "details", label: text.tabDetails },
+    { id: "background", label: text.tabBackground },
   ];
+
   return (
-    <div className="space-y-5">
-      <ProfileHeader name={name} named={!!realName} level={level} city={value("location.current_city")} stage={stage} updated={shortDate(dates.at(-1))} />
-      <div ref={top} className="flex scroll-mt-4 flex-wrap items-center justify-between gap-3">
-        <div role="tablist" aria-label={text.viewLabel} className="inline-flex rounded-2xl bg-muted p-1"
-          onKeyDown={(e) => {
-            const order: Tab[] = ["visual", "details"];
-            const index = order.indexOf(tab);
-            const next = e.key === "ArrowRight" ? order[(index + 1) % 2] : e.key === "ArrowLeft" ? order[(index + 1) % 2]
-              : e.key === "Home" ? order[0] : e.key === "End" ? order[1] : null;
-            if (!next) return;
-            e.preventDefault();
-            switchTab(next);
-            document.getElementById(`profile-tab-${next}`)?.focus();
-          }}>
-          {tabs.map(({ id, label, icon: Icon }) => (
-            <button key={id} role="tab" id={`profile-tab-${id}`} aria-selected={tab === id}
-              aria-controls={tab === id ? `profile-panel-${id}` : undefined} tabIndex={tab === id ? 0 : -1}
-              onClick={() => switchTab(id)}
-              className={cn("inline-flex min-h-11 items-center gap-2 rounded-xl px-4 text-sm font-semibold transition-colors",
-                tab === id ? "bg-card text-foreground shadow-soft" : "text-muted-foreground hover:text-foreground")}>
-              <Icon aria-hidden className="size-4" />{label}
-            </button>
-          ))}
+    <div>
+      <header className="flex flex-wrap items-center gap-4 sm:gap-5">
+        <Ring pct={pct} />
+        <div className="min-w-0 basis-48 flex-1">
+          <h1 className="break-words text-2xl font-bold leading-tight tracking-tight sm:text-[2rem]">{name}</h1>
+          <p className="text-lg font-semibold leading-tight text-muted-foreground sm:text-[1.6rem]">
+            {[level || text.statusFallback, value("location.current_city")].filter(Boolean).join(" · ")}
+          </p>
         </div>
-        <div className="flex flex-wrap gap-2">
-          <Button size="tap" variant="ghost" aria-pressed={showPrivate} onClick={() => setShowPrivate(!showPrivate)}>
-            {showPrivate ? <EyeOff aria-hidden /> : <Eye aria-hidden />}{showPrivate ? text.hideSensitive : text.showSensitive}
-          </Button>
-          <Button size="tap" variant="ghost" onClick={resource.refresh} aria-label={copy.refresh} aria-busy={resource.busy}><RefreshCw aria-hidden className={cn(resource.busy && "animate-spin")} /><span className="hidden sm:inline">{copy.refresh}</span></Button>
-        </div>
+        <Button size="tap" variant="outline" aria-pressed={showPrivate} onClick={() => setShowPrivate(!showPrivate)} className="max-sm:w-full">
+          {showPrivate ? <EyeOff aria-hidden /> : <Eye aria-hidden />}{showPrivate ? text.hideSensitive : text.showSensitive}
+        </Button>
+      </header>
+
+      <div role="tablist" aria-label={text.tabsLabel} className="mt-6 flex gap-6 border-b">
+        {tabs.map(({ id, label }) => (
+          <button key={id} role="tab" id={`profile-tab-${id}`} aria-selected={tab === id} aria-controls={`profile-panel-${id}`}
+            tabIndex={tab === id ? 0 : -1} onClick={() => switchTab(id)}
+            onKeyDown={(e) => {
+              if (e.key !== "ArrowRight" && e.key !== "ArrowLeft") return;
+              e.preventDefault();
+              const next = id === "details" ? "background" : "details";
+              switchTab(next);
+              document.getElementById(`profile-tab-${next}`)?.focus();
+            }}
+            className={cn("relative min-h-12 text-[15px] transition-colors",
+              tab === id ? "font-bold text-foreground after:absolute after:inset-x-0 after:-bottom-px after:h-[3px] after:rounded-t-full after:bg-primary"
+                : "font-medium text-muted-foreground hover:text-foreground")}>
+            {label}
+          </button>
+        ))}
       </div>
 
-      <div role="tabpanel" id={`profile-panel-${tab}`} aria-labelledby={`profile-tab-${tab}`}>
+      <div role="tabpanel" id={`profile-panel-${tab}`} aria-labelledby={`profile-tab-${tab}`} className="pt-7">
         {tab === "details" ? (
-          <DetailsView picture={picture} cards={cards} filter={filter} onFilter={setFilter} showPrivate={showPrivate}
-            onSaved={resource.refresh} onChat={onChat} />
-        ) : (
-          <div className="space-y-5">
-            <MirrorPanel picture={picture} onChat={onChat} onChanged={resource.refresh} />
-            <div className="grid gap-5 lg:grid-cols-3">
-              <SectionCard className="lg:col-span-2" title={text.heatmapTitle} description={text.heatmapIntro} icon={LayoutGrid} tone="blue">
-                <CoverageHeatmap coverage={picture.coverage} selected={filter} onSelect={selectArea} />
-              </SectionCard>
-              <SectionCard title={text.certaintyTitle} icon={TrendingUp} tone="sky">
-                <CertaintyChart ratings={picture.ratings} />
-              </SectionCard>
-            </div>
-            <div className="grid gap-5 md:grid-cols-2">
-              <SectionCard title={text.interestsTitle} icon={areaIcon("interests")} tone="rose">
-                <ChipCloud items={picture.sections?.interests || []} tone="rose" />
-              </SectionCard>
-              <SectionCard title={text.strengthsTitle} icon={areaIcon("strengths")} tone="amber">
-                <ChipCloud items={[...picture.personal.self, ...skills]} tone="amber" />
-              </SectionCard>
-            </div>
-            <SectionCard title={text.peopleTitle} icon={Users} tone="teal">
-              <PeopleMap people={picture.personal.world.people || []} showPrivate={showPrivate} initials={initials} />
-            </SectionCard>
-            <div className="grid gap-5 lg:grid-cols-3">
-              <SectionCard className="lg:col-span-2" title={text.educationTitle} icon={GraduationCap} tone="violet">
-                <EducationTimeline cards={datedEducation} />
-              </SectionCard>
-              <SectionCard title={text.stillWants} description={text.stillWantsIntro} icon={MessageCircle} tone="blue" variant="dashed">
-                {missing.length ? (
-                  <div className="flex flex-wrap gap-2">
-                    {missing.map(([key, label]) => {
-                      const Icon = areaIcon(key);
-                      const tone = areaTone(key);
-                      return (
-                        <button key={key} onClick={() => onChat(label)}
-                          className={cn("inline-flex min-h-11 items-center gap-2 rounded-full px-4 text-left text-sm font-semibold transition-transform hover:-translate-y-0.5", toneClass[tone].soft, toneClass[tone].ink)}>
-                          <Icon aria-hidden className="size-4 shrink-0" />
-                          {label}{picture.coverage[key]?.item_count ? ` · ${copy.partialArea}` : ""}
-                        </button>
-                      );
-                    })}
+          <div className="grid items-start gap-8 xl:grid-cols-[minmax(0,1fr)_18rem]">
+            <div className="min-w-0 space-y-8">
+              {groups.map(({ group, rows }, index) => (
+                <section key={group.id} aria-labelledby={`group-${group.id}`} className={cn(index > 0 && "border-t pt-7")}>
+                  <h2 id={`group-${group.id}`} className="mb-4 text-xl font-bold tracking-tight">{group.title}</h2>
+                  <div className="grid gap-x-4 gap-y-5 sm:grid-cols-2 lg:grid-cols-3">
+                    {rows.map((card) => (
+                      <FactField key={card.id} card={card} hidden={!showPrivate && isSensitive(card.key)} onOpen={() => setOpenId(card.id)} />
+                    ))}
                   </div>
-                ) : <p className="text-sm text-muted-foreground">{copy.empty}</p>}
-              </SectionCard>
+                </section>
+              ))}
             </div>
-            <p className="flex items-start gap-2 text-xs text-muted-foreground"><ShieldCheck aria-hidden className="mt-0.5 size-4 shrink-0 text-success" />{text.privacyNote}</p>
+            <aside aria-labelledby="missing-title" className="rounded-2xl border bg-card p-5 shadow-soft xl:sticky xl:top-4">
+              <h2 id="missing-title" className="flex items-center gap-2 text-lg font-bold">
+                <AlertCircle aria-hidden className="size-5 text-warning" />{text.missingTitle}
+              </h2>
+              {missing.length ? (
+                <ul className="mt-2 divide-y">
+                  {missing.map((item) => (
+                    <li key={item.key}>
+                      <button onClick={() => onChat(fill(text.missingDraft, { label: item.label.toLowerCase() }))}
+                        className="group flex w-full flex-col items-start py-3 text-left">
+                        <span className="text-xs text-muted-foreground">{item.label}</span>
+                        <span className="text-[15px] font-semibold group-hover:text-primary">{text.missingAction}</span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              ) : <p className="mt-2 text-sm text-muted-foreground">{text.missingNone}</p>}
+            </aside>
+          </div>
+        ) : (
+          <div className="space-y-8">
+            <MirrorPanel picture={picture} onChat={onChat} onChanged={resource.refresh} />
+            <section aria-labelledby="story-title">
+              <h2 id="story-title" className="text-xl font-bold tracking-tight">{text.storyTitle}</h2>
+              <p className="mt-1 max-w-2xl text-sm text-muted-foreground">{text.storyIntro}</p>
+              <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                {layout.sharedGroups.map(({ area, source }) => {
+                  const items = at(picture, source);
+                  const hidden = !showPrivate && layout.sensitive.areas.includes(area);
+                  const label = copy.areas[area as keyof typeof copy.areas] || area;
+                  return (
+                    <article key={area} className="flex flex-col rounded-2xl border bg-card p-5 shadow-soft">
+                      <div className="flex items-start justify-between gap-3 border-b pb-3">
+                        <h3 className="text-base font-bold leading-snug">{label}</h3>
+                        <button onClick={() => onChat(fill(text.storyDraft, { area: label.toLowerCase() }))} aria-label={`${text.storyTalk}: ${label}`}
+                          className="flex size-9 shrink-0 items-center justify-center rounded-full border transition-colors hover:border-primary hover:text-primary">
+                          <MessageCircle aria-hidden className="size-4" />
+                        </button>
+                      </div>
+                      <p className="mt-3 text-sm text-muted-foreground">{layout.story[area as keyof typeof layout.story]}</p>
+                      {items.length > 0 && (
+                        <ul className="mt-3 space-y-2 text-sm">
+                          {items.slice(0, 3).map((item, i) => (
+                            <li key={item.id || i} className="min-w-0">
+                              {hidden ? (
+                                <span className="flex items-center gap-1.5 italic text-muted-foreground"><Lock aria-hidden className="size-3.5" />{text.sensitiveHidden}</span>
+                              ) : (
+                                <>
+                                  <span className="font-semibold">{human(item.value || item.role)}</span>
+                                  {item.wish && <span className="block text-muted-foreground">{text.wish}: {human(item.wish)}</span>}
+                                  {(item.worry || item.concern) && <span className="block text-muted-foreground">{text.worry}: {human(item.worry || item.concern)}</span>}
+                                </>
+                              )}
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                      <div className="mt-auto pt-4">
+                        <div className="h-1.5 overflow-hidden rounded-full bg-muted">
+                          <div className="h-full rounded-full bg-primary" style={{ width: `${Math.min(items.length, 3) / 3 * 100}%` }} />
+                        </div>
+                        <p className="mt-1.5 text-xs font-semibold text-muted-foreground">{fill(text.sharedCount, { count: items.length })}</p>
+                      </div>
+                    </article>
+                  );
+                })}
+              </div>
+            </section>
           </div>
         )}
       </div>
+
+      <Dialog open={!!opened} onOpenChange={(open) => { if (!open) setOpenId(null); }}>
+        <DialogContent className="max-w-lg">
+          {opened && (
+            <>
+              <DialogHeader>
+                <DialogTitle>{evidenceLabel(opened.key)}</DialogTitle>
+                <DialogDescription className="sr-only">{fill(text.expand, { label: evidenceLabel(opened.key) })}</DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4">
+                {!showPrivate && isSensitive(opened.key)
+                  ? <p className="flex items-center gap-1.5 text-sm italic text-muted-foreground"><Lock aria-hidden className="size-3.5" />{text.sensitiveHidden}</p>
+                  : <ReadableValue value={opened.value} />}
+                <FactReview key={opened.id + opened.digest} card={opened} hidden={!showPrivate && isSensitive(opened.key)}
+                  onSaved={() => { setOpenId(null); void resource.refresh(); }} />
+              </div>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -31,7 +31,7 @@ export function RoadmapCard({ roadmap, busy, onAction, onDetails }: {
   return <article className="flex min-w-0 flex-col rounded-3xl border bg-card p-5 shadow-card">
     <div className="flex items-start justify-between gap-3">
       <div className="min-w-0">
-        <p className="text-xs font-bold uppercase tracking-wider text-brand-ink">{originLabel}</p>
+        <p className="text-xs font-semibold text-primary">{originLabel}</p>
         <h3 className="mt-1 break-words text-lg font-bold leading-snug">{roadmap.title || t('roadmapFit.routeTitle')}</h3>
         {routeDetail && <p className="mt-1 text-sm text-muted-foreground">{routeDetail}</p>}
       </div>

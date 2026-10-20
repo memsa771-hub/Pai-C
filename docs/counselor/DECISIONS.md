@@ -135,3 +135,57 @@ The Counselor shell accidentally omitted the shared UserMenu when replacing the 
 - **Reply language removed everywhere.** It was a question, a Settings card, labels and copy, but no counseling logic read it. The `preferences.preferred_language` Vault definition and its migrations stay, so no data is dropped and old facts remain readable. A `replyLanguage` answer sent by an old client is ignored, not rejected (`RETIRED_ANSWERS`).
 - **Older clients keep working.** `apply()` still accepts the previous name/level/city shape and the legacy shape. The required set is chosen by which answers arrive.
 - **Design.** Onboarding uses the same auth shell as sign-in: form on the left, mascot on the right with a per-step speech bubble. It has a segmented progress bar, a "Step N of 3" label, a validate-on-Continue flow with inline errors and focus, and a short slide between steps (reduced-motion aware). It fits without scrolling at 1440, 768 and 375 in light and dark.
+
+## 20 October: workspace v3 (four places, warm and personal)
+
+- **Navigation is four places plus Settings:** PAI (the conversation), Roadmaps (Paths, Compare, Plan), Journey (A to K) and Vault (Documents, About you). This replaces eight items in three groups. Sections and their sub-tabs are data in `copy.json` (`sections`, `subTabs`) and in `SECTIONS` in `shell-parts.tsx`. Old `?view=` links still work, and `?view=roadmaps`, `?view=vault` and `?view=pai` resolve to the first view of their section.
+- **One visual language with sign-in.** The workspace takes on the auth palette: a warm cream frame (`--sidebar`), a lighter sheet for content (`--canvas`), off-white cards and ink-black primary buttons, inverted in dark mode. PAI blue stays for the brand, information and the evidence scale. Kollegio was the founder's reference. One bright accent, the highlighter yellow (`--highlight`), marks "you are here": the current stage, the current phase and try-it cards. Pastel gradient blocks and blue selected states were replaced by ink outlines. Path tones stay, because they identify a path.
+- **Headers lead with words.** `PageHeader` drops the coloured icon tile for a heavy title (extrabold, tight tracking) and an optional eyebrow.
+- **Personal touches, kept few:** the top bar greets the student by first name on PAI ("Good afternoon, Sam"), and a "You are here" card in the sidebar shows the stage and an A–K track. After founder review, the Journey mascot and the phone header's stage badge and progress strip were removed as noise; the mascot stays on sign-in and onboarding only.
+- **Vault, About you, is a plain record.** On the left is a profile card (initials, name, education and place, last updated), an "On this page" index and the private-details switch. On the right are How PAI sees you (four label and value rows, not pastel quadrants), one card per Vault group with the same fact rows and Confirm / Edit / Remove (exact digest), and "From your conversations", read-only by area with Tell PAI. Removed: the dark hero, the Visual/Details tabs, the coverage heatmap, the certainty chart, the chip clouds, the people map and "still wants to know". The components stay in the kit and are no longer rendered here. Evidence badges are now a quiet word and icon; only Confirmed is coloured.
+- **Vault, Documents, is back to the file manager:** a title, one Upload button, then the folder list and preview. The "why upload" card, the evidence chips and the footnote are gone.
+- **Journey is interactive.** An A–K trail is grouped into phases (Know yourself, Explore, Decide, Keep going; the phases are data in `copy.json`). Any stage can be picked, by mouse or arrow keys, to read about it and act on it. "Ask PAI about this" only fills a draft.
+- **Command menu (Ctrl/⌘ K)** jumps to any view. "Ask PAI" opens the conversation with the typed words as a draft; it never sends.
+- **Responsive:** on desktop the sidebar collapses to an icon rail, and the choice is remembered per browser in localStorage, which is optional. On phones there is a four-tab bottom bar, sub-tabs under the top bar, a thin A–K progress line, and Settings in the account menu. The old "More" sheet is gone.
+- No data, API or backend change.
+
+**Revision, same day (founder review against the live Kollegio account and placement-ai.com):**
+
+- **Colours come from placement-ai.com, not cream.** The workspace now uses PAI blue `#2d5df5` for primary actions, navy `#16224b` for text and the top bar, a light blue-grey page `#f5f7fc` and white cards. Buttons are pills, as on the site. The cream and brown palette and the yellow highlighter are gone; "you are here" uses the brand blue. Dark mode returns to the navy palette. The font stays Plus Jakarta Sans (self-hosted). The site's Poppins is not adopted, to avoid a font CDN.
+- **Top navigation bar instead of a sidebar**, following Kollegio's layout. A navy bar holds the brand, PAI, Roadmaps, Journey and Vault (the active item is marked with a dot), plus search (Ctrl/⌘ K), notifications and the account menu, where Settings now lives. Roadmaps and Vault sub-views are underlined tabs under the bar. The collapsible sidebar, its "You are here" card and the greeting were removed. Phones keep the four-tab bottom bar.
+- **Vault, About you, follows Kollegio's profile.** The header has a completion ring and a large name with education and city. Under it are **Details** and **Background** tabs.
+  - **Details** shows each Vault group as a grid of form-like fields. Opening a field shows its source and the same Confirm / Edit / Remove review (exact digest) in a dialog. A **Missing details** panel lists unfilled basics, and "Add with PAI" opens the conversation with a draft.
+  - **Background** holds How PAI sees you and **Your story**: one card per area of the conversation with a short description, what was shared, a count and a "talk about this" draft.
+  - The basics and the story descriptions are data in `profile-layout.json`. Completion counts only those basics; it is never a score of the student.
+
+**Second revision (founder: "keep our style, Kollegio was for exploring; only the Vault profile should follow it"):**
+
+- **The left sidebar is back, now navy (`#16224b`) and collapsible.** It holds:
+  - the brand, a search field (Ctrl/⌘ K) and the four places;
+  - a compact stage line (stage, title, progress), then Settings and the account.
+  - The current item has a soft lit background and a brand-blue edge that slides between items. Collapsed, it is a 76px rail whose labels move into tooltips; the choice is remembered per browser.
+  - The content area has a slim header with the section name, the underlined sub-tabs and notifications. The Kollegio-style top bar is dropped. The Vault About you profile stays as built.
+- **Chat follows established AI-chat patterns** (setproduct.com's 2026 guide was the reference):
+  - PAI's replies sit on the page with its name above, not in bubbles;
+  - the student's turns are a soft brand-tint pill on the right;
+  - the reading column is 46rem and the composer focus is brand blue;
+  - the welcome state is left-aligned and calm;
+  - early in a conversation, three dismissible starter chips sit above the composer. They only fill the draft; nothing is sent.
+- **One card language across pages.** Section-card icons share one brand tint instead of a different colour per card. Card labels are quiet sentence-case (no coloured uppercase). Feature cards (check-in, try it) use a soft brand tint. A design-system search proposed a purple-and-pink "AI" palette; it was rejected as exactly the generic look to avoid.
+
+**Third revision: one design family with PAI for Institutions (Figma "Pai University snapshot", node 184:235):**
+
+- **Tokens come from that Figma frame:**
+  - canvas `#f5f8ff`, pale `#eaf2ff`, blue `#155eef`, ink `#0f172a`, muted slate, borders `#d9e5fa`;
+  - signal colours for metric cards: lime `#d4ff59` and peach `#ffd2af`; powder `#92bdff` for "PAI recommends";
+  - 22px cards and pill controls.
+- **Fonts:** Manrope for text and Manjari Bold for headings, both SIL OFL and self-hosted in `public/fonts`, so there is no font CDN.
+- **Sidebar:** the left, collapsible sidebar stays (founder's request) but becomes a floating white panel. The current item is a blue pill that slides, like the design's pill navigation. The stage sits in a pale-blue card. Sub-views (Roadmaps, Vault) use the white pill track with a blue pill.
+- **New Overview** (first nav item, `?view=overview`), laid out like the institutions dashboard:
+  - a heading;
+  - four signal cards: paths to explore (lime), journey stage, facts saved in the Vault, and missing basics (peach);
+  - "Your strongest paths": live paths with their own why and status. There is no fit score, because none exists for students and inventing one would mislead;
+  - "What PAI understands so far" bars, from coverage item counts;
+  - a "PAI recommends" card that pages through real next steps: the current stage, missing basics and a path to open;
+  - an Ask PAI bar that only drafts into the conversation.
+  - Every number comes from the student's data. The chat remains the default landing view, so PAI still opens the first conversation after onboarding.

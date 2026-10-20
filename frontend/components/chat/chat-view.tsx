@@ -252,6 +252,7 @@ export function ChatView({counselorOnly=false,initialDraft=""}:{counselorOnly?:b
   // Per-thread message drafts
   const draftsRef = useRef<Record<string, string>>({});
   const [currentDraft, setCurrentDraft] = useState('');
+  const [startersHidden, setStartersHidden] = useState(false);
 
   // Save/restore draft when switching threads + cache messages
   const prevSessionIdRef = useRef<string | null>(null);
@@ -264,8 +265,9 @@ export function ChatView({counselorOnly=false,initialDraft=""}:{counselorOnly?:b
         cacheMessages(prevSessionIdRef.current, messages);
       }
     }
-    // Restore draft for new session
-    setCurrentDraft(currentSessionId ? (draftsRef.current[currentSessionId] ?? '') : '');
+    // Restore draft for new session. A topic handed in from elsewhere (a
+    // check-in, "Ask PAI") is the draft until the student has typed their own.
+    setCurrentDraft(currentSessionId ? (draftsRef.current[currentSessionId] ?? initialDraft ?? '') : '');
     prevSessionIdRef.current = currentSessionId;
     // Clear optimistic messages when switching sessions
     setOptimisticMessages([]);
@@ -962,15 +964,15 @@ export function ChatView({counselorOnly=false,initialDraft=""}:{counselorOnly?:b
             if (currentSessionId === 'pai-counselor') {
               // PAI opens the conversation; until its first words arrive the
               // student sees a warm welcome and PAI typing, not a blank pane.
-              return <div className="flex-1 overflow-y-auto px-4 py-8 lg:px-8">
-                <div className="mx-auto flex max-w-3xl flex-col items-center text-center">
-                  <span className="flex size-16 items-center justify-center rounded-3xl bg-card shadow-lift ring-1 ring-border">
-                    <img src="/pai-emblem.png" alt="" className="size-9" />
+              return <div className="flex flex-1 flex-col overflow-y-auto px-4 py-10 lg:px-8">
+                <div className="mx-auto mt-[8vh] w-full max-w-[46rem]">
+                  <span className="flex size-12 items-center justify-center rounded-2xl bg-card shadow-card ring-1 ring-border">
+                    <img src="/pai-emblem.png" alt="" className="size-7" />
                   </span>
-                  <h2 className="mt-4 text-2xl font-bold tracking-tight">{t('chat.welcomeTitle')}</h2>
-                  <p className="mt-2 max-w-md text-pretty text-muted-foreground">{t('chat.welcomeBody')}</p>
+                  <h2 className="mt-5 text-balance text-3xl font-bold tracking-tight sm:text-[2.25rem] sm:leading-tight">{t('chat.welcomeTitle')}</h2>
+                  <p className="mt-2 max-w-lg text-pretty text-[15.5px] leading-relaxed text-muted-foreground">{t('chat.welcomeBody')}</p>
+                  <div className="mt-8"><TypingBubble /></div>
                 </div>
-                <div className="mt-6"><TypingBubble /></div>
               </div>;
             }
             // A fresh DM with the built-in assistant opens on her intro (what
@@ -1010,8 +1012,24 @@ export function ChatView({counselorOnly=false,initialDraft=""}:{counselorOnly?:b
             tracking the pane, but the cap steps up on large displays: 768px is
             cramped on a 27" 4K, where the pane itself is 2000px+ wide. */}
         {(!isDM || dmWritable) && (
-          <div className="mx-auto w-full max-w-3xl px-3 pt-1 pb-3 lg:px-5 lg:pb-4">
+          <div className="mx-auto w-full max-w-[48rem] px-3 pt-1 pb-3 lg:px-4 lg:pb-5">
             {counselorOnly && initialDraft === counselorCopy.checkin && !checkinSent && <CheckInCard onPick={(text) => setCurrentDraft(counselorCopy.checkinCard.draftTemplate.replace('{option}', text))} />}
+            {/* Early on, a few ways in. They only fill the draft; the student
+                sends. Dismissible, and gone once the talk is under way. */}
+            {counselorOnly && !startersHidden && !currentDraft.trim() && displayMessages.length > 0 && displayMessages.length < 8 && (
+              <div className="mb-2.5 flex items-center gap-2 overflow-x-auto pb-0.5">
+                {counselorCopy.shell.starters.map((starter) => (
+                  <button key={starter} type="button" onClick={() => handleDraftChange(starter)}
+                    className="shrink-0 rounded-full border bg-card px-3.5 py-2 text-[13px] font-medium text-foreground/85 shadow-soft transition-colors hover:border-primary/40 hover:text-primary">
+                    {starter}
+                  </button>
+                ))}
+                <button type="button" onClick={() => setStartersHidden(true)} aria-label={counselorCopy.shell.hideStarters}
+                  className="flex size-9 shrink-0 items-center justify-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground">
+                  <X aria-hidden className="size-4" />
+                </button>
+              </div>
+            )}
             {currentSessionId === 'pai-counselor' && <div className="mb-2">
               <CounselorResearchStatus />
               <CounselorMirrorCard refreshKey={`${currentSessionId}:${displayMessages.length}`}

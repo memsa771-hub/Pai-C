@@ -33,7 +33,7 @@ export function PathCardView({ id, tone: given, title, whyLabel, why, quote, sta
           {status && <StatChip size="sm" tone={statusTone}>{status}</StatChip>}
         </div>
         <Heading className={cn('mt-3 break-words font-bold tracking-tight', compact ? 'text-lg' : 'text-xl')}>{title}</Heading>
-        <p className={cn('mt-3 text-xs font-bold uppercase tracking-wider', toneClass[tone].ink)}>{whyLabel}</p>
+        <p className={'mt-3 text-xs font-semibold text-muted-foreground'}>{whyLabel}</p>
         <p className="mt-1 text-pretty text-sm leading-relaxed text-muted-foreground">{why}</p>
         {quote && (
           <blockquote className={cn('mt-4 flex gap-2 rounded-2xl px-4 py-3 text-sm', toneClass[tone].soft)}>

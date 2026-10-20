@@ -139,7 +139,7 @@ export function RoadmapsView({ pathOnly = false, onChanged }: { pathOnly?: boole
       </form>}
       <div className={`flex flex-wrap items-center gap-2 ${pathOnly ? '' : 'mt-4'}`}>
         <div className="flex flex-wrap gap-2" role="group" aria-label={t('counselorRoadmaps.filtersLabel')}>{(['all', 'favorites', 'exploring', 'dismissed'] as const).map((option) => <button type="button" key={option} onClick={() => setFilter(option)} aria-pressed={filter === option}
-          className={`min-h-11 rounded-full px-4 text-sm font-semibold transition-colors ${filter === option ? 'bg-brand text-primary-foreground' : 'bg-muted text-foreground hover:bg-brand-soft'}`}>{t(`counselorRoadmaps.filter_${option}`)}</button>)}</div>
+          className={`min-h-11 rounded-full px-4 text-sm font-semibold transition-colors ${filter === option ? 'bg-primary text-primary-foreground' : 'bg-muted text-foreground hover:bg-accent'}`}>{t(`counselorRoadmaps.filter_${option}`)}</button>)}</div>
         {pathOnly && <div className="ms-auto">{refreshButton}</div>}
       </div>
       {run?.taskType === 'roadmap_research' && !['completed', 'failed', 'needs_user_action'].includes(run.status) &&

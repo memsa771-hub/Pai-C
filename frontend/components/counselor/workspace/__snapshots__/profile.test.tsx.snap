@@ -780,8 +780,8 @@ exports[`labels evidence in words, not colour alone, in dark 1`] = `
         class="mt-4 flex flex-wrap items-center gap-2"
       >
         <span
-          class="inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold bg-evidence-0 text-evidence-0-ink"
-          title="Nothing shared yet"
+          class="inline-flex shrink-0 items-center gap-1 py-0.5 text-xs font-semibold text-muted-foreground"
+          title="Not yet: Nothing shared yet"
         >
           <svg
             aria-hidden="true"
@@ -802,11 +802,15 @@ exports[`labels evidence in words, not colour alone, in dark 1`] = `
               r="10"
             />
           </svg>
-          Not yet
+          <span
+            class=""
+          >
+            Not yet
+          </span>
         </span>
         <span
-          class="inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold bg-evidence-1 text-evidence-1-ink"
-          title="You said it"
+          class="inline-flex shrink-0 items-center gap-1 py-0.5 text-xs font-semibold text-muted-foreground"
+          title="Stated: You said it"
         >
           <svg
             aria-hidden="true"
@@ -825,11 +829,15 @@ exports[`labels evidence in words, not colour alone, in dark 1`] = `
               d="M2.992 16.342a2 2 0 0 1 .094 1.167l-1.065 3.29a1 1 0 0 0 1.236 1.168l3.413-.998a2 2 0 0 1 1.099.092 10 10 0 1 0-4.777-4.719"
             />
           </svg>
-          Stated
+          <span
+            class=""
+          >
+            Stated
+          </span>
         </span>
         <span
-          class="inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold bg-evidence-2 text-evidence-2-ink"
-          title="You showed it, for example with a document or something you did"
+          class="inline-flex shrink-0 items-center gap-1 py-0.5 text-xs font-semibold text-foreground"
+          title="Shown: You showed it, for example with a document or something you did"
         >
           <svg
             aria-hidden="true"
@@ -853,11 +861,15 @@ exports[`labels evidence in words, not colour alone, in dark 1`] = `
               r="3"
             />
           </svg>
-          Shown
+          <span
+            class=""
+          >
+            Shown
+          </span>
         </span>
         <span
-          class="inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold bg-evidence-3 text-evidence-3-ink"
-          title="You confirmed it"
+          class="inline-flex shrink-0 items-center gap-1 py-0.5 text-xs font-semibold text-success-ink"
+          title="Confirmed: You confirmed it"
         >
           <svg
             aria-hidden="true"
@@ -879,7 +891,11 @@ exports[`labels evidence in words, not colour alone, in dark 1`] = `
               d="m9 12 2 2 4-4"
             />
           </svg>
-          Confirmed
+          <span
+            class=""
+          >
+            Confirmed
+          </span>
         </span>
       </div>
       <p
@@ -1817,8 +1833,8 @@ exports[`labels evidence in words, not colour alone, in light 1`] = `
         class="mt-4 flex flex-wrap items-center gap-2"
       >
         <span
-          class="inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold bg-evidence-0 text-evidence-0-ink"
-          title="Nothing shared yet"
+          class="inline-flex shrink-0 items-center gap-1 py-0.5 text-xs font-semibold text-muted-foreground"
+          title="Not yet: Nothing shared yet"
         >
           <svg
             aria-hidden="true"
@@ -1839,11 +1855,15 @@ exports[`labels evidence in words, not colour alone, in light 1`] = `
               r="10"
             />
           </svg>
-          Not yet
+          <span
+            class=""
+          >
+            Not yet
+          </span>
         </span>
         <span
-          class="inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold bg-evidence-1 text-evidence-1-ink"
-          title="You said it"
+          class="inline-flex shrink-0 items-center gap-1 py-0.5 text-xs font-semibold text-muted-foreground"
+          title="Stated: You said it"
         >
           <svg
             aria-hidden="true"
@@ -1862,11 +1882,15 @@ exports[`labels evidence in words, not colour alone, in light 1`] = `
               d="M2.992 16.342a2 2 0 0 1 .094 1.167l-1.065 3.29a1 1 0 0 0 1.236 1.168l3.413-.998a2 2 0 0 1 1.099.092 10 10 0 1 0-4.777-4.719"
             />
           </svg>
-          Stated
+          <span
+            class=""
+          >
+            Stated
+          </span>
         </span>
         <span
-          class="inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold bg-evidence-2 text-evidence-2-ink"
-          title="You showed it, for example with a document or something you did"
+          class="inline-flex shrink-0 items-center gap-1 py-0.5 text-xs font-semibold text-foreground"
+          title="Shown: You showed it, for example with a document or something you did"
         >
           <svg
             aria-hidden="true"
@@ -1890,11 +1914,15 @@ exports[`labels evidence in words, not colour alone, in light 1`] = `
               r="3"
             />
           </svg>
-          Shown
+          <span
+            class=""
+          >
+            Shown
+          </span>
         </span>
         <span
-          class="inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold bg-evidence-3 text-evidence-3-ink"
-          title="You confirmed it"
+          class="inline-flex shrink-0 items-center gap-1 py-0.5 text-xs font-semibold text-success-ink"
+          title="Confirmed: You confirmed it"
         >
           <svg
             aria-hidden="true"
@@ -1916,7 +1944,11 @@ exports[`labels evidence in words, not colour alone, in light 1`] = `
               d="m9 12 2 2 4-4"
             />
           </svg>
-          Confirmed
+          <span
+            class=""
+          >
+            Confirmed
+          </span>
         </span>
       </div>
       <p

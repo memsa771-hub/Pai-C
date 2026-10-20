@@ -31,10 +31,10 @@ export function TryItFeedback({ roadmap, headingLevel = 4 }: { roadmap: Roadmap;
     } catch { setError(true); }
     finally { setBusy(false); }
   };
-  const chip = (on: boolean) => `min-h-11 rounded-2xl border-2 px-4 text-sm font-semibold transition-colors ${on ? 'border-brand bg-brand-soft text-brand-ink' : 'border-border bg-card hover:border-brand/40'}`;
-  return <section className="min-w-0 space-y-3 rounded-3xl bg-gradient-to-br from-tone-violet-soft to-tone-sky-soft p-5">
+  const chip = (on: boolean) => `min-h-11 rounded-2xl border-2 px-4 text-sm font-semibold transition-colors ${on ? 'border-foreground bg-secondary text-foreground ring-1 ring-foreground' : 'border-border bg-card hover:border-foreground/30'}`;
+  return <section className="min-w-0 space-y-3 rounded-3xl border border-primary/15 bg-brand-soft/60 p-5">
     <Heading className="flex items-center gap-2 font-bold"><Sparkles aria-hidden className="size-5 text-tone-violet-ink" />{t('tryIt.title')}</Heading>
-    <p className="text-xs font-bold uppercase tracking-wider text-tone-violet-ink">{t(`tryIt.${trial.kind}`)}</p>
+    <p className="text-xs font-semibold text-primary">{t(`tryIt.${trial.kind}`)}</p>
     <p className="text-sm leading-relaxed">{trial.what}</p>
     <p className="flex items-center gap-1.5 text-xs text-muted-foreground"><Clock aria-hidden className="size-3.5" />{trial.time_needed}</p>
     {!!trial.questions.length && <ol className="list-inside list-decimal space-y-1 text-sm">{trial.questions.map((question, index) => <li key={index}>{question}</li>)}</ol>}

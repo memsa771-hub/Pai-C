@@ -204,7 +204,7 @@ export function PathPage({
           </span>
           <div className="min-w-0 flex-1">
             <h1 className="text-balance text-2xl font-bold tracking-tight sm:text-3xl">{result.possibility.title}</h1>
-            <p className={cn("mt-3 text-xs font-bold uppercase tracking-wider", toneClass[tone].ink)}>{copy.why}</p>
+            <p className={"mt-3 text-xs font-semibold text-muted-foreground"}>{copy.why}</p>
             <p className="mt-1 max-w-2xl text-pretty leading-relaxed">{result.possibility.why}</p>
           </div>
         </div>
@@ -258,7 +258,7 @@ export function PathPage({
               );
             })}
           </div>
-          <section className="my-6 rounded-3xl bg-gradient-to-br from-tone-violet-soft to-tone-sky-soft p-6 sm:p-7">
+          <section className="my-6 rounded-3xl border border-primary/15 bg-brand-soft/60 p-6 sm:p-7">
             <h2 className="flex items-center gap-2.5 text-lg font-bold">
               <span aria-hidden className="flex size-10 items-center justify-center rounded-xl bg-card text-tone-violet-ink shadow-soft"><Sparkles className="size-5" /></span>
               {copy.tryIt}
@@ -279,7 +279,7 @@ export function PathPage({
             <div className="flex min-w-0 max-w-xl items-start gap-3">
               <span aria-hidden className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-tone-blue-soft text-tone-blue-ink"><MapPin className="size-5" /></span>
               <div>
-                <p className="text-xs font-bold uppercase tracking-wider text-brand-ink">{copy.placesCta}</p>
+                <p className="text-xs font-semibold text-primary">{copy.placesCta}</p>
                 <h2 className="text-lg font-bold">{copy.places}</h2>
                 <p className="mt-1 text-sm text-muted-foreground">{copy.placesIntro}</p>
               </div>
@@ -450,7 +450,7 @@ export function ProgramPage({
               <p className="mt-2 text-pretty text-muted-foreground">{copy.consentBody}</p>
               {resource.data.status === "stale" && <div className="mt-4"><NeedsChecking /></div>}
               <label className={cn("mt-5 flex min-h-14 cursor-pointer items-center gap-3 rounded-2xl border-2 px-4 py-3 font-semibold transition-colors",
-                consent ? "border-brand bg-brand-soft text-brand-ink" : "border-border hover:border-brand/40")}>
+                consent ? "border-foreground bg-secondary text-foreground ring-1 ring-foreground" : "border-border hover:border-foreground/30")}>
                 <input
                   type="checkbox"
                   checked={consent}
@@ -486,9 +486,9 @@ export function ProgramPage({
             </>
           )}
           {resource.data.status === "completed" && (
-            <section className="mt-6 flex flex-wrap items-center justify-between gap-4 rounded-3xl bg-brand-soft p-6 sm:p-7">
+            <section className="mt-6 flex flex-wrap items-center justify-between gap-4 rounded-3xl border bg-card p-6 shadow-soft sm:p-7">
               <div className="max-w-xl">
-                <h2 className="font-bold text-brand-ink">{copy.nextStepTitle}</h2>
+                <h2 className="text-lg font-extrabold tracking-tight">{copy.nextStepTitle}</h2>
                 <p className="mt-1 text-sm text-muted-foreground">{copy.decisionPending}</p>
               </div>
               <Button size="tap" disabled={busy} onClick={prepare}>

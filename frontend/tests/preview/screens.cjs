@@ -62,23 +62,29 @@ module.exports = [
   { id: 'shell-notifications', path: '/student?view=journey', ready: 'main h1', crawl: false, setup: async (page) => {
     await page.getByRole('button', { name: 'Notifications', exact: true }).click(); await page.waitForTimeout(250);
   } },
-  { id: 'shell-more', path: '/student?view=journey', ready: 'main h1', crawl: false, setup: async (page) => {
-    const more = page.getByRole('button', { name: 'More', exact: true });
-    if (await more.isVisible()) { await more.click(); await page.getByRole('dialog').waitFor(); }
+  { id: 'shell-command', path: '/student?view=journey', ready: 'main h1', crawl: false, setup: async (page) => {
+    await page.getByRole('button', { name: 'Search or ask PAI' }).click(); await page.getByRole('dialog').waitFor();
+  } },
+  { id: 'shell-collapsed', path: '/student?view=journey', ready: 'main h1', crawl: false, setup: async (page) => {
+    const collapse = page.getByRole('button', { name: 'Collapse sidebar' });
+    if (await collapse.isVisible()) { await collapse.click(); await page.waitForTimeout(350); }
+  } },
+  { id: 'journey-stage-picked', path: '/student?view=journey', ready: 'main h1', crawl: false, setup: async (page) => {
+    await page.getByRole('button', { name: /^Stage B:/ }).click(); await page.getByRole('heading', { name: /Getting to know you/ }).waitFor();
+  } },
+  { id: 'overview', path: '/student?view=overview', ready: 'main h1', full: true },
+  { id: 'overview-rec-2', path: '/student?view=overview', ready: 'main h1', crawl: false, setup: async (page) => {
+    await page.getByRole('button', { name: 'Next recommendation' }).click(); await page.waitForTimeout(250);
   } },
   { id: 'journey', path: '/student?view=journey', ready: 'main h1', full: true },
 
   { id: 'profile', path: '/student?view=profile', ready: 'main h1', full: true },
-  { id: 'profile-mirror-check', path: '/student?view=profile&mirror=1', ready: 'main h1', full: true, crawl: false },
+  { id: 'profile-background', path: '/student?view=profile&tab=background', ready: 'main h1', full: true },
+  { id: 'profile-mirror-check', path: '/student?view=profile&tab=background&mirror=1', ready: 'main h1', full: true, crawl: false },
   { id: 'profile-private-shown', path: '/student?view=profile', ready: 'main h1', full: true, crawl: false, setup: async (page) => {
     await page.getByRole('button', { name: 'Show private details' }).click();
   } },
-  { id: 'profile-details', path: '/student?view=profile&tab=details', ready: 'main h1', full: true },
-  { id: 'profile-details-filtered', path: '/student?view=profile', ready: 'main h1', full: true, crawl: false, setup: async (page) => {
-    await page.getByRole('button', { name: /^Education & experience:/ }).click();
-    await page.getByText('Showing: Education & experience').waitFor();
-  } },
-  { id: 'profile-details-row-open', path: '/student?view=profile&tab=details', ready: 'main h1', full: true, crawl: false, setup: async (page) => {
+  { id: 'profile-row-open', path: '/student?view=profile', ready: 'main h1', full: true, crawl: false, setup: async (page) => {
     await page.getByRole('button', { name: 'Show source and actions for Education' }).first().click();
   } },
 
@@ -135,6 +141,8 @@ module.exports = [
   { id: 'states-profile-loading', path: '/student?view=profile&state=loading', ready: 'main [role=status], main [role=alert], main h1', crawl: false },
   { id: 'states-profile-error', path: '/student?view=profile&state=error', ready: 'main [role=status], main [role=alert], main h1', crawl: true },
   { id: 'states-profile-empty', path: '/student?view=profile&state=empty', ready: 'main [role=status], main [role=alert], main h1', crawl: true },
+  { id: 'states-overview-error', path: '/student?view=overview&state=error', ready: 'main [role=status], main [role=alert], main h1', crawl: true },
+  { id: 'states-overview-empty', path: '/student?view=overview&state=empty', ready: 'main [role=status], main [role=alert], main h1', crawl: true },
   { id: 'states-journey-loading', path: '/student?view=journey&state=loading', ready: 'main [role=status], main [role=alert], main h1', crawl: false },
   { id: 'states-journey-error', path: '/student?view=journey&state=error', ready: 'main [role=status], main [role=alert], main h1', crawl: true },
   { id: 'states-journey-empty', path: '/student?view=journey&state=empty', ready: 'main [role=status], main [role=alert], main h1', crawl: true },

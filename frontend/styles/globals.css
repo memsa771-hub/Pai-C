@@ -10,6 +10,30 @@
     Light and dark are tuned separately (not inverted). Text/background pairs
     are checked for WCAG AA (4.5:1 body text, 3:1 large text and UI). **/
 @font-face {
+  font-family: 'Manrope';
+  font-style: normal;
+  font-weight: 200 800;
+  font-display: swap;
+  src: url('/fonts/manrope-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'Manrope';
+  font-style: normal;
+  font-weight: 200 800;
+  font-display: swap;
+  src: url('/fonts/manrope-latin-ext.woff2') format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+  font-family: 'Manjari';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('/fonts/manjari-latin-700.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
   font-family: 'Plus Jakarta Sans';
   font-style: normal;
   font-weight: 200 800;
@@ -28,32 +52,32 @@
 
 :root {
   /* Brand: the logo blue. White on it is 4.96:1. */
-  --brand: #2f63f6;
-  --brand-strong: #1d4fd8;
-  --brand-soft: #e8eeff;
-  --brand-ink: #1a3fb0;
+  --brand: #155eef;
+  --brand-strong: #0f4fd6;
+  --brand-soft: #eaf2ff;
+  --brand-ink: #1249c4;
 
   /* Neutrals: cool and slightly blue so the brand feels at home. */
-  --background: #f5f7fc;
-  --foreground: #121a33;
+  --background: #f5f8ff;
+  --foreground: #0f172a;
   --card: #ffffff;
-  --card-foreground: #121a33;
+  --card-foreground: #0f172a;
   --popover: #ffffff;
-  --popover-foreground: #121a33;
+  --popover-foreground: #0f172a;
   --primary: var(--brand);
   --primary-foreground: #ffffff;
-  --secondary: #eef1f8;
-  --secondary-foreground: #1e2742;
-  --muted: #eef1f8;
-  --muted-foreground: #556079; /* 5.9:1 on card */
-  --accent: #eef1f8;
-  --accent-foreground: #1e2742;
+  --secondary: #eef3fc;
+  --secondary-foreground: #0f172a;
+  --muted: #eef3fc;
+  --muted-foreground: #5b6b82 /* 5.4:1 on card */; /* 5.9:1 on card */
+  --accent: #eaf2ff;
+  --accent-foreground: #0f172a;
   --destructive: #c8283b;
   --destructive-foreground: #ffffff;
-  --border: #e2e7f2;
-  --input: #cfd7e8;
+  --border: #d9e5fa;
+  --input: #c7d6f2;
   --ring: var(--brand);
-  --radius: 0.75rem;
+  --radius: 0.875rem;
 
   /* Status: calm, never alarming. `*-ink` is text on `*-soft`. */
   --success: #16a36a;
@@ -78,19 +102,19 @@
   --tone-sky: #0ea5e9;    --tone-sky-soft: #e0f4fd;    --tone-sky-ink: #075985;
 
   /* Evidence strength: none, stated, shown, confirmed. Never a score. */
-  --evidence-0: #eef1f8;
+  --evidence-0: #eef3fc;
   --evidence-1: #c9d6ff;
   --evidence-2: #7f9dfa;
   --evidence-3: #2f63f6;
-  --evidence-0-ink: #556079;
+  --evidence-0-ink: #5b6b82;
   --evidence-1-ink: #1a3fb0;
   --evidence-2-ink: #0b1f66;
   --evidence-3-ink: #ffffff;
 
   /* Elevation */
-  --elev-soft: 0 1px 2px rgb(18 26 51 / 0.04), 0 2px 8px rgb(18 26 51 / 0.04);
-  --elev-card: 0 1px 2px rgb(18 26 51 / 0.05), 0 8px 24px -8px rgb(18 26 51 / 0.10);
-  --elev-lift: 0 2px 4px rgb(18 26 51 / 0.06), 0 18px 40px -12px rgb(47 99 246 / 0.28);
+  --elev-soft: 0 1px 2px rgb(15 23 42 / 0.04);
+  --elev-card: 0 1px 2px rgb(15 23 42 / 0.04), 0 10px 30px -18px rgb(21 94 239 / 0.22);
+  --elev-lift: 0 2px 4px rgb(15 23 42 / 0.05), 0 18px 40px -14px rgb(21 94 239 / 0.30);
 
   /* Auth screens: warm neutral page, white card, beige showcase, ink buttons. */
   --auth-page: #f2f0eb;
@@ -107,17 +131,28 @@
   --auth-google-to: #ebebea;
 
   /* Hero gradient for auth, onboarding and the profile header. */
-  --hero-from: #2f63f6;
-  --hero-via: #6a4dff;
-  --hero-to: #0ea5e9;
+  --hero-from: #155eef;
+  --hero-via: #0f4fd6;
+  --hero-to: #0f172a;
+
+  /** "You are here": the brand blue, used sparingly **/
+  --highlight: #155eef;
+  /** The workspace sheet that sits on the cream frame **/
+  --canvas: #f5f8ff;
+  /** Signal cards, from the Placement AI dashboard design **/
+  --lime: #d4ff59;
+  --peach: #ffd2af;
+  --powder: #92bdff;
+  --signal-ink: #0f172a;
+  --highlight-ink: #ffffff;
 
   /** Sidebar **/
   --sidebar: #ffffff;
   --sidebar-foreground: var(--foreground);
   --sidebar-primary: var(--primary);
   --sidebar-primary-foreground: var(--primary-foreground);
-  --sidebar-accent: var(--brand-soft);
-  --sidebar-accent-foreground: var(--brand-ink);
+  --sidebar-accent: #eaf2ff;
+  --sidebar-accent-foreground: #0f172a;
   --sidebar-border: var(--border);
   --sidebar-ring: var(--ring);
 
@@ -162,7 +197,7 @@
   --secondary: #1b2440;
   --secondary-foreground: #e8ecf8;
   --muted: #1b2440;
-  --muted-foreground: #a3abbf; /* 7.6:1 on card */
+  --muted-foreground: #a3abbf /* 7.6:1 on card */; /* 7.6:1 on card */
   --accent: #1b2440;
   --accent-foreground: #e8ecf8;
   --destructive: #ff6b7d;
@@ -217,16 +252,24 @@
   --auth-google-from: #2b2b2f;
   --auth-google-to: #222226;
 
-  --hero-from: #2a4fd6;
-  --hero-via: #5b3fd9;
-  --hero-to: #0b7fb8;
+  --hero-from: #3a63f0;
+  --hero-via: #2a49c4;
+  --hero-to: #1a2a6c;
 
-  --sidebar: #0e1428;
+  --highlight: #7c9cff;
+  --canvas: #0d1326;
+  --lime: #c8ef4f;
+  --peach: #f4c39b;
+  --powder: #7ea6f2;
+  --signal-ink: #0f172a;
+  --highlight-ink: #0a1028;
+
+  --sidebar: #101830;
   --sidebar-foreground: var(--foreground);
   --sidebar-primary: var(--primary);
   --sidebar-primary-foreground: var(--primary-foreground);
-  --sidebar-accent: var(--brand-soft);
-  --sidebar-accent-foreground: var(--brand-ink);
+  --sidebar-accent: #1c2650;
+  --sidebar-accent-foreground: #e8ecf8;
   --sidebar-border: var(--border);
   --sidebar-ring: var(--ring);
 
@@ -248,7 +291,8 @@
 /** Theme Setup **/
 @theme inline {
   /** Type: one family across the app **/
-  --font-sans: 'Plus Jakarta Sans', ui-sans-serif, system-ui, 'Segoe UI', Roboto, sans-serif;
+  --font-display: 'Manjari', 'Manrope', ui-sans-serif, system-ui, sans-serif;
+  --font-sans: 'Manrope', 'Plus Jakarta Sans', ui-sans-serif, system-ui, 'Segoe UI', Roboto, sans-serif;
 
   /** PAI semantic colours **/
   --color-brand: var(--brand);
@@ -293,6 +337,14 @@
   --color-evidence-2-ink: var(--evidence-2-ink);
   --color-evidence-3: var(--evidence-3);
   --color-evidence-3-ink: var(--evidence-3-ink);
+
+  --color-highlight: var(--highlight);
+  --color-canvas: var(--canvas);
+  --color-lime: var(--lime);
+  --color-peach: var(--peach);
+  --color-powder: var(--powder);
+  --color-signal-ink: var(--signal-ink);
+  --color-highlight-ink: var(--highlight-ink);
 
   /** Auth screens **/
   --color-auth-page: var(--auth-page);

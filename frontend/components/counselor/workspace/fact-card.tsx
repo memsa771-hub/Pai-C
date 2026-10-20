@@ -51,7 +51,7 @@ export function FactCard({ card }: { card: OfferedFact }) {
   }
   const chip = (selected: boolean) => cn(
     "min-h-11 rounded-2xl border-2 px-4 text-sm font-semibold transition-colors",
-    selected ? "border-brand bg-brand-soft text-brand-ink" : "border-border bg-card hover:border-brand/40",
+    selected ? "border-foreground bg-secondary text-foreground ring-1 ring-foreground" : "border-border bg-card hover:border-foreground/30",
   );
   return (
     <section

@@ -30,8 +30,8 @@ export function ConversationCard({card, channel, children}: {card?: InlineCard; 
       <span aria-hidden className="flex size-9 items-center justify-center rounded-xl bg-gradient-to-br from-[var(--hero-from)] to-[var(--hero-via)] text-white"><Sparkles className="size-[18px]"/></span>
       <h3 className="font-bold">{copy.firstPicture}</h3>
     </div>}
-    {!first && <div aria-hidden className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-brand-ink"><SlidersHorizontal className="size-4"/>{copy.ratingTitle}</div>}
-    <div className={cn(first && 'rounded-2xl border-l-4 border-brand bg-brand-soft/50 px-4 py-3')}>{children}</div>
+    {!first && <div aria-hidden className="mb-2 flex items-center gap-2 text-xs font-semibold text-muted-foreground"><SlidersHorizontal className="size-4"/>{copy.ratingTitle}</div>}
+    <div className={cn(first && 'rounded-2xl border-l-4 border-foreground bg-secondary ring-1 ring-foreground/50 px-4 py-3')}>{children}</div>
     {card.kind === 'rating' && (saved ? <p role="status" className="mt-3 flex items-center gap-2 font-medium text-success-ink"><Check aria-hidden className="size-4"/>{copy.ratingSent}</p> : <div className="mt-4">
       <div className="grid grid-cols-6 gap-1.5 sm:grid-cols-11" role="group" aria-label={copy.ratingTitle}>
         {Array.from({length: max - min + 1},(_,i)=>i+min).map(n=>{
@@ -39,7 +39,7 @@ export function ConversationCard({card, channel, children}: {card?: InlineCard; 
           const strength = (n - min) / Math.max(1, max - min);
           return <button key={n} type="button" aria-pressed={value===n} onClick={()=>setValue(n)}
             className={cn('flex h-11 items-center justify-center rounded-xl border-2 text-sm font-bold transition-colors',
-              value===n ? 'border-brand bg-brand text-primary-foreground' : 'border-transparent bg-muted hover:border-brand/40')}
+              value===n ? 'border-primary bg-primary text-primary-foreground' : 'border-transparent bg-muted hover:border-foreground/30')}
             style={value===n ? undefined : {backgroundColor: `color-mix(in oklab, var(--brand) ${Math.round(6 + strength * 22)}%, var(--muted))`}}>{n}</button>;
         })}
       </div>

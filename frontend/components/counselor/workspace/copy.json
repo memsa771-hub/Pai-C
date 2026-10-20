@@ -2,6 +2,7 @@
   "brand": "Placement AI",
   "tagline": "Your direction. Your decision.",
   "nav": {
+    "overview": "Overview",
     "threads": "PAI Counselor",
     "journey": "Your journey",
     "paths": "Paths",
@@ -276,23 +277,9 @@
     "K": "Check in when you try something, get a result or change your mind."
   },
   "shell": {
-    "more": "More",
-    "moreTitle": "More places",
     "stage": "Stage {id}",
     "progress": "{done} of {total} steps done",
-    "seeJourney": "See your journey",
-    "groups": {
-      "main": "Your counselor",
-      "decide": "Decide",
-      "yours": "Yours"
-    },
     "skip": "Skip to content",
-    "tabs": {
-      "threads": "Chat",
-      "journey": "Journey",
-      "paths": "Paths",
-      "profile": "Profile"
-    },
     "short": {
       "threads": "Chat",
       "journey": "Journey",
@@ -303,7 +290,24 @@
       "files": "Documents",
       "settings": "Settings",
       "notifications": "Notifications"
-    }
+    },
+    "search": "Search or ask PAI",
+    "commandTitle": "Go anywhere or ask PAI",
+    "commandPlaceholder": "Type a place, or a question for PAI…",
+    "commandEmpty": "Nothing here. Press Enter to ask PAI.",
+    "commandGo": "Go to",
+    "commandAskGroup": "Ask PAI",
+    "commandAsk": "Ask PAI: “{q}”",
+    "starters": [
+      "What should I explore next?",
+      "Help me understand my options",
+      "Talk through my family's expectations"
+    ],
+    "sectionsLabel": "Sections",
+    "collapse": "Collapse sidebar",
+    "expand": "Expand sidebar",
+    "hideStarters": "Hide suggestions",
+    "forStudents": "For students"
   },
   "journeyStates": {
     "done": "Done",
@@ -418,5 +422,117 @@
     "not_possible_yet": "Not possible yet",
     "unconfirmed": "Fit unconfirmed"
   },
-  "notSet": "Not set"
+  "notSet": "Not set",
+  "sections": {
+    "overview": {
+      "label": "Overview",
+      "hint": "Your signals and next best step"
+    },
+    "threads": {
+      "label": "PAI",
+      "hint": "Talk with your counselor"
+    },
+    "roadmaps": {
+      "label": "Roadmaps",
+      "hint": "Paths, compare and your plan"
+    },
+    "journey": {
+      "label": "Journey",
+      "hint": "Where you are, A to K"
+    },
+    "vault": {
+      "label": "Vault",
+      "hint": "Your documents and what PAI knows"
+    },
+    "settings": {
+      "label": "Settings",
+      "hint": "Theme, notifications and your data"
+    }
+  },
+  "subTabs": {
+    "paths": "Paths",
+    "compare": "Compare",
+    "plan": "Plan",
+    "files": "Documents",
+    "profile": "About you"
+  },
+  "journey": {
+    "phases": [
+      {
+        "label": "Know yourself",
+        "from": "A",
+        "to": "E"
+      },
+      {
+        "label": "Explore",
+        "from": "F",
+        "to": "H"
+      },
+      {
+        "label": "Decide",
+        "from": "I",
+        "to": "J"
+      },
+      {
+        "label": "Keep going",
+        "from": "K",
+        "to": "K"
+      }
+    ],
+    "trailLabel": "Stages A to K",
+    "ask": "Ask PAI about this",
+    "askDraft": "Can we talk about “{title}”?",
+    "selected": "Stage {id}: {title}, {state}",
+    "pick": "Tap any stage to see what it means."
+  },
+  "overview": {
+    "title": "Find the path that fits you.",
+    "intro": "Your signals, strongest paths and the next best step, in one place.",
+    "metrics": {
+      "paths": "Paths to explore",
+      "pathsSub": "{saved} saved · {exploring} exploring",
+      "pathsNone": "Talk with PAI to find your first",
+      "journey": "Your journey",
+      "journeySub": "Now: {title}",
+      "vault": "Saved in your Vault",
+      "vaultSub": "{confirmed} confirmed by you",
+      "attention": "Needs your attention",
+      "attentionSub": "Missing details in your profile",
+      "attentionNone": "Nothing missing right now"
+    },
+    "pathsTitle": "Your strongest paths",
+    "pathsNote": "Directions from your own words. These are possibilities, not decisions made for you.",
+    "viewAll": "View all {count}",
+    "pathsEmpty": "No paths yet. Keep talking with PAI and directions worth exploring will show up here.",
+    "status": {
+      "suggested": "Suggested",
+      "exploring": "Exploring",
+      "saved": "Saved",
+      "chosen": "Chosen",
+      "dismissed": "Not for me"
+    },
+    "statusLabel": "Status",
+    "understandTitle": "What PAI understands so far",
+    "understandNote": "Things you have shared, by area.",
+    "understandEmpty": "Nothing shared yet.",
+    "nextLabel": "Your next step",
+    "nextOpen": "Open {view}",
+    "recommends": "PAI recommends",
+    "recStage": "Stage {id}: {title}",
+    "recMissingTitle": "Your profile is missing {count} details.",
+    "recMissingBody": "PAI gives better suggestions when it knows the basics.",
+    "recMissingAction": "Add with PAI",
+    "recMissingDraft": "I want to add my {label}.",
+    "recPathTitle": "Take a closer look at {title}.",
+    "recPathBody": "What it is, a day at work, and a small way to try it.",
+    "recPathAction": "Open the path",
+    "recAlso": "Also: {items}",
+    "recPrev": "Previous recommendation",
+    "recNext": "Next recommendation",
+    "trackLabel": "{done} of {total} stages",
+    "ask": "Ask PAI",
+    "askPlaceholder": "What should I explore next, given what I enjoy?",
+    "askAction": "Ask PAI",
+    "footer": "Your fit first. Better choices follow."
+  }
 }

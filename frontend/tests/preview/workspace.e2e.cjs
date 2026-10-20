@@ -88,7 +88,11 @@ async function crawl(browser) {
     for (const width of [1440, 375]) {
       const { context, page, errors } = await open(browser, width, 'light');
       try {
-        await load(page, screen);
+        // The first load gets the same single retry as the reloads below.
+        try { await load(page, screen); } catch {
+          try { await page.waitForTimeout(1500); await load(page, screen); }
+          catch (error) { failures.push(`${screen.id} ${width}: first load: ${error.message.split('\n')[0]}`); continue; }
+        }
         const count = await page.locator('button:not([disabled]):visible, a[href]:visible').count();
         for (let i = 0; i < count; i++) {
           // Thousands of reloads can slow the dev server; a reload that times out

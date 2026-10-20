@@ -341,7 +341,7 @@ export function FileList() {
               // right edge up with the folder counts above it.
               "w-full min-h-11 flex items-center gap-2.5 py-2 pl-2 pr-9 rounded-xl text-left transition-colors cursor-pointer",
               isFoldersSection && !currentFilePath && !selectedFileId
-                ? "bg-brand-soft text-brand-ink"
+                ? "bg-secondary font-semibold text-foreground ring-1 ring-inset ring-border"
                 : "hover:bg-muted",
             )}
           >

@@ -41,7 +41,7 @@ module.exports = async function flow(browser, open, ORIGIN) {
       dateOfBirth: '2008-03-12', gender: 'female', currentCountry: 'Pakistan', currentCity: 'My city' }, 'entry answers sent as typed');
 
     // B-D: the conversation, and a journey with every A-K stage present.
-    await page.getByRole('navigation').getByRole('button', { name: 'Your journey', exact: true }).click();
+    await page.getByRole('navigation').getByRole('button', { name: 'Journey', exact: true }).click();
     await page.getByRole('heading', { name: 'Your journey, at your pace' }).waitFor();
     assert.equal(await page.locator('main ol > li').count(), 11, 'all eleven stages');
     assert.equal(await page.locator('main ol > li[aria-current="step"]').count(), 1, 'exactly one current stage');
@@ -59,7 +59,8 @@ module.exports = async function flow(browser, open, ORIGIN) {
     assert.deepEqual(feedback.at(-1).args, [1, 5, 7], 'Mirror feedback is version 1, understood 5, certainty 7');
 
     // F-G: paths first. Merely viewing a path must not search programs.
-    await page.getByRole('navigation').getByRole('button', { name: 'Paths', exact: true }).click();
+    await page.getByRole('navigation').getByRole('button', { name: 'Roadmaps', exact: true }).click();
+    await page.getByRole('heading', { name: 'Directions worth exploring' }).waitFor();
     await page.getByRole('button', { name: 'Explore', exact: true }).first().click();
     await page.getByRole('heading', { name: 'What it is', exact: true }).waitFor();
     assert.equal((await called(page, 'searchPrograms')).length, 0, 'no program search from viewing a path');
@@ -95,7 +96,8 @@ module.exports = async function flow(browser, open, ORIGIN) {
 
     // J-K: the plan, and a check-in that opens the same conversation as a
     // draft. Quick starts fill the draft; nothing is sent automatically.
-    await page.getByRole('navigation').getByRole('button', { name: 'Plan & check-ins', exact: true }).click();
+    await page.getByRole('navigation').getByRole('button', { name: 'Roadmaps', exact: true }).click();
+    await page.getByRole('group', { name: 'Sections' }).getByRole('button', { name: 'Plan', exact: true }).click();
     await page.getByRole('heading', { name: 'Small next steps' }).waitFor();
     const sentBefore = (await called(page, 'sendMessage')).length;
     await page.getByRole('button', { name: 'Open conversation' }).click();
@@ -105,15 +107,33 @@ module.exports = async function flow(browser, open, ORIGIN) {
     assert.match(await page.locator('textarea[data-chat-input]').inputValue(), /^I tried something\. /);
     assert.equal((await called(page, 'sendMessage')).length, sentBefore, 'check-in is a draft, not an auto-send');
 
-    // Profile: a heatmap area opens readable details; confirm uses the exact digest.
+    // Vault, About you: facts read as plain rows; confirm uses the exact digest.
     await go('/student?view=profile');
-    await page.getByRole('button', { name: /^Current life:/ }).click();
-    await page.getByText('Showing: Current life').waitFor();
-    await page.getByRole('button', { name: 'Show source and actions for Name' }).click();
+    await page.getByRole('heading', { name: 'About you', exact: true }).waitFor();
+    await page.getByRole('button', { name: /^Show source and actions for Name/ }).click();
     await page.getByRole('button', { name: 'Confirm', exact: true }).click();
     const review = await called(page, 'reviewProfileCard');
     assert.equal(review.at(-1).args[1].expected_digest, 'a'.repeat(64));
     assert.equal(review.at(-1).args[1].action, 'confirm');
+
+    // Command menu: Ctrl+K jumps anywhere; "Ask PAI" only fills a draft.
+    await page.keyboard.press('Control+k');
+    await page.getByRole('dialog').getByPlaceholder(/question for PAI/).fill('Vault Documents');
+    await page.getByRole('option', { name: 'Vault · Documents' }).click();
+    await page.getByRole('heading', { name: 'Your documents' }).waitFor();
+    const sentBeforeAsk = (await called(page, 'sendMessage')).length;
+    await page.getByRole('button', { name: 'Search or ask PAI' }).click();
+    await page.getByRole('dialog').getByPlaceholder(/question for PAI/).fill('Can we talk about my options?');
+    await page.keyboard.press('Enter');
+    await page.waitForFunction(() => document.querySelector('textarea[data-chat-input]')?.value === 'Can we talk about my options?', null, { timeout: 5000 });
+    assert.equal((await called(page, 'sendMessage')).length, sentBeforeAsk, 'asking from the menu is a draft, not a send');
+
+    // The sidebar collapses to a rail and remembers it.
+    await page.getByRole('button', { name: 'Collapse sidebar' }).click();
+    await page.reload();
+    await page.getByRole('button', { name: 'Expand sidebar' }).click();
+    await page.getByRole('button', { name: 'Collapse sidebar' }).waitFor();
+
   } finally {
     assert.equal(errors.length, 0, 'flow: ' + errors.join(' | '));
     await context.close();
@@ -137,14 +157,15 @@ module.exports = async function flow(browser, open, ORIGIN) {
     await p.getByRole('dialog').getByRole('button', { name: 'Sign out', exact: true }).click();
     await p.waitForURL('**/sign-in');
     assert.equal(await p.evaluate(() => sessionStorage.getItem('offline-sign-out')), 'done');
-    // Every phone tab is a 44px target and the More sheet reaches the rest.
+    // Every phone tab is a 44px target; Settings is in the account menu.
     await p.goto(`${ORIGIN}/student?view=journey&theme=dark`);
     for (const tab of await p.getByRole('navigation').last().getByRole('button').all()) {
       const b = await tab.boundingBox();
       assert(b && b.height >= 44 && b.width >= 44, 'tab bar target is at least 44px');
     }
-    await p.getByRole('button', { name: 'More', exact: true }).click();
-    await p.getByRole('dialog').getByRole('button', { name: 'Settings' }).click();
+    assert.equal(await p.getByRole('navigation').last().getByRole('button').count(), 5, 'Overview, PAI, Roadmaps, Journey, Vault');
+    await p.getByRole('button', { name: 'Account', exact: true }).click();
+    await p.getByRole('menuitem', { name: 'Settings', exact: true }).click();
     await p.getByRole('heading', { name: 'Make this space yours' }).waitFor();
   } finally {
     assert.equal(phone.errors.length, 0, 'phone flow: ' + phone.errors.join(' | '));

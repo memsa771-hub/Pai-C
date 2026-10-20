@@ -31,7 +31,7 @@ export function FamilyTalk() {
     catch { setError(true); } finally { setBusy(false); }
   }
   const card = (on: boolean) => cn("flex min-h-12 cursor-pointer items-center gap-3 rounded-2xl border-2 px-4 py-3 text-sm transition-colors has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-ring",
-    on ? "border-brand bg-brand-soft" : "border-border hover:border-brand/40");
+    on ? "border-foreground bg-secondary ring-1 ring-foreground" : "border-border hover:border-foreground/30");
   return <div className="space-y-5">
     <p className="text-sm text-muted-foreground">{guide.message}</p>
     {guide.ready && !result && <>

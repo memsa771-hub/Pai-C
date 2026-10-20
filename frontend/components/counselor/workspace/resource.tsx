@@ -69,14 +69,16 @@ export function Heading({
   action,
   icon,
   tone,
+  eyebrow,
 }: {
   title: string;
   description: string;
+  eyebrow?: string;
   action?: React.ReactNode;
   icon?: LucideIcon;
   tone?: Tone;
 }) {
-  return <PageHeader title={title} description={description} action={action} icon={icon} tone={tone} />;
+  return <PageHeader title={title} description={description} action={action} icon={icon} tone={tone} eyebrow={eyebrow} />;
 }
 /** "12 Oct 2026" in the app locale; empty for a missing or invalid date. */
 export function shortDate(value: string | null | undefined) {

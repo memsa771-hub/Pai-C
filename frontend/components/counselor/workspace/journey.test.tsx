@@ -9,9 +9,13 @@ afterEach(()=>{cleanup();vi.clearAllMocks();});
 it('gives all A-K stages a home and links known conversation moments',async()=>{
   vi.mocked(workspaceApi.getCounselorWorkspace).mockResolvedValue(picture);
   const navigate=vi.fn();render(<Journey navigate={navigate}/>);
-  await screen.findByRole('heading',{name:/Check your Mirror/});
+  await screen.findByRole('heading',{name:'Stages A to K'});
   expect(screen.getAllByRole('listitem')).toHaveLength(11);
-  fireEvent.click(screen.getAllByRole('button',{name:'Open conversation'})[0]);
+  expect(screen.getAllByRole('listitem').filter((li)=>li.getAttribute('aria-current')==='step')).toHaveLength(1);
+  // Picking a stage on the trail shows it, with its conversation moment.
+  fireEvent.click(screen.getByRole('button',{name:/^Stage B: Getting to know you/}));
+  await screen.findByRole('heading',{name:/Getting to know you/});
+  fireEvent.click(screen.getAllByRole('button',{name:'Open conversation'}).at(-1)!);
   expect(navigate).toHaveBeenCalledWith('threads','m1');
 });
 it('keeps a failed load retryable',async()=>{

@@ -17,54 +17,45 @@ afterEach(() => {
   window.history.replaceState({}, "", "/");
 });
 const RAW_KEY = /\b(?:identity|location|preferences)\.[a-z_]+\b|\b[a-z]{2,}_[a-z_]{2,}\b/;
-it("renders the visual profile without interpretation scores or private notes", async () => {
+it("shows Details as fields with missing basics, and Background as the Mirror and the student's story", async () => {
   vi.mocked(workspaceApi.getCounselorWorkspace).mockResolvedValue(picture);
   vi.mocked(workspaceApi.getProfileCards).mockResolvedValue({ cards });
-  render(<LivingProfile onChat={vi.fn()} />);
+  const chat = vi.fn();
+  render(<LivingProfile onChat={chat} />);
   expect(await screen.findByRole("heading", { level: 1, name: "Sam Taylor" })).toBeTruthy();
-  for (const title of [
-    "How PAI sees you",
-    "What PAI understands so far",
-    "Your certainty over time",
-    "What you enjoy",
-    "What you are good at",
-    "People around you",
-    "Your education",
-    "PAI still wants to know",
-  ])
+  expect(screen.getByRole("img", { name: /\d+% complete/ })).toBeTruthy();
+  for (const title of ["About you", "Education and tests", "Missing details"])
     expect(screen.getByRole("heading", { name: title })).toBeTruthy();
+  // A missing basic hands PAI a draft; nothing is saved from here.
+  fireEvent.click(screen.getAllByRole("button", { name: /Add with PAI/ })[0]);
+  expect(chat).toHaveBeenCalledWith(expect.stringMatching(/^I want to add my /));
+  // Opening a field shows its source and the review actions.
+  fireEvent.click(screen.getByRole("button", { name: /^Show source and actions for Name/ }));
+  expect(await screen.findByRole("dialog")).toBeTruthy();
+  expect(within(screen.getByRole("dialog")).getByRole("button", { name: "Confirm" })).toBeTruthy();
+  fireEvent.keyDown(screen.getByRole("dialog"), { key: "Escape" });
+  fireEvent.click(screen.getByRole("tab", { name: "Background" }));
+  for (const title of ["How PAI sees you", "Your story", "Interests", "Family"])
+    expect(screen.getByRole("heading", { name: title })).toBeTruthy();
+  for (const gone of ["What PAI understands so far", "Your certainty over time", "PAI still wants to know"])
+    expect(screen.queryByRole("heading", { name: gone })).toBeNull();
   const text = document.body.textContent || "";
   expect(text).not.toContain("private_notes");
-  expect(text).not.toMatch(/\d+\s?%\s?(understood|known|complete)/i);
+  expect(text).not.toMatch(/\d+\s?%\s?(understood|known)/i);
   expect(text).not.toMatch(RAW_KEY);
   // Worries are private until the student asks to see them.
   expect(text).not.toContain("Financial security");
   fireEvent.click(screen.getByRole("button", { name: "Show private details" }));
   expect(document.body.textContent).toContain("Financial security");
 });
-it("explains that an area can have saved evidence and still invite deeper discussion", async () => {
-  vi.mocked(workspaceApi.getCounselorWorkspace).mockResolvedValue({
-    ...picture,
-    coverage: { ...picture.coverage, history: { covered: false, item_count: 1 } },
-  });
-  vi.mocked(workspaceApi.getProfileCards).mockResolvedValue({ cards });
-  const chat = vi.fn();
-  render(<LivingProfile onChat={chat} />);
-  fireEvent.click(await screen.findByRole("button", {
-    name: "Education & experience · Some details saved; explore further",
-  }));
-  expect(chat).toHaveBeenCalledWith("Education & experience");
-});
-it("tapping a heatmap area opens readable details filtered to that area", async () => {
+it("hands a story topic to PAI instead of editing shared evidence here", async () => {
   vi.mocked(workspaceApi.getCounselorWorkspace).mockResolvedValue(picture);
   vi.mocked(workspaceApi.getProfileCards).mockResolvedValue({ cards });
-  render(<LivingProfile onChat={vi.fn()} />);
-  fireEvent.click(await screen.findByRole("button", { name: /^Education & experience: Shown/ }));
-  expect(screen.getByRole("tab", { name: "Details" }).getAttribute("aria-selected")).toBe("true");
-  expect(screen.getByText("Showing: Education & experience")).toBeTruthy();
-  expect(screen.getAllByText("Qualification").length).toBeGreaterThan(0);
-  expect(screen.queryByText("Name")).toBeNull();
-  expect(document.body.textContent).not.toMatch(RAW_KEY);
+  window.history.replaceState({}, "", "/?tab=background");
+  const chat = vi.fn();
+  render(<LivingProfile onChat={chat} />);
+  fireEvent.click(await screen.findByRole("button", { name: "Talk about this: Interests" }));
+  expect(chat).toHaveBeenCalledWith("Can we talk about interests?");
 });
 it("confirms the exact digest; edits require an explanation", async () => {
   const done = vi.fn();

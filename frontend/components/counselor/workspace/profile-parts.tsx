@@ -10,7 +10,7 @@ import type { CounselorMirrorDraft } from "@/lib/counselor-mirror";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import {
-  EmptyState, EvidenceBadge, QuadrantCard, SectionCard, StatChip, Timeline, evidenceLevel,
+  EmptyState, EvidenceBadge, SectionCard, StatChip, Timeline, evidenceLevel,
   toneClass, toneFor, type EvidenceLevel, type Quadrant, type Tone,
 } from "@/components/pai";
 import { cn } from "@/lib/utils";
@@ -247,15 +247,15 @@ export function MirrorPanel({ picture, onChat, onChanged }: { picture: LivingPic
   }
   if (!lines) {
     return (
-      <SectionCard title={text.mirrorTitle} icon={Sparkles} tone="violet">
+      <SectionCard id="mirror" className="scroll-mt-6" title={text.mirrorTitle}>
         {draft?.mirror?.intro ? (
           <div>
-            <p className="text-xs font-semibold uppercase tracking-wider text-brand-ink">{text.firstPicture}</p>
+            <p className="text-xs font-semibold text-primary">{text.firstPicture}</p>
             <p className="mt-2 text-pretty text-lg leading-relaxed">{draft.mirror.intro}</p>
             <Button size="tap" variant="soft" className="mt-4" onClick={() => onChat()}><MessageCircle aria-hidden />{text.openChat}</Button>
           </div>
         ) : (
-          <EmptyState icon={Sparkles} tone="violet" title={text.gettingToKnow} description={text.gettingToKnowBody}
+          <EmptyState icon={MessageCircle} tone="blue" title={text.gettingToKnow} description={text.gettingToKnowBody}
             action={<Button size="tap" onClick={() => onChat()}><MessageCircle aria-hidden />{text.openChat}</Button>} />
         )}
       </SectionCard>
@@ -265,11 +265,18 @@ export function MirrorPanel({ picture, onChat, onChanged }: { picture: LivingPic
     key, icon, tone, text: lines[key], label: copy.pictureLabels[key],
   }));
   return (
-    <SectionCard title={text.mirrorTitle} description={text.mirrorIntro} icon={Sparkles} tone="violet"
+    <SectionCard id="mirror" className="scroll-mt-6" title={text.mirrorTitle} description={text.mirrorIntro}
       action={<StatChip size="sm" tone={status === "confirmed" ? "success" : status === "needs_changes" ? "warning" : "blue"}>
         {status === "confirmed" ? text.mirrorConfirmed : status === "needs_changes" ? text.mirrorChanged : text.mirrorWaiting}
       </StatChip>}>
-      <QuadrantCard quadrants={quadrants} />
+      <dl className="divide-y rounded-2xl border">
+        {quadrants.map((q) => (
+          <div key={q.key} className="grid gap-1 px-4 py-3.5 sm:grid-cols-[10rem_1fr] sm:gap-4">
+            <dt className="text-sm text-muted-foreground">{q.label}</dt>
+            <dd className="text-pretty text-[15px] font-semibold leading-relaxed">{q.text}</dd>
+          </div>
+        ))}
+      </dl>
       {error && <p role="alert" className="mt-3 text-sm font-medium text-danger-ink">{copy.error}</p>}
       {status === "awaiting_confirmation" && (editing ? (
         <form className="mt-4 space-y-3" onSubmit={(e) => { e.preventDefault(); void act(true); }}>
@@ -333,7 +340,7 @@ export function FeltUnderstood({ version, onSaved, onSkip, labels }: {
         <div role="radiogroup" aria-label={l.legend} className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-5">
           {text.feltScale.map((label, i) => (
             <label key={label} className={cn("flex min-h-11 cursor-pointer items-center gap-3 rounded-xl border-2 bg-card px-3 text-sm font-medium transition-colors has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-ring sm:min-h-14 sm:flex-col sm:justify-center sm:gap-0.5 sm:px-1 sm:text-center sm:text-xs",
-              understood === i + 1 ? "border-brand bg-brand-soft text-brand-ink" : "border-transparent hover:border-border")}>
+              understood === i + 1 ? "border-foreground bg-secondary text-foreground ring-1 ring-foreground" : "border-transparent hover:border-border")}>
               <input type="radio" name={name} value={i + 1} checked={understood === i + 1} onChange={() => setUnderstood(i + 1)}
                 aria-label={`${i + 1}: ${label}`} className="sr-only" />
               <span aria-hidden className="text-base font-bold">{i + 1}</span><span aria-hidden className="leading-tight">{label}</span>

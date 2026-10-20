@@ -256,10 +256,10 @@ export const ChatMessage = memo(function ChatMessage({ message, agents = [] }: C
       : (message.senderName && message.senderName !== 'user' ? message.senderName : t('chat.you'));
 
     return (
-      <div className="mx-auto w-full max-w-3xl py-2">
+      <div className="mx-auto w-full max-w-[46rem] py-3">
         <div className="flex flex-col items-end">
           <span className="sr-only">{displayName}:</span>
-          <div className="max-w-[85%] rounded-3xl rounded-br-md bg-gradient-to-br from-[var(--hero-from)] to-[var(--hero-via)] px-4 py-2.5 text-left text-[15px] leading-relaxed text-white shadow-soft sm:max-w-[75%] [&_a]:text-white [&_a]:underline [&_code]:bg-white/20">
+          <div className="max-w-[85%] rounded-[22px] rounded-br-md bg-brand-soft px-4 py-2.5 text-left text-[15px] leading-relaxed text-foreground sm:max-w-[75%] [&_a]:underline">
             <ConversationCard card={message.metadata?.counselor_card as InlineCard | undefined} channel={message.sessionId}><MarkdownContent content={message.content} agentNames={agentNames} agentLabels={agentLabels} /></ConversationCard>
           </div>
           {/* Attachments and their status sit below the bubble, on the page
@@ -273,15 +273,18 @@ export const ChatMessage = memo(function ChatMessage({ message, agents = [] }: C
   }
 
   // ── Agent message ──
-  // PAI's reply sits in a card bubble beside its avatar. Rich cards (fact,
-  // rating, paths, roadmaps) follow the text at full reading width.
+  // PAI speaks on the page, not in a bubble: its name above, then the reply at
+  // full reading width, like a letter. Rich cards (fact, rating, paths,
+  // roadmaps) follow the text.
   return (
-    <div className="group mx-auto w-full max-w-3xl py-2">
-      <div className="flex items-start gap-2.5">
-        <AgentAvatar name={message.senderName} size={32} className="mt-0.5" />
-        <div className="min-w-0 flex-1">
-          <span className="sr-only">{agent ? agentLabel(agent) : message.senderName}:</span>
-          <div className="w-fit max-w-full rounded-3xl rounded-tl-md border bg-card px-4 py-3 text-[15px] leading-relaxed shadow-soft">
+    <div className="group mx-auto w-full max-w-[46rem] py-3">
+      <div className="min-w-0">
+        <div className="mb-1.5 flex items-center gap-2">
+          <AgentAvatar name={message.senderName} size={26} />
+          <span className="text-sm font-bold">{agent ? agentLabel(agent) : message.senderName}</span>
+        </div>
+        <div className="min-w-0">
+          <div className="max-w-full text-[15.5px] leading-7 text-foreground [&_p+p]:mt-3">
             <ConversationCard card={message.metadata?.counselor_card as InlineCard | undefined} channel={message.sessionId}><MarkdownContent content={message.content} agentNames={agentNames} agentLabels={agentLabels} /></ConversationCard>
             <Attachments items={attachments} />
           </div>

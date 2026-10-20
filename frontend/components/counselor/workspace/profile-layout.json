@@ -255,6 +255,70 @@
     "areaEmpty": "PAI has not learned about this yet. Tap “Tell PAI” to start.",
     "confirmed": "Confirmed",
     "removed": "Removed",
-    "expand": "Show source and actions for {label}"
+    "expand": "Show source and actions for {label}",
+    "onThisPage": "On this page",
+    "fromChat": "From your conversations",
+    "fromChatNote": "What you told PAI in chat. To change something, tell PAI.",
+    "fromChatEmpty": "Nothing yet. As you talk with PAI, what you share shows up here.",
+    "privateLabel": "Private details",
+    "privateHelp": "Date of birth, gender, money and family worries stay hidden until you choose.",
+    "factsCount": "{count} saved",
+    "tabDetails": "Details",
+    "tabBackground": "Background",
+    "tabsLabel": "Profile sections",
+    "complete": "{pct}% complete",
+    "statusFallback": "Student",
+    "missingTitle": "Missing details",
+    "missingNone": "Your basics are complete.",
+    "missingAction": "Add with PAI",
+    "missingDraft": "I want to add my {label}.",
+    "storyTitle": "Your story",
+    "storyIntro": "Built from your conversations with PAI. The more you share, the better PAI's suggestions get.",
+    "sharedCount": "{count} shared",
+    "storyTalk": "Talk about this",
+    "storyDraft": "Can we talk about {area}?"
+  },
+  "basics": [
+    {
+      "key": "identity.full_name",
+      "label": "Your name"
+    },
+    {
+      "key": "identity.date_of_birth",
+      "label": "Date of birth"
+    },
+    {
+      "key": "identity.gender",
+      "label": "Gender"
+    },
+    {
+      "key": "location.current_city",
+      "label": "City"
+    },
+    {
+      "key": "location.current_country",
+      "label": "Country"
+    },
+    {
+      "key": "education",
+      "label": "Current or most recent education"
+    },
+    {
+      "key": "test_attempt",
+      "label": "A test or exam result"
+    },
+    {
+      "key": "preferences.target_countries",
+      "label": "Where you would like to study"
+    }
+  ],
+  "story": {
+    "interests": "What you enjoy doing, in class and outside it.",
+    "strengths": "What you are good at, and how you know it.",
+    "values": "What matters to you in work and in life.",
+    "family_social": "The people whose opinion matters, and what they hope for you.",
+    "pressures": "Money, time and expectations: what weighs on your choice.",
+    "goals": "What you want, and whose wish it really is.",
+    "options": "The directions you are weighing, and what you have heard about them."
   }
 }

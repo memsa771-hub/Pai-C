@@ -64,7 +64,7 @@ function CompareColumns({ paths, roadmaps, onOpen }: { paths: Possibility[]; roa
             </header>
             {rows.map(([key, label]) => (
               <section key={key} className="border-t px-5 py-4">
-                <h3 className={cn("mb-1.5 text-xs font-bold uppercase tracking-wider", toneClass[tone].ink)}>{label}</h3>
+                <h3 className={"mb-1 text-xs font-semibold text-muted-foreground"}>{label}</h3>
                 {cells[key]}
               </section>
             ))}
@@ -93,9 +93,9 @@ function DecisionCard({ roadmaps, decision }: { roadmaps: Roadmap[]; decision: D
   }
   const question = chosen ? copy.decisionCertainty : copy.decisionCertaintyNone;
   return (
-    <section aria-labelledby="decision-title" className={cn("rounded-3xl p-5 sm:p-7", chosen ? "bg-success-soft" : "bg-brand-soft")}>
+    <section aria-labelledby="decision-title" className={cn("rounded-3xl p-5 sm:p-7", chosen ? "bg-success-soft" : "border bg-card shadow-soft")}>
       <div className="flex flex-wrap items-start gap-4">
-        <span aria-hidden className={cn("flex size-12 shrink-0 items-center justify-center rounded-2xl bg-card shadow-soft", chosen ? "text-success-ink" : "text-brand-ink")}>
+        <span aria-hidden className={cn("flex size-12 shrink-0 items-center justify-center rounded-2xl bg-card shadow-soft", chosen ? "text-success-ink" : "text-foreground")}>
           {chosen ? <Flag className="size-6" /> : <Scale className="size-6" />}
         </span>
         <div className="min-w-0 flex-1">
@@ -178,7 +178,7 @@ export function Plan({ onChat, onNavigate }: { onChat: (text: string) => void; o
   return (
     <>
       <Heading title={copy.planTitle} description={copy.planIntro} icon={ListChecks} tone="sky" />
-      <section className="mb-6 flex flex-wrap items-center justify-between gap-4 rounded-3xl bg-gradient-to-br from-tone-sky-soft to-tone-blue-soft p-6 sm:p-7">
+      <section className="mb-6 flex flex-wrap items-center justify-between gap-4 rounded-3xl border border-primary/15 bg-brand-soft/60 p-6 sm:p-7">
         <div className="flex min-w-0 max-w-xl items-start gap-3">
           <span aria-hidden className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-card text-tone-sky-ink shadow-soft"><CalendarCheck className="size-5" /></span>
           <div>
