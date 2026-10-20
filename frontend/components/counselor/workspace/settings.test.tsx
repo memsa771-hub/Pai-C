@@ -27,7 +27,11 @@ it('requires an explicit irreversible-deletion acknowledgement and surfaces fail
 it('exports through the owner-scoped data API and reports download failure',async()=>{
  vi.mocked(workspaceApi.exportCounselorData).mockRejectedValue(new Error());
  render(<CounselorSettings base='/student'/>);
+ // The page may read profile cards once to show the current language;
+ // exporting must never assemble data from them.
+ await waitFor(()=>expect(workspaceApi.getProfileCards).toHaveBeenCalledTimes(1));
+ const readsBefore=vi.mocked(workspaceApi.getProfileCards).mock.calls.length;
  fireEvent.click(screen.getByRole('button',{name:'Export my Counselor data'}));
  expect(await screen.findByRole('alert')).toBeTruthy();expect(workspaceApi.exportCounselorData).toHaveBeenCalledTimes(1);
- expect(workspaceApi.getProfileCards).not.toHaveBeenCalled();
+ expect(vi.mocked(workspaceApi.getProfileCards).mock.calls.length).toBe(readsBefore);
 });

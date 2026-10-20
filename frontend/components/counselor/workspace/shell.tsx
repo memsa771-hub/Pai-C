@@ -97,6 +97,10 @@ export function CounselorShell() {
   const navigate = (view: string, event?: string) => {
     openView(view as ViewMode);
     setMore(false);
+    // A chat topic is one-shot; chat() sets it again right after navigating.
+    setDraft("");
+    // Moments, paths and choices change as the student works; keep the stage fresh.
+    void journey.refresh();
     setPath(null);
     setPlaces(false);
     const q = new URLSearchParams({ view });
@@ -104,6 +108,7 @@ export function CounselorShell() {
     window.history.pushState({}, "", `${base}?${q}`);
   };
   const openPath = (id: string) => {
+    void journey.refresh();
     openView("paths");
     setPath(id);
     setPlaces(false);
@@ -237,7 +242,7 @@ export function CounselorShell() {
             </div>
             <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
               {stage && (
-                <button onClick={() => navigate("journey")} className="rounded-full" aria-label={`${copy.shell.stage.replace("{id}", stage.id)}: ${stage.title}`}>
+                <button onClick={() => navigate("journey")} className="inline-flex min-h-11 items-center rounded-full" aria-label={`${copy.shell.stage.replace("{id}", stage.id)}: ${stage.title}`}>
                   <StatChip tone="blue" icon={Flag} className="min-h-9">
                     <span className="sm:hidden">{stage.id}</span>
                     <span className="hidden sm:inline">{copy.shell.stage.replace("{id}", stage.id)} · {stage.title}</span>

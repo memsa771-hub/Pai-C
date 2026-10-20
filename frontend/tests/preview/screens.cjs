@@ -98,7 +98,7 @@ module.exports = [
   { id: 'compare-family', path: '/student?view=compare&roadmap=1', ready: 'main h1', full: true, crawl: false, setup: async (page) => {
     await page.getByRole('button', { name: 'Help me talk this through with my family', exact: true }).click();
     await page.locator('label', { hasText: 'Parent' }).first().click();
-    await page.getByRole('radio', { name: 'Parent', exact: true }).isChecked();
+    if (!(await page.getByRole('radio', { name: 'Parent', exact: true }).isChecked())) throw new Error('compare-family: the label must select the person');
     await page.getByRole('checkbox').first().check();
   } },
   { id: 'decision', path: '/student?view=compare&roadmap=1', ready: 'main h1', crawl: false, setup: async (page) => {

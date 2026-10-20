@@ -32,6 +32,11 @@ export function CounselorMirrorCard({ refreshKey, onUpdated }: {
   const [error, setError] = useState(false);
   const [feedbackVersion, setFeedbackVersion] = useState<number | null>(null);
   const version = useRef<number | null>(null);
+  const feedback = useRef<HTMLDivElement>(null);
+  // After agreeing, bring the rating into view inside the scrolling card.
+  useEffect(() => {
+    if (feedbackVersion !== null) feedback.current?.scrollIntoView?.({ block: 'nearest', behavior: 'smooth' });
+  }, [feedbackVersion]);
 
   useEffect(() => {
     let active = true;
@@ -99,10 +104,10 @@ export function CounselorMirrorCard({ refreshKey, onUpdated }: {
     {draft.status === 'confirmed' && <p role="status" className="mt-3 text-muted-foreground">{t('counselorMirror.confirmed')}</p>}
     {draft.status === 'needs_changes' && <p role="status" className="mt-3 text-muted-foreground">{t('counselorMirror.sent')}</p>}
     {error && <p role="alert" className="mt-2 font-medium text-danger-ink">{t('counselorMirror.error')}</p>}
-    {feedbackVersion === draft.version && <FeltUnderstood version={feedbackVersion}
+    {feedbackVersion === draft.version && <div ref={feedback}><FeltUnderstood version={feedbackVersion}
       labels={{ legend: t('counselorMirror.understood'), certainty: `${t('counselorMirror.certaintyAfter')} (${t('counselorMirror.optional')})`,
         send: t('counselorMirror.sendFeedback'), skip: t('counselorMirror.skipFeedback') }}
-      onSaved={() => onUpdated?.()} onSkip={() => { setFeedbackVersion(null); setError(false); }} />}
+      onSaved={() => onUpdated?.()} onSkip={() => { setFeedbackVersion(null); setError(false); }} /></div>}
     {draft.status === 'awaiting_confirmation' && <div className="mt-4">
       {editing ? <form onSubmit={(event) => { event.preventDefault(); void act(true); }}>
         <label className="block text-sm font-semibold">{t('counselorMirror.editHint')}

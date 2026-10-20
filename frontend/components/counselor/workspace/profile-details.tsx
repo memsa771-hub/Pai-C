@@ -110,8 +110,8 @@ export function FactRow({ card, onSaved, hidden = false }: { card: ProfileCard; 
   return (
     <li className="border-b last:border-b-0">
       <button type="button" onClick={() => setOpen(!open)} aria-expanded={open} aria-controls={panel}
-        aria-label={fill(text.expand, { label })}
         className="flex min-h-14 w-full items-start gap-3 py-3 text-left">
+        <span className="sr-only">{fill(text.expand, { label })}: </span>
         <div className="min-w-0 flex-1 sm:grid sm:grid-cols-[minmax(8rem,14rem)_1fr] sm:gap-4">
           <p className="text-sm text-muted-foreground">{label}</p>
           {hidden ? <p className="flex items-center gap-1.5 text-sm italic text-muted-foreground"><Lock aria-hidden className="size-3.5" />{text.sensitiveHidden}</p>

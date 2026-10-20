@@ -170,7 +170,9 @@ export function ChatView({counselorOnly=false,initialDraft=""}:{counselorOnly?:b
 
   // Continuously refresh message caches for top recent sessions in the background.
   // This ensures clicking any recent thread shows messages instantly and up-to-date.
-  useEffect(()=>{if(initialDraft)setCurrentDraft(initialDraft);},[initialDraft]);
+  // The check-in card belongs to one visit: it hides once something is sent.
+  const [checkinSent, setCheckinSent] = useState(false);
+  useEffect(()=>{if(initialDraft)setCurrentDraft(initialDraft);setCheckinSent(false);},[initialDraft]);
   const currentSessionIdRef = useRef<string | null>(currentSessionId);
   currentSessionIdRef.current = currentSessionId;
 
@@ -431,6 +433,7 @@ export function ChatView({counselorOnly=false,initialDraft=""}:{counselorOnly?:b
     async (content: string, mentions: string[] = [], files: PendingFile[] = [],
            throwOnError = false) => {
       if (!currentSessionId) return;
+      setCheckinSent(true);
       if (!currentUser.id || !currentUser.name.trim()) return;
 
       // Create optimistic messages for instant feedback
@@ -1008,7 +1011,7 @@ export function ChatView({counselorOnly=false,initialDraft=""}:{counselorOnly?:b
             cramped on a 27" 4K, where the pane itself is 2000px+ wide. */}
         {(!isDM || dmWritable) && (
           <div className="mx-auto w-full max-w-3xl px-3 pt-1 pb-3 lg:px-5 lg:pb-4">
-            {counselorOnly && initialDraft === counselorCopy.checkin && <CheckInCard onPick={(text) => setCurrentDraft(`${text}. `)} />}
+            {counselorOnly && initialDraft === counselorCopy.checkin && !checkinSent && <CheckInCard onPick={(text) => setCurrentDraft(counselorCopy.checkinCard.draftTemplate.replace('{option}', text))} />}
             {currentSessionId === 'pai-counselor' && <div className="mb-2">
               <CounselorResearchStatus />
               <CounselorMirrorCard refreshKey={`${currentSessionId}:${displayMessages.length}`}

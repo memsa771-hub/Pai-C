@@ -261,8 +261,10 @@ export const ChatMessage = memo(function ChatMessage({ message, agents = [] }: C
           <span className="sr-only">{displayName}:</span>
           <div className="max-w-[85%] rounded-3xl rounded-br-md bg-gradient-to-br from-[var(--hero-from)] to-[var(--hero-via)] px-4 py-2.5 text-left text-[15px] leading-relaxed text-white shadow-soft sm:max-w-[75%] [&_a]:text-white [&_a]:underline [&_code]:bg-white/20">
             <ConversationCard card={message.metadata?.counselor_card as InlineCard | undefined} channel={message.sessionId}><MarkdownContent content={message.content} agentNames={agentNames} agentLabels={agentLabels} /></ConversationCard>
-            <Attachments items={attachments} />
           </div>
+          {/* Attachments and their status sit below the bubble, on the page
+              surface, so chips and status text keep normal contrast. */}
+          <div className="flex max-w-[85%] justify-end sm:max-w-[75%]"><Attachments items={attachments} /></div>
           {!!message.metadata?.fact_card && <div className="w-full max-w-lg"><FactCard card={message.metadata.fact_card as OfferedFact}/></div>}
           {timestamp && <span className="mt-1 px-1 text-[11px] text-muted-foreground">{timestamp}</span>}
         </div>

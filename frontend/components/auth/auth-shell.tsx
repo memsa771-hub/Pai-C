@@ -105,7 +105,7 @@ export function PasswordInput({ className, ...props }: React.ComponentProps<type
     <div className="relative">
       <Input {...props} type={visible ? 'text' : 'password'} className={cn(authInputClass, 'pe-12', className)} />
       <button type="button" onClick={() => setVisible(!visible)} aria-pressed={visible}
-        aria-label={visible ? t('auth.hidePassword') : t('auth.showPassword')}
+        aria-label={t('auth.showPassword')}
         className="absolute inset-y-0 end-0 flex w-12 items-center justify-center rounded-e-xl text-muted-foreground hover:text-foreground">
         {visible ? <EyeOff aria-hidden className="size-5" /> : <Eye aria-hidden className="size-5" />}
       </button>

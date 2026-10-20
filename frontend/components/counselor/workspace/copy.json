@@ -323,7 +323,8 @@
       "I got a result",
       "I changed my mind",
       "I feel stuck"
-    ]
+    ],
+    "draftTemplate": "{option}. "
   },
   "ratingTitle": "Quick rating",
   "pathsEmptyTitle": "No paths yet",
@@ -339,7 +340,10 @@
   "programsLoading": "PAI is checking programs for this path. You can keep chatting meanwhile.",
   "eligibilityTitle": "Your fit",
   "rulesTitle": "Entry rules",
-  "programsFound": "{count} programs with sources",
+  "programsFound": {
+    "one": "{count} program with sources",
+    "other": "{count} programs with sources"
+  },
   "nextStepTitle": "Next: a reviewed roadmap",
   "pathSectionIcons": {
     "what_it_is": "book",
@@ -395,7 +399,8 @@
       "Test scores",
       "Letters"
     ],
-    "privacy": "Only you and PAI can see your documents. Nothing is shared with a university."
+    "privacy": "Only you and PAI can see your documents. Nothing is shared with a university.",
+    "backToFolders": "Back to folders"
   },
   "settings": {
     "intro": "Appearance, language, notifications and your data, in one place.",
@@ -407,5 +412,14 @@
     "dangerHelp": "This cannot be undone.",
     "languageSaved": "Saved. PAI will reply in {language}.",
     "exported": "Your download has started. Keep the file somewhere private."
-  }
+  },
+  "placesOpen": "Look at places",
+  "fitLabels": {
+    "strong": "Strong fit",
+    "partial": "Partial fit",
+    "weak": "Several gaps",
+    "not_possible_yet": "Not possible yet",
+    "unconfirmed": "Fit unconfirmed"
+  },
+  "notSet": "Not set"
 }

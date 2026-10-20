@@ -44,8 +44,28 @@ exports[`labels evidence in words, not colour alone, in dark 1`] = `
               </svg>
               <span
                 aria-hidden="true"
-                class="flex gap-1"
+                class="flex items-center gap-1"
               >
+                <svg
+                  aria-hidden="true"
+                  class="lucide lucide-badge-check me-1 size-3.5"
+                  fill="none"
+                  height="24"
+                  stroke="currentColor"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  viewBox="0 0 24 24"
+                  width="24"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <path
+                    d="M3.85 8.62a4 4 0 0 1 4.78-4.77 4 4 0 0 1 6.74 0 4 4 0 0 1 4.78 4.78 4 4 0 0 1 0 6.74 4 4 0 0 1-4.77 4.78 4 4 0 0 1-6.75 0 4 4 0 0 1-4.78-4.77 4 4 0 0 1 0-6.76Z"
+                  />
+                  <path
+                    d="m9 12 2 2 4-4"
+                  />
+                </svg>
                 <span
                   class="size-1.5 rounded-full bg-current opacity-100"
                 />
@@ -101,8 +121,30 @@ exports[`labels evidence in words, not colour alone, in dark 1`] = `
               </svg>
               <span
                 aria-hidden="true"
-                class="flex gap-1"
+                class="flex items-center gap-1"
               >
+                <svg
+                  aria-hidden="true"
+                  class="lucide lucide-eye me-1 size-3.5"
+                  fill="none"
+                  height="24"
+                  stroke="currentColor"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  viewBox="0 0 24 24"
+                  width="24"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <path
+                    d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"
+                  />
+                  <circle
+                    cx="12"
+                    cy="12"
+                    r="3"
+                  />
+                </svg>
                 <span
                   class="size-1.5 rounded-full bg-current opacity-100"
                 />
@@ -152,8 +194,25 @@ exports[`labels evidence in words, not colour alone, in dark 1`] = `
               </svg>
               <span
                 aria-hidden="true"
-                class="flex gap-1"
+                class="flex items-center gap-1"
               >
+                <svg
+                  aria-hidden="true"
+                  class="lucide lucide-message-circle me-1 size-3.5"
+                  fill="none"
+                  height="24"
+                  stroke="currentColor"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  viewBox="0 0 24 24"
+                  width="24"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <path
+                    d="M2.992 16.342a2 2 0 0 1 .094 1.167l-1.065 3.29a1 1 0 0 0 1.236 1.168l3.413-.998a2 2 0 0 1 1.099.092 10 10 0 1 0-4.777-4.719"
+                  />
+                </svg>
                 <span
                   class="size-1.5 rounded-full bg-current opacity-100"
                 />
@@ -209,8 +268,30 @@ exports[`labels evidence in words, not colour alone, in dark 1`] = `
               </svg>
               <span
                 aria-hidden="true"
-                class="flex gap-1"
+                class="flex items-center gap-1"
               >
+                <svg
+                  aria-hidden="true"
+                  class="lucide lucide-eye me-1 size-3.5"
+                  fill="none"
+                  height="24"
+                  stroke="currentColor"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  viewBox="0 0 24 24"
+                  width="24"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <path
+                    d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"
+                  />
+                  <circle
+                    cx="12"
+                    cy="12"
+                    r="3"
+                  />
+                </svg>
                 <span
                   class="size-1.5 rounded-full bg-current opacity-100"
                 />
@@ -271,8 +352,25 @@ exports[`labels evidence in words, not colour alone, in dark 1`] = `
               </svg>
               <span
                 aria-hidden="true"
-                class="flex gap-1"
+                class="flex items-center gap-1"
               >
+                <svg
+                  aria-hidden="true"
+                  class="lucide lucide-message-circle me-1 size-3.5"
+                  fill="none"
+                  height="24"
+                  stroke="currentColor"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  viewBox="0 0 24 24"
+                  width="24"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <path
+                    d="M2.992 16.342a2 2 0 0 1 .094 1.167l-1.065 3.29a1 1 0 0 0 1.236 1.168l3.413-.998a2 2 0 0 1 1.099.092 10 10 0 1 0-4.777-4.719"
+                  />
+                </svg>
                 <span
                   class="size-1.5 rounded-full bg-current opacity-100"
                 />
@@ -328,8 +426,25 @@ exports[`labels evidence in words, not colour alone, in dark 1`] = `
               </svg>
               <span
                 aria-hidden="true"
-                class="flex gap-1"
+                class="flex items-center gap-1"
               >
+                <svg
+                  aria-hidden="true"
+                  class="lucide lucide-message-circle me-1 size-3.5"
+                  fill="none"
+                  height="24"
+                  stroke="currentColor"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  viewBox="0 0 24 24"
+                  width="24"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <path
+                    d="M2.992 16.342a2 2 0 0 1 .094 1.167l-1.065 3.29a1 1 0 0 0 1.236 1.168l3.413-.998a2 2 0 0 1 1.099.092 10 10 0 1 0-4.777-4.719"
+                  />
+                </svg>
                 <span
                   class="size-1.5 rounded-full bg-current opacity-100"
                 />
@@ -391,8 +506,25 @@ exports[`labels evidence in words, not colour alone, in dark 1`] = `
               </svg>
               <span
                 aria-hidden="true"
-                class="flex gap-1"
+                class="flex items-center gap-1"
               >
+                <svg
+                  aria-hidden="true"
+                  class="lucide lucide-message-circle me-1 size-3.5"
+                  fill="none"
+                  height="24"
+                  stroke="currentColor"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  viewBox="0 0 24 24"
+                  width="24"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <path
+                    d="M2.992 16.342a2 2 0 0 1 .094 1.167l-1.065 3.29a1 1 0 0 0 1.236 1.168l3.413-.998a2 2 0 0 1 1.099.092 10 10 0 1 0-4.777-4.719"
+                  />
+                </svg>
                 <span
                   class="size-1.5 rounded-full bg-current opacity-100"
                 />
@@ -445,8 +577,27 @@ exports[`labels evidence in words, not colour alone, in dark 1`] = `
               </svg>
               <span
                 aria-hidden="true"
-                class="flex gap-1"
+                class="flex items-center gap-1"
               >
+                <svg
+                  aria-hidden="true"
+                  class="lucide lucide-circle me-1 size-3.5"
+                  fill="none"
+                  height="24"
+                  stroke="currentColor"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  viewBox="0 0 24 24"
+                  width="24"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <circle
+                    cx="12"
+                    cy="12"
+                    r="10"
+                  />
+                </svg>
                 <span
                   class="size-1.5 rounded-full bg-current opacity-25"
                 />
@@ -508,8 +659,27 @@ exports[`labels evidence in words, not colour alone, in dark 1`] = `
               </svg>
               <span
                 aria-hidden="true"
-                class="flex gap-1"
+                class="flex items-center gap-1"
               >
+                <svg
+                  aria-hidden="true"
+                  class="lucide lucide-circle me-1 size-3.5"
+                  fill="none"
+                  height="24"
+                  stroke="currentColor"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  viewBox="0 0 24 24"
+                  width="24"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <circle
+                    cx="12"
+                    cy="12"
+                    r="10"
+                  />
+                </svg>
                 <span
                   class="size-1.5 rounded-full bg-current opacity-25"
                 />
@@ -565,8 +735,27 @@ exports[`labels evidence in words, not colour alone, in dark 1`] = `
               </svg>
               <span
                 aria-hidden="true"
-                class="flex gap-1"
+                class="flex items-center gap-1"
               >
+                <svg
+                  aria-hidden="true"
+                  class="lucide lucide-circle me-1 size-3.5"
+                  fill="none"
+                  height="24"
+                  stroke="currentColor"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  viewBox="0 0 24 24"
+                  width="24"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <circle
+                    cx="12"
+                    cy="12"
+                    r="10"
+                  />
+                </svg>
                 <span
                   class="size-1.5 rounded-full bg-current opacity-25"
                 />
@@ -892,8 +1081,28 @@ exports[`labels evidence in words, not colour alone, in light 1`] = `
               </svg>
               <span
                 aria-hidden="true"
-                class="flex gap-1"
+                class="flex items-center gap-1"
               >
+                <svg
+                  aria-hidden="true"
+                  class="lucide lucide-badge-check me-1 size-3.5"
+                  fill="none"
+                  height="24"
+                  stroke="currentColor"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  viewBox="0 0 24 24"
+                  width="24"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <path
+                    d="M3.85 8.62a4 4 0 0 1 4.78-4.77 4 4 0 0 1 6.74 0 4 4 0 0 1 4.78 4.78 4 4 0 0 1 0 6.74 4 4 0 0 1-4.77 4.78 4 4 0 0 1-6.75 0 4 4 0 0 1-4.78-4.77 4 4 0 0 1 0-6.76Z"
+                  />
+                  <path
+                    d="m9 12 2 2 4-4"
+                  />
+                </svg>
                 <span
                   class="size-1.5 rounded-full bg-current opacity-100"
                 />
@@ -949,8 +1158,30 @@ exports[`labels evidence in words, not colour alone, in light 1`] = `
               </svg>
               <span
                 aria-hidden="true"
-                class="flex gap-1"
+                class="flex items-center gap-1"
               >
+                <svg
+                  aria-hidden="true"
+                  class="lucide lucide-eye me-1 size-3.5"
+                  fill="none"
+                  height="24"
+                  stroke="currentColor"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  viewBox="0 0 24 24"
+                  width="24"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <path
+                    d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"
+                  />
+                  <circle
+                    cx="12"
+                    cy="12"
+                    r="3"
+                  />
+                </svg>
                 <span
                   class="size-1.5 rounded-full bg-current opacity-100"
                 />
@@ -1000,8 +1231,25 @@ exports[`labels evidence in words, not colour alone, in light 1`] = `
               </svg>
               <span
                 aria-hidden="true"
-                class="flex gap-1"
+                class="flex items-center gap-1"
               >
+                <svg
+                  aria-hidden="true"
+                  class="lucide lucide-message-circle me-1 size-3.5"
+                  fill="none"
+                  height="24"
+                  stroke="currentColor"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  viewBox="0 0 24 24"
+                  width="24"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <path
+                    d="M2.992 16.342a2 2 0 0 1 .094 1.167l-1.065 3.29a1 1 0 0 0 1.236 1.168l3.413-.998a2 2 0 0 1 1.099.092 10 10 0 1 0-4.777-4.719"
+                  />
+                </svg>
                 <span
                   class="size-1.5 rounded-full bg-current opacity-100"
                 />
@@ -1057,8 +1305,30 @@ exports[`labels evidence in words, not colour alone, in light 1`] = `
               </svg>
               <span
                 aria-hidden="true"
-                class="flex gap-1"
+                class="flex items-center gap-1"
               >
+                <svg
+                  aria-hidden="true"
+                  class="lucide lucide-eye me-1 size-3.5"
+                  fill="none"
+                  height="24"
+                  stroke="currentColor"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  viewBox="0 0 24 24"
+                  width="24"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <path
+                    d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"
+                  />
+                  <circle
+                    cx="12"
+                    cy="12"
+                    r="3"
+                  />
+                </svg>
                 <span
                   class="size-1.5 rounded-full bg-current opacity-100"
                 />
@@ -1119,8 +1389,25 @@ exports[`labels evidence in words, not colour alone, in light 1`] = `
               </svg>
               <span
                 aria-hidden="true"
-                class="flex gap-1"
+                class="flex items-center gap-1"
               >
+                <svg
+                  aria-hidden="true"
+                  class="lucide lucide-message-circle me-1 size-3.5"
+                  fill="none"
+                  height="24"
+                  stroke="currentColor"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  viewBox="0 0 24 24"
+                  width="24"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <path
+                    d="M2.992 16.342a2 2 0 0 1 .094 1.167l-1.065 3.29a1 1 0 0 0 1.236 1.168l3.413-.998a2 2 0 0 1 1.099.092 10 10 0 1 0-4.777-4.719"
+                  />
+                </svg>
                 <span
                   class="size-1.5 rounded-full bg-current opacity-100"
                 />
@@ -1176,8 +1463,25 @@ exports[`labels evidence in words, not colour alone, in light 1`] = `
               </svg>
               <span
                 aria-hidden="true"
-                class="flex gap-1"
+                class="flex items-center gap-1"
               >
+                <svg
+                  aria-hidden="true"
+                  class="lucide lucide-message-circle me-1 size-3.5"
+                  fill="none"
+                  height="24"
+                  stroke="currentColor"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  viewBox="0 0 24 24"
+                  width="24"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <path
+                    d="M2.992 16.342a2 2 0 0 1 .094 1.167l-1.065 3.29a1 1 0 0 0 1.236 1.168l3.413-.998a2 2 0 0 1 1.099.092 10 10 0 1 0-4.777-4.719"
+                  />
+                </svg>
                 <span
                   class="size-1.5 rounded-full bg-current opacity-100"
                 />
@@ -1239,8 +1543,25 @@ exports[`labels evidence in words, not colour alone, in light 1`] = `
               </svg>
               <span
                 aria-hidden="true"
-                class="flex gap-1"
+                class="flex items-center gap-1"
               >
+                <svg
+                  aria-hidden="true"
+                  class="lucide lucide-message-circle me-1 size-3.5"
+                  fill="none"
+                  height="24"
+                  stroke="currentColor"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  viewBox="0 0 24 24"
+                  width="24"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <path
+                    d="M2.992 16.342a2 2 0 0 1 .094 1.167l-1.065 3.29a1 1 0 0 0 1.236 1.168l3.413-.998a2 2 0 0 1 1.099.092 10 10 0 1 0-4.777-4.719"
+                  />
+                </svg>
                 <span
                   class="size-1.5 rounded-full bg-current opacity-100"
                 />
@@ -1293,8 +1614,27 @@ exports[`labels evidence in words, not colour alone, in light 1`] = `
               </svg>
               <span
                 aria-hidden="true"
-                class="flex gap-1"
+                class="flex items-center gap-1"
               >
+                <svg
+                  aria-hidden="true"
+                  class="lucide lucide-circle me-1 size-3.5"
+                  fill="none"
+                  height="24"
+                  stroke="currentColor"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  viewBox="0 0 24 24"
+                  width="24"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <circle
+                    cx="12"
+                    cy="12"
+                    r="10"
+                  />
+                </svg>
                 <span
                   class="size-1.5 rounded-full bg-current opacity-25"
                 />
@@ -1356,8 +1696,27 @@ exports[`labels evidence in words, not colour alone, in light 1`] = `
               </svg>
               <span
                 aria-hidden="true"
-                class="flex gap-1"
+                class="flex items-center gap-1"
               >
+                <svg
+                  aria-hidden="true"
+                  class="lucide lucide-circle me-1 size-3.5"
+                  fill="none"
+                  height="24"
+                  stroke="currentColor"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  viewBox="0 0 24 24"
+                  width="24"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <circle
+                    cx="12"
+                    cy="12"
+                    r="10"
+                  />
+                </svg>
                 <span
                   class="size-1.5 rounded-full bg-current opacity-25"
                 />
@@ -1413,8 +1772,27 @@ exports[`labels evidence in words, not colour alone, in light 1`] = `
               </svg>
               <span
                 aria-hidden="true"
-                class="flex gap-1"
+                class="flex items-center gap-1"
               >
+                <svg
+                  aria-hidden="true"
+                  class="lucide lucide-circle me-1 size-3.5"
+                  fill="none"
+                  height="24"
+                  stroke="currentColor"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  viewBox="0 0 24 24"
+                  width="24"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <circle
+                    cx="12"
+                    cy="12"
+                    r="10"
+                  />
+                </svg>
                 <span
                   class="size-1.5 rounded-full bg-current opacity-25"
                 />

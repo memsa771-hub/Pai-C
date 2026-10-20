@@ -45,7 +45,7 @@ function CompareColumns({ paths, roadmaps, onOpen }: { paths: Possibility[]; roa
             ? <ul className="space-y-1.5">{path.evidence.slice(0, 2).map((e, i) => <li key={i} className="text-sm italic text-muted-foreground">“{e.text}”</li>)}</ul>
             : <p className="text-sm text-muted-foreground">{copy.nothingRecorded}</p>,
           fit: roadmap
-            ? <StatChip size="sm" tone={FIT_TONE[(roadmap.fit_level || "unconfirmed") as keyof typeof FIT_TONE] || "neutral"}>{human(roadmap.fit_level || "unconfirmed")}</StatChip>
+            ? <StatChip size="sm" tone={FIT_TONE[(roadmap.fit_level || "unconfirmed") as keyof typeof FIT_TONE] || "neutral"}>{copy.fitLabels[(roadmap.fit_level || "unconfirmed") as keyof typeof copy.fitLabels] || copy.fitLabels.unconfirmed}</StatChip>
             : <p className="text-sm text-muted-foreground">{copy.noRoadmapYet}</p>,
           risks: roadmap?.risks.length
             ? <ul className="space-y-1 text-sm">{roadmap.risks.slice(0, 2).map((risk, i) => <li key={i}>{risk}</li>)}</ul>
@@ -115,6 +115,8 @@ function DecisionCard({ roadmaps, decision }: { roadmaps: Roadmap[]; decision: D
             <div className="mt-2 flex items-center gap-3">
               <input id="decision-certainty" type="range" min={0} max={10} step={1} value={value}
                 onChange={(e) => { setValue(Number(e.target.value)); setTouched(true); }}
+                onPointerDown={() => setTouched(true)}
+                onKeyDown={(e) => { if ([" ", "Enter"].includes(e.key)) setTouched(true); }}
                 aria-valuetext={`${value} / 10`} className="h-11 flex-1 accent-[var(--brand)]" />
               <span aria-hidden className="w-14 text-right text-lg font-bold tabular-nums">{value}/10</span>
             </div>
@@ -190,7 +192,7 @@ export function Plan({ onChat, onNavigate }: { onChat: (text: string) => void; o
         <LoadState error={resource.error} busy={resource.busy} retry={resource.refresh} skeleton="list" />
       ) : chosen ? (
         <div className="grid gap-5 lg:grid-cols-[1.4fr_1fr]">
-          <SectionCard title={fill(copy.decisionChosen, { title: chosen.title })} description={copy.planStepsTitle} icon={Flag} tone="blue">
+          <SectionCard title={fill(copy.decisionChosen, { title: chosen.title })} icon={Flag} tone="blue">
             {chosen.steps.length ? (
               <Timeline label={copy.planStepsTitle} items={chosen.steps.map((step, i) => ({
                 id: String(i), marker: i + 1, state: i === 0 ? "now" : "next",
@@ -204,7 +206,7 @@ export function Plan({ onChat, onNavigate }: { onChat: (text: string) => void; o
                 <ul className="space-y-2 text-sm">{chosen.risks.map((risk, i) => <li key={i} className="rounded-xl bg-warning-soft px-3 py-2 text-warning-ink">{risk}</li>)}</ul>
               </SectionCard>
             )}
-            {chosen.try_it && <TryItFeedback roadmap={chosen} />}
+            {chosen.try_it && <TryItFeedback roadmap={chosen} headingLevel={2} />}
           </div>
         </div>
       ) : (

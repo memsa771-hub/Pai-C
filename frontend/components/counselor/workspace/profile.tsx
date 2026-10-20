@@ -117,9 +117,20 @@ export function LivingProfile({
     <div className="space-y-5">
       <ProfileHeader name={name} named={!!realName} level={level} city={value("location.current_city")} stage={stage} updated={shortDate(dates.at(-1))} />
       <div ref={top} className="flex scroll-mt-4 flex-wrap items-center justify-between gap-3">
-        <div role="tablist" aria-label={text.viewLabel} className="inline-flex rounded-2xl bg-muted p-1">
+        <div role="tablist" aria-label={text.viewLabel} className="inline-flex rounded-2xl bg-muted p-1"
+          onKeyDown={(e) => {
+            const order: Tab[] = ["visual", "details"];
+            const index = order.indexOf(tab);
+            const next = e.key === "ArrowRight" ? order[(index + 1) % 2] : e.key === "ArrowLeft" ? order[(index + 1) % 2]
+              : e.key === "Home" ? order[0] : e.key === "End" ? order[1] : null;
+            if (!next) return;
+            e.preventDefault();
+            switchTab(next);
+            document.getElementById(`profile-tab-${next}`)?.focus();
+          }}>
           {tabs.map(({ id, label, icon: Icon }) => (
-            <button key={id} role="tab" id={`profile-tab-${id}`} aria-selected={tab === id} aria-controls={`profile-panel-${id}`}
+            <button key={id} role="tab" id={`profile-tab-${id}`} aria-selected={tab === id}
+              aria-controls={tab === id ? `profile-panel-${id}` : undefined} tabIndex={tab === id ? 0 : -1}
               onClick={() => switchTab(id)}
               className={cn("inline-flex min-h-11 items-center gap-2 rounded-xl px-4 text-sm font-semibold transition-colors",
                 tab === id ? "bg-card text-foreground shadow-soft" : "text-muted-foreground hover:text-foreground")}>

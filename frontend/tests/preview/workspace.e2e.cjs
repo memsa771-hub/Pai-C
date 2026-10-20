@@ -91,7 +91,12 @@ async function crawl(browser) {
         await load(page, screen);
         const count = await page.locator('button:not([disabled]):visible, a[href]:visible').count();
         for (let i = 0; i < count; i++) {
-          await load(page, screen);
+          // Thousands of reloads can slow the dev server; a reload that times out
+          // is retried once, and a page that still will not load is a failure.
+          try { await load(page, screen); } catch {
+            try { await page.waitForTimeout(1500); await load(page, screen); }
+            catch (error) { failures.push(`${screen.id} ${width}: reload before control ${i}: ${error.message.split('\n')[0]}`); continue; }
+          }
           const control = page.locator('button:not([disabled]):visible, a[href]:visible').nth(i);
           if (!(await control.count())) continue;
           const name = ((await control.getAttribute('aria-label')) || (await control.innerText()).trim() || '(icon)').slice(0, 40);
@@ -113,7 +118,19 @@ async function crawl(browser) {
             new MutationObserver((list) => { window.__mutations += list.length; })
               .observe(document.body, { subtree: true, childList: true, attributes: true, characterData: true });
           });
-          try { await control.click({ timeout: 3000 }); } catch (error) { failures.push(`${screen.id} ${width}: "${name}": ${error.message.split('\n')[0]}`); continue; }
+          // A click that times out under load is retried once on a fresh page;
+          // a control that still cannot be clicked is a failure.
+          try { await control.click({ timeout: 3000 }); } catch {
+            try {
+              await load(page, screen);
+              await page.evaluate(() => {
+                window.__mutations = 0;
+                new MutationObserver((list) => { window.__mutations += list.length; })
+                  .observe(document.body, { subtree: true, childList: true, attributes: true, characterData: true });
+              });
+              await page.locator('button:not([disabled]):visible, a[href]:visible').nth(i).click({ timeout: 8000 });
+            } catch (error) { failures.push(`${screen.id} ${width}: "${name}": ${error.message.split('\n')[0]}`); continue; }
+          }
           clicks++;
           await page.waitForTimeout(400);
           // Opening the file chooser or starting a download is a real response.

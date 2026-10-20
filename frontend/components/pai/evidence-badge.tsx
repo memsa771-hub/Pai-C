@@ -28,3 +28,4 @@ export function EvidenceBadge({ level, className, label }: { level: EvidenceLeve
   );
 }
 export const evidenceFill = styles;
+export const evidenceIcons = icons;

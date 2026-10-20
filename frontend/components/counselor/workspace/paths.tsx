@@ -12,7 +12,8 @@ import { Button } from "@/components/ui/button";
 import { EmptyState, SectionCard, Skeletons, StatChip, toneClass, toneFor, tonesByOrder, type Tone } from "@/components/pai";
 import { PathCardView } from "@/components/counselor/path-card";
 import { cn } from "@/lib/utils";
-import { Heading, LoadState, useResource, human, shortDate } from "./resource";
+import { Heading, LoadState, useResource, human, evidenceLabel, shortDate } from "./resource";
+import { DEFAULT_LOCALE } from "@/lib/i18n/locales";
 import copy from "./copy.json";
 
 const list = () => workspaceApi.getPossibilities();
@@ -283,7 +284,7 @@ export function PathPage({
                 <p className="mt-1 text-sm text-muted-foreground">{copy.placesIntro}</p>
               </div>
             </div>
-            <Button size="tap" onClick={onPlaces}>{copy.places}<ArrowRight aria-hidden /></Button>
+            <Button size="tap" onClick={onPlaces}>{copy.placesOpen}<ArrowRight aria-hidden /></Button>
           </section>
         </>
       )}
@@ -303,7 +304,7 @@ function Source({ fact }: { fact: Record<string, unknown> }) {
     <p className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
       {host && (
         <a href={url} target="_blank" rel="noopener noreferrer"
-          className="inline-flex min-h-8 items-center gap-1 font-semibold text-brand-ink underline-offset-4 hover:underline">
+          className="inline-flex min-h-11 items-center gap-1 font-semibold text-brand-ink underline-offset-4 hover:underline">
           <ExternalLink aria-hidden className="size-3.5" />{host}
         </a>
       )}
@@ -311,14 +312,6 @@ function Source({ fact }: { fact: Record<string, unknown> }) {
       <StatChip size="sm" tone={verified ? "success" : "neutral"}>{verified ? copy.verified : copy.unconfirmed}</StatChip>
     </p>
   );
-}
-
-/** "1,200 USD · Per year" when the fee is structured; readable text otherwise. */
-function money(fees: Record<string, unknown>) {
-  const amount = Number(fees.amount ?? fees.fee ?? fees.cost);
-  if (!Number.isFinite(amount)) return human(fees);
-  return [`${new Intl.NumberFormat().format(amount)} ${fees.currency ? String(fees.currency) : ""}`.trim(), fees.basis ? human(fees.basis) : ""]
-    .filter(Boolean).join(" · ");
 }
 
 const ELIGIBILITY_TONE: Record<string, "success" | "blue" | "warning" | "neutral"> = {
@@ -350,7 +343,18 @@ function ProgramCard({ program }: { program: Program }) {
       {program.fees && Object.keys(program.fees).length > 0 && (
         <section className="mt-4 rounded-2xl bg-muted/60 px-4 py-3 text-sm">
           <h3 className="flex items-center gap-1.5 font-semibold"><Wallet aria-hidden className="size-4" />{copy.fees}</h3>
-          <p className="mt-1">{money(program.fees)}</p>
+          {/* Each fee is a sourced fact: its label, its value, and where it came from. */}
+          <ul className="mt-2 space-y-2">
+            {Object.entries(program.fees).map(([key, fee]) => {
+              const fact = fee && typeof fee === "object" ? fee as Record<string, unknown> : { value: fee };
+              return (
+                <li key={key}>
+                  <p><span className="text-muted-foreground">{evidenceLabel(key)}: </span><span className="font-medium">{human(fact.value ?? fact.quote)}</span></p>
+                  {fact.source_url ? <Source fact={fact} /> : null}
+                </li>
+              );
+            })}
+          </ul>
         </section>
       )}
       {program.rules.length > 0 && (
@@ -473,7 +477,9 @@ export function ProgramPage({
             <EmptyState icon={Info} tone="sky" title={copy.needsChecking} description={copy.noPrograms} />
           ) : (
             <>
-              <p className="mb-4 text-sm font-medium text-muted-foreground">{fill(copy.programsFound, { count: resource.data.programs.length })}</p>
+              <p className="mb-4 text-sm font-medium text-muted-foreground">{fill(
+                new Intl.PluralRules(DEFAULT_LOCALE).select(resource.data.programs.length) === "one" ? copy.programsFound.one : copy.programsFound.other,
+                { count: resource.data.programs.length })}</p>
               <div className="grid gap-5 md:grid-cols-2">
                 {resource.data.programs.map((program) => <ProgramCard key={program.opportunity_id} program={program} />)}
               </div>

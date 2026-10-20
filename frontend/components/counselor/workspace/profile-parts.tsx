@@ -160,7 +160,7 @@ const record = (card: ProfileCard) => (card.value && typeof card.value === "obje
 export const cardTitle = (card: ProfileCard) => {
   const value = record(card);
   const field = layout.titleFields.find((key) => typeof value[key] === "string" && value[key]);
-  return field ? String(value[field]) : evidenceLabel(card.key);
+  return field ? human(value[field]) : evidenceLabel(card.key);
 };
 const HIDDEN_IN_TIMELINE = new Set(["academic_status", ...layout.titleFields]);
 const percent = (value: Record<string, unknown>) => {
@@ -330,9 +330,9 @@ export function FeltUnderstood({ version, onSaved, onSkip, labels }: {
     <form className="mt-5 rounded-2xl bg-muted/60 p-4" onSubmit={(e) => { e.preventDefault(); void send(); }}>
       <fieldset disabled={busy}>
         <legend className="text-sm font-semibold">{l.legend}</legend>
-        <div role="radiogroup" aria-label={l.legend} className="mt-3 grid grid-cols-5 gap-2">
+        <div role="radiogroup" aria-label={l.legend} className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-5">
           {text.feltScale.map((label, i) => (
-            <label key={label} className={cn("flex min-h-14 cursor-pointer flex-col items-center justify-center gap-0.5 rounded-xl border-2 bg-card px-1 text-center text-xs font-medium transition-colors has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-ring",
+            <label key={label} className={cn("flex min-h-11 cursor-pointer items-center gap-3 rounded-xl border-2 bg-card px-3 text-sm font-medium transition-colors has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-ring sm:min-h-14 sm:flex-col sm:justify-center sm:gap-0.5 sm:px-1 sm:text-center sm:text-xs",
               understood === i + 1 ? "border-brand bg-brand-soft text-brand-ink" : "border-transparent hover:border-border")}>
               <input type="radio" name={name} value={i + 1} checked={understood === i + 1} onChange={() => setUnderstood(i + 1)}
                 aria-label={`${i + 1}: ${label}`} className="sr-only" />
@@ -344,8 +344,14 @@ export function FeltUnderstood({ version, onSaved, onSkip, labels }: {
       <label className="mt-4 block text-sm font-medium">
         {l.certainty}
         <span className="mt-2 flex items-center gap-3">
-          <input type="range" min={0} max={10} step={1} value={certainty ?? 5} disabled={busy} onChange={(e) => setCertainty(Number(e.target.value))}
-            className="h-11 flex-1 accent-[var(--brand)]" aria-valuetext={certainty === null ? "-" : `${certainty} / 10`} />
+          {/* Unset until touched; pressing the thumb (or a key) records the
+              value under it, so 5 is choosable without moving away and back. */}
+          <input type="range" min={0} max={10} step={1} value={certainty ?? 5} disabled={busy}
+            onChange={(e) => setCertainty(Number(e.target.value))}
+            onPointerDown={(e) => { if (certainty === null) setCertainty(Number(e.currentTarget.value)); }}
+            onKeyDown={(e) => { if (certainty === null && [" ", "Enter"].includes(e.key)) setCertainty(Number(e.currentTarget.value)); }}
+            className={cn("h-11 flex-1 accent-[var(--brand)]", certainty === null && "opacity-50")}
+            aria-valuetext={certainty === null ? copy.notSet : `${certainty} / 10`} />
           <span aria-hidden className="w-12 text-right font-bold tabular-nums">{certainty === null ? "–" : `${certainty}/10`}</span>
         </span>
       </label>

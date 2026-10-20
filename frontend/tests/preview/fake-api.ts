@@ -6,14 +6,20 @@ export const mirror={type:'mirror',version:1,status:'awaiting_confirmation',mirr
   dimensions:[{key:'strengths',name:'Practical curiosity',picture:'You try things, notice what happens and try again.',evidence:'I fixed a broken lamp with my friend.',unknown:false}],
   blockers:['We still need to test how the study itself feels to you.'],opinion:'Practical design is worth exploring alongside computing.',question:'What feels right, and what should I change?',roadmap_lanes:[]}};
 const sampleSource=(path:string)=>({source_url:`https://example.org/${path}`,checked_at:'2026-10-10T09:00:00Z',status:'verified'});
+// Same shape as the backend payload: fees and rules are sourced facts;
+// eligibility follows eligibility(): unconfirmed means unknown, a band needs
+// every rule met, and a route only appears with gaps.
+const fact=(path:string,value:unknown,status='verified')=>({value,...sampleSource(path),status,fact_id:`offline:${path}`});
 const richPrograms={status:'completed',missing:[],programs:[
   {opportunity_id:'program-one',title:'Design foundation programme, Sample Institute',...sampleSource('design-foundation'),
-    rules:[{value:'Completed upper secondary education',...sampleSource('design-foundation/entry')}],fees:{amount:1200,currency:'USD',basis:'per_year'},
-    eligibility:{label:'realistic',gaps:[],route:[]}},
-  {opportunity_id:'program-two',title:'Applied product design, Example College',status:'unconfirmed',source_url:'https://example.org/applied-design',checked_at:'2026-09-28T09:00:00Z',
-    rules:[],fees:{},eligibility:{label:'stretch',gaps:[],route:[{action:'Take a short portfolio course first',...sampleSource('portfolio-course')}]}},
-  {opportunity_id:'program-three',title:'Creative technology diploma, Demo Polytechnic',...sampleSource('creative-technology'),
+    rules:[fact('design-foundation/entry','Completed upper secondary education')],fees:{tuition:fact('design-foundation/fees','1,200 USD per year')},
+    eligibility:{label:'realistic',gaps:[{field:'qualification',status:'met'}],route:[]}},
+  {opportunity_id:'program-two',title:'Applied product design, Example College',...sampleSource('applied-design'),status:'unconfirmed',
     rules:[],fees:{},eligibility:{label:'unknown',gaps:[],route:[]}},
+  {opportunity_id:'program-three',title:'Creative technology diploma, Demo Polytechnic',...sampleSource('creative-technology'),
+    rules:[fact('creative-technology/entry','A portfolio of three small projects')],fees:{},
+    eligibility:{label:'not_yet',gaps:[{field:'portfolio',status:'fixable',remediation:{action:'Take a short portfolio course first'}}],
+      route:[{action:'Take a short portfolio course first',...sampleSource('portfolio-course')}]}},
 ]};
 let searched=new URLSearchParams(location.search).has('programs'), prepared=new URLSearchParams(location.search).has('roadmap'), chosen=new URLSearchParams(location.search).has('family');
 const roadmap={id:'roadmap-one',journey_id:'journey-one',goal_id:null,title:'Practical design',origin:'stated_goal',route:{},

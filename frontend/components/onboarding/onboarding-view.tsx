@@ -43,6 +43,14 @@ export function OnboardingView({ state, onDone }: {
   const fields = state.fields;
   const field = fields[step];
   const last = step === fields.length - 1;
+  // Move focus to the new question so screen readers announce each step
+  // (choice steps have no text box to autofocus). Not on first render.
+  const question = React.useRef<HTMLHeadingElement>(null);
+  const moved = React.useRef(false);
+  React.useEffect(() => {
+    if (moved.current) question.current?.focus();
+    moved.current = true;
+  }, [step]);
 
   const set = (name: string, value: string) =>
     setAnswers((prev) => ({ ...prev, [name]: value }));
@@ -114,6 +122,9 @@ export function OnboardingView({ state, onDone }: {
                 <motion.div key={field.name} custom={direction}
                   initial={{ opacity: 0, x: direction * 24 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: direction * -24 }}
                   transition={{ duration: 0.22, ease: 'easeOut' }}>
+                  <h2 ref={question} tabIndex={-1} className="sr-only">
+                    {t('onboarding.step', { current: step + 1, total: fields.length })}: {translated(`onboarding.field.${field.name}`, field.name)}
+                  </h2>
                   <Step field={field} label={translated(`onboarding.field.${field.name}`, field.name)}
                     help={translated(`onboarding.help.${field.name}`, '')} value={answers[field.name] || ''}
                     onChange={(v) => set(field.name, v)} />
@@ -127,8 +138,8 @@ export function OnboardingView({ state, onDone }: {
                     <ArrowLeft aria-hidden />{t('onboarding.back')}
                   </Button>
                 )}
-                <Button type="submit" size="tap" className="ms-auto h-12 min-w-36" disabled={busy || !stepReady || (last && missingRequired)}>
-                  {busy ? <Loader2 aria-hidden className="size-4 animate-spin" />
+                <Button type="submit" size="tap" className="ms-auto h-12 min-w-36" aria-busy={busy} disabled={busy || !stepReady || (last && missingRequired)}>
+                  {busy ? <><Loader2 aria-hidden className="size-4 animate-spin" /><span className="sr-only">{t('common.loading')}</span></>
                     : last ? <>{t('onboarding.continue')}<Check aria-hidden /></>
                     : <>{t('onboarding.next')}<ArrowRight aria-hidden /></>}
                 </Button>

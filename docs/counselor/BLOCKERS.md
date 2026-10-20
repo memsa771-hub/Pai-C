@@ -41,3 +41,12 @@ Myth correction requires an existing official registry domain or a reviewed trus
 Guided family preparation intentionally requires completed stage-H results for the chosen path. Earlier family discussion stays in chat; legacy choices without H proof cannot produce a potentially institution-bearing preparation. A person without a recorded concern or a path without student evidence is shown the missing-information state. No concern or evidence is invented.
 
 New check-ins are scheduled by new explicit choices/try-it acceptance only; existing historical choices are not backfilled. Continued care defers an unrelated follow-up. The in-app notification service retains its workspace visibility rules; separate cross-workspace operator/admin alert routing was not introduced.
+
+## UI redesign v2 (20 October)
+
+- **No live run.** Every screen was verified offline with synthetic fixtures and blocked network (build, unit tests, harness, crawler, flow). The Docker stack was not started, so real data shapes, long real names, real documents and provider latency have not been seen on the new UI.
+- **Shared OS screens are only re-tokenised.** The Documents file manager internals (`components/files/*`) and the workspace settings sub-pages (`/[workspace]/settings/*`, reached from Settings) are shared with PAI OS. They pick up the new tokens and the student-facing wrapper, but were not redesigned, to avoid changing another developer's screens.
+- **Stage chip is an approximation.** Without a backend A-K field, the chip reflects the furthest signal reached (see DECISIONS). A student who skips ahead (for example chooses a route early) shows the later stage.
+- **Eligibility pills depend on reviewed packs.** As before, no authoritative entry or merit packs exist. Programs therefore show "Needs checking" unless the backend supplies a reviewed label.
+- **Font coverage.** The self-hosted font covers Latin and Latin-ext (English and Roman Urdu). Urdu script, if ever shown, falls back to the system font.
+- **Follow-up brief not started.** `docs/counselor/PROFILE_ONBOARDING_PROMPT.md` (new onboarding fields, editable profile, PAI memory area) says to start only after this redesign. It is untracked and was not acted on.

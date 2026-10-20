@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useTheme } from "next-themes";
 import { Bell, Check, ChevronRight, Download, Languages, Link2, Monitor, Moon, Palette, ShieldCheck, Sun, Trash2, TriangleAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -27,7 +27,17 @@ export function CounselorSettings({ base }: { base: string }) {
     [deleting, setDeleting] = useState(false),
     [confirmDelete, setConfirmDelete] = useState(false),
     [busy, setBusy] = useState(false),
-    [exported, setExported] = useState(false);
+    [exported, setExported] = useState(false),
+    [currentLanguage, setCurrentLanguage] = useState<string | null>(null);
+  // Show the language PAI uses now; a failed read just leaves none selected.
+  useEffect(() => {
+    let alive = true;
+    Promise.resolve().then(() => workspaceApi.getProfileCards()).then((result) => {
+      const card = result?.cards?.find((c) => c.key === "preferences.preferred_language");
+      if (alive && typeof card?.value === "string") setCurrentLanguage(card.value);
+    }).catch(() => {});
+    return () => { alive = false; };
+  }, []);
   async function remove() {
     if (!confirmDelete) return;
     setBusy(true);
@@ -49,6 +59,7 @@ export function CounselorSettings({ base }: { base: string }) {
       });
       if (!result.saved) throw new Error();
       setSavedLanguage(value);
+      setCurrentLanguage(value);
     } catch {
       setError(true);
     }
@@ -100,10 +111,10 @@ export function CounselorSettings({ base }: { base: string }) {
         <SectionCard title={copy.replyLanguage} description={copy.settings.languageHelp} icon={Languages} tone="teal">
           <div className="grid gap-2 sm:grid-cols-2">
             {entry.languages.map((item) => (
-              <button type="button" key={item.value} aria-pressed={savedLanguage === item.value}
-                className={option(savedLanguage === item.value)} onClick={() => language(item.value)}>
+              <button type="button" key={item.value} aria-pressed={currentLanguage === item.value}
+                className={option(currentLanguage === item.value)} onClick={() => language(item.value)}>
                 {item.label}
-                {savedLanguage === item.value && <Check aria-hidden className="ms-auto size-4" />}
+                {currentLanguage === item.value && <Check aria-hidden className="ms-auto size-4" />}
               </button>
             ))}
           </div>

@@ -49,7 +49,7 @@ it("shows general explanation and invites deeper research only afterwards", asyn
   );
   expect(await screen.findByText("What you study")).toBeTruthy();
   fireEvent.click(
-    screen.getByRole("button", { name: "Where could I study this?" }),
+    screen.getByRole("button", { name: "Look at places" }),
   );
   expect(places).toHaveBeenCalledOnce();
   expect(workspaceApi.searchPrograms).not.toHaveBeenCalled();

@@ -319,7 +319,15 @@
     "financial": "Financial fit",
     "family": "Family fit",
     "timeline": "Timing",
-    "requirements": "Requirements"
+    "requirements": "Requirements",
+    "identity.gender": "Gender",
+    "identity.nationality": "Nationality",
+    "finance.funding_status": "Funding",
+    "finance.scholarship_interest": "Interest in scholarships",
+    "preferences.countries": "Countries you are considering",
+    "preferences.learning_style": "How you like to learn",
+    "tuition": "Tuition",
+    "application_fee": "Application fee"
   },
   "values": {
     "in_progress": "In progress",
@@ -419,6 +427,13 @@
     "weak": "Needs review",
     "unknown": "Not known yet",
     "english": "English",
-    "roman urdu": "Roman Urdu"
+    "roman urdu": "Roman Urdu",
+    "male": "Male",
+    "female": "Female",
+    "undisclosed": "Prefer not to say",
+    "matric": "Matric",
+    "o-level": "O-level",
+    "fsc": "FSc",
+    "a-level": "A-level"
   }
 }

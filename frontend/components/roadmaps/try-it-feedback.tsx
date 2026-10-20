@@ -7,7 +7,8 @@ import { useT } from '@/lib/i18n';
 import type { Roadmap } from '@/lib/roadmaps';
 import { PAI_PRIMARY_CONVERSATION_ID } from '@/lib/primary-conversation';
 
-export function TryItFeedback({ roadmap }: { roadmap: Roadmap }) {
+export function TryItFeedback({ roadmap, headingLevel = 4 }: { roadmap: Roadmap; headingLevel?: 2 | 3 | 4 }) {
+  const Heading = `h${headingLevel}` as const;
   const t = useT();
   const [open, setOpen] = useState(false);
   const [feeling, setFeeling] = useState<'more' | 'okay' | 'notForMe' | ''>('');
@@ -32,7 +33,7 @@ export function TryItFeedback({ roadmap }: { roadmap: Roadmap }) {
   };
   const chip = (on: boolean) => `min-h-11 rounded-2xl border-2 px-4 text-sm font-semibold transition-colors ${on ? 'border-brand bg-brand-soft text-brand-ink' : 'border-border bg-card hover:border-brand/40'}`;
   return <section className="min-w-0 space-y-3 rounded-3xl bg-gradient-to-br from-tone-violet-soft to-tone-sky-soft p-5">
-    <h4 className="flex items-center gap-2 font-bold"><Sparkles aria-hidden className="size-5 text-tone-violet-ink" />{t('tryIt.title')}</h4>
+    <Heading className="flex items-center gap-2 font-bold"><Sparkles aria-hidden className="size-5 text-tone-violet-ink" />{t('tryIt.title')}</Heading>
     <p className="text-xs font-bold uppercase tracking-wider text-tone-violet-ink">{t(`tryIt.${trial.kind}`)}</p>
     <p className="text-sm leading-relaxed">{trial.what}</p>
     <p className="flex items-center gap-1.5 text-xs text-muted-foreground"><Clock aria-hidden className="size-3.5" />{trial.time_needed}</p>

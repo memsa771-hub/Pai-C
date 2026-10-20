@@ -1,7 +1,7 @@
 'use client';
 import type { LucideIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { EvidenceBadge, evidenceFill, EVIDENCE_LEVELS, type EvidenceLevel } from './evidence-badge';
+import { EvidenceBadge, evidenceFill, evidenceIcons, EVIDENCE_LEVELS, type EvidenceLevel } from './evidence-badge';
 import copy from './kit-copy.json';
 
 export type HeatmapArea = {
@@ -31,6 +31,7 @@ export function AreaHeatmap({ areas, selected, onSelect, title }: {
           const Icon = area.icon;
           const active = selected === area.key;
           const dots = Math.min(3, area.count);
+          const LevelIcon = evidenceIcons[area.level];
           return (
             <li key={area.key} className="min-w-0">
               <button
@@ -47,7 +48,8 @@ export function AreaHeatmap({ areas, selected, onSelect, title }: {
               >
                 <span className="flex items-center justify-between gap-2">
                   <Icon aria-hidden className="size-5 shrink-0" />
-                  <span aria-hidden className="flex gap-1">
+                  <span aria-hidden className="flex items-center gap-1">
+                    <LevelIcon className="me-1 size-3.5" />
                     {[0, 1, 2].map((i) => (
                       <span key={i} className={cn('size-1.5 rounded-full bg-current', i < dots ? 'opacity-100' : 'opacity-25')} />
                     ))}

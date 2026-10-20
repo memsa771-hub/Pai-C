@@ -50,7 +50,7 @@ module.exports = async function flow(browser, open, ORIGIN) {
     assert.equal((await called(page, 'searchPrograms')).length, 0, 'no program search from viewing a path');
 
     // H: the student explicitly opens places and consents before any search.
-    await page.getByRole('button', { name: 'Where could I study this?' }).click();
+    await page.getByRole('button', { name: 'Look at places' }).click();
     const search = page.getByRole('button', { name: 'Look at programs' });
     assert(await search.isDisabled(), 'search needs consent');
     await page.getByRole('checkbox').check();

@@ -69,7 +69,8 @@ it("tapping a heatmap area opens readable details filtered to that area", async 
 it("confirms the exact digest; edits require an explanation", async () => {
   const done = vi.fn();
   render(<ul><EvidenceCard card={cards[0]} onSaved={done} /></ul>);
-  fireEvent.click(screen.getByRole("button", { name: "Show source and actions for Name" }));
+  // The row's name carries the label, the value and its evidence level.
+  fireEvent.click(screen.getByRole("button", { name: /^Show source and actions for Name: Name Sam Taylor Confirmed/ }));
   expect(screen.getByText(/You confirmed this on/)).toBeTruthy();
   fireEvent.click(screen.getByRole("button", { name: "Confirm" }));
   await waitFor(() =>

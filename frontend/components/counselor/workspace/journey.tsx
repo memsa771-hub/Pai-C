@@ -46,7 +46,7 @@ function JourneyBody({ navigate, resource }: { navigate: JourneyProps["navigate"
                     <p className="max-w-lg text-sm text-muted-foreground">
                       {copy.stageDescriptions[stage.id as keyof typeof copy.stageDescriptions]}
                     </p>
-                    {state !== "next" && (
+                    {(state !== "next" || moment) && (
                       <Button size="tap" variant={state === "now" ? "primary" : "soft"} onClick={() => navigate(stage.view, moment)}>
                         {moment ? <MessageCircle aria-hidden /> : null}
                         {moment ? copy.moment : copy.nav[stage.view as keyof typeof copy.nav]}
