@@ -4,8 +4,8 @@ import { desktopHost } from './desktop-host';
 // Sign-in / sign-out entry points for the workspace app.
 //
 // Placement AI serves its own login at /sign-in on this origin — on hosted
-// web that is https://app.placement-ai.com/sign-in (email or
-// username + password, plus Google/GitHub OAuth — see app/sign-in/page.tsx).
+// web that is https://app.placement-ai.com/sign-in (email + password, or
+// Google — see app/sign-in/page.tsx).
 // These helpers used to bounce to a central openagents.org/login instead, a
 // leftover from the OpenAgents product: on localhost that path fell through to
 // a `fallbackSignIn` that is a no-op outside the desktop app, so the "Log in"

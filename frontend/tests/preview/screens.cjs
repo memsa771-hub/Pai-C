@@ -7,17 +7,20 @@ module.exports = [
 
   { id: 'auth-sign-in', path: '/sign-in' },
   { id: 'auth-sign-in-error', path: '/sign-in', crawl: false, setup: async (page) => {
-    await fill(page, 'Email or username', 'sam'); await fill(page, 'Password', 'wrong');
+    await fill(page, 'Email', 'sam@example.test'); await fill(page, 'Password', 'wrong');
     await submit(page, 'Sign in'); await page.getByRole('alert').waitFor();
+  } },
+  { id: 'auth-sign-in-empty', path: '/sign-in', crawl: false, setup: async (page) => {
+    await submit(page, 'Sign in'); await page.getByText('Enter a valid email address.').waitFor();
   } },
   { id: 'auth-sign-up', path: '/sign-up' },
   { id: 'auth-sign-up-error', path: '/sign-up', crawl: false, setup: async (page) => {
-    await fill(page, 'Username', 'sam'); await fill(page, 'Email', 'sam@example.test');
+    await fill(page, 'Email', 'sam@example.test');
     await fill(page, 'Password', 'Better-pass1'); await fill(page, 'Confirm password', 'Different-pass1');
     await submit(page, 'Create account'); await page.getByText('Passwords do not match.').waitFor();
   } },
   { id: 'auth-check-email', path: '/sign-up', crawl: false, setup: async (page) => {
-    await fill(page, 'Username', 'sam'); await fill(page, 'Email', 'sam@example.test');
+    await fill(page, 'Email', 'sam@example.test');
     await fill(page, 'Password', 'Better-pass1'); await fill(page, 'Confirm password', 'Better-pass1');
     await submit(page, 'Create account'); await page.getByRole('heading', { name: 'Check your email' }).waitFor();
   } },

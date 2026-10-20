@@ -1,78 +1,65 @@
 'use client';
 
 import { useId, useState } from 'react';
+import Link from 'next/link';
 import type { LucideIcon } from 'lucide-react';
-import { AlertCircle, Check, Eye, EyeOff, Loader2 } from 'lucide-react';
-import Image from 'next/image';
-import { Button } from '@/components/ui/button';
+import { AlertCircle, ArrowUp, ChevronDown, Compass, Eye, EyeOff, Loader2, Mic, Plus } from 'lucide-react';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { OAUTH_PROVIDERS, type OAuthProvider } from '@/lib/auth/oauth-providers';
 import { useT } from '@/lib/i18n';
 import { cn } from '@/lib/utils';
 
-/** Soft path illustration: stepping stones toward a flag. Decorative only. */
-function PathArt({ className }: { className?: string }) {
+/** Decorative preview of talking with PAI, under the mascot. Not interactive. */
+function PromptPreview() {
+  const t = useT();
   return (
-    <svg viewBox="0 0 320 220" aria-hidden className={className} fill="none">
-      <circle cx="58" cy="58" r="30" fill="white" fillOpacity=".08" />
-      <circle cx="272" cy="176" r="36" fill="white" fillOpacity=".08" />
-      <path d="M24 200 C 90 192, 76 134, 146 122 S 236 92, 252 44" stroke="white" strokeOpacity=".28" strokeWidth="6" strokeLinecap="round" />
-      {[[24, 200], [94, 164], [150, 121], [212, 96], [252, 44]].map(([x, y], i) => (
-        <circle key={i} cx={x} cy={y} r={i === 4 ? 11 : 8} fill="white" fillOpacity={0.45 + i * 0.12} />
-      ))}
-      <path d="M252 44 V 8" stroke="white" strokeWidth="4" strokeLinecap="round" />
-      <path d="M254 10 L 284 19 L 254 28 Z" fill="white" />
-    </svg>
+    <div aria-hidden className="w-full max-w-[505px] rounded-2xl bg-auth-card p-3 shadow-[0_1px_2px_rgb(0_0_0/0.06),0_12px_32px_-12px_rgb(0_0_0/0.18)]">
+      <p className="px-1.5 pt-1 text-[15px] leading-relaxed text-auth-ink">
+        {t('auth.previewPrompt')}<span className="ms-0.5 inline-block h-4 w-px translate-y-0.5 bg-brand" />
+      </p>
+      <div className="mt-3 flex items-center gap-2">
+        <span className="flex size-9 items-center justify-center rounded-lg border border-auth-line text-auth-ink"><Plus className="size-4" /></span>
+        <span className="flex h-9 items-center gap-1.5 rounded-lg border border-auth-line px-3 text-sm text-auth-muted">
+          <Compass className="size-4 text-success" />{t('auth.previewChip')}<ChevronDown className="size-3.5" />
+        </span>
+        <span className="ms-auto flex h-9 items-center gap-1.5 rounded-lg bg-auth-page px-3 text-sm font-medium text-auth-ink">
+          {t('auth.previewModel')}<ChevronDown className="size-3.5" />
+        </span>
+        <span className="flex size-9 items-center justify-center text-auth-muted"><Mic className="size-4" /></span>
+        <span className="flex size-10 items-center justify-center rounded-[10px] bg-gradient-to-b from-[var(--auth-button-from)] to-[var(--auth-button-to)] text-auth-button-ink">
+          <ArrowUp className="size-4" />
+        </span>
+      </div>
+    </div>
   );
 }
 
-function Logo() {
-  return (
-    <span className="flex size-12 items-center justify-center rounded-2xl bg-white shadow-lift">
-      <Image src="/pai-emblem.png" alt="Placement AI" width={30} height={30} className="size-7 object-contain" />
-    </span>
-  );
-}
-
-/** Two-panel auth page: a warm brand panel and a clean form card. On a
- * phone the brand panel becomes a short gradient band above the form. */
-export function AuthShell({ title, subtitle, children, footer }: {
+/** One auth layout: a white card on a warm page; the form on the left and a
+ * showcase with the PAI mascot on the right. Phones show only the form, with
+ * a small mascot above the title. */
+export function AuthShell({ title, children, footer }: {
   title?: string;
-  subtitle?: string;
   children: React.ReactNode;
   footer?: React.ReactNode;
 }) {
   const t = useT();
   return (
-    <div className="flex min-h-svh w-full flex-col bg-background lg:flex-row">
-      <aside className="relative overflow-hidden bg-gradient-to-br from-[var(--hero-from)] via-[var(--hero-via)] to-[var(--hero-to)] px-6 pb-16 pt-8 text-white lg:flex lg:w-[44%] lg:flex-col lg:justify-between lg:p-12">
-        <div className="relative z-10 flex items-center gap-3">
-          <Logo />
-          <span className="text-lg font-bold tracking-tight">Placement AI</span>
-        </div>
-        <div className="relative z-10 mt-6 max-w-md lg:mt-0">
-          <p className="text-balance text-2xl font-bold leading-tight sm:text-3xl lg:text-4xl">{t('auth.promise')}</p>
-          <p className="mt-3 hidden text-pretty text-white/90 lg:block">{t('auth.promiseBody')}</p>
-          <ul className="mt-8 hidden space-y-3 lg:block">
-            {(['benefit1', 'benefit2', 'benefit3'] as const).map((key) => (
-              <li key={key} className="flex items-center gap-3 text-sm font-medium">
-                <span className="flex size-6 items-center justify-center rounded-full bg-white/20"><Check aria-hidden className="size-3.5" /></span>
-                {t(`auth.${key}`)}
-              </li>
-            ))}
-          </ul>
-        </div>
-        <PathArt className="pointer-events-none absolute -bottom-6 right-0 w-56 opacity-70 lg:relative lg:bottom-auto lg:mt-10 lg:w-full lg:max-w-sm lg:opacity-100" />
-      </aside>
-      <main className="relative z-10 -mt-8 flex flex-1 items-start justify-center px-4 pb-10 lg:mt-0 lg:items-center lg:px-10">
-        <div className="w-full max-w-md rounded-3xl border bg-card p-6 shadow-card sm:p-8 lg:border-0 lg:bg-transparent lg:shadow-none">
-          {title && <header className="mb-6"><h1 className="text-2xl font-bold tracking-tight">{title}</h1>
-            {subtitle && <p className="mt-1.5 text-sm text-muted-foreground">{subtitle}</p>}</header>}
-          {children}
-          {footer && <div className="mt-6 text-center text-sm text-muted-foreground">{footer}</div>}
-        </div>
-      </main>
+    <div className="flex min-h-svh w-full items-center justify-center bg-auth-page sm:p-6 lg:p-10">
+      <div className="grid min-h-svh w-full max-w-[1352px] bg-auth-card shadow-[0_30px_80px_-30px_rgb(0_0_0/0.18)] sm:min-h-[min(845px,calc(100svh-3rem))] sm:rounded-[40px] lg:grid-cols-2 lg:p-[18px]">
+        <main className="flex items-center justify-center px-6 py-12 sm:px-10">
+          <div className="w-full max-w-[302px]">
+            <img src="/pai-mascot.webp" alt="" width={702} height={855} className="mx-auto mb-4 h-28 w-auto lg:hidden" />
+            {title && <h1 className="mb-9 text-center text-[32px] font-normal leading-tight tracking-tight text-auth-ink">{title}</h1>}
+            {children}
+            {footer && <div className="mt-5 text-center text-xs text-auth-muted">{footer}</div>}
+          </div>
+        </main>
+        <aside aria-label={t('auth.previewLabel')}
+          className="relative hidden flex-col items-center justify-end overflow-hidden rounded-[28px] bg-auth-panel px-8 pb-5 lg:flex">
+          <img src="/pai-mascot.webp" alt={t('auth.mascotAlt')} width={702} height={855}
+            className="absolute left-1/2 top-[11%] h-[58%] w-auto -translate-x-1/2 object-contain drop-shadow-[0_24px_30px_rgb(0_0_0/0.12)]" />
+          <PromptPreview />
+        </aside>
+      </div>
     </div>
   );
 }
@@ -88,26 +75,27 @@ export function AuthField({ label, hint, error, children }: {
   const described = error ? `${id}-error` : hint ? `${id}-hint` : undefined;
   return (
     <div className="grid gap-1.5">
-      <Label htmlFor={id} className="text-sm font-semibold">{label}</Label>
+      <label htmlFor={id} className="text-xs font-medium text-auth-ink">{label}</label>
       {children({ id, 'aria-describedby': described, 'aria-invalid': error ? true : undefined })}
       {error ? <p id={`${id}-error`} className="flex items-center gap-1.5 text-xs font-medium text-danger-ink"><AlertCircle aria-hidden className="size-3.5" />{error}</p>
-        : hint ? <p id={`${id}-hint`} className="text-xs text-muted-foreground">{hint}</p> : null}
+        : hint ? <p id={`${id}-hint`} className="text-[11px] leading-snug text-auth-muted">{hint}</p> : null}
     </div>
   );
 }
 
-export const authInputClass = 'h-12 rounded-xl px-4 text-base';
+export const isEmail = (value: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
+
+export const authInputClass = 'h-11 rounded-lg border-auth-line bg-auth-field px-3.5 text-sm text-auth-ink shadow-[inset_0_1px_2px_rgb(0_0_0/0.04)] placeholder:text-auth-muted/70';
 
 export function PasswordInput({ className, ...props }: React.ComponentProps<typeof Input>) {
   const t = useT();
   const [visible, setVisible] = useState(false);
   return (
     <div className="relative">
-      <Input {...props} type={visible ? 'text' : 'password'} className={cn(authInputClass, 'pe-12', className)} />
-      <button type="button" onClick={() => setVisible(!visible)} aria-pressed={visible}
-        aria-label={t('auth.showPassword')}
-        className="absolute inset-y-0 end-0 flex w-12 items-center justify-center rounded-e-xl text-muted-foreground hover:text-foreground">
-        {visible ? <EyeOff aria-hidden className="size-5" /> : <Eye aria-hidden className="size-5" />}
+      <Input {...props} type={visible ? 'text' : 'password'} className={cn(authInputClass, 'pe-11', className)} />
+      <button type="button" onClick={() => setVisible(!visible)} aria-pressed={visible} aria-label={t('auth.showPassword')}
+        className="absolute inset-y-0 end-0 flex w-11 items-center justify-center rounded-e-lg text-auth-muted hover:text-auth-ink">
+        {visible ? <EyeOff aria-hidden className="size-4" /> : <Eye aria-hidden className="size-4" />}
       </button>
     </div>
   );
@@ -115,55 +103,71 @@ export function PasswordInput({ className, ...props }: React.ComponentProps<type
 
 export function AuthAlert({ children }: { children: React.ReactNode }) {
   return (
-    <p role="alert" className="flex items-start gap-2 rounded-xl bg-danger-soft px-3.5 py-3 text-sm font-medium text-danger-ink">
-      <AlertCircle aria-hidden className="mt-0.5 size-4 shrink-0" />{children}
+    <p role="alert" className="flex items-start gap-2 rounded-lg bg-danger-soft px-3 py-2.5 text-xs font-medium text-danger-ink">
+      <AlertCircle aria-hidden className="mt-px size-4 shrink-0" />{children}
     </p>
   );
 }
 
-export function SubmitButton({ busy, busyLabel, children, disabled }: {
-  busy: boolean; busyLabel: string; children: React.ReactNode; disabled?: boolean;
+const inkButton = 'flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-gradient-to-b from-[var(--auth-button-from)] to-[var(--auth-button-to)] text-sm font-medium text-auth-button-ink shadow-[0_1px_2px_rgb(0_0_0/0.2),inset_0_1px_0_rgb(255_255_255/0.12)] transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50';
+
+/** Always pressable (as in the design); forms validate on submit and say
+ * exactly what is missing, instead of a silently disabled button. */
+export function SubmitButton({ busy, busyLabel, children }: {
+  busy: boolean; busyLabel: string; children: React.ReactNode;
 }) {
   return (
-    <Button type="submit" size="tap" className="h-12 w-full text-base" disabled={busy || disabled} aria-busy={busy}>
+    <button type="submit" className={inkButton} disabled={busy} aria-busy={busy}>
       {busy ? <><Loader2 aria-hidden className="size-4 animate-spin" />{busyLabel}</> : children}
-    </Button>
+    </button>
   );
 }
 
-export function OAuthButtons({ onSelect, disabled }: { onSelect: (provider: OAuthProvider) => void; disabled?: boolean }) {
-  const t = useT();
+/** A link styled like the primary button, for status screens. */
+export function InkLink({ href, children }: { href: string; children: React.ReactNode }) {
+  return <Link href={href} className={inkButton}>{children}</Link>;
+}
+
+/** The small grey footer link under each form. */
+export function FooterLink({ href, children }: { href: string; children: React.ReactNode }) {
+  return <Link href={href} className="inline-flex min-h-11 items-center font-semibold text-auth-ink underline-offset-4 hover:underline">{children}</Link>;
+}
+
+/** Google's multicolour "G", as Google's sign-in guidelines require. */
+function GoogleMark() {
   return (
-    <>
-      <div className="my-6 flex items-center gap-3 text-xs font-medium uppercase tracking-wider text-muted-foreground">
-        <span className="h-px flex-1 bg-border" />{t('auth.or')}<span className="h-px flex-1 bg-border" />
-      </div>
-      <div className="grid gap-2">
-        {(Object.keys(OAUTH_PROVIDERS) as OAuthProvider[]).map((provider) => (
-          <Button key={provider} type="button" variant="outline" size="tap" className="h-12 w-full"
-            onClick={() => onSelect(provider)} disabled={disabled}>
-            {t('auth.continueWith', { provider: OAUTH_PROVIDERS[provider].label })}
-          </Button>
-        ))}
-      </div>
-    </>
+    <svg aria-hidden viewBox="0 0 48 48" className="size-[18px]">
+      <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z" />
+      <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z" />
+      <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z" />
+      <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z" />
+    </svg>
+  );
+}
+
+export function GoogleButton({ label, onClick, disabled }: { label: string; onClick: () => void; disabled?: boolean }) {
+  return (
+    <button type="button" onClick={onClick} disabled={disabled}
+      className="flex h-11 w-full items-center justify-center gap-2.5 rounded-lg border border-auth-line bg-gradient-to-b from-[var(--auth-google-from)] to-[var(--auth-google-to)] text-sm font-medium text-auth-ink shadow-[0_1px_2px_rgb(0_0_0/0.08),inset_0_1px_0_rgb(255_255_255/0.7)] transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50">
+      <GoogleMark />{label}
+    </button>
   );
 }
 
 /** A finished or blocked step: an icon, a message, and one way forward. */
-export function AuthStatus({ icon: Icon, tone = 'brand', title, body, children }: {
-  icon: LucideIcon; tone?: 'brand' | 'success' | 'warning'; title: string; body?: string; children?: React.ReactNode;
+export function AuthStatus({ icon: Icon, tone = 'neutral', title, body, children }: {
+  icon: LucideIcon; tone?: 'neutral' | 'success' | 'warning'; title: string; body?: string; children?: React.ReactNode;
 }) {
   return (
     <div role="status" className="text-center">
-      <span aria-hidden className={cn('mx-auto mb-4 flex size-16 items-center justify-center rounded-3xl',
-        tone === 'brand' && 'bg-brand-soft text-brand-ink', tone === 'success' && 'bg-success-soft text-success-ink',
+      <span aria-hidden className={cn('mx-auto mb-5 flex size-14 items-center justify-center rounded-2xl',
+        tone === 'neutral' && 'bg-auth-page text-auth-ink', tone === 'success' && 'bg-success-soft text-success-ink',
         tone === 'warning' && 'bg-warning-soft text-warning-ink')}>
-        <Icon className="size-8" />
+        <Icon className="size-7" />
       </span>
-      <h1 className="text-xl font-bold">{title}</h1>
-      {body && <p className="mt-2 text-pretty text-sm text-muted-foreground">{body}</p>}
-      {children && <div className="mt-6 grid gap-2">{children}</div>}
+      <h1 className="text-[28px] font-normal leading-tight tracking-tight text-auth-ink">{title}</h1>
+      {body && <p className="mt-3 text-pretty text-sm text-auth-muted">{body}</p>}
+      {children && <div className="mt-7 grid gap-3">{children}</div>}
     </div>
   );
 }

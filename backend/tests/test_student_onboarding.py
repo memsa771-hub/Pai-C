@@ -242,9 +242,9 @@ def test_returning_student_sees_their_own_values_prefilled(db):
     assert prefill["currentCity"] == "Islamabad"
 
 
-def test_untouched_account_prefills_preferred_name_from_the_login_handle(db):
+def test_untouched_account_never_prefills_a_name_from_a_login_handle(db):
     prefill = OnboardingService(db).state(db.info["workspace"])["prefill"]
-    assert prefill["preferredName"] == "alikhan"
+    assert "preferredName" not in prefill
 
 
 def test_account_display_name_does_not_guess_legal_or_preferred_name(db):
@@ -254,7 +254,7 @@ def test_account_display_name_does_not_guess_legal_or_preferred_name(db):
 
     prefill = OnboardingService(db).state(db.info["workspace"])["prefill"]
     assert "fullName" not in prefill
-    assert prefill["preferredName"] == "alikhan"
+    assert "preferredName" not in prefill
 
 
 def test_every_identity_answer_is_required(db):

@@ -23,9 +23,7 @@ an event payload or request body — `sender_email`, `role`, `owner` — is ever
 read as an identity claim; a client could set any of them.
 """
 
-import hashlib
 import logging
-import re
 import secrets
 from datetime import datetime, timezone
 from typing import Optional
@@ -43,25 +41,6 @@ logger = logging.getLogger(__name__)
 
 class AuthAccountConflict(Exception):
     """A verified provider subject conflicts with an existing PAI account."""
-
-
-def _available_username(db: Session, claims: dict, email: str) -> str:
-    """Choose a login handle without adding another onboarding screen."""
-    requested = (claims.get("username") or "").strip().lower()
-    if re.fullmatch(r"[a-z0-9_-]{3,32}", requested):
-        taken = db.execute(
-            select(User.id).where(User.username.isnot(None), User.username.ilike(requested))
-        ).first()
-        if taken is None:
-            return requested
-
-    local_part = email.split("@", 1)[0].lower()
-    base = re.sub(r"[^a-z0-9_-]+", "_", local_part).strip("_-") or "user"
-    if len(base) < 3:
-        base = f"user_{base}"
-    identity = claims.get("subject") or claims.get("supabase_uid") or email
-    suffix = hashlib.sha256(str(identity).encode("utf-8")).hexdigest()[:10]
-    return f"{base[:21]}_{suffix}"
 
 
 def _now() -> datetime:
@@ -107,7 +86,6 @@ def get_or_create_user(db: Session, claims: dict) -> Optional[User]:
             with db.begin_nested():
                 user = User(
                     email=email, supabase_uid=supabase_subject,
-                    username=_available_username(db, claims, email),
                     display_name=claims.get("display_name"),
                     last_login_at=_now(),
                 )
@@ -144,8 +122,6 @@ def get_or_create_user(db: Session, claims: dict) -> Optional[User]:
         user.supabase_uid = subject
     if claims.get("display_name") and not user.display_name:
         user.display_name = claims["display_name"]
-    if not user.username:
-        user.username = _available_username(db, claims, email)
     user.last_login_at = _now()
     return user
 

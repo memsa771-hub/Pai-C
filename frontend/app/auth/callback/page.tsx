@@ -2,10 +2,8 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import Link from 'next/link';
 import { Loader2, ShieldAlert } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { AuthShell, AuthStatus } from '@/components/auth/auth-shell';
+import { AuthShell, AuthStatus, InkLink } from '@/components/auth/auth-shell';
 import { usePaiAuth } from '@/lib/pai-auth-context';
 import { completeOAuth } from '@/lib/auth/service';
 import { useT } from '@/lib/i18n';
@@ -41,14 +39,14 @@ function AuthCallback() {
     return (
       <AuthShell>
         <AuthStatus icon={ShieldAlert} tone="warning" title={t('auth.callbackFailedTitle')} body={error}>
-          <Button asChild size="tap" className="h-12"><Link href="/sign-in">{t('auth.backToSignIn')}</Link></Button>
+          <InkLink href="/sign-in">{t('auth.backToSignIn')}</InkLink>
         </AuthStatus>
       </AuthShell>
     );
   }
   return (
-    <div role="status" className="fixed inset-0 flex items-center justify-center gap-2 bg-background text-sm text-muted-foreground">
-      <Loader2 aria-hidden className="size-5 animate-spin text-brand" />{t('auth.signingInStatus')}
+    <div role="status" className="fixed inset-0 flex items-center justify-center gap-2 bg-auth-page text-sm text-auth-muted">
+      <Loader2 aria-hidden className="size-5 animate-spin" />{t('auth.signingInStatus')}
     </div>
   );
 }

@@ -50,3 +50,8 @@ New check-ins are scheduled by new explicit choices/try-it acceptance only; exis
 - **Eligibility pills depend on reviewed packs.** As before, no authoritative entry or merit packs exist. Programs therefore show "Needs checking" unless the backend supplies a reviewed label.
 - **Font coverage.** The self-hosted font covers Latin and Latin-ext (English and Roman Urdu). Urdu script, if ever shown, falls back to the system font.
 - **Follow-up brief not started.** `docs/counselor/PROFILE_ONBOARDING_PROMPT.md` (new onboarding fields, editable profile, PAI memory area) says to start only after this redesign. It is untracked and was not acted on.
+
+## Email/Google-only auth (20 October)
+
+- The Supabase project settings live outside this repo. Google must be enabled there (client id and redirect URL); GitHub and LinkedIn should be switched off there too. The app no longer shows them either way.
+- Students who used to sign in with a username now sign in with their email. That email is the one on their account, and "Forgot password?" works as before.

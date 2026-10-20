@@ -20,7 +20,8 @@ beforeEach(() => {
 afterEach(() => { storage.clear(); vi.unstubAllGlobals(); });
 
 it('uses one Supabase OAuth registry and single-use PKCE for every social provider', async () => {
-  expect(Object.keys(OAUTH_PROVIDERS)).toEqual(['google', 'github', 'linkedin']);
+  // Google is the only social sign-in; there is no username anywhere.
+  expect(Object.keys(OAUTH_PROVIDERS)).toEqual(['google']);
   for (const provider of Object.keys(OAUTH_PROVIDERS) as (keyof typeof OAUTH_PROVIDERS)[]) {
     const { url, codeVerifier } = await buildOAuthAuthorizeUrl(provider, 'https://app.placement-ai.com/auth/callback');
     const parsed = new URL(url, 'https://supabase.example.test');
@@ -41,9 +42,11 @@ it('handles password sign-in, signup confirmation, and invalid credentials witho
     .mockResolvedValueOnce({ ok: false, status: 400, json: async () => ({ error: 'secret provider detail' }) });
   vi.stubGlobal('fetch', fetchMock);
   expect((await signInWithPassword('a@test', 'password')).accessToken).toBe('jwt');
-  expect((await signUpWithPassword('a@test', 'password', 'student')).needsEmailConfirmation).toBe(true);
+  expect((await signUpWithPassword('a@test', 'password')).needsEmailConfirmation).toBe(true);
   const signupBody = JSON.parse(fetchMock.mock.calls[1][1].body);
   expect(signupBody.code_challenge_method).toBe('s256');
+  // Sign-up sends no username or other profile metadata.
+  expect(signupBody.data).toBeUndefined();
   expect(consumePkceVerifier()).toBeTruthy();
   await expect(signInWithPassword('a@test', 'wrong')).rejects.toThrow('Invalid email or password');
   expect(fetchMock.mock.calls[0][0]).toContain('/auth/v1/token?grant_type=password');
@@ -74,7 +77,7 @@ it('uses the opaque cookie for app requests and revokes the PAI session on logou
     .mockResolvedValueOnce({ ok: true, json: async () => ({ data: {} }) })
     .mockResolvedValueOnce({ ok: true, json: async () => ({ data: { revoked: true } }) });
   vi.stubGlobal('fetch', fetchMock);
-  await establishSession({ accessToken: 'jwt', refreshToken: 'refresh', expiresAt: 0, user: { id: 'u', email: 'a@test', username: null } });
+  await establishSession({ accessToken: 'jwt', refreshToken: 'refresh', expiresAt: 0, user: { id: 'u', email: 'a@test' } });
   await authenticatedFetch('/v1/account/workspace', {}, COOKIE_SESSION);
   await signOut();
   expect(fetchMock.mock.calls[0][1].headers.Authorization).toBe('Bearer jwt');

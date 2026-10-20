@@ -7,7 +7,7 @@ def test_supabase_claims_are_normalized() -> None:
     raw = {
         "id": "user-123",
         "email": "  Student@Example.COM ",
-        "user_metadata": {"username": "student", "display_name": "Ignored"},
+        "user_metadata": {"username": "ignored-handle", "full_name": "Sam Taylor", "display_name": "Ignored"},
     }
     with (
         patch.object(human_auth, "_looks_like_supabase_token", return_value=True),
@@ -21,8 +21,7 @@ def test_supabase_claims_are_normalized() -> None:
         "email": "student@example.com",
         "supabase_uid": "user-123",
         "email_verified": True,
-        "username": "student",
-        "display_name": "student",
+        "display_name": "Sam Taylor",
     }
 
 

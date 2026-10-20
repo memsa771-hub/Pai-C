@@ -151,11 +151,8 @@ class OnboardingService:
                 rows = StudentRecordService(self.db).list(str(workspace.id), field.field_key)
                 if rows:
                     prefill[field.name] = getattr(rows[0], field.record_field, "")
-        # Full name is deliberately collected here, not at signup, and must
-        # never be guessed from an account handle or OAuth display name.
-        # Preferred name starts as the signup username but remains editable.
-        if user is not None:
-            prefill.setdefault("preferredName", user.username or "")
+        # Full name is deliberately collected here, not at signup, and is never
+        # guessed from an email address or an OAuth display name.
         return {
             "required": user is not None and user.onboarded_at is None,
             "completedAt": user.onboarded_at.isoformat()

@@ -1,4 +1,4 @@
-"""Account creation reaches PAI onboarding without a second username gate."""
+"""Account creation reaches PAI onboarding with no username at all."""
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
@@ -15,7 +15,7 @@ def _session():
     return Session(engine, autoflush=False)
 
 
-def test_signup_username_is_attached_when_user_is_created():
+def test_new_accounts_never_get_a_username_even_if_one_is_offered():
     with _session() as db:
         user = get_or_create_user(db, {
             "email": "student@example.test",
@@ -23,31 +23,29 @@ def test_signup_username_is_attached_when_user_is_created():
             "username": "AliKhan",
         })
         assert user is not None
-        assert user.username == "alikhan"
+        assert user.username is None
 
 
-def test_oauth_user_gets_a_silent_stable_username():
-    claims = {"email": "new.student@example.test", "supabase_uid": "oauth-user-123"}
+def test_oauth_user_keeps_the_provider_name_and_stays_stable():
+    claims = {"email": "new.student@example.test", "supabase_uid": "oauth-user-123",
+              "display_name": "Sam Taylor"}
     with _session() as db:
         first = get_or_create_user(db, claims)
-        assert first is not None
-        generated = first.username
-        assert generated and 3 <= len(generated) <= 32
+        assert first is not None and first.username is None
+        assert first.display_name == "Sam Taylor"
         db.commit()
 
         again = get_or_create_user(db, claims)
-        assert again is not None
-        assert again.username == generated
+        assert again is not None and again.id == first.id
 
 
-def test_legacy_user_without_username_is_backfilled_silently():
+def test_legacy_username_is_left_untouched_and_never_generated():
     with _session() as db:
+        db.add(User(email="old@example.test", supabase_uid="old-user", username="oldhandle"))
         db.add(User(email="legacy@example.test", supabase_uid="legacy-user"))
         db.commit()
 
-        user = get_or_create_user(db, {
-            "email": "legacy@example.test",
-            "supabase_uid": "legacy-user",
-        })
-        assert user is not None
-        assert user.username and user.username.startswith("legacy_")
+        old = get_or_create_user(db, {"email": "old@example.test", "supabase_uid": "old-user"})
+        legacy = get_or_create_user(db, {"email": "legacy@example.test", "supabase_uid": "legacy-user"})
+        assert old is not None and old.username == "oldhandle"
+        assert legacy is not None and legacy.username is None

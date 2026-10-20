@@ -529,9 +529,7 @@ class PaiSessionBoundaryMiddleware(BaseHTTPMiddleware):
         if not path.startswith("/v1/"):
             return await call_next(request)
         cookie = request.cookies.get(COOKIE_NAME)
-        is_exchange = path in {"/v1/auth/session", "/v1/auth/sign-in-username"} and (
-            request.method == "POST")
-        is_public = path == "/v1/auth/username-available"
+        is_exchange = path == "/v1/auth/session" and request.method == "POST"
         if path == "/v1/auth/session" and request.method == "POST":
             origin = request.headers.get("origin", "")
             desktop = (request.headers.get("x-pai-desktop") == "1"
@@ -547,7 +545,7 @@ class PaiSessionBoundaryMiddleware(BaseHTTPMiddleware):
             if origin not in allowed_origins:
                 return json_response(ResponseCode.FORBIDDEN, "AUTH_CSRF_REJECTED")
 
-        if not is_exchange and not is_public:
+        if not is_exchange:
             auth = request.headers.get("authorization", "")
             bearer = auth[7:].strip() if auth.lower().startswith("bearer ") else ""
             # A browser cookie wins over any caller-supplied header. Without a
@@ -619,8 +617,8 @@ def _redacted_validation_errors(exc: RequestValidationError) -> list[dict]:
 
     Pydantic attaches the offending value to each error as `input` — and for a
     missing-field error at the body root, `input` is the ENTIRE request body.
-    `POST /v1/auth/sign-in-username` carries a password, so a single malformed
-    request used to put that secret straight into the logs. `ctx` can quote
+    A request that carries a password or token could put that secret straight
+    into the logs. `ctx` can quote
     values too.
 
     Keep the location and the failure type, which is all a developer needs to

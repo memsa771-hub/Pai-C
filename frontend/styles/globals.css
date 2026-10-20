@@ -92,6 +92,20 @@
   --elev-card: 0 1px 2px rgb(18 26 51 / 0.05), 0 8px 24px -8px rgb(18 26 51 / 0.10);
   --elev-lift: 0 2px 4px rgb(18 26 51 / 0.06), 0 18px 40px -12px rgb(47 99 246 / 0.28);
 
+  /* Auth screens: warm neutral page, white card, beige showcase, ink buttons. */
+  --auth-page: #f2f0eb;
+  --auth-card: #fdfdfc;
+  --auth-panel: #f3efe6;
+  --auth-ink: #161616;
+  --auth-muted: #6b6b6b; /* 5.3:1 on card */
+  --auth-line: #e2e0da;
+  --auth-field: #ffffff;
+  --auth-button-from: #3a3a3a;
+  --auth-button-to: #161616;
+  --auth-button-ink: #ffffff;
+  --auth-google-from: #fbfbfa;
+  --auth-google-to: #ebebea;
+
   /* Hero gradient for auth, onboarding and the profile header. */
   --hero-from: #2f63f6;
   --hero-via: #6a4dff;
@@ -190,6 +204,19 @@
   --elev-card: 0 1px 0 rgb(255 255 255 / 0.03) inset, 0 10px 30px -12px rgb(0 0 0 / 0.55);
   --elev-lift: 0 1px 0 rgb(255 255 255 / 0.05) inset, 0 18px 40px -14px rgb(124 156 255 / 0.35);
 
+  --auth-page: #0e0e0f;
+  --auth-card: #17171a;
+  --auth-panel: #222226;
+  --auth-ink: #f3f3f3;
+  --auth-muted: #a3a3a3;
+  --auth-line: #323236;
+  --auth-field: #1d1d21;
+  --auth-button-from: #fafafa;
+  --auth-button-to: #dcdcdc;
+  --auth-button-ink: #121212;
+  --auth-google-from: #2b2b2f;
+  --auth-google-to: #222226;
+
   --hero-from: #2a4fd6;
   --hero-via: #5b3fd9;
   --hero-to: #0b7fb8;
@@ -266,6 +293,16 @@
   --color-evidence-2-ink: var(--evidence-2-ink);
   --color-evidence-3: var(--evidence-3);
   --color-evidence-3-ink: var(--evidence-3-ink);
+
+  /** Auth screens **/
+  --color-auth-page: var(--auth-page);
+  --color-auth-card: var(--auth-card);
+  --color-auth-panel: var(--auth-panel);
+  --color-auth-ink: var(--auth-ink);
+  --color-auth-muted: var(--auth-muted);
+  --color-auth-line: var(--auth-line);
+  --color-auth-field: var(--auth-field);
+  --color-auth-button-ink: var(--auth-button-ink);
 
   /** Elevation **/
   --shadow-soft: var(--elev-soft);

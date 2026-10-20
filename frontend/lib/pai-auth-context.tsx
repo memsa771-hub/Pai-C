@@ -144,7 +144,7 @@ export function PaiAuthProvider({ children }: { children: React.ReactNode }) {
         try {
           const providerSession: AuthSession = {
             accessToken: handoff.token, refreshToken: '', expiresAt: 0,
-            user: { id: '', email: handoff.email, username: null },
+            user: { id: '', email: handoff.email },
           };
           const session = await establishSession(providerSession, true, bearerRef.current);
           accept(session, true);

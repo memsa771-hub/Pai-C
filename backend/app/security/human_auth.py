@@ -133,8 +133,9 @@ def verify_supabase_claims(token: str) -> Optional[dict]:
         "email": email,
         "supabase_uid": claims.get("sub") or claims.get("id"),
         "email_verified": bool(claims.get("email_confirmed_at", True)),
-        "username": metadata.get("username"),
-        "display_name": metadata.get("username") or metadata.get("display_name"),
+        # Google supplies full_name/name; email sign-ups usually supply none.
+        "display_name": (metadata.get("full_name") or metadata.get("name")
+                         or metadata.get("display_name")),
     }
 
 
@@ -154,7 +155,6 @@ def verify_identity_claims(token: str) -> Optional[dict]:
             "email": user.email,
             "supabase_uid": user.supabase_uid,
             "session_user_id": str(user.id),
-            "username": user.username,
             "display_name": user.display_name,
         }
     finally:

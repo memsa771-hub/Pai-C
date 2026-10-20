@@ -11,14 +11,13 @@ import {
   signOut as providerSignOut,
   type AuthSession,
 } from '../supabase-auth';
-import { signInWithUsername } from '../supabase-auth';
 import type { OAuthProvider } from './oauth-providers';
 
 export const COOKIE_SESSION = 'pai-cookie';
 export const AUTH_INVALID_EVENT = 'pai:auth-invalid';
 
 export interface PaiSession {
-  user: { id: string; email: string; username: string | null; displayName: string };
+  user: { id: string; email: string; displayName: string };
   workspace: { workspaceId: string; slug: string };
   desktopToken?: string;
 }
@@ -89,10 +88,8 @@ export async function signOut(token?: string): Promise<void> {
   await data(response);
 }
 
-export async function signInWithPassword(identifier: string, password: string): Promise<AuthSession> {
-  return identifier.includes('@')
-    ? providerSignIn(identifier.trim(), password)
-    : signInWithUsername(identifier.trim(), password);
+export async function signInWithPassword(email: string, password: string): Promise<AuthSession> {
+  return providerSignIn(email.trim(), password);
 }
 
 export const signUpWithPassword = providerSignUp;

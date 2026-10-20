@@ -11,7 +11,6 @@ class AuthenticatedIdentity:
     email: str
     email_verified: bool
     display_name: str | None = None
-    username: str | None = None
 
 
 class IdentityVerifier(Protocol):
@@ -29,5 +28,4 @@ class SupabaseIdentityVerifier:
             email=claims["email"],
             email_verified=bool(claims.get("email_verified", True)),
             display_name=claims.get("display_name"),
-            username=claims.get("username"),
         )

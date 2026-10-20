@@ -83,24 +83,6 @@ class Config:
     PAI_SESSION_TTL_SECONDS: int = int(os.environ.get(
         "PAI_SESSION_TTL_SECONDS", str(14 * 24 * 60 * 60)))
 
-    # Failed sign-ins allowed against ONE username per hour, before that
-    # account is locked out (per process, sliding window). Keyed by username,
-    # not by client address: the attack this stops is a brute force against a
-    # single account, and an address key would instead punish every student
-    # behind one school NAT or reverse proxy for each other's typos.
-    SIGN_IN_USERNAME_MAX_ATTEMPTS_PER_HOUR: int = int(
-        os.environ.get("SIGN_IN_USERNAME_MAX_ATTEMPTS_PER_HOUR", "20")
-    )
-
-    # Loose per-source backstop for the two unauthenticated auth endpoints,
-    # covering what a per-username limit cannot: password spraying (one common
-    # password against many accounts) and username enumeration. Deliberately
-    # generous, because behind a proxy or a campus NAT this is shared by every
-    # student at once — it is a ceiling on abuse, not a login quota.
-    AUTH_MAX_REQUESTS_PER_SOURCE_PER_HOUR: int = int(
-        os.environ.get("AUTH_MAX_REQUESTS_PER_SOURCE_PER_HOUR", "120")
-    )
-
     # Identity mode: "standalone" (own agent table) or "shared" (external agent_ids)
     IDENTITY_MODE: str = os.environ.get("IDENTITY_MODE", "standalone")
     WORKSPACE_ENDPOINT: str = os.environ.get("WORKSPACE_ENDPOINT", "")

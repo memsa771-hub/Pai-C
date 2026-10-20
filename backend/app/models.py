@@ -376,10 +376,8 @@ class User(Base):
     id = Column(UUID(as_uuid=False), primary_key=True, default=_uuid, server_default=text("gen_random_uuid()"))
     email = Column(Text, nullable=False)                 # normalized lowercase
     supabase_uid = Column(Text, nullable=True)           # Supabase auth.users `id`
-    # Unique login handle, normalized lowercase — authentication only (not a
-    # profile/display name). Lets "sign in with username" resolve to an email
-    # server-side (see app/routers/auth.py) without Supabase's own API, which
-    # only takes email/phone.
+    # Legacy login handle: usernames are no longer created or used. The column and its
+    # unique index stay so existing rows and migrations are untouched.
     username = Column(Text, nullable=True)
     display_name = Column(Text, nullable=True)
     # User-set profile picture: an https:// URL or a small data:image/... URL

@@ -2,10 +2,8 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import Link from 'next/link';
-import { ArrowLeft, LinkIcon } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { AuthAlert, AuthField, AuthShell, AuthStatus, PasswordInput, SubmitButton } from '@/components/auth/auth-shell';
+import { LinkIcon } from 'lucide-react';
+import { AuthAlert, AuthField, AuthShell, AuthStatus, FooterLink, InkLink, PasswordInput, SubmitButton } from '@/components/auth/auth-shell';
 import { completePasswordReset } from '@/lib/auth/service';
 import { usePaiAuth } from '@/lib/pai-auth-context';
 import { registrationPasswordError } from '@/lib/password-policy';
@@ -52,28 +50,27 @@ export default function ResetPasswordPage() {
 
   if (linkInvalid) {
     return (
-      <AuthShell>
+      <AuthShell footer={<FooterLink href="/sign-in">{t('auth.backToSignIn')}</FooterLink>}>
         <AuthStatus icon={LinkIcon} tone="warning" title={t('auth.linkInvalidTitle')} body={t('auth.linkInvalidBody')}>
-          <Button asChild size="tap" className="h-12"><Link href="/forgot-password">{t('auth.requestNewLink')}</Link></Button>
-          <Button asChild size="tap" variant="ghost"><Link href="/sign-in">{t('auth.backToSignIn')}</Link></Button>
+          <InkLink href="/forgot-password">{t('auth.requestNewLink')}</InkLink>
         </AuthStatus>
       </AuthShell>
     );
   }
   return (
-    <AuthShell title={t('auth.resetTitle')} subtitle={t('auth.resetSubtitle')}
-      footer={<Link href="/sign-in" className="inline-flex min-h-11 items-center gap-1.5 font-semibold text-brand-ink underline-offset-4 hover:underline"><ArrowLeft aria-hidden className="size-4" />{t('auth.backToSignIn')}</Link>}>
+    <AuthShell title={t('auth.resetTitle')} footer={<FooterLink href="/sign-in">{t('auth.backToSignIn')}</FooterLink>}>
+      <p className="-mt-5 mb-7 text-center text-sm text-auth-muted">{t('auth.resetSubtitle')}</p>
       <form onSubmit={submit} className="grid gap-4" noValidate>
         <AuthField label={t('auth.newPassword')} hint={t('auth.passwordHint')} error={field === 'password' ? error : null}>
-          {(props) => <PasswordInput {...props} autoComplete="new-password" required autoFocus value={password}
+          {(props) => <PasswordInput {...props} autoComplete="new-password" placeholder="•••••••" required autoFocus value={password}
             onChange={(event) => setPassword(event.target.value)} disabled={busy} />}
         </AuthField>
         <AuthField label={t('auth.confirmPassword')} error={field === 'confirm' ? error : null}>
-          {(props) => <PasswordInput {...props} autoComplete="new-password" required value={confirm}
+          {(props) => <PasswordInput {...props} autoComplete="new-password" placeholder="•••••••" required value={confirm}
             onChange={(event) => setConfirm(event.target.value)} disabled={busy} />}
         </AuthField>
         {error && !field && <AuthAlert>{error}</AuthAlert>}
-        <SubmitButton busy={busy} busyLabel={t('auth.updating')} disabled={!password || !confirm}>{t('auth.updatePassword')}</SubmitButton>
+        <SubmitButton busy={busy} busyLabel={t('auth.updating')}>{t('auth.updatePassword')}</SubmitButton>
       </form>
     </AuthShell>
   );

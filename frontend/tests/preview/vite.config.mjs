@@ -7,7 +7,6 @@ export default defineConfig({root:local('.'),envDir:local('.'),publicDir:local('
     {find:'@/lib/workspace-context',replacement:local('fake-workspace.ts')},
     {find:'@/lib/pai-auth-context',replacement:local('fake-auth.ts')},
     {find:'@/lib/auth/service',replacement:local('fake-auth-service.ts')},
-    {find:'@/lib/auth-api',replacement:local('fake-auth-api.ts')},
     {find:'@/hooks/use-polling',replacement:local('fake-hooks.ts')},
     {find:'@/hooks/use-operator-status',replacement:local('fake-hooks.ts')},
     {find:'@/hooks/use-composing-signal',replacement:local('fake-hooks.ts')},

@@ -21,7 +21,7 @@ export interface AuthSession {
   accessToken: string;
   refreshToken: string;
   expiresAt: number; // unix seconds
-  user: { id: string; email: string; username: string | null };
+  user: { id: string; email: string };
 }
 
 export interface SignUpResult {
@@ -51,7 +51,6 @@ function sessionFromSupabase(body: any): AuthSession {
     user: {
       id: user.id,
       email: user.email,
-      username: user.user_metadata?.username ?? null,
     },
   };
 }
@@ -74,28 +73,7 @@ export async function signInWithPassword(email: string, password: string): Promi
   return sessionFromSupabase(await res.json());
 }
 
-/** PAI resolves the username; Supabase still verifies the password. */
-export async function signInWithUsername(username: string, password: string): Promise<AuthSession> {
-  const response = await authFetch(`${API_URL}/v1/auth/sign-in-username`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ username, password }),
-  });
-  if (!response.ok) throw authErrorFromStatus(response.status, response.status === 401
-    ? 'Invalid email/username or password' : 'Sign-in is temporarily unavailable');
-  const body = (await response.json()).data;
-  const userResponse = await authFetch(authUrl('/user'), {
-    headers: authHeaders({ Authorization: `Bearer ${body.access_token}` }),
-  });
-  if (!userResponse.ok) throw new AuthRejected('Invalid email/username or password');
-  return sessionFromSupabase({ ...body, user: await userResponse.json() });
-}
-
-export async function signUpWithPassword(
-  email: string,
-  password: string,
-  username: string,
-): Promise<SignUpResult> {
+export async function signUpWithPassword(email: string, password: string): Promise<SignUpResult> {
   const verifier = base64UrlEncode(crypto.getRandomValues(new Uint8Array(32)));
   const challenge = base64UrlEncode(await sha256(verifier));
   const redirectTo = `${window.location.origin}/auth/callback`;
@@ -103,7 +81,7 @@ export async function signUpWithPassword(
     method: 'POST',
     headers: authHeaders(),
     body: JSON.stringify({
-      email, password, data: { username },
+      email, password,
       code_challenge: challenge, code_challenge_method: 's256',
     }),
   });
