@@ -13,6 +13,10 @@ network retries. A reading that still fails is recorded as an error, and its fac
 Build the readers once per process, before DBOS launches: DBOS registers their steps by agent name.
 """
 
+import asyncio
+import concurrent.futures
+import contextvars
+import threading
 from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -136,12 +140,47 @@ class ReadingResult:
         return self.usage.requests or 0
 
 
+class _ReadingLoop:
+    """One event loop for every reading in the process, on its own daemon thread.
+
+    The readers are built once and share one async client, whose connections belong to the loop that first used
+    them. Readings come from several threads (the worker's DBOS queue, the quality runner), so each running its
+    own loop broke ("bound to a different event loop", slice-2-quality-report). Each reading runs here instead,
+    in a copy of the caller's context, so DBOS still sees the calling workflow (DBOSDurability steps)."""
+
+    def __init__(self) -> None:
+        self._loop: asyncio.AbstractEventLoop | None = None
+        self._lock = threading.Lock()
+
+    def _get(self) -> asyncio.AbstractEventLoop:
+        with self._lock:
+            if self._loop is None:
+                loop = asyncio.new_event_loop()
+                threading.Thread(target=loop.run_forever, name="os-readings", daemon=True).start()
+                self._loop = loop
+            return self._loop
+
+    def run(self, make_coro):
+        loop, ctx, done = self._get(), contextvars.copy_context(), concurrent.futures.Future()
+
+        def start() -> None:
+            task = loop.create_task(make_coro(), context=ctx)
+            task.add_done_callback(lambda t: done.set_exception(t.exception()) if t.exception()
+                                   else done.set_result(t.result()))
+
+        loop.call_soon_threadsafe(start)
+        return done.result()
+
+
+_READINGS = _ReadingLoop()
+
+
 def run_reading(agent: Agent, spec: AgentSpec, prompt: str) -> ReadingResult:
     """One reading. A failure is returned as an error, not retried (invariant 7)."""
     usage = RunUsage()
     limits = UsageLimits(request_limit=spec.retries.output + 1)
     try:
-        r = agent.run_sync(prompt, usage=usage, usage_limits=limits)
+        r = _READINGS.run(lambda: agent.run(prompt, usage=usage, usage_limits=limits))
     except Exception as e:
         return ReadingResult(None, f"{type(e).__name__}: {e}"[:300], usage)
     return ReadingResult(r.output, None, r.usage)

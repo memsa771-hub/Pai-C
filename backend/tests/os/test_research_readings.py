@@ -186,3 +186,35 @@ def test_month_spend(engine, clean):
     assert runs.month_spend(now) == pytest.approx(0.50)
     with engine.connect() as conn:
         assert conn.execute(select(func.count()).select_from(models.agent_runs)).scalar() == 4
+
+
+def test_readings_from_several_threads_share_one_loop():
+    """The gate's bug (slice-2-quality-report): readers built once share one async client, whose connections
+    are bound to an event loop. Readings run on several threads (the worker's DBOS queue, the gate runner) must
+    not each bring their own loop. Reproduced with a model that holds a loop-bound asyncio object."""
+    import asyncio
+    import threading
+
+    from pydantic_ai.models.function import FunctionModel
+
+    shared = {}
+
+    async def fn(messages, info: AgentInfo) -> ModelResponse:
+        event = shared.setdefault("event", asyncio.Event())  # bound to the first loop that waits on it
+        try:
+            await asyncio.wait_for(event.wait(), 0.01)
+        except TimeoutError:
+            pass
+        return ModelResponse(parts=[ToolCallPart(info.output_tools[0].name, GOOD)])
+
+    agent = build_readers(FunctionModel(fn), PROFILE, SPEC)["A"]
+    errors: list = []
+
+    def read():
+        errors.append(run_reading(agent, SPEC, user_prompt(PROG, [PAGE])).error)
+
+    for _ in range(3):  # one after another, each on a new thread
+        t = threading.Thread(target=read)
+        t.start()
+        t.join()
+    assert errors == [None, None, None]

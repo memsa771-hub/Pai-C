@@ -27,7 +27,7 @@ import yaml
 
 from app.os.agents.spec import AGENT_DIR, load_agent_spec
 from app.os.knowledge.profile import load_profile_dir
-from app.os.knowledge.programmes import PROGRAMME_SEED, Programme
+from app.os.knowledge.programmes import PROGRAMME_SEED, Programme, with_own_pages
 from app.os.knowledge.research.pages import Page, PageGateway
 from app.os.knowledge.research.readings import build_readers, cost, model_for, run_reading, user_prompt
 from app.os.knowledge.research.trust import judge
@@ -39,15 +39,14 @@ ROUTE = "germany_master"
 
 
 def _programmes(only: list[str] | None) -> list[Programme]:
+    """The seed's programmes with their own pages (worked out over the whole registry, as the store does)."""
     seed = yaml.safe_load(PROGRAMME_SEED.read_text(encoding="utf-8"))
-    out = []
-    for ref, p in seed["programmes"].items():
-        if p.get("status", "active") != "active" or (only and ref not in only):
-            continue
-        out.append(Programme(ref=ref, route_key=seed["route_key"], university=p["university"], name=p["name"],
-                             aliases=tuple(p.get("aliases", ())), start_urls=tuple(p["start_urls"]),
-                             official_domains=tuple(p["official_domains"])))
-    return out
+    every = with_own_pages([
+        Programme(ref=ref, route_key=seed["route_key"], university=p["university"], name=p["name"],
+                  aliases=tuple(p.get("aliases", ())), start_urls=tuple(p["start_urls"]),
+                  official_domains=tuple(p["official_domains"]), status=p.get("status", "active"))
+        for ref, p in seed["programmes"].items()])
+    return [p for p in every if p.status == "active" and (not only or p.ref in only)]
 
 
 def _snapshot_fetch():

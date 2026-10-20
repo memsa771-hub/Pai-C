@@ -14,7 +14,7 @@ import re
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Any
-from urllib.parse import unquote
+from urllib.parse import unquote, urlsplit
 
 from app.os.knowledge.research.links import domain_of
 from app.os.knowledge.research.text import normalise
@@ -202,11 +202,35 @@ def _url_form(text: str) -> str:
     return normalise(re.sub(r"[-_/.+?=&%#]+", " ", unquote(text)))
 
 
+def _own_folder(url: str) -> str | None:
+    """'https://h/a/b/page.html' -> 'https://h/a/b/'. None when the folder is less than two levels deep
+    ('/' or '/en/'), which is the whole site or one language of it, not a programme."""
+    parts = urlsplit(url)
+    folder = parts.path.rsplit("/", 1)[0] + "/"
+    if len([s for s in folder.split("/") if s]) < 2:
+        return None
+    return f"{parts.scheme}://{parts.netloc.lower()}{folder}"
+
+
+def _under_own_page(urls: list[str], programme) -> bool:
+    """The page is one of the programme's own start pages (no other programme starts there), or sits in one's
+    folder (its FAQ, its how-to-apply page)."""
+    own = [u for u in getattr(programme, "own_pages", ()) if u]
+    folders = [f for f in (_own_folder(u) for u in own) if f]
+    for u in urls:
+        low = f"{urlsplit(u).scheme}://{urlsplit(u).netloc.lower()}{urlsplit(u).path}"
+        if u in own or any(low.startswith(f) for f in folders):
+            return True
+    return False
+
+
 def _page_is_specific(page, programme) -> bool:
-    """The page's title (its first line) or URL names the programme or an alias ('&' reads as 'and'; in a
-    URL, words may be joined by hyphens or run together)."""
+    """The page is one of the programme's own pages, or its title (its first line) or URL names the programme or
+    an alias ('&' reads as 'and'; in a URL, words may be joined by hyphens or run together)."""
     title = _and(normalise(page.text.split("\n", 1)[0])) if page.text else ""
     urls = [u for u in (page.url, page.final_url) if u]
+    if _under_own_page(urls, programme):
+        return True
     url_words = " ".join(_url_form(u) for u in urls)
     url_compact = re.sub(r"[^a-z0-9]", "", " ".join(unquote(u).lower() for u in urls))
     for name in _names(programme):
