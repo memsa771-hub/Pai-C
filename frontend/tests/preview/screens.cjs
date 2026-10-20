@@ -118,4 +118,22 @@ module.exports = [
   { id: 'settings-delete', path: '/student?view=settings', ready: 'main h1', full: true, crawl: false, setup: async (page) => {
     await page.getByRole('button', { name: 'Delete my app data' }).click(); await page.getByRole('checkbox').waitFor();
   } },
+
+  { id: 'states-profile-loading', path: '/student?view=profile&state=loading', ready: 'main [role=status], main [role=alert], main h1', crawl: false },
+  { id: 'states-profile-error', path: '/student?view=profile&state=error', ready: 'main [role=status], main [role=alert], main h1', crawl: true },
+  { id: 'states-profile-empty', path: '/student?view=profile&state=empty', ready: 'main [role=status], main [role=alert], main h1', crawl: true },
+  { id: 'states-journey-loading', path: '/student?view=journey&state=loading', ready: 'main [role=status], main [role=alert], main h1', crawl: false },
+  { id: 'states-journey-error', path: '/student?view=journey&state=error', ready: 'main [role=status], main [role=alert], main h1', crawl: true },
+  { id: 'states-journey-empty', path: '/student?view=journey&state=empty', ready: 'main [role=status], main [role=alert], main h1', crawl: true },
+  { id: 'states-paths-loading', path: '/student?view=paths&state=loading', ready: 'main [role=status], main [role=alert], main h1', crawl: false },
+  { id: 'states-paths-error', path: '/student?view=paths&state=error', ready: 'main [role=status], main [role=alert], main h1', crawl: true },
+  { id: 'states-paths-empty', path: '/student?view=paths&state=empty', ready: 'main [role=status], main [role=alert], main h1', crawl: true },
+  { id: 'states-compare-loading', path: '/student?view=compare&state=loading', ready: 'main [role=status], main [role=alert], main h1', crawl: false },
+  { id: 'states-compare-error', path: '/student?view=compare&state=error', ready: 'main [role=status], main [role=alert], main h1', crawl: true },
+  { id: 'states-compare-empty', path: '/student?view=compare&state=empty', ready: 'main [role=status], main [role=alert], main h1', crawl: true },
+  { id: 'states-plan-loading', path: '/student?view=plan&state=loading', ready: 'main [role=status], main [role=alert], main h1', crawl: false },
+  { id: 'states-plan-error', path: '/student?view=plan&state=error', ready: 'main [role=status], main [role=alert], main h1', crawl: true },
+  { id: 'states-plan-empty', path: '/student?view=plan&state=empty', ready: 'main [role=status], main [role=alert], main h1', crawl: true },
+  { id: 'states-path-error', path: '/student?view=paths&path=path-one&state=error', ready: 'main [role=alert]', crawl: true },
+  { id: 'states-programs-loading', path: '/student?view=paths&path=path-one&stage=H&state=loading', ready: 'main [role=status]', crawl: false },
 ];

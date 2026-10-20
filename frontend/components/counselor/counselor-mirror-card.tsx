@@ -102,7 +102,7 @@ export function CounselorMirrorCard({ refreshKey, onUpdated }: {
     {feedbackVersion === draft.version && <FeltUnderstood version={feedbackVersion}
       labels={{ legend: t('counselorMirror.understood'), certainty: `${t('counselorMirror.certaintyAfter')} (${t('counselorMirror.optional')})`,
         send: t('counselorMirror.sendFeedback'), skip: t('counselorMirror.skipFeedback') }}
-      onSaved={() => setFeedbackVersion(null)} onSkip={() => { setFeedbackVersion(null); setError(false); }} />}
+      onSaved={() => onUpdated?.()} onSkip={() => { setFeedbackVersion(null); setError(false); }} />}
     {draft.status === 'awaiting_confirmation' && <div className="mt-4">
       {editing ? <form onSubmit={(event) => { event.preventDefault(); void act(true); }}>
         <label className="block text-sm font-semibold">{t('counselorMirror.editHint')}

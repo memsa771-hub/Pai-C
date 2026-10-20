@@ -58,7 +58,7 @@ export function LoadState({
   skeleton?: "cards" | "list" | "profile" | "chat";
   empty?: { title: string; description?: string; icon?: LucideIcon; action?: React.ReactNode };
 }) {
-  if (error) return <ErrorState description={copy.error} retryLabel={copy.retry} onRetry={retry} />;
+  if (error) return <ErrorState retryLabel={copy.retry} onRetry={retry} />;
   if (busy) return <Skeletons variant={skeleton} label={copy.loading} />;
   return <EmptyState title={empty?.title || copy.emptyTitle} description={empty?.description || copy.empty}
     icon={empty?.icon} action={empty?.action} />;

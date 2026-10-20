@@ -2,7 +2,7 @@
  * (`npx vite --config tests/preview/vite.config.mjs`). No real API, identity
  * or provider is used: every non-local request is aborted.
  *
- *   node tests/preview/workspace.e2e.cjs <playwright-module-path> [--only=a,b] [--skip-crawl] [--skip-flow]
+ *   node tests/preview/workspace.e2e.cjs <playwright-module-path> [--only=a,b] [--skip-crawl] [--skip-flow] [--flow-only]
  *
  * For every screen: light and dark at 375, 768 and 1440 px. It fails on page
  * errors, console errors, horizontal overflow and raw schema keys in visible
@@ -132,9 +132,10 @@ async function crawl(browser) {
 
 (async () => {
   const browser = await chromium.launch({ channel: 'msedge' });
-  const shots = await checkScreens(browser);
-  const clicks = args.includes('--skip-crawl') ? 0 : await crawl(browser);
-  if (!args.includes('--skip-flow') && !only.length) await require('./flow.cjs')(browser, open, ORIGIN, OUT);
+  const flowOnly = args.includes('--flow-only');
+  const shots = flowOnly ? 0 : await checkScreens(browser);
+  const clicks = flowOnly || args.includes('--skip-crawl') ? 0 : await crawl(browser);
+  if (flowOnly || (!args.includes('--skip-flow') && !only.length)) await require('./flow.cjs')(browser, open, ORIGIN);
   console.log(`PASS: ${shots} screenshots, ${clicks} crawled clicks, no overflow, raw keys or console errors. No live calls.`);
   await browser.close();
 })().catch((error) => { console.error(error); process.exit(1); });

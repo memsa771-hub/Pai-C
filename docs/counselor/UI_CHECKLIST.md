@@ -21,4 +21,4 @@ and the link crawler (no dead buttons, no 404 links, no console errors, no page 
 | 11 | Plan and check-ins | [x] | `plan-*` |
 | 12 | Documents | [x] | `documents-*` |
 | 13 | Settings | [x] | `settings-*` |
-| 14 | Empty, loading and error states | [ ] | `states-*` |
+| 14 | Empty, loading and error states | [x] | `states-*` |

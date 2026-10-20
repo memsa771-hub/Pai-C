@@ -34,5 +34,20 @@ const api={getCounselorWorkspace:async()=>picture,getProfileCards:async()=>({car
   answerFactCard:async()=>({saved:true}),reviewProfileCard:async()=>({saved:true}),
   submitOnboarding:async()=>({completed:true,rejected:{},saved:[]}),
 };
-export const workspaceApi=new Proxy(api,{get:(target,key)=>{const method=String(key);return (...args:unknown[])=>{calls.push({method,args});const fn=target[key as keyof typeof target];return fn?fn():Promise.resolve([]);};}}) as any;
+// ?state=loading|error|empty forces every read into that state for review.
+const forced=new URLSearchParams(location.search).get('state');
+const emptyReads:Record<string,unknown>={
+  getCounselorWorkspace:{coverage:Object.fromEntries(Object.keys(picture.coverage).map(k=>[k,{covered:false,item_count:0,evidence:null}])),
+    personal:{world:{},self:[],source:[],pressures:{items:[]},sure:{score:null,history:[]}},capabilities:[],academic:{records:{}},sections:{},
+    picture:null,mirror_status:null,moments:{},ratings:[]},
+  getProfileCards:{cards:[]},getPossibilities:[],getRoadmaps:[],getCurrentDecision:null,getCounselorSummary:{type:null,status:null,version:null},
+};
+const read=(method:string)=>method.startsWith('get')&&method!=='getCounselorHealth'&&method!=='getFileUrl';
+export const workspaceApi=new Proxy(api,{get:(target,key)=>{const method=String(key);return (...args:unknown[])=>{calls.push({method,args});
+  if(forced&&read(method)){
+    if(forced==='loading') return new Promise(()=>{});
+    if(forced==='error') return Promise.reject(new Error('Offline review: forced error'));
+    if(forced==='empty'&&method in emptyReads) return Promise.resolve(structuredClone(emptyReads[method]));
+  }
+  const fn=target[key as keyof typeof target];return fn?fn():Promise.resolve([]);};}}) as any;
 (window as any).__offlineCalls=calls;

@@ -58,7 +58,7 @@ export function Skeletons({ variant = 'cards', count = 3, label = copy.loading }
       {variant === 'profile' ? (
         <div className="space-y-5">
           <div className="flex items-center gap-4 rounded-3xl border bg-card p-6">
-            <Skeleton className="size-16 rounded-full" />
+            <Skeleton className="size-16 shrink-0 rounded-full" />
             <div className="flex-1 space-y-2"><Skeleton className="h-5 w-48" /><Skeleton className="h-4 w-64 max-w-full" /></div>
           </div>
           <Skeleton className="h-56 rounded-3xl" />

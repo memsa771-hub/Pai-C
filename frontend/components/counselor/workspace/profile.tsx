@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
-import { Eye, EyeOff, Flag, GraduationCap, LayoutGrid, List, MapPin, MessageCircle, RefreshCw, ShieldCheck, TrendingUp, Users } from "lucide-react";
+import { Eye, EyeOff, Flag, UserRound, GraduationCap, LayoutGrid, List, MapPin, MessageCircle, RefreshCw, ShieldCheck, TrendingUp, Users } from "lucide-react";
 import { workspaceApi } from "@/lib/api";
 import type { LivingPicture, ProfileCard } from "@/lib/counselor-workspace";
 import { Button } from "@/components/ui/button";
@@ -40,15 +40,15 @@ export function CoverageHeatmap({ coverage, selected, onSelect }: {
   return <AreaHeatmap title={text.heatmapTitle} areas={heatmapAreas(coverage)} selected={selected} onSelect={onSelect} />;
 }
 
-function ProfileHeader({ name, level, city, stage, updated }: { name: string; level?: string; city?: string; stage?: { id: string; title: string }; updated?: string }) {
-  const initials = name.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]?.toUpperCase()).join("") || "?";
+function ProfileHeader({ name, named, level, city, stage, updated }: { name: string; named: boolean; level?: string; city?: string; stage?: { id: string; title: string }; updated?: string }) {
+  const initials = named ? name.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]?.toUpperCase()).join("") : "";
   const chip = "inline-flex min-h-8 items-center gap-1.5 rounded-full bg-white/20 px-3 text-sm font-medium backdrop-blur";
   return (
     <section className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[var(--hero-from)] via-[var(--hero-via)] to-[var(--hero-to)] p-5 text-white shadow-lift sm:p-7">
       <span aria-hidden className="absolute -right-10 -top-12 size-48 rounded-full bg-white/10" />
       <span aria-hidden className="absolute -bottom-16 right-24 size-36 rounded-full bg-white/10" />
       <div className="relative flex flex-wrap items-center gap-4 sm:gap-5">
-        <span aria-hidden className="flex size-16 shrink-0 items-center justify-center rounded-full bg-white text-xl font-bold text-[#2a3fb8] shadow-lift sm:size-20 sm:text-2xl">{initials}</span>
+        <span aria-hidden className="flex size-16 shrink-0 items-center justify-center rounded-full bg-white text-xl font-bold text-[#2a3fb8] shadow-lift sm:size-20 sm:text-2xl">{initials || <UserRound className="size-8" />}</span>
         <div className="min-w-0 flex-1">
           <p className="text-xs font-semibold uppercase tracking-wider text-white/85">{copy.profileTitle}</p>
           <h1 className="mt-0.5 break-words text-2xl font-bold tracking-tight sm:text-3xl">{name}</h1>
@@ -92,7 +92,8 @@ export function LivingProfile({
   const education = cards.filter((c) => EDUCATION.includes(c.key));
   const current = education.find((c) => (c.value as Record<string, unknown>)?.academic_status === "current") || education[0];
   const level = human((current?.value as Record<string, unknown>)?.qualification_name) || undefined;
-  const name = value("identity.preferred_name") || value("identity.full_name") || copy.nav.profile;
+  const realName = value("identity.preferred_name") || value("identity.full_name");
+  const name = realName || copy.nav.profile;
   const dates = [...cards.map((c) => c.updated_at), ...Object.values(picture.coverage).map((c) => c.last_confirmed || "")].filter(Boolean).sort();
   const skills = Array.isArray(picture.capabilities) ? picture.capabilities : Object.values(picture.capabilities).flat();
   const datedEducation = [...education].sort((a, b) => {
@@ -102,7 +103,7 @@ export function LivingProfile({
     };
     return date(a).localeCompare(date(b));
   });
-  const initials = name.split(/\s+/).filter(Boolean).slice(0, 2).map((p) => p[0]?.toUpperCase()).join("");
+  const initials = realName ? realName.split(/\s+/).filter(Boolean).slice(0, 2).map((p) => p[0]?.toUpperCase()).join("") : "";
   const missing = Object.entries(copy.areas).filter(([key]) => !picture.coverage[key]?.covered);
   const selectArea = (area: string | null) => {
     setFilter(area);
@@ -114,7 +115,7 @@ export function LivingProfile({
   ];
   return (
     <div className="space-y-5">
-      <ProfileHeader name={name} level={level} city={value("location.current_city")} stage={stage} updated={shortDate(dates.at(-1))} />
+      <ProfileHeader name={name} named={!!realName} level={level} city={value("location.current_city")} stage={stage} updated={shortDate(dates.at(-1))} />
       <div ref={top} className="flex scroll-mt-4 flex-wrap items-center justify-between gap-3">
         <div role="tablist" aria-label={text.viewLabel} className="inline-flex rounded-2xl bg-muted p-1">
           {tabs.map(({ id, label, icon: Icon }) => (

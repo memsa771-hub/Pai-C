@@ -2,7 +2,7 @@
 import { useEffect, useId, useState } from "react";
 import {
   CircleAlert, Eye, FileText, Gauge, Gem, GraduationCap, Heart, Home, Lightbulb, MessageCircle,
-  Scale, Signpost, Sparkles, Target, Users, type LucideIcon,
+  Scale, Signpost, Sparkles, Target, UserRound, Users, type LucideIcon,
 } from "lucide-react";
 import { workspaceApi } from "@/lib/api";
 import type { EvidenceItem, LivingPicture, ProfileCard } from "@/lib/counselor-workspace";
@@ -121,7 +121,7 @@ export function PeopleMap({ people, showPrivate, initials }: { people: EvidenceI
   return (
     <div className="flex flex-col items-center">
       <span className="flex size-14 items-center justify-center rounded-full bg-gradient-to-br from-[var(--hero-from)] to-[var(--hero-via)] text-lg font-bold text-white shadow-lift" aria-hidden>
-        {initials}
+        {initials || <UserRound className="size-6" />}
       </span>
       <span className="mt-1 text-xs font-semibold text-muted-foreground">{text.you}</span>
       <span aria-hidden className="h-5 w-0.5 bg-border" />
