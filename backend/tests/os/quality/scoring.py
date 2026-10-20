@@ -14,7 +14,10 @@ from typing import Any
 import yaml
 
 KEY_PATH = Path(__file__).parent / "spike1_answer_key.yaml"
-PASS_CORRECT, PASS_CONFIRMED = 0.95, 0.70
+# The pass bars, per run. Confirmed was 0.70 (parent §5); the owners lowered it to 0.45 for the pilot on 2026-10-20
+# (spec Q1, docs/os/slice-2-quality-report.md) after two gates at about 0.50. Raise it again once the programme
+# start pages are improved. The correct-rate bar is unchanged.
+PASS_CORRECT, PASS_CONFIRMED = 0.95, 0.45
 ENGLISH_KEYS = ("cefr", "ielts", "toefl_ibt", "pte", "moi_accepted")
 _TESTS = {"testas": "TestAS", "gate": "GATE", "gre": "GRE", "dmat": "dMat"}
 

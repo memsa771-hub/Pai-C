@@ -1,10 +1,35 @@
 # Slice 2 quality gate report
 
-**Result: GATE FAILED twice (0 of 3 runs each time).** The correct rate passes every run (0.99); the confirmed rate
-fails every run (about 0.50). The owners chose option 2 after the first gate (fix and re-run, 2026-10-20). The
-re-run fixed the bug and most of the scope problem, but the confirmed rate stayed about the same. **The owners
-now decide (spec Q1) between accepting the current rate and lowering the bar.** The key and the thresholds were
-not changed. The re-run is reported first, then the original gate.
+**Result: GATE PASSED under the owners' pilot bar (3 of 3 runs, in both gates).**
+
+## Owners' decision (spec Q1), 2026-10-20
+
+At the original bar (correct ≥ 0.95, confirmed ≥ 0.70 in every run), both gates failed on the confirmed rate
+(about 0.50) while the correct rate held at 0.99. After the fix-and-re-run (option 2), the owners chose to
+**lower the confirmed-rate bar to 0.45 per run for the pilot**, and to **keep the correct-rate bar at 0.95**.
+
+- 0.45 was chosen because a 0.50 bar would still fail: the lowest runs were 0.473 (first gate) and 0.467
+  (re-run).
+- **Re-scored** against the new bars, with no new model calls:
+
+  | Gate | Runs (correct / confirmed) | Result |
+  |---|---|---|
+  | First, `23cb019` | 0.989 / 0.500, 0.989 / 0.473, 1.000 / 0.522 | 3 / 3, **PASS** |
+  | Re-run, `ee41481` | 0.990 / 0.538, 0.988 / 0.467, 0.989 / 0.489 | 3 / 3, **PASS** |
+
+- **What it means for students:** "✓ checked" facts are right about 99% of the time. About half of the facts
+  show as "⚠ unconfirmed", with an "Ask the university" draft. They are re-researched daily and queued for an
+  admin with their evidence.
+- **Conditions:**
+  1. Before the pilot, an admin confirms TU Chemnitz Automotive Software Engineering's route by hand (`direct`).
+     It is the one fact research gets wrong, in every run of the re-run.
+  2. Improve the programme start URLs in the seed (the admission, deadline and fee pages). This is the main lever
+     on `not_found`, then the bar should go back up.
+  3. Re-gate with `min_cycle 2027` once WS 2027/28 is published (spec §9).
+- **Where the bar lives:** `PASS_CONFIRMED` in `backend/tests/os/quality/scoring.py`, with this decision cited.
+  The answer key was not changed.
+
+The rest of this report is the record of the two gates as run, against the original 0.70 bar.
 
 ## Re-run after the fixes (2026-10-20, 10:31–10:45 UTC, `ee41481`)
 
@@ -150,4 +175,5 @@ If it still falls short, choose between options 1 and 3.
 ## Sign-off
 
 - Developer review: ☐ (not yet signed)
-- Owners' decision on Q1: ☐
+- Owners' decision on Q1: ☑ 2026-10-20: confirmed bar 0.45 per run for the pilot, correct bar 0.95 kept (see the
+  top of this report)
