@@ -17,7 +17,6 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import datetime, timezone
 
-from openai import AsyncOpenAI
 from pydantic_ai import Agent
 from pydantic_ai.durable_exec.dbos import DBOSDurability
 from pydantic_ai.models import Model
@@ -82,9 +81,12 @@ def prompts(profile: ResearchProfile) -> dict[str, str]:
 
 
 def model_for(settings: OsSettings, tier: str) -> OpenAIChatModel:
-    """The model for a tier (parent D8). The client never retries (invariant 7)."""
+    """The model for a tier (parent D8). The client never retries (invariant 7).
+
+    The client comes from Pydantic AI's provider: the OS never imports a provider SDK itself (invariant 11,
+    and the Counsellor's guard in tests/test_model_gateway.py)."""
     name = settings.model_cheap if tier == "cheap" else settings.model_strong
-    client = AsyncOpenAI(api_key=settings.openai_api_key, max_retries=0)
+    client = OpenAIProvider(api_key=settings.openai_api_key).client.with_options(max_retries=0)
     return OpenAIChatModel(name, provider=OpenAIProvider(openai_client=client))
 
 
