@@ -1,4 +1,5 @@
-"""Tables of the PAI OS, all in schema `os` (SQLAlchemy Core): Slice 1, and Slice 2's Knowledge tables.
+"""Tables of the PAI OS, all in schema `os` (SQLAlchemy Core): Slice 1, Slice 2's Knowledge tables and Slice 3's
+Documents tables.
 
 Only `app.os.kernel` writes os_plans, os_tasks, os_task_edges and os_plan_revisions (invariant 1).
 Every timestamp is timezone-aware (invariant 13) and every table carries tenant_id.
@@ -14,6 +15,7 @@ from sqlalchemy import (
     Identity,
     Index,
     Integer,
+    LargeBinary,
     Numeric,
     Table,
     Text,
@@ -269,7 +271,9 @@ research_runs = Table(
 agent_runs = Table(
     "os_agent_runs", md,
     _id(), _tenant(),
-    Column("research_run_id", BigInteger, ForeignKey("os.os_research_runs.id", ondelete="CASCADE"), nullable=False),
+    # A reading belongs to a research run (Slice 2) or to a document (Slice 3, os_0004).
+    Column("research_run_id", BigInteger, ForeignKey("os.os_research_runs.id", ondelete="CASCADE")),
+    Column("document_id", BigInteger, ForeignKey("os.os_documents.id", ondelete="SET NULL")),
     Column("reading", Text, nullable=False),
     Column("agent", Text, nullable=False),
     Column("agent_version", Integer, nullable=False),
@@ -281,4 +285,84 @@ agent_runs = Table(
     Column("error", Text),
     Column("at", DateTime(timezone=True), nullable=False, server_default=func.now()),
     UniqueConstraint("research_run_id", "reading", name="uq_os_agent_runs_reading"),
+    UniqueConstraint("document_id", "reading", name="uq_os_agent_runs_document"),
+)
+
+# --- Slice 3: Documents (spec 2026-10-20 §3, os_0004) ------------------------------------------------------
+
+DOCUMENT_STATUSES = ("uploaded", "reading", "read", "needs_student", "confirmed", "failed", "deleted")
+FIELD_CHECKS = ("ok", "check_failed", "missing")
+
+documents = Table(
+    "os_documents", md,
+    _id(), _tenant(),
+    Column("student_ref", Text, nullable=False),
+    Column("doc_type", Text, nullable=False),
+    Column("type_version", Integer, nullable=False),
+    Column("filename", Text, nullable=False),
+    Column("content_type", Text, nullable=False),
+    Column("size", Integer, nullable=False),
+    Column("sha256", Text, nullable=False),
+    Column("pages", Integer),
+    Column("status", Text, nullable=False, server_default="uploaded"),
+    Column("detected_type", Text),
+    Column("error", Text),
+    _created(),
+    Column("read_at", DateTime(timezone=True)),
+    Column("confirmed_at", DateTime(timezone=True)),
+    Column("deleted_at", DateTime(timezone=True)),
+    _in("status", DOCUMENT_STATUSES, "ck_os_documents_status"),
+    # one live copy of a file per student; a deleted one may be uploaded again
+    Index("uq_os_documents_sha", "tenant_id", "student_ref", "sha256", unique=True,
+          postgresql_where=text("status <> 'deleted'")),
+    Index("ix_os_documents_student", "tenant_id", "student_ref"),
+)
+
+document_files = Table(
+    "os_document_files", md,
+    Column("document_id", BigInteger, ForeignKey("os.os_documents.id", ondelete="CASCADE"), primary_key=True),
+    _tenant(),
+    Column("data", LargeBinary, nullable=False),
+)
+
+document_fields = Table(
+    "os_document_fields", md,
+    _id(), _tenant(),
+    Column("document_id", BigInteger, ForeignKey("os.os_documents.id", ondelete="CASCADE"), nullable=False),
+    Column("field", Text, nullable=False),
+    Column("value_read", JSONB),
+    Column("check_result", Text, nullable=False, server_default="ok"),  # not "check": a SQL keyword
+    Column("reasons", JSONB, nullable=False, server_default=text("'[]'::jsonb")),
+    Column("value_confirmed", JSONB),
+    Column("confirmed_by", Text),
+    Column("confirmed_at", DateTime(timezone=True)),
+    UniqueConstraint("document_id", "field", name="uq_os_document_fields"),
+    _in("check_result", FIELD_CHECKS, "ck_os_document_fields_check"),
+)
+
+document_findings = Table(
+    "os_document_findings", md,
+    _id(), _tenant(),
+    Column("student_ref", Text, nullable=False),
+    Column("kind", Text, nullable=False),
+    Column("field", Text, nullable=False),
+    Column("items", JSONB, nullable=False),  # [[document_id, value], ...]
+    Column("status", Text, nullable=False, server_default="open"),
+    Column("resolution", JSONB),
+    _created(),
+    Column("resolved_at", DateTime(timezone=True)),
+    _in("kind", ("variant", "mismatch"), "ck_os_document_findings_kind"),
+    _in("status", ("open", "resolved"), "ck_os_document_findings_status"),
+    Index("ix_os_document_findings_student", "tenant_id", "student_ref"),
+)
+
+profile_values = Table(
+    "os_profile_values", md,
+    _id(), _tenant(),
+    Column("student_ref", Text, nullable=False),
+    Column("key", Text, nullable=False),
+    Column("value", JSONB),
+    Column("source_document_id", BigInteger, ForeignKey("os.os_documents.id", ondelete="SET NULL")),
+    Column("confirmed_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
+    UniqueConstraint("tenant_id", "student_ref", "key", name="uq_os_profile_values_key"),
 )

@@ -30,6 +30,8 @@ def test_os_tables_present():
         "os_knowledge_facts",
         # Slice 2 (os_0003)
         "os_programmes", "os_pages", "os_research_runs", "os_agent_runs",
+        # Slice 3 (os_0004)
+        "os_documents", "os_document_files", "os_document_fields", "os_document_findings", "os_profile_values",
     }
 
 
@@ -66,7 +68,7 @@ def test_downgrade_then_upgrade_slice2(os_db):
 
     from tests.os.conftest import run_alembic
 
-    run_alembic(["downgrade", "os@-1"], os_db)
+    run_alembic(["downgrade", "os_0002"], os_db)  # a fixed target: later slices add revisions on top
     eng = create_engine(os_db)
     try:
         assert "os_programmes" not in inspect(eng).get_table_names(schema=OS_SCHEMA)
