@@ -5,7 +5,9 @@ Environment: OS_DATABASE_URL (also the DBOS system database), OS_DBOS_SYSTEM_SCH
 OS_PARENT_PID (optional: exit when that parent is gone). Stops on SIGTERM/SIGINT.
 
 Besides running DBOS workflows, the main loop is the enqueuer: about once a second it sends the
-kernel's unsent enqueue requests to the queue (the reconciler, every 5 minutes, is only the backstop).
+kernel's unsent enqueue requests to the queue (the reconciler, every 5 minutes, is only the backstop),
+and starts the day's research runs for programmes whose facts are waiting (Slice 2, R2-P1). Research runs
+only when OS_OPENAI_API_KEY is set; without it, confirm_fact tasks wait for an admin.
 """
 
 import importlib
@@ -15,6 +17,7 @@ import signal
 import sys
 import threading
 from collections.abc import Callable
+from datetime import datetime, timezone
 from pathlib import Path
 
 from dbos import DBOS, DBOSClient
@@ -48,6 +51,26 @@ def _extra_modules(spec: str) -> list[Module]:
     return found
 
 
+def register_research_if_configured(settings: OsSettings, engine: Engine, kernel: Kernel) -> bool:
+    """Registers os.research (readers built once, before launch). False when no model key is set."""
+    if not settings.openai_api_key:
+        log.warning("OS_OPENAI_API_KEY is not set: research is off and confirm_fact tasks wait for an admin")
+        return False
+    from app.os.agents.spec import AGENT_DIR, load_agent_spec  # imported late: only a researching worker needs them
+    from app.os.knowledge.research.pages import PageGateway
+    from app.os.knowledge.research.readings import build_readers, model_for
+    from app.os.knowledge.research.run import register_research
+    from app.os.workers.jobs import _service
+
+    spec = load_agent_spec(AGENT_DIR / "research.v1.yaml")
+    profiles = load_profile_dir(PROFILE_SOURCE)
+    model = model_for(settings, spec.tier)
+    readers = {key: build_readers(model, profile, spec) for key, profile in profiles.items()}
+    register_research(engine, settings, kernel, _service(settings, engine, kernel),
+                      PageGateway(engine, settings.tenant_id, settings), readers, spec, profiles)
+    return True
+
+
 def build(settings: OsSettings) -> tuple[Registry, Kernel, DBOSClient, Engine]:
     registry = default_registry()
     for module in _extra_modules(os.environ.get("OS_EXTRA_MODULES", "")):
@@ -65,7 +88,11 @@ def build(settings: OsSettings) -> tuple[Registry, Kernel, DBOSClient, Engine]:
 
     for name, cron, factory in [*worker_jobs, *JOB_FACTORIES]:
         register_job(name, cron, factory(settings, engine, kernel, client))
+    RESEARCH["on"] = register_research_if_configured(settings, engine, kernel)
     return registry, kernel, client, engine
+
+
+RESEARCH = {"on": False}  # set by build(): whether this worker starts research runs
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -85,8 +112,12 @@ def main(argv: list[str] | None = None) -> int:
                 break  # the parent died without stopping us: do not linger
             try:
                 enqueue_pending(engine, client, settings.tenant_id)
+                if RESEARCH["on"]:
+                    from app.os.knowledge.research.run import enqueue_research
+
+                    enqueue_research(engine, client, settings.tenant_id, datetime.now(timezone.utc).date())
             except Exception:  # noqa: BLE001  (a database blip must not kill the worker; next tick retries)
-                log.exception("enqueue_pending failed")
+                log.exception("enqueue failed")
     finally:
         client.destroy()
         DBOS.destroy(destroy_registry=True)

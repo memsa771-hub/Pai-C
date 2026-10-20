@@ -56,9 +56,11 @@ class SqlKnowledge:
             "status": fact.status, "conflict_note": fact.conflict_note, "source": source,
         }
 
-    def upsert(self, scope: Scope, ref: str, field: str, fact: Fact, source: Source = "manual") -> int:
-        """Adds or replaces a fact. An admin's fact is `manual` (the default); research passes `research`."""
-        values = self._values(fact, source)
+    def upsert(self, scope: Scope, ref: str, field: str, fact: Fact, source: Source = "manual",
+               research_run_id: int | None = None, evidence: list | None = None) -> int:
+        """Adds or replaces a fact. An admin's fact is `manual` (the default); research passes `research`,
+        its run and the evidence of every reading (Slice 2 spec §4.4)."""
+        values = {**self._values(fact, source), "research_run_id": research_run_id, "evidence": evidence}
         stmt = insert(T).values(
             tenant_id=self.tenant_id, scope=scope, ref=ref, field=field, intake_year=fact.intake_year, **values
         )
@@ -83,6 +85,15 @@ class SqlKnowledge:
         if row is None:
             raise KeyError(fact_id)
         return row.scope, row.ref, row.field, _fact(row)
+
+    def annotate(self, fact_id: int, *, conflict_note: str | None, checked_at=None) -> None:
+        """Research found the same value again (`checked_at`), or a different one (`conflict_note`), for a
+        confirmed fact: the value, quote and status stay (spec §4.6 step 6)."""
+        values: dict = {"conflict_note": conflict_note, "updated_at": func.now()}
+        if checked_at is not None:
+            values["checked_at"] = checked_at
+        with self.engine.begin() as conn:
+            conn.execute(update(T).where(T.c.id == fact_id, T.c.tenant_id == self.tenant_id).values(**values))
 
     def confirm(self, fact_id: int, *, value, quote: str, url: str, status: str,
                 conflict_note: str | None = None) -> Fact:

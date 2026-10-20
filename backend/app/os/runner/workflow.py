@@ -59,7 +59,8 @@ def register_workflow(engine: Engine, settings: OsSettings, registry: Registry, 
         if row is None or row.attempt != attempt or not kernel.mark_running(task_id, attempt):
             return None  # another tenant's task, superseded, or already settled: nothing to run
         return asdict(TaskContext(task_id=task_id, attempt=attempt, task_type=row.task_type, plan_id=row.plan_id,
-                                  programme_ref=row.programme_ref, payload=row.result or {}))
+                                  programme_ref=row.programme_ref, payload=row.result or {},
+                                  fact_refs=list(row.fact_refs or [])))
 
     def handle(ctx: dict) -> dict:
         module = registry.owner(ctx["task_type"])

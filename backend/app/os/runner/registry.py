@@ -1,7 +1,7 @@
 """Module registry: every task type has exactly one owner module (invariant 2)."""
 
 from collections.abc import Callable, Iterable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from app.os.compiler import CONFIRM_TYPE
 from app.os.kernel import Outcome
@@ -17,6 +17,7 @@ class TaskContext:
     plan_id: int
     programme_ref: str | None
     payload: dict
+    fact_refs: list = field(default_factory=list)  # [[scope, ref, field], ...] (confirm_fact tasks)
 
 
 @dataclass(frozen=True)

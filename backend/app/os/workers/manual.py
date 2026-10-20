@@ -1,4 +1,5 @@
-"""knowledge.manual: an admin confirms, corrects or supplies a fact (Slice 1; the research agent from Slice 2)."""
+"""The admin fallback: an admin confirms, corrects or supplies a fact (Slice 1). From Slice 2 the
+`knowledge.research` module owns `confirm_fact`; this API completes whatever research leaves unconfirmed."""
 
 from datetime import datetime, timezone
 
@@ -8,23 +9,9 @@ from app.os import models
 from app.os.compiler import CONFIRM_TYPE
 from app.os.kernel import TERMINAL, Kernel
 from app.os.knowledge import Fact, SqlKnowledge
+from app.os.knowledge.changes import after_fact_change as _after_fact_change
 
 T = models.tasks
-
-
-def _after_fact_change(service, kernel: Kernel, scope: str, ref: str, field: str, fact_id: int,
-                       status: str) -> list[int]:
-    """Completes the fact's waiting confirm tasks and revises every plan that uses the fact."""
-    with service.engine.connect() as conn:
-        waiting = conn.execute(select(T.c.id).where(
-            T.c.tenant_id == kernel.tenant_id, T.c.instance_key == f"confirm_fact@{ref}:{field}",
-            T.c.state == "waiting_review")).scalars().all()
-        plan_ids = conn.execute(select(T.c.plan_id).distinct().where(
-            T.c.tenant_id == kernel.tenant_id, T.c.fact_refs.contains([[scope, ref, field]]),
-        ).order_by(T.c.plan_id)).scalars().all()
-    for task_id in waiting:
-        kernel.complete_review(task_id, {"fact_id": fact_id, "status": status})
-    return [p for p in plan_ids if service.recompile(p, "fact_changed") is not None]
 
 
 def confirm_fact(service, knowledge: SqlKnowledge, kernel: Kernel, fact_id: int, **fields) -> list[int]:
