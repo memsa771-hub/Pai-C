@@ -1,10 +1,11 @@
-"""PlanQuery reads (reads are allowed outside the kernel; only writes are kernel-only)."""
+"""PlanQuery and Knowledge reads (reads are allowed outside the kernel; only writes are kernel-only)."""
 
 from sqlalchemy import Engine, select
 
 from app.os import models
 
 T, P = models.tasks, models.plans
+F, R, A, G = models.knowledge_facts, models.research_runs, models.agent_runs, models.programmes
 
 
 def task_out(row) -> dict:
@@ -35,3 +36,85 @@ def inbox_items(engine: Engine, tenant_id: str, student_ref: str) -> list[dict]:
             T.c.state == "waiting_student",
         ).order_by(T.c.due_at.asc().nulls_last(), T.c.id)).all()
     return [task_out(r) for r in rows]
+
+
+# --- Knowledge (Slice 2 spec §4.8) ---------------------------------------------------------------------------
+
+
+def _run_out(row) -> dict:
+    return {"id": row.id, "programme_ref": row.programme_ref, "intake_year": row.intake_year,
+            "workflow_id": row.workflow_id, "status": row.status, "started_at": row.started_at,
+            "ended_at": row.ended_at, "pages": row.pages, "confirmed": row.confirmed,
+            "unconfirmed": row.unconfirmed, "cost_usd": float(row.cost_usd)}
+
+
+def research_runs(engine: Engine, tenant_id: str, programme: str | None = None, limit: int = 100) -> list[dict]:
+    """Research runs, newest first, each with its readings (model, tokens, cost, error)."""
+    q = select(R).where(R.c.tenant_id == tenant_id)
+    if programme:
+        q = q.where(R.c.programme_ref == programme)
+    with engine.connect() as conn:
+        runs = conn.execute(q.order_by(R.c.started_at.desc(), R.c.id.desc()).limit(limit)).all()
+        readings = conn.execute(select(A).where(A.c.tenant_id == tenant_id, A.c.research_run_id.in_([r.id for r in runs]))
+                                .order_by(A.c.research_run_id, A.c.reading)).all() if runs else []
+    by_run: dict[int, list] = {}
+    for a in readings:
+        by_run.setdefault(a.research_run_id, []).append({
+            "reading": a.reading, "agent": a.agent, "agent_version": a.agent_version, "model": a.model,
+            "input_tokens": a.input_tokens, "cached_tokens": a.cached_tokens, "output_tokens": a.output_tokens,
+            "cost_usd": float(a.cost_usd), "error": a.error, "at": a.at})
+    return [{**_run_out(r), "readings": by_run.get(r.id, [])} for r in runs]
+
+
+def _fact_out(row, admin: bool) -> dict:
+    out = {"field": row.field, "value": row.value, "status": row.status, "source_url": row.url or None,
+           "quote": row.quote or None, "checked_at": row.checked_at, "conflict_note": row.conflict_note}
+    if admin:
+        out |= {"fact_id": row.id, "source": row.source, "evidence": row.evidence,
+                "research_run_id": row.research_run_id}
+    return out
+
+
+def open_facts(engine: Engine, tenant_id: str, items: list[dict]) -> list[dict]:
+    """The open confirm tasks, each with its fact (for the plan's intake year, with evidence) and the
+    programme's last research run."""
+    year = P.c.contract["target_intake"]["year"].as_integer()
+    with engine.connect() as conn:
+        years = dict(conn.execute(select(P.c.id, year).where(
+            P.c.tenant_id == tenant_id, P.c.id.in_({i["plan_id"] for i in items}))).all()) if items else {}
+        out = []
+        for i in items:
+            fact = conn.execute(select(F).where(
+                F.c.tenant_id == tenant_id, F.c.scope == i["scope"], F.c.ref == i["ref"], F.c.field == i["field"],
+                F.c.intake_year == years.get(i["plan_id"]))).first()
+            run = conn.execute(select(R).where(R.c.tenant_id == tenant_id, R.c.programme_ref == i["ref"])
+                               .order_by(R.c.started_at.desc(), R.c.id.desc()).limit(1)).first() \
+                if i["scope"] == "programme" else None
+            out.append({**i, "intake_year": years.get(i["plan_id"]),
+                        "fact": None if fact is None else _fact_out(fact, admin=True),
+                        "last_research_run": None if run is None else _run_out(run)})
+    return out
+
+
+def student_programmes(engine: Engine, tenant_id: str, student_ref: str) -> list[dict]:
+    """The programmes in the student's plans, in plan then rank order, with their facts for the plan's intake
+    year: value, status, source link, quote, check date and conflict note. No evidence (it is for admins)."""
+    with engine.connect() as conn:
+        plans = conn.execute(select(P.c.contract).where(
+            P.c.tenant_id == tenant_id, P.c.student_ref == student_ref, P.c.status != "done").order_by(P.c.id)).all()
+        out, seen = [], set()
+        for (contract,) in plans:
+            intake_year = contract["target_intake"]["year"]
+            for choice in sorted(contract["programmes"], key=lambda c: c["rank"]):
+                ref = choice["programme_ref"]
+                if (ref, intake_year) in seen:
+                    continue
+                seen.add((ref, intake_year))
+                prog = conn.execute(select(G).where(G.c.tenant_id == tenant_id, G.c.ref == ref)).first()
+                facts = conn.execute(select(F).where(
+                    F.c.tenant_id == tenant_id, F.c.scope == "programme", F.c.ref == ref,
+                    F.c.intake_year == intake_year).order_by(F.c.field)).all()
+                out.append({"ref": ref, "name": prog.name if prog else ref,
+                            "university": prog.university if prog else None, "intake_year": intake_year,
+                            "facts": [_fact_out(f, admin=False) for f in facts]})
+    return out

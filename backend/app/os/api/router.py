@@ -1,11 +1,12 @@
-"""The OS HTTP API (spec §4.9): PlanSource (admin), PlanQuery and the student inbox."""
+"""The OS HTTP API (spec §4.9; Slice 2 spec §4.8): PlanSource (admin), PlanQuery, the student inbox, the
+student's programme facts, and research (admin)."""
 
 from collections.abc import Callable
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Response
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, Response
 
 from app.os.api.deps import check_admin, current_student_ref, current_student_ref_for_write
-from app.os.api.queries import inbox_items, plan_out
+from app.os.api.queries import inbox_items, open_facts, plan_out, research_runs, student_programmes
 from app.os.api.schemas import (
     CompleteIn,
     CompleteOut,
@@ -14,9 +15,14 @@ from app.os.api.schemas import (
     InboxOut,
     OpenFactsOut,
     PlanOut,
+    ProgrammesOut,
+    ResearchRunsOut,
+    ResearchStartOut,
     SupplyIn,
     UpgradeOut,
 )
+from app.os.knowledge.programmes import ProgrammeStore
+from app.os.knowledge.research.run import enqueue_one
 from app.os.api.services import Services
 from app.os.compiler import CompileError
 from app.os.contracts.route_contract import RouteContract
@@ -93,7 +99,27 @@ def build_router(get_services: Callable[[], Services]) -> APIRouter:
         return {"revised_plans": revised}
 
     @router.get("/facts/open", response_model=OpenFactsOut, dependencies=[Depends(require_admin)])
-    def open_facts(svc: Services = Depends(services)) -> dict:
-        return {"items": open_confirm_tasks(svc.engine, svc.settings.tenant_id)}
+    def facts_open(svc: Services = Depends(services)) -> dict:
+        tenant = svc.settings.tenant_id
+        return {"items": open_facts(svc.engine, tenant, open_confirm_tasks(svc.engine, tenant))}
+
+    @router.post("/research/{programme_ref}", status_code=202, response_model=ResearchStartOut,
+                 dependencies=[Depends(require_admin)])
+    def research_now(programme_ref: str, intake_year: int = Query(ge=2025, le=2100),
+                     svc: Services = Depends(services)) -> dict:
+        """Starts today's research run for a programme now (the same workflow ID the worker would use)."""
+        tenant = svc.settings.tenant_id
+        if ProgrammeStore(svc.engine, tenant).get(programme_ref) is None:
+            raise HTTPException(status_code=404, detail="programme not found")
+        wid, sent = enqueue_one(svc.engine, svc.dbos_client(), tenant, programme_ref, intake_year, svc.today())
+        return {"workflow_id": wid, "enqueued": sent}
+
+    @router.get("/research/runs", response_model=ResearchRunsOut, dependencies=[Depends(require_admin)])
+    def runs(programme: str | None = None, svc: Services = Depends(services)) -> dict:
+        return {"runs": research_runs(svc.engine, svc.settings.tenant_id, programme)}
+
+    @router.get("/programmes", response_model=ProgrammesOut)
+    def programmes(student: str = Depends(current_student_ref), svc: Services = Depends(services)) -> dict:
+        return {"programmes": student_programmes(svc.engine, svc.settings.tenant_id, student)}
 
     return router

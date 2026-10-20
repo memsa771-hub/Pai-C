@@ -49,28 +49,32 @@ def _utcnow() -> datetime:
 # --- kernel side: start the day's runs -----------------------------------------------------------------------
 
 
-def enqueue_research(engine: Engine, client: DBOSClient, tenant_id: str, today: date) -> int:
-    """Starts one run per (programme, intake) that has confirm_fact tasks waiting for research and no run
-    today. Enqueueing the same workflow ID again returns the existing workflow. Returns how many were sent."""
+def enqueue_one(engine: Engine, client: DBOSClient, tenant_id: str, programme_ref: str, intake_year: int,
+                today: date) -> tuple[str, bool]:
+    """Starts today's run for one programme unless it already ran: (workflow ID, whether it was sent).
+    Enqueueing the same workflow ID again returns the existing workflow, so a race is harmless."""
     from app.os.runner.workflow import APP_VERSION, QUEUE_NAME  # imported here: the runner imports knowledge
 
+    wid = research_workflow_id(tenant_id, programme_ref, intake_year, today)
+    with engine.connect() as conn:
+        if conn.execute(select(R.c.id).where(R.c.tenant_id == tenant_id, R.c.workflow_id == wid)).first():
+            return wid, False
+    options: EnqueueOptions = {"queue_name": QUEUE_NAME, "workflow_name": RESEARCH_WORKFLOW, "workflow_id": wid,
+                               "app_version": APP_VERSION}
+    client.enqueue(options, programme_ref, intake_year, today.isoformat())
+    return wid, True
+
+
+def enqueue_research(engine: Engine, client: DBOSClient, tenant_id: str, today: date) -> int:
+    """Starts one run per (programme, intake) that has confirm_fact tasks waiting for research and no run
+    today. Returns how many were sent."""
     year = P.c.contract["target_intake"]["year"].as_integer()
     with engine.connect() as conn:
         wanted = conn.execute(select(T.c.programme_ref, year).distinct().join(P, P.c.id == T.c.plan_id).where(
             T.c.tenant_id == tenant_id, T.c.task_type == CONFIRM_TYPE, T.c.state == "waiting_review",
             T.c.result["waiting_for"].as_string() == "research", T.c.programme_ref.is_not(None),
         ).order_by(T.c.programme_ref)).all()
-        done = set(conn.execute(select(R.c.workflow_id).where(R.c.tenant_id == tenant_id)).scalars())
-    sent = 0
-    for ref, intake_year in wanted:
-        wid = research_workflow_id(tenant_id, ref, intake_year, today)
-        if wid in done:
-            continue
-        options: EnqueueOptions = {"queue_name": QUEUE_NAME, "workflow_name": RESEARCH_WORKFLOW, "workflow_id": wid,
-                                   "app_version": APP_VERSION}
-        client.enqueue(options, ref, intake_year, today.isoformat())
-        sent += 1
-    return sent
+    return sum(enqueue_one(engine, client, tenant_id, ref, intake_year, today)[1] for ref, intake_year in wanted)
 
 
 # --- store (spec §4.6 steps 4-6) -----------------------------------------------------------------------------

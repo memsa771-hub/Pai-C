@@ -65,6 +65,61 @@ class ConfirmOut(BaseModel):
     revised_plans: list[int]
 
 
+class FactOut(BaseModel):
+    """A fact as a student sees it: value, status, source link, quote, check date, conflict note."""
+    field: str
+    value: Any
+    status: str
+    source_url: str | None
+    quote: str | None
+    checked_at: datetime
+    conflict_note: str | None
+
+
+class AdminFactOut(FactOut):
+    fact_id: int
+    source: str
+    evidence: list[dict] | None
+    research_run_id: int | None
+
+
+class ReadingOut(BaseModel):
+    reading: str
+    agent: str
+    agent_version: int
+    model: str
+    input_tokens: int
+    cached_tokens: int
+    output_tokens: int
+    cost_usd: float
+    error: str | None
+    at: datetime
+
+
+class ResearchRunOut(BaseModel):
+    id: int
+    programme_ref: str
+    intake_year: int
+    workflow_id: str
+    status: str
+    started_at: datetime
+    ended_at: datetime | None
+    pages: int
+    confirmed: int
+    unconfirmed: int
+    cost_usd: float
+    readings: list[ReadingOut] = []
+
+
+class ResearchRunsOut(BaseModel):
+    runs: list[ResearchRunOut]
+
+
+class ResearchStartOut(BaseModel):
+    workflow_id: str
+    enqueued: bool  # False: today's run for this programme already exists
+
+
 class OpenFact(BaseModel):
     task_id: int
     plan_id: int
@@ -73,10 +128,25 @@ class OpenFact(BaseModel):
     scope: str
     ref: str
     field: str
+    intake_year: int | None = None
+    fact: AdminFactOut | None = None  # None: the fact is missing (fact_missing)
+    last_research_run: ResearchRunOut | None = None
 
 
 class OpenFactsOut(BaseModel):
     items: list[OpenFact]
+
+
+class ProgrammeOut(BaseModel):
+    ref: str
+    name: str
+    university: str | None
+    intake_year: int
+    facts: list[FactOut]
+
+
+class ProgrammesOut(BaseModel):
+    programmes: list[ProgrammeOut]
 
 
 class UpgradeOut(BaseModel):
