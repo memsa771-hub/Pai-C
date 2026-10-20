@@ -10,13 +10,20 @@ Work in `workspace` on branch `pai-c`. `pai-os` is the PAI OS developer's branch
 5. `SPINE.md` - how the code is built (services, jobs, policy modes)
 
 ## Working files
-- `BUILD_REPORT_V1.md` - current locked-workflow implementation, card checklist, screenshots, tests and founder start command
+- `BUILD_REPORT_V1.md` - locked-workflow implementation, card checklist, tests and founder start command
+- `UI_REPORT_V2.md` - the v2 UI redesign: screens, design system, verification
 - `DECISIONS.md`, `BLOCKERS.md` - implementation choices and safely unavailable/deferred items
-- `UI_CLEANUP_V1.md` - importer evidence for the approved deferred UI deletion
-- `CLEANUP_AUDIT.md` - starting point for removing PAI OS from `pai-c`
-- `OS_REMOVAL_AUDIT.md` - current dependency/ownership inventory; deletion requires approval
 - `COUNSELOR_V3_PROMPTS.md` - copy of the runtime prompts; tests check it matches the prompt files
 - `COUNSELING_CONVERSATIONS.md`, `DEEP_COUNSELING_DANISH.md` - persona examples; a test uses them to make sure no persona name is hardcoded in code
+
+## Archive
+Finished briefs and audits, kept for history in `archive/`: `UI_REDESIGN_PROMPT.md` and `UI_CHECKLIST.md`
+(v2 redesign, done), `CLEANUP_AUDIT.md` and `OS_REMOVAL_AUDIT.md` (OS removal inventory), `UI_CLEANUP_V1.md`
+(deferred UI deletion evidence), `ADAPTIVE_COUNSELING_REPORT.md` (adaptive counseling evidence).
+
+## Screenshots
+Screenshots are not committed. The offline harness writes them to `screenshots/` (git-ignored); see
+`frontend/tests/preview/README.md`.
 
 ## Other docs
 - `../AUTH_SESSION.md` - sign-in and sessions

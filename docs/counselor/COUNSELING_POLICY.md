@@ -29,6 +29,6 @@ The ten canonical areas stay stable. `understanding/capability_mapping.json` map
 
 Paths-first is the default decision strategy, not an information gate. A direct information request can use `research.gateway` -> the existing bounded `research.claim` job -> SourceVerifier -> Messenger at any stage. Current source receipts enter the same Counselor context. Missing sources leave the request unanswered with an honest response. Care defers delivery. Information never chooses a roadmap or authorizes OS execution. Personal recommendations still need relevant student evidence, current world evidence and uncertainty; selection keeps the existing confirmation and authorization gates.
 
-See [ADAPTIVE_COUNSELING_REPORT.md](ADAPTIVE_COUNSELING_REPORT.md) for implementation evidence, scenario coverage and limitations.
+See [ADAPTIVE_COUNSELING_REPORT.md](archive/ADAPTIVE_COUNSELING_REPORT.md) for implementation evidence, scenario coverage and limitations.
 
 See also PAI_C_WORKFLOW_LOCK_V1.md (locked engineering workflow, 18 Oct 2026) and the Figma board https://www.figma.com/board/NjVJfdxERWfRHPycy1wDkF

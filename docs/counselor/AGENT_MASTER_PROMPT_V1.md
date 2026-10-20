@@ -8,7 +8,7 @@ SOURCE OF TRUTH (read all before any code)
 - docs/counselor/PAI_C_WORKFLOW_LOCK_V1.md
 - docs/counselor/COUNSELING_POLICY.md
 - docs/counselor/SPINE.md
-- docs/counselor/CLEANUP_AUDIT.md (OS removal only)
+- docs/counselor/archive/CLEANUP_AUDIT.md (OS removal only)
 - The board decides behavior. If code and board disagree, stop and report. Never guess a product decision.
 
 PRODUCT RULES (never break)

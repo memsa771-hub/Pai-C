@@ -1,6 +1,6 @@
 # UI report v2: PAI C redesign
 
-Brief: `UI_REDESIGN_PROMPT.md`. Checklist: `UI_CHECKLIST.md` (all 15 rows ticked). Decisions and blockers: see the "UI redesign v2" sections of `DECISIONS.md` and `BLOCKERS.md`.
+Brief: `archive/UI_REDESIGN_PROMPT.md`. Checklist: `archive/UI_CHECKLIST.md` (all 15 rows ticked). Decisions and blockers: see the "UI redesign v2" sections of `DECISIONS.md` and `BLOCKERS.md`.
 
 ## See it live
 
@@ -59,7 +59,7 @@ One read-only field: `coverage_areas` returns `evidence`, the strongest public e
 
 ## Screenshots
 
-`docs/counselor/screenshots/v2/<screen>-<light|dark>-<phone|desktop>.png`, for every screen and state in `frontend/tests/preview/screens.cjs`. Main ones:
+Not committed (they were 40 MB). Run the harness and it writes `docs/counselor/screenshots/v2/<screen>-<light|dark>-<phone|desktop>.png` locally (git-ignored), for every screen and state in `frontend/tests/preview/screens.cjs`. Main ones:
 
 - Design system: `design-system-*`
 - Auth: `auth-sign-in-*`, `auth-sign-in-error-*`, `auth-sign-up-*`, `auth-sign-up-error-*`, `auth-check-email-*`, `auth-forgot-*`, `auth-forgot-sent-*`, `auth-reset-*`, `auth-reset-expired-*`, `auth-callback-failed-*`

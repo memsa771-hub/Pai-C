@@ -9,6 +9,8 @@
     "dev:desktop": "vite",
     "start": "next start -p 3000",
     "test": "vitest run",
+    "preview:offline": "vite --config tests/preview/vite.config.mjs",
+    "test:ui": "node tests/preview/workspace.e2e.cjs",
     "build:desktop:debug": "vite build --mode development"
   },
   "dependencies": {

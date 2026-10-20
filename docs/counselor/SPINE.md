@@ -2083,7 +2083,7 @@ hit five worker-startup timeouts; rerunning the same suite with one Vitest worke
 passed without source changes. No live quality or latency claim is made.
 
 Phase 0 has no open product decision. Phase 1 remains audit-only; its approval
-boundary and shared-module findings are in `OS_REMOVAL_AUDIT.md`. No OS file,
+boundary and shared-module findings are in `archive/OS_REMOVAL_AUDIT.md`. No OS file,
 table, test or contract was removed. No dotenv file was edited.
 
 
@@ -2217,7 +2217,7 @@ retry limits and usage accounting remain. No live provider calls verified these
 workflows in this run.
 
 Deferred UI cleanup (131decb): twelve no-longer-imported files removed, with
-evidence in UI_CLEANUP_V1.md. Shared controls/services and tasks tools remain.
+evidence in archive/UI_CLEANUP_V1.md. Shared controls/services and tasks tools remain.
 New bilateral OS intake/outcome contracts are blocked on joint agreement; no
 tables or shared KEEP code were deleted.
 

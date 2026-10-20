@@ -118,31 +118,33 @@ These are updates to the locked workflow, not additional invented orange cards. 
 
 ## Phase 3 screens and screenshots
 
+Screenshots are no longer committed (20 October cleanup). The names below are the v1 capture names; regenerate current captures with the offline harness (`frontend/tests/preview/README.md`).
+
 Screenshots use real production components with synthetic, network-blocked backend/workspace/auth adapters. They are **not** screenshots of a live student account. There are **36 desktop captures plus two mobile captures**. Light/dark theme tokens, accessible controls and mobile overflow were checked; existing unit snapshots remain. Chat shows one Talk to PAI label; profile/evidence and roadmap labels come from data. The bottom-left account menu and notification bell are restored.
 
 | Screen / stage | Light | Dark |
 | --- | --- | --- |
-| Onboarding (A) | [Light](screenshots/onboarding-light.png) | [Dark](screenshots/onboarding-dark.png) |
-| Chat (B-D) | [Light](screenshots/chat-light.png) | [Dark](screenshots/chat-dark.png) |
-| Bottom-left account / Profile / Sign out | [Light](screenshots/account-menu-light.png) | [Dark](screenshots/account-menu-dark.png) |
-| First picture (C) | [Light](screenshots/first-picture-light.png) | [Dark](screenshots/first-picture-dark.png) |
-| Fact / upload invitation | [Light](screenshots/fact-card-light.png) | [Dark](screenshots/fact-card-dark.png) |
-| Certainty rating | [Light](screenshots/rating-light.png) | [Dark](screenshots/rating-dark.png) |
-| Mirror / agree-change (E) | [Light](screenshots/mirror-light.png) | [Dark](screenshots/mirror-dark.png) |
-| Journey (A-K) | [Light](screenshots/journey-light.png) | [Dark](screenshots/journey-dark.png) |
-| Paths (F) | [Light](screenshots/paths-light.png) | [Dark](screenshots/paths-dark.png) |
-| Path explanation / try-it (G) | [Light](screenshots/path-light.png) | [Dark](screenshots/path-dark.png) |
-| Where to study / consent (H) | [Light](screenshots/programs-light.png) | [Dark](screenshots/programs-dark.png) |
-| Compare (I) | [Light](screenshots/compare-light.png) | [Dark](screenshots/compare-dark.png) |
-| Guided family preparation (I) | [Light](screenshots/family-talk-light.png) | [Dark](screenshots/family-talk-dark.png) |
-| Explicit choice confirmation (I) | [Light](screenshots/decision-light.png) | [Dark](screenshots/decision-dark.png) |
-| Plan and check-ins (J-K) | [Light](screenshots/plan-light.png) | [Dark](screenshots/plan-dark.png) |
-| Living profile | [Light](screenshots/profile-light.png) | [Dark](screenshots/profile-dark.png) |
-| Documents | [Light](screenshots/documents-light.png) | [Dark](screenshots/documents-dark.png) |
-| Settings / privacy | [Light](screenshots/settings-light.png) | [Dark](screenshots/settings-dark.png) |
+| Onboarding (A) | `onboarding-light` | `onboarding-dark` |
+| Chat (B-D) | `chat-light` | `chat-dark` |
+| Bottom-left account / Profile / Sign out | `account-menu-light` | `account-menu-dark` |
+| First picture (C) | `first-picture-light` | `first-picture-dark` |
+| Fact / upload invitation | `fact-card-light` | `fact-card-dark` |
+| Certainty rating | `rating-light` | `rating-dark` |
+| Mirror / agree-change (E) | `mirror-light` | `mirror-dark` |
+| Journey (A-K) | `journey-light` | `journey-dark` |
+| Paths (F) | `paths-light` | `paths-dark` |
+| Path explanation / try-it (G) | `path-light` | `path-dark` |
+| Where to study / consent (H) | `programs-light` | `programs-dark` |
+| Compare (I) | `compare-light` | `compare-dark` |
+| Guided family preparation (I) | `family-talk-light` | `family-talk-dark` |
+| Explicit choice confirmation (I) | `decision-light` | `decision-dark` |
+| Plan and check-ins (J-K) | `plan-light` | `plan-dark` |
+| Living profile | `profile-light` | `profile-dark` |
+| Documents | `documents-light` | `documents-dark` |
+| Settings / privacy | `settings-light` | `settings-dark` |
 
-[Mobile profile, dark](screenshots/profile-mobile-dark.png).
-[Mobile account menu, dark](screenshots/account-menu-mobile-dark.png).
+`profile-mobile-dark`.
+`account-menu-mobile-dark`.
 
 ### Routes, components and APIs
 
@@ -217,7 +219,7 @@ In this continuation the only unit-test edits are the exact registered-job inven
 
 ## Deferred UI cleanup and shared code kept
 
-[UI_CLEANUP_V1.md](UI_CLEANUP_V1.md) contains commands and pre-deletion importer evidence. Commit 131decb deleted 12 files: monitor grid/overlay/tile, agent profile panel, thread list, routines view/list/format helper, and knowledge view/list/editor/utils. **2,954 file lines plus six ListPanel branch/import lines** were removed.
+[UI_CLEANUP_V1.md](archive/UI_CLEANUP_V1.md) contains commands and pre-deletion importer evidence. Commit 131decb deleted 12 files: monitor grid/overlay/tile, agent profile panel, thread list, routines view/list/format helper, and knowledge view/list/editor/utils. **2,954 file lines plus six ListPanel branch/import lines** were removed.
 
 Kept because shared or still imported: wrapper/context/API/notifications, AppSidebar/MobileHeader, CreateRoutineDialog, orchestration/sharing controls, Browser backend, integration relay/settings, generic Operator, workflow advancement, tasks.list/tasks.create, shared tools/plugins, auth/workspaces/onboarding, memory/Vault/reconciler/documents, gateways/Task Runtime, decision records/student requests/escalations/service token.
 
