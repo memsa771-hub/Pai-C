@@ -14,8 +14,9 @@
 
 /** Names match `ONBOARDING_FIELDS` in the backend, which is the source. */
 export interface OnboardingAnswers {
+  firstName?: string;
+  lastName?: string;
   level?: string;
-  replyLanguage?: string;
   fullName?: string;
   preferredName?: string;
   statusCategory?: string;
@@ -38,6 +39,12 @@ export interface OnboardingFieldSpec {
   choices: string[];
   isDate: boolean;
   allowOther?: boolean;
+  /** Which of the three steps asks it. */
+  step?: number;
+  /** Pre-selected value when nothing is known (data-driven, e.g. a country). */
+  default?: string | null;
+  /** Suggested values; unlike `choices` they do not restrict the answer. */
+  options?: string[];
 }
 
 export interface OnboardingState {

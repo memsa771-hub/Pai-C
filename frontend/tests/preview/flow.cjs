@@ -9,21 +9,36 @@ module.exports = async function flow(browser, open, ORIGIN) {
   const { context, page, errors } = await open(browser, 1440, 'light');
   const go = (path) => page.goto(`${ORIGIN}${path}${path.includes('?') ? '&' : '?'}theme=light`);
   try {
-    // A: four entry cards, one per step; no hidden extra fields; no provider call.
+    // A: three entry steps; a required step cannot be skipped; no reply
+    // language; Pakistan is the data default; no provider call.
     await go('/student?onboarding=1');
-    assert.equal(await page.locator('form input:visible').count(), 1, 'one field per onboarding step');
-    assert.equal(await page.locator('ol[aria-label^="Step"] > li').count(), 4, 'four onboarding steps');
-    assert(await page.getByRole('button', { name: 'Next' }).isDisabled(), 'a required step cannot be skipped');
-    await page.getByLabel('Your name').fill('Sam Taylor');
-    await page.getByRole('button', { name: 'Next' }).click();
+    assert.equal(await page.locator('ol[aria-label^="Step"] > li').count(), 3, 'three onboarding steps');
+    assert.equal(await page.locator('form input:visible').count(), 2, 'step 1 asks first and last name only');
+    await page.getByRole('button', { name: 'Continue' }).click();
+    await page.getByText('Please fill this in.').first().waitFor();
+    assert.equal(await page.getByText('Step 1 of 3').count(), 1, 'an empty required step does not advance');
+    await page.getByLabel('First name', { exact: true }).fill('Sam');
+    await page.getByLabel('Last name', { exact: true }).fill('Taylor');
+    await page.getByRole('button', { name: 'Continue' }).click();
     await page.getByRole('button', { name: 'Other', exact: true }).click();
     await page.getByPlaceholder('Type it in your own words').fill('Secondary education');
-    await page.getByRole('button', { name: 'Next' }).click();
-    await page.getByLabel('City').fill('My city');
-    await page.getByRole('button', { name: 'Next' }).click();
-    await page.getByRole('button', { name: 'English', exact: true }).click();
+    await page.getByRole('button', { name: 'Date of birth' }).click();
+    await page.getByRole('option', { name: '2008', exact: true }).click();
+    await page.getByRole('option', { name: 'Mar', exact: true }).click();
+    await page.getByRole('button', { name: 'March 12, 2008' }).click();
+    await page.getByRole('button', { name: 'Female', exact: true }).click();
     await page.getByRole('button', { name: 'Continue' }).click();
+    assert.equal(await page.getByLabel('Country').inputValue(), 'Pakistan', 'country defaults to Pakistan');
+    await page.getByLabel('City').fill('My city');
+    assert.equal(await page.getByText(/reply language/i).count(), 0, 'no reply-language question');
+    // The preview reloads into the workspace on finish; keep the recorded call.
+    await page.evaluate(() => addEventListener('pagehide', () => sessionStorage.setItem('entryCalls', JSON.stringify(window.__offlineCalls))));
+    await page.getByRole('button', { name: 'Start with PAI' }).click();
     await page.waitForURL('**view=threads');
+    const entry = (await page.evaluate(() => JSON.parse(sessionStorage.getItem('entryCalls') || '[]')))
+      .filter((call) => call.method === 'submitOnboarding').at(-1);
+    assert.deepEqual(entry && entry.args[0], { firstName: 'Sam', lastName: 'Taylor', level: 'Secondary education',
+      dateOfBirth: '2008-03-12', gender: 'female', currentCountry: 'Pakistan', currentCity: 'My city' }, 'entry answers sent as typed');
 
     // B-D: the conversation, and a journey with every A-K stage present.
     await page.getByRole('navigation').getByRole('button', { name: 'Your journey', exact: true }).click();

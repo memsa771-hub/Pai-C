@@ -316,14 +316,53 @@ def test_every_declared_field_maps_to_a_real_vault_key(db):
             assert fields.get(field.field_key) is not None, field.field_key
 
 
-def test_four_card_entry_writes_education_through_reconciler(db):
-    workspace=db.info["workspace"]
-    service=OnboardingService(db)
-    assert [field["name"] for field in service.state(workspace)["fields"]]==["fullName","level","currentCity","replyLanguage"]
-    result=service.apply(workspace,{"fullName":"A Student","level":"Secondary education","currentCity":"My city","replyLanguage":"english"})
+THREE_STEPS = {"firstName": "Sam", "lastName": "Taylor", "level": "Secondary education",
+               "dateOfBirth": "2008-03-12", "gender": "female",
+               "currentCountry": "Pakistan", "currentCity": "My city"}
+
+
+def test_three_step_form_is_advertised_in_order_with_no_reply_language(db):
+    state = OnboardingService(db).state(db.info["workspace"])
+    assert [(f["name"], f["step"]) for f in state["fields"]] == [
+        ("firstName", 1), ("lastName", 1), ("level", 2), ("dateOfBirth", 2), ("gender", 2),
+        ("currentCountry", 3), ("currentCity", 3)]
+    assert "replyLanguage" not in {f["name"] for f in state["fields"]}
+    # The default country is data, shown pre-selected for a new student.
+    assert state["prefill"]["currentCountry"] == "Pakistan"
+
+
+def test_three_step_form_composes_the_name_and_greets_by_first_name(db):
+    workspace, user = db.info["workspace"], db.info["user"]
+    service = OnboardingService(db)
+    result = service.apply(workspace, THREE_STEPS)
     db.commit()
     assert result["completed"] and not result["rejected"]
-    assert service.state(workspace)["prefill"]["level"]=="Secondary education"
+    facts = VaultService(db).snapshot(str(workspace.id), include_sensitive=True)
+    assert facts["identity.full_name"] == "Sam Taylor"
+    assert facts["identity.preferred_name"] == "Sam"
+    assert facts["identity.date_of_birth"] == "2008-03-12"
+    assert facts["identity.gender"] == "female"
+    assert facts["location.current_country"] == "Pakistan"
+    assert user.display_name == "Sam"
+    prefill = service.state(workspace)["prefill"]
+    assert (prefill["firstName"], prefill["lastName"]) == ("Sam", "Taylor")
+    assert prefill["level"] == "Secondary education"
+
+
+@pytest.mark.parametrize("missing", ["lastName", "dateOfBirth", "gender", "currentCity"])
+def test_three_step_form_requires_every_answer(db, missing):
+    answers = {k: v for k, v in THREE_STEPS.items() if k != missing}
+    with pytest.raises(MemoryDataError, match=missing):
+        OnboardingService(db).apply(db.info["workspace"], answers)
+
+
+def test_a_retired_reply_language_answer_is_ignored_not_rejected(db):
+    workspace = db.info["workspace"]
+    result = OnboardingService(db).apply(workspace, {**THREE_STEPS, "replyLanguage": "english"})
+    db.commit()
+    assert result["completed"] and not result["rejected"]
+    facts = VaultService(db).snapshot(str(workspace.id), include_sensitive=True)
+    assert "preferences.preferred_language" not in facts
 
 
 def test_entry_other_preserves_student_words_and_requests_catalog_review(db):
@@ -336,4 +375,4 @@ def test_entry_other_preserves_student_words_and_requests_catalog_review(db):
     candidate=db.scalar(select(MemoryCandidate).where(MemoryCandidate.workspace_id==workspace.id,MemoryCandidate.key=='education'))
     assert candidate.evidence['quote']=='My education system'
     assert candidate.evidence['catalog_review']['status']=='pending'
-    assert service.state(workspace)['fields'][1]['allowOther'] is True
+    assert next(f for f in service.state(workspace)['fields'] if f['name'] == 'level')['allowOther'] is True

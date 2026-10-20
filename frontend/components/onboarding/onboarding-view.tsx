@@ -1,22 +1,23 @@
 'use client';
 
-/** Four schema-driven entry cards, one per step; deeper discovery stays in
- * the conversation. The backend owns which fields exist and their choices. */
+/** Three short steps of schema-driven questions; deeper discovery stays in the
+ * conversation. The backend owns which fields exist, their step, choices and
+ * defaults; this file owns how they look. */
 
 import * as React from 'react';
-import Image from 'next/image';
 import { AnimatePresence, MotionConfig, motion } from 'motion/react';
-import { ArrowLeft, ArrowRight, Check, Loader2 } from 'lucide-react';
+import { ArrowLeft, ChevronDown } from 'lucide-react';
 import { toast } from 'sonner';
-import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { AuthField, AuthShell, SpeechBubble, SubmitButton, authInputClass } from '@/components/auth/auth-shell';
 import { workspaceApi } from '@/lib/api';
 import { useT, type MessageKey } from '@/lib/i18n';
 import { cn } from '@/lib/utils';
 import {
-  FIELD_LAYOUT, visibleOnboardingAnswers,
+  visibleOnboardingAnswers,
   type OnboardingAnswers, type OnboardingFieldSpec, type OnboardingState,
 } from '@/lib/onboarding';
+import { DobPicker } from './dob-picker';
 
 /** Pull the human message out of an API error like `API 400: {json}`. */
 function errorMessage(e: unknown): string {
@@ -36,38 +37,31 @@ export function OnboardingView({ state, onDone }: {
   onDone: () => void;
 }) {
   const t = useT();
-  const [answers, setAnswers] = React.useState<OnboardingAnswers>(state.prefill || {});
-  const [busy, setBusy] = React.useState(false);
-  const [step, setStep] = React.useState(0);
-  const [direction, setDirection] = React.useState(1);
-  const fields = state.fields;
-  const field = fields[step];
-  const last = step === fields.length - 1;
-  // Move focus to the new question so screen readers announce each step
-  // (choice steps have no text box to autofocus). Not on first render.
-  const question = React.useRef<HTMLHeadingElement>(null);
-  const moved = React.useRef(false);
-  React.useEffect(() => {
-    if (moved.current) question.current?.focus();
-    moved.current = true;
-  }, [step]);
-
-  const set = (name: string, value: string) =>
-    setAnswers((prev) => ({ ...prev, [name]: value }));
   const translated = (key: string, fallback: string) => {
     const text = t(key as MessageKey);
     return text === key ? fallback : text;
   };
-  const value = (f: OnboardingFieldSpec) => (answers[f.name] || '').trim();
-  const missingRequired = fields.some((f) => f.required && !value(f));
-  const stepReady = !field?.required || !!value(field);
+  const defaults = Object.fromEntries(state.fields.filter((f) => f.default).map((f) => [f.name, f.default as string]));
+  const [answers, setAnswers] = React.useState<OnboardingAnswers>({ ...defaults, ...(state.prefill || {}) });
+  const [busy, setBusy] = React.useState(false);
+  const [errors, setErrors] = React.useState<Record<string, boolean>>({});
+  const steps = React.useMemo(() => [...new Set(state.fields.map((f) => f.step || 1))].sort((a, b) => a - b), [state.fields]);
+  const [index, setIndex] = React.useState(0);
+  const [direction, setDirection] = React.useState(1);
+  const step = steps[index];
+  const fields = state.fields.filter((f) => (f.step || 1) === step);
+  const last = index === steps.length - 1;
+
+  const set = (name: string, value: string) => {
+    setAnswers((prev) => ({ ...prev, [name]: value }));
+    setErrors((prev) => ({ ...prev, [name]: false }));
+  };
+  const filled = (f: OnboardingFieldSpec) => !!(answers[f.name] || '').trim();
 
   const submit = async () => {
     setBusy(true);
     try {
-      // The prefill may contain legacy fields absent from the four visible
-      // cards. Submit only answers the student had an opportunity to review.
-      const result = await workspaceApi.submitOnboarding(visibleOnboardingAnswers(fields, answers));
+      const result = await workspaceApi.submitOnboarding(visibleOnboardingAnswers(state.fields, answers));
       // The backend reports per-field rejections rather than failing the whole
       // call. Saying "saved" over a rejected field would be a lie about
       // canonical state, so surface it.
@@ -84,129 +78,139 @@ export function OnboardingView({ state, onDone }: {
       setBusy(false);
     }
   };
-  const go = (delta: number) => { setDirection(delta); setStep((s) => Math.min(fields.length - 1, Math.max(0, s + delta))); };
-  const next = () => { if (!stepReady) return; if (last) { if (!missingRequired) void submit(); } else go(1); };
 
-  if (!field) return null;
+  const next = (event: React.FormEvent) => {
+    event.preventDefault();
+    const missing = fields.filter((f) => f.required && !filled(f));
+    if (missing.length) {
+      setErrors(Object.fromEntries(missing.map((f) => [f.name, true])));
+      document.querySelector<HTMLElement>(`[data-field="${missing[0].name}"]`)?.focus();
+      return;
+    }
+    if (last) void submit();
+    else { setDirection(1); setIndex(index + 1); }
+  };
+  const back = () => { setDirection(-1); setIndex(index - 1); };
+
+  const stepKey = String(step);
   return (
     <MotionConfig reducedMotion="user">
-      <div data-scroll-root className="relative h-svh w-full overflow-y-auto bg-background">
-        <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-80 rounded-b-[2.5rem] bg-gradient-to-br from-[var(--hero-from)] via-[var(--hero-via)] to-[var(--hero-to)] sm:h-[22rem]" />
-        <div className="relative mx-auto flex min-h-full w-full max-w-lg flex-col px-4 pb-8 pt-8 sm:pt-14">
-          <header className="flex flex-col items-center text-center text-white">
-            <span className="flex size-14 items-center justify-center rounded-2xl bg-white shadow-lift">
-              <Image src="/pai-emblem.png" alt="Placement AI" width={34} height={34} className="size-8 object-contain" />
-            </span>
-            <h1 className="mt-4 text-balance text-2xl font-bold tracking-tight sm:text-3xl">{t('onboarding.title')}</h1>
-            <p className="mt-1.5 max-w-sm text-pretty text-sm text-white/90">{t('onboarding.subtitle')}</p>
-          </header>
-
-          <div className="mt-8 rounded-3xl border bg-card p-6 shadow-card sm:p-8">
-            <div className="flex items-center justify-between gap-3">
-              <p className="text-xs font-semibold uppercase tracking-wider text-brand-ink">
-                {t('onboarding.step', { current: step + 1, total: fields.length })}
-              </p>
-              <ol className="flex items-center gap-1.5" aria-label={t('onboarding.step', { current: step + 1, total: fields.length })}>
-                {fields.map((f, i) => (
-                  <li key={f.name} aria-current={i === step ? 'step' : undefined}
-                    className={cn('h-2 rounded-full transition-all duration-300',
-                      i === step ? 'w-6 bg-brand' : i < step ? 'w-2 bg-brand/60' : 'w-2 bg-border')}>
-                    <span className="sr-only">{translated(`onboarding.field.${f.name}`, f.name)}</span>
-                  </li>
-                ))}
-              </ol>
-            </div>
-
-            <form className="mt-5" onSubmit={(event) => { event.preventDefault(); next(); }}>
-              <AnimatePresence mode="wait" initial={false} custom={direction}>
-                <motion.div key={field.name} custom={direction}
-                  initial={{ opacity: 0, x: direction * 24 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: direction * -24 }}
-                  transition={{ duration: 0.22, ease: 'easeOut' }}>
-                  <h2 ref={question} tabIndex={-1} className="sr-only">
-                    {t('onboarding.step', { current: step + 1, total: fields.length })}: {translated(`onboarding.field.${field.name}`, field.name)}
-                  </h2>
-                  <Step field={field} label={translated(`onboarding.field.${field.name}`, field.name)}
-                    help={translated(`onboarding.help.${field.name}`, '')} value={answers[field.name] || ''}
-                    onChange={(v) => set(field.name, v)} />
-                </motion.div>
-              </AnimatePresence>
-              {!stepReady && <p className="mt-3 text-xs text-muted-foreground">{t('onboarding.required')}</p>}
-
-              <div className="mt-8 flex items-center gap-3">
-                {step > 0 && (
-                  <Button type="button" variant="ghost" size="tap" onClick={() => go(-1)} disabled={busy}>
-                    <ArrowLeft aria-hidden />{t('onboarding.back')}
-                  </Button>
-                )}
-                <Button type="submit" size="tap" className="ms-auto h-12 min-w-36" aria-busy={busy} disabled={busy || !stepReady || (last && missingRequired)}>
-                  {busy ? <><Loader2 aria-hidden className="size-4 animate-spin" /><span className="sr-only">{t('common.loading')}</span></>
-                    : last ? <>{t('onboarding.continue')}<Check aria-hidden /></>
-                    : <>{t('onboarding.next')}<ArrowRight aria-hidden /></>}
-                </Button>
-              </div>
-            </form>
+      <AuthShell title={translated(`onboarding.steps.${stepKey}.title`, t('onboarding.title'))}
+        showcase={<SpeechBubble>{translated(`onboarding.steps.${stepKey}.bubble`, t('onboarding.subtitle'))}</SpeechBubble>}
+        footer={<span className="text-xs font-normal text-auth-muted">{t('onboarding.privacy')}</span>}>
+        <div className="-mt-4 mb-7 [@media(max-height:780px)]:mb-5">
+          <div className="flex items-center justify-between text-xs font-semibold text-auth-muted">
+            <span>{t('onboarding.step', { current: index + 1, total: steps.length })}</span>
           </div>
-          <p className="mt-5 text-center text-xs text-muted-foreground">{t('onboarding.privacy')}</p>
+          <ol className="mt-2 grid gap-1.5" style={{ gridTemplateColumns: `repeat(${steps.length}, minmax(0, 1fr))` }}
+            aria-label={t('onboarding.step', { current: index + 1, total: steps.length })}>
+            {steps.map((s, i) => (
+              <li key={s} aria-current={i === index ? 'step' : undefined}
+                className={cn('h-1.5 rounded-full transition-colors duration-300', i <= index ? 'bg-auth-ink' : 'bg-auth-line')} />
+            ))}
+          </ol>
         </div>
-      </div>
+
+        <form onSubmit={next} noValidate>
+          <AnimatePresence mode="wait" initial={false} custom={direction}>
+            <motion.div key={step} custom={direction}
+              initial={{ opacity: 0, x: direction * 24 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: direction * -24 }}
+              transition={{ duration: 0.2, ease: 'easeOut' }}
+              className={cn('grid gap-4 [@media(max-height:780px)]:gap-3', fields.every((f) => !f.choices.length && !f.isDate && !f.options?.length) && fields.length === 2 && 'sm:grid-cols-2')}>
+              {fields.map((field) => (
+                <Field key={field.name} field={field} value={answers[field.name] || ''} error={errors[field.name]}
+                  label={translated(`onboarding.field.${field.name}`, field.name)}
+                  placeholder={translated(`onboarding.placeholder.${field.name}`, '')}
+                  onChange={(v) => set(field.name, v)} />
+              ))}
+            </motion.div>
+          </AnimatePresence>
+
+          <div className="mt-7 flex items-center gap-3 [@media(max-height:780px)]:mt-5">
+            {index > 0 && (
+              <button type="button" onClick={back} disabled={busy}
+                className="flex h-12 items-center gap-2 rounded-xl px-4 text-[15px] font-semibold text-auth-ink transition-colors hover:bg-auth-page [@media(max-height:780px)]:h-11">
+                <ArrowLeft aria-hidden className="size-4" />{t('onboarding.back')}
+              </button>
+            )}
+            <div className="flex-1">
+              <SubmitButton busy={busy} busyLabel={t('onboarding.continue')}>
+                {last ? t('onboarding.continue') : t('onboarding.next')}
+              </SubmitButton>
+            </div>
+          </div>
+        </form>
+      </AuthShell>
     </MotionConfig>
   );
 }
 
-function Step({ field, label, help, value, onChange }: {
+function Field({ field, label, placeholder, value, error, onChange }: {
   field: OnboardingFieldSpec;
   label: string;
-  help: string;
+  placeholder: string;
   value: string;
+  error?: boolean;
   onChange: (value: string) => void;
 }) {
   const t = useT();
-  // A field the backend added but the layout map has not caught up with still
-  // renders as a plain text box rather than silently vanishing.
-  const layout = FIELD_LAYOUT[field.name] || {};
-  const id = React.useId();
   const [other, setOther] = React.useState(!!value && !!field.allowOther && !field.choices.includes(value));
   const choiceLabel = (choice: string) => {
     const key = `onboarding.choice.${choice}`;
     const translated = t(key as MessageKey);
     return translated === key ? choice : translated;
   };
-  const chip = (selected: boolean) => cn(
-    'min-h-12 rounded-2xl border-2 px-5 text-base font-semibold transition-colors',
-    selected ? 'border-brand bg-brand-soft text-brand-ink' : 'border-border bg-card hover:border-brand/40 hover:bg-muted',
+  const id = `onb-${field.name}`;
+  const chip = (on: boolean) => cn(
+    'min-h-11 rounded-xl border px-4 text-sm font-semibold transition-colors [@media(max-height:780px)]:min-h-10',
+    on ? 'border-auth-ink bg-auth-ink text-auth-card' : 'border-auth-line bg-auth-field text-auth-ink hover:border-auth-muted/60',
   );
+  const errorText = error ? t('onboarding.required') : null;
+
+  if (field.choices.length > 0) {
+    return (
+      <div className="grid gap-1.5">
+        <span id={`${id}-label`} className="text-sm font-semibold text-auth-ink">{label}</span>
+        <div role="group" aria-labelledby={`${id}-label`} aria-describedby={error ? `${id}-error` : undefined} className="flex flex-wrap gap-2">
+          {field.choices.map((choice, i) => (
+            <button key={choice} data-field={i === 0 ? field.name : undefined} type="button" aria-pressed={value === choice && !other}
+              className={chip(value === choice && !other)} onClick={() => { setOther(false); onChange(choice); }}>
+              {choiceLabel(choice)}
+            </button>
+          ))}
+          {field.allowOther && (
+            <button type="button" aria-pressed={other} className={chip(other)} onClick={() => { setOther(true); onChange(''); }}>
+              {choiceLabel('other')}
+            </button>
+          )}
+        </div>
+        {other && (
+          <Input aria-labelledby={`${id}-label`} autoFocus value={value} placeholder={t('onboarding.otherPlaceholder')}
+            className={cn(authInputClass, 'mt-1')} onChange={(event) => onChange(event.target.value)} />
+        )}
+        {errorText && <p id={`${id}-error`} className="text-xs font-medium text-danger-ink">{errorText}</p>}
+      </div>
+    );
+  }
 
   return (
-    <div>
-      <label htmlFor={field.choices.length ? undefined : id} id={`${id}-label`} className="block text-xl font-bold leading-snug">
-        {label}
-      </label>
-      {help && <p className="mt-1 text-sm text-muted-foreground">{help}</p>}
-      <div className="mt-5">
-        {field.choices.length > 0 ? (
-          <div role="group" aria-labelledby={`${id}-label`} className="flex flex-wrap gap-2.5">
-            {field.choices.map((choice) => (
-              <button key={choice} type="button" aria-pressed={value === choice && !other} className={chip(value === choice && !other)}
-                onClick={() => { setOther(false); onChange(choice); }}>
-                {choiceLabel(choice)}
-              </button>
-            ))}
-            {field.allowOther && (
-              <button type="button" aria-pressed={other} className={chip(other)} onClick={() => { setOther(true); onChange(''); }}>
-                {choiceLabel('other')}
-              </button>
-            )}
-            {other && (
-              <Input id={id} aria-labelledby={`${id}-label`} autoFocus value={value} placeholder={t('onboarding.otherPlaceholder')}
-                className="mt-1 h-12 w-full rounded-xl px-4 text-base" onChange={(event) => onChange(event.target.value)} />
-            )}
-          </div>
-        ) : (
-          <Input id={id} autoFocus type={field.isDate ? 'date' : 'text'} value={value} placeholder={layout.placeholder}
-            max={field.isDate ? new Date().toISOString().slice(0, 10) : undefined}
-            className="h-14 rounded-2xl px-5 text-lg" onChange={(e) => onChange(e.target.value)} />
-        )}
-      </div>
-    </div>
+    <AuthField label={label} error={errorText}>
+      {(props) => field.isDate ? (
+        <DobPicker id={props.id} field={field.name} value={value} onChange={onChange} invalid={!!error} describedBy={props['aria-describedby']} />
+      ) : field.options && field.options.length > 0 ? (
+        <div className="relative">
+          <select {...props} data-field={field.name} value={value} onChange={(e) => onChange(e.target.value)}
+            className={cn(authInputClass, 'w-full appearance-none border pe-10 outline-none')}>
+            {field.options.map((option) => <option key={option} value={option}>{option}</option>)}
+          </select>
+          <ChevronDown aria-hidden className="pointer-events-none absolute end-4 top-1/2 size-4 -translate-y-1/2 text-auth-muted" />
+          {field.options.length === 1 && <p className="mt-1.5 text-[11px] text-auth-muted">{t('onboarding.countryNote')}</p>}
+        </div>
+      ) : (
+        <Input {...props} data-field={field.name} value={value} placeholder={placeholder || undefined}
+          autoComplete={field.name === 'firstName' ? 'given-name' : field.name === 'lastName' ? 'family-name' : field.name === 'currentCity' ? 'address-level2' : undefined}
+          className={authInputClass} onChange={(e) => onChange(e.target.value)} />
+      )}
+    </AuthField>
   );
 }

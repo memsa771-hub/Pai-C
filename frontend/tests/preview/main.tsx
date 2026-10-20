@@ -17,10 +17,13 @@ import '@/styles/globals.css';
 // Fixture-only entry point: deliberately cannot contact the application or a provider.
 window.fetch=async()=>{throw new Error('Network disabled in offline UI review');};
 const q=new URLSearchParams(location.search);
-const entry={required:true,completedAt:null,prefill:{},fields:[
-  {name:'fullName',fieldKey:'identity.full_name',required:true,choices:[],isDate:false},
-  {name:'level',fieldKey:'education',required:true,choices:['Catalog level'],allowOther:true,isDate:false},
-  {name:'currentCity',fieldKey:'location.current_city',required:true,choices:[],isDate:false},
-  {name:'replyLanguage',fieldKey:'preferences.preferred_language',required:true,choices:['english','roman urdu'],isDate:false},
+const entry={required:true,completedAt:null,prefill:{currentCountry:'Pakistan'},fields:[
+  {name:'firstName',fieldKey:'identity.full_name',required:true,choices:[],isDate:false,step:1},
+  {name:'lastName',fieldKey:'identity.full_name',required:true,choices:[],isDate:false,step:1},
+  {name:'level',fieldKey:'education',required:true,choices:['matric','o-level','fsc','a-level'],allowOther:true,isDate:false,step:2},
+  {name:'dateOfBirth',fieldKey:'identity.date_of_birth',required:true,choices:[],isDate:true,step:2},
+  {name:'gender',fieldKey:'identity.gender',required:true,choices:['male','female','undisclosed'],isDate:false,step:2},
+  {name:'currentCountry',fieldKey:'location.current_country',required:true,choices:[],isDate:false,step:3,default:'Pakistan',options:['Pakistan']},
+  {name:'currentCity',fieldKey:'location.current_city',required:true,choices:[],isDate:false,step:3},
 ]};
 createRoot(document.getElementById('root')!).render(<ThemeProvider attribute="class" forcedTheme={q.get('theme')||'light'}><I18nProvider><DialogsProvider><LayoutProvider>{authPages[location.pathname]?React.createElement(authPages[location.pathname]):q.has('kit')?<KitGallery/>:q.has('onboarding')?<OnboardingView state={entry as any} onDone={()=>location.assign('/student?view=threads')}/>:<CounselorShell/>}</LayoutProvider></DialogsProvider></I18nProvider></ThemeProvider>);

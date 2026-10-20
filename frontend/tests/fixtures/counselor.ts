@@ -149,16 +149,6 @@ export const cards: ProfileCard[] = [
     updated_at: "2026-10-16",
   },
   {
-    kind: "vault_fact",
-    key: "preferences.preferred_language",
-    id: "language",
-    value: "english",
-    digest: "d".repeat(64),
-    evidence_level: "confirmed",
-    source: { quote: "English, please." },
-    updated_at: "2026-10-12",
-  },
-  {
     kind: "education",
     key: "education",
     id: "education-earlier",

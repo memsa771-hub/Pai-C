@@ -67,7 +67,7 @@ FACT_GROUPS: tuple[tuple[str, tuple[str, ...]], ...] = (
                "identity.status_category", "identity.nationality", "identity.gender",
                "location.current_country", "location.current_city",
                "career.primary_interest")),
-    ("preferences", ("preferences.target_countries", "preferences.preferred_language",
+    ("preferences", ("preferences.target_countries",
                      "preferences.learning_style", "mobility.relocation_willingness")),
     ("finance", ("finance.funding_status", "finance.scholarship_interest", "finance.budget")),
 )

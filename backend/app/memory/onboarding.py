@@ -56,6 +56,17 @@ class OnboardingField:
     is_date: bool = False
     record_field: str | None = None
     allow_other: bool = False
+    # Which of the onboarding steps asks it (the UI groups by this).
+    step: int = 1
+    # A part of another answer (first + last name make fullName); parts are
+    # composed, never written on their own.
+    part_of: str | None = None
+    # Also use this answer for another field (first name is the greeting name).
+    copy_to: str | None = None
+    # Shown pre-selected when nothing is known yet (data, not code).
+    default: str | None = None
+    # Suggested values for the UI. Unlike `choices`, these do not restrict.
+    options: tuple[str, ...] = ()
 
 
 # The order here is the order the form asks them in.
@@ -76,8 +87,12 @@ LEGACY_FIELDS: tuple[OnboardingField, ...] = (
     OnboardingField("currentCity", "location.current_city", required=True),
 )
 
-ONBOARDING_FIELDS = tuple(OnboardingField(**{**entry, "choices": tuple(entry["choices"])})
+ONBOARDING_FIELDS = tuple(OnboardingField(**{**entry, "choices": tuple(entry["choices"]),
+                                              "options": tuple(entry.get("options", ()))})
     for entry in json.loads(Path(__file__).with_name("entry_fields.json").read_text(encoding="utf-8")))
+# Answers older clients may still send. They are accepted and dropped, so an
+# open tab from before a field was retired cannot fail the whole submission.
+RETIRED_ANSWERS = frozenset({"replyLanguage"})
 FIELDS_BY_NAME = {field.name: field for field in (*LEGACY_FIELDS, *ONBOARDING_FIELDS)}
 
 
@@ -143,8 +158,19 @@ class OnboardingService:
         prefill = {
             field.name: facts[field.field_key]
             for field in FIELDS_BY_NAME.values()
-            if isinstance(facts.get(field.field_key), str)
+            if isinstance(facts.get(field.field_key), str) and not field.part_of
         }
+        # A known full name splits back into its parts (first word, the rest).
+        full_name = facts.get("identity.full_name")
+        if isinstance(full_name, str) and full_name.strip():
+            first, _, rest = full_name.strip().partition(" ")
+            parts = [f for f in ONBOARDING_FIELDS if f.part_of == "fullName"]
+            if len(parts) == 2:
+                prefill.setdefault(parts[0].name, first)
+                prefill.setdefault(parts[1].name, rest)
+        for field in ONBOARDING_FIELDS:
+            if field.default and not prefill.get(field.name):
+                prefill[field.name] = field.default
         from .student_records import StudentRecordService
         for field in ONBOARDING_FIELDS:
             if field.record_field:
@@ -159,7 +185,8 @@ class OnboardingService:
             if user is not None and user.onboarded_at else None,
             "fields": [
                 {"name": f.name, "fieldKey": f.field_key, "required": f.required,
-                 "choices": list(f.choices), "isDate": f.is_date, "allowOther": f.allow_other}
+                 "choices": list(f.choices), "isDate": f.is_date, "allowOther": f.allow_other,
+                 "step": f.step, "default": f.default, "options": list(f.options)}
                 for f in ONBOARDING_FIELDS
             ],
             "prefill": {k: v for k, v in prefill.items() if v},
@@ -175,6 +202,7 @@ class OnboardingService:
         """
         if not isinstance(answers, dict):
             raise MemoryDataError("Onboarding answers must be an object")
+        answers = {k: v for k, v in answers.items() if k not in RETIRED_ANSWERS}
         unknown = set(answers) - set(FIELDS_BY_NAME)
         if unknown:
             raise MemoryDataError(f"Unknown onboarding field: {', '.join(sorted(unknown))}")
@@ -184,13 +212,28 @@ class OnboardingService:
             value = _clean(answers.get(name), field)
             if value is not None:
                 cleaned[name] = value
-        # Old clients may finish an in-flight eight-field submission. Only the
-        # four-card contract is advertised to new clients; old facts are retained.
-        legacy = "level" not in answers and "replyLanguage" not in answers
-        required = LEGACY_FIELDS if legacy else ONBOARDING_FIELDS
+        # The current contract is the three-step form. Older in-flight clients
+        # (the eight-field form, or the four-card form with a full name) still
+        # complete with their own required set; their old facts are retained.
+        if "firstName" in answers or "lastName" in answers:
+            required = ONBOARDING_FIELDS
+        elif "level" in answers:
+            required = tuple(FIELDS_BY_NAME[name] for name in ("fullName", "level", "currentCity"))
+        else:
+            required = LEGACY_FIELDS
         missing = [f.name for f in required if f.required and f.name not in cleaned]
         if missing:
             raise MemoryDataError(f"Missing required answer: {', '.join(missing)}")
+        # Compose split answers (first + last name) into the field they form,
+        # in declared order, and copy answers that also serve another field.
+        for target in {f.part_of for f in FIELDS_BY_NAME.values() if f.part_of}:
+            parts = [cleaned.pop(f.name) for f in ONBOARDING_FIELDS if f.part_of == target and f.name in cleaned]
+            if parts:
+                cleaned[target] = " ".join(parts)
+        for field in ONBOARDING_FIELDS:
+            source = answers.get(field.name)
+            if field.copy_to and isinstance(source, str) and source.strip() and field.copy_to not in cleaned:
+                cleaned[field.copy_to] = " ".join(source.split())
 
         workspace_id = str(workspace.id)
         user = self.owner(workspace)

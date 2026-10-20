@@ -1,39 +1,190 @@
 {
   "areaMeta": {
-    "status": { "icon": "home", "tone": "blue" },
-    "history": { "icon": "graduation", "tone": "violet" },
-    "interests": { "icon": "heart", "tone": "rose" },
-    "strengths": { "icon": "lightbulb", "tone": "amber" },
-    "family_social": { "icon": "users", "tone": "teal" },
-    "values": { "icon": "gem", "tone": "violet" },
-    "pressures": { "icon": "scale", "tone": "amber" },
-    "sure": { "icon": "gauge", "tone": "sky" },
-    "goals": { "icon": "target", "tone": "blue" },
-    "options": { "icon": "signpost", "tone": "teal" }
+    "status": {
+      "icon": "home",
+      "tone": "blue"
+    },
+    "history": {
+      "icon": "graduation",
+      "tone": "violet"
+    },
+    "interests": {
+      "icon": "heart",
+      "tone": "rose"
+    },
+    "strengths": {
+      "icon": "lightbulb",
+      "tone": "amber"
+    },
+    "family_social": {
+      "icon": "users",
+      "tone": "teal"
+    },
+    "values": {
+      "icon": "gem",
+      "tone": "violet"
+    },
+    "pressures": {
+      "icon": "scale",
+      "tone": "amber"
+    },
+    "sure": {
+      "icon": "gauge",
+      "tone": "sky"
+    },
+    "goals": {
+      "icon": "target",
+      "tone": "blue"
+    },
+    "options": {
+      "icon": "signpost",
+      "tone": "teal"
+    }
   },
   "detailGroups": [
-    { "id": "about", "title": "About you", "icon": "home", "areas": ["status"], "keys": ["identity.", "location."] },
-    { "id": "education", "title": "Education and tests", "icon": "graduation", "areas": ["history"], "keys": ["education", "course", "test_attempt", "certification", "academic"] },
-    { "id": "experience", "title": "Experience and activities", "icon": "lightbulb", "areas": ["history", "strengths"], "keys": ["experience", "activity", "project", "award", "publication", "skill", "research"] },
-    { "id": "goals", "title": "Goals and plans", "icon": "target", "areas": ["goals", "options"], "keys": ["goal", "preferences.target_countries", "preferences.study_mode", "application", "scholarship_application"] },
-    { "id": "money", "title": "Money and support", "icon": "scale", "areas": ["pressures"], "keys": ["finance.", "financial", "financial_sponsor"] },
-    { "id": "preferences", "title": "How PAI talks with you", "icon": "message", "areas": [], "keys": ["preferences.", "language.", "communication."] },
-    { "id": "other", "title": "Other details", "icon": "file", "areas": [], "keys": [] }
+    {
+      "id": "about",
+      "title": "About you",
+      "icon": "home",
+      "areas": [
+        "status"
+      ],
+      "keys": [
+        "identity.",
+        "location."
+      ]
+    },
+    {
+      "id": "education",
+      "title": "Education and tests",
+      "icon": "graduation",
+      "areas": [
+        "history"
+      ],
+      "keys": [
+        "education",
+        "course",
+        "test_attempt",
+        "certification",
+        "academic"
+      ]
+    },
+    {
+      "id": "experience",
+      "title": "Experience and activities",
+      "icon": "lightbulb",
+      "areas": [
+        "history",
+        "strengths"
+      ],
+      "keys": [
+        "experience",
+        "activity",
+        "project",
+        "award",
+        "publication",
+        "skill",
+        "research"
+      ]
+    },
+    {
+      "id": "goals",
+      "title": "Goals and plans",
+      "icon": "target",
+      "areas": [
+        "goals",
+        "options"
+      ],
+      "keys": [
+        "goal",
+        "preferences.target_countries",
+        "preferences.study_mode",
+        "application",
+        "scholarship_application"
+      ]
+    },
+    {
+      "id": "money",
+      "title": "Money and support",
+      "icon": "scale",
+      "areas": [
+        "pressures"
+      ],
+      "keys": [
+        "finance.",
+        "financial",
+        "financial_sponsor"
+      ]
+    },
+    {
+      "id": "preferences",
+      "title": "Your preferences",
+      "icon": "message",
+      "areas": [],
+      "keys": [
+        "preferences."
+      ]
+    },
+    {
+      "id": "other",
+      "title": "Other details",
+      "icon": "file",
+      "areas": [],
+      "keys": []
+    }
   ],
   "sharedGroups": [
-    { "area": "interests", "source": "sections.interests" },
-    { "area": "strengths", "source": "personal.self" },
-    { "area": "values", "source": "sections.values" },
-    { "area": "family_social", "source": "personal.world.people" },
-    { "area": "pressures", "source": "personal.pressures.items" },
-    { "area": "goals", "source": "sections.goals" },
-    { "area": "options", "source": "sections.options" }
+    {
+      "area": "interests",
+      "source": "sections.interests"
+    },
+    {
+      "area": "strengths",
+      "source": "personal.self"
+    },
+    {
+      "area": "values",
+      "source": "sections.values"
+    },
+    {
+      "area": "family_social",
+      "source": "personal.world.people"
+    },
+    {
+      "area": "pressures",
+      "source": "personal.pressures.items"
+    },
+    {
+      "area": "goals",
+      "source": "sections.goals"
+    },
+    {
+      "area": "options",
+      "source": "sections.options"
+    }
   ],
   "sensitive": {
-    "areas": ["pressures", "family_social"],
-    "keys": ["identity.date_of_birth", "identity.gender", "finance.", "financial", "financial_sponsor"]
+    "areas": [
+      "pressures",
+      "family_social"
+    ],
+    "keys": [
+      "identity.date_of_birth",
+      "identity.gender",
+      "finance.",
+      "financial",
+      "financial_sponsor"
+    ]
   },
-  "titleFields": ["qualification_name", "test_name", "credential_name", "title", "name", "program_name", "scholarship_name"],
+  "titleFields": [
+    "qualification_name",
+    "test_name",
+    "credential_name",
+    "title",
+    "name",
+    "program_name",
+    "scholarship_name"
+  ],
   "copy": {
     "visual": "Visual",
     "details": "Details",
@@ -51,7 +202,13 @@
     "mirrorTalk": "Something changed? Tell PAI",
     "feltUnderstood": "Did you feel understood?",
     "feltUnderstoodValue": "You felt understood: {value} of 5",
-    "feltScale": ["Not at all", "A little", "Somewhat", "Mostly", "Completely"],
+    "feltScale": [
+      "Not at all",
+      "A little",
+      "Somewhat",
+      "Mostly",
+      "Completely"
+    ],
     "certaintyAfter": "How sure do you feel about your direction now? (optional)",
     "sendRating": "Send",
     "ratingSaved": "Thank you. PAI will use this to do better.",

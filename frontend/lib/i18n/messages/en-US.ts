@@ -920,30 +920,27 @@ export const messages = {
    */
   onboarding: {
     title: 'Tell PAI about yourself',
-    subtitle: 'A few basics so your first conversation is useful. PAI fills in the rest as you talk.',
-    privacy: 'Your profile grows through conversation. Nothing is shared with a university without your permission.',
-    choose: 'Select…',
-    continue: 'Continue',
+    subtitle: 'Three quick steps so your first conversation is useful.',
+    privacy: 'Only you and PAI see this. Nothing is shared with a university without your permission.',
+    continue: 'Start with PAI',
     saved: 'Welcome to Placement AI',
     partial: "Saved, but {count} answer(s) need a second look on your profile.",
     failed: "Couldn't save that — please try again.",
     step: 'Step {current} of {total}',
     back: 'Back',
-    next: 'Next',
-    finish: 'Start talking with PAI',
-    required: 'This one helps PAI get started. You can change it later.',
+    next: 'Continue',
+    required: 'Please fill this in.',
     otherPlaceholder: 'Type it in your own words',
-    help: {
-      fullName: 'This is how PAI will greet you.',
-      level: 'Pick the closest one. Your own words are fine too.',
-      currentCity: 'Where you live now. It helps PAI talk about real options later.',
-      replyLanguage: 'PAI will reply in this language. You can switch any time.',
+    steps: {
+      '1': { title: 'What is your name?', bubble: 'Hi, I am PAI! I will be your counselor. What should I call you?' },
+      '2': { title: 'A little about you', bubble: 'Nice to meet you. Tell me where you are in your studies.' },
+      '3': { title: 'Where do you live?', bubble: 'Last one. Knowing where you are helps me talk about real options later.' },
     },
-
     field: {
+      firstName: 'First name',
+      lastName: 'Last name',
       fullName: 'Your name',
-      level: 'Current or most recent education level',
-      replyLanguage: 'Reply language',
+      level: 'Current or most recent education',
       preferredName: 'What should PAI call you?',
       statusCategory: 'Current status',
       nationality: 'Nationality',
@@ -952,10 +949,13 @@ export const messages = {
       currentCountry: 'Country',
       currentCity: 'City',
     },
-
+    placeholder: {
+      firstName: 'Your first name',
+      lastName: 'Your last name',
+      currentCity: 'The city you live in',
+    },
+    countryNote: 'More countries are coming soon.',
     choice: {
-      english: 'English',
-      'roman urdu': 'Roman Urdu',
       matric: 'Matric', 'o-level': 'O-level', fsc: 'FSc', 'a-level': 'A-level',
       student: 'Student',
       professional: 'Working professional',
@@ -963,6 +963,15 @@ export const messages = {
       male: 'Male',
       female: 'Female',
       undisclosed: 'Prefer not to say',
+    },
+    date: {
+      placeholder: 'Select your date of birth',
+      chooseYear: 'Choose a year',
+      chooseMonth: 'Choose a month',
+      previous: 'Previous month',
+      nextMonth: 'Next month',
+      clear: 'Clear',
+      age: '{age} years old',
     },
   },
 
@@ -1073,7 +1082,6 @@ export const messages = {
       },
       preferences: {
         target_countries: 'Target countries',
-        preferred_language: 'Preferred language',
         learning_style: 'Learning style',
       },
       mobility: {

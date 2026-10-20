@@ -1,9 +1,22 @@
 [
   {
-    "name": "fullName",
+    "name": "firstName",
     "field_key": "identity.full_name",
     "required": true,
-    "choices": []
+    "choices": [],
+    "max_length": 80,
+    "step": 1,
+    "part_of": "fullName",
+    "copy_to": "preferredName"
+  },
+  {
+    "name": "lastName",
+    "field_key": "identity.full_name",
+    "required": true,
+    "choices": [],
+    "max_length": 80,
+    "step": 1,
+    "part_of": "fullName"
   },
   {
     "name": "level",
@@ -16,21 +29,44 @@
       "a-level"
     ],
     "record_field": "qualification_name",
-    "allow_other": true
+    "allow_other": true,
+    "step": 2
+  },
+  {
+    "name": "dateOfBirth",
+    "field_key": "identity.date_of_birth",
+    "required": true,
+    "choices": [],
+    "is_date": true,
+    "step": 2
+  },
+  {
+    "name": "gender",
+    "field_key": "identity.gender",
+    "required": true,
+    "choices": [
+      "male",
+      "female",
+      "undisclosed"
+    ],
+    "step": 2
+  },
+  {
+    "name": "currentCountry",
+    "field_key": "location.current_country",
+    "required": true,
+    "choices": [],
+    "step": 3,
+    "default": "Pakistan",
+    "options": [
+      "Pakistan"
+    ]
   },
   {
     "name": "currentCity",
     "field_key": "location.current_city",
     "required": true,
-    "choices": []
-  },
-  {
-    "name": "replyLanguage",
-    "field_key": "preferences.preferred_language",
-    "required": true,
-    "choices": [
-      "english",
-      "roman urdu"
-    ]
+    "choices": [],
+    "step": 3
   }
 ]

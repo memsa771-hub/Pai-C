@@ -33,13 +33,27 @@ function PromptPreview() {
   );
 }
 
+/** PAI speaking in the showcase: a white bubble with the PAI mark. */
+export function SpeechBubble({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="flex w-full max-w-[505px] items-start gap-3 rounded-2xl bg-auth-card p-4 shadow-[0_1px_2px_rgb(0_0_0/0.06),0_12px_32px_-12px_rgb(0_0_0/0.18)]">
+      <span aria-hidden className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-white ring-1 ring-auth-line">
+        <img src="/pai-emblem.png" alt="" className="size-6 object-contain" />
+      </span>
+      <p aria-live="polite" className="pt-0.5 text-[15px] font-medium leading-relaxed text-auth-ink">{children}</p>
+    </div>
+  );
+}
+
 /** One auth layout that fits the screen: the form on the left with the PAI
  * logo, and a full-height showcase with the mascot on the right. Desktop never
  * scrolls; very short screens scroll only the form column. Phones show the form. */
-export function AuthShell({ title, children, footer }: {
+export function AuthShell({ title, children, footer, showcase }: {
   title?: string;
   children: React.ReactNode;
   footer?: React.ReactNode;
+  /** What sits under the mascot; the chat preview by default. */
+  showcase?: React.ReactNode;
 }) {
   const t = useT();
   return (
@@ -57,7 +71,7 @@ export function AuthShell({ title, children, footer }: {
         className="relative hidden flex-col items-center justify-end overflow-hidden rounded-[28px] bg-auth-panel px-8 pb-6 lg:flex">
           <img src="/pai-mascot.webp" alt={t('auth.mascotAlt')} width={702} height={855}
             className="absolute left-1/2 top-[8%] h-[60%] w-auto -translate-x-1/2 object-contain drop-shadow-[0_24px_30px_rgb(0_0_0/0.12)]" />
-          <PromptPreview />
+          {showcase ?? <PromptPreview />}
         </aside>
     </div>
   );

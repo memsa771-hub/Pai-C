@@ -1,14 +1,13 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useTheme } from "next-themes";
-import { Bell, Check, ChevronRight, Download, Languages, Link2, Monitor, Moon, Palette, ShieldCheck, Sun, Trash2, TriangleAlert } from "lucide-react";
+import { Bell, Check, ChevronRight, Download, Link2, Monitor, Moon, Palette, ShieldCheck, Sun, Trash2, TriangleAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { SectionCard } from "@/components/pai";
 import { workspaceApi } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { Heading } from "./resource";
 import copy from "./copy.json";
-import entry from "./settings-data.json";
 
 const THEMES = [
   { value: "light", icon: Sun },
@@ -23,21 +22,10 @@ const option = (on: boolean) => cn(
 export function CounselorSettings({ base }: { base: string }) {
   const { theme, setTheme } = useTheme();
   const [error, setError] = useState(false),
-    [savedLanguage, setSavedLanguage] = useState<string | null>(null),
     [deleting, setDeleting] = useState(false),
     [confirmDelete, setConfirmDelete] = useState(false),
     [busy, setBusy] = useState(false),
-    [exported, setExported] = useState(false),
-    [currentLanguage, setCurrentLanguage] = useState<string | null>(null);
-  // Show the language PAI uses now; a failed read just leaves none selected.
-  useEffect(() => {
-    let alive = true;
-    Promise.resolve().then(() => workspaceApi.getProfileCards()).then((result) => {
-      const card = result?.cards?.find((c) => c.key === "preferences.preferred_language");
-      if (alive && typeof card?.value === "string") setCurrentLanguage(card.value);
-    }).catch(() => {});
-    return () => { alive = false; };
-  }, []);
+    [exported, setExported] = useState(false);
   async function remove() {
     if (!confirmDelete) return;
     setBusy(true);
@@ -48,20 +36,6 @@ export function CounselorSettings({ base }: { base: string }) {
       setError(true);
     } finally {
       setBusy(false);
-    }
-  }
-  async function language(value: string) {
-    try {
-      const result = await workspaceApi.editStudentProfile({
-        fieldKey: "preferences.preferred_language",
-        value,
-        reason: copy.replyLanguage,
-      });
-      if (!result.saved) throw new Error();
-      setSavedLanguage(value);
-      setCurrentLanguage(value);
-    } catch {
-      setError(true);
     }
   }
   async function download() {
@@ -87,7 +61,6 @@ export function CounselorSettings({ base }: { base: string }) {
       <ChevronRight aria-hidden className="size-5 text-muted-foreground" />
     </a>
   );
-  const languageLabel = entry.languages.find((l) => l.value === savedLanguage)?.label;
   return (
     <>
       <Heading title={copy.settingsTitle} description={copy.settings.intro} icon={Palette} tone="violet" />
@@ -107,22 +80,6 @@ export function CounselorSettings({ base }: { base: string }) {
               </button>
             ))}
           </div>
-        </SectionCard>
-        <SectionCard title={copy.replyLanguage} description={copy.settings.languageHelp} icon={Languages} tone="teal">
-          <div className="grid gap-2 sm:grid-cols-2">
-            {entry.languages.map((item) => (
-              <button type="button" key={item.value} aria-pressed={currentLanguage === item.value}
-                className={option(currentLanguage === item.value)} onClick={() => language(item.value)}>
-                {item.label}
-                {currentLanguage === item.value && <Check aria-hidden className="ms-auto size-4" />}
-              </button>
-            ))}
-          </div>
-          {languageLabel && (
-            <p role="status" className="mt-3 text-sm font-medium text-success-ink">
-              {copy.settings.languageSaved.replace("{language}", languageLabel)}
-            </p>
-          )}
         </SectionCard>
         <SectionCard title={copy.settings.notificationsTitle} description={copy.settings.notificationsHelp} icon={Bell} tone="amber">
           <div className="-mx-3">

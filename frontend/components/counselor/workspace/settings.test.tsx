@@ -7,12 +7,11 @@ const theme=vi.hoisted(()=>({setTheme:vi.fn(),theme:'light'}));
 vi.mock('next-themes',()=>({useTheme:()=>theme}));
 vi.mock('@/lib/api',()=>({workspaceApi:{deleteMyAccount:vi.fn(),editStudentProfile:vi.fn(),getProfileCards:vi.fn(),exportCounselorData:vi.fn()}}));
 afterEach(()=>{cleanup();vi.clearAllMocks();});
-it('changes theme locally and saves reply language through the profile API',async()=>{
-  vi.mocked(workspaceApi.editStudentProfile).mockResolvedValue({saved:true} as never);
+it('changes theme locally and offers no reply-language setting',()=>{
   render(<CounselorSettings base='/student'/>);
   fireEvent.click(screen.getByRole('button',{name:'Dark',exact:true}));expect(theme.setTheme).toHaveBeenCalledWith('dark');
-  fireEvent.click(screen.getByRole('button',{name:'English',exact:true}));
-  await waitFor(()=>expect(workspaceApi.editStudentProfile).toHaveBeenCalledWith(expect.objectContaining({fieldKey:'preferences.preferred_language',value:'english'})));
+  expect(screen.queryByText(/reply language/i)).toBeNull();
+  expect(workspaceApi.editStudentProfile).not.toHaveBeenCalled();
 });
 it('requires an explicit irreversible-deletion acknowledgement and surfaces failure',async()=>{
   vi.mocked(workspaceApi.deleteMyAccount).mockRejectedValue(new Error());
@@ -27,11 +26,7 @@ it('requires an explicit irreversible-deletion acknowledgement and surfaces fail
 it('exports through the owner-scoped data API and reports download failure',async()=>{
  vi.mocked(workspaceApi.exportCounselorData).mockRejectedValue(new Error());
  render(<CounselorSettings base='/student'/>);
- // The page may read profile cards once to show the current language;
- // exporting must never assemble data from them.
- await waitFor(()=>expect(workspaceApi.getProfileCards).toHaveBeenCalledTimes(1));
- const readsBefore=vi.mocked(workspaceApi.getProfileCards).mock.calls.length;
  fireEvent.click(screen.getByRole('button',{name:'Export my Counselor data'}));
  expect(await screen.findByRole('alert')).toBeTruthy();expect(workspaceApi.exportCounselorData).toHaveBeenCalledTimes(1);
- expect(vi.mocked(workspaceApi.getProfileCards).mock.calls.length).toBe(readsBefore);
+ expect(workspaceApi.getProfileCards).not.toHaveBeenCalled();
 });

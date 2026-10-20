@@ -87,7 +87,6 @@
   "light": "Light",
   "dark": "Dark",
   "system": "Use device setting",
-  "replyLanguage": "Reply language",
   "privacy": "Your data & privacy",
   "privacyHelp": "Private interpretation stays with PAI. Nothing is shared with a university here. Per-university consent is required before any future sharing.",
   "export": "Export my Counselor data",
@@ -264,7 +263,7 @@
   "activityScheduled": "PAI will check in here",
   "emptyTitle": "Nothing here yet",
   "stageDescriptions": {
-    "A": "Your name, level, city and reply language.",
+    "A": "Your name, studies, date of birth and where you live.",
     "B": "PAI asks about your life, interests and the people around you.",
     "C": "PAI shares a first picture of you, and you correct it.",
     "D": "You go deeper on what matters most.",
@@ -403,14 +402,12 @@
     "backToFolders": "Back to folders"
   },
   "settings": {
-    "intro": "Appearance, language, notifications and your data, in one place.",
+    "intro": "Appearance, notifications and your data, in one place.",
     "themeHelp": "Choose how PAI looks on this device.",
-    "languageHelp": "PAI replies in this language. You can switch any time.",
     "notificationsTitle": "Notifications and channels",
     "notificationsHelp": "Choose what PAI tells you about, and where.",
     "dangerTitle": "Delete your data",
     "dangerHelp": "This cannot be undone.",
-    "languageSaved": "Saved. PAI will reply in {language}.",
     "exported": "Your download has started. Keep the file somewhere private."
   },
   "placesOpen": "Look at places",
