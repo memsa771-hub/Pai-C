@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Loader2, MailCheck } from 'lucide-react';
 import { Input } from '@/components/ui/input';
-import { AuthAlert, AuthField, AuthShell, AuthStatus, FooterLink, GoogleButton, InkLink, PasswordInput, SubmitButton, authInputClass, isEmail } from '@/components/auth/auth-shell';
+import { AuthAlert, AuthField, AuthShell, AuthStatus, FooterLink, GoogleButton, OrDivider, InkLink, PasswordInput, SubmitButton, authInputClass, isEmail } from '@/components/auth/auth-shell';
 import { usePaiAuth } from '@/lib/pai-auth-context';
 import { signUpWithPassword, signInWithOAuth } from '@/lib/auth/service';
 import { registrationPasswordError } from '@/lib/password-policy';
@@ -96,7 +96,8 @@ export default function SignUpPage() {
     <AuthShell title={t('auth.signUpTitle')}
       footer={<>{t('auth.haveAccount')}{' '}<FooterLink href="/sign-in">{t('auth.signIn')}</FooterLink></>}>
       <GoogleButton label={t('auth.googleSignUp')} onClick={() => void google()} disabled={busy} />
-      <form onSubmit={submit} className="mt-6 grid gap-4" noValidate>
+      <OrDivider />
+      <form onSubmit={submit} className="grid gap-4 [@media(max-height:780px)]:gap-3 [@media(max-height:680px)]:gap-2.5" noValidate>
         <AuthField label={t('auth.email')} error={fieldError('email')}>
           {(props) => <Input {...props} className={authInputClass} type="email" autoComplete="email" autoCapitalize="none"
             spellCheck={false} placeholder={t('auth.emailPlaceholder')} required value={email}

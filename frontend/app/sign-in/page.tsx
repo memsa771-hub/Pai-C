@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Input } from '@/components/ui/input';
-import { AuthAlert, AuthField, AuthShell, FooterLink, GoogleButton, PasswordInput, SubmitButton, authInputClass, isEmail } from '@/components/auth/auth-shell';
+import { AuthAlert, AuthField, AuthShell, FooterLink, GoogleButton, OrDivider, PasswordInput, SubmitButton, authInputClass, isEmail } from '@/components/auth/auth-shell';
 import { usePaiAuth } from '@/lib/pai-auth-context';
 import { signInWithPassword, signInWithOAuth } from '@/lib/auth/service';
 import { desktopHost } from '@/lib/desktop-host';
@@ -60,7 +60,8 @@ export default function SignInPage() {
     <AuthShell title={t('auth.signInTitle')}
       footer={<>{t('auth.noAccount')}{' '}<FooterLink href="/sign-up">{t('auth.signUp')}</FooterLink></>}>
       <GoogleButton label={t('auth.googleSignIn')} onClick={() => void google()} disabled={busy} />
-      <form onSubmit={submit} className="mt-6 grid gap-4" noValidate>
+      <OrDivider />
+      <form onSubmit={submit} className="grid gap-4 [@media(max-height:780px)]:gap-3 [@media(max-height:680px)]:gap-2.5" noValidate>
         <AuthField label={t('auth.email')} error={field === 'email' ? error : null}>
           {(props) => <Input {...props} className={authInputClass} type="email" autoComplete="email" autoCapitalize="none"
             spellCheck={false} placeholder={t('auth.emailPlaceholder')} required value={email}
@@ -70,8 +71,8 @@ export default function SignInPage() {
           {(props) => <PasswordInput {...props} autoComplete="current-password" placeholder="•••••••" required value={password}
             onChange={(e) => setPassword(e.target.value)} disabled={busy} />}
         </AuthField>
-        <div className="-mt-2 text-right">
-          <Link href="/forgot-password" className="inline-flex min-h-11 items-center text-xs font-medium text-auth-muted underline-offset-4 hover:text-auth-ink hover:underline">
+        <div className="-mt-2">
+          <Link href="/forgot-password" className="inline-flex min-h-11 items-center text-sm font-semibold text-auth-ink underline underline-offset-4 hover:opacity-80">
             {t('auth.forgot')}
           </Link>
         </div>

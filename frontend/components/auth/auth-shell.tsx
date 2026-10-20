@@ -33,9 +33,9 @@ function PromptPreview() {
   );
 }
 
-/** One auth layout: a white card on a warm page; the form on the left and a
- * showcase with the PAI mascot on the right. Phones show only the form, with
- * a small mascot above the title. */
+/** One auth layout that fits the screen: the form on the left with the PAI
+ * logo, and a full-height showcase with the mascot on the right. Desktop never
+ * scrolls; very short screens scroll only the form column. Phones show the form. */
 export function AuthShell({ title, children, footer }: {
   title?: string;
   children: React.ReactNode;
@@ -43,23 +43,22 @@ export function AuthShell({ title, children, footer }: {
 }) {
   const t = useT();
   return (
-    <div className="flex min-h-svh w-full items-center justify-center bg-auth-page sm:p-6 lg:p-10">
-      <div className="grid min-h-svh w-full max-w-[1352px] bg-auth-card shadow-[0_30px_80px_-30px_rgb(0_0_0/0.18)] sm:min-h-[min(845px,calc(100svh-3rem))] sm:rounded-[40px] lg:grid-cols-2 lg:p-[18px]">
-        <main className="flex items-center justify-center px-6 py-12 sm:px-10">
-          <div className="w-full max-w-[302px]">
-            <img src="/pai-mascot.webp" alt="" width={702} height={855} className="mx-auto mb-4 h-28 w-auto lg:hidden" />
-            {title && <h1 className="mb-9 text-center text-[32px] font-normal leading-tight tracking-tight text-auth-ink">{title}</h1>}
-            {children}
-            {footer && <div className="mt-5 text-center text-xs text-auth-muted">{footer}</div>}
-          </div>
-        </main>
-        <aside aria-label={t('auth.previewLabel')}
-          className="relative hidden flex-col items-center justify-end overflow-hidden rounded-[28px] bg-auth-panel px-8 pb-5 lg:flex">
+    <div className="grid min-h-svh w-full bg-auth-card lg:h-svh lg:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)] lg:gap-4 lg:overflow-hidden lg:p-4">
+      <main className="flex items-center justify-center px-6 py-10 sm:px-10 lg:overflow-y-auto lg:py-6 [@media(max-height:680px)]:lg:py-1">
+        <div className="w-full max-w-[400px]">
+          <img src="/pai-emblem.png" alt="Placement AI" width={56} height={56}
+            className="mx-auto mb-5 size-14 object-contain dark:rounded-2xl dark:bg-white dark:p-2 [@media(max-height:780px)]:mb-3 [@media(max-height:780px)]:size-11 [@media(max-height:680px)]:mb-2 [@media(max-height:680px)]:size-9" />
+          {title && <h1 className="mb-8 text-center text-[32px] font-bold leading-tight tracking-tight text-auth-ink [@media(max-height:780px)]:mb-5 [@media(max-height:780px)]:text-[28px] [@media(max-height:680px)]:mb-4 [@media(max-height:680px)]:text-[26px]">{title}</h1>}
+          {children}
+          {footer && <div className="mt-6 text-center text-sm font-medium text-auth-ink [@media(max-height:780px)]:mt-4 [@media(max-height:680px)]:mt-2">{footer}</div>}
+        </div>
+      </main>
+      <aside aria-label={t('auth.previewLabel')}
+        className="relative hidden flex-col items-center justify-end overflow-hidden rounded-[28px] bg-auth-panel px-8 pb-6 lg:flex">
           <img src="/pai-mascot.webp" alt={t('auth.mascotAlt')} width={702} height={855}
-            className="absolute left-1/2 top-[11%] h-[58%] w-auto -translate-x-1/2 object-contain drop-shadow-[0_24px_30px_rgb(0_0_0/0.12)]" />
+            className="absolute left-1/2 top-[8%] h-[60%] w-auto -translate-x-1/2 object-contain drop-shadow-[0_24px_30px_rgb(0_0_0/0.12)]" />
           <PromptPreview />
         </aside>
-      </div>
     </div>
   );
 }
@@ -75,7 +74,7 @@ export function AuthField({ label, hint, error, children }: {
   const described = error ? `${id}-error` : hint ? `${id}-hint` : undefined;
   return (
     <div className="grid gap-1.5">
-      <label htmlFor={id} className="text-xs font-medium text-auth-ink">{label}</label>
+      <label htmlFor={id} className="text-sm font-semibold text-auth-ink">{label}</label>
       {children({ id, 'aria-describedby': described, 'aria-invalid': error ? true : undefined })}
       {error ? <p id={`${id}-error`} className="flex items-center gap-1.5 text-xs font-medium text-danger-ink"><AlertCircle aria-hidden className="size-3.5" />{error}</p>
         : hint ? <p id={`${id}-hint`} className="text-[11px] leading-snug text-auth-muted">{hint}</p> : null}
@@ -85,16 +84,16 @@ export function AuthField({ label, hint, error, children }: {
 
 export const isEmail = (value: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
 
-export const authInputClass = 'h-11 rounded-lg border-auth-line bg-auth-field px-3.5 text-sm text-auth-ink shadow-[inset_0_1px_2px_rgb(0_0_0/0.04)] placeholder:text-auth-muted/70';
+export const authInputClass = 'h-12 rounded-xl border-auth-line bg-auth-field px-4 text-[15px] font-medium text-auth-ink shadow-[inset_0_1px_2px_rgb(0_0_0/0.04)] placeholder:font-normal placeholder:text-auth-muted/80 [@media(max-height:780px)]:h-11 [@media(max-height:680px)]:h-10!';
 
 export function PasswordInput({ className, ...props }: React.ComponentProps<typeof Input>) {
   const t = useT();
   const [visible, setVisible] = useState(false);
   return (
     <div className="relative">
-      <Input {...props} type={visible ? 'text' : 'password'} className={cn(authInputClass, 'pe-11', className)} />
+      <Input {...props} type={visible ? 'text' : 'password'} className={cn(authInputClass, 'pe-12', className)} />
       <button type="button" onClick={() => setVisible(!visible)} aria-pressed={visible} aria-label={t('auth.showPassword')}
-        className="absolute inset-y-0 end-0 flex w-11 items-center justify-center rounded-e-lg text-auth-muted hover:text-auth-ink">
+        className="absolute inset-y-0 end-0 flex w-12 items-center justify-center rounded-e-xl text-auth-muted hover:text-auth-ink">
         {visible ? <EyeOff aria-hidden className="size-4" /> : <Eye aria-hidden className="size-4" />}
       </button>
     </div>
@@ -109,7 +108,7 @@ export function AuthAlert({ children }: { children: React.ReactNode }) {
   );
 }
 
-const inkButton = 'flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-gradient-to-b from-[var(--auth-button-from)] to-[var(--auth-button-to)] text-sm font-medium text-auth-button-ink shadow-[0_1px_2px_rgb(0_0_0/0.2),inset_0_1px_0_rgb(255_255_255/0.12)] transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50';
+const inkButton = 'flex h-12 w-full items-center justify-center gap-2 rounded-xl [@media(max-height:780px)]:h-11 [@media(max-height:680px)]:h-10! bg-gradient-to-b from-[var(--auth-button-from)] to-[var(--auth-button-to)] text-[15px] font-semibold text-auth-button-ink shadow-[0_1px_2px_rgb(0_0_0/0.2),inset_0_1px_0_rgb(255_255_255/0.12)] transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50';
 
 /** Always pressable (as in the design); forms validate on submit and say
  * exactly what is missing, instead of a silently disabled button. */
@@ -130,7 +129,7 @@ export function InkLink({ href, children }: { href: string; children: React.Reac
 
 /** The small grey footer link under each form. */
 export function FooterLink({ href, children }: { href: string; children: React.ReactNode }) {
-  return <Link href={href} className="inline-flex min-h-11 items-center font-semibold text-auth-ink underline-offset-4 hover:underline">{children}</Link>;
+  return <Link href={href} className="inline-flex min-h-11 items-center font-bold text-auth-ink underline underline-offset-4 hover:opacity-80">{children}</Link>;
 }
 
 /** Google's multicolour "G", as Google's sign-in guidelines require. */
@@ -148,9 +147,18 @@ function GoogleMark() {
 export function GoogleButton({ label, onClick, disabled }: { label: string; onClick: () => void; disabled?: boolean }) {
   return (
     <button type="button" onClick={onClick} disabled={disabled}
-      className="flex h-11 w-full items-center justify-center gap-2.5 rounded-lg border border-auth-line bg-gradient-to-b from-[var(--auth-google-from)] to-[var(--auth-google-to)] text-sm font-medium text-auth-ink shadow-[0_1px_2px_rgb(0_0_0/0.08),inset_0_1px_0_rgb(255_255_255/0.7)] transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50">
+      className="flex h-12 w-full items-center justify-center gap-3 rounded-xl border border-auth-line bg-gradient-to-b from-[var(--auth-google-from)] to-[var(--auth-google-to)] text-[15px] font-semibold text-auth-ink [@media(max-height:780px)]:h-11 [@media(max-height:680px)]:h-10! shadow-[0_1px_2px_rgb(0_0_0/0.08),inset_0_1px_0_rgb(255_255_255/0.7)] transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50">
       <GoogleMark />{label}
     </button>
+  );
+}
+
+export function OrDivider() {
+  const t = useT();
+  return (
+    <div className="my-6 flex items-center gap-4 text-xs font-semibold uppercase tracking-wider text-auth-muted [@media(max-height:780px)]:my-4 [@media(max-height:680px)]:my-3">
+      <span aria-hidden className="h-px flex-1 bg-auth-line" />{t('auth.or')}<span aria-hidden className="h-px flex-1 bg-auth-line" />
+    </div>
   );
 }
 
@@ -165,7 +173,7 @@ export function AuthStatus({ icon: Icon, tone = 'neutral', title, body, children
         tone === 'warning' && 'bg-warning-soft text-warning-ink')}>
         <Icon className="size-7" />
       </span>
-      <h1 className="text-[28px] font-normal leading-tight tracking-tight text-auth-ink">{title}</h1>
+      <h1 className="text-[28px] font-bold leading-tight tracking-tight text-auth-ink">{title}</h1>
       {body && <p className="mt-3 text-pretty text-sm text-auth-muted">{body}</p>}
       {children && <div className="mt-7 grid gap-3">{children}</div>}
     </div>
