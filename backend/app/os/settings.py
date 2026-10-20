@@ -20,6 +20,18 @@ class OsSettings:
     fetch_host_interval_s: float = 2.0  # research: minimum seconds between requests to one host
     page_ttl_h: float = 24.0  # research: how long a fetched page is reused
     page_max_bytes: int = 5_000_000  # research: larger pages are refused
+    # List prices, USD per 1M tokens (parent §9, checked 2026-10-13). None = not known yet: cost() refuses.
+    price_cheap_in: float | None = 0.75
+    price_cheap_cached: float | None = 0.075
+    price_cheap_out: float | None = 4.50
+    price_strong_in: float | None = 2.50
+    price_strong_cached: float | None = None
+    price_strong_out: float | None = None
+
+
+def _price(env: Mapping[str, str], name: str, default: float | None) -> float | None:
+    raw = env.get(name)
+    return float(raw) if raw else default
 
 
 def load_settings(env: Mapping[str, str] | None = None) -> OsSettings:
@@ -41,4 +53,10 @@ def load_settings(env: Mapping[str, str] | None = None) -> OsSettings:
         fetch_host_interval_s=float(env.get("OS_FETCH_HOST_INTERVAL_S") or 2.0),
         page_ttl_h=float(env.get("OS_PAGE_TTL_H") or 24.0),
         page_max_bytes=int(env.get("OS_PAGE_MAX_BYTES") or 5_000_000),
+        price_cheap_in=_price(env, "OS_PRICE_CHEAP_IN", 0.75),
+        price_cheap_cached=_price(env, "OS_PRICE_CHEAP_CACHED", 0.075),
+        price_cheap_out=_price(env, "OS_PRICE_CHEAP_OUT", 4.50),
+        price_strong_in=_price(env, "OS_PRICE_STRONG_IN", 2.50),
+        price_strong_cached=_price(env, "OS_PRICE_STRONG_CACHED", None),
+        price_strong_out=_price(env, "OS_PRICE_STRONG_OUT", None),
     )

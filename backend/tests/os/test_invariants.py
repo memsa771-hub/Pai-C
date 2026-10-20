@@ -1,5 +1,7 @@
-"""Fitness checks for invariants 1 (kernel is the sole writer) and 12 (nothing country-specific in code)."""
+"""Fitness checks for invariants 1 (kernel is the sole writer), 11 (no provider SDK outside Pydantic AI) and 12
+(nothing country-specific in code)."""
 
+import ast
 import re
 from pathlib import Path
 
@@ -36,6 +38,32 @@ def test_write_check_catches_a_violation(tmp_path):
     (tmp_path / "kernel").mkdir()
     (tmp_path / "kernel" / "ok.py").write_text("conn.execute(update(models.tasks).values(state='done'))\n")
     assert [v.split(":")[0] for v in kernel_write_violations(tmp_path)] == ["workers/bad.py"]
+
+
+def provider_sdk_imports(root: Path) -> list[str]:
+    """Imports of a model provider's SDK (the Counsellor's legacy guard, test_model_gateway.py, bans them outside
+    app/inference). The OS reaches models only through Pydantic AI (invariant 11)."""
+    found = []
+    for path in root.rglob("*.py"):
+        for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
+            names = []
+            if isinstance(node, ast.Import):
+                names = [a.name for a in node.names]
+            elif isinstance(node, ast.ImportFrom):
+                names = [node.module or ""] + (["openai"] if any(a.name == "AsyncOpenAI" for a in node.names) else [])
+            if any(n == "openai" or n.startswith("openai.") or n.startswith("app.inference") for n in names):
+                found.append(f"{path.relative_to(root).as_posix()}:{node.lineno}")
+    return found
+
+
+def test_no_provider_sdk_imports():
+    assert provider_sdk_imports(APP_OS) == []
+
+
+def test_provider_sdk_check_catches_a_violation(tmp_path):
+    (tmp_path / "a.py").write_text("from openai import AsyncOpenAI\n")
+    (tmp_path / "b.py").write_text("from pydantic_ai.providers.openai import OpenAIProvider\n")
+    assert provider_sdk_imports(tmp_path) == ["a.py:1"]
 
 
 def test_no_country_terms_in_python():
