@@ -19,10 +19,10 @@ def confirm_fact(service, knowledge: SqlKnowledge, kernel: Kernel, fact_id: int,
 
     Returns the ids of plans that got a new revision.
     """
-    scope, ref, field, _ = knowledge.get(fact_id)
+    scope, ref, field, old = knowledge.get(fact_id)
     service.check_fact_value(field, fields.get("value"))
     knowledge.confirm(fact_id, **fields)
-    return _after_fact_change(service, kernel, scope, ref, field, fact_id, fields.get("status"))
+    return _after_fact_change(service, kernel, scope, ref, field, fact_id, fields.get("status"), old.intake_year)
 
 
 def supply_fact(service, knowledge: SqlKnowledge, kernel: Kernel, *, scope: str, ref: str, field: str,
@@ -33,7 +33,7 @@ def supply_fact(service, knowledge: SqlKnowledge, kernel: Kernel, *, scope: str,
     fact = Fact(value=value, quote=quote, url=url, checked_at=datetime.now(timezone.utc),
                 intake_year=intake_year, status=status, conflict_note=conflict_note)  # validates trust rules
     fact_id = knowledge.upsert(scope, ref, field, fact)
-    return _after_fact_change(service, kernel, scope, ref, field, fact_id, status)
+    return _after_fact_change(service, kernel, scope, ref, field, fact_id, status, intake_year)
 
 
 def open_confirm_tasks(engine, tenant_id: str) -> list[dict]:

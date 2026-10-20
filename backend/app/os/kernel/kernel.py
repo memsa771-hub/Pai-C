@@ -15,9 +15,9 @@ from sqlalchemy import Connection, Engine, and_, delete, insert, select, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from app.os import models
-from app.os.compiler import DraftTask, PlanDraft
+from app.os.compiler import CONFIRM_TYPE, DraftTask, PlanDraft
 from app.os.contracts.route_contract import RouteContract
-from app.os.kernel.revisions import CANCELLED_MARK, NOTICE_PREFIX, diff
+from app.os.kernel.revisions import CANCELLED_MARK, DONE_MARK, NOTICE_PREFIX, diff
 from app.os.kernel.states import (
     SATISFIES_DEPENDENCY,
     TERMINAL,
@@ -280,7 +280,7 @@ class Kernel:
         stored = {r.instance_key: r._mapping for r in conn.execute(select(T).where(T.c.plan_id == plan_id))}
         ids = {k: r["id"] for k, r in stored.items()}
         new = {t.instance_key: t for t in draft.tasks}
-        d = diff(stored, new, self._stored_deps(conn, plan_id, ids))
+        d = diff(stored, new, self._stored_deps(conn, plan_id, ids), recheck_types=frozenset({CONFIRM_TYPE}))
         if contract_update:
             conn.execute(update(P).where(P.c.id == plan_id).values(**contract_update, updated_at=self.clock()))
         for key, t in new.items():  # drift fields: refreshed in place, never a revision on their own
@@ -292,6 +292,8 @@ class Kernel:
             self._set_risk(conn, plan_id, draft.at_risk)
             return None
         number = conn.execute(select(P.c.current_revision).where(P.c.id == plan_id)).scalar_one() + 1
+        for key in d.rechecked:  # the finished check stays as history; its key goes to the fresh task below
+            conn.execute(update(T).where(T.c.id == ids.pop(key)).values(instance_key=f"{key}{DONE_MARK}{number}"))
         for key in d.added:
             ids[key] = self._insert_task(conn, plan_id, new[key], draft.playbook_version)
         for key in d.removed:  # unstarted, including open inbox items: all may move to cancelled

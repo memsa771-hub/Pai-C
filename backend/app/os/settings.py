@@ -28,6 +28,7 @@ class OsSettings:
     price_strong_cached: float | None = None
     price_strong_out: float | None = None
     research_monthly_usd: float = 20.0  # research spend cap per tenant and month (S2-D10)
+    fact_ttl_days: int = 30  # a confirmed fact older than this goes stale (spec §4.7)
 
 
 def _price(env: Mapping[str, str], name: str, default: float | None) -> float | None:
@@ -61,4 +62,5 @@ def load_settings(env: Mapping[str, str] | None = None) -> OsSettings:
         price_strong_cached=_price(env, "OS_PRICE_STRONG_CACHED", None),
         price_strong_out=_price(env, "OS_PRICE_STRONG_OUT", None),
         research_monthly_usd=float(env.get("OS_RESEARCH_MONTHLY_USD") or 20.0),
+        fact_ttl_days=int(env.get("OS_FACT_TTL_DAYS") or 30),
     )
