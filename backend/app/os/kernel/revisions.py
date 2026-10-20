@@ -10,6 +10,7 @@ from app.os.kernel.states import TERMINAL, TaskState, is_started
 
 NOTICE_PREFIX = "plan_updated@"
 CANCELLED_MARK = "#c"  # a cancelled task's instance_key becomes "<key>#c<revision>", so the key can return
+DONE_MARK = "#d"  # a re-checked task's finished row becomes "<key>#d<revision>" (see `diff`, recheck_types)
 REMOVED_TOKEN = "removed"
 
 # Fields whose change is a structural revision. earliest_start, slack and critical drift with "today"
@@ -27,6 +28,7 @@ class RevisionDiff:
     changed: list[str] = field(default_factory=list)
     skipped_started: list[str] = field(default_factory=list)
     kept_protected: list[str] = field(default_factory=list)
+    rechecked: list[str] = field(default_factory=list)  # done tasks whose check is needed again (also in added)
     # key -> token of the draft difference that was reported for a started/protected task (stored on the
     # row so the same difference is reported once, not on every recompute)
     tokens: dict[str, str] = field(default_factory=dict)
@@ -58,9 +60,13 @@ def draft_token(t: DraftTask) -> str:
 
 
 def diff(stored: Mapping[str, Mapping], draft_tasks: Mapping[str, DraftTask],
-         stored_deps: Mapping[str, set], ) -> RevisionDiff:
+         stored_deps: Mapping[str, set], recheck_types: frozenset[str] = frozenset()) -> RevisionDiff:
     """A task that has started (or is protected) keeps its version; the difference is reported once,
-    the first time this exact draft version is seen. Finished tasks are history and never reported."""
+    the first time this exact draft version is seen. Finished tasks are history and never reported.
+
+    One exception: a done task of a `recheck_types` type whose key is in the draft again (the compiler asks
+    for a fact check only while the fact is not confirmed, so a stale fact asks again, spec §4.7) is
+    `rechecked`: its row keeps its history under a new key and a fresh task is added."""
     d = RevisionDiff()
 
     def report_once(target: list[str], key: str, token: str, row: Mapping) -> None:
@@ -69,10 +75,13 @@ def diff(stored: Mapping[str, Mapping], draft_tasks: Mapping[str, DraftTask],
             d.tokens[key] = token
 
     for key, row in stored.items():
-        if key.startswith(NOTICE_PREFIX) or CANCELLED_MARK in key:
+        if key.startswith(NOTICE_PREFIX) or CANCELLED_MARK in key or DONE_MARK in key:
             continue
         state = TaskState(row["state"])
         started = is_started(state, row["kind"])
+        if key in draft_tasks and state == TaskState.DONE and row["task_type"] in recheck_types:
+            d.rechecked.append(key)
+            continue
         if key not in draft_tasks:
             if state in TERMINAL:
                 continue
@@ -91,5 +100,5 @@ def diff(stored: Mapping[str, Mapping], draft_tasks: Mapping[str, DraftTask],
             d.changed.append(key)
         elif state not in TERMINAL:
             report_once(d.skipped_started, key, draft_token(new), row)
-    d.added = sorted(k for k in draft_tasks if k not in stored)
+    d.added = sorted(k for k in draft_tasks if k not in stored or k in d.rechecked)
     return d

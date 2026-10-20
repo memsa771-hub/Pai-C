@@ -86,6 +86,14 @@ class SqlKnowledge:
             raise KeyError(fact_id)
         return row.scope, row.ref, row.field, _fact(row)
 
+    def mark_stale(self, fact_id: int) -> bool:
+        """A confirmed fact becomes stale (spec §4.7). False if it was no longer confirmed."""
+        with self.engine.begin() as conn:
+            r = conn.execute(update(T).where(T.c.id == fact_id, T.c.tenant_id == self.tenant_id,
+                                             T.c.status == "confirmed")
+                             .values(status="stale", updated_at=func.now()).returning(T.c.id))
+            return r.first() is not None
+
     def annotate(self, fact_id: int, *, conflict_note: str | None, checked_at=None) -> None:
         """Research found the same value again (`checked_at`), or a different one (`conflict_note`), for a
         confirmed fact: the value, quote and status stay (spec §4.6 step 6)."""

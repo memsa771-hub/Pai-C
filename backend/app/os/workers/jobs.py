@@ -1,4 +1,5 @@
-"""Scheduled jobs the worker registers: hourly deadline engine and reminders, outbox delivery every minute."""
+"""Scheduled jobs the worker registers: hourly deadline engine and reminders, outbox delivery every minute,
+and the daily freshness sweeper (Slice 2 spec §4.7)."""
 
 from datetime import datetime, timezone
 
@@ -6,7 +7,7 @@ from app.os.knowledge import SqlKnowledge
 from app.os.outbox import Outbox, make_sender
 from app.os.playbooks import load_playbook_dir
 from app.os.service import PlanService
-from app.os.workers import deadline_engine
+from app.os.workers import deadline_engine, freshness
 from app.os.workers.reminders import run_reminders
 
 
@@ -30,8 +31,14 @@ def _deliver(settings, engine, kernel, client):
     return lambda: box.deliver(sender)
 
 
+def _freshness(settings, engine, kernel, client):
+    svc = _service(settings, engine, kernel)
+    return lambda: freshness.run(svc, engine, datetime.now(timezone.utc))
+
+
 JOB_FACTORIES = [
     ("deadline_engine", "0 * * * *", _deadlines),
     ("reminders", "0 * * * *", _reminders),
     ("deliver_outbox", "* * * * *", _deliver),
+    ("freshness", "0 3 * * *", _freshness),  # schedule os.freshness, daily at 03:00 UTC
 ]

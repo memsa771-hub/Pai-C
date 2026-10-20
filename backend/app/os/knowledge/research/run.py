@@ -142,7 +142,7 @@ def store_research(engine: Engine, service, kernel, run_id: int, programme_ref: 
                     "new": {"value": new_value, "status": v["status"]}})
         if changed or v["status"] == "confirmed":
             after_fact_change(service, kernel, "programme", programme_ref, spec.name, fact_id, v["status"],
-                              complete=v["status"] == "confirmed")
+                              intake_year, complete=v["status"] == "confirmed")
     return counts
 
 
