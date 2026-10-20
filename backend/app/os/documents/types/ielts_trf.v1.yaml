@@ -1,0 +1,27 @@
+# IELTS Test Report Form (Slice 3 spec S3-D2).
+key: ielts_trf
+version: 1
+label: IELTS Test Report Form
+full_name_from: [first_name, family_name]
+fields:
+  - {name: module, type: enum, values: [Academic, General Training], hint: "Academic or General Training"}
+  - {name: family_name, type: name, hint: "Family name as printed"}
+  - {name: first_name, type: name, hint: "First name(s) as printed"}
+  - {name: date_of_birth, type: date, cross_check: date_of_birth, hint: "Date of birth as YYYY-MM-DD"}
+  - {name: sex, type: enum, values: [M, F, X], hint: "Sex: M, F or X"}
+  - {name: nationality, type: text, hint: "Country of nationality"}
+  - {name: first_language, type: text, hint: "First language"}
+  - {name: candidate_id, type: code, hint: "Candidate ID (identity document number) as printed"}
+  - {name: centre_number, type: code, hint: "Centre number"}
+  - {name: candidate_number, type: code, hint: "Candidate number"}
+  - {name: test_date, type: date, hint: "Test date as YYYY-MM-DD"}
+  - {name: issue_date, type: date, hint: "Date the form was issued, YYYY-MM-DD"}
+  - {name: listening, type: band, hint: "Listening band score"}
+  - {name: reading, type: band, hint: "Reading band score"}
+  - {name: writing, type: band, hint: "Writing band score"}
+  - {name: speaking, type: band, hint: "Speaking band score"}
+  - {name: overall, type: band, hint: "Overall band score"}
+  - {name: cefr, type: enum, values: [A1, A2, B1, B2, C1, C2], hint: "CEFR level if printed"}
+  - {name: trf_number, type: code, hint: "Test Report Form number"}
+rules:
+  - {kind: band_mean, fields: [listening, reading, writing, speaking, overall]}

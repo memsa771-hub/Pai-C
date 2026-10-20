@@ -84,6 +84,9 @@ def build(settings: OsSettings) -> tuple[Registry, Kernel, DBOSClient, Engine]:
         registry.register(module)
     registry.validate(load_playbook_dir(PLAYBOOK_SOURCE).values())  # fail at startup, not on a task (I7)
     load_profile_dir(PROFILE_SOURCE)  # an invalid research profile stops startup too (Slice 2 spec §4.2)
+    from app.os.documents.types import load_document_types  # imported late: keeps the worker's import graph small
+
+    load_document_types()  # so does an invalid document type (Slice 3 spec S3-D2)
     engine = make_engine(settings)
     kernel = Kernel(engine, settings.tenant_id)
     DBOS(config=dbos_config(settings, settings.worker_id))
