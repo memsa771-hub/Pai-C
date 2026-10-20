@@ -1,0 +1,302 @@
+# Spike 1 regression set (Slice 2 plan Task 4; spike1-report §9, defects D1-D5).
+# Each case holds readings exactly as a Spike 1 run recorded them and the URLs of the pages that run read
+# (all in spike1-pages-2026-10-19.json.gz). The trust rules must never confirm a case's wrong value.
+cases:
+- id: d1-anhalt-ece-intakes
+  defect: D1
+  what: one intake named, confirmed as the complete list
+  source: docs/os/spikes/spike1-results/rerun10.json
+  programme: anhalt-electrical-computer-engineering
+  field: intakes
+  wrong_value: &id001
+  - winter
+  pages:
+  - https://www.hs-anhalt.de/studiengaenge/met/studium.html
+  - https://www.hs-anhalt.de/international/bewerbung-auslaendische-studierende.html
+  - https://www.hs-anhalt.de/international/bewerbung-auslaendische-studierende/praxisnah-studieren.html
+  - https://www.hs-anhalt.de/international/bewerbung-auslaendische-studierende/studienkolleg/fspdsh.html
+  - https://www.hs-anhalt.de/international/bewerbung-auslaendische-studierende/studienkolleg/startseite.html
+  readings:
+    A:
+      value: *id001
+      quote: Intake winter semester 2026
+      url: https://www.hs-anhalt.de/studiengaenge/met/studium.html
+      cycle: winter semester 2026
+      scope_quote: null
+    B:
+      value:
+      - winter
+      quote: Intake winter semester 2026
+      url: https://www.hs-anhalt.de/studiengaenge/met/studium.html
+      cycle: Intake winter semester 2026
+      scope_quote: null
+- id: d2-btu-power-english
+  defect: D2
+  what: CEFR level without the handout's scores; MOI letter accepted without support
+  source: docs/os/spikes/spike1-results/rerun10.json
+  programme: btu-power-engineering
+  field: english_requirement
+  wrong_value: &id002
+    cefr: B2
+    ielts: null
+    toefl_ibt: null
+    pte: null
+    moi_accepted: true
+  pages:
+  - https://www.b-tu.de/en/powerengineering-ms/admission
+  - https://www.b-tu.de/en/sprachen/languages/intensive-courses
+  - https://www-docs.b-tu.de/zulassung/public/universitaere/Merkblaetter_BA_MA/Sprachnachweise/MB_Sprachnachweis_Englisch_Language_Certificate_English.pdf
+  - https://www.b-tu.de/en/powerengineering-ms/programme-content-scope
+  - http://www.b-tu.de/en/international/contacts/bureau-of-international-studies
+  - https://www.b-tu.de/en/international
+  readings:
+    A:
+      value: *id002
+      quote: 'a certificate of proficiency in English at least at level B2 of the Common European Framework of Reference
+        for Languages (CEFR); for accepted tests please check: Proof of English language skills,'
+      url: https://www.b-tu.de/en/powerengineering-ms/admission
+      cycle: null
+      scope_quote: null
+    B:
+      value:
+        cefr: B2
+        ielts: null
+        toefl_ibt: null
+        pte: null
+        moi_accepted: true
+      quote: 'a certificate of proficiency in English at least at level B2 of the Common European Framework of Reference
+        for Languages (CEFR); for accepted tests please check: Proof of English language skills,'
+      url: https://www.b-tu.de/en/powerengineering-ms/admission
+      cycle: null
+      scope_quote: null
+- id: d2-btu-micro-nano-english
+  defect: D2
+  what: CEFR level confirmed while the run's handout lists the test scores
+  source: docs/os/spikes/spike1-results/rerun10.json
+  programme: btu-micro-and-nanoelectronics
+  field: english_requirement
+  wrong_value: &id003
+    cefr: B2
+    ielts: null
+    toefl_ibt: null
+    pte: null
+    moi_accepted: false
+  pages:
+  - https://www.b-tu.de/micro-nano-electronics-ms/faq
+  - https://www-docs.b-tu.de/zulassung/public/universitaere/Merkblaetter_BA_MA/Sprachnachweise/MB_Sprachnachweis_Englisch_Language_Certificate_English.pdf
+  - https://www.b-tu.de/en/micro-nano-electronics-ms/faq
+  - https://www.b-tu.de/international
+  - https://www.b-tu.de/international/aus-dem-ausland-an-die-btu/studium-mit-abschluss
+  readings:
+    A:
+      value: *id003
+      quote: Only valid certificates are recognized, »medium of instruction certificates« are not accepted.
+      url: https://www.b-tu.de/micro-nano-electronics-ms/faq
+      cycle: Winter Semester 2027/2028
+      scope_quote: null
+    B:
+      value:
+        cefr: B2
+        ielts: null
+        toefl_ibt: null
+        pte: null
+        moi_accepted: false
+      quote: Applicants need a certificate of proficiency in English as described in this handout. Only valid certificates
+        are recognized, »medium of instruction certificates« are not accepted.
+      url: https://www.b-tu.de/micro-nano-electronics-ms/faq
+      cycle: Winter Semester 2027/2028
+      scope_quote: null
+- id: d3-chemnitz-web-german
+  defect: D3
+  what: university-wide German rule applied without its scope
+  source: docs/os/spikes/spike1-results/rerun9.json
+  programme: tu-chemnitz-web-engineering
+  field: german_requirement
+  wrong_value: &id004
+    level: A1
+    when: at the time of application
+  pages:
+  - https://www2.daad.de/deutschland/studienangebote/international-programmes/en/detail/4655/
+  - https://www.tu-chemnitz.de/studierendenservice/studserv/bewerbung/bew_bamala.php.en
+  - https://www.tu-chemnitz.de/studierendenservice/studserv/bewerbung/index.php.en
+  - https://www.tu-chemnitz.de/tu/termine/detail.html.en?id=25127
+  - https://www.tu-chemnitz.de/informatik/studium/studiengaenge/ma_web_engineering.php
+  - https://www.tu-chemnitz.de/international/
+  - https://www.tu-chemnitz.de/international/forschende/index.php.en
+  readings:
+    A:
+      value: *id004
+      quote: Applicants applying for a degree programme offered in English language need to show a German language
+        proof at minimum level A1 (according to the Common European Framework of Reference for Languages - CEFR)
+        at the time of application.
+      url: https://www.tu-chemnitz.de/studierendenservice/studserv/bewerbung/bew_bamala.php.en
+      cycle: null
+      scope_quote: null
+    B:
+      value:
+        level: A1
+        when: at the time of application
+      quote: Applicants applying for a degree programme offered in English language need to show a German language
+        proof at minimum level A1 (according to the Common European Framework of Reference for Languages - CEFR)
+        at the time of application.
+      url: https://www.tu-chemnitz.de/studierendenservice/studserv/bewerbung/bew_bamala.php.en
+      cycle: null
+      scope_quote: null
+    C:
+      value:
+        level: A1
+        when: at the time of application
+      quote: Applicants applying for a degree programme offered in English language need to show a German language
+        proof at minimum level A1 (according to the Common European Framework of Reference for Languages - CEFR)
+        at the time of application.
+      url: https://www.tu-chemnitz.de/studierendenservice/studserv/bewerbung/bew_bamala.php.en
+      cycle: null
+      scope_quote: null
+- id: d3-chemnitz-automotive-route
+  defect: D3
+  what: the page's general uni-assist list applied to this programme
+  source: docs/os/spikes/spike1-results/rerun9.json
+  programme: tu-chemnitz-automotive-software-engineering
+  field: application_route
+  wrong_value: uni_assist
+  pages:
+  - https://www2.daad.de/deutschland/studienangebote/international-programmes/en/detail/4122/
+  - https://www.tu-chemnitz.de/studierendenservice/studserv/bewerbung/bew_bamala.php.en
+  - https://www.tu-chemnitz.de/studierendenservice/studserv/bewerbung/index.php.en
+  - https://www.tu-chemnitz.de/tu/termine/detail.html.en?id=25127
+  - https://www.tu-chemnitz.de/informatik/studium/studiengaenge/index.php.en?page=ma_ase
+  - https://www.tu-chemnitz.de/international/
+  - https://www.tu-chemnitz.de/international/forschende/index.php.en
+  readings:
+    A:
+      value: uni_assist
+      quote: 'The following applicants have to apply via uni-assist1:
+
+        International applicants without German high school diploma (applicants with international education background,
+        but not for applicants as an exchange student / Erasmus)
+
+        International applicants with a international Bachelor''s or Master''s degree (not for applicants as an
+        exchange student / Erasmus)'
+      url: https://www.tu-chemnitz.de/studierendenservice/studserv/bewerbung/bew_bamala.php.en
+      cycle: null
+      scope_quote: null
+    B:
+      value: uni_assist
+      quote: 'The following applicants have to apply via uni-assist1:
+
+        International applicants without German high school diploma (applicants with international education background,
+        but not for applicants as an exchange student / Erasmus)
+
+        International applicants with a international Bachelor''s or Master''s degree (not for applicants as an
+        exchange student / Erasmus)'
+      url: https://www.tu-chemnitz.de/studierendenservice/studserv/bewerbung/bew_bamala.php.en
+      cycle: null
+      scope_quote: null
+    C:
+      value: uni_assist
+      quote: 'The following applicants have to apply via uni-assist1:
+
+        International applicants with a international Bachelor''s or Master''s degree (not for applicants as an
+        exchange student / Erasmus)'
+      url: https://www.tu-chemnitz.de/studierendenservice/studserv/bewerbung/bew_bamala.php.en
+      cycle: null
+      scope_quote: null
+- id: d4-koblenz-route
+  defect: D4
+  what: a link label used as evidence; a paraphrased quote
+  source: docs/os/spikes/spike1-results/run9.json
+  programme: koblenz-web-data-science
+  field: application_route
+  wrong_value: direct
+  pages:
+  - https://www.uni-koblenz.de/en/degree-programs/web-and-data-science-msc
+  - https://www.uni-koblenz.de/en/studies/application-and-admission/the-path-to-studying/deadlines-and-dates
+  - https://www.uni-koblenz.de/en/international-relations-office/incomings/degree-seeking-students/apply-now
+  - https://www.uni-koblenz.de/de/informatik/international
+  - https://www.uni-koblenz.de/en/degree-programs
+  - https://www.uni-koblenz.de/en/international-relations-office/incomings
+  readings:
+    A:
+      value: direct
+      quote: The Universität Koblenz is a member of uni-assist. Whether you need to apply via uni-assist or directly
+        through the university depends on your prior education.
+      url: https://www.uni-koblenz.de/de/informatik/international
+      cycle: null
+      scope_quote: null
+    B:
+      value: direct
+      quote: Die Universität Koblenz ist Mitglied bei uni-assist. Ob Sie sich über uni-assist oder direkt über die
+        Universität bewerben müssen, hängt von Ihrer Vorbildung ab.
+      url: https://www.uni-koblenz.de/de/informatik/international
+      cycle: null
+      scope_quote: null
+    C:
+      value: direct
+      quote: Application via University of Koblenz
+      url: https://www.uni-koblenz.de/en/international-relations-office/incomings/degree-seeking-students/apply-now
+      cycle: null
+      scope_quote: null
+- id: d5-chemnitz-automotive-german-none
+  defect: D5
+  what: '''none'' with a quote that states A1 (the two readings that agreed)'
+  source: docs/os/spikes/spike1-results/rerun11.json
+  programme: tu-chemnitz-automotive-software-engineering
+  field: german_requirement
+  wrong_value: &id005
+    level: none
+    when: at the time of application
+  pages:
+  - https://www2.daad.de/deutschland/studienangebote/international-programmes/en/detail/4122/
+  - https://www.tu-chemnitz.de/studierendenservice/studserv/bewerbung/bew_bamala.php.en
+  - https://www.tu-chemnitz.de/studierendenservice/studserv/bewerbung/index.php.en
+  - https://www.tu-chemnitz.de/tu/termine/detail.html.en?id=25127
+  - https://www.tu-chemnitz.de/informatik/studium/studiengaenge/index.php.en?page=ma_ase
+  - https://www.tu-chemnitz.de/international/
+  - https://www.tu-chemnitz.de/international/forschende/index.php.en
+  readings:
+    A:
+      value: *id005
+      quote: Applicants applying for a degree programme offered in English language need to show a German language
+        proof at minimum level A1 (according to the Common European Framework of Reference for Languages - CEFR)
+        at the time of application.
+      url: https://www.tu-chemnitz.de/studierendenservice/studserv/bewerbung/bew_bamala.php.en
+      cycle: null
+      scope_quote: null
+    B:
+      value:
+        level: none
+        when: at the time of application
+      quote: Applicants applying for a degree programme offered in English language need to show a German language
+        proof at minimum level A1 (according to the Common European Framework of Reference for Languages - CEFR)
+        at the time of application. By no later than the end of their third study term at TU Chemnitz, they have
+        to submit a German language proof at level A2 according to CEFR.
+      url: https://www.tu-chemnitz.de/studierendenservice/studserv/bewerbung/bew_bamala.php.en
+      cycle: null
+      scope_quote: null
+- id: d5-btu-ai-tuition
+  defect: D5
+  what: a fee of 0 with a quote about the teaching language (one reading, used twice)
+  source: docs/os/spikes/spike1-results/rerun10.json
+  programme: btu-artificial-intelligence
+  field: tuition_fee_non_eu_eur
+  wrong_value: 0.0
+  pages:
+  - https://www.b-tu.de/en/artificial-intelligence-ms/faq
+  - https://www-docs.b-tu.de/zulassung/public/universitaere/Merkblaetter_BA_MA/Sprachnachweise/MB_Sprachnachweis_Englisch_Language_Certificate_English.pdf
+  - https://www.b-tu.de/en/study/during-studies/study-organization/quicklinks/dates-and-deadlines
+  - https://www.b-tu.de/artificial-intelligence-ms/faq
+  - https://www.b-tu.de/en/artificial-intelligence-ms/detail-information/chairs-involved-in-the-study-program
+  - https://www.b-tu.de/en/artificial-intelligence-ms/detail-information/structure-of-the-degree-program
+  readings:
+    A:
+      value: 0.0
+      quote: The program, including teaching and exams, is in Englisch.
+      url: https://www.b-tu.de/en/artificial-intelligence-ms/detail-information/structure-of-the-degree-program
+      cycle: null
+      scope_quote: null
+    B:
+      value: 0.0
+      quote: The program, including teaching and exams, is in Englisch.
+      url: https://www.b-tu.de/en/artificial-intelligence-ms/detail-information/structure-of-the-degree-program
+      cycle: null
+      scope_quote: null

@@ -53,6 +53,12 @@ none_phrases:
 # A one-item list (one intake, one test) is complete only if the quote says so (Spike 1 lesson 3).
 exclusive_phrases: [only, exclusively, no summer intake, no summer semester, winter semester only, nur]
 
+# A rule on a general page counts for a programme only if its scope quote names the programme or says the
+# rule is for every programme (spec §4.4 rule 6, Spike 1 lesson 2).
+scope_all_phrases: [all programmes, all programs, all degree programmes, all degree programs, all study programmes,
+  all master's programmes, all master programmes, international bachelor or master, alle studiengänge,
+  alle masterstudiengänge]
+
 # "Ask the university" draft for unconfirmed facts (spec §4.9). The student sends it; the OS never does.
 draft_email: |
   Dear admissions team,
@@ -71,8 +77,9 @@ fields:
       Teaching language. "english" = the whole programme is taught in English; "english_or_german" = it can be
       studied fully in English or fully in German; "mostly_english" = most courses are in English.
     values:
-      english: [english]
-      english_or_german: [english or german, german or english, english and german]
+      english: [english, englisch]
+      english_or_german: [english or german, german or english, english and german, english/german,
+        englisch/deutsch, in either language]
       mostly_english: [mostly english, mainly english, mostly in english, mainly in english]
       german: [german]
 
@@ -102,7 +109,7 @@ fields:
       How applicants with a foreign degree apply: "uni_assist" (through uni-assist), "uni_assist_vpd"
       (a uni-assist VPD, then directly to the university), or "direct" (only to the university).
     values:
-      uni_assist: [uni-assist, uni assist]
+      uni_assist: [uni-assist, uni assist, uniassist]
       uni_assist_vpd: [vpd, vorprüfungsdokumentation]
       direct: [directly, direct application, online application, application portal, apply online, portal]
 
@@ -115,6 +122,12 @@ fields:
     levels: [A1, A2, B1, B2, C1, C2]
     scores: [ielts, toefl_ibt, pte]
     flags: [moi_accepted]
+    # What a quote or page must name for a score or flag to count (spec §4.4 rule 4; Spike 1 D2).
+    values:
+      ielts: [ielts]
+      toefl_ibt: [toefl]
+      pte: [pte]
+      moi_accepted: [medium of instruction, medium-of-instruction, moi]
 
   - name: german_requirement
     type: level

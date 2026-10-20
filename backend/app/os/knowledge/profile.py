@@ -31,7 +31,8 @@ class FieldSpec(_Model):
     type: FieldType
     hint: str
     cycle_bound: bool = False
-    values: dict[str, list[str]] = {}  # value -> aliases a quote may use (enum, name_set, season_set)
+    # value -> aliases a quote may use (enum, name_set, season_set); level_scores: score or flag -> aliases
+    values: dict[str, list[str]] = {}
     levels: list[str] = []  # level, level_scores
     scores: list[str] = []  # level_scores: the numeric test scores
     flags: list[str] = []  # level_scores: yes/no facts, e.g. whether a letter is accepted instead of a test
@@ -45,6 +46,10 @@ class FieldSpec(_Model):
             raise ValueError(f"field '{self.name}' ({self.type}) needs levels")
         if self.type == "level_scores" and not self.scores:
             raise ValueError(f"field '{self.name}' (level_scores) needs scores")
+        if self.type == "level_scores":
+            for key in self.values:
+                if key not in (*self.scores, *self.flags):
+                    raise ValueError(f"field '{self.name}': values names unknown score or flag '{key}'")
         if self.type == "grade" and not self.parts:
             raise ValueError(f"field '{self.name}' (grade) needs parts")
         return self
@@ -59,6 +64,7 @@ class ResearchProfile(_Model):
     month_names: dict[int, list[str]]
     none_phrases: dict[str, list[str]] = {}
     exclusive_phrases: list[str]
+    scope_all_phrases: list[str] = []  # a scope quote with one of these says a rule is for every programme
     draft_email: str
     fields: list[FieldSpec]
 
