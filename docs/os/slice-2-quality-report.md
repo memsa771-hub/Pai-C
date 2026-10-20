@@ -1,8 +1,61 @@
 # Slice 2 quality gate report
 
-**Result: GATE FAILED (0 of 3 runs passed).** Correct rate passes every run; confirmed rate fails every run.
-Per spec §9 and plan Task 10 step 4, work stops here: the owners decide (spec Q1). The key and the thresholds
-were not changed.
+**Result: GATE FAILED twice (0 of 3 runs each time).** The correct rate passes every run (0.99); the confirmed rate
+fails every run (about 0.50). The owners chose option 2 after the first gate (fix and re-run, 2026-10-20). The
+re-run fixed the bug and most of the scope problem, but the confirmed rate stayed about the same. **The owners
+now decide (spec Q1) between accepting the current rate and lowering the bar.** The key and the thresholds were
+not changed. The re-run is reported first, then the original gate.
+
+## Re-run after the fixes (2026-10-20, 10:31–10:45 UTC, `ee41481`)
+
+The fixes, on PR #65:
+- **One event loop for all readings.** The first gate lost 16 readings to "bound to a different event loop".
+  `test_readings_from_several_threads_share_one_loop` reproduces it. The test that checks each model request is
+  still a DBOS step was extended.
+- **A programme's own start pages are programme-specific**, together with the pages in their folder. These are
+  the start URLs no other programme in the registry uses. A shared university-wide start page stays general, so
+  the D1–D5 regressions still pass.
+
+| Run | Correct | Confirmed | Cost | Reading errors | Result |
+|---|---|---|---|---|---|
+| 1 | 98 / 99 = **0.990** | 99 / 184 = **0.538** | $0.45 | 0 | FAIL (confirmed) |
+| 2 | 85 / 86 = **0.988** | 86 / 184 = **0.467** | $0.37 | 2 (OpenAI timeouts) | FAIL (confirmed) |
+| 3 | 89 / 90 = **0.989** | 90 / 184 = **0.489** | $0.34 | 0 | FAIL (confirmed) |
+| All | 272 / 275 = 0.989 | 275 / 552 = 0.498 | **$1.16** | 2 | |
+
+Full results: `docs/os/quality/slice2-gate-20261020T103154Z.json.gz`.
+
+**What changed:**
+- **The bug is gone:** no event-loop errors.
+- **The scope fix worked:** facts blocked only by `scope_unclear` fell from about 15 per run to about 8.
+- **The confirmed rate did not move.** The largest reason is now **`not_found`** (23–29 facts per run, up from
+  13–18): no reading reported the field, because the pages collected (the seed's start URLs plus up to 5 ranked
+  links) do not state it. Next come `single_reading` (11–17), `cycle_unknown` (6–11) and `readings_disagree`
+  (4–9).
+- **The ceiling of these fixes:** even if every `not_found` fact were found *and* confirmed, a run would reach
+  about 0.64, still under 0.70.
+
+**The wrong fact** (all three runs): TU Chemnitz Automotive Software Engineering, `application_route`. It is
+confirmed `uni_assist`, but the key says `direct`. This is the same scope-quote case as in the first gate: the
+scope sentence names the programme in the direct-application pilot's exception list. It is the only wrong fact in
+the re-run.
+
+**What would raise the rate further** (each is larger than a fix):
+1. **Better start URLs per programme.** This is data work by a developer: add each programme's admission,
+   deadline and fee pages to the seed. It is the main lever on `not_found`.
+2. **Relax rules:** accept a fee with no year when the page has no year at all (`cycle_unknown`), or confirm on
+   one valid reading for low-risk fields (`single_reading`). Either trades correctness for confirmations.
+3. **Lower the bar** (option 3 below).
+
+My recommendation: **accept the current rules for the pilot (option 1), with the correct-rate bar kept at 0.95**,
+and do the start-URL work as a data task in parallel. Students see only facts that are right 99% of the time.
+About half are labelled "unconfirmed" with an "Ask the university" draft, re-researched daily, and queued for an
+admin with their evidence. Before the pilot, an admin should confirm the TU Chemnitz Automotive route by hand
+(`direct`).
+
+---
+
+# The first gate (2026-10-20, 09:41–09:49 UTC, `23cb019`)
 
 | | |
 |---|---|
