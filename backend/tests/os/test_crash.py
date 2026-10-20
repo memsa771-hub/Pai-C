@@ -34,8 +34,8 @@ TASKS, WORKERS, KILL_EVERY_S, TIMEOUT_S, TASK_SLEEP_S = 20, 3, 1.5, 180.0, "3.0"
 
 
 class Pool:
-    def __init__(self, url: str, log_dir: Path) -> None:
-        self.url, self.log_dir = url, log_dir
+    def __init__(self, url: str, log_dir: Path, extra_env: dict | None = None) -> None:
+        self.url, self.log_dir, self.extra_env = url, log_dir, extra_env or {}
         self.procs: dict[int, subprocess.Popen] = {}
         self.generation = {i: 0 for i in range(WORKERS)}
         self.labels: dict[int, str] = {}
@@ -45,7 +45,8 @@ class Pool:
         self.generation[slot] += 1
         env = {**os.environ, "OS_DATABASE_URL": self.url, "OS_DBOS_SYSTEM_SCHEMA": TEST_DBOS_SCHEMA,
                "OS_WORKER_ID": f"crash-w{slot}", "OS_EXTRA_MODULES": "tests.os.runner_helpers:SLEEP_MODULE",
-               "OS_PARENT_PID": str(os.getpid()), "OS_TEST_LABEL": label, "OS_TEST_SLEEP_S": TASK_SLEEP_S}
+               "OS_PARENT_PID": str(os.getpid()), "OS_TEST_LABEL": label, "OS_TEST_SLEEP_S": TASK_SLEEP_S,
+               **self.extra_env}
         log = open(self.log_dir / f"{label}.log", "wb")
         self.procs[slot] = subprocess.Popen([sys.executable, "-m", "app.os.runner.worker"], cwd=BACKEND, env=env,
                                             stdout=log, stderr=subprocess.STDOUT)
@@ -167,3 +168,78 @@ def test_crash_no_lost_or_duplicated(os_db, engine, clean, tmp_path):
         for earlier, later in zip(rows, rows[1:]):
             assert any(label == earlier.label and earlier.at <= t <= later.at for label, t in kills), \
                 f"duplicate run of task {earlier.task_id} without a kill of {earlier.label}"
+
+
+def test_crash_during_research(os_db, engine, clean, tmp_path):
+    """Slice 2 spec §8 test 6: SIGKILL workers during research (fake model). No lost task, no duplicate
+    os_agent_runs row, no duplicate fact or fact_changed event."""
+    from datetime import datetime, timezone
+
+    from sqlalchemy import insert
+
+    from app.os.knowledge import SEED_DIR, SqlKnowledge, load_seed
+    from app.os.knowledge.programmes import Programme, ProgrammeStore
+    from app.os.playbooks import load_playbook_dir
+    from app.os.service import PlanService
+    from app.os.settings import load_settings
+    from tests.os.research_helpers import PAGES, page_text
+    from tests.os.test_golden import TEST_STUDENT
+
+    reset_dbos_schema(os_db)
+    kb = SqlKnowledge(engine, "pai")
+    load_seed(SEED_DIR / "germany_ws2027.yaml", kb)
+    store = ProgrammeStore(engine, "pai")
+    now = datetime.now(timezone.utc)
+    with engine.begin() as conn:  # the pages are already in the gateway's cache: no network in the workers
+        for ref, (url, domain, name) in PAGES.items():
+            store.upsert(Programme(ref=ref, route_key="germany_master", university="University", name=name,
+                                   aliases=(), start_urls=(url,), official_domains=(domain,)))
+            conn.execute(insert(models.pages).values(tenant_id="pai", url=url, final_url=url, http_status=200,
+                                                     text=page_text(name), links=[], fetched_at=now))
+    service = PlanService(engine, load_settings({"DATABASE_URL": os_db}), Kernel(engine, "pai"), kb,
+                          load_playbook_dir(), today=lambda: date.today())
+    pool = Pool(os_db, tmp_path, {"OS_TEST_RESEARCH_MODEL": "tests.os.research_helpers:slow_model",
+                                  "OS_TEST_MODEL_SLEEP_S": "1.5"})
+    rng = random.Random(11)
+    kills = 0
+    client = None
+    keys = [f"confirm_fact@{ref}:{field}" for ref in PAGES for field in ("deadline_close", "application_route")]
+    try:
+        for slot in range(2):
+            pool.start(slot)
+        client = DBOSClient(system_database_url=os_db, dbos_system_schema=TEST_DBOS_SCHEMA, application_name=APP_NAME)
+        _wait_queue(client, pool)
+        plan_id = service.start_plan(TEST_STUDENT).plan_id  # the workers run the confirm tasks, then research
+        deadline = time.monotonic() + TIMEOUT_S
+        next_kill = time.monotonic() + KILL_EVERY_S
+        while True:
+            with engine.connect() as conn:
+                states = conn.execute(select(models.tasks.c.state).where(
+                    models.tasks.c.plan_id == plan_id, models.tasks.c.instance_key.in_(keys))).scalars().all()
+                runs = conn.execute(select(models.research_runs.c.status)).scalars().all()
+            if len(states) == len(keys) and set(states) == {"done"} and len(runs) == 3 and set(runs) == {"done"}:
+                break
+            assert time.monotonic() < deadline, f"stuck: tasks {states}, runs {runs} (logs: {tmp_path})"
+            if time.monotonic() >= next_kill and kills < 6:
+                slot = rng.randrange(2)
+                pool.kill(slot)
+                kills += 1
+                pool.start(slot)
+                next_kill = time.monotonic() + KILL_EVERY_S
+            time.sleep(0.2)
+    finally:
+        pool.stop_all()
+        if client is not None:
+            client.destroy()
+
+    with engine.connect() as conn:
+        agent_runs = conn.execute(select(models.agent_runs.c.research_run_id, models.agent_runs.c.reading)).all()
+        facts = conn.execute(select(models.knowledge_facts.c.ref, models.knowledge_facts.c.status,
+                                    models.knowledge_facts.c.source).where(
+            models.knowledge_facts.c.field == "deadline_close", models.knowledge_facts.c.ref.in_(list(PAGES)))).all()
+        changed = conn.execute(select(models.events.c.payload).where(models.events.c.type == "fact_changed")).scalars().all()
+    assert kills >= 2
+    assert len(agent_runs) == len(set(agent_runs)) == 6  # A and B per programme, once each
+    assert sorted(f.ref for f in facts) == sorted(PAGES) and {(f.status, f.source) for f in facts} == {("confirmed", "research")}
+    per_fact = [(e["ref"], e["field"]) for e in changed if e["field"] == "deadline_close"]
+    assert sorted(per_fact) == sorted((ref, "deadline_close") for ref in PAGES)  # one event per change, never repeated
