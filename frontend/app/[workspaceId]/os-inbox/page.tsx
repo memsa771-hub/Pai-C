@@ -6,6 +6,7 @@ import { InboxList } from '@/components/os/inbox-list';
 import { workspaceApi } from '@/lib/api';
 import { OS_UI_ENABLED } from '@/lib/config';
 import type { OsInboxItem } from '@/lib/os-inbox';
+import { dateFactStatus, type FactStatus } from '@/lib/os-programmes';
 import { usePaiAuth } from '@/lib/pai-auth-context';
 import { goToSignIn } from '@/lib/auth-redirects';
 
@@ -16,6 +17,7 @@ export default function OsInboxPage({ params }: { params: Promise<{ workspaceId:
   const [items, setItems] = useState<OsInboxItem[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<number | null>(null);
+  const [factStatus, setFactStatus] = useState<Record<string, FactStatus | null>>({});
 
   const load = useCallback(async () => {
     try {
@@ -23,6 +25,12 @@ export default function OsInboxPage({ params }: { params: Promise<{ workspaceId:
       setError(null);
     } catch {
       setError('Could not load your next steps. Please try again.');
+    }
+    try {  // the fact labels are extra: the inbox works without them
+      const programmes = await workspaceApi.getOsProgrammes();
+      setFactStatus(Object.fromEntries(programmes.map((p) => [p.ref, dateFactStatus(p)])));
+    } catch {
+      setFactStatus({});
     }
   }, []);
 
@@ -58,7 +66,8 @@ export default function OsInboxPage({ params }: { params: Promise<{ workspaceId:
       {items === null ? (
         <p className="text-sm text-muted-foreground">Loading…</p>
       ) : (
-        <InboxList items={items} now={new Date()} onComplete={complete} busyId={busyId} />
+        <InboxList items={items} now={new Date()} onComplete={complete} busyId={busyId}
+                   factStatus={factStatus} programmesHref={`/${workspaceId}/os-programmes`} />
       )}
     </main>
   );

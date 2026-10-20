@@ -212,6 +212,13 @@ class WorkspaceApi {
     });
   }
 
+  /** PAI OS: the facts of the programmes in the student's plan (Slice 2 spec §4.8). */
+  async getOsProgrammes(): Promise<import('./os-programmes').OsProgramme[]> {
+    const params = new URLSearchParams({ network: this.requireWorkspace() });
+    const body = await this.requestJson<{ programmes: import('./os-programmes').OsProgramme[] }>(`/v1/os/programmes?${params}`);
+    return body.programmes;
+  }
+
   // ---------------------------------------------------------------------------
   // Workspace CRUD (REST endpoints — not event-based)
   // ---------------------------------------------------------------------------
