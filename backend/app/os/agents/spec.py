@@ -24,7 +24,14 @@ class _Model(BaseModel):
 class AgentLimits(_Model):
     max_readings: int = Field(ge=1)
     timeout_s: float = Field(gt=0)
-    spend_usd_per_programme: float = Field(gt=0)
+    spend_usd_per_programme: float | None = Field(None, gt=0)  # research
+    spend_usd_per_document: float | None = Field(None, gt=0)  # documents (Slice 3)
+
+    @model_validator(mode="after")
+    def _a_spend_cap(self) -> "AgentLimits":
+        if self.spend_usd_per_programme is None and self.spend_usd_per_document is None:
+            raise ValueError("limits need a spend cap (spend_usd_per_programme or spend_usd_per_document)")
+        return self
 
 
 class AgentRetries(_Model):
@@ -38,7 +45,10 @@ class AgentSpec(_Model):
     zone: Literal["reader", "actor"]
     tier: Literal["cheap", "strong"]
     tools: list[str]
-    output: Literal["profile_reading"]  # the route's reading model, built from its research profile
+    # profile_reading: the route's reading model, built from its research profile (Slice 2);
+    # document_reading: the document type's reading model (Slice 3)
+    output: Literal["profile_reading", "document_reading"]
+    mode: Literal["whole", "tiles"] | None = None  # documents: page images whole or in bands (Spike 2)
     limits: AgentLimits
     retries: AgentRetries
 
