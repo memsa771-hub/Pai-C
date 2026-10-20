@@ -85,6 +85,8 @@ module.exports = async function flow(browser, open, ORIGIN) {
     const sentBefore = (await called(page, 'sendMessage')).length;
     await page.getByRole('button', { name: 'Open conversation' }).click();
     await page.getByRole('region', { name: 'Check-in' }).getByRole('button', { name: 'I tried something' }).click();
+    // Wait for the draft to render (the click updates React state), then check it.
+    await page.waitForFunction(() => /^I tried something\. /.test(document.querySelector('textarea[data-chat-input]')?.value || ''), null, { timeout: 5000 });
     assert.match(await page.locator('textarea[data-chat-input]').inputValue(), /^I tried something\. /);
     assert.equal((await called(page, 'sendMessage')).length, sentBefore, 'check-in is a draft, not an auto-send');
 
