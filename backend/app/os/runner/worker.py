@@ -52,8 +52,11 @@ def _extra_modules(spec: str) -> list[Module]:
 
 
 def register_research_if_configured(settings: OsSettings, engine: Engine, kernel: Kernel) -> bool:
-    """Registers os.research (readers built once, before launch). False when no model key is set."""
-    if not settings.openai_api_key:
+    """Registers os.research (readers built once, before launch). False when no model key is set.
+
+    OS_TEST_RESEARCH_MODEL (tests only, `pkg.mod:factory`) gives a fake model instead, like OS_EXTRA_MODULES."""
+    test_model = os.environ.get("OS_TEST_RESEARCH_MODEL", "").strip()
+    if not settings.openai_api_key and not test_model:
         log.warning("OS_OPENAI_API_KEY is not set: research is off and confirm_fact tasks wait for an admin")
         return False
     from app.os.agents.spec import AGENT_DIR, load_agent_spec  # imported late: only a researching worker needs them
@@ -64,7 +67,11 @@ def register_research_if_configured(settings: OsSettings, engine: Engine, kernel
 
     spec = load_agent_spec(AGENT_DIR / "research.v1.yaml")
     profiles = load_profile_dir(PROFILE_SOURCE)
-    model = model_for(settings, spec.tier)
+    if test_model:
+        module_path, _, name = test_model.partition(":")
+        model = getattr(importlib.import_module(module_path), name)()
+    else:
+        model = model_for(settings, spec.tier)
     readers = {key: build_readers(model, profile, spec) for key, profile in profiles.items()}
     register_research(engine, settings, kernel, _service(settings, engine, kernel),
                       PageGateway(engine, settings.tenant_id, settings), readers, spec, profiles)
