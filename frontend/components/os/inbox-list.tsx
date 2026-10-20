@@ -11,16 +11,21 @@ import {
   sourceHost,
   type OsInboxItem,
 } from '@/lib/os-inbox';
+import { statusLabel, type FactStatus } from '@/lib/os-programmes';
 
 interface InboxListProps {
   items: OsInboxItem[];
   now: Date;
   onComplete: (item: OsInboxItem) => void;
   busyId?: number | null;
+  /** Programme ref -> the status of its date facts (Slice 2): shown next to provisional/estimated. */
+  factStatus?: Record<string, FactStatus | null>;
+  /** The programme facts page; items of a programme link to its section there. */
+  programmesHref?: string;
 }
 
 /** The PAI OS student inbox (Slice 1 spec §4.11): mobile-first, one action per item. */
-export function InboxList({ items, now, onComplete, busyId = null }: InboxListProps) {
+export function InboxList({ items, now, onComplete, busyId = null, factStatus = {}, programmesHref }: InboxListProps) {
   if (items.length === 0) {
     return <p className="px-4 py-10 text-center text-sm text-muted-foreground">Nothing to do right now.</p>;
   }
@@ -34,7 +39,8 @@ export function InboxList({ items, now, onComplete, busyId = null }: InboxListPr
           <ul className="flex flex-col gap-2">
             {groupItemsList.map((item) => {
               const due = formatDue(item);
-              const labels = dateLabels(item);
+              const fact = item.programme_ref ? factStatus[item.programme_ref] : null;
+              const labels = [...dateLabels(item), ...(due && fact ? [statusLabel(fact)] : [])];
               const source = item.citations[0];
               return (
                 <li key={item.id} className="rounded-lg border bg-card p-3">
@@ -65,6 +71,14 @@ export function InboxList({ items, now, onComplete, busyId = null }: InboxListPr
                         >
                           source: {sourceHost(source.url)}
                           <ExternalLink className="size-3" aria-hidden />
+                        </a>
+                      )}
+                      {programmesHref && item.programme_ref && fact && (
+                        <a
+                          href={`${programmesHref}#${item.programme_ref}`}
+                          className="mt-1 ml-3 inline-flex text-xs text-primary underline-offset-2 hover:underline"
+                        >
+                          programme facts
                         </a>
                       )}
                     </div>
