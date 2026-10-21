@@ -31,16 +31,16 @@ export function TryItFeedback({ roadmap, headingLevel = 4 }: { roadmap: Roadmap;
     } catch { setError(true); }
     finally { setBusy(false); }
   };
-  const chip = (on: boolean) => `min-h-11 rounded-2xl border-2 px-4 text-sm font-semibold transition-colors ${on ? 'border-foreground bg-secondary text-foreground ring-1 ring-foreground' : 'border-border bg-card hover:border-foreground/30'}`;
-  return <section className="min-w-0 space-y-3 rounded-3xl border border-primary/15 bg-brand-soft/60 p-5">
-    <Heading className="flex items-center gap-2 font-bold"><Sparkles aria-hidden className="size-5 text-tone-violet-ink" />{t('tryIt.title')}</Heading>
+  const chip = (on: boolean) => `min-h-11 rounded-2xl border-2 px-4 text-sm font-semibold transition-colors ${on ? 'border-primary bg-brand-soft text-foreground' : 'border-border bg-card hover:border-primary/40'}`;
+  return <section className="min-w-0 space-y-3 rounded-[22px] bg-powder p-5 text-signal-ink">
+    <Heading className="flex items-center gap-2 font-display text-lg leading-tight"><Sparkles aria-hidden className="size-4" />{t('tryIt.title')}</Heading>
     <p className="text-xs font-semibold text-primary">{t(`tryIt.${trial.kind}`)}</p>
     <p className="text-sm leading-relaxed">{trial.what}</p>
-    <p className="flex items-center gap-1.5 text-xs text-muted-foreground"><Clock aria-hidden className="size-3.5" />{trial.time_needed}</p>
+    <p className="flex items-center gap-1.5 text-xs opacity-80"><Clock aria-hidden className="size-3.5" />{trial.time_needed}</p>
     {!!trial.questions.length && <ol className="list-inside list-decimal space-y-1 text-sm">{trial.questions.map((question, index) => <li key={index}>{question}</li>)}</ol>}
     {sent ? <p role="status" className="flex items-center gap-2 text-sm font-medium text-success-ink"><Check aria-hidden className="size-4" />{t('tryIt.sent')}</p>
       : !open && <Button type="button" size="tap" onClick={() => setOpen(true)}>{t('tryIt.tried')}</Button>}
-    {open && <form onSubmit={submit} className="space-y-3 rounded-2xl bg-card p-4">
+    {open && <form onSubmit={submit} className="space-y-3 rounded-[14px] bg-card p-4 text-foreground">
       <fieldset disabled={busy}><legend className="text-sm font-semibold">{t('tryIt.feeling')}</legend>
         <div className="mt-2 flex flex-wrap gap-2">{(['more', 'okay', 'notForMe'] as const).map(value =>
           <button type="button" key={value} aria-pressed={feeling === value} onClick={() => setFeeling(value)}

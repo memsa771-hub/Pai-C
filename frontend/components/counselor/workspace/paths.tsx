@@ -15,7 +15,7 @@ import { Label } from "@/components/ui/label";
 import {
   Dialog, DialogBody, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from "@/components/ui/responsive-dialog";
-import { EmptyState, SectionCard, Skeletons, StatChip, toneClass, toneFor, tonesByOrder, type Tone } from "@/components/pai";
+import { EmptyState, Skeletons, StatChip, toneClass, toneFor, tonesByOrder, type Tone } from "@/components/pai";
 import { FitDots, FitList, initials } from "@/components/counselor/path-card";
 import { cn } from "@/lib/utils";
 import { Heading, LoadState, useResource, human, evidenceLabel, shortDate } from "./resource";
@@ -23,6 +23,8 @@ import { DEFAULT_LOCALE } from "@/lib/i18n/locales";
 import copy from "./copy.json";
 
 const list = () => workspaceApi.getPossibilities();
+/** The workspace card surface (as on the Overview). */
+const CARD = "rounded-[22px] bg-card shadow-card ring-1 ring-border/70";
 const statusTone = { suggested: "blue", exploring: "blue", saved: "success", dismissed: "neutral", chosen: "success" } as const;
 const SECTION_ICONS: Record<string, LucideIcon> = {
   book: BookOpen, graduation: GraduationCap, sun: Sun, wrench: Wrench, thumbs: ThumbsUp, flask: FlaskConical,
@@ -166,7 +168,7 @@ function AddOwnPath({ open, onOpenChange, onAdded }: {
   );
 }
 
-const LIST = "divide-y divide-border/70 overflow-hidden rounded-[22px] bg-card shadow-card ring-1 ring-border/70";
+const LIST = cn(CARD, "divide-y divide-border/70 overflow-hidden");
 
 /** How long the page keeps looking for the analyzer's paths after a request. */
 const FINDING_POLLS = 12, FINDING_EVERY_MS = 5000;
@@ -323,102 +325,106 @@ export function PathPage({
   return (
     <>
       <BackButton onClick={onBack} />
-      <header className={cn("relative mb-6 overflow-hidden rounded-3xl p-5 sm:p-7", toneClass[tone].soft)}>
-        <div className="flex flex-wrap items-start gap-4">
-          <span aria-hidden className={cn("flex size-14 shrink-0 items-center justify-center rounded-2xl", toneClass[tone].solid)}>
-            <Compass className="size-7" />
+      <header className="mb-6">
+        <div className="flex items-center gap-3.5">
+          <span aria-hidden className={cn("flex size-12 shrink-0 items-center justify-center rounded-full text-sm font-semibold", toneClass[tone].soft, toneClass[tone].ink)}>
+            {initials(result.possibility.title)}
           </span>
-          <div className="min-w-0 flex-1">
-            <h1 className="text-balance text-2xl font-bold tracking-tight sm:text-3xl">{result.possibility.title}</h1>
-            <p className={"mt-3 text-xs font-semibold text-muted-foreground"}>{copy.why}</p>
-            <p className="mt-1 max-w-2xl text-pretty leading-relaxed">{result.possibility.why}</p>
-          </div>
+          <h1 className="min-w-0 text-balance font-display text-[1.85rem] leading-[1.15] sm:text-[2.1rem]">{result.possibility.title}</h1>
         </div>
-        <p className="mt-4 text-sm text-muted-foreground">{copy.pathIntro}</p>
+        <p className="mt-4 max-w-3xl text-pretty text-[15px] leading-relaxed">
+          <span className="font-semibold text-muted-foreground">{copy.why}: </span>{result.possibility.why}
+        </p>
+        <p className="mt-1 text-[13px] text-muted-foreground">{copy.pathIntro}</p>
       </header>
-      {!!result.possibility.fit?.length && (
-        <SectionCard title={copy.fitTitle} description={copy.fitLegend} icon={ShieldCheck} tone={tone} className="mb-6">
-          <FitList items={result.possibility.fit} detailed />
-        </SectionCard>
-      )}
       {result.status === "stale" && (
-        <section className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-warning-soft px-5 py-4 text-warning-ink">
+        <section className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-[14px] bg-warning-soft px-5 py-4 text-warning-ink">
           <p className="flex items-start gap-2 text-sm font-medium"><Info aria-hidden className="mt-0.5 size-4 shrink-0" />{copy.stalePath}</p>
           <Button size="tap" variant="outline" disabled={busy} onClick={start}><RefreshCw aria-hidden />{copy.refresh}</Button>
           {error && <p role="alert" className="w-full text-sm font-medium text-danger-ink">{copy.error}</p>}
         </section>
       )}
-      {!result.path ? (
-        <section className="rounded-3xl border bg-card p-6 shadow-card sm:p-8">
-          {waiting ? (
-            <>
-              <p role="status" className="flex items-center gap-2.5 font-medium"><Loader2 aria-hidden className="size-5 animate-spin text-brand" />{copy.pathLoading}</p>
-              <div className="mt-6"><Skeletons variant="list" count={3} label={copy.pathLoading} /></div>
-            </>
-          ) : (
-            <EmptyState icon={Compass} tone={tone} title={result.possibility.title} description={copy.pathEmpty}
-              action={<Button size="tap" disabled={busy} onClick={start}><Compass aria-hidden />{copy.explore}</Button>} />
-          )}
-          {error && <p role="alert" className="mt-3 text-sm font-medium text-danger-ink">{copy.error}</p>}
-        </section>
-      ) : (
-        <>
-          <div className="grid gap-5 md:grid-cols-2">
+      <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_20rem] xl:grid-cols-[minmax(0,1fr)_23rem]">
+        {!result.path ? (
+          <section className={cn(CARD, "p-6 sm:p-8")}>
+            {waiting ? (
+              <>
+                <p role="status" className="flex items-center gap-2.5 font-medium"><Loader2 aria-hidden className="size-5 animate-spin text-brand" />{copy.pathLoading}</p>
+                <div className="mt-6"><Skeletons variant="list" count={3} label={copy.pathLoading} /></div>
+              </>
+            ) : (
+              <EmptyState icon={Compass} tone={tone} title={result.possibility.title} description={copy.pathEmpty}
+                action={<Button size="tap" disabled={busy} onClick={start}><Compass aria-hidden />{copy.explore}</Button>} />
+            )}
+            {error && <p role="alert" className="mt-3 text-sm font-medium text-danger-ink">{copy.error}</p>}
+          </section>
+        ) : (
+          /* One card, one row per topic: easy to read down, nothing competing. */
+          <section aria-label={result.possibility.title} className={cn(CARD, "divide-y divide-border/70 px-5 sm:px-6")}>
             {Object.entries(copy.pathSections).map(([key, label]) => {
               const value = result.path?.[key];
               const facts = result.facts.filter((f) => f.field === key);
               const Icon = SECTION_ICONS[copy.pathSectionIcons[key as keyof typeof copy.pathSectionIcons]] || BookOpen;
-              const sectionTone = key === "fit_for" ? "teal" : key === "fit_against" ? "amber" : tone;
               return (
-                <SectionCard key={key} title={label} icon={Icon} tone={sectionTone}>
-                  {human(value).trim() ? (
-                    <SectionBody value={value} />
-                  ) : facts.length ? (
-                    <div className="space-y-3">
-                      {facts.map((fact, i) => (
-                        <div key={i}>
-                          <p className="text-sm">{human(fact.value)}</p>
-                          <Source fact={fact} />
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <NeedsChecking compact />
-                  )}
-                </SectionCard>
+                <div key={key} className="grid gap-2 py-5 sm:grid-cols-[10.5rem_minmax(0,1fr)] sm:gap-6">
+                  <h2 className="flex items-center gap-2 text-[13px] font-semibold text-muted-foreground">
+                    <Icon aria-hidden className="size-4 shrink-0 text-primary" />{label}
+                  </h2>
+                  <div className="min-w-0">
+                    {human(value).trim() ? (
+                      <SectionBody value={value} />
+                    ) : facts.length ? (
+                      <div className="space-y-3">
+                        {facts.map((fact, i) => (
+                          <div key={i}>
+                            <p className="text-sm">{human(fact.value)}</p>
+                            <Source fact={fact} />
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="flex items-center gap-1.5 text-sm text-muted-foreground"><Info aria-hidden className="size-3.5 shrink-0" />{copy.needsChecking}</p>
+                    )}
+                  </div>
+                </div>
               );
             })}
-          </div>
-          <section className="my-6 rounded-3xl border border-primary/15 bg-brand-soft/60 p-6 sm:p-7">
-            <h2 className="flex items-center gap-2.5 text-lg font-bold">
-              <span aria-hidden className="flex size-10 items-center justify-center rounded-xl bg-card text-tone-violet-ink shadow-soft"><Sparkles className="size-5" /></span>
-              {copy.tryIt}
-            </h2>
-            <p className="my-4 max-w-2xl text-pretty leading-relaxed">{human(result.path.try_it)}</p>
-            <div className="flex flex-wrap gap-2">
-              <Button size="tap" disabled={busy || activityScheduled} onClick={async () => {
-                setBusy(true); setError(false);
-                try { await workspaceApi.acceptPathActivity(id); setActivityScheduled(true); } catch { setError(true); } finally { setBusy(false); }
-              }}>{activityScheduled ? copy.activityScheduled : copy.acceptActivity}</Button>
-              <Button size="tap" variant="outline" onClick={() => onChat(copy.reflection)}>
-                <MessageCircle aria-hidden />{copy.reflection}
-              </Button>
-            </div>
-            {error && <p role="alert" className="mt-3 text-sm font-medium text-danger-ink">{copy.error}</p>}
           </section>
-          <section className="flex flex-wrap items-center justify-between gap-4 rounded-3xl border bg-card p-6 shadow-card sm:p-7">
-            <div className="flex min-w-0 max-w-xl items-start gap-3">
-              <span aria-hidden className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-tone-blue-soft text-tone-blue-ink"><MapPin className="size-5" /></span>
-              <div>
-                <p className="text-xs font-semibold text-primary">{copy.placesCta}</p>
-                <h2 className="text-lg font-bold">{copy.places}</h2>
-                <p className="mt-1 text-sm text-muted-foreground">{copy.placesIntro}</p>
+        )}
+        <aside className="space-y-5">
+          {!!result.possibility.fit?.length && (
+            <section aria-labelledby="path-fit" className={cn(CARD, "p-5")}>
+              <h2 id="path-fit" className="font-display text-lg leading-tight">{copy.fitTitle}</h2>
+              <p className="mb-4 mt-1 text-[12px] text-muted-foreground">{copy.fitLegend}</p>
+              <FitList items={result.possibility.fit} detailed />
+            </section>
+          )}
+          {result.path && (
+            <section aria-labelledby="path-try" className="rounded-[22px] bg-powder p-5 text-signal-ink">
+              <h2 id="path-try" className="flex items-center gap-2 font-display text-lg leading-tight"><Sparkles aria-hidden className="size-4" />{copy.tryIt}</h2>
+              <p className="mt-2 text-pretty text-sm leading-relaxed">{human(result.path.try_it)}</p>
+              <div className="mt-4 flex flex-wrap gap-2">
+                <Button size="tap" disabled={busy || activityScheduled} onClick={async () => {
+                  setBusy(true); setError(false);
+                  try { await workspaceApi.acceptPathActivity(id); setActivityScheduled(true); } catch { setError(true); } finally { setBusy(false); }
+                }}>{activityScheduled ? copy.activityScheduled : copy.acceptActivity}</Button>
+                <Button size="tap" variant="outline" className="bg-white/70" onClick={() => onChat(copy.reflection)}>
+                  <MessageCircle aria-hidden />{copy.reflection}
+                </Button>
               </div>
-            </div>
-            <Button size="tap" onClick={onPlaces}>{copy.placesOpen}<ArrowRight aria-hidden /></Button>
-          </section>
-        </>
-      )}
+              {error && <p role="alert" className="mt-3 text-sm font-medium text-danger-ink">{copy.error}</p>}
+            </section>
+          )}
+          {result.path && (
+            <section aria-labelledby="path-places" className={cn(CARD, "p-5")}>
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-primary">{copy.placesCta}</p>
+              <h2 id="path-places" className="mt-1 font-display text-lg leading-tight">{copy.places}</h2>
+              <p className="mt-1 text-[13px] text-muted-foreground">{copy.placesIntro}</p>
+              <Button size="tap" className="mt-4 w-full" onClick={onPlaces}><MapPin aria-hidden />{copy.placesOpen}<ArrowRight aria-hidden /></Button>
+            </section>
+          )}
+        </aside>
+      </div>
     </>
   );
 }
@@ -457,13 +463,13 @@ function EligibilityPill({ label }: { label: string }) {
 function ProgramCard({ program }: { program: Program }) {
   const tone = toneFor(program.opportunity_id);
   return (
-    <article className="flex min-w-0 flex-col rounded-3xl border bg-card p-5 shadow-card sm:p-6">
+    <article className={cn(CARD, "flex min-w-0 flex-col p-5 sm:p-6")}>
       <div className="flex items-start gap-3">
-        <span aria-hidden className={cn("flex size-11 shrink-0 items-center justify-center rounded-2xl", toneClass[tone].soft, toneClass[tone].ink)}>
+        <span aria-hidden className={cn("flex size-11 shrink-0 items-center justify-center rounded-full", toneClass[tone].soft, toneClass[tone].ink)}>
           <GraduationCap className="size-5" />
         </span>
         <div className="min-w-0 flex-1">
-          <h2 className="break-words text-lg font-bold leading-snug">{program.title}</h2>
+          <h2 className="break-words font-display text-lg leading-snug">{program.title}</h2>
           <Source fact={program as unknown as Record<string, unknown>} />
         </div>
       </div>
@@ -472,7 +478,7 @@ function ProgramCard({ program }: { program: Program }) {
         <EligibilityPill label={program.eligibility.label} />
       </div>
       {program.fees && Object.keys(program.fees).length > 0 && (
-        <section className="mt-4 rounded-2xl bg-muted/60 px-4 py-3 text-sm">
+        <section className="mt-4 rounded-[14px] bg-background px-4 py-3 text-sm">
           <h3 className="flex items-center gap-1.5 font-semibold"><Wallet aria-hidden className="size-4" />{copy.fees}</h3>
           {/* Each fee is a sourced fact: its label, its value, and where it came from. */}
           <ul className="mt-2 space-y-2">
@@ -502,8 +508,8 @@ function ProgramCard({ program }: { program: Program }) {
         </section>
       )}
       {program.eligibility.route.length > 0 && (
-        <section className="mt-4 rounded-2xl bg-tone-teal-soft px-4 py-3">
-          <h3 className="text-sm font-semibold text-tone-teal-ink">{copy.route}</h3>
+        <section className="mt-4 rounded-[14px] bg-brand-soft px-4 py-3">
+          <h3 className="text-sm font-semibold text-primary">{copy.route}</h3>
           <ul className="mt-2 space-y-2">
             {program.eligibility.route.map((route, i) => (
               <li key={i} className="text-sm">
@@ -575,13 +581,13 @@ export function ProgramPage({
         <>
           {resource.data.status === "not_started" ||
           ["failed", "stale"].includes(resource.data.status) ? (
-            <section className="mx-auto max-w-2xl rounded-3xl border bg-card p-6 shadow-card sm:p-8">
-              <span aria-hidden className="flex size-12 items-center justify-center rounded-2xl bg-success-soft text-success-ink"><ShieldCheck className="size-6" /></span>
-              <h2 className="mt-4 text-xl font-bold">{copy.consentTitle}</h2>
+            <section className={cn(CARD, "mx-auto max-w-2xl p-6 sm:p-8")}>
+              <span aria-hidden className="flex size-11 items-center justify-center rounded-full bg-brand-soft text-primary"><ShieldCheck className="size-5" /></span>
+              <h2 className="mt-4 font-display text-xl">{copy.consentTitle}</h2>
               <p className="mt-2 text-pretty text-muted-foreground">{copy.consentBody}</p>
               {resource.data.status === "stale" && <div className="mt-4"><NeedsChecking /></div>}
               <label className={cn("mt-5 flex min-h-14 cursor-pointer items-center gap-3 rounded-2xl border-2 px-4 py-3 font-semibold transition-colors",
-                consent ? "border-foreground bg-secondary text-foreground ring-1 ring-foreground" : "border-border hover:border-foreground/30")}>
+                consent ? "border-primary bg-brand-soft text-foreground" : "border-border hover:border-primary/40")}>
                 <input
                   type="checkbox"
                   checked={consent}
@@ -600,7 +606,7 @@ export function ProgramPage({
               )}
             </section>
           ) : resource.data.status !== "completed" ? (
-            <section className="rounded-3xl border bg-card p-6 shadow-card">
+            <section className={cn(CARD, "p-6")}>
               <p role="status" className="flex items-center gap-2.5 font-medium"><Loader2 aria-hidden className="size-5 animate-spin text-brand" />{copy.programsLoading}</p>
               <div className="mt-6"><Skeletons count={2} label={copy.programsLoading} /></div>
             </section>
@@ -617,10 +623,10 @@ export function ProgramPage({
             </>
           )}
           {resource.data.status === "completed" && (
-            <section className="mt-6 flex flex-wrap items-center justify-between gap-4 rounded-3xl border bg-card p-6 shadow-soft sm:p-7">
+            <section className="mt-6 flex flex-wrap items-center justify-between gap-4 rounded-[22px] bg-powder p-6 text-signal-ink sm:p-7">
               <div className="max-w-xl">
-                <h2 className="text-lg font-extrabold tracking-tight">{copy.nextStepTitle}</h2>
-                <p className="mt-1 text-sm text-muted-foreground">{copy.decisionPending}</p>
+                <h2 className="font-display text-xl leading-tight">{copy.nextStepTitle}</h2>
+                <p className="mt-1 text-sm">{copy.decisionPending}</p>
               </div>
               <Button size="tap" disabled={busy} onClick={prepare}>
                 {copy.prepareRoadmap}<ArrowRight aria-hidden />

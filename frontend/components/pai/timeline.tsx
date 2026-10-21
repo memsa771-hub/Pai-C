@@ -26,21 +26,21 @@ export function Timeline({ items, label, className }: { items: TimelineItem[]; l
           <li key={item.id} aria-current={state === 'now' ? 'step' : undefined} className="relative flex gap-4 pb-4 last:pb-0">
             {!last && (
               <span aria-hidden className={cn('absolute left-5 top-11 -bottom-0 w-0.5 -translate-x-1/2 rounded-full',
-                state === 'done' ? 'bg-foreground' : 'bg-border')} />
+                state === 'done' ? 'bg-primary' : 'bg-border')} />
             )}
             <span
               aria-hidden
               className={cn(
                 'relative z-10 flex size-10 shrink-0 items-center justify-center rounded-full text-sm font-bold',
-                state === 'done' && 'bg-foreground text-background',
-                state === 'now' && 'bg-highlight text-highlight-ink ring-[1.5px] ring-highlight-ink shadow-lift',
-                state === 'next' && 'border-2 border-dashed border-input bg-card text-muted-foreground',
+                state === 'done' && 'bg-primary text-primary-foreground',
+                state === 'now' && 'bg-primary text-primary-foreground ring-4 ring-brand-soft',
+                state === 'next' && 'bg-background text-muted-foreground ring-1 ring-border',
               )}
             >
               {state === 'done' ? <Check className="size-5" /> : Icon ? <Icon className="size-5" /> : item.marker}
             </span>
             <div className={cn('min-w-0 flex-1 rounded-2xl p-4',
-              state === 'now' ? 'border-[1.5px] border-foreground bg-card shadow-card' : 'border bg-card shadow-soft')}>
+              state === 'now' ? 'bg-brand-soft/60 ring-1 ring-primary/25' : 'bg-background ring-1 ring-border/70')}>
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div className="min-w-0 font-semibold">{item.title}</div>
                 {item.meta}

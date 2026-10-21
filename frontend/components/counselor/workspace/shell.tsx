@@ -178,7 +178,8 @@ export function CounselorShell() {
   return (
     <MotionConfig reducedMotion="user">
     <SidebarProvider>
-      <div data-scroll-root className="flex h-svh w-full overflow-hidden bg-background text-foreground">
+      {/* clip, not hidden: a focused field can never scroll the whole layout (and the rail) out of view. */}
+      <div data-scroll-root className="flex h-svh w-full overflow-clip bg-background text-foreground">
         <a href="#pai-main" className="sr-only focus:not-sr-only focus:fixed focus:left-3 focus:top-3 focus:z-[60] focus:rounded-lg focus:bg-card focus:px-4 focus:py-2 focus:shadow-lift">
           {copy.shell.skip}
         </a>

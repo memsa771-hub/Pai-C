@@ -285,3 +285,16 @@ The Counselor shell accidentally omitted the shared UserMenu when replacing the 
   - bare numbers without a currency or % sign are not caught as world numbers, because students state their own marks that way;
   - a profile record change alone does not trigger a fresh analysis until the Truth Map version or the student's paths change.
 - **Docs.** Section 7 of `COUNSELOR_V3_PROMPTS.md` had drifted from `voice_guided.md`; it now mirrors the runtime prompt. The analyzer prompt has its own section, checked by a test.
+
+## 21 October: About you scrolling and Roadmaps pages in the workspace style
+
+- **About you.**
+  - The Details/Background tabs stick to the top of the scroll area.
+  - The right column (Please check, Confirm with a document, Missing details) is no longer sticky. Once it grew taller than the window, its bottom could not be reached and scrolling felt uneven.
+  - The shell root uses `overflow-clip` instead of `overflow-hidden`, so no focused field can scroll the whole layout, rail included, out of view.
+  - The exact live trigger could not be reproduced offline; these remove every cause found in the code.
+- **Roadmaps pages** (Path, Places, Compare, Plan) now use the Overview's surface:
+  - `rounded-[22px]` cards with a light ring, `font-display` headings, initials avatars and brand-blue accents;
+  - powder is kept for the one "try it" action;
+  - the shared Timeline marks done and current steps in brand blue, not black.
+- **Path page layout.** One card with a row per topic, beside a column for fit, try it and places, instead of ten separate cards.

@@ -13,6 +13,7 @@ import { cn } from "@/lib/utils";
 import { Heading, LoadState, useResource, human } from "./resource";
 import copy from "./copy.json";
 import { FamilyTalk } from "./family-talk";
+import { FitDots, initials } from "@/components/counselor/path-card";
 import familyCopy from "./family-talk.json";
 
 const fill = (template: string, values: Record<string, string | number>) =>
@@ -55,16 +56,22 @@ function CompareColumns({ paths, roadmaps, onOpen }: { paths: Possibility[]; roa
             : <p className="text-sm text-muted-foreground">{copy.nothingRecorded}</p>,
         };
         return (
-          <article key={path.id} className="row-span-6 grid min-w-0 grid-rows-subgrid gap-0 overflow-hidden rounded-3xl border bg-card shadow-card">
-            <header className={cn("flex items-center justify-between gap-3 p-5", toneClass[tone].soft)}>
-              <h2 className="min-w-0 break-words text-lg font-bold">{path.title}</h2>
-              <Button size="tap" variant="outline" onClick={() => onOpen(path.id)} aria-label={`${copy.openPath}: ${path.title}`}>
+          <article key={path.id} className="row-span-6 grid min-w-0 grid-rows-subgrid gap-0 overflow-hidden rounded-[22px] bg-card shadow-card ring-1 ring-border/70">
+            <header className="flex items-center justify-between gap-3 p-5">
+              <div className="flex min-w-0 items-center gap-3">
+                <span aria-hidden className={cn("flex size-10 shrink-0 items-center justify-center rounded-full text-[13px] font-semibold", toneClass[tone].soft, toneClass[tone].ink)}>{initials(path.title)}</span>
+                <div className="min-w-0">
+                  <h2 className="break-words font-display text-lg leading-snug">{path.title}</h2>
+                  <FitDots items={path.fit || []} summary={copy.overview.fitDots} />
+                </div>
+              </div>
+              <Button size="md" variant="soft" onClick={() => onOpen(path.id)} aria-label={`${copy.openPath}: ${path.title}`}>
                 <Compass aria-hidden /><span className="max-sm:sr-only">{copy.openPath}</span>
               </Button>
             </header>
             {rows.map(([key, label]) => (
-              <section key={key} className="border-t px-5 py-4">
-                <h3 className={"mb-1 text-xs font-semibold text-muted-foreground"}>{label}</h3>
+              <section key={key} className="border-t border-border/70 px-5 py-4">
+                <h3 className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{label}</h3>
                 {cells[key]}
               </section>
             ))}
@@ -93,20 +100,20 @@ function DecisionCard({ roadmaps, decision }: { roadmaps: Roadmap[]; decision: D
   }
   const question = chosen ? copy.decisionCertainty : copy.decisionCertaintyNone;
   return (
-    <section aria-labelledby="decision-title" className={cn("rounded-3xl p-5 sm:p-7", chosen ? "bg-success-soft" : "border bg-card shadow-soft")}>
+    <section aria-labelledby="decision-title" className={cn("rounded-[22px] p-5 sm:p-6", chosen ? "bg-success-soft" : "bg-card shadow-card ring-1 ring-border/70")}>
       <div className="flex flex-wrap items-start gap-4">
-        <span aria-hidden className={cn("flex size-12 shrink-0 items-center justify-center rounded-2xl bg-card shadow-soft", chosen ? "text-success-ink" : "text-foreground")}>
-          {chosen ? <Flag className="size-6" /> : <Scale className="size-6" />}
+        <span aria-hidden className={cn("flex size-10 shrink-0 items-center justify-center rounded-full", chosen ? "bg-card text-success-ink" : "bg-brand-soft text-primary")}>
+          {chosen ? <Flag className="size-5" /> : <Scale className="size-5" />}
         </span>
         <div className="min-w-0 flex-1">
-          <h2 id="decision-title" className="text-xs font-bold uppercase tracking-wider text-muted-foreground">{copy.decisionTitle}</h2>
-          <p className="mt-1 text-pretty text-xl font-bold">{chosen ? fill(copy.decisionChosen, { title: chosen.title }) : copy.decisionNone}</p>
+          <h2 id="decision-title" className="text-[11px] font-semibold uppercase tracking-wide text-primary">{copy.decisionTitle}</h2>
+          <p className="mt-1 text-pretty font-display text-xl leading-snug">{chosen ? fill(copy.decisionChosen, { title: chosen.title }) : copy.decisionNone}</p>
           {chosen && decision?.real_objective && (
             <p className="mt-2 text-sm"><span className="font-semibold">{copy.decisionWhy}: </span>{decision.real_objective}</p>
           )}
         </div>
       </div>
-      <div className="mt-5 rounded-2xl bg-card p-4 shadow-soft">
+      <div className="mt-5 rounded-[14px] bg-background p-4">
         {sent ? (
           <p role="status" className="flex items-center gap-2 text-sm font-medium text-success-ink"><Check aria-hidden className="size-4" />{copy.decisionShared}</p>
         ) : (
@@ -162,7 +169,7 @@ export function Compare({
             {familyOpen && <FamilyTalk />}
           </SectionCard>
           <SectionCard title={copy.roadmapsTitle} description={copy.roadmapsIntro} icon={MapIcon} tone="violet">
-            <p className="mb-4 rounded-2xl bg-muted/60 px-4 py-3 text-sm text-muted-foreground">{copy.decisionPending}</p>
+            <p className="mb-4 rounded-[14px] bg-brand-soft/60 px-4 py-3 text-[13px] text-muted-foreground">{copy.decisionPending}</p>
             <RoadmapsView pathOnly onChanged={resource.refresh} />
           </SectionCard>
         </div>
@@ -178,11 +185,11 @@ export function Plan({ onChat, onNavigate }: { onChat: (text: string) => void; o
   return (
     <>
       <Heading title={copy.planTitle} description={copy.planIntro} icon={ListChecks} tone="sky" />
-      <section className="mb-6 flex flex-wrap items-center justify-between gap-4 rounded-3xl border border-primary/15 bg-brand-soft/60 p-6 sm:p-7">
+      <section className="mb-6 flex flex-wrap items-center justify-between gap-4 rounded-[22px] bg-card p-5 shadow-card ring-1 ring-border/70 sm:p-6">
         <div className="flex min-w-0 max-w-xl items-start gap-3">
-          <span aria-hidden className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-card text-tone-sky-ink shadow-soft"><CalendarCheck className="size-5" /></span>
+          <span aria-hidden className="flex size-10 shrink-0 items-center justify-center rounded-full bg-brand-soft text-primary"><CalendarCheck className="size-5" /></span>
           <div>
-            <h2 className="text-lg font-bold">{copy.checkin}</h2>
+            <h2 className="font-display text-lg leading-tight">{copy.checkin}</h2>
             <p className="mt-1 text-sm text-muted-foreground">{copy.checkinHelp}</p>
           </div>
         </div>
@@ -203,7 +210,7 @@ export function Plan({ onChat, onNavigate }: { onChat: (text: string) => void; o
           <div className="space-y-5">
             {chosen.risks.length > 0 && (
               <SectionCard title={copy.planRisks} icon={Scale} tone="amber">
-                <ul className="space-y-2 text-sm">{chosen.risks.map((risk, i) => <li key={i} className="rounded-xl bg-warning-soft px-3 py-2 text-warning-ink">{risk}</li>)}</ul>
+                <ul className="space-y-2 text-sm">{chosen.risks.map((risk, i) => <li key={i} className="rounded-[12px] bg-warning-soft px-3 py-2 text-warning-ink">{risk}</li>)}</ul>
               </SectionCard>
             )}
             {chosen.try_it && <TryItFeedback roadmap={chosen} headingLevel={2} />}

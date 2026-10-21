@@ -188,7 +188,8 @@ export function LivingProfile({
         </div>
       </header>
 
-      <div role="tablist" aria-label={text.tabsLabel} className="mt-6 flex gap-6 border-b">
+      {/* The tabs stay in view while the page scrolls, so the student can always switch. */}
+      <div role="tablist" aria-label={text.tabsLabel} className="sticky top-0 z-10 -mx-4 mt-6 flex gap-6 border-b bg-background/95 px-4 backdrop-blur sm:-mx-8 sm:px-8">
         {tabs.map(({ id, label }) => (
           <button key={id} role="tab" id={`profile-tab-${id}`} aria-selected={tab === id} aria-controls={`profile-panel-${id}`}
             tabIndex={tab === id ? 0 : -1} onClick={() => switchTab(id)}
@@ -231,7 +232,7 @@ export function LivingProfile({
                 </section>
               ))}
             </div>
-            <div className="space-y-4 xl:sticky xl:top-4">
+            <div className="space-y-4">
             {resource.data.issues.length > 0 && (
               <section aria-labelledby="check-title" className="rounded-2xl border border-warning/40 bg-card p-5 shadow-soft">
                 <h2 id="check-title" className="flex items-center gap-2 text-lg font-bold">
