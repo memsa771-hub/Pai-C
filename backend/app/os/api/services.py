@@ -8,6 +8,8 @@ from functools import cache
 from sqlalchemy import Engine
 
 from app.os.db import make_engine
+from app.os.documents.checks import load_name_variants
+from app.os.documents.types import DocumentType, load_document_types
 from app.os.kernel import Kernel
 from app.os.knowledge import SqlKnowledge
 from app.os.playbooks import Playbook, load_playbook_dir
@@ -25,6 +27,8 @@ class Services:
     plans: PlanService
     dbos_client: Callable[[], object]  # the kernel side's DBOSClient, made on first use (spec §4.8 research trigger)
     today: Callable[[], date]
+    document_types: Mapping[str, DocumentType]  # Slice 3: validated at mount, like the playbooks
+    name_variants: list[set[str]]
 
 
 def _client_factory(settings: OsSettings) -> Callable[[], object]:
@@ -41,7 +45,8 @@ def _client_factory(settings: OsSettings) -> Callable[[], object]:
 def make_services(settings: OsSettings, *, engine: Engine | None = None,
                   playbooks: Mapping[tuple[str, int], Playbook] | None = None,
                   today: Callable[[], date] | None = None,
-                  dbos_client: Callable[[], object] | None = None) -> Services:
+                  dbos_client: Callable[[], object] | None = None,
+                  document_types: Mapping[str, DocumentType] | None = None) -> Services:
     engine = engine or make_engine(settings)
     books = playbooks if playbooks is not None else load_playbook_dir()
     registry = default_registry()
@@ -50,4 +55,6 @@ def make_services(settings: OsSettings, *, engine: Engine | None = None,
     knowledge = SqlKnowledge(engine, settings.tenant_id)
     today = today or (lambda: datetime.now(timezone.utc).date())
     plans = PlanService(engine, settings, kernel, knowledge, books, today=today, registry=registry)
-    return Services(settings, engine, kernel, knowledge, plans, dbos_client or _client_factory(settings), today)
+    types = document_types if document_types is not None else load_document_types()
+    return Services(settings, engine, kernel, knowledge, plans, dbos_client or _client_factory(settings), today,
+                    types, load_name_variants())

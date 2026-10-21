@@ -20,11 +20,11 @@ from collections.abc import Callable, Mapping
 from datetime import date, datetime, timezone
 
 from dbos import DBOS, DBOSClient, EnqueueOptions
-from sqlalchemy import Engine, insert, select, update
+from sqlalchemy import Engine, func, insert, select, update
 
 from app.os import models
 from app.os.agents.spec import AgentSpec
-from app.os.documents.checks import cross_check
+from app.os.documents.checks import Finding, cross_check
 from app.os.documents.intake import UploadError, check_upload, prepare
 from app.os.documents.reader import read_document
 from app.os.documents.store import Document, DocumentStore, FindingStore
@@ -56,6 +56,19 @@ def enqueue_document(client: DBOSClient, tenant_id: str, doc: Document, retry_da
     return wid
 
 
+def forget_document(client: DBOSClient, tenant_id: str, document_id: int) -> int:
+    """Cancels and deletes every workflow of one document (the first and any retry-day ones). DBOS keeps each step's
+    output, and the model request's output holds the values read, so deleting a document must delete these too
+    (S3-D10). Returns how many were deleted."""
+    prefix = f"document:{tenant_id}:{document_id}:"  # the trailing colon: document 1 never matches document 10
+    ids = [w.workflow_id for w in client.list_workflows(workflow_id_prefix=prefix, load_input=False,
+                                                        load_output=False)]
+    if ids:
+        client.cancel_workflows(ids)
+        client.delete_workflows(ids)
+    return len(ids)
+
+
 def retry_waiting(engine: Engine, client: DBOSClient, tenant_id: str, today: date) -> int:
     """Enqueues every upload still `uploaded` (it waited for the budget, or its first enqueue was lost) once for
     `today`. Returns how many were sent. The daily `documents_retry` job calls it."""
@@ -66,6 +79,56 @@ def retry_waiting(engine: Engine, client: DBOSClient, tenant_id: str, today: dat
     for doc_id in ids:
         enqueue_document(client, tenant_id, store.get(doc_id), retry_day=today)
     return len(ids)
+
+
+class student_lock:
+    """One student's cross-checks run one at a time (a Postgres advisory lock held for the block)."""
+
+    def __init__(self, engine: Engine, tenant_id: str, student_ref: str) -> None:
+        self.engine, self.name = engine, f"os.documents:{tenant_id}:{student_ref}"
+
+    def __enter__(self) -> None:
+        self.conn = self.engine.connect()
+        self.key = self.conn.execute(select(func.hashtextextended(self.name, 0))).scalar()
+        self.conn.execute(select(func.pg_advisory_lock(self.key)))
+
+    def __exit__(self, *exc) -> None:
+        try:
+            self.conn.execute(select(func.pg_advisory_unlock(self.key)))
+            self.conn.commit()
+        finally:
+            self.conn.close()
+
+
+def _resolved(engine: Engine, tenant_id: str, student_ref: str) -> set[tuple]:
+    FI = models.document_findings
+    with engine.connect() as conn:
+        rows = conn.execute(select(FI.c.kind, FI.c.field, FI.c["items"]).where(
+            FI.c.tenant_id == tenant_id, FI.c.student_ref == student_ref, FI.c.status == "resolved")).all()
+    return {(r.kind, r.field, tuple(tuple(i) for i in r.items)) for r in rows}
+
+
+def compare_documents(engine: Engine, tenant_id: str, student_ref: str, types: Mapping[str, DocumentType],
+                      variants: list[set[str]], include_id: int | None = None) -> list[Finding]:
+    """Replaces the student's open findings with a cross-check of their read documents (plus `include_id`, the
+    one being read). A confirmed field is compared by its confirmed value. A finding the student already resolved
+    (the same documents and values) is not opened again. Returns the open findings. One student at a time
+    (`student_lock`), so overlapping checks cannot lose or duplicate findings."""
+    with student_lock(engine, tenant_id, student_ref):
+        docs = DocumentStore(engine, tenant_id)
+        items = []
+        for d in docs.list_for(student_ref):
+            if (d.id != include_id and d.status not in COMPARED) or d.doc_type not in types:
+                continue
+            values = {f["field"]: f["value_confirmed"] if f["confirmed_at"] else f["value_read"]
+                      for f in docs.fields(d.id)}
+            items.append((d.id, types[d.doc_type], values))
+        resolved = _resolved(engine, tenant_id, student_ref)
+        found = [f for f in cross_check(items, variants)
+                 if (f.kind, f.field, tuple(tuple(i) for i in f.items)) not in resolved]
+        FindingStore(engine, tenant_id).replace_open(
+            student_ref, [{"kind": f.kind, "field": f.field, "items": f.items} for f in found])
+        return found
 
 
 def _utcnow() -> datetime:
@@ -93,7 +156,7 @@ def register_documents(engine: Engine, settings: OsSettings, readers: Mapping[st
     from app.os.runner.workflow import STEP_CONFIG  # imported here: the runner imports documents
 
     tenant = settings.tenant_id
-    docs, findings, runs = DocumentStore(engine, tenant), FindingStore(engine, tenant), AgentRuns(engine, tenant)
+    docs, runs = DocumentStore(engine, tenant), AgentRuns(engine, tenant)
 
     def start(document_id: int) -> dict:
         """`reading` (claimed by this workflow), `budget` when the month's cap is spent (a budget_exceeded event;
@@ -150,17 +213,8 @@ def register_documents(engine: Engine, settings: OsSettings, readers: Mapping[st
             docs.save_fields(document_id, values, checks)
 
     def compare(student_ref: str, document_id: int) -> int:
-        """Replaces the student's open findings with a cross-check of all their read documents."""
-        items = []
-        for d in docs.list_for(student_ref):
-            if d.id != document_id and d.status not in COMPARED:
-                continue
-            values = {f["field"]: f["value_confirmed"] if f["confirmed_at"] else f["value_read"]
-                      for f in docs.fields(d.id)}
-            items.append((d.id, types[d.doc_type], values))
-        found = cross_check(items, variants)
-        findings.replace_open(student_ref, [{"kind": f.kind, "field": f.field, "items": f.items} for f in found])
-        return len(found)
+        """The student's findings again, after `finish`, so a document read at the same time sees this one."""
+        return len(compare_documents(engine, tenant, student_ref, types, variants, include_id=document_id))
 
     def finish(document_id: int, status: str, error: str | None, detected_type: str | None,
                pages: int | None) -> None:
@@ -199,9 +253,9 @@ def register_documents(engine: Engine, settings: OsSettings, readers: Mapping[st
             return {"status": "failed"}
         checks = validate_step(doc_type, reading.values)
         store_step(document_id, reading.values, checks)
-        compare_step(student_ref, document_id)
         status = "read" if type_matches(t, reading.detected_type) else "needs_student"
         finish_step(document_id, status, None, reading.detected_type, checked["pages"])
+        compare_step(student_ref, document_id)  # after finish: a document read at the same time sees this one
         return {"status": status}
 
     DBOS.workflow(name=DOCUMENT_WORKFLOW)(document)

@@ -118,3 +118,31 @@ def student_programmes(engine: Engine, tenant_id: str, student_ref: str) -> list
                             "university": prog.university if prog else None, "intake_year": intake_year,
                             "facts": [_fact_out(f, admin=False) for f in facts]})
     return out
+
+
+# --- Slice 3: documents ----------------------------------------------------------------------------------------
+
+
+def finding_out(f: dict) -> dict:
+    return {"id": f["id"], "kind": f["kind"], "field": f["field"], "status": f["status"],
+            "resolution": f["resolution"], "items": [{"document_id": i, "value": v} for i, v in f["items"]]}
+
+
+def documents_out(engine: Engine, tenant_id: str, student_ref: str, types: dict) -> dict:
+    """The student's live documents with their fields and open findings. File bytes are never read here."""
+    from app.os.documents.store import DocumentStore, FindingStore  # imported here: keeps the API's imports small
+
+    store = DocumentStore(engine, tenant_id)
+    findings = [finding_out(f) for f in FindingStore(engine, tenant_id).list_open(student_ref)]
+    return {"documents": [document_out(store, d, findings) for d in store.list_for(student_ref)],
+            "findings": findings,
+            "doc_types": sorted(({"key": t.key, "label": t.label} for t in types.values()), key=lambda t: t["label"])}
+
+
+def document_out(store, d, findings: list[dict]) -> dict:
+    fields = [{k: f[k] for k in ("field", "value_read", "check", "reasons", "value_confirmed")}
+              for f in store.fields(d.id)]
+    return {"id": d.id, "doc_type": d.doc_type, "filename": d.filename, "status": d.status,
+            "detected_type": d.detected_type, "pages": d.pages, "error": d.error, "created_at": d.created_at,
+            "read_at": d.read_at, "confirmed_at": d.confirmed_at, "fields": fields,
+            "findings": [f for f in findings if any(i["document_id"] == d.id for i in f["items"])]}

@@ -80,6 +80,11 @@ def _cross_value(t: DocumentType, values: dict, field: str) -> str | None:
     return str(v).strip() or None if v is not None else None
 
 
+def cross_values(t: DocumentType, values: dict) -> dict[str, str]:
+    """The document's values for the cross-check keys (full name built from its parts), where it has them."""
+    return {field: v for field in CROSS_FIELDS if (v := _cross_value(t, values, field))}
+
+
 def cross_check(docs: list[tuple[int, DocumentType, dict]], variants: list[set[str]]) -> list[Finding]:
     findings = []
     for field in CROSS_FIELDS:

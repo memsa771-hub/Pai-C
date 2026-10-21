@@ -165,6 +165,12 @@ class FindingStore:
                                                  FI.c.status == "open").order_by(FI.c.id)).all()
         return [_finding(r) for r in rows]
 
+    def list_resolved(self, student_ref: str) -> list[dict]:
+        with self.engine.connect() as conn:
+            rows = conn.execute(select(FI).where(FI.c.tenant_id == self.tenant_id, FI.c.student_ref == student_ref,
+                                                 FI.c.status == "resolved").order_by(FI.c.id)).all()
+        return [_finding(r) for r in rows]
+
     def get(self, finding_id: int) -> dict | None:
         with self.engine.connect() as conn:
             row = conn.execute(select(FI).where(FI.c.id == finding_id, FI.c.tenant_id == self.tenant_id)).first()
