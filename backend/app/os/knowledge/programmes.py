@@ -30,7 +30,7 @@ class Programme:
     aliases: tuple[str, ...]
     start_urls: tuple[str, ...]
     official_domains: tuple[str, ...]  # the university's own; the route's shared sources are in its profile
-    status: Literal["active", "excluded"] = "active"
+    status: Literal["active", "excluded", "requested"] = "active"  # requested: a student asked (Slice 4)
     notes: str | None = None
     # Start URLs no other programme of the tenant uses: pages about this programme (the trust rules' scope
     # check). Filled by `with_own_pages` / the store; a shared start page (a university-wide page) is not one.
