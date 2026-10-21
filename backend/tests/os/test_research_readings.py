@@ -183,7 +183,7 @@ def test_month_spend(engine, clean):
     runs.record(r2, "B", spec=SPEC, model="m", usage=None, cost_usd=0.10, at=datetime(2026, 10, 19, tzinfo=timezone.utc))
     other.record(r3, "A", spec=SPEC, model="m", usage=None, cost_usd=5.0, at=datetime(2026, 10, 5, tzinfo=timezone.utc))
     now = datetime(2026, 10, 20, 12, tzinfo=timezone.utc)
-    assert runs.month_spend(now) == pytest.approx(0.50)
+    assert runs.month_spend(now, "research") == pytest.approx(0.50)
     with engine.connect() as conn:
         assert conn.execute(select(func.count()).select_from(models.agent_runs)).scalar() == 4
 

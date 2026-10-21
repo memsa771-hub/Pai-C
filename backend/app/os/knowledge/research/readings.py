@@ -205,32 +205,37 @@ def cost(usage: RunUsage | None, settings: OsSettings, tier: str) -> float:
 
 
 class AgentRuns:
-    """os_agent_runs: one row per (research run, reading). A repeated record is ignored (invariant 8)."""
+    """os_agent_runs: one row per (research run, reading) or per (document, reading). A repeated record is ignored
+    (invariant 8)."""
 
     def __init__(self, engine: Engine, tenant_id: str) -> None:
         self.engine, self.tenant_id = engine, tenant_id
 
-    def record(self, research_run_id: int, reading: str, *, spec: AgentSpec, model: str, usage: RunUsage | None,
-               cost_usd: float, error: str | None = None, at: datetime | None = None) -> bool:
-        """True if the row was written, False if this reading was already recorded."""
+    def record(self, research_run_id: int | None, reading: str, *, spec: AgentSpec, model: str,
+               usage: RunUsage | None, cost_usd: float, error: str | None = None, at: datetime | None = None,
+               document_id: int | None = None) -> bool:
+        """True if the row was written, False if this reading was already recorded. A document reading passes
+        `document_id` (and no research run)."""
         u = usage or RunUsage()
-        values = {"tenant_id": self.tenant_id, "research_run_id": research_run_id, "reading": reading,
-                  "agent": spec.id, "agent_version": spec.version, "model": model,
+        values = {"tenant_id": self.tenant_id, "research_run_id": research_run_id, "document_id": document_id,
+                  "reading": reading, "agent": spec.id, "agent_version": spec.version, "model": model,
                   "input_tokens": u.input_tokens or 0, "cached_tokens": u.cache_read_tokens or 0,
                   "output_tokens": u.output_tokens or 0, "cost_usd": cost_usd, "error": error}
         if at is not None:
             values["at"] = at
+        constraint = "uq_os_agent_runs_document" if document_id is not None else "uq_os_agent_runs_reading"
         with self.engine.begin() as conn:
             new_id = conn.execute(insert(models.agent_runs).values(**values)
-                                  .on_conflict_do_nothing(constraint="uq_os_agent_runs_reading")
+                                  .on_conflict_do_nothing(constraint=constraint)
                                   .returning(models.agent_runs.c.id)).scalar()
         return new_id is not None
 
-    def month_spend(self, now: datetime) -> float:
-        """This tenant's research spend since the start of `now`'s month (UTC)."""
+    def month_spend(self, now: datetime, agent: str) -> float:
+        """This tenant's spend on one agent since the start of `now`'s month (UTC). Each agent has its own cap,
+        so document readings never use up the research budget, or the reverse."""
         start = now.astimezone(timezone.utc).replace(day=1, hour=0, minute=0, second=0, microsecond=0)
         t = models.agent_runs
         with self.engine.connect() as conn:
-            total = conn.execute(select(func.coalesce(func.sum(t.c.cost_usd), 0))
-                                 .where(t.c.tenant_id == self.tenant_id, t.c.at >= start)).scalar()
+            total = conn.execute(select(func.coalesce(func.sum(t.c.cost_usd), 0)).where(
+                t.c.tenant_id == self.tenant_id, t.c.agent == agent, t.c.at >= start)).scalar()
         return float(total)
