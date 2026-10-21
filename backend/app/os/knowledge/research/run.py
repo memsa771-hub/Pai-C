@@ -175,7 +175,7 @@ def register_research(engine: Engine, settings: OsSettings, kernel, service, gat
             row = conn.execute(select(R.c.id, R.c.status).where(R.c.tenant_id == tenant, R.c.workflow_id == wid)).first()
             if row is not None:
                 return {"run_id": row.id, "status": row.status}
-            spent = runs.month_spend(clock())
+            spent = runs.month_spend(clock(), spec.id)
             status = "skipped_budget" if spent >= settings.research_monthly_usd else "running"
             run_id = conn.execute(insert(R).values(tenant_id=tenant, programme_ref=programme_ref,
                                                    intake_year=intake_year, workflow_id=wid, status=status,

@@ -311,6 +311,7 @@ documents = Table(
     Column("read_at", DateTime(timezone=True)),
     Column("confirmed_at", DateTime(timezone=True)),
     Column("deleted_at", DateTime(timezone=True)),
+    Column("claimed_by", Text),  # the os.document workflow that claimed it for reading (os_0005)
     _in("status", DOCUMENT_STATUSES, "ck_os_documents_status"),
     # one live copy of a file per student; a deleted one may be uploaded again
     Index("uq_os_documents_sha", "tenant_id", "student_ref", "sha256", unique=True,

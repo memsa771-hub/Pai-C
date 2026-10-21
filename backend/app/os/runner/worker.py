@@ -6,8 +6,9 @@ OS_PARENT_PID (optional: exit when that parent is gone). Stops on SIGTERM/SIGINT
 
 Besides running DBOS workflows, the main loop is the enqueuer: about once a second it sends the
 kernel's unsent enqueue requests to the queue (the reconciler, every 5 minutes, is only the backstop),
-and starts the day's research runs for programmes whose facts are waiting (Slice 2, R2-P1). Research runs
-only when OS_OPENAI_API_KEY is set; without it, confirm_fact tasks wait for an admin.
+and starts the day's research runs for programmes whose facts are waiting (Slice 2, R2-P1). Research and
+document reading (Slice 3; the API enqueues each upload) run only when OS_OPENAI_API_KEY is set; without it,
+confirm_fact tasks wait for an admin and uploads stay unread.
 """
 
 import importlib
@@ -78,6 +79,33 @@ def register_research_if_configured(settings: OsSettings, engine: Engine, kernel
     return True
 
 
+def register_documents_if_configured(settings: OsSettings, engine: Engine) -> bool:
+    """Registers os.document (readers built once, before launch). False when no model key is set: uploads then
+    stay `uploaded` until a worker with a key runs.
+
+    OS_TEST_DOCUMENT_MODEL (tests only, `pkg.mod:factory`) gives a fake model instead, like OS_TEST_RESEARCH_MODEL."""
+    test_model = os.environ.get("OS_TEST_DOCUMENT_MODEL", "").strip()
+    if not settings.openai_api_key and not test_model:
+        log.warning("OS_OPENAI_API_KEY is not set: documents are not read")
+        return False
+    from app.os.agents.spec import AGENT_DIR, load_agent_spec  # imported late: only a reading worker needs them
+    from app.os.documents.checks import load_name_variants
+    from app.os.documents.reader import build_readers
+    from app.os.documents.run import register_documents
+    from app.os.documents.types import load_document_types
+    from app.os.knowledge.research.readings import model_for
+
+    spec = load_agent_spec(AGENT_DIR / "documents.v1.yaml")
+    types = load_document_types()
+    if test_model:
+        module_path, _, name = test_model.partition(":")
+        model = getattr(importlib.import_module(module_path), name)()
+    else:
+        model = model_for(settings, spec.tier)
+    register_documents(engine, settings, build_readers(model, types, spec), spec, types, load_name_variants())
+    return True
+
+
 def build(settings: OsSettings) -> tuple[Registry, Kernel, DBOSClient, Engine]:
     registry = default_registry()
     for module in _extra_modules(os.environ.get("OS_EXTRA_MODULES", "")):
@@ -99,6 +127,11 @@ def build(settings: OsSettings) -> tuple[Registry, Kernel, DBOSClient, Engine]:
     for name, cron, factory in [*worker_jobs, *JOB_FACTORIES]:
         register_job(name, cron, factory(settings, engine, kernel, client))
     RESEARCH["on"] = register_research_if_configured(settings, engine, kernel)
+    if register_documents_if_configured(settings, engine):
+        from app.os.documents.run import retry_waiting
+
+        register_job("documents_retry", "10 0 * * *",  # uploads that waited for the budget, daily at 00:10 UTC
+                     lambda: retry_waiting(engine, client, settings.tenant_id, datetime.now(timezone.utc).date()))
     return registry, kernel, client, engine
 
 
