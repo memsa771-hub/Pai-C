@@ -16,7 +16,8 @@ The real set never enters the repo: it defaults to ~/spike2-docs/docs and ~/spik
 billed run on it needs `verified: true` in the key (the owner checked it). Do not change the key or the bar to pass.
 A failed gate is reported to the owners.
 
-The gate (spec §9): on the real set, the chosen mode reaches >= 0.90 of fields correct in every run. On the sample
+The gate (spec §9): on the real set, the chosen mode reaches >= PASS_CORRECT of fields correct in every run (the
+spec's 0.90; the owners' pilot bar is 0.89, see doc_scoring.py). On the sample
 set, every planted finding is caught, and no consistent bundle gets a mismatch or more than one variant flag.
 """
 

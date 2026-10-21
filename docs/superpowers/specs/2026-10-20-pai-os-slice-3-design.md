@@ -145,6 +145,9 @@ plainly: "We read this automatically; please check every value."
 - §8 is green in CI (`os` and `legacy`).
 - **Spike 2:**
   - On the real set, the chosen mode reaches **≥ 90% of fields correct in each of 2 runs**.
+    - **Owners' pilot bar (2026-10-21): ≥ 89%**, with tiles on the strong tier, after two fix rounds measured
+      0.905 and 0.892. Students confirm every value. See `docs/os/slice-3-quality-report.md`; the 0.90 target
+      stands for the re-gate on a larger real set.
   - On the sample set, **every planted mismatch is caught** and **no consistent bundle gets more than one
     variant flag**.
 - If Spike 2 fails: stop and report. The parent's fallbacks (self-hosted OCR, or students type key values) are

@@ -184,9 +184,13 @@ def _verified_empty_set(tmp_path):
 
 def test_strong_tier_needs_its_prices(tmp_path, monkeypatch, capsys):
     """A billed strong run must not start without the strong model's list prices (cost() refuses to guess)."""
+    import dataclasses
+
+    from tests.os.quality import run_document_quality as runner
+
     monkeypatch.setenv("OS_OPENAI_API_KEY", "sk-test-not-a-real-key")
-    for name in ("OS_PRICE_STRONG_IN", "OS_PRICE_STRONG_CACHED", "OS_PRICE_STRONG_OUT"):
-        monkeypatch.delenv(name, raising=False)
+    real = runner.load_settings
+    monkeypatch.setattr(runner, "load_settings", lambda env: dataclasses.replace(real(env), price_strong_cached=None))
     assert main(["--model", "openai", "--tier", "strong", *_verified_empty_set(tmp_path)]) == 2
     assert "OS_PRICE_STRONG_CACHED" in capsys.readouterr().err
 

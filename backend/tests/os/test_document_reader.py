@@ -49,10 +49,10 @@ def spec_with(mode: str) -> AgentSpec:
 
 def test_documents_spec_values():
     assert (SPEC.id, SPEC.version, SPEC.zone, SPEC.tier, SPEC.tools, SPEC.output) == \
-        ("documents", 1, "reader", "cheap", [], "document_reading")
+        ("documents", 1, "reader", "strong", [], "document_reading")
     assert SPEC.limits.timeout_s == 90 and SPEC.limits.spend_usd_per_document == pytest.approx(0.05)
     assert SPEC.retries.tools == 0 and SPEC.retries.output == 2
-    assert SPEC.mode in ("whole", "tiles")
+    assert SPEC.mode == "tiles"  # Spike 2 (slice-3-quality-report.md)
 
 
 def test_reader_has_no_tools():

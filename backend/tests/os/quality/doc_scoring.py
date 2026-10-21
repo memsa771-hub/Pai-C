@@ -20,7 +20,10 @@ import yaml
 from app.os.documents.checks import normalise_name
 from app.os.documents.types import DocumentType
 
-PASS_CORRECT = 0.90  # per run, for the chosen mode (spec §9)
+# Per run, for the chosen mode (spec §9). The spec's bar is 0.90. The owners set a pilot bar of 0.89 on 2026-10-21,
+# after the fix rounds measured 0.905 and 0.892 with tiles on the strong tier (docs/os/slice-3-quality-report.md);
+# students confirm every value before it is used. The answer key was not changed.
+PASS_CORRECT = 0.89
 
 
 def load_doc_key(path: Path) -> dict:
