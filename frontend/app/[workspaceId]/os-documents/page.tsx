@@ -102,7 +102,9 @@ export default function OsDocumentsPage({ params }: { params: Promise<{ workspac
                       onUpload={(file, docType) => act(() => workspaceApi.uploadOsDocument(file, docType),
                                                        'Could not upload. Please try again.')}
                       onResolve={(f, value) => act(() => workspaceApi.resolveOsFinding(f.id, value),
-                                                   'Could not save your choice. Please try again.')} />
+                                                   'Could not save your choice. Please try again.')}
+                      onDelete={(d) => act(() => workspaceApi.deleteOsDocument(d.id),
+                                           'Could not delete. Please try again.')} />
       )}
     </main>
   );

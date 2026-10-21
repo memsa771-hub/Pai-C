@@ -21,12 +21,14 @@ interface DocumentListProps {
   onUpload: (file: File, docType: string) => void;
   onOpen: (doc: OsDocument) => void;
   onResolve: (finding: OsFinding, value: string) => void;
+  /** A document that cannot be opened (failed, waiting, reading): the student can still remove it. */
+  onDelete: (doc: OsDocument) => void;
   busy?: boolean;
 }
 
 /** "Your documents" (Slice 3 spec §5): mobile-first (360 px). Upload with a type, each document's status, and
  * the findings across documents, each with a choice of the values found. */
-export function DocumentList({ documents, findings, docTypes, onUpload, onOpen, onResolve, busy = false }: DocumentListProps) {
+export function DocumentList({ documents, findings, docTypes, onUpload, onOpen, onResolve, onDelete, busy = false }: DocumentListProps) {
   const [docType, setDocType] = useState(docTypes[0]?.key ?? '');
   return (
     <div className="mx-auto flex w-full max-w-md flex-col gap-4">
@@ -58,7 +60,7 @@ export function DocumentList({ documents, findings, docTypes, onUpload, onOpen, 
       ) : (
         <ul className="flex flex-col gap-2">
           {documents.map((d) => (
-            <DocumentRow key={d.id} doc={d} docTypes={docTypes} onOpen={onOpen} />
+            <DocumentRow key={d.id} doc={d} docTypes={docTypes} onOpen={onOpen} onDelete={onDelete} busy={busy} />
           ))}
         </ul>
       )}
@@ -82,7 +84,15 @@ export function DocumentList({ documents, findings, docTypes, onUpload, onOpen, 
   );
 }
 
-function DocumentRow({ doc, docTypes, onOpen }: { doc: OsDocument; docTypes: OsDocType[]; onOpen: (d: OsDocument) => void }) {
+interface DocumentRowProps {
+  doc: OsDocument;
+  docTypes: OsDocType[];
+  onOpen: (d: OsDocument) => void;
+  onDelete: (d: OsDocument) => void;
+  busy: boolean;
+}
+
+function DocumentRow({ doc, docTypes, onOpen, onDelete, busy }: DocumentRowProps) {
   const failed = checkFailedCount(doc);
   const open = canConfirm(doc);
   const summary = (
@@ -105,8 +115,14 @@ function DocumentRow({ doc, docTypes, onOpen }: { doc: OsDocument; docTypes: OsD
       {doc.status === 'needs_student' && doc.detected_type && (
         <p className="mt-1 break-words text-xs text-amber-900">This looks like a {doc.detected_type}. Is that right?</p>
       )}
-      {doc.status === 'failed' && doc.error && (
-        <p className="mt-1 break-words text-xs text-destructive">{doc.error}</p>
+      {doc.status === 'failed' && (
+        <p className="mt-1 break-words text-xs text-destructive">
+          {doc.error ? `${doc.error} ` : ''}You can delete it and upload the file again.
+        </p>
+      )}
+      {!open && (
+        <Button size="sm" variant="ghost" className="mt-1 h-auto px-0 text-xs text-destructive" disabled={busy}
+                onClick={() => onDelete(doc)}>Delete</Button>
       )}
     </li>
   );
