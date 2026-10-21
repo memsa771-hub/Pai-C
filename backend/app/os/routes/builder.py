@@ -10,6 +10,7 @@ from sqlalchemy import func, select, text
 
 from app.os import models
 from app.os.contracts.route_contract import IntakeRef, ProgrammeChoice, RouteContract
+from app.os.eligibility.notes import on_profile_change
 from app.os.kernel import PlanRef
 from app.os.kernel.states import is_started
 from app.os.knowledge.requests import visible_programmes
@@ -67,6 +68,7 @@ def start(plans, student_ref: str, route_key: str, intake: IntakeRef, choices: l
                                                                T.c.instance_key == task)).first()
         if row is not None and row.state == "waiting_student":
             plans.kernel.complete_student_task(row.id, student_ref, {"programmes": [c.programme_ref for c in choices]})
+    on_profile_change(plans, student_ref)  # records the starting verdicts (no note), so a later change notes (S4-D7)
     return ref
 
 
@@ -119,7 +121,9 @@ def swap(plans, student_ref: str, plan_id: int, out_ref: str, in_ref: str) -> in
     _within_limit(plans, plan_id)
     new = [ProgrammeChoice(programme_ref=in_ref if p.programme_ref == out_ref else p.programme_ref, rank=p.rank)
            for p in contract.programmes]
-    return plans.change_programmes(plan_id, new, f"programmes:swap:{out_ref}->{in_ref}")
+    revision = plans.change_programmes(plan_id, new, f"programmes:swap:{out_ref}->{in_ref}")
+    on_profile_change(plans, student_ref)  # records the new programme's verdict
+    return revision
 
 
 def remove(plans, student_ref: str, plan_id: int, ref: str) -> int | None:
