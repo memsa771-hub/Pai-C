@@ -66,6 +66,9 @@ async function checkScreens(browser) {
         assert(!raw, `${where}: raw key visible: ${raw && raw[0]}`);
         const [scrollWidth, innerWidth] = await page.evaluate(() => [document.documentElement.scrollWidth, innerWidth]);
         assert(scrollWidth <= innerWidth, `${where}: horizontal overflow ${scrollWidth} > ${innerWidth}`);
+        // The workspace scrolls inside its areas; the page itself must never scroll (the rail would move away).
+        const [pageHeight, innerHeight] = await page.evaluate(() => [document.querySelector('[data-scroll-root]') ? document.documentElement.scrollHeight : 0, innerHeight]);
+        assert(pageHeight <= innerHeight, `${where}: the page scrolls ${pageHeight} > ${innerHeight}`);
         if (SHOT_WIDTHS.includes(width)) {
           if (screen.full) { await page.addStyleTag({ content: EXPAND }); await page.waitForTimeout(150); }
           const device = width < 500 ? 'phone' : 'desktop';

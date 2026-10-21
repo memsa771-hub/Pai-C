@@ -125,7 +125,7 @@ export function CounselorShell() {
     ) : active === "overview" ? (
       // Overview is one screen when the window is big enough (fit): cards
       // scroll inside. Smaller windows scroll the page, so nothing is cut off.
-      <div data-scroll-area className="min-h-0 flex-1 overflow-y-auto fit:overflow-hidden">
+      <div data-scroll-area className="relative min-h-0 flex-1 overflow-y-auto fit:overflow-hidden">
         <div className="mx-auto w-full max-w-6xl px-4 pb-6 pt-2 sm:px-8 fit:h-full">
           <Overview journey={journey} navigate={navigate} openPath={openPath} onChat={chat} />
         </div>
@@ -133,7 +133,7 @@ export function CounselorShell() {
     ) : active === "notifications" ? (
       <NotificationsCenterView />
     ) : (
-      <div data-scroll-area className="min-h-0 flex-1 overflow-y-auto">
+      <div data-scroll-area className="relative min-h-0 flex-1 overflow-y-auto">
         <div className="mx-auto max-w-6xl px-4 pb-16 pt-6 sm:px-8 sm:pt-8">
           {active === "profile" && <LivingProfile onChat={chat} onNavigate={navigate} stage={journey.progress?.stage} />}
           {active === "journey" && <Journey navigate={navigate} journey={journey} onChat={chat} />}
@@ -178,8 +178,10 @@ export function CounselorShell() {
   return (
     <MotionConfig reducedMotion="user">
     <SidebarProvider>
-      {/* clip, not hidden: a focused field can never scroll the whole layout (and the rail) out of view. */}
-      <div data-scroll-root className="flex h-svh w-full overflow-clip bg-background text-foreground">
+      {/* relative + clip: absolutely positioned bits (screen-reader text, rings) stay
+          inside the app, so the page itself never grows taller than the window
+          and the rail never scrolls away. */}
+      <div data-scroll-root className="relative flex h-svh w-full overflow-clip bg-background text-foreground">
         <a href="#pai-main" className="sr-only focus:not-sr-only focus:fixed focus:left-3 focus:top-3 focus:z-[60] focus:rounded-lg focus:bg-card focus:px-4 focus:py-2 focus:shadow-lift">
           {copy.shell.skip}
         </a>

@@ -298,3 +298,6 @@ The Counselor shell accidentally omitted the shared UserMenu when replacing the 
   - powder is kept for the one "try it" action;
   - the shared Timeline marks done and current steps in brand blue, not black.
 - **Path page layout.** One card with a row per topic, beside a column for fit, try it and places, instead of ten separate cards.
+- **Root cause of the vanishing rail (found from the founder's screenshot).** Screen-reader text and other absolutely positioned bits had no positioned ancestor. They escaped the scroll areas and made the document taller than the window, so the whole page, rail included, scrolled away.
+  - The shell root and its scroll areas are now `relative`.
+  - The preview harness now fails any screen where the page itself scrolls.
