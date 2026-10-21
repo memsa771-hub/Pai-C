@@ -120,20 +120,34 @@ def _grade_line(rules: EligibilityRules, check: GradeCheck, need: float, sources
         if why:
             reasons.append(why)
             continue
-        provisional = False
+        provisional, needs = False, []
         if check.method == "linear_scale":
-            min_pass, why = vals.number(scale.min_pass) if scale.min_pass else (None, "missing_value")
-            if min_pass is None:
+            min_pass = _own_min_pass(scale, vals)
+            if min_pass is None:  # the route's default stands in, labelled, until the student's letter (S4-D6)
                 min_pass, provisional = scale.provisional_min_pass, True
+                needs = [_doc_type(scale.min_pass)] if scale.min_pass else []
             t = check.target
             have = linear_scale(value, scale.best, min_pass, t.best, t.worst_pass, t.decimals, t.rounding)
         else:
             have = value
         return Line("grade", "likely_meets" if meets(have, need, check.better) else "likely_below", have, need,
-                    provisional=provisional, sources=sources)
+                    provisional=provisional, needs=needs, sources=sources)
     docs = [_doc_type(rules.grade_scales[n].value) for n in check.scales]
     return Line("grade", "needs_input", need=need, needs=list(dict.fromkeys(docs)), reason=_worst_reason(reasons),
                 sources=sources)
+
+
+def _own_min_pass(scale, vals: _Values) -> float | None:
+    """The student's confirmed minimum pass for this scale: only from a letter about a scale with the same best
+    grade (a percentage letter does not set a CGPA scale's minimum), and never under an open finding."""
+    if not scale.min_pass:
+        return None
+    if scale.min_pass_scale:
+        best, why = vals.number(scale.min_pass_scale)
+        if why or abs(best - scale.best) > 1e-9:
+            return None
+    value, why = vals.number(scale.min_pass)
+    return None if why else value
 
 
 def _language(check: LanguageCheck, facts: dict[str, Fact], vals: _Values) -> Line:

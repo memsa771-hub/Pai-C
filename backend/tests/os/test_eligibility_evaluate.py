@@ -142,3 +142,36 @@ def test_no_country_terms_scan_covers_eligibility():
     from tests.os.test_invariants import APP_OS
 
     assert (APP_OS / "eligibility" / "evaluate.py").is_file()  # the red-flag test scans app/os recursively
+
+
+
+# --- Task 4: the student's minimum-passing-grade letter replaces the provisional default (S4-D6) -------------
+
+LETTER = {"min_passing_grade_letter.scale_best": 4.0, "min_passing_grade_letter.min_pass": 2.4}
+
+
+def test_letter_value_replaces_default():
+    before = line(evaluate(DE, "p", DE_FACTS, STRONG), "grade")
+    after = line(evaluate(DE, "p", DE_FACTS, STRONG | LETTER), "grade")
+    assert (before.have, before.provisional, before.needs) == (2.2, True, ["min_passing_grade_letter"])
+    assert (after.have, after.provisional, after.needs) == (2.5, False, [])  # 1 + 3 * 0.8 / 1.6
+
+
+def test_letter_for_other_scale_ignored():
+    other = {"min_passing_grade_letter.scale_best": 100, "min_passing_grade_letter.min_pass": 50}
+    g = line(evaluate(DE, "p", DE_FACTS, STRONG | other), "grade")
+    assert (g.have, g.provisional) == (2.2, True)  # a percentage letter does not set a CGPA scale's minimum
+
+
+def test_letter_under_open_finding_ignored():
+    g = line(evaluate(DE, "p", DE_FACTS, STRONG | LETTER,
+                      held=frozenset({"min_passing_grade_letter.min_pass"})), "grade")
+    assert g.provisional and g.have == 2.2
+
+
+def test_letter_type_loads_by_config():
+    from app.os.documents.types import load_document_types
+
+    t = load_document_types()["min_passing_grade_letter"]
+    assert [f.name for f in t.fields] == ["institution", "scale_best", "min_pass", "issue_date"]
+    assert [(r.kind, r.fields) for r in t.rules] == [("lte", ["min_pass", "scale_best"])]
