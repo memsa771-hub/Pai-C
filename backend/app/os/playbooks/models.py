@@ -5,6 +5,8 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from pydantic import AnyHttpUrl, BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from app.os.eligibility.rules import EligibilityRules, SelfServe
+
 
 class _Model(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True, populate_by_name=True)
@@ -94,6 +96,8 @@ class Playbook(_Model):
     require_citations: bool = False
     constants: dict[str, Constant] = {}
     tasks: list[TaskTemplate]
+    eligibility: EligibilityRules | None = None  # Slice 4: the route's eligibility checks (S4-D2)
+    self_serve: SelfServe | None = None  # Slice 4: what the route builder completes (S4-D9)
 
     @field_validator("default_timezone")
     @classmethod

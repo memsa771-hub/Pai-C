@@ -8,6 +8,36 @@ route: {origin: PK, destination: DE, level: master}
 default_timezone: Europe/Berlin
 require_citations: true
 
+# Slice 4 (spec S4-D9): the route builder completes this task with the student's programmes.
+self_serve:
+  choose_task: choose_programmes
+
+# Slice 4 eligibility (spec S4-D2). Generic checks; this route's numbers. An estimate, never a block (S4-D5).
+# linear_scale with target 1.0 (best) / 4.0 (worst pass) is the modified Bavarian formula. Rounding: German exam
+# regulations count only the first decimal and drop the rest; unverified against the KMK decision of 12.09.2013
+# (cited by https://backend.uni-heidelberg.de/de/dokumente/modifizierte-bayerische-formel-0/download).
+# Provisional minimum passes (owners, spec Q2) apply until the student's letter is confirmed (S4-D6, Task 4).
+eligibility:
+  grade:
+    - method: linear_scale
+      requirement: grade_requirement
+      part: german_max
+      better: lower
+      target: {best: 1.0, worst_pass: 4.0, decimals: 1, rounding: truncate}
+      scales: [cgpa_4, percent]
+    - method: threshold
+      requirement: grade_requirement
+      part: percent_min
+      better: higher
+      scales: [percent]
+  language:
+    - {language: english, requirement: english_requirement, level_key: cefr, scores: {ielts: ielts_trf.overall}}
+    - {language: german, requirement: german_requirement, level_key: level}
+  test: {requirement: admission_test, list_key: any_of}
+  grade_scales:
+    cgpa_4: {best: 4.0, provisional_min_pass: 2.0, value: transcript.cgpa}
+    percent: {best: 100, provisional_min_pass: 33, value: transcript.percentage}
+
 constants:
   uni_assist_lead_days:
     value: 56

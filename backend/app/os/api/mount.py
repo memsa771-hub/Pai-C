@@ -14,6 +14,7 @@ from app.os.api.deps import current_student_ref, current_student_ref_for_write
 from app.os.api.router import build_router
 from app.os.api.services import make_services
 from app.os.documents.types import TYPES_DIR, load_document_types
+from app.os.eligibility.rules import check_rules, profile_keys
 from app.os.knowledge.profile import PROFILE_DIR, load_profile_dir
 from app.os.playbooks import PLAYBOOK_DIR, load_playbook_dir
 from app.os.settings import load_settings
@@ -32,9 +33,15 @@ def mount_os(app: FastAPI, *, env: Mapping[str, str] | None = None,
         return False  # no database configured: the OS stays off
     if not settings.os_enabled:
         return False
-    load_profile_dir(profile_dir)  # an invalid research profile stops startup (Slice 2 spec §4.2)
+    # an invalid research profile stops startup (Slice 2 spec §4.2): loaded below with the playbooks
     types = load_document_types(document_types_dir)  # so does an invalid document type (Slice 3 spec S3-D2)
-    services = make_services(settings, playbooks=load_playbook_dir(playbook_dir), document_types=types)
+    profiles = load_profile_dir(profile_dir)
+    books = load_playbook_dir(playbook_dir)
+    keys = profile_keys(types)
+    for book in books.values():  # so do eligibility rules naming an unknown fact or profile key (Slice 4 S4-D2)
+        profile = next((p for p in profiles.values() if p.route_key == book.key), None)
+        check_rules(book, {f.name for f in profile.fields} if profile else None, keys)
+    services = make_services(settings, playbooks=books, document_types=types)
     app.include_router(build_router(lambda: services), prefix=PREFIX)
     if student_dependency is not None:
         app.dependency_overrides[current_student_ref] = student_dependency
