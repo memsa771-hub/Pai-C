@@ -9,8 +9,10 @@ from app.os.api.deps import check_admin, current_student_ref, current_student_re
 from app.os.api.queries import (
     document_out,
     documents_out,
+    eligibility_notes,
     finding_out,
     inbox_items,
+    mark_note_read,
     open_facts,
     plan_out,
     research_runs,
@@ -45,6 +47,7 @@ from app.os.documents.confirm import NotConfirmable, confirm_document, delete_do
 from app.os.documents.intake import MAX_BYTES, UploadError, check_upload
 from app.os.documents.run import enqueue_document
 from app.os.documents.store import DocumentStore, DuplicateDocument, FindingStore, ProfileStore
+from app.os.eligibility.notes import on_profile_change
 from app.os.kernel import IllegalTransition
 from app.os.playbooks import PlaybookError
 from app.os.workers import confirm_fact, open_confirm_tasks, supply_fact
@@ -85,7 +88,16 @@ def build_router(get_services: Callable[[], Services]) -> APIRouter:
 
     @router.get("/inbox", response_model=InboxOut)
     def inbox(student: str = Depends(current_student_ref), svc: Services = Depends(services)) -> dict:
-        return {"items": inbox_items(svc.engine, svc.settings.tenant_id, student)}
+        tenant = svc.settings.tenant_id
+        return {"items": inbox_items(svc.engine, tenant, student),
+                "notes": eligibility_notes(svc.engine, tenant, student)}
+
+    @router.post("/inbox/notes/{note_id}/read", status_code=204)
+    def read_note(note_id: int, student: str = Depends(current_student_ref_for_write),
+                  svc: Services = Depends(services)) -> Response:
+        if not mark_note_read(svc.engine, svc.settings.tenant_id, student, note_id):
+            raise HTTPException(status_code=404, detail="note not found")
+        return Response(status_code=204)
 
     @router.post("/inbox/{task_id}/complete", response_model=CompleteOut)
     def complete(task_id: int, body: CompleteIn | None = None,
@@ -193,6 +205,7 @@ def build_router(get_services: Callable[[], Services]) -> APIRouter:
             raise HTTPException(status_code=409, detail=str(e)) from None
         except ValueError as e:
             raise HTTPException(status_code=422, detail=str(e)) from None
+        on_profile_change(svc.plans, student)  # Slice 4: a note if a programme's eligibility changed
         store = DocumentStore(svc.engine, tenant)
         findings = [finding_out(f) for f in FindingStore(svc.engine, tenant).list_open(student)]
         return document_out(store, store.get(doc_id), findings)
@@ -207,9 +220,11 @@ def build_router(get_services: Callable[[], Services]) -> APIRouter:
         if finding["status"] != "open":
             raise HTTPException(status_code=409, detail="this finding is already resolved")
         try:
-            return finding_out(resolve_finding(svc.engine, tenant, finding, body.value))
+            resolved = resolve_finding(svc.engine, tenant, finding, body.value)
         except ValueError as e:
             raise HTTPException(status_code=422, detail=str(e)) from None
+        on_profile_change(svc.plans, student)  # Slice 4: the resolved value may change eligibility
+        return finding_out(resolved)
 
     @router.delete("/documents/{doc_id}", status_code=204)
     def delete_doc(doc_id: int, student: str = Depends(current_student_ref_for_write),
