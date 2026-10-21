@@ -33,6 +33,7 @@ from app.pai_c.possibilities import PossibilityService
 from app.pai_c.possibility_titles import normalized_title, valid_title
 from app.pai_c.posting import send_to_student
 from app.pai_c.understanding.data import at_path, load_policy as understanding_policy
+from app.workspace_language import workspace_language_block
 from app.runtime.task_runtime import enqueue
 
 logger = logging.getLogger(__name__)
@@ -41,6 +42,10 @@ JOB_ANALYZE_PATHS = "counselor.paths"
 
 def policy() -> dict:
     return load_data("path_analyzer.json")
+
+
+def fields_of_study() -> dict[str, str]:
+    return load_data("fields_of_study.json")["fields"]
 
 
 class _Strict(BaseModel):
@@ -56,6 +61,7 @@ class FitItem(_Strict):
 
 class AnalyzedPath(_Strict):
     title: str = Field(min_length=1, max_length=120)
+    field_code: str = ""
     why: str = Field(min_length=1, max_length=600)
     evidence_item_ids: list[str] = Field(default_factory=list)
     fit: list[FitItem] = Field(default_factory=list)
@@ -75,9 +81,16 @@ def _evidence_index(db, workspace_id: str, notebook) -> dict[str, str]:
             if row.get("status", "active") == "active" and row.get("id") and row.get("evidence"):
                 index[row["id"]] = str(row["evidence"])[:300]
     for card in MemoryService(db).profile_cards(workspace_id):
-        quote = (card.get("source") or {}).get("quote")
-        index[card["id"]] = str(quote or card.get("value"))[:300]
+        # The stored value, in the workspace language; the raw quote stays
+        # backend evidence and is never shown on a path.
+        index[card["id"]] = _card_text(card.get("value"))[:300]
     return index
+
+
+def _card_text(value) -> str:
+    if isinstance(value, dict):
+        return ", ".join(str(item) for item in value.values() if isinstance(item, (str, int, float)) and str(item).strip())
+    return str(value)
 
 
 def _records(db, workspace_id: str) -> list[dict]:
@@ -87,11 +100,13 @@ def _records(db, workspace_id: str) -> list[dict]:
 
 
 def sanitize(analysis: PathAnalysis, evidence: dict[str, str], dismissed: set[str]) -> list[dict]:
-    """Code-level honesty: drop world numbers, malformed titles and dismissed
-    paths, cap counts, and turn any uncited verdict into "unknown"."""
+    """Code-level honesty: drop world numbers, malformed titles, paths outside
+    the fields of study and dismissed paths, cap counts, and turn any uncited
+    verdict into "unknown"."""
     rules = policy()
     world_number = re.compile(load_data("grounding.json")["numeric_world_pattern"])
     evidenced = set(rules["evidenced_statuses"])
+    fields = fields_of_study()
     kept, seen = [], set()
     for path in analysis.paths:
         key = normalized_title(path.title)
@@ -99,6 +114,9 @@ def sanitize(analysis: PathAnalysis, evidence: dict[str, str], dismissed: set[st
             continue
         if not valid_title(path.title):
             logger.warning("path_analyzer_dropped_title words=%d", len(path.title.split()))
+            continue
+        if path.field_code not in fields:
+            logger.warning("path_analyzer_dropped_not_a_field")
             continue
         if any(world_number.search(text) for text in (path.title, path.why)):
             logger.warning("path_analyzer_dropped_world_number")
@@ -162,6 +180,8 @@ async def path_analysis_job(job, db) -> dict:
         analyst_input = ("<limits>" + _json({"max_paths": rules["max_paths"], "max_fit_items": rules["max_fit_items"]}) + "</limits>\n"
             + build_planner_view(snapshot.notebook).text + "\n"
             + "<records>" + _json(_records(db, job.workspace_id)) + "</records>\n"
+            + "<fields>" + _json(fields_of_study()) + "</fields>\n"
+            + workspace_language_block() + "\n"
             + "<existing_paths>" + _json([{"title": row.title, "why": row.why} for row in existing if row.status != "dismissed"]) + "</existing_paths>\n"
             + "<dismissed_paths>" + _json([row.title for row in existing if row.status == "dismissed"]) + "</dismissed_paths>")
         db.rollback()

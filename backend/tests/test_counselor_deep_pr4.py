@@ -77,6 +77,7 @@ async def test_analysis_is_idempotent_and_workspace_scoped():
         assert "<notebook_schema>" in model.call_args.kwargs["messages"][0]["content"]
         assert "<profile>" in model.call_args.kwargs["messages"][0]["content"]
         assert "<transcript>" in model.call_args.kwargs["messages"][0]["content"]
+        assert "<workspace_language>" in model.call_args.kwargs["messages"][0]["content"]
         assert model.call_args.kwargs["system_prompt"].startswith("You are the private Planner")
 
 

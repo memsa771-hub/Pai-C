@@ -301,3 +301,19 @@ The Counselor shell accidentally omitted the shared UserMenu when replacing the 
 - **Root cause of the vanishing rail (found from the founder's screenshot).** Screen-reader text and other absolutely positioned bits had no positioned ancestor. They escaped the scroll areas and made the document taller than the window, so the whole page, rail included, scrolled away.
   - The shell root and its scroll areas are now `relative`.
   - The preview harness now fails any screen where the page itself scrolls.
+
+## 21 October: one workspace language; paths are catalogued fields (founder)
+
+- **Only the chat follows the student's language.** Everything stored for the workspace is written in the language and style set in `app/workspace_language.json` (shared by memory and PAI-C) (English, plain and simple), passed to each prompt as `<workspace_language>`:
+  - Vault values (extractor);
+  - Truth Map notes and evidence, shown in Background (planner);
+  - paths, their reasons and fit checks (analyzer);
+  - the Mirror's review card and lanes;
+  - path explanations.
+  - Proper names and official qualification titles stay as written.
+  - The extractor's quote stays exact as backend evidence, but the workspace no longer shows it.
+  - The Counselor's replies, the Mirror's spoken parts and the analyzer's chat message stay in the student's language.
+- **Paths must be fields of study, enforced in code.** The analyzer names an ISCED-F 2013 detailed field code (`policy/fields_of_study.json`) for every path. Any path without a valid code is dropped, as are titles that fail `valid_title`. Limits (money, place, time) are fit checks, never a reason to suggest work instead of study; when a limit makes a long degree hard, the analyzer suggests the same field at a shorter level.
+- **Known limits:**
+  - data stored before this change stays in the student's language until it is re-extracted or corrected;
+  - the planner's possibility and the Mirror's lanes follow the field rule through the prompt and `valid_title`, but are not yet checked against the field catalog.

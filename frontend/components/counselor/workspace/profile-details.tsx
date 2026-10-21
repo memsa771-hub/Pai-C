@@ -76,7 +76,7 @@ function sourceLine(card: ProfileCard) {
 
 /** The source of one Vault fact and the existing Confirm / Edit / Remove
  * review actions (exact digest, never a guess). */
-export function FactReview({ card, onSaved, hidden = false }: { card: ProfileCard; onSaved: () => void; hidden?: boolean }) {
+export function FactReview({ card, onSaved }: { card: ProfileCard; onSaved: () => void }) {
   const [editing, setEditing] = useState(false),
     [removing, setRemoving] = useState(false),
     [value, setValue] = useState(card.value),
@@ -104,12 +104,11 @@ export function FactReview({ card, onSaved, hidden = false }: { card: ProfileCar
       setBusy(false);
     }
   }
-  const quote = typeof card.source?.quote === "string" ? card.source.quote : "";
   return (
     <div className="space-y-3">
       <div className="rounded-xl bg-muted/60 px-4 py-3 text-sm">
         <p className="text-xs font-semibold text-muted-foreground">{sourceLine(card)}</p>
-        {quote && !hidden && <p className="mt-1">“{quote}”</p>}
+        {/* The student's raw words stay backend evidence: the workspace shows only the stored value, in the workspace language. */}
       </div>
       {editing && (
         <div className="space-y-3">
@@ -168,7 +167,7 @@ export function FactRow({ card, onSaved, hidden = false }: { card: ProfileCard; 
         <ChevronDown aria-hidden className={cn("mt-0.5 size-5 shrink-0 text-muted-foreground transition-transform", open && "rotate-180")} />
       </button>
       <div id={panel} hidden={!open} className="pb-4 sm:ps-[calc(14rem+1rem)]">
-        {open && <FactReview card={card} onSaved={onSaved} hidden={hidden} />}
+        {open && <FactReview card={card} onSaved={onSaved} />}
       </div>
     </li>
   );

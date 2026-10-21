@@ -208,6 +208,8 @@ async def _candidate(db, workspace_id: str, student: EventRecord,
     db.rollback()
     recalled = await MemoryService(db).recall(workspace_id, query)
     analyst_input += "\n<semantic_recall>" + _json(recalled) + "</semantic_recall>"
+    from app.workspace_language import workspace_language_block
+    analyst_input += "\n" + workspace_language_block()
     from app.pai_c.deep.context import estimated_tokens
     logger.info("planner_input turn_id=%s history_limit=%d map_tokens=%d total_tokens=%d",
                 student_id, config.PAI_PLANNER_HISTORY_TURNS, view.tokens, estimated_tokens(analyst_input))

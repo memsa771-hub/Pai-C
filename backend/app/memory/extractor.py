@@ -22,6 +22,7 @@ import math
 from dataclasses import dataclass
 from typing import Any, Optional
 
+from app.workspace_language import workspace_language_block
 from app.config import config
 from app.inference.gateway import complete as chat_completion, resolve_model
 
@@ -54,7 +55,7 @@ class ExtractedCandidate:
 
 SYSTEM_PROMPT = """You extract durable objective student facts from one counseling turn.
 The student's message is the only evidence. The assistant and earlier context only resolve references. Return JSON {"candidates": [...]} and no prose.
-Use the supplied Vault fields and record schemas. Preserve original qualification wording and reuse exact existing record ids for corrections. Propose only stated fields; never infer dates, scores, currency, institutions or commitment. Every candidate needs a quote copied from the student's message and confidence 0-1.
+Use the supplied Vault fields and record schemas. Write every proposed value in <workspace_language>, translating the student's meaning, because values are shown in the workspace; keep proper names, places, institutions and official qualification titles as written. Reuse exact existing record ids for corrections. Propose only stated fields; never infer dates, scores, currency, institutions or commitment. Every candidate needs a quote copied from the student's message and confidence 0-1.
 For currency, write the ISO 4217 code when the student's currency is clear; otherwise copy it as the student wrote it.
 A result the student states for a qualification (for example 780 out of 1100) belongs on that education record as result.marks_obtained and result.marks_total, patching the existing record by id; copy the numbers, never compute a percentage.
 Where the student says they live (for example "I live in X" or "I cannot leave X") is location.current_city with that quote; a city that only says where they studied stays on the education record. A value that differs from the Vault is still proposed; the reconciler asks the student which is right.
@@ -518,7 +519,7 @@ async def extract_candidates(
     specs = field_specs or [{"key": key} for key in sorted(allowed_vault_keys)]
     raw = await chat_completion(role="extractor",
         api_key=api_key, model=model,
-        messages=[{"role": "user", "content": build_user_prompt(turn, specs)}],
+        messages=[{"role": "user", "content": build_user_prompt(turn, specs) + "\n" + workspace_language_block()}],
         system_prompt=SYSTEM_PROMPT, max_tokens=4000, base_url=base_url,
     )
 

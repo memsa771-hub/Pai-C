@@ -3,6 +3,7 @@ import json
 from pathlib import Path
 from datetime import datetime, timezone
 from pydantic import BaseModel, ConfigDict, Field
+from app.workspace_language import workspace_language
 from app.config import config
 from app.inference.gateway import complete
 from app.pai_c.deep.polish import contains_blocked_script
@@ -74,7 +75,7 @@ async def explain(context, payload):
         raw = await complete(role="roadmap", phase="path_explain",
             system_prompt=Path(__file__).with_name("explain.md").read_text(encoding="utf-8"),
             messages=[{"role": "user", "content": json.dumps({"path": brief, "pages": pages,
-                "schema": PathExplanation.model_json_schema(), "language_policy": {
+                "schema": PathExplanation.model_json_schema(), "workspace_language": workspace_language(), "language_policy": {
                     "blocked_scripts": config.PAI_LANGUAGE_BLOCKED_SCRIPTS,
                     "replacement": config.PAI_LANGUAGE_BLOCKED_SCRIPT_REPLACEMENT}}, ensure_ascii=False)}],
             response_format={"type": "json_object"}, max_tokens=rules["max_tokens"], usage_callback=record_model_usage)

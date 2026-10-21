@@ -269,6 +269,9 @@ async def build_context(db, workspace_id: str, turn: CounselorTurnInput, *,
     if not wellbeing and not mirror:
         from app.pai_c.deep.actions import workspace_places
         sections["workspace_places"] = _json(workspace_places())
+    if mirror:
+        from app.workspace_language import workspace_language
+        sections["workspace_language"] = _json(workspace_language())
     from app.pai_c.fact_cards import available_cards
     cards = ()
     if decision is not None and decision.question_allowed and not wellbeing and not mirror and decision.action in {"explore_area", "ask", "ask_choice", "answer_request", "counsel"}:

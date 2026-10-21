@@ -32,8 +32,8 @@ def fit(label, status, ids=(), note=""):
     return {"label": label, "status": status, "note": note, "evidence_item_ids": list(ids)}
 
 
-def path(title, *, why="It follows what you said.", ids=("c1",), fits=()):
-    return {"title": title, "why": why, "evidence_item_ids": list(ids), "fit": list(fits)}
+def path(title, *, why="It follows what you said.", ids=("c1",), fits=(), field_code="0714"):
+    return {"title": title, "field_code": field_code, "why": why, "evidence_item_ids": list(ids), "fit": list(fits)}
 
 
 def analysis(*paths, message="I have put together a few paths from what you shared."):
@@ -96,6 +96,18 @@ def test_sanitize_drops_world_numbers_dismissed_duplicates_and_caps():
     assert len(next(row for row in result if row["title"] == "Electronics")["fit"]) == rules["max_fit_items"]
 
 
+def test_sanitize_keeps_only_fields_of_study():
+    raw = analysis(path("Electrical Engineering"), path("Phone Repair Shop", field_code=""),
+                   path("Online Resale", field_code="9999"))
+    assert [row["title"] for row in sanitize(PathAnalysis.model_validate(raw), EVIDENCE, set())] == ["Electrical Engineering"]
+
+
+def test_profile_evidence_is_the_stored_value_not_the_raw_quote():
+    from app.pai_c.paths.analyzer import _card_text
+    assert _card_text("Family cannot pay high fees") == "Family cannot pay high fees"
+    assert _card_text({"qualification_name": "FSc Pre-Engineering", "marks_obtained": 780, "notes": ""}) == "FSc Pre-Engineering, 780"
+
+
 def test_sanitize_clears_a_note_that_carries_a_world_number():
     result = sanitize(PathAnalysis.model_validate(analysis(path("Electronics", fits=[
         fit("Fees", "unknown", note="Usually $500 per semester."),
@@ -125,6 +137,7 @@ async def test_job_stores_paths_updates_fit_posts_once_and_never_revives_dismiss
             assert kwargs["role"] == "analyst"
             sent = kwargs["messages"][0]["content"]
             assert "<dismissed_paths>" in sent and "Medicine" in sent and "Mobile repair" in sent
+            assert '"0714":"Electronics and automation"' in sent and "<workspace_language>" in sent
             return reply_json
 
         job = db.get(BackgroundJob, job_id)
