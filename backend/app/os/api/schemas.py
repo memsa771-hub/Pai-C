@@ -151,6 +151,8 @@ class OpenFactsOut(BaseModel):
 
 class ProgrammeOut(BaseModel):
     ref: str
+    plan_id: int | None = None  # Slice 4: the plan it is in, for swap and remove
+    rank: int | None = None
     name: str
     university: str | None
     intake_year: int

@@ -56,7 +56,7 @@ def _line(ln) -> dict:
     return d
 
 
-def _record(plans, student_ref: str, card: Card, suggestions) -> bool:
+def _record(plans, student_ref: str, plan_id: int, card: Card, suggestions) -> bool:
     """Compare with the last verdict told; on a change, store it and write one note. True if a note was written."""
     tenant = plans.kernel.tenant_id
     with plans.engine.begin() as conn:
@@ -75,7 +75,7 @@ def _record(plans, student_ref: str, card: Card, suggestions) -> bool:
         ).values(verdict=card.verdict, updated_at=func.now()))
         conn.execute(insert(NOTES).values(
             tenant_id=tenant, student_ref=student_ref, programme_ref=card.programme_ref, verdict=card.verdict,
-            payload={"programme_ref": card.programme_ref, "verdict": card.verdict, "previous": old,
+            payload={"plan_id": plan_id, "programme_ref": card.programme_ref, "verdict": card.verdict, "previous": old,
                      "lines": [_line(ln) for ln in card.lines], "suggestions": suggestions()}))
     return True
 
@@ -98,7 +98,7 @@ def _check_plan(plans, student_ref: str, plan_id: int, only: str | None = None) 
             return [s.programme_ref for s in suggest(card, list(cands.values()), set(chosen))]
         return make
 
-    return sum(_record(plans, student_ref, card, suggestions_for(card)) for card, _ in mine.values())
+    return sum(_record(plans, student_ref, plan_id, card, suggestions_for(card)) for card, _ in mine.values())
 
 
 def _plans_of(plans, *, student_ref: str | None = None, intake_year: int | None = None) -> list[tuple[int, str, dict]]:
