@@ -125,3 +125,35 @@ def test_invalid_output_repaired_max_two():
     agent = build_readers(model, TYPES, SPEC)["ielts_trf"]
     r = read_document(agent, SPEC, IELTS, [PagePart(1, None, jpeg(), "image/jpeg")])
     assert r.values is None and r.error and calls["n"] == 3  # 1 + 2 repairs, then it stops
+
+
+# --- the machine-readable zone's filler (Spike 2 fix round) ----------------------------------------------------
+
+L1 = "P<UTOERIKSSON<<ANNA<MARIA<<<<<<<<<<<<<<<<<<<"  # the ICAO 9303 specimen
+L2 = "L898902C36UTO7408122F1204159ZE184226B<<<<<10"
+
+
+@pytest.mark.parametrize("read, want", [
+    (L1, L1),                                     # already right
+    (L1[:-3], L1),                                # filler miscounted short: padded to 44
+    (L1 + "<<<", L1),                             # filler miscounted long: trimmed to 44
+    ("p<uto eriksson<<anna<maria" + "<" * 18, L1),  # case and spaces from the reader
+    ("P«UTOERIKSSON««ANNA«MARIA" + "«" * 19, L1),   # chevrons for fillers
+    (L2, L2),
+    (L2[:-1], L2[:-1]),                           # ends in a digit: a short line cannot be padded, left for the check
+    ("P<UTO" + "A" * 40 + "<<", "P<UTO" + "A" * 40 + "<<"),  # over 44 before its filler: kept for the check
+])
+def test_mrz_filler_normalised(read, want):
+    from app.os.documents.reader import normalise_values
+
+    passport = TYPES["passport"]
+    out = normalise_values(passport, {"mrz_line1": read, "surname": "Eriksson", "passport_number": None})
+    assert out["mrz_line1"] == want
+    assert out["surname"] == "Eriksson" and out["passport_number"] is None  # other fields untouched
+
+
+def test_reader_returns_normalised_mrz():
+    model, _ = answering([{"mrz_line1": L1[:-2], "mrz_line2": L2, "detected_type": "passport"}])
+    agent = build_readers(model, TYPES, SPEC)["passport"]
+    r = read_document(agent, SPEC, TYPES["passport"], [PagePart(1, None, jpeg(), "image/jpeg")])
+    assert r.values["mrz_line1"] == L1 and r.values["mrz_line2"] == L2
