@@ -40,7 +40,7 @@ const FINDING: OsFinding = {
 function list(props: Partial<Parameters<typeof DocumentList>[0]> = {}): string {
   return renderToStaticMarkup(
     <DocumentList documents={[]} findings={[]} docTypes={TYPES} onUpload={() => {}} onOpen={() => {}}
-                  onResolve={() => {}} {...props} />,
+                  onResolve={() => {}} onDelete={() => {}} {...props} />,
   );
 }
 
@@ -99,6 +99,13 @@ describe('DocumentList', () => {
     });
     expect(html).toContain('This looks like a transcript. Is that right?');
     expect(html).toContain('The file could not be read: it may be damaged.');
+  });
+
+  it('offers Delete on a document that cannot be opened, so a failed reading is never a dead end', () => {
+    const html = list({ documents: [doc({ id: 1, status: 'failed', error: 'We could not read this document.' }),
+                                    doc({ id: 2, status: 'uploaded' }), doc({ id: 3, status: 'read' })] });
+    expect(html.match(/>Delete<\/button>/g)?.length).toBe(2);  // failed and uploaded; a read one opens instead
+    expect(html).toContain('You can delete it and upload the file again.');
   });
 
   it('shows a finding with a Choose button per value', () => {
