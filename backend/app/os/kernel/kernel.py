@@ -113,6 +113,18 @@ class Kernel:
             self._check_current(conn, plan_id, based_on)
             return self._revise(conn, plan_id, cause, draft)
 
+    def change_contract(self, plan_id: int, contract: RouteContract, draft: PlanDraft, cause: str,
+                        based_on: str) -> int | None:
+        """Stores a new contract for the plan (e.g. the student swapped a programme, Slice 4) and applies its draft
+        as a revision, in one transaction under the plan lock. `based_on` is the contract_sha256 the change was
+        made from: if the plan changed since, StaleDraft is raised and the caller starts again from the new one."""
+        with self.engine.begin() as conn:
+            self._lock_plan(conn, plan_id)
+            self._check_current(conn, plan_id, based_on)
+            return self._revise(conn, plan_id, cause, draft, contract_update={
+                "contract": contract.model_dump(mode="json"), "contract_sha256": contract_sha256(contract),
+                "student_ref": contract.student_ref})
+
     def upgrade_playbook(self, plan_id: int, draft: PlanDraft, based_on: str | None = None) -> int:
         with self.engine.begin() as conn:
             self._lock_plan(conn, plan_id)

@@ -92,6 +92,20 @@ class PlanService:
                 continue
         raise StaleDraft(f"plan {plan_id} kept changing during recompile")
 
+    def change_programmes(self, plan_id: int, programmes: list, cause: str) -> int | None:
+        """A new programme list for the plan (Slice 4 swap or remove), compiled with the plan's pinned playbook and
+        applied by the kernel. Retries StaleDraft a few times, like `recompile`."""
+        for _ in range(3):
+            contract, sha = self._contract(plan_id)
+            new = RouteContract.model_validate({**contract.model_dump(mode="json"),
+                                                "programmes": [p.model_dump() for p in programmes]})
+            draft = self.compile(new, self._pinned(plan_id))
+            try:
+                return self.kernel.change_contract(plan_id, new, draft, cause, based_on=sha)
+            except StaleDraft:
+                continue
+        raise StaleDraft(f"plan {plan_id} kept changing during the programme change")
+
     def upgrade(self, plan_id: int) -> int:
         """Moves a running plan to the newest playbook for its route (parent §4.3)."""
         contract, sha = self._contract(plan_id)
