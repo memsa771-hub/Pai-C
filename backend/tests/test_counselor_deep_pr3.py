@@ -131,7 +131,7 @@ async def test_identity_marked_never_ask_and_other_workspace_excluded():
         assert '"identity_never_ask"' in context.text
         assert "Danish" in context.text
         assert "Private Other" not in context.text
-        assert set(context.section_tokens) == {"today", "language_policy", "profile", "notebook", "open_requests", "memory", "journey"}
+        assert set(context.section_tokens) == {"today", "language_policy", "profile", "notebook", "open_requests", "memory", "journey", "workspace_places"}
 
 
 @pytest.mark.asyncio

@@ -3,11 +3,14 @@ import { useEffect, useState } from "react";
 import { AlertCircle, Lock, MessageCircle, PencilLine } from "lucide-react";
 import { workspaceApi } from "@/lib/api";
 import type { LivingPicture, ProfileCard } from "@/lib/counselor-workspace";
+import type { ProfileIssue } from "@/lib/student-profile";
+import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AreaHeatmap, EvidenceBadge, evidenceLevel, type HeatmapArea } from "@/components/pai";
 import { cn } from "@/lib/utils";
 import copy from "./copy.json";
 import layout from "./profile-layout.json";
+import { missingBasics, resultsToProve } from "./profile-basics";
 import labels from "@/lib/evidence-labels.json";
 import { LoadState, useResource, human, evidenceLabel } from "./resource";
 import { MirrorPanel, areaIcon, fill, text } from "./profile-parts";
@@ -16,11 +19,14 @@ export { CertaintyChart } from "./profile-parts";
 export { FactRow as EvidenceCard } from "./profile-details";
 
 const load = async () => {
-  const [picture, cards] = await Promise.all([
+  const [picture, cards, profile] = await Promise.all([
     workspaceApi.getCounselorWorkspace(),
     workspaceApi.getProfileCards(),
+    // Open conflicts (what the student said vs. what the profile holds). A
+    // failed read only hides the check panel; it never blocks the profile.
+    workspaceApi.getStudentProfile().catch(() => null),
   ]);
-  return { picture, cards: cards.cards };
+  return { picture, cards: cards.cards, issues: (profile?.issues || []) as ProfileIssue[] };
 };
 const EDUCATION = ["education", "course", "test_attempt", "certification"];
 type Tab = "details" | "background";
@@ -38,6 +44,38 @@ export function CoverageHeatmap({ coverage, selected, onSelect }: {
   coverage: LivingPicture["coverage"]; selected?: string | null; onSelect?: (area: string | null) => void;
 }) {
   return <AreaHeatmap title={text.heatmapTitle} areas={heatmapAreas(coverage)} selected={selected} onSelect={onSelect} />;
+}
+
+/** One open conflict, resolved through the reconciler: keep what the profile
+ * holds, or take what the student said. Conflicts whose field may not be
+ * named on the profile are offered as a conversation instead. */
+function CheckItem({ issue, onDone, onChat }: { issue: ProfileIssue; onDone: () => void; onChat: (topic?: string) => void }) {
+  const [busy, setBusy] = useState(false), [failed, setFailed] = useState(false);
+  const label = issue.fieldKey ? evidenceLabel(issue.fieldKey) : "";
+  const current = human(issue.values?.current), proposed = human(issue.values?.proposed);
+  async function resolve(action: "keep_current" | "accept_proposed") {
+    setBusy(true); setFailed(false);
+    try { await workspaceApi.resolveProfileIssue(issue.id, action); onDone(); }
+    catch { setFailed(true); setBusy(false); }
+  }
+  if (!label || !current || !proposed)
+    return (
+      <li className="flex flex-wrap items-center justify-between gap-3 py-3">
+        <p className="text-sm">{text.checkOther}</p>
+        <Button size="tap" variant="outline" onClick={() => onChat(fill(text.checkDraft, { label: label.toLowerCase() || "details" }))}>{text.checkTalk}</Button>
+      </li>
+    );
+  return (
+    <li className="py-3">
+      <p className="text-xs font-semibold text-muted-foreground">{label}</p>
+      <p className="mt-0.5 text-sm">{fill(text.checkLine, { current, proposed })}</p>
+      <div className="mt-2.5 flex flex-wrap gap-2">
+        <Button size="tap" variant="outline" disabled={busy} onClick={() => resolve("keep_current")}>{fill(text.checkKeep, { value: current })}</Button>
+        <Button size="tap" disabled={busy} onClick={() => resolve("accept_proposed")}>{fill(text.checkUse, { value: proposed })}</Button>
+      </div>
+      {failed && <p role="alert" className="mt-2 text-sm text-danger-ink">{text.checkFailed}</p>}
+    </li>
+  );
 }
 
 /** A record's headline: its title field, then up to two other values. */
@@ -98,8 +136,10 @@ function Ring({ pct }: { pct: number }) {
  * Details as fields and Background as their story with PAI. */
 export function LivingProfile({
   onChat,
+  onNavigate,
 }: {
   onChat: (topic?: string) => void;
+  onNavigate?: (view: string) => void;
   stage?: { id: string; title: string };
 }) {
   const resource = useResource(load);
@@ -124,8 +164,8 @@ export function LivingProfile({
   const current = education.find((c) => (c.value as Record<string, unknown>)?.academic_status === "current") || education[0];
   const level = human((current?.value as Record<string, unknown>)?.qualification_name) || undefined;
   const name = value("identity.full_name") || copy.nav.profile;
-  const has = (key: string) => cards.some((c) => c.key === key || c.key.startsWith(key + "."));
-  const missing = layout.basics.filter((b) => !has(b.key));
+  const missing = missingBasics(cards);
+  const toProve = resultsToProve(cards);
   const pct = Math.round(((layout.basics.length - missing.length) / layout.basics.length) * 100);
   const groups = layout.detailGroups
     .map((group) => ({ group, rows: cards.filter((card: ProfileCard) => groupOf(card).id === group.id) }))
@@ -191,7 +231,29 @@ export function LivingProfile({
                 </section>
               ))}
             </div>
-            <aside aria-labelledby="missing-title" className="rounded-2xl border bg-card p-5 shadow-soft xl:sticky xl:top-4">
+            <div className="space-y-4 xl:sticky xl:top-4">
+            {resource.data.issues.length > 0 && (
+              <section aria-labelledby="check-title" className="rounded-2xl border border-warning/40 bg-card p-5 shadow-soft">
+                <h2 id="check-title" className="flex items-center gap-2 text-lg font-bold">
+                  <AlertCircle aria-hidden className="size-5 text-warning" />{text.checkTitle}
+                </h2>
+                <p className="mt-1 text-sm text-muted-foreground">{text.checkIntro}</p>
+                <ul className="mt-1 divide-y">
+                  {resource.data.issues.map((issue) => <CheckItem key={issue.id} issue={issue} onDone={() => void resource.refresh()} onChat={onChat} />)}
+                </ul>
+              </section>
+            )}
+            {toProve.length > 0 && onNavigate && (
+              <section aria-labelledby="proof-title" className="rounded-2xl border bg-card p-5 shadow-soft">
+                <h2 id="proof-title" className="text-lg font-bold">{text.proofTitle}</h2>
+                <p className="mt-1 text-sm text-muted-foreground">{text.proofIntro}</p>
+                <ul className="mt-2 space-y-1 text-sm font-semibold">
+                  {toProve.map((card) => <li key={card.id}>{summary(card.value).title || evidenceLabel(card.key)}</li>)}
+                </ul>
+                <Button size="tap" className="mt-3" onClick={() => onNavigate("files")}>{text.proofAction}</Button>
+              </section>
+            )}
+            <aside aria-labelledby="missing-title" className="rounded-2xl border bg-card p-5 shadow-soft">
               <h2 id="missing-title" className="flex items-center gap-2 text-lg font-bold">
                 <AlertCircle aria-hidden className="size-5 text-warning" />{text.missingTitle}
               </h2>
@@ -209,6 +271,7 @@ export function LivingProfile({
                 </ul>
               ) : <p className="mt-2 text-sm text-muted-foreground">{text.missingNone}</p>}
             </aside>
+            </div>
           </div>
         ) : (
           <div className="space-y-8">

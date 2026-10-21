@@ -1,11 +1,13 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { Bookmark, Compass, X } from 'lucide-react';
+import { ArrowRight, Bookmark, Compass, X } from 'lucide-react';
 import { workspaceApi } from '@/lib/api';
 import { useT } from '@/lib/i18n';
+import { DEFAULT_LOCALE } from '@/lib/i18n/locales';
 import type { Possibility } from '@/lib/possibilities';
 import { Button } from '@/components/ui/button';
-import { PathCardView } from './path-card';
+import { FitList, PathCardView } from './path-card';
+import { openWorkspaceView } from './workspace-link';
 import { tonesByOrder, type Tone } from '@/components/pai';
 import copy from './workspace/copy.json';
 
@@ -23,7 +25,7 @@ export function PossibilityCard({ value, onChange, tone }: { value: Possibility;
     finally { setBusy(false); }
   };
   return <PathCardView compact headingLevel={3} id={value.id} tone={tone} title={value.title} whyLabel={copy.why} why={value.why}
-    quote={value.evidence[0]?.text} status={t(`possibilities.${value.status}`)} statusTone={statusTone[value.status]} error={error}
+    quote={value.evidence[0]?.text} fit={value.fit} status={t(`possibilities.${value.status}`)} statusTone={statusTone[value.status]} error={error}
     actions={<>
       {(['suggested', 'saved', 'dismissed'].includes(value.status)) && <Button size="tap" disabled={busy} onClick={() => void action('explore')}><Compass aria-hidden />{t('possibilities.explore')}</Button>}
       {(['suggested', 'dismissed'].includes(value.status)) && <Button size="tap" variant="soft" disabled={busy} onClick={() => void action('save')}><Bookmark aria-hidden />{t('possibilities.save')}</Button>}
@@ -49,4 +51,32 @@ export function Possibilities({ id, refreshKey, onUpdated }: { id?: string; refr
     {selected.map(row => <PossibilityCard key={row.id} value={row} tone={tones[row.id]}
       onChange={updated => { setRows(current => current.map(item => item.id === updated.id ? updated : item)); onUpdated?.(); }} />)}
   </section>;
+}
+
+/** The analyzer's result in chat: which paths it found and how each fits, at
+ * a glance, with the way to the full picture. */
+export function PathsFound({ ids }: { ids: string[] }) {
+  const [rows, setRows] = useState<Possibility[]>([]);
+  useEffect(() => {
+    let active = true;
+    workspaceApi.getPossibilities().then(value => { if (active) setRows(value); }).catch(() => {});
+    return () => { active = false; };
+  }, [ids.join()]); // eslint-disable-line react-hooks/exhaustive-deps
+  const found = rows.filter(row => ids.includes(row.id) && row.status !== 'dismissed');
+  if (!found.length) return null;
+  return (
+    <section className="my-3 max-w-lg rounded-3xl border bg-card p-5 shadow-card">
+      <h3 className="flex items-center gap-2 text-base font-bold"><Compass aria-hidden className="size-5 text-brand" />{copy.pathsFoundTitle}</h3>
+      <p className="mt-1 text-sm text-muted-foreground">{copy.pathsFoundBody[new Intl.PluralRules(DEFAULT_LOCALE).select(found.length) === 'one' ? 'one' : 'other'].replace('{count}', String(found.length))}</p>
+      <ul className="mt-4 space-y-4">
+        {found.map(row => (
+          <li key={row.id} className="border-t pt-4 first:border-t-0 first:pt-0">
+            <p className="font-semibold">{row.title}</p>
+            {!!row.fit?.length && <div className="mt-2"><FitList items={row.fit} limit={3} /></div>}
+          </li>
+        ))}
+      </ul>
+      <Button size="tap" className="mt-5" onClick={() => openWorkspaceView('paths')}>{copy.pathsFoundOpen}<ArrowRight aria-hidden /></Button>
+    </section>
+  );
 }

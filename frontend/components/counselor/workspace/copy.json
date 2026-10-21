@@ -60,6 +60,32 @@
   "explore": "Explore",
   "notForMe": "Not for me",
   "why": "Why it fits you",
+  "fitTitle": "How it fits you",
+  "fitLegend": "Checked against what you shared. Grey means PAI does not know yet, not that it is bad.",
+  "fitStatus": {
+    "have": "You have this",
+    "partial": "Partly there",
+    "blocker": "In the way",
+    "unknown": "Not known yet"
+  },
+  "fitFrom": "From what you said",
+  "ownPath": "Your idea",
+  "findPaths": "Find my paths",
+  "findingPaths": "PAI is looking at everything you have shared. New paths and how they fit you appear here in a minute. If nothing changes, tell PAI a little more about yourself first.",
+  "addOwn": "Add your own path",
+  "addOwnTitle": "A path you have in mind",
+  "addOwnIntro": "Any direction you are curious about. PAI will check how it fits you, the same way as the others.",
+  "addOwnName": "Path",
+  "addOwnPlaceholder": "For example: nursing, mobile repair, graphic design",
+  "addOwnWhy": "Why it interests you (optional)",
+  "addOwnSave": "Add path",
+  "addOwnCancel": "Cancel",
+  "pathsFoundTitle": "Your paths are ready",
+  "pathsFoundBody": {
+    "one": "One path, checked against what you shared.",
+    "other": "{count} paths, each checked against what you shared."
+  },
+  "pathsFoundOpen": "Open your paths",
   "compare": "Compare paths",
   "pathLoading": "PAI is working on this path. You can keep chatting while it checks.",
   "pathEmpty": "Explore this path to learn what it involves.",
@@ -566,6 +592,8 @@
     "understandTitle": "What PAI understands so far",
     "understandNote": "Things you have shared, by area.",
     "understandEmpty": "Nothing shared yet.",
+    "understandOpen": "See the full picture",
+    "fitDots": "{have} you have, {partial} partly, {blocker} in the way, {unknown} not known yet",
     "nextLabel": "Your next step",
     "nextOpen": "Open {view}",
     "recommends": "PAI recommends",
@@ -581,5 +609,12 @@
     "recPrev": "Previous recommendation",
     "recNext": "Next recommendation",
     "trackLabel": "{done} of {total} stages"
+  },
+  "stageCaps": {
+    "_note": "Furthest A-K index the view may show as current for each server stage. Moments are planned moves, not proof; stages not listed here do not cap.",
+    "IDENTITY": 1,
+    "FOUNDATION": 1,
+    "DIRECTION": 3,
+    "MIRROR": 4
   }
 }

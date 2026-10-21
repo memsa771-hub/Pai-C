@@ -9,6 +9,8 @@ vi.mock("@/lib/api", () => ({
     getCounselorWorkspace: vi.fn(),
     getProfileCards: vi.fn(),
     reviewProfileCard: vi.fn(),
+    getStudentProfile: vi.fn().mockResolvedValue({ issues: [] }),
+    resolveProfileIssue: vi.fn(),
   },
 }));
 afterEach(() => {
@@ -65,6 +67,34 @@ it("hands a story topic to PAI instead of editing shared evidence here", async (
   render(<LivingProfile onChat={chat} />);
   fireEvent.click(await screen.findByRole("button", { name: "Talk about this: Interests" }));
   expect(chat).toHaveBeenCalledWith("Can we talk about interests?");
+});
+it("asks the student to settle a conflict between what they said and their profile", async () => {
+  vi.mocked(workspaceApi.getCounselorWorkspace).mockResolvedValue(picture);
+  vi.mocked(workspaceApi.getProfileCards).mockResolvedValue({ cards });
+  vi.mocked(workspaceApi.getStudentProfile).mockResolvedValue({ issues: [{
+    id: "i1", type: "conflicting_fact", severity: "blocking", summary: "", clarificationQuestion: null,
+    recordType: null, recordId: null, fieldKey: "location.current_city", values: { current: "Islamabad", proposed: "Lahore" }, createdAt: null,
+  }] } as never);
+  vi.mocked(workspaceApi.resolveProfileIssue).mockResolvedValue({ resolved: true, action: "accept_proposed", id: "f" });
+  render(<LivingProfile onChat={vi.fn()} />);
+  const check = await screen.findByRole("region", { name: "Please check" });
+  expect(within(check).getByText("Your profile says Islamabad. You also said Lahore.")).toBeTruthy();
+  fireEvent.click(within(check).getByRole("button", { name: "Use Lahore" }));
+  await waitFor(() => expect(workspaceApi.resolveProfileIssue).toHaveBeenCalledWith("i1", "accept_proposed"));
+});
+it("invites a result card for marks the student only said", async () => {
+  vi.mocked(workspaceApi.getCounselorWorkspace).mockResolvedValue(picture);
+  // The live audit's case: FSc marks said in chat, no document yet.
+  const fsc = { kind: "education", key: "education", id: "fsc", digest: "e".repeat(64), evidence_level: "stated",
+    value: { qualification_name: "FSc Pre-Engineering", result: { marks_obtained: 780, marks_total: 1100 } },
+    source: { quote: "780 out of 1100" }, updated_at: "2026-10-21" };
+  vi.mocked(workspaceApi.getProfileCards).mockResolvedValue({ cards: [...cards, fsc] } as never);
+  const navigate = vi.fn();
+  render(<LivingProfile onChat={vi.fn()} onNavigate={navigate} />);
+  const proof = await screen.findByRole("region", { name: "Confirm with a document" });
+  expect(within(proof).getByText("FSc Pre-Engineering")).toBeTruthy();
+  fireEvent.click(within(proof).getByRole("button", { name: "Upload result card" }));
+  expect(navigate).toHaveBeenCalledWith("files");
 });
 it("confirms the exact digest; edits require an explanation", async () => {
   const done = vi.fn();

@@ -91,6 +91,13 @@ def confirm_summary(body: MirrorAction, network: str = Query(...), db=Depends(ge
         from app.pai_c.possibilities import PossibilityService
         PossibilityService(db).from_mirror(journey)
         enqueue_confirmed_research(db, str(workspace.id), journey)
+        # A confirmed Mirror is the moment for the full 360-degree look: the
+        # analyzer fit-checks the Mirror's paths and adds any the evidence supports.
+        from app.pai_c.paths.analyzer import enqueue_path_analysis, policy as path_policy
+        if path_policy()["triggers"]["after_mirror_confirmed"]:
+            draft = journey.counselor_summary_draft or {}
+            enqueue_path_analysis(db, str(workspace.id), source_event_id=draft.get("source_event_id"),
+                                  channel=draft.get("channel"), reason="mirror")
         db.commit()
     except JourneyError as exc:
         db.rollback()

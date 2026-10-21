@@ -168,13 +168,16 @@ class PaiPossibility(Base):
     source = Column(Text, nullable=False)
     roadmap_id = Column(Text, ForeignKey("pai_roadmaps.id", ondelete="SET NULL"), nullable=True)
     mirror_versions = Column(JSONB, nullable=False, default=list)
+    # Analyzer indicators: [{"label", "status": have|partial|blocker|unknown,
+    # "note", "evidence_item_ids"}]. A known status always cites the student.
+    fit = Column(JSONB, nullable=False, default=list)
     mentioned_at = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True), nullable=False, default=_now)
     updated_at = Column(DateTime(timezone=True), nullable=False, default=_now)
     __table_args__ = (
         UniqueConstraint("workspace_id", "normalized_title", name="uq_possibility_title"),
         CheckConstraint("status IN ('suggested','exploring','saved','dismissed','chosen')", name="ck_possibility_status"),
-        CheckConstraint("source IN ('mirror','planner','student')", name="ck_possibility_source"),
+        CheckConstraint("source IN ('mirror','planner','student','analyzer')", name="ck_possibility_source"),
         CheckConstraint("kind IN ('stated_goal','family_wish','strength_based','safe_or_local','test_the_dream','discovered','student_added')", name="ck_possibility_kind"),
     )
 

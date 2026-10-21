@@ -461,6 +461,17 @@ class WorkspaceApi {
       { method: 'POST' });
   }
 
+  /** A path the student puts in themselves; PAI then checks it against them. */
+  async addOwnPath(title: string, why = ''): Promise<import('./possibilities').Possibility> {
+    return this.request(`/v1/counselor/possibilities?network=${this.requireWorkspace()}`,
+      { method: 'POST', body: JSON.stringify({ title, why }) });
+  }
+
+  /** Ask PAI to work out the student's paths now; results arrive in the background. */
+  async analyzePaths(): Promise<{ job_id: string | null }> {
+    return this.request(`/v1/counselor/possibilities/analyze?network=${this.requireWorkspace()}`, { method: 'POST' });
+  }
+
   async confirmCounselorMirror(version: number): Promise<void> {
     await this.request(`/v1/counselor/summary/confirm?network=${this.requireWorkspace()}`,
       { method: 'POST', body: JSON.stringify({ version }) });

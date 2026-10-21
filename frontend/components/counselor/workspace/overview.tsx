@@ -13,10 +13,11 @@ import { LoadState, useResource } from "./resource";
 import type { useJourney } from "./use-journey";
 import copy from "./copy.json";
 import layout from "./profile-layout.json";
+import { missingBasics } from "./profile-basics";
+import { FitDots, initials } from "@/components/counselor/path-card";
 
 const text = copy.overview;
 const fill = (s: string, v: Record<string, string | number>) => s.replace(/\{(\w+)\}/g, (_, k) => String(v[k] ?? ""));
-const initials = (title: string) => title.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]?.toUpperCase()).join("");
 
 function Metric({ label, value, sub, tone = "white" }: { label: string; value: React.ReactNode; sub: string; tone?: "lime" | "white" | "peach" }) {
   return (
@@ -49,8 +50,7 @@ export function Overview({ journey, navigate, openPath, onChat }: {
   const total = copy.stages.length;
   const live = possibilities.filter((p) => p.status !== "dismissed");
   const facts = (cards.data || []).filter((c) => !layout.hiddenKeys.includes(c.key));
-  const has = (key: string) => facts.some((c) => c.key === key || c.key.startsWith(key + "."));
-  const missing = layout.basics.filter((b) => !has(b.key));
+  const missing = missingBasics(facts);
   const stage = progress.stage;
   const moment = "action" in stage ? picture.moments?.[stage.action!] : undefined;
   const areas = Object.entries(copy.areas)
@@ -87,7 +87,7 @@ export function Overview({ journey, navigate, openPath, onChat }: {
   const others = recs.filter((r) => r.key !== current.key);
 
   return (
-    <div className="flex flex-col gap-5 lg:h-full lg:min-h-0 [@media(max-height:820px)]:gap-4">
+    <div className="flex flex-col gap-5 fit:h-full fit:min-h-0 [@media(max-height:820px)]:gap-4">
       <header className="shrink-0">
         <h1 className="text-balance font-display text-[1.85rem] leading-[1.15] sm:text-[2.1rem]">{text.title}</h1>
         <p className="mt-1 text-sm text-muted-foreground sm:text-[15px] [@media(max-height:760px)]:hidden">{text.intro}</p>
@@ -104,9 +104,9 @@ export function Overview({ journey, navigate, openPath, onChat }: {
           sub={missing.length ? text.metrics.attentionSub : text.metrics.attentionNone} />
       </section>
 
-      <div className="grid items-start gap-5 lg:min-h-0 lg:grid-cols-[minmax(0,1fr)_minmax(0,19rem)] xl:grid-cols-[minmax(0,1fr)_minmax(0,25rem)] [@media(max-height:820px)]:gap-4">
-        <div className="flex min-w-0 flex-col gap-5 lg:min-h-0 [@media(max-height:820px)]:gap-4">
-          <section aria-labelledby="ov-paths" className="rounded-[22px] bg-card p-5 shadow-card ring-1 ring-border/70">
+      <div className="grid items-start gap-5 fit:min-h-0 fit:flex-1 fit:items-stretch lg:grid-cols-[minmax(0,1fr)_minmax(0,19rem)] xl:grid-cols-[minmax(0,1fr)_minmax(0,25rem)] [@media(max-height:820px)]:gap-4">
+        <div className="flex min-w-0 flex-col gap-5 fit:min-h-0 [@media(max-height:820px)]:gap-4">
+          <section aria-labelledby="ov-paths" className="rounded-[22px] bg-card p-5 shadow-card ring-1 ring-border/70 fit:flex fit:min-h-0 fit:flex-col">
             <div className="flex items-start justify-between gap-3">
               <h2 id="ov-paths" className="font-display text-[22px] leading-tight">{text.pathsTitle}</h2>
               {live.length > 0 && (
@@ -117,14 +117,17 @@ export function Overview({ journey, navigate, openPath, onChat }: {
             </div>
             <p className="mt-1 text-[11px] text-muted-foreground">{text.pathsNote}</p>
             {live.length ? (
-              <ul className="mt-3 space-y-2.5">
+              <ul className="mt-3 space-y-2.5 fit:-me-2 fit:min-h-0 fit:overflow-y-auto fit:pe-2">
                 {live.slice(0, 3).map((path) => (
                   <li key={path.id}>
                     <button onClick={() => openPath(path.id)}
                       className="group flex w-full items-center gap-3.5 rounded-xl bg-background px-3 py-2.5 text-left ring-1 ring-transparent transition hover:ring-primary/30">
                       <span aria-hidden className="flex size-10 shrink-0 items-center justify-center rounded-full bg-brand-soft text-[13px] font-semibold text-primary">{initials(path.title)}</span>
                       <span className="min-w-0 flex-1">
-                        <span className="block truncate text-[13px] font-semibold">{path.title}</span>
+                        <span className="flex items-center gap-2">
+                          <span className="truncate text-[13px] font-semibold">{path.title}</span>
+                          <FitDots items={path.fit || []} summary={text.fitDots} />
+                        </span>
                         <span className="block truncate text-[11px] text-primary">{path.why}</span>
                       </span>
                       <span className="hidden shrink-0 flex-col items-end sm:flex">
@@ -139,7 +142,7 @@ export function Overview({ journey, navigate, openPath, onChat }: {
             ) : <p className="mt-4 rounded-xl bg-background px-4 py-5 text-sm text-muted-foreground">{text.pathsEmpty}</p>}
           </section>
 
-          <section className="grid content-start gap-6 rounded-[22px] bg-card p-5 shadow-card ring-1 ring-border/70 md:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
+          <section className="grid content-start gap-6 rounded-[22px] bg-card p-5 shadow-card ring-1 ring-border/70 fit:min-h-44 fit:flex-1 fit:overflow-y-auto md:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
             <div aria-labelledby="ov-understand">
               <h2 id="ov-understand" className="font-display text-lg leading-tight">{text.understandTitle}</h2>
               <p className="mt-0.5 text-[11px] text-muted-foreground">{text.understandNote}</p>
@@ -156,6 +159,11 @@ export function Overview({ journey, navigate, openPath, onChat }: {
                   ))}
                 </ul>
               ) : <p className="mt-3 text-sm text-muted-foreground">{text.understandEmpty}</p>}
+              {areas.length > 0 && (
+                <button onClick={() => navigate("profile")} className="mt-3 inline-flex min-h-8 items-center gap-1 text-xs font-semibold text-primary hover:underline">
+                  {text.understandOpen}<ArrowRight aria-hidden className="size-3.5" />
+                </button>
+              )}
             </div>
             <div className="flex flex-col rounded-[14px] bg-brand-soft p-3.5 lg:max-xl:hidden">
               <p className="text-[10px] font-semibold uppercase tracking-wide text-primary">{text.nextLabel}</p>
@@ -168,7 +176,7 @@ export function Overview({ journey, navigate, openPath, onChat }: {
           </section>
         </div>
 
-        <section aria-labelledby="ov-rec" aria-roledescription="carousel" className="flex flex-col rounded-[22px] bg-powder p-6 text-signal-ink [@media(max-height:820px)]:p-5">
+        <section aria-labelledby="ov-rec" aria-roledescription="carousel" className="flex flex-col rounded-[22px] bg-powder p-6 text-signal-ink fit:min-h-0 fit:overflow-y-auto [@media(max-height:820px)]:p-5">
           <div className="flex items-center justify-between">
             <span id="ov-rec" className="rounded-full bg-white px-3.5 py-2 text-[10px] font-semibold uppercase tracking-wide text-[#155eef]">{text.recommends}</span>
             <div className="flex items-center gap-1">

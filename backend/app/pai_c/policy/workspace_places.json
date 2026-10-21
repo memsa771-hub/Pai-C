@@ -1,0 +1,13 @@
+{
+  "_note": "Places in the student's workspace the Counselor may point to with action show_place. Keys are the workspace view names; descriptions are what the student finds there, never how it works.",
+  "places": {
+    "overview": "A one-screen summary of where the student is and what comes next.",
+    "paths": "The student's paths, how each one fits them, and where they can add a path of their own or ask PAI to find paths.",
+    "journey": "The steps of their journey with PAI and which step they are on.",
+    "profile": "What PAI knows about them, which they can check and correct, including details still missing.",
+    "files": "Their documents, where they can upload a marksheet, certificate or result to confirm it.",
+    "compare": "Prepared roadmaps side by side, where they compare and choose one.",
+    "plan": "The plan for their chosen roadmap and their check-ins.",
+    "settings": "Language, notifications, privacy and their account."
+  }
+}

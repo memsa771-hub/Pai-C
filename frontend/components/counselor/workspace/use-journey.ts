@@ -35,7 +35,12 @@ export function signalMet(signal: string, data: JourneySignals): boolean {
 export function journeyProgress(data: JourneySignals) {
   let reached = -1;
   copy.stages.forEach((stage, index) => { if (signalMet(stage.signal, data)) reached = index; });
-  const current = Math.min(reached + 1, copy.stages.length - 1);
+  // The server's own stage bounds how far the view may go: a planned move
+  // (a moment) is not proof the student saw it, so without this the view
+  // jumped from B to E after a few messages.
+  const cap = (copy.stageCaps as Record<string, number | string>)[data.picture.stage || ""];
+  const limit = typeof cap === "number" ? cap : copy.stages.length - 1;
+  const current = Math.min(reached + 1, limit, copy.stages.length - 1);
   return {
     current,
     stage: copy.stages[current],

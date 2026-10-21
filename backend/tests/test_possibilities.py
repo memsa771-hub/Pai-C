@@ -18,9 +18,10 @@ from tests.test_conversation_policy import state
 from tests.truth_map_fixtures import item
 
 
-@pytest.mark.parametrize('title,expected', [('General study', True), ('Study', False),
+@pytest.mark.parametrize('title,expected', [('General study', True), ('Nursing', True),
     ('Study 2 routes', False), ('Study https://example.test', False),
-    ('one two three four five six seven eight nine', False)])
+    ('Phone/electronics repair', False), ('Repair technician (self-employed)', False),
+    ('one two three four five six seven', False)])
 def test_structural_title(title, expected):
     assert valid_title(title) is expected
 
@@ -245,6 +246,8 @@ def test_migration_111_upgrade_constraints_and_downgrade():
     from pathlib import Path
     from alembic.migration import MigrationContext
     from alembic.operations import Operations
+    import sqlalchemy as sa
+    from sqlalchemy.dialects.postgresql import JSONB
     from sqlalchemy import inspect
     from sqlalchemy.exc import IntegrityError
     spec=importlib.util.spec_from_file_location('migration111',Path(__file__).parents[1]/'alembic/versions/111_possibilities.py')
@@ -253,7 +256,10 @@ def test_migration_111_upgrade_constraints_and_downgrade():
     with StudentSession() as student:
         with student.engine.begin() as connection:
             PaiPossibility.__table__.drop(connection)
-            with patch.object(migration,'op',Operations(MigrationContext.configure(connection))): migration.upgrade()
+            operations=Operations(MigrationContext.configure(connection))
+            with patch.object(migration,'op',operations): migration.upgrade()
+            # The model is at head; 112 only adds this column (SQLite cannot swap its check).
+            operations.add_column('pai_possibilities',sa.Column('fit',JSONB(),nullable=False,server_default=sa.text("'[]'")))
         with student.factory() as db:
             _,journey,_=prepare(student,db)
             row=PossibilityService(db).add(student.workspace_id,journey.id,title='Practical route',why='Evidence',kind='discovered',source='planner',status='suggested')

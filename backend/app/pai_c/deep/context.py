@@ -266,6 +266,9 @@ async def build_context(db, workspace_id: str, turn: CounselorTurnInput, *,
             memory.coverage_areas(workspace_id), NotedQuestionService(db).open_requests(workspace_id)))
     sections["journey"] = _json({"stage": journey.current_stage if journey else "IDENTITY",
         "mirror_status": draft.get("status"), "mirror_notebook_version": draft.get("notebook_version")})
+    if not wellbeing and not mirror:
+        from app.pai_c.deep.actions import workspace_places
+        sections["workspace_places"] = _json(workspace_places())
     from app.pai_c.fact_cards import available_cards
     cards = ()
     if decision is not None and decision.question_allowed and not wellbeing and not mirror and decision.action in {"explore_area", "ask", "ask_choice", "answer_request", "counsel"}:

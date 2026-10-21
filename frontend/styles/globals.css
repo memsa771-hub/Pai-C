@@ -5,6 +5,8 @@
 
 /** Dark Mode Variant **/
 @custom-variant dark (&:is(.dark *));
+/* Wide and tall enough for a one-screen page; shorter windows scroll the page instead. */
+@custom-variant fit (@media (min-width: 64rem) and (min-height: 44rem));
 
 /** PAI design tokens: the single source for colour, radius, shadow and type.
     Light and dark are tuned separately (not inverted). Text/background pairs

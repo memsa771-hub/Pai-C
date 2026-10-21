@@ -66,6 +66,31 @@ async def test_direct_information_empty_profile_queues_research_not_an_interview
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("mode", ["guided", "strict"])
+async def test_voice_promise_to_check_always_starts_research(monkeypatch, mode):
+    """Live audit: PAI said it would check official sources and nothing ran,
+    because research started only on the policy's answer_request. When Voice
+    itself notes a question for research, the check must start too."""
+    monkeypatch.setattr(config, "PAI_POLICY_MODE", mode)
+    monkeypatch.setattr(config, "PAI_API_KEY", "offline-fake")
+    sig = fallback_signals()
+    question = "DAE Electronics fee range in Lahore"
+    with StudentSession() as student:
+        async def voice(**kwargs):
+            return json.dumps({"reply": "I will check that from official sources.", "moves": ["give"],
+                               "action": {"type": "note_question", "question_to_research": question}})
+        with patch("app.pai_c.policy.classifier.complete", AsyncMock(return_value=sig.model_dump_json())),              patch("app.pai_c.deep.turn.chat_completion", voice):
+            await student.turn("Lahore mein electronics ke courses kitne ke hain?")
+        with student.factory() as db:
+            noted = db.scalar(select(CounselorNotedQuestion).where(CounselorNotedQuestion.question_to_research == question))
+            assert noted is not None and noted.needs_research
+            job = db.scalar(select(BackgroundJob).where(BackgroundJob.job_type == "research.claim"))
+            assert job is not None and job.payload["request_id"] == noted.id
+            # Idempotent: the policy path queuing the same request adds nothing.
+            assert myths.enqueue_information(db, student.workspace_id, job.payload["source_event_id"]).id == job.id
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize("text,response,areas", [
     ("I play football with friends after helping at home.", "There is room here for both your friendships and what life at home asks of you.", ["interests", "family_social"]),
     ("I help at the shop, study, and edit videos at night.", "Your days combine responsibilities, learning and something you choose for yourself.", ["status", "history", "interests", "family_social"]),

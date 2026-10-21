@@ -244,3 +244,44 @@ The Counselor shell accidentally omitted the shared UserMenu when replacing the 
     - the university-consent promise as a note.
   - **Help:** Send feedback.
   - The account menu now holds only the student's identity and Sign out.
+
+## 21 October: the agentic counselor (live audit P0/P1 and the founder's vision)
+
+- **One voice, workers behind it.** The Counselor still speaks; background workers (research, the path analyzer) feed it. This is a fixed workflow (router plus workers), not an autonomous agent, so it stays testable and costed.
+- **Research is decision support at any stage (founder).** Whenever the student asks a fact that helps them choose (fees, a field, places), research runs. Before, it ran only when the policy chose `answer_request`; when Voice itself promised "I will check" (`note_question`), nothing started. Now either starts the same idempotent `research.claim` job. Full research of every step of a chosen path stays PAI OS work.
+- **Early directions (founder).** Voice may name one or two general fields as soon as the student's words point there, offered as ideas to test. Institutions and programs still need sourced research.
+- **The 360-degree path analyzer** (`app/pai_c/paths/analyzer.py`, prompt `path_analyzer.md`, policy `path_analyzer.json`, migration 112):
+  - It runs as a background job when the student asks for help deciding (`decision_help`), when they confirm the Mirror, when they press "Find my paths", or when they add their own path.
+  - It runs once per input: the Truth Map version plus the paths the student typed in. A job that has not started yet is reused.
+  - It suggests up to five general paths and checks each against the student, with four statuses:
+    - 🟢 have;
+    - 🟡 partial;
+    - 🔴 blocker;
+    - ⚪ unknown (founder).
+  - Code, not the prompt, enforces honesty:
+    - a known status without a valid evidence id becomes unknown;
+    - paths or notes with a world number (the shared grounding pattern) are dropped or cleared;
+    - dismissed paths never come back.
+  - The student's own words travel with each verdict.
+  - Analyzer paths are stored as `source="analyzer"`, `status="suggested"`; the student's own as `source="student"`, `status="saved"`. Re-adding a dismissed one restores it.
+- **A path is a field of study (founder, after the first live look).** PAI is an education counselor, and the university side is about program fit, so every path generator now names fields as institutions name programs:
+  - the analyzer, the planner's possibility and the Mirror lanes;
+  - examples: a computing, data, business or design field, not "open a repair shop" or an apprenticeship.
+  - When the evidence points to a kind of work, the path is the field of study that leads to it.
+  - Code enforces the shape: 1 to 6 words, no slash, bracket or digit (`possibilities.json`, `valid_title`). One-word fields such as nursing are now valid.
+  - The analyzer drops any title that fails.
+  - The planner writes evidence as the student's words alone, without a speaker label or quotes. Rows stored before this change keep their old titles until dismissed.
+- **Paths are a list, not big cards (founder).** Each row shows the field, why in one line, fit dots, status, Explore, Save and Not for me. The fit detail with the student's words is on the path page.
+- **Overview never cuts content (founder).** "No scroll" meant one screen, not hidden content. The fixed layout now applies only through the `fit` variant (at least 64rem wide and 44rem tall, in `globals.css`). There the cards share the height, and the path list and the understanding card scroll inside themselves. Shorter windows scroll the page.
+- **Workspace guide.** Voice may set `show_place` with a key from `workspace_places.json`. The reply then carries `workspace_place`, which chat renders as a link chip with the view's student-facing name. Unknown keys are ignored. The places list describes what the student finds, never how it works.
+- **Conversation rules** (shared tail of both voice prompts): answer a direct ask first, give something concrete every reply, say a caution once, vary openings.
+- **Journey stage.** The workspace projection reports the server stage, and `copy.json` `stageCaps` caps the journey step by it, so the journey no longer jumps from B to E on planned moments.
+- **One operator stream per tab.** Components share one EventSource; hidden tabs hold none. This fixed the HTTP/1.1 connection exhaustion. Caddy/HTTP2 was not changed.
+- **Composer.** Dropped characters could not be reproduced in 10 fast-typing runs; no change was made.
+- **Profile.** The extractor is told to store stated marks as `result.marks_obtained` and `result.marks_total` (never a computed percentage) and the home city as `location.current_city`. The profile shows a "Please check" area for reconciler conflicts and invites a document upload for stated results. An education result now satisfies the "test result" basic.
+- **Known gaps:**
+  - background job messages (research replies) are English templates, not in the student's language;
+  - institution names in analyzer titles are blocked only by the prompt, since there is no deterministic detector;
+  - bare numbers without a currency or % sign are not caught as world numbers, because students state their own marks that way;
+  - a profile record change alone does not trigger a fresh analysis until the Truth Map version or the student's paths change.
+- **Docs.** Section 7 of `COUNSELOR_V3_PROMPTS.md` had drifted from `voice_guided.md`; it now mirrors the runtime prompt. The analyzer prompt has its own section, checked by a test.

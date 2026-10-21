@@ -123,9 +123,10 @@ export function CounselorShell() {
     ) : active === "files" ? (
       <DocumentsView list={<FileList />} preview={<FilePreview />} />
     ) : active === "overview" ? (
-      // Overview is one screen: on desktop it fits the window and never scrolls.
-      <div data-scroll-area className="min-h-0 flex-1 overflow-y-auto lg:overflow-hidden">
-        <div className="mx-auto w-full max-w-6xl px-4 pb-6 pt-2 sm:px-8 lg:h-full">
+      // Overview is one screen when the window is big enough (fit): cards
+      // scroll inside. Smaller windows scroll the page, so nothing is cut off.
+      <div data-scroll-area className="min-h-0 flex-1 overflow-y-auto fit:overflow-hidden">
+        <div className="mx-auto w-full max-w-6xl px-4 pb-6 pt-2 sm:px-8 fit:h-full">
           <Overview journey={journey} navigate={navigate} openPath={openPath} onChat={chat} />
         </div>
       </div>
@@ -134,7 +135,7 @@ export function CounselorShell() {
     ) : (
       <div data-scroll-area className="min-h-0 flex-1 overflow-y-auto">
         <div className="mx-auto max-w-6xl px-4 pb-16 pt-6 sm:px-8 sm:pt-8">
-          {active === "profile" && <LivingProfile onChat={chat} stage={journey.progress?.stage} />}
+          {active === "profile" && <LivingProfile onChat={chat} onNavigate={navigate} stage={journey.progress?.stage} />}
           {active === "journey" && <Journey navigate={navigate} journey={journey} onChat={chat} />}
           {active === "paths" &&
             (path ? (

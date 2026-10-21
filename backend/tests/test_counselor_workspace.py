@@ -71,6 +71,18 @@ def test_workspace_projection_does_not_publish_private_map():
             assert forbidden not in text
 
 
+def test_workspace_projection_reports_the_server_stage():
+    from app.routers.counselor_workspace import counselor_workspace
+    from app.journey import JourneyService
+    from app.models import Workspace
+    with StudentSession() as student, student.factory() as db:
+        workspace = db.get(Workspace, student.workspace_id)
+        journey = JourneyService(db).ensure_counselor(student.workspace_id)
+        with patch('app.routers.counselor_workspace._authorized', return_value=workspace):
+            result = counselor_workspace(student.workspace_id, db, None, None)
+        assert result['data']['stage'] == journey.current_stage
+
+
 def test_student_export_is_scoped_readonly_and_excludes_private_data():
     from app.pai_c.data_export import export_student_data
     from app.models import EventRecord, Workspace, CounselorNotebook, FileRecord

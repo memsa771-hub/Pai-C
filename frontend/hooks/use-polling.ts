@@ -1,5 +1,6 @@
 'use client';
 
+import { usePageVisible } from './use-page-visible';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { workspaceApi } from '@/lib/api';
 import { eventToMessage } from '@/lib/types';
@@ -78,6 +79,7 @@ export function useMessagePolling({ sessionId, enabled = true, initialMessages }
   // EventSource connections, which otherwise leaves the UI stuck on a stale
   // "thinking…" after the answer already arrived).
   const [reconnectNonce, setReconnectNonce] = useState(0);
+  const pageVisible = usePageVisible();
 
   // Refs for cursor tracking
   const newestIdRef = useRef<string | null>(null);
@@ -286,9 +288,12 @@ export function useMessagePolling({ sessionId, enabled = true, initialMessages }
     }
   }, [sessionId, hasOlder, loadingOlder, dmPair]);
 
-  // Initial load + SSE with polling fallback
+  // Initial load + SSE with polling fallback. A hidden tab holds neither:
+  // background tabs keeping streams open used up the browser's per-host
+  // connection limit and stalled every request in the visible one. The
+  // visibility effect below catches up and reconnects on return.
   useEffect(() => {
-    if (!sessionId || !enabled) return;
+    if (!sessionId || !enabled || !pageVisible) return;
 
     if (!historyLoadedRef.current) {
       // History hydration excludes intermediate step events (thinking/status/
@@ -371,7 +376,7 @@ export function useMessagePolling({ sessionId, enabled = true, initialMessages }
       if (eventSource) eventSource.close();
       if (timeout) clearTimeout(timeout);
     };
-  }, [sessionId, enabled, poll, loadHistory, reconnectNonce]);
+  }, [sessionId, enabled, poll, loadHistory, reconnectNonce, pageVisible]);
 
   // Recover after the tab is backgrounded (esp. mobile browsers, which suspend
   // timers and kill the EventSource). On return to the foreground: immediately

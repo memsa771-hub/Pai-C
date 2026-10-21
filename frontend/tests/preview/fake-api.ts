@@ -28,6 +28,8 @@ const api={getCounselorWorkspace:async()=>picture,getProfileCards:async()=>({car
   getFamilyTalk:async()=>({ready:true,path_id:'path-one',path:'Practical design',message:'Prepare around what you know, without assuming that a concern has been resolved.',family:[{id:'person-one',role:'Parent',wish:'A dependable career',worry:'Whether the work will be stable',evidence:'My parent wants me to have dependable work.'}],evidence:[{id:'quote-one',quote:'I fixed a broken lamp with my friend.'}]}),
   prepareFamilyTalk:async()=>({event_id:'offline-family',script:'I understand that dependable work matters to you. I want to explore practical design. I fixed a broken lamp with my friend. I would like us to look at the evidence together before deciding.'}),
   acceptPathActivity:async()=>({scheduled:true}),
+  addOwnPath:async()=>({...possibilities[1],id:'own-path',title:'Nursing',why:'Nursing',source:'student',status:'saved',fit:[]}),
+  analyzePaths:async()=>({job_id:'offline-paths'}),
   getCounselorHealth:async()=>({planner_lag_alert:false}),getPath:async()=>pathResult,
   getPrograms:async()=>searched?(new URLSearchParams(location.search).has('programs')?richPrograms:programs):{status:'not_started',programs:[],missing:[]},
   searchPrograms:async()=>{searched=true;return{};},preparePathRoadmap:async()=>{prepared=true;return {run_id:'offline'};},

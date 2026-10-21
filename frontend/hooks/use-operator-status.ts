@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { workspaceApi } from '@/lib/api';
 import type { OperatorRun } from '@/lib/types';
 
@@ -24,102 +24,131 @@ function pickNewer(current: OperatorRun | null, incoming: OperatorRun | null): O
   return incomingTime >= currentTime ? incoming : current;
 }
 
+type Listener = (run: OperatorRun | null) => void;
+
+/**
+ * One connection per tab for PAI Operator's run updates, however many
+ * components show the "PAI is working…" state. Each component used to open
+ * its own EventSource; with a chat stream as well, two or three tabs filled
+ * the browser's six-connection limit per host and every request stalled.
+ *
+ * The hub opens on the first subscriber and closes with the last, and it lets
+ * go of the stream while the tab is hidden, catching up on return.
+ */
+const hub = {
+  listeners: new Set<Listener>(),
+  run: null as OperatorRun | null,
+  source: null as EventSource | null,
+  timer: null as ReturnType<typeof setTimeout> | null,
+  polling: false,
+
+  publish(incoming: OperatorRun | null) {
+    const next = pickNewer(this.run, incoming);
+    if (next === this.run) return;
+    this.run = next;
+    this.listeners.forEach((listener) => listener(next));
+  },
+
+  async seed() {
+    try {
+      const { runs } = await workspaceApi.listOperatorRuns({ limit: 1 });
+      this.publish(runs[0] ?? null);
+      return runs[0] ?? null;
+    } catch {
+      // Best-effort: the stream or the polling fallback catches up.
+      return null;
+    }
+  },
+
+  async tick() {
+    const latest = await this.seed();
+    if (!this.polling) return;
+    const working = latest && !['completed', 'needs_user_action', 'failed'].includes(latest.status);
+    this.timer = setTimeout(() => void this.tick(), working ? ACTIVE_POLL_MS : IDLE_POLL_MS);
+  },
+
+  startPolling() {
+    if (this.polling) return;
+    this.polling = true;
+    void this.tick();
+  },
+
+  stopPolling() {
+    this.polling = false;
+    if (this.timer) clearTimeout(this.timer);
+    this.timer = null;
+  },
+
+  open() {
+    if (this.source || this.polling) return;
+    void this.seed();
+    try {
+      const source = new EventSource(workspaceApi.getOperatorEventsUrl());
+      source.onmessage = (ev) => {
+        try {
+          const event = JSON.parse(ev.data);
+          if (event.type !== 'workspace.operator.run_updated') return;
+          this.publish(workspaceApi.mapOperatorRun(event.payload));
+        } catch {
+          // malformed event
+        }
+      };
+      source.onerror = () => {
+        source.close();
+        if (this.source === source) this.source = null;
+        this.startPolling();
+      };
+      this.source = source;
+    } catch {
+      this.startPolling();
+    }
+  },
+
+  close() {
+    this.source?.close();
+    this.source = null;
+    this.stopPolling();
+  },
+
+  visibility: () => {
+    if (!hub.listeners.size) return;
+    if (document.visibilityState === 'hidden') hub.close();
+    else hub.open();
+  },
+
+  subscribe(listener: Listener) {
+    this.listeners.add(listener);
+    listener(this.run);
+    if (this.listeners.size === 1) {
+      document.addEventListener('visibilitychange', this.visibility);
+      if (document.visibilityState !== 'hidden') this.open();
+    }
+    return () => {
+      this.listeners.delete(listener);
+      if (!this.listeners.size) {
+        document.removeEventListener('visibilitychange', this.visibility);
+        this.close();
+        this.run = null;
+      }
+    };
+  },
+};
+
 /**
  * PAI Operator's most recent run — the read side of the "PAI is working…"
- * indicator. Backed by realtime SSE first: every meaningful status change
- * PAI Operator makes is persisted to Postgres AND published as a
- * "workspace.operator.run_updated" event on target "core" (see
- * `operator._publish_run_updated`), and this hook subscribes to exactly that
- * stream via `getOperatorEventsUrl()` — the same SSE mechanism chat messages
- * already use (see hooks/use-polling.ts), just filtered by target instead of
- * channel since Operator has no thread of its own.
- *
- * Polling is only the fallback: it seeds the initial state (SSE only carries
- * events published after the connection opens) and takes back over if the
- * SSE connection drops. This hook never simulates progress on its own — it
- * only ever reflects a value that came from the server.
+ * indicator. Realtime SSE first (Operator publishes
+ * "workspace.operator.run_updated" on target "core"), polling only as the
+ * fallback. This hook never simulates progress; it reflects only what the
+ * server reported, through the one shared connection above.
  */
 export function useOperatorStatus(enabled: boolean): OperatorRun | null {
   const [run, setRun] = useState<OperatorRun | null>(null);
-  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
   useEffect(() => {
     if (!enabled) {
       setRun(null);
       return;
     }
-    let cancelled = false;
-    let eventSource: EventSource | null = null;
-    let polling = false;
-
-    const tick = async () => {
-      let latest: OperatorRun | null = null;
-      try {
-        // Unfiltered: the most recent run regardless of status, so a just-
-        // finished run's result (e.g. "needs your approval") stays visible
-        // instead of vanishing the instant it leaves the active states.
-        const { runs } = await workspaceApi.listOperatorRuns({ limit: 1 });
-        latest = runs[0] ?? null;
-        if (!cancelled) setRun((current) => pickNewer(current, latest));
-      } catch {
-        // Best-effort — try again on the next tick.
-      }
-      if (cancelled || !polling) return;
-      const stillWorking = latest && !['completed', 'needs_user_action', 'failed'].includes(latest.status);
-      timeoutRef.current = setTimeout(tick, stillWorking ? ACTIVE_POLL_MS : IDLE_POLL_MS);
-    };
-
-    const startPolling = () => {
-      if (polling) return;
-      polling = true;
-      void tick();
-    };
-
-    const stopPolling = () => {
-      polling = false;
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-        timeoutRef.current = null;
-      }
-    };
-
-    // Seed initial state, then prefer the realtime stream. This request and
-    // the SSE connection below race each other — pickNewer (keyed on the
-    // server's updatedAt, not arrival order) is what keeps a slow response
-    // here from clobbering a newer state SSE already delivered.
-    workspaceApi.listOperatorRuns({ limit: 1 }).then(({ runs }) => {
-      if (!cancelled) setRun((current) => pickNewer(current, runs[0] ?? null));
-    }).catch(() => {
-      // Best-effort — SSE (or the polling fallback below) will catch up.
-    });
-
-    try {
-      eventSource = new EventSource(workspaceApi.getOperatorEventsUrl());
-      eventSource.onmessage = (ev) => {
-        try {
-          const event = JSON.parse(ev.data);
-          if (event.type !== 'workspace.operator.run_updated') return;
-          if (!cancelled) setRun((current) => pickNewer(current, workspaceApi.mapOperatorRun(event.payload)));
-        } catch {
-          // malformed event
-        }
-      };
-      eventSource.onerror = () => {
-        eventSource?.close();
-        eventSource = null;
-        startPolling();
-      };
-    } catch {
-      startPolling();
-    }
-
-    return () => {
-      cancelled = true;
-      stopPolling();
-      eventSource?.close();
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    return hub.subscribe(setRun);
   }, [enabled]);
-
   return run;
 }

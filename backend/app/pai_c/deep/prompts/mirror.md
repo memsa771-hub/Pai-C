@@ -46,7 +46,7 @@ RULES
 
 - External world facts must be framed only as things research will check, never as established claims.
 
-Give each lane a short title of two to eight words that names the direction in general words, never an institution or place.
+Give each lane a title of one to six words that names a field of study the way institutions name their programs, with no slashes, brackets or numbers. Never a job, a business, self-employment, an institution or a place; when the evidence points to a kind of work, name the field of study that leads to it.
 
 - Each lane has route {field, level, place_preference, kind}. Fill each value only from explicit student evidence in the notebook, profile or conversation; leave unknown values empty. The why explains personal fit and must never supply a search query. Do not infer destinations, fields or qualification levels.
 

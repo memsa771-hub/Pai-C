@@ -179,6 +179,10 @@ async def _run_deep_turn(db, workspace_id: str, event_data: dict, depth: int):
         reply_metadata["mirror_pending"] = True
     from app.pai_c.fact_cards import validated_card, presentation_card
     card = validated_card(action, context.fact_cards, turn.student_text) if context and decision and decision.question_allowed and not flagged else None
+    from app.pai_c.deep.actions import shown_place
+    if place := shown_place(action):
+        # The student sees a link to the place; never a route or system name.
+        reply_metadata = {**(reply_metadata or {}), "workspace_place": place}
     inline_card = presentation_card(decision, safety_flagged=flagged)
     if inline_card:
         reply_metadata = {**(reply_metadata or {}), "counselor_card": inline_card}
@@ -226,8 +230,15 @@ async def _run_deep_turn(db, workspace_id: str, event_data: dict, depth: int):
         db.commit()
     # Queue after the reply and its decision are durable: a cache hit must not
     # overtake the acknowledgment, and a Voice safety override must win.
-    if (decision is not None and decision.action == "answer_request" and signals.request
-            and signals.request.needs_research and action.get("type") != "wellbeing"):
+    # Research starts whenever the student is told it will: on the policy's
+    # answer_request with a research need, and equally when Voice itself noted
+    # a question for research (its prompt says "I will check" and sets
+    # note_question). Without the second case PAI promised a check that never
+    # ran. The job is idempotent per request, so both paths queue it once.
+    voice_noted = move == "note_question" and status == "recorded"
+    policy_asked = (decision is not None and decision.action == "answer_request" and signals.request
+                    and signals.request.needs_research)
+    if (policy_asked or voice_noted) and action.get("type") != "wellbeing":
         from app.research.gateway import request_research
         from app.tools import ToolContext
         try:
@@ -237,6 +248,18 @@ async def _run_deep_turn(db, workspace_id: str, event_data: dict, depth: int):
         except Exception as exc:
             db.rollback()
             logger.warning("information_enqueue_failed error_type=%s", type(exc).__name__)
+    # A student asking which paths they have gets them worked out in the
+    # background by the path analyzer; the reply above never waits for it.
+    from app.pai_c.paths.analyzer import enqueue_path_analysis, policy as path_policy
+    if (signals is not None and signals.request is not None and not flagged
+            and signals.request.kind in path_policy()["triggers"]["request_kinds"]):
+        try:
+            enqueue_path_analysis(db, workspace_id, source_event_id=turn.source_event_id,
+                                  channel=turn.channel, reason="asked")
+            db.commit()
+        except Exception as exc:
+            db.rollback()
+            logger.warning("path_analysis_enqueue_failed error_type=%s", type(exc).__name__)
     logger.info(
         "counselor_deep_turn context_ms=%d model_ms=%d polish_ms=%d "
         "post_ms=%d classifier_ms=%d total_ms=%d action=%s action_status=%s moves=%s",

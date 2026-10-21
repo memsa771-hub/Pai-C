@@ -92,6 +92,8 @@ module.exports = [
   { id: 'chat-rating', path: '/student?view=threads&card=rating', ready: 'main textarea' },
   { id: 'chat-fact-upload', path: '/student?view=threads&card=fact', ready: 'main textarea' },
   { id: 'chat-path-card', path: '/student?view=threads&card=paths', ready: 'main textarea' },
+  { id: 'chat-paths-found', path: '/student?view=threads&card=paths-found', ready: 'main textarea' },
+  { id: 'chat-place', path: '/student?view=threads&card=place', ready: 'main textarea' },
   { id: 'chat-mirror', path: '/student?view=threads&mirror=1', ready: 'main textarea' },
   { id: 'chat-mirror-rate', path: '/student?view=threads&mirror=1', ready: 'main textarea', crawl: false, setup: async (page) => {
     await page.getByRole('button', { name: 'Yes, that is right' }).click(); await page.getByRole('radiogroup').waitFor();
@@ -103,6 +105,9 @@ module.exports = [
 
   { id: 'paths', path: '/student?view=paths', ready: 'main h1', full: true },
   { id: 'path', path: '/student?view=paths&path=path-one', ready: 'main h1', full: true },
+  { id: 'paths-add-own', path: '/student?view=paths', ready: 'main h1', crawl: false, setup: async (page) => {
+    await page.getByRole('button', { name: 'Add your own path' }).click(); await page.getByRole('dialog').waitFor();
+    await page.getByLabel('Path', { exact: true }).fill('Nursing'); } },
   { id: 'programs-consent', path: '/student?view=paths&path=path-one&stage=H', ready: 'main h1', full: true },
   { id: 'programs', path: '/student?view=paths&path=path-one&stage=H&programs=1', ready: 'main h1', full: true },
   { id: 'programs-none-verified', path: '/student?view=paths&path=path-one&stage=H', ready: 'main h1', full: true, crawl: false, setup: async (page) => {

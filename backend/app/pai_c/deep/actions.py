@@ -11,7 +11,18 @@ from app.pai_c.deep.turn_input import CounselorTurnInput
 from app.models import EventRecord, Roadmap
 
 logger = logging.getLogger(__name__)
-_KNOWN = frozenset({"none", "mirror", "note_question", "wellbeing", "rethink", "collect_fact"})
+_KNOWN = frozenset({"none", "mirror", "note_question", "wellbeing", "rethink", "collect_fact", "show_place"})
+
+
+def workspace_places() -> dict[str, str]:
+    from app.pai_c.policy.controller import load_data
+    return load_data("workspace_places.json")["places"]
+
+
+def shown_place(action: dict) -> str | None:
+    """The workspace place a reply links to, only when it is a known one."""
+    place = action.get("place") if isinstance(action, dict) and action.get("type") == "show_place" else None
+    return place if isinstance(place, str) and place in workspace_places() else None
 
 
 def _record(db, turn: CounselorTurnInput, name: str, status: str, **details) -> None:
@@ -38,6 +49,10 @@ async def dispatch_action(db, turn: CounselorTurnInput, action: dict,
     if kind == "collect_fact":
         from app.pai_c.fact_cards import validated_card
         status = "offered" if validated_card(action, context.fact_cards, turn.student_text) else "ignored"
+        _record(db, turn, kind, status)
+        return kind, status
+    if kind == "show_place":
+        status = "offered" if shown_place(action) else "ignored"
         _record(db, turn, kind, status)
         return kind, status
     if kind == "mirror":

@@ -283,7 +283,19 @@
       "about": "I want to add something about me.",
       "education": "I want to add my education.",
       "experience": "I want to add an experience: a job, a project, an activity or an award."
-    }
+    },
+    "checkTitle": "Please check",
+    "checkIntro": "Something you said is different from your profile. Which is right?",
+    "checkLine": "Your profile says {current}. You also said {proposed}.",
+    "checkKeep": "Keep {value}",
+    "checkUse": "Use {value}",
+    "checkOther": "PAI needs to check one detail with you.",
+    "checkTalk": "Talk about it",
+    "checkDraft": "Can we check my {label}?",
+    "checkFailed": "Could not save that. Please try again.",
+    "proofTitle": "Confirm with a document",
+    "proofIntro": "You told PAI your marks. A photo of your result card lets PAI use them when checking where you can apply.",
+    "proofAction": "Upload result card"
   },
   "basics": [
     {
@@ -312,7 +324,13 @@
     },
     {
       "key": "test_attempt",
-      "label": "A test or exam result"
+      "label": "A test or exam result",
+      "alsoMetBy": [
+        {
+          "record": "education",
+          "field": "result"
+        }
+      ]
     },
     {
       "key": "preferences.target_countries",
@@ -335,5 +353,15 @@
     "about",
     "education",
     "experience"
+  ],
+  "proofRecords": [
+    {
+      "record": "education",
+      "field": "result"
+    },
+    {
+      "record": "test_attempt",
+      "field": "overall_score"
+    }
   ]
 }

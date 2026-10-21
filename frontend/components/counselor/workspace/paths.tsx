@@ -2,15 +2,21 @@
 import { useCallback, useEffect, useState } from "react";
 import {
   ArrowLeft, ArrowRight, Bookmark, BookOpen, Briefcase, Compass, DoorOpen, ExternalLink, FlaskConical, GraduationCap,
-  HelpCircle, Info, Loader2, MapPin, MessageCircle, RefreshCw, ShieldCheck, Sparkles, Sun, Telescope, ThumbsUp,
+  HelpCircle, Info, Loader2, MapPin, MessageCircle, Plus, RefreshCw, ShieldCheck, Sparkles, Sun, Telescope, ThumbsUp,
   Wallet, Wrench, X, type LucideIcon,
 } from "lucide-react";
 import { workspaceApi } from "@/lib/api";
 import type { Possibility } from "@/lib/possibilities";
 import type { Program } from "@/lib/counselor-workspace";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import {
+  Dialog, DialogBody, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
+} from "@/components/ui/responsive-dialog";
 import { EmptyState, SectionCard, Skeletons, StatChip, toneClass, toneFor, tonesByOrder, type Tone } from "@/components/pai";
-import { PathCardView } from "@/components/counselor/path-card";
+import { FitDots, FitList, initials } from "@/components/counselor/path-card";
 import { cn } from "@/lib/utils";
 import { Heading, LoadState, useResource, human, evidenceLabel, shortDate } from "./resource";
 import { DEFAULT_LOCALE } from "@/lib/i18n/locales";
@@ -43,7 +49,9 @@ function BackButton({ onClick }: { onClick: () => void }) {
   );
 }
 
-export function PathCard({
+/** One path as a list row: the field, why it fits in a line, how it fits at a
+ * glance, and the student's controls. The path page holds the detail. */
+export function PathRow({
   path,
   onOpen,
   onChange,
@@ -67,52 +75,170 @@ export function PathCard({
       setBusy(false);
     }
   }
+  const accent = toneClass[tone || toneFor(path.id)];
   return (
-    <PathCardView id={path.id} tone={tone} title={path.title} whyLabel={copy.why} why={path.why} quote={path.evidence[0]?.text}
-      status={human(path.status)} statusTone={statusTone[path.status]} error={error ? copy.error : null}
-      actions={<>
-        <Button size="tap" onClick={onOpen}><Compass aria-hidden />{copy.explore}</Button>
+    <li className="flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:gap-5 sm:px-5">
+      <div className="flex min-w-0 flex-1 items-center gap-3.5">
+        <span aria-hidden className={cn("flex size-10 shrink-0 items-center justify-center rounded-full text-[13px] font-semibold", accent.soft, accent.ink)}>
+          {initials(path.title)}
+        </span>
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
+            <h2 className="font-semibold leading-snug">{path.title}</h2>
+            <FitDots items={path.fit || []} summary={copy.overview.fitDots} />
+          </div>
+          <p className="mt-0.5 line-clamp-2 text-sm text-muted-foreground sm:line-clamp-1">{path.why}</p>
+        </div>
+      </div>
+      <div className="flex shrink-0 items-center gap-1.5 ps-[3.375rem] sm:ps-0">
+        <StatChip size="sm" tone={statusTone[path.status]}>
+          {path.source === "student" && path.status === "saved" ? copy.ownPath : human(path.status)}
+        </StatChip>
+        <Button size="md" variant="soft" className="ms-1.5" onClick={onOpen}><Compass aria-hidden />{copy.explore}</Button>
         {["suggested", "dismissed"].includes(path.status) && (
-          <Button size="tap" variant="soft" disabled={busy} onClick={() => act("save")}><Bookmark aria-hidden />{copy.save}</Button>
+          <Button size="icon" variant="ghost" disabled={busy} aria-label={copy.save} title={copy.save} onClick={() => act("save")}><Bookmark aria-hidden /></Button>
         )}
         {!["dismissed", "chosen"].includes(path.status) && (
-          <Button size="tap" variant="ghost" disabled={busy} onClick={() => act("dismiss")}><X aria-hidden />{copy.notForMe}</Button>
+          <Button size="icon" variant="ghost" disabled={busy} aria-label={copy.notForMe} title={copy.notForMe} onClick={() => act("dismiss")}><X aria-hidden /></Button>
         )}
-      </>} />
+      </div>
+      {error && <p role="alert" className="text-sm font-medium text-danger-ink sm:basis-full">{copy.error}</p>}
+    </li>
   );
 }
 
+/** The student's own direction, in their words. PAI then checks it against
+ * them like any other path. */
+function AddOwnPath({ open, onOpenChange, onAdded }: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onAdded: () => void;
+}) {
+  const [title, setTitle] = useState(""),
+    [why, setWhy] = useState(""),
+    [busy, setBusy] = useState(false),
+    [error, setError] = useState(false);
+  useEffect(() => {
+    if (open) { setTitle(""); setWhy(""); setError(false); }
+  }, [open]);
+  async function submit(event: React.FormEvent) {
+    event.preventDefault();
+    if (!title.trim()) return;
+    setBusy(true);
+    setError(false);
+    try {
+      await workspaceApi.addOwnPath(title.trim(), why.trim());
+      onOpenChange(false);
+      onAdded();
+    } catch {
+      setError(true);
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-lg">
+        <form onSubmit={submit}>
+          <DialogHeader className="space-y-2 px-7 pb-2 pt-7">
+            <DialogTitle className="text-xl">{copy.addOwnTitle}</DialogTitle>
+            <DialogDescription>{copy.addOwnIntro}</DialogDescription>
+          </DialogHeader>
+          <DialogBody className="space-y-4 px-7 py-3">
+            <div className="space-y-2">
+              <Label htmlFor="own-path-title">{copy.addOwnName}</Label>
+              <Input id="own-path-title" required maxLength={120} value={title} autoFocus
+                placeholder={copy.addOwnPlaceholder} onChange={(e) => setTitle(e.target.value)} />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="own-path-why">{copy.addOwnWhy}</Label>
+              <Textarea id="own-path-why" maxLength={600} rows={3} value={why} onChange={(e) => setWhy(e.target.value)} />
+            </div>
+            {error && <p role="alert" className="text-sm font-medium text-danger-ink">{copy.error}</p>}
+          </DialogBody>
+          <DialogFooter className="px-7 pb-7 pt-2">
+            <Button type="button" size="tap" variant="ghost" onClick={() => onOpenChange(false)}>{copy.addOwnCancel}</Button>
+            <Button type="submit" size="tap" disabled={busy || !title.trim()}><Plus aria-hidden />{copy.addOwnSave}</Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+const LIST = "divide-y divide-border/70 overflow-hidden rounded-[22px] bg-card shadow-card ring-1 ring-border/70";
+
+/** How long the page keeps looking for the analyzer's paths after a request. */
+const FINDING_POLLS = 12, FINDING_EVERY_MS = 5000;
+
 export function Paths({ onOpen, onChat }: { onOpen: (id: string) => void; onChat?: (topic?: string) => void }) {
   const resource = useResource(list);
+  const [adding, setAdding] = useState(false),
+    [finding, setFinding] = useState(0),
+    [findError, setFindError] = useState(false);
   const live = resource.data?.filter((p) => p.status !== "dismissed") || [];
   const dismissed = resource.data?.filter((p) => p.status === "dismissed") || [];
   const tones = tonesByOrder((resource.data || []).map((p) => p.id));
+  const { refresh } = resource;
+  // The analyzer works in the background; look again a few times, then stop.
+  useEffect(() => {
+    if (!finding) return;
+    const timer = setTimeout(() => { void refresh(); setFinding((left) => left - 1); }, FINDING_EVERY_MS);
+    return () => clearTimeout(timer);
+  }, [finding, refresh]);
+  async function find() {
+    setFindError(false);
+    try {
+      await workspaceApi.analyzePaths();
+      setFinding(FINDING_POLLS);
+    } catch {
+      setFindError(true);
+    }
+  }
+  const added = () => { void refresh(); setFinding(FINDING_POLLS); };
+  const actions = (
+    <>
+      <Button size="tap" disabled={finding > 0} onClick={find}><Sparkles aria-hidden />{copy.findPaths}</Button>
+      <Button size="tap" variant="outline" onClick={() => setAdding(true)}><Plus aria-hidden />{copy.addOwn}</Button>
+    </>
+  );
   return (
     <>
-      <Heading title={copy.pathsTitle} description={copy.pathsIntro} icon={Compass} tone="teal" />
+      <Heading title={copy.pathsTitle} description={copy.pathsIntro} icon={Compass} tone="teal"
+        action={resource.data?.length ? actions : undefined} />
+      <AddOwnPath open={adding} onOpenChange={setAdding} onAdded={added} />
+      {finding > 0 && (
+        <p role="status" className="mb-5 flex items-start gap-2.5 rounded-2xl bg-info-soft px-4 py-3 text-sm text-info-ink">
+          <Loader2 aria-hidden className="mt-0.5 size-4 shrink-0 animate-spin" />{copy.findingPaths}
+        </p>
+      )}
+      {findError && <p role="alert" className="mb-5 text-sm font-medium text-danger-ink">{copy.error}</p>}
       {!resource.data || resource.error ? (
         <LoadState error={resource.error} busy={resource.busy} retry={resource.refresh} />
       ) : !resource.data.length ? (
         <EmptyState icon={Compass} tone="teal" title={copy.pathsEmptyTitle} description={copy.pathsEmptyBody}
-          action={onChat && <Button size="tap" onClick={() => onChat()}><MessageCircle aria-hidden />{copy.openChat}</Button>} />
+          action={<div className="flex flex-wrap justify-center gap-2">
+            {actions}
+            {onChat && <Button size="tap" variant="ghost" onClick={() => onChat()}><MessageCircle aria-hidden />{copy.openChat}</Button>}
+          </div>} />
       ) : (
         <>
-          <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+          <ul className={LIST}>
             {live.map((path) => (
-              <PathCard path={path} tone={tones[path.id]} key={path.id} onOpen={() => onOpen(path.id)} onChange={resource.refresh} />
+              <PathRow path={path} tone={tones[path.id]} key={path.id} onOpen={() => onOpen(path.id)} onChange={resource.refresh} />
             ))}
-          </div>
+          </ul>
           {dismissed.length > 0 && (
             <details className="group mt-8">
               <summary className="inline-flex min-h-11 cursor-pointer list-none items-center gap-2 rounded-xl px-1 font-semibold text-muted-foreground">
                 <ArrowRight aria-hidden className="size-4 transition-transform group-open:rotate-90" />
                 {fill(copy.dismissedTitle, { count: dismissed.length })}
               </summary>
-              <div className="mt-4 grid gap-5 opacity-80 md:grid-cols-2 xl:grid-cols-3">
+              <ul className={cn(LIST, "mt-4 opacity-80")}>
                 {dismissed.map((path) => (
-                  <PathCard path={path} tone={tones[path.id]} key={path.id} onOpen={() => onOpen(path.id)} onChange={resource.refresh} />
+                  <PathRow path={path} tone={tones[path.id]} key={path.id} onOpen={() => onOpen(path.id)} onChange={resource.refresh} />
                 ))}
-              </div>
+              </ul>
             </details>
           )}
         </>
@@ -210,6 +336,11 @@ export function PathPage({
         </div>
         <p className="mt-4 text-sm text-muted-foreground">{copy.pathIntro}</p>
       </header>
+      {!!result.possibility.fit?.length && (
+        <SectionCard title={copy.fitTitle} description={copy.fitLegend} icon={ShieldCheck} tone={tone} className="mb-6">
+          <FitList items={result.possibility.fit} detailed />
+        </SectionCard>
+      )}
       {result.status === "stale" && (
         <section className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-warning-soft px-5 py-4 text-warning-ink">
           <p className="flex items-start gap-2 text-sm font-medium"><Info aria-hidden className="mt-0.5 size-4 shrink-0" />{copy.stalePath}</p>

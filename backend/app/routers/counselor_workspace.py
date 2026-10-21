@@ -62,6 +62,10 @@ def counselor_workspace(network: str=Query(...),db=Depends(get_db),
         'capabilities':memory.capability_view(wid),'academic':memory.academic_view(wid),
         'picture':(draft.get('mirror') or {}).get('core_picture') if draft.get('status')=='confirmed' else None,
         'mirror_status':draft.get('status'),'moments':moments,
+        # The server-owned Counselor stage. Moments are the Counselor's planned
+        # next moves, not things the student has seen, so the A-K view uses
+        # this to keep its progress honest.
+        'stage':journey.current_stage if journey else None,
         'ratings':[{'version':r.mirror_version,'understood':r.understood,'before':r.certainty_before,
                     'after':r.certainty_after} for r in feedback]})
 

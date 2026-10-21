@@ -1,6 +1,6 @@
 {
-  "title_min_words": 2,
-  "title_max_words": 8,
+  "title_min_words": 1,
+  "title_max_words": 6,
   "transitions": {
     "explore": {"suggested": "exploring", "saved": "exploring", "dismissed": "exploring", "exploring": "exploring"},
     "save": {"suggested": "saved", "dismissed": "saved", "saved": "saved"},

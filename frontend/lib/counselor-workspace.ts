@@ -38,6 +38,8 @@ export type LivingPicture = {
   picture: Record<string, { text: string; evidence: string[] }> | null;
   mirror_status: string | null;
   moments: Record<string, string>;
+  /** Server-owned Counselor stage (IDENTITY … CHOSEN); null before a journey exists. */
+  stage?: string | null;
   ratings: {
     version: number;
     understood: number;

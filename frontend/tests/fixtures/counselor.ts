@@ -14,6 +14,13 @@ export const possibilities: Possibility[] = [
     evidence: [
       { text: "I fixed a broken lamp with my friend.", item_id: "e1" },
     ],
+    source: "analyzer",
+    fit: [
+      { label: "Hands-on making", status: "have", note: "You already repair and build things.",
+        evidence: ["I fixed a broken lamp with my friend."] },
+      { label: "Drawing ideas on paper", status: "partial", note: "", evidence: ["I sketch before I build."] },
+      { label: "Paying for a full degree", status: "unknown", note: "", evidence: [] },
+    ],
     unknowns: [],
     roadmap_id: null,
   },
