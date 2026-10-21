@@ -397,3 +397,31 @@ def test_documents_read_together_are_compared(os_db, engine, clean):
         assert [(f["kind"], f["field"]) for f in findings] == [("variant", "full_name")]
     finally:
         stop(ctx)
+
+
+def test_delete_leaves_no_workflow_data(documents):
+    """Review C1: DBOS keeps every step's output, and the model request's output holds the values read. Deleting
+    the document deletes its workflows (the first and any retry-day ones), so nothing read is left (S3-D10)."""
+    from app.os.documents.confirm import delete_document
+
+    doc_id = documents.upload("transcript", 1)
+    other = documents.upload("transcript", 2, student="student-2")
+    documents.read(doc_id)
+    documents.read(other)
+    doc = documents.docs.get(doc_id)
+    retry = enqueue_document(documents.client, TENANT, doc, retry_day=date(2026, 10, 22))
+    documents.client.retrieve_workflow(retry).get_result()  # skipped: already read
+    prefix = f"document:{TENANT}:{doc_id}:"
+
+    def rows(table):
+        with documents.engine.connect() as conn:
+            return conn.execute(text(f"SELECT count(*) FROM {TEST_DBOS_SCHEMA}.{table} WHERE workflow_uuid LIKE :p"),
+                                {"p": prefix + "%"}).scalar()
+
+    assert rows("workflow_status") == 2 and rows("operation_outputs") > 0
+    delete_document(documents.engine, TENANT, TYPES, load_name_variants(), doc, client=documents.client)
+    assert rows("workflow_status") == 0 and rows("operation_outputs") == 0
+    other_prefix = f"document:{TENANT}:{other}:"
+    with documents.engine.connect() as conn:
+        assert conn.execute(text(f"SELECT count(*) FROM {TEST_DBOS_SCHEMA}.workflow_status WHERE workflow_uuid LIKE :p"),
+                            {"p": other_prefix + "%"}).scalar() == 1  # another document's workflow stays

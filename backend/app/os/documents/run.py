@@ -56,6 +56,19 @@ def enqueue_document(client: DBOSClient, tenant_id: str, doc: Document, retry_da
     return wid
 
 
+def forget_document(client: DBOSClient, tenant_id: str, document_id: int) -> int:
+    """Cancels and deletes every workflow of one document (the first and any retry-day ones). DBOS keeps each step's
+    output, and the model request's output holds the values read, so deleting a document must delete these too
+    (S3-D10). Returns how many were deleted."""
+    prefix = f"document:{tenant_id}:{document_id}:"  # the trailing colon: document 1 never matches document 10
+    ids = [w.workflow_id for w in client.list_workflows(workflow_id_prefix=prefix, load_input=False,
+                                                        load_output=False)]
+    if ids:
+        client.cancel_workflows(ids)
+        client.delete_workflows(ids)
+    return len(ids)
+
+
 def retry_waiting(engine: Engine, client: DBOSClient, tenant_id: str, today: date) -> int:
     """Enqueues every upload still `uploaded` (it waited for the budget, or its first enqueue was lost) once for
     `today`. Returns how many were sent. The daily `documents_retry` job calls it."""

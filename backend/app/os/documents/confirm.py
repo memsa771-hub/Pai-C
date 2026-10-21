@@ -12,7 +12,7 @@ from sqlalchemy import Engine, delete
 
 from app.os import models
 from app.os.documents.checks import cross_values
-from app.os.documents.run import compare_documents
+from app.os.documents.run import compare_documents, forget_document
 from app.os.documents.store import Document, DocumentStore, FindingStore, ProfileStore
 from app.os.documents.types import DocumentType
 
@@ -42,7 +42,7 @@ def confirm_document(engine: Engine, tenant_id: str, types: Mapping[str, Documen
                          + (f"; unknown: {', '.join(extra)}" if extra else ""))
     DocumentStore(engine, tenant_id).confirm(doc.id, values)
     open_findings = compare_documents(engine, tenant_id, doc.student_ref, types, variants)
-    held = {f.field for f in open_findings}
+    held = {f.field for f in open_findings} | _resolved_with(engine, tenant_id, doc)  # keep the student's choice
     profile = ProfileStore(engine, tenant_id)
     for key, v in cross_values(t, values).items():
         if key not in held:
@@ -50,6 +50,12 @@ def confirm_document(engine: Engine, tenant_id: str, types: Mapping[str, Documen
     for name, v in values.items():
         if not _empty(v):
             profile.set(doc.student_ref, f"{doc.doc_type}.{name}", v, doc.id)
+
+
+def _resolved_with(engine: Engine, tenant_id: str, doc: Document) -> set[str]:
+    """The cross-check keys the student already settled by resolving a finding that names this document."""
+    return {f["field"] for f in FindingStore(engine, tenant_id).list_resolved(doc.student_ref)
+            if any(i[0] == doc.id for i in f["items"])}
 
 
 def resolve_finding(engine: Engine, tenant_id: str, finding: dict, value) -> dict:
@@ -64,10 +70,12 @@ def resolve_finding(engine: Engine, tenant_id: str, finding: dict, value) -> dic
 
 
 def delete_document(engine: Engine, tenant_id: str, types: Mapping[str, DocumentType], variants: list[set[str]],
-                    doc: Document) -> None:
-    """The file and fields go, and so do the profile values taken from them; the row stays as `deleted`. The
-    student's findings are checked again without it."""
+                    doc: Document, *, client) -> None:
+    """The file and fields go, and so do the profile values taken from them and the document's DBOS workflows
+    (their step outputs hold the values read); the row stays as `deleted`. The student's findings are checked
+    again without it."""
     DocumentStore(engine, tenant_id).delete(doc.id)
+    forget_document(client, tenant_id, doc.id)
     P = models.profile_values
     with engine.begin() as conn:
         conn.execute(delete(P).where(P.c.tenant_id == tenant_id, P.c.source_document_id == doc.id))

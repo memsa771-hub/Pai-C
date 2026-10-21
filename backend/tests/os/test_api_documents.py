@@ -19,9 +19,29 @@ from app.os.documents.validators import validate
 from app.os.playbooks import load_playbook_dir
 from app.os.settings import load_settings
 from tests.os.test_api import ADMIN, TOKEN, as_student
-from tests.os.test_api_knowledge import FakeClient
+from tests.os.test_api_knowledge import FakeClient as _FakeClient
 
 FAKE = Path(__file__).parent / "playbooks"
+
+
+class FakeClient(_FakeClient):
+    """Also records the workflows a delete asks DBOS to forget."""
+
+    def __init__(self):
+        super().__init__()
+        self.deleted: list[str] = []
+
+    def list_workflows(self, *, workflow_id_prefix=None, **_):
+        from types import SimpleNamespace
+
+        return [SimpleNamespace(workflow_id=o["workflow_id"]) for o, _ in self.calls
+                if o["workflow_id"].startswith(workflow_id_prefix)]
+
+    def cancel_workflows(self, ids):
+        pass
+
+    def delete_workflows(self, ids, **_):
+        self.deleted.extend(ids)
 TYPES = load_document_types()
 TENANT = "pai"
 # Fictional values only.
@@ -266,6 +286,7 @@ def test_delete_removes_bytes(api):
     simulate_read(api.engine, doc_id, "transcript", TRANSCRIPT)
     api.post(f"/v1/os/documents/{doc_id}/confirm", json=confirm_body("transcript", TRANSCRIPT), headers=as_student())
     assert api.delete(f"/v1/os/documents/{doc_id}", headers=as_student()).status_code == 204
+    assert api.fake.deleted == [api.fake.calls[0][0]["workflow_id"]]  # its reading is forgotten by DBOS too (C1)
     with api.engine.connect() as conn:
         assert conn.execute(select(models.document_files)).all() == []
         assert conn.execute(select(models.document_fields)).all() == []
@@ -303,3 +324,34 @@ def test_admin_view_never_returns_bytes(api):
     assert data[:64] not in body and b"/9j/" not in body  # neither raw nor base64 JPEG bytes
     assert not ({"data", "file", "bytes", "content"} & set(doc))
     assert api.get("/v1/os/documents/admin", params={"student": "stu-1"}, headers=as_student()).status_code == 401
+
+
+def test_resolved_value_survives_confirm(api):
+    """Review I2: the student resolved a finding; confirming one of its documents unchanged keeps their choice."""
+    t = upload(api, data=jpeg(1)).json()["id"]
+    d = upload(api, doc_type="degree_certificate", data=jpeg(2), name="degree.jpg").json()["id"]
+    simulate_read(api.engine, t, "transcript", TRANSCRIPT)
+    simulate_read(api.engine, d, "degree_certificate", {**DEGREE, "student_name": "Sara Ahmad Khan",
+                                                          "father_name": "Ahmed Khan"})
+    [finding] = list_docs(api)["findings"]
+    assert (finding["kind"], finding["field"]) == ("variant", "full_name")
+    api.post(f"/v1/os/documents/findings/{finding['id']}/resolve", json={"value": "Sara Ahmed Khan"},
+             headers=as_student())
+    api.post(f"/v1/os/documents/{d}/confirm",
+             json=confirm_body("degree_certificate", {**DEGREE, "student_name": "Sara Ahmad Khan",
+                                                      "father_name": "Ahmed Khan"}), headers=as_student())
+    profile = {p["key"]: p for p in api.get("/v1/os/profile", headers=as_student()).json()["values"]}
+    assert profile["full_name"]["value"] == "Sara Ahmed Khan" and profile["full_name"]["source_document_id"] == t
+    assert profile["father_name"]["value"] == "Ahmed Khan"  # no finding on it: set as confirmed
+
+
+def test_failed_document_can_be_deleted_and_uploaded_again(api):
+    """Review I3: a reading that failed is not a dead end. The student deletes it and uploads the file again
+    (spec §6: "the student can retry")."""
+    data = jpeg(5)
+    doc_id = upload(api, data=data).json()["id"]
+    DocumentStore(api.engine, TENANT).set_status(doc_id, "failed", error="We could not read this document.")
+    assert upload(api, data=data).status_code == 409  # still there
+    assert api.delete(f"/v1/os/documents/{doc_id}", headers=as_student()).status_code == 204
+    r = upload(api, data=data)
+    assert r.status_code == 201 and r.json()["status"] == "uploaded"

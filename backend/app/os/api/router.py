@@ -215,7 +215,8 @@ def build_router(get_services: Callable[[], Services]) -> APIRouter:
     def delete_doc(doc_id: int, student: str = Depends(current_student_ref_for_write),
                    svc: Services = Depends(services)) -> Response:
         doc = own_document(svc, doc_id, student)
-        delete_document(svc.engine, svc.settings.tenant_id, svc.document_types, svc.name_variants, doc)
+        delete_document(svc.engine, svc.settings.tenant_id, svc.document_types, svc.name_variants, doc,
+                        client=svc.dbos_client())
         return Response(status_code=204)
 
     @router.get("/profile", response_model=ProfileOut)
