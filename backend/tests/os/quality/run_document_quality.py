@@ -115,7 +115,9 @@ def run_once(docs_dir: Path, key: dict, readers, spec, types, variants, settings
                           and r["detected"].replace(" ", "_").casefold() != key_docs[n]["type"])
     out = {"files": len(key_docs), "missing_files": len(set(key["documents"]) - set(key_docs)),  # a count: real file names may hold names
            "correct": s.correct, "scored": s.scored, "invented": s.invented, "correct_rate": round(s.rate, 4),
-           "per_type": s.type_rates(), "per_field": s.field_counts(), "failed_readings": sum(r["values"] is None for r in results.values()),
+           "per_type": s.type_rates(), "per_field": s.field_counts(), "wrong_why": s.wrong_why(),
+           "correct_rate_ignoring_punctuation": round(s.correct_ignoring_punctuation / s.scored, 4) if s.scored else 0.0,
+           "failed_readings": sum(r["values"] is None for r in results.values()),
            "check_failed_fields": sum(1 for r in results.values() for c, _ in r["checks"].values()
                                       if c == "check_failed"),
            "detected_type_differs": mismatched_type,
@@ -185,12 +187,16 @@ def main(argv: list[str] | None = None) -> int:
               f"invented {r['invented']}, failed readings {r['failed_readings']}{extra}, cost ${r['cost_usd']:.2f}, "
               f"{r['elapsed_s']}s -> {'PASS' if r['passed'] else 'FAIL'}")
         print(f"  per type: {r['per_type']}")
+        print(f"  for information, ignoring punctuation: {r['correct_rate_ignoring_punctuation']:.3f} "
+              f"(the gate scores strictly)")
         print("  per field (worst first; names and counts only):")
         worst = sorted(r["per_field"].items(), key=lambda kv: (kv[1]["correct"] - sum(kv[1].values()), kv[0]))
         for name, c in worst:
             n = sum(c.values())
+            why = r["wrong_why"].get(name)
             print(f"    {name}: correct {c['correct']}/{n}, wrong {c['wrong']}, missed {c['missed']}, "
-                  f"invented {c['invented']}")
+                  f"invented {c['invented']}" + (f" (wrong: {', '.join(f'{k} {v}' for k, v in why.items())})"
+                                                 if why else ""))
     gate = bool(runs) and all(r["passed"] for r in runs)
     model_name = settings.model_strong if spec.tier == "strong" else settings.model_cheap
     args.out.write_text(json.dumps({"set": args.which, "mode": args.mode, "tier": spec.tier,

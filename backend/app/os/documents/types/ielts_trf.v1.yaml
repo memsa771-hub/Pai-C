@@ -5,7 +5,7 @@ label: IELTS Test Report Form
 full_name_from: [first_name, family_name]
 fields:
   - {name: module, type: enum, values: [Academic, General Training], hint: "Academic or General Training"}
-  - {name: family_name, type: name, hint: "Family name as printed"}
+  - {name: family_name, type: name, hint: "Only what is in the Family Name box, as printed; never the first name"}
   - {name: first_name, type: name, hint: "First name(s) as printed"}
   - {name: date_of_birth, type: date, cross_check: date_of_birth, hint: "Date of birth as YYYY-MM-DD"}
   - {name: sex, type: enum, values: [M, F, X], hint: "Sex: M, F or X"}
@@ -18,10 +18,10 @@ fields:
   - {name: issue_date, type: date, hint: "Date the form was issued, YYYY-MM-DD"}
   - {name: listening, type: band, hint: "Listening band score"}
   - {name: reading, type: band, hint: "Reading band score"}
-  - {name: writing, type: band, hint: "Writing band score"}
+  - {name: writing, type: band, hint: "The Writing band score from the row of four band scores (Listening, Reading, Writing, Speaking); not the overall score"}
   - {name: speaking, type: band, hint: "Speaking band score"}
   - {name: overall, type: band, hint: "Overall band score"}
   - {name: cefr, type: enum, values: [A1, A2, B1, B2, C1, C2], hint: "CEFR level if printed"}
-  - {name: trf_number, type: code, hint: "Test Report Form number"}
+  - {name: trf_number, type: code, hint: "The Test Report Form number: capital letters and digits with no spaces; leave empty if you cannot read every character"}
 rules:
   - {kind: band_mean, fields: [listening, reading, writing, speaking, overall]}

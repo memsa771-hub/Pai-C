@@ -200,3 +200,43 @@ def test_runner_reads_model_and_prices_from_env(tmp_path, monkeypatch, capsys):
     result = json.loads((tmp_path / "r.json").read_text(encoding="utf-8"))
     assert (result["model"], result["tier"]) == ("a-strong-model", "strong")  # no files: nothing billed, gate fails
     assert "OS_PRICE" not in capsys.readouterr().err
+
+
+# --- why a value is wrong (gate fix round): categories only, never a value ------------------------------------
+
+
+@pytest.mark.parametrize("want, have, why", [
+    ("Board of Education, Lahore", "BOARD OF EDUCATION LAHORE", "punctuation"),
+    ("B.Sc. (Hons) Physics", "BSc Hons Physics", "punctuation"),
+    ("University of X", "University of X, Lahore Campus", "words added"),
+    ("Secondary School Certificate Examination, Annual 2020", "Secondary School Certificate Examination", "words missing"),
+    ("12345678", "12345679", "one character"),
+    ("2021-07-15", "2021-08-15", "one character"),
+    ("Physics", "Chemistry", "other"),
+])
+def test_why_wrong_categories(want, have, why):
+    from tests.os.quality.doc_scoring import why_wrong
+
+    assert why_wrong(want, have) == why
+
+
+def test_scoring_explains_wrong_values():
+    key = {"a.png": {"type": "ssc_certificate", "fields": {"board": "Board of Education, Lahore",
+                                                           "exam": "SSC Examination, Annual 2020", "grade": "A1"}},
+           "b.png": {"type": "ssc_certificate", "fields": {"board": "Board of Education, Multan", "grade": "A"}}}
+    readings = {"a.png": {"board": "BOARD OF EDUCATION LAHORE", "exam": "SSC Examination", "grade": "A1"},
+                "b.png": {"board": "Board of Education, Multan", "grade": "B"}}
+    s = score(key, readings, TYPES)
+    assert s.wrong_why() == {"ssc_certificate.board": {"punctuation": 1},
+                             "ssc_certificate.exam": {"words missing": 1},
+                             "ssc_certificate.grade": {"one character": 1}}
+    assert (s.correct, s.scored) == (2, 5)
+    assert s.correct_ignoring_punctuation == 3  # informational: the gate still scores strictly
+
+
+def test_runner_reports_why_names_only(tmp_path, capsys):
+    out = tmp_path / "s.json"
+    assert main(["--model", "test", "--set", "sample", "--mode", "whole", "--runs", "1", "--out", str(out)]) == 0
+    [run] = json.loads(out.read_text(encoding="utf-8"))["runs"]
+    assert run["wrong_why"] == {} and run["correct_rate_ignoring_punctuation"] == 1.0
+    assert "ignoring punctuation" in capsys.readouterr().out
