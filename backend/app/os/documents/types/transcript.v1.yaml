@@ -7,8 +7,8 @@ fields:
   - {name: father_name, type: name, cross_check: father_name, hint: "Father's name if printed"}
   - {name: date_of_birth, type: date, cross_check: date_of_birth, hint: "Date of birth as YYYY-MM-DD, if printed"}
   - {name: national_id, type: code, hint: "National identity (CNIC) or passport number if printed, as printed"}
-  - {name: institution, type: text, hint: "The university"}
-  - {name: degree_title, type: text, hint: "The degree or programme, as printed"}
+  - {name: institution, type: text, hint: "The university's name only, as in the transcript's heading; leave out the campus, city and address unless they are part of the printed name"}
+  - {name: degree_title, type: text, hint: "The degree or programme, copied exactly as printed, with its brackets, dots and commas; the full title, not an abbreviation, unless only the abbreviation is printed"}
   - {name: student_id, type: code, hint: "Student ID if printed"}
   - {name: registration_number, type: code, hint: "Registration number"}
   - {name: enrollment_number, type: code, hint: "Enrollment number if printed"}

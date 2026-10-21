@@ -80,6 +80,28 @@ class DocReading:
     usage: RunUsage
 
 
+MRZ_LEN = 44  # a passport's machine-readable line (ICAO 9303 TD3)
+_MRZ_FILLER_LOOKALIKES = str.maketrans({"«": "<", "‹": "<", " ": None})
+
+
+def _mrz_line(v: str) -> str:
+    """Readers miscount the run of '<' fillers at the end of a line. When the line ends in fillers, pad or trim
+    that run to 44 characters; anything else (letters or digits at the end, too many letters) is left for the
+    validators to judge. Case, spaces and chevrons read for '<' are cleaned first."""
+    line = v.translate(_MRZ_FILLER_LOOKALIKES).upper()
+    if line.endswith("<") and len(line) != MRZ_LEN:
+        body = line.rstrip("<")
+        if len(body) < MRZ_LEN:
+            return body + "<" * (MRZ_LEN - len(body))
+    return line
+
+
+def normalise_values(t: DocumentType, values: dict) -> dict:
+    """The values read, with machine-readable lines cleaned (`_mrz_line`). Other fields are returned as read."""
+    return {k: _mrz_line(v) if isinstance(v, str) and t.field(k).type == "mrz_line" else v
+            for k, v in values.items()}
+
+
 def read_document(agent: Agent, spec: AgentSpec, t: DocumentType, parts: list[PagePart]) -> DocReading:
     """One reading. A failure is returned as an error, not retried (invariant 7)."""
     usage = RunUsage()
@@ -91,4 +113,4 @@ def read_document(agent: Agent, spec: AgentSpec, t: DocumentType, parts: list[Pa
         return DocReading(None, None, f"{type(e).__name__}: {e}"[:300], usage)
     values = r.output.model_dump()
     detected = values.pop("detected_type", None)
-    return DocReading(values, detected, None, r.usage)
+    return DocReading(normalise_values(t, values), detected, None, r.usage)

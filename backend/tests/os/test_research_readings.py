@@ -151,8 +151,12 @@ def test_cost_uses_cached_price():
     usage = RunUsage(input_tokens=1_000_000, cache_read_tokens=400_000, output_tokens=100_000)
     # 600k new input at $0.75, 400k cached at $0.075, 100k output at $4.50 (per 1M)
     assert cost(usage, SETTINGS, "cheap") == pytest.approx(0.45 + 0.03 + 0.45)
+    # strong (list prices checked 2026-10-21): 600k at $2.50, 400k cached at $0.25, 100k output at $15.00
+    assert cost(usage, SETTINGS, "strong") == pytest.approx(1.50 + 0.10 + 1.50)
+    import dataclasses
+
     with pytest.raises(ValueError, match="price"):
-        cost(usage, SETTINGS, "strong")  # the strong tier's output price is not set yet (parent §9)
+        cost(usage, dataclasses.replace(SETTINGS, price_strong_out=None), "strong")  # an unknown price is refused
 
 
 def _research_run(engine, tenant="pai", n=1) -> int:
