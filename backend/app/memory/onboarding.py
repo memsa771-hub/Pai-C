@@ -270,10 +270,13 @@ class OnboardingService:
             # submission stamp. Any reconciliation rejection keeps the gate
             # in place so the UI cannot enter Counselor with missing identity.
             if complete and not rejected:
-                # Account/workspace surfaces still read this row. Mirror the
-                # successfully reconciled canonical preferred name so the
-                # student's chosen name is consistent everywhere immediately.
-                user.display_name = cleaned.get("preferredName") or cleaned["fullName"]
+                # Account/workspace surfaces still read this row. The student
+                # is greeted by the first name they gave (no separate
+                # "preferred name" is asked or stored); older clients that
+                # still send one keep it.
+                first = answers.get("firstName")
+                first = " ".join(first.split()) if isinstance(first, str) and first.strip() else None
+                user.display_name = cleaned.get("preferredName") or first or cleaned["fullName"]
                 if user.onboarded_at is None:
                     user.onboarded_at = datetime.now(timezone.utc)
                     from app.runtime.task_runtime import enqueue

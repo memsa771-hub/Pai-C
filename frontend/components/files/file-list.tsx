@@ -273,16 +273,16 @@ export function FileList() {
   const trashCount = trashEntries.length
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full px-3 pt-3">
       {/* ── Header ── */}
       {/* Same shape as the Threads/Knowledge panels: a --header-height title row
           that lines up with the rail and the detail header, then the search on
           its own row below. */}
-      <div className="flex h-(--header-height) shrink-0 items-center justify-between gap-2 border-b border-border px-3">
+      <div className="flex h-11 shrink-0 items-center justify-between gap-2 ps-2">
         {/* No count here — this panel is about folders, and the detail header
             counts the files you're actually looking at. */}
         <div className="flex min-w-0 items-center gap-2">
-          <span className="text-sm leading-relaxed font-semibold">{t("files.title")}</span>
+          <span className="font-display text-lg leading-none">{t("files.title")}</span>
         </div>
 
         {/* This panel owns the folder structure; uploading a file belongs to
@@ -296,9 +296,9 @@ export function FileList() {
                 size="sm"
                 aria-label={t("files.newTopLevelFolder")}
                 onClick={() => handleCreateFolder()}
-                className="text-muted-foreground"
+                className="size-9 rounded-full text-muted-foreground hover:bg-accent hover:text-primary"
               >
-                <FolderPlus className="size-3.5" />
+                <FolderPlus className="size-4" />
               </Button>
             </TooltipTrigger>
             <TooltipContent>{t("files.newTopLevelFolder")}</TooltipContent>
@@ -307,15 +307,15 @@ export function FileList() {
       </div>
 
       {/* ── Search ── */}
-      <div className="shrink-0 border-b border-border/60 px-3 py-2">
+      <div className="shrink-0 pb-2 pt-1">
         <div className="relative">
-          <Search className="pointer-events-none absolute top-1/2 left-2.5 size-3 -translate-y-1/2 text-muted-foreground/50" />
+          <Search className="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             placeholder={t("files.searchFoldersPlaceholder")}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             aria-label={t("files.searchFoldersLabel")}
-            className="h-7 pl-7 text-xs"
+            className="h-10 rounded-full border-border bg-background pl-10 text-[13px] shadow-none"
           />
         </div>
       </div>
@@ -324,7 +324,7 @@ export function FileList() {
       {/* The panel is navigation only: pick a folder here, see its contents in
           the detail pane. A recency list here duplicated the grid and mixed
           files from every folder together. */}
-      <div className="flex-1 overflow-y-auto px-1 py-1">
+      <div className="flex-1 overflow-y-auto pb-3">
         {/* ── Recent files ── */}
         {/* The detail pane's default view, given a row of its own so it can be
             returned to. On mobile the two are separate screens, and without
@@ -339,13 +339,13 @@ export function FileList() {
             className={cn(
               // pr-9 for the same reason as the trash row: it lines this row's
               // right edge up with the folder counts above it.
-              "w-full min-h-11 flex items-center gap-2.5 py-2 pl-2 pr-9 rounded-xl text-left transition-colors cursor-pointer",
+              "w-full min-h-11 flex items-center gap-2.5 py-2 pl-3.5 pr-9 rounded-full text-left transition-colors cursor-pointer",
               isFoldersSection && !currentFilePath && !selectedFileId
-                ? "bg-secondary font-semibold text-foreground ring-1 ring-inset ring-border"
-                : "hover:bg-muted",
+                ? "bg-brand-soft font-semibold text-primary"
+                : "hover:bg-accent",
             )}
           >
-            <Clock className="size-4 shrink-0 text-muted-foreground" />
+            <Clock className="size-4 shrink-0" />
             <span className="flex-1 truncate text-[13px] font-medium">
               {t("files.recentFiles")}
             </span>
@@ -354,13 +354,11 @@ export function FileList() {
 
         <div
           className={cn(
-            "px-2 pb-1",
-            // The rule separates this section from the recent row; with that
-            // row hidden during a search there is nothing above to separate.
-            search ? "pt-1" : "mt-3 border-t border-border/60 pt-3",
+            "px-3.5 pb-1.5",
+            search ? "pt-1" : "pt-5",
           )}
         >
-          <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+          <span className="text-xs font-semibold text-muted-foreground">
             {t("folders.sectionLabel")}
           </span>
         </div>
@@ -378,19 +376,19 @@ export function FileList() {
             <div
               key={folder.path}
               className={cn(
-                "group flex items-center rounded-lg transition-colors",
+                "group flex items-center rounded-full transition-colors",
                 isActive
-                  ? "bg-zinc-100 dark:bg-zinc-800"
-                  : "hover:bg-zinc-50 dark:hover:bg-zinc-800/50",
+                  ? "bg-brand-soft text-primary"
+                  : "hover:bg-accent",
               )}
               style={{ paddingLeft: `${folder.depth * 12}px` }}
             >
               <button
                 type="button"
                 onClick={() => openFolder(folder.path)}
-                className="flex min-w-0 flex-1 cursor-pointer items-center gap-2.5 px-2 py-2 text-left"
+                className="flex min-h-11 min-w-0 flex-1 cursor-pointer items-center gap-2.5 py-2 pl-3.5 pr-2 text-left"
               >
-                <Folder className="size-4 shrink-0 text-amber-500" />
+                <Folder className="size-4 shrink-0 text-primary" />
                 <span
                   className={cn(
                     "flex-1 truncate text-[13px] font-medium transition-opacity",
@@ -454,9 +452,9 @@ export function FileList() {
         })}
 
         {folders.length === 0 && (
-          <div className="flex flex-col items-center gap-2 px-4 py-10 text-center text-muted-foreground">
-            <FolderOpen className="size-9 opacity-30" />
-            <p className="text-sm font-medium">
+          <div className="mx-1 mt-1 flex flex-col items-center gap-1.5 rounded-2xl bg-background px-4 py-8 text-center text-muted-foreground">
+            <span className="mb-1 flex size-11 items-center justify-center rounded-full bg-brand-soft text-primary"><FolderOpen className="size-5" /></span>
+            <p className="text-sm font-semibold text-foreground">
               {search ? t("folders.noMatches") : t("folders.empty")}
             </p>
             <p className="text-xs">
@@ -466,7 +464,7 @@ export function FileList() {
               <Button
                 variant="outline"
                 size="sm"
-                className="mt-1"
+                className="mt-2 h-9 rounded-full px-4"
                 onClick={() => handleCreateFolder()}
               >
                 <FolderPlus className="size-3.5" />
@@ -481,8 +479,8 @@ export function FileList() {
             live, and what it holds can't be browsed into. */}
         {!search && (
           <>
-            <div className="mt-3 border-t border-border/60 px-2 pt-3 pb-1">
-              <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+            <div className="px-3.5 pt-5 pb-1.5">
+              <span className="text-xs font-semibold text-muted-foreground">
                 {t("trash.title")}
               </span>
             </div>
@@ -494,13 +492,13 @@ export function FileList() {
                 // actions button (size-6 + mr-1) even while that button is
                 // invisible. This row has no menu, so it reserves the same
                 // 28px and every count in the panel lines up on one edge.
-                "w-full flex items-center gap-2.5 py-2 pl-2 pr-9 rounded-lg text-left transition-colors cursor-pointer",
+                "w-full min-h-11 flex items-center gap-2.5 py-2 pl-3.5 pr-9 rounded-full text-left transition-colors cursor-pointer",
                 filesSection === "trash"
-                  ? "bg-zinc-100 dark:bg-zinc-800"
-                  : "hover:bg-zinc-50 dark:hover:bg-zinc-800/50",
+                  ? "bg-brand-soft text-primary"
+                  : "hover:bg-accent",
               )}
             >
-              <Trash2 className="size-4 shrink-0 text-muted-foreground text-red-500" />
+              <Trash2 className="size-4 shrink-0 text-danger" />
               <span className="flex-1 truncate text-[13px] font-medium">
                 {t("trash.recentlyDeleted")}
               </span>

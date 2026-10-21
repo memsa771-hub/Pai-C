@@ -1,24 +1,16 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import type * as React from 'react';
-import { useRouter } from 'next/navigation';
 import {
-  Check, KeyRound, LogIn, LogOut, Monitor, Moon, Settings, Sun, User, MessageSquarePlus } from 'lucide-react';
-import { useTheme } from 'next-themes';
+  Check, KeyRound, LogIn, LogOut, User } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
-  DropdownMenuPortal,
-  DropdownMenuRadioGroup,
-  DropdownMenuRadioItem,
   DropdownMenuSeparator,
-  DropdownMenuSub,
-  DropdownMenuSubContent,
-  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { useConfirm } from '@/components/ui/dialogs-provider';
@@ -26,7 +18,6 @@ import { useWorkspace } from '@/lib/workspace-context';
 import { usePaiAuth } from '@/lib/pai-auth-context';
 import { goToSignIn, signOutAndReturnToSignIn } from '@/lib/auth-redirects';
 import { useT } from '@/lib/i18n';
-import { FeedbackDialog } from '@/components/feedback/feedback-dialog';
 
 interface UserMenuProps {
   side?: 'top' | 'right' | 'bottom' | 'left';
@@ -37,34 +28,12 @@ interface UserMenuProps {
   variant?: 'default' | 'avatar';
 }
 
-// System first — it is the default, and the one most people leave it on.
-const THEME_OPTIONS = [
-  { value: 'system', labelKey: 'theme.system', icon: Monitor },
-  { value: 'light', labelKey: 'theme.light', icon: Sun },
-  { value: 'dark', labelKey: 'theme.dark', icon: Moon },
-] as const;
-
 export function UserMenu({ side, align = 'end', showIdentity = false, profileAction, variant = 'default' }: UserMenuProps = {}) {
-  const { workspace, token } = useWorkspace();
+  const { token } = useWorkspace();
   const { user, isPaiDeployment, signIn, signOut } = usePaiAuth();
-  const [showFeedback, setShowFeedback] = useState(false);
-  const { theme, setTheme } = useTheme();
   const confirm = useConfirm();
-  const router = useRouter();
   const t = useT();
-  const [mounted, setMounted] = useState(false);
   const [tokenCopied, setTokenCopied] = useState(false);
-
-  useEffect(() => { setMounted(true); }, []);
-
-  // `theme` is undefined until next-themes has read localStorage on the client,
-  // so fall back to 'system' — the provider default — until then. Without the
-  // mounted guard the trigger would render one value on the server and another
-  // after hydration.
-  const activeTheme = (mounted && theme) || 'system';
-  const activeThemeOption =
-    THEME_OPTIONS.find((option) => option.value === activeTheme) ?? THEME_OPTIONS[0];
-  const ActiveThemeIcon = activeThemeOption.icon;
 
   const handleCopyToken = async () => {
     if (!token) {
@@ -150,27 +119,6 @@ export function UserMenu({ side, align = 'end', showIdentity = false, profileAct
             {profileAction.icon ? <profileAction.icon /> : <User />}{profileAction.label}
           </DropdownMenuItem>}
 
-          <DropdownMenuSub>
-            <DropdownMenuSubTrigger>
-              <ActiveThemeIcon />
-              {t('theme.label')}
-              <span className="ms-auto pe-1 text-xs text-muted-foreground">
-                {t(activeThemeOption.labelKey)}
-              </span>
-            </DropdownMenuSubTrigger>
-            <DropdownMenuPortal>
-              <DropdownMenuSubContent className="w-36">
-                <DropdownMenuRadioGroup value={activeTheme} onValueChange={setTheme}>
-                  {THEME_OPTIONS.map(({ value, labelKey, icon: Icon }) => (
-                    <DropdownMenuRadioItem key={value} value={value} className="gap-2">
-                      <Icon className="size-4 opacity-60" />
-                      {t(labelKey)}
-                    </DropdownMenuRadioItem>
-                  ))}
-                </DropdownMenuRadioGroup>
-              </DropdownMenuSubContent>
-            </DropdownMenuPortal>
-          </DropdownMenuSub>
 
           {token && (
             <DropdownMenuItem onSelect={(e) => { e.preventDefault(); handleCopyToken(); }}>
@@ -179,25 +127,9 @@ export function UserMenu({ side, align = 'end', showIdentity = false, profileAct
             </DropdownMenuItem>
           )}
 
-          {/* Feedback goes to POST /v1/feedback (stored + forwarded to the
-              team) — the cheapest possible path from an annoyed user to us. */}
-          <DropdownMenuItem onClick={() => setShowFeedback(true)}>
-            <MessageSquarePlus />
-            {t('userMenu.sendFeedback')}
-          </DropdownMenuItem>
 
-          {/* Full-page workspace settings (general / security / devices /
-              integrations / preferences). window.location.search carries an
-              incoming ?token= through so token-link visitors keep access. */}
-          <DropdownMenuItem
-            onClick={() => {
-              if (!workspace) return;
-              router.push(`/${workspace.slug}/settings${window.location.search}`);
-            }}
-          >
-            <Settings />
-            {t('userMenu.workspaceSettings')}
-          </DropdownMenuItem>
+          {/* Settings live in one place: the workspace's own Settings page,
+              reached from the sidebar. Appearance is there too. */}
 
           {isPaiDeployment && (
             <>
@@ -217,7 +149,6 @@ export function UserMenu({ side, align = 'end', showIdentity = false, profileAct
           )}
         </DropdownMenuContent>
       </DropdownMenu>
-      {showFeedback && <FeedbackDialog onClose={() => setShowFeedback(false)} />}
     </>
   );
 }

@@ -56,7 +56,7 @@
     },
     {
       "id": "education",
-      "title": "Education and tests",
+      "title": "Education",
       "icon": "graduation",
       "areas": [
         "history"
@@ -71,7 +71,7 @@
     },
     {
       "id": "experience",
-      "title": "Experience and activities",
+      "title": "Experience",
       "icon": "lightbulb",
       "areas": [
         "history",
@@ -276,7 +276,14 @@
     "storyIntro": "Built from your conversations with PAI. The more you share, the better PAI's suggestions get.",
     "sharedCount": "{count} shared",
     "storyTalk": "Talk about this",
-    "storyDraft": "Can we talk about {area}?"
+    "storyDraft": "Can we talk about {area}?",
+    "emptyGroup": "Nothing here yet",
+    "emptyGroupAction": "Add with PAI",
+    "emptyDrafts": {
+      "about": "I want to add something about me.",
+      "education": "I want to add my education.",
+      "experience": "I want to add an experience: a job, a project, an activity or an award."
+    }
   },
   "basics": [
     {
@@ -320,5 +327,13 @@
     "pressures": "Money, time and expectations: what weighs on your choice.",
     "goals": "What you want, and whose wish it really is.",
     "options": "The directions you are weighing, and what you have heard about them."
-  }
+  },
+  "hiddenKeys": [
+    "identity.preferred_name"
+  ],
+  "alwaysShow": [
+    "about",
+    "education",
+    "experience"
+  ]
 }

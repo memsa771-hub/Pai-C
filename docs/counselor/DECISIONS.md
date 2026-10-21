@@ -189,3 +189,58 @@ The Counselor shell accidentally omitted the shared UserMenu when replacing the 
   - a "PAI recommends" card that pages through real next steps: the current stage, missing basics and a path to open;
   - an Ask PAI bar that only drafts into the conversation.
   - Every number comes from the student's data. The chat remains the default landing view, so PAI still opens the first conversation after onboarding.
+
+**Fourth revision (founder polish after approval):**
+
+- **No page names in the top bar.** The sidebar already marks the current place and every page has its own heading, so the bar now holds only the sub-tabs (where a section has them) and notifications.
+- **Documents' inner panel matches the workspace:**
+  - a Manjari "Files" title and a pill search;
+  - pill rows with the pale-blue current state, as in the sidebar;
+  - brand-blue folder icons and sentence-case labels;
+  - empty states with a pale icon disc;
+  - the frame is the same 22px card.
+  - The old OS file-manager look (zinc, amber, uppercase rules) is gone.
+- **No preferred name.** Onboarding asks first and last name only. `copy_to` is removed, so `identity.preferred_name` is no longer written. The account display name is the first name the student gave (a legacy client's preferredName still wins). Older saved preferred names stay in the Vault but are hidden from the profile and from Overview counts (`hiddenKeys`).
+- **No privacy masking in the profile.** The founder judged gender, date of birth and family context not private within the student's own workspace. The "Show private details" toggle and "Hidden for your privacy" placeholders are removed from About you. Private model interpretation is still never fetched or shown.
+- **Details sections:** "Education" (renamed from "Education and tests") and a new "Experience" section in the same field style. Both always show; an empty section offers "Add with PAI", which drafts a message to PAI.
+
+**Fixes from founder testing (21 October):**
+
+- **Documents actions were silently missing.** On desktop `DetailHeader` portals its toolbar into the old app-shell header. That header does not exist in the counselor workspace, so the file pane lost its breadcrumbs, its view toggle and its hidden upload `<input>`, which is why "Upload files" did nothing. `DetailHeader` now renders its bar in place whenever no header slot is mounted.
+- **Recently deleted showed nothing.** `TrashView` was never rendered in the workspace. Documents now shows it when the folder panel is on Trash. The empty state matches the rest.
+- **Date of birth now shows on the student's own profile.** It stays `restricted` in the Vault; `PROFILE_OWNER_RESTRICTED_FIELDS` names it as the one restricted field the owner's projection shows back. Every reader of that projection (profile, profile cards, the owner's export) is the student. Passport, contact and accessibility fields stay withheld.
+- **Overview is one screen.** The Ask PAI bar and the footer line are removed; questions belong in the conversation and Ctrl/⌘ K. On desktop the Overview fits the window without scrolling. Measured with no overflow at 1920×1080, 1536×864, 1440×900, 1366×768, 1280×720 and 1024×768. On short windows the intro line and the stage track tuck away, and between 1024 and 1280px the duplicate "Your next step" box hides. Phones still scroll, as a stacked layout must.
+- **No starter messages anywhere.** At the founder's request the canned starter prompts are gone, both the chips above the composer and the suggestions in the Ctrl/⌘ K menu. The conversation opens with PAI's own words and an empty composer. The menu still lets a student type their own question and hand it to PAI as a draft.
+
+**One Settings (21 October):**
+
+- **Settings live only in the workspace's Settings view**, reached from the sidebar (and, on phones, a gear in the top bar, since phones have no sidebar). The account menu's "Settings", "Workspace settings" and theme submenu are removed; the menu holds only the student's name and email, Send feedback and Sign out.
+- **What moved in:**
+  - a "Your account" card (name and email);
+  - Notifications as an inline "Sound for new messages" switch, the one student-relevant workspace preference.
+  - Settings now holds account, appearance, notifications, data and privacy, and delete.
+- **What did not move, deliberately.** The old `/[workspace]/settings` pages were the OpenAgents operator console:
+  - workspace name, URL and ID;
+  - experimental agent "monitor mode";
+  - the login-enforcement switch and the workspace machine token;
+  - Slack, Telegram and Lark bot bindings with tokens, signing secrets and a "default agent";
+  - a BrowserFabric API key;
+  - a split-browser toggle.
+  
+  None of these is a student's setting, and showing bot tokens to a 15-year-old would be harmful. Those pages and `components/settings` are removed. `/[workspace]/settings` and any sub-path redirect to `?view=settings`, so old links and the Slack OAuth return still land somewhere real. If operator controls are needed later they belong in an operator console, not the student workspace.
+
+- **Settings layout and contents (founder: professional, not big cards; match the old workspace-settings pattern).** There is a section list on the left (Account, Appearance, Notifications, Privacy & data, Help) and compact rows on the right, in the workspace tokens. Each row has a label and one line of help on the left and its control on the right. On phones the section list becomes a scrolling pill strip. `?section=` deep-links a section.
+  - **Account:**
+    - Name shows with "Edit in About you", because the name lives in the Vault and a second editable display name would bring back the preferred-name split;
+    - Email is read-only;
+    - Password sends a reset link through the existing recovery flow (Google sign-ins have no password here, which the help says);
+    - Sign out, with a confirmation.
+  - **Appearance:** theme as a three-way pill control.
+  - **Notifications:** the message sound.
+  - **Privacy & data:**
+    - **Shared links** lists the student's active share links, with Copy link and Stop sharing (the existing `/v1/shares` list and delete; a new `listShares()` client method);
+    - Download your data;
+    - Delete your data, with an explicit acknowledgement;
+    - the university-consent promise as a note.
+  - **Help:** Send feedback.
+  - The account menu now holds only the student's identity and Sign out.

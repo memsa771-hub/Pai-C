@@ -149,6 +149,16 @@ export const cards: ProfileCard[] = [
     updated_at: "2026-10-16",
   },
   {
+    kind: "vault_fact",
+    key: "identity.date_of_birth",
+    id: "dob",
+    value: "2008-03-12",
+    digest: "d".repeat(64),
+    evidence_level: "stated",
+    source: {},
+    updated_at: "2026-10-16",
+  },
+  {
     kind: "education",
     key: "education",
     id: "education-earlier",

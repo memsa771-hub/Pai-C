@@ -9,12 +9,15 @@ provenance and revision history survive an edit made by hand.
 
 Two rules this module exists to enforce:
 
-1. **Restricted facts never reach the Profile.** `VaultService.snapshot`
-   already withholds `restricted` fields; this module additionally names the
-   small set of `sensitive` fields the student's own profile page may show
-   (their nationality, their funding situation), so adding a sensitive field to
-   the Vault does not silently publish it. Passport number, date of birth,
-   stored contact details and accessibility needs stay out by construction.
+1. **Restricted facts never reach the Profile, with one named exception.**
+   `VaultService.snapshot` already withholds `restricted` fields; this module
+   additionally names the small set of `sensitive` fields the student's own
+   profile page may show (their nationality, their funding situation), so
+   adding a sensitive field to the Vault does not silently publish it. The
+   student's own date of birth, which they gave at onboarding, is shown back
+   to them (founder decision, 21 Oct 2026; every reader of this projection is
+   the student themself). Passport number, stored contact details and
+   accessibility needs stay out by construction.
 
 2. **Issue evidence is sanitized.** A `conflicting_fact` issue carries the
    proposed value inline, and that value can be the very identifier rule 1
@@ -41,6 +44,12 @@ PROFILE_SAFE_SENSITIVE_FIELDS = frozenset({
     "finance.funding_status",
     "finance.scholarship_interest",
     "finance.budget",
+})
+
+# Restricted Vault fields shown back to their own subject on the Profile. Kept
+# explicit and tiny: everything else `restricted` never appears here.
+PROFILE_OWNER_RESTRICTED_FIELDS = frozenset({
+    "identity.date_of_birth",
 })
 
 # Section id -> the record kinds it renders, in display order. Section ids are
@@ -139,10 +148,13 @@ class StudentProfileView:
 
     def safe_facts(self, workspace_id: str) -> dict[str, Any]:
         """Active Vault facts minus everything the Profile must not show."""
-        return self.vault.snapshot(
+        facts = self.vault.snapshot(
             workspace_id, include_sensitive=False,
             allowed_sensitive_keys=set(PROFILE_SAFE_SENSITIVE_FIELDS),
         )
+        everything = self.vault.snapshot(workspace_id, include_sensitive=True)
+        facts.update({key: everything[key] for key in PROFILE_OWNER_RESTRICTED_FIELDS if key in everything})
+        return facts
 
     # -- header ------------------------------------------------------------
 

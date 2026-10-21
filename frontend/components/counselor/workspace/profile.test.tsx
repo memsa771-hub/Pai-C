@@ -24,11 +24,22 @@ it("shows Details as fields with missing basics, and Background as the Mirror an
   render(<LivingProfile onChat={chat} />);
   expect(await screen.findByRole("heading", { level: 1, name: "Sam Taylor" })).toBeTruthy();
   expect(screen.getByRole("img", { name: /\d+% complete/ })).toBeTruthy();
-  for (const title of ["About you", "Education and tests", "Missing details"])
+  for (const title of ["About you", "Education", "Experience", "Missing details"])
     expect(screen.getByRole("heading", { name: title })).toBeTruthy();
+  // No preferred name and nothing masked: only what onboarding asked for.
+  expect(screen.queryByText("Preferred name")).toBeNull();
+  expect(screen.queryByRole("button", { name: /private details/i })).toBeNull();
+  expect(document.body.textContent).not.toContain("Hidden for your privacy");
+  // Date of birth from onboarding shows as a readable date, not hidden.
+  expect(screen.getByText("Date of birth")).toBeTruthy();
+  expect(screen.getByRole("button", { name: /^Show source and actions for Date of birth: .*2008/ })).toBeTruthy();
   // A missing basic hands PAI a draft; nothing is saved from here.
-  fireEvent.click(screen.getAllByRole("button", { name: /Add with PAI/ })[0]);
+  fireEvent.click(within(screen.getByRole("complementary", { name: "Missing details" })).getAllByRole("button", { name: /Add with PAI/ })[0]);
   expect(chat).toHaveBeenCalledWith(expect.stringMatching(/^I want to add my /));
+  // An empty section offers the same way in.
+  const experience = screen.getByRole("region", { name: "Experience" });
+  fireEvent.click(within(experience).getByRole("button", { name: /Add with PAI/ }));
+  expect(chat).toHaveBeenLastCalledWith(expect.stringMatching(/^I want to add an experience/));
   // Opening a field shows its source and the review actions.
   fireEvent.click(screen.getByRole("button", { name: /^Show source and actions for Name/ }));
   expect(await screen.findByRole("dialog")).toBeTruthy();
@@ -43,10 +54,8 @@ it("shows Details as fields with missing basics, and Background as the Mirror an
   expect(text).not.toContain("private_notes");
   expect(text).not.toMatch(/\d+\s?%\s?(understood|known)/i);
   expect(text).not.toMatch(RAW_KEY);
-  // Worries are private until the student asks to see them.
-  expect(text).not.toContain("Financial security");
-  fireEvent.click(screen.getByRole("button", { name: "Show private details" }));
-  expect(document.body.textContent).toContain("Financial security");
+  // Family hopes and worries read plainly in the student's own story.
+  expect(text).toContain("Financial security");
 });
 it("hands a story topic to PAI instead of editing shared evidence here", async () => {
   vi.mocked(workspaceApi.getCounselorWorkspace).mockResolvedValue(picture);

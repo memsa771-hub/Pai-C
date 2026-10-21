@@ -617,10 +617,10 @@ export function FileGrid() {
            one move that gets you out of it, and on mobile, where the folder
            panel is a separate pane, the way to reach it. */
         <div className="flex flex-1 items-center justify-center text-muted-foreground">
-          <div className="flex flex-col items-center gap-3 px-6 text-center">
-            <FolderOpen className="size-16 opacity-20" />
-            <p className="text-sm font-medium">{t('files.emptyTitle')}</p>
-            <p className="max-w-md text-xs text-balance">{t('files.emptyBody')}</p>
+          <div className="flex flex-col items-center gap-2 px-6 text-center">
+            <span className="mb-2 flex size-16 items-center justify-center rounded-full bg-brand-soft text-primary"><FolderOpen className="size-7" /></span>
+            <p className="font-display text-xl text-foreground">{t('files.emptyTitle')}</p>
+            <p className="max-w-sm text-sm text-balance">{t('files.emptyBody')}</p>
             {isMobile && (
               <Button variant="outline" size="sm" className="mt-1" onClick={openMobileList}>
                 <PanelLeft className="size-3.5" />
@@ -631,8 +631,8 @@ export function FileGrid() {
         </div>
       ) : hasFolder && isEmpty ? (
         <div className="flex-1 flex items-center justify-center text-muted-foreground">
-          <div className="flex flex-col items-center gap-3 px-6 text-center">
-            <FileX className="size-16 opacity-20" />
+          <div className="flex flex-col items-center gap-2 px-6 text-center">
+            <span className="mb-2 flex size-16 items-center justify-center rounded-full bg-brand-soft text-primary"><FileX className="size-7" /></span>
             <p className="text-sm font-medium">
               {typeFilter === 'folders'
                 ? t('files.noFoldersHere')
@@ -700,7 +700,7 @@ export function FileGrid() {
             <div
               key={folder.path}
               onClick={() => openFolder(folder.path)}
-              className="flex cursor-pointer items-center gap-3 rounded-lg px-3 py-2 transition-colors hover:bg-zinc-100 dark:hover:bg-zinc-800/60"
+              className="flex cursor-pointer items-center gap-3 rounded-lg px-3 py-2 transition-colors hover:bg-accent"
             >
               <FolderRowIcon />
               <span className="flex-1 truncate text-sm font-medium" title={folder.path}>
@@ -728,7 +728,7 @@ export function FileGrid() {
                   'group flex cursor-pointer items-center gap-3 rounded-lg px-3 py-2 transition-colors',
                   isSelected
                     ? 'bg-primary/10 ring-1 ring-inset ring-primary/30'
-                    : 'hover:bg-zinc-100 dark:hover:bg-zinc-800/60',
+                    : 'hover:bg-accent',
                 )}
               >
                 <FileRowIcon file={file} />
@@ -784,7 +784,7 @@ export function FileGrid() {
               <div
                 key={folder.path}
                 onClick={() => openFolder(folder.path)}
-                className="group flex cursor-pointer flex-col items-center gap-1.5 rounded-xl p-3 text-center transition-colors hover:bg-zinc-100 dark:hover:bg-zinc-800/60"
+                className="group flex cursor-pointer flex-col items-center gap-1.5 rounded-xl p-3 text-center transition-colors hover:bg-accent"
               >
                 <div className="flex h-19 items-center justify-center">
                   <FolderTile className="group-hover:-translate-y-0.5" />
@@ -809,7 +809,7 @@ export function FileGrid() {
                     'relative flex flex-col items-center gap-1.5 p-3 rounded-xl text-center transition-colors cursor-pointer group',
                     isSelected
                       ? 'bg-primary/10 ring-2 ring-primary/30'
-                      : 'hover:bg-zinc-100 dark:hover:bg-zinc-800/60'
+                      : 'hover:bg-accent'
                   )}
                   onClick={() => {
                     // Opening a file leaves the folder selection alone: the

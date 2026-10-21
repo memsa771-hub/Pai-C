@@ -1877,6 +1877,21 @@ class WorkspaceApi {
     };
   }
 
+  /** The student's active share links, newest first. */
+  async listShares(): Promise<ShareSummary[]> {
+    const raw = await this.request<Record<string, unknown>[]>(`/v1/shares?network=${this.workspaceId}`);
+    return (raw || []).map((row) => ({
+      id: row.id as string,
+      workspaceId: (row.workspace_id || '') as string,
+      channelName: (row.channel_name || '') as string,
+      title: (row.title || null) as string | null,
+      shareToken: row.share_token as string,
+      messageCount: (row.message_count || 0) as number,
+      status: (row.status || 'active') as string,
+      createdAt: (row.created_at || null) as string | null,
+    }));
+  }
+
   async deleteShare(shareId: string): Promise<void> {
     await this.request<unknown>(`/v1/shares/${shareId}?network=${this.workspaceId}`, {
       method: 'DELETE',

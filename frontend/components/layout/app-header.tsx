@@ -77,8 +77,15 @@ export function DetailHeader({
   children?: React.ReactNode
 }) {
   const { isMobile } = useLayout()
+  // The counselor workspace has no app-shell header to portal into; there the
+  // bar renders in place, as on mobile, so its actions (and the hidden upload
+  // input among them) still exist.
+  const [hasSlot, setHasSlot] = useState(false)
+  useEffect(() => {
+    setHasSlot(!!document.getElementById(ACTIONS_SLOT_ID))
+  })
 
-  if (!isMobile) {
+  if (!isMobile && hasSlot) {
     return (
       <>
         {titleInHeader && <AppHeaderTitle>{title}</AppHeaderTitle>}
@@ -88,7 +95,7 @@ export function DetailHeader({
   }
 
   return (
-    <div className="flex h-12 shrink-0 items-center gap-2 border-b border-border px-2 lg:px-4">
+    <div className="flex h-14 shrink-0 items-center gap-2 border-b border-border/70 px-3 lg:px-5">
       <div className="flex min-w-0 flex-1 items-center gap-2 lg:gap-3">
         {title}
       </div>

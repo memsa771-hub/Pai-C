@@ -162,10 +162,10 @@ export function TrashView() {
       </DetailHeader>
 
       {entries.length === 0 ? (
-        <div className="flex flex-1 flex-col items-center justify-center gap-3 px-6 text-center text-muted-foreground">
-          <Trash2 className="size-16 opacity-20" />
-          <p className="text-sm font-medium">{t('trash.empty')}</p>
-          <p className="max-w-md text-xs text-balance">{t('trash.emptyHint')}</p>
+        <div className="flex flex-1 flex-col items-center justify-center gap-2 px-6 text-center text-muted-foreground">
+          <span className="mb-2 flex size-16 items-center justify-center rounded-full bg-brand-soft text-primary"><Trash2 className="size-7" /></span>
+          <p className="font-display text-xl text-foreground">{t('trash.empty')}</p>
+          <p className="max-w-sm text-sm text-balance">{t('trash.emptyHint')}</p>
         </div>
       ) : (
         /* Same row as the file list: nothing here is a different kind of thing,

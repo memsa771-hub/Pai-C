@@ -39,6 +39,7 @@ const api={getCounselorWorkspace:async()=>picture,getProfileCards:async()=>({car
   loadMessageHistory:async()=>({events:[]}),pollMessages:async()=>({messages:[]}),editStudentProfile:async()=>({saved:true}),
   answerFactCard:async()=>({saved:true}),reviewProfileCard:async()=>({saved:true}),
   submitOnboarding:async()=>({completed:true,rejected:{},saved:[]}),
+  listShares:async()=>[{id:'share-1',workspaceId:'offline',channelName:'pai-counselor',title:'My conversation with PAI',shareToken:'offline-token',messageCount:12,status:'active',createdAt:'2026-10-18T09:00:00Z'}],
 };
 // ?state=loading|error|empty forces every read into that state for review.
 const forced=new URLSearchParams(location.search).get('state');

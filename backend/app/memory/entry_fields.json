@@ -6,8 +6,7 @@
     "choices": [],
     "max_length": 80,
     "step": 1,
-    "part_of": "fullName",
-    "copy_to": "preferredName"
+    "part_of": "fullName"
   },
   {
     "name": "lastName",

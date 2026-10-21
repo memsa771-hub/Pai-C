@@ -20,7 +20,7 @@ const initials = (title: string) => title.split(/\s+/).filter(Boolean).slice(0, 
 
 function Metric({ label, value, sub, tone = "white" }: { label: string; value: React.ReactNode; sub: string; tone?: "lime" | "white" | "peach" }) {
   return (
-    <div className={cn("flex min-h-[110px] flex-col rounded-[18px] px-4 py-3.5 sm:px-5",
+    <div className={cn("flex min-h-[110px] flex-col rounded-[18px] px-4 py-3.5 sm:px-5 [@media(max-height:820px)]:min-h-[96px] [@media(max-height:820px)]:py-2.5",
       tone === "lime" ? "bg-lime text-signal-ink" : tone === "peach" ? "bg-peach text-signal-ink" : "bg-card shadow-card ring-1 ring-border/70")}>
       <p className={cn("text-xs font-medium", tone === "white" ? "text-muted-foreground" : "text-signal-ink/70")}>{label}</p>
       <p className="mt-0.5 text-[32px] font-bold leading-[44px] tabular-nums">{value}</p>
@@ -40,7 +40,6 @@ export function Overview({ journey, navigate, openPath, onChat }: {
   const loadCards = useCallback(() => workspaceApi.getProfileCards().then((r) => r.cards).catch(() => [] as ProfileCard[]), []);
   const cards = useResource(loadCards);
   const [rec, setRec] = useState(0);
-  const [ask, setAsk] = useState("");
 
   if (!journey.data || journey.error || !journey.progress)
     return <LoadState error={journey.error} busy={journey.busy} retry={journey.refresh} skeleton="cards" />;
@@ -49,7 +48,7 @@ export function Overview({ journey, navigate, openPath, onChat }: {
   const progress = journey.progress;
   const total = copy.stages.length;
   const live = possibilities.filter((p) => p.status !== "dismissed");
-  const facts = cards.data || [];
+  const facts = (cards.data || []).filter((c) => !layout.hiddenKeys.includes(c.key));
   const has = (key: string) => facts.some((c) => c.key === key || c.key.startsWith(key + "."));
   const missing = layout.basics.filter((b) => !has(b.key));
   const stage = progress.stage;
@@ -86,16 +85,15 @@ export function Overview({ journey, navigate, openPath, onChat }: {
   ];
   const current = recs[Math.min(rec, recs.length - 1)];
   const others = recs.filter((r) => r.key !== current.key);
-  const sendAsk = (event: React.FormEvent) => { event.preventDefault(); onChat(ask.trim() || text.askPlaceholder); };
 
   return (
-    <div className="space-y-5">
-      <header>
+    <div className="flex flex-col gap-5 lg:h-full lg:min-h-0 [@media(max-height:820px)]:gap-4">
+      <header className="shrink-0">
         <h1 className="text-balance font-display text-[1.85rem] leading-[1.15] sm:text-[2.1rem]">{text.title}</h1>
-        <p className="mt-1 text-sm text-muted-foreground sm:text-[15px]">{text.intro}</p>
+        <p className="mt-1 text-sm text-muted-foreground sm:text-[15px] [@media(max-height:760px)]:hidden">{text.intro}</p>
       </header>
 
-      <section aria-label={text.title} className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
+      <section aria-label={text.title} className="grid shrink-0 grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
         <Metric tone="lime" label={text.metrics.paths} value={live.length}
           sub={live.length ? fill(text.metrics.pathsSub, { saved: live.filter((p) => p.status === "saved").length, exploring: live.filter((p) => p.status === "exploring" || p.status === "chosen").length }) : text.metrics.pathsNone} />
         <Metric label={text.metrics.journey} value={<>{progress.current}<span className="text-lg font-semibold text-muted-foreground"> / {total}</span></>}
@@ -106,8 +104,8 @@ export function Overview({ journey, navigate, openPath, onChat }: {
           sub={missing.length ? text.metrics.attentionSub : text.metrics.attentionNone} />
       </section>
 
-      <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(0,25rem)]">
-        <div className="min-w-0 space-y-5">
+      <div className="grid items-start gap-5 lg:min-h-0 lg:grid-cols-[minmax(0,1fr)_minmax(0,19rem)] xl:grid-cols-[minmax(0,1fr)_minmax(0,25rem)] [@media(max-height:820px)]:gap-4">
+        <div className="flex min-w-0 flex-col gap-5 lg:min-h-0 [@media(max-height:820px)]:gap-4">
           <section aria-labelledby="ov-paths" className="rounded-[22px] bg-card p-5 shadow-card ring-1 ring-border/70">
             <div className="flex items-start justify-between gap-3">
               <h2 id="ov-paths" className="font-display text-[22px] leading-tight">{text.pathsTitle}</h2>
@@ -141,7 +139,7 @@ export function Overview({ journey, navigate, openPath, onChat }: {
             ) : <p className="mt-4 rounded-xl bg-background px-4 py-5 text-sm text-muted-foreground">{text.pathsEmpty}</p>}
           </section>
 
-          <section className="grid gap-6 rounded-[22px] bg-card p-5 shadow-card ring-1 ring-border/70 md:grid-cols-2">
+          <section className="grid content-start gap-6 rounded-[22px] bg-card p-5 shadow-card ring-1 ring-border/70 md:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
             <div aria-labelledby="ov-understand">
               <h2 id="ov-understand" className="font-display text-lg leading-tight">{text.understandTitle}</h2>
               <p className="mt-0.5 text-[11px] text-muted-foreground">{text.understandNote}</p>
@@ -159,7 +157,7 @@ export function Overview({ journey, navigate, openPath, onChat }: {
                 </ul>
               ) : <p className="mt-3 text-sm text-muted-foreground">{text.understandEmpty}</p>}
             </div>
-            <div className="flex flex-col rounded-[14px] bg-brand-soft p-3.5">
+            <div className="flex flex-col rounded-[14px] bg-brand-soft p-3.5 lg:max-xl:hidden">
               <p className="text-[10px] font-semibold uppercase tracking-wide text-primary">{text.nextLabel}</p>
               <p className="mt-1 text-[15px] font-semibold leading-snug">{stage.title}</p>
               <p className="mt-0.5 text-xs text-muted-foreground">{copy.stageDescriptions[stage.id as keyof typeof copy.stageDescriptions]}</p>
@@ -170,7 +168,7 @@ export function Overview({ journey, navigate, openPath, onChat }: {
           </section>
         </div>
 
-        <section aria-labelledby="ov-rec" aria-roledescription="carousel" className="flex min-h-[26rem] flex-col rounded-[22px] bg-powder p-6 text-signal-ink">
+        <section aria-labelledby="ov-rec" aria-roledescription="carousel" className="flex flex-col rounded-[22px] bg-powder p-6 text-signal-ink [@media(max-height:820px)]:p-5">
           <div className="flex items-center justify-between">
             <span id="ov-rec" className="rounded-full bg-white px-3.5 py-2 text-[10px] font-semibold uppercase tracking-wide text-[#155eef]">{text.recommends}</span>
             <div className="flex items-center gap-1">
@@ -186,7 +184,7 @@ export function Overview({ journey, navigate, openPath, onChat }: {
               initial={{ opacity: 0, x: 12 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -12 }} transition={{ duration: 0.18 }}>
               <h3 className="mt-4 text-balance font-display text-[28px] leading-[34px]">{current.title}</h3>
               <p className="mt-2 text-sm font-semibold">{current.body}</p>
-              <div aria-hidden className="mt-5 rounded-2xl bg-white/85 p-4">
+              <div aria-hidden className="mt-5 rounded-2xl bg-white/85 p-4 [@media(max-height:760px)]:hidden">
                 <div className="flex gap-1">
                   {copy.stages.map((s, i) => (
                     <span key={s.id} className={cn("flex h-7 flex-1 items-center justify-center rounded-md text-[10px] font-bold",
@@ -195,7 +193,7 @@ export function Overview({ journey, navigate, openPath, onChat }: {
                 </div>
                 <p className="mt-2 text-[11px] font-semibold text-[#155eef]">{fill(text.trackLabel, { done: progress.current, total })}</p>
               </div>
-              <div className="mt-auto pt-5">
+              <div className="mt-auto pt-6">
                 <button onClick={current.run}
                   className="flex h-11 w-full items-center justify-center gap-2 rounded-full bg-[#155eef] text-sm font-semibold text-white shadow-[0_10px_24px_-12px_rgb(21_94_239/0.9)] transition hover:bg-[#0f4fd6]">
                   {current.action}<ArrowRight aria-hidden className="size-4" />
@@ -207,15 +205,6 @@ export function Overview({ journey, navigate, openPath, onChat }: {
         </section>
       </div>
 
-      <form onSubmit={sendAsk} className="flex items-center gap-3 rounded-full bg-card py-2 pe-2 ps-5 shadow-card ring-1 ring-border/70">
-        <label htmlFor="ov-ask" className="shrink-0 text-sm font-semibold text-primary">{text.ask}</label>
-        <input id="ov-ask" value={ask} onChange={(e) => setAsk(e.target.value)} placeholder={text.askPlaceholder}
-          className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground" />
-        <button type="submit" className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-full bg-primary px-4 text-xs font-semibold text-primary-foreground hover:bg-brand-strong">
-          {text.askAction}<ArrowRight aria-hidden className="size-3.5" />
-        </button>
-      </form>
-      <p className="text-right text-[10px] text-muted-foreground">{text.footer}</p>
     </div>
   );
 }

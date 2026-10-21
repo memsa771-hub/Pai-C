@@ -157,16 +157,6 @@ export function CommandMenu({ open, onOpenChange, onGo, onAsk }: {
             </CommandItem>
           </CommandGroup>
         )}
-        {!q.trim() && (
-          <CommandGroup heading={copy.shell.commandAskGroup}>
-            {copy.shell.starters.map((starter) => (
-              <CommandItem key={starter} value={`ask ${starter}`} onSelect={() => run(() => onAsk(starter))}>
-                <MessageCircle aria-hidden />
-                <span>{starter}</span>
-              </CommandItem>
-            ))}
-          </CommandGroup>
-        )}
       </CommandList>
       </Command>
     </CommandDialog>

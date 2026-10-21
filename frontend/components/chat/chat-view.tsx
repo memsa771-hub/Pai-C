@@ -252,7 +252,6 @@ export function ChatView({counselorOnly=false,initialDraft=""}:{counselorOnly?:b
   // Per-thread message drafts
   const draftsRef = useRef<Record<string, string>>({});
   const [currentDraft, setCurrentDraft] = useState('');
-  const [startersHidden, setStartersHidden] = useState(false);
 
   // Save/restore draft when switching threads + cache messages
   const prevSessionIdRef = useRef<string | null>(null);
@@ -1014,22 +1013,6 @@ export function ChatView({counselorOnly=false,initialDraft=""}:{counselorOnly?:b
         {(!isDM || dmWritable) && (
           <div className="mx-auto w-full max-w-[48rem] px-3 pt-1 pb-3 lg:px-4 lg:pb-5">
             {counselorOnly && initialDraft === counselorCopy.checkin && !checkinSent && <CheckInCard onPick={(text) => setCurrentDraft(counselorCopy.checkinCard.draftTemplate.replace('{option}', text))} />}
-            {/* Early on, a few ways in. They only fill the draft; the student
-                sends. Dismissible, and gone once the talk is under way. */}
-            {counselorOnly && !startersHidden && !currentDraft.trim() && displayMessages.length > 0 && displayMessages.length < 8 && (
-              <div className="mb-2.5 flex items-center gap-2 overflow-x-auto pb-0.5">
-                {counselorCopy.shell.starters.map((starter) => (
-                  <button key={starter} type="button" onClick={() => handleDraftChange(starter)}
-                    className="shrink-0 rounded-full border bg-card px-3.5 py-2 text-[13px] font-medium text-foreground/85 shadow-soft transition-colors hover:border-primary/40 hover:text-primary">
-                    {starter}
-                  </button>
-                ))}
-                <button type="button" onClick={() => setStartersHidden(true)} aria-label={counselorCopy.shell.hideStarters}
-                  className="flex size-9 shrink-0 items-center justify-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground">
-                  <X aria-hidden className="size-4" />
-                </button>
-              </div>
-            )}
             {currentSessionId === 'pai-counselor' && <div className="mb-2">
               <CounselorResearchStatus />
               <CounselorMirrorCard refreshKey={`${currentSessionId}:${displayMessages.length}`}

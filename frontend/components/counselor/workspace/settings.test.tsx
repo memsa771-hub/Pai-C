@@ -1,32 +1,76 @@
 // @vitest-environment jsdom
 import {it,expect,vi,afterEach} from 'vitest';
-import {render,screen,fireEvent,cleanup,waitFor} from '@testing-library/react';
+import {render,screen,fireEvent,cleanup,waitFor,within} from '@testing-library/react';
 import {CounselorSettings} from './settings';
 import {workspaceApi} from '@/lib/api';
+import {requestPasswordReset} from '@/lib/auth/service';
 const theme=vi.hoisted(()=>({setTheme:vi.fn(),theme:'light'}));
 vi.mock('next-themes',()=>({useTheme:()=>theme}));
-vi.mock('@/lib/api',()=>({workspaceApi:{deleteMyAccount:vi.fn(),editStudentProfile:vi.fn(),getProfileCards:vi.fn(),exportCounselorData:vi.fn()}}));
-afterEach(()=>{cleanup();vi.clearAllMocks();});
-it('changes theme locally and offers no reply-language setting',()=>{
-  render(<CounselorSettings base='/student'/>);
-  fireEvent.click(screen.getByRole('button',{name:'Dark',exact:true}));expect(theme.setTheme).toHaveBeenCalledWith('dark');
-  expect(screen.queryByText(/reply language/i)).toBeNull();
+vi.mock('@/lib/api',()=>({workspaceApi:{deleteMyAccount:vi.fn(),editStudentProfile:vi.fn(),getProfileCards:vi.fn(),exportCounselorData:vi.fn(),listShares:vi.fn(),deleteShare:vi.fn()}}));
+vi.mock('@/lib/auth/service',()=>({requestPasswordReset:vi.fn()}));
+vi.mock('@/lib/auth-redirects',()=>({signOutAndReturnToSignIn:vi.fn()}));
+vi.mock('@/components/ui/dialogs-provider',()=>({useConfirm:()=>vi.fn().mockResolvedValue(false)}));
+vi.mock('@/components/feedback/feedback-dialog',()=>({FeedbackDialog:()=><div role="dialog">feedback</div>}));
+const ws=vi.hoisted(()=>({notificationSound:false,setNotificationSound:vi.fn()}));
+vi.mock('@/lib/workspace-context',()=>({useWorkspace:()=>ws}));
+vi.mock('@/lib/pai-auth-context',()=>({usePaiAuth:()=>({user:{displayName:'Sam',email:'sam@example.test'},signOut:vi.fn()})}));
+afterEach(()=>{cleanup();vi.clearAllMocks();window.history.replaceState({},'','/');});
+const open=(name:string)=>fireEvent.click(within(screen.getByRole('navigation',{name:'Settings sections'})).getByRole('button',{name}));
+
+it('is the one settings place, in sections, with no operator controls',()=>{
+  const navigate=vi.fn();
+  render(<CounselorSettings onNavigate={navigate}/>);
+  for (const name of ['Account','Appearance','Notifications','Privacy & data','Help']) expect(screen.getByRole('button',{name})).toBeTruthy();
+  expect(screen.getByText('sam@example.test')).toBeTruthy();
+  // The name lives in the profile; Settings sends the student there.
+  fireEvent.click(screen.getByRole('button',{name:'Edit in About you'}));expect(navigate).toHaveBeenCalledWith('profile');
+  for (const gone of [/connected channels/i,/workspace token/i,/slack|telegram|lark/i,/monitor mode/i,/reply language/i]) expect(screen.queryByText(gone)).toBeNull();
+});
+it('sends a password reset link to the account email',async()=>{
+  vi.mocked(requestPasswordReset).mockResolvedValue(undefined);
+  render(<CounselorSettings/>);
+  fireEvent.click(screen.getByRole('button',{name:'Send reset link'}));
+  expect(await screen.findByText('Link sent to sam@example.test.')).toBeTruthy();
+  expect(requestPasswordReset).toHaveBeenCalledWith('sam@example.test');
+});
+it('changes theme and the notification sound locally',()=>{
+  render(<CounselorSettings/>);
+  open('Appearance');fireEvent.click(screen.getByRole('radio',{name:'Dark'}));expect(theme.setTheme).toHaveBeenCalledWith('dark');
+  open('Notifications');fireEvent.click(screen.getByRole('switch',{name:'Sound for new messages'}));expect(ws.setNotificationSound).toHaveBeenCalledWith(true);
   expect(workspaceApi.editStudentProfile).not.toHaveBeenCalled();
 });
+it('lists shared links and stops sharing one',async()=>{
+  vi.mocked(workspaceApi.listShares).mockResolvedValue([{id:'s1',workspaceId:'w',channelName:'pai-counselor',title:'My chat',shareToken:'tok',messageCount:3,status:'active',createdAt:'2026-10-18T00:00:00Z'}]);
+  vi.mocked(workspaceApi.deleteShare).mockResolvedValue(undefined);
+  render(<CounselorSettings/>);
+  open('Privacy & data');
+  expect(await screen.findByText('My chat')).toBeTruthy();
+  fireEvent.click(screen.getByRole('button',{name:'Stop sharing'}));
+  await waitFor(()=>expect(screen.queryByText('My chat')).toBeNull());
+  expect(workspaceApi.deleteShare).toHaveBeenCalledWith('s1');
+});
 it('requires an explicit irreversible-deletion acknowledgement and surfaces failure',async()=>{
+  vi.mocked(workspaceApi.listShares).mockResolvedValue([]);
   vi.mocked(workspaceApi.deleteMyAccount).mockRejectedValue(new Error());
-  render(<CounselorSettings base='/student'/>);
+  render(<CounselorSettings/>);
+  open('Privacy & data');
   fireEvent.click(screen.getByRole('button',{name:'Delete my app data',exact:true}));
   const submit=screen.getByRole('button',{name:'Permanently delete my app data'});
   expect((submit as HTMLButtonElement).disabled).toBe(true);expect(workspaceApi.deleteMyAccount).not.toHaveBeenCalled();
   fireEvent.click(screen.getByRole('checkbox'));fireEvent.click(submit);
   expect(await screen.findByRole('alert')).toBeTruthy();expect(workspaceApi.deleteMyAccount).toHaveBeenCalledTimes(1);
 });
-
 it('exports through the owner-scoped data API and reports download failure',async()=>{
- vi.mocked(workspaceApi.exportCounselorData).mockRejectedValue(new Error());
- render(<CounselorSettings base='/student'/>);
- fireEvent.click(screen.getByRole('button',{name:'Export my Counselor data'}));
- expect(await screen.findByRole('alert')).toBeTruthy();expect(workspaceApi.exportCounselorData).toHaveBeenCalledTimes(1);
- expect(workspaceApi.getProfileCards).not.toHaveBeenCalled();
+  vi.mocked(workspaceApi.listShares).mockResolvedValue([]);
+  vi.mocked(workspaceApi.exportCounselorData).mockRejectedValue(new Error());
+  render(<CounselorSettings/>);
+  open('Privacy & data');
+  fireEvent.click(screen.getByRole('button',{name:'Export my Counselor data'}));
+  expect(await screen.findByRole('alert')).toBeTruthy();expect(workspaceApi.exportCounselorData).toHaveBeenCalledTimes(1);
+  expect(workspaceApi.getProfileCards).not.toHaveBeenCalled();
+});
+it('opens feedback from Help',()=>{
+  render(<CounselorSettings/>);
+  open('Help');fireEvent.click(screen.getByRole('button',{name:'Write feedback'}));
+  expect(screen.getByRole('dialog')).toBeTruthy();
 });

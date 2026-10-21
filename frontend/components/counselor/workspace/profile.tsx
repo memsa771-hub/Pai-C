@@ -1,9 +1,8 @@
 "use client";
 import { useEffect, useState } from "react";
-import { AlertCircle, Eye, EyeOff, Lock, MessageCircle, PencilLine } from "lucide-react";
+import { AlertCircle, Lock, MessageCircle, PencilLine } from "lucide-react";
 import { workspaceApi } from "@/lib/api";
 import type { LivingPicture, ProfileCard } from "@/lib/counselor-workspace";
-import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AreaHeatmap, EvidenceBadge, evidenceLevel, type HeatmapArea } from "@/components/pai";
 import { cn } from "@/lib/utils";
@@ -12,7 +11,7 @@ import layout from "./profile-layout.json";
 import labels from "@/lib/evidence-labels.json";
 import { LoadState, useResource, human, evidenceLabel } from "./resource";
 import { MirrorPanel, areaIcon, fill, text } from "./profile-parts";
-import { FactReview, ReadableValue, at, groupOf, isSensitive } from "./profile-details";
+import { FactReview, ReadableValue, at, groupOf } from "./profile-details";
 export { CertaintyChart } from "./profile-parts";
 export { FactRow as EvidenceCard } from "./profile-details";
 
@@ -105,7 +104,6 @@ export function LivingProfile({
 }) {
   const resource = useResource(load);
   const [tab, setTab] = useState<Tab>("details");
-  const [showPrivate, setShowPrivate] = useState(false);
   const [openId, setOpenId] = useState<string | null>(null);
   useEffect(() => {
     if (new URLSearchParams(window.location.search).get("tab") === "background") setTab("background");
@@ -118,18 +116,20 @@ export function LivingProfile({
   };
   if (!resource.data || resource.error)
     return <LoadState error={resource.error} busy={resource.busy} retry={resource.refresh} skeleton="profile" />;
-  const { picture, cards } = resource.data;
+  const { picture } = resource.data;
+  // A preferred name is no longer asked for; older saved ones stay out of view.
+  const cards = resource.data.cards.filter((card: ProfileCard) => !layout.hiddenKeys.includes(card.key));
   const value = (key: string) => human(cards.find((c) => c.key === key)?.value) || undefined;
   const education = cards.filter((c) => EDUCATION.includes(c.key));
   const current = education.find((c) => (c.value as Record<string, unknown>)?.academic_status === "current") || education[0];
   const level = human((current?.value as Record<string, unknown>)?.qualification_name) || undefined;
-  const name = value("identity.full_name") || value("identity.preferred_name") || copy.nav.profile;
+  const name = value("identity.full_name") || copy.nav.profile;
   const has = (key: string) => cards.some((c) => c.key === key || c.key.startsWith(key + "."));
   const missing = layout.basics.filter((b) => !has(b.key));
   const pct = Math.round(((layout.basics.length - missing.length) / layout.basics.length) * 100);
   const groups = layout.detailGroups
     .map((group) => ({ group, rows: cards.filter((card: ProfileCard) => groupOf(card).id === group.id) }))
-    .filter(({ rows }) => rows.length);
+    .filter(({ group, rows }) => rows.length || layout.alwaysShow.includes(group.id));
   const opened = cards.find((c) => c.id === openId) || null;
   const tabs: { id: Tab; label: string }[] = [
     { id: "details", label: text.tabDetails },
@@ -146,9 +146,6 @@ export function LivingProfile({
             {[level || text.statusFallback, value("location.current_city")].filter(Boolean).join(" · ")}
           </p>
         </div>
-        <Button size="tap" variant="outline" aria-pressed={showPrivate} onClick={() => setShowPrivate(!showPrivate)} className="max-sm:w-full">
-          {showPrivate ? <EyeOff aria-hidden /> : <Eye aria-hidden />}{showPrivate ? text.hideSensitive : text.showSensitive}
-        </Button>
       </header>
 
       <div role="tablist" aria-label={text.tabsLabel} className="mt-6 flex gap-6 border-b">
@@ -179,8 +176,17 @@ export function LivingProfile({
                   <h2 id={`group-${group.id}`} className="mb-4 text-xl font-bold tracking-tight">{group.title}</h2>
                   <div className="grid gap-x-4 gap-y-5 sm:grid-cols-2 lg:grid-cols-3">
                     {rows.map((card) => (
-                      <FactField key={card.id} card={card} hidden={!showPrivate && isSensitive(card.key)} onOpen={() => setOpenId(card.id)} />
+                      <FactField key={card.id} card={card} hidden={false} onOpen={() => setOpenId(card.id)} />
                     ))}
+                    {!rows.length && (
+                      <div className="min-w-0">
+                        <p className="mb-1.5 text-sm font-semibold">{text.emptyGroup}</p>
+                        <button type="button" onClick={() => onChat(layout.copy.emptyDrafts[group.id as keyof typeof layout.copy.emptyDrafts])}
+                          className="group flex min-h-12 w-full items-center justify-between gap-3 rounded-xl border border-dashed border-input bg-card/60 px-4 py-2.5 text-left text-[15px] font-semibold text-primary transition-colors hover:border-primary/50 hover:bg-card">
+                          {text.emptyGroupAction}<MessageCircle aria-hidden className="size-4 shrink-0" />
+                        </button>
+                      </div>
+                    )}
                   </div>
                 </section>
               ))}
@@ -213,7 +219,6 @@ export function LivingProfile({
               <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
                 {layout.sharedGroups.map(({ area, source }) => {
                   const items = at(picture, source);
-                  const hidden = !showPrivate && layout.sensitive.areas.includes(area);
                   const label = copy.areas[area as keyof typeof copy.areas] || area;
                   return (
                     <article key={area} className="flex flex-col rounded-2xl border bg-card p-5 shadow-soft">
@@ -229,15 +234,9 @@ export function LivingProfile({
                         <ul className="mt-3 space-y-2 text-sm">
                           {items.slice(0, 3).map((item, i) => (
                             <li key={item.id || i} className="min-w-0">
-                              {hidden ? (
-                                <span className="flex items-center gap-1.5 italic text-muted-foreground"><Lock aria-hidden className="size-3.5" />{text.sensitiveHidden}</span>
-                              ) : (
-                                <>
-                                  <span className="font-semibold">{human(item.value || item.role)}</span>
-                                  {item.wish && <span className="block text-muted-foreground">{text.wish}: {human(item.wish)}</span>}
-                                  {(item.worry || item.concern) && <span className="block text-muted-foreground">{text.worry}: {human(item.worry || item.concern)}</span>}
-                                </>
-                              )}
+                              <span className="font-semibold">{human(item.value || item.role)}</span>
+                              {item.wish && <span className="block text-muted-foreground">{text.wish}: {human(item.wish)}</span>}
+                              {(item.worry || item.concern) && <span className="block text-muted-foreground">{text.worry}: {human(item.worry || item.concern)}</span>}
                             </li>
                           ))}
                         </ul>
@@ -266,10 +265,8 @@ export function LivingProfile({
                 <DialogDescription className="sr-only">{fill(text.expand, { label: evidenceLabel(opened.key) })}</DialogDescription>
               </DialogHeader>
               <div className="space-y-4">
-                {!showPrivate && isSensitive(opened.key)
-                  ? <p className="flex items-center gap-1.5 text-sm italic text-muted-foreground"><Lock aria-hidden className="size-3.5" />{text.sensitiveHidden}</p>
-                  : <ReadableValue value={opened.value} />}
-                <FactReview key={opened.id + opened.digest} card={opened} hidden={!showPrivate && isSensitive(opened.key)}
+                <ReadableValue value={opened.value} />
+                <FactReview key={opened.id + opened.digest} card={opened}
                   onSaved={() => { setOpenId(null); void resource.refresh(); }} />
               </div>
             </>

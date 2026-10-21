@@ -1,31 +1,134 @@
 "use client";
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useTheme } from "next-themes";
-import { Bell, Check, ChevronRight, Download, Link2, Monitor, Moon, Palette, ShieldCheck, Sun, Trash2, TriangleAlert } from "lucide-react";
+import {
+  Bell, Check, Copy, Download, LifeBuoy, Link2, LogOut, Monitor, Moon, Palette, ShieldCheck, Sun, TriangleAlert, UserRound,
+  type LucideIcon,
+} from "lucide-react";
+import { motion } from "motion/react";
 import { Button } from "@/components/ui/button";
-import { SectionCard } from "@/components/pai";
+import { Switch } from "@/components/ui/switch";
+import { useConfirm } from "@/components/ui/dialogs-provider";
+import { FeedbackDialog } from "@/components/feedback/feedback-dialog";
 import { workspaceApi } from "@/lib/api";
+import { requestPasswordReset } from "@/lib/auth/service";
+import { signOutAndReturnToSignIn } from "@/lib/auth-redirects";
+import { publicAppUrl } from "@/lib/desktop-host";
+import { usePaiAuth } from "@/lib/pai-auth-context";
+import { useWorkspace } from "@/lib/workspace-context";
+import type { ShareSummary } from "@/lib/types";
 import { cn } from "@/lib/utils";
-import { Heading } from "./resource";
+import { Heading, shortDate } from "./resource";
 import copy from "./copy.json";
 
+const text = copy.settings;
+type SectionId = keyof typeof text.sections;
+const SECTIONS: { id: SectionId; icon: LucideIcon }[] = [
+  { id: "account", icon: UserRound },
+  { id: "appearance", icon: Palette },
+  { id: "notifications", icon: Bell },
+  { id: "privacy", icon: ShieldCheck },
+  { id: "help", icon: LifeBuoy },
+];
 const THEMES = [
+  { value: "system", icon: Monitor },
   { value: "light", icon: Sun },
   { value: "dark", icon: Moon },
-  { value: "system", icon: Monitor },
 ] as const;
-const option = (on: boolean) => cn(
-  "flex min-h-12 items-center gap-2.5 rounded-2xl border-2 px-4 py-3 text-sm font-semibold transition-colors",
-  on ? "border-foreground bg-secondary text-foreground ring-1 ring-foreground" : "border-border bg-card hover:border-foreground/30",
-);
+const fill = (s: string, v: Record<string, string | number>) => s.replace(/\{(\w+)\}/g, (_, k) => String(v[k] ?? ""));
 
-export function CounselorSettings({ base }: { base: string }) {
+/** One setting: what it is and why on the left, its control on the right. */
+function Row({ label, help, children, tone }: { label: string; help?: string; children?: React.ReactNode; tone?: "danger" }) {
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3 px-5 py-4 sm:px-6">
+      <div className="min-w-0 flex-1 basis-60">
+        <p className={cn("text-sm font-semibold", tone === "danger" && "text-danger-ink")}>{label}</p>
+        {help && <p className="mt-0.5 max-w-xl text-[13px] leading-relaxed text-muted-foreground">{help}</p>}
+      </div>
+      {children && <div className="flex shrink-0 flex-wrap items-center gap-2">{children}</div>}
+    </div>
+  );
+}
+
+function Panel({ children }: { children: React.ReactNode }) {
+  return <div className="divide-y divide-border/70 overflow-hidden rounded-[22px] bg-card shadow-card ring-1 ring-border/70">{children}</div>;
+}
+
+/** The one Settings place for the student: account, appearance, the
+ * notification sound, their data and shared links, and help. Workspace
+ * administration (machine tokens, chat-platform bots, agent monitoring)
+ * belongs to an operator console, not to a student, and is not here. */
+export function CounselorSettings({ onNavigate }: { base?: string; onNavigate?: (view: string) => void }) {
   const { theme, setTheme } = useTheme();
-  const [error, setError] = useState(false),
-    [deleting, setDeleting] = useState(false),
-    [confirmDelete, setConfirmDelete] = useState(false),
-    [busy, setBusy] = useState(false),
-    [exported, setExported] = useState(false);
+  const { user, signOut } = usePaiAuth();
+  const { notificationSound, setNotificationSound } = useWorkspace();
+  const confirm = useConfirm();
+  const [section, setSection] = useState<SectionId>("account");
+  const [error, setError] = useState(false);
+  const [reset, setReset] = useState<"idle" | "busy" | "sent" | "failed">("idle");
+  const [exported, setExported] = useState(false);
+  const [feedback, setFeedback] = useState(false);
+  const [shares, setShares] = useState<ShareSummary[] | null>(null);
+  const [sharesFailed, setSharesFailed] = useState(false);
+  const [copied, setCopied] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false), [confirmDelete, setConfirmDelete] = useState(false), [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    const requested = new URLSearchParams(window.location.search).get("section");
+    if (requested && requested in text.sections) setSection(requested as SectionId);
+  }, []);
+  const choose = (id: SectionId) => {
+    setSection(id);
+    const q = new URLSearchParams(window.location.search);
+    q.set("section", id);
+    window.history.replaceState({}, "", `${window.location.pathname}?${q}`);
+  };
+  const loadShares = useCallback(() => {
+    setSharesFailed(false);
+    workspaceApi.listShares().then(setShares).catch(() => { setShares([]); setSharesFailed(true); });
+  }, []);
+  useEffect(() => { if (section === "privacy" && shares === null) loadShares(); }, [section, shares, loadShares]);
+
+  async function sendReset() {
+    if (!user?.email) return;
+    setReset("busy");
+    try { await requestPasswordReset(user.email); setReset("sent"); } catch { setReset("failed"); }
+  }
+  async function leave() {
+    const ok = await confirm({ title: text.signOut, description: text.signOutHelp, confirmText: text.signOut, destructive: true });
+    if (ok) await signOutAndReturnToSignIn(signOut);
+  }
+  async function download() {
+    try {
+      const data = await workspaceApi.exportCounselorData();
+      const url = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: "application/json" }));
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = "my-counselor-data.json";
+      link.click();
+      URL.revokeObjectURL(url);
+      setExported(true);
+    } catch {
+      setError(true);
+    }
+  }
+  async function stopSharing(share: ShareSummary) {
+    try {
+      await workspaceApi.deleteShare(share.id);
+      setShares((list) => (list || []).filter((s) => s.id !== share.id));
+    } catch {
+      setError(true);
+    }
+  }
+  async function copyLink(share: ShareSummary) {
+    try {
+      await navigator.clipboard.writeText(publicAppUrl(`/share/${encodeURIComponent(share.shareToken)}`));
+      setCopied(share.id);
+      setTimeout(() => setCopied(null), 2000);
+    } catch {
+      setError(true);
+    }
+  }
   async function remove() {
     if (!confirmDelete) return;
     setBusy(true);
@@ -38,102 +141,150 @@ export function CounselorSettings({ base }: { base: string }) {
       setBusy(false);
     }
   }
-  async function download() {
-    try {
-      const data = await workspaceApi.exportCounselorData();
-      const url = URL.createObjectURL(
-        new Blob([JSON.stringify(data, null, 2)], { type: "application/json" }),
-      );
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = "my-counselor-data.json";
-      link.click();
-      URL.revokeObjectURL(url);
-      setExported(true);
-    } catch {
-      setError(true);
-    }
-  }
-  const linkRow = (href: string, label: string, Icon: typeof Bell) => (
-    <a href={href} className="flex min-h-14 items-center gap-3 rounded-2xl px-3 transition-colors hover:bg-muted">
-      <span aria-hidden className="flex size-9 items-center justify-center rounded-xl bg-muted"><Icon className="size-[18px]" /></span>
-      <span className="flex-1 text-sm font-semibold">{label}</span>
-      <ChevronRight aria-hidden className="size-5 text-muted-foreground" />
-    </a>
-  );
+
+  const meta = text.sections[section];
   return (
     <>
-      <Heading title={copy.settingsTitle} description={copy.settings.intro} icon={Palette} tone="violet" />
-      {error && (
-        <p className="mb-5 flex items-center gap-2 rounded-2xl bg-danger-soft px-4 py-3 text-sm font-medium text-danger-ink" role="alert">
-          <TriangleAlert aria-hidden className="size-4 shrink-0" />{copy.error}
-        </p>
-      )}
-      <div className="grid gap-5 lg:grid-cols-2">
-        <SectionCard title={copy.theme} description={copy.settings.themeHelp} icon={Palette} tone="violet">
-          <div className="grid grid-cols-3 gap-2">
-            {THEMES.map(({ value, icon: Icon }) => (
-              <button key={value} type="button" aria-pressed={theme === value} onClick={() => setTheme(value)}
-                className={cn(option(theme === value), "flex-col justify-center text-center")}>
-                <Icon aria-hidden className="size-5" />
-                {copy[value]}
+      <Heading title={copy.settingsTitle} description={text.intro} />
+      <div className="grid items-start gap-6 md:grid-cols-[13.5rem_minmax(0,1fr)] lg:gap-10">
+        <nav aria-label={text.sectionsLabel} className="flex gap-1 overflow-x-auto pb-1 md:sticky md:top-2 md:flex-col md:overflow-visible md:pb-0">
+          {SECTIONS.map(({ id, icon: Icon }) => {
+            const on = section === id;
+            return (
+              <button key={id} type="button" onClick={() => choose(id)} aria-current={on ? "page" : undefined}
+                className={cn("relative flex h-11 shrink-0 items-center gap-3 rounded-full px-4 text-sm font-semibold transition-colors",
+                  on ? "text-primary" : "text-muted-foreground hover:bg-accent hover:text-foreground")}>
+                {on && <motion.span layoutId="settings-section" aria-hidden className="absolute inset-0 rounded-full bg-brand-soft"
+                  transition={{ type: "spring", stiffness: 500, damping: 40 }} />}
+                <Icon aria-hidden className="relative size-[18px]" />
+                <span className="relative whitespace-nowrap">{text.sections[id].label}</span>
               </button>
-            ))}
-          </div>
-        </SectionCard>
-        <SectionCard title={copy.settings.notificationsTitle} description={copy.settings.notificationsHelp} icon={Bell} tone="amber">
-          <div className="-mx-3">
-            {linkRow(`${base}/settings/preferences`, copy.notificationSettings, Bell)}
-            {linkRow(`${base}/settings/integrations`, copy.integrations, Link2)}
-          </div>
-        </SectionCard>
-        <SectionCard title={copy.privacy} icon={ShieldCheck} tone="blue">
-          <p className="text-sm leading-relaxed text-muted-foreground">{copy.privacyHelp}</p>
-          <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{copy.exportScope}</p>
-          <Button size="tap" variant="soft" className="mt-4" onClick={download}>
-            <Download aria-hidden />{copy.export}
-          </Button>
-          {exported && (
-            <p role="status" className="mt-3 flex items-center gap-2 text-sm font-medium text-success-ink">
-              <Check aria-hidden className="size-4 shrink-0" />{copy.settings.exported}
+            );
+          })}
+        </nav>
+
+        <section aria-labelledby="settings-section-title" className="min-w-0">
+          <h2 id="settings-section-title" className="font-display text-xl leading-tight">{meta.title}</h2>
+          <p className="mb-4 mt-1 text-sm text-muted-foreground">{meta.description}</p>
+          {error && (
+            <p className="mb-4 flex items-center gap-2 rounded-2xl bg-danger-soft px-4 py-3 text-sm font-medium text-danger-ink" role="alert">
+              <TriangleAlert aria-hidden className="size-4 shrink-0" />{copy.error}
             </p>
           )}
-        </SectionCard>
+
+          {section === "account" && (
+            <Panel>
+              <Row label={text.name} help={text.nameHelp}>
+                <span className="text-sm font-semibold">{user?.displayName || "—"}</span>
+                {onNavigate && <Button size="tap" variant="outline" onClick={() => onNavigate("profile")}>{text.nameEdit}</Button>}
+              </Row>
+              <Row label={text.email} help={text.emailHelp}>
+                <span className="text-sm font-semibold">{user?.email || "—"}</span>
+              </Row>
+              <Row label={text.password} help={text.passwordHelp}>
+                {reset === "sent"
+                  ? <span role="status" className="flex items-center gap-1.5 text-sm font-semibold text-success-ink"><Check aria-hidden className="size-4" />{fill(text.passwordSent, { email: user?.email || "" })}</span>
+                  : <Button size="tap" variant="outline" disabled={reset === "busy" || !user?.email} onClick={sendReset}>{text.passwordSend}</Button>}
+                {reset === "failed" && <span role="alert" className="text-sm text-danger-ink">{text.passwordFailed}</span>}
+              </Row>
+              <Row label={text.signOut} help={text.signOutHelp}>
+                <Button size="tap" variant="outline" onClick={leave}><LogOut aria-hidden />{text.signOut}</Button>
+              </Row>
+            </Panel>
+          )}
+
+          {section === "appearance" && (
+            <Panel>
+              <Row label={text.theme} help={text.themeHelp}>
+                <div role="radiogroup" aria-label={text.theme} className="inline-flex rounded-full bg-background p-1 ring-1 ring-inset ring-border">
+                  {THEMES.map(({ value, icon: Icon }) => {
+                    const on = (theme || "system") === value;
+                    return (
+                      <button key={value} type="button" role="radio" aria-checked={on} onClick={() => setTheme(value)}
+                        className={cn("flex h-9 items-center gap-1.5 rounded-full px-3.5 text-[13px] font-semibold transition-colors",
+                          on ? "bg-primary text-primary-foreground" : "text-foreground/75 hover:text-foreground")}>
+                        <Icon aria-hidden className="size-4" />{copy[value]}
+                      </button>
+                    );
+                  })}
+                </div>
+              </Row>
+            </Panel>
+          )}
+
+          {section === "notifications" && (
+            <Panel>
+              <Row label={text.soundLabel} help={text.soundHelp}>
+                <Switch checked={notificationSound} onCheckedChange={setNotificationSound} aria-label={text.soundLabel} />
+              </Row>
+            </Panel>
+          )}
+
+          {section === "privacy" && (
+            <div className="space-y-5">
+              <Panel>
+                <Row label={text.sharesTitle} help={text.sharesHelp} />
+                {shares === null ? (
+                  <p className="px-5 py-4 text-sm text-muted-foreground sm:px-6">{text.sharesLoading}</p>
+                ) : sharesFailed ? (
+                  <p className="px-5 py-4 text-sm text-danger-ink sm:px-6">{text.sharesFailed}</p>
+                ) : shares.length === 0 ? (
+                  <p className="px-5 py-4 text-sm text-muted-foreground sm:px-6">{text.sharesEmpty}</p>
+                ) : shares.map((share) => (
+                  <div key={share.id} className="flex flex-wrap items-center gap-x-4 gap-y-2 px-5 py-3.5 sm:px-6">
+                    <span aria-hidden className="flex size-9 shrink-0 items-center justify-center rounded-full bg-brand-soft text-primary"><Link2 className="size-4" /></span>
+                    <div className="min-w-0 flex-1 basis-48">
+                      <p className="truncate text-sm font-semibold">{share.title || copy.nav.threads}</p>
+                      <p className="text-xs text-muted-foreground">{fill(text.shareMeta, { count: share.messageCount, date: shortDate(share.createdAt) })}</p>
+                    </div>
+                    <Button size="tap" variant="ghost" onClick={() => copyLink(share)}>
+                      {copied === share.id ? <Check aria-hidden /> : <Copy aria-hidden />}{copied === share.id ? text.shareCopied : text.shareCopy}
+                    </Button>
+                    <Button size="tap" variant="outline" className="border-danger/40 text-danger-ink" onClick={() => stopSharing(share)}>{text.shareStop}</Button>
+                  </div>
+                ))}
+              </Panel>
+              <Panel>
+                <Row label={text.exportLabel} help={text.exportHelp}>
+                  <Button size="tap" variant="outline" onClick={download}><Download aria-hidden />{copy.export}</Button>
+                </Row>
+                {exported && (
+                  <p role="status" className="flex items-center gap-2 px-5 py-3 text-sm font-medium text-success-ink sm:px-6">
+                    <Check aria-hidden className="size-4 shrink-0" />{text.exported}
+                  </p>
+                )}
+                <Row label={text.deleteLabel} help={text.deleteHelp} tone="danger">
+                  {!deleting && <Button size="tap" variant="outline" className="border-danger/40 text-danger-ink" onClick={() => setDeleting(true)}>{copy.deleteAccount}</Button>}
+                </Row>
+                {deleting && (
+                  <div className="bg-danger-soft px-5 py-4 text-danger-ink sm:px-6">
+                    <p className="text-sm">{copy.deleteHelp}</p>
+                    <label className="mt-3 flex min-h-11 cursor-pointer items-start gap-3 text-sm font-medium">
+                      <input type="checkbox" className="mt-0.5 size-5 shrink-0 accent-[var(--danger)]" checked={confirmDelete}
+                        onChange={(e) => setConfirmDelete(e.target.checked)} />
+                      {copy.deleteConfirm}
+                    </label>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <Button size="tap" variant="destructive" disabled={!confirmDelete || busy} onClick={remove}>{copy.deleteNow}</Button>
+                      <Button size="tap" variant="ghost" onClick={() => { setDeleting(false); setConfirmDelete(false); }}>{copy.cancel}</Button>
+                    </div>
+                  </div>
+                )}
+              </Panel>
+              <p className="flex items-start gap-2 px-1 text-xs text-muted-foreground"><ShieldCheck aria-hidden className="mt-0.5 size-4 shrink-0 text-success" />{text.privacyNote}</p>
+            </div>
+          )}
+
+          {section === "help" && (
+            <Panel>
+              <Row label={text.feedbackLabel} help={text.feedbackHelp}>
+                <Button size="tap" variant="outline" onClick={() => setFeedback(true)}>{text.feedbackAction}</Button>
+              </Row>
+            </Panel>
+          )}
+        </section>
       </div>
-      <section aria-labelledby="danger-title" className="mt-5 rounded-3xl border border-danger/30 bg-card p-5 shadow-soft sm:p-6">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <span aria-hidden className="flex size-9 items-center justify-center rounded-xl bg-danger-soft text-danger-ink"><Trash2 className="size-[18px]" /></span>
-            <div>
-              <h2 id="danger-title" className="font-semibold">{copy.settings.dangerTitle}</h2>
-              <p className="text-sm text-muted-foreground">{copy.settings.dangerHelp}</p>
-            </div>
-          </div>
-          {!deleting && <Button size="tap" variant="outline" className="border-danger/40 text-danger-ink" onClick={() => setDeleting(true)}>{copy.deleteAccount}</Button>}
-        </div>
-        {deleting && (
-          <div className="mt-5 rounded-2xl bg-danger-soft p-4 text-danger-ink">
-            <p className="text-sm">{copy.deleteHelp}</p>
-            <label className="mt-4 flex min-h-11 cursor-pointer items-start gap-3 text-sm font-medium">
-              <input
-                type="checkbox"
-                className="mt-0.5 size-5 shrink-0 accent-[var(--danger)]"
-                checked={confirmDelete}
-                onChange={(e) => setConfirmDelete(e.target.checked)}
-              />
-              {copy.deleteConfirm}
-            </label>
-            <div className="mt-3 flex flex-wrap gap-2">
-              <Button size="tap" variant="destructive" disabled={!confirmDelete || busy} onClick={remove}>
-                {copy.deleteNow}
-              </Button>
-              <Button size="tap" variant="ghost" onClick={() => { setDeleting(false); setConfirmDelete(false); }}>
-                {copy.cancel}
-              </Button>
-            </div>
-          </div>
-        )}
-      </section>
+      {feedback && <FeedbackDialog onClose={() => setFeedback(false)} />}
     </>
   );
 }

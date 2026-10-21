@@ -298,15 +298,9 @@
     "commandGo": "Go to",
     "commandAskGroup": "Ask PAI",
     "commandAsk": "Ask PAI: “{q}”",
-    "starters": [
-      "What should I explore next?",
-      "Help me understand my options",
-      "Talk through my family's expectations"
-    ],
     "sectionsLabel": "Sections",
     "collapse": "Collapse sidebar",
     "expand": "Expand sidebar",
-    "hideStarters": "Hide suggestions",
     "forStudents": "For students"
   },
   "journeyStates": {
@@ -406,13 +400,70 @@
     "backToFolders": "Back to folders"
   },
   "settings": {
-    "intro": "Appearance, notifications and your data, in one place.",
-    "themeHelp": "Choose how PAI looks on this device.",
-    "notificationsTitle": "Notifications and channels",
-    "notificationsHelp": "Choose what PAI tells you about, and where.",
-    "dangerTitle": "Delete your data",
-    "dangerHelp": "This cannot be undone.",
-    "exported": "Your download has started. Keep the file somewhere private."
+    "intro": "Your account, how PAI looks and sounds, and your data.",
+    "sectionsLabel": "Settings sections",
+    "sections": {
+      "account": {
+        "label": "Account",
+        "title": "Account",
+        "description": "Who you are signed in as, and how you sign in."
+      },
+      "appearance": {
+        "label": "Appearance",
+        "title": "Appearance",
+        "description": "How PAI looks on this device."
+      },
+      "notifications": {
+        "label": "Notifications",
+        "title": "Notifications",
+        "description": "How PAI lets you know something new happened."
+      },
+      "privacy": {
+        "label": "Privacy & data",
+        "title": "Privacy & data",
+        "description": "What you have shared, your copy of your data, and deleting it."
+      },
+      "help": {
+        "label": "Help",
+        "title": "Help & feedback",
+        "description": "Tell the team what works and what does not."
+      }
+    },
+    "name": "Name",
+    "nameHelp": "Your name comes from your profile, so it stays the same everywhere.",
+    "nameEdit": "Edit in About you",
+    "email": "Email",
+    "emailHelp": "The email on your account. It cannot be changed here.",
+    "password": "Password",
+    "passwordHelp": "We will email you a link to set a new password. If you sign in with Google, you do not have a password here.",
+    "passwordSend": "Send reset link",
+    "passwordSent": "Link sent to {email}.",
+    "passwordFailed": "Could not send the link. Please try again.",
+    "signOut": "Sign out",
+    "signOutHelp": "Sign out of Placement AI on this device.",
+    "theme": "Theme",
+    "themeHelp": "Use your device setting, or choose light or dark.",
+    "soundLabel": "Sound for new messages",
+    "soundHelp": "Play a short sound when PAI replies while you are elsewhere in the workspace.",
+    "sharesTitle": "Shared links",
+    "sharesHelp": "Anyone with one of these links can read that conversation. Stop sharing to turn a link off.",
+    "sharesEmpty": "You have not shared anything.",
+    "sharesLoading": "Loading your shared links…",
+    "sharesFailed": "Could not load your shared links.",
+    "shareMeta": "{count} messages · shared {date}",
+    "shareCopy": "Copy link",
+    "shareCopied": "Link copied",
+    "shareStop": "Stop sharing",
+    "shareStopped": "Link turned off.",
+    "exportLabel": "Download your data",
+    "exportHelp": "Export includes your visible profile, conversation, paths, roadmaps, picture and ratings. Document metadata is included; download the original files from Documents. Private model notes and credentials are excluded.",
+    "exported": "Your download has started. Keep the file somewhere private.",
+    "privacyNote": "Private interpretation stays with PAI. Nothing is shared with a university without your permission.",
+    "deleteLabel": "Delete your data",
+    "deleteHelp": "Permanently delete your Placement AI data. This cannot be undone.",
+    "feedbackLabel": "Send feedback",
+    "feedbackHelp": "Report a problem or suggest something. It goes straight to the team.",
+    "feedbackAction": "Write feedback"
   },
   "placesOpen": "Look at places",
   "fitLabels": {
@@ -529,10 +580,6 @@
     "recAlso": "Also: {items}",
     "recPrev": "Previous recommendation",
     "recNext": "Next recommendation",
-    "trackLabel": "{done} of {total} stages",
-    "ask": "Ask PAI",
-    "askPlaceholder": "What should I explore next, given what I enjoy?",
-    "askAction": "Ask PAI",
-    "footer": "Your fit first. Better choices follow."
+    "trackLabel": "{done} of {total} stages"
   }
 }

@@ -81,9 +81,6 @@ module.exports = [
   { id: 'profile', path: '/student?view=profile', ready: 'main h1', full: true },
   { id: 'profile-background', path: '/student?view=profile&tab=background', ready: 'main h1', full: true },
   { id: 'profile-mirror-check', path: '/student?view=profile&tab=background&mirror=1', ready: 'main h1', full: true, crawl: false },
-  { id: 'profile-private-shown', path: '/student?view=profile', ready: 'main h1', full: true, crawl: false, setup: async (page) => {
-    await page.getByRole('button', { name: 'Show private details' }).click();
-  } },
   { id: 'profile-row-open', path: '/student?view=profile', ready: 'main h1', full: true, crawl: false, setup: async (page) => {
     await page.getByRole('button', { name: 'Show source and actions for Education' }).first().click();
   } },
@@ -133,8 +130,13 @@ module.exports = [
   } },
 
   { id: 'documents', path: '/student?view=files', ready: 'main h1' },
+  { id: 'documents-trash', path: '/student?view=files', ready: 'main h1', crawl: false, setup: async (page) => {
+    await page.getByRole('button', { name: /Recently deleted/ }).click(); await page.getByText('Trash is empty').waitFor();
+  } },
   { id: 'settings', path: '/student?view=settings', ready: 'main h1', full: true },
-  { id: 'settings-delete', path: '/student?view=settings', ready: 'main h1', full: true, crawl: false, setup: async (page) => {
+  { id: 'settings-privacy', path: '/student?view=settings&section=privacy', ready: 'main h1', full: true },
+  { id: 'settings-appearance', path: '/student?view=settings&section=appearance', ready: 'main h1', crawl: false },
+  { id: 'settings-delete', path: '/student?view=settings&section=privacy', ready: 'main h1', full: true, crawl: false, setup: async (page) => {
     await page.getByRole('button', { name: 'Delete my app data' }).click(); await page.getByRole('checkbox').waitFor();
   } },
 

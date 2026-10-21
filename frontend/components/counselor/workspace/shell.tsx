@@ -122,12 +122,18 @@ export function CounselorShell() {
       </div>
     ) : active === "files" ? (
       <DocumentsView list={<FileList />} preview={<FilePreview />} />
+    ) : active === "overview" ? (
+      // Overview is one screen: on desktop it fits the window and never scrolls.
+      <div data-scroll-area className="min-h-0 flex-1 overflow-y-auto lg:overflow-hidden">
+        <div className="mx-auto w-full max-w-6xl px-4 pb-6 pt-2 sm:px-8 lg:h-full">
+          <Overview journey={journey} navigate={navigate} openPath={openPath} onChat={chat} />
+        </div>
+      </div>
     ) : active === "notifications" ? (
       <NotificationsCenterView />
     ) : (
       <div data-scroll-area className="min-h-0 flex-1 overflow-y-auto">
         <div className="mx-auto max-w-6xl px-4 pb-16 pt-6 sm:px-8 sm:pt-8">
-          {active === "overview" && <Overview journey={journey} navigate={navigate} openPath={openPath} onChat={chat} />}
           {active === "profile" && <LivingProfile onChat={chat} stage={journey.progress?.stage} />}
           {active === "journey" && <Journey navigate={navigate} journey={journey} onChat={chat} />}
           {active === "paths" &&
@@ -160,11 +166,10 @@ export function CounselorShell() {
             <Compare onChat={chat} onOpen={openPath} />
           )}
           {active === "plan" && <Plan onChat={chat} onNavigate={navigate} />}
-          {active === "settings" && <CounselorSettings base={base} />}
+          {active === "settings" && <CounselorSettings base={base} onNavigate={navigate} />}
         </div>
       </div>
     );
-  const settingsAction = { label: copy.sections.settings.label, icon: Settings, onSelect: () => navigate("settings") };
   const stage = journey.progress?.stage;
   const done = journey.progress?.current ?? 0;
   const total = copy.stages.length;
@@ -231,7 +236,7 @@ export function CounselorShell() {
               <NavItem section={SECTIONS.find((s) => s.key === "settings")!} current={section.key === "settings"}
                 collapsed={collapsed} onSelect={() => navigate("settings")} />
               <div className={cn("flex pt-1", collapsed && "justify-center")}>
-                <UserMenu side="right" align="end" showIdentity={!collapsed} variant={collapsed ? "avatar" : "default"} profileAction={settingsAction} />
+                <UserMenu side="right" align="end" showIdentity={!collapsed} variant={collapsed ? "avatar" : "default"} />
               </div>
             </div>
           </LayoutGroup>
@@ -242,9 +247,8 @@ export function CounselorShell() {
             <span className="flex size-8 items-center justify-center rounded-lg bg-white ring-1 ring-border lg:hidden">
               <img src="/pai-emblem.png" alt={copy.brand} className="size-5 object-contain" />
             </span>
-            <p className="shrink-0 font-display text-xl leading-none">{copy.sections[section.key].label}</p>
             {subViews.length > 1 && (
-              <SubTabs views={subViews} current={active} onSelect={navigate} className="ms-3 max-md:hidden" />
+              <SubTabs views={subViews} current={active} onSelect={navigate} className="max-md:hidden" />
             )}
             <div className="ms-auto flex items-center gap-1">
               <button onClick={() => setCommand(true)} aria-label={copy.shell.search}
@@ -252,7 +256,13 @@ export function CounselorShell() {
                 <Search aria-hidden className="size-[18px]" />
               </button>
               <NotificationsMenu side="bottom" align="end" />
-              <span className="lg:hidden"><UserMenu side="bottom" align="end" variant="avatar" profileAction={settingsAction} /></span>
+              {/* Phones have no sidebar: the same single Settings page, one tap away. */}
+              <button onClick={() => navigate("settings")} aria-label={copy.sections.settings.label} aria-current={section.key === "settings" ? "page" : undefined}
+                className={cn("flex size-10 items-center justify-center rounded-full hover:bg-muted lg:hidden",
+                  section.key === "settings" ? "bg-brand-soft text-primary" : "text-muted-foreground hover:text-foreground")}>
+                <Settings aria-hidden className="size-[18px]" />
+              </button>
+              <span className="lg:hidden"><UserMenu side="bottom" align="end" variant="avatar" /></span>
             </div>
           </header>
           {subViews.length > 1 && (

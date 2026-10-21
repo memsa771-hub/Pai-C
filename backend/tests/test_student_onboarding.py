@@ -192,7 +192,7 @@ def test_onboarding_category_does_not_freeze_the_living_status(db):
     assert refined["identity.status_category"] == "student"
 
 
-def test_profile_shows_onboarding_facts_and_still_hides_date_of_birth(db):
+def test_profile_shows_onboarding_facts_including_the_students_own_date_of_birth(db):
     workspace = db.info["workspace"]
     OnboardingService(db).apply(workspace, ANSWERS)
     db.commit()
@@ -202,9 +202,9 @@ def test_profile_shows_onboarding_facts_and_still_hides_date_of_birth(db):
     # No richer status yet, so the header falls back to the category.
     assert profile["header"]["status"] == "Student"
     assert profile["facts"]["identity.gender"] == "male"
-    # Date of birth is `restricted` and must not reach the Profile surface.
-    assert "identity.date_of_birth" not in profile["facts"]
-    assert "2003-04-15" not in str(profile)
+    # Date of birth is `restricted` in the Vault, but the student's own
+    # Profile shows it back to them; no other restricted field is opened.
+    assert profile["facts"]["identity.date_of_birth"] == "2003-04-15"
 
 
 def test_required_answers_are_enforced_and_nothing_is_half_written(db):
@@ -339,7 +339,8 @@ def test_three_step_form_composes_the_name_and_greets_by_first_name(db):
     assert result["completed"] and not result["rejected"]
     facts = VaultService(db).snapshot(str(workspace.id), include_sensitive=True)
     assert facts["identity.full_name"] == "Sam Taylor"
-    assert facts["identity.preferred_name"] == "Sam"
+    # No separate preferred name: only first and last name are asked.
+    assert "identity.preferred_name" not in facts
     assert facts["identity.date_of_birth"] == "2008-03-12"
     assert facts["identity.gender"] == "female"
     assert facts["location.current_country"] == "Pakistan"

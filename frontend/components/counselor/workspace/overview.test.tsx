@@ -19,7 +19,7 @@ const data: JourneySignals = {
 };
 const journey = { data, error: false, busy: false, refresh: vi.fn(), progress: journeyProgress(data) };
 
-it("shows signals from the student's own data, never a score, and only drafts for PAI", async () => {
+it("shows signals from the student's own data and never a score", async () => {
   vi.mocked(workspaceApi.getProfileCards).mockResolvedValue({ cards });
   const navigate = vi.fn(), openPath = vi.fn(), onChat = vi.fn();
   render(<Overview journey={journey} navigate={navigate} openPath={openPath} onChat={onChat} />);
@@ -31,10 +31,8 @@ it("shows signals from the student's own data, never a score, and only drafts fo
   fireEvent.click(within(paths).getByRole("button", { name: /Practical design/ }));
   expect(openPath).toHaveBeenCalledWith("p1");
   expect(document.body.textContent).not.toMatch(/\d+\s?\/\s?100|\d+\s?%\s?(fit|match)/i);
-  // Asking fills a draft in the conversation; nothing is sent from here.
-  fireEvent.change(screen.getByLabelText("Ask PAI"), { target: { value: "Is design right for me?" } });
-  fireEvent.submit(screen.getByLabelText("Ask PAI").closest("form")!);
-  expect(onChat).toHaveBeenCalledWith("Is design right for me?");
+  // The overview has no free-text box; questions belong in the conversation.
+  expect(screen.queryByRole("textbox")).toBeNull();
   // The recommendation pager moves between real next steps.
   await screen.findByText(/Your profile is missing \d+ details\./, undefined, { timeout: 2000 }).catch(() => null);
   fireEvent.click(screen.getByRole("button", { name: "Next recommendation" }));

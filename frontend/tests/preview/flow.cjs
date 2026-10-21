@@ -121,6 +121,11 @@ module.exports = async function flow(browser, open, ORIGIN) {
     await page.getByRole('dialog').getByPlaceholder(/question for PAI/).fill('Vault Documents');
     await page.getByRole('option', { name: 'Vault · Documents' }).click();
     await page.getByRole('heading', { name: 'Your documents' }).waitFor();
+    // Documents: the grid's own upload input is mounted (not lost to a missing
+    // header slot), and Recently deleted opens the trash.
+    assert.equal(await page.locator('main input[type=file]').count(), 2, 'page and folder upload inputs both exist');
+    await page.getByRole('button', { name: /Recently deleted/ }).click();
+    await page.getByText('Trash is empty').waitFor();
     const sentBeforeAsk = (await called(page, 'sendMessage')).length;
     await page.getByRole('button', { name: 'Search or ask PAI' }).click();
     await page.getByRole('dialog').getByPlaceholder(/question for PAI/).fill('Can we talk about my options?');
@@ -164,8 +169,12 @@ module.exports = async function flow(browser, open, ORIGIN) {
       assert(b && b.height >= 44 && b.width >= 44, 'tab bar target is at least 44px');
     }
     assert.equal(await p.getByRole('navigation').last().getByRole('button').count(), 5, 'Overview, PAI, Roadmaps, Journey, Vault');
+    // One Settings: on phones it is the gear in the top bar; the account menu
+    // holds only sign-out.
     await p.getByRole('button', { name: 'Account', exact: true }).click();
-    await p.getByRole('menuitem', { name: 'Settings', exact: true }).click();
+    assert.deepEqual(await p.getByRole('menuitem').allInnerTexts(), ['Sign out'], 'the account menu holds only sign-out; settings and feedback live in Settings');
+    await p.keyboard.press('Escape');
+    await p.getByRole('button', { name: 'Settings', exact: true }).click();
     await p.getByRole('heading', { name: 'Make this space yours' }).waitFor();
   } finally {
     assert.equal(phone.errors.length, 0, 'phone flow: ' + phone.errors.join(' | '));
