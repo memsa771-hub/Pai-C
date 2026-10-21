@@ -33,6 +33,7 @@ class GradeScale(_Model):
     provisional_min_pass: float
     value: str  # profile key of the student's grade on this scale
     min_pass: str | None = None  # profile key of their institution's confirmed minimum pass (S4-D6)
+    min_pass_scale: str | None = None  # profile key of the best grade that letter's scale has; must equal `best`
 
 
 class GradeCheck(_Model):
@@ -88,8 +89,8 @@ class EligibilityRules(_Model):
                 | ({self.test.requirement} if self.test else set()))
 
     def profile_fields(self) -> set[str]:
-        keys = {s.value for s in self.grade_scales.values()} | {s.min_pass for s in self.grade_scales.values()
-                                                                if s.min_pass}
+        keys = {s.value for s in self.grade_scales.values()}
+        keys |= {k for s in self.grade_scales.values() for k in (s.min_pass, s.min_pass_scale) if k}
         for g in self.grade:
             keys |= set(g.weights) | set(g.totals.values())
         for lc in self.language:

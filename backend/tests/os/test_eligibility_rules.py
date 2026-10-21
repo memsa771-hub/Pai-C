@@ -77,8 +77,8 @@ def test_playbook_without_rules_still_loads(tmp_path):
 
 
 def test_profile_keys_are_doc_type_and_field():
-    assert {"transcript.cgpa", "ielts_trf.overall", "min_passing_grade_letter.min_pass"} - KEYS == \
-        {"min_passing_grade_letter.min_pass"}  # Task 4 adds the letter type
+    assert {"transcript.cgpa", "ielts_trf.overall", "min_passing_grade_letter.min_pass",
+            "min_passing_grade_letter.scale_best"} <= KEYS
     assert all("." in k for k in KEYS)
 
 

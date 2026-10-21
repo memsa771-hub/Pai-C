@@ -33,7 +33,8 @@ def test_sample_set_deterministic(tmp_path):
 def test_sample_set_shape():
     docs = KEY["documents"]
     base = {n: d for n, d in docs.items() if not d.get("variant_of")}
-    assert len(base) == 30 and {d["type"] for d in base.values()} == set(TYPES)  # 5 bundles x 6 types
+    spike2_types = set(TYPES) - {"min_passing_grade_letter"}  # the letter came with Slice 4, after Spike 2
+    assert len(base) == 30 and {d["type"] for d in base.values()} == spike2_types  # 5 bundles x 6 types
     assert sorted({d["person"] for d in base.values()}) == ["b1", "b2", "b3", "b4", "b5"]
     assert {n for n, d in docs.items() if d.get("variant_of")} == {"b1_passport_rotated.png", "b5_transcript_lowres.jpg"}
     for name, d in docs.items():
