@@ -22,6 +22,10 @@ class NotAllowed(ValueError):
     """The change cannot be made; the message is safe to show the student."""
 
 
+class NotYourPlan(NotAllowed):
+    """The plan does not exist or is another student's (the API answers 404)."""
+
+
 class SwapLimit(NotAllowed):
     """CHANGES_PER_DAY programme changes in the last 24 hours."""
 
@@ -71,7 +75,7 @@ def _own(plans, student_ref: str, plan_id: int) -> RouteContract:
         owner = conn.execute(select(P.c.student_ref).where(
             P.c.id == plan_id, P.c.tenant_id == plans.kernel.tenant_id)).scalar_one_or_none()
     if owner != student_ref:
-        raise NotAllowed("this plan is not yours")
+        raise NotYourPlan("this plan is not yours")
     return plans._contract(plan_id)[0]
 
 
