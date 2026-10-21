@@ -346,3 +346,25 @@ def test_deleted_before_reading_is_skipped(documents):
     wid = enqueue_document(documents.client, TENANT, doc)
     assert documents.client.retrieve_workflow(wid).get_result()["status"] == "skipped"
     assert documents.calls == [] and documents.docs.get(doc_id).status == "deleted"
+
+
+def test_claim_survives_a_crash_inside_start(documents):
+    """A worker killed after the claim commits but before DBOS records the step replays `start`: the same workflow
+    carries on (invariant 8), and the document is not left in `reading`."""
+    doc_id = documents.upload("transcript", 1)
+    doc = documents.docs.get(doc_id)
+    wid = document_workflow_id(TENANT, doc_id, doc.sha256)
+    with documents.engine.begin() as conn:  # what the first attempt of `start` left behind
+        conn.execute(update(models.documents).where(models.documents.c.id == doc_id)
+                     .values(status="reading", claimed_by=wid))
+    assert documents.read(doc_id) == {"status": "read"}
+    assert documents.calls == ["transcript"]
+
+
+def test_a_document_claimed_by_another_workflow_is_skipped(documents):
+    doc_id = documents.upload("transcript", 1)
+    with documents.engine.begin() as conn:
+        conn.execute(update(models.documents).where(models.documents.c.id == doc_id)
+                     .values(status="reading", claimed_by="document:pai:other"))
+    assert documents.read(doc_id) == {"status": "skipped"}
+    assert documents.calls == [] and documents.docs.get(doc_id).status == "reading"

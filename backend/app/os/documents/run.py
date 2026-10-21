@@ -96,8 +96,15 @@ def register_documents(engine: Engine, settings: OsSettings, readers: Mapping[st
     docs, findings, runs = DocumentStore(engine, tenant), FindingStore(engine, tenant), AgentRuns(engine, tenant)
 
     def start(document_id: int) -> dict:
-        """`reading` (claimed), `budget` when the month's cap is spent (a budget_exceeded event; the document stays
-        `uploaded`), or `skipped` when the document is not `uploaded` (deleted, or read by another workflow)."""
+        """`reading` (claimed by this workflow), `budget` when the month's cap is spent (a budget_exceeded event;
+        the document stays `uploaded`), or `skipped` when the document is not ours to read (deleted, or claimed or
+        read by another workflow). A replay after a crash inside this step finds its own claim and carries on."""
+        wid = DBOS.workflow_id
+        with engine.connect() as conn:
+            row = conn.execute(select(D.c.status, D.c.claimed_by, D.c.doc_type, D.c.student_ref).where(
+                D.c.id == document_id, D.c.tenant_id == tenant)).first()
+        if row is not None and row.status == "reading" and row.claimed_by == wid:
+            return {"status": "reading", "doc_type": row.doc_type, "student_ref": row.student_ref}
         doc = docs.get(document_id)
         if doc is None or doc.status != "uploaded":
             return {"status": "skipped"}
@@ -115,7 +122,7 @@ def register_documents(engine: Engine, settings: OsSettings, readers: Mapping[st
         with engine.begin() as conn:
             claimed = conn.execute(update(D).where(D.c.id == document_id, D.c.tenant_id == tenant,
                                                    D.c.status == "uploaded")
-                                   .values(status="reading", error=None).returning(D.c.id)).first()
+                                   .values(status="reading", error=None, claimed_by=wid).returning(D.c.id)).first()
         if claimed is None:
             return {"status": "skipped"}
         return {"status": "reading", "doc_type": doc.doc_type, "student_ref": doc.student_ref}
