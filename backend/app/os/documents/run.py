@@ -20,7 +20,7 @@ from collections.abc import Callable, Mapping
 from datetime import date, datetime, timezone
 
 from dbos import DBOS, DBOSClient, EnqueueOptions
-from sqlalchemy import Engine, insert, select, update
+from sqlalchemy import Engine, func, insert, select, update
 
 from app.os import models
 from app.os.agents.spec import AgentSpec
@@ -66,6 +66,25 @@ def retry_waiting(engine: Engine, client: DBOSClient, tenant_id: str, today: dat
     for doc_id in ids:
         enqueue_document(client, tenant_id, store.get(doc_id), retry_day=today)
     return len(ids)
+
+
+class student_lock:
+    """One student's cross-checks run one at a time (a Postgres advisory lock held for the block)."""
+
+    def __init__(self, engine: Engine, tenant_id: str, student_ref: str) -> None:
+        self.engine, self.name = engine, f"os.documents:{tenant_id}:{student_ref}"
+
+    def __enter__(self) -> None:
+        self.conn = self.engine.connect()
+        self.key = self.conn.execute(select(func.hashtextextended(self.name, 0))).scalar()
+        self.conn.execute(select(func.pg_advisory_lock(self.key)))
+
+    def __exit__(self, *exc) -> None:
+        try:
+            self.conn.execute(select(func.pg_advisory_unlock(self.key)))
+            self.conn.commit()
+        finally:
+            self.conn.close()
 
 
 def _utcnow() -> datetime:
@@ -150,17 +169,19 @@ def register_documents(engine: Engine, settings: OsSettings, readers: Mapping[st
             docs.save_fields(document_id, values, checks)
 
     def compare(student_ref: str, document_id: int) -> int:
-        """Replaces the student's open findings with a cross-check of all their read documents."""
-        items = []
-        for d in docs.list_for(student_ref):
-            if d.id != document_id and d.status not in COMPARED:
-                continue
-            values = {f["field"]: f["value_confirmed"] if f["confirmed_at"] else f["value_read"]
-                      for f in docs.fields(d.id)}
-            items.append((d.id, types[d.doc_type], values))
-        found = cross_check(items, variants)
-        findings.replace_open(student_ref, [{"kind": f.kind, "field": f.field, "items": f.items} for f in found])
-        return len(found)
+        """Replaces the student's open findings with a cross-check of all their read documents. It runs after
+        `finish`, one student at a time, so the last of several documents read together sees them all."""
+        with student_lock(engine, tenant, student_ref):
+            items = []
+            for d in docs.list_for(student_ref):
+                if d.id != document_id and d.status not in COMPARED:
+                    continue
+                values = {f["field"]: f["value_confirmed"] if f["confirmed_at"] else f["value_read"]
+                          for f in docs.fields(d.id)}
+                items.append((d.id, types[d.doc_type], values))
+            found = cross_check(items, variants)
+            findings.replace_open(student_ref, [{"kind": f.kind, "field": f.field, "items": f.items} for f in found])
+            return len(found)
 
     def finish(document_id: int, status: str, error: str | None, detected_type: str | None,
                pages: int | None) -> None:
@@ -199,9 +220,9 @@ def register_documents(engine: Engine, settings: OsSettings, readers: Mapping[st
             return {"status": "failed"}
         checks = validate_step(doc_type, reading.values)
         store_step(document_id, reading.values, checks)
-        compare_step(student_ref, document_id)
         status = "read" if type_matches(t, reading.detected_type) else "needs_student"
         finish_step(document_id, status, None, reading.detected_type, checked["pages"])
+        compare_step(student_ref, document_id)  # after finish: a document read at the same time sees this one
         return {"status": status}
 
     DBOS.workflow(name=DOCUMENT_WORKFLOW)(document)

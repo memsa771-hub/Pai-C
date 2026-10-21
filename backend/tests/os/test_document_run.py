@@ -51,6 +51,7 @@ class Ctx:
         self.engine, self.client = engine, client
         self.answers: dict[str, dict] = {"transcript": TRANSCRIPT, "degree_certificate": DEGREE}
         self.calls: list[str] = []
+        self.barrier = None  # an async callable the fake model awaits before answering
         self.docs = DocumentStore(engine, TENANT)
 
     def upload(self, doc_type: str, seed: int, student: str = STUDENT) -> int:
@@ -78,10 +79,12 @@ def make_documents(engine, os_db, settings_env: dict | None = None, clock=lambda
                               **(settings_env or {})})
     holder: dict = {}
 
-    def fn(messages, info: AgentInfo) -> ModelResponse:
+    async def fn(messages, info: AgentInfo) -> ModelResponse:
         ctx: Ctx = holder["ctx"]
         key = _type_of(messages)
         ctx.calls.append(key)
+        if ctx.barrier is not None:
+            await ctx.barrier()
         return ModelResponse(parts=[ToolCallPart(info.output_tools[0].name, ctx.answers.get(key, {}))])
 
     readers = build_readers(FunctionModel(fn), TYPES, SPEC)
@@ -301,7 +304,7 @@ def test_model_requests_are_dbos_steps(documents):
     assert sum("model.request" in n for n in names) == 1
     assert [n for n in names if n.startswith("os.document.")] == [
         "os.document.start", "os.document.prepare", "os.document.record", "os.document.validate",
-        "os.document.store", "os.document.cross_check", "os.document.finish"]
+        "os.document.store", "os.document.finish", "os.document.cross_check"]
 
 
 def test_file_bytes_never_in_step_outputs(documents):
@@ -368,3 +371,29 @@ def test_a_document_claimed_by_another_workflow_is_skipped(documents):
                      .values(status="reading", claimed_by="document:pai:other"))
     assert documents.read(doc_id) == {"status": "skipped"}
     assert documents.calls == [] and documents.docs.get(doc_id).status == "reading"
+
+
+def test_documents_read_together_are_compared(os_db, engine, clean):
+    """Review I1: two documents of one student read at the same time still get compared. Both readings finish
+    together (a barrier in the model), so each cross-check runs while the other document is not finished."""
+    import asyncio
+
+    ctx = make_documents(engine, os_db)
+    both = asyncio.Event()
+
+    async def together():
+        if len(ctx.calls) >= 2:
+            both.set()
+        await asyncio.wait_for(both.wait(), 10)
+
+    ctx.barrier = together
+    try:
+        t_id, d_id = ctx.upload("transcript", 1), ctx.upload("degree_certificate", 2)
+        wids = [enqueue_document(ctx.client, TENANT, ctx.docs.get(i)) for i in (t_id, d_id)]
+        for wid in wids:
+            ctx.client.retrieve_workflow(wid).get_result()
+        assert sorted(ctx.calls) == ["degree_certificate", "transcript"]
+        findings = FindingStore(engine, TENANT).list_open(STUDENT)
+        assert [(f["kind"], f["field"]) for f in findings] == [("variant", "full_name")]
+    finally:
+        stop(ctx)
