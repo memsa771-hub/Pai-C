@@ -12,6 +12,7 @@ import {
   type OsInboxItem,
 } from '@/lib/os-inbox';
 import { statusLabel, type FactStatus } from '@/lib/os-programmes';
+import { checkLabel, chipLabel, chipTone, lineText, type OsNote } from '@/lib/os-self-serve';
 
 interface InboxListProps {
   items: OsInboxItem[];
@@ -22,15 +23,60 @@ interface InboxListProps {
   factStatus?: Record<string, FactStatus | null>;
   /** The programme facts page; items of a programme link to its section there. */
   programmesHref?: string;
+  /** Slice 4: eligibility changes, with up to 3 suggested swaps each. */
+  notes?: OsNote[];
+  /** Programme ref -> its name, for notes and suggestions. */
+  names?: Record<string, string>;
+  /** The page asks the student first (swapPrompt), then swaps. */
+  onSwap?: (note: OsNote, inRef: string) => void;
+  onReadNote?: (note: OsNote) => void;
+}
+
+function NoteCard({ note, names, onSwap, onReadNote }: { note: OsNote; names: Record<string, string>;
+  onSwap?: InboxListProps['onSwap']; onReadNote?: InboxListProps['onReadNote'] }) {
+  const name = names[note.programme_ref] ?? note.programme_ref;
+  const reasons = note.payload.lines.filter((l) => l.status !== 'likely_meets');
+  return (
+    <li className="rounded-lg border bg-card p-3 text-sm">
+      <p className="flex flex-wrap items-center gap-2 font-medium">
+        <span className="min-w-0 break-words">{name}</span>
+        <span className={`rounded px-1.5 py-0.5 text-xs ${chipTone(note.verdict)}`}>{chipLabel(note.verdict)}</span>
+      </p>
+      <ul className="mt-1 flex flex-col gap-0.5 text-xs text-muted-foreground">
+        {reasons.map((l) => (
+          <li key={l.check} className="break-words">{checkLabel(l.check)}: {lineText(l)}</li>
+        ))}
+      </ul>
+      <div className="mt-2 flex flex-wrap gap-2">
+        {onSwap && note.payload.plan_id !== undefined && note.payload.suggestions.map((ref) => (
+          <Button key={ref} size="sm" variant="outline" onClick={() => onSwap(note, ref)}>
+            Swap for {names[ref] ?? ref}
+          </Button>
+        ))}
+        {onReadNote && <Button size="sm" variant="ghost" onClick={() => onReadNote(note)}>OK</Button>}
+      </div>
+    </li>
+  );
 }
 
 /** The PAI OS student inbox (Slice 1 spec §4.11): mobile-first, one action per item. */
-export function InboxList({ items, now, onComplete, busyId = null, factStatus = {}, programmesHref }: InboxListProps) {
-  if (items.length === 0) {
+export function InboxList({ items, now, onComplete, busyId = null, factStatus = {}, programmesHref, notes = [],
+                            names = {}, onSwap, onReadNote }: InboxListProps) {
+  if (items.length === 0 && notes.length === 0) {
     return <p className="px-4 py-10 text-center text-sm text-muted-foreground">Nothing to do right now.</p>;
   }
   return (
     <div className="flex flex-col gap-6">
+      {notes.length > 0 && (
+        <section aria-label="Eligibility updates">
+          <h2 className="mb-2 px-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            Eligibility updates
+          </h2>
+          <ul className="flex flex-col gap-2">
+            {notes.map((n) => <NoteCard key={n.id} note={n} names={names} onSwap={onSwap} onReadNote={onReadNote} />)}
+          </ul>
+        </section>
+      )}
       {groupItems(items, now).map(({ group, items: groupItemsList }) => (
         <section key={group} aria-label={GROUP_TITLES[group]}>
           <h2 className="mb-2 px-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">

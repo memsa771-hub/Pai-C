@@ -280,6 +280,82 @@ class WorkspaceApi {
     if (!res.ok) throw new Error(`API ${res.status}: ${await res.text()}`);
   }
 
+  // ---------------------------------------------------------------------------
+  // PAI OS self-serve start and eligibility (Slice 4 spec §4)
+  // ---------------------------------------------------------------------------
+
+  /** PAI OS: the student's eligibility change notes (the inbox's `notes`). */
+  async getOsInboxNotes(): Promise<import('./os-self-serve').OsNote[]> {
+    const params = new URLSearchParams({ network: this.requireWorkspace() });
+    const body = await this.requestJson<{ notes?: import('./os-self-serve').OsNote[] }>(`/v1/os/inbox?${params}`);
+    return body.notes ?? [];
+  }
+
+  /** PAI OS: mark an eligibility note read (204, no body). */
+  async readOsNote(id: number): Promise<void> {
+    const params = new URLSearchParams({ network: this.requireWorkspace() });
+    const headers: Record<string, string> = {};
+    if (this.token) headers['X-Workspace-Token'] = this.token;
+    if (this.bearerToken) headers['Authorization'] = `Bearer ${this.bearerToken}`;
+    const res = await fetch(`${API_URL}/v1/os/inbox/notes/${id}/read?${params}`, {
+      method: 'POST', headers, credentials: 'include', cache: 'no-store',
+    });
+    if (!res.ok) throw new Error(`API ${res.status}: ${await res.text()}`);
+  }
+
+  async getOsRoutes(): Promise<import('./os-self-serve').OsRoute[]> {
+    const params = new URLSearchParams({ network: this.requireWorkspace() });
+    const body = await this.requestJson<{ routes: import('./os-self-serve').OsRoute[] }>(`/v1/os/routes?${params}`);
+    return body.routes;
+  }
+
+  /** PAI OS: the route's programmes, each with the student's eligibility card. */
+  async getOsRouteProgrammes(route: string, intakeYear: number): Promise<import('./os-self-serve').OsRouteProgramme[]> {
+    const params = new URLSearchParams({ network: this.requireWorkspace(), intake: String(intakeYear) });
+    const body = await this.requestJson<{ programmes: import('./os-self-serve').OsRouteProgramme[] }>(
+      `/v1/os/routes/${encodeURIComponent(route)}/programmes?${params}`);
+    return body.programmes;
+  }
+
+  /** PAI OS: one programme's card, with up to 3 swap suggestions. */
+  async getOsEligibility(programmeRef: string, route: string, intakeYear: number): Promise<import('./os-self-serve').OsEligibility> {
+    const params = new URLSearchParams({ network: this.requireWorkspace(), route, intake: String(intakeYear) });
+    return this.requestJson(`/v1/os/eligibility/${encodeURIComponent(programmeRef)}?${params}`);
+  }
+
+  /** PAI OS: start the student's own plan (or get the one they already have). */
+  async startOsPlan(route: string, intake: { term: string; year: number },
+                    choices: { programme_ref: string; rank: number }[]): Promise<import('./os-self-serve').OsSelfPlan> {
+    const params = new URLSearchParams({ network: this.requireWorkspace() });
+    return this.requestJson(`/v1/os/plans/self?${params}`, {
+      method: 'POST', body: JSON.stringify({ route, intake, choices }),
+    });
+  }
+
+  /** PAI OS: swap one programme for another (the screen asks the student first). */
+  async swapOsProgramme(planId: number, outRef: string, inRef: string): Promise<import('./os-self-serve').OsSelfPlan> {
+    const params = new URLSearchParams({ network: this.requireWorkspace() });
+    return this.requestJson(`/v1/os/plans/${planId}/swap?${params}`, {
+      method: 'POST', body: JSON.stringify({ out: outRef, in: inRef }),
+    });
+  }
+
+  /** PAI OS: drop one programme from the plan while nothing for it has started. */
+  async removeOsProgramme(planId: number, ref: string): Promise<import('./os-self-serve').OsSelfPlan> {
+    const params = new URLSearchParams({ network: this.requireWorkspace() });
+    return this.requestJson(`/v1/os/plans/${planId}/programmes/${encodeURIComponent(ref)}?${params}`, {
+      method: 'DELETE',
+    });
+  }
+
+  /** PAI OS: ask for a programme that is not on the list; it is researched once and shared. */
+  async requestOsProgramme(request: import('./os-self-serve').OsProgrammeRequest): Promise<{ programme_ref: string; created: boolean }> {
+    const params = new URLSearchParams({ network: this.requireWorkspace() });
+    return this.requestJson(`/v1/os/programmes/requests?${params}`, {
+      method: 'POST', body: JSON.stringify(request),
+    });
+  }
+
   /** PAI OS: the student's confirmed profile values, each with its source document. */
   async getOsProfile(): Promise<import('./os-documents').OsProfileValue[]> {
     const params = new URLSearchParams({ network: this.requireWorkspace() });

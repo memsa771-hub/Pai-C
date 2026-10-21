@@ -20,6 +20,9 @@ export interface OsFact {
 
 export interface OsProgramme {
   ref: string;
+  /** Slice 4: the plan it is in and its rank there (for swap and remove). */
+  plan_id?: number | null;
+  rank?: number | null;
   name: string;
   university: string | null;
   intake_year: number;
