@@ -2,7 +2,8 @@
 
 Used by the admin API (knowledge.manual), research and the freshness sweeper. Plans change only through the
 kernel (invariant 1): `complete_review` and `service.recompile` (which calls `kernel.revise`). Only plans for
-the fact's intake year are touched (handoff M17).
+the fact's intake year are touched (handoff M17). A programme fact also re-checks its students'
+eligibility, which writes a note when a verdict changes (Slice 4 S4-D7).
 """
 
 from sqlalchemy import select
@@ -34,4 +35,9 @@ def after_fact_change(service, kernel, scope: str, ref: str, field: str, fact_id
     if complete:
         for task_id in waiting:
             kernel.complete_review(task_id, {"fact_id": fact_id, "status": status})
-    return [p for p in plan_ids if service.recompile(p, "fact_changed") is not None]
+    revised = [p for p in plan_ids if service.recompile(p, "fact_changed") is not None]
+    if scope == "programme":
+        from app.os.eligibility.notes import on_fact_change  # imported here: notes imports knowledge
+
+        on_fact_change(service, ref, intake_year)
+    return revised

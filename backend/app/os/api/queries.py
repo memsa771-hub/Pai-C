@@ -29,6 +29,28 @@ def plan_out(engine: Engine, tenant_id: str, plan_id: int) -> dict | None:
             "tasks": [task_out(r) for r in rows]}
 
 
+def eligibility_notes(engine: Engine, tenant_id: str, student_ref: str) -> list[dict]:
+    """The student's unread eligibility change notes, newest first (Slice 4 S4-D7)."""
+    N = models.eligibility_notes
+    with engine.connect() as conn:
+        rows = conn.execute(select(N).where(N.c.tenant_id == tenant_id, N.c.student_ref == student_ref,
+                                            N.c.read_at.is_(None)).order_by(N.c.id.desc())).all()
+    return [{"id": r.id, "programme_ref": r.programme_ref, "verdict": r.verdict, "payload": r.payload,
+             "created_at": r.created_at} for r in rows]
+
+
+def mark_note_read(engine: Engine, tenant_id: str, student_ref: str, note_id: int) -> bool:
+    """False if the note is not this student's."""
+    from sqlalchemy import func, update
+
+    N = models.eligibility_notes
+    with engine.begin() as conn:
+        found = conn.execute(update(N).where(N.c.id == note_id, N.c.tenant_id == tenant_id,
+                                             N.c.student_ref == student_ref)
+                             .values(read_at=func.coalesce(N.c.read_at, func.now())).returning(N.c.id)).scalar()
+    return found is not None
+
+
 def inbox_items(engine: Engine, tenant_id: str, student_ref: str) -> list[dict]:
     with engine.connect() as conn:
         rows = conn.execute(select(T).join(P, P.c.id == T.c.plan_id).where(

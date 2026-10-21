@@ -31,8 +31,17 @@ class PlanOut(BaseModel):
     tasks: list[TaskOut]
 
 
+class NoteOut(BaseModel):
+    id: int
+    programme_ref: str
+    verdict: str
+    payload: dict
+    created_at: datetime
+
+
 class InboxOut(BaseModel):
     items: list[TaskOut]
+    notes: list[NoteOut] = []  # Slice 4: eligibility changes
 
 
 class CompleteIn(BaseModel):
