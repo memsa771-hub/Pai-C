@@ -219,6 +219,74 @@ class WorkspaceApi {
     return body.programmes;
   }
 
+  /** PAI OS: the student's documents, their open findings and the document types (Slice 3 spec §4). */
+  async getOsDocuments(): Promise<import('./os-documents').OsDocuments> {
+    const params = new URLSearchParams({ network: this.requireWorkspace() });
+    return this.requestJson(`/v1/os/documents?${params}`);
+  }
+
+  /**
+   * PAI OS: upload one document. Multipart, so this is a bare fetch with the same auth headers and **no**
+   * `Content-Type` (the browser sets the multipart boundary); requestJson would send application/json.
+   */
+  async uploadOsDocument(file: File, docType: string): Promise<import('./os-documents').OsDocument> {
+    const params = new URLSearchParams({ network: this.requireWorkspace() });
+    const form = new FormData();
+    form.append('file', file);
+    form.append('doc_type', docType);
+    const headers: Record<string, string> = {};
+    if (this.token) headers['X-Workspace-Token'] = this.token;
+    if (this.bearerToken) headers['Authorization'] = `Bearer ${this.bearerToken}`;
+    const res = await fetch(`${API_URL}/v1/os/documents?${params}`, {
+      method: 'POST', body: form, headers, credentials: 'include', cache: 'no-store',
+    });
+    if (!res.ok) {
+      if (res.status === 401 && typeof window !== 'undefined') window.dispatchEvent(new Event(AUTH_INVALID_EVENT));
+      const text = await res.text();
+      let detail = text;
+      try {
+        detail = (JSON.parse(text) as { detail?: string }).detail ?? text;
+      } catch { /* not JSON: keep the text */ }
+      throw new Error(`API ${res.status}: ${detail}`);
+    }
+    return (await res.json()) as import('./os-documents').OsDocument;
+  }
+
+  /** PAI OS: confirm or correct every field of one document. */
+  async confirmOsDocument(id: number, fields: Record<string, unknown>): Promise<import('./os-documents').OsDocument> {
+    const params = new URLSearchParams({ network: this.requireWorkspace() });
+    return this.requestJson(`/v1/os/documents/${id}/confirm?${params}`, {
+      method: 'POST', body: JSON.stringify({ fields }),
+    });
+  }
+
+  /** PAI OS: choose the right value for a finding across documents. */
+  async resolveOsFinding(id: number, value: unknown): Promise<import('./os-documents').OsFinding> {
+    const params = new URLSearchParams({ network: this.requireWorkspace() });
+    return this.requestJson(`/v1/os/documents/findings/${id}/resolve?${params}`, {
+      method: 'POST', body: JSON.stringify({ value }),
+    });
+  }
+
+  /** PAI OS: delete a document (its file and fields go; an audit row stays). */
+  async deleteOsDocument(id: number): Promise<void> {
+    const params = new URLSearchParams({ network: this.requireWorkspace() });
+    const headers: Record<string, string> = {};
+    if (this.token) headers['X-Workspace-Token'] = this.token;
+    if (this.bearerToken) headers['Authorization'] = `Bearer ${this.bearerToken}`;
+    const res = await fetch(`${API_URL}/v1/os/documents/${id}?${params}`, {
+      method: 'DELETE', headers, credentials: 'include', cache: 'no-store',
+    });
+    if (!res.ok) throw new Error(`API ${res.status}: ${await res.text()}`);
+  }
+
+  /** PAI OS: the student's confirmed profile values, each with its source document. */
+  async getOsProfile(): Promise<import('./os-documents').OsProfileValue[]> {
+    const params = new URLSearchParams({ network: this.requireWorkspace() });
+    const body = await this.requestJson<{ values: import('./os-documents').OsProfileValue[] }>(`/v1/os/profile?${params}`);
+    return body.values;
+  }
+
   // ---------------------------------------------------------------------------
   // Workspace CRUD (REST endpoints — not event-based)
   // ---------------------------------------------------------------------------
