@@ -3,6 +3,16 @@ key: pakistan_bs
 version: 1
 route: {origin: PK, destination: PK, level: bachelor}
 default_timezone: Asia/Karachi
+# Slice 4: a merit aggregate, the third generic method (spec S4-D2). No language check on this route.
+eligibility:
+  grade:
+    - method: weighted_aggregate
+      requirement: merit_closing
+      part: aggregate
+      better: higher
+      weights: {hssc_certificate.marks_obtained: 0.5, entry_test.score: 0.5}
+      totals: {hssc_certificate.marks_obtained: hssc_certificate.marks_total}
+  test: {requirement: entry_test_required, list_key: any_of}
 tasks:
   - template_key: entry_test
     task_type: student.act

@@ -3,6 +3,14 @@ key: ireland_master
 version: 1
 route: {origin: PK, destination: IE, level: master}
 default_timezone: Europe/Dublin
+# Slice 4: a different grade method on another destination, same code (spec S4-D2).
+eligibility:
+  grade:
+    - {method: threshold, requirement: grade_requirement, part: percent_min, better: higher, scales: [percent]}
+  language:
+    - {language: english, requirement: english_requirement, level_key: cefr, scores: {ielts: ielts_trf.overall}}
+  grade_scales:
+    percent: {best: 100, provisional_min_pass: 40, value: transcript.percentage}
 tasks:
   - template_key: apply
     task_type: student.act
