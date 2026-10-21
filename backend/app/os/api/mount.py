@@ -33,8 +33,8 @@ def mount_os(app: FastAPI, *, env: Mapping[str, str] | None = None,
     if not settings.os_enabled:
         return False
     load_profile_dir(profile_dir)  # an invalid research profile stops startup (Slice 2 spec §4.2)
-    load_document_types(document_types_dir)  # so does an invalid document type (Slice 3 spec S3-D2)
-    services = make_services(settings, playbooks=load_playbook_dir(playbook_dir))
+    types = load_document_types(document_types_dir)  # so does an invalid document type (Slice 3 spec S3-D2)
+    services = make_services(settings, playbooks=load_playbook_dir(playbook_dir), document_types=types)
     app.include_router(build_router(lambda: services), prefix=PREFIX)
     if student_dependency is not None:
         app.dependency_overrides[current_student_ref] = student_dependency

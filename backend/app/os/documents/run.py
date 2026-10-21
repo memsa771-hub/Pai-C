@@ -24,7 +24,7 @@ from sqlalchemy import Engine, func, insert, select, update
 
 from app.os import models
 from app.os.agents.spec import AgentSpec
-from app.os.documents.checks import cross_check
+from app.os.documents.checks import Finding, cross_check
 from app.os.documents.intake import UploadError, check_upload, prepare
 from app.os.documents.reader import read_document
 from app.os.documents.store import Document, DocumentStore, FindingStore
@@ -87,6 +87,37 @@ class student_lock:
             self.conn.close()
 
 
+def _resolved(engine: Engine, tenant_id: str, student_ref: str) -> set[tuple]:
+    FI = models.document_findings
+    with engine.connect() as conn:
+        rows = conn.execute(select(FI.c.kind, FI.c.field, FI.c["items"]).where(
+            FI.c.tenant_id == tenant_id, FI.c.student_ref == student_ref, FI.c.status == "resolved")).all()
+    return {(r.kind, r.field, tuple(tuple(i) for i in r.items)) for r in rows}
+
+
+def compare_documents(engine: Engine, tenant_id: str, student_ref: str, types: Mapping[str, DocumentType],
+                      variants: list[set[str]], include_id: int | None = None) -> list[Finding]:
+    """Replaces the student's open findings with a cross-check of their read documents (plus `include_id`, the
+    one being read). A confirmed field is compared by its confirmed value. A finding the student already resolved
+    (the same documents and values) is not opened again. Returns the open findings. One student at a time
+    (`student_lock`), so overlapping checks cannot lose or duplicate findings."""
+    with student_lock(engine, tenant_id, student_ref):
+        docs = DocumentStore(engine, tenant_id)
+        items = []
+        for d in docs.list_for(student_ref):
+            if (d.id != include_id and d.status not in COMPARED) or d.doc_type not in types:
+                continue
+            values = {f["field"]: f["value_confirmed"] if f["confirmed_at"] else f["value_read"]
+                      for f in docs.fields(d.id)}
+            items.append((d.id, types[d.doc_type], values))
+        resolved = _resolved(engine, tenant_id, student_ref)
+        found = [f for f in cross_check(items, variants)
+                 if (f.kind, f.field, tuple(tuple(i) for i in f.items)) not in resolved]
+        FindingStore(engine, tenant_id).replace_open(
+            student_ref, [{"kind": f.kind, "field": f.field, "items": f.items} for f in found])
+        return found
+
+
 def _utcnow() -> datetime:
     return datetime.now(timezone.utc)
 
@@ -112,7 +143,7 @@ def register_documents(engine: Engine, settings: OsSettings, readers: Mapping[st
     from app.os.runner.workflow import STEP_CONFIG  # imported here: the runner imports documents
 
     tenant = settings.tenant_id
-    docs, findings, runs = DocumentStore(engine, tenant), FindingStore(engine, tenant), AgentRuns(engine, tenant)
+    docs, runs = DocumentStore(engine, tenant), AgentRuns(engine, tenant)
 
     def start(document_id: int) -> dict:
         """`reading` (claimed by this workflow), `budget` when the month's cap is spent (a budget_exceeded event;
@@ -169,19 +200,8 @@ def register_documents(engine: Engine, settings: OsSettings, readers: Mapping[st
             docs.save_fields(document_id, values, checks)
 
     def compare(student_ref: str, document_id: int) -> int:
-        """Replaces the student's open findings with a cross-check of all their read documents. It runs after
-        `finish`, one student at a time, so the last of several documents read together sees them all."""
-        with student_lock(engine, tenant, student_ref):
-            items = []
-            for d in docs.list_for(student_ref):
-                if d.id != document_id and d.status not in COMPARED:
-                    continue
-                values = {f["field"]: f["value_confirmed"] if f["confirmed_at"] else f["value_read"]
-                          for f in docs.fields(d.id)}
-                items.append((d.id, types[d.doc_type], values))
-            found = cross_check(items, variants)
-            findings.replace_open(student_ref, [{"kind": f.kind, "field": f.field, "items": f.items} for f in found])
-            return len(found)
+        """The student's findings again, after `finish`, so a document read at the same time sees this one."""
+        return len(compare_documents(engine, tenant, student_ref, types, variants, include_id=document_id))
 
     def finish(document_id: int, status: str, error: str | None, detected_type: str | None,
                pages: int | None) -> None:

@@ -151,3 +151,71 @@ class ProgrammesOut(BaseModel):
 
 class UpgradeOut(BaseModel):
     revision: int
+
+
+# --- Slice 3: documents (spec §4) ------------------------------------------------------------------------------
+
+
+class DocumentFieldOut(BaseModel):
+    field: str
+    value_read: Any
+    check: Literal["ok", "check_failed", "missing"]
+    reasons: list[str]
+    value_confirmed: Any
+
+
+class FindingItemOut(BaseModel):
+    document_id: int
+    value: str
+
+
+class FindingOut(BaseModel):
+    id: int
+    kind: Literal["variant", "mismatch"]
+    field: str
+    items: list[FindingItemOut]
+    status: Literal["open", "resolved"]
+    resolution: Any = None
+
+
+class DocumentOut(BaseModel):
+    """A document as its student (or an admin) sees it. Never the file's bytes (S3-D10)."""
+
+    id: int
+    doc_type: str
+    filename: str
+    status: str
+    detected_type: str | None
+    pages: int | None
+    error: str | None
+    created_at: datetime
+    read_at: datetime | None
+    confirmed_at: datetime | None
+    fields: list[DocumentFieldOut]
+    findings: list[FindingOut]  # the open findings that name this document
+
+
+class DocumentsOut(BaseModel):
+    documents: list[DocumentOut]
+    findings: list[FindingOut]  # all the student's open findings
+
+
+class ConfirmDocumentIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    fields: dict[str, Any]
+
+
+class ResolveIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    value: Any
+
+
+class ProfileValueOut(BaseModel):
+    key: str
+    value: Any
+    source_document_id: int | None
+    confirmed_at: datetime
+
+
+class ProfileOut(BaseModel):
+    values: list[ProfileValueOut]
