@@ -21,11 +21,11 @@ from app.os.knowledge.requests import visible_programmes
 P, SEEN, NOTES = models.plans, models.eligibility_seen, models.eligibility_notes
 
 
-def _profile(plans, student_ref: str) -> dict:
+def profile_of(plans, student_ref: str) -> dict:
     return {v["key"]: v["value"] for v in ProfileStore(plans.engine, plans.kernel.tenant_id).all(student_ref)}
 
 
-def _cards(plans, rules, refs: list[str], year: int, profile: dict) -> dict[str, tuple[Card, int]]:
+def programme_cards(plans, rules, refs: list[str], year: int, profile: dict) -> dict[str, tuple[Card, int]]:
     """Each programme's card and how many of its facts are confirmed."""
     raw = plans.knowledge.programme_facts(refs, sorted(rules.fact_fields()), year)
     out = {}
@@ -46,7 +46,7 @@ def cards_for(plans, student_ref: str, plan_id: int) -> dict[str, Card]:
     if book.eligibility is None:
         return {}
     refs = [p.programme_ref for p in contract.programmes]
-    cards = _cards(plans, book.eligibility, refs, contract.target_intake.year, _profile(plans, student_ref))
+    cards = programme_cards(plans, book.eligibility, refs, contract.target_intake.year, profile_of(plans, student_ref))
     return {ref: card for ref, (card, _) in cards.items()}
 
 
@@ -86,15 +86,15 @@ def _check_plan(plans, student_ref: str, plan_id: int, only: str | None = None) 
         return 0
     rules, year = book.eligibility, contract.target_intake.year
     chosen = [p.programme_ref for p in contract.programmes]
-    profile = _profile(plans, student_ref)
-    mine = _cards(plans, rules, [r for r in chosen if only is None or r == only], year, profile)
+    profile = profile_of(plans, student_ref)
+    mine = programme_cards(plans, rules, [r for r in chosen if only is None or r == only], year, profile)
 
     def suggestions_for(card):
         def make() -> list[str]:
             if card.verdict != "likely_below":
                 return []
             others = [p.ref for p in visible_programmes(plans.engine, plans.kernel.tenant_id, book.key, year)]
-            cands = _cards(plans, rules, others, year, profile)
+            cands = programme_cards(plans, rules, others, year, profile)
             return [s.programme_ref for s in suggest(card, list(cands.values()), set(chosen))]
         return make
 

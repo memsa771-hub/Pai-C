@@ -3,7 +3,9 @@
 from datetime import datetime
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
+
+from app.os.contracts.route_contract import IntakeRef, ProgrammeChoice
 
 
 class TaskOut(BaseModel):
@@ -144,6 +146,7 @@ class OpenFact(BaseModel):
 
 class OpenFactsOut(BaseModel):
     items: list[OpenFact]
+    requested_programmes: list["RequestedProgrammeOut"] = []  # Slice 4 Q1: student requests research found nothing for
 
 
 class ProgrammeOut(BaseModel):
@@ -234,3 +237,116 @@ class ProfileValueOut(BaseModel):
 
 class ProfileOut(BaseModel):
     values: list[ProfileValueOut]
+
+
+# --- Slice 4: self-serve start and eligibility (spec §4) -------------------------------------------------------
+
+
+class RouteOut(BaseModel):
+    key: str
+    version: int
+    origin: str
+    destination: str
+    level: str
+
+
+class RoutesOut(BaseModel):
+    routes: list[RouteOut]
+
+
+class FactRefOut(BaseModel):
+    field: str
+    url: str
+    status: str
+
+
+class LineOut(BaseModel):
+    check: str
+    status: str
+    have: Any = None
+    need: Any = None
+    provisional: bool = False
+    needs: list[str] = []
+    reason: str | None = None
+    sources: list[FactRefOut] = []
+
+
+class CardOut(BaseModel):
+    programme_ref: str
+    verdict: str
+    lines: list[LineOut]
+
+
+class RouteProgrammeOut(BaseModel):
+    ref: str
+    university: str
+    name: str
+    research_state: Literal["researched", "being_researched"]
+    requested_by_student: bool
+    confirmed_facts: int
+    card: CardOut | None  # None while being researched, or on a route without eligibility rules
+
+
+class RouteProgrammesOut(BaseModel):
+    route: str
+    intake_year: int
+    programmes: list[RouteProgrammeOut]
+
+
+class SuggestionOut(BaseModel):
+    programme_ref: str
+    university: str
+    name: str
+    confirmed_facts: int
+
+
+class EligibilityOut(BaseModel):
+    card: CardOut | None
+    suggestions: list[SuggestionOut]
+
+
+class SelfStartIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    route: str
+    intake: IntakeRef
+    choices: list[ProgrammeChoice]
+
+
+class SwapIn(BaseModel):
+    model_config = ConfigDict(extra="forbid", populate_by_name=True)
+    out: str
+    in_: str = Field(alias="in")
+
+
+class ChoiceOut(BaseModel):
+    programme_ref: str
+    rank: int
+
+
+class SelfPlanOut(PlanOut):
+    programmes: list[ChoiceOut]
+
+
+class RequestIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    route: str
+    intake_year: int = Field(ge=2025, le=2100)
+    university: str = Field(min_length=1, max_length=200)
+    name: str = Field(min_length=1, max_length=200)
+    url: str = Field(min_length=1, max_length=2000)
+
+
+class RequestOut(BaseModel):
+    programme_ref: str
+    created: bool
+
+
+class RequestedProgrammeOut(BaseModel):
+    ref: str
+    route_key: str
+    university: str
+    name: str
+    start_urls: list[str]
+
+
+OpenFactsOut.model_rebuild()  # it names RequestedProgrammeOut, defined below it

@@ -2,6 +2,7 @@
 inbox, the student's programme facts, research (admin), and the student's documents and profile."""
 
 from collections.abc import Callable
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, File, Form, Header, HTTPException, Query, Response, UploadFile
 
@@ -34,6 +35,14 @@ from app.os.api.schemas import (
     ProgrammesOut,
     ResearchRunsOut,
     ResolveIn,
+    EligibilityOut,
+    RequestIn,
+    RequestOut,
+    RouteProgrammesOut,
+    RoutesOut,
+    SelfPlanOut,
+    SelfStartIn,
+    SwapIn,
     ResearchStartOut,
     SupplyIn,
     UpgradeOut,
@@ -48,6 +57,9 @@ from app.os.documents.intake import MAX_BYTES, UploadError, check_upload
 from app.os.documents.run import enqueue_document
 from app.os.documents.store import DocumentStore, DuplicateDocument, FindingStore, ProfileStore
 from app.os.eligibility.notes import on_profile_change
+from app.os.api import self_serve
+from app.os.knowledge.requests import RequestLimit, request_programme
+from app.os.routes import builder
 from app.os.kernel import IllegalTransition
 from app.os.playbooks import PlaybookError
 from app.os.workers import confirm_fact, open_confirm_tasks, supply_fact
@@ -132,7 +144,8 @@ def build_router(get_services: Callable[[], Services]) -> APIRouter:
     @router.get("/facts/open", response_model=OpenFactsOut, dependencies=[Depends(require_admin)])
     def facts_open(svc: Services = Depends(services)) -> dict:
         tenant = svc.settings.tenant_id
-        return {"items": open_facts(svc.engine, tenant, open_confirm_tasks(svc.engine, tenant))}
+        return {"items": open_facts(svc.engine, tenant, open_confirm_tasks(svc.engine, tenant)),
+                "requested_programmes": self_serve.requested_programmes_out(svc.plans)}
 
     @router.post("/research/{programme_ref}", status_code=202, response_model=ResearchStartOut,
                  dependencies=[Depends(require_admin)])
@@ -152,6 +165,75 @@ def build_router(get_services: Callable[[], Services]) -> APIRouter:
     @router.get("/programmes", response_model=ProgrammesOut)
     def programmes(student: str = Depends(current_student_ref), svc: Services = Depends(services)) -> dict:
         return {"programmes": student_programmes(svc.engine, svc.settings.tenant_id, student)}
+
+    # --- Slice 4: self-serve start and eligibility (spec §4). Eligibility warns, never blocks (S4-D5). ----------
+
+    @router.get("/routes", response_model=RoutesOut)
+    def routes(student: str = Depends(current_student_ref), svc: Services = Depends(services)) -> dict:
+        return {"routes": self_serve.routes_out(svc.plans)}
+
+    @router.get("/routes/{route_key}/programmes", response_model=RouteProgrammesOut)
+    def route_programmes(route_key: str, intake: int = Query(ge=2025, le=2100),
+                         student: str = Depends(current_student_ref), svc: Services = Depends(services)) -> dict:
+        found = self_serve.route_programmes(svc.plans, student, route_key, intake)
+        if found is None:
+            raise HTTPException(status_code=404, detail="route not found")
+        return {"route": route_key, "intake_year": intake, "programmes": found}
+
+    @router.get("/eligibility/{programme_ref}", response_model=EligibilityOut)
+    def eligibility(programme_ref: str, route: str, intake: int = Query(ge=2025, le=2100),
+                    student: str = Depends(current_student_ref), svc: Services = Depends(services)) -> dict:
+        found = self_serve.eligibility(svc.plans, student, programme_ref, route, intake)
+        if found is None:
+            raise HTTPException(status_code=404, detail="programme not found on this route")
+        return found
+
+    @router.post("/plans/self", status_code=201, response_model=SelfPlanOut)
+    def start_self(body: SelfStartIn, response: Response, student: str = Depends(current_student_ref_for_write),
+                   svc: Services = Depends(services)) -> dict:
+        try:
+            ref = builder.start(svc.plans, student, body.route, body.intake, body.choices)
+        except (builder.NotAllowed, PlaybookError, CompileError) as e:
+            raise HTTPException(status_code=422, detail=str(e)) from None
+        if not ref.created:
+            response.status_code = 200
+        return self_serve.self_plan_out(svc.plans, ref.plan_id)
+
+    def _change(svc: Services, plan_id: int, do) -> dict:
+        try:
+            do()
+        except builder.NotYourPlan:
+            raise HTTPException(status_code=404, detail="plan not found") from None
+        except builder.NotAllowed as e:  # includes SwapLimit
+            raise HTTPException(status_code=409, detail=str(e)) from None
+        return self_serve.self_plan_out(svc.plans, plan_id)
+
+    @router.post("/plans/{plan_id}/swap", response_model=SelfPlanOut)
+    def swap_programme(plan_id: int, body: SwapIn, student: str = Depends(current_student_ref_for_write),
+                       svc: Services = Depends(services)) -> dict:
+        return _change(svc, plan_id, lambda: builder.swap(svc.plans, student, plan_id, body.out, body.in_))
+
+    @router.delete("/plans/{plan_id}/programmes/{programme_ref}", response_model=SelfPlanOut)
+    def remove_programme(plan_id: int, programme_ref: str, student: str = Depends(current_student_ref_for_write),
+                         svc: Services = Depends(services)) -> dict:
+        return _change(svc, plan_id, lambda: builder.remove(svc.plans, student, plan_id, programme_ref))
+
+    @router.post("/programmes/requests", status_code=202, response_model=RequestOut)
+    def request_new(body: RequestIn, student: str = Depends(current_student_ref_for_write),
+                    svc: Services = Depends(services)) -> dict:
+        if body.route not in self_serve.newest_books(svc.plans):
+            raise HTTPException(status_code=422, detail=f"unknown route '{body.route}'")
+        tenant = svc.settings.tenant_id
+        try:
+            ref, created = request_programme(
+                svc.engine, tenant, student, body.route, body.university, body.name, body.url,
+                now=datetime.now(timezone.utc),
+                enqueue=lambda r: enqueue_one(svc.engine, svc.dbos_client(), tenant, r, body.intake_year, svc.today()))
+        except RequestLimit as e:
+            raise HTTPException(status_code=429, detail=str(e)) from None
+        except ValueError as e:
+            raise HTTPException(status_code=422, detail=str(e)) from None
+        return {"programme_ref": ref, "created": created}
 
     # --- Slice 3: documents (spec §4). Students see and change only their own; files never leave (S3-D10). ---
 
