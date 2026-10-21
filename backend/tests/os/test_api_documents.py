@@ -139,6 +139,14 @@ def test_duplicate_per_student_only(api):
 # --- reading the documents -------------------------------------------------------------------------------------
 
 
+def test_list_gives_the_document_types(api):
+    """The screens show the configured types and their labels; nothing about a type is written in the frontend."""
+    types = list_docs(api)["doc_types"]
+    assert {t["key"] for t in types} == set(TYPES)
+    assert {"key": "passport", "label": "Passport"} in types
+    assert [t["label"] for t in types] == sorted(t["label"] for t in types)
+
+
 def test_student_sees_only_own(api):
     mine = upload(api, data=jpeg(1), student="stu-1").json()["id"]
     theirs = upload(api, data=jpeg(2), student="stu-2").json()["id"]

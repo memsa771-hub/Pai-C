@@ -152,7 +152,7 @@ def build_router(get_services: Callable[[], Services]) -> APIRouter:
     @router.get("/documents/admin", response_model=DocumentsOut, dependencies=[Depends(require_admin)])
     def documents_admin(student: str = Query(min_length=1), svc: Services = Depends(services)) -> dict:
         """Status, fields and findings only: never file bytes (S3-D10)."""
-        return documents_out(svc.engine, svc.settings.tenant_id, student)
+        return documents_out(svc.engine, svc.settings.tenant_id, student, svc.document_types)
 
     @router.post("/documents", status_code=201, response_model=DocumentOut)
     def upload_document(file: UploadFile = File(...), doc_type: str = Form(...),
@@ -180,7 +180,7 @@ def build_router(get_services: Callable[[], Services]) -> APIRouter:
 
     @router.get("/documents", response_model=DocumentsOut)
     def documents(student: str = Depends(current_student_ref), svc: Services = Depends(services)) -> dict:
-        return documents_out(svc.engine, svc.settings.tenant_id, student)
+        return documents_out(svc.engine, svc.settings.tenant_id, student, svc.document_types)
 
     @router.post("/documents/{doc_id}/confirm", response_model=DocumentOut)
     def confirm_doc(doc_id: int, body: ConfirmDocumentIn, student: str = Depends(current_student_ref_for_write),

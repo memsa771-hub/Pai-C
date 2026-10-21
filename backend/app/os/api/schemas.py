@@ -195,9 +195,15 @@ class DocumentOut(BaseModel):
     findings: list[FindingOut]  # the open findings that name this document
 
 
+class DocTypeOut(BaseModel):
+    key: str
+    label: str
+
+
 class DocumentsOut(BaseModel):
     documents: list[DocumentOut]
     findings: list[FindingOut]  # all the student's open findings
+    doc_types: list[DocTypeOut]  # the configured types, for the upload choice (labels come from the YAML)
 
 
 class ConfirmDocumentIn(BaseModel):

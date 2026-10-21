@@ -128,14 +128,15 @@ def finding_out(f: dict) -> dict:
             "resolution": f["resolution"], "items": [{"document_id": i, "value": v} for i, v in f["items"]]}
 
 
-def documents_out(engine: Engine, tenant_id: str, student_ref: str) -> dict:
+def documents_out(engine: Engine, tenant_id: str, student_ref: str, types: dict) -> dict:
     """The student's live documents with their fields and open findings. File bytes are never read here."""
     from app.os.documents.store import DocumentStore, FindingStore  # imported here: keeps the API's imports small
 
     store = DocumentStore(engine, tenant_id)
     findings = [finding_out(f) for f in FindingStore(engine, tenant_id).list_open(student_ref)]
     return {"documents": [document_out(store, d, findings) for d in store.list_for(student_ref)],
-            "findings": findings}
+            "findings": findings,
+            "doc_types": sorted(({"key": t.key, "label": t.label} for t in types.values()), key=lambda t: t["label"])}
 
 
 def document_out(store, d, findings: list[dict]) -> dict:
