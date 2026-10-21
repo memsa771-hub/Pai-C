@@ -243,3 +243,62 @@ def test_crash_during_research(os_db, engine, clean, tmp_path):
     assert sorted(f.ref for f in facts) == sorted(PAGES) and {(f.status, f.source) for f in facts} == {("confirmed", "research")}
     per_fact = [(e["ref"], e["field"]) for e in changed if e["field"] == "deadline_close"]
     assert sorted(per_fact) == sorted((ref, "deadline_close") for ref in PAGES)  # one event per change, never repeated
+
+
+def test_crash_during_document_read(os_db, engine, clean, tmp_path):
+    """Slice 3 spec §8 test 6: SIGKILL workers while documents are read (fake model). Every upload ends read, with
+    one os_agent_runs row, one row per field and one set of findings: nothing lost, nothing duplicated."""
+    import io
+
+    from PIL import Image
+
+    from app.os.documents.run import enqueue_document
+    from app.os.documents.store import DocumentStore, FindingStore
+    from app.os.documents.types import load_document_types
+
+    reset_dbos_schema(os_db)
+    t = load_document_types()["transcript"]
+    docs = DocumentStore(engine, "pai")
+    ids = []
+    for n in range(12):  # synthetic images; they agree, so no finding. Two waves on 2 workers x 4 slots
+        out = io.BytesIO()
+        Image.new("RGB", (400, 560), (n * 20, 200, 200)).save(out, "JPEG")
+        ids.append(docs.create("crash-student", "transcript", t.version, f"t{n}.jpg", "image/jpeg", out.getvalue()))
+    pool = Pool(os_db, tmp_path, {"OS_TEST_DOCUMENT_MODEL": "tests.os.document_helpers:slow_model",
+                                  "OS_TEST_MODEL_SLEEP_S": "1.5"})
+    rng = random.Random(13)
+    kills = 0
+    client = None
+    try:
+        for slot in range(2):
+            pool.start(slot)
+        client = DBOSClient(system_database_url=os_db, dbos_system_schema=TEST_DBOS_SCHEMA, application_name=APP_NAME)
+        _wait_queue(client, pool)
+        for doc_id in ids:
+            enqueue_document(client, "pai", docs.get(doc_id))
+        deadline = time.monotonic() + TIMEOUT_S
+        next_kill = time.monotonic() + KILL_EVERY_S
+        while True:
+            statuses = [docs.get(i).status for i in ids]
+            if set(statuses) == {"read"}:
+                break
+            assert time.monotonic() < deadline, f"stuck: {statuses} (logs: {tmp_path})"
+            if time.monotonic() >= next_kill and kills < 6:
+                slot = rng.randrange(2)
+                pool.kill(slot)
+                kills += 1
+                pool.start(slot)
+                next_kill = time.monotonic() + KILL_EVERY_S
+            time.sleep(0.2)
+    finally:
+        pool.stop_all()
+        if client is not None:
+            client.destroy()
+
+    with engine.connect() as conn:
+        agent_runs = conn.execute(select(models.agent_runs.c.document_id, models.agent_runs.c.reading)).all()
+        fields = conn.execute(select(models.document_fields.c.document_id, models.document_fields.c.field)).all()
+    assert kills >= 2
+    assert sorted(r.document_id for r in agent_runs) == sorted(ids) and len(set(agent_runs)) == len(ids)
+    assert len(fields) == len(set(fields)) == len(ids) * len(t.fields)  # one row per field, never repeated
+    assert FindingStore(engine, "pai").list_open("crash-student") == []
