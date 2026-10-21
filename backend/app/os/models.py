@@ -1,5 +1,5 @@
-"""Tables of the PAI OS, all in schema `os` (SQLAlchemy Core): Slice 1, Slice 2's Knowledge tables and Slice 3's
-Documents tables.
+"""Tables of the PAI OS, all in schema `os` (SQLAlchemy Core): Slice 1, Slice 2's Knowledge tables, Slice 3's
+Documents tables and Slice 4's self-serve tables.
 
 Only `app.os.kernel` writes os_plans, os_tasks, os_task_edges and os_plan_revisions (invariant 1).
 Every timestamp is timezone-aware (invariant 13) and every table carries tenant_id.
@@ -235,7 +235,7 @@ programmes = Table(
     Column("notes", Text),
     Column("updated_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
     UniqueConstraint("tenant_id", "ref", name="uq_os_programmes_ref"),
-    _in("status", ("active", "excluded"), "ck_os_programmes_status"),
+    _in("status", ("active", "excluded", "requested"), "ck_os_programmes_status"),  # requested: Slice 4
 )
 
 pages = Table(
@@ -366,4 +366,41 @@ profile_values = Table(
     Column("source_document_id", BigInteger, ForeignKey("os.os_documents.id", ondelete="SET NULL")),
     Column("confirmed_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
     UniqueConstraint("tenant_id", "student_ref", "key", name="uq_os_profile_values_key"),
+)
+
+
+# --- Slice 4: self-serve start and eligibility (spec 2026-10-21 §3, os_0006) ---------------------------------
+
+programme_requests = Table(
+    "os_programme_requests", md,
+    _id(), _tenant(),
+    Column("student_ref", Text, nullable=False),
+    Column("route_key", Text, nullable=False),
+    Column("url", Text, nullable=False),
+    Column("programme_ref", Text, nullable=False),
+    _created(),
+    Index("ix_os_programme_requests_student", "tenant_id", "student_ref", "created_at"),
+)
+
+# The last verdict a student was told about, per programme: a note is written only when it changes (S4-D7).
+eligibility_seen = Table(
+    "os_eligibility_seen", md,
+    _id(), _tenant(),
+    Column("student_ref", Text, nullable=False),
+    Column("programme_ref", Text, nullable=False),
+    Column("verdict", Text, nullable=False),
+    Column("updated_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
+    UniqueConstraint("tenant_id", "student_ref", "programme_ref", name="uq_os_eligibility_seen"),
+)
+
+eligibility_notes = Table(
+    "os_eligibility_notes", md,
+    _id(), _tenant(),
+    Column("student_ref", Text, nullable=False),
+    Column("programme_ref", Text, nullable=False),
+    Column("verdict", Text, nullable=False),
+    Column("payload", JSONB, nullable=False, server_default=text("'{}'::jsonb")),
+    _created(),
+    Column("read_at", DateTime(timezone=True)),
+    Index("ix_os_eligibility_notes_student", "tenant_id", "student_ref"),
 )
