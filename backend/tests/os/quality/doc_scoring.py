@@ -59,10 +59,17 @@ class DocScore:
     scored: int = 0
     invented: int = 0
     per_type: dict[str, list[int]] = field(default_factory=lambda: defaultdict(lambda: [0, 0]))  # type -> [ok, n]
+    per_field: dict[str, dict[str, int]] = field(default_factory=lambda: defaultdict(
+        lambda: {"correct": 0, "wrong": 0, "missed": 0, "invented": 0}))  # "type.field" -> outcome counts
 
     @property
     def rate(self) -> float:
         return self.correct / self.scored if self.scored else 0.0
+
+    def field_counts(self) -> dict[str, dict[str, int]]:
+        """Per field name: correct, wrong (both present, different), missed (the reader gave nothing) and invented
+        (the key says absent). Names and counts only."""
+        return {k: dict(v) for k, v in sorted(self.per_field.items())}
 
     def type_rates(self) -> dict[str, float]:
         return {t: round(ok / n, 3) if n else 0.0 for t, (ok, n) in sorted(self.per_type.items())}
@@ -80,7 +87,9 @@ def score(key_docs: dict, readings: dict[str, dict | None], types: dict[str, Doc
             if _empty(want) and _empty(have):
                 continue  # absent in both: not scored
             ok = not _empty(want) and not _empty(have) and same(t.field(fname).type, want, have)
-            if _empty(want) and not _empty(have):
+            outcome = ("invented" if _empty(want) else "missed" if _empty(have) else "correct" if ok else "wrong")
+            s.per_field[f"{t.key}.{fname}"][outcome] += 1
+            if outcome == "invented":
                 s.invented += 1
             s.scored += 1
             s.correct += ok

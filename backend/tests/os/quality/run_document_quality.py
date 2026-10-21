@@ -115,7 +115,7 @@ def run_once(docs_dir: Path, key: dict, readers, spec, types, variants, settings
                           and r["detected"].replace(" ", "_").casefold() != key_docs[n]["type"])
     out = {"files": len(key_docs), "missing_files": len(set(key["documents"]) - set(key_docs)),  # a count: real file names may hold names
            "correct": s.correct, "scored": s.scored, "invented": s.invented, "correct_rate": round(s.rate, 4),
-           "per_type": s.type_rates(), "failed_readings": sum(r["values"] is None for r in results.values()),
+           "per_type": s.type_rates(), "per_field": s.field_counts(), "failed_readings": sum(r["values"] is None for r in results.values()),
            "check_failed_fields": sum(1 for r in results.values() for c, _ in r["checks"].values()
                                       if c == "check_failed"),
            "detected_type_differs": mismatched_type,
@@ -138,6 +138,8 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--docs", type=Path, help="the folder of files (default: by --set)")
     ap.add_argument("--key", type=Path, help="the answer key (default: by --set)")
     ap.add_argument("--mode", choices=["whole", "tiles"], required=True)
+    ap.add_argument("--tier", choices=["cheap", "strong"], default=None,
+                    help="the model tier (default: the agent spec's, cheap)")
     ap.add_argument("--runs", type=int, default=2)
     ap.add_argument("--out", type=Path, required=True)
     args = ap.parse_args(argv)
@@ -150,9 +152,8 @@ def main(argv: list[str] | None = None) -> int:
     key = load_doc_key(key_path)
     import os
 
-    settings = load_settings({"OS_DATABASE_URL": "postgresql://unused/x",
-                              **({"OS_OPENAI_API_KEY": os.environ["OS_OPENAI_API_KEY"]}
-                                 if os.environ.get("OS_OPENAI_API_KEY") else {})})
+    passed = {k: v for k, v in os.environ.items() if k == "OS_OPENAI_API_KEY" or k.startswith(("OS_PRICE_", "OS_MODEL_"))}
+    settings = load_settings({"OS_DATABASE_URL": "postgresql://unused/x", **passed})
     if args.model == "openai":
         if not settings.openai_api_key:
             print("OS_OPENAI_API_KEY is not set", file=sys.stderr)
@@ -161,7 +162,16 @@ def main(argv: list[str] | None = None) -> int:
             print("the answer key is not verified (`verified: true`): no billed run on it", file=sys.stderr)
             return 2
     spec = load_agent_spec(AGENT_DIR / "documents.v1.yaml")
-    spec = AgentSpec.model_validate({**spec.model_dump(), "mode": args.mode})
+    spec = AgentSpec.model_validate({**spec.model_dump(), "mode": args.mode, "tier": args.tier or spec.tier})
+    if args.model == "openai":
+        prices = {"in": settings.price_strong_in, "cached": settings.price_strong_cached,
+                  "out": settings.price_strong_out} if spec.tier == "strong" else {
+                  "in": settings.price_cheap_in, "cached": settings.price_cheap_cached, "out": settings.price_cheap_out}
+        unknown = [f"OS_PRICE_{spec.tier.upper()}_{k.upper()}" for k, v in prices.items() if v is None]
+        if unknown:
+            print(f"the {spec.tier} tier's list price is not set: {', '.join(unknown)} (USD per 1M tokens)",
+                  file=sys.stderr)
+            return 2
     types, variants = load_document_types(), load_name_variants()
     model = model_for(settings, spec.tier) if args.model == "openai" else _test_model()
     readers = build_readers(model, types, spec)
@@ -171,13 +181,20 @@ def main(argv: list[str] | None = None) -> int:
         runs.append(r)
         extra = "" if "bundles_passed" not in r else (
             f", bundles {'ok' if r['bundles_passed'] else 'FAIL: ' + '; '.join(r['bundle_fails'])}")
-        print(f"run {i} ({args.mode}): correct {r['correct']}/{r['scored']} = {r['correct_rate']:.3f}, "
+        print(f"run {i} ({args.mode}, {spec.tier}): correct {r['correct']}/{r['scored']} = {r['correct_rate']:.3f}, "
               f"invented {r['invented']}, failed readings {r['failed_readings']}{extra}, cost ${r['cost_usd']:.2f}, "
               f"{r['elapsed_s']}s -> {'PASS' if r['passed'] else 'FAIL'}")
         print(f"  per type: {r['per_type']}")
+        print("  per field (worst first; names and counts only):")
+        worst = sorted(r["per_field"].items(), key=lambda kv: (kv[1]["correct"] - sum(kv[1].values()), kv[0]))
+        for name, c in worst:
+            n = sum(c.values())
+            print(f"    {name}: correct {c['correct']}/{n}, wrong {c['wrong']}, missed {c['missed']}, "
+                  f"invented {c['invented']}")
     gate = bool(runs) and all(r["passed"] for r in runs)
-    args.out.write_text(json.dumps({"set": args.which, "mode": args.mode,
-                                    "model": settings.model_cheap if args.model == "openai" else "test",
+    model_name = settings.model_strong if spec.tier == "strong" else settings.model_cheap
+    args.out.write_text(json.dumps({"set": args.which, "mode": args.mode, "tier": spec.tier,
+                                    "model": model_name if args.model == "openai" else "test",
                                     "runs": runs, "gate_passed": gate}, indent=1), encoding="utf-8")
     print(f"GATE {'PASS' if gate else 'FAIL'} ({args.which}, {args.mode}): {sum(r['passed'] for r in runs)}/"
           f"{len(runs)} runs passed (correct >= {PASS_CORRECT} in every run"

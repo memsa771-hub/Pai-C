@@ -140,3 +140,63 @@ def test_real_set_defaults_outside_the_repo():
 
     repo = Path(__file__).resolve().parents[3]
     assert not REAL_DOCS.is_relative_to(repo) and not REAL_KEY.is_relative_to(repo)
+
+
+def test_scoring_counts_per_field():
+    """The breakdown the owners need after a failed gate: per field name, how many were correct, wrong (both
+    present, different), missed (the key has a value, the reader none) and invented. Names only, never values."""
+    key = {"a.png": {"type": "transcript", "fields": {"cgpa": 3.7, "serial_number": None, "degree_title": "BS CS",
+                                                       "issue_date": "2024-08-01"}},
+           "b.png": {"type": "transcript", "fields": {"cgpa": 3.1, "serial_number": "S-1", "degree_title": "BS CS",
+                                                       "issue_date": None}}}
+    readings = {"a.png": {"cgpa": 3.7, "serial_number": "S-9", "degree_title": "BS Computer Science",
+                          "issue_date": None},
+                "b.png": {"cgpa": 3.1, "serial_number": "S-1", "degree_title": "BS CS", "issue_date": None}}
+    s = score(key, readings, TYPES)
+    assert s.field_counts() == {
+        "transcript.cgpa": {"correct": 2, "wrong": 0, "missed": 0, "invented": 0},
+        "transcript.degree_title": {"correct": 1, "wrong": 1, "missed": 0, "invented": 0},
+        "transcript.issue_date": {"correct": 0, "wrong": 0, "missed": 1, "invented": 0},
+        "transcript.serial_number": {"correct": 1, "wrong": 0, "missed": 0, "invented": 1},
+    }
+
+
+def test_runner_prints_field_breakdown_names_only(tmp_path, capsys):
+    out = tmp_path / "s.json"
+    assert main(["--model", "test", "--set", "sample", "--mode", "tiles", "--tier", "strong", "--runs", "1",
+                 "--out", str(out)]) == 0
+    printed = capsys.readouterr().out
+    result = json.loads(out.read_text(encoding="utf-8"))
+    assert (result["mode"], result["tier"]) == ("tiles", "strong")
+    [run] = result["runs"]
+    assert run["per_field"]["passport.mrz_line2"] == {"correct": 6, "wrong": 0, "missed": 0, "invented": 0}
+    assert "per field" in printed and "passport.mrz_line2" in printed
+    values = {str(v) for d in KEY["documents"].values() for v in d["fields"].values() if v is not None and len(str(v)) > 4}
+    assert not [v for v in values if v in printed or v in out.read_text(encoding="utf-8")]
+
+
+def _verified_empty_set(tmp_path):
+    key = tmp_path / "answer_key.yaml"
+    key.write_text(yaml.safe_dump({"verified": True, "documents": {}}), encoding="utf-8")
+    return ["--set", "real", "--docs", str(tmp_path), "--key", str(key), "--mode", "tiles",
+            "--out", str(tmp_path / "r.json")]
+
+
+def test_strong_tier_needs_its_prices(tmp_path, monkeypatch, capsys):
+    """A billed strong run must not start without the strong model's list prices (cost() refuses to guess)."""
+    monkeypatch.setenv("OS_OPENAI_API_KEY", "sk-test-not-a-real-key")
+    for name in ("OS_PRICE_STRONG_IN", "OS_PRICE_STRONG_CACHED", "OS_PRICE_STRONG_OUT"):
+        monkeypatch.delenv(name, raising=False)
+    assert main(["--model", "openai", "--tier", "strong", *_verified_empty_set(tmp_path)]) == 2
+    assert "OS_PRICE_STRONG_CACHED" in capsys.readouterr().err
+
+
+def test_runner_reads_model_and_prices_from_env(tmp_path, monkeypatch, capsys):
+    monkeypatch.setenv("OS_OPENAI_API_KEY", "sk-test-not-a-real-key")
+    monkeypatch.setenv("OS_PRICE_STRONG_CACHED", "0.25")
+    monkeypatch.setenv("OS_PRICE_STRONG_OUT", "15")
+    monkeypatch.setenv("OS_MODEL_STRONG", "a-strong-model")
+    assert main(["--model", "openai", "--tier", "strong", "--runs", "1", *_verified_empty_set(tmp_path)]) == 1
+    result = json.loads((tmp_path / "r.json").read_text(encoding="utf-8"))
+    assert (result["model"], result["tier"]) == ("a-strong-model", "strong")  # no files: nothing billed, gate fails
+    assert "OS_PRICE" not in capsys.readouterr().err
