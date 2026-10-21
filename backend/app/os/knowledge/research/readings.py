@@ -175,12 +175,17 @@ class _ReadingLoop:
 _READINGS = _ReadingLoop()
 
 
+def run_in_reading_loop(make_coro):
+    """Run `make_coro()` on the process's one reading loop and return its result (research and documents)."""
+    return _READINGS.run(make_coro)
+
+
 def run_reading(agent: Agent, spec: AgentSpec, prompt: str) -> ReadingResult:
     """One reading. A failure is returned as an error, not retried (invariant 7)."""
     usage = RunUsage()
     limits = UsageLimits(request_limit=spec.retries.output + 1)
     try:
-        r = _READINGS.run(lambda: agent.run(prompt, usage=usage, usage_limits=limits))
+        r = run_in_reading_loop(lambda: agent.run(prompt, usage=usage, usage_limits=limits))
     except Exception as e:
         return ReadingResult(None, f"{type(e).__name__}: {e}"[:300], usage)
     return ReadingResult(r.output, None, r.usage)

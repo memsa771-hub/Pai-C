@@ -1,0 +1,16 @@
+# The documents agent (Slice 3 spec S3-D3): reads one uploaded document (page text or page images) into its
+# type's reading model. It has no tools: files are checked and prepared by rule (documents.intake).
+id: documents
+version: 1
+zone: reader
+tier: cheap
+tools: []
+output: document_reading
+mode: whole                    # whole page images or tiles; set by Spike 2 (S3-D5)
+limits:
+  max_readings: 1              # one reading per document (S3-D3)
+  timeout_s: 90                # per reading
+  spend_usd_per_document: 0.05
+retries:
+  tools: 0
+  output: 2                    # invariant 7: answer repair through output validation, at most 2
