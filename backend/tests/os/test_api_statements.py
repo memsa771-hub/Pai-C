@@ -20,7 +20,7 @@ from app.os.playbooks import load_playbook_dir
 from app.os.settings import load_settings
 from app.os.statements.approval import delete_statements
 from app.os.statements.config import load_statement_configs
-from tests.os.test_api_knowledge import FakeClient
+from tests.os.test_api_documents import FakeClient
 
 FAKE = Path(__file__).parent / "playbooks"
 CONFIGS = load_statement_configs(Path(__file__).parent / "statements")
@@ -49,8 +49,11 @@ def api(engine, clean, os_db):
                                                            CHECKED, 2027, "confirmed"), "manual")
     # p1 asks for its own statement (researched); p2 does not say
     kb.upsert("programme", "p1", "statement_requirement",
-              Fact({"limit_words": 500, "limit_chars": None}, "q", "https://uni.example/r", CHECKED, 2027,
-                   "confirmed"), "manual")
+              Fact({"limit_words": 500, "limit_chars": None, "needed": True}, "q", "https://uni.example/r", CHECKED,
+                   2027, "confirmed"), "manual")
+    kb.upsert("programme", "p2", "statement_requirement",  # a limit found, but no own statement asked for
+              Fact({"limit_words": 900, "limit_chars": None, "needed": None}, "q", "https://uni.example/r", CHECKED,
+                   2027, "confirmed"), "manual")
     ProfileStore(engine, TENANT).set("stu-1", "transcript.institution", "Example University", None)
     app = FastAPI()
     app.include_router(build_router(lambda: svc), prefix=P)
@@ -210,11 +213,11 @@ def test_student_sees_only_own(api):
     start(api)
     start(api, "stu-2")
     art = written(api)
-    assert api.get(f"{P}/statements", headers=me("stu-2")).json() == {"statements": []}
+    assert api.get(f"{P}/statements", headers=me("stu-2")).json()["statements"] == []
     for call in (lambda: api.put(f"{P}/statements/{art}/text", headers=me("stu-2"), json={"text": "Mine now."}),
                  lambda: api.post(f"{P}/statements/{art}/approve", headers=me("stu-2"), json={"version": 1})):
         assert call().status_code == 404
-    assert api.get(f"{P}/statements", headers=me("stu-3")).json() == {"statements": []}
+    assert api.get(f"{P}/statements", headers=me("stu-3")).json() == {"statements": [], "programmes": []}
     assert api.get(f"{P}/statements/interview", headers=me("stu-3")).status_code == 404
 
 
@@ -238,3 +241,42 @@ def test_deleting_a_student_deletes_statements(api):
     with api.engine.connect() as conn:
         for table in (models.artifacts, models.artifact_versions, models.statement_answers, models.statement_rules):
             assert conn.execute(select(table)).all() == []
+
+
+def test_no_edit_or_approve_while_drafting(api):
+    """Final review: a running draft would land on top of the student's edit and drop their approval."""
+    start(api)
+    art = written(api)
+    ArtifactStore(api.engine, TENANT).set_status(art, "drafting")
+    assert api.put(f"{P}/statements/{art}/text", headers=me(), json={"text": "Mine."}).status_code == 409
+    assert api.post(f"{P}/statements/{art}/approve", headers=me(), json={"version": 1}).status_code == 409
+
+
+def test_draft_shows_drafting_at_once_and_is_not_enqueued_twice(api):
+    start(api)
+    answer_all(api)
+    r = api.post(f"{P}/statements/sop/draft", headers=me())
+    assert r.json()["status"] == "drafting"  # the page starts polling from this answer
+    api.post(f"{P}/statements/sop/draft", headers=me())
+    assert len(api.fake.calls) == 1
+
+
+def test_task_completes_on_read_when_ready_later(api):
+    """Final review: approvals first, then the plan reaches the documents step; the next read completes it."""
+    plan = start(api)
+    for art in (written(api), written(api, "cv", text="Example University, BSc.")):
+        api.post(f"{P}/statements/{art}/approve", headers=me(), json={"version": 1})
+    tasks = apply_tasks(api, plan)
+    assert task_state(api, tasks["p2"]).state == "waiting_student"
+    api.get(f"{P}/statements", headers=me())
+    assert task_state(api, tasks["p2"]).state == "done"
+
+
+def test_programmes_rules_listed(api):
+    start(api)
+    by_ref = {p["programme_ref"]: p for p in api.get(f"{P}/statements", headers=me()).json()["programmes"]}
+    assert (by_ref["p1"]["needed"], by_ref["p1"]["limit_words"], by_ref["p1"]["source"]) == (True, 500, "research")
+    assert (by_ref["p2"]["needed"], by_ref["p2"]["source"]) == (False, "default")  # a limit alone is not "needed"
+    api.put(f"{P}/statements/rules/p2", headers=me(), json={"prompt": "Why p2?", "limit_words": 600})
+    p2 = next(p for p in api.get(f"{P}/statements", headers=me()).json()["programmes"] if p["programme_ref"] == "p2")
+    assert (p2["needed"], p2["limit_words"], p2["prompt"], p2["source"]) == (True, 600, "Why p2?", "student")

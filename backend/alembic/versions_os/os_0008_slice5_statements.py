@@ -51,7 +51,7 @@ def upgrade() -> None:
         _now("created_at"), _now("updated_at"),
         sa.UniqueConstraint("tenant_id", "student_ref", "kind", "programme_ref", name="uq_os_artifacts_key"),
         sa.CheckConstraint("kind IN ('sop', 'cv')", name="ck_os_artifacts_kind"),
-        sa.CheckConstraint("status IN ('empty', 'drafting', 'draft', 'needs_answers', 'failed', 'approved')", name="ck_os_artifacts_status"),
+        sa.CheckConstraint("status IN ('empty', 'drafting', 'draft', 'needs_answers', 'failed', 'budget', 'approved')", name="ck_os_artifacts_status"),
         schema=S)
     op.create_table(
         "os_artifact_versions", _id(), _tenant(),

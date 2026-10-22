@@ -37,7 +37,7 @@ class FieldSpec(_Model):
     values: dict[str, list[str]] = {}
     levels: list[str] = []  # level, level_scores
     scores: list[str] = []  # level_scores: the numeric test scores
-    flags: list[str] = []  # level_scores: yes/no facts, e.g. whether a letter is accepted instead of a test
+    flags: list[str] = []  # level_scores, numbers: yes/no facts, e.g. whether a letter is accepted instead of a test
     parts: list[str] = []  # grade, numbers: the numeric parts
 
     @model_validator(mode="after")
@@ -54,6 +54,10 @@ class FieldSpec(_Model):
                     raise ValueError(f"field '{self.name}': values names unknown score or flag '{key}'")
         if self.type in ("grade", "numbers") and not self.parts:
             raise ValueError(f"field '{self.name}' ({self.type}) needs parts")
+        if self.type == "numbers":
+            for key in self.values:
+                if key not in self.flags:
+                    raise ValueError(f"field '{self.name}': values names unknown flag '{key}'")
         return self
 
 
@@ -143,7 +147,8 @@ def _value_type(spec: FieldSpec) -> Any:
         parts |= {f: (bool | None, None) for f in spec.flags}
         return create_model(model, __config__=_FORBID, **parts)
     if spec.type in ("grade", "numbers"):
-        return create_model(model, __config__=_FORBID, **{p: (float | None, None) for p in spec.parts})
+        parts = {p: (float | None, None) for p in spec.parts} | {f: (bool | None, None) for f in spec.flags}
+        return create_model(model, __config__=_FORBID, **parts)
     # name_set: the tests (or other named items) that satisfy the requirement; empty if none is required
     return create_model(model, __config__=_FORBID,
                         any_of=(list[_literal(spec.values)], Field(description="Empty if none is required")))

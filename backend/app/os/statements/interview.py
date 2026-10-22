@@ -11,7 +11,7 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from app.os import models
 from app.os.artifacts.store import ArtifactStore
 from app.os.statements.config import StatementConfig
-from app.os.statements.run import enqueue_statement, inputs_for, inputs_sha
+from app.os.statements.run import enqueue_statement, inputs_for, inputs_sha, statement_workflow_id
 
 MAX_ANSWER_CHARS = 4000
 FOLLOW_UP = "followup:"
@@ -61,11 +61,21 @@ def missing_required(engine: Engine, tenant: str, student: str, cfg: StatementCo
 
 
 def start_draft(engine: Engine, client, tenant: str, cfg: StatementConfig, artifact_id: int, year: int,
-                knowledge) -> str:
-    """Enqueues os.statement for this artifact with its current inputs; the same inputs give the same workflow."""
-    art = ArtifactStore(engine, tenant).get(artifact_id)
+                knowledge) -> str | None:
+    """Enqueues os.statement for this artifact with its current inputs. Returns the workflow ID, or None when there
+    is nothing to do: these inputs were already drafted (invariant 8), or a draft is being written. After a `failed`
+    or `budget` run the same inputs get a new attempt. The artifact shows `drafting` from here, so the page polls."""
+    store = ArtifactStore(engine, tenant)
+    art = store.get(artifact_id)
+    if art.status == "drafting":
+        return None
     sha = inputs_sha(inputs_for(engine, tenant, cfg, art.student_ref, art.kind, art.programme_ref, knowledge, year))
-    return enqueue_statement(client, tenant, artifact_id, cfg.route_key, year, sha)
+    prefix = statement_workflow_id(tenant, artifact_id, sha, 0)[:-1]  # "...:<sha16>:"
+    done = len(client.list_workflows(workflow_id_prefix=prefix, load_input=False, load_output=False))
+    if done and art.status not in ("failed", "budget"):
+        return None
+    store.set_status(artifact_id, "drafting")
+    return enqueue_statement(client, tenant, artifact_id, cfg.route_key, year, sha, attempt=done + 1)
 
 
 def answer_follow_up(engine: Engine, client, tenant: str, student: str, cfg: StatementConfig, question_id: str,
@@ -77,8 +87,9 @@ def answer_follow_up(engine: Engine, client, tenant: str, student: str, cfg: Sta
     if _open_follow_ups(_answers(engine, tenant, student)):
         return []
     store = ArtifactStore(engine, tenant)
-    return [start_draft(engine, client, tenant, cfg, a.id, year, knowledge)
-            for a in store.list_for(student) if a.status == "needs_answers"]
+    started = [start_draft(engine, client, tenant, cfg, a.id, year, knowledge)
+               for a in store.list_for(student) if a.status == "needs_answers"]
+    return [w for w in started if w]
 
 
 def save_pasted_rules(engine: Engine, tenant: str, student: str, programme_ref: str, prompt: str | None,

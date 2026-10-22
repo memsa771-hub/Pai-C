@@ -4,10 +4,13 @@ import { use, useCallback, useEffect, useState } from 'react';
 import { notFound } from 'next/navigation';
 import { StatementEditor } from '@/components/os/statement-editor';
 import { StatementInterview } from '@/components/os/statement-interview';
+import { StatementProgrammes } from '@/components/os/statement-programmes';
 import { Button } from '@/components/ui/button';
 import { workspaceApi } from '@/lib/api';
 import { OS_UI_ENABLED } from '@/lib/config';
-import { kindLabel, statusLabel, type OsInterview, type OsStatement, type OsStatementKind } from '@/lib/os-statements';
+import {
+  kindLabel, statusLabel, type OsInterview, type OsProgrammeRules, type OsStatement, type OsStatementKind,
+} from '@/lib/os-statements';
 import { usePaiAuth } from '@/lib/pai-auth-context';
 import { goToSignIn } from '@/lib/auth-redirects';
 
@@ -34,12 +37,13 @@ export default function OsStatementsPage({ params }: { params: Promise<{ workspa
   const { user, idToken, loading } = usePaiAuth();
   const [interview, setInterview] = useState<OsInterview | null>(null);
   const [statements, setStatements] = useState<OsStatement[] | null>(null);
+  const [programmes, setProgrammes] = useState<OsProgrammeRules[]>([]);
   const [openId, setOpenId] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(() => Promise.all([workspaceApi.getOsInterview(), workspaceApi.getOsStatements()]).then(
-    ([i, s]) => { setInterview(i); setStatements(s); setError(null); },
+    ([i, s]) => { setInterview(i); setStatements(s.statements); setProgrammes(s.programmes); setError(null); },
     (e) => setError(reason(e, 'Could not load your statements. Please try again.')),
   ), []);
 
@@ -109,6 +113,11 @@ export default function OsStatementsPage({ params }: { params: Promise<{ workspa
               <Button variant="outline" disabled={busy || interview.missing.length > 0} onClick={() => draft('cv')}>Write my CV</Button>
             </div>
           </div>
+          <StatementProgrammes programmes={programmes} statements={statements}
+                               disabled={busy || interview.missing.length > 0}
+                               onDraft={(ref) => draft('sop', ref)}
+                               onPaste={(ref, rules) => act(() => workspaceApi.saveOsStatementRules(ref, rules),
+                                                            'Could not save. Please try again.')} />
           <StatementInterview items={interview.questions} busy={busy}
                               onSave={(id, answer) => act(() => workspaceApi.saveOsAnswer(id, answer),
                                                           'Could not save your answer. Please try again.')} />

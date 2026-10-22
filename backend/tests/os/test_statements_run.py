@@ -18,6 +18,7 @@ from app.os.documents.store import ProfileStore
 from app.os.settings import load_settings
 from app.os.statements.agents import build_agents
 from app.os.statements.config import load_statement_configs
+from app.os.statements.interview import start_draft
 from app.os.statements.run import enqueue_statement, inputs_for, inputs_sha, register_statements, \
     statement_workflow_id
 from tests.os.conftest import TEST_DBOS_SCHEMA, reset_dbos_schema
@@ -205,7 +206,9 @@ def test_inputs_are_one_students_only(statements):
 
 
 def test_budget_exceeded_waits(os_db, engine, clean):
-    ctx = make_statements(engine, os_db)
+    """Over the month's cap nothing is drafted and the student sees `budget`; next month Write again drafts."""
+    now = {"t": NOW}
+    ctx = make_statements(engine, os_db, clock=lambda: now["t"])
     try:
         ctx.answer()
         art = ctx.sop()
@@ -218,9 +221,28 @@ def test_budget_exceeded_waits(os_db, engine, clean):
             [event] = conn.execute(select(models.events.c.payload)
                                    .where(models.events.c.type == "budget_exceeded")).scalars().all()
         assert event["artifact_id"] == art and event["cap_usd"] == 10.0 and event["spent_usd"] == 10.0
-        assert ctx.prompts == {"writer": [], "critic": []} and ctx.store.get(art).status == "empty"
+        assert ctx.prompts == {"writer": [], "critic": []} and ctx.store.get(art).status == "budget"
+        now["t"] = datetime(2026, 11, 2, tzinfo=timezone.utc)  # a new month: the same inputs get a new attempt
+        wid = start_draft(engine, ctx.client, TENANT, CONFIGS[ROUTE], art, YEAR, None)
+        assert wid.endswith(":2") and ctx.client.retrieve_workflow(wid).get_result()["status"] == "draft"
     finally:
         stop(ctx)
+
+
+def test_write_again_after_failure_runs_again(statements):
+    """Final review: the same inputs after a failed run must draft again, not return the finished workflow."""
+    statements.answer()
+    statements.writer = [{"no_text": 1}]
+    art = statements.sop()
+    cfg = CONFIGS[ROUTE]
+    first = start_draft(statements.engine, statements.client, TENANT, cfg, art, YEAR, None)
+    assert statements.store.get(art).status == "drafting"  # at once, before the worker starts: the page polls
+    assert statements.client.retrieve_workflow(first).get_result() == {"status": "failed"}
+    statements.writer = [{"text": CLEAN}]
+    again = start_draft(statements.engine, statements.client, TENANT, cfg, art, YEAR, None)
+    assert again != first and statements.client.retrieve_workflow(again).get_result()["status"] == "draft"
+    assert start_draft(statements.engine, statements.client, TENANT, cfg, art, YEAR, None) is None  # drafted
+    assert statements.store.get(art).status == "draft"
 
 
 def test_model_requests_are_dbos_steps(statements):

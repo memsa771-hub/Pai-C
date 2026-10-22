@@ -39,7 +39,7 @@ export interface OsStatement {
   id: number;
   kind: OsStatementKind;
   programme_ref: string | null;
-  status: 'empty' | 'drafting' | 'draft' | 'needs_answers' | 'failed' | 'approved';
+  status: 'empty' | 'drafting' | 'draft' | 'needs_answers' | 'failed' | 'budget' | 'approved';
   version: OsStatementVersion | null;
   approval: OsApproval | null;
 }
@@ -109,6 +109,33 @@ export function statusLabel(s: OsStatement): string {
     case 'draft': return 'draft ready';
     case 'needs_answers': return 'answer the new questions';
     case 'failed': return 'could not write: try again';
+    case 'budget': return "paused: this month's writing budget is used up; try again later";
     case 'approved': return 'approved ✓';
   }
+}
+
+/** One plan programme's statement rules: does it ask for its own statement, and with what limit and prompt. */
+export interface OsProgrammeRules {
+  programme_ref: string;
+  needed: boolean;
+  limit_words: number | null;
+  limit_chars: number | null;
+  prompt: string | null;
+  source: 'research' | 'student' | 'default';
+  status: string | null;
+}
+
+export interface OsStatements {
+  statements: OsStatement[];
+  programmes: OsProgrammeRules[];
+}
+
+export function rulesLabel(r: OsProgrammeRules): string {
+  if (!r.needed) return 'Uses your main statement';
+  const limit = r.limit_chars ? `${r.limit_chars.toLocaleString('en-US')} characters`
+    : r.limit_words ? `${r.limit_words.toLocaleString('en-US')} words` : 'no stated limit';
+  const from = r.source === 'research'
+    ? (r.status === 'confirmed' ? "from the programme's pages" : "from the programme's pages, not yet confirmed")
+    : 'from what you pasted';
+  return `Asks for its own statement: ${limit} (${from})`;
 }

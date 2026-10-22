@@ -32,6 +32,17 @@ _STARTERS = {"a", "an", "the", "my", "our", "his", "her", "their", "its", "this"
              "also", "and", "but", "so", "then", "there", "here", "it", "we", "you", "they", "he", "she"}
 ALLOWED_NAMES = {"i", "cv", "sop", "dear", "sir", "madam", "yours", "sincerely"} | set(MONTHS)
 _DAYS = {"monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"}
+# Generic application vocabulary: CV headings, salutations, degree words. Never a name, alone or inside a run
+# ("WORK EXPERIENCE", "Dear Admissions Committee", "Master of Science"); the rest of a run is still checked.
+GENERIC = {
+    "experience", "work", "education", "skills", "skill", "technical", "professional", "projects", "project",
+    "publications", "languages", "language", "certifications", "certificates", "summary", "profile", "objective",
+    "references", "interests", "hobbies", "achievements", "activities", "volunteer", "volunteering", "contact",
+    "personal", "details", "information", "statement", "purpose", "motivation", "letter", "admissions", "admission",
+    "committee", "dear", "master", "masters", "master's", "bachelor", "bachelors", "bachelor's", "degree", "science",
+    "sciences", "arts", "programme", "program", "university", "college", "school", "department", "faculty",
+    "institute", "english", "covid", "thesis", "internship", "course", "courses", "honours", "honors",
+}
 
 
 @dataclass(frozen=True)
@@ -40,6 +51,7 @@ class Claim:
     text: str
     norm: str
     start: int = 0
+    parts: tuple[str, ...] = ()  # a name: the stretches that must appear in a source (generic words left out)
 
 
 def _month(s: str) -> int:
@@ -75,24 +87,54 @@ def _mask(text: str, start: int, end: int) -> str:
     return text[:start] + " " * (end - start) + text[end:]
 
 
+def _sentence_start(text: str, at: int) -> bool:
+    """True if the word at `at` opens a sentence, a line or a list item (its capital says nothing)."""
+    before = text[:at].rstrip(" \t")
+    return not before or before[-1] in ".!?:;\n•*-(\"'“"
+
+
 def _names(text: str) -> list[Claim]:
+    """Names: capitalised words, split at generic words and connectors. Two or more together are a name; one alone
+    is a name unless it opens a sentence or line (an all-caps acronym always is). A line break ends a run."""
     out, run = [], []
+    last_end = 0
 
     def flush():
         while run and run[0][0].lower() in _STARTERS | _CONNECTORS:
             run.pop(0)
         while run and run[-1][0].lower() in _CONNECTORS:
             run.pop()
-        caps = [w for w, _ in run if w[0].isupper()]
-        if len(caps) >= 2 or (len(caps) == 1 and len(run) == 1 and caps[0].isupper() and len(caps[0]) >= 2):
-            if not (len(run) == 1 and run[0][0].lower() in ALLOWED_NAMES):
-                start, end = run[0][1], run[-1][1] + len(run[-1][0])
-                phrase = text[start:end]
-                out.append(Claim("name", phrase, normalise("name", phrase), start))
+        caps = [(w, at) for w, at in run if w[0].isupper()]
+        if not caps:
+            run.clear()
+            return
+        if len(caps) == 1:  # one capitalised word: a name unless generic, allowed, or opening a sentence
+            w, at = caps[0]
+            low = w.lower()
+            acronym = w.isupper() and len(w) >= 2
+            if low in GENERIC or low in ALLOWED_NAMES or low.startswith("i'") or (
+                    not acronym and _sentence_start(text, at)):
+                run.clear()
+                return
+        parts, seg = [], []  # what must be found in a source: the run's non-generic stretches
+        for w, _ in run + [("", 0)]:
+            low = w.lower()
+            if w and low not in GENERIC and low not in _CONNECTORS:
+                seg.append(w)
+            elif seg:
+                parts.append(normalise("name", " ".join(seg)))
+                seg = []
+        if parts:
+            start, end = run[0][1], run[-1][1] + len(run[-1][0])
+            phrase = text[start:end]
+            out.append(Claim("name", phrase, normalise("name", phrase), start, tuple(parts)))
         run.clear()
 
     for m in _WORD.finditer(text):
         w = m.group()
+        if "\n" in text[last_end:m.start()]:  # a line break ends a run (CV headings stand on their own lines)
+            flush()
+        last_end = m.end()
         word = w[0].isalpha()
         low = w.lower()
         if word and w[0].isupper() and low not in _DAYS and not (low in ALLOWED_NAMES and len(w) <= 4 and w != w.upper()):
@@ -137,7 +179,7 @@ def unsupported(draft: str, sources: list[str]) -> list[Claim]:
         elif c.kind == "date":
             ok = any(d == c.norm or d.startswith(c.norm + "-") for d in dates)
         else:
-            ok = any(f" {c.norm} " in t for t in texts)
+            ok = all(any(f" {p} " in t for t in texts) for p in (c.parts or (c.norm,)))
         if not ok:
             out.append(c)
     return out

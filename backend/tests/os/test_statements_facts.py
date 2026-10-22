@@ -51,7 +51,7 @@ def test_year_supported_by_full_date():
 
 
 def test_sentence_start_capital_not_a_name():
-    text = "During my studies I learned Python. After that I wanted more. My Bachelor taught me patience."
+    text = "During my studies I learned to code. After that I wanted more. My Bachelor taught me patience."
     assert [c for c in claims(text) if c.kind == "name"] == []
 
 
@@ -61,3 +61,27 @@ def test_common_acronyms_not_claims():
 
 def test_empty_draft_no_claims():
     assert claims("") == [] and unsupported("", SOURCES) == []
+
+
+def test_single_word_invented_name_flagged():
+    """Final review: one capitalised word inside a sentence is a name too (an employer, a university)."""
+    assert [c.text for c in unsupported("I interned at Siemens.", SOURCES)] == ["Siemens"]
+    assert {c.text for c in unsupported("I studied at Oxford and then joined Google.", SOURCES)} == {"Oxford", "Google"}
+    assert unsupported("Then I moved on. Python is my main tool.", SOURCES) == []  # supported, and a sentence start
+
+
+def test_headings_and_salutations_not_flagged():
+    draft = ("Dear Admissions Committee,\nStatement of Purpose\nWORK EXPERIENCE\nTechnical Skills\n"
+             "I hold a Bachelor of Science in Computer Science. During COVID I studied online.")
+    assert unsupported(draft, SOURCES) == []
+
+
+def test_line_break_ends_a_run():
+    found = [c.text for c in claims("EDUCATION\nUniversity of Exampleton\nSKILLS\nPython")]
+    assert found == ["University of Exampleton"]  # one claim per line, never one across the lines
+
+
+def test_institution_checked_without_its_generic_words():
+    assert unsupported("I studied at the University of Exampleton.", SOURCES) == []
+    [c] = unsupported("I studied at the University of Nowhere.", SOURCES)
+    assert c.text == "University of Nowhere"

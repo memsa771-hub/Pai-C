@@ -2,6 +2,7 @@
 # Writer may use beside the confirmed profile values listed per kind (S5-D4). English only (spec Q2).
 route_key: germany_master
 documents_task: application_documents
+allowed_names: [Germany, German, Pakistan, Pakistani, Europe, European, DAAD, uni-assist]
 questions:
   - {id: field_why, prompt: "Which field do you want to study, and why does it interest you?", hint: "A moment or experience that started it is better than a general statement."}
   - {id: key_project, prompt: "Describe your most important academic or personal project.", hint: "What was the problem, what did you do yourself, and what was the result?"}

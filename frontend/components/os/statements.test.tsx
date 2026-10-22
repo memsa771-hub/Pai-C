@@ -2,14 +2,18 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { StatementEditor } from './statement-editor';
 import { StatementInterview } from './statement-interview';
+import { StatementProgrammes } from './statement-programmes';
 import { workspaceApi } from '@/lib/api';
 import {
   countLabel,
   overBy,
   progressLabel,
+  rulesLabel,
   segments,
   shortHash,
+  statusLabel,
   type OsInterviewItem,
+  type OsProgrammeRules,
   type OsStatement,
 } from '@/lib/os-statements';
 
@@ -150,5 +154,41 @@ describe('statements API', () => {
     const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
     expect(url).toContain('/v1/os/statements/rules/p1?network=ws-1');
     expect(init.method).toBe('PUT');
+  });
+});
+
+describe('StatementProgrammes', () => {
+  const rules = (over: Partial<OsProgrammeRules>): OsProgrammeRules => ({
+    programme_ref: 'p1', needed: true, limit_words: 1000, limit_chars: null, prompt: 'Why this programme?',
+    source: 'research', status: 'confirmed', ...over,
+  });
+  const render = (programmes: OsProgrammeRules[], statements: OsStatement[] = []) => renderToStaticMarkup(
+    <StatementProgrammes programmes={programmes} statements={statements} onDraft={() => {}} onPaste={() => {}} />);
+
+  it('offers the programme statement only when the programme asks for one', () => {
+    const html = render([rules({}), rules({ programme_ref: 'p2', needed: false, source: 'default', prompt: null })]);
+    expect(html.match(/Write the statement for this programme/g)?.length).toBe(1);
+    expect(html).toContain("Asks for its own statement: 1,000 words (from the programme&#x27;s pages)");
+    expect(html).toContain('Uses your main statement');
+    expect(html).toContain('Its question: Why this programme?');
+  });
+
+  it('hides the button once that statement exists, and offers a paste where research found nothing', () => {
+    const html = render([rules({ source: 'default', needed: false, prompt: null })],
+                        [stmt({ programme_ref: 'p1' })]);
+    expect(html).not.toContain('Write the statement for this programme');
+    expect(html).toContain('Paste its question');
+    expect(render([rules({ programme_ref: 'p3' })], [stmt({ programme_ref: 'p3' })]))
+      .not.toContain('Write the statement for this programme');
+  });
+
+  it('labels unconfirmed research and pasted rules', () => {
+    expect(rulesLabel(rules({ status: 'unconfirmed' }))).toContain('not yet confirmed');
+    expect(rulesLabel(rules({ source: 'student', limit_words: null, limit_chars: 4000 })))
+      .toBe('Asks for its own statement: 4,000 characters (from what you pasted)');
+  });
+
+  it('labels a budget pause', () => {
+    expect(statusLabel(stmt({ status: 'budget' }))).toContain('budget is used up');
   });
 });

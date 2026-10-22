@@ -59,7 +59,7 @@ def inputs_of(persona: dict, cfg, kind: str) -> Inputs:
     allowed = set(cfg.kinds[kind].profile_keys)
     profile = {k: v for k, v in persona.get("profile", {}).items() if k in allowed}
     rules = Rules(True, cfg.kinds[kind].default_words, None, None, "default")
-    return Inputs(kind, answers, profile, rules, list(cfg.kinds[kind].rubric.criteria))
+    return Inputs(kind, answers, profile, rules, list(cfg.kinds[kind].rubric.criteria), list(cfg.allowed_names))
 
 
 def _test_model():
