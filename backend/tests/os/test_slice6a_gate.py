@@ -156,9 +156,13 @@ def test_slice6a_gate(api, route):
     r = api.post(f"{P}/packs/{programme}/approve", headers=ME, json={"sha256": pack["manifest_sha256"]})
     assert r.status_code == 200, r.text
 
-    # 6. the plan moves on: review_pack is done, bound to the approved manifest
+    # 6. where the route's plan has the pack step, it is done, bound to the approved manifest (route data: the fake
+    #    routes' shared plans have none, and their packs are still complete and approved)
     with api.engine.connect() as conn:
-        state, result = conn.execute(select(T.c.state, T.c.result).where(
-            T.c.plan_id == plan_id, T.c.template_key == "review_pack")).one()
-    assert state == "done" and result["artifacts"]["pack"] == pack["manifest_sha256"]
+        row = conn.execute(select(T.c.state, T.c.result).where(
+            T.c.plan_id == plan_id, T.c.template_key == "review_pack")).first()
+    if route == "germany_master":
+        assert row is not None and row.state == "done" and row.result["artifacts"]["pack"] == pack["manifest_sha256"]
+    else:
+        assert row is None
     assert settled(api, programme)["approved"] is True

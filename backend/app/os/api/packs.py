@@ -124,7 +124,8 @@ def add_pack_routes(router: APIRouter, services: Callable[[], Services]) -> None
         manifest = json.loads(version.text)
         ap = store.approval(art.id)
         stale = manifest.get("inputs_sha256") != current_inputs  # a rebuild is enqueued: never show it as settled
-        out.update(status=art.status if art.status == "failed" else "building" if stale else art.status, version=version.number, manifest_sha256=version.sha256,
+        settled_status = art.status if art.status in ("ready", "incomplete", "approved", "failed") else "building"
+        out.update(status="failed" if art.status == "failed" else "building" if stale else settled_status, version=version.number, manifest_sha256=version.sha256,
                    approved=ap is not None and ap.version == version.number, route_value=manifest["route_value"],
                    instructions=manifest["instructions"], fees=manifest["fees"], checklist=manifest["checklist"],
                    data_sheet=manifest["data_sheet"],

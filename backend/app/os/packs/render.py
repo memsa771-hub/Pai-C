@@ -46,7 +46,7 @@ def _canvas(out: io.BytesIO, title: str) -> canvas.Canvas:
 
 
 def _latin(text: str) -> str:
-    """The built-in fonts use WinAnsi (cp1252): Latin-1 plus smart quotes, dashes, bullets and the euro sign.
+    """The built-in fonts use WinAnsi (cp1252): Latin-1 plus smart quotes, dashes, bullets and currency signs.
     Anything else is replaced so the file still renders."""
     return text.encode("cp1252", "replace").decode("cp1252")
 
