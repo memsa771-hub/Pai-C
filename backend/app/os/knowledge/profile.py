@@ -13,7 +13,9 @@ from pydantic import BaseModel, ConfigDict, Field, StringConstraints, Validation
 
 PROFILE_DIR = Path(__file__).parent / "profiles"
 
-FieldType = Literal["enum", "amount", "month_day", "level", "level_scores", "grade", "name_set", "season_set"]
+# numbers: like grade, named numeric parts each stated in the quote (Slice 5: a statement's length limit)
+FieldType = Literal["enum", "amount", "month_day", "level", "level_scores", "grade", "numbers", "name_set",
+                    "season_set"]
 MonthDay = Annotated[str, StringConstraints(pattern=r"^(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$")]
 _DOMAIN = re.compile(r"^[a-z0-9-]+(\.[a-z0-9-]+)+$")
 
@@ -36,7 +38,7 @@ class FieldSpec(_Model):
     levels: list[str] = []  # level, level_scores
     scores: list[str] = []  # level_scores: the numeric test scores
     flags: list[str] = []  # level_scores: yes/no facts, e.g. whether a letter is accepted instead of a test
-    parts: list[str] = []  # grade: the numeric parts
+    parts: list[str] = []  # grade, numbers: the numeric parts
 
     @model_validator(mode="after")
     def _type_needs(self) -> "FieldSpec":
@@ -50,8 +52,8 @@ class FieldSpec(_Model):
             for key in self.values:
                 if key not in (*self.scores, *self.flags):
                     raise ValueError(f"field '{self.name}': values names unknown score or flag '{key}'")
-        if self.type == "grade" and not self.parts:
-            raise ValueError(f"field '{self.name}' (grade) needs parts")
+        if self.type in ("grade", "numbers") and not self.parts:
+            raise ValueError(f"field '{self.name}' ({self.type}) needs parts")
         return self
 
 
@@ -140,7 +142,7 @@ def _value_type(spec: FieldSpec) -> Any:
         parts |= {s: (float | None, None) for s in spec.scores}
         parts |= {f: (bool | None, None) for f in spec.flags}
         return create_model(model, __config__=_FORBID, **parts)
-    if spec.type == "grade":
+    if spec.type in ("grade", "numbers"):
         return create_model(model, __config__=_FORBID, **{p: (float | None, None) for p in spec.parts})
     # name_set: the tests (or other named items) that satisfy the requirement; empty if none is required
     return create_model(model, __config__=_FORBID,
