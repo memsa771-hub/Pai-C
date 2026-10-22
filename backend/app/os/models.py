@@ -368,6 +368,9 @@ profile_values = Table(
     Column("value", JSONB),
     Column("source_document_id", BigInteger, ForeignKey("os.os_documents.id", ondelete="SET NULL")),
     Column("confirmed_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
+    # Slice 6a (os_0009): "document" (confirmed from a document) or "entered" (typed by the student)
+    Column("source", Text, nullable=False, server_default="document"),
+    CheckConstraint("source IN ('document', 'entered')", name="ck_os_profile_values_source"),
     UniqueConstraint("tenant_id", "student_ref", "key", name="uq_os_profile_values_key"),
 )
 
@@ -479,4 +482,35 @@ statement_rules = Table(
     Column("limit_chars", Integer),
     Column("updated_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
     UniqueConstraint("tenant_id", "student_ref", "programme_ref", name="uq_os_statement_rules"),
+)
+
+# --- Slice 6a: the application pack (spec 2026-10-22 §3, os_0009) ---------------------------------------------
+
+pack_files = Table(
+    "os_pack_files", md,
+    _id(), _tenant(),
+    Column("student_ref", Text, nullable=False),
+    Column("programme_ref", Text, nullable=False),
+    Column("item_key", Text, nullable=False),
+    Column("sha256", Text, nullable=False),
+    Column("filename", Text, nullable=False),
+    Column("content_type", Text, nullable=False),
+    Column("size", Integer, nullable=False),
+    Column("pages", Integer, nullable=False),
+    Column("data", LargeBinary, nullable=False),
+    _created(),
+    UniqueConstraint("tenant_id", "student_ref", "sha256", name="uq_os_pack_files_sha"),
+)
+
+pack_items = Table(
+    "os_pack_items", md,
+    _id(), _tenant(),
+    Column("student_ref", Text, nullable=False),
+    Column("programme_ref", Text, nullable=False),
+    Column("item_key", Text, nullable=False),
+    Column("kind", Text, nullable=False),
+    Column("label", Text),
+    Column("at", DateTime(timezone=True), nullable=False, server_default=func.now()),
+    CheckConstraint("kind IN ('added', 'ticked')", name="ck_os_pack_items_kind"),
+    UniqueConstraint("tenant_id", "student_ref", "programme_ref", "item_key", "kind", name="uq_os_pack_items"),
 )
