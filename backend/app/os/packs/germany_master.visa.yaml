@@ -1,0 +1,82 @@
+# The visa file for Germany master's (Slice 6b spec S6b-D3..D7, D10). Route data, validated at startup.
+# The embassy's Consular Services Portal generates each applicant's own list: this checklist is a default to check
+# against it. Sources: the German mission in Pakistan (S9 blocked account, S11 study visa, S13 digital visa,
+# S15 the study visa leaflet; see the playbook).
+route_key: germany_master
+version: 1
+
+data_sheet:
+  - title: Personal details
+    fields:
+      - {key: surname, label: Surname (family name), source: passport.surname, required: true}
+      - {key: given_names, label: Given names, source: passport.given_names, required: true}
+      - {key: date_of_birth, label: Date of birth, source: passport.date_of_birth, required: true}
+      - {key: place_of_birth, label: Place of birth, source: passport.place_of_birth}
+      - {key: nationality, label: Nationality, source: passport.nationality, required: true}
+      - {key: passport_number, label: Passport number, source: passport.passport_number, required: true}
+      - {key: passport_issue, label: Passport issued on, source: passport.issue_date}
+      - {key: passport_expiry, label: Passport valid until, source: passport.expiry_date, required: true}
+  - title: Contact
+    fields:
+      - {key: email, label: Email, source: entered, required: true}
+      - {key: phone, label: Phone (with country code), source: entered, required: true}
+      - {key: address_line, label: Street address, source: entered, required: true}
+      - {key: city, label: City, source: entered, required: true}
+  - title: Studies in Germany
+    fields:
+      - {key: admitted_institution, label: University, source: admission_letter.institution, required: true}
+      - {key: admitted_programme, label: Programme, source: admission_letter.programme, required: true}
+      - {key: study_start, label: Studies start, source: admission_letter.start_date, required: true}
+  - title: Funds and insurance
+    fields:
+      - {key: blocked_amount, label: Amount in the blocked account, source: blocked_account_confirmation.amount}
+      - {key: blocked_provider, label: Blocked account provider, source: blocked_account_confirmation.provider}
+      - {key: insurer, label: Insurance company, source: insurance_certificate.insurer}
+      - {key: cover_start, label: Insurance cover from, source: insurance_certificate.cover_start}
+
+checklist:
+  - {key: passport, label: Passport (data page), kind: document, ref: passport}
+  - {key: admission, label: Admission letter, kind: document, ref: admission_letter}
+  - {key: blocked_account, label: Blocked account confirmation, kind: document, ref: blocked_account_confirmation}
+  - {key: insurance, label: Travel health insurance certificate, kind: document, ref: insurance_certificate}
+  - {key: degree, label: Degree certificate, kind: document, ref: degree_certificate, format: attested}
+  - {key: transcript, label: Transcript, kind: document, ref: transcript, format: attested}
+  - {key: cv, label: CV, kind: statement, ref: cv}
+  - key: motivation_letter
+    label: Motivation letter
+    kind: statement
+    ref: sop
+    note: "The embassy may want a letter about your study plan in Germany; check your SOP covers it."
+  - {key: portal_applied, label: Applied on the Consular Services Portal, kind: manual}
+  - {key: visa_fee_paid, label: Paid the visa fee, kind: manual}
+
+formats:
+  default: {types: [pdf], max_mb: 5}
+  named:
+    attested:
+      types: [pdf]
+      max_mb: 5
+      colour: true
+      notes: ["Upload a colour scan of the attested copy, not the original"]
+
+# The same steps whatever the programme's application route was (keys are the route's application_route values).
+instructions:
+  uni_assist: &visa_steps
+    - {text: "Open a blocked account for the amount shown below and get its confirmation.", source: "citation:S9"}
+    - {text: "Buy travel health insurance that starts on your travel date.", source: "citation:S15"}
+    - {text: "Apply for the student visa on the Consular Services Portal and upload the checklist files.", source: "citation:S13"}
+    - {text: "Book the appointment the portal offers, and pay the visa fee yourself.", source: "citation:S11"}
+  uni_assist_vpd: *visa_steps
+  direct: *visa_steps
+
+fees: []
+
+funds:
+  fact: blocked_account_yearly_eur
+  months: 12
+  currency_label: EUR
+  alternatives:
+    - {key: scholarship, label: A scholarship that covers your living costs}
+    - {key: sponsor, label: A formal obligation letter from a sponsor in Germany}
+  proof_item: blocked_account
+  proof_field: amount
