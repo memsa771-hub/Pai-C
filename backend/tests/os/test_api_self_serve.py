@@ -181,3 +181,9 @@ def test_admin_open_facts_lists_requested_programmes(api):
     ref = request(api).json()["programme_ref"]
     body = api.get(f"{P}/facts/open", headers={"X-OS-Admin-Token": TOKEN}).json()
     assert [p["ref"] for p in body["requested_programmes"]] == [ref]
+
+
+def test_my_programmes_carry_plan_and_rank(api):
+    plan = start(api, refs=("p2", "p1")).json()["plan_id"]
+    mine = api.get(f"{P}/programmes", headers=me()).json()["programmes"]
+    assert [(p["ref"], p["plan_id"], p["rank"]) for p in mine] == [("p2", plan, 1), ("p1", plan, 2)]

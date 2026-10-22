@@ -187,3 +187,15 @@ def test_only_own_plan(svc):
         swap(svc.plans, "stu-2", plan, "p1", "p3")
     with pytest.raises(NotAllowed, match="plan"):
         remove(svc.plans, "stu-2", plan, "p1")
+
+
+def test_start_and_swap_record_starting_verdicts(svc):
+    """Without this, a student's first confirmed document would only be recorded, never noted (S4-D7)."""
+    S = models.eligibility_seen
+    plan = start(svc.plans, "stu-1", "ireland_master", WINTER, choices("p1")).plan_id
+    with svc.engine.connect() as conn:
+        assert conn.execute(select(S.c.programme_ref, S.c.verdict)).all() == [("p1", "unknown")]  # only a deadline fact here: requirements not researched
+    swap(svc.plans, "stu-1", plan, "p1", "p2")
+    with svc.engine.connect() as conn:
+        assert {r.programme_ref for r in conn.execute(select(S.c.programme_ref))} == {"p1", "p2"}
+

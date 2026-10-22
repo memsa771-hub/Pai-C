@@ -122,10 +122,10 @@ def student_programmes(engine: Engine, tenant_id: str, student_ref: str) -> list
     """The programmes in the student's plans, in plan then rank order, with their facts for the plan's intake
     year: value, status, source link, quote, check date and conflict note. No evidence (it is for admins)."""
     with engine.connect() as conn:
-        plans = conn.execute(select(P.c.contract).where(
+        plans = conn.execute(select(P.c.id, P.c.contract).where(
             P.c.tenant_id == tenant_id, P.c.student_ref == student_ref, P.c.status != "done").order_by(P.c.id)).all()
         out, seen = [], set()
-        for (contract,) in plans:
+        for plan_id, contract in plans:
             intake_year = contract["target_intake"]["year"]
             for choice in sorted(contract["programmes"], key=lambda c: c["rank"]):
                 ref = choice["programme_ref"]
@@ -136,7 +136,7 @@ def student_programmes(engine: Engine, tenant_id: str, student_ref: str) -> list
                 facts = conn.execute(select(F).where(
                     F.c.tenant_id == tenant_id, F.c.scope == "programme", F.c.ref == ref,
                     F.c.intake_year == intake_year).order_by(F.c.field)).all()
-                out.append({"ref": ref, "name": prog.name if prog else ref,
+                out.append({"ref": ref, "plan_id": plan_id, "rank": choice["rank"], "name": prog.name if prog else ref,
                             "university": prog.university if prog else None, "intake_year": intake_year,
                             "facts": [_fact_out(f, admin=False) for f in facts]})
     return out

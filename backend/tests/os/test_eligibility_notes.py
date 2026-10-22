@@ -83,13 +83,14 @@ def test_first_evaluation_no_note(svc, engine):
 
 
 def test_confirm_changing_verdict_writes_one_note(svc, engine):
-    start(svc, "stu-1")
+    plan_id = start(svc, "stu-1")
     profile(engine, "stu-1", transcript__percentage=70, ielts_trf__overall=7.0)
     on_profile_change(svc.plans, "stu-1")
     profile(engine, "stu-1", ielts_trf__overall=6.0)
     assert on_profile_change(svc.plans, "stu-1") == 1
     [n] = notes(engine, "stu-1")
     assert (n.programme_ref, n.verdict, n.payload["previous"]) == ("p1", "likely_below", "likely_meets")
+    assert n.payload["plan_id"] == plan_id
     english = next(ln for ln in n.payload["lines"] if ln["check"] == "language:english")
     assert (english["status"], english["have"], english["need"]) == ("likely_below", 6.0, 6.5)
 
