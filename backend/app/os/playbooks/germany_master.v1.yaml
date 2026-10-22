@@ -41,6 +41,11 @@ eligibility:
               min_pass: min_passing_grade_letter.min_pass, min_pass_scale: min_passing_grade_letter.scale_best}
 
 constants:
+  # Slice 6a (spec S6a-D11, Q2): the handling fee for the first programme, shown in the pack with its source.
+  uni_assist_fee_eur:
+    value: 75
+    citations:
+      - {source: S5, url: "https://www.uni-assist.de/en/how-to-apply/apply-online/pay-submit/"}
   uni_assist_lead_days:
     value: 56
     estimate: true   # S6: "at least 8 weeks before the application deadline" (a recommendation)
@@ -144,6 +149,17 @@ tasks:
     duration_days: 7
     citation_from_fact: required_documents
 
+  # Slice 6a (spec S6a-D8): the student approves this programme's application pack (a manifest version).
+  - template_key: review_pack
+    task_type: student.approve
+    title: Review and approve this programme's application pack
+    kind: student
+    inbox_kind: approve
+    fan_out: programme
+    depends_on: [{key: application_documents}]
+    duration_days: 2
+    citation_from_fact: required_documents
+
   # ---- Phase B: application ------------------------------------------------------------------
   - template_key: uni_assist_apply
     task_type: student.act
@@ -163,6 +179,7 @@ tasks:
       - {key: english_test}
       - {key: admission_test}
       - {key: application_documents}
+      - {key: review_pack}
     citations:
       - {source: S4, url: "https://www.uni-assist.de/en/faqs/plan-your-application/"}
       - {source: S5, url: "https://www.uni-assist.de/en/how-to-apply/apply-online/pay-submit/"}
@@ -180,6 +197,7 @@ tasks:
     depends_on:
       - {key: uni_assist_apply}
       - {key: application_documents}
+      - {key: review_pack}
       - {key: english_test}
       - {key: hec_attestation}
     citation_from_fact: portal_url

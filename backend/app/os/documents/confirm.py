@@ -76,6 +76,9 @@ def delete_document(engine: Engine, tenant_id: str, types: Mapping[str, Document
     again without it."""
     DocumentStore(engine, tenant_id).delete(doc.id)
     forget_document(client, tenant_id, doc.id)
+    from app.os.packs.store import PackFileStore  # imported here: packs read documents, not the other way round
+
+    PackFileStore(engine, tenant_id).delete_for_student(doc.student_ref)  # rendered copies go too; rebuilt on demand
     P = models.profile_values
     with engine.begin() as conn:
         conn.execute(delete(P).where(P.c.tenant_id == tenant_id, P.c.source_document_id == doc.id))

@@ -1,0 +1,22 @@
+# Fake local route (spec S6a-D12): a bachelor's pack with school documents only. Fictional rules.
+route_key: pakistan_bs
+version: 1
+data_sheet:
+  - title: Candidate
+    fields:
+      - {key: name, label: Candidate name, source: hssc_certificate.student_name, required: true}
+      - {key: father_name, label: Father's name, source: hssc_certificate.father_name, required: true}
+      - {key: hssc_marks, label: HSSC marks, source: hssc_certificate.marks_obtained, required: true}
+      - {key: hssc_total, label: HSSC total, source: hssc_certificate.marks_total, required: true}
+      - {key: mobile, label: Mobile number, source: entered, required: true}
+checklist:
+  - {key: ssc, label: Matric certificate, kind: document, ref: ssc_certificate}
+  - {key: hssc, label: Intermediate certificate, kind: document, ref: hssc_certificate}
+  - {key: entry_test_slip, label: Entry test admit card printed, kind: manual}
+formats:
+  default: {types: [pdf], max_mb: 1}
+instructions:
+  portal:
+    - {text: "Register on the admissions portal before {merit_list_date}.", source: "fact:merit_list_date"}
+    - {text: "Upload both certificates and print the admit card.", source: "fact:application_route"}
+fees: []

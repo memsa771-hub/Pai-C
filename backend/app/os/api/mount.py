@@ -15,6 +15,7 @@ from app.os.api.router import build_router
 from app.os.api.services import make_services
 from app.os.documents.types import TYPES_DIR, load_document_types
 from app.os.eligibility.rules import check_rules, profile_keys
+from app.os.packs.config import PACK_DIR, load_checked_pack_configs
 from app.os.statements.config import check_config, load_statement_configs
 from app.os.knowledge.profile import PROFILE_DIR, load_profile_dir
 from app.os.playbooks import PLAYBOOK_DIR, load_playbook_dir
@@ -27,7 +28,7 @@ def mount_os(app: FastAPI, *, env: Mapping[str, str] | None = None,
              student_dependency: Callable[..., str] | None = None,
              student_write_dependency: Callable[..., str] | None = None,
              playbook_dir: Path = PLAYBOOK_DIR, profile_dir: Path = PROFILE_DIR,
-             document_types_dir: Path = TYPES_DIR) -> bool:
+             document_types_dir: Path = TYPES_DIR, pack_dir: Path = PACK_DIR) -> bool:
     try:
         settings = load_settings(env)
     except ValueError:
@@ -45,7 +46,9 @@ def mount_os(app: FastAPI, *, env: Mapping[str, str] | None = None,
     statement_configs = load_statement_configs()
     for cfg in statement_configs.values():  # so do statement configs (Slice 5 S5-D12)
         check_config(cfg, keys, books)
-    services = make_services(settings, playbooks=books, document_types=types, statement_configs=statement_configs)
+    pack_configs = load_checked_pack_configs(pack_dir, types, books, profiles)  # so do pack configs (S6a-D12)
+    services = make_services(settings, playbooks=books, document_types=types, statement_configs=statement_configs,
+                             pack_configs=pack_configs)
     app.include_router(build_router(lambda: services), prefix=PREFIX)
     if student_dependency is not None:
         app.dependency_overrides[current_student_ref] = student_dependency

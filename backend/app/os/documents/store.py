@@ -190,8 +190,12 @@ class ProfileStore:
     def __init__(self, engine: Engine, tenant_id: str) -> None:
         self.engine, self.tenant_id = engine, tenant_id
 
-    def set(self, student_ref: str, key: str, value, source_document_id: int | None) -> None:
-        row = {"value": value, "source_document_id": source_document_id, "confirmed_at": func.now()}
+    def set(self, student_ref: str, key: str, value, source_document_id: int | None, *,
+            source: str = "document") -> None:
+        """`source` is "document" (confirmed from a document) or "entered" (typed by the student; Slice 6a)."""
+        if source not in ("document", "entered"):
+            raise ValueError(f"unknown profile value source '{source}'")
+        row = {"value": value, "source_document_id": source_document_id, "confirmed_at": func.now(), "source": source}
         with self.engine.begin() as conn:
             conn.execute(pg_insert(P).values(tenant_id=self.tenant_id, student_ref=student_ref, key=key, **row)
                          .on_conflict_do_update(constraint="uq_os_profile_values_key", set_=row))
@@ -201,4 +205,4 @@ class ProfileStore:
             rows = conn.execute(select(P).where(P.c.tenant_id == self.tenant_id, P.c.student_ref == student_ref)
                                 .order_by(P.c.key)).all()
         return [{"key": r.key, "value": r.value, "source_document_id": r.source_document_id,
-                 "confirmed_at": r.confirmed_at} for r in rows]
+                 "confirmed_at": r.confirmed_at, "source": r.source} for r in rows]

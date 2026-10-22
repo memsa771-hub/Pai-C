@@ -1,0 +1,119 @@
+"""What a pack is built from (Slice 6a spec §2): the student's documents, approved statements and profile values, the
+programme's facts, the playbook's constants and citations, and the student's ticks and added items. The pure rules
+(checklist, data sheet, instructions) read only this, so they can be tested without a database."""
+
+from dataclasses import dataclass, field
+from typing import Any
+
+from app.os.packs.config import PackConfig
+
+ENTERED_PREFIX = "entered."  # profile key of a value the student typed: "entered.<data-sheet field key>"
+
+
+@dataclass(frozen=True)
+class DocState:
+    status: str  # the os_documents status: uploaded, reading, read, needs_student, confirmed, failed
+    document_id: int
+    sha256: str | None
+
+
+@dataclass(frozen=True)
+class ProfileValue:
+    value: Any
+    source: str  # "document" or "entered"
+    document_id: int | None
+
+
+@dataclass(frozen=True)
+class PackInputs:
+    cfg: PackConfig
+    documents: dict[str, DocState]  # by document type: the student's live document of that type
+    statements: dict[str, str | None]  # "sop", "cv", and "sop:<programme>" when needed -> approved SHA-256 or None
+    profile: dict[str, ProfileValue]
+    facts: dict[str, Any]  # fact name -> knowledge Fact (value, url, status) for this programme and intake
+    constants: dict[str, Any]  # playbook constants (value, citations, estimate)
+    citations: dict[str, str]  # playbook citation source id -> URL
+    ticked: set[str] = field(default_factory=set)
+    added: list[tuple[str, str]] = field(default_factory=list)  # (item key, label) the student added
+    required_override: list[str] | None = None  # the confirmed required_documents fact, if any
+
+
+def _fact_names(cfg: PackConfig) -> list[str]:
+    """Every fact the pack reads: the route and the required documents, and those its instructions and fees name."""
+    import re
+
+    names = {"application_route", "required_documents"}
+    for steps in cfg.instructions.values():
+        for s in steps:
+            names |= set(re.findall(r"\{([a-z][a-z0-9_]*)\}", s.text))
+            if s.source.startswith("fact:"):
+                names.add(s.source[5:])
+    names |= {f.source[5:] for f in cfg.fees if f.source.startswith("fact:")}
+    return sorted(names)
+
+
+def load_inputs(engine, tenant_id: str, knowledge, book, cfg: PackConfig, statement_cfg, student_ref: str,
+                programme_ref: str, year: int) -> PackInputs:
+    """This student's material for one programme's pack. Only their own rows are read (every store filters by
+    tenant and student). `statement_cfg` may be None (no statements for the route: no programme SOP is needed)."""
+    from app.os.documents.store import DocumentStore, ProfileStore
+    from app.os.packs.store import PackItemStore
+    from app.os.statements.approval import approved_shas, needed_artifacts
+
+    documents: dict[str, DocState] = {}
+    for d in DocumentStore(engine, tenant_id).list_for(student_ref):  # oldest first: the newest of a type wins
+        documents[d.doc_type] = DocState(d.status, d.id, d.sha256)
+    shas = approved_shas(engine, tenant_id, student_ref)
+    statements: dict[str, str | None] = {"sop": shas.get(("sop", None)), "cv": shas.get(("cv", None))}
+    if statement_cfg is not None:
+        for kind, prog in needed_artifacts(engine, tenant_id, knowledge, student_ref, programme_ref, year,
+                                           statement_cfg):
+            if prog is not None:
+                statements[f"{kind}:{prog}"] = shas.get((kind, prog))
+    profile = {v["key"]: ProfileValue(v["value"], v.get("source", "document"), v["source_document_id"])
+               for v in ProfileStore(engine, tenant_id).all(student_ref)}
+    found = knowledge.programme_facts([programme_ref], _fact_names(cfg), year)
+    facts = {name: f for (_, name), f in found.items()}
+    required = facts.get("required_documents")
+    override = None
+    if required is not None and required.status == "confirmed" and isinstance(required.value, list):
+        override = [k for k in required.value if k != "other"]
+    items = PackItemStore(engine, tenant_id)
+    return PackInputs(
+        cfg=cfg, documents=documents, statements=statements, profile=profile, facts=facts,
+        constants=dict(book.constants),
+        citations={c.source: str(c.url) for t in book.tasks for c in t.citations}
+        | {c.source: str(c.url) for k in book.constants.values() for c in k.citations},
+        ticked=items.ticked(student_ref, programme_ref), added=items.added(student_ref, programme_ref),
+        required_override=override)
+
+
+def inputs_sha(inp: PackInputs) -> str:
+    """A fingerprint of everything the pack is built from: a change to any input gives a new build (and version)."""
+    import hashlib
+    import json
+
+    body = {
+        "config": [inp.cfg.route_key, inp.cfg.version],
+        "documents": {k: [d.status, d.document_id, d.sha256] for k, d in inp.documents.items()},
+        "statements": inp.statements,
+        "profile": {k: [v.value, v.source, v.document_id] for k, v in inp.profile.items()},
+        "facts": {k: [f.value, f.status, f.url] for k, f in inp.facts.items()},
+        "constants": {k: c.value for k, c in inp.constants.items()},
+        "ticked": sorted(inp.ticked), "added": inp.added, "override": inp.required_override,
+    }
+    blob = json.dumps(body, sort_keys=True, default=str, ensure_ascii=False)
+    return hashlib.sha256(blob.encode("utf-8")).hexdigest()
+
+
+def show(value: Any) -> str:
+    """A fact or constant value as one short line (no country-specific formatting)."""
+    if isinstance(value, dict) and "date" in value:
+        return str(value["date"])
+    if isinstance(value, list):
+        return ", ".join(show(v) for v in value)
+    if isinstance(value, float) and value.is_integer():
+        return str(int(value))
+    if isinstance(value, dict):
+        return ", ".join(f"{k.replace('_', ' ')} {show(v)}" for k, v in value.items() if v is not None)
+    return str(value)
