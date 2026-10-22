@@ -62,10 +62,10 @@ export default function OsInboxPage({ params }: { params: Promise<{ workspaceId:
     void load();
   }, [loading, user, idToken, workspaceId, load]);
 
-  const complete = async (item: OsInboxItem) => {
+  const complete = async (item: OsInboxItem, payload: Record<string, unknown> = {}) => {
     setBusyId(item.id);
     try {
-      await workspaceApi.completeOsInboxItem(item.id);
+      await workspaceApi.completeOsInboxItem(item.id, payload);
       await load();
     } catch {
       setError('That did not save. Please try again.');

@@ -98,3 +98,15 @@ export function sourceHost(url: string): string {
     return url;
   }
 }
+
+const ADMISSION_PREFIX = 'admission_result@'; // the plan's per-programme admission step (Slice 6b S6b-D8)
+
+/** The buttons an item offers and what each sends: an admission result says admitted or not (the visa page
+ * pre-selects the admitted programme); other choices confirm; the rest are done. */
+export function completeActions(item: OsInboxItem): { label: string; payload: Record<string, unknown> }[] {
+  if (item.instance_key.startsWith(ADMISSION_PREFIX)) {
+    return [{ label: 'Admitted', payload: { choice: 'admitted' } },
+            { label: 'Not admitted', payload: { choice: 'rejected' } }];
+  }
+  return [{ label: item.inbox_kind === 'choose' ? 'Confirm' : 'Done', payload: {} }];
+}
