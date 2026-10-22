@@ -1,0 +1,15 @@
+# The critic (Slice 5 spec S5-D4): scores a draft against the route's rubric; may ask up to 2 follow-up questions.
+# An actor with no tools: it cannot fetch, store or send anything; the os.statement workflow does (S5-D6).
+id: critic
+version: 1
+zone: actor
+tier: strong
+tools: []
+output: statement_review
+limits:
+  max_readings: 3              # a draft and at most 2 revisions (S5-D6)
+  timeout_s: 90
+  spend_usd_per_artifact: 0.30
+retries:
+  tools: 0
+  output: 2                    # invariant 7
