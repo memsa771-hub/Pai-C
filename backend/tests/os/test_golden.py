@@ -49,7 +49,7 @@ def normalised(plan: dict) -> dict:
 
 def test_germany_playbook_loads_with_registry():
     book = load_playbook(PLAYBOOK_DIR / "germany_master.v1.yaml")
-    assert book.require_citations and len(book.tasks) == 20  # Slice 6a added review_pack
+    assert book.require_citations and len(book.tasks) == 21  # Slice 6a added review_pack, 6b review_visa_file
     default_registry().validate([book])
 
 
