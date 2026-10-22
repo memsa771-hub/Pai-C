@@ -30,6 +30,7 @@ class OsSettings:
     price_strong_out: float | None = 15.00
     research_monthly_usd: float = 20.0  # research spend cap per tenant and month (S2-D10)
     documents_monthly_usd: float = 10.0  # document reading spend cap per tenant and month (S3-D11)
+    statements_monthly_usd: float = 10.0  # Writer + Critic spend cap per tenant and month (S5-D10)
     fact_ttl_days: int = 30  # a confirmed fact older than this goes stale (spec §4.7)
 
 
@@ -65,5 +66,6 @@ def load_settings(env: Mapping[str, str] | None = None) -> OsSettings:
         price_strong_out=_price(env, "OS_PRICE_STRONG_OUT", 15.00),
         research_monthly_usd=float(env.get("OS_RESEARCH_MONTHLY_USD") or 20.0),
         documents_monthly_usd=float(env.get("OS_DOCUMENTS_MONTHLY_USD") or 10.0),
+        statements_monthly_usd=float(env.get("OS_STATEMENTS_MONTHLY_USD") or 10.0),
         fact_ttl_days=int(env.get("OS_FACT_TTL_DAYS") or 30),
     )

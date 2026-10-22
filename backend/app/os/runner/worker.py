@@ -106,6 +106,32 @@ def register_documents_if_configured(settings: OsSettings, engine: Engine) -> bo
     return True
 
 
+def register_statements_if_configured(settings: OsSettings, engine: Engine) -> bool:
+    """Registers os.statement (Writer and Critic built once, before launch). False when no model key is set.
+    OS_TEST_STATEMENT_MODEL (tests only, `pkg.mod:factory`) gives a fake model, like the documents worker."""
+    test_model = os.environ.get("OS_TEST_STATEMENT_MODEL", "").strip()
+    if not settings.openai_api_key and not test_model:
+        log.warning("OS_OPENAI_API_KEY is not set: statements are not drafted")
+        return False
+    from app.os.agents.spec import AGENT_DIR, load_agent_spec  # imported late: only a drafting worker needs them
+    from app.os.knowledge.research.readings import model_for
+    from app.os.knowledge.store import SqlKnowledge
+    from app.os.statements.agents import build_agents
+    from app.os.statements.config import load_statement_configs
+    from app.os.statements.run import register_statements
+
+    wspec, cspec = load_agent_spec(AGENT_DIR / "writer.v1.yaml"), load_agent_spec(AGENT_DIR / "critic.v1.yaml")
+    if test_model:
+        module_path, _, name = test_model.partition(":")
+        model = getattr(importlib.import_module(module_path), name)()
+    else:
+        model = model_for(settings, wspec.tier)
+    writer, critic = build_agents(model, wspec, cspec)
+    register_statements(engine, settings, writer, critic, wspec, cspec, load_statement_configs(),
+                        SqlKnowledge(engine, settings.tenant_id))
+    return True
+
+
 def build(settings: OsSettings) -> tuple[Registry, Kernel, DBOSClient, Engine]:
     registry = default_registry()
     for module in _extra_modules(os.environ.get("OS_EXTRA_MODULES", "")):
@@ -132,6 +158,7 @@ def build(settings: OsSettings) -> tuple[Registry, Kernel, DBOSClient, Engine]:
 
         register_job("documents_retry", "10 0 * * *",  # uploads that waited for the budget, daily at 00:10 UTC
                      lambda: retry_waiting(engine, client, settings.tenant_id, datetime.now(timezone.utc).date()))
+    register_statements_if_configured(settings, engine)
     return registry, kernel, client, engine
 
 
