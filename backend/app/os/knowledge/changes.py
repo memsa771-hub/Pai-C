@@ -6,10 +6,13 @@ the fact's intake year are touched (handoff M17). A programme fact also re-check
 eligibility, which writes a note when a verdict changes (Slice 4 S4-D7).
 """
 
+import logging
+
 from sqlalchemy import select
 
 from app.os import models
 
+log = logging.getLogger(__name__)
 T = models.tasks
 P = models.plans
 
@@ -37,7 +40,10 @@ def after_fact_change(service, kernel, scope: str, ref: str, field: str, fact_id
             kernel.complete_review(task_id, {"fact_id": fact_id, "status": status})
     revised = [p for p in plan_ids if service.recompile(p, "fact_changed") is not None]
     if scope == "programme":
-        from app.os.eligibility.notes import on_fact_change  # imported here: notes imports knowledge
+        from app.os.eligibility import notes  # imported here: notes imports knowledge
 
-        on_fact_change(service, ref, intake_year)
+        try:  # a note is extra: it must never stop a fact from being stored (Slice 4 final review)
+            notes.on_fact_change(service, ref, intake_year)
+        except Exception:
+            log.exception("eligibility notes failed after a fact change: %s %s", ref, field)
     return revised

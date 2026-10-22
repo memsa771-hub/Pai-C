@@ -35,7 +35,7 @@ eligibility:
     - {language: german, requirement: german_requirement, level_key: level}
   test: {requirement: admission_test, list_key: any_of}
   grade_scales:
-    cgpa_4: {best: 4.0, provisional_min_pass: 2.0, value: transcript.cgpa,
+    cgpa_4: {best: 4.0, provisional_min_pass: 2.0, value: transcript.cgpa, scale_value: transcript.cgpa_scale,
              min_pass: min_passing_grade_letter.min_pass, min_pass_scale: min_passing_grade_letter.scale_best}
     percent: {best: 100, provisional_min_pass: 33, value: transcript.percentage,
               min_pass: min_passing_grade_letter.min_pass, min_pass_scale: min_passing_grade_letter.scale_best}

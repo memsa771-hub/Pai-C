@@ -1,6 +1,7 @@
 """The OS HTTP API (spec §4.9; Slice 2 spec §4.8; Slice 3 spec §4): PlanSource (admin), PlanQuery, the student
 inbox, the student's programme facts, research (admin), and the student's documents and profile."""
 
+import logging
 from collections.abc import Callable
 from datetime import datetime, timezone
 
@@ -63,6 +64,16 @@ from app.os.routes import builder
 from app.os.kernel import IllegalTransition
 from app.os.playbooks import PlaybookError
 from app.os.workers import confirm_fact, open_confirm_tasks, supply_fact
+
+log = logging.getLogger(__name__)
+
+
+def _notify(plans, student: str) -> None:
+    """Eligibility notes after a confirm or resolve. A note is extra: it never turns a saved confirm into an error."""
+    try:
+        on_profile_change(plans, student)
+    except Exception:
+        log.exception("eligibility notes failed for a student")
 
 
 def build_router(get_services: Callable[[], Services]) -> APIRouter:
@@ -193,6 +204,8 @@ def build_router(get_services: Callable[[], Services]) -> APIRouter:
                    svc: Services = Depends(services)) -> dict:
         try:
             ref = builder.start(svc.plans, student, body.route, body.intake, body.choices)
+        except builder.PlanExists as e:
+            raise HTTPException(status_code=409, detail=str(e)) from None
         except (builder.NotAllowed, PlaybookError, CompileError) as e:
             raise HTTPException(status_code=422, detail=str(e)) from None
         if not ref.created:
@@ -227,7 +240,7 @@ def build_router(get_services: Callable[[], Services]) -> APIRouter:
         try:
             ref, created = request_programme(
                 svc.engine, tenant, student, body.route, body.university, body.name, body.url,
-                now=datetime.now(timezone.utc),
+                now=datetime.now(timezone.utc), intake_year=body.intake_year,
                 enqueue=lambda r: enqueue_one(svc.engine, svc.dbos_client(), tenant, r, body.intake_year, svc.today()))
         except RequestLimit as e:
             raise HTTPException(status_code=429, detail=str(e)) from None
@@ -287,7 +300,7 @@ def build_router(get_services: Callable[[], Services]) -> APIRouter:
             raise HTTPException(status_code=409, detail=str(e)) from None
         except ValueError as e:
             raise HTTPException(status_code=422, detail=str(e)) from None
-        on_profile_change(svc.plans, student)  # Slice 4: a note if a programme's eligibility changed
+        _notify(svc.plans, student)  # Slice 4: a note if a programme's eligibility changed
         store = DocumentStore(svc.engine, tenant)
         findings = [finding_out(f) for f in FindingStore(svc.engine, tenant).list_open(student)]
         return document_out(store, store.get(doc_id), findings)
@@ -305,7 +318,7 @@ def build_router(get_services: Callable[[], Services]) -> APIRouter:
             resolved = resolve_finding(svc.engine, tenant, finding, body.value)
         except ValueError as e:
             raise HTTPException(status_code=422, detail=str(e)) from None
-        on_profile_change(svc.plans, student)  # Slice 4: the resolved value may change eligibility
+        _notify(svc.plans, student)  # Slice 4: the resolved value may change eligibility
         return finding_out(resolved)
 
     @router.delete("/documents/{doc_id}", status_code=204)

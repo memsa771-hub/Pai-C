@@ -61,18 +61,16 @@ def _record(plans, student_ref: str, plan_id: int, card: Card, suggestions) -> b
     tenant = plans.kernel.tenant_id
     with plans.engine.begin() as conn:
         first = conn.execute(pg_insert(SEEN).values(
-            tenant_id=tenant, student_ref=student_ref, programme_ref=card.programme_ref, verdict=card.verdict,
+            tenant_id=tenant, student_ref=student_ref, plan_id=plan_id, programme_ref=card.programme_ref,
+            verdict=card.verdict,
         ).on_conflict_do_nothing(constraint="uq_os_eligibility_seen").returning(SEEN.c.id)).scalar()
         if first is not None:
             return False  # the first evaluation: nothing changed for the student yet
-        old = conn.execute(select(SEEN.c.verdict).where(
-            SEEN.c.tenant_id == tenant, SEEN.c.student_ref == student_ref, SEEN.c.programme_ref == card.programme_ref,
-        ).with_for_update()).scalar_one()
+        mine = (SEEN.c.tenant_id == tenant) & (SEEN.c.plan_id == plan_id) & (SEEN.c.programme_ref == card.programme_ref)
+        old = conn.execute(select(SEEN.c.verdict).where(mine).with_for_update()).scalar_one()
         if old == card.verdict:
             return False
-        conn.execute(update(SEEN).where(
-            SEEN.c.tenant_id == tenant, SEEN.c.student_ref == student_ref, SEEN.c.programme_ref == card.programme_ref,
-        ).values(verdict=card.verdict, updated_at=func.now()))
+        conn.execute(update(SEEN).where(mine).values(verdict=card.verdict, updated_at=func.now()))
         conn.execute(insert(NOTES).values(
             tenant_id=tenant, student_ref=student_ref, programme_ref=card.programme_ref, verdict=card.verdict,
             payload={"plan_id": plan_id, "programme_ref": card.programme_ref, "verdict": card.verdict, "previous": old,

@@ -15,7 +15,7 @@ from app.os.knowledge.port import Fact
 
 ORDER = ("likely_below", "needs_input", "unknown", "likely_meets")  # worst first: the verdict is the worst line
 # why a value is not usable, most telling first
-_REASONS = ("open_finding", "not_a_number", "missing_value")
+_REASONS = ("open_finding", "invalid_value", "other_scale", "not_a_number", "missing_value")
 
 
 @dataclass(frozen=True)
@@ -33,7 +33,8 @@ class Line:
     need: Any = None
     provisional: bool = False  # a route default stands in for the student's own value (S4-D6)
     needs: list[str] = field(default_factory=list)  # document types whose confirmation would fill this line
-    reason: str | None = None  # open_finding | not_a_number | missing_value | missing_fact | no_proof_type
+    # open_finding | invalid_value | other_scale | not_a_number | missing_value | missing_fact | no_proof_type
+    reason: str | None = None
     sources: list[FactRef] = field(default_factory=list)
 
 
@@ -109,7 +110,11 @@ def _grade_line(rules: EligibilityRules, check: GradeCheck, need: float, sources
             return Line("grade", "needs_input", need=need, needs=list(dict.fromkeys(map(_doc_type, missing))),
                         reason=_worst_reason(reasons), sources=sources)
         totals = {k: got[t] for k, t in check.totals.items()}
-        have = round(weighted_aggregate(got, check.weights, totals), 2)
+        try:
+            have = round(weighted_aggregate(got, check.weights, totals), 2)
+        except ZeroDivisionError:  # a total of 0: an impossible value, never a crash
+            return Line("grade", "needs_input", need=need, needs=list(dict.fromkeys(map(_doc_type, keys))),
+                        reason="invalid_value", sources=sources)
         return Line("grade", "likely_meets" if meets(have, need, check.better) else "likely_below", have, need,
                     sources=sources)
 
@@ -120,6 +125,11 @@ def _grade_line(rules: EligibilityRules, check: GradeCheck, need: float, sources
         if why:
             reasons.append(why)
             continue
+        if scale.scale_value:  # the student's grade is on another scale (e.g. a CGPA out of 5): not this one
+            best, why = vals.number(scale.scale_value)
+            if not why and abs(best - scale.best) > 1e-9:
+                reasons.append("other_scale")
+                continue
         provisional, needs = False, []
         if check.method == "linear_scale":
             min_pass = _own_min_pass(scale, vals)
@@ -127,7 +137,11 @@ def _grade_line(rules: EligibilityRules, check: GradeCheck, need: float, sources
                 min_pass, provisional = scale.provisional_min_pass, True
                 needs = [_doc_type(scale.min_pass)] if scale.min_pass else []
             t = check.target
-            have = linear_scale(value, scale.best, min_pass, t.best, t.worst_pass, t.decimals, t.rounding)
+            try:
+                have = linear_scale(value, scale.best, min_pass, t.best, t.worst_pass, t.decimals, t.rounding)
+            except ValueError:  # e.g. a letter whose minimum pass is the best grade: impossible, never a crash
+                reasons.append("invalid_value")
+                continue
         else:
             have = value
         return Line("grade", "likely_meets" if meets(have, need, check.better) else "likely_below", have, need,
@@ -160,7 +174,15 @@ def _language(check: LanguageCheck, facts: dict[str, Fact], vals: _Values) -> Li
     level = req.get(check.level_key) if check.level_key else None
     required = {k: req[k] for k in check.scores if req.get(k) is not None}
     if not required:
-        if level is None or str(level).strip().casefold() in {v.casefold() for v in check.none_values}:
+        # scores the route's rules cannot check against a document (e.g. a test with no document type yet)
+        stated = {k: v for k, v in req.items() if k != check.level_key and isinstance(v, (int, float))
+                  and not isinstance(v, bool)}
+        if stated:
+            need = [f"{k.replace('_', ' ')} {v:g}" for k, v in stated.items()]
+            return Line(name, "needs_input", need=need, reason="no_proof_type", sources=sources)
+        if level is None:
+            return Line(name, "unknown", reason="missing_fact", sources=sources)
+        if str(level).strip().casefold() in {v.casefold() for v in check.none_values}:
             return Line(name, "likely_meets", need=level, sources=sources)
         return Line(name, "needs_input", need=level, reason="no_proof_type", sources=sources)
     reasons, best = [], None

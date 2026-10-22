@@ -5,16 +5,19 @@ route's origin, destination and level come from its playbook, and the task the b
 (`self_serve.choose_task`). Eligibility never blocks a choice (S4-D5); these checks are about the plan itself.
 """
 
+import logging
+
 from pydantic import ValidationError
 from sqlalchemy import func, select, text
 
 from app.os import models
 from app.os.contracts.route_contract import IntakeRef, ProgrammeChoice, RouteContract
 from app.os.eligibility.notes import on_profile_change
-from app.os.kernel import PlanRef
+from app.os.kernel import PlanRef, contract_sha256
 from app.os.kernel.states import is_started
 from app.os.knowledge.requests import visible_programmes
 
+log = logging.getLogger(__name__)
 CHANGES_PER_DAY = 3  # swaps and removals per plan (S4-D10); the kernel has no revision limit yet (Slice 7)
 P, T, R, F = models.plans, models.tasks, models.plan_revisions, models.knowledge_facts
 
@@ -25,6 +28,10 @@ class NotAllowed(ValueError):
 
 class NotYourPlan(NotAllowed):
     """The plan does not exist or is another student's (the API answers 404)."""
+
+
+class PlanExists(NotAllowed):
+    """The student already has a plan for this route and intake (the API answers 409)."""
 
 
 class SwapLimit(NotAllowed):
@@ -60,6 +67,9 @@ def start(plans, student_ref: str, route_key: str, intake: IntakeRef, choices: l
             "target_intake": intake.model_dump(), "programmes": [c.model_dump() for c in choices]})
     except ValidationError as e:
         raise NotAllowed(e.errors()[0]["msg"]) from None
+    existing = plans._existing_plan(contract)
+    if existing is not None and plans._contract(existing)[1] != contract_sha256(contract):
+        raise PlanExists("you already have a plan for this route and intake; change its programmes with swap or remove")
     ref = plans.start_plan(contract)
     task = book.self_serve.choose_task if book.self_serve else None
     if task and ref.created:
@@ -68,8 +78,16 @@ def start(plans, student_ref: str, route_key: str, intake: IntakeRef, choices: l
                                                                T.c.instance_key == task)).first()
         if row is not None and row.state == "waiting_student":
             plans.kernel.complete_student_task(row.id, student_ref, {"programmes": [c.programme_ref for c in choices]})
-    on_profile_change(plans, student_ref)  # records the starting verdicts (no note), so a later change notes (S4-D7)
+    _record_verdicts(plans, student_ref)  # the starting verdicts (no note), so a later change notes (S4-D7)
     return ref
+
+
+def _record_verdicts(plans, student_ref: str) -> None:
+    """A note is extra: recording verdicts never turns a started or changed plan into an error."""
+    try:
+        on_profile_change(plans, student_ref)
+    except Exception:
+        log.exception("recording eligibility verdicts failed")
 
 
 def _own(plans, student_ref: str, plan_id: int) -> RouteContract:
@@ -119,10 +137,18 @@ def swap(plans, student_ref: str, plan_id: int, out_ref: str, in_ref: str) -> in
         raise NotAllowed(f"{in_ref} is still being researched")
     _not_started(plans, plan_id, out_ref)
     _within_limit(plans, plan_id)
-    new = [ProgrammeChoice(programme_ref=in_ref if p.programme_ref == out_ref else p.programme_ref, rank=p.rank)
-           for p in contract.programmes]
-    revision = plans.change_programmes(plan_id, new, f"programmes:swap:{out_ref}->{in_ref}")
-    on_profile_change(plans, student_ref)  # records the new programme's verdict
+
+    def edit(current: RouteContract) -> list[ProgrammeChoice]:  # re-applied to the current list on every retry
+        refs_now = [p.programme_ref for p in current.programmes]
+        if out_ref not in refs_now:
+            raise NotAllowed(f"{out_ref} is no longer in your plan")
+        if in_ref in refs_now:
+            raise NotAllowed(f"{in_ref} is already in your plan")
+        return [ProgrammeChoice(programme_ref=in_ref if p.programme_ref == out_ref else p.programme_ref, rank=p.rank)
+                for p in current.programmes]
+
+    revision = plans.change_programmes(plan_id, edit, f"programmes:swap:{out_ref}->{in_ref}")
+    _record_verdicts(plans, student_ref)  # the new programme's verdict
     return revision
 
 
@@ -136,5 +162,13 @@ def remove(plans, student_ref: str, plan_id: int, ref: str) -> int | None:
         raise NotAllowed("this is the last programme in your plan; swap it instead")
     _not_started(plans, plan_id, ref)
     _within_limit(plans, plan_id)
-    new = [ProgrammeChoice(programme_ref=r, rank=i + 1) for i, r in enumerate(x for x in refs if x != ref)]
-    return plans.change_programmes(plan_id, new, f"programmes:remove:{ref}")
+
+    def edit(current: RouteContract) -> list[ProgrammeChoice]:  # re-applied to the current list on every retry
+        now = [p.programme_ref for p in sorted(current.programmes, key=lambda p: p.rank)]
+        if ref not in now:
+            raise NotAllowed(f"{ref} is no longer in your plan")
+        if len(now) == 1:
+            raise NotAllowed("this is the last programme in your plan; swap it instead")
+        return [ProgrammeChoice(programme_ref=r, rank=i + 1) for i, r in enumerate(x for x in now if x != ref)]
+
+    return plans.change_programmes(plan_id, edit, f"programmes:remove:{ref}")

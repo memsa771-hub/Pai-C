@@ -33,7 +33,7 @@ def weighted_aggregate(values: Mapping[str, float], weights: Mapping[str, float]
                        totals: Mapping[str, float] | None = None) -> float:
     """The weighted sum of the named values. A value with a total is first made a percentage of it.
     A missing value raises KeyError naming it."""
-    totals = totals or {}
+    totals = totals or {}  # a total of 0 raises ZeroDivisionError; evaluate treats it as an unusable value
     out = 0.0
     for key, weight in weights.items():
         if key not in values:
