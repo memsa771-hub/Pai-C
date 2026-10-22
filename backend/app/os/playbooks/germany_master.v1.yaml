@@ -242,6 +242,19 @@ tasks:
     citations:
       - {source: S15, url: "https://pakistan.diplo.de/resource/blob/2208710/4a44b499964d27c04ecb6e5770fdb824/study-visa---leaflet-data.pdf"}
 
+  # Slice 6b (spec S6b-D9): the student approves the visa file (a manifest version) before applying.
+  - template_key: review_visa_file
+    task_type: student.approve
+    title: Review and approve your visa file
+    kind: student
+    inbox_kind: approve
+    depends_on:
+      - {key: blocked_account}
+      - {key: travel_insurance}
+    duration_days: 2
+    citations:
+      - {source: S11, url: "https://pakistan.diplo.de/pk-en/service/2-study-visa-seite-1676104"}
+
   - template_key: visa_apply
     task_type: student.act
     title: Apply for the student visa on the Consular Services Portal
@@ -253,6 +266,7 @@ tasks:
       - {key: admission_result}
       - {key: blocked_account}
       - {key: travel_insurance}
+      - {key: review_visa_file}
     citations:
       - {source: S11, url: "https://pakistan.diplo.de/pk-en/service/2-study-visa-seite-1676104"}
       - {source: S13, url: "https://digital.diplo.de/studium"}
