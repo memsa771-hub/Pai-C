@@ -8,7 +8,8 @@ from pydantic import ValidationError
 from app.os.documents.types import TYPES_DIR, DocumentTypeError, load_document_types, reading_model
 
 TYPES = {"passport", "degree_certificate", "transcript", "ssc_certificate", "hssc_certificate", "ielts_trf",
-         "min_passing_grade_letter"}  # the letter: Slice 4 Task 4, added by config only
+         "min_passing_grade_letter",  # the letter: Slice 4 Task 4, added by config only
+         "admission_letter", "blocked_account_confirmation", "insurance_certificate"}  # Slice 6b, by config only
 
 
 def test_all_types_load():
