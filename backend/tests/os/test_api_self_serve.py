@@ -153,7 +153,9 @@ def test_request_202_enqueues_once(api):
     r = request(api)
     assert r.status_code == 202 and r.json()["created"] and len(api.fake.calls) == 1
     again = request(api, student="stu-2")
-    assert again.status_code == 202 and not again.json()["created"] and len(api.fake.calls) == 1
+    # a repeat before research found facts asks again with the same workflow ID: DBOS returns the existing run
+    assert again.status_code == 202 and not again.json()["created"]
+    assert {o["workflow_id"] for o, _ in api.fake.calls} == {api.fake.calls[0][0]["workflow_id"]}
     assert again.json()["programme_ref"] == r.json()["programme_ref"]
 
 

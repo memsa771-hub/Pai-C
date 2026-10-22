@@ -57,8 +57,11 @@ def _existing(conn, tenant_id: str, route_key: str, url: str, university: str, n
 
 
 def request_programme(engine: Engine, tenant_id: str, student_ref: str, route_key: str, university: str, name: str,
-                      url: str, *, now: datetime, enqueue: Callable[[str], object]) -> tuple[str, bool]:
-    """(programme_ref, created). `enqueue(ref)` starts its research and is called only for a new programme."""
+                      url: str, *, now: datetime, enqueue: Callable[[str], object],
+                      intake_year: int | None = None) -> tuple[str, bool]:
+    """(programme_ref, created). `enqueue(ref)` starts its research (for the request's year): for a new programme,
+    and for a known one with no facts for `intake_year` yet (another year, or an enqueue that was lost).
+    Research is idempotent per programme, year and day, so a repeat is harmless."""
     canon, host = _normalise(url)
     university, name = university.strip(), name.strip()
     if not university or not name:
@@ -80,9 +83,16 @@ def request_programme(engine: Engine, tenant_id: str, student_ref: str, route_ke
             ).on_conflict_do_nothing(constraint="uq_os_programmes_ref").returning(P.c.id)).scalar() is not None
         conn.execute(insert(R).values(tenant_id=tenant_id, student_ref=student_ref, route_key=route_key, url=canon,
                                       programme_ref=ref, created_at=now))
-    if created:  # after the commit: research reads the registry row
-        enqueue(ref)
+    if created or (intake_year is not None and not _facts_for(engine, tenant_id, ref, intake_year)):
+        enqueue(ref)  # after the commit: research reads the registry row
     return ref, created
+
+
+def _facts_for(engine: Engine, tenant_id: str, ref: str, intake_year: int) -> bool:
+    with engine.connect() as conn:
+        return conn.execute(select(exists(select(F.c.id).where(
+            F.c.tenant_id == tenant_id, F.c.scope == "programme", F.c.ref == ref,
+            F.c.intake_year == intake_year)))).scalar()
 
 
 def _has_facts(tenant_id: str, intake_year: int | None = None):

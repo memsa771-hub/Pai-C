@@ -108,10 +108,16 @@ def store_research(engine: Engine, service, kernel, run_id: int, programme_ref: 
     existing = knowledge.programme_facts([programme_ref], [f.name for f in profile.fields], intake_year)
     base = {"tenant_id": tenant, "scope": "programme", "ref": programme_ref, "intake_year": intake_year,
             "research_run_id": run_id}
+    # A student-requested programme's "official" domain came from the student (Slice 4): its facts stay unconfirmed
+    # until an admin reviews it and sets it active (final review).
+    programme = ProgrammeStore(engine, tenant).get(programme_ref)
+    requested = programme is not None and programme.status == "requested"
     for spec in profile.fields:
         v = verdicts.get(spec.name)
         if not v or v["status"] == "not_found":
             continue  # stays as it is (a missing fact stays fact_missing for an admin, spec §4.6 step 5)
+        if requested and v["status"] == "confirmed":
+            v = {**v, "status": "unconfirmed"}
         counts[v["status"]] += 1
         new_value = fact_value(spec, v["value"], intake_year)
         old = existing.get((programme_ref, spec.name))

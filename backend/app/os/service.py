@@ -92,13 +92,14 @@ class PlanService:
                 continue
         raise StaleDraft(f"plan {plan_id} kept changing during recompile")
 
-    def change_programmes(self, plan_id: int, programmes: list, cause: str) -> int | None:
-        """A new programme list for the plan (Slice 4 swap or remove), compiled with the plan's pinned playbook and
-        applied by the kernel. Retries StaleDraft a few times, like `recompile`."""
+    def change_programmes(self, plan_id: int, edit, cause: str) -> int | None:
+        """A Slice 4 swap or remove: `edit(contract)` returns the new programme list from the plan's *current*
+        contract (it may refuse). It is re-applied on every retry, so a change that landed meanwhile is kept, never
+        overwritten (final review). Compiled with the pinned playbook and applied by the kernel."""
         for _ in range(3):
             contract, sha = self._contract(plan_id)
             new = RouteContract.model_validate({**contract.model_dump(mode="json"),
-                                                "programmes": [p.model_dump() for p in programmes]})
+                                                "programmes": [p.model_dump() for p in edit(contract)]})
             draft = self.compile(new, self._pinned(plan_id))
             try:
                 return self.kernel.change_contract(plan_id, new, draft, cause, based_on=sha)

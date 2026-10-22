@@ -382,15 +382,17 @@ programme_requests = Table(
     Index("ix_os_programme_requests_student", "tenant_id", "student_ref", "created_at"),
 )
 
-# The last verdict a student was told about, per programme: a note is written only when it changes (S4-D7).
+# The last verdict a student was told about, per plan and programme: a note only when it changes (S4-D7).
+# Per plan (os_0007): the same programme can be in two of a student's plans (two intakes) with two verdicts.
 eligibility_seen = Table(
     "os_eligibility_seen", md,
     _id(), _tenant(),
     Column("student_ref", Text, nullable=False),
+    Column("plan_id", BigInteger, ForeignKey("os.os_plans.id", ondelete="CASCADE"), nullable=False),
     Column("programme_ref", Text, nullable=False),
     Column("verdict", Text, nullable=False),
     Column("updated_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
-    UniqueConstraint("tenant_id", "student_ref", "programme_ref", name="uq_os_eligibility_seen"),
+    UniqueConstraint("tenant_id", "plan_id", "programme_ref", name="uq_os_eligibility_seen"),
 )
 
 eligibility_notes = Table(
