@@ -213,17 +213,19 @@ class AgentRuns:
 
     def record(self, research_run_id: int | None, reading: str, *, spec: AgentSpec, model: str,
                usage: RunUsage | None, cost_usd: float, error: str | None = None, at: datetime | None = None,
-               document_id: int | None = None) -> bool:
+               document_id: int | None = None, artifact_id: int | None = None) -> bool:
         """True if the row was written, False if this reading was already recorded. A document reading passes
         `document_id` (and no research run)."""
         u = usage or RunUsage()
         values = {"tenant_id": self.tenant_id, "research_run_id": research_run_id, "document_id": document_id,
+                  "artifact_id": artifact_id,
                   "reading": reading, "agent": spec.id, "agent_version": spec.version, "model": model,
                   "input_tokens": u.input_tokens or 0, "cached_tokens": u.cache_read_tokens or 0,
                   "output_tokens": u.output_tokens or 0, "cost_usd": cost_usd, "error": error}
         if at is not None:
             values["at"] = at
-        constraint = "uq_os_agent_runs_document" if document_id is not None else "uq_os_agent_runs_reading"
+        constraint = ("uq_os_agent_runs_artifact" if artifact_id is not None else
+                      "uq_os_agent_runs_document" if document_id is not None else "uq_os_agent_runs_reading")
         with self.engine.begin() as conn:
             new_id = conn.execute(insert(models.agent_runs).values(**values)
                                   .on_conflict_do_nothing(constraint=constraint)
