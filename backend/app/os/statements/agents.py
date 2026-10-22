@@ -44,6 +44,7 @@ class Inputs:
     profile: dict[str, object]  # the confirmed profile values this kind may use
     rules: Rules
     rubric: list[str]
+    allowed: list[str] = field(default_factory=list)  # names the route and programme allow (not shown as data)
 
 
 @dataclass

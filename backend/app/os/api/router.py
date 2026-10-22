@@ -63,7 +63,9 @@ from app.os.artifacts.store import ArtifactStore
 from app.os.statements import interview as stmt
 from app.os.statements.approval import complete_documents_tasks
 from app.os.statements.facts_check import unsupported
+from app.os.statements.rules import resolve_rules
 from app.os.statements.run import inputs_for, sources
+from dataclasses import asdict
 from app.os.knowledge.programmes import ProgrammeStore
 from app.os.knowledge.research.run import enqueue_one
 from app.os.api.services import Services
@@ -127,6 +129,7 @@ def build_router(get_services: Callable[[], Services]) -> APIRouter:
 
     @router.get("/inbox", response_model=InboxOut)
     def inbox(student: str = Depends(current_student_ref), svc: Services = Depends(services)) -> dict:
+        complete_ready(svc, student)  # Slice 5: a documents task whose statements are already approved
         tenant = svc.settings.tenant_id
         return {"items": inbox_items(svc.engine, tenant, student),
                 "notes": eligibility_notes(svc.engine, tenant, student)}
@@ -358,6 +361,22 @@ def build_router(get_services: Callable[[], Services]) -> APIRouter:
             raise HTTPException(status_code=404, detail="no statements for your route yet: start a plan first")
         return plan, cfg
 
+    def complete_ready(svc: Services, student: str) -> None:
+        """Completes a documents task that became ready after its statements were approved (final review). Extra
+        work on a read: it never turns the read into an error."""
+        try:
+            plan = self_serve.student_plan(svc.plans, student)
+            cfg = plan and svc.statement_configs.get(plan.route_key)
+            if cfg is not None:
+                complete_documents_tasks(svc.engine, svc.kernel, svc.knowledge, svc.settings.tenant_id, student, cfg,
+                                         plan.plan_id, plan.year)
+        except Exception:
+            log.exception("statement task completion failed for a student")
+
+    def not_while_drafting(art) -> None:
+        if art.status == "drafting":  # the running draft would land on top of the student's change (final review)
+            raise HTTPException(status_code=409, detail="a draft is being written; wait for it, then edit or approve")
+
     def own_artifact(svc: Services, artifact_id: int, student: str):
         art = ArtifactStore(svc.engine, svc.settings.tenant_id).get(artifact_id)
         if art is None or art.student_ref != student:
@@ -403,8 +422,15 @@ def build_router(get_services: Callable[[], Services]) -> APIRouter:
 
     @router.get("/statements", response_model=StatementsOut)
     def statements(student: str = Depends(current_student_ref), svc: Services = Depends(services)) -> dict:
-        store = ArtifactStore(svc.engine, svc.settings.tenant_id)
-        return {"statements": [statement_out(store, a) for a in store.list_for(student)]}
+        complete_ready(svc, student)
+        tenant = svc.settings.tenant_id
+        store = ArtifactStore(svc.engine, tenant)
+        plan = self_serve.student_plan(svc.plans, student)
+        cfg = plan and svc.statement_configs.get(plan.route_key)
+        programmes = [] if cfg is None else [  # each plan programme's rules: does it ask for its own statement?
+            {"programme_ref": ref, **asdict(resolve_rules(svc.engine, tenant, svc.knowledge, student, ref, plan.year,
+                                                          cfg, "sop"))} for ref in plan.programmes]
+        return {"statements": [statement_out(store, a) for a in store.list_for(student)], "programmes": programmes}
 
     @router.post("/statements/{kind}/draft", status_code=202, response_model=StatementOut)
     def statement_draft(kind: str, body: DraftIn | None = None, student: str = Depends(current_student_ref_for_write),
@@ -428,6 +454,7 @@ def build_router(get_services: Callable[[], Services]) -> APIRouter:
     def statement_text(artifact_id: int, body: TextIn, student: str = Depends(current_student_ref_for_write),
                        svc: Services = Depends(services)) -> dict:
         art = own_artifact(svc, artifact_id, student)
+        not_while_drafting(art)
         plan, cfg = route_of(svc, student)
         tenant = svc.settings.tenant_id
         inputs = inputs_for(svc.engine, tenant, cfg, student, art.kind, art.programme_ref, svc.knowledge, plan.year)
@@ -439,7 +466,7 @@ def build_router(get_services: Callable[[], Services]) -> APIRouter:
     @router.post("/statements/{artifact_id}/approve", response_model=ApproveOut)
     def statement_approve(artifact_id: int, body: ApproveIn, student: str = Depends(current_student_ref_for_write),
                           svc: Services = Depends(services)) -> dict:
-        own_artifact(svc, artifact_id, student)
+        not_while_drafting(own_artifact(svc, artifact_id, student))
         plan, cfg = route_of(svc, student)
         tenant = svc.settings.tenant_id
         try:

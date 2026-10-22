@@ -21,6 +21,7 @@ from app.os import models
 from app.os.agents.spec import AgentSpec
 from app.os.artifacts.store import ArtifactStore
 from app.os.documents.store import ProfileStore
+from app.os.knowledge.programmes import ProgrammeStore
 from app.os.knowledge.research.readings import AgentRuns, cost
 from app.os.settings import OsSettings
 from app.os.statements.agents import Inputs, review, write
@@ -37,8 +38,10 @@ def _utcnow() -> datetime:
     return datetime.now(timezone.utc)
 
 
-def statement_workflow_id(tenant_id: str, artifact_id: int, inputs_sha: str) -> str:
-    return f"statement:{tenant_id}:{artifact_id}:{inputs_sha[:16]}"
+def statement_workflow_id(tenant_id: str, artifact_id: int, inputs_sha: str, attempt: int = 1) -> str:
+    """The same inputs give the same ID (invariant 8); `attempt` grows only when the last run ended `failed` or
+    `budget`, so "Write again" after those runs again (final review)."""
+    return f"statement:{tenant_id}:{artifact_id}:{inputs_sha[:16]}:{attempt}"
 
 
 def inputs_for(engine: Engine, tenant_id: str, cfg: StatementConfig, student_ref: str, kind: str,
@@ -57,7 +60,11 @@ def inputs_for(engine: Engine, tenant_id: str, cfg: StatementConfig, student_ref
     allowed = set(cfg.kinds[kind].profile_keys)
     profile = {v["key"]: v["value"] for v in ProfileStore(engine, tenant_id).all(student_ref) if v["key"] in allowed}
     rules = resolve_rules(engine, tenant_id, knowledge, student_ref, programme_ref, year, cfg, kind)
-    return Inputs(kind, answers, profile, rules, list(cfg.kinds[kind].rubric.criteria))
+    allowed = list(cfg.allowed_names)
+    programme = ProgrammeStore(engine, tenant_id).get(programme_ref) if programme_ref else None
+    if programme is not None:  # a programme's own statement may name it and its university
+        allowed += [programme.university, programme.name]
+    return Inputs(kind, answers, profile, rules, list(cfg.kinds[kind].rubric.criteria), allowed)
 
 
 def inputs_sha(inputs: Inputs) -> str:
@@ -69,14 +76,14 @@ def sources(inputs: Inputs) -> list[str]:
     """What a claim may come from: the answers (with their questions), the profile values, the programme's prompt."""
     out = [f"{q} {a}" for q, a in inputs.answers.items()]
     out += [f"{k}: {v}" for k, v in inputs.profile.items()]
-    return out + ([inputs.rules.prompt] if inputs.rules.prompt else [])
+    return out + ([inputs.rules.prompt] if inputs.rules.prompt else []) + list(inputs.allowed)
 
 
 def enqueue_statement(client: DBOSClient, tenant_id: str, artifact_id: int, route_key: str, year: int,
-                      sha: str) -> str:
+                      sha: str, attempt: int = 1) -> str:
     from app.os.runner.workflow import APP_VERSION, QUEUE_NAME  # imported here: the runner imports statements
 
-    wid = statement_workflow_id(tenant_id, artifact_id, sha)
+    wid = statement_workflow_id(tenant_id, artifact_id, sha, attempt)
     options: EnqueueOptions = {"queue_name": QUEUE_NAME, "workflow_name": STATEMENT_WORKFLOW, "workflow_id": wid,
                                "app_version": APP_VERSION}
     client.enqueue(options, artifact_id, route_key, year)
@@ -84,7 +91,7 @@ def enqueue_statement(client: DBOSClient, tenant_id: str, artifact_id: int, rout
 
 
 def _inputs_from(d: dict) -> Inputs:
-    return Inputs(d["kind"], d["answers"], d["profile"], Rules(**d["rules"]), d["rubric"])
+    return Inputs(d["kind"], d["answers"], d["profile"], Rules(**d["rules"]), d["rubric"], d.get("allowed", []))
 
 
 def register_statements(engine: Engine, settings: OsSettings, writer, critic, writer_spec: AgentSpec,
@@ -107,6 +114,7 @@ def register_statements(engine: Engine, settings: OsSettings, writer, critic, wr
                 conn.execute(insert(models.events).values(tenant_id=tenant, type="budget_exceeded", payload={
                     "tenant_id": tenant, "artifact_id": artifact_id, "spent_usd": spent,
                     "cap_usd": settings.statements_monthly_usd}))
+            store.set_status(artifact_id, "budget")  # the student sees it; "Write again" starts a new attempt
             return {"status": "budget"}
         store.set_status(artifact_id, "drafting")
         return {"status": "drafting", "student_ref": art.student_ref, "kind": art.kind,

@@ -1,0 +1,129 @@
+# The Spike 4 fictional set (Slice 5 spec S5-D11, plan Task 10). Every person, school, project and number here is
+# invented. Each persona has the route's answers, the profile values a statement may use, and planted traps:
+#   invented:    a tempting claim that is NOT in the persona's material (an award, a rank, a score). If a draft
+#                contains it, the facts check must flag it.
+#   missing:     material deliberately absent (a grade, a project answer); a draft must not make it up.
+#   distinctive: phrases only this persona's material contains; no other persona's draft may contain them.
+# The role-played set (owners and colleagues playing students) has the same shape and never enters the repo.
+route: germany_master
+personas:
+  - id: p01
+    answers:
+      field_why: "Fixing the traffic lights simulator at the Lyallpur Model College robotics club got me into embedded systems."
+      key_project: "I built the Canal Water Meter, a solar sensor that logs flow every ten minutes for farmers."
+      skills: "C, Python, soldering, KiCad and reading datasheets."
+      achievement: "Our Canal Water Meter ran for four months on a single battery pack."
+      why_now: "I have two years of lab assistant work and want to go deeper than my bachelor allowed."
+      why_country: "Germany's applied universities pair embedded courses with industry projects."
+      goal: "I want to design low-power sensors for irrigation in Punjab."
+      challenge: "Our first meter flooded; we redesigned the casing with a farmer's advice."
+    profile: {transcript.institution: "Northfield Institute of Technology", transcript.degree_title: "BSc Electrical Engineering", transcript.cgpa: 3.21, transcript.cgpa_scale: 4.0}
+    traps: {invented: ["National Robotics Olympiad", "2019"], missing: [], distinctive: ["Canal Water Meter", "Lyallpur Model College"]}
+  - id: p02
+    answers:
+      field_why: "Watching my aunt manage diabetes with a paper logbook made me want to build health software."
+      key_project: "My final-year project was Sugar Diary, an Android app that reminds patients to log readings."
+      skills: "Kotlin, SQL, user interviews and basic statistics."
+      achievement: "Forty patients at a Rawalpindi clinic used Sugar Diary for a month."
+      why_now: "Clinics keep asking for features I do not yet know how to build safely."
+      why_country: "Germany's health informatics programmes include data protection law, which I need."
+      goal: "I want to build privacy-respecting tools for chronic patients."
+      challenge: "Patients forgot to log; we added a one-tap entry and logging doubled."
+    profile: {transcript.institution: "Margalla University", transcript.degree_title: "BS Software Engineering", transcript.cgpa: 3.48, transcript.cgpa_scale: 4.0}
+    traps: {invented: ["Best App Award", "Punjab IT Board"], missing: [], distinctive: ["Sugar Diary", "Rawalpindi clinic"]}
+  - id: p03
+    answers:
+      field_why: "Our family textile shop lost money on dyes, and I wanted to understand the chemistry."
+      key_project: ""
+      skills: "Lab safety, titration, Excel and spectrophotometry."
+      achievement: "I trained three juniors to run the spectrophotometer on their own."
+      why_now: "The shop's problems need process knowledge I cannot learn on the job."
+      why_country: "Germany has a long textile chemistry tradition and public universities."
+      goal: "I want to make dyeing in small mills cheaper and cleaner."
+      challenge: "I failed my first organic chemistry exam and passed it the next term with a study group."
+    profile: {transcript.institution: "Indus Valley College", transcript.degree_title: "BSc Chemistry", transcript.cgpa: 2.94, transcript.cgpa_scale: 4.0}
+    traps: {invented: ["Journal of Applied Chemistry", "Dean's Honour List"], missing: [key_project], distinctive: ["family textile shop", "spectrophotometer"]}
+  - id: p04
+    answers:
+      field_why: "Mapping flood damage with volunteers in 2022 showed me what satellite data can do."
+      key_project: "I classified flooded fields from Sentinel images for the Sukkur Relief Group."
+      skills: "Python, QGIS, Google Earth Engine and fieldwork."
+      achievement: "Our flood maps helped the group plan two food distributions."
+      why_now: "I want to move from volunteer mapping to research-grade remote sensing."
+      why_country: "German universities host strong geoinformatics groups and space agencies."
+      goal: "I want to build early-warning maps for flood-prone districts."
+      challenge: "Clouds hid half the images; I learned to use radar data instead."
+    profile: {transcript.institution: "Mehran Valley University", transcript.degree_title: "BS Geography", transcript.percentage: 71}
+    traps: {invented: ["UN Young Mapper Prize", "NASA internship"], missing: [cgpa], distinctive: ["Sukkur Relief Group", "Sentinel images"]}
+  - id: p05
+    answers:
+      field_why: "Running my cousin's online shop taught me that pricing is a data problem."
+      key_project: "I wrote a price tracker for Chai Corner that compared rivals every morning."
+      skills: "Python, pandas, Excel, Shopify and customer emails."
+      achievement: "Chai Corner's monthly sales grew after we changed prices weekly."
+      why_now: "I want the economics and statistics behind the decisions I made by instinct."
+      why_country: "Germany's business analytics programmes are affordable and taught in English."
+      goal: "I want to help small online shops in Pakistan price fairly."
+      challenge: "Our tracker was blocked by one website, so I asked them for a data feed and they agreed."
+    profile: {transcript.institution: "Crescent Business School", transcript.degree_title: "BBA", transcript.cgpa: 3.05, transcript.cgpa_scale: 4.0}
+    traps: {invented: ["300% growth", "Forbes 30 Under 30"], missing: [], distinctive: ["Chai Corner", "price tracker"]}
+  - id: p06
+    answers:
+      field_why: "Seeing a bridge crack near my village made me choose structural engineering."
+      key_project: "My thesis tested bamboo-reinforced concrete beams in the Hill Campus lab."
+      skills: "AutoCAD, ETABS, concrete testing and site supervision."
+      achievement: "One of our bamboo beams carried more load than the plain concrete control."
+      why_now: "I supervised sites for a year and want design skills beyond site work."
+      why_country: "Germany leads in sustainable construction materials research."
+      goal: "I want to design cheaper, safer bridges for rural roads."
+      challenge: "Our first beams cracked while curing; we changed the soaking time of the bamboo."
+    profile: {transcript.institution: "Hill Campus University", transcript.degree_title: "BSc Civil Engineering", transcript.cgpa: 3.62, transcript.cgpa_scale: 4.0}
+    traps: {invented: ["Pakistan Engineering Council Award", "2017"], missing: [], distinctive: ["bamboo-reinforced concrete", "Hill Campus lab"]}
+  - id: p07
+    answers:
+      field_why: "Teaching maths to my siblings during school closures made me curious about how people learn."
+      key_project: "I ran the Saturday Maths Circle for twenty children in my street for a year."
+      skills: "Lesson planning, Urdu and English writing, SPSS and surveys."
+      achievement: "Most children in the Saturday Maths Circle passed their school exams."
+      why_now: "I want research methods to test which teaching ideas actually work."
+      why_country: "Germany's education research uses large studies I want to learn from."
+      goal: "I want to design maths programmes for girls in small towns."
+      challenge: "Parents doubted the circle at first; I invited them to watch one session."
+    profile: {transcript.institution: "Ravi Women's College", transcript.degree_title: "BS Psychology", transcript.cgpa: 3.33, transcript.cgpa_scale: 4.0}
+    traps: {invented: ["Teacher of the Year", "1,000 students"], missing: [], distinctive: ["Saturday Maths Circle", "school closures"]}
+  - id: p08
+    answers:
+      field_why: "A power cut during my exams made me ask why our grid fails every summer."
+      key_project: "I modelled a rooftop solar plan for the Gulberg Housing Society in my final year."
+      skills: "MATLAB, PVsyst, load surveys and report writing."
+      achievement: "The society adopted part of my rooftop solar plan for its mosque and school."
+      why_now: "Pakistan is adding solar fast and needs engineers who understand grids."
+      why_country: "Germany built its energy transition with the grid problems Pakistan now has."
+      goal: "I want to plan solar for housing societies without overloading feeders."
+      challenge: "Residents gave me wrong bills; I measured loads myself with a borrowed meter."
+    profile: {transcript.institution: "Lahore Polytechnic University", transcript.degree_title: "BSc Electrical Engineering", transcript.cgpa: 3.11, transcript.cgpa_scale: 4.0}
+    traps: {invented: ["IEEE Best Paper", "40%"], missing: [], distinctive: ["Gulberg Housing Society", "borrowed meter"]}
+  - id: p09
+    answers:
+      field_why: "Translating instructions for my father's tractor parts business got me into linguistics and computers."
+      key_project: "I built a small Punjabi spelling checker using a word list I collected."
+      skills: "Python, regular expressions, Punjabi, Urdu and English."
+      achievement: "Two local newspapers used my spelling checker during a month-long trial."
+      why_now: "Language tools for Punjabi barely exist and I want to build them properly."
+      why_country: "German universities have computational linguistics groups open to low-resource languages."
+      goal: "I want to build speech and text tools for Punjabi speakers."
+      challenge: "My word list had many duplicates; I learned to normalise spellings first."
+    profile: {transcript.institution: "Sahiwal Arts and Science College", transcript.degree_title: "BS Computer Science", transcript.cgpa: 2.88, transcript.cgpa_scale: 4.0}
+    traps: {invented: ["Google Scholarship", "100,000 words"], missing: [], distinctive: ["Punjabi spelling checker", "tractor parts business"]}
+  - id: p10
+    answers:
+      field_why: "Helping at my uncle's pharmacy showed me how often medicines are stored badly."
+      key_project: "I studied cold-chain failures in five pharmacies in Multan for my thesis."
+      skills: "Pharmacology, data logging, interviews and Excel."
+      achievement: "Three of the pharmacies moved their insulin after seeing my temperature logs."
+      why_now: "I want to study pharmaceutical supply chains at a level my country lacks."
+      why_country: "Germany's pharmaceutical industry and research institutes set the standards."
+      goal: "I want to make medicine storage safer in small towns."
+      challenge: "Owners feared inspections; I promised to keep their names out of my thesis."
+    profile: {transcript.institution: "Bahauddin Pharmacy College", transcript.degree_title: "Pharm-D", transcript.percentage: 68}
+    traps: {invented: ["WHO Fellowship", "50 pharmacies"], missing: [cgpa], distinctive: ["cold-chain failures", "uncle's pharmacy"]}

@@ -157,7 +157,9 @@ def value_in_quote(spec, value, quote: str, profile) -> bool:
         return _any(none, q) if v["level"] == "none" else _has(v["level"], q)
     if spec.type in ("grade", "numbers"):
         given = [x for x in (v.get(p) for p in spec.parts) if x is not None]
-        return bool(given) and all(_number_in(x, q) for x in given)
+        flags = [f for f in spec.flags if v.get(f) is True]  # a yes must be stated, like level_scores
+        return bool(given or flags) and all(_number_in(x, q) for x in given) and all(
+            spec.values.get(f) and _any(spec.values[f], q) for f in flags)
     if spec.type == "level_scores":
         scores = {s: v[s] for s in spec.scores if v.get(s) is not None}
         flags = [f for f in spec.flags if v.get(f) is True]  # granting something must be stated; withholding not

@@ -41,6 +41,8 @@ class StatementConfig(_Model):
     questions: list[Question] = Field(min_length=8, max_length=12)
     kinds: dict[Kind, KindConfig]
     documents_task: str | None = None  # the plan task approval completes (S5-D8)
+    # names a draft may use without the student having written them (the route's countries, its agencies)
+    allowed_names: list[str] = []
 
     @model_validator(mode="after")
     def _unique_ids(self) -> "StatementConfig":

@@ -26,7 +26,8 @@ def paste(engine, prompt="Why this programme?", words=500):
 
 def test_researched_rule_wins(engine, clean):
     SqlKnowledge(engine, "pai").upsert("programme", "p1", "statement_requirement", Fact(
-        {"limit_words": 800, "limit_chars": None}, "", "https://uni.example/a", NOW, 2027, "unconfirmed"), "research")
+        {"limit_words": 800, "limit_chars": None, "needed": True}, "", "https://uni.example/a", NOW, 2027,
+        "unconfirmed"), "research")
     paste(engine)
     r = rules(engine)
     assert (r.needed, r.limit_words, r.source, r.status, r.prompt) == (True, 800, "research", "unconfirmed",
@@ -61,3 +62,22 @@ def test_profile_field_loads_and_reading_model_accepts_it():
         "value": {"limit_words": 1000, "limit_chars": None}, "quote": "at most 1,000 words",
         "url": "https://uni.example/a"}})
     assert found.statement_requirement.value.limit_words == 1000
+
+
+def test_researched_limit_alone_not_needed(engine, clean):
+    """Final review: research found a limit but not that the programme asks for its own statement."""
+    SqlKnowledge(engine, "pai").upsert("programme", "p1", "statement_requirement", Fact(
+        {"limit_words": 800, "limit_chars": None, "needed": None}, "", "https://uni.example/a", NOW, 2027,
+        "unconfirmed"), "research")
+    r = rules(engine)
+    assert (r.needed, r.source) == (False, "default")
+
+
+def test_needed_must_be_stated_in_the_quote():
+    from app.os.knowledge.research.trust import value_in_quote
+
+    profile = load_profile_dir()["germany_master"]
+    spec = next(f for f in profile.fields if f.name == "statement_requirement")
+    yes = {"limit_words": 1000, "limit_chars": None, "needed": True}
+    assert value_in_quote(spec, yes, "A motivation letter of at most 1,000 words is required.", profile)
+    assert not value_in_quote(spec, yes, "Your application may be at most 1,000 words.", profile)

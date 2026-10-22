@@ -381,10 +381,11 @@ class WorkspaceApi {
     });
   }
 
-  async getOsStatements(): Promise<import('./os-statements').OsStatement[]> {
+  /** PAI OS: the student's statements, and each plan programme's statement rules. */
+  async getOsStatements(): Promise<import('./os-statements').OsStatements> {
     const params = new URLSearchParams({ network: this.requireWorkspace() });
-    const body = await this.requestJson<{ statements: import('./os-statements').OsStatement[] }>(`/v1/os/statements?${params}`);
-    return body.statements;
+    const body = await this.requestJson<import('./os-statements').OsStatements>(`/v1/os/statements?${params}`);
+    return { statements: body.statements, programmes: body.programmes ?? [] };
   }
 
   /** PAI OS: start a draft (202). A 409 names the questions still to answer. */

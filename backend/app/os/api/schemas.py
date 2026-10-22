@@ -407,8 +407,21 @@ class StatementOut(BaseModel):
     approval: ApprovalOut | None
 
 
+class ProgrammeRulesOut(BaseModel):
+    """One plan programme's statement rules: whether it asks for its own SOP, its limit and prompt, and where they
+    come from (research with its status, the student's paste, or the route default)."""
+    programme_ref: str
+    needed: bool
+    limit_words: int | None
+    limit_chars: int | None
+    prompt: str | None
+    source: Literal["research", "student", "default"]
+    status: str | None
+
+
 class StatementsOut(BaseModel):
     statements: list[StatementOut]
+    programmes: list[ProgrammeRulesOut] = []
 
 
 class DraftIn(BaseModel):

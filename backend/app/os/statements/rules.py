@@ -42,7 +42,8 @@ def resolve_rules(engine: Engine, tenant_id: str, knowledge, student_ref: str, p
     fact = knowledge.programme_facts([programme_ref], [FIELD], year).get((programme_ref, FIELD))
     value = fact.value if fact is not None and isinstance(fact.value, dict) else {}
     words, chars = value.get("limit_words"), value.get("limit_chars")
-    if words is not None or chars is not None:  # researched: this programme asks for its own statement
+    if value.get("needed") is True:  # researched: this programme asks for its own statement (a limit alone does not)
+        words = words if words is not None or chars is not None else default
         return Rules(True, int(words) if words is not None else None, int(chars) if chars is not None else None,
                      paste.prompt if paste is not None else None, "research", fact.status)
     if paste is not None and (paste.limit_words or paste.limit_chars or paste.prompt):

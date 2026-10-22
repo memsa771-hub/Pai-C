@@ -414,7 +414,7 @@ eligibility_notes = Table(
 # --- Slice 5: statements (spec 2026-10-22 §3, os_0008) -------------------------------------------------------
 
 ARTIFACT_KINDS = ('sop', 'cv')
-ARTIFACT_STATUSES = ('empty', 'drafting', 'draft', 'needs_answers', 'failed', 'approved')
+ARTIFACT_STATUSES = ('empty', 'drafting', 'draft', 'needs_answers', 'failed', 'budget', 'approved')
 
 statement_answers = Table(
     "os_statement_answers", md,
