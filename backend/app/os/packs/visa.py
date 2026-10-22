@@ -2,7 +2,6 @@
 (a scholarship, a sponsor) covers. One row per student. `preselect` proposes the programme the student told us
 admitted them."""
 
-import json
 from dataclasses import dataclass
 from decimal import Decimal
 
@@ -15,6 +14,7 @@ from app.os.kernel.states import TaskState
 V, T = models.visa_choices, models.tasks
 VISA_ITEMS = ":visa"  # the os_pack_items key of the visa file's ticks and added items (no programme ref has a colon)
 ADMISSION_TASK = "admission_result"
+ADMITTED = "admitted"  # the admission_result payload: {"choice": "admitted" | "rejected"}
 
 
 @dataclass(frozen=True)
@@ -50,10 +50,11 @@ class VisaChoiceStore:
 
 
 def preselect(engine: Engine, tenant_id: str, plan_id: int) -> str | None:
-    """The programme of a done `admission_result` task whose result says "admitted" (anywhere in it), else None."""
+    """The programme of a done `admission_result` task whose result is {"choice": "admitted"} (what the inbox sends
+    for that task), else None."""
     with engine.connect() as conn:
         rows = conn.execute(select(T.c.programme_ref, T.c.result).where(
             T.c.tenant_id == tenant_id, T.c.plan_id == plan_id, T.c.template_key == ADMISSION_TASK,
             T.c.state == TaskState.DONE).order_by(T.c.id)).all()
     return next((r.programme_ref for r in rows
-                 if r.programme_ref and '"admitted"' in json.dumps(r.result, ensure_ascii=False)), None)
+                 if r.programme_ref and isinstance(r.result, dict) and r.result.get("choice") == ADMITTED), None)

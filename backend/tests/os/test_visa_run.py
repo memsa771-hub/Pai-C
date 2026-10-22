@@ -211,3 +211,16 @@ def test_programme_in_visa_fingerprint(visa):
     a = visa.inputs(programme=PROG)
     b = replace(visa.inputs(programme=OTHER), facts=a.facts)
     assert inputs_sha(a) != inputs_sha(b)
+
+
+def test_preselect_reads_the_choice_only(visa):
+    """Final review I2: only {"choice": "admitted"} pre-selects; a key or another value named "admitted" does not."""
+    svc = PlanService(visa.engine, load_settings({"OS_DATABASE_URL": "postgresql://unused/x"}),
+                      Kernel(visa.engine, TENANT), visa.kb, BOOKS, today=lambda: date(2027, 2, 1))
+    plan_id = svc.start_plan(TEST_STUDENT).plan_id
+    T = models.tasks
+    for result in ({"admitted": False}, {"choice": "rejected", "note": "admitted elsewhere"}):
+        with visa.engine.begin() as conn:
+            conn.execute(update(T).where(T.c.plan_id == plan_id, T.c.instance_key == f"admission_result@{OTHER}")
+                         .values(state="done", result=result))
+        assert preselect(visa.engine, TENANT, plan_id) is None, result

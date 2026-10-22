@@ -152,7 +152,8 @@ def register_packs(engine: Engine, settings: OsSettings, knowledge, books, confi
         arts.set_status(artifact_id, "failed")
 
     step = lambda name, fn: DBOS.step(name=f"os.pack.{name}", **STEP_CONFIG)(fn)  # noqa: E731
-    start_step, load_step, store_step, fail_step = step("start", start), step("load", load), step("store", store),         step("fail", fail)
+    start_step, load_step, store_step, fail_step = step("start", start), step("load", load), step("store", store), \
+        step("fail", fail)
     render_step = step("render", render_file)
 
     def pack(student: str, programme: str, route_key: str, year: int, kind: str = PACK_KIND) -> dict:
