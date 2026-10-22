@@ -352,3 +352,86 @@ class RequestedProgrammeOut(BaseModel):
 
 
 OpenFactsOut.model_rebuild()  # it names RequestedProgrammeOut, defined below it
+
+
+# --- Slice 5: statements (spec §4) -----------------------------------------------------------------------------
+
+class InterviewItemOut(BaseModel):
+    id: str
+    prompt: str
+    hint: str
+    required: bool
+    answer: str
+    follow_up: bool  # asked by the Critic; open follow-ups come first
+
+
+class InterviewOut(BaseModel):
+    route: str
+    questions: list[InterviewItemOut]
+    missing: list[str]  # required questions (and open follow-ups) not answered yet
+
+
+class AnswerIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    answer: str = Field(max_length=4000)
+
+
+class AnswerOut(BaseModel):
+    saved: bool
+    drafting: int  # artifacts drafted again because the last open follow-up was answered
+
+
+class StatementVersionOut(BaseModel):
+    number: int
+    text: str
+    author: Literal["writer", "student"]
+    words: int
+    critic: dict | None
+    flags: list[str]  # phrases we could not find in the student's answers or profile
+    limit_words: int | None
+    created_at: datetime
+
+
+class ApprovalOut(BaseModel):
+    version: int
+    sha256: str
+    approved_at: datetime
+
+
+class StatementOut(BaseModel):
+    id: int
+    kind: Literal["sop", "cv"]
+    programme_ref: str | None
+    status: str
+    version: StatementVersionOut | None  # the latest
+    approval: ApprovalOut | None
+
+
+class StatementsOut(BaseModel):
+    statements: list[StatementOut]
+
+
+class DraftIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    programme_ref: str | None = None
+
+
+class TextIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    text: str = Field(min_length=1, max_length=20000)
+
+
+class ApproveIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    version: int = Field(ge=1)
+
+
+class ApproveOut(ApprovalOut):
+    completed_tasks: list[int]
+
+
+class PastedRulesIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    prompt: str | None = Field(None, max_length=4000)
+    limit_words: int | None = Field(None, gt=0, le=100000)
+    limit_chars: int | None = Field(None, gt=0, le=100000)

@@ -16,6 +16,7 @@ from app.os.playbooks import Playbook, load_playbook_dir
 from app.os.runner import APP_NAME, default_registry
 from app.os.service import PlanService
 from app.os.settings import OsSettings
+from app.os.statements.config import StatementConfig, load_statement_configs
 
 
 @dataclass(frozen=True)
@@ -29,6 +30,7 @@ class Services:
     today: Callable[[], date]
     document_types: Mapping[str, DocumentType]  # Slice 3: validated at mount, like the playbooks
     name_variants: list[set[str]]
+    statement_configs: Mapping[str, StatementConfig] = None  # Slice 5: per route, checked at mount
 
 
 def _client_factory(settings: OsSettings) -> Callable[[], object]:
@@ -46,7 +48,8 @@ def make_services(settings: OsSettings, *, engine: Engine | None = None,
                   playbooks: Mapping[tuple[str, int], Playbook] | None = None,
                   today: Callable[[], date] | None = None,
                   dbos_client: Callable[[], object] | None = None,
-                  document_types: Mapping[str, DocumentType] | None = None) -> Services:
+                  document_types: Mapping[str, DocumentType] | None = None,
+                  statement_configs: Mapping[str, StatementConfig] | None = None) -> Services:
     engine = engine or make_engine(settings)
     books = playbooks if playbooks is not None else load_playbook_dir()
     registry = default_registry()
@@ -57,4 +60,5 @@ def make_services(settings: OsSettings, *, engine: Engine | None = None,
     plans = PlanService(engine, settings, kernel, knowledge, books, today=today, registry=registry)
     types = document_types if document_types is not None else load_document_types()
     return Services(settings, engine, kernel, knowledge, plans, dbos_client or _client_factory(settings), today,
-                    types, load_name_variants())
+                    types, load_name_variants(),
+                    statement_configs if statement_configs is not None else load_statement_configs())

@@ -42,9 +42,10 @@ def mount_os(app: FastAPI, *, env: Mapping[str, str] | None = None,
     for book in books.values():  # so do eligibility rules naming an unknown fact or profile key (Slice 4 S4-D2)
         profile = next((p for p in profiles.values() if p.route_key == book.key), None)
         check_rules(book, {f.name for f in profile.fields} if profile else None, keys)
-    for cfg in load_statement_configs().values():  # so do statement configs (Slice 5 S5-D12)
+    statement_configs = load_statement_configs()
+    for cfg in statement_configs.values():  # so do statement configs (Slice 5 S5-D12)
         check_config(cfg, keys, books)
-    services = make_services(settings, playbooks=books, document_types=types)
+    services = make_services(settings, playbooks=books, document_types=types, statement_configs=statement_configs)
     app.include_router(build_router(lambda: services), prefix=PREFIX)
     if student_dependency is not None:
         app.dependency_overrides[current_student_ref] = student_dependency

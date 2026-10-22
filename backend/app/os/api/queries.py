@@ -168,3 +168,16 @@ def document_out(store, d, findings: list[dict]) -> dict:
             "detected_type": d.detected_type, "pages": d.pages, "error": d.error, "created_at": d.created_at,
             "read_at": d.read_at, "confirmed_at": d.confirmed_at, "fields": fields,
             "findings": [f for f in findings if any(i["document_id"] == d.id for i in f["items"])]}
+
+
+def statement_out(store, art) -> dict:
+    """One artifact with its latest version and its approval (Slice 5 spec §4)."""
+    latest = store.version(art.id, art.current_version) if art.current_version else None
+    approval = store.approval(art.id)
+    return {"id": art.id, "kind": art.kind, "programme_ref": art.programme_ref, "status": art.status,
+            "version": None if latest is None else {
+                "number": latest.number, "text": latest.text, "author": latest.author, "words": latest.words,
+                "critic": latest.critic, "flags": latest.flags, "limit_words": latest.limit_words,
+                "created_at": latest.created_at},
+            "approval": None if approval is None else {"version": approval.version, "sha256": approval.sha256,
+                                                       "approved_at": approval.approved_at}}

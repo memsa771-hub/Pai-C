@@ -2,7 +2,7 @@
 cards, one card with swap suggestions, and the plan with its programmes. Reads only; plans change in routes.builder.
 """
 
-from dataclasses import asdict
+from dataclasses import asdict, dataclass
 
 from sqlalchemy import exists, select
 
@@ -114,3 +114,28 @@ def self_plan_out(plans, plan_id: int) -> dict:
 def requested_programmes_out(plans) -> list[dict]:
     return [{"ref": p.ref, "route_key": p.route_key, "university": p.university, "name": p.name,
              "start_urls": list(p.start_urls)} for p in requested_without_facts(plans.engine, plans.kernel.tenant_id)]
+
+
+@dataclass(frozen=True)
+class StudentPlan:
+    plan_id: int
+    route_key: str
+    year: int
+    programmes: tuple[str, ...]
+
+
+def student_plan(plans, student_ref: str) -> StudentPlan | None:
+    """The student's newest open plan and the route it follows (Slice 5: statements belong to a route)."""
+    with plans.engine.connect() as conn:
+        rows = conn.execute(select(P.c.id, P.c.contract).where(
+            P.c.tenant_id == plans.kernel.tenant_id, P.c.student_ref == student_ref, P.c.status != "done")
+            .order_by(P.c.id.desc())).all()
+    books = newest_books(plans)
+    for row in rows:
+        c = row.contract
+        for key, b in sorted(books.items()):
+            if (b.route.origin, b.route.destination, b.route.level) == (
+                    c["origin_country"], c["destination_country"], c["level"]):
+                return StudentPlan(row.id, key, c["target_intake"]["year"],
+                                   tuple(p["programme_ref"] for p in sorted(c["programmes"], key=lambda p: p["rank"])))
+    return None
