@@ -157,3 +157,25 @@ def test_route_without_visa_config_404(api):
                               today=lambda: date(2027, 2, 1), visa_configs={}))
     r = bare.get(V, headers=ME)
     assert r.status_code == 404 and "visa" in r.json()["detail"]
+
+
+def test_approval_does_not_survive_a_failed_rebuild(api, monkeypatch):
+    """Final review I1: approve for one programme, choose another, the rebuild fails: the page is not approved and the
+    plan's visa step is not completed with the old programme's file."""
+    from app.os.packs import render
+
+    ready_visa(api.ctx)
+    body = settled(api)
+    assert api.post(f"{V}/approve", headers=ME, json={"sha256": body["manifest_sha256"]}).status_code == 200
+    monkeypatch.setattr(render, "render_sheet", lambda *a, **k: (_ for _ in ()).throw(RuntimeError("renderer down")))
+    assert api.put(f"{V}/choice", headers=ME, json={"programme_ref": OTHER_PROG}).status_code == 200
+    after = settled(api)
+    assert after["status"] == "failed" and after["approved"] is False
+    with api.engine.begin() as conn:  # the visa step becomes ready only now (blocked account and insurance done)
+        conn.execute(update(T).where(T.c.plan_id == api.plan_id, T.c.instance_key == "review_visa_file")
+                     .values(state="waiting_student"))
+    api.get("/v1/os/inbox", headers=ME)
+    with api.engine.connect() as conn:
+        state = conn.execute(select(T.c.state).where(T.c.plan_id == api.plan_id,
+                                                     T.c.instance_key == "review_visa_file")).scalar()
+    assert state == "waiting_student"

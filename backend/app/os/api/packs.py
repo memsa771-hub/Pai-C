@@ -89,9 +89,36 @@ def complete_ready_packs(svc: Services, student: str) -> None:
         plan = self_serve.student_plan(svc.plans, student)
         if plan is not None:
             for kind in (PACK_KIND, VISA_KIND):  # and a review_visa_file task (Slice 6b)
-                complete_review_tasks(svc.engine, svc.kernel, svc.settings.tenant_id, student, plan.plan_id, kind)
+                complete_review_tasks(svc.engine, svc.kernel, svc.settings.tenant_id, student, plan.plan_id, kind,
+                                      lambda ref, kind=kind: current_inputs(svc, plan, student, kind, ref))
     except Exception:
         log.exception("pack task completion failed for a student")
+
+
+def visa_choice(svc: Services, plan, student: str) -> tuple[str | None, str | None, float, str | None]:
+    """(the programme the visa file is for, the stored choice, the reduction, the pre-selected programme)."""
+    stored = VisaChoiceStore(svc.engine, svc.settings.tenant_id).get(student)
+    ref = stored.programme_ref if stored and stored.programme_ref in plan.programmes else None
+    pre = preselect(svc.engine, svc.settings.tenant_id, plan.plan_id)
+    pre = pre if pre in plan.programmes else None
+    return ref or pre, ref, stored.reduction if stored else 0.0, pre
+
+
+def load_current(svc: Services, plan, student: str, kind: str, programme_ref: str):
+    """The inputs a pack (or the visa file) for this programme would be built from now."""
+    cfg = (svc.visa_configs if kind == VISA_KIND else svc.pack_configs)[plan.route_key]
+    book = self_serve.newest_books(svc.plans)[plan.route_key]
+    return load_inputs(svc.engine, svc.settings.tenant_id, svc.knowledge, book, cfg,
+                       svc.statement_configs.get(plan.route_key), student, programme_ref, plan.year, kind)
+
+
+def current_inputs(svc: Services, plan, student: str, kind: str, programme_ref: str | None) -> str | None:
+    """The SHA-256 of what would be built now; None when there is nothing to build (no config, no visa choice)."""
+    configs = svc.visa_configs if kind == VISA_KIND else svc.pack_configs
+    if not configs or plan.route_key not in configs:
+        return None
+    ref = visa_choice(svc, plan, student)[0] if kind == VISA_KIND else programme_ref
+    return None if ref is None else inputs_sha(load_current(svc, plan, student, kind, ref))
 
 
 def fill_from_manifest(out: dict, store: ArtifactStore, art, current_inputs: str) -> dict:
@@ -106,7 +133,8 @@ def fill_from_manifest(out: dict, store: ArtifactStore, art, current_inputs: str
     settled_status = art.status if art.status in ("ready", "incomplete", "approved", "failed") else "building"
     out.update(status="failed" if art.status == "failed" else "building" if stale else settled_status,
                version=version.number, manifest_sha256=version.sha256,
-               approved=ap is not None and ap.version == version.number, route_value=manifest["route_value"],
+               approved=ap is not None and ap.version == version.number and not stale,  # final review I1
+               route_value=manifest["route_value"],
                instructions=manifest["instructions"], fees=manifest["fees"], checklist=manifest["checklist"],
                data_sheet=manifest["data_sheet"],
                files=[{"key": k, **f} for k, f in sorted(manifest["files"].items())])
@@ -239,18 +267,10 @@ def add_visa_routes(router: APIRouter, services: Callable[[], Services]) -> None
             raise HTTPException(status_code=404, detail="no visa file for your route yet: start a plan first")
         return plan, cfg
 
-    def chosen(svc: Services, plan, student: str) -> tuple[str | None, str | None, float, str | None]:
-        """(the programme the file is for, the stored choice, the reduction, the pre-selected programme)."""
-        stored = VisaChoiceStore(svc.engine, svc.settings.tenant_id).get(student)
-        ref = stored.programme_ref if stored and stored.programme_ref in plan.programmes else None
-        pre = preselect(svc.engine, svc.settings.tenant_id, plan.plan_id)
-        pre = pre if pre in plan.programmes else None
-        return ref or pre, ref, stored.reduction if stored else 0.0, pre
+    chosen = visa_choice
 
     def inputs(svc: Services, plan, cfg, student: str, programme_ref: str):
-        book = self_serve.newest_books(svc.plans)[plan.route_key]
-        return load_inputs(svc.engine, svc.settings.tenant_id, svc.knowledge, book, cfg,
-                           svc.statement_configs.get(plan.route_key), student, programme_ref, plan.year, VISA_KIND)
+        return load_current(svc, plan, student, VISA_KIND, programme_ref)
 
     def art_of(svc: Services, student: str):
         return next((a for a in ArtifactStore(svc.engine, svc.settings.tenant_id).list_for(student)

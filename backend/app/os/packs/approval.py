@@ -3,6 +3,7 @@ the current manifest version, bound by its SHA-256, and that completes the match
 the programme, `review_visa_file` for the plan) through the kernel. A stale or incomplete one is refused."""
 
 import json
+from collections.abc import Callable
 
 from sqlalchemy import Engine, select
 
@@ -51,7 +52,8 @@ def approve_pack(engine: Engine, kernel, tenant_id: str, student_ref: str, progr
 
 
 def complete_review_tasks(engine: Engine, kernel, tenant_id: str, student_ref: str, plan_id: int,
-                          kind: str = "pack") -> list[int]:
+                          kind: str = "pack",
+                          current_inputs: Callable[[str | None], str | None] | None = None) -> list[int]:
     """Completes each waiting `review_pack` task whose programme's current pack version is approved. Also called when
     the student reads their packs or inbox, so a task that becomes ready after the approval still completes."""
     with engine.connect() as conn:
@@ -64,6 +66,9 @@ def complete_review_tasks(engine: Engine, kernel, tenant_id: str, student_ref: s
         ap = store.approval(art.id) if art is not None else None
         if ap is None or ap.version != art.current_version:
             continue
+        if current_inputs is not None and json.loads(store.version(art.id, ap.version).text).get(
+                "inputs_sha256") != current_inputs(t.programme_ref):
+            continue  # approved, but built from older material (another programme, a failed rebuild): final review I1
         try:
             if kernel.complete_student_task(t.id, student_ref, {"artifacts": {kind: ap.sha256}}):
                 done.append(t.id)
