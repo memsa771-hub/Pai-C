@@ -77,6 +77,24 @@ class FeeRef(_Model):
     source: str  # "fact:<name>" or "constant:<name>"
 
 
+class Alt(_Model):
+    key: str = Field(pattern=_KEY)
+    label: str
+
+
+class Funds(_Model):
+    """The visa file's funds rule (Slice 6b S6b-D4, D7): the route fact holding a year's amount, how many months are
+    required, the currency's label (YAML only), the accepted alternatives, and the checklist item and document field
+    whose amount proves it."""
+
+    fact: str
+    months: int = Field(gt=0)
+    currency_label: str
+    alternatives: list[Alt] = []
+    proof_item: str
+    proof_field: str
+
+
 class PackConfig(_Model):
     route_key: str
     version: int = Field(ge=1)
@@ -85,6 +103,7 @@ class PackConfig(_Model):
     formats: Formats
     instructions: dict[str, list[Step]] = Field(min_length=1)  # keyed by the route's application_route values
     fees: list[FeeRef] = []
+    funds: Funds | None = None  # the visa file only (Slice 6b)
 
     @model_validator(mode="after")
     def _unique(self) -> "PackConfig":
@@ -111,9 +130,18 @@ def load_pack_config(path: Path) -> PackConfig:
         raise PackConfigError(f"{path.name}: {e}") from e
 
 
-def load_pack_configs(directory: Path = PACK_DIR) -> dict[str, PackConfig]:
+VISA_SUFFIX = ".visa.yaml"
+
+
+def _paths(directory: Path, kind: str) -> list[Path]:
+    """`pack`: <route>.yaml; `visa`: <route>.visa.yaml (Slice 6b S6b-D3)."""
+    every = sorted(directory.glob("*.yaml"))
+    return [p for p in every if p.name.endswith(VISA_SUFFIX) == (kind == "visa")]
+
+
+def load_pack_configs(directory: Path = PACK_DIR, kind: str = "pack") -> dict[str, PackConfig]:
     out: dict[str, PackConfig] = {}
-    for path in sorted(directory.glob("*.yaml")):
+    for path in _paths(directory, kind):
         cfg = load_pack_config(path)
         if cfg.route_key in out:
             raise PackConfigError(f"{path.name}: a second pack config for route {cfg.route_key}")
@@ -175,9 +203,15 @@ def check_pack_config(cfg: PackConfig, profile_keys: set[str], doc_types: set[st
                     fail(f"{what}: unknown placeholder '{{{name}}}'")
     for fee in cfg.fees:
         check_source(fee.source, f"fee '{fee.label}'", ("fact", "constant"))
+    if cfg.funds is not None:  # the route fact itself is seeded, not researched: it is not checked here
+        proof = next((i for i in cfg.checklist if i.key == cfg.funds.proof_item), None)
+        if proof is None or proof.kind != "document":
+            fail(f"funds: proof_item '{cfg.funds.proof_item}' is not a document item")
+        if f"{proof.ref}.{cfg.funds.proof_field}" not in profile_keys:
+            fail(f"funds: '{cfg.funds.proof_field}' is not a field of '{proof.ref}'")
 
 
-def load_checked_pack_configs(directory: Path, doc_types, books, profiles) -> dict[str, PackConfig]:
+def load_checked_pack_configs(directory: Path, doc_types, books, profiles, kind: str = "pack") -> dict[str, PackConfig]:
     """Every pack config in `directory`, checked against the document types, the newest playbook of its route and
     the route's research profile (if any). An invalid config, or one for a route with no playbook, stops startup."""
     from app.os.eligibility.rules import profile_keys  # imported here: eligibility is a sibling module
@@ -187,7 +221,7 @@ def load_checked_pack_configs(directory: Path, doc_types, books, profiles) -> di
     for (key, version), b in books.items():
         if key not in newest or version > newest[key].version:
             newest[key] = b
-    configs = load_pack_configs(directory)
+    configs = load_pack_configs(directory, kind)
     for cfg in configs.values():
         if cfg.route_key not in newest:
             raise PackConfigError(f"pack for {cfg.route_key}: no playbook for this route")

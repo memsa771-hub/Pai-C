@@ -4,7 +4,7 @@ The items are the research list if confirmed (it replaces the route default's do
 route default, plus the items the student added. Manual and entered items always stay. Each item comes out `ready`,
 `missing`, `needs_action` (with reasons) or `manual` (ticked by the student, or not)."""
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Literal
 
 from app.os.packs.inputs import ENTERED_PREFIX, PackInputs
@@ -35,8 +35,10 @@ def _effective(inp: PackInputs):
             if i.kind in ("manual", "entered") or i.key in wanted]
 
 
-def checklist(inp: PackInputs, programme_ref: str, unfixable: dict[str, str] | None = None) -> list[ItemResult]:
-    """`unfixable`: item key -> the reason its file could not be made to fit (from the renderer)."""
+def checklist(inp: PackInputs, programme_ref: str, unfixable: dict[str, str] | None = None,
+              funds=None) -> list[ItemResult]:
+    """`unfixable`: item key -> the reason its file could not be made to fit (from the renderer). `funds`: the visa
+    file's FundsResult; the config's proof item is then compared with it (Slice 6b S6b-D7)."""
     unfixable = unfixable or {}
     out = []
     for item, source in _effective(inp):
@@ -53,6 +55,8 @@ def checklist(inp: PackInputs, programme_ref: str, unfixable: dict[str, str] | N
             sha = inp.statements.get(f"{item.ref}:{programme_ref}", inp.statements.get(item.ref))
             out.append(ItemResult(**base, state="ready" if sha else "missing",
                                   reasons=[] if sha else [f"approve your {item.ref.upper()} first"]))
+        elif funds is not None and inp.cfg.funds is not None and item.key == inp.cfg.funds.proof_item:
+            out.append(_proof(inp, item, base, ticked, unfixable.get(item.key), funds))
         else:
             out.append(_document(inp, item, base, ticked, unfixable.get(item.key)))
     for key, label in inp.added:
@@ -78,6 +82,28 @@ def _document(inp: PackInputs, item, base: dict, ticked: bool, unfixable: str | 
     if notes and not ticked:  # what no converter can check: the student confirms it with a tick
         return ItemResult(**base, **where, state="needs_action", reasons=list(notes), tickable=True)
     return ItemResult(**base, **where, state="ready", ticked=ticked, tickable=bool(notes))
+
+
+def _proof(inp: PackInputs, item, base: dict, ticked: bool, unfixable: str | None, funds) -> ItemResult:
+    """The document proving the funds: not needed when other proof covers it all; otherwise its amount must reach
+    the requirement, and with no known requirement the student checks it against the official page."""
+    from app.os.packs.funds import as_number
+
+    if funds.required == 0:
+        return ItemResult(**base, state="ready", reasons=["not needed: your other proof covers the requirement"])
+    result = _document(inp, item, base, ticked, unfixable)
+    if result.state != "ready":
+        return result
+    if funds.required is None:
+        return replace(result, state="needs_action", reasons=["check the amount against the embassy's page"])
+    v = inp.profile.get(f"{item.ref}.{inp.cfg.funds.proof_field}")
+    amount = as_number(v.value) if v is not None else None
+    if amount is None:
+        return replace(result, state="needs_action", reasons=["the amount could not be read; check the document"])
+    if amount < funds.required:
+        return replace(result, state="needs_action",
+                       reasons=[f"the amount is below what you need: {funds.required:g} {funds.currency_label}"])
+    return result
 
 
 def complete(results: list[ItemResult]) -> bool:
