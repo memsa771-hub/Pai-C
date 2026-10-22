@@ -49,7 +49,7 @@ def normalised(plan: dict) -> dict:
 
 def test_germany_playbook_loads_with_registry():
     book = load_playbook(PLAYBOOK_DIR / "germany_master.v1.yaml")
-    assert book.require_citations and len(book.tasks) == 19
+    assert book.require_citations and len(book.tasks) == 20  # Slice 6a added review_pack
     default_registry().validate([book])
 
 
@@ -79,7 +79,7 @@ def test_golden_dates_follow_the_rules(engine, clean):
     assert tasks["visa_apply"]["state"] == "blocked" and tasks["visa_apply"]["blocked_reason"] == "fact_missing:visa_target_date"
     assert "confirm_fact@germany_master:visa_target_date" in tasks
     assert tasks["choose_programmes"]["state"] == "waiting_student"
-    from_facts = {"admission_test", "application_documents", "admission_result"}  # cite the programme's fact
+    from_facts = {"admission_test", "application_documents", "review_pack", "admission_result"}  # cite the programme's fact
     assert all(t["citations"] for k, t in tasks.items()
                if t["kind"] == "student" and k.split("@")[0] not in from_facts)
 

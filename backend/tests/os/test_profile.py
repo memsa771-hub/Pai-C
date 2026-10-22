@@ -27,7 +27,7 @@ def test_germany_profile_loads_with_the_answer_key_fields():
     assert profile.route_key == "germany_master" and profile.version == 1
     # plan ruling R2-P3: the Spike 1 key's fields, plus fields later slices added that the key does not score
     # (Slice 5: statement_requirement; the scorer skips a field the key has no value for)
-    assert {f.name for f in profile.fields} == key_fields | {"statement_requirement"}
+    assert {f.name for f in profile.fields} == key_fields | {"statement_requirement", "required_documents"}
     assert set(profile.month_names) == set(range(1, 13))
 
 

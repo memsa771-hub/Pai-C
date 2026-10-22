@@ -83,5 +83,6 @@ instructions:
     - {text: "Submit before {deadline_close}.", source: "fact:deadline_close"}
 
 fees:
+  - {label: uni-assist handling fee (first programme), source: "constant:uni_assist_fee_eur"}
   - {label: Tuition per semester (non-EU), source: "fact:tuition_fee_non_eu_eur"}
   - {label: Semester contribution, source: "fact:semester_contribution_eur"}

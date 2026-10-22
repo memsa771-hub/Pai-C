@@ -20,12 +20,20 @@ tasks:
     kind: student
     inbox_kind: act
     duration_days: 1
+  # Slice 6a: the pack step, before the merit-list round (spec S6a-D8)
+  - template_key: review_pack
+    task_type: student.approve
+    title: Review and approve your application pack
+    kind: student
+    inbox_kind: approve
+    fan_out: programme
+    duration_days: 1
   - template_key: merit_list
     task_type: student.choose
     title: Choose from the merit-list offers
     kind: student
     inbox_kind: choose
     fan_out: programme
-    depends_on: [{key: entry_test}]
+    depends_on: [{key: entry_test}, {key: review_pack}]
     anchor: {fact: merit_list_date}
     duration_days: 2

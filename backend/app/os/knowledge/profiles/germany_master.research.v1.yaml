@@ -154,6 +154,23 @@ fields:
     values:
       needed: [statement of purpose, motivation letter, letter of motivation, motivational letter, personal statement]
 
+  - name: required_documents
+    type: name_set
+    hint: >-
+      The documents this programme's application asks for, as the pages list them (Slice 6a: the pack checklist).
+      Null if the pages give no list for this programme.
+    values:
+      passport: [passport]
+      degree: [degree certificate, bachelor's certificate, bachelor certificate, degree]
+      transcript: [transcript, transcript of records, mark sheet, marksheet]
+      hssc: [higher secondary, intermediate certificate, hssc, school-leaving certificate]
+      ssc: [secondary school certificate, matriculation, ssc]
+      english_test: [ielts, toefl, english proficiency, english language certificate]
+      min_passing_grade: [minimum passing grade, grading system]
+      sop: [statement of purpose, motivation letter, letter of motivation]
+      cv: [curriculum vitae, cv, resume, résumé]
+      other: []
+
   - name: admission_test
     type: name_set
     hint: >-
