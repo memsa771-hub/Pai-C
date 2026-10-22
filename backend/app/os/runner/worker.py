@@ -41,6 +41,7 @@ log = logging.getLogger("app.os.worker")
 JOB_FACTORIES: list[tuple[str, str, Callable]] = []
 PLAYBOOK_SOURCE: Path = PLAYBOOK_DIR  # the playbooks every task type must have an owner for
 PROFILE_SOURCE: Path = PROFILE_DIR  # the research profiles, validated at startup
+PACK_SOURCE: Path = Path(__file__).resolve().parents[1] / "packs"  # the pack configs, validated at startup (Slice 6a)
 ENQUEUE_EVERY_S = 1.0
 
 
@@ -136,11 +137,14 @@ def build(settings: OsSettings) -> tuple[Registry, Kernel, DBOSClient, Engine]:
     registry = default_registry()
     for module in _extra_modules(os.environ.get("OS_EXTRA_MODULES", "")):
         registry.register(module)
-    registry.validate(load_playbook_dir(PLAYBOOK_SOURCE).values())  # fail at startup, not on a task (I7)
-    load_profile_dir(PROFILE_SOURCE)  # an invalid research profile stops startup too (Slice 2 spec §4.2)
+    books = load_playbook_dir(PLAYBOOK_SOURCE)
+    registry.validate(books.values())  # fail at startup, not on a task (I7)
+    profiles = load_profile_dir(PROFILE_SOURCE)  # an invalid research profile stops startup too (Slice 2 spec §4.2)
     from app.os.documents.types import load_document_types  # imported late: keeps the worker's import graph small
+    from app.os.packs.config import load_checked_pack_configs
 
-    load_document_types()  # so does an invalid document type (Slice 3 spec S3-D2)
+    types = load_document_types()  # so does an invalid document type (Slice 3 spec S3-D2)
+    load_checked_pack_configs(PACK_SOURCE, types, books, profiles)  # and an invalid pack config (Slice 6a S6a-D12)
     engine = make_engine(settings)
     kernel = Kernel(engine, settings.tenant_id)
     DBOS(config=dbos_config(settings, settings.worker_id))
