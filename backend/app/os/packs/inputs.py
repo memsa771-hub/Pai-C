@@ -39,6 +39,7 @@ class PackInputs:
     required_override: list[str] | None = None  # the confirmed required_documents fact, if any
     funds: FundsResult | None = None  # the visa file only (Slice 6b S6b-D4)
     kind: str = "pack"  # "pack" or "visa" (S6b-D2)
+    programme_ref: str | None = None  # the visa file only: the chosen programme is part of what it is built from
 
 
 def _fact_names(cfg: PackConfig) -> list[str]:
@@ -78,10 +79,10 @@ def load_inputs(engine, tenant_id: str, knowledge, book, cfg: PackConfig, statem
     shas = approved_shas(engine, tenant_id, student_ref)
     statements: dict[str, str | None] = {"sop": shas.get(("sop", None)), "cv": shas.get(("cv", None))}
     if statement_cfg is not None:
-        for kind, prog in needed_artifacts(engine, tenant_id, knowledge, student_ref, programme_ref, year,
-                                           statement_cfg):
+        for statement_kind, prog in needed_artifacts(engine, tenant_id, knowledge, student_ref, programme_ref, year,
+                                                     statement_cfg):
             if prog is not None:
-                statements[f"{kind}:{prog}"] = shas.get((kind, prog))
+                statements[f"{statement_kind}:{prog}"] = shas.get((statement_kind, prog))
     profile = {v["key"]: ProfileValue(v["value"], v.get("source", "document"), v["source_document_id"])
                for v in ProfileStore(engine, tenant_id).all(student_ref)}
     found = knowledge.programme_facts([programme_ref], _fact_names(cfg), year)
@@ -102,7 +103,7 @@ def load_inputs(engine, tenant_id: str, knowledge, book, cfg: PackConfig, statem
         citations={c.source: str(c.url) for t in book.tasks for c in t.citations}
         | {c.source: str(c.url) for k in book.constants.values() for c in k.citations},
         ticked=items.ticked(student_ref, items_key), added=items.added(student_ref, items_key),
-        required_override=override, funds=funds, kind=kind)
+        required_override=override, funds=funds, kind=kind, programme_ref=programme_ref if visa else None)
 
 
 def inputs_sha(inp: PackInputs) -> str:
@@ -120,7 +121,7 @@ def inputs_sha(inp: PackInputs) -> str:
         "ticked": sorted(inp.ticked), "added": inp.added, "override": inp.required_override,
     }
     if inp.kind != "pack":  # only when set, so a pack's fingerprint is unchanged from Slice 6a
-        body["kind"] = inp.kind
+        body["kind"], body["programme"] = inp.kind, inp.programme_ref
     if inp.funds is not None:
         body["funds"] = asdict(inp.funds)
     blob = json.dumps(body, sort_keys=True, default=str, ensure_ascii=False)

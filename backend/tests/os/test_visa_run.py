@@ -134,6 +134,7 @@ def test_visa_build_and_funds_in_manifest(visa):
 def test_pack_and_visa_are_separate(visa):
     """Review Focus #4: a pack and a visa file for one programme are two artifacts; approving one is not the other."""
     ready_visa(visa)
+    assert visa.inputs("pack").kind == "pack" and visa.inputs("visa").kind == "visa"
     pack, file = visa.build("pack", PROG), visa.build("visa")
     assert visa.art("pack") is not None and visa.art("visa") is not None and visa.art("pack").id != visa.art("visa").id
     approve_pack(visa.engine, Kernel(visa.engine, TENANT), TENANT, STUDENT, None, file["sha256"], None, kind="visa")
@@ -200,3 +201,13 @@ def test_approve_visa_completes_review_visa_file(visa):
         state, result = conn.execute(select(T.c.state, T.c.result).where(
             T.c.plan_id == plan_id, T.c.instance_key == "review_visa_file")).one()
     assert state == "done" and result["artifacts"]["visa"] == built["sha256"]
+
+
+def test_programme_in_visa_fingerprint(visa):
+    """Two programmes can share every fact: the visa file's fingerprint still differs, so an old tab is refused."""
+    ready_visa(visa)
+    from dataclasses import replace
+
+    a = visa.inputs(programme=PROG)
+    b = replace(visa.inputs(programme=OTHER), facts=a.facts)
+    assert inputs_sha(a) != inputs_sha(b)
