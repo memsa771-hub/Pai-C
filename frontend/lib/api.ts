@@ -480,6 +480,56 @@ class WorkspaceApi {
   }
 
   // ---------------------------------------------------------------------------
+  // PAI OS visa file (Slice 6b spec §4)
+  // ---------------------------------------------------------------------------
+
+  /** PAI OS: the visa file for the chosen (or pre-selected) programme, with the funds the student must show. */
+  async getOsVisa(): Promise<import('./os-visa').OsVisa> {
+    const params = new URLSearchParams({ network: this.requireWorkspace() });
+    return this.requestJson(`/v1/os/visa?${params}`);
+  }
+
+  async saveOsVisaChoice(choice: { programme_ref?: string; reduction?: number }): Promise<{ programme_ref: string | null; reduction: number }> {
+    const params = new URLSearchParams({ network: this.requireWorkspace() });
+    return this.requestJson(`/v1/os/visa/choice?${params}`, { method: 'PUT', body: JSON.stringify(choice) });
+  }
+
+  async buildOsVisa(): Promise<{ workflow_id: string }> {
+    const params = new URLSearchParams({ network: this.requireWorkspace() });
+    return this.requestJson(`/v1/os/visa/build?${params}`, { method: 'POST' });
+  }
+
+  async saveOsVisaDetails(fields: Record<string, string | null>): Promise<{ saved: number }> {
+    const params = new URLSearchParams({ network: this.requireWorkspace() });
+    return this.requestJson(`/v1/os/visa/details?${params}`, { method: 'PUT', body: JSON.stringify({ fields }) });
+  }
+
+  async updateOsVisaItems(change: { tick?: string[]; untick?: string[]; add?: { label: string }[] }): Promise<{ added: string[] }> {
+    const params = new URLSearchParams({ network: this.requireWorkspace() });
+    return this.requestJson(`/v1/os/visa/items?${params}`, { method: 'PUT', body: JSON.stringify(change) });
+  }
+
+  /** PAI OS: one visa file, fetched with the auth headers (no token in a URL). */
+  async downloadOsVisaFile(sha256: string): Promise<{ blob: Blob; filename: string }> {
+    const params = new URLSearchParams({ network: this.requireWorkspace() });
+    const headers: Record<string, string> = {};
+    if (this.token) headers['X-Workspace-Token'] = this.token;
+    if (this.bearerToken) headers['Authorization'] = `Bearer ${this.bearerToken}`;
+    const res = await fetch(`${API_URL}/v1/os/visa/files/${sha256}?${params}`, {
+      headers, credentials: 'include', cache: 'no-store',
+    });
+    if (!res.ok) throw new Error(`API ${res.status}: ${await res.text()}`);
+    const m = /filename="([^"]+)"/.exec(res.headers.get('Content-Disposition') ?? '');
+    return { blob: await res.blob(), filename: m ? m[1] : `${sha256.slice(0, 12)}.pdf` };
+  }
+
+  /** PAI OS: approve the visa file version the student is looking at (409 if it changed, is incomplete or unchosen). */
+  async approveOsVisa(sha256: string): Promise<{ sha256: string; version: number }> {
+    const params = new URLSearchParams({ network: this.requireWorkspace() });
+    return this.requestJson(`/v1/os/visa/approve?${params}`, { method: 'POST', body: JSON.stringify({ sha256 }) });
+  }
+
+  // ---------------------------------------------------------------------------
   // Workspace CRUD (REST endpoints — not event-based)
   // ---------------------------------------------------------------------------
 
