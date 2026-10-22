@@ -37,7 +37,7 @@ def test_os_tables_present():
         # Slice 5 (os_0008)
         "os_statement_answers", "os_artifacts", "os_artifact_versions", "os_approvals", "os_statement_rules",
         # Slice 6a (os_0009)
-        "os_pack_files", "os_pack_items",
+        "os_pack_files", "os_pack_items", "os_visa_choices",
     }
 
 

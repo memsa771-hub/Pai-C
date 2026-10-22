@@ -30,34 +30,35 @@ from app.os.settings import OsSettings
 
 PACK_WORKFLOW = "os.pack"
 PACK_KIND = "pack"
+VISA_KIND = "visa"  # the visa file (Slice 6b S6b-D2): the same workflow, a second kind
 SHEET = "data_sheet"
 
 
 def pack_workflow_id(tenant_id: str, student_ref: str, programme_ref: str, inputs_sha: str, version: int = 0,
-                     attempt: int = 0) -> str:
+                     attempt: int = 0, kind: str = PACK_KIND) -> str:
     """The same inputs on top of the same current version are one build (invariant 8). The version is in the ID so
     inputs that change and change back (A -> B -> A) build again; `attempt` grows only when the student rebuilds after
-    a failure (final review C1, C2)."""
-    wid = f"pack:{tenant_id}:{student_ref}:{programme_ref}:{inputs_sha[:16]}:v{version}"
+    a failure (final review C1, C2). The ID starts with the kind: `pack:` or `visa:` (Slice 6b S6b-D2)."""
+    wid = f"{kind}:{tenant_id}:{student_ref}:{programme_ref}:{inputs_sha[:16]}:v{version}"
     return f"{wid}:r{attempt}" if attempt else wid
 
 
 def latest_attempt(client: DBOSClient, tenant_id: str, student_ref: str, programme_ref: str, inputs_sha: str,
-                   version: int) -> int:
+                   version: int, kind: str = PACK_KIND) -> int:
     """The highest attempt already started for these inputs and version (0 if none or only the first)."""
-    base = pack_workflow_id(tenant_id, student_ref, programme_ref, inputs_sha, version)
+    base = pack_workflow_id(tenant_id, student_ref, programme_ref, inputs_sha, version, 0, kind)
     ids = [w.workflow_id for w in client.list_workflows(workflow_id_prefix=base, load_input=False, load_output=False)]
     return max((int(i.rsplit(":r", 1)[1]) for i in ids if ":r" in i[len(base):]), default=0)
 
 
 def enqueue_pack(client: DBOSClient, tenant_id: str, student_ref: str, programme_ref: str, route_key: str,
-                 year: int, inputs_sha: str, version: int = 0, attempt: int = 0) -> str:
+                 year: int, inputs_sha: str, version: int = 0, attempt: int = 0, kind: str = PACK_KIND) -> str:
     from app.os.runner.workflow import APP_VERSION, QUEUE_NAME  # imported here: the runner imports packs
 
-    wid = pack_workflow_id(tenant_id, student_ref, programme_ref, inputs_sha, version, attempt)
+    wid = pack_workflow_id(tenant_id, student_ref, programme_ref, inputs_sha, version, attempt, kind)
     options: EnqueueOptions = {"queue_name": QUEUE_NAME, "workflow_name": PACK_WORKFLOW, "workflow_id": wid,
                                "app_version": APP_VERSION}
-    client.enqueue(options, student_ref, programme_ref, route_key, year)
+    client.enqueue(options, student_ref, programme_ref, route_key, year, kind)
     return wid
 
 
@@ -70,29 +71,32 @@ def _newest_books(books) -> dict:
 
 
 def register_packs(engine: Engine, settings: OsSettings, knowledge, books, configs: Mapping[str, PackConfig],
-                   statement_configs: Mapping) -> None:
-    """Registers os.pack and its steps. Must run before DBOS.launch(). No model key is needed: there is no AI."""
+                   statement_configs: Mapping, visa_configs: Mapping[str, PackConfig] | None = None) -> None:
+    """Registers os.pack and its steps. Must run before DBOS.launch(). No model key is needed: there is no AI.
+    `visa_configs`: the routes' visa files (Slice 6b), built by the same workflow with `kind="visa"`."""
     from app.os.runner.workflow import STEP_CONFIG  # imported here: the runner imports packs
 
     tenant = settings.tenant_id
     arts, files, docs = ArtifactStore(engine, tenant), PackFileStore(engine, tenant), DocumentStore(engine, tenant)
     newest = _newest_books(books)
+    by_kind = {PACK_KIND: configs, VISA_KIND: visa_configs or {}}
 
-    def inputs(student: str, programme: str, route_key: str, year: int):
-        return load_inputs(engine, tenant, knowledge, newest[route_key], configs[route_key],
-                           statement_configs.get(route_key), student, programme, year)
+    def inputs(student: str, programme: str, route_key: str, year: int, kind: str):
+        return load_inputs(engine, tenant, knowledge, newest[route_key], by_kind[kind][route_key],
+                           statement_configs.get(route_key), student, programme, year, kind)
 
-    def start(student: str, programme: str) -> int:
-        art = arts.get_or_create(student, PACK_KIND, programme)
+    def start(student: str, programme: str, kind: str = PACK_KIND) -> int:
+        # one visa file per student: the chosen programme is in its inputs and manifest, not its key (S6b-D8)
+        art = arts.get_or_create(student, kind, None if kind == VISA_KIND else programme)
         arts.set_status(art.id, "building")
         return art.id
 
-    def load(student: str, programme: str, route_key: str, year: int) -> list[dict]:
+    def load(student: str, programme: str, route_key: str, year: int, kind: str = PACK_KIND) -> list[dict]:
         """The files to render: the data sheet, each confirmed document and each approved statement on the list."""
-        inp = inputs(student, programme, route_key, year)
+        inp = inputs(student, programme, route_key, year, kind)
         todo = [{"key": SHEET, "kind": SHEET, "label": "Data sheet"}]
         by_key = {i.key: i for i in inp.cfg.checklist}
-        for r in checklist(inp, programme):
+        for r in checklist(inp, programme, funds=inp.funds):
             item = by_key.get(r.key)
             if item is None:
                 continue  # an item the student added: they upload it in the portal themselves
@@ -104,10 +108,10 @@ def register_packs(engine: Engine, settings: OsSettings, knowledge, books, confi
                              "programme": programme if own else None})
         return todo
 
-    def render_file(student: str, programme: str, route_key: str, year: int, spec: dict) -> dict:
-        cfg = configs[route_key]
+    def render_file(student: str, programme: str, route_key: str, year: int, spec: dict, kind: str = PACK_KIND) -> dict:
+        cfg = by_kind[kind][route_key]
         if spec["kind"] == SHEET:
-            data = render.render_sheet(data_sheet(inputs(student, programme, route_key, year)),
+            data = render.render_sheet(data_sheet(inputs(student, programme, route_key, year, kind)),
                                        f"Data sheet: {programme}")
             pages = len(PdfReader(io.BytesIO(data)).pages)
         elif spec["kind"] == "statement":
@@ -129,9 +133,9 @@ def register_packs(engine: Engine, settings: OsSettings, knowledge, books, confi
         return asdict(FileRef(sha, name, len(data), pages))
 
     def store(artifact_id: int, student: str, programme: str, route_key: str, year: int, refs: dict,
-              unfixable: dict) -> dict:
-        inp = inputs(student, programme, route_key, year)
-        results = checklist(inp, programme, unfixable)
+              unfixable: dict, kind: str = PACK_KIND) -> dict:
+        inp = inputs(student, programme, route_key, year, kind)
+        results = checklist(inp, programme, unfixable, funds=inp.funds)
         route_value, steps = instructions(inp, programme)
         text, sha = build_manifest(inp, programme, route_value, results, data_sheet(inp), steps, fees(inp),
                                    {k: FileRef(**v) for k, v in refs.items()})
@@ -148,21 +152,20 @@ def register_packs(engine: Engine, settings: OsSettings, knowledge, books, confi
         arts.set_status(artifact_id, "failed")
 
     step = lambda name, fn: DBOS.step(name=f"os.pack.{name}", **STEP_CONFIG)(fn)  # noqa: E731
-    start_step, load_step, store_step, fail_step = step("start", start), step("load", load), step("store", store), \
-        step("fail", fail)
+    start_step, load_step, store_step, fail_step = step("start", start), step("load", load), step("store", store),         step("fail", fail)
     render_step = step("render", render_file)
 
-    def pack(student: str, programme: str, route_key: str, year: int) -> dict:
-        artifact_id = start_step(student, programme)
+    def pack(student: str, programme: str, route_key: str, year: int, kind: str = PACK_KIND) -> dict:
+        artifact_id = start_step(student, programme, kind)
         try:
             refs, unfixable = {}, {}
-            for spec in load_step(student, programme, route_key, year):
-                out = render_step(student, programme, route_key, year, spec)
+            for spec in load_step(student, programme, route_key, year, kind):
+                out = render_step(student, programme, route_key, year, spec, kind)
                 if "unfixable" in out:
                     unfixable[spec["key"]] = out["unfixable"]
                 else:
                     refs[spec["key"]] = out
-            return store_step(artifact_id, student, programme, route_key, year, refs, unfixable)
+            return store_step(artifact_id, student, programme, route_key, year, refs, unfixable, kind)
         except Exception:  # noqa: BLE001  (a step's retries are used up: the student sees `failed` and can rebuild)
             fail_step(artifact_id)
             return {"status": "failed"}
