@@ -155,7 +155,7 @@ def value_in_quote(spec, value, quote: str, profile) -> bool:
         return _any(spec.values.get(v, []), q)
     if spec.type == "level":
         return _any(none, q) if v["level"] == "none" else _has(v["level"], q)
-    if spec.type == "grade":
+    if spec.type in ("grade", "numbers"):
         given = [x for x in (v.get(p) for p in spec.parts) if x is not None]
         return bool(given) and all(_number_in(x, q) for x in given)
     if spec.type == "level_scores":

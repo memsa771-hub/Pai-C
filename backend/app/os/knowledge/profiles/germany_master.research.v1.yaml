@@ -143,6 +143,13 @@ fields:
       percent_min = a minimum percentage, if given that way.
     parts: [german_max, percent_min]
 
+  - name: statement_requirement
+    type: numbers
+    hint: >-
+      The length limit this programme sets for its statement of purpose or motivation letter: limit_words or
+      limit_chars, exactly as the pages state it. Null if the pages give no limit for this programme.
+    parts: [limit_words, limit_chars]
+
   - name: admission_test
     type: name_set
     hint: >-

@@ -25,7 +25,9 @@ def test_germany_profile_loads_with_the_answer_key_fields():
     profile = load_profile(GERMANY)
     key_fields = set(next(iter(yaml.safe_load(KEY.read_text(encoding="utf-8"))["programmes"].values()))["facts"])
     assert profile.route_key == "germany_master" and profile.version == 1
-    assert {f.name for f in profile.fields} == key_fields  # plan ruling R2-P3
+    # plan ruling R2-P3: the Spike 1 key's fields, plus fields later slices added that the key does not score
+    # (Slice 5: statement_requirement; the scorer skips a field the key has no value for)
+    assert {f.name for f in profile.fields} == key_fields | {"statement_requirement"}
     assert set(profile.month_names) == set(range(1, 13))
 
 
