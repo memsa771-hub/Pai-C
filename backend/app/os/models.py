@@ -416,7 +416,7 @@ eligibility_notes = Table(
 
 # --- Slice 5: statements (spec 2026-10-22 §3, os_0008) -------------------------------------------------------
 
-ARTIFACT_KINDS = ('sop', 'cv', 'pack')  # pack: Slice 6a (os_0010)
+ARTIFACT_KINDS = ('sop', 'cv', 'pack', 'visa')  # pack: Slice 6a (os_0010); visa: Slice 6b (os_0011)
 ARTIFACT_STATUSES = ('empty', 'drafting', 'draft', 'needs_answers', 'failed', 'budget', 'approved',
                      'building', 'ready', 'incomplete')  # the last three: a pack (Slice 6a, os_0010)
 
@@ -514,4 +514,17 @@ pack_items = Table(
     Column("at", DateTime(timezone=True), nullable=False, server_default=func.now()),
     CheckConstraint("kind IN ('added', 'ticked')", name="ck_os_pack_items_kind"),
     UniqueConstraint("tenant_id", "student_ref", "programme_ref", "item_key", "kind", name="uq_os_pack_items"),
+)
+
+# --- Slice 6b: the visa file (spec 2026-10-22 S6b §3, os_0011) ------------------------------------------------
+
+visa_choices = Table(
+    "os_visa_choices", md,
+    _id(), _tenant(),
+    Column("student_ref", Text, nullable=False),
+    Column("programme_ref", Text),  # the programme the visa file is for; None until chosen
+    Column("reduction", Numeric(14, 2), nullable=False, server_default="0"),  # other proof of funds, e.g. a scholarship
+    Column("updated_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
+    UniqueConstraint("tenant_id", "student_ref", name="uq_os_visa_choices"),
+    CheckConstraint("reduction >= 0", name="ck_os_visa_choices_reduction"),
 )

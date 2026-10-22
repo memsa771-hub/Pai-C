@@ -2,10 +2,11 @@
 programme's facts, the playbook's constants and citations, and the student's ticks and added items. The pure rules
 (checklist, data sheet, instructions) read only this, so they can be tested without a database."""
 
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field
 from typing import Any
 
 from app.os.packs.config import PackConfig
+from app.os.packs.funds import FundsResult
 
 ENTERED_PREFIX = "entered."  # profile key of a value the student typed: "entered.<data-sheet field key>"
 
@@ -36,6 +37,9 @@ class PackInputs:
     ticked: set[str] = field(default_factory=set)
     added: list[tuple[str, str]] = field(default_factory=list)  # (item key, label) the student added
     required_override: list[str] | None = None  # the confirmed required_documents fact, if any
+    funds: FundsResult | None = None  # the visa file only (Slice 6b S6b-D4)
+    kind: str = "pack"  # "pack" or "visa" (S6b-D2)
+    programme_ref: str | None = None  # the visa file only: the chosen programme is part of what it is built from
 
 
 def _fact_names(cfg: PackConfig) -> list[str]:
@@ -53,12 +57,21 @@ def _fact_names(cfg: PackConfig) -> list[str]:
 
 
 def load_inputs(engine, tenant_id: str, knowledge, book, cfg: PackConfig, statement_cfg, student_ref: str,
-                programme_ref: str, year: int) -> PackInputs:
+                programme_ref: str, year: int, kind: str = "pack") -> PackInputs:
     """This student's material for one programme's pack. Only their own rows are read (every store filters by
-    tenant and student). `statement_cfg` may be None (no statements for the route: no programme SOP is needed)."""
+    tenant and student). `statement_cfg` may be None (no statements for the route: no programme SOP is needed).
+
+    A visa file (`kind="visa"`, Slice 6b) uses the base SOP and CV only, its own checklist (the programme's
+    required-documents fact is the university's list, not the embassy's), its own ticks, and the funds."""
     from app.os.documents.store import DocumentStore, ProfileStore
+    from app.os.packs.funds import required_funds
     from app.os.packs.store import PackItemStore
+    from app.os.packs.visa import VISA_ITEMS, VisaChoiceStore
     from app.os.statements.approval import approved_shas, needed_artifacts
+
+    visa = kind == "visa"
+    if visa:
+        statement_cfg = None
 
     documents: dict[str, DocState] = {}
     for d in DocumentStore(engine, tenant_id).list_for(student_ref):  # oldest first: the newest of a type wins
@@ -66,26 +79,31 @@ def load_inputs(engine, tenant_id: str, knowledge, book, cfg: PackConfig, statem
     shas = approved_shas(engine, tenant_id, student_ref)
     statements: dict[str, str | None] = {"sop": shas.get(("sop", None)), "cv": shas.get(("cv", None))}
     if statement_cfg is not None:
-        for kind, prog in needed_artifacts(engine, tenant_id, knowledge, student_ref, programme_ref, year,
-                                           statement_cfg):
+        for statement_kind, prog in needed_artifacts(engine, tenant_id, knowledge, student_ref, programme_ref, year,
+                                                     statement_cfg):
             if prog is not None:
-                statements[f"{kind}:{prog}"] = shas.get((kind, prog))
+                statements[f"{statement_kind}:{prog}"] = shas.get((statement_kind, prog))
     profile = {v["key"]: ProfileValue(v["value"], v.get("source", "document"), v["source_document_id"])
                for v in ProfileStore(engine, tenant_id).all(student_ref)}
     found = knowledge.programme_facts([programme_ref], _fact_names(cfg), year)
     facts = {name: f for (_, name), f in found.items()}
     required = facts.get("required_documents")
     override = None
-    if required is not None and required.status == "confirmed" and isinstance(required.value, list):
+    if not visa and required is not None and required.status == "confirmed" and isinstance(required.value, list):
         override = [k for k in required.value if k != "other"]
-    items = PackItemStore(engine, tenant_id)
+    funds = None
+    if visa and cfg.funds is not None:
+        choice = VisaChoiceStore(engine, tenant_id).get(student_ref)
+        fact = knowledge.route_facts(cfg.route_key, [cfg.funds.fact], year).get(cfg.funds.fact)
+        funds = required_funds(cfg.funds, fact, choice.reduction if choice else 0)
+    items, items_key = PackItemStore(engine, tenant_id), VISA_ITEMS if visa else programme_ref
     return PackInputs(
         cfg=cfg, documents=documents, statements=statements, profile=profile, facts=facts,
         constants=dict(book.constants),
         citations={c.source: str(c.url) for t in book.tasks for c in t.citations}
         | {c.source: str(c.url) for k in book.constants.values() for c in k.citations},
-        ticked=items.ticked(student_ref, programme_ref), added=items.added(student_ref, programme_ref),
-        required_override=override)
+        ticked=items.ticked(student_ref, items_key), added=items.added(student_ref, items_key),
+        required_override=override, funds=funds, kind=kind, programme_ref=programme_ref if visa else None)
 
 
 def inputs_sha(inp: PackInputs) -> str:
@@ -102,6 +120,10 @@ def inputs_sha(inp: PackInputs) -> str:
         "constants": {k: c.value for k, c in inp.constants.items()},
         "ticked": sorted(inp.ticked), "added": inp.added, "override": inp.required_override,
     }
+    if inp.kind != "pack":  # only when set, so a pack's fingerprint is unchanged from Slice 6a
+        body["kind"], body["programme"] = inp.kind, inp.programme_ref
+    if inp.funds is not None:
+        body["funds"] = asdict(inp.funds)
     blob = json.dumps(body, sort_keys=True, default=str, ensure_ascii=False)
     return hashlib.sha256(blob.encode("utf-8")).hexdigest()
 

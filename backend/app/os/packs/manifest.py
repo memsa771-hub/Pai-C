@@ -38,5 +38,7 @@ def build_manifest(inp: PackInputs, programme_ref: str, route_value: str | None,
         "files": {k: asdict(f) for k, f in sorted(files.items())},
         "statements": {k: v for k, v in sorted(inp.statements.items())},
     }
+    if inp.funds is not None:  # the visa file (Slice 6b S6b-D4): what the student must show, and its source
+        body["funds"] = asdict(inp.funds)
     text = json.dumps(body, sort_keys=True, ensure_ascii=False, separators=(",", ":"))
     return text, sha256(text)

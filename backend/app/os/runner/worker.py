@@ -133,14 +133,15 @@ def register_statements_if_configured(settings: OsSettings, engine: Engine) -> b
     return True
 
 
-def register_packs_always(settings: OsSettings, engine: Engine, books, pack_configs) -> None:
-    """Registers os.pack (Slice 6a). It needs no model key: the pack is built by rules only (S6a-D5)."""
+def register_packs_always(settings: OsSettings, engine: Engine, books, pack_configs, visa_configs=None) -> None:
+    """Registers os.pack (Slice 6a), for packs and visa files (Slice 6b). It needs no model key: both are built by
+    rules only (S6a-D5)."""
     from app.os.knowledge.store import SqlKnowledge
     from app.os.packs.run import register_packs
     from app.os.statements.config import load_statement_configs
 
     register_packs(engine, settings, SqlKnowledge(engine, settings.tenant_id), books, pack_configs,
-                   load_statement_configs())
+                   load_statement_configs(), visa_configs)
 
 
 def build(settings: OsSettings) -> tuple[Registry, Kernel, DBOSClient, Engine]:
@@ -155,6 +156,7 @@ def build(settings: OsSettings) -> tuple[Registry, Kernel, DBOSClient, Engine]:
 
     types = load_document_types()  # so does an invalid document type (Slice 3 spec S3-D2)
     pack_configs = load_checked_pack_configs(PACK_SOURCE, types, books, profiles)  # and an invalid pack config (S6a-D12)
+    visa_configs = load_checked_pack_configs(PACK_SOURCE, types, books, profiles, kind="visa")  # or visa file (S6b-D3)
     engine = make_engine(settings)
     kernel = Kernel(engine, settings.tenant_id)
     DBOS(config=dbos_config(settings, settings.worker_id))
@@ -173,7 +175,7 @@ def build(settings: OsSettings) -> tuple[Registry, Kernel, DBOSClient, Engine]:
         register_job("documents_retry", "10 0 * * *",  # uploads that waited for the budget, daily at 00:10 UTC
                      lambda: retry_waiting(engine, client, settings.tenant_id, datetime.now(timezone.utc).date()))
     register_statements_if_configured(settings, engine)
-    register_packs_always(settings, engine, books, pack_configs)
+    register_packs_always(settings, engine, books, pack_configs, visa_configs)
     return registry, kernel, client, engine
 
 
