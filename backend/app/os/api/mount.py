@@ -47,8 +47,9 @@ def mount_os(app: FastAPI, *, env: Mapping[str, str] | None = None,
     for cfg in statement_configs.values():  # so do statement configs (Slice 5 S5-D12)
         check_config(cfg, keys, books)
     pack_configs = load_checked_pack_configs(pack_dir, types, books, profiles)  # so do pack configs (S6a-D12)
+    visa_configs = load_checked_pack_configs(pack_dir, types, books, profiles, kind="visa")  # and visa files (S6b-D3)
     services = make_services(settings, playbooks=books, document_types=types, statement_configs=statement_configs,
-                             pack_configs=pack_configs)
+                             pack_configs=pack_configs, visa_configs=visa_configs)
     app.include_router(build_router(lambda: services), prefix=PREFIX)
     if student_dependency is not None:
         app.dependency_overrides[current_student_ref] = student_dependency
