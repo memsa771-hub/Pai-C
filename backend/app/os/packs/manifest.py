@@ -9,7 +9,7 @@ from dataclasses import asdict, dataclass
 from app.os.artifacts.store import sha256
 from app.os.packs.checklist import ItemResult, complete
 from app.os.packs.datasheet import SheetRow
-from app.os.packs.inputs import PackInputs
+from app.os.packs.inputs import PackInputs, inputs_sha
 from app.os.packs.instructions import FeeRow, InstructionStep
 
 
@@ -27,6 +27,7 @@ def build_manifest(inp: PackInputs, programme_ref: str, route_value: str | None,
     """(the manifest text, its SHA-256)."""
     body = {
         "programme": programme_ref,
+        "inputs_sha256": inputs_sha(inp),  # what it was built from: a newer input means a rebuild is due
         "config": {"route": inp.cfg.route_key, "version": inp.cfg.version},
         "route_value": route_value,
         "complete": complete(results),

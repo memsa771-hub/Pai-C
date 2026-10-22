@@ -264,3 +264,12 @@ def test_render_failure_marks_failed(packs, monkeypatch):
     ready_inputs(packs)
     assert packs.build()["status"] == "failed"
     assert packs.pack().status == "failed"
+
+
+def test_manifest_records_its_inputs(packs):
+    """GET compares this with the current inputs: a changed input shows `building`, never a stale settled pack."""
+    ready_inputs(packs)
+    packs.build()
+    art = packs.pack()
+    manifest = json.loads(ArtifactStore(packs.engine, TENANT).version(art.id, art.current_version).text)
+    assert manifest["inputs_sha256"] == inputs_sha(packs.inputs())
