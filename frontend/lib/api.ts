@@ -364,6 +364,67 @@ class WorkspaceApi {
   }
 
   // ---------------------------------------------------------------------------
+  // PAI OS statements: the SOP and CV the student co-writes (Slice 5 spec §4)
+  // ---------------------------------------------------------------------------
+
+  /** PAI OS: the route's interview questions with the student's answers (open follow-ups first). */
+  async getOsInterview(): Promise<import('./os-statements').OsInterview> {
+    const params = new URLSearchParams({ network: this.requireWorkspace() });
+    return this.requestJson(`/v1/os/statements/interview?${params}`);
+  }
+
+  /** PAI OS: save one answer. `drafting` counts the drafts started again by the last follow-up answer. */
+  async saveOsAnswer(questionId: string, answer: string): Promise<{ saved: boolean; drafting: number }> {
+    const params = new URLSearchParams({ network: this.requireWorkspace() });
+    return this.requestJson(`/v1/os/statements/answers/${encodeURIComponent(questionId)}?${params}`, {
+      method: 'PUT', body: JSON.stringify({ answer }),
+    });
+  }
+
+  async getOsStatements(): Promise<import('./os-statements').OsStatement[]> {
+    const params = new URLSearchParams({ network: this.requireWorkspace() });
+    const body = await this.requestJson<{ statements: import('./os-statements').OsStatement[] }>(`/v1/os/statements?${params}`);
+    return body.statements;
+  }
+
+  /** PAI OS: start a draft (202). A 409 names the questions still to answer. */
+  async draftOsStatement(kind: import('./os-statements').OsStatementKind,
+                         programmeRef: string | null = null): Promise<import('./os-statements').OsStatement> {
+    const params = new URLSearchParams({ network: this.requireWorkspace() });
+    return this.requestJson(`/v1/os/statements/${kind}/draft?${params}`, {
+      method: 'POST', body: JSON.stringify({ programme_ref: programmeRef }),
+    });
+  }
+
+  /** PAI OS: save the student's edit as a new version; the answer carries its flags. */
+  async saveOsStatementText(id: number, text: string): Promise<import('./os-statements').OsStatement> {
+    const params = new URLSearchParams({ network: this.requireWorkspace() });
+    return this.requestJson(`/v1/os/statements/${id}/text?${params}`, {
+      method: 'PUT', body: JSON.stringify({ text }),
+    });
+  }
+
+  async approveOsStatement(id: number, version: number): Promise<import('./os-statements').OsApproval & { completed_tasks: number[] }> {
+    const params = new URLSearchParams({ network: this.requireWorkspace() });
+    return this.requestJson(`/v1/os/statements/${id}/approve?${params}`, {
+      method: 'POST', body: JSON.stringify({ version }),
+    });
+  }
+
+  /** PAI OS: the prompt and limit the student pasted from a programme's page (204, no body). */
+  async saveOsStatementRules(programmeRef: string,
+                             rules: { prompt?: string | null; limit_words?: number | null; limit_chars?: number | null }): Promise<void> {
+    const params = new URLSearchParams({ network: this.requireWorkspace() });
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (this.token) headers['X-Workspace-Token'] = this.token;
+    if (this.bearerToken) headers['Authorization'] = `Bearer ${this.bearerToken}`;
+    const res = await fetch(`${API_URL}/v1/os/statements/rules/${encodeURIComponent(programmeRef)}?${params}`, {
+      method: 'PUT', body: JSON.stringify(rules), headers, credentials: 'include', cache: 'no-store',
+    });
+    if (!res.ok) throw new Error(`API ${res.status}: ${await res.text()}`);
+  }
+
+  // ---------------------------------------------------------------------------
   // Workspace CRUD (REST endpoints — not event-based)
   // ---------------------------------------------------------------------------
 
