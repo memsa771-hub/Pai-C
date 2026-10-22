@@ -16,7 +16,7 @@ from app.os.knowledge.programmes import ProgrammeStore
 from app.os.packs.approval import PackIncomplete, PackNotCurrent, approve_pack, complete_review_tasks
 from app.os.packs.details import save_details
 from app.os.packs.inputs import inputs_sha, load_inputs
-from app.os.packs.run import PACK_KIND, enqueue_pack
+from app.os.packs.run import PACK_KIND, enqueue_pack, latest_attempt
 from app.os.packs.store import PackFileStore, PackItemStore
 
 log = logging.getLogger(__name__)
@@ -95,11 +95,19 @@ def add_pack_routes(router: APIRouter, services: Callable[[], Services]) -> None
         return load_inputs(svc.engine, svc.settings.tenant_id, svc.knowledge, book, cfg,
                            svc.statement_configs.get(plan.route_key), student, programme_ref, plan.year)
 
-    def build(svc: Services, plan, cfg, student: str, programme_ref: str) -> tuple[str, str]:
-        """(the workflow ID, the current inputs' SHA-256)."""
+    def build(svc: Services, plan, cfg, student: str, programme_ref: str, art,
+              retry: bool = False) -> tuple[str, str]:
+        """(the workflow ID, the current inputs' SHA-256). The same inputs on the same version are one build; a
+        retry after a failure is a new attempt (final review C1)."""
         sha = inputs_sha(inputs(svc, plan, cfg, student, programme_ref))
-        return enqueue_pack(svc.dbos_client(), svc.settings.tenant_id, student, programme_ref, plan.route_key,
-                            plan.year, sha), sha
+        version = (art.current_version or 0) if art is not None else 0
+        client, tenant = svc.dbos_client(), svc.settings.tenant_id
+        attempt = latest_attempt(client, tenant, student, programme_ref, sha, version)
+        if retry and art is not None and art.status == "failed":
+            attempt += 1
+            ArtifactStore(svc.engine, tenant).set_status(art.id, "building")  # the student sees it start at once
+        return enqueue_pack(client, tenant, student, programme_ref, plan.route_key, plan.year, sha, version,
+                            attempt), sha
 
     def pack_out(svc: Services, student: str, programme_ref: str, art, current_inputs: str) -> dict:
         store = ArtifactStore(svc.engine, svc.settings.tenant_id)
@@ -108,13 +116,15 @@ def add_pack_routes(router: APIRouter, services: Callable[[], Services]) -> None
                "university": programme.university if programme else None, "status": "building", "version": None,
                "approved": False, "manifest_sha256": None, "route_value": None, "instructions": [], "fees": [],
                "checklist": [], "data_sheet": [], "files": []}
+        if art is not None and art.status == "failed":
+            out["status"] = "failed"  # shown as such, with Rebuild; never "being prepared" for ever (final review C1)
         if art is None or not art.current_version:
             return out
         version = store.version(art.id, art.current_version)
         manifest = json.loads(version.text)
         ap = store.approval(art.id)
         stale = manifest.get("inputs_sha256") != current_inputs  # a rebuild is enqueued: never show it as settled
-        out.update(status="building" if stale else art.status, version=version.number, manifest_sha256=version.sha256,
+        out.update(status=art.status if art.status == "failed" else "building" if stale else art.status, version=version.number, manifest_sha256=version.sha256,
                    approved=ap is not None and ap.version == version.number, route_value=manifest["route_value"],
                    instructions=manifest["instructions"], fees=manifest["fees"], checklist=manifest["checklist"],
                    data_sheet=manifest["data_sheet"],
@@ -129,7 +139,7 @@ def add_pack_routes(router: APIRouter, services: Callable[[], Services]) -> None
                 if a.kind == PACK_KIND}
         out = []
         for ref in plan.programmes:
-            _, current = build(svc, plan, cfg, student, ref)  # the same inputs: the same workflow, built once
+            _, current = build(svc, plan, cfg, student, ref, arts.get(ref))  # the same inputs: built once
             item = pack_out(svc, student, ref, arts.get(ref), current)
             out.append(item)
         return {"route": plan.route_key, "programmes": out}
@@ -138,7 +148,9 @@ def add_pack_routes(router: APIRouter, services: Callable[[], Services]) -> None
     def build_pack(programme_ref: str, student: str = Depends(current_student_ref_for_write),
                    svc: Services = Depends(services)) -> dict:
         plan, cfg = programme_of(svc, student, programme_ref)
-        return {"workflow_id": build(svc, plan, cfg, student, programme_ref)[0]}
+        art = next((a for a in ArtifactStore(svc.engine, svc.settings.tenant_id).list_for(student)
+                    if a.kind == PACK_KIND and a.programme_ref == programme_ref), None)
+        return {"workflow_id": build(svc, plan, cfg, student, programme_ref, art, retry=True)[0]}
 
     @router.put("/packs/details")
     def details(body: DetailsIn, student: str = Depends(current_student_ref_for_write),
@@ -179,10 +191,11 @@ def add_pack_routes(router: APIRouter, services: Callable[[], Services]) -> None
     @router.post("/packs/{programme_ref}/approve")
     def approve(programme_ref: str, body: ApproveIn, student: str = Depends(current_student_ref_for_write),
                 svc: Services = Depends(services)) -> dict:
-        plan, _ = programme_of(svc, student, programme_ref)
+        plan, cfg = programme_of(svc, student, programme_ref)
+        current = inputs_sha(inputs(svc, plan, cfg, student, programme_ref))
         try:
             ap = approve_pack(svc.engine, svc.kernel, svc.settings.tenant_id, student, programme_ref, body.sha256,
-                              plan.plan_id)
+                              plan.plan_id, current_inputs=current)
         except (PackNotCurrent, PackIncomplete) as e:
             raise HTTPException(status_code=409, detail=str(e)) from None
         return {"sha256": ap.sha256, "version": ap.version}

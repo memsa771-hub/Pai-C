@@ -113,3 +113,34 @@ def test_damaged_file():
 def test_filename():
     assert filename("min_passing_grade", "Minimum passing grade letter") == "minimum-passing-grade-letter.pdf"
     assert filename("added:1", "Módule déscriptions / 2024!") == "module-descriptions-2024.pdf"
+
+
+def test_statement_keeps_common_punctuation():
+    """Review I2: smart quotes, dashes, bullets and the euro sign survive in the PDF (not "?")."""
+    text = "I’m applying – 2019–2023 • fees €75 “quoted” …"
+    pdf = render_statement(text, "SOP")
+    doc = pypdfium2.PdfDocument(pdf)  # pdfium reads WinAnsi's bullet correctly (pypdf shows it as )
+    try:
+        got = "".join(doc[i].get_textpage().get_text_range() for i in range(len(doc)))
+    finally:
+        doc.close()
+    for ch in "’–•€“”":
+        assert ch in got, ch
+    assert "?" not in got
+
+
+def test_large_pages_rasterised_within_cap():
+    """Review I3: a PDF that must be rasterised is rendered page by page at a bounded size (never at its full declared
+    size, all pages in memory at once)."""
+    from app.os.packs.render import START_PX, _pdf_pages
+
+    w = PdfWriter()
+    for _ in range(3):
+        w.add_blank_page(width=2480, height=3508)  # a scanner app's pixel-sized pages: 4 x 6 m at 150 dpi
+    out = io.BytesIO()
+    w.write(out)
+    pages = _pdf_pages(out.getvalue())
+    assert len(pages) == 3
+    for jpeg_bytes in pages:  # each page is kept as an encoded JPEG, not a decoded image
+        with Image.open(io.BytesIO(jpeg_bytes)) as img:
+            assert img.format == "JPEG" and max(img.size) <= START_PX

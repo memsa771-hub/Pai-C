@@ -46,8 +46,9 @@ def _canvas(out: io.BytesIO, title: str) -> canvas.Canvas:
 
 
 def _latin(text: str) -> str:
-    """The built-in fonts cover Latin-1; anything else is replaced so the file still renders."""
-    return text.encode("latin-1", "replace").decode("latin-1")
+    """The built-in fonts use WinAnsi (cp1252): Latin-1 plus smart quotes, dashes, bullets and the euro sign.
+    Anything else is replaced so the file still renders."""
+    return text.encode("cp1252", "replace").decode("cp1252")
 
 
 class _Writer:
@@ -98,13 +99,26 @@ def render_statement(text: str, title: str) -> bytes:
     return out.getvalue()
 
 
-def _images_pdf(images: list[Image.Image], long_side: int) -> bytes:
+def _bounded_jpeg(img: Image.Image) -> bytes:
+    """One page as a JPEG with its long side at most START_PX: what the shrinking starts from. Pages are kept encoded,
+    so only one is decoded at a time."""
+    img = img.convert("RGB")
+    if max(img.size) > START_PX:
+        scale = START_PX / max(img.size)
+        img = img.resize((max(1, round(img.width * scale)), max(1, round(img.height * scale))), Image.Resampling.LANCZOS)
+    buf = io.BytesIO()
+    img.save(buf, "JPEG", quality=95)
+    return buf.getvalue()
+
+
+def _images_pdf(pages: list[bytes], long_side: int) -> bytes:
     out = io.BytesIO()
     c = canvas.Canvas(out, invariant=1)
-    for img in images:
-        scale = min(1.0, long_side / max(img.size))
-        small = img.resize((max(1, round(img.width * scale)), max(1, round(img.height * scale))),
-                           Image.Resampling.LANCZOS) if scale < 1 else img
+    for page in pages:
+        with Image.open(io.BytesIO(page)) as img:
+            scale = min(1.0, long_side / max(img.size))
+            small = img.resize((max(1, round(img.width * scale)), max(1, round(img.height * scale))),
+                               Image.Resampling.LANCZOS) if scale < 1 else img.copy()
         buf = io.BytesIO()
         small.save(buf, "JPEG", quality=JPEG_QUALITY)
         fit = min(A4[0] / small.width, A4[1] / small.height)  # the page has the image's shape, at most A4
@@ -120,17 +134,19 @@ def _too_large(width: float, height: float) -> bool:
     return width * height > MAX_PIXELS
 
 
-def _pdf_pages_as_images(data: bytes) -> list[Image.Image] | Unfixable:
+def _pdf_pages(data: bytes) -> list[bytes]:
+    """Each page rendered at RENDER_DPI, but never more than START_PX on its long side (a page declared at pixel size
+    would otherwise be metres wide), and encoded at once: one decoded page in memory at a time."""
     doc = pypdfium2.PdfDocument(data)
     try:
-        images = []
+        pages = []
         for i in range(len(doc)):
             w, h = doc[i].get_size()
-            scale = RENDER_DPI / 72
-            if _too_large(w * scale, h * scale):
-                return Unfixable("page too large")
-            images.append(doc[i].render(scale=scale).to_pil().convert("RGB"))
-        return images
+            scale = min(RENDER_DPI / 72, START_PX / max(w, h, 1))
+            img = doc[i].render(scale=scale).to_pil()
+            pages.append(_bounded_jpeg(img))
+            img.close()
+        return pages
     finally:
         doc.close()
 
@@ -148,22 +164,20 @@ def convert_document(data: bytes, kind: str, fmt: Format) -> tuple[bytes, int] |
                 return Unfixable(f"too many pages ({pages}); the limit is {MAX_PAGES}")
             if len(data) <= limit:
                 return data, pages
-            images = _pdf_pages_as_images(data)
-            if isinstance(images, Unfixable):
-                return images
+            pages = _pdf_pages(data)
         else:
             with Image.open(io.BytesIO(data)) as img:
                 if _too_large(*img.size):
                     return Unfixable("page too large")
-                images = [ImageOps.exif_transpose(img).convert("RGB")]
+                pages = [_bounded_jpeg(ImageOps.exif_transpose(img))]
     except Exception:  # noqa: BLE001  (Pillow, pypdf and pdfium raise many types for a damaged file)
         return Unfixable("upload a clearer copy")
-    longest = max(max(i.size) for i in images)
+    longest = max(max(Image.open(io.BytesIO(p)).size) for p in pages)
     side, floor = min(longest, START_PX), min(FLOOR_PX, longest)
     while True:
-        pdf = _images_pdf(images, side)
+        pdf = _images_pdf(pages, side)
         if len(pdf) <= limit:
-            return pdf, len(images)
+            return pdf, len(pages)
         if side <= floor:
             return Unfixable(f"cannot make it smaller than {fmt.max_mb:g} MB without losing legibility; "
                              "upload a smaller scan")

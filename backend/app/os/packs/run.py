@@ -33,15 +33,28 @@ PACK_KIND = "pack"
 SHEET = "data_sheet"
 
 
-def pack_workflow_id(tenant_id: str, student_ref: str, programme_ref: str, inputs_sha: str) -> str:
-    return f"pack:{tenant_id}:{student_ref}:{programme_ref}:{inputs_sha[:16]}"
+def pack_workflow_id(tenant_id: str, student_ref: str, programme_ref: str, inputs_sha: str, version: int = 0,
+                     attempt: int = 0) -> str:
+    """The same inputs on top of the same current version are one build (invariant 8). The version is in the ID so
+    inputs that change and change back (A -> B -> A) build again; `attempt` grows only when the student rebuilds after
+    a failure (final review C1, C2)."""
+    wid = f"pack:{tenant_id}:{student_ref}:{programme_ref}:{inputs_sha[:16]}:v{version}"
+    return f"{wid}:r{attempt}" if attempt else wid
+
+
+def latest_attempt(client: DBOSClient, tenant_id: str, student_ref: str, programme_ref: str, inputs_sha: str,
+                   version: int) -> int:
+    """The highest attempt already started for these inputs and version (0 if none or only the first)."""
+    base = pack_workflow_id(tenant_id, student_ref, programme_ref, inputs_sha, version)
+    ids = [w.workflow_id for w in client.list_workflows(workflow_id_prefix=base, load_input=False, load_output=False)]
+    return max((int(i.rsplit(":r", 1)[1]) for i in ids if ":r" in i[len(base):]), default=0)
 
 
 def enqueue_pack(client: DBOSClient, tenant_id: str, student_ref: str, programme_ref: str, route_key: str,
-                 year: int, inputs_sha: str) -> str:
+                 year: int, inputs_sha: str, version: int = 0, attempt: int = 0) -> str:
     from app.os.runner.workflow import APP_VERSION, QUEUE_NAME  # imported here: the runner imports packs
 
-    wid = pack_workflow_id(tenant_id, student_ref, programme_ref, inputs_sha)
+    wid = pack_workflow_id(tenant_id, student_ref, programme_ref, inputs_sha, version, attempt)
     options: EnqueueOptions = {"queue_name": QUEUE_NAME, "workflow_name": PACK_WORKFLOW, "workflow_id": wid,
                                "app_version": APP_VERSION}
     client.enqueue(options, student_ref, programme_ref, route_key, year)

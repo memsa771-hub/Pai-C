@@ -155,3 +155,43 @@ def test_other_students_pack_404(api):
     assert api.post(f"{P}/{PROG}/build", headers=OTHER).status_code == 404
     assert api.post(f"{P}/{PROG}/approve", headers=OTHER, json={"sha256": "0" * 64}).status_code == 404
     assert api.post(f"{P}/not-in-my-plan/build", headers=ME).status_code == 404
+
+
+# --- final review fixes ---------------------------------------------------------------------------------------
+
+
+def test_failed_build_shows_failed_and_rebuild_retries(api, monkeypatch):
+    """Review C1: a failed build shows `failed` (never "being prepared" for ever), and Rebuild really runs again."""
+    from app.os.packs import render
+
+    real = render.render_sheet
+    monkeypatch.setattr(render, "render_sheet", lambda *a, **k: (_ for _ in ()).throw(RuntimeError("renderer down")))
+    assert settled(api)["status"] == "failed"
+    monkeypatch.setattr(render, "render_sheet", real)
+    retried = api.post(f"{P}/{PROG}/build", headers=ME).json()["workflow_id"]
+    assert retried.endswith(":r1")  # a new attempt, not the failed run again
+    built = settled(api)
+    assert built["status"] == "incomplete" and built["version"] == 1
+    again = api.post(f"{P}/{PROG}/build", headers=ME).json()["workflow_id"]
+    assert api.post(f"{P}/{PROG}/build", headers=ME).json()["workflow_id"] == again  # nothing changed: one build
+    assert settled(api)["version"] == 1  # and no new version
+
+
+def test_return_to_earlier_inputs_rebuilds(api):
+    """Review C2: inputs that change and change back (A -> B -> A) still settle; the pack is never stuck."""
+    assert settled(api)["status"] == "incomplete"
+    api.put(f"{P}/{PROG}/items", headers=ME, json={"tick": ["fee_paid"]})
+    assert {i["key"]: i for i in settled(api)["checklist"]}["fee_paid"]["ticked"]
+    api.put(f"{P}/{PROG}/items", headers=ME, json={"untick": ["fee_paid"]})
+    back = settled(api)
+    assert back["status"] == "incomplete" and not {i["key"]: i for i in back["checklist"]}["fee_paid"]["ticked"]
+
+
+def test_approve_refuses_when_inputs_changed(api):
+    """Review I1: an old tab cannot approve a version whose inputs have changed since (invariant 5)."""
+    ready_inputs(api.ctx)
+    pack = settled(api)
+    assert pack["status"] == "ready"
+    api.put(f"{P}/{PROG}/items", headers=ME, json={"untick": ["fee_paid"]})  # before any rebuild runs
+    r = api.post(f"{P}/{PROG}/approve", headers=ME, json={"sha256": pack["manifest_sha256"]})
+    assert r.status_code == 409 and "changed" in r.json()["detail"]

@@ -28,13 +28,16 @@ def _pack(store: ArtifactStore, student_ref: str, programme_ref: str):
 
 
 def approve_pack(engine: Engine, kernel, tenant_id: str, student_ref: str, programme_ref: str, sha256: str,
-                 plan_id: int | None) -> Approval:
+                 plan_id: int | None, current_inputs: str | None = None) -> Approval:
+    """`current_inputs`: the SHA-256 of the student's material now. A version built from older material is refused
+    even if it is still the newest version (an old tab after a change, before the rebuild: final review I1)."""
     store = ArtifactStore(engine, tenant_id)
     art = _pack(store, student_ref, programme_ref)
     if art is None or not art.current_version:
         raise PackNotCurrent("there is no pack for this programme yet")
     version = store.version(art.id, art.current_version)
-    if version.sha256 != sha256:
+    stale = current_inputs is not None and json.loads(version.text).get("inputs_sha256") != current_inputs
+    if version.sha256 != sha256 or stale:
         raise PackNotCurrent("the pack has changed since you opened it; check it again")
     if not json.loads(version.text)["complete"]:
         raise PackIncomplete("the checklist is not complete")
