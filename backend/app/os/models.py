@@ -416,8 +416,9 @@ eligibility_notes = Table(
 
 # --- Slice 5: statements (spec 2026-10-22 §3, os_0008) -------------------------------------------------------
 
-ARTIFACT_KINDS = ('sop', 'cv')
-ARTIFACT_STATUSES = ('empty', 'drafting', 'draft', 'needs_answers', 'failed', 'budget', 'approved')
+ARTIFACT_KINDS = ('sop', 'cv', 'pack')  # pack: Slice 6a (os_0010)
+ARTIFACT_STATUSES = ('empty', 'drafting', 'draft', 'needs_answers', 'failed', 'budget', 'approved',
+                     'building', 'ready', 'incomplete')  # the last three: a pack (Slice 6a, os_0010)
 
 statement_answers = Table(
     "os_statement_answers", md,
@@ -459,7 +460,7 @@ artifact_versions = Table(
     Column("limit_words", Integer),
     _created(),
     UniqueConstraint("artifact_id", "number", name="uq_os_artifact_versions"),
-    _in("author", ('writer', 'student'), "ck_os_artifact_versions_author"),
+    _in("author", ('writer', 'student', 'system'), "ck_os_artifact_versions_author"),  # system: a pack manifest
 )
 
 approvals = Table(
