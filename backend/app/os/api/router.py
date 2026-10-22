@@ -47,7 +47,23 @@ from app.os.api.schemas import (
     ResearchStartOut,
     SupplyIn,
     UpgradeOut,
+    AnswerIn,
+    AnswerOut,
+    ApproveIn,
+    ApproveOut,
+    DraftIn,
+    InterviewOut,
+    PastedRulesIn,
+    StatementOut,
+    StatementsOut,
+    TextIn,
 )
+from app.os.api.queries import statement_out
+from app.os.artifacts.store import ArtifactStore
+from app.os.statements import interview as stmt
+from app.os.statements.approval import complete_documents_tasks
+from app.os.statements.facts_check import unsupported
+from app.os.statements.run import inputs_for, sources
 from app.os.knowledge.programmes import ProgrammeStore
 from app.os.knowledge.research.run import enqueue_one
 from app.os.api.services import Services
@@ -332,5 +348,107 @@ def build_router(get_services: Callable[[], Services]) -> APIRouter:
     @router.get("/profile", response_model=ProfileOut)
     def profile(student: str = Depends(current_student_ref), svc: Services = Depends(services)) -> dict:
         return {"values": ProfileStore(svc.engine, svc.settings.tenant_id).all(student)}
+
+    # --- Slice 5: statements (spec §4). The student's own only; the route comes from their plan. ---
+
+    def route_of(svc: Services, student: str):
+        plan = self_serve.student_plan(svc.plans, student)
+        cfg = plan and svc.statement_configs.get(plan.route_key)
+        if cfg is None:
+            raise HTTPException(status_code=404, detail="no statements for your route yet: start a plan first")
+        return plan, cfg
+
+    def own_artifact(svc: Services, artifact_id: int, student: str):
+        art = ArtifactStore(svc.engine, svc.settings.tenant_id).get(artifact_id)
+        if art is None or art.student_ref != student:
+            raise HTTPException(status_code=404, detail="statement not found")
+        return art
+
+    @router.get("/statements/interview", response_model=InterviewOut)
+    def statement_interview(student: str = Depends(current_student_ref), svc: Services = Depends(services)) -> dict:
+        _, cfg = route_of(svc, student)
+        tenant = svc.settings.tenant_id
+        return {"route": cfg.route_key, "questions": stmt.interview(svc.engine, tenant, student, cfg),
+                "missing": stmt.missing_required(svc.engine, tenant, student, cfg)}
+
+    @router.put("/statements/answers/{question_id}", response_model=AnswerOut)
+    def statement_answer(question_id: str, body: AnswerIn, student: str = Depends(current_student_ref_for_write),
+                         svc: Services = Depends(services)) -> dict:
+        plan, cfg = route_of(svc, student)
+        tenant = svc.settings.tenant_id
+        try:
+            if question_id.startswith(stmt.FOLLOW_UP):
+                started = stmt.answer_follow_up(svc.engine, svc.dbos_client(), tenant, student, cfg, question_id,
+                                                body.answer, plan.year, svc.knowledge)
+            else:
+                stmt.save_answer(svc.engine, tenant, student, cfg, question_id, body.answer)
+                started = []
+        except ValueError as e:
+            code = 404 if "unknown question" in str(e) else 422
+            raise HTTPException(status_code=code, detail=str(e)) from None
+        return {"saved": True, "drafting": len(started)}
+
+    @router.put("/statements/rules/{programme_ref}", status_code=204)
+    def statement_rules(programme_ref: str, body: PastedRulesIn, student: str = Depends(current_student_ref_for_write),
+                        svc: Services = Depends(services)) -> Response:
+        plan, _ = route_of(svc, student)
+        if programme_ref not in plan.programmes:
+            raise HTTPException(status_code=404, detail="this programme is not in your plan")
+        try:
+            stmt.save_pasted_rules(svc.engine, svc.settings.tenant_id, student, programme_ref, body.prompt,
+                                   body.limit_words, body.limit_chars)
+        except ValueError as e:
+            raise HTTPException(status_code=422, detail=str(e)) from None
+        return Response(status_code=204)
+
+    @router.get("/statements", response_model=StatementsOut)
+    def statements(student: str = Depends(current_student_ref), svc: Services = Depends(services)) -> dict:
+        store = ArtifactStore(svc.engine, svc.settings.tenant_id)
+        return {"statements": [statement_out(store, a) for a in store.list_for(student)]}
+
+    @router.post("/statements/{kind}/draft", status_code=202, response_model=StatementOut)
+    def statement_draft(kind: str, body: DraftIn | None = None, student: str = Depends(current_student_ref_for_write),
+                        svc: Services = Depends(services)) -> dict:
+        if kind not in ("sop", "cv"):
+            raise HTTPException(status_code=404, detail=f"unknown statement kind: {kind}")
+        plan, cfg = route_of(svc, student)
+        programme_ref = (body or DraftIn()).programme_ref
+        if programme_ref is not None and (kind == "cv" or programme_ref not in plan.programmes):
+            raise HTTPException(status_code=422, detail="a programme SOP needs a programme in your plan; a CV has none")
+        tenant = svc.settings.tenant_id
+        missing = stmt.missing_required(svc.engine, tenant, student, cfg)
+        if missing:
+            raise HTTPException(status_code=409, detail={"message": "answer these questions first", "missing": missing})
+        store = ArtifactStore(svc.engine, tenant)
+        art = store.get_or_create(student, kind, programme_ref)
+        stmt.start_draft(svc.engine, svc.dbos_client(), tenant, cfg, art.id, plan.year, svc.knowledge)
+        return statement_out(store, store.get(art.id))
+
+    @router.put("/statements/{artifact_id}/text", response_model=StatementOut)
+    def statement_text(artifact_id: int, body: TextIn, student: str = Depends(current_student_ref_for_write),
+                       svc: Services = Depends(services)) -> dict:
+        art = own_artifact(svc, artifact_id, student)
+        plan, cfg = route_of(svc, student)
+        tenant = svc.settings.tenant_id
+        inputs = inputs_for(svc.engine, tenant, cfg, student, art.kind, art.programme_ref, svc.knowledge, plan.year)
+        flags = [c.text for c in unsupported(body.text, sources(inputs))]
+        store = ArtifactStore(svc.engine, tenant)
+        store.add_version(artifact_id, body.text, "student", flags=flags, limit_words=inputs.rules.limit_words)
+        return statement_out(store, store.get(artifact_id))
+
+    @router.post("/statements/{artifact_id}/approve", response_model=ApproveOut)
+    def statement_approve(artifact_id: int, body: ApproveIn, student: str = Depends(current_student_ref_for_write),
+                          svc: Services = Depends(services)) -> dict:
+        own_artifact(svc, artifact_id, student)
+        plan, cfg = route_of(svc, student)
+        tenant = svc.settings.tenant_id
+        try:
+            approval = ArtifactStore(svc.engine, tenant).approve(artifact_id, body.version)
+        except KeyError:
+            raise HTTPException(status_code=404, detail="version not found") from None
+        done = complete_documents_tasks(svc.engine, svc.kernel, svc.knowledge, tenant, student, cfg, plan.plan_id,
+                                        plan.year)
+        return {"version": approval.version, "sha256": approval.sha256, "approved_at": approval.approved_at,
+                "completed_tasks": done}
 
     return router
