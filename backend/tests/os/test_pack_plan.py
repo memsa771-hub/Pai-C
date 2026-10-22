@@ -10,16 +10,17 @@ from tests.os.quality.scoring import score
 
 FAKE_BOOKS = Path(__file__).parent / "playbooks"
 BOOKS = {key: b for (key, _), b in {**load_playbook_dir(), **load_playbook_dir(FAKE_BOOKS)}.items()}
-# per route: the task review_pack follows, and the tasks that must follow review_pack
-ORDER = {
-    "germany_master": ("application_documents", {"uni_assist_apply", "direct_apply"}),
-    "ireland_master": (None, {"apply"}),
-    "pakistan_bs": (None, {"merit_list"}),
-}
+# per route that has the pack step: the task review_pack follows, and the tasks that must follow it. The pack step is
+# route data: the fake routes have none (their plans are shared Slice 1 fixtures), and their packs still build.
+ORDER = {"germany_master": ("application_documents", {"uni_assist_apply", "direct_apply"})}
 
 
 def task(book, key):
     return next((t for t in book.tasks if t.template_key == key), None)
+
+
+def test_fake_routes_have_no_pack_step():
+    assert task(BOOKS["ireland_master"], "review_pack") is None and task(BOOKS["pakistan_bs"], "review_pack") is None
 
 
 def test_review_pack_in_each_route():

@@ -12,14 +12,6 @@ eligibility:
   grade_scales:
     percent: {best: 100, provisional_min_pass: 40, value: transcript.percentage}
 tasks:
-  # Slice 6a: the pack step, before applying (spec S6a-D8)
-  - template_key: review_pack
-    task_type: student.approve
-    title: Review and approve your application pack
-    kind: student
-    inbox_kind: approve
-    fan_out: programme
-    duration_days: 2
   - template_key: apply
     task_type: student.act
     title: Apply to the programme
@@ -27,7 +19,6 @@ tasks:
     inbox_kind: act
     fan_out: programme
     anchor: {fact: deadline_close}
-    depends_on: [{key: review_pack}]
     duration_days: 3
   - template_key: visa
     task_type: student.act

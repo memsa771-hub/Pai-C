@@ -45,11 +45,8 @@ def test_invalid_playbook_rejected(tmp_path, mutate, msg):
 def test_citation_from_fact_satisfies_requirement(tmp_path):
     data = _ie()
     data["require_citations"] = True
-    for t in data["tasks"]:  # one task cited from a fact, the others directly
-        if t["template_key"] == "apply":
-            t["citation_from_fact"] = "deadline_close"
-        else:
-            t["citations"] = [{"source": "S1", "url": "https://example.org/visa"}]
+    data["tasks"][0]["citation_from_fact"] = "deadline_close"
+    data["tasks"][1]["citations"] = [{"source": "S1", "url": "https://example.org/visa"}]
     assert load_playbook(_write(tmp_path, data)).require_citations
 
 
