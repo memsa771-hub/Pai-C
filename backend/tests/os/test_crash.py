@@ -375,3 +375,77 @@ def test_crash_during_pack_build(os_db, engine, clean, tmp_path):
         files = conn.execute(select(models.pack_files.c.student_ref, models.pack_files.c.item_key)).all()
     per_student = len(doc_items) + 3  # each document, the data sheet, the SOP and the CV
     assert len(files) == len(set(files)) == len(students) * per_student
+
+
+def test_crash_during_visa_build(os_db, engine, clean, tmp_path):
+    """Slice 6b plan Task 7: SIGKILL workers while visa files are rendered. Every visa file ends built, with exactly
+    one version and one stored file per item: nothing lost, nothing duplicated."""
+    import io
+
+    from PIL import Image
+
+    from app.os.artifacts.store import ArtifactStore
+    from app.os.documents.store import DocumentStore
+    from app.os.knowledge import SqlKnowledge
+    from app.os.packs.config import load_pack_configs
+    from app.os.packs.inputs import inputs_sha, load_inputs
+    from app.os.packs.run import enqueue_pack
+    from app.os.packs.visa import VisaChoiceStore
+    from app.os.playbooks import load_playbook_dir
+
+    reset_dbos_schema(os_db)
+    route, programme, year = "germany_master", "ovgu-eeit", 2027
+    cfg = load_pack_configs(kind="visa")[route]
+    book = next(b for (k, _), b in load_playbook_dir().items() if k == route)
+    kb = SqlKnowledge(engine, "pai")
+    docs, arts, choices = DocumentStore(engine, "pai"), ArtifactStore(engine, "pai"), VisaChoiceStore(engine, "pai")
+    doc_items = [i for i in cfg.checklist if i.kind == "document"]
+    students = [f"crash-student-{n}" for n in range(8)]
+    for s in students:  # synthetic noisy scans, so each conversion takes real time and kills land inside one
+        for item in doc_items:
+            out = io.BytesIO()
+            Image.frombytes("RGB", (1600, 2000), os.urandom(1600 * 2000 * 3)).save(out, "JPEG", quality=90)
+            docs.set_status(docs.create(s, item.ref, 1, f"{item.ref}.jpg", "image/jpeg", out.getvalue()), "confirmed")
+        for kind in ("sop", "cv"):
+            a = arts.get_or_create(s, kind, None)
+            arts.approve(a.id, arts.add_version(a.id, f"A fictional {kind}.", "student").number)
+        choices.set_programme(s, programme)
+    pool = Pool(os_db, tmp_path)
+    rng = random.Random(19)
+    kills = 0
+    client = None
+    try:
+        for slot in range(2):
+            pool.start(slot)
+        client = DBOSClient(system_database_url=os_db, dbos_system_schema=TEST_DBOS_SCHEMA, application_name=APP_NAME)
+        _wait_queue(client, pool)
+        for s in students:
+            sha = inputs_sha(load_inputs(engine, "pai", kb, book, cfg, None, s, programme, year, "visa"))
+            enqueue_pack(client, "pai", s, programme, route, year, sha, kind="visa")
+        deadline = time.monotonic() + TIMEOUT_S
+        next_kill = time.monotonic() + KILL_EVERY_S
+        while True:
+            files_ = [a for s in students for a in arts.list_for(s) if a.kind == "visa"]
+            statuses = [a.status for a in files_]
+            if len(files_) == len(students) and set(statuses) <= {"ready", "incomplete"}:
+                break
+            assert time.monotonic() < deadline, f"stuck: {statuses} (logs: {tmp_path})"
+            if time.monotonic() >= next_kill and kills < 6:
+                slot = rng.randrange(2)
+                pool.kill(slot)
+                kills += 1
+                pool.start(slot)
+                next_kill = time.monotonic() + KILL_EVERY_S
+            time.sleep(0.2)
+    finally:
+        pool.stop_all()
+        if client is not None:
+            client.destroy()
+
+    assert kills >= 2
+    for a in files_:
+        assert len(arts.versions(a.id)) == 1, a  # one manifest version per inputs
+    with engine.connect() as conn:
+        files = conn.execute(select(models.pack_files.c.student_ref, models.pack_files.c.item_key)).all()
+    per_student = len(doc_items) + 3  # each document, the data sheet, the motivation letter (the SOP) and the CV
+    assert len(files) == len(set(files)) == len(students) * per_student
