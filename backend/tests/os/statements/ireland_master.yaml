@@ -1,0 +1,21 @@
+# Fake route statements (Slice 5 spec S5-D12): other questions, same kinds, same code.
+route_key: ireland_master
+documents_task: apply
+questions:
+  - {id: background, prompt: "Summarise your academic background."}
+  - {id: motivation, prompt: "What motivates you to take this course?"}
+  - {id: experience, prompt: "What relevant experience do you have?", required: false}
+  - {id: strengths, prompt: "What are your main strengths?"}
+  - {id: research, prompt: "Which topics would you like to research?"}
+  - {id: why_ireland, prompt: "Why Ireland?"}
+  - {id: future, prompt: "Where do you see yourself in five years?"}
+  - {id: other, prompt: "Anything else?", required: false}
+kinds:
+  sop:
+    default_words: 800
+    rubric: {criteria: ["Motivation", "Evidence", "Within the limit"]}
+    profile_keys: [transcript.institution, transcript.percentage]
+  cv:
+    default_words: 600
+    rubric: {criteria: ["Sections present", "Dates consistent"]}
+    profile_keys: [transcript.institution]
