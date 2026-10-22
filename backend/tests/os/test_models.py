@@ -34,6 +34,8 @@ def test_os_tables_present():
         "os_documents", "os_document_files", "os_document_fields", "os_document_findings", "os_profile_values",
         # Slice 4 (os_0006)
         "os_programme_requests", "os_eligibility_seen", "os_eligibility_notes",
+        # Slice 5 (os_0008)
+        "os_statement_answers", "os_artifacts", "os_artifact_versions", "os_approvals", "os_statement_rules",
     }
 
 

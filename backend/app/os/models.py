@@ -286,6 +286,9 @@ agent_runs = Table(
     Column("at", DateTime(timezone=True), nullable=False, server_default=func.now()),
     UniqueConstraint("research_run_id", "reading", name="uq_os_agent_runs_reading"),
     UniqueConstraint("document_id", "reading", name="uq_os_agent_runs_document"),
+    # Slice 5 (os_0008): a Writer or Critic reading belongs to an artifact.
+    Column("artifact_id", BigInteger, ForeignKey("os.os_artifacts.id", ondelete="SET NULL")),
+    UniqueConstraint("artifact_id", "reading", name="uq_os_agent_runs_artifact"),
 )
 
 # --- Slice 3: Documents (spec 2026-10-20 §3, os_0004) ------------------------------------------------------
@@ -405,4 +408,75 @@ eligibility_notes = Table(
     _created(),
     Column("read_at", DateTime(timezone=True)),
     Index("ix_os_eligibility_notes_student", "tenant_id", "student_ref"),
+)
+
+
+# --- Slice 5: statements (spec 2026-10-22 §3, os_0008) -------------------------------------------------------
+
+ARTIFACT_KINDS = ('sop', 'cv')
+ARTIFACT_STATUSES = ('empty', 'drafting', 'draft', 'needs_answers', 'failed', 'approved')
+
+statement_answers = Table(
+    "os_statement_answers", md,
+    _id(), _tenant(),
+    Column("student_ref", Text, nullable=False),
+    Column("question_id", Text, nullable=False),  # a route question's id, or "followup:<n>"
+    Column("question", Text),  # the text of a follow-up question (route questions live in config)
+    Column("answer", Text, nullable=False, server_default=""),
+    Column("updated_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
+    UniqueConstraint("tenant_id", "student_ref", "question_id", name="uq_os_statement_answers"),
+)
+
+artifacts = Table(
+    "os_artifacts", md,
+    _id(), _tenant(),
+    Column("student_ref", Text, nullable=False),
+    Column("kind", Text, nullable=False),
+    Column("programme_ref", Text, nullable=False, server_default=""),  # "" = the base artifact
+    Column("status", Text, nullable=False, server_default="empty"),
+    Column("current_version", Integer),
+    _created(),
+    Column("updated_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
+    UniqueConstraint("tenant_id", "student_ref", "kind", "programme_ref", name="uq_os_artifacts_key"),
+    _in("kind", ARTIFACT_KINDS, "ck_os_artifacts_kind"),
+    _in("status", ARTIFACT_STATUSES, "ck_os_artifacts_status"),
+)
+
+artifact_versions = Table(
+    "os_artifact_versions", md,
+    _id(), _tenant(),
+    Column("artifact_id", BigInteger, ForeignKey("os.os_artifacts.id", ondelete="CASCADE"), nullable=False),
+    Column("number", Integer, nullable=False),
+    Column("text", Text, nullable=False),
+    Column("sha256", Text, nullable=False),
+    Column("author", Text, nullable=False),
+    Column("words", Integer, nullable=False),
+    Column("critic", JSONB),
+    Column("flags", JSONB, nullable=False, server_default=text("'[]'::jsonb")),
+    Column("limit_words", Integer),
+    _created(),
+    UniqueConstraint("artifact_id", "number", name="uq_os_artifact_versions"),
+    _in("author", ('writer', 'student'), "ck_os_artifact_versions_author"),
+)
+
+approvals = Table(
+    "os_approvals", md,
+    _id(), _tenant(),
+    Column("artifact_id", BigInteger, ForeignKey("os.os_artifacts.id", ondelete="CASCADE"), nullable=False),
+    Column("version", Integer, nullable=False),
+    Column("sha256", Text, nullable=False),
+    Column("approved_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
+    UniqueConstraint("artifact_id", name="uq_os_approvals_artifact"),
+)
+
+statement_rules = Table(
+    "os_statement_rules", md,
+    _id(), _tenant(),
+    Column("student_ref", Text, nullable=False),
+    Column("programme_ref", Text, nullable=False),
+    Column("prompt", Text),
+    Column("limit_words", Integer),
+    Column("limit_chars", Integer),
+    Column("updated_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
+    UniqueConstraint("tenant_id", "student_ref", "programme_ref", name="uq_os_statement_rules"),
 )
