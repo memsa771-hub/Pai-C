@@ -16,6 +16,7 @@ from app.os.playbooks import Playbook, load_playbook_dir
 from app.os.runner import APP_NAME, default_registry
 from app.os.service import PlanService
 from app.os.settings import OsSettings
+from app.os.packs.config import PackConfig, load_pack_configs
 from app.os.statements.config import StatementConfig, load_statement_configs
 
 
@@ -31,6 +32,7 @@ class Services:
     document_types: Mapping[str, DocumentType]  # Slice 3: validated at mount, like the playbooks
     name_variants: list[set[str]]
     statement_configs: Mapping[str, StatementConfig] = None  # Slice 5: per route, checked at mount
+    pack_configs: Mapping[str, PackConfig] = None  # Slice 6a: per route, checked at mount
 
 
 def _client_factory(settings: OsSettings) -> Callable[[], object]:
@@ -49,7 +51,8 @@ def make_services(settings: OsSettings, *, engine: Engine | None = None,
                   today: Callable[[], date] | None = None,
                   dbos_client: Callable[[], object] | None = None,
                   document_types: Mapping[str, DocumentType] | None = None,
-                  statement_configs: Mapping[str, StatementConfig] | None = None) -> Services:
+                  statement_configs: Mapping[str, StatementConfig] | None = None,
+                  pack_configs: Mapping[str, PackConfig] | None = None) -> Services:
     engine = engine or make_engine(settings)
     books = playbooks if playbooks is not None else load_playbook_dir()
     registry = default_registry()
@@ -61,4 +64,5 @@ def make_services(settings: OsSettings, *, engine: Engine | None = None,
     types = document_types if document_types is not None else load_document_types()
     return Services(settings, engine, kernel, knowledge, plans, dbos_client or _client_factory(settings), today,
                     types, load_name_variants(),
-                    statement_configs if statement_configs is not None else load_statement_configs())
+                    statement_configs if statement_configs is not None else load_statement_configs(),
+                    pack_configs if pack_configs is not None else load_pack_configs())

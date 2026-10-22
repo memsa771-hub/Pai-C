@@ -77,6 +77,7 @@ from app.os.documents.run import enqueue_document
 from app.os.documents.store import DocumentStore, DuplicateDocument, FindingStore, ProfileStore
 from app.os.eligibility.notes import on_profile_change
 from app.os.api import self_serve
+from app.os.api.packs import add_pack_routes, complete_ready_packs
 from app.os.knowledge.requests import RequestLimit, request_programme
 from app.os.routes import builder
 from app.os.kernel import IllegalTransition
@@ -130,6 +131,7 @@ def build_router(get_services: Callable[[], Services]) -> APIRouter:
     @router.get("/inbox", response_model=InboxOut)
     def inbox(student: str = Depends(current_student_ref), svc: Services = Depends(services)) -> dict:
         complete_ready(svc, student)  # Slice 5: a documents task whose statements are already approved
+        complete_ready_packs(svc, student)  # Slice 6a: a review_pack task whose pack is already approved
         tenant = svc.settings.tenant_id
         return {"items": inbox_items(svc.engine, tenant, student),
                 "notes": eligibility_notes(svc.engine, tenant, student)}
@@ -478,4 +480,5 @@ def build_router(get_services: Callable[[], Services]) -> APIRouter:
         return {"version": approval.version, "sha256": approval.sha256, "approved_at": approval.approved_at,
                 "completed_tasks": done}
 
+    add_pack_routes(router, services)  # Slice 6a (spec §4)
     return router
