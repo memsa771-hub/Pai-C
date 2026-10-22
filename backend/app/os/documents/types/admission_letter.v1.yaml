@@ -1,0 +1,10 @@
+# Admission letter (Slice 6b spec S6b-D6): the university's offer, which the visa file needs. Added by config only.
+key: admission_letter
+version: 1
+label: Admission letter
+fields:
+  - {name: student_name, type: name, cross_check: full_name, hint: "The admitted student's name exactly as printed"}
+  - {name: institution, type: text, hint: "The university that issued the letter"}
+  - {name: programme, type: text, hint: "The programme of study the letter admits the student to, as printed"}
+  - {name: start_date, type: date, hint: "When the studies start (semester start or enrolment date), YYYY-MM-DD"}
+  - {name: issue_date, type: date, hint: "Date of the letter, YYYY-MM-DD"}
