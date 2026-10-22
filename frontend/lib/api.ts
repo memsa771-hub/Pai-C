@@ -426,6 +426,60 @@ class WorkspaceApi {
   }
 
   // ---------------------------------------------------------------------------
+  // PAI OS application packs (Slice 6a spec §4)
+  // ---------------------------------------------------------------------------
+
+  /** PAI OS: one pack per programme in the student's plan (reading also starts any rebuild that is due). */
+  async getOsPacks(): Promise<import('./os-packs').OsPacks> {
+    const params = new URLSearchParams({ network: this.requireWorkspace() });
+    return this.requestJson(`/v1/os/packs?${params}`);
+  }
+
+  async buildOsPack(programmeRef: string): Promise<{ workflow_id: string }> {
+    const params = new URLSearchParams({ network: this.requireWorkspace() });
+    return this.requestJson(`/v1/os/packs/${encodeURIComponent(programmeRef)}/build?${params}`, { method: 'POST' });
+  }
+
+  /** PAI OS: the details no document shows (email, phone, address…). */
+  async saveOsPackDetails(fields: Record<string, string | null>): Promise<{ saved: number }> {
+    const params = new URLSearchParams({ network: this.requireWorkspace() });
+    return this.requestJson(`/v1/os/packs/details?${params}`, { method: 'PUT', body: JSON.stringify({ fields }) });
+  }
+
+  async updateOsPackItems(programmeRef: string,
+                          change: { tick?: string[]; untick?: string[]; add?: { label: string }[] }): Promise<{ added: string[] }> {
+    const params = new URLSearchParams({ network: this.requireWorkspace() });
+    return this.requestJson(`/v1/os/packs/${encodeURIComponent(programmeRef)}/items?${params}`, {
+      method: 'PUT', body: JSON.stringify(change),
+    });
+  }
+
+  /**
+   * PAI OS: one rendered file, fetched with the same auth headers (no token in a URL), returned as a Blob with the
+   * file name the server gave, for the page to save.
+   */
+  async downloadOsPackFile(programmeRef: string, sha256: string): Promise<{ blob: Blob; filename: string }> {
+    const params = new URLSearchParams({ network: this.requireWorkspace() });
+    const headers: Record<string, string> = {};
+    if (this.token) headers['X-Workspace-Token'] = this.token;
+    if (this.bearerToken) headers['Authorization'] = `Bearer ${this.bearerToken}`;
+    const res = await fetch(`${API_URL}/v1/os/packs/${encodeURIComponent(programmeRef)}/files/${sha256}?${params}`, {
+      headers, credentials: 'include', cache: 'no-store',
+    });
+    if (!res.ok) throw new Error(`API ${res.status}: ${await res.text()}`);
+    const m = /filename="([^"]+)"/.exec(res.headers.get('Content-Disposition') ?? '');
+    return { blob: await res.blob(), filename: m ? m[1] : `${sha256.slice(0, 12)}.pdf` };
+  }
+
+  /** PAI OS: approve the pack version the student is looking at (409 if it changed or is incomplete). */
+  async approveOsPack(programmeRef: string, sha256: string): Promise<{ sha256: string; version: number }> {
+    const params = new URLSearchParams({ network: this.requireWorkspace() });
+    return this.requestJson(`/v1/os/packs/${encodeURIComponent(programmeRef)}/approve?${params}`, {
+      method: 'POST', body: JSON.stringify({ sha256 }),
+    });
+  }
+
+  // ---------------------------------------------------------------------------
   // Workspace CRUD (REST endpoints — not event-based)
   // ---------------------------------------------------------------------------
 

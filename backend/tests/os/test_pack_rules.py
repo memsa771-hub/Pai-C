@@ -153,3 +153,17 @@ def test_fake_routes_build_sheet_and_checklist():
     with_referee = inputs(cfg=FAKE["ireland_master"], constants={}, citations={},
                           profile={"entered.referee_name": ProfileValue("Dr Example", "entered", None)})
     assert by_key(checklist(with_referee, "p1"))["referee"].state == "ready"
+
+
+def test_rows_say_which_fields_the_student_types():
+    rows = {r.key: r for r in data_sheet(inputs())}
+    assert rows["email"].entered and rows["phone"].entered and not rows["surname"].entered
+
+
+def test_items_say_whether_a_tick_settles_them():
+    r = by_key(checklist(inputs(added=[("added:1", "Module descriptions")]), "p1"))
+    assert r["degree"].tickable and r["fee_paid"].tickable and r["added:1"].tickable  # attested note, manual, added
+    assert not r["passport"].tickable and not r["sop"].tickable
+    docs = docs_all_confirmed(CFG)
+    docs["degree_certificate"] = DocState("failed", 2, None)
+    assert not by_key(checklist(inputs(documents=docs), "p1"))["degree"].tickable  # a tick can't fix a bad scan

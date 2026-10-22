@@ -23,6 +23,7 @@ class ItemResult:
     reasons: list[str] = field(default_factory=list)
     source: Literal["research", "default", "student"] = "default"
     document_id: int | None = None
+    tickable: bool = False  # the student settles it with a tick (a manual item, or a note no converter can check)
 
 
 def _effective(inp: PackInputs):
@@ -42,7 +43,7 @@ def checklist(inp: PackInputs, programme_ref: str, unfixable: dict[str, str] | N
         base = {"key": item.key, "label": item.label, "kind": item.kind, "source": source}
         ticked = item.key in inp.ticked
         if item.kind == "manual":
-            out.append(ItemResult(**base, state="manual", ticked=ticked))
+            out.append(ItemResult(**base, state="manual", ticked=ticked, tickable=True))
         elif item.kind == "entered":
             v = inp.profile.get(ENTERED_PREFIX + item.ref)
             filled = v is not None and v.value not in (None, "")
@@ -56,7 +57,7 @@ def checklist(inp: PackInputs, programme_ref: str, unfixable: dict[str, str] | N
             out.append(_document(inp, item, base, ticked, unfixable.get(item.key)))
     for key, label in inp.added:
         out.append(ItemResult(key=key, label=label, kind="manual", state="manual", ticked=key in inp.ticked,
-                              source="student"))
+                              source="student", tickable=True))
     return out
 
 
@@ -75,8 +76,8 @@ def _document(inp: PackInputs, item, base: dict, ticked: bool, unfixable: str | 
         return ItemResult(**base, **where, state="needs_action", reasons=[unfixable])
     notes = inp.cfg.format_for(item).notes
     if notes and not ticked:  # what no converter can check: the student confirms it with a tick
-        return ItemResult(**base, **where, state="needs_action", reasons=list(notes))
-    return ItemResult(**base, **where, state="ready", ticked=ticked)
+        return ItemResult(**base, **where, state="needs_action", reasons=list(notes), tickable=True)
+    return ItemResult(**base, **where, state="ready", ticked=ticked, tickable=bool(notes))
 
 
 def complete(results: list[ItemResult]) -> bool:

@@ -17,6 +17,7 @@ class SheetRow:
     document_id: int | None
     gap: bool  # required and missing
     hint: str = ""
+    entered: bool = False  # a field the student types on the details form (no document shows it)
 
 
 def data_sheet(inp: PackInputs) -> list[SheetRow]:
@@ -26,5 +27,6 @@ def data_sheet(inp: PackInputs) -> list[SheetRow]:
             v = inp.profile.get(ENTERED_PREFIX + f.key if f.source == ENTERED else f.source)
             value = None if v is None or v.value in (None, "") else show(v.value)
             rows.append(SheetRow(section.title, f.key, f.label, value, v.source if value else None,
-                                 v.document_id if value else None, f.required and value is None, f.hint))
+                                 v.document_id if value else None, f.required and value is None, f.hint,
+                                 f.source == ENTERED))
     return rows
