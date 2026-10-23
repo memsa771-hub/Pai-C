@@ -449,3 +449,69 @@ def test_crash_during_visa_build(os_db, engine, clean, tmp_path):
         files = conn.execute(select(models.pack_files.c.student_ref, models.pack_files.c.item_key)).all()
     per_student = len(doc_items) + 3  # each document, the data sheet, the motivation letter (the SOP) and the CV
     assert len(files) == len(set(files)) == len(students) * per_student
+
+
+def test_crash_during_replan(os_db, engine, clean, tmp_path):
+    """Slice 7 spec §8: SIGKILL workers while replans run. Every event ends with exactly one proposal, one override
+    and one replan revision: nothing lost, nothing duplicated."""
+    from app.os.knowledge import SEED_DIR, SqlKnowledge, load_seed
+    from app.os.playbooks import load_playbook_dir
+    from app.os.replan import events
+    from app.os.replan.run import enqueue_replan
+    from app.os.service import PlanService
+    from app.os.settings import load_settings
+    from tests.os.test_golden import TEST_STUDENT
+
+    reset_dbos_schema(os_db)
+    kb = SqlKnowledge(engine, "pai")
+    load_seed(SEED_DIR / "germany_ws2027.yaml", kb)
+    svc = PlanService(engine, load_settings({"DATABASE_URL": "x"}), Kernel(engine, "pai"), kb, load_playbook_dir(),
+                      today=lambda: date(2027, 2, 1))
+    plan_ids, event_ids = [], []
+    for n in range(8):
+        c = TEST_STUDENT.model_copy(update={"external_ref": f"crash-{n}", "student_ref": f"crash-student-{n}"})
+        plan_id = svc.start_plan(c).plan_id
+        with engine.begin() as conn:
+            event_ids.append(events.record(conn, "pai", plan_id, "approved_changed",
+                                           {"template_key": "review_visa_file", "programme_ref": None}, f"crash-{n}"))
+        plan_ids.append(plan_id)
+    pool = Pool(os_db, tmp_path)
+    rng = random.Random(23)
+    kills = 0
+    client = None
+    PR, O, REV = models.proposals, models.plan_overrides, models.plan_revisions
+    try:
+        for slot in range(2):
+            pool.start(slot)
+        client = DBOSClient(system_database_url=os_db, dbos_system_schema=TEST_DBOS_SCHEMA, application_name=APP_NAME)
+        _wait_queue(client, pool)
+        for plan_id, eid in zip(plan_ids, event_ids):
+            enqueue_replan(client, "pai", plan_id, eid)
+        deadline = time.monotonic() + TIMEOUT_S
+        next_kill = time.monotonic() + KILL_EVERY_S
+        while True:
+            with engine.connect() as conn:
+                done = conn.execute(select(func.count()).select_from(PR).where(
+                    PR.c.status == "applied", PR.c.revision.is_not(None))).scalar()
+            if done == len(plan_ids):
+                break
+            assert time.monotonic() < deadline, f"stuck: {done} of {len(plan_ids)} (logs: {tmp_path})"
+            if time.monotonic() >= next_kill and kills < 6:
+                slot = rng.randrange(2)
+                pool.kill(slot)
+                kills += 1
+                pool.start(slot)
+                next_kill = time.monotonic() + KILL_EVERY_S
+            time.sleep(0.2)
+    finally:
+        pool.stop_all()
+        if client is not None:
+            client.destroy()
+
+    assert kills >= 2
+    with engine.connect() as conn:
+        for plan_id in plan_ids:
+            assert conn.execute(select(func.count()).select_from(PR).where(PR.c.plan_id == plan_id)).scalar() == 1
+            assert conn.execute(select(func.count()).select_from(O).where(O.c.plan_id == plan_id)).scalar() == 1
+            assert conn.execute(select(func.count()).select_from(REV).where(
+                REV.c.plan_id == plan_id, REV.c.cause.like("replan:%"))).scalar() == 1

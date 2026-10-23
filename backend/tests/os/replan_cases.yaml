@@ -1,0 +1,77 @@
+# The Slice 7 gate's scripted events (spec "Done when": every scripted event gives the right change). Each case:
+# a route, the plan's programmes, optional task states to set first, one event, and the expected end state.
+# `supervisor`: what the fake Supervisor answers (recorded output), for cases the rules hand over.
+# Fictional data only.
+- id: germany_rejection_cancels_after_accept
+  route: germany_master
+  event: {type: admission_rejected, programme_ref: tu-chemnitz-embedded-systems}
+  expect: {status: pending, ops: [cancel_programme], accept: true, cancelled_programme: tu-chemnitz-embedded-systems}
+
+- id: germany_document_missing_nudges
+  route: germany_master
+  event: {type: document_missing, instance_key: hec_attestation}
+  expect: {status: applied, ops: [request_from_student], outbox: hec_attestation}
+
+- id: germany_changed_file_re_review
+  route: germany_master
+  event: {type: approved_changed, template_key: review_visa_file, programme_ref: null}
+  expect: {status: applied, ops: [add_task], task: "review_visa_file#2"}
+
+- id: germany_failed_once_retries
+  route: germany_master
+  states: {applications_submitted: failed}
+  event: {type: task_failed, instance_key: applications_submitted, attempt: 1}
+  expect: {status: retried}
+
+- id: germany_failed_twice_escalates
+  route: germany_master
+  event: {type: task_failed, instance_key: applications_submitted, attempt: 2}
+  expect: {status: applied, ops: [escalate], support: true}
+
+- id: germany_newer_guide_missing_refused
+  route: germany_master
+  event: {type: playbook_newer, version: 99}  # no such version: refused, a person checks (invariant 10)
+  expect: {status: refused, support: true}
+
+- id: germany_deadline_at_risk_asks_student
+  route: germany_master
+  event: {type: deadline_at_risk, instance_key: review_visa_file}
+  expect: {status: applied, ops_include: [request_from_student]}
+
+- id: germany_escalation_supervisor
+  route: germany_master
+  event: {type: escalate, instance_key: travel_insurance}
+  supervisor: {ops: [{op: request_from_student, instance_key: travel_insurance, message: "Please buy your insurance.",
+                      reason: "The visa needs it."}], summary: "Ask for the insurance."}
+  expect: {status: applied, ops: [request_from_student], source: supervisor}
+
+- id: germany_supervisor_invented_step_refused
+  route: germany_master
+  event: {type: route_invalid, error: "fictional"}
+  supervisor: {ops: [{op: add_task, template_key: invented_step, reason: "x"}], summary: "?"}
+  expect: {status: refused, support: true}
+
+- id: ireland_rejection_cancels_after_accept
+  route: ireland_master
+  programmes: [i1, i2]
+  event: {type: admission_rejected, programme_ref: i1}
+  expect: {status: pending, ops: [cancel_programme], accept: true, cancelled_programme: i1}
+
+- id: ireland_document_missing_nudges
+  route: ireland_master
+  programmes: [i1, i2]
+  event: {type: document_missing, instance_key: visa}
+  expect: {status: applied, ops: [request_from_student], outbox: visa}
+
+- id: pakistan_escalation_supervisor
+  route: pakistan_bs
+  programmes: [k1, k2]
+  event: {type: escalate, instance_key: entry_test}
+  supervisor: {ops: [{op: escalate, reason: "A person should check the entry test date."}], summary: "Escalate."}
+  expect: {status: applied, ops: [escalate], support: true, source: supervisor}
+
+- id: pakistan_rejection_cancels_after_accept
+  route: pakistan_bs
+  programmes: [k1, k2]
+  event: {type: admission_rejected, programme_ref: k2}
+  expect: {status: pending, ops: [cancel_programme], accept: true, cancelled_programme: k2}

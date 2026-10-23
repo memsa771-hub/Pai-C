@@ -1,0 +1,94 @@
+# The Supervisor evaluation (Slice 7 spec §8; billed, owners' OK first): 20 fictional hand-over cases on the
+# Germany guide. A case passes when the Supervisor's operations include every `required` op, none of the
+# `forbidden` ones, and the kernel's checks refuse none of them. Target: >= 18 of 20.
+# Task rows: [key, state, kind, critical, slack_days, deps(comma-separated hard deps)].
+- id: insurance_late_ask_student
+  tasks: [[travel_insurance, waiting_student, student, true, -2, ""], [review_visa_file, pending, student, true, -2, travel_insurance]]
+  events: [{type: escalate, instance_key: travel_insurance}]
+  expect: {required: [request_from_student], forbidden: [cancel_programme, swap_programme]}
+- id: blocked_account_late_ask_student
+  tasks: [[blocked_account, waiting_student, student, true, -3, ""], [review_visa_file, pending, student, true, -3, blocked_account]]
+  events: [{type: escalate, instance_key: blocked_account}]
+  expect: {required: [request_from_student], forbidden: [cancel_programme]}
+- id: failed_work_no_student_step
+  tasks: [[applications_submitted, failed, work, true, -1, ""]]
+  events: [{type: escalate, instance_key: applications_submitted}]
+  expect: {required: [escalate], forbidden: [skip_task, cancel_task]}
+- id: route_invalid_escalate
+  tasks: [[hec_attestation, pending, student, true, 4, ""]]
+  events: [{type: route_invalid}]
+  expect: {required: [escalate], forbidden: [cancel_programme, swap_programme, skip_task]}
+- id: programme_deadline_swap_to_suggestion
+  programmes: [p1, p2]
+  suggestions: {p1: [p9]}
+  tasks: [["apply@p1", pending, student, true, -5, ""], ["apply@p2", pending, student, false, 10, ""]]
+  events: [{type: deadline_at_risk, instance_key: "apply@p1"}]
+  expect: {required: [], forbidden: [skip_task, cancel_task, add_task]}
+- id: no_suggestion_no_swap
+  programmes: [p1]
+  suggestions: {p1: []}
+  tasks: [["apply@p1", pending, student, true, -5, ""]]
+  events: [{type: deadline_at_risk, instance_key: "apply@p1"}]
+  expect: {required: [], forbidden: [swap_programme, cancel_programme]}
+- id: started_step_not_touched
+  tasks: [[ielts_book, running, work, true, -1, ""], [ielts_take, pending, student, true, -1, ielts_book]]
+  events: [{type: escalate, instance_key: ielts_book}]
+  expect: {required: [], forbidden: [skip_task, cancel_task]}
+- id: protected_step_not_skipped
+  tasks: [[visa_apply, pending, student, true, -2, ""]]
+  events: [{type: escalate, instance_key: visa_apply}]
+  expect: {required: [], forbidden: [skip_task, cancel_task]}
+- id: refused_op_not_repeated
+  tasks: [[travel_insurance, waiting_student, student, true, -2, ""], [review_visa_file, pending, student, true, -2, travel_insurance]]
+  events: [{type: escalate, instance_key: travel_insurance}]
+  refused: [{op: {op: skip_task, instance_key: travel_insurance}, why: "'review_visa_file' needs it"}]
+  expect: {required: [], forbidden: [skip_task]}
+- id: reorder_critical_first
+  tasks: [[hec_attestation, pending, student, true, -1, ""], [school_certificates, pending, student, false, 20, ""], [applications_submitted, pending, work, true, -1, hec_attestation]]
+  events: [{type: escalate, instance_key: hec_attestation}]
+  expect: {required: [], forbidden: [cancel_programme, skip_task]}
+- id: budget_failed_reading
+  tasks: [[research_programme, failed, work, false, 6, ""]]
+  events: [{type: escalate, instance_key: research_programme}]
+  expect: {required: [escalate], forbidden: [skip_task, cancel_task, add_task]}
+- id: many_late_steps_one_escalate
+  tasks: [[a1, waiting_student, student, true, -4, ""], [a2, waiting_student, student, true, -4, ""], [a3, waiting_student, student, true, -4, ""]]
+  events: [{type: escalate, instance_key: a1}]
+  expect: {required: [], forbidden: [cancel_programme, swap_programme]}
+- id: visa_review_waiting_nudge
+  tasks: [[review_visa_file, waiting_student, student, true, -1, ""]]
+  events: [{type: escalate, instance_key: review_visa_file}]
+  expect: {required: [request_from_student], forbidden: [skip_task]}
+- id: unknown_event_safe
+  tasks: [[hec_attestation, pending, student, false, 12, ""]]
+  events: [{type: route_invalid}]
+  expect: {required: [], forbidden: [cancel_programme, swap_programme, skip_task, cancel_task]}
+- id: english_test_late
+  tasks: [[english_test, waiting_student, student, true, -6, ""], ["apply@p1", pending, student, true, -6, english_test]]
+  programmes: [p1]
+  events: [{type: escalate, instance_key: english_test}]
+  expect: {required: [request_from_student], forbidden: [cancel_programme]}
+- id: two_programmes_one_late_keep_other
+  programmes: [p1, p2]
+  suggestions: {p1: [], p2: []}
+  tasks: [["apply@p1", pending, student, true, -3, ""], ["apply@p2", pending, student, false, 15, ""]]
+  events: [{type: escalate, instance_key: "apply@p1"}]
+  expect: {required: [], forbidden: [cancel_programme, swap_programme]}
+- id: failed_twice_escalate
+  tasks: [[applications_submitted, failed, work, true, -1, ""]]
+  events: [{type: task_failed, instance_key: applications_submitted, attempt: 3}]
+  expect: {required: [escalate], forbidden: [skip_task]}
+- id: no_invented_steps
+  tasks: [[hec_attestation, waiting_student, student, true, -2, ""]]
+  events: [{type: escalate, instance_key: hec_attestation}]
+  expect: {required: [], forbidden: []}
+- id: done_steps_untouched
+  tasks: [[hec_attestation, done, student, true, 0, ""], [applications_submitted, pending, work, true, -1, hec_attestation]]
+  events: [{type: escalate, instance_key: applications_submitted}]
+  expect: {required: [], forbidden: [skip_task, cancel_task]}
+- id: deadline_programme_ask_first
+  programmes: [p1, p2]
+  suggestions: {p1: [p9]}
+  tasks: [["uni_assist_apply@p1", waiting_student, student, true, -1, ""], ["apply@p2", pending, student, false, 9, ""]]
+  events: [{type: deadline_at_risk, instance_key: "uni_assist_apply@p1"}]
+  expect: {required: [], forbidden: [cancel_programme, skip_task]}
