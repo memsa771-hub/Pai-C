@@ -12,9 +12,6 @@
    shorter laptop windows the same screen tightens its spacing instead of
    scrolling; the look (colours, type, components) never changes. */
 .auth-frame {
-  /* Figma's 1440 x 900 frame at this window height, and its panel column. */
-  --auth-frame-w: min(100vw, calc((100svh - 48px) * 1.64319 + 40px));
-  --auth-aside-w: min(calc(var(--auth-frame-w) * 0.525), calc((100svh - 48px) * 0.840376 + 40px));
   --auth-pad: 32px;
   --auth-gap: 28px;
   --auth-gap-onb: 22px;

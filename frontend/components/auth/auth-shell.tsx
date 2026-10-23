@@ -3,10 +3,9 @@
 /** The sign-in and onboarding frame from Figma ("PAI / Sign in / Refined" and
  * "PAI / Onboarding / 01–03"): a white column with a soft pattern, the PAI
  * logo and the form; beside it a pale-blue panel where PAI waves from a
- * portal above a chat prompt. The panel is drawn at its design size
- * (716 × 852) and scaled to fit, so it looks the same on every screen; on
- * screens narrower than a laptop it follows the form instead of sitting
- * beside it. */
+ * portal above a chat prompt. The two columns always fill the screen; the
+ * panel's artwork is drawn at its design size (716 × 852) and fitted inside
+ * it. On screens narrower than a laptop the panel follows the form. */
 
 import { useEffect, useId, useRef, useState } from 'react';
 import Link from 'next/link';
@@ -141,13 +140,17 @@ function OnboardingMascot({ lines }: { lines?: { x: number; y: number } }) {
   );
 }
 
-/** The right-hand panel of each frame, at design size (716 × 852). */
-function PanelArt({ panel, prompt }: { panel: AuthPanel; prompt: string }) {
+/** The quiet white arc in the panel's top-right corner, at design size. */
+function PanelBackdrop() {
+  return <img alt="" src="/auth/arc.svg" className="absolute left-[254px] top-[-320px] size-[700px] max-w-none" />;
+}
+
+/** What sits on the panel (PAI, the portal, the heading and the chat prompt), at design size. */
+function PanelContent({ panel, prompt }: { panel: AuthPanel; prompt: string }) {
   const t = useT();
   if (panel === 'sign-in') {
     return (
-      <div className="relative size-full overflow-clip rounded-[24px] bg-auth-panel">
-        <img alt="" src="/auth/arc.svg" className="absolute left-[254px] top-[-320px] size-[700px] max-w-none" />
+      <>
         <div className="absolute left-[244.56px] top-[221.5px] h-[395.936px] w-[234.534px]">
           <div className="absolute inset-[-4.55%_-7.67%]"><img alt="" src="/auth/portal-glow-sign-in.svg" className="block size-full max-w-none" /></div>
         </div>
@@ -161,15 +164,14 @@ function PanelArt({ panel, prompt }: { panel: AuthPanel; prompt: string }) {
         </div>
         <PromptPanel text={prompt} chip={t('auth.previewChip')} left={64} top={677} />
         <MotionLines x={189} y={412} />
-      </div>
+      </>
     );
   }
   const step = panel === 'about' ? '2' : '3';
   return (
-    <div className={cn('relative size-full overflow-clip rounded-[24px]', panel === 'name' ? 'bg-auth-panel' : 'bg-auth-panel-alt')}>
-      {panel === 'name'
-        ? <img alt="" src="/auth/arc.svg" className="absolute left-[254px] top-[-320px] size-[700px] max-w-none" />
-        : <img alt="" src={panel === 'about' ? '/auth/accents-about.svg' : '/auth/accents-location.svg'} className="absolute left-0 top-0 h-[852px] w-[716px] max-w-none" />}
+    <>
+      {/* Steps 2–3: the orbit around PAI and two small accents. */}
+      {panel !== 'name' && <img alt="" src="/auth/orbit.svg" className="absolute left-0 top-0 h-[852px] w-[716px] max-w-none" />}
       <OnboardingMascot lines={panel === 'about' ? { x: 112.58, y: 203 } : panel === 'location' ? { x: 110.58, y: 198 } : undefined} />
       <PromptPanel text={prompt} chip={t('onboarding.chip')} left={69} top={656} />
       {panel === 'name' && <MotionLines x={177} y={336} />}
@@ -180,7 +182,7 @@ function PanelArt({ panel, prompt }: { panel: AuthPanel; prompt: string }) {
           <p className="w-[588px] text-[27px] leading-[34px] text-auth-heading">{t(`onboarding.steps.${step}.heading` as never)}</p>
         </div>
       )}
-    </div>
+    </>
   );
 }
 
@@ -201,16 +203,11 @@ export function AuthShell({ title, subtitle, panel = 'sign-in', prompt, logoGap 
 }) {
   const t = useT();
   const [ref, { scale, beside }] = usePanelScale();
+  const design = { width: PANEL_W, height: PANEL_H };
   return (
-    <div className="auth-frame relative min-h-svh w-full bg-auth-page font-display text-auth-ink lg:h-svh lg:overflow-hidden">
-      {/* Beside each other, the pattern runs from the screen's left edge up to the panel column. */}
-      <div aria-hidden className="pointer-events-none absolute inset-y-0 left-0 hidden w-[calc((100vw-var(--auth-frame-w))/2+var(--auth-frame-w)-var(--auth-aside-w))] bg-[url(/auth/pattern.png)] bg-[length:684px_auto] bg-repeat opacity-10 lg:block" />
-      {/* Beside each other the frame keeps Figma's proportions (1440 × 900): the
-          panel column is exactly as wide as the panel at this height, and the
-          whole frame is centred, so the form sits the same distance from PAI. */}
-      <div className="relative lg:mx-auto lg:flex lg:h-full lg:w-[var(--auth-frame-w)]">
-      <main className="relative flex min-w-0 flex-col lg:flex-1 lg:overflow-y-auto">
-        <div aria-hidden className="pointer-events-none absolute inset-0 bg-[url(/auth/pattern.png)] bg-[length:684px_auto] bg-repeat opacity-10 lg:hidden" />
+    <div className="auth-frame min-h-svh w-full bg-auth-page font-display text-auth-ink lg:flex lg:h-svh lg:overflow-hidden">
+      <main className="relative flex min-w-0 flex-col lg:w-[47.5%] lg:overflow-y-auto">
+        <div aria-hidden className="pointer-events-none absolute inset-0 bg-[url(/auth/pattern.png)] bg-[length:684px_auto] bg-repeat opacity-10" />
         <div className="relative mx-auto flex w-full max-w-[442px] flex-1 flex-col justify-center px-4 py-10 lg:py-[var(--auth-pad)]">
           <div style={{ marginBottom: `calc(${logoGap}px * var(--auth-logo-scale))` }}><PaiLogo /></div>
           {(title || subtitle) && (
@@ -229,15 +226,19 @@ export function AuthShell({ title, subtitle, panel = 'sign-in', prompt, logoGap 
           </div>
         )}
       </main>
-      <aside aria-label={t('auth.previewLabel')} className="px-4 pb-4 lg:w-[var(--auth-aside-w)] lg:shrink-0 lg:pb-[25px] lg:pl-0 lg:pr-[40px] lg:pt-[23px]">
-        <div ref={ref} className="relative w-full lg:h-full" style={beside ? undefined : { height: PANEL_H * scale }}>
-          <div aria-hidden className={cn('absolute left-1/2 top-1/2', !scale && 'invisible')}
-            style={{ width: PANEL_W, height: PANEL_H, transform: `translate(-50%, -50%) scale(${scale || 1})` }}>
-            <PanelArt panel={panel} prompt={prompt ?? t('auth.previewPrompt')} />
+      {/* The panel fills its column; PAI and the prompt are fitted inside it. */}
+      <aside aria-label={t('auth.previewLabel')} className="px-4 pb-4 lg:w-[52.5%] lg:pb-[25px] lg:pl-0 lg:pr-[40px] lg:pt-[23px]">
+        <div ref={ref} aria-hidden
+          className={cn('relative w-full overflow-clip rounded-[24px] lg:h-full', panel === 'about' || panel === 'location' ? 'bg-auth-panel-alt' : 'bg-auth-panel', !scale && 'invisible')}
+          style={beside ? undefined : { height: PANEL_H * scale }}>
+          <div className="absolute right-0 top-0 origin-top-right" style={{ ...design, transform: `scale(${scale || 1})` }}>
+            <PanelBackdrop />
+          </div>
+          <div className="absolute left-1/2 top-1/2" style={{ ...design, transform: `translate(-50%, -50%) scale(${scale || 1})` }}>
+            <PanelContent panel={panel} prompt={prompt ?? t('auth.previewPrompt')} />
           </div>
         </div>
       </aside>
-      </div>
     </div>
   );
 }
