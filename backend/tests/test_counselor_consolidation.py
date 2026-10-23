@@ -125,4 +125,4 @@ async def test_posting_runs_all_post_commit_hooks_before_return():
                                        "What matters most?", 0, metadata={"voice_delegation_id": "voice-1"})
         assert db.get(EventRecord, event_id).metadata_["voice_delegation_id"] == "voice-1"
         publish.assert_called_once()
-        assert loop.run_in_executor.call_count == 2
+        assert loop.run_in_executor.call_count == 1

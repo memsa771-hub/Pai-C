@@ -1,7 +1,7 @@
-"""Offline, deterministic comparison of the guided and strict counseling policies.
+"""Offline, deterministic replay of the guided counseling policy.
 
 Replays scripted persona turns (recorded classifier signals and coverage) through
-the real derive_state and decide functions in both modes. No model, network or
+the real derive_state and decide functions. No model, network or
 database is used. Reply quality needs real replies: run the printed live command
 for that, only after approval.
 
@@ -21,7 +21,7 @@ from app.pai_c.policy.state import decision_log, derive_state
 ROOT = Path(__file__).resolve().parent
 FIXTURES = ROOT.parent / "tests" / "fixtures" / "policy_personas"
 RESULTS = ROOT / "results"
-MODES = ("guided", "strict")
+MODES = ("guided",)
 SERVES_REQUEST = {"answer_request", "counsel", "guide"}
 LIVE_COMMAND = ("python -m scripts.eval_counselor_deep --live --max-cost-usd 3 --policy-mode {mode} "
                 "--max-turns 12 {personas} --result-dir scripts/results/policy_{mode}")
@@ -53,7 +53,7 @@ def replay(script: dict, mode: str) -> list[dict]:
                              replies=replies, student_ordinals=dict(ordinals), current_event_id=event_id)
         state.update(mirror_correction=False, mirror_allowed=False, discover_available=False,
                      possibility_id=None, open_requests=[])
-        decision = controller.decide(state, mode=mode)
+        decision = controller.decide(state)
         asks = decision.question_allowed and decision.action != "care"
         replies.append("A reply that asks one thing?" if asks else "A reply that gives something.")
         prior.append({"event_id": event_id, "decision": decision_log(decision, signals)})
@@ -100,7 +100,7 @@ def run(directory: Path = FIXTURES) -> dict:
 def markdown(report: dict) -> str:
     keys = ("question_turns_max", "longest_question_streak", "requests_served",
             "guide_before_picture", "first_picture_turn", "safety_to_care")
-    lines = ["# Guided vs strict policy (offline replay)", "",
+    lines = ["# Guided policy (offline replay)", "",
              "| persona | mode | " + " | ".join(keys) + " |", "|" + "---|" * (len(keys) + 2)]
     for entry in report["personas"]:
         for mode in MODES:
@@ -108,7 +108,7 @@ def markdown(report: dict) -> str:
             lines.append(f"| {entry['id']} | {mode} | " + " | ".join(str(values[key]) for key in keys) + " |")
     lines += ["", "question_turns_max is an upper bound: it assumes every allowed question is asked.",
               "guide_before_picture counts guide decisions; general decision help does not require Mirror confirmation.",
-              "", "Live comparison (needs approval, capped at $3 per mode):", ""]
+              "", "Live run (needs approval, capped at $3):", ""]
     lines += [f"    {command}" for command in report["live_commands"]]
     return "\n".join(lines) + "\n"
 

@@ -44,8 +44,6 @@ def test_old_saved_roadmap_remains_readable_without_rewrite():
 
 @pytest.mark.asyncio
 async def test_guide_compare_contains_published_fit_only_with_limit_and_exclusions(monkeypatch):
-    from app.config import config
-    monkeypatch.setattr(config, "PAI_POLICY_MODE", "strict")
     with StudentSession() as student,student.factory() as db:
         journey=_journey(db,student.workspace_id)
         for index in range(8):
@@ -92,7 +90,7 @@ def test_try_it_message_uses_normal_event_path_and_reaches_planner_without_dismi
             with patch('app.security.event_identity.verify_identity_claims',return_value={'session_user_id':student.user_id}), \
                  patch('app.routers.events.pipeline.process',AsyncMock(side_effect=persist)), \
                  patch('app.pai_c.orchestrator.handle_student_message',AsyncMock()) as counselor, \
-                 patch('app.services.workflow.advance_workflow'),patch('app.services.integrations.relay_for_event'), \
+                 patch('app.services.workflow.advance_workflow'), \
                  patch('app.infrastructure.cache.publish_event'),patch('app.routers.events._invalidate_poll_cache'):
                 result=client.post('/v1/events',json={'network':student.workspace_id,'type':'workspace.message.posted',
                     'target':'channel/pai-counselor','payload':{'content':'Practical route, Try it: Not for me. I tried the small task.','message_type':'chat'},

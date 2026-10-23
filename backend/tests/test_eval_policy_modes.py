@@ -1,4 +1,4 @@
-"""Offline guided-vs-strict comparison; no provider or network calls."""
+"""Offline guided policy replay; no provider or network calls."""
 from unittest.mock import patch
 
 import pytest
@@ -30,12 +30,11 @@ def test_guided_guardrails_hold_on_every_persona():
             assert {"status", "history"} <= covered and len(covered) >= 4
 
 
-def test_report_prints_capped_live_commands_for_both_modes():
+def test_report_prints_capped_live_command():
     report = policy_eval.run()
     text = policy_eval.markdown(report)
-    assert len(report["live_commands"]) == 2
-    for mode in ("guided", "strict"):
-        assert f"--live --max-cost-usd 3 --policy-mode {mode}" in text
+    assert len(report["live_commands"]) == 1
+    assert "--live --max-cost-usd 3 --policy-mode guided" in text
 
 
 @pytest.mark.asyncio

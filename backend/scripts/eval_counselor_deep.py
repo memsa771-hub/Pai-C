@@ -552,8 +552,8 @@ async def run_evaluation(*, live: bool = False, max_cost_usd: float | None = Non
         raise ValueError("--live requires a positive --max-cost-usd")
     if max_turns < 1:
         raise ValueError("--max-turns must be positive")
-    if policy_mode not in (None, "guided", "strict"):
-        raise ValueError("--policy-mode must be guided or strict")
+    if policy_mode not in (None, "guided"):
+        raise ValueError("--policy-mode must be guided")
     if live and not config.PAI_API_KEY:
         raise ValueError("--live requires the configured backend model key")
     personas = [item for item in load_personas(fixture_dir)
@@ -576,12 +576,9 @@ async def run_evaluation(*, live: bool = False, max_cost_usd: float | None = Non
                 raise ValueError(f"price verification required before live: {model}")
     result = {"mode": "live" if live else "offline", "policy_mode": policy_mode, "status": "complete",
               "personas": [], "cost_usd": 0.0, "all_calls": []}
-    with ExitStack() as stack:
-        if policy_mode:
-            stack.enter_context(patch.object(config, "PAI_POLICY_MODE", policy_mode))
-        await _evaluate_all(result, personas, ledger, live=live, max_turns=max_turns,
-            simulator_model=simulator_model, grader_model=grader_model,
-            end_to_end=end_to_end, result_dir=result_dir, policy_mode=policy_mode)
+    await _evaluate_all(result, personas, ledger, live=live, max_turns=max_turns,
+        simulator_model=simulator_model, grader_model=grader_model,
+        end_to_end=end_to_end, result_dir=result_dir, policy_mode=policy_mode)
     paths = write_report(result, result_dir)
     result["paths"] = [str(path) for path in paths]
     return result
@@ -624,8 +621,8 @@ def main() -> None:
     parser.add_argument("--simulator-model", default="")
     parser.add_argument("--grader-model", default="")
     parser.add_argument("--result-dir", type=Path, default=RESULTS)
-    parser.add_argument("--policy-mode", choices=("guided", "strict"),
-                        help="Run turns through the production classifier, controller and Voice in this mode")
+    parser.add_argument("--policy-mode", choices=("guided",),
+                        help="Run turns through the production classifier, controller and Voice")
     args = parser.parse_args()
     if args.live and (args.max_cost_usd is None or args.max_cost_usd <= 0):
         parser.error("--live requires --max-cost-usd greater than zero")

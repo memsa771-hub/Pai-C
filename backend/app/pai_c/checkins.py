@@ -69,7 +69,7 @@ async def checkin_job(job, db):
             deferred.delay_seconds = max(60, int(retry_hours * 3600))
             raise deferred
         posted = await send_to_student(db, job.workspace_id, f'channel/{PAI_PRIMARY_CHANNEL}', PAI_AGENT_NAME,
-            rules[kind], 0, metadata={'checkin_key': job.idempotency_key, 'in_app_only': True})
+            rules[kind], 0, metadata={'checkin_key': job.idempotency_key})
         if not posted:
             raise RuntimeError('Check-in was not posted')
         return {'status': 'posted', 'event_id': posted}

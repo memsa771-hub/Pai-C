@@ -9,17 +9,12 @@ import type {
   TaskRunInfo,
   Workflow,
   WorkflowStep,
-  KnowledgeEntry,
   MessagePollResponse,
   NetworkDiscovery,
-  NetworkProfile,
   NotificationItem,
   ONMEvent,
   OperatorRun,
-  IntegrationBinding,
   ShareSummary,
-  TimerItem,
-  TodoItem,
   TrashEntry,
   Workspace,
   WorkspaceAgent,
@@ -96,10 +91,6 @@ class WorkspaceApi {
     this.token = '';
     this.signedIn = false;
     this.streamTicket = '';
-  }
-
-  setBearerToken(bearerToken: string) {
-    this.signedIn = !!bearerToken;
   }
 
   private async authHeaders(): Promise<Record<string, string>> {
@@ -209,11 +200,6 @@ class WorkspaceApi {
     });
   }
 
-  /** Who am I in this workspace? Drives client-side gating of admin UI. */
-  async getMe(): Promise<WorkspaceMe> {
-    return this.request<WorkspaceMe>(`/v1/workspaces/${this.requireWorkspace()}/me`);
-  }
-
   // ---------------------------------------------------------------------------
   // Nodes — devices running the launcher daemon (connect-a-node)
   // ---------------------------------------------------------------------------
@@ -222,89 +208,10 @@ class WorkspaceApi {
   // Chat-platform integrations (Slack / Telegram bridges) — workspace access required
   // ---------------------------------------------------------------------------
 
-  async listIntegrations(): Promise<{
-    integrations: IntegrationBinding[];
-    /** True when this deployment has the official Placement AI Slack app,
-     * enabling one-click "Add to Slack" instead of bring-your-own-app. */
-    slackAppConfigured: boolean;
-  }> {
-    return this.request(`/v1/workspaces/${this.requireWorkspace()}/integrations`);
-  }
-
-  /** Authorize URL for the official Slack app's Add-to-Slack flow. */
-  async getSlackInstallUrl(): Promise<string> {
-    const data = await this.request<{ url: string }>(
-      `/v1/workspaces/${this.requireWorkspace()}/integrations/slack/install-url`,
-    );
-    return data.url;
-  }
-
-  async createIntegration(params: {
-    platform: 'telegram' | 'slack' | 'lark';
-    /** Telegram bot token / Slack xoxb token / Lark App Secret. */
-    botToken: string;
-    signingSecret?: string;
-    defaultAgent?: string;
-    name?: string;
-    /** Lark/Feishu custom-app fields. */
-    appId?: string;
-    verificationToken?: string;
-    encryptKey?: string;
-  }): Promise<IntegrationBinding> {
-    const data = await this.request<{ integration: IntegrationBinding }>(
-      `/v1/workspaces/${this.requireWorkspace()}/integrations`,
-      {
-        method: 'POST',
-        body: JSON.stringify({
-          platform: params.platform,
-          bot_token: params.botToken,
-          signing_secret: params.signingSecret,
-          default_agent: params.defaultAgent,
-          name: params.name,
-          app_id: params.appId,
-          verification_token: params.verificationToken,
-          encrypt_key: params.encryptKey,
-        }),
-      },
-    );
-    return data.integration;
-  }
-
-  async updateIntegration(
-    bindingId: string,
-    updates: { defaultAgent?: string; name?: string; status?: 'active' | 'disabled' },
-  ): Promise<IntegrationBinding> {
-    const data = await this.request<{ integration: IntegrationBinding }>(
-      `/v1/workspaces/${this.requireWorkspace()}/integrations/${bindingId}`,
-      {
-        method: 'PATCH',
-        body: JSON.stringify({
-          default_agent: updates.defaultAgent,
-          name: updates.name,
-          status: updates.status,
-        }),
-      },
-    );
-    return data.integration;
-  }
-
-  async deleteIntegration(bindingId: string): Promise<{ id: string; removed: boolean }> {
-    return this.request(`/v1/workspaces/${this.requireWorkspace()}/integrations/${bindingId}`, {
-      method: 'DELETE',
-    });
-  }
-
   async updateMember(agentName: string, updates: { description?: string; role?: string; display_name?: string }): Promise<unknown> {
     return this.request(`/v1/workspaces/${this.workspaceId}/members/${agentName}`, {
       method: 'PATCH',
       body: JSON.stringify(updates),
-    });
-  }
-
-  /** Remove an agent (member) from the workspace — works whether it's online or offline. */
-  async removeMember(agentName: string): Promise<{ agent_name: string; removed: boolean }> {
-    return this.request(`/v1/workspaces/${this.workspaceId}/members/${encodeURIComponent(agentName)}`, {
-      method: 'DELETE',
     });
   }
 
@@ -335,11 +242,6 @@ class WorkspaceApi {
   /** Discover agents, channels, and resources in the network. */
   async discover(): Promise<NetworkDiscovery> {
     return this.request<NetworkDiscovery>(`/v1/discover?network=${this.workspaceId}`);
-  }
-
-  /** Get network profile metadata. */
-  async networkProfile(): Promise<NetworkProfile> {
-    return this.request<NetworkProfile>(`/v1/profile?network=${this.workspaceId}`);
   }
 
   // ---------------------------------------------------------------------------
@@ -510,114 +412,6 @@ class WorkspaceApi {
   async addCustomRoadmapGoal(input: import('./roadmaps').CustomRoadmapGoal): Promise<import('./roadmaps').Roadmap> {
     return this.request(`/v1/roadmaps/custom?network=${this.requireWorkspace()}`,
       { method: 'POST', body: JSON.stringify(input) });
-  }
-
-  // Application workspace: operational plans, separate from the canonical Profile.
-  async searchInstitutions(q = '', countryCode = ''): Promise<import('./application-workspace').Institution[]> {
-    const params = new URLSearchParams({ network: this.requireWorkspace(), q });
-    if (countryCode) params.set('country_code', countryCode);
-    return this.request(`/v1/application-workspace/institutions?${params}`);
-  }
-
-  async getSavedInstitutions(): Promise<import('./application-workspace').Institution[]> {
-    return this.request(`/v1/application-workspace/saved?network=${this.requireWorkspace()}`);
-  }
-
-  async addInstitution(input: import('./application-workspace').CreateInstitution): Promise<import('./application-workspace').Institution> {
-    return this.request('/v1/application-workspace/institutions', {
-      method: 'POST', body: JSON.stringify({ ...input, website_url: input.website_url || null, network: this.requireWorkspace() }),
-    });
-  }
-
-  async saveInstitution(id: string): Promise<import('./application-workspace').Institution> {
-    return this.request(`/v1/application-workspace/saved/${encodeURIComponent(id)}`, {
-      method: 'POST', body: JSON.stringify({ network: this.requireWorkspace() }),
-    });
-  }
-
-  async unsaveInstitution(id: string): Promise<void> {
-    await this.request(`/v1/application-workspace/saved/${encodeURIComponent(id)}?network=${this.requireWorkspace()}`, { method: 'DELETE' });
-  }
-
-  async getApplications(): Promise<import('./application-workspace').ApplicationPlan[]> {
-    return this.request(`/v1/application-workspace/applications?network=${this.requireWorkspace()}`);
-  }
-
-  async getApplicationCalendar(start: string, end: string): Promise<{ events: import('./application-workspace').ApplicationCalendarEvent[] }> {
-    const params = new URLSearchParams({ network: this.requireWorkspace(), start, end });
-    return this.request(`/v1/application-workspace/calendar?${params}`);
-  }
-
-  async getStudentDeadlines(start: string, end: string): Promise<{ deadlines: import('./student-deadlines').StudentDeadline[]; settings: import('./student-deadlines').DeadlineSettings }> {
-    const params = new URLSearchParams({ network: this.requireWorkspace(), start, end });
-    return this.request(`/v1/deadlines?${params}`);
-  }
-
-  async createStudentDeadline(input: { title: string; due_on: string; category: string; notes?: string; source_url?: string | null }): Promise<import('./student-deadlines').StudentDeadline> {
-    return this.request('/v1/deadlines', { method: 'POST', body: JSON.stringify({ ...input, network: this.requireWorkspace() }) });
-  }
-
-  async updateStudentDeadline(id: string, input: { title?: string; due_on?: string; category?: string; notes?: string | null; source_url?: string | null; status?: 'open' | 'done' }): Promise<import('./student-deadlines').StudentDeadline> {
-    return this.request(`/v1/deadlines/${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify({ ...input, network: this.requireWorkspace() }) });
-  }
-
-  async deleteStudentDeadline(id: string): Promise<void> {
-    await this.request(`/v1/deadlines/${encodeURIComponent(id)}?network=${this.requireWorkspace()}`, { method: 'DELETE' });
-  }
-
-  async saveDeadlineSettings(input: import('./student-deadlines').DeadlineSettings): Promise<import('./student-deadlines').DeadlineSettings> {
-    return this.request('/v1/deadlines/settings/reminders', { method: 'PUT', body: JSON.stringify({ ...input, network: this.requireWorkspace() }) });
-  }
-
-  async getApplication(id: string): Promise<import('./application-workspace').ApplicationPlan> {
-    return this.request(`/v1/application-workspace/applications/${encodeURIComponent(id)}?network=${this.requireWorkspace()}`);
-  }
-
-  async createApplication(input: import('./application-workspace').CreateApplication): Promise<import('./application-workspace').ApplicationPlan> {
-    return this.request('/v1/application-workspace/applications', {
-      method: 'POST', body: JSON.stringify({ ...input, network: this.requireWorkspace() }),
-    });
-  }
-
-  async updateApplication(id: string, updates: Partial<Omit<import('./application-workspace').ApplicationPlan,
-    'id' | 'institution' | 'requirements' | 'created_at' | 'updated_at'>>): Promise<import('./application-workspace').ApplicationPlan> {
-    return this.request(`/v1/application-workspace/applications/${encodeURIComponent(id)}`, {
-      method: 'PATCH', body: JSON.stringify({ ...updates, network: this.requireWorkspace() }),
-    });
-  }
-
-  async addApplicationRequirement(id: string, input: { label: string; kind?: string; due_at?: string | null;
-    source_url?: string | null; notes?: string | null }): Promise<import('./application-workspace').ApplicationRequirement> {
-    return this.request(`/v1/application-workspace/applications/${encodeURIComponent(id)}/requirements`, {
-      method: 'POST', body: JSON.stringify({ ...input, network: this.requireWorkspace() }),
-    });
-  }
-
-  async updateApplicationRequirement(id: string, requirementId: string, updates: Partial<import('./application-workspace').ApplicationRequirement>): Promise<import('./application-workspace').ApplicationRequirement> {
-    return this.request(`/v1/application-workspace/applications/${encodeURIComponent(id)}/requirements/${encodeURIComponent(requirementId)}`, {
-      method: 'PATCH', body: JSON.stringify({ ...updates, network: this.requireWorkspace() }),
-    });
-  }
-
-  async deleteApplicationRequirement(id: string, requirementId: string): Promise<void> {
-    await this.request(`/v1/application-workspace/applications/${encodeURIComponent(id)}/requirements/${encodeURIComponent(requirementId)}?network=${this.requireWorkspace()}`, { method: 'DELETE' });
-  }
-
-  async ensureApplicationTask(id: string, requirementId: string, workflowId?: string | null): Promise<import('./application-workspace').ApplicationRequirement> {
-    return this.request(`/v1/application-workspace/applications/${encodeURIComponent(id)}/requirements/${encodeURIComponent(requirementId)}/task`, {
-      method: 'POST', body: JSON.stringify({ network: this.requireWorkspace(), workflow_id: workflowId ?? null }),
-    });
-  }
-
-  async createApplicationRoutine(id: string, input: { name: string; message: string; hour: number;
-    minute: number; days: number[] | null; timezone: string }): Promise<import('./application-workspace').ApplicationRoutine> {
-    return this.request(`/v1/application-workspace/applications/${encodeURIComponent(id)}/routines`, {
-      method: 'POST', body: JSON.stringify({ ...input, network: this.requireWorkspace() }),
-    });
-  }
-
-  async cancelApplicationRoutine(id: string, routineId: string): Promise<void> {
-    await this.request(`/v1/application-workspace/applications/${encodeURIComponent(id)}/routines/${encodeURIComponent(routineId)}?network=${this.requireWorkspace()}`, { method: 'DELETE' });
   }
 
   /**
@@ -1110,96 +904,6 @@ class WorkspaceApi {
   // Knowledge Base
   // ---------------------------------------------------------------------------
 
-  async listKnowledge(): Promise<{ entries: KnowledgeEntry[]; total: number }> {
-    const raw = await this.request<{ entries: Record<string, unknown>[]; total: number }>(
-      `/v1/knowledge?network=${this.workspaceId}`
-    );
-    return {
-      entries: (raw.entries || []).map((e): KnowledgeEntry => ({
-        id: e.id as string,
-        slug: e.slug as string,
-        title: e.title as string,
-        description: (e.description ?? null) as string | null,
-        contentSize: (e.content_size ?? null) as number | null,
-        createdBy: (e.created_by || '') as string,
-        updatedBy: (e.updated_by ?? null) as string | null,
-        status: (e.status || 'active') as string,
-        createdAt: (e.created_at || null) as string | null,
-        updatedAt: (e.updated_at || null) as string | null,
-      })),
-      total: raw.total || 0,
-    };
-  }
-
-  async getKnowledgeEntry(entryId: string): Promise<KnowledgeEntry & { content: string }> {
-    const raw = await this.request<Record<string, unknown>>(`/v1/knowledge/${entryId}`);
-    return {
-      id: raw.id as string,
-      slug: raw.slug as string,
-      title: raw.title as string,
-      description: (raw.description ?? null) as string | null,
-      contentSize: (raw.content_size ?? null) as number | null,
-      createdBy: (raw.created_by || '') as string,
-      updatedBy: (raw.updated_by ?? null) as string | null,
-      status: (raw.status || 'active') as string,
-      createdAt: (raw.created_at || null) as string | null,
-      updatedAt: (raw.updated_at || null) as string | null,
-      content: (raw.content || '') as string,
-    };
-  }
-
-  async createKnowledge(params: { title: string; content: string; description?: string }): Promise<KnowledgeEntry> {
-    const raw = await this.request<Record<string, unknown>>('/v1/knowledge', {
-      method: 'POST',
-      body: JSON.stringify({
-        network: this.workspaceId,
-        title: params.title,
-        content: params.content,
-        description: params.description || null,
-        }),
-    });
-    return {
-      id: raw.id as string,
-      slug: raw.slug as string,
-      title: raw.title as string,
-      description: (raw.description ?? null) as string | null,
-      contentSize: (raw.content_size ?? null) as number | null,
-      createdBy: (raw.created_by || '') as string,
-      updatedBy: (raw.updated_by ?? null) as string | null,
-      status: (raw.status || 'active') as string,
-      createdAt: (raw.created_at || null) as string | null,
-      updatedAt: (raw.updated_at || null) as string | null,
-    };
-  }
-
-  async updateKnowledge(entryId: string, params: { title?: string; content?: string; description?: string }): Promise<KnowledgeEntry> {
-    const raw = await this.request<Record<string, unknown>>(`/v1/knowledge/${entryId}`, {
-      method: 'PUT',
-      body: JSON.stringify({
-        network: this.workspaceId,
-        ...params.title !== undefined && { title: params.title },
-        ...params.content !== undefined && { content: params.content },
-        ...params.description !== undefined && { description: params.description },
-        }),
-    });
-    return {
-      id: raw.id as string,
-      slug: raw.slug as string,
-      title: raw.title as string,
-      description: (raw.description ?? null) as string | null,
-      contentSize: (raw.content_size ?? null) as number | null,
-      createdBy: (raw.created_by || '') as string,
-      updatedBy: (raw.updated_by ?? null) as string | null,
-      status: (raw.status || 'active') as string,
-      createdAt: (raw.created_at || null) as string | null,
-      updatedAt: (raw.updated_at || null) as string | null,
-    };
-  }
-
-  async deleteKnowledge(entryId: string): Promise<void> {
-    await this.request<unknown>(`/v1/knowledge/${entryId}?network=${this.workspaceId}`, { method: 'DELETE' });
-  }
-
   // ---------------------------------------------------------------------------
   // Browser
   // ---------------------------------------------------------------------------
@@ -1257,14 +961,6 @@ class WorkspaceApi {
     return this.mapTab(result);
   }
 
-  /** Validate a browser tab session — auto-reconnects if expired. */
-  async validateBrowserTab(tabId: string): Promise<BrowserTab> {
-    const result = await this.request<Record<string, unknown>>(
-      `/v1/browser/tabs/${tabId}?validate=true`,
-    );
-    return this.mapTab(result);
-  }
-
   /** Reconnect an expired browser tab (creates a new session). */
   async reconnectBrowserTab(tabId: string): Promise<BrowserTab> {
     const result = await this.request<Record<string, unknown>>(
@@ -1286,11 +982,6 @@ class WorkspaceApi {
   /** Close a browser tab. */
   async closeBrowserTab(tabId: string): Promise<void> {
     await this.request<unknown>(`/v1/browser/tabs/${tabId}`, { method: 'DELETE' });
-  }
-
-  /** Get screenshot URL for a browser tab. */
-  getBrowserScreenshotUrl(tabId: string): string {
-    return `${API_URL}/v1/browser/tabs/${tabId}/screenshot`;
   }
 
   /** Remove persistent state from a browser tab (revert to temporal). */
@@ -1331,34 +1022,7 @@ class WorkspaceApi {
   // Agent management (stubs — not yet event-native)
   // ---------------------------------------------------------------------------
 
-  async listAgents(): Promise<WorkspaceAgent[]> {
-    const discovery = await this.discover();
-    return discovery.agents.map((a) => ({
-      agentName: a.address.replace(/^openagents:/, ''),
-      displayName: a.display_name || null,
-      role: a.role,
-      agentType: a.agent_type || null,
-      description: a.description || null,
-      status: a.status,
-      lastHeartbeatAt: null,
-      joinedAt: null,
-      builtin: a.builtin ?? false,
-    }));
-  }
-
   /** Fetch the catalog of supported agent client types. */
-
-  /** Fetch full detail for one agent type (install/uninstall + supported models). */
-  async updateAgentRole(_agentName: string, _role: string): Promise<WorkspaceAgent> {
-    throw new Error('Agent role management is not yet available in event-native mode');
-  }
-
-  async removeAgent(agentName: string): Promise<void> {
-    await this.request<unknown>('/v1/remove', {
-      method: 'POST',
-      body: JSON.stringify({ agent_name: agentName, network: this.workspaceId }),
-    });
-  }
 
   // ---------------------------------------------------------------------------
   // Low-level ONM event API
@@ -1434,20 +1098,6 @@ class WorkspaceApi {
     });
   }
 
-  /** Search messages across all channels. Returns events grouped by channel. */
-  async searchMessages(query: string): Promise<{ channelName: string; snippet: string; messageId: string }[]> {
-    const result = await this.pollEvents({
-      type: 'workspace.message',
-      search: query,
-      limit: 50,
-    });
-    return result.events.map((e) => ({
-      channelName: e.target.replace(/^channel\//, ''),
-      snippet: (e.payload as Record<string, string>)?.content || '',
-      messageId: e.id,
-    }));
-  }
-
   // ---------------------------------------------------------------------------
   // Agent DM conversations
   // ---------------------------------------------------------------------------
@@ -1498,25 +1148,6 @@ class WorkspaceApi {
   // ---------------------------------------------------------------------------
   // Todos / Tasks
   // ---------------------------------------------------------------------------
-
-  async listTodos(): Promise<{ todos: TodoItem[] }> {
-    const params = new URLSearchParams({ network: this.workspaceId, all: 'true' });
-    const raw = await this.request<{ todos: Record<string, unknown>[] }>(`/v1/todos?${params}`);
-    return {
-      todos: (raw.todos || []).map((t): TodoItem => ({
-        id: t.id as string,
-        content: t.content as string,
-        status: t.status as TodoItem['status'],
-        assignee: t.assignee as string,
-        createdBy: (t.created_by || '') as string,
-        channelName: (t.channel_name || '') as string,
-        threadId: (t.thread_id || null) as string | null,
-        position: (t.position || 0) as number,
-        createdAt: (t.created_at || null) as string | null,
-        updatedAt: (t.updated_at || null) as string | null,
-      })),
-    };
-  }
 
   // ---------------------------------------------------------------------------
   // Kanban tasks (workspace-wide board)
@@ -1686,28 +1317,6 @@ class WorkspaceApi {
     await this.request(`/v1/workflows/${id}?${params}`, { method: 'DELETE' });
   }
 
-  async listTimers(channel?: string): Promise<{ timers: TimerItem[] }> {
-    const params = new URLSearchParams({ network: this.workspaceId });
-    if (channel) params.set('channel', channel);
-    const raw = await this.request<{ timers: Record<string, unknown>[] }>(`/v1/timers?${params}`);
-    return {
-      timers: (raw.timers || []).map((t): TimerItem => ({
-        id: t.id as string,
-        message: t.message as string,
-        delaySeconds: (t.delay_seconds || 0) as number,
-        firesAt: (t.fires_at || '') as string,
-        status: (t.status || 'active') as string,
-        createdBy: (t.created_by || '') as string,
-        channelName: (t.channel_name || '') as string,
-        createdAt: (t.created_at || null) as string | null,
-      })),
-    };
-  }
-
-  async cancelTimer(timerId: string): Promise<void> {
-    await this.request<unknown>(`/v1/timers/${timerId}`, { method: 'DELETE' });
-  }
-
   async cancelQueuedMessage(channelName: string, queueId: string): Promise<void> {
     await this.sendEvent({
       type: 'workspace.message.posted',
@@ -1717,70 +1326,6 @@ class WorkspaceApi {
         message_type: 'queue_cancel',
       },
     });
-  }
-
-  async listRoutines(): Promise<{ routines: import('./types').RoutineItem[] }> {
-    const params = new URLSearchParams({ network: this.workspaceId });
-    const raw = await this.request<{ routines: Record<string, unknown>[] }>(`/v1/routines?${params}`);
-    return {
-      routines: (raw.routines || []).map((r) => ({
-        id: r.id as string,
-        name: r.name as string,
-        message: r.message as string,
-        context: (r.context || null) as string | null,
-        scheduleHour: (r.schedule_hour || 0) as number,
-        scheduleMinute: (r.schedule_minute || 0) as number,
-        scheduleDays: (r.schedule_days || null) as number[] | null,
-        scheduleIntervalMinutes: (r.schedule_interval_minutes || null) as number | null,
-        timezone: (r.timezone || 'UTC') as string,
-        nextFiresAt: (r.next_fires_at || '') as string,
-        lastFiredAt: (r.last_fired_at || null) as string | null,
-        status: (r.status || 'active') as string,
-        createdBy: (r.created_by || '') as string,
-        channelName: (r.channel_name || '') as string,
-        createdAt: (r.created_at || null) as string | null,
-      })),
-    };
-  }
-
-  async createRoutine(params: {
-    name: string;
-    message: string;
-    source: string;
-    hour?: number;
-    minute?: number;
-    days?: number[];
-    interval_minutes?: number;
-    conversation_history?: string;
-  }): Promise<import('./types').RoutineItem> {
-    const raw = await this.request<Record<string, unknown>>('/v1/routines', {
-      method: 'POST',
-      body: JSON.stringify({
-        ...params,
-        network: this.workspaceId,
-      }),
-    });
-    return {
-      id: raw.id as string,
-      name: raw.name as string,
-      message: raw.message as string,
-      context: (raw.context || null) as string | null,
-      scheduleHour: (raw.schedule_hour || 0) as number,
-      scheduleMinute: (raw.schedule_minute || 0) as number,
-      scheduleDays: (raw.schedule_days || null) as number[] | null,
-      scheduleIntervalMinutes: (raw.schedule_interval_minutes || null) as number | null,
-      timezone: (raw.timezone || 'UTC') as string,
-      nextFiresAt: (raw.next_fires_at || '') as string,
-      lastFiredAt: (raw.last_fired_at || null) as string | null,
-      status: (raw.status || 'active') as string,
-      createdBy: (raw.created_by || '') as string,
-      channelName: (raw.channel_name || '') as string,
-      createdAt: (raw.created_at || null) as string | null,
-    };
-  }
-
-  async cancelRoutine(routineId: string): Promise<void> {
-    await this.request<unknown>(`/v1/routines/${routineId}`, { method: 'DELETE' });
   }
 
   // ---------------------------------------------------------------------------
@@ -1911,27 +1456,6 @@ class WorkspaceApi {
     });
   }
 
-  async cancelChannelTodos(channel: string, source: string): Promise<void> {
-    const params = new URLSearchParams({ network: this.workspaceId, channel, source });
-    const raw = await this.request<{ todos: Record<string, unknown>[] }>(`/v1/todos?${params}`);
-    const todos = raw.todos || [];
-    const hasActive = todos.some((t) => t.status === 'pending' || t.status === 'in_progress');
-    if (!hasActive) return;
-    const updated = todos.map((t) => ({
-      content: t.content as string,
-      status: (t.status === 'pending' || t.status === 'in_progress') ? 'cancelled' : t.status as string,
-      assignee: t.assignee as string,
-    }));
-    await this.request<unknown>('/v1/todos', {
-      method: 'PUT',
-      body: JSON.stringify({
-        todos: updated,
-        network: this.workspaceId,
-        channel,
-        source,
-      }),
-    });
-  }
 }
 
 export const workspaceApi = new WorkspaceApi();

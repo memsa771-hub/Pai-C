@@ -21,7 +21,7 @@ def first_picture_due(*, coverage, student_count, prior_decisions, summary_confi
 def derive_state(signals, *, coverage, mirror_ready, plan, student_count,
                  prior_decisions, replies, student_ordinals, current_event_id,
                  summary_confirmed=False, reply_requested_input=None):
-    policy = load_data("decision_table.json")["derived"]
+    policy = load_data("guided_table.json")["derived"]
     data = signals.model_dump()
     previous = prior_decisions[-1]["decision"] if prior_decisions else {}
     covered = sum(bool(area.get("covered")) for area in coverage.values())

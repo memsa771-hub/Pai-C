@@ -199,7 +199,3 @@ def get_embedding_provider() -> EmbeddingProvider:
     return _provider
 
 
-def set_embedding_provider(provider: Optional[EmbeddingProvider]) -> None:
-    """Install a provider (tests, and future runtime reconfiguration)."""
-    global _provider
-    _provider = provider

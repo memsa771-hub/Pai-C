@@ -332,12 +332,6 @@ class BackgroundJobService:
     def get(self, job_id: str) -> Optional[BackgroundJob]:
         return self.db.get(BackgroundJob, job_id)
 
-    def pending_count(self, workspace_id: Optional[str] = None) -> int:
-        stmt = select(BackgroundJob).where(BackgroundJob.status == "pending")
-        if workspace_id:
-            stmt = stmt.where(BackgroundJob.workspace_id == workspace_id)
-        return len(list(self.db.execute(stmt).scalars().all()))
-
 
 async def run_job(job: BackgroundJob, db, registry: JobHandlerRegistry = job_handlers) -> Any:
     """Temporary shared compatibility dispatch; new code uses Task Runtime."""

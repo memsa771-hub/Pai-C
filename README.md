@@ -55,10 +55,3 @@ Install `backend/requirements.txt`, `pytest`, and `pytest-asyncio`, then run
 explicitly only when their credentials and costs are intended. Legacy runtime
 tests explicitly select the legacy path; current Counselor v2 tests exercise
 the shared chat and voice pipeline.
-
-## Timers
-
-Timers use a conditional database update committed before event delivery. This
-makes claims safe across multiple Uvicorn processes and gives timer delivery
-at-most-once semantics: a process failure after claim may lose a timer event,
-but another process cannot deliver a duplicate.

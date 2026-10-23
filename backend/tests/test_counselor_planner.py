@@ -217,7 +217,7 @@ async def test_plan_saved_with_map_version_context_and_wellbeing_forces_care():
         turn=CounselorTurnInput("chat",student.workspace_id,"Next",(),None,event_id,None,f"human:{student.user_id}")
         from app.pai_c.policy.controller import Decision
         context=await build_context(db,student.workspace_id,turn,
-            decision=Decision("default","insight",None,False,False,False))
+            decision=Decision("counsel","counsel",None,False,False,False))
         assert "<plan>" not in context.text and "<decision>" in context.text
         assert "Some reflection" in context.text and "Already answered?" in context.text
         assert '"playbooks"' not in context.text

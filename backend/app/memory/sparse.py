@@ -136,6 +136,3 @@ def get_sparse_encoder() -> SparseEncoder:
     return _encoder
 
 
-def set_sparse_encoder(encoder: Optional[SparseEncoder]) -> None:
-    global _encoder
-    _encoder = encoder

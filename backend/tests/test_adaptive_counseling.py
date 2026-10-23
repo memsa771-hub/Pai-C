@@ -39,9 +39,7 @@ def reply(text):
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("mode", ["guided", "strict"])
-async def test_direct_information_empty_profile_queues_research_not_an_interview(monkeypatch, mode):
-    monkeypatch.setattr(config, "PAI_POLICY_MODE", mode)
+async def test_direct_information_empty_profile_queues_research_not_an_interview(monkeypatch):
     monkeypatch.setattr(config, "PAI_API_KEY", "offline-fake")
     sig = signals(intent="asking_info", request={"text": "Tell me about Example University",
         "kind": "information", "needs_research": True, "needs_context": False})
@@ -66,12 +64,10 @@ async def test_direct_information_empty_profile_queues_research_not_an_interview
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("mode", ["guided", "strict"])
-async def test_voice_promise_to_check_always_starts_research(monkeypatch, mode):
+async def test_voice_promise_to_check_always_starts_research(monkeypatch):
     """Live audit: PAI said it would check official sources and nothing ran,
     because research started only on the policy's answer_request. When Voice
     itself notes a question for research, the check must start too."""
-    monkeypatch.setattr(config, "PAI_POLICY_MODE", mode)
     monkeypatch.setattr(config, "PAI_API_KEY", "offline-fake")
     sig = fallback_signals()
     question = "DAE Electronics fee range in Lahore"
@@ -98,11 +94,9 @@ async def test_voice_promise_to_check_always_starts_research(monkeypatch, mode):
     ("I used to want research; now time with family matters more.", "That changes what a good path needs to offer you. We can reconsider the earlier direction.", ["goals", "values"]),
     ("Mujhe doston ke sath khelna acha lagta hai.", "Doston ke sath waqt tumhari zindagi ka aik aham hissa lagta hai.", ["interests", "family_social"]),
 ])
-@pytest.mark.parametrize("mode", ["guided", "strict"])
-async def test_personal_sharing_stays_in_domain_without_forced_questions(monkeypatch, text, response, areas, mode):
-    monkeypatch.setattr(config, "PAI_POLICY_MODE", mode)
+async def test_personal_sharing_stays_in_domain_without_forced_questions(monkeypatch, text, response, areas):
     sig = signals(intent="sharing", mentioned_areas=areas, opened_thread=areas[0])
-    decision = decide(state(**sig.model_dump(), coverage={}), mode=mode)
+    decision = decide(state(**sig.model_dump(), coverage={}))
     assert not decision.question_allowed
     with StudentSession() as student, student.factory() as db:
         model = AsyncMock(return_value=reply(response + " What else do you enjoy?"))
@@ -114,12 +108,11 @@ async def test_personal_sharing_stays_in_domain_without_forced_questions(monkeyp
 
 
 def test_useful_clarification_not_a_fixed_ratio_and_safety_precedes_request():
-    for mode in ("guided", "strict"):
-        decision = decide(state(coverage={}, question_needed=True, questions_in_last_two=True), mode=mode)
-        assert decision.question_allowed
-        for index in range(4):
-            assert not decide(state(coverage={}, question_needed=False, student_count=index + 1), mode=mode).question_allowed
-        assert decide(state(safety={"level": "urgent"}, request={"needs_context": True}), mode=mode).action == "care"
+    decision = decide(state(coverage={}, question_needed=True, questions_in_last_two=True))
+    assert decision.question_allowed
+    for index in range(4):
+        assert not decide(state(coverage={}, question_needed=False, student_count=index + 1)).question_allowed
+    assert decide(state(safety={"level": "urgent"}, request={"needs_context": True})).action == "care"
 
 
 def addition(part, key, value, **extra):

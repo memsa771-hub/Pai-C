@@ -26,25 +26,6 @@ export interface WorkspaceMe {
   tokenAccess: boolean;
 }
 
-/** A connected chat-platform bot (Slack app / Telegram bot) bridging
- * external conversations into workspace channels. */
-export interface IntegrationBinding {
-  id: string;
-  platform: 'telegram' | 'slack' | 'lark';
-  name: string | null;
-  botTokenMasked: string | null;
-  defaultAgent: string | null;
-  config: Record<string, unknown>;
-  status: 'active' | 'disabled';
-  lastError: string | null;
-  lastEventAt: string | null;
-  createdAt: string | null;
-  /** Custom Slack apps only: the Events API request URL to paste into the app. */
-  slackEventsUrl: string | null;
-  /** Lark/Feishu only: the event-subscription request URL to paste into the app. */
-  larkEventsUrl: string | null;
-}
-
 export interface WorkspaceAgent {
   agentName: string;
   /** User-set label (any script, incl. CJK). Falls back to agentName when null. */
@@ -149,19 +130,6 @@ export interface TrashEntry {
   files: TrashFile[];
 }
 
-export interface KnowledgeEntry {
-  id: string;
-  slug: string;
-  title: string;
-  description: string | null;
-  contentSize: number | null;
-  createdBy: string;
-  updatedBy: string | null;
-  status: string;
-  createdAt: string | null;
-  updatedAt: string | null;
-}
-
 export interface BrowserTab {
   id: string;
   url: string;
@@ -220,48 +188,6 @@ export interface ShareSummary {
 // ---------------------------------------------------------------------------
 // Todos / Tasks (agent planning)
 // ---------------------------------------------------------------------------
-
-export interface TodoItem {
-  id: string;
-  content: string;
-  status: 'pending' | 'in_progress' | 'completed' | 'cancelled';
-  assignee: string;
-  createdBy: string;
-  channelName: string;
-  threadId: string | null;
-  position: number;
-  createdAt: string | null;
-  updatedAt: string | null;
-}
-
-export interface TimerItem {
-  id: string;
-  message: string;
-  delaySeconds: number;
-  firesAt: string;
-  status: string;
-  createdBy: string;
-  channelName: string;
-  createdAt: string | null;
-}
-
-export interface RoutineItem {
-  id: string;
-  name: string;
-  message: string;
-  context: string | null;
-  scheduleHour: number;
-  scheduleMinute: number;
-  scheduleDays: number[] | null;
-  scheduleIntervalMinutes: number | null;
-  timezone: string;
-  nextFiresAt: string;
-  lastFiredAt: string | null;
-  status: string;
-  createdBy: string;
-  channelName: string;
-  createdAt: string | null;
-}
 
 // ---------------------------------------------------------------------------
 // Kanban board tasks (workspace-wide, GitHub-issue-like)
@@ -464,16 +390,6 @@ export interface NetworkDiscovery {
   channels: NetworkChannel[];
   mods: string[];
   resources: string[];
-}
-
-export interface NetworkProfile {
-  id: string;
-  slug: string;
-  name: string;
-  access: { policy: string; min_verification: number };
-  status: string;
-  capabilities: string[];
-  agents_online: number;
 }
 
 // ---------------------------------------------------------------------------

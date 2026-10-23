@@ -25,7 +25,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { ListTree, MessageSquare, CalendarClock, Square, ChevronLeft, X, Plus, Globe, Share2, Crown, AlertTriangle, RefreshCw, Sparkles, Cog, CalendarCheck } from 'lucide-react';
+import { ListTree, MessageSquare, Square, ChevronLeft, X, Plus, Globe, Share2, Crown, AlertTriangle, RefreshCw, Sparkles, Cog, CalendarCheck } from 'lucide-react';
 import { ShareDialog } from './share-dialog';
 import { OrchestrationControl } from './orchestration-control';
 import { useLayout } from '@/components/layout/layout-context';
@@ -34,7 +34,6 @@ import { cn } from '@/lib/utils';
 import { AgentAvatar } from '@/components/agents/agent-avatar';
 import { usePaiSystemStatus, OPERATOR_DOT_CLASS } from '@/components/layout/pai-system-status';
 import { agentLabel } from '@/lib/helpers';
-import { CreateRoutineDialog } from '@/components/routines/create-routine-dialog';
 import { eventToMessage } from '@/lib/types';
 import type { WorkspaceMessage } from '@/lib/types';
 import { useT } from '@/lib/i18n';
@@ -152,9 +151,8 @@ function CheckInCard({ onPick }: { onPick: (text: string) => void }) {
 }
 
 export function ChatView({counselorOnly=false,initialDraft=""}:{counselorOnly?:boolean;initialDraft?:string}) {
-  const { agents, currentUser, currentSessionId, sessions, updateLastMessage, setSessionActive, updateAgentMode, stopAllAgents, activeSessionIds, stoppingSessionIds, renameSession, addParticipant, removeParticipant, setSessionMaster, setSessionOrchestration, consumeSkipFocus, createRoutine, knowledge } = useWorkspace();
+  const { agents, currentUser, currentSessionId, sessions, updateLastMessage, setSessionActive, updateAgentMode, stopAllAgents, activeSessionIds, stoppingSessionIds, renameSession, addParticipant, removeParticipant, setSessionMaster, setSessionOrchestration, consumeSkipFocus } = useWorkspace();
   const t = useT();
-  const [showCreateRoutine, setShowCreateRoutine] = useState(false);
   const { operatorRun, tone: operatorTone, label: operatorStatusLabel } = usePaiSystemStatus();
   const {
     isMobile,
@@ -548,33 +546,20 @@ export function ChatView({counselorOnly=false,initialDraft=""}:{counselorOnly?:b
   const hasStatusMessages = displayMessages.some((m) => m.messageType === 'status' || m.messageType === 'thinking');
 
   if (!currentSessionId) {
-    const isRoutinesView = viewMode === 'routines';
     return (
       <div className="flex flex-col h-full items-center justify-center text-center text-muted-foreground px-8">
-        {isRoutinesView ? (
-          <>
-            <div className="opacity-20 mb-3">
-              <CalendarClock className="size-10" />
-            </div>
-            <p className="text-sm font-medium">{t('chat.noRoutinesTitle')}</p>
-            <p className="text-xs mt-1">{t('chat.noRoutinesBody')}</p>
-          </>
-        ) : (
-          <>
-            <div className="flex items-center p-4 rounded-full bg-primary/10 mb-4">
-              <MessageSquare className="size-8 text-primary" />
-            </div>
-            <p className="text-lg font-semibold text-foreground">{t('chat.newSessionTitle')}</p>
-            <p className="text-sm mt-1 max-w-xs">
-              {t('chat.newSessionBody')}
-            </p>
-            {agents.length > 0 && (
-              <Button className="mt-5 gap-1.5" onClick={openNewThread}>
-                <Plus className="size-4" />
-                {t('chat.newThread')}
-              </Button>
-            )}
-          </>
+        <div className="flex items-center p-4 rounded-full bg-primary/10 mb-4">
+          <MessageSquare className="size-8 text-primary" />
+        </div>
+        <p className="text-lg font-semibold text-foreground">{t('chat.newSessionTitle')}</p>
+        <p className="text-sm mt-1 max-w-xs">
+          {t('chat.newSessionBody')}
+        </p>
+        {agents.length > 0 && (
+          <Button className="mt-5 gap-1.5" onClick={openNewThread}>
+            <Plus className="size-4" />
+            {t('chat.newThread')}
+          </Button>
         )}
       </div>
     );
@@ -1030,30 +1015,15 @@ export function ChatView({counselorOnly=false,initialDraft=""}:{counselorOnly?:b
             <ChatInput
               onSend={handleSend}
               agents={agents}
-              knowledge={knowledge}
               draft={currentDraft}
               onDraftChange={handleDraftChange}
               onFocusChange={(focused) => focused ? notifyFocus() : notifyBlur()}
               focusKey={focusKey}
-              onCreateRoutine={() => setShowCreateRoutine(true)}
               disabled={!currentUser.name.trim()}
               voice={voiceEnabled ? <VoiceModeButton voice={voice} /> : undefined}
             />
           </div>
         )}
-
-        <CreateRoutineDialog
-          open={showCreateRoutine}
-          onOpenChange={setShowCreateRoutine}
-          agents={agents}
-          conversationHistory={(() => {
-            if (!sessionMessages.length) return undefined;
-            const recent = sessionMessages.filter((m) => m.messageType === 'chat').slice(-20);
-            if (!recent.length) return undefined;
-            return recent.map((m) => `${m.senderName}: ${m.content}`).join('\n');
-          })()}
-          onCreateRoutine={createRoutine}
-        />
 
         {currentSessionId && (
           <ShareDialog

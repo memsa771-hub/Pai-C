@@ -10,7 +10,7 @@ import { defaultWorkspaceConversation } from './primary-conversation';
 import { DMS_UI_ENABLED } from './config';
 import { useUploadQueue } from '@/hooks/use-upload-queue';
 import type { PendingUpload } from '@/hooks/use-upload-queue';
-import type { BrowserPersistentContext, BrowserTab, DMConversation, KanbanTask, Workflow, WorkflowStep, KnowledgeEntry, NotificationItem, OnlineUser, RoutineItem, TodoItem, TrashEntry, Workspace, WorkspaceAgent, WorkspaceFile, WorkspaceIdentity, WorkspaceSession } from './types';
+import type { BrowserPersistentContext, BrowserTab, DMConversation, KanbanTask, Workflow, WorkflowStep, NotificationItem, OnlineUser, TrashEntry, Workspace, WorkspaceAgent, WorkspaceFile, WorkspaceIdentity, WorkspaceSession } from './types';
 
 function useWorkspaceIdentity() {
   const { user } = usePaiAuth();
@@ -126,7 +126,6 @@ interface WorkspaceContextValue {
   sessions: WorkspaceSession[];
   files: WorkspaceFile[];
   selectedFileId: string | null;
-  selectedKnowledgeId: string | null;
   currentFilePath: string;
   currentSessionId: string | null;
   loading: boolean;
@@ -146,7 +145,6 @@ interface WorkspaceContextValue {
   /** Read-and-clear: was the most recent setCurrentSessionId asked to skip auto-focus? */
   consumeSkipFocus: () => boolean;
   setSelectedFileId: (id: string | null) => void;
-  setSelectedKnowledgeId: (id: string | null) => void;
   setCurrentFilePath: (path: string) => void;
   createSession: (opts?: { title?: string; master?: string; participants?: string[] }) => Promise<WorkspaceSession>;
   /** Request that a thread be opened with an agent as soon as it joins — used
@@ -201,8 +199,6 @@ interface WorkspaceContextValue {
   openBrowserTabWithContext: (contextId: string, url?: string) => Promise<BrowserTab>;
   dmConversations: DMConversation[];
   refreshDMConversations: () => Promise<void>;
-  todos: TodoItem[];
-  refreshTodos: () => Promise<void>;
   tasks: KanbanTask[];
   refreshTasks: () => Promise<void>;
   createTask: (input: { title: string; description?: string; status?: KanbanTask['status']; assignee?: string | null; workflowId?: string | null; knowledgeIds?: string[]; fileIds?: string[] }) => Promise<KanbanTask>;
@@ -217,23 +213,6 @@ interface WorkspaceContextValue {
   createWorkflow: (input: { name: string; description?: string; steps: WorkflowStep[]; maxIterations?: number }) => Promise<Workflow>;
   updateWorkflow: (id: string, updates: { name?: string; description?: string; steps?: WorkflowStep[]; maxIterations?: number }) => Promise<void>;
   deleteWorkflow: (id: string) => Promise<void>;
-  routines: RoutineItem[];
-  refreshRoutines: () => Promise<void>;
-  createRoutine: (params: {
-    name: string;
-    message: string;
-    source: string;
-    hour?: number;
-    minute?: number;
-    days?: number[];
-    interval_minutes?: number;
-    conversation_history?: string;
-  }) => Promise<void>;
-  knowledge: KnowledgeEntry[];
-  refreshKnowledge: () => Promise<void>;
-  createKnowledge: (params: { title: string; content: string; description?: string }) => Promise<KnowledgeEntry>;
-  updateKnowledge: (entryId: string, params: { title?: string; content?: string; description?: string }) => Promise<KnowledgeEntry>;
-  deleteKnowledge: (entryId: string) => Promise<void>;
   notifications: NotificationItem[];
   unreadNotificationCount: number;
   /** Threads with activity the user hasn't opened since */
@@ -354,17 +333,13 @@ export function WorkspaceProvider({
     setFiles(next);
   }, []);
   const [selectedFileId, setSelectedFileId] = useState<string | null>(null);
-  const [selectedKnowledgeId, setSelectedKnowledgeId] = useState<string | null>(null);
   const [currentFilePath, setCurrentFilePath] = useState('');
   const [browserTabs, setBrowserTabs] = useState<BrowserTab[]>([]);
   const [selectedBrowserTabId, setSelectedBrowserTabId] = useState<string | null>(null);
   const [browserContexts, setBrowserContexts] = useState<BrowserPersistentContext[]>([]);
   const [dmConversations, setDMConversations] = useState<DMConversation[]>([]);
-  const [todos, setTodos] = useState<TodoItem[]>([]);
   const [tasks, setTasks] = useState<KanbanTask[]>([]);
   const [workflows, setWorkflows] = useState<Workflow[]>([]);
-  const [routines, setRoutines] = useState<RoutineItem[]>([]);
-  const [knowledge, setKnowledge] = useState<KnowledgeEntry[]>([]);
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
   const [manuallyRenamedSessions, setManuallyRenamedSessions] = useState<Set<string>>(new Set());
@@ -798,11 +773,8 @@ export function WorkspaceProvider({
       workspaceApi.listBrowserTabs().then((r) => setBrowserTabs(r.tabs)).catch(() => {});
       workspaceApi.listBrowserContexts().then((r) => setBrowserContexts(r.contexts)).catch(() => {});
       workspaceApi.listConversations().then((c) => setDMConversations(c)).catch(() => {});
-      workspaceApi.listTodos().then((r) => setTodos(r.todos)).catch(() => {});
       workspaceApi.listTasks().then((r) => setTasks(r.tasks)).catch(() => {});
       workspaceApi.listWorkflows().then((r) => setWorkflows(r.workflows)).catch(() => {});
-      workspaceApi.listRoutines().then((r) => setRoutines(r.routines)).catch(() => {});
-      workspaceApi.listKnowledge().then((r) => setKnowledge(r.entries)).catch(() => {});
       workspaceApi.listNotifications().then((r) => {
         setNotifications(r.notifications);
         setUnreadNotificationCount(r.unreadCount);
@@ -824,15 +796,6 @@ export function WorkspaceProvider({
       // Non-critical
     }
   }, [commitFiles]);
-
-  const refreshTodos = useCallback(async () => {
-    try {
-      const result = await workspaceApi.listTodos();
-      setTodos(result.todos);
-    } catch {
-      // Non-critical
-    }
-  }, []);
 
   const refreshTasks = useCallback(async () => {
     try {
@@ -917,29 +880,6 @@ export function WorkspaceProvider({
     }
   }, [refreshWorkflows]);
 
-  const refreshRoutines = useCallback(async () => {
-    try {
-      const result = await workspaceApi.listRoutines();
-      setRoutines(result.routines);
-    } catch {
-      // Non-critical
-    }
-  }, []);
-
-  const createRoutine = useCallback(async (params: {
-    name: string;
-    message: string;
-    source: string;
-    hour?: number;
-    minute?: number;
-    days?: number[];
-    interval_minutes?: number;
-    conversation_history?: string;
-  }) => {
-    await workspaceApi.createRoutine(params);
-    await refreshRoutines();
-  }, [refreshRoutines]);
-
   const refreshNotifications = useCallback(async () => {
     try {
       const result = await workspaceApi.listNotifications();
@@ -995,32 +935,6 @@ export function WorkspaceProvider({
       await refreshNotifications();
     }
   }, [notifications, refreshNotifications]);
-
-  const refreshKnowledge = useCallback(async () => {
-    try {
-      const result = await workspaceApi.listKnowledge();
-      setKnowledge(result.entries);
-    } catch {
-      // Non-critical
-    }
-  }, []);
-
-  const createKnowledge = useCallback(async (params: { title: string; content: string; description?: string }) => {
-    const entry = await workspaceApi.createKnowledge(params);
-    await refreshKnowledge();
-    return entry;
-  }, [refreshKnowledge]);
-
-  const updateKnowledge = useCallback(async (entryId: string, params: { title?: string; content?: string; description?: string }) => {
-    const entry = await workspaceApi.updateKnowledge(entryId, params);
-    await refreshKnowledge();
-    return entry;
-  }, [refreshKnowledge]);
-
-  const deleteKnowledge = useCallback(async (entryId: string) => {
-    await workspaceApi.deleteKnowledge(entryId);
-    setKnowledge((prev) => prev.filter((k) => k.id !== entryId));
-  }, []);
 
   // Uploads are queued rather than awaited: the Files grid draws each one as it
   // goes up, so the work has to outlive the pane that started it.
@@ -1244,11 +1158,8 @@ export function WorkspaceProvider({
           workspaceApi.listTrash().then((r) => setTrashEntries(r.entries)).catch(() => {}),
           workspaceApi.listBrowserTabs().then((r) => setBrowserTabs(r.tabs)).catch(() => {}),
           workspaceApi.listBrowserContexts().then((r) => setBrowserContexts(r.contexts)).catch(() => {}),
-          workspaceApi.listTodos().then((r) => setTodos(r.todos)).catch(() => {}),
           workspaceApi.listTasks().then((r) => setTasks(r.tasks)).catch(() => {}),
           workspaceApi.listWorkflows().then((r) => setWorkflows(r.workflows)).catch(() => {}),
-          workspaceApi.listRoutines().then((r) => setRoutines(r.routines)).catch(() => {}),
-          workspaceApi.listKnowledge().then((r) => setKnowledge(r.entries)).catch(() => {}),
           workspaceApi.listNotifications().then((r) => {
             setNotifications(r.notifications);
             setUnreadNotificationCount(r.unreadCount);
@@ -1669,7 +1580,6 @@ export function WorkspaceProvider({
         sessions,
         files: visibleFiles,
         selectedFileId,
-        selectedKnowledgeId,
         currentSessionId,
         loading,
         error,
@@ -1687,7 +1597,6 @@ export function WorkspaceProvider({
         setCurrentSessionId,
         consumeSkipFocus,
         setSelectedFileId,
-        setSelectedKnowledgeId,
         currentFilePath,
         setCurrentFilePath,
         createSession,
@@ -1732,8 +1641,6 @@ export function WorkspaceProvider({
         openBrowserTabWithContext,
         dmConversations,
         refreshDMConversations,
-        todos,
-        refreshTodos,
         tasks,
         refreshTasks,
         createTask,
@@ -1746,14 +1653,6 @@ export function WorkspaceProvider({
         createWorkflow,
         updateWorkflow,
         deleteWorkflow,
-        routines,
-        refreshRoutines,
-        createRoutine,
-        knowledge,
-        refreshKnowledge,
-        createKnowledge,
-        updateKnowledge,
-        deleteKnowledge,
         notifications,
         unreadNotificationCount,
         unreadSessionIds,

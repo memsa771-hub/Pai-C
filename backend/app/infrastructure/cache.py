@@ -8,11 +8,10 @@ closed SSE stream, never an authorization success.
 """
 
 import asyncio
-import json
 import logging
 import threading
 import time
-from typing import Any, AsyncGenerator, Callable, Optional
+from typing import AsyncGenerator, Optional
 
 from app.config import config
 
@@ -157,23 +156,6 @@ def delete_key(key: str) -> None:
         client.delete(key)
     except Exception as exc:
         _sync_failed(exc)
-
-
-def json_read_through(key: str, ttl_seconds: float, compute: Callable[[], Any]) -> Any:
-    """Read JSON through Redis, falling back to the authoritative computation."""
-    raw = get_bytes(key)
-    if raw is not None:
-        try:
-            return json.loads(raw)
-        except Exception:
-            delete_key(key)
-
-    value = compute()
-    try:
-        set_bytes(key, json.dumps(value, separators=(",", ":")).encode(), ttl_seconds)
-    except (TypeError, ValueError) as exc:
-        logger.debug("Skip cache for %s: %s", key, exc)
-    return value
 
 
 def publish_event(channel: str, data: bytes) -> None:

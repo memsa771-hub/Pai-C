@@ -20,10 +20,6 @@ class StudentSnapshot:
     issues: tuple[dict[str, Any], ...]
     generated_at: datetime
 
-    def fact_value(self, key: str) -> Any:
-        fact = self.facts.get(key)
-        return None if fact is None else fact.get("value")
-
 
 class StudentSnapshotService:
     """Build one shared read model without creating another source of truth."""

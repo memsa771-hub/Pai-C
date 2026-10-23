@@ -15,16 +15,15 @@ from tests.test_counselor_deep_pr3 import _turn
 from scripts.counselor_eval_support import StudentSession
 
 
-@pytest.mark.parametrize("mode", ["guided", "strict"])
-def test_thread_request_safety_order_and_question_cap(mode):
+def test_thread_request_safety_order_and_question_cap():
     sample = state(opened_thread="interests", coverage={}, first_picture_due=True)
-    assert decide(sample, mode).action == "follow_thread"
+    assert decide(sample).action == "follow_thread"
     sample["questions_in_last_two"] = True
-    assert not decide(sample, mode).question_allowed
+    assert not decide(sample).question_allowed
     sample["request"] = {"needs_context": False}
-    assert decide(sample, mode).action == "answer_request"
+    assert decide(sample).action == "answer_request"
     sample["safety"] = {"level": "urgent"}
-    assert decide(sample, mode).action == "care"
+    assert decide(sample).action == "care"
 
 
 def test_choices_are_catalog_only_with_other(monkeypatch):
@@ -52,8 +51,7 @@ def test_card_interactions_obey_two_question_cap():
         student_count=3, prior_decisions=[], replies=["A card.", "Another card."],
         reply_requested_input=[True, True], student_ordinals={}, current_event_id="third")
     assert sample["questions_in_last_two"]
-    assert not decide(sample, "guided").question_allowed
-    assert not decide(sample, "strict").question_allowed
+    assert not decide(sample).question_allowed
 
 
 def test_other_reconciles_with_stated_review_evidence_once(api):
@@ -85,7 +83,7 @@ async def test_card_replaces_spoken_question_without_writing():
 
 def test_inline_presentation_obeys_policy_and_care_priority():
     from app.pai_c.fact_cards import presentation_card
-    decision=SimpleNamespace(action='ask',topic='sure',question_allowed=True)
+    decision=SimpleNamespace(action='explore_area',topic='sure',question_allowed=True)
     assert presentation_card(decision)=={'kind':'rating','min':0,'max':10}
     assert presentation_card(decision,safety_flagged=True) is None
     decision.question_allowed=False

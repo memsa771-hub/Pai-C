@@ -2,7 +2,7 @@
 from datetime import datetime, timezone
 import logging
 from sqlalchemy import select
-from app.models import PaiPossibility, Roadmap, RoadmapStudentState, Workspace, StudentJourney
+from app.models import PaiPossibility, Roadmap, Workspace, StudentJourney
 from app.pai_c.policy.controller import load_data
 from app.pai_c.possibility_titles import normalized_title
 
@@ -154,28 +154,3 @@ class PossibilityService:
                 "level": details.get("degree_level") or "",
                 "place_preference": countries[0] if len(countries) == 1 else "", "kind": ""}
 
-    def prepare_explore(self, workspace_id, id):
-        from app.journey import JourneyService
-        from app.research.gateway import mirror_is_current
-        self.lock(workspace_id)
-        row = self.get(workspace_id, id)
-        if row.status == "exploring":
-            return row, False
-        if not mirror_is_current(self.db, workspace_id):
-            raise PossibilityError("Confirm your current Mirror before exploring")
-        journey = JourneyService(self.db).get(workspace_id, row.journey_id)
-        if journey is None or journey.current_stage not in {"PROPOSED", "RESEARCHING"}:
-            raise PossibilityError("The journey is not ready for exploration")
-        row, changed = self.transition(workspace_id, id, "explore")
-        if journey.current_stage == "PROPOSED":
-            JourneyService(self.db).set_counselor_stage(workspace_id, journey.id, "RESEARCHING", actor="human:student")
-        if row.roadmap_id is None:
-            roadmap = Roadmap(workspace_id=workspace_id, journey_id=journey.id,
-                lane="discovered", origin="operator_suggested", title=row.title,
-                route=self.research_route(row), generation_status="generating")
-            self.db.add(roadmap)
-            self.db.flush()
-            self.db.add(RoadmapStudentState(roadmap_id=roadmap.id, journey_id=journey.id))
-            row.roadmap_id = roadmap.id
-            self.db.flush()
-        return row, changed

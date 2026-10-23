@@ -13,7 +13,7 @@ import { useIsMobile } from '@/hooks/use-mobile';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import type { FileSortKey, FileTypeFilter } from '@/components/files/file-utils';
 
-export type ViewMode = 'overview' | 'journey' | 'paths' | 'compare' | 'plan' | 'settings' | 'threads' | 'roadmaps' | 'profile' | 'notifications' | 'files' | 'knowledge' | 'browser' | 'routines' | 'inbox';
+export type ViewMode = 'overview' | 'journey' | 'paths' | 'compare' | 'plan' | 'settings' | 'threads' | 'roadmaps' | 'profile' | 'notifications' | 'files' | 'browser' | 'inbox';
 
 /** The Files view has two halves the folder panel switches between. */
 export type FilesSection = 'folders' | 'trash';
@@ -57,7 +57,7 @@ const DEFAULT_FILES_BROWSE: FilesBrowseState = {
  * over the full detail area, so the sidebar collapses down to the rail.
  */
 export const VIEWS_WITH_LIST: ReadonlySet<ViewMode> = new Set<ViewMode>([
-  'threads', 'files', 'browser', 'routines', 'knowledge',
+  'threads', 'files', 'browser',
 ]);
 
 /**

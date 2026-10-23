@@ -36,10 +36,8 @@ def test_only_known_places_are_shown(action, expected):
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("mode", ["guided", "strict"])
 @pytest.mark.parametrize("place,linked", [("files", True), ("operator-console", False)])
-async def test_reply_links_to_a_known_place_and_context_lists_them(monkeypatch, mode, place, linked):
-    monkeypatch.setattr(config, "PAI_POLICY_MODE", mode)
+async def test_reply_links_to_a_known_place_and_context_lists_them(monkeypatch, place, linked):
     monkeypatch.setattr(config, "PAI_API_KEY", "offline-fake")
     prompts = []
 

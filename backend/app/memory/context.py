@@ -1,19 +1,10 @@
 # -*- coding: utf-8 -*-
 """MemoryContextService — the single read path into memory for prompts.
 
-Two jobs:
-
-1. `build_student_context(...)` assembles a *compact* context — critical Vault
-   facts, relevant semantic memories, recent episodes. Never the whole
-   database: every section is budgeted, because the failure mode of a memory
-   system is not "forgot something", it is "sent 80k tokens of history and
-   buried the question".
-
-2. `resolve_refs(...)` turns Operator's lightweight `context_refs`
-   (`["vault", "memory:preferences", "episodes:recent"]`) into fresh data at
-   read time. ExecutionRun keeps storing *references*, never payloads, so a
-   run started an hour ago sees the student's current profile rather than a
-   stale copy — and the row stays small.
+`build_student_context(...)` assembles a *compact* context — critical Vault
+facts, relevant semantic memories, recent episodes. Never the whole database:
+every section is budgeted, because the failure mode of a memory system is not
+"forgot something", it is "sent 80k tokens of history and buried the question".
 
 Retrieval today is structured + lexical. The hybrid dense/sparse/rerank stack
 slots in behind `_semantic_section` without changing this contract.
@@ -143,13 +134,6 @@ class MemoryContextService:
 
         return context
 
-    def resolve_refs(
-        self, workspace_id: str, context_refs: list[str], caller: str = "operator",
-    ) -> StudentContext:
-        """Resolve an ExecutionRun's stored refs to fresh data."""
-        return self.build_student_context(
-            workspace_id=workspace_id, context_refs=context_refs, caller=caller,
-        )
 
     async def build_student_context_async(
         self,

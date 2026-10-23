@@ -8,7 +8,7 @@ const state = vi.hoisted(() => ({ messages: [] as any[] }));
 vi.mock('@/lib/workspace-context', () => ({ useWorkspace: () => ({
   agents: [], currentUser: { id: 'student', name: 'Student' },
   currentSessionId: 'pai-counselor', sessions: [], activeSessionIds: new Set(),
-  stoppingSessionIds: new Set(), consumeSkipFocus: () => true, knowledge: [],
+  stoppingSessionIds: new Set(), consumeSkipFocus: () => true,
   updateLastMessage: vi.fn(), setSessionActive: vi.fn(),
 }) }));
 vi.mock('@/hooks/use-polling', () => ({ useMessagePolling: () => ({
@@ -27,7 +27,6 @@ vi.mock('./counselor-request-panel', () => ({ CounselorRequestPanel: () => null 
 vi.mock('./counselor-research-status', () => ({ CounselorResearchStatus: () => null }));
 vi.mock('@/components/counselor/counselor-mirror-card', () => ({ CounselorMirrorCard: () => null }));
 vi.mock('./share-dialog', () => ({ ShareDialog: () => null }));
-vi.mock('@/components/routines/create-routine-dialog', () => ({ CreateRoutineDialog: () => null }));
 vi.mock('./chat-messages', () => ({ ChatMessages: ({ messages }: any) => <div>{messages.map((m: any) => <p key={m.messageId}>{m.content}</p>)}</div> }));
 
 afterEach(() => { cleanup(); state.messages = []; });

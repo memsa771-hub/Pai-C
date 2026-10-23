@@ -95,6 +95,3 @@ def get_reranker() -> Reranker:
     return _reranker
 
 
-def set_reranker(reranker: Optional[Reranker]) -> None:
-    global _reranker
-    _reranker = reranker

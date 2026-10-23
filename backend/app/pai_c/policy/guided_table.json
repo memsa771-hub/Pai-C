@@ -5,7 +5,12 @@
     "first_picture_required_areas": [
       "status",
       "history"
-    ]
+    ],
+    "summary_min_covered": 2,
+    "invite_max_covered": 3,
+    "question_window": 2,
+    "short_reply_intent": "short_reply",
+    "summary_action": "summarize"
   },
   "rows": [
     {

@@ -13,12 +13,6 @@ from scripts.counselor_eval_support import StudentSession
 from tests.test_counselor_deep_pr3 import _turn
 
 
-@pytest.fixture(autouse=True)
-def strict_policy_mode(monkeypatch):
-    """These contracts describe the strict decision table."""
-    monkeypatch.setattr(config, "PAI_POLICY_MODE", "strict")
-
-
 def output(reply, action=None):
     return json.dumps({"reply":reply,"moves":["reflect"],"action":action or {"type":"none"}})
 
@@ -34,7 +28,7 @@ async def test_question_guard_and_bounded_retry(drafts,expected,calls,violation)
         model=AsyncMock(side_effect=[output(reply) for reply in drafts])
         with patch("app.pai_c.deep.turn.chat_completion",model):
             result=await run_deep_turn(db,_turn(student),history=[],
-                decision=Decision("listen","listen_reflect",None,False,False,False))
+                decision=Decision("counsel","counsel",None,False,False,False))
         assert model.await_count==calls and result.reply==(expected or config.PAI_STATEMENT_FALLBACK_REPLY)
         assert violation in result.guard_violations and "?" not in result.reply
         if calls==2:assert "Do not ask any question in this reply." in model.await_args.kwargs["system_prompt"]

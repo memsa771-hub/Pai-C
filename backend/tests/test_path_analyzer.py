@@ -196,10 +196,8 @@ def test_enqueue_reuses_a_pending_job():
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("mode", ["guided", "strict"])
 @pytest.mark.parametrize("kind,queued", [("decision_help", True), ("information", False)])
-async def test_asking_for_paths_queues_the_analyzer_in_the_background(monkeypatch, mode, kind, queued):
-    monkeypatch.setattr(config, "PAI_POLICY_MODE", mode)
+async def test_asking_for_paths_queues_the_analyzer_in_the_background(monkeypatch, kind, queued):
     monkeypatch.setattr(config, "PAI_API_KEY", "offline-fake")
     sig = signals(intent="deciding" if kind == "decision_help" else "asking_info",
                   request={"text": "Which paths do I have?", "kind": kind,

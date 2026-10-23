@@ -2,17 +2,16 @@
 
 import * as React from 'react';
 import { cn } from '@/lib/utils';
-import { Paperclip, X, FileIcon, ImageIcon, CalendarClock } from 'lucide-react';
+import { Paperclip, X, FileIcon, ImageIcon } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import type { WorkspaceAgent, KnowledgeEntry } from '@/lib/types';
+import type { WorkspaceAgent } from '@/lib/types';
 import { AgentAvatar } from '@/components/agents/agent-avatar';
 import { agentLabel } from '@/lib/helpers';
-import { BookOpen } from 'lucide-react';
 import { toast } from 'sonner';
 import { useT } from '@/lib/i18n';
 import {
@@ -37,13 +36,11 @@ interface ChatInputProps {
   disabled?: boolean;
   className?: string;
   agents?: WorkspaceAgent[];
-  knowledge?: KnowledgeEntry[];
   draft?: string;
   onDraftChange?: (draft: string) => void;
   onFocusChange?: (focused: boolean) => void;
   /** Auto-focus the textarea when mounted or when this key changes. */
   focusKey?: number;
-  onCreateRoutine?: () => void;
   /** The voice button, shown beside send when the conversation supports voice. */
   voice?: React.ReactNode;
 }
@@ -58,7 +55,7 @@ function isImageFile(file: File): boolean {
 // lib/document-types.ts; the server re-validates from the file's bytes.
 const FILE_ACCEPT = `image/*,${DOCUMENT_ACCEPT}`;
 
-export function ChatInput({ onSend, disabled, className, agents = [], knowledge = [], draft, onDraftChange, onFocusChange, focusKey, onCreateRoutine, voice }: ChatInputProps) {
+export function ChatInput({ onSend, disabled, className, agents = [], draft, onDraftChange, onFocusChange, focusKey, voice }: ChatInputProps) {
   const t = useT();
   const [message, setMessage] = React.useState(draft ?? '');
   const [showMentions, setShowMentions] = React.useState(false);
@@ -126,19 +123,9 @@ export function ChatInput({ onSend, disabled, className, agents = [], knowledge 
     )
   );
 
-  const filteredKnowledge = knowledge.filter(
-    (k) => k.title.toLowerCase().includes(mentionFilter.toLowerCase()) ||
-           k.slug.toLowerCase().includes(mentionFilter.toLowerCase())
-  );
+  type MentionItem = { type: 'agent'; agent: WorkspaceAgent };
 
-  type MentionItem =
-    | { type: 'agent'; agent: WorkspaceAgent }
-    | { type: 'knowledge'; entry: KnowledgeEntry };
-
-  const mentionItems: MentionItem[] = [
-    ...filteredAgents.map((agent): MentionItem => ({ type: 'agent', agent })),
-    ...filteredKnowledge.map((entry): MentionItem => ({ type: 'knowledge', entry })),
-  ];
+  const mentionItems: MentionItem[] = filteredAgents.map((agent): MentionItem => ({ type: 'agent', agent }));
 
   const addFiles = React.useCallback((files: FileList | File[]) => {
     const newFiles: PendingFile[] = [];
@@ -215,11 +202,7 @@ export function ChatInput({ onSend, disabled, className, agents = [], knowledge 
   };
 
   const insertMentionItem = (item: MentionItem) => {
-    if (item.type === 'agent') {
-      insertMention(item.agent.agentName);
-    } else {
-      insertMention(`knowledge:${item.entry.slug}`);
-    }
+    insertMention(item.agent.agentName);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -275,7 +258,7 @@ export function ChatInput({ onSend, disabled, className, agents = [], knowledge 
     // [^\s@] (not \w) so typing a display name like "@小明" keeps the
     // picker open while filtering; the inserted mention is still ASCII.
     const atMatch = textBefore.match(/@([^\s@]*)$/);
-    if (atMatch && (agents.length > 1 || knowledge.length > 0)) {
+    if (atMatch && agents.length > 1) {
       setMentionFilter(atMatch[1]);
       setMentionIndex(0);
       setShowMentions(true);
@@ -374,9 +357,6 @@ export function ChatInput({ onSend, disabled, className, agents = [], knowledge 
       {/* @mention autocomplete dropdown */}
       {showMentions && mentionItems.length > 0 && (
         <div className="absolute bottom-full mb-2 left-0 right-0 bg-popover border rounded-lg shadow-lg z-50 overflow-hidden max-h-70 overflow-y-auto">
-          {filteredAgents.length > 0 && filteredKnowledge.length > 0 && (
-            <div className="px-3 py-1.5 text-[10px] font-medium text-muted-foreground uppercase tracking-wider border-b border-border">{t('chatInput.mentionAgents')}</div>
-          )}
           {filteredAgents.map((agent) => {
             const idx = mentionItems.findIndex((m) => m.type === 'agent' && m.agent.agentName === agent.agentName);
             return (
@@ -411,35 +391,6 @@ export function ChatInput({ onSend, disabled, className, agents = [], knowledge 
               </button>
             );
           })}
-          {filteredKnowledge.length > 0 && (
-            <>
-              {filteredAgents.length > 0 && (
-                <div className="px-3 py-1.5 text-[10px] font-medium text-muted-foreground uppercase tracking-wider border-t border-border">{t('chatInput.mentionKnowledge')}</div>
-              )}
-              {filteredKnowledge.map((entry) => {
-                const idx = mentionItems.findIndex((m) => m.type === 'knowledge' && m.entry.id === entry.id);
-                return (
-                  <button
-                    key={entry.id}
-                    className={cn(
-                      'w-full flex items-center gap-2.5 px-3 py-2 text-sm text-left hover:bg-accent transition-colors',
-                      idx === mentionIndex && 'bg-accent'
-                    )}
-                    onMouseDown={(e) => {
-                      e.preventDefault();
-                      insertMention(`knowledge:${entry.slug}`);
-                    }}
-                  >
-                    <div className="size-6 rounded-md bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center shrink-0">
-                      <BookOpen className="size-3.5 text-amber-600 dark:text-amber-400" />
-                    </div>
-                    <span className="font-medium truncate">{entry.title}</span>
-                    <span className="text-[10px] text-muted-foreground ml-auto font-mono shrink-0">@knowledge:{entry.slug}</span>
-                  </button>
-                );
-              })}
-            </>
-          )}
         </div>
       )}
 
@@ -526,12 +477,6 @@ export function ChatInput({ onSend, disabled, className, agents = [], knowledge 
                 <ImageIcon className="size-4" />
                 {t('chatInput.attachImage')}
               </DropdownMenuItem>
-              {onCreateRoutine && (
-                <DropdownMenuItem onSelect={() => onCreateRoutine()}>
-                  <CalendarClock className="size-4" />
-                  {t('chatInput.createRoutine')}
-                </DropdownMenuItem>
-              )}
             </DropdownMenuContent>
           </DropdownMenu>
 
@@ -543,7 +488,7 @@ export function ChatInput({ onSend, disabled, className, agents = [], knowledge 
             onPaste={handlePaste}
             onFocus={() => { setIsFocused(true); onFocusChange?.(true); }}
             onBlur={() => { setIsFocused(false); onFocusChange?.(false); }}
-            placeholder={agents.length > 1 || knowledge.length > 0 ? t('chatInput.placeholderWithMentions') : t('chatInput.placeholder')}
+            placeholder={agents.length > 1 ? t('chatInput.placeholderWithMentions') : t('chatInput.placeholder')}
             rows={1}
             disabled={disabled}
             data-chat-input

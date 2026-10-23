@@ -22,26 +22,17 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from app.config import config
 from app.security.errors import EmailNotVerified, IdentityUnavailable
 from app.api.response import ResponseCode, json_response
-from app.routers import counselor_possibilities, account, app_version, auth, browser, counselor_summary, counselor_voice, decision_records, escalations, events, feedback, fetch, files, integrations, knowledge, network, notifications, operator, roadmaps, routines, search, shares, student_profile, student_requests, tasks, timers, todos, workflows, workspaces
+from app.routers import counselor_possibilities, account, app_version, auth, browser, counselor_summary, counselor_voice, decision_records, escalations, events, feedback, fetch, files, network, notifications, operator, roadmaps, search, shares, student_profile, student_requests, tasks, workflows, workspaces
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
-# Background timer-loop cadence. Time-sensitive firing (timers/routines)
-# runs every cycle; the heavy maintenance scans run far less often so they
-# never hold a pooled DB connection — or block the event loop — every 10s.
-TIMER_LOOP_INTERVAL_SECONDS = 10
-MAINTENANCE_EVERY_N_CYCLES = 30  # ~5 minutes
-
-# A routine whose previous fire hasn't produced an answer within this window
-# is treated as stuck (e.g. crashed adapter) and allowed to re-fire so the
-# routine can recover, rather than being skipped forever.
-ROUTINE_STUCK_MS = 30 * 60 * 1000  # 30 minutes
+MAINTENANCE_INTERVAL_SECONDS = 300
 
 
 def _run_maintenance():
-    """Expire stale todos/notifications and auto-archive stale threads.
+    """Expire old notifications and auto-archive stale threads.
 
     Pure synchronous DB work in a short-lived session. Invoked via
     ``asyncio.to_thread`` so these table scans run off the event loop and the
@@ -52,25 +43,11 @@ def _run_maintenance():
     from datetime import timedelta
     from sqlalchemy import update
     from app.database import SessionLocal
-    from app.models import Channel, NotificationRecord, TodoRecord
+    from app.models import Channel, NotificationRecord
 
     db = SessionLocal()
     try:
         now = datetime.now(timezone.utc)
-
-        # ── Expire stale todos (no update for 1 hour) ──
-        stale_cutoff = now - timedelta(hours=1)
-        expired = db.execute(
-            update(TodoRecord)
-            .where(
-                TodoRecord.status.in_(["pending", "in_progress"]),
-                TodoRecord.updated_at < stale_cutoff,
-            )
-            .values(status="cancelled", updated_at=now)
-            .returning(TodoRecord.id)
-        ).fetchall()
-        if expired:
-            logger.info("Expired %d stale todo(s)", len(expired))
 
         # ── Expire old notifications (older than 7 days) ──
         seven_days_ago = now - timedelta(days=7)
@@ -95,7 +72,6 @@ def _run_maintenance():
                 Channel.starred == False,  # noqa: E712
                 Channel.last_event_at != None,  # noqa: E711
                 Channel.last_event_at < stale_thread_cutoff,
-                ~Channel.name.startswith("routines:"),
             )
             .values(status="archived")
             .returning(Channel.id)
@@ -108,278 +84,22 @@ def _run_maintenance():
         db.close()
 
 
-async def _fire_due():
-    """Fire due timers and routines.
-
-    Runs every loop cycle. Opens one short-lived session that is committed
-    and closed within the cycle, so it never holds a pooled connection across
-    the sleep interval. ``pipeline.process`` is a coroutine (its mods are
-    async), so firing runs on the event loop — but only when something is
-    actually due, which is rare.
-    """
-    from sqlalchemy import select, update
-    from app.database import SessionLocal
-    from app.models import EventRecord, RoutineRecord, TimerRecord, Workspace
-    from app.eventing.factory import pipeline
-    from app.routers.routines import _compute_next_fires_at
-    from app.eventing.events import Event
-    from app.eventing.mods import PipelineContext
-
-    db = SessionLocal()
-    try:
-        now = datetime.now(timezone.utc)
-
-        # ── Fire due timers ──
-        due = db.execute(
-            select(TimerRecord).where(
-                TimerRecord.status == "active",
-                TimerRecord.fires_at <= now,
-            ).limit(50)
-        ).scalars().all()
-
-        pending_timers = [
-            {
-                "id": timer.id,
-                "workspace_id": timer.workspace_id,
-                "channel_name": timer.channel_name,
-                "created_by": timer.created_by,
-                "message": timer.message,
-            }
-            for timer in due
-        ]
-
-        for timer in pending_timers:
-            # Atomically claim before delivery. Under PostgreSQL READ COMMITTED,
-            # concurrent workers serialize on this UPDATE and only one can
-            # change active -> fired. Commit immediately to release the lock.
-            # This intentionally gives timers at-most-once semantics: a crash
-            # after the claim can lose the event, but can never duplicate it.
-            claimed = db.execute(
-                update(TimerRecord)
-                .where(
-                    TimerRecord.id == timer["id"],
-                    TimerRecord.status == "active",
-                    TimerRecord.fires_at <= now,
-                )
-                .values(status="fired")
-                .execution_options(synchronize_session=False)
-            )
-            db.commit()
-            if claimed.rowcount == 0:
-                continue
-
-            workspace = db.execute(
-                select(Workspace).where(Workspace.id == timer["workspace_id"])
-            ).scalar_one_or_none()
-            if not workspace:
-                continue
-            agent_name = timer["created_by"].replace("openagents:", "")
-            event = Event(
-                type="workspace.message.posted",
-                source="system:timer",
-                target=f"channel/{timer['channel_name']}",
-                payload={
-                    "content": f"⏰ Timer fired (set by @{agent_name}): {timer['message']}",
-                    "message_type": "chat",
-                },
-                metadata={"target_agents": [agent_name]},
-            )
-            ctx = PipelineContext(
-                network_id=str(workspace.id),
-                agent_address=timer["created_by"],
-                db=db,
-                workspace=workspace,
-                token=workspace.password_hash,
-            )
-            try:
-                await pipeline.process(event, ctx)
-            except Exception:
-                logger.exception("Timer fire failed for %s", timer["id"])
-
-        # ── Fire due routines ──
-        due_routines = db.execute(
-            select(RoutineRecord).where(
-                RoutineRecord.status == "active",
-                RoutineRecord.next_fires_at <= now,
-            ).limit(50)
-        ).scalars().all()
-
-        # Materialize fields now — the per-routine commit below would otherwise
-        # expire these ORM rows and force a re-query on every iteration.
-        pending_routines = [
-            {
-                "id": r.id,
-                "channel_name": r.channel_name,
-                "name": r.name,
-                "message": r.message,
-                "context": r.context,
-                "created_by": r.created_by,
-                "workspace_id": r.workspace_id,
-                "next_fire": _compute_next_fires_at(
-                    r.schedule_hour,
-                    r.schedule_minute,
-                    r.schedule_days,
-                    r.schedule_interval_minutes,
-                    r.timezone or "UTC",
-                ),
-            }
-            for r in due_routines
-        ]
-
-        now_ms = int(now.timestamp() * 1000)
-        for rt in pending_routines:
-            routine_id = rt["id"]
-            channel_name = rt["channel_name"]
-            r_name = rt["name"]
-            r_message = rt["message"]
-            r_context = rt["context"]
-            created_by = rt["created_by"]
-            workspace_id = rt["workspace_id"]
-            next_fire = rt["next_fire"]
-
-            # ── Atomically claim this tick so only one replica fires it ──
-            #
-            # The backend runs multiple replicas, each with its own scheduler
-            # loop. Without a claim, every replica sees the same due routine
-            # (next_fires_at <= now) and fires it, double-posting the routine
-            # context into the channel. This conditional UPDATE advances
-            # next_fires_at only while the row is still due, so under Postgres
-            # READ COMMITTED exactly one replica's UPDATE matches a row — the
-            # losers block on the row lock, then re-check the predicate after
-            # the winner commits, see a future time, and match nothing. We fire
-            # only if we claimed a row; committing straight away releases the
-            # lock so a losing replica isn't stalled for the whole cycle.
-            claimed = db.execute(
-                update(RoutineRecord)
-                .where(
-                    RoutineRecord.id == routine_id,
-                    RoutineRecord.status == "active",
-                    RoutineRecord.next_fires_at <= now,
-                )
-                .values(next_fires_at=next_fire)
-            )
-            db.commit()
-            if claimed.rowcount == 0:
-                continue  # another replica already claimed this tick
-
-            workspace = db.execute(
-                select(Workspace).where(Workspace.id == workspace_id)
-            ).scalar_one_or_none()
-            if not workspace:
-                continue
-            agent_name = created_by.replace("openagents:", "")
-
-            # Skip if the previous run of this routine is still in progress.
-            #
-            # A routine fires into the agent's dedicated routine channel and the
-            # agent works the task as a single turn, ending with a final `chat`
-            # answer. Firing again before that answer lands makes the adapter
-            # queue the new fire behind the running one, and on a short interval
-            # a long-running task snowballs into a backlog of duplicate runs.
-            #
-            # So: find the most recent fire in this channel and, if the agent
-            # hasn't posted a `chat` reply since, skip this tick — the claim
-            # above already advanced the schedule, so the next due tick
-            # re-checks. A run that produces no answer within ROUTINE_STUCK_MS
-            # (crashed adapter, etc.) is allowed to re-fire so it can recover.
-            last_fire = db.execute(
-                select(EventRecord)
-                .where(
-                    EventRecord.network_id == workspace.id,
-                    EventRecord.target == f"channel/{channel_name}",
-                    EventRecord.type == "workspace.message.posted",
-                    EventRecord.source == "system:routine",
-                )
-                .order_by(EventRecord.timestamp.desc())
-                .limit(1)
-            ).scalar_one_or_none()
-            if last_fire is not None:
-                answered = db.execute(
-                    select(EventRecord.id)
-                    .where(
-                        EventRecord.network_id == workspace.id,
-                        EventRecord.target == f"channel/{channel_name}",
-                        EventRecord.type == "workspace.message.posted",
-                        EventRecord.source == f"openagents:{agent_name}",
-                        EventRecord.timestamp > last_fire.timestamp,
-                        EventRecord.payload["message_type"].astext == "chat",
-                    )
-                    .limit(1)
-                ).scalar_one_or_none()
-                run_age_ms = now_ms - int(last_fire.timestamp or 0)
-                if answered is None and run_age_ms < ROUTINE_STUCK_MS:
-                    # Previous run still working — skip (schedule already advanced).
-                    continue
-
-            ctx = PipelineContext(
-                network_id=str(workspace.id),
-                agent_address=created_by,
-                db=db,
-                workspace=workspace,
-                token=workspace.password_hash,
-            )
-            try:
-                content = f"Routine \"{r_name}\" fired: {r_message}"
-                if r_context:
-                    content = f"**Routine Context for \"{r_name}\"**\n\n{r_context}\n\n---\n\n{content}"
-
-                fire_event = Event(
-                    type="workspace.message.posted",
-                    source="system:routine",
-                    target=f"channel/{channel_name}",
-                    payload={
-                        "content": content,
-                        "message_type": "chat",
-                    },
-                    metadata={"target_agents": [agent_name]},
-                )
-                await pipeline.process(fire_event, ctx)
-                db.commit()
-            except Exception:
-                logger.exception("Routine fire failed for %s", routine_id)
-
-            # Record the actual fire time (schedule already advanced by the claim).
-            db.execute(
-                update(RoutineRecord)
-                .where(RoutineRecord.id == routine_id)
-                .values(last_fired_at=now)
-            )
-            db.commit()
-
-        db.commit()
-    finally:
-        db.close()
-
-
-async def _timer_loop():
-    """Background loop: fire due timers/routines each cycle; run heavy
-    maintenance (expiry/archival) every few minutes.
-
-    Previously this did all of the above in one session held open for the
-    whole run, every 10s — including unindexed table scans that grew with the
-    data. On the event loop that froze the worker (even /health) and starved
-    the 24-slot DB pool. Now the firing path uses a short-lived session and
-    the heavy scans run off-loop via ``asyncio.to_thread``, far less often.
-    """
+async def _maintenance_loop():
+    """Background loop: heavy expiry/archival scans every few minutes, run
+    off the event loop via ``asyncio.to_thread``, plus the browser sweep."""
     from app.browser.maintenance import sweep_browser_tabs
 
-    cycle = 0
     browser_sweep_task = None
     while True:
+        await asyncio.sleep(MAINTENANCE_INTERVAL_SECONDS)
         try:
-            await _fire_due()
-            cycle += 1
-            if cycle % MAINTENANCE_EVERY_N_CYCLES == 0:
-                await asyncio.to_thread(_run_maintenance)
-                # Browser sweep is async (BF HTTP calls) and self-contained;
-                # run it as its own task so slow BF responses never delay
-                # timer firing. Overlap guard: skip if the last one is
-                # still running.
-                if browser_sweep_task is None or browser_sweep_task.done():
-                    browser_sweep_task = asyncio.create_task(sweep_browser_tabs())
+            await asyncio.to_thread(_run_maintenance)
+            # Browser sweep is async (BF HTTP calls) and self-contained; run it
+            # as its own task. Overlap guard: skip if the last one still runs.
+            if browser_sweep_task is None or browser_sweep_task.done():
+                browser_sweep_task = asyncio.create_task(sweep_browser_tabs())
         except Exception:
-            logger.exception("Timer loop error")
-        await asyncio.sleep(TIMER_LOOP_INTERVAL_SECONDS)
+            logger.exception("Maintenance loop error")
 
 
 @asynccontextmanager
@@ -434,8 +154,8 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.error("LIFESPAN: database import failed: %s", e)
 
-    logger.info("LIFESPAN: creating timer task")
-    timer_task = asyncio.create_task(_timer_loop())
+    logger.info("LIFESPAN: creating maintenance task")
+    maintenance_task = asyncio.create_task(_maintenance_loop())
 
     # One-off browser sweep at boot: sessions leaked before a restart (or
     # closes that failed mid-deploy) get released now instead of waiting
@@ -445,9 +165,9 @@ async def lifespan(app: FastAPI):
 
     logger.info("LIFESPAN: yielding (startup complete)")
     yield
-    timer_task.cancel()
+    maintenance_task.cancel()
     try:
-        await timer_task
+        await maintenance_task
     except asyncio.CancelledError:
         pass
     from app.infrastructure.cache import close_redis
@@ -688,21 +408,16 @@ app.include_router(events.router)
 app.include_router(feedback.router)
 app.include_router(fetch.router)
 app.include_router(files.router)
-app.include_router(integrations.router)
-app.include_router(knowledge.router)
 app.include_router(network.router)
 app.include_router(notifications.router)
 app.include_router(operator.router)
 app.include_router(roadmaps.router)
-app.include_router(routines.router)
 app.include_router(search.router)
 app.include_router(shares.router)
 app.include_router(student_profile.router)
 app.include_router(student_requests.router)
 app.include_router(tasks.router)
-app.include_router(todos.router)
 app.include_router(workflows.router)
-app.include_router(timers.router)
 app.include_router(workspaces.router)
 
 

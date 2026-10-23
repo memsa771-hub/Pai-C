@@ -114,9 +114,7 @@ export const VIEW_TITLE_KEYS: Record<ViewMode, MessageKey> = {
   profile: "views.profile",
   notifications: "views.notifications",
   files: "views.files",
-  knowledge: "views.knowledge",
   browser: "views.browser",
-  routines: "views.routines",
   inbox: "views.inbox",
 }
 
@@ -217,7 +215,7 @@ export function AppHeader() {
 
   // Title: the selected item for list-backed views, the view name otherwise.
   let title: React.ReactNode
-  if (viewMode === "threads" || viewMode === "routines") {
+  if (viewMode === "threads") {
     title = <ThreadTitle />
   } else if (viewMode === "files") {
     const name =
@@ -225,12 +223,6 @@ export function AppHeader() {
     title = (
       <h3 className="w-0 flex-1 truncate text-sm leading-snug font-semibold text-foreground">
         {name || t("views.files")}
-      </h3>
-    )
-  } else if (viewMode === "knowledge") {
-    title = (
-      <h3 className="w-0 flex-1 truncate text-sm leading-snug font-semibold text-foreground">
-        {t("views.knowledge")}
       </h3>
     )
   } else if (viewMode === "browser") {

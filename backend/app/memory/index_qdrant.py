@@ -117,8 +117,7 @@ class QdrantMemoryIndex(MemoryIndex):
         dead loop. The background worker keeps one long-lived loop and so
         keeps one long-lived client, unchanged.
 
-        Entries for finished loops are dropped here, and `aclose_current` is
-        what actually closes a foreground client before its loop ends.
+        Entries for finished loops are dropped here.
         """
         try:
             from qdrant_client import AsyncQdrantClient
@@ -147,27 +146,6 @@ class QdrantMemoryIndex(MemoryIndex):
             client = AsyncQdrantClient(url=self._url, api_key=self._api_key)
             self._clients[key] = (loop, client)
             return client
-
-    async def aclose_current(self) -> None:
-        """Close and forget the client owned by the current loop.
-
-        Called by foreground retrieval before its `asyncio.run` loop ends, so
-        a short-lived loop never leaves an unclosed client behind. Best-effort:
-        a failure to close must not fail the retrieval that already succeeded.
-        """
-        try:
-            loop = asyncio.get_running_loop()
-        except RuntimeError:
-            return
-
-        with self._clients_lock:
-            entry = self._clients.pop(id(loop), None)
-        if entry is None:
-            return
-        try:
-            await entry[1].close()
-        except Exception:
-            logger.debug("qdrant: closing foreground client failed", exc_info=True)
 
     async def ensure_collection(self) -> None:
         """Create the collection if absent. Idempotent.

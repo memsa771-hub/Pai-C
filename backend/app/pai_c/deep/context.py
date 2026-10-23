@@ -261,7 +261,7 @@ async def build_context(db, workspace_id: str, turn: CounselorTurnInput, *,
             # this nested view of already-published artifacts.
             sections["research"] = sections.get("research", "") + "\n<compare>" + _json(compare) + "</compare>"
     draft = (journey.counselor_summary_draft or {}) if journey else {}
-    if decision is not None and not wellbeing and not mirror and config.PAI_POLICY_MODE == "guided":
+    if decision is not None and not wellbeing and not mirror:
         sections["state"] = _json(guided_state(db, workspace_id, notebook, draft, decision,
             memory.coverage_areas(workspace_id), NotedQuestionService(db).open_requests(workspace_id)))
     sections["journey"] = _json({"stage": journey.current_stage if journey else "IDENTITY",
@@ -274,7 +274,7 @@ async def build_context(db, workspace_id: str, turn: CounselorTurnInput, *,
         sections["workspace_language"] = _json(workspace_language())
     from app.pai_c.fact_cards import available_cards
     cards = ()
-    if decision is not None and decision.question_allowed and not wellbeing and not mirror and decision.action in {"explore_area", "ask", "ask_choice", "answer_request", "counsel"}:
+    if decision is not None and decision.question_allowed and not wellbeing and not mirror and decision.action in {"explore_area", "answer_request", "counsel"}:
         cards = tuple(available_cards(snapshot, None if decision.topic == "request" else decision.topic))
         sections["fact_cards"] = _json(cards)
     text = "<context>\n" + "\n".join(

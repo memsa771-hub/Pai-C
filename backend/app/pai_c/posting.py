@@ -237,21 +237,10 @@ async def _post_response(
     except Exception:
         logger.warning("counselor: failed to schedule workflow advance", exc_info=True)
 
-    # Cloud replies bypass POST /v1/events, so the route's Slack/Telegram
-    # relay hook never sees them either â€” schedule it here the same way.
-    try:
-        from app.services.integrations import relay_for_event
-        if not (metadata or {}).get("in_app_only"):
-            asyncio.get_running_loop().run_in_executor(
-                None, relay_for_event, workspace_id, snapshot,
-            )
-    except Exception:
-        logger.warning("counselor: failed to schedule integration relay", exc_info=True)
-
-    # LAST. Every post-commit hook above must run before this returns â€”
-    # returning early once orphaned the Redis publish, workflow advance and
-    # integration relay, which cloud replies reach ONLY from here (they bypass
-    # the POST /v1/events route that schedules them for everyone else).
+    # LAST. Every post-commit hook above must run before this returns:
+    # returning early once orphaned the Redis publish and workflow advance,
+    # which cloud replies reach ONLY from here (they bypass the POST
+    # /v1/events route that schedules them for everyone else).
     return event.id
 
 

@@ -1,22 +1,10 @@
 'use client';
 
-import { useEffect, useMemo, useState, useCallback } from 'react';
-import { Circle, Loader2, Timer, MessageSquareMore, X } from 'lucide-react';
-import { useWorkspace } from '@/lib/workspace-context';
+import { useMemo, useState, useCallback } from 'react';
+import { MessageSquareMore, X } from 'lucide-react';
 import { workspaceApi } from '@/lib/api';
-import type { TimerItem, WorkspaceMessage } from '@/lib/types';
+import type { WorkspaceMessage } from '@/lib/types';
 import { useT } from '@/lib/i18n';
-
-/** Countdown to a timer's next fire. Units stay in the compact `12m` shorthand. */
-function timeUntil(dateStr: string, nowLabel: string): string {
-  const diff = new Date(dateStr).getTime() - Date.now();
-  if (diff <= 0) return nowLabel;
-  const secs = Math.floor(diff / 1000);
-  if (secs < 60) return `${secs}s`;
-  const mins = Math.floor(secs / 60);
-  if (mins < 60) return `${mins}m`;
-  return `${Math.floor(mins / 60)}h`;
-}
 
 interface QueuedMessage {
   queueId: string;
@@ -24,40 +12,8 @@ interface QueuedMessage {
 }
 
 export function ThreadStatusBar({ channelName, messages = [] }: { channelName: string; messages?: WorkspaceMessage[] }) {
-  const { todos, refreshTodos } = useWorkspace();
   const t = useT();
-  const [timers, setTimers] = useState<TimerItem[]>([]);
   const [cancelledQueueIds, setCancelledQueueIds] = useState<Set<string>>(new Set());
-
-  const pollTimers = useCallback(async () => {
-    try {
-      const result = await workspaceApi.listTimers(channelName);
-      setTimers(result.timers);
-    } catch {}
-  }, [channelName]);
-
-  useEffect(() => {
-    let cancelled = false;
-    const poll = async () => {
-      const result = await workspaceApi.listTimers(channelName).catch(() => null);
-      if (!cancelled && result) setTimers(result.timers);
-    };
-    poll();
-    const interval = setInterval(poll, 15000);
-    return () => { cancelled = true; clearInterval(interval); };
-  }, [channelName]);
-
-  const [, setTick] = useState(0);
-  useEffect(() => {
-    if (!timers.length) return;
-    const interval = setInterval(() => setTick((t) => t + 1), 1000);
-    return () => clearInterval(interval);
-  }, [timers.length]);
-
-  const channelTodos = useMemo(() =>
-    todos.filter((t) => t.channelName === channelName && (t.status === 'pending' || t.status === 'in_progress')),
-    [todos, channelName]
-  );
 
   // Extract queued messages from status messages with queue metadata
   const queuedMessages = useMemo(() => {
@@ -87,28 +43,6 @@ export function ThreadStatusBar({ channelName, messages = [] }: { channelName: s
     return queued.reverse();
   }, [messages, cancelledQueueIds]);
 
-  const pendingCount = channelTodos.filter((t) => t.status === 'pending').length;
-  const inProgressCount = channelTodos.filter((t) => t.status === 'in_progress').length;
-  const activeTimers = timers.filter((t) => t.status === 'active');
-
-  const handleCancelTimer = useCallback(async (timerId: string) => {
-    setTimers((prev) => prev.filter((t) => t.id !== timerId));
-    try {
-      await workspaceApi.cancelTimer(timerId);
-    } catch {}
-    pollTimers();
-  }, [pollTimers]);
-
-  const handleCancelTodos = useCallback(async () => {
-    const agents = Array.from(new Set(channelTodos.map((t) => t.createdBy)));
-    for (const source of agents) {
-      try {
-        await workspaceApi.cancelChannelTodos(channelName, source);
-      } catch {}
-    }
-    refreshTodos();
-  }, [channelTodos, channelName, refreshTodos]);
-
   const handleCancelQueued = useCallback(async (queueId: string) => {
     setCancelledQueueIds((prev) => new Set(prev).add(queueId));
     try {
@@ -116,56 +50,10 @@ export function ThreadStatusBar({ channelName, messages = [] }: { channelName: s
     } catch {}
   }, [channelName]);
 
-  const hasContent = pendingCount > 0 || inProgressCount > 0 || activeTimers.length > 0 || queuedMessages.length > 0;
-  if (!hasContent) return null;
+  if (!queuedMessages.length) return null;
 
   return (
     <div className="flex flex-col gap-0.5 px-1 py-1 text-[11px] text-muted-foreground">
-      {/* Todos and timers row */}
-      {(inProgressCount > 0 || pendingCount > 0 || activeTimers.length > 0) && (
-        <div className="flex items-center gap-2.5">
-          {(inProgressCount > 0 || pendingCount > 0) && (
-            <span className="flex items-center gap-1">
-              {inProgressCount > 0 && (
-                <>
-                  <Loader2 className="size-3 text-foreground animate-spin" />
-                  <span>{t('threadStatus.inProgress', { count: inProgressCount })}</span>
-                </>
-              )}
-              {inProgressCount > 0 && pendingCount > 0 && <span className="text-muted-foreground/30">·</span>}
-              {pendingCount > 0 && (
-                <>
-                  <Circle className="size-3" />
-                  <span>{t('threadStatus.pending', { count: pendingCount })}</span>
-                </>
-              )}
-              <button
-                onClick={handleCancelTodos}
-                className="ml-0.5 p-0.5 rounded hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors"
-                title={t('threadStatus.cancelAllTasks')}
-              >
-                <X className="size-3" />
-              </button>
-            </span>
-          )}
-          {activeTimers.map((timer) => (
-            <span key={timer.id} className="flex items-center gap-1">
-              <Timer className="size-3 text-amber-500" />
-              <span>{timer.message.length > 30 ? timer.message.slice(0, 30) + '…' : timer.message}</span>
-              <span className="text-amber-500 font-mono">{timeUntil(timer.firesAt, t('threadStatus.now'))}</span>
-              <button
-                onClick={() => handleCancelTimer(timer.id)}
-                className="p-0.5 rounded hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors"
-                title={t('threadStatus.cancelTimer')}
-              >
-                <X className="size-3" />
-              </button>
-            </span>
-          ))}
-        </div>
-      )}
-
-      {/* Queued messages */}
       {queuedMessages.map((q) => (
         <div key={q.queueId} className="flex items-center gap-1.5 text-foreground/80">
           <MessageSquareMore className="size-3 shrink-0" />

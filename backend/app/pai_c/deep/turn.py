@@ -88,7 +88,7 @@ async def run_deep_turn(db, turn: CounselorTurnInput, *,
     messages = [*history, {"role": "user", "content": current}]
     # Read transactions must not remain open over the network call.
     db.rollback()
-    voice_prompt = "voice_guided" if config.PAI_POLICY_MODE == "guided" and decision is not None else "voice"
+    voice_prompt = "voice_guided" if decision is not None else "voice"
     prompt = load_prompt(voice_prompt) + "\n\n" + context.text
     if instructions:
         prompt += "\n\n" + load_prompt(instructions)

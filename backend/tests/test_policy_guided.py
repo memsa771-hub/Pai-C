@@ -1,7 +1,6 @@
 """Guided policy mode: guardrail table, first picture and coverage depth (offline)."""
 import pytest
 
-from app.config import config
 from app.pai_c.policy import classifier, controller
 from app.pai_c.policy.state import derive_state, first_picture_due
 
@@ -31,24 +30,14 @@ def state(**changes):
     ({}, "counsel", "counsel", False),
 ])
 def test_guided_rows_first_match(changes, rule, action, question):
-    result = controller.decide(state(**changes), mode="guided")
+    result = controller.decide(state(**changes))
     assert (result.rule_id, result.action, result.question_allowed) == (rule, action, question)
 
 
-def test_guided_has_usefulness_guard_and_mode_comes_from_config(monkeypatch):
+def test_guided_has_usefulness_guard():
     assert [check["id"] for check in controller.load_data("guided_table.json")["post_checks"]] == ["useful_question"]
-    previous = controller.decide(state(), mode="guided").as_dict()
-    assert controller.decide(state(previous=previous), mode="guided").rule_id == "counsel"
-    monkeypatch.setattr(config, "PAI_POLICY_MODE", "strict")
-    assert controller.decide(state()).rule_id == "default"
-    monkeypatch.setattr(config, "PAI_POLICY_MODE", "guided")
-    assert controller.decide(state()).rule_id == "counsel"
-
-
-def test_policy_mode_is_validated(monkeypatch):
-    monkeypatch.setattr(config, "PAI_POLICY_MODE", "other")
-    with pytest.raises(RuntimeError, match="PAI_POLICY_MODE"):
-        config.validate_startup()
+    previous = controller.decide(state()).as_dict()
+    assert controller.decide(state(previous=previous)).rule_id == "counsel"
 
 
 def coverage(covered):
@@ -81,10 +70,10 @@ def test_derive_state_exposes_first_picture_and_confirmation():
 
 
 def test_action_texts_for_guided_mode():
-    counsel = controller.decide(state(), mode="guided")
+    counsel = controller.decide(state())
     text = controller.decision_context(counsel, None, None)["instruction"]
     assert text.strip() == "Follow the counseling loop for this reply."
-    picture = controller.decide(state(first_picture_due=True), mode="guided")
+    picture = controller.decide(state(first_picture_due=True))
     text = controller.decision_context(picture, None, None)["instruction"]
     assert text.startswith("Share your first picture of them.") and "Tell me what feels right and what feels wrong." in text
 

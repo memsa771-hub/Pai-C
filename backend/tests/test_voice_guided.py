@@ -5,7 +5,6 @@ from unittest.mock import AsyncMock, patch
 import pytest
 from sqlalchemy import select
 
-from app.config import config
 from app.models import CounselorNotedQuestion
 from app.pai_c.deep.prompts import load_prompt
 from app.pai_c.deep.turn import run_deep_turn
@@ -35,12 +34,8 @@ def test_guided_prompt_keeps_shared_sections_from_voice():
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("mode,first_line,has_state", [
-    ("guided", "You are PAI, a counselor who stays", True),
-    ("strict", "You are PAI, a personal education and career counselor.", False),
-])
-async def test_prompt_and_state_follow_policy_mode(monkeypatch, mode, first_line, has_state):
-    monkeypatch.setattr(config, "PAI_POLICY_MODE", mode)
+async def test_guided_prompt_and_state(monkeypatch):
+    first_line, has_state = "You are PAI, a counselor who stays", True
     with StudentSession() as student, student.factory() as db:
         model = AsyncMock(return_value=output("That sounds like a real turning point for you."))
         with patch("app.pai_c.deep.turn.chat_completion", model):
@@ -52,7 +47,6 @@ async def test_prompt_and_state_follow_policy_mode(monkeypatch, mode, first_line
 
 @pytest.mark.asyncio
 async def test_state_block_content(monkeypatch):
-    monkeypatch.setattr(config, "PAI_POLICY_MODE", "guided")
     signals = fallback_signals().model_dump()
     signals.update(intent="asking_info", request={"text": "What does a data analyst do", "kind": "information",
                                                   "needs_research": False, "needs_context": False})
@@ -82,9 +76,7 @@ async def test_state_block_content(monkeypatch):
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("mode", ["guided", "strict"])
-async def test_reply_repetition_guard_retries_once(monkeypatch, mode):
-    monkeypatch.setattr(config, "PAI_POLICY_MODE", mode)
+async def test_reply_repetition_guard_retries_once(monkeypatch):
     previous = "You enjoy building things with your hands and you want your parents to see that."
     history = [{"role": "user", "content": "hi"}, {"role": "assistant", "content": previous}]
     with StudentSession() as student, student.factory() as db:
@@ -98,7 +90,6 @@ async def test_reply_repetition_guard_retries_once(monkeypatch, mode):
 
 @pytest.mark.asyncio
 async def test_reply_guard_keeps_second_draft_and_skips_care(monkeypatch):
-    monkeypatch.setattr(config, "PAI_POLICY_MODE", "guided")
     previous = "I am here with you, and what you feel matters."
     history = [{"role": "assistant", "content": previous}]
     with StudentSession() as student, student.factory() as db:
@@ -115,7 +106,6 @@ async def test_reply_guard_keeps_second_draft_and_skips_care(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_question_guard_still_enforced_in_guided_mode(monkeypatch):
-    monkeypatch.setattr(config, "PAI_POLICY_MODE", "guided")
     with StudentSession() as student, student.factory() as db:
         model = AsyncMock(return_value=output("That took courage. What happened next?"))
         with patch("app.pai_c.deep.turn.chat_completion", model):

@@ -2,7 +2,6 @@
 
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { cleanup, renderHook } from '@testing-library/react';
-import { useWorkspaceNavigation } from './workspace-navigation';
 import { useDesktopWorkspaceState } from './use-desktop-workspace-state';
 import { useNotificationNavigation } from '../notifications/use-notification-navigation';
 import type { NotificationItem } from '@/lib/types';
@@ -28,12 +27,6 @@ const notification = (overrides: Partial<NotificationItem> = {}): NotificationIt
 });
 beforeEach(() => { vi.clearAllMocks(); localStorage.clear(); state.markNotificationRead.mockResolvedValue(undefined); });
 afterEach(cleanup);
-
-it('keeps profile and documents in shared mobile/desktop navigation without OS or browser entries', () => {
-  const { result } = renderHook(useWorkspaceNavigation);
-  expect(result.current.flatMap(group => group.items.map(item => item.mode))).toEqual(['profile', 'files']);
-  expect(result.current.every(group => group.items.length > 0)).toBe(true);
-});
 
 it.each(['applications', 'deadlines', 'tasks', 'workflows'])('ignores an old saved %s view while retaining the Counselor session', (view) => {
   localStorage.setItem(preferenceKey, JSON.stringify({ view, thread: 'pai-counselor' }));

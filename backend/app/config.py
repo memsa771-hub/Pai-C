@@ -164,7 +164,6 @@ class Config:
     PAI_CLASSIFIER_REASONING_EFFORT: str = os.environ.get("PAI_CLASSIFIER_REASONING_EFFORT", "low")
     PAI_CLASSIFIER_TIMEOUT_MS: int = int(os.environ.get("PAI_CLASSIFIER_TIMEOUT_MS", "8000"))
     PAI_SUMMARY_EVERY_TURNS: int = int(os.environ.get("PAI_SUMMARY_EVERY_TURNS", "4"))
-    PAI_POLICY_MODE: str = os.environ.get("PAI_POLICY_MODE", "guided").strip().lower()
     PAI_STATEMENT_FALLBACK_REPLY: str = os.environ.get(
         "PAI_STATEMENT_FALLBACK_REPLY",
         "Thank you for sharing that with me. I'm taking it in, and I'll keep it in mind as we continue.")
@@ -358,19 +357,6 @@ class Config:
     # Must be a domain verified in Resend, or delivery fails.
     EMAIL_FROM: str = os.environ.get("EMAIL_FROM", "Placement AI <noreply@placement-ai.com>")
 
-    # Chat-platform integrations (Slack / Telegram bridges). The public base
-    # URL is what external platforms call back to — Telegram setWebhook and
-    # the Slack Events API URL both derive from it.
-    PUBLIC_API_BASE: str = os.environ.get(
-        "PUBLIC_API_BASE", "https://api.placement-ai.com"
-    )
-    # The official "OpenAgents" Slack app (one-click Add to Slack). All three
-    # come from the app's Basic Information page; when unset, the UI falls
-    # back to the bring-your-own-app flow (docs/slack-app-setup.md).
-    SLACK_CLIENT_ID: str = os.environ.get("SLACK_CLIENT_ID", "")
-    SLACK_CLIENT_SECRET: str = os.environ.get("SLACK_CLIENT_SECRET", "")
-    SLACK_SIGNING_SECRET: str = os.environ.get("SLACK_SIGNING_SECRET", "")
-
     # In-app feedback forwarding. Feedback rows always land in the DB; when
     # this is set they are also emailed (via Resend) to the team.
     FEEDBACK_EMAIL_TO: str = os.environ.get("FEEDBACK_EMAIL_TO", "")
@@ -419,8 +405,6 @@ class Config:
             raise RuntimeError("PAI_REPEAT_QUESTION_SIMILARITY must be in (0, 1]")
         if not 0 < self.PAI_REPEAT_REPLY_SIMILARITY <= 1:
             raise RuntimeError("PAI_REPEAT_REPLY_SIMILARITY must be in (0, 1]")
-        if self.PAI_POLICY_MODE not in {"guided", "strict"}:
-            raise RuntimeError("PAI_POLICY_MODE must be guided or strict")
         if self.PAI_PROFILE_COMPLETION_ROLLOUT_MODE not in {"off", "shadow", "new", "all"}:
             raise RuntimeError(
                 "PAI_PROFILE_COMPLETION_ROLLOUT_MODE must be off, shadow, new, or all"

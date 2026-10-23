@@ -85,15 +85,6 @@ class StudentContextBuilder:
         )
         return self._shape(context, student_id, intent)
 
-    async def build_context_async(self, student_id: str, query: str | None = None,
-                                  caller: str = "counselor", intent: str | None = None):
-        intent = intent if intent in INTENT_RECORDS else classify_intent(query)
-        context = await self.memory.build_student_context_async(
-            workspace_id=student_id, query=query, caller=caller,
-            include_sensitive=False,
-        )
-        return self._shape(context, student_id, intent)
-
     def _shape(self, context, student_id, intent):
         if "vault" not in context.resolved_refs:
             context.records = {}

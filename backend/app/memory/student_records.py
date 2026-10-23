@@ -93,10 +93,6 @@ _VERIFICATION_RANK = {
 MAX_CORROBORATIONS = 10
 
 
-def _explicit_correction(evidence):
-    return (evidence or {}).get("semantic_correction") is True
-
-
 class StudentRecordService:
     def __init__(self, db):
         self.db = db

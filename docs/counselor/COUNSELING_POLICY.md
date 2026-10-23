@@ -17,8 +17,8 @@ Decision: no separate code path per student type. One universal counseling loop 
 7. Coverage depth tracked in code (min items per area) and shown to the model as known/missing.
 8. Every turn logged (model moves + guardrail flags) for evaluation.
 
-## Modes
-PAI_POLICY_MODE = guided (universal loop + guardrails, default for strong models) | strict (full decision table, kept as fallback). Choose by measured results on the same persona set and live tests.
+## Mode
+One guided policy (universal loop + guardrails) in `policy/guided_table.json`. The strict decision table was removed on 23 Oct 2026; it is in git history if a measured comparison ever needs it.
 
 ## Success measures
 Measure felt understood, appropriate questions, corrections respected, source accuracy, and informed student choice. Do not optimize a reflection/question ratio or a fixed picture deadline. Offline tests demonstrate routing and guards; counseling quality needs reviewed student conversations.

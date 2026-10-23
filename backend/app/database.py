@@ -95,14 +95,9 @@ Base = declarative_base()
 # the name at import time — so a test overriding `get_db` silently leaves them
 # pointed at the production engine (or, in tests, a second empty database).
 #
-# Call `session_factory()` instead of importing SessionLocal directly, and one
+# Call `new_session()` instead of importing SessionLocal directly, and one
 # `set_session_factory()` redirects every such path at once.
 _session_factory = SessionLocal
-
-
-def session_factory():
-    """The session factory background/tool code should use."""
-    return _session_factory
 
 
 def set_session_factory(factory):

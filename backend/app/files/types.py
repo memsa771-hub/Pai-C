@@ -136,6 +136,3 @@ def kind_for(filename: str, content_type: Optional[str] = None) -> str:
     return "unknown"
 
 
-def group_for(filename: str, content_type: Optional[str] = None) -> str:
-    """The filter group a file belongs to."""
-    return KIND_GROUPS[kind_for(filename, content_type)]

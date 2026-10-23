@@ -20,7 +20,7 @@ from app.pai_c.deep.coverage import enforce_mirror_readiness
 from app.pai_c.deep.notebook import NotebookService, NotebookVersionConflict
 from app.pai_c.deep.notebook_schema import CounselorNotebookData
 from app.pai_c.deep.sensitive import filter_sensitive_changes, model_sensitive_checker, check_notebook_before_mirror
-from app.pai_c.deep.usage import usage_callback
+from app.inference.gateway import usage_callback
 from app.pai_c.stages import advance_discovery_stage
 from app.jobs.service import BackgroundJobService
 from app.inference.client import chat_completion

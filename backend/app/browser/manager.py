@@ -140,15 +140,6 @@ class BrowserManager:
             return self._tab_keys[tab_id]
         return BROWSERFABRIC_API_KEY
 
-    def bind_tab_key(self, tab_id: str, api_key: Optional[str]) -> None:
-        """Refresh the in-process key cache from the router's credential
-        resolver, so per-tab ops use the verified key even when the tab was
-        opened by another process/before a restart."""
-        if api_key:
-            self._tab_keys[tab_id] = api_key
-        else:
-            self._tab_keys.pop(tab_id, None)
-
     async def _bf_call(self, tool_name: str, arguments: dict = None, session_id: str = None, api_key: str = None, tab_id: str = None) -> dict:
         """Call a Browser Fabric tool via REST API."""
         key = api_key or (self._key_for_tab(tab_id) if tab_id else BROWSERFABRIC_API_KEY)
