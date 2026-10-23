@@ -5,6 +5,8 @@ DBOS steps) -> `decide` (kernel checks, limits, apply or propose) or `support` /
 small JSON, never plan state. Step retries are the only retries (invariant 7); every write is keyed by the
 proposal or the event (invariant 8)."""
 
+import logging
+
 from dbos import DBOS, DBOSClient, EnqueueOptions
 from sqlalchemy import Engine, func, select
 
@@ -17,6 +19,7 @@ from app.os.replan.supervisor import propose
 from app.os.settings import OsSettings
 
 REPLAN_WORKFLOW = "os.replan"
+log = logging.getLogger("app.os.replan")
 
 
 def replan_workflow_id(tenant_id: str, plan_id: int, event_id: int, generation: int = 0) -> str:
@@ -135,9 +138,12 @@ def run_replan_job(replanner: Replanner, client: DBOSClient, now) -> int:
     with engine.connect() as conn:
         plan_ids = conn.execute(select(P.c.id).where(P.c.tenant_id == tenant, P.c.status.in_(("active", "at_risk")))
                                 .order_by(P.c.id)).scalars().all()
-    for plan_id in plan_ids:
-        replanner.plans.check_newer(plan_id)
-        ev.detect_approved_changed(engine, tenant, plan_id)
+    for plan_id in plan_ids:  # one bad plan never stops the others (final review I9)
+        try:
+            replanner.plans.check_newer(plan_id)
+            ev.detect_approved_changed(engine, tenant, plan_id)
+        except Exception:  # noqa: BLE001  (logged; the plan is swept again in 5 minutes)
+            log.exception("replan sweep failed for plan %s", plan_id)
     replanner.expire_due(now)
     queued = 0
     for e in ev.pending(engine, tenant):

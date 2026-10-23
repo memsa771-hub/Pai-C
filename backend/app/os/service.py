@@ -128,10 +128,13 @@ class PlanService:
                                  {"playbook": newest.key, "version": newest.version, "from": pinned.version},
                                  f"{newest.key}@{newest.version}") is not None
 
-    def upgrade(self, plan_id: int) -> int:
-        """Moves a running plan to the newest playbook for its route (parent §4.3)."""
+    def upgrade(self, plan_id: int, version: int | None = None) -> int:
+        """Moves a running plan to the newest playbook for its route (parent §4.3), or to `version` (the one the
+        student accepted, Slice 7: never a newer one they did not see)."""
         contract, sha = self._contract(plan_id)
         newest = select_playbook(self.playbooks, contract.origin_country, contract.destination_country, contract.level)
+        if version is not None:
+            newest = self.playbooks[(newest.key, version)]
         return self.kernel.upgrade_playbook(plan_id, self.compile(contract, newest, plan_id), based_on=sha)
 
     def anchor_fields(self) -> set[str]:

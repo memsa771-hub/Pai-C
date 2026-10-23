@@ -135,7 +135,7 @@ def test_small_change_applies_at_once(ctx):
     assert got["status"] == "applied"
     with ctx.engine.connect() as conn:
         keys = conn.execute(select(models.outbox.c.idempotency_key)).scalars().all()
-    assert f"replan:{got['proposal_id']}:travel_insurance" in keys
+    assert f"replan:{ctx.plan_id}:travel_insurance:{NOW.date().isoformat()}" in keys  # one nudge per step per day
 
 
 def test_override_change_is_a_replan_revision(ctx):
@@ -233,3 +233,118 @@ def test_accept_other_student_refused(ctx):
 
 def test_today_is_fixed(ctx):
     assert ctx.r.clock() == NOW and date(2027, 2, 1) == NOW.date()
+
+
+# --- final review fixes ---------------------------------------------------------------------------------------
+
+
+def test_uncompilable_plan_opens_support_case(ctx, monkeypatch):
+    """Final review C1: a plan that no longer compiles reaches a person; the workflow never fails."""
+    from app.os.compiler import CompileError
+
+    def broken(*a, **k):
+        raise CompileError("cycle: a -> b -> a")
+
+    monkeypatch.setattr(ctx.r.plans, "compile", broken)
+    eid = ctx.event("document_missing", instance_key="travel_insurance")
+    assert ctx.run(eid)["status"] == "support"
+    assert [c.event_ids for c in SupportStore(ctx.engine, TENANT).list("open")] == [[eid]]
+    assert events.pending(ctx.engine, TENANT) == []
+
+
+def test_decide_and_accept_wait_for_the_plan_lock(ctx):
+    """Final review I2, I5: one plan's replans and answers run one at a time."""
+    import threading
+
+    eid = ctx.event("document_missing", instance_key="travel_insurance")
+    from app.os.replan.ops import RequestFromStudent
+
+    op = RequestFromStudent(instance_key="travel_insurance", message="Please.", reason="On time.")
+    done = threading.Event()
+    with ctx.r.plan_lock(ctx.plan_id):
+        t = threading.Thread(target=lambda: (ctx.r.decide(ctx.plan_id, [eid], "rules", [op]), done.set()))
+        t.start()
+        assert not done.wait(1.0)  # blocked while the lock is held
+    t.join(30)
+    assert done.is_set()
+
+
+def test_one_nudge_per_step_per_day(ctx):
+    """Final review I2: two requests for the same step on one day send one message."""
+    from app.os.replan.ops import RequestFromStudent
+
+    op = RequestFromStudent(instance_key="travel_insurance", message="Please.", reason="On time.")
+    for n in (1, 2):
+        ctx.r.decide(ctx.plan_id, [ctx.event("document_missing", dedupe=f"n{n}", instance_key="travel_insurance")],
+                     "rules", [op])
+    with ctx.engine.connect() as conn:
+        keys = [k for k in conn.execute(select(models.outbox.c.idempotency_key)).scalars() if k.startswith("replan:")]
+    assert len(keys) == 1
+
+
+def test_failed_apply_leaves_no_override(ctx, monkeypatch):
+    """Final review I3: if the revision cannot be written, no override stays behind to apply later."""
+    from app.os.kernel import StaleDraft
+
+    pid = ctx.run(ctx.event("admission_rejected", programme_ref=P1))["proposal_id"]
+
+    def stale(*a, **k):
+        raise StaleDraft("changed")
+
+    monkeypatch.setattr(ctx.r.plans.kernel, "apply_replan", stale)
+    with pytest.raises(ProposalStale):
+        ctx.r.accept(STUDENT, pid)
+    from app.os.replan.store import OverrideStore
+
+    assert OverrideStore(ctx.engine, TENANT).active(ctx.plan_id) == []
+    assert ProposalStore(ctx.engine, TENANT).get(pid).status == "pending"
+
+
+def test_accept_refused_after_contract_changed(ctx):
+    """Final review I4: the student reordered their programmes since: accepting is refused even if the op still fits."""
+    pid = ctx.run(ctx.event("admission_rejected", programme_ref=P1))["proposal_id"]
+    flip = lambda c: [p.model_copy(update={"rank": len(c.programmes) + 1 - p.rank}) for p in c.programmes]  # noqa: E731
+    ctx.r.plans.change_programmes(ctx.plan_id, flip, "programmes:reorder")
+    with pytest.raises(ProposalStale):
+        ctx.r.accept(STUDENT, pid)
+
+
+def test_refused_proposal_finishes_its_case_after_a_crash(ctx):
+    """Final review I6: a crash between the refusal and the case/pause is finished on the step's retry."""
+    with ctx.engine.begin() as conn:
+        n = conn.execute(select(models.plans.c.current_revision).where(models.plans.c.id == ctx.plan_id)).scalar()
+        for i, cause in enumerate(["replan:90", "replan:91", "replan:92"], n + 1):
+            conn.execute(REV.insert().values(tenant_id=TENANT, plan_id=ctx.plan_id, number=i, cause=cause, diff={},
+                                             created_at=NOW - timedelta(hours=1)))
+    eid = ctx.event("approved_changed", template_key="review_visa_file", programme_ref=None)
+    from app.os.replan.ops import AddTask
+
+    op = AddTask(template_key="review_visa_file", reason="Again.")
+    assert ctx.r.decide(ctx.plan_id, [eid], "rules", [op]).status == "paused"
+    with ctx.engine.begin() as conn:  # the crash: the case and the pause were lost
+        conn.execute(models.support_cases.delete())
+    ctx.r.plans.kernel.set_changes_paused(ctx.plan_id, False)
+    with ctx.engine.begin() as conn:  # (and the resume must not give a fresh allowance in this simulation)
+        conn.execute(models.events.delete().where(models.events.c.type == "changes_resumed"))
+    ctx.r.decide(ctx.plan_id, [eid], "rules", [op])  # the step's retry
+    assert ctx.r.plans.kernel.changes_paused(ctx.plan_id)
+    assert len(SupportStore(ctx.engine, TENANT).list("open")) == 1
+
+
+def test_job_survives_one_bad_plan(ctx, monkeypatch):
+    """Final review I9: one plan that fails its sweep never stops the others."""
+    from app.os.replan.run import run_replan_job
+
+    def boom(plan_id):
+        raise RuntimeError("no playbook")
+
+    monkeypatch.setattr(ctx.r.plans, "check_newer", boom)
+    ctx.event("document_missing", instance_key="travel_insurance")
+    assert run_replan_job(ctx.r, ctx.client, NOW) == 1
+
+
+def test_upgrade_only_to_an_existing_version(ctx):
+    """Self-found + final review minor (invariant 10): an upgrade to a version that does not exist is refused."""
+    eid = ctx.event("playbook_newer", version=99)
+    assert ctx.run(eid)["status"] == "refused"
+    assert len(SupportStore(ctx.engine, TENANT).list("open")) == 1

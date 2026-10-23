@@ -6,7 +6,7 @@ Every public method runs in one transaction that also writes its events and enqu
 
 import hashlib
 import json
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any, Literal
@@ -134,12 +134,18 @@ class Kernel:
             cause = f"playbook_upgrade:{draft.playbook_key}@{draft.playbook_version}"
             return self._revise(conn, plan_id, cause, draft, pin_version=draft.playbook_version)
 
-    def apply_replan(self, plan_id: int, proposal_id: int, draft: PlanDraft, based_on: str) -> int | None:
+    def apply_replan(self, plan_id: int, proposal_id: int, draft: PlanDraft, based_on: str,
+                     overrides: Sequence = ()) -> int | None:
         """Applies a replan (Slice 7 S7-D5): the draft compiled with the proposal's overrides, as a numbered revision
-        with cause `replan:<proposal id>`, under the plan lock. StaleDraft if the contract changed since."""
+        with cause `replan:<proposal id>`, under the plan lock. The overrides (op, target, payload) are stored in the
+        same transaction, so a failed revision leaves none behind. StaleDraft if the contract changed since."""
         with self.engine.begin() as conn:
             self._lock_plan(conn, plan_id)
             self._check_current(conn, plan_id, based_on)
+            for o in overrides:
+                conn.execute(insert(models.plan_overrides).values(
+                    tenant_id=self.tenant_id, plan_id=plan_id, proposal_id=proposal_id, op=o.op, target=o.target,
+                    payload=o.payload))
             return self._revise(conn, plan_id, f"{REPLAN_CAUSE}{proposal_id}", draft)
 
     def set_changes_paused(self, plan_id: int, paused: bool) -> None:

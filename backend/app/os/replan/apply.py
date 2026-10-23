@@ -1,17 +1,20 @@
 """Deciding and applying replan proposals (Slice 7 spec S7-D5..D10). Plan state changes only through the kernel
-(invariant 1): overrides are stored, then the plan is recompiled with them and applied as a kernel revision.
+(invariant 1): a proposal's overrides are written in the same transaction as its kernel revision.
 
-Every write is keyed by the proposal, and a proposal is keyed by its event, so a repeated step or workflow finds
-its work already done (invariant 8)."""
+One plan's replans and the student's answers run one at a time (a per-plan advisory lock). Every write is keyed by
+the proposal, and a proposal by its event, so a repeated step or workflow finds its work already done (invariant 8).
+"""
 
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Iterator, Mapping
+from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 
 from pydantic import TypeAdapter
-from sqlalchemy import Engine, func, select
+from sqlalchemy import Engine, func, select, text
 
 from app.os import models
+from app.os.compiler import CompileError
 from app.os.kernel import IllegalTransition, StaleDraft
 from app.os.replan.checks import check_operations, task_rows
 from app.os.replan.config import ReplanConfig
@@ -27,11 +30,18 @@ BEFORE_DEADLINE = timedelta(days=1)
 MIN_EXPIRY = timedelta(hours=1)
 DAILY_REVISIONS = 3  # replan revisions per plan per UTC day; the 4th pauses changes (S7-D9)
 LIMIT_REASON = "Changes are paused: this plan reached today's limit of 3 automatic changes."
+REFUSED_REASON = "Every proposed change was refused by the plan's checks."
+BROKEN_REASON = "This plan no longer compiles: a person needs to check it."
+LOCK_CLASS = 7007  # pg_advisory_lock(LOCK_CLASS, plan id): one replan or answer per plan at a time
 _OPS = TypeAdapter(Ops)
 
 
 class ProposalStale(ValueError):
     """The proposal can no longer be accepted: answered, expired, or the plan changed so that it no longer fits."""
+
+
+class ReplanFailed(RuntimeError):
+    """The revision could not be written (the plan kept changing, or no longer compiles)."""
 
 
 @dataclass(frozen=True)
@@ -61,6 +71,18 @@ class Replanner:
         self.proposals, self.overrides = ProposalStore(engine, self.tenant), OverrideStore(engine, self.tenant)
         self.support_cases = SupportStore(engine, self.tenant)
 
+    @contextmanager
+    def plan_lock(self, plan_id: int) -> Iterator[None]:
+        """Holds the plan's replan lock (a session advisory lock) for the block (final review I2, I5)."""
+        with self.engine.connect() as conn:
+            conn.execute(text("SELECT pg_advisory_lock(:c, :p)"), {"c": LOCK_CLASS, "p": plan_id})
+            conn.commit()
+            try:
+                yield
+            finally:
+                conn.execute(text("SELECT pg_advisory_unlock(:c, :p)"), {"c": LOCK_CLASS, "p": plan_id})
+                conn.commit()
+
     # ------------------------------------------------------------------ state
 
     def config(self, plan_id: int) -> ReplanConfig:
@@ -69,6 +91,12 @@ class Replanner:
     def student_of(self, plan_id: int) -> str:
         with self.engine.connect() as conn:
             return conn.execute(select(models.plans.c.student_ref).where(models.plans.c.id == plan_id)).scalar_one()
+
+    def _base(self, plan_id: int) -> tuple[str, int]:
+        with self.engine.connect() as conn:
+            row = conn.execute(select(models.plans.c.contract_sha256, models.plans.c.current_revision).where(
+                models.plans.c.id == plan_id)).one()
+        return row.contract_sha256, row.current_revision
 
     def state(self, plan_id: int, with_suggestions: bool = False) -> PlanState:
         contract, _ = self.plans._contract(plan_id)
@@ -99,6 +127,7 @@ class Replanner:
                 F.c.status == "confirmed")).scalar())
 
     def check(self, plan_id: int, ops: list[Op]) -> tuple[list[Op], list[dict]]:
+        """(kept, refused). Raises CompileError when the plan does not compile even without the operations."""
         contract, _ = self.plans._contract(plan_id)
         book = self.plans._pinned(plan_id)
 
@@ -106,8 +135,14 @@ class Replanner:
             return self.plans.compile(contract, book, plan_id, [o for op in candidate for o in to_overrides(op)])
 
         year = contract.target_intake.year
-        return check_operations(ops, task_rows(self.engine, self.tenant, plan_id), book, compile_with,
-                                compile_with([]), lambda ref: self.confirmed(ref, year))
+        upgrades = [op for op in ops if isinstance(op, UpgradePlaybook)
+                    and (book.key, op.version) not in self.plans.playbooks]
+        refused = [{"op": op.model_dump(mode="json"), "why": f"version {op.version} of the guide does not exist"}
+                   for op in upgrades]
+        rest = [op for op in ops if op not in upgrades]
+        kept, more = check_operations(rest, task_rows(self.engine, self.tenant, plan_id), book, compile_with,
+                                      compile_with([]), lambda ref: self.confirmed(ref, year))
+        return kept, refused + more
 
     def _expires(self, plan_id: int, ops: list[Op]) -> datetime:
         """7 days, or 1 day before the earliest deadline among the steps the proposal touches (never under 1 h)."""
@@ -129,38 +164,70 @@ class Replanner:
 
     def decide(self, plan_id: int, event_ids: list[int], source: str, ops: list[Op]) -> Decision:
         """Checks the operations and either applies them (small), proposes them (big), or opens a support case."""
-        existing = self.proposals.for_event(event_ids[0])
-        if existing is not None:  # a repeated step: finish what it started
-            if existing.status == "applied" and existing.revision is None and existing.ops:
+        with self.plan_lock(plan_id):
+            return self._decide(plan_id, event_ids, source, ops)
+
+    def _finish(self, existing, plan_id: int, event_ids: list[int]) -> Decision:
+        """A repeated step: complete whatever the first run left undone (final review I6)."""
+        if existing.status == "applied" and existing.revision is None and existing.ops:
+            try:
                 self.apply(existing.id, "applied")
-            return Decision(existing.status, existing.id)
+            except ReplanFailed as e:
+                self.support(plan_id, event_ids, str(e), existing.id)
+                return Decision("support", existing.id)
+        elif existing.status == "refused":
+            limit = any(r.get("limit") for r in existing.refused)
+            broken = any(r.get("broken") for r in existing.refused)
+            if limit and not self.plans.kernel.changes_paused(plan_id):
+                self.plans.kernel.set_changes_paused(plan_id, True)
+            self.support(plan_id, event_ids, LIMIT_REASON if limit else BROKEN_REASON if broken else REFUSED_REASON,
+                         existing.id)
+            return Decision("paused" if limit else "refused", existing.id)
+        return Decision(existing.status, existing.id)
+
+    def _refuse(self, plan_id: int, event_ids: list[int], source: str, raw: list[dict], refused: list[dict],
+                marker: dict | None = None) -> int:
+        return self.proposals.create(plan_id, event_ids, source, raw, [*refused, *([marker] if marker else [])],
+                                     big=False, expires_at=None, status="refused")
+
+    def _decide(self, plan_id: int, event_ids: list[int], source: str, ops: list[Op]) -> Decision:
+        existing = self.proposals.for_event(event_ids[0])
+        if existing is not None:
+            return self._finish(existing, plan_id, event_ids)
         if self.plans.kernel.changes_paused(plan_id):
             return Decision("paused")
-        kept, refused = self.check(plan_id, ops)
+        try:
+            kept, refused = self.check(plan_id, ops)
+        except CompileError as e:  # the plan itself no longer compiles (final review C1)
+            pid = self._refuse(plan_id, event_ids, source, [], [], {"why": str(e)[:200], "broken": True})
+            self.support(plan_id, event_ids, BROKEN_REASON, pid)
+            return Decision("support", pid)
         kept = kept[:10]
         if ops and not kept:
-            pid = self.proposals.create(plan_id, event_ids, source, [], refused, big=False, expires_at=None,
-                                        status="refused")
-            self.support(plan_id, event_ids, "Every proposed change was refused by the plan's checks.", pid)
+            pid = self._refuse(plan_id, event_ids, source, [], refused)
+            self.support(plan_id, event_ids, REFUSED_REASON, pid)
             return Decision("refused", pid)
         tasks = task_rows(self.engine, self.tenant, plan_id)
         book = self.plans._pinned(plan_id)
-        big = any(is_big(op, tasks, book) for op in kept)
         raw = [op.model_dump(mode="json") for op in kept]
-        if big:
+        sha, revision = self._base(plan_id)
+        if any(is_big(op, tasks, book) for op in kept):
             pid = self.proposals.create(plan_id, event_ids, source, raw, refused, big=True,
-                                        expires_at=self._expires(plan_id, kept))
+                                        expires_at=self._expires(plan_id, kept), based_on=sha, base_revision=revision)
             return Decision("pending", pid)
         if any(_writes(op) for op in kept) and self.plans.kernel.replan_revisions_today(plan_id) >= DAILY_REVISIONS:
-            pid = self.proposals.create(plan_id, event_ids, source, raw, refused, big=False, expires_at=None,
-                                        status="refused")
+            pid = self._refuse(plan_id, event_ids, source, raw, refused, {"why": LIMIT_REASON, "limit": True})
             self.plans.kernel.set_changes_paused(plan_id, True)
             self.support(plan_id, event_ids, LIMIT_REASON, pid)
             return Decision("paused", pid)
         pid = self.proposals.create(plan_id, event_ids, source, raw, refused, big=False, expires_at=None,
-                                    status="applied")
+                                    status="applied", based_on=sha, base_revision=revision)
         if kept:
-            self.apply(pid, "applied")
+            try:
+                self.apply(pid, "applied")
+            except ReplanFailed as e:
+                self.support(plan_id, event_ids, str(e), pid)
+                return Decision("support", pid)
         return Decision("applied", pid)
 
     def close(self, plan_id: int, event_ids: list[int]) -> int:
@@ -179,37 +246,39 @@ class Replanner:
     # ------------------------------------------------------------------ applying
 
     def apply(self, proposal_id: int, status: str) -> int | None:
-        """Applies a proposal's operations (idempotent: overrides once, recompiles that change nothing are no-ops)."""
+        """Applies a proposal's operations. The overrides and the revision are one kernel transaction (final review
+        I3); a repeat finds them stored and recompiles to no change. Raises ReplanFailed if it cannot be written."""
         p = self.proposals.get(proposal_id)
         ops, plan_id = ops_of(p.ops), p.plan_id
-        if not self.overrides.for_proposal(proposal_id):
-            for op in ops:
-                for o in to_overrides(op):
-                    self.overrides.add(plan_id, proposal_id, o.op, o.target, o.payload)
+        stored = bool(self.overrides.for_proposal(proposal_id))
+        new = [] if stored else [o for op in ops for o in to_overrides(op)]
         cause = f"replan:{proposal_id}"
         if any(to_overrides(op) for op in ops):
             for _ in range(3):
                 contract, sha = self.plans._contract(plan_id)
-                draft = self.plans.compile(contract, self.plans._pinned(plan_id), plan_id)
                 try:
-                    self.plans.kernel.apply_replan(plan_id, proposal_id, draft, sha)
+                    draft = self.plans.compile(contract, self.plans._pinned(plan_id), plan_id, new)
+                    self.plans.kernel.apply_replan(plan_id, proposal_id, draft, sha, overrides=new)
                     break
                 except StaleDraft:
                     continue
+                except CompileError as e:
+                    raise ReplanFailed(f"{BROKEN_REASON} ({e})"[:300]) from None
+            else:
+                raise ReplanFailed("The plan kept changing while this change was being made.")
         for op in ops:
             if isinstance(op, SwapProgramme):
                 self._swap(plan_id, op, cause)
             elif isinstance(op, UpgradePlaybook) and self.plans._pinned(plan_id).version < op.version:
-                self.plans.upgrade(plan_id)
-            elif isinstance(op, RequestFromStudent):
-                self.outbox.add(f"replan:{proposal_id}:{op.instance_key}", "email", self.student_of(plan_id),
+                self.plans.upgrade(plan_id, op.version)
+            elif isinstance(op, RequestFromStudent):  # one nudge per step per day (final review I2)
+                day = self.clock().astimezone(timezone.utc).date().isoformat()
+                self.outbox.add(f"replan:{plan_id}:{op.instance_key}:{day}", "email", self.student_of(plan_id),
                                 "replan_request", {"instance_key": op.instance_key, "message": op.message,
                                                    "reason": op.reason})
             elif isinstance(op, Escalate):
                 self.support(plan_id, p.event_ids, op.reason, proposal_id)
-        with self.engine.connect() as conn:
-            revision = conn.execute(select(models.plans.c.current_revision).where(
-                models.plans.c.id == plan_id)).scalar_one()
+        revision = self._base(plan_id)[1]
         self.proposals.set_status(proposal_id, status, revision=revision)
         return revision
 
@@ -242,17 +311,34 @@ class Replanner:
         return p
 
     def accept(self, student_ref: str, proposal_id: int) -> int | None:
-        """Applies a big proposal the student accepted, after checking it again against the plan as it is now."""
-        p = self._own_pending(student_ref, proposal_id)
-        ops = ops_of(p.ops)
-        kept, refused = self.check(p.plan_id, ops)
-        if len(kept) != len(ops):
-            raise ProposalStale("your plan changed since this was suggested: " + refused[0]["why"])
-        return self.apply(p.id, "accepted")
+        """Applies a big proposal the student accepted, after checking it again against the plan as it is now: a
+        changed contract (a swap, a reorder) or an operation that no longer fits refuses it (final review I4)."""
+        p = self.proposals.get(proposal_id)
+        if p is None:
+            raise PermissionError("not this student's proposal")
+        with self.plan_lock(p.plan_id):
+            p = self._own_pending(student_ref, proposal_id)
+            if p.based_on is not None and self._base(p.plan_id)[0] != p.based_on:
+                raise ProposalStale("your plan changed since this was suggested")
+            ops = ops_of(p.ops)
+            try:
+                kept, refused = self.check(p.plan_id, ops)
+            except CompileError:
+                raise ProposalStale("your plan changed since this was suggested") from None
+            if len(kept) != len(ops):
+                raise ProposalStale("your plan changed since this was suggested: " + refused[0]["why"])
+            try:
+                return self.apply(p.id, "accepted")
+            except ReplanFailed as e:
+                raise ProposalStale(f"your plan changed since this was suggested ({e})") from None
 
     def decline(self, student_ref: str, proposal_id: int) -> None:
-        p = self._own_pending(student_ref, proposal_id)
-        self.proposals.set_status(p.id, "declined")
+        p = self.proposals.get(proposal_id)
+        if p is None:
+            raise PermissionError("not this student's proposal")
+        with self.plan_lock(p.plan_id):
+            p = self._own_pending(student_ref, proposal_id)
+            self.proposals.set_status(p.id, "declined")
 
     def expire_due(self, now: datetime) -> int:
         PR = models.proposals
