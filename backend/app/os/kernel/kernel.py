@@ -18,6 +18,7 @@ from app.os import models
 from app.os.compiler import CONFIRM_TYPE, DraftTask, PlanDraft
 from app.os.contracts.route_contract import RouteContract
 from app.os.kernel.revisions import CANCELLED_MARK, DONE_MARK, NOTICE_PREFIX, diff
+from app.os.replan import events as replan_events
 from app.os.kernel.states import (
     SATISFIES_DEPENDENCY,
     TERMINAL,
@@ -205,6 +206,10 @@ class Kernel:
                 result["reason"] = outcome.reason
             self._transition(conn, row, _OUTCOME_STATE[outcome.status], cause=f"result:{outcome.status}",
                              result=result)
+            if outcome.status == "failed":  # Slice 7: the replan rules act on it (S7-D2)
+                replan_events.record(conn, self.tenant_id, row.plan_id, "task_failed",
+                                     {"instance_key": row.instance_key, "reason": outcome.reason, "attempt": attempt},
+                                     f"task:{task_id}:{attempt}", task_id)
             done = conn.execute(update(models.task_attempts).where(
                 models.task_attempts.c.task_id == task_id, models.task_attempts.c.attempt == attempt,
             ).values(status=outcome.status, ended_at=self.clock()).returning(models.task_attempts.c.id)).first()
@@ -226,6 +231,10 @@ class Kernel:
             if row.state != S.WAITING_STUDENT:
                 raise IllegalTransition(f"task is {row.state}, not waiting for the student")
             self._transition(conn, row, S.DONE, cause="student_completed", result=payload)
+            if row.template_key == replan_events.ADMISSION_TEMPLATE and payload.get("choice") == "rejected":
+                replan_events.record(conn, self.tenant_id, row.plan_id, "admission_rejected",
+                                     {"programme_ref": row.programme_ref, "instance_key": row.instance_key},
+                                     f"task:{task_id}", task_id)
             self._promote(conn, row.plan_id)
             return True
 

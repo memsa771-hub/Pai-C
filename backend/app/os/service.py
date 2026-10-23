@@ -111,6 +111,21 @@ class PlanService:
                 continue
         raise StaleDraft(f"plan {plan_id} kept changing during the programme change")
 
+    def check_newer(self, plan_id: int) -> bool:
+        """Records a `playbook_newer` replan event (Slice 7) when a newer playbook exists for the plan's route.
+        True when one was recorded now."""
+        from app.os.replan import events  # imported here: replan imports the service
+
+        contract, _ = self._contract(plan_id)
+        pinned = self._pinned(plan_id)
+        newest = select_playbook(self.playbooks, contract.origin_country, contract.destination_country, contract.level)
+        if newest.key != pinned.key or newest.version <= pinned.version:
+            return False
+        with self.engine.begin() as conn:
+            return events.record(conn, self.kernel.tenant_id, plan_id, "playbook_newer",
+                                 {"playbook": newest.key, "version": newest.version, "from": pinned.version},
+                                 f"{newest.key}@{newest.version}") is not None
+
     def upgrade(self, plan_id: int) -> int:
         """Moves a running plan to the newest playbook for its route (parent §4.3)."""
         contract, sha = self._contract(plan_id)
