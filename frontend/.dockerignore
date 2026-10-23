@@ -13,6 +13,7 @@ coverage
 *.test.*
 *.spec.*
 **/__tests__/
+tests/
 desktop/
 vite.config.*
 vitest.config.*

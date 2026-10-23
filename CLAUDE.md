@@ -30,8 +30,9 @@ Figma board (locked): https://www.figma.com/board/NjVJfdxERWfRHPycy1wDkF
 - Backend tests (from backend/, key unset): `env -u PAI_API_KEY python -m pytest -q -p no:cacheprovider`
   Run with PAI_POLICY_MODE=guided and PAI_POLICY_MODE=strict.
 - Frontend: `npm test` and `npm run build` in frontend/.
-- Local stack: `docker compose --env-file .env -p pai-c-test2 -f docker-compose.prod.yml -f docker-compose.local.yml up --build -d`
-  then http://localhost:3000 (frontend) and :8000 (backend).
+- Local stack: `python scripts/run.py` (rebuilds and restarts only what changed, keeps data), then http://localhost:3000 (frontend)
+  and :8000 (backend). `python scripts/del.py` wipes all containers, volumes, images and build cache of this project;
+  `python scripts/run.py --fresh` does both.
 
 ## Current direction (19 Oct 2026)
 - Core engineering is mostly built (see BUILD_REPORT_V1.md). Freeze new modules.

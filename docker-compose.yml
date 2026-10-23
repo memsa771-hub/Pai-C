@@ -1,0 +1,136 @@
+# Local development stack. Start with `python scripts/run.py`, wipe with `python scripts/del.py`.
+#   frontend  http://localhost:3000
+#   backend   http://localhost:8000
+# Secrets and model settings come from .env. Anything the app does not find
+# there falls back to the defaults in backend/app/config.py, so only values
+# that differ inside Docker (service hostnames, local URLs) are set here.
+name: pai-c
+
+x-logging: &logging
+  driver: json-file
+  options: {max-size: "10m", max-file: "3"}
+
+# migrate, backend and worker share one image, built only by `backend`: each
+# builder stamps its own service label on the image, so building it three
+# times gives a new image ID every run and restarts unchanged containers.
+x-backend: &backend
+  image: pai-c-backend:local
+  pull_policy: never
+  env_file: .env
+  environment:
+    APP_ENV: development
+    DATABASE_URL: postgresql+psycopg2://${DB_USER:-pai_admin}:${DB_PASSWORD:-pai_local}@postgres:5432/openagents_workspace
+    REDIS_URL: redis://redis:6379/0
+    MEMORY_VECTOR_BACKEND: ${MEMORY_VECTOR_BACKEND:-qdrant}
+    QDRANT_URL: http://qdrant:6333
+    # Semantic recall needs Qdrant plus an embeddings key; off for the MVP.
+    PAI_SEMANTIC_RECALL_ENABLED: ${PAI_SEMANTIC_RECALL_ENABLED:-false}
+    # Uploads live on a volume shared with the worker, which parses them.
+    FILE_STORAGE_BACKEND: local
+    FILE_STORAGE_PATH: /data/files
+    CORS_ORIGINS: http://localhost:3000,http://127.0.0.1:3000
+    FRONTEND_BASE_URL: http://localhost:3000
+    PUBLIC_API_BASE: http://localhost:8000
+    WORKSPACE_ENDPOINT: http://localhost:8000
+  volumes:
+    - files:/data/files
+  logging: *logging
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: openagents_workspace
+      POSTGRES_USER: ${DB_USER:-pai_admin}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-pai_local}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    logging: *logging
+
+  redis:
+    image: redis:7.4-alpine
+    # Cache and Pub/Sub only: no persistence, bounded memory.
+    command: ["redis-server", "--save", "", "--appendonly", "no",
+              "--maxmemory", "256mb", "--maxmemory-policy", "allkeys-lru"]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    logging: *logging
+
+  qdrant:
+    image: qdrant/qdrant:v1.19.1
+    volumes:
+      - qdrant_data:/qdrant/storage
+    restart: unless-stopped
+    logging: *logging
+
+  migrate:
+    <<: *backend
+    entrypoint: ["alembic", "upgrade", "head"]
+    depends_on:
+      postgres: {condition: service_healthy}
+    restart: "no"
+
+  backend:
+    <<: *backend
+    pull_policy: build
+    build:
+      context: ./backend
+      # No provenance metadata: it carries a timestamp, so every build would
+      # give a new image ID and restart unchanged containers.
+      provenance: false
+      # `cloud` skips Chromium; use it only when Browser Fabric is configured.
+      target: ${BACKEND_IMAGE_TARGET:-browser}
+    depends_on:
+      migrate: {condition: service_completed_successfully}
+      redis: {condition: service_healthy}
+      qdrant: {condition: service_started}
+    ports:
+      - "127.0.0.1:8000:8000"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3)"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  worker:
+    <<: *backend
+    entrypoint: ["python", "-m", "app.jobs.worker"]
+    depends_on:
+      migrate: {condition: service_completed_successfully}
+      qdrant: {condition: service_started}
+    restart: unless-stopped
+
+  frontend:
+    image: pai-c-frontend:local
+    build:
+      context: ./frontend
+      provenance: false
+      # NEXT_PUBLIC_* values are compiled into the bundle at build time.
+      args:
+        NEXT_PUBLIC_API_URL: http://localhost:8000
+        NEXT_PUBLIC_SUPABASE_URL: ${SUPABASE_URL:-}
+        NEXT_PUBLIC_SUPABASE_ANON_KEY: ${SUPABASE_ANON_KEY:-}
+        NEXT_PUBLIC_ENABLE_DMS: ${NEXT_PUBLIC_ENABLE_DMS:-false}
+    depends_on:
+      backend: {condition: service_healthy}
+    ports:
+      - "127.0.0.1:3000:3000"
+    restart: unless-stopped
+    logging: *logging
+
+volumes:
+  pgdata:
+  qdrant_data:
+  files:

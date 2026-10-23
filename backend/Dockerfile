@@ -24,7 +24,7 @@ RUN sed -i 's/\r$//' entrypoint.sh && chmod +x entrypoint.sh
 # Default image retains local Playwright/Chromium for self-hosted and fallback
 # browser use. Browser installation stays cached when application code changes.
 FROM python-deps AS browser-deps
-RUN playwright install-deps chromium
+RUN playwright install-deps chromium && rm -rf /var/lib/apt/lists/*
 ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
 RUN --mount=type=cache,id=pai-os-playwright-shell,target=/root/.cache/playwright,sharing=locked \
     PLAYWRIGHT_BROWSERS_PATH=/root/.cache/playwright \

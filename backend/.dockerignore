@@ -17,9 +17,7 @@ test*/
 **/*_test.py
 docs/
 scripts/
-api/
 pytest.ini
-vercel.json
 *.md
 
 # Local virtualenv and dev databases — never ship to the remote builder / image

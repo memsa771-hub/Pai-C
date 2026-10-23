@@ -140,7 +140,7 @@ def main():
             db.execute(text("PRAGMA query_only=ON"))
         result = export_session(db, workspace_id, args.usage_log)
         db.rollback()
-    output = args.out or ROOT / "eval_reports/sessions" / (
+    output = args.out or ROOT.parent / "eval_reports/sessions" / (
         workspace_id + "-" + datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ") + ".json")
     output.parent.mkdir(parents=True, exist_ok=True)
     with output.open("x", encoding="utf-8") as stream:
