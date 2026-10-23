@@ -49,7 +49,7 @@ DEFAULT_MAX_REDIRECTS = 4
 # the article but refuse its images.
 #
 # The platform token is load-bearing, not cosmetic. mp.weixin.qq.com serves a
-#  interstitial instead of the article to non-browser agents, and
+# "当前环境异常" interstitial instead of the article to non-browser agents, and
 # it treats "X11; Linux x86_64" as one of them: measured over four requests
 # each from the same IP, the Linux token was blocked 4/4 while the Windows and
 # macOS tokens succeeded 4/4. The trailing product token is fine to keep (3/3
