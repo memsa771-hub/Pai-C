@@ -4,7 +4,9 @@ FROM python:3.12-slim AS python-deps
 WORKDIR /app
 ENV PIP_DISABLE_PIP_VERSION_CHECK=1 \
     PIP_DEFAULT_TIMEOUT=300 \
-    PYTHONPATH=/app
+    PYTHONPATH=/app \
+    PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1
 
 # psycopg2-binary ships libpq; no compiler or libpq-dev layer is needed.
 # Dependency and download caches survive source-only rebuilds.
