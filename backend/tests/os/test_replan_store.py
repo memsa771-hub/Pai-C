@@ -37,8 +37,9 @@ def test_migration_up_down_up(os_db):
 def test_proposal_store_roundtrip(engine, clean):
     p, store = plan(engine), ProposalStore(engine, "pai")
     ops = [{"op": "cancel_programme", "programme_ref": "p1", "reason": "fictional"}]
-    pid = store.create(p, [7], "rules", ops, [], big=True, expires_at=LATER)
+    pid = store.create(p, [7], "rules", ops, [], big=True, expires_at=LATER, based_on="a" * 64, base_revision=4)
     got = store.get(pid)
+    assert (got.based_on, got.base_revision) == ("a" * 64, 4)  # the plan it was made against (final review I4)
     assert (got.plan_id, got.event_ids, got.source, got.ops, got.big, got.status) == (p, [7], "rules", ops, True,
                                                                                        "pending")
     assert store.for_event(7).id == pid and store.for_event(8) is None

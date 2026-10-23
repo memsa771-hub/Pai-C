@@ -26,6 +26,8 @@ class Proposal:
     expires_at: datetime | None
     created_at: datetime
     answered_at: datetime | None
+    based_on: str | None = None  # the plan's contract SHA-256 and revision when proposed
+    base_revision: int | None = None
 
 
 @dataclass(frozen=True)
@@ -51,7 +53,7 @@ class SupportCase:
 
 def _proposal(r) -> Proposal:
     return Proposal(r.id, r.plan_id, r.event_ids, r.source, r.ops, r.refused, r.big, r.status, r.revision,
-                    r.expires_at, r.created_at, r.answered_at)
+                    r.expires_at, r.created_at, r.answered_at, r.based_on, r.base_revision)
 
 
 def _case(r) -> SupportCase:
@@ -64,11 +66,13 @@ class ProposalStore:
         self.engine, self.tenant_id = engine, tenant_id
 
     def create(self, plan_id: int, event_ids: list[int], source: str, ops: list[dict], refused: list[dict],
-               big: bool, expires_at: datetime | None, status: str = "pending") -> int:
+               big: bool, expires_at: datetime | None, status: str = "pending", based_on: str | None = None,
+               base_revision: int | None = None) -> int:
         with self.engine.begin() as conn:
             return conn.execute(insert(PR).values(
                 tenant_id=self.tenant_id, plan_id=plan_id, event_ids=event_ids, source=source, ops=ops,
-                refused=refused, big=big, status=status, expires_at=expires_at).returning(PR.c.id)).scalar_one()
+                refused=refused, big=big, status=status, expires_at=expires_at, based_on=based_on,
+                base_revision=base_revision).returning(PR.c.id)).scalar_one()
 
     def get(self, proposal_id: int) -> Proposal | None:
         with self.engine.connect() as conn:

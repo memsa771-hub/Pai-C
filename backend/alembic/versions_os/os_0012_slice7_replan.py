@@ -42,6 +42,8 @@ def upgrade() -> None:
         sa.Column("big", sa.Boolean, nullable=False, server_default=sa.text("false")),
         sa.Column("status", sa.Text, nullable=False),
         sa.Column("revision", sa.Integer),
+        sa.Column("based_on", sa.Text),  # the plan's contract SHA-256 when proposed
+        sa.Column("base_revision", sa.Integer),  # and its revision: accepting after either changed is refused
         sa.Column("expires_at", sa.DateTime(timezone=True)),
         sa.Column("created_at", sa.DateTime(timezone=True), nullable=False, server_default=now),
         sa.Column("answered_at", sa.DateTime(timezone=True)),

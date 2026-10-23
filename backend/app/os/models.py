@@ -553,6 +553,8 @@ proposals = Table(
     Column("big", Boolean, nullable=False, server_default=text("false")),
     Column("status", Text, nullable=False),
     Column("revision", Integer),
+    Column("based_on", Text),  # the plan's contract SHA-256 when proposed (final review I4)
+    Column("base_revision", Integer),  # and its revision: accepting after either changed is refused
     Column("expires_at", DateTime(timezone=True)),
     _created(),
     Column("answered_at", DateTime(timezone=True)),
