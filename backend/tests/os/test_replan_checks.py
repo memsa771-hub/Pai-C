@@ -156,3 +156,40 @@ def test_replan_revisions_today_counts_cause(svc, engine):
         conn.execute(update(R_).where(R_.c.plan_id == plan_id, R_.c.number == 1).values(
             cause="replan:0", created_at=R_.c.created_at - timedelta(days=2)))  # an older replan does not count
     assert svc.kernel.replan_revisions_today(plan_id) == 2
+
+
+def test_op_that_breaks_the_plan_refused():
+    """Final review C1: an operation that makes the plan uncompilable is refused, never an exception."""
+    from app.os.compiler import CompileError
+
+    def broken(ops):
+        if ops:
+            raise CompileError("cycle: a -> b -> a")
+        return CURRENT
+
+    kept, refused = check([Reprioritise(instance_key="travel_insurance", before="review_visa_file", reason=R),
+                           Escalate(reason=R)], compile_fn=broken)
+    assert [o.op for o in kept] == ["escalate"] and "invalid" in why(refused)[0]
+
+
+def test_add_task_needs_its_step_in_the_plan():
+    """Final review I7: re-adding a step the plan does not have would silently change nothing: refused."""
+    kept, refused = check([AddTask(template_key="admission_result", reason=R)])  # per programme, no programme given
+    assert kept == [] and "not in the plan" in why(refused)[0]
+    kept, refused = check([AddTask(template_key="admission_result", programme_ref="not-in-plan", reason=R)])
+    assert kept == [] and refused
+    kept, _ = check([AddTask(template_key="admission_result", programme_ref=P1, reason=R)])
+    assert len(kept) == 1
+
+
+def test_replan_count_restarts_after_resume(svc, engine):
+    """Final review I10: an admin who resumes the plan gives it a fresh daily allowance."""
+    plan_id = svc.start_plan(TEST_STUDENT).plan_id
+    R_ = models.plan_revisions
+    with engine.begin() as conn:
+        for n, cause in enumerate(["replan:1", "replan:2", "replan:3"], start=2):
+            conn.execute(R_.insert().values(tenant_id="pai", plan_id=plan_id, number=n, cause=cause, diff={}))
+    assert svc.kernel.replan_revisions_today(plan_id) == 3
+    svc.kernel.set_changes_paused(plan_id, True)
+    svc.kernel.set_changes_paused(plan_id, False)
+    assert svc.kernel.replan_revisions_today(plan_id) == 0

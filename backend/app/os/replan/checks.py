@@ -14,6 +14,7 @@ from collections.abc import Callable, Mapping
 from sqlalchemy import Engine, select
 
 from app.os import models
+from app.os.compiler import CompileError
 from app.os.kernel.revisions import CANCELLED_MARK, DONE_MARK
 from app.os.kernel.states import is_started
 from app.os.replan.ops import (
@@ -54,6 +55,9 @@ def _static(op: Op, tasks: Mapping[str, TaskRow], playbook, confirmed: Callable[
     if isinstance(op, AddTask):
         if not any(t.template_key == op.template_key for t in playbook.tasks):
             return f"'{op.template_key}' is not a step of this route's guide"
+        base = op.template_key if op.programme_ref is None else f"{op.template_key}@{op.programme_ref}"
+        if base not in tasks:  # the compiler adds a step again only next to the one the plan has
+            return f"'{base}' is not in the plan"
         return None
     targets = []
     if isinstance(op, (SkipTask, CancelTask, RequestFromStudent)):
@@ -113,7 +117,10 @@ def check_operations(ops: list[Op], tasks: Mapping[str, TaskRow], playbook,
     for op in ops:
         why = _static(op, tasks, playbook, confirmed) or _loses_input([*kept, op], tasks)
         if why is None and to_overrides(op):
-            why = _late(current, compile_with([*kept, op]))
+            try:
+                why = _late(current, compile_with([*kept, op]))
+            except CompileError as e:  # e.g. a reorder that closes a cycle (final review C1)
+                why = f"it would make the plan invalid ({e})"[:200]
         if why is None:
             kept.append(op)
         else:
