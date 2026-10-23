@@ -11,7 +11,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any, Literal
 
-from sqlalchemy import Connection, Engine, and_, delete, insert, select, update
+from sqlalchemy import Connection, Engine, and_, delete, func, insert, select, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from app.os import models
@@ -30,6 +30,7 @@ from app.os.kernel.states import (
 P, T, E = models.plans, models.tasks, models.task_edges
 S = TaskState
 NOTICE_TYPE = "student.act"
+REPLAN_CAUSE = "replan:"  # a replan revision's cause: "replan:<proposal id>" (Slice 7)
 
 
 class StaleDraft(RuntimeError):
@@ -131,6 +132,41 @@ class Kernel:
             self._check_current(conn, plan_id, based_on)
             cause = f"playbook_upgrade:{draft.playbook_key}@{draft.playbook_version}"
             return self._revise(conn, plan_id, cause, draft, pin_version=draft.playbook_version)
+
+    def apply_replan(self, plan_id: int, proposal_id: int, draft: PlanDraft, based_on: str) -> int | None:
+        """Applies a replan (Slice 7 S7-D5): the draft compiled with the proposal's overrides, as a numbered revision
+        with cause `replan:<proposal id>`, under the plan lock. StaleDraft if the contract changed since."""
+        with self.engine.begin() as conn:
+            self._lock_plan(conn, plan_id)
+            self._check_current(conn, plan_id, based_on)
+            return self._revise(conn, plan_id, f"{REPLAN_CAUSE}{proposal_id}", draft)
+
+    def set_changes_paused(self, plan_id: int, paused: bool) -> None:
+        """Pauses or resumes replanning for a plan (S7-D9). Student-driven changes are not affected."""
+        with self.engine.begin() as conn:
+            self._lock_plan(conn, plan_id)
+            conn.execute(update(P).where(P.c.id == plan_id).values(changes_paused=paused, updated_at=self.clock()))
+            self._event(conn, plan_id, None, "changes_paused" if paused else "changes_resumed", {})
+
+    def changes_paused(self, plan_id: int) -> bool:
+        with self.engine.connect() as conn:
+            return bool(conn.execute(select(P.c.changes_paused).where(
+                P.c.tenant_id == self.tenant_id, P.c.id == plan_id)).scalar_one())
+
+    def replan_revisions_today(self, plan_id: int) -> int:
+        """Replan revisions of this plan since UTC midnight, or since an admin last resumed its changes, whichever is
+        later (the daily limit, S7-D9; a resume gives a fresh allowance: final review I10)."""
+        now = self.clock().astimezone(timezone.utc)
+        midnight = now.replace(hour=0, minute=0, second=0, microsecond=0)
+        R, E = models.plan_revisions, models.events
+        with self.engine.connect() as conn:
+            resumed = conn.execute(select(func.max(E.c.at)).where(
+                E.c.tenant_id == self.tenant_id, E.c.plan_id == plan_id, E.c.type == "changes_resumed")).scalar()
+            if resumed is not None:
+                midnight = max(midnight, resumed)
+            return conn.execute(select(func.count()).select_from(R).where(
+                R.c.tenant_id == self.tenant_id, R.c.plan_id == plan_id, R.c.cause.like(f"{REPLAN_CAUSE}%"),
+                R.c.created_at >= midnight)).scalar_one()
 
     def _check_current(self, conn: Connection, plan_id: int, based_on: str | None) -> None:
         if based_on is None:
