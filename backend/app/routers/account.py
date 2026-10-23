@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Account-level endpoints for the signed-in Supabase user.
+Account-level endpoints for the signed-in Firebase user.
 
 DELETE /v1/account    Permanently delete the calling user's account data.
 
@@ -11,7 +11,7 @@ the app. Auth is the user's identity bearer token (Authorization: Bearer <id>)
 touched, so it can't be scoped to a single workspace's token.
 
 Scope of deletion: the user is identified only by email (the app has no
-app-managed credential; identity is delegated to Supabase Auth).
+app-managed credential; identity is delegated to Firebase Auth).
 Placement AI v2.0: the user's own personal workspace (`owner_user_id`) is
 private to them, so it is soft-deleted along with every other email-keyed
 row and channel human memberships across any workspace they touched.
@@ -326,10 +326,10 @@ def delete_account(
 
     So it is now a hard delete, in one transaction: either every row goes or
     none does. The `users` row goes too, which frees the email and the
-    username. Signing in again with the same Supabase account is a new start —
+    username. Signing in again with the same Firebase account is a new start —
     a fresh user, a fresh empty workspace — not a recovery.
 
-    What this does NOT delete, because it does not own them: the Supabase auth
+    What this does NOT delete, because it does not own them: the Firebase auth
     record (the identity provider holds that), and `feedback` rows, whose
     `user_id` is `ondelete="SET NULL"` so the text survives, detached, as
     product feedback.

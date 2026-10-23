@@ -2,8 +2,8 @@
 
 Placement AI is a FastAPI/PostgreSQL backend with a standalone Next.js frontend.
 
-Account sign-in, PAI session cookies, Supabase provider setup, and the additive
-identity migration are documented in [docs/AUTH_SESSION.md](docs/AUTH_SESSION.md).
+Sign-in (Firebase Auth), the account emails and the Firebase console setup are
+documented in [docs/AUTH_SESSION.md](docs/AUTH_SESSION.md).
 
 ## Run locally
 

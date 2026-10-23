@@ -1,24 +1,37 @@
-# Placement AI account authentication
+# Sign-in: Firebase Auth
 
-Supabase Auth verifies email/password and Google, GitHub, or LinkedIn. Its verified subject maps to a stable PAI `User` through `auth_identities`. PAI then creates an opaque application session and resolves the user's one canonical Student Workspace. Counselor, Vault, and student records remain owned by the workspace; OAuth profile fields do not become student profile facts.
+Firebase Auth is the only identity provider (web now, the mobile app later). Students sign in with email and password or with Google. Hosting stays on our own server; Firebase Hosting is not used.
 
-The hosted browser keeps only an HttpOnly `pai_session` cookie. The API stores its SHA-256 hash, user, provider, expiry, and revocation time in `pai_sessions`. The cookie is `Secure` in production, `SameSite=Lax`, and `Path=/`. `GET /v1/auth/session` restores and renews the current session. `DELETE /v1/auth/session` revokes it. Protected `/v1` APIs reject Supabase JWTs as application authority. A revoked session also invalidates stream tickets. A desktop renderer receives a PAI bearer from the session exchange for its native handoff; it uses the same account and workspace. On native provider refresh, exchange rotates the prior PAI bearer in one database transaction.
+## How it works
 
-## Supabase Dashboard and provider consoles
+- **Every protected API call carries a Firebase ID token** as `Authorization: Bearer <token>`. The backend verifies it with the Firebase Admin SDK (`backend/app/security/firebase_auth.py`, `human_auth.py`). Nothing a client says about who it is (a user id, an email in a body) is trusted. There are no session cookies.
+- **Accounts.** A verified token resolves to the PAI account with that `users.firebase_uid`. On the first verified request the account is created, or the existing account with the same email (and its Vault) is linked.
+- **Email verification.** Email/password accounts must verify their address. Until then every protected route answers `403` with the code `AUTH_EMAIL_NOT_VERIFIED`, and the app shows the "check your email" screen. Google accounts arrive verified.
+- **Our own emails.** Firebase never sends an email. Verification links, password-reset links and new-sign-in alerts are sent by the backend through Resend (`backend/app/services/auth_emails.py`). Links open `APP_URL/auth/action?mode=verifyEmail|resetPassword&oobCode=…`.
+- **Endpoints** (rate-limited, shared with the mobile app):
+  - `POST /v1/auth/session`: called after every sign-in with a random per-device id. It links the account and records the device, and a new device sends a sign-in alert (not the account's first device).
+  - `POST /v1/auth/send-verification`: sends the verification email to the signed-in, unverified account.
+  - `POST /v1/auth/forgot-password`: sends a reset email. The answer is the same whether or not the account exists.
+- **SSE and file URLs** cannot send a header, so they use short-lived read-only stream tickets bound to the account's Firebase uid (`backend/app/security/stream_ticket.py`).
 
-1. Enable Email provider and choose whether email confirmation is required. Configure Supabase Auth's email sender and templates. PAI creates the account session only after Supabase returns a verified identity.
-2. Enable Google, GitHub, and LinkedIn OIDC (`linkedin_oidc`) providers in Supabase. Register each provider's client ID and secret **in Supabase**, and register Supabase's callback URL in the corresponding provider console. Never add those secrets to PAI source or `NEXT_PUBLIC_*` variables.
-3. Set Supabase Site URL to the deployed app origin. Add `https://app.placement-ai.com/auth/callback` and `https://app.placement-ai.com/auth/reset-password` to allowed redirect URLs. For local development, add the corresponding `http://localhost:3000` URLs (or the port in use). These are PAI return URLs; the external provider callbacks point to Supabase.
-4. Enable password recovery in Supabase and use the same reset-password redirect URL. Recovery uses Supabase's code exchange and password update, with no PAI reset token.
+## Firebase console (project "Placement-ai")
 
-## Environment
+1. Create a web app and copy its config into the frontend variables (`NEXT_PUBLIC_FIREBASE_API_KEY`, `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN`, `NEXT_PUBLIC_FIREBASE_APP_ID`; the project id comes from `FIREBASE_PROJECT_ID`).
+2. Authentication → Sign-in method: enable **Email/Password** and **Google**.
+3. Authentication → Settings → Authorized domains: add `placement-ai.com`, `app.placement-ai.com` and `localhost`.
+4. Project settings → Service accounts: generate a key. Save the JSON as `secrets/firebase-service-account.json` (git-ignored); Docker mounts it read-only for the backend. Never commit it.
+5. Leave Firebase's own email templates unused: the backend sends every account email through Resend, so `RESEND_API_KEY`, `EMAIL_FROM` (a domain verified in Resend) and `APP_URL` must be set.
 
-Set `SUPABASE_URL` and `SUPABASE_ANON_KEY` on the backend and use those same public values as frontend build inputs. Set `NEXT_PUBLIC_API_URL` to the API origin. `CORS_ORIGINS` must contain the exact hosted app origin (`https://app.placement-ai.com` in production). The desktop origin `pai://workspace` is separately allowed. `PAI_SESSION_TTL_SECONDS` defaults to 1209600 seconds (14 days). Production requires HTTPS for the `Secure` cookie. Do not put a Supabase service role key or provider client secret in the frontend.
+## Deploy
 
-Keep `REDIS_URL` configured and Redis healthy for the shared username sign-in and availability budgets. Those endpoints fail closed if a configured Redis limiter is unavailable; Supabase owns rate limiting for direct email/password and social authentication.
+Run the Alembic migrations through `114` (adds `users.firebase_uid` and `auth_devices`, and drops the old provider column). Existing accounts and their workspaces stay; each student is linked on their first Firebase sign-in with the same email.
 
-Run Alembic migration `077_auth_sessions` before deploying the new backend/frontend together. It adds session and identity tables and backfills identities from `users.supabase_uid`; existing user IDs, workspace ownership, and student data remain in place. Old browser `localStorage` Supabase sessions are removed on first load; the student signs in again once.
+## Local testing
 
-## Operational checks
+The backend tests run the account flows against the Firebase Auth emulator (`backend/tests/test_firebase_auth.py`, demo project `demo-pai`, skipped when the emulator is not running):
 
-Test one email/password and one social sign-in in the configured Supabase project, confirm that all methods return to the existing workspace, then test recovery and confirmation links. After logout, replay the old cookie and old Supabase access token against a protected API: both must be rejected. Test browser Back and a second tab. OAuth availability depends on the provider console and Supabase dashboard configuration; local unit tests cannot prove a production provider is enabled.
+```
+firebase emulators:start --only auth --project demo-pai
+```
+
+Set `FIREBASE_AUTH_EMULATOR_HOST=127.0.0.1:9099` (backend) and `NEXT_PUBLIC_FIREBASE_AUTH_EMULATOR_HOST=127.0.0.1:9099` (frontend) to point a local stack at the emulator.

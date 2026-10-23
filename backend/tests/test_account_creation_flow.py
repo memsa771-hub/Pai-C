@@ -38,11 +38,10 @@ def test_google_user_keeps_the_provider_name_and_stays_stable():
 
 def test_existing_account_is_linked_once_and_keeps_its_data():
     with _session() as db:
-        db.add(User(email="old@example.test", supabase_uid="old-supabase", username="oldhandle"))
+        db.add(User(email="old@example.test", username="oldhandle"))
         db.commit()
         linked = get_or_create_user(db, _claims("old@example.test", "firebase-old"))
         assert linked.firebase_uid == "firebase-old" and linked.username == "oldhandle"
-        assert linked.supabase_uid == "old-supabase"
         db.commit()
         with pytest.raises(AuthAccountConflict):
             get_or_create_user(db, _claims("old@example.test", "someone-else"))
@@ -50,5 +49,5 @@ def test_existing_account_is_linked_once_and_keeps_its_data():
 
 def test_only_firebase_identities_resolve():
     with _session() as db:
-        assert get_or_create_user(db, {"provider": "supabase", "subject": "x", "email": "a@example.test"}) is None
+        assert get_or_create_user(db, {"provider": "other", "subject": "x", "email": "a@example.test"}) is None
         assert get_or_create_user(db, _claims("", "uid")) is None

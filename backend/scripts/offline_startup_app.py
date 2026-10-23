@@ -25,7 +25,8 @@ def local_addresses_only(host, *args, **kwargs):
 socket.getaddrinfo = local_addresses_only
 
 from app.inference import client
-from app.security.identity import AuthenticatedIdentity, SupabaseIdentityVerifier
+from app.security import firebase_auth
+from app.security.identity import AuthenticatedIdentity
 
 
 def deny_model_client(*args, **kwargs):
@@ -40,17 +41,17 @@ async def fake_tool_completion(**kwargs):
     return {"role": "assistant", "content": await fake_completion(**kwargs)}
 
 
-def fake_identity(self, token):
+def fake_identity(token):
     if token != "offline-provider-token":
         return None
-    return AuthenticatedIdentity("supabase", "00000000-0000-0000-0000-000000000001",
-                                 "offline-student@example.invalid", True, "Offline Student")
+    return AuthenticatedIdentity("firebase", "offline-firebase-uid",
+                                 "offline-student@example.invalid", True, "Offline Student", "google.com")
 
 
 client.create_client = deny_model_client
 client.chat_completion = fake_completion
 client.chat_completion_tools = fake_tool_completion
-SupabaseIdentityVerifier.verify = fake_identity
+firebase_auth.verify_token = fake_identity
 
 from app.main import app
 from app.routers import counselor_voice

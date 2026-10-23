@@ -351,3 +351,7 @@ The Counselor shell accidentally omitted the shared UserMenu when replacing the 
   - New routes `/auth/action` and `/auth/verify-email`.
   - The Supabase callback, reset and desktop-handoff routes are removed.
 - **Tests.** Account flows run against the Firebase Auth emulator (`tests/test_firebase_auth.py`, demo project); other tests use stand-in tokens (`tests/auth_fakes.py`).
+- **Supabase fully removed (founder, same day).**
+  - Migration 114 drops `users.supabase_uid`.
+  - The unused `PaiSession` and `AuthIdentity` models are gone from the code. Their tables stay, because tables are never dropped.
+  - The offline startup check now drives the API with a stand-in Firebase token. Its browser step, which relied on the old session cookie, was removed until the offline stack gets an Auth emulator.

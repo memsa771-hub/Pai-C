@@ -378,7 +378,6 @@ class User(Base):
 
     id = Column(UUID(as_uuid=False), primary_key=True, default=_uuid, server_default=text("gen_random_uuid()"))
     email = Column(Text, nullable=False)                 # normalized lowercase
-    supabase_uid = Column(Text, nullable=True)           # legacy: the earlier Supabase identity
     firebase_uid = Column(Text, nullable=True)           # Firebase Auth uid, the sign-in identity
     # Legacy login handle: usernames are no longer created or used. The column and its
     # unique index stay so existing rows and migrations are untouched.
@@ -429,53 +428,6 @@ class AuthDevice(Base):
         UniqueConstraint("user_id", "device_hash", name="uq_auth_device_user_hash"),
     )
 
-
-
-class AuthIdentity(Base):
-    """Provider identity mapped to a stable Placement AI account."""
-    __tablename__ = "auth_identities"
-
-    id = Column(UUID(as_uuid=False), primary_key=True, default=_uuid,
-                server_default=text("gen_random_uuid()"))
-    user_id = Column(UUID(as_uuid=False), ForeignKey("users.id", ondelete="CASCADE"),
-                     nullable=False)
-    provider = Column(Text, nullable=False)
-    provider_subject = Column(Text, nullable=False)
-    email = Column(Text, nullable=False)
-    created_at = Column(DateTime(timezone=True), default=_now,
-                        server_default=text("NOW()"), nullable=False)
-    updated_at = Column(DateTime(timezone=True), default=_now,
-                        server_default=text("NOW()"), nullable=False)
-
-    __table_args__ = (
-        UniqueConstraint("provider", "provider_subject",
-                         name="uq_auth_identity_provider_subject"),
-        Index("idx_auth_identity_user", "user_id"),
-    )
-
-
-class PaiSession(Base):
-    """Revocable application session; only a token hash is persisted."""
-    __tablename__ = "pai_sessions"
-
-    id = Column(UUID(as_uuid=False), primary_key=True, default=_uuid,
-                server_default=text("gen_random_uuid()"))
-    user_id = Column(UUID(as_uuid=False), ForeignKey("users.id", ondelete="CASCADE"),
-                     nullable=False)
-    token_hash = Column(Text, nullable=False, unique=True)
-    provider = Column(Text, nullable=False)
-    provider_token_hash = Column(Text, nullable=True)
-    created_at = Column(DateTime(timezone=True), default=_now,
-                        server_default=text("NOW()"), nullable=False)
-    last_seen_at = Column(DateTime(timezone=True), default=_now,
-                          server_default=text("NOW()"), nullable=False)
-    expires_at = Column(DateTime(timezone=True), nullable=False)
-    revoked_at = Column(DateTime(timezone=True), nullable=True)
-
-    __table_args__ = (
-        Index("idx_pai_session_user", "user_id"),
-        Index("idx_pai_session_provider_token", "provider_token_hash"),
-    )
 
 
 class KnowledgeEntry(Base):

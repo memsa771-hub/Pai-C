@@ -53,5 +53,5 @@ New check-ins are scheduled by new explicit choices/try-it acceptance only; exis
 
 ## Email/Google-only auth (20 October)
 
-- The Supabase project settings live outside this repo. Google must be enabled there (client id and redirect URL); GitHub and LinkedIn should be switched off there too. The app no longer shows them either way.
+- Sign-in moved to Firebase Auth on 23 October; its console setup (Email/Password and Google on, authorized domains, service account) is in `docs/AUTH_SESSION.md`.
 - Students who used to sign in with a username now sign in with their email. That email is the one on their account, and "Forgot password?" works as before.
