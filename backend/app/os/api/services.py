@@ -33,6 +33,7 @@ class Services:
     name_variants: list[set[str]]
     statement_configs: Mapping[str, StatementConfig] = None  # Slice 5: per route, checked at mount
     pack_configs: Mapping[str, PackConfig] = None  # Slice 6a: per route, checked at mount
+    visa_configs: Mapping[str, PackConfig] = None  # Slice 6b: the visa file per route, checked at mount
 
 
 def _client_factory(settings: OsSettings) -> Callable[[], object]:
@@ -52,7 +53,8 @@ def make_services(settings: OsSettings, *, engine: Engine | None = None,
                   dbos_client: Callable[[], object] | None = None,
                   document_types: Mapping[str, DocumentType] | None = None,
                   statement_configs: Mapping[str, StatementConfig] | None = None,
-                  pack_configs: Mapping[str, PackConfig] | None = None) -> Services:
+                  pack_configs: Mapping[str, PackConfig] | None = None,
+                  visa_configs: Mapping[str, PackConfig] | None = None) -> Services:
     engine = engine or make_engine(settings)
     books = playbooks if playbooks is not None else load_playbook_dir()
     registry = default_registry()
@@ -65,4 +67,5 @@ def make_services(settings: OsSettings, *, engine: Engine | None = None,
     return Services(settings, engine, kernel, knowledge, plans, dbos_client or _client_factory(settings), today,
                     types, load_name_variants(),
                     statement_configs if statement_configs is not None else load_statement_configs(),
-                    pack_configs if pack_configs is not None else load_pack_configs())
+                    pack_configs if pack_configs is not None else load_pack_configs(),
+                    visa_configs if visa_configs is not None else load_pack_configs(kind="visa"))
