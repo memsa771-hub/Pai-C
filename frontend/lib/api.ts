@@ -480,6 +480,42 @@ class WorkspaceApi {
   }
 
   // ---------------------------------------------------------------------------
+  // PAI OS replanning (Slice 7 spec §4)
+  // ---------------------------------------------------------------------------
+
+  /** PAI OS: what changed in the student's open plan, and the suggestions waiting for their answer. */
+  async getOsChanges(): Promise<import('./os-replan').OsChanges> {
+    const params = new URLSearchParams({ network: this.requireWorkspace() });
+    return this.requestJson(`/v1/os/changes?${params}`);
+  }
+
+  async acceptOsProposal(id: number): Promise<{ status: string; revision: number | null }> {
+    const params = new URLSearchParams({ network: this.requireWorkspace() });
+    return this.requestJson(`/v1/os/proposals/${id}/accept?${params}`, { method: 'POST' });
+  }
+
+  async declineOsProposal(id: number): Promise<{ status: string }> {
+    const params = new URLSearchParams({ network: this.requireWorkspace() });
+    return this.requestJson(`/v1/os/proposals/${id}/decline?${params}`, { method: 'POST' });
+  }
+
+  /** PAI OS admin: support cases. The admin token goes in its own header only, never in a URL. */
+  async getOsSupportCases(adminToken: string, status?: 'open' | 'resolved'): Promise<import('./os-replan').OsSupportCase[]> {
+    const params = new URLSearchParams({ network: this.requireWorkspace(), ...(status ? { status } : {}) });
+    const body = await this.requestJson<{ cases: import('./os-replan').OsSupportCase[] }>(`/v1/os/admin/support?${params}`, {
+      headers: { 'X-OS-Admin-Token': adminToken },
+    });
+    return body.cases;
+  }
+
+  async resolveOsSupportCase(adminToken: string, id: number, note: string, unpause: boolean): Promise<import('./os-replan').OsSupportCase> {
+    const params = new URLSearchParams({ network: this.requireWorkspace() });
+    return this.requestJson(`/v1/os/admin/support/${id}/resolve?${params}`, {
+      method: 'POST', headers: { 'X-OS-Admin-Token': adminToken }, body: JSON.stringify({ note, unpause }),
+    });
+  }
+
+  // ---------------------------------------------------------------------------
   // PAI OS visa file (Slice 6b spec §4)
   // ---------------------------------------------------------------------------
 
