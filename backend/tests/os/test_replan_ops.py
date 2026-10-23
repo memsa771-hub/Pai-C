@@ -136,3 +136,9 @@ def test_ops_reject_unknown_op_and_11_ops():
 def test_no_overrides_no_change():
     assert draft() == compile_plan(TEST_STUDENT, BOOK, {}, {}, TODAY)
     assert datetime(2027, 1, 1, tzinfo=timezone.utc)  # keeps the import list honest for the dates used above
+
+
+def test_reprioritise_never_closes_a_cycle():
+    """Final review I8: a reorder whose step already (transitively) waits for `before` is ignored, never a cycle."""
+    d = draft(Override("reprioritise", "visa_apply", {"before": "travel_insurance"}))  # visa_apply needs it, via review
+    assert ("visa_apply", False) not in task(d, "travel_insurance").depends_on

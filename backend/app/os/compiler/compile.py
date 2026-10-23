@@ -141,6 +141,18 @@ def _topological(keys: list[str], deps: Mapping[str, list[tuple[str, bool]]]) ->
     return order
 
 
+def _waits_for(insts: dict[str, _Inst], key: str) -> set[str]:
+    """Every step `key` waits for, directly or through others."""
+    seen: set[str] = set()
+    todo = [key]
+    while todo:
+        for d, _ in insts[todo.pop()].deps:
+            if d in insts and d not in seen:
+                seen.add(d)
+                todo.append(d)
+    return seen
+
+
 def _apply_overrides(insts: dict[str, _Inst], confirms: dict[str, tuple[str, str]], overrides: Sequence) -> None:
     def drop(keys: set[str]) -> None:
         for k in keys:
@@ -173,9 +185,9 @@ def _apply_overrides(insts: dict[str, _Inst], confirms: dict[str, tuple[str, str
                     inst.deps.sort()
         elif o.op == "reprioritise":
             before = insts.get(o.payload.get("before", ""))
-            if before is not None and o.target in insts and (o.target, False) not in before.deps \
-                    and (o.target, True) not in before.deps:
-                before.deps.append((o.target, False))
+            if before is not None and o.target in insts and before.key not in _waits_for(insts, o.target) \
+                    and (o.target, False) not in before.deps and (o.target, True) not in before.deps:
+                before.deps.append((o.target, False))  # never a cycle: `target` does not already wait for `before`
                 before.deps.sort()
 
 
