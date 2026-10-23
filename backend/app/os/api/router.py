@@ -78,6 +78,7 @@ from app.os.documents.store import DocumentStore, DuplicateDocument, FindingStor
 from app.os.eligibility.notes import on_profile_change
 from app.os.api import self_serve
 from app.os.api.packs import add_pack_routes, add_visa_routes, complete_ready_packs
+from app.os.api.replan import add_replan_routes, changes_paused, student_proposals
 from app.os.knowledge.requests import RequestLimit, request_programme
 from app.os.routes import builder
 from app.os.kernel import IllegalTransition
@@ -134,7 +135,8 @@ def build_router(get_services: Callable[[], Services]) -> APIRouter:
         complete_ready_packs(svc, student)  # Slice 6a/6b: a review task whose pack or visa file is approved
         tenant = svc.settings.tenant_id
         return {"items": inbox_items(svc.engine, tenant, student),
-                "notes": eligibility_notes(svc.engine, tenant, student)}
+                "notes": eligibility_notes(svc.engine, tenant, student),
+                "proposals": student_proposals(svc, student), "changes_paused": changes_paused(svc, student)}
 
     @router.post("/inbox/notes/{note_id}/read", status_code=204)
     def read_note(note_id: int, student: str = Depends(current_student_ref_for_write),
@@ -482,4 +484,5 @@ def build_router(get_services: Callable[[], Services]) -> APIRouter:
 
     add_pack_routes(router, services)  # Slice 6a (spec §4)
     add_visa_routes(router, services)  # Slice 6b (spec §4)
+    add_replan_routes(router, services, require_admin)  # Slice 7 (spec §4)
     return router
