@@ -323,7 +323,7 @@ The Counselor shell accidentally omitted the shared UserMenu when replacing the 
 - Built from the Figma frames "PAI / Sign in / Refined" and "PAI / Onboarding / 01 Your name, 02 About you, 03 Your location" (file ICKgQnHlT4z8qqK7XeQDsr), with the frames' assets in `public/auth/` and Manjari Regular added.
 - The frames are 1440 × 900 only:
   - from 1024px wide, the form and panel sit side by side;
-  - below that, the panel follows the form.
+  - below that (phones and tablets), the panel is hidden and the form is centred, as on Kollegio (founder).
   - The panel is drawn at its design size and scaled, so it never changes look.
 - The old "Sign in to Placement AI" gate on `/` is gone; a signed-out student goes straight to `/sign-in`.
 - The auth tokens follow the design and are light only.

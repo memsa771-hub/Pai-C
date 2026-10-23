@@ -5,7 +5,7 @@
  * logo and the form; beside it a pale-blue panel where PAI waves from a
  * portal above a chat prompt. The two columns always fill the screen; the
  * panel's artwork is drawn at its design size (716 × 852) and fitted inside
- * it. On screens narrower than a laptop the panel follows the form. */
+ * it. Phones and tablets show only the form, centred on the screen. */
 
 import { useEffect, useId, useRef, useState } from 'react';
 import Link from 'next/link';
@@ -20,28 +20,23 @@ export type AuthPanel = 'sign-in' | 'name' | 'about' | 'location';
 const PANEL_W = 716;
 const PANEL_H = 852;
 
-/** Scale for the panel: beside the form it fits the column's width and
- * height; stacked under the form it fits the width. */
+/** Scale that fits the panel's artwork (716 × 852) inside its column. */
 function usePanelScale() {
   const ref = useRef<HTMLDivElement>(null);
-  const [fit, setFit] = useState({ scale: 0, beside: true });
+  const [scale, setScale] = useState(0);
   useEffect(() => {
     const element = ref.current;
     if (!element) return;
-    const wide = window.matchMedia('(min-width: 1024px)');
     const measure = () => {
       const { width, height } = element.getBoundingClientRect();
-      setFit(wide.matches
-        ? { scale: Math.min(width / PANEL_W, height / PANEL_H), beside: true }
-        : { scale: width / PANEL_W, beside: false });
+      setScale(Math.min(width / PANEL_W, height / PANEL_H));
     };
     const observer = new ResizeObserver(measure);
     observer.observe(element);
-    wide.addEventListener('change', measure);
     measure();
-    return () => { observer.disconnect(); wide.removeEventListener('change', measure); };
+    return () => observer.disconnect();
   }, []);
-  return [ref, fit] as const;
+  return [ref, scale] as const;
 }
 
 /** The PAI logo as placed in the frame: a 100 × 63 crop of the logo artwork. */
@@ -202,11 +197,11 @@ export function AuthShell({ title, subtitle, panel = 'sign-in', prompt, logoGap 
   footer?: React.ReactNode;
 }) {
   const t = useT();
-  const [ref, { scale, beside }] = usePanelScale();
+  const [ref, scale] = usePanelScale();
   const design = { width: PANEL_W, height: PANEL_H };
   return (
     <div className="auth-frame min-h-svh w-full bg-auth-page font-display text-auth-ink lg:flex lg:h-svh lg:overflow-hidden">
-      <main className="relative flex min-w-0 flex-col lg:w-[47.5%] lg:overflow-y-auto">
+      <main className="relative flex min-h-svh min-w-0 flex-col lg:min-h-0 lg:w-[47.5%] lg:overflow-y-auto">
         <div aria-hidden className="pointer-events-none absolute inset-0 bg-[url(/auth/pattern.png)] bg-[length:684px_auto] bg-repeat opacity-10" />
         <div className="relative mx-auto flex w-full max-w-[442px] flex-1 flex-col justify-center px-4 py-10 lg:py-[var(--auth-pad)]">
           <div style={{ marginBottom: `calc(${logoGap}px * var(--auth-logo-scale))` }}><PaiLogo /></div>
@@ -226,11 +221,11 @@ export function AuthShell({ title, subtitle, panel = 'sign-in', prompt, logoGap 
           </div>
         )}
       </main>
-      {/* The panel fills its column; PAI and the prompt are fitted inside it. */}
-      <aside aria-label={t('auth.previewLabel')} className="px-4 pb-4 lg:w-[52.5%] lg:pb-[25px] lg:pl-0 lg:pr-[40px] lg:pt-[23px]">
+      {/* Laptops and up: the panel fills its column, PAI and the prompt fitted
+          inside it. Phones and tablets show only the form, centred. */}
+      <aside aria-label={t('auth.previewLabel')} className="hidden lg:block lg:w-[52.5%] lg:pb-[25px] lg:pr-[40px] lg:pt-[23px]">
         <div ref={ref} aria-hidden
-          className={cn('relative w-full overflow-clip rounded-[24px] lg:h-full', panel === 'about' || panel === 'location' ? 'bg-auth-panel-alt' : 'bg-auth-panel', !scale && 'invisible')}
-          style={beside ? undefined : { height: PANEL_H * scale }}>
+          className={cn('relative size-full overflow-clip rounded-[24px]', panel === 'about' || panel === 'location' ? 'bg-auth-panel-alt' : 'bg-auth-panel', !scale && 'invisible')}>
           <div className="absolute right-0 top-0 origin-top-right" style={{ ...design, transform: `scale(${scale || 1})` }}>
             <PanelBackdrop />
           </div>
