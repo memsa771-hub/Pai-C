@@ -144,6 +144,40 @@ def register_packs_always(settings: OsSettings, engine: Engine, books, pack_conf
                    load_statement_configs(), visa_configs)
 
 
+def register_replan_always(settings: OsSettings, engine: Engine, kernel: Kernel, books) -> object:
+    """Registers os.replan (Slice 7). The rules need no model key; the Supervisor is built only with a key (or
+    OS_TEST_REPLAN_MODEL, tests only, `pkg.mod:factory`). Without it, what the rules leave goes to the support
+    inbox. Returns the Replanner the replan job uses."""
+    from app.os.knowledge.store import SqlKnowledge
+    from app.os.outbox import Outbox
+    from app.os.replan.apply import Replanner
+    from app.os.replan.config import load_replan_configs
+    from app.os.replan.run import register_replan
+    from app.os.service import PlanService
+
+    plans = PlanService(engine, settings, kernel, SqlKnowledge(engine, settings.tenant_id), books,
+                        today=lambda: datetime.now(timezone.utc).date())
+    replanner = Replanner(engine, plans, load_replan_configs(), Outbox(engine, settings.tenant_id))
+    supervisor = None
+    test_model = os.environ.get("OS_TEST_REPLAN_MODEL", "").strip()
+    if settings.openai_api_key or test_model:
+        from app.os.agents.spec import AGENT_DIR, load_agent_spec
+        from app.os.knowledge.research.readings import model_for
+        from app.os.replan.supervisor import build_supervisor
+
+        spec = load_agent_spec(AGENT_DIR / "supervisor.v1.yaml")
+        if test_model:
+            module_path, _, name = test_model.partition(":")
+            model = getattr(importlib.import_module(module_path), name)()
+        else:
+            model = model_for(settings, spec.tier)
+        supervisor = (build_supervisor(model, spec), spec)
+    else:
+        log.warning("OS_OPENAI_API_KEY is not set: replan hand-overs go to the support inbox")
+    register_replan(engine, settings, replanner, supervisor)
+    return replanner
+
+
 def build(settings: OsSettings) -> tuple[Registry, Kernel, DBOSClient, Engine]:
     registry = default_registry()
     for module in _extra_modules(os.environ.get("OS_EXTRA_MODULES", "")):
@@ -176,6 +210,10 @@ def build(settings: OsSettings) -> tuple[Registry, Kernel, DBOSClient, Engine]:
                      lambda: retry_waiting(engine, client, settings.tenant_id, datetime.now(timezone.utc).date()))
     register_statements_if_configured(settings, engine)
     register_packs_always(settings, engine, books, pack_configs, visa_configs)
+    replanner = register_replan_always(settings, engine, kernel, books)
+    from app.os.replan.run import run_replan_job
+
+    register_job("replan", "*/5 * * * *", lambda: run_replan_job(replanner, client, datetime.now(timezone.utc)))
     return registry, kernel, client, engine
 
 
