@@ -1,0 +1,16 @@
+# The Supervisor (Slice 7 spec S7-D8): proposes typed replan operations for the cases the rules leave to it.
+# An actor with no tools: it cannot fetch, store or send anything; the os.replan workflow checks its operations
+# through the kernel and asks the student for big ones. It sees structured plan state only (invariant 9).
+id: supervisor
+version: 1
+zone: actor
+tier: strong
+tools: []
+output: replan_ops
+limits:
+  max_readings: 1
+  timeout_s: 120
+  spend_usd_per_wake: 0.20
+retries:
+  tools: 0
+  output: 2                    # invariant 7

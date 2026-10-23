@@ -27,11 +27,14 @@ class AgentLimits(_Model):
     spend_usd_per_programme: float | None = Field(None, gt=0)  # research
     spend_usd_per_document: float | None = Field(None, gt=0)  # documents (Slice 3)
     spend_usd_per_artifact: float | None = Field(None, gt=0)  # statements (Slice 5)
+    spend_usd_per_wake: float | None = Field(None, gt=0)  # the Supervisor, per replan (Slice 7)
 
     @model_validator(mode="after")
     def _a_spend_cap(self) -> "AgentLimits":
-        if (self.spend_usd_per_programme, self.spend_usd_per_document, self.spend_usd_per_artifact) == (None,) * 3:
-            raise ValueError("limits need a spend cap (spend_usd_per_programme, _document or _artifact)")
+        caps = (self.spend_usd_per_programme, self.spend_usd_per_document, self.spend_usd_per_artifact,
+                self.spend_usd_per_wake)
+        if caps == (None,) * len(caps):
+            raise ValueError("limits need a spend cap (spend_usd_per_programme, _document, _artifact or _wake)")
         return self
 
 
@@ -48,8 +51,9 @@ class AgentSpec(_Model):
     tools: list[str]
     # profile_reading: the route's reading model, built from its research profile (Slice 2);
     # document_reading: the document type's reading model (Slice 3);
-    # statement_draft / statement_review: the Writer's draft and the Critic's review (Slice 5)
-    output: Literal["profile_reading", "document_reading", "statement_draft", "statement_review"]
+    # statement_draft / statement_review: the Writer's draft and the Critic's review (Slice 5);
+    # replan_ops: the Supervisor's typed operations (Slice 7)
+    output: Literal["profile_reading", "document_reading", "statement_draft", "statement_review", "replan_ops"]
     mode: Literal["whole", "tiles"] | None = None  # documents: page images whole or in bands (Spike 2)
     limits: AgentLimits
     retries: AgentRetries
