@@ -111,7 +111,7 @@ function BearerWorkspace({ workspaceId, idToken }: { workspaceId: string; idToke
     (async () => {
       try {
         const { getAccountWorkspace } = await import('@/lib/account-api');
-        const ws = await getAccountWorkspace(idToken);
+        const ws = await getAccountWorkspace();
         if (cancelled) return;
         if (ws.slug === workspaceId || ws.workspaceId === workspaceId) {
           setWorkspaceCookie(ws.slug || workspaceId);

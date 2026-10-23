@@ -62,7 +62,7 @@ def _verify_workspace_access(workspace, token: Optional[str], authorization: Opt
 
     Thin wrapper over the single source of truth in app.security.access — kept here so
     the many callers importing this name don't have to change. (This path now
-    accepts the same Supabase bearer as the network router.)
+    accepts the same Firebase bearer as the network router.)
     """
     from app.security.access import verify_workspace_access
     return verify_workspace_access(workspace, token, authorization)

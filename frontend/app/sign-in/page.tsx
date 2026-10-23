@@ -5,9 +5,8 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Input } from '@/components/ui/input';
 import { AuthAlert, AuthField, AuthShell, FooterLink, GoogleButton, OrDivider, PasswordInput, SubmitButton, authInputClass, isEmail } from '@/components/auth/auth-shell';
-import { usePaiAuth } from '@/lib/pai-auth-context';
-import { signInWithPassword, signInWithOAuth } from '@/lib/auth/service';
-import { desktopHost } from '@/lib/desktop-host';
+import { needsEmailVerification, usePaiAuth, VERIFY_EMAIL_PATH } from '@/lib/pai-auth-context';
+import { SignInCancelled, signInWithGoogle, signInWithPassword } from '@/lib/auth/service';
 import { useT } from '@/lib/i18n';
 
 export default function SignInPage() {
@@ -31,8 +30,9 @@ export default function SignInPage() {
     if (!password) { setError(t('auth.errorPasswordRequired')); setField('password'); return; }
     setBusy(true);
     try {
-      const session = await signInWithPassword(email.trim(), password);
-      await applySession(session);
+      const user = await signInWithPassword(email.trim(), password);
+      if (needsEmailVerification(user)) { router.replace(VERIFY_EMAIL_PATH); return; }
+      await applySession();
       router.replace('/');
     } catch (err) {
       setError(err instanceof Error && err.message ? err.message : t('auth.errorSignIn'));
@@ -43,16 +43,17 @@ export default function SignInPage() {
 
   const google = async () => {
     setError(null);
-    // Inside the desktop app's embedded view, OAuth can't complete on this
-    // origin (a custom Electron scheme Supabase can't redirect back to) —
-    // delegate to the launcher's own native sign-in, which runs the browser
-    // round trip outside this view.
-    const host = desktopHost();
-    if (host) { host.signIn(); return; }
+    setBusy(true);
     try {
-      await signInWithOAuth('google');
+      await signInWithGoogle();
+      await applySession();
+      router.replace('/');
     } catch (err) {
-      setError(err instanceof Error && err.message ? err.message : t('auth.errorOAuth'));
+      if (!(err instanceof SignInCancelled)) {
+        setError(err instanceof Error && err.message ? err.message : t('auth.errorOAuth'));
+      }
+    } finally {
+      setBusy(false);
     }
   };
 

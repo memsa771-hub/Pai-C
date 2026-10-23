@@ -10,9 +10,9 @@ from sqlalchemy import select
 
 from app.database import Base, get_db
 from app.main import app
-from app.models import AuthIdentity, PaiSession, User, Workspace, FileRecord, Roadmap
-from app.security.identity import AuthenticatedIdentity
+from app.models import AuthDevice, User, Workspace, FileRecord, Roadmap
 from scripts.counselor_eval_support import StudentSession
+from tests.auth_fakes import firebase_tokens, identity_for, link_owner
 
 
 @contextmanager
@@ -30,9 +30,9 @@ def client_for(student):
             app.dependency_overrides.update(old)
 
 
-def test_verified_identity_to_onboarding_refresh_logout_and_expiry():
+def test_verified_identity_to_onboarding_and_unverified_is_blocked():
     with StudentSession() as student:
-        Base.metadata.create_all(student.engine, tables=[AuthIdentity.__table__, PaiSession.__table__])
+        Base.metadata.create_all(student.engine, tables=[AuthDevice.__table__])
         from tests.test_student_onboarding import FIELD_SPECS
         from app.memory.field_definitions import VaultFieldDefinitionService
         with student.factory() as db:
@@ -45,20 +45,19 @@ def test_verified_identity_to_onboarding_refresh_logout_and_expiry():
                     data_type='string', validation_schema=schema,
                     conflict_policy='manual_review' if sensitivity == 'restricted' else 'latest_wins'))
             db.commit()
-        identity = AuthenticatedIdentity('supabase', 'new-student', 'new@example.test', True)
         with student.factory() as db:
             # Use the real provisioning services; synthetic schema lacks only Channel.
             from app.models import Channel, ChannelMember
             Base.metadata.create_all(student.engine, tables=[Channel.__table__, ChannelMember.__table__])
-        with client_for(student) as client, patch(
-                'app.security.identity.SupabaseIdentityVerifier.verify', return_value=identity):
-            login = client.post('/v1/auth/session', headers={
-                'Authorization': 'Bearer fake-provider', 'X-PAI-Desktop': '1', 'Origin': 'pai://workspace'})
-            assert login.status_code == 200
-            data = login.json()['data']
-            token = data['desktopToken']
-            workspace_id = data['workspace']['workspaceId']
-            auth = {'Authorization': 'Bearer ' + token}
+        tokens = {
+            'new-student-token': identity_for('new@example.test', 'new-student', sign_in_provider='password'),
+            'unverified-token': identity_for('late@example.test', 'late-student', verified=False, sign_in_provider='password'),
+        }
+        with client_for(student) as client, firebase_tokens(tokens):
+            auth = {'Authorization': 'Bearer new-student-token'}
+            login = client.post('/v1/auth/session', headers=auth, json={'deviceId': 'device-one-fixture'})
+            assert login.status_code == 200, login.text
+            workspace_id = login.json()['data']['workspace']['workspaceId']
             state = client.get('/v1/student-profile/onboarding', params={'network': workspace_id}, headers=auth)
             assert state.status_code == 200 and state.json()['data']['required']
             answers = dict(fullName='Test Student', preferredName='Student', statusCategory='student',
@@ -69,31 +68,18 @@ def test_verified_identity_to_onboarding_refresh_logout_and_expiry():
             assert saved.status_code == 200
             assert saved.json()['data']['completed'], saved.json()
             with student.factory() as db:
-                owner = db.scalar(select(User).where(User.email == identity.email))
-                assert owner.onboarded_at is not None
+                owner = db.scalar(select(User).where(User.email == 'new@example.test'))
+                assert owner.onboarded_at is not None and owner.firebase_uid == 'new-student'
                 from app.memory.vault import VaultService
                 assert VaultService(db).snapshot(workspace_id, include_sensitive=True)['identity.full_name'] == answers['fullName']
                 from app.journey import JourneyService
                 assert JourneyService(db).ensure_counselor(workspace_id).current_stage == 'IDENTITY'
-            assert client.get('/v1/auth/session', headers=auth).status_code == 200
-            refreshed = client.post('/v1/auth/session', headers={
-                'Authorization': 'Bearer fake-provider-refresh', 'X-PAI-Desktop': '1',
-                'X-PAI-Previous-Session': token, 'Origin': 'pai://workspace'})
-            assert refreshed.status_code == 200
-            assert refreshed.json()['data']['workspace']['workspaceId'] == workspace_id
-            assert client.get('/v1/auth/session', headers=auth).status_code == 401
-            auth = {'Authorization': 'Bearer ' + refreshed.json()['data']['desktopToken']}
-            assert client.delete('/v1/auth/session', headers=auth).status_code == 200
-            assert client.get('/v1/auth/session', headers=auth).status_code == 401
-            assert client.get('/v1/auth/session', headers={'Authorization': 'Bearer pai_invalid'}).status_code == 401
-            with student.factory() as db:
-                from app.security.app_session import create_session, resolve_session
-                owner = db.scalar(select(User).where(User.email == identity.email))
-                expired = create_session(db, owner, provider='supabase')
-                row, _ = resolve_session(db, expired)
-                row.expires_at = datetime.now(timezone.utc) - timedelta(seconds=1)
-                db.commit()
-            assert client.get('/v1/auth/session', headers={'Authorization': 'Bearer '+expired}).status_code == 401
+            # An unverified email/password account is turned away with a clear code, not a sign-out.
+            blocked = client.get('/v1/account/workspace', headers={'Authorization': 'Bearer unverified-token'})
+            assert blocked.status_code == 403 and blocked.json()['message'] == 'AUTH_EMAIL_NOT_VERIFIED'
+            # Anything Firebase would not verify is a 401.
+            assert client.get('/v1/account/workspace', headers={'Authorization': 'Bearer forged'}).status_code == 401
+            assert client.get('/v1/account/workspace').status_code == 401
 
 
 def sample(schema, schemas):
@@ -134,7 +120,6 @@ CASES = [(path, method, spec) for path, methods in SPEC['paths'].items()
 @pytest.mark.parametrize('caller', ['anonymous', 'other_student'])
 def test_all_pai_c_routes_reject_anonymous_and_other_workspace(path, method, spec, caller):
     with StudentSession() as student:
-        Base.metadata.create_all(student.engine, tables=[PaiSession.__table__])
         with student.factory() as db:
             other = User(email='other@example.test', username='other', onboarded_at=datetime.now(timezone.utc))
             db.add(other)
@@ -152,10 +137,7 @@ def test_all_pai_c_routes_reject_anonymous_and_other_workspace(path, method, spe
             db.add(Roadmap(id=foreign_roadmap, workspace_id=foreign_id, journey_id=journey.id,
                 origin='stated_goal', title='Private roadmap', generation_status='ready'))
             db.commit()
-            from app.security.app_session import create_session
-            owner = db.get(User, student.user_id)
-            token = create_session(db, owner, provider='supabase')
-            db.commit()
+            token, identity = link_owner(db, db.get(User, student.user_id))
         schemas = SPEC['components']['schemas']
         params = {'network': foreign_id}
         url = path
@@ -186,18 +168,15 @@ def test_all_pai_c_routes_reject_anonymous_and_other_workspace(path, method, spe
             options['files'] = {'file': ('fixture.txt', b'offline', 'text/plain'), 'files': ('fixture.txt', b'offline', 'text/plain')}
         if caller == 'other_student':
             options['headers'] = {'Authorization': 'Bearer '+token}
-        with client_for(student) as client:
+        with client_for(student) as client, firebase_tokens({token: identity}):
             response = client.request(method, url, **options)
             assert response.status_code in {401, 403, 404}, (method, path, response.status_code, response.text)
 
 def test_folder_noop_still_works_for_authenticated_owner():
     with StudentSession() as student:
-        Base.metadata.create_all(student.engine, tables=[PaiSession.__table__])
         with student.factory() as db:
-            from app.security.app_session import create_session
-            token = create_session(db, db.get(User, student.user_id), provider='supabase')
-            db.commit()
-        with client_for(student) as client:
+            token, identity = link_owner(db, db.get(User, student.user_id))
+        with client_for(student) as client, firebase_tokens({token: identity}):
             result = client.patch('/v1/files/folders', headers={'Authorization': 'Bearer '+token},
                 json={'network': student.workspace_id, 'path': 'folder', 'new_path': 'folder'})
             assert result.status_code == 200
@@ -216,22 +195,3 @@ def test_pai_os_contract_names_and_service_token_rejection():
         assert client.post('/v1/escalations', json=body,
                            headers={'X-PAI-Service-Token': 'incorrect'}).status_code == 401
 
-def test_browser_cookie_session_refresh_and_logout():
-    with StudentSession() as student:
-        Base.metadata.create_all(student.engine, tables=[AuthIdentity.__table__, PaiSession.__table__])
-        with student.factory() as db:
-            owner = db.get(User, student.user_id)
-            owner.supabase_uid = 'cookie-subject'
-            identity = AuthenticatedIdentity('supabase', 'cookie-subject', owner.email, True)
-            db.commit()
-        with client_for(student) as client, patch('app.security.identity.SupabaseIdentityVerifier.verify', return_value=identity), patch('app.main.origins', ['https://student.example.test']), patch('app.main.allowed_origins', ['https://student.example.test']):
-            origin = {'Origin': 'https://student.example.test'}
-            login = client.post('/v1/auth/session', headers={**origin, 'Authorization': 'Bearer fake-cookie-provider'})
-            assert login.status_code == 200
-            assert 'desktopToken' not in login.json()['data']
-            assert 'HttpOnly' in login.headers['set-cookie']
-            assert 'SameSite=lax' in login.headers['set-cookie']
-            assert client.get('/v1/auth/session').status_code == 200
-            assert client.get('/v1/student-profile/onboarding', params={'network': student.workspace_id}).status_code == 200
-            assert client.delete('/v1/auth/session', headers=origin).status_code == 200
-            assert client.get('/v1/auth/session').status_code == 401

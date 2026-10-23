@@ -605,7 +605,7 @@ export function WorkspaceProvider({
     const remint = async () => {
       try {
         const { refreshStreamTicket } = await import('@/lib/account-api');
-        const next = await refreshStreamTicket(bearerToken);
+        const next = await refreshStreamTicket();
         if (!cancelled && next.streamTicket) setStreamTicket(next.streamTicket);
       } catch { /* keep the current ticket; the next tick retries */ }
     };

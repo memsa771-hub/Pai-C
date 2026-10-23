@@ -1,6 +1,12 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import { workspaceApi } from './api';
 
+vi.mock('./auth/service', async (original) => ({
+  ...(await original<typeof import('./auth/service')>()),
+  // Requests carry the signed-in student's fresh Firebase ID token.
+  currentIdToken: async () => 'student-bearer',
+}));
+
 afterEach(() => vi.unstubAllGlobals());
 
 it('sends speech as the same authenticated student message event as text', async () => {

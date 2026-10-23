@@ -67,21 +67,16 @@ class Config:
     DB_POOL_RECYCLE: int = int(os.environ.get("DB_POOL_RECYCLE", "300"))
     APP_ENV: str = os.environ.get("APP_ENV", "development")
 
-    # Supabase Auth — the sole human-identity provider for web/desktop (and,
-    # later, mobile). SUPABASE_ANON_KEY is the public/publishable key that also
-    # ships in every client bundle, so it is not a secret; there is
-    # deliberately no service-role key or JWT signing secret here (see
-    # app.security.human_auth.verify_identity_claims, which verifies tokens via
-    # Supabase's own JWKS/introspection instead of a shared secret).
-    #
-    # Required from the environment (see workspace/.env.example) — no default
-    # project baked into source, so a misconfigured deployment fails loudly
-    # (empty string) instead of silently talking to whichever project used to
-    # be hardcoded here.
-    SUPABASE_URL: str = os.environ.get("SUPABASE_URL", "")
-    SUPABASE_ANON_KEY: str = os.environ.get("SUPABASE_ANON_KEY", "")
-    PAI_SESSION_TTL_SECONDS: int = int(os.environ.get(
-        "PAI_SESSION_TTL_SECONDS", str(14 * 24 * 60 * 60)))
+    # Firebase Auth — the sole human-identity provider for web, desktop and
+    # mobile. The backend verifies Firebase ID tokens with the Admin SDK.
+    # FIREBASE_SERVICE_ACCOUNT is the path to the service-account JSON, mounted
+    # into the container and never committed. With FIREBASE_AUTH_EMULATOR_HOST
+    # set (local tests) the SDK uses the Auth emulator and needs no account.
+    FIREBASE_PROJECT_ID: str = os.environ.get("FIREBASE_PROJECT_ID", "")
+    FIREBASE_SERVICE_ACCOUNT: str = os.environ.get("FIREBASE_SERVICE_ACCOUNT", "")
+    # Abuse limits for the account-email endpoints, per process and per hour.
+    AUTH_EMAILS_PER_ADDRESS_PER_HOUR: int = int(os.environ.get("AUTH_EMAILS_PER_ADDRESS_PER_HOUR", "5"))
+    AUTH_REQUESTS_PER_IP_PER_HOUR: int = int(os.environ.get("AUTH_REQUESTS_PER_IP_PER_HOUR", "30"))
 
     # Identity mode: "standalone" (own agent table) or "shared" (external agent_ids)
     IDENTITY_MODE: str = os.environ.get("IDENTITY_MODE", "standalone")
@@ -357,6 +352,8 @@ class Config:
     # The application origin, for links the backend puts in email and in
     # integration redirects. Placement AI's canonical hosted app.
     FRONTEND_BASE_URL: str = os.environ.get("FRONTEND_BASE_URL", "https://app.placement-ai.com")
+    # Where account-email links land (/auth/action?mode=…&oobCode=…).
+    APP_URL: str = os.environ.get("APP_URL", "") or FRONTEND_BASE_URL
     RESEND_API_KEY: str = os.environ.get("RESEND_API_KEY", "")
     # Must be a domain verified in Resend, or delivery fails.
     EMAIL_FROM: str = os.environ.get("EMAIL_FROM", "Placement AI <noreply@placement-ai.com>")

@@ -34,7 +34,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy.orm import Session as SqlaSession
 
 from app.security.human_auth import verify_identity_claims
-from app.models import AuthIdentity, User, Workspace
+from app.models import User, Workspace
 
 logger = logging.getLogger(__name__)
 
@@ -59,67 +59,45 @@ def extract_bearer(authorization: Optional[str]) -> Optional[str]:
 # ---------------------------------------------------------------------------
 
 def get_or_create_user(db: Session, claims: dict) -> Optional[User]:
-    """Resolve by stable provider subject, preserving legacy account IDs."""
+    """Resolve a verified Firebase identity to its PAI account, creating it once.
+
+    Lookup order: the account already linked to this Firebase uid; else the
+    account with this (verified) email that has no Firebase uid yet, which
+    links an existing student and their Vault on first Firebase sign-in;
+    else a new account. Nothing is migrated or deleted.
+    """
     if claims.get("session_user_id"):
         return db.get(User, claims["session_user_id"])
     email = (claims.get("email") or "").strip().lower()
-    provider = str(claims.get("provider") or "supabase")
-    subject = str(claims.get("subject") or claims.get("supabase_uid") or "")
-    supabase_subject = subject if provider == "supabase" else None
-    if not email or not subject:
+    uid = str(claims.get("subject") or "")
+    if not email or not uid or claims.get("provider") != "firebase":
         return None
 
-    identity = db.execute(select(AuthIdentity).where(
-        AuthIdentity.provider == provider,
-        AuthIdentity.provider_subject == subject,
-    )).scalar_one_or_none()
-    user = db.get(User, identity.user_id) if identity else None
-    if user is None and supabase_subject:
-        user = db.execute(select(User).where(User.supabase_uid == subject)).scalar_one_or_none()
+    user = db.execute(select(User).where(User.firebase_uid == uid)).scalar_one_or_none()
     if user is None:
-        legacy = db.execute(select(User).where(User.email == email)).scalar_one_or_none()
-        if legacy and (not supabase_subject or legacy.supabase_uid not in (None, "", subject)):
-            raise AuthAccountConflict("Email belongs to another identity")
-        user = legacy
+        existing = db.execute(select(User).where(User.email == email)).scalar_one_or_none()
+        if existing is not None:
+            if existing.firebase_uid not in (None, "", uid):
+                raise AuthAccountConflict("Email belongs to another Firebase account")
+            existing.firebase_uid = uid
+            user = existing
+            logger.info("auth: linked Firebase identity to existing account user=%s", user.id)
     if user is None:
         try:
             with db.begin_nested():
-                user = User(
-                    email=email, supabase_uid=supabase_subject,
-                    display_name=claims.get("display_name"),
-                    last_login_at=_now(),
-                )
+                user = User(email=email, firebase_uid=uid,
+                            display_name=claims.get("display_name"), last_login_at=_now())
                 db.add(user)
                 db.flush()
         except IntegrityError:
-            user = (db.execute(select(User).where(User.supabase_uid == subject)).scalar_one_or_none()
-                    if supabase_subject else None)
+            user = db.execute(select(User).where(User.firebase_uid == uid)).scalar_one_or_none()
             if user is None:
                 raise AuthAccountConflict("Account creation conflict")
-    if not identity:
-        try:
-            with db.begin_nested():
-                db.add(AuthIdentity(
-                    user_id=user.id, provider=provider,
-                    provider_subject=subject, email=email))
-                db.flush()
-        except IntegrityError:
-            existing = db.execute(select(AuthIdentity).where(
-                AuthIdentity.provider == provider,
-                AuthIdentity.provider_subject == subject,
-            )).scalar_one_or_none()
-            if not existing or str(existing.user_id) != str(user.id):
-                raise AuthAccountConflict("Identity is linked to another account")
-    else:
-        identity.email = email
-        identity.updated_at = _now()
     if user.email != email:
         other = db.execute(select(User.id).where(User.email == email, User.id != user.id)).first()
         if other:
             raise AuthAccountConflict("Email belongs to another account")
         user.email = email
-    if supabase_subject and not user.supabase_uid:
-        user.supabase_uid = subject
     if claims.get("display_name") and not user.display_name:
         user.display_name = claims["display_name"]
     user.last_login_at = _now()
@@ -127,7 +105,7 @@ def get_or_create_user(db: Session, claims: dict) -> Optional[User]:
 
 
 def resolve_current_user(db: Session, authorization: Optional[str]) -> Optional[User]:
-    """Verify a PAI session and return its account, or None."""
+    """Verify the Firebase bearer and return its account, or None."""
     bearer = extract_bearer(authorization)
     if not bearer:
         return None

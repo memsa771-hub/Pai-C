@@ -27,7 +27,7 @@ const THEMES = ['light', 'dark'];
 const SCREENS = require('./screens.cjs');
 
 /* Next.js routes that exist in app/. Links must resolve to one of these. */
-const ROUTES = [/^\/$/, /^\/sign-in$/, /^\/sign-up$/, /^\/forgot-password$/, /^\/auth\/(callback|desktop|reset-password)$/,
+const ROUTES = [/^\/$/, /^\/sign-in$/, /^\/sign-up$/, /^\/forgot-password$/, /^\/auth\/(action|verify-email)$/,
   /^\/share\/[^/]+$/, /^\/[^/]+$/, /^\/[^/]+\/settings(\/(general|integrations|preferences|profile|security))?$/];
 const RAW_KEY = /\b(?:identity|location|preferences|education|language|communication)\.[a-z_]+\b|\b[a-z]{2,}_[a-z_]{2,}\b/;
 const EXPAND = '[data-scroll-root]{height:auto!important;min-height:100svh;overflow:visible!important}'

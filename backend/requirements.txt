@@ -6,8 +6,8 @@ sqlalchemy>=2.0.0
 psycopg2-binary>=2.9.0
 alembic>=1.13.0
 python-dotenv>=1.0.0
-# Supabase access-token verification (asymmetric JWT/JWKS support).
-pyjwt[crypto]>=2.8.0
+# Firebase Auth: ID-token verification and account action codes.
+firebase-admin>=7.0.0
 boto3>=1.34.0
 python-multipart>=0.0.9
 httpx>=0.27.0

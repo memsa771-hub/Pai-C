@@ -1,15 +1,20 @@
 'use client';
 
+/** Who is signed in, from Firebase Auth.
+ *
+ * Firebase keeps the sign-in (and syncs it across tabs); `onAuthStateChanged`
+ * is the single source of truth. Email/password accounts that have not
+ * verified their address are held at the "check your email" screen. Every API
+ * call fetches a fresh ID token itself, so `idToken` here only says "signed in". */
+
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
+import type { User } from 'firebase/auth';
 import { identify, resetIdentity } from './analytics';
-import { desktopHost } from './desktop-host';
-import { clearAuthSession } from './auth-session';
 import { workspaceApi } from './api';
 import {
-  AUTH_INVALID_EVENT, AuthInvalid, AuthUnavailable, COOKIE_SESSION,
-  establishSession, restoreSession, signOut as revokeSession,
+  AUTH_INVALID_EVENT, AUTH_UNVERIFIED_EVENT, FIREBASE_SESSION, onUserChange, signedInUser,
+  signOut as firebaseSignOut, startSession,
 } from './auth/service';
-import type { AuthSession } from './supabase-auth';
 
 interface PaiUser {
   id: string;
@@ -20,19 +25,30 @@ interface PaiUser {
 
 interface PaiAuthContextValue {
   user: PaiUser | null;
-  /** Web: cookie sentinel; Desktop: PAI application bearer held in memory. */
+  /** FIREBASE_SESSION while a verified student is signed in, else null. */
   idToken: string | null;
   loading: boolean;
   isPaiDeployment: boolean;
   signIn: () => Promise<void>;
   signOut: () => Promise<void>;
-  applySession: (session: AuthSession) => Promise<void>;
+  /** After a successful sign-in: tell the backend (device check) and enter the app. */
+  applySession: () => Promise<void>;
 }
 
 const PAI_HOSTNAMES = ['app.placement-ai.com', 'placement-ai.com', 'localhost', 'workspace'];
 export function isPaiHostname(hostname: string): boolean {
   const host = (hostname || '').toLowerCase().replace(/^www\./, '');
   return PAI_HOSTNAMES.includes(host) || host === '127.0.0.1' || host === '[::1]';
+}
+
+/** Pages a signed-out (or unverified) visitor may stay on. */
+const PUBLIC_PATHS = ['/sign-in', '/sign-up', '/forgot-password'];
+const isPublicPath = (path: string) => PUBLIC_PATHS.includes(path) || path.startsWith('/auth/');
+export const VERIFY_EMAIL_PATH = '/auth/verify-email';
+
+/** Email/password accounts must verify their address; Google accounts arrive verified. */
+export function needsEmailVerification(user: User): boolean {
+  return !user.emailVerified && user.providerData.some((p) => p.providerId === 'password');
 }
 
 const PaiAuthContext = createContext<PaiAuthContextValue | null>(null);
@@ -43,14 +59,12 @@ export function usePaiAuth() {
 }
 
 function clearAccountBrowserState() {
-  clearAuthSession(); // migrate away from the old localStorage token format
   resetIdentity();
   try {
     for (const key of Object.keys(localStorage)) {
       if (key.startsWith('previews:') || key.startsWith('oa-read-') ||
           key.startsWith('oa:desktop:view:')) localStorage.removeItem(key);
     }
-    sessionStorage.removeItem('oa_pkce_verifier');
   } catch { /* storage may be disabled */ }
   workspaceApi.reset();
 }
@@ -67,17 +81,10 @@ export function PaiAuthProvider({ children }: { children: React.ReactNode }) {
   const [idToken, setIdToken] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [isPaiDeployment, setIsPaiDeployment] = useState(false);
-  const retryRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const channelRef = useRef<BroadcastChannel | null>(null);
-  const bearerRef = useRef<string | null>(null);
   const accountRef = useRef<string | null>(null);
-  const validationRef = useRef(0);
 
   const clearSession = useCallback(() => {
-    validationRef.current += 1;
-    if (retryRef.current) clearTimeout(retryRef.current);
     clearAccountBrowserState();
-    bearerRef.current = null;
     accountRef.current = null;
     setUser(null);
     setIdToken(null);
@@ -85,127 +92,62 @@ export function PaiAuthProvider({ children }: { children: React.ReactNode }) {
     hideSessionShield();
   }, []);
 
-  const accept = useCallback((session: {
-    user: { id: string; email: string; displayName: string };
-    desktopToken?: string;
-  }, desktop = false) => {
-    if (accountRef.current && accountRef.current !== session.user.id) clearAccountBrowserState();
-    accountRef.current = session.user.id;
-    const displayName = session.user.displayName || session.user.email;
-    bearerRef.current = desktop ? session.desktopToken || null : COOKIE_SESSION;
-    setUser({ id: session.user.id, email: session.user.email, displayName, photoURL: null });
-    setIdToken(bearerRef.current);
+  const accept = useCallback((firebaseUser: User) => {
+    if (accountRef.current && accountRef.current !== firebaseUser.uid) clearAccountBrowserState();
+    accountRef.current = firebaseUser.uid;
+    const email = firebaseUser.email || '';
+    const displayName = firebaseUser.displayName || email;
+    setUser({ id: firebaseUser.uid, email, displayName, photoURL: firebaseUser.photoURL });
+    setIdToken(FIREBASE_SESSION);
     setLoading(false);
     hideSessionShield();
-    identify(session.user.email, { email: session.user.email, display_name: displayName });
+    identify(email, { email, display_name: displayName });
   }, []);
 
-  const applySession = useCallback(async (providerSession: AuthSession) => {
-    const session = await establishSession(providerSession);
-    validationRef.current += 1;
-    clearAuthSession();
-    accept(session);
-    channelRef.current?.postMessage('login');
+  const applySession = useCallback(async () => {
+    const current = signedInUser();
+    if (!current) throw new Error('Please sign in again.');
+    await startSession();
+    accept(current);
   }, [accept]);
-
-  const validate = useCallback(async () => {
-    const validation = ++validationRef.current;
-    setLoading(true);
-    try {
-      const session = await restoreSession();
-      if (validation !== validationRef.current) return;
-      accept(session);
-    } catch (error) {
-      if (validation !== validationRef.current) return;
-      if (error instanceof AuthUnavailable) {
-        // An outage says nothing about whether this cookie is still valid.
-        retryRef.current = setTimeout(() => { void validate(); }, 30_000);
-        return;
-      }
-      clearSession();
-      if (window.location.pathname !== '/sign-in' &&
-          window.location.pathname !== '/sign-up' &&
-          window.location.pathname !== '/forgot-password' &&
-          !window.location.pathname.startsWith('/auth/')) {
-        window.location.replace('/sign-in');
-      }
-    }
-  }, [accept, clearSession]);
 
   useEffect(() => {
     const hosted = isPaiHostname(window.location.hostname);
     setIsPaiDeployment(hosted);
     if (!hosted) { setLoading(false); return; }
-    clearAuthSession();
 
-    const host = desktopHost();
-    if (host) {
-      const adopt = async (handoff: { token: string; email: string; displayName?: string | null }) => {
-        try {
-          const providerSession: AuthSession = {
-            accessToken: handoff.token, refreshToken: '', expiresAt: 0,
-            user: { id: '', email: handoff.email },
-          };
-          const session = await establishSession(providerSession, true, bearerRef.current);
-          accept(session, true);
-        } catch { clearSession(); }
-      };
-      if (host.session) void adopt(host.session);
-      else setLoading(false);
-      const unsubscribe = host.onSession?.((next) => { void adopt(next); });
-      return () => { unsubscribe?.(); };
-    }
-
-    void validate();
-    const onPageHide = () => {
-      const shield = document.getElementById('pai-session-shield');
-      if (shield) shield.style.display = 'flex';
-    };
-    const onPageShow = () => { void validate(); };
-    const onVisibility = () => {
-      if (document.visibilityState === 'visible') void validate();
-    };
-    const onInvalid = () => {
-      clearSession();
-      channelRef.current?.postMessage('logout');
-      window.location.replace('/sign-in');
-    };
-    window.addEventListener('pagehide', onPageHide);
-    window.addEventListener('pageshow', onPageShow);
-    document.addEventListener('visibilitychange', onVisibility);
+    const unsubscribe = onUserChange((firebaseUser) => {
+      const path = window.location.pathname;
+      if (!firebaseUser) {
+        clearSession();
+        if (!isPublicPath(path)) window.location.replace('/sign-in');
+        return;
+      }
+      if (needsEmailVerification(firebaseUser)) {
+        clearSession();
+        if (!isPublicPath(path)) window.location.replace(VERIFY_EMAIL_PATH);
+        return;
+      }
+      accept(firebaseUser);
+    });
+    const onInvalid = () => { void firebaseSignOut(); };
+    const onUnverified = () => { window.location.replace(VERIFY_EMAIL_PATH); };
     window.addEventListener(AUTH_INVALID_EVENT, onInvalid);
-    if (typeof BroadcastChannel !== 'undefined') {
-      const channel = new BroadcastChannel('pai-auth');
-      channelRef.current = channel;
-      channel.onmessage = (event) => {
-        if (event.data === 'logout') {
-          clearSession();
-          window.location.replace('/sign-in');
-        }
-        if (event.data === 'login') void validate();
-      };
-    }
+    window.addEventListener(AUTH_UNVERIFIED_EVENT, onUnverified);
     return () => {
-      if (retryRef.current) clearTimeout(retryRef.current);
-      window.removeEventListener('pagehide', onPageHide);
-      window.removeEventListener('pageshow', onPageShow);
-      document.removeEventListener('visibilitychange', onVisibility);
+      unsubscribe();
       window.removeEventListener(AUTH_INVALID_EVENT, onInvalid);
-      channelRef.current?.close();
-      channelRef.current = null;
+      window.removeEventListener(AUTH_UNVERIFIED_EVENT, onUnverified);
     };
-  }, [accept, clearSession, validate]);
+  }, [accept, clearSession]);
 
   const signIn = useCallback(async () => {
-    desktopHost()?.signIn();
+    window.location.assign('/sign-in');
   }, []);
 
   const signOut = useCallback(async () => {
-    const host = desktopHost();
-    await revokeSession(host ? bearerRef.current || undefined : undefined);
-    channelRef.current?.postMessage('logout');
+    await firebaseSignOut();
     clearSession();
-    if (host) host.signOut();
   }, [clearSession]);
 
   return (

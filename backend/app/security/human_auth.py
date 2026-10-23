@@ -1,167 +1,57 @@
 # -*- coding: utf-8 -*-
-"""Central Supabase authentication boundary for human users.
+"""The authentication boundary for human users.
 
-Every backend caller verifies human bearer tokens through this module.  The
-application deliberately has one identity provider: Supabase Auth.  OAuth
-providers configured inside Supabase still produce ordinary Supabase access
-tokens and therefore follow this same path.
+Every protected request carries a Firebase ID token as its Bearer; nothing a
+client sends about who it is (a user id, an email in a body) is ever trusted.
+A verified token resolves to the PAI account linked by `users.firebase_uid`,
+which is created on the first verified request. Email/password accounts must
+have verified their address first (EmailNotVerified -> 403).
 """
 
 import logging
-import threading
-import time
 from typing import Optional
 
-from app.config import config
-from app.security.errors import IdentityUnavailable
+from app.security.errors import EmailNotVerified
+from app.security import firebase_auth
 
 logger = logging.getLogger(__name__)
 
-_jwk_client = None
-_jwk_lock = threading.Lock()
-_jwks_failed_at = 0.0
-_JWKS_RETRY_SECONDS = 300.0
-
-
-def _looks_like_supabase_token(token: str) -> bool:
-    """Inspect the unsigned issuer only to route tokens, never to trust them."""
-    if not token or token.count(".") != 2 or not config.SUPABASE_URL:
-        return False
-    try:
-        import jwt
-
-        claims = jwt.decode(token, options={"verify_signature": False})
-        return claims.get("iss") == f"{config.SUPABASE_URL}/auth/v1"
-    except Exception:
-        return False
-
-
-def _get_jwk_client():
-    """Return a cached Supabase JWKS client, or None during its retry window."""
-    global _jwk_client, _jwks_failed_at
-    if _jwk_client is not None:
-        return _jwk_client
-    if time.monotonic() - _jwks_failed_at < _JWKS_RETRY_SECONDS:
-        return None
-    with _jwk_lock:
-        if _jwk_client is None:
-            from jwt import PyJWKClient
-
-            try:
-                client = PyJWKClient(
-                    f"{config.SUPABASE_URL}/auth/v1/.well-known/jwks.json"
-                )
-                client.get_signing_keys()
-                _jwk_client = client
-                _jwks_failed_at = 0.0
-            except Exception as exc:
-                logger.warning(
-                    "human_auth: Supabase JWKS unavailable (%s); retrying in %ss",
-                    exc,
-                    int(_JWKS_RETRY_SECONDS),
-                )
-                _jwks_failed_at = time.monotonic()
-    return _jwk_client
-
-
-def _introspect(token: str) -> Optional[dict]:
-    """Ask Supabase to verify a token when local asymmetric keys are unavailable."""
-    if not config.SUPABASE_URL or not config.SUPABASE_ANON_KEY:
-        raise IdentityUnavailable("Supabase authentication is not configured")
-    try:
-        import httpx
-
-        response = httpx.get(
-            f"{config.SUPABASE_URL}/auth/v1/user",
-            headers={
-                "Authorization": f"Bearer {token}",
-                "apikey": config.SUPABASE_ANON_KEY,
-            },
-            timeout=10.0,
-        )
-        if response.status_code == 200:
-            return response.json()
-        if response.status_code in (400, 401, 403):
-            return None
-        raise IdentityUnavailable(
-            f"Supabase introspection returned {response.status_code}"
-        )
-    except IdentityUnavailable:
-        raise
-    except Exception as exc:
-        logger.warning("human_auth: Supabase introspection unreachable: %s", exc)
-        raise IdentityUnavailable(str(exc)) from exc
-
-
-def verify_supabase_claims(token: str) -> Optional[dict]:
-    """Verify the provider credential only during login or account linking."""
-    if not _looks_like_supabase_token(token):
-        return None
-
-    claims = None
-    jwk_client = _get_jwk_client()
-    if jwk_client is not None:
-        try:
-            import jwt
-
-            signing_key = jwk_client.get_signing_key_from_jwt(token)
-            claims = jwt.decode(
-                token,
-                signing_key.key,
-                algorithms=["RS256", "ES256"],
-                audience="authenticated",
-                issuer=f"{config.SUPABASE_URL}/auth/v1",
-                options={"require": ["exp", "iss", "aud"]},
-            )
-        except Exception as exc:
-            # Introspection distinguishes a rejected token from key rotation.
-            logger.warning("human_auth: local Supabase verification failed: %s", exc)
-
-    if claims is None:
-        claims = _introspect(token)
-    if not claims:
-        return None
-
-    email = str(claims.get("email") or "").strip().lower()
-    if not email:
-        logger.warning("human_auth: Supabase token has no email claim")
-        return None
-
-    metadata = claims.get("user_metadata") or {}
-    return {
-        "provider": "supabase",
-        "email": email,
-        "supabase_uid": claims.get("sub") or claims.get("id"),
-        "email_verified": bool(claims.get("email_confirmed_at", True)),
-        # Google supplies full_name/name; email sign-ups usually supply none.
-        "display_name": (metadata.get("full_name") or metadata.get("name")
-                         or metadata.get("display_name")),
-    }
-
 
 def verify_identity_claims(token: str) -> Optional[dict]:
-    """Resolve only a live PAI session for protected application requests."""
+    """Verify the bearer and resolve (or create) its PAI account."""
+    identity = firebase_auth.verify_token(token)
+    if identity is None:
+        return None
+    if identity.needs_email_verification:
+        raise EmailNotVerified()
     from app.database import SessionLocal
-    from .app_session import resolve_session
+    from app.security.access import AuthAccountConflict, get_or_create_user
 
     db = SessionLocal()
     try:
-        resolved = resolve_session(db, token)
-        if not resolved:
+        user = get_or_create_user(db, {
+            "provider": identity.provider, "subject": identity.subject,
+            "email": identity.email, "display_name": identity.display_name,
+        })
+        if user is None:
             return None
-        session, user = resolved
+        db.commit()
         return {
-            "provider": session.provider,
+            "provider": identity.provider,
             "email": user.email,
-            "supabase_uid": user.supabase_uid,
+            "firebase_uid": user.firebase_uid,
             "session_user_id": str(user.id),
             "display_name": user.display_name,
         }
+    except AuthAccountConflict:
+        db.rollback()
+        logger.warning("human_auth: verified Firebase identity conflicts with another account")
+        return None
     finally:
         db.close()
 
 
 def verify_identity_token(token: str) -> Optional[str]:
-    """Verify a PAI application session and return its account email."""
+    """Verify the bearer and return its account email."""
     claims = verify_identity_claims(token)
     return claims["email"] if claims else None

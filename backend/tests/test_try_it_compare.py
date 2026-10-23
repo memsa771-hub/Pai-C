@@ -78,7 +78,6 @@ async def test_guide_compare_contains_published_fit_only_with_limit_and_exclusio
 def test_try_it_message_uses_normal_event_path_and_reaches_planner_without_dismissal():
     from app.main import app
     from app.database import get_db
-    from app.security.app_session import TOKEN_PREFIX
     from app.pai_c.deep.analysis import _input
     from app.pai_c.deep.notebook_schema import CounselorNotebookData
     from tests.test_counselor_mirror import client_for
@@ -98,7 +97,7 @@ def test_try_it_message_uses_normal_event_path_and_reaches_planner_without_dismi
                 result=client.post('/v1/events',json={'network':student.workspace_id,'type':'workspace.message.posted',
                     'target':'channel/pai-counselor','payload':{'content':'Practical route, Try it: Not for me. I tried the small task.','message_type':'chat'},
                     'metadata':{'target_agents':['pai'],'try_it_roadmap_id':roadmap.id}},
-                    headers={'X-Workspace-Token':'synthetic-test-only','Authorization':f'Bearer {TOKEN_PREFIX}offline-owner'})
+                    headers={'X-Workspace-Token':'synthetic-test-only','Authorization':'Bearer offline-owner-id-token'})
             assert result.status_code==200,result.text
             counselor.assert_awaited_once()
             db.expire_all();event=db.get(EventRecord,result.json()['data']['id'])

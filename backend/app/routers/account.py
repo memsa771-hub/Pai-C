@@ -43,8 +43,6 @@ from app.api.response import ResponseCode, json_response, success_response
 from app.files.storage import get_file_store
 from app.security.stream_ticket import TICKET_TTL_SECONDS
 from app.security.stream_ticket import mint as mint_stream_ticket
-from app.security.app_session import resolve_session
-from app.security.access import extract_bearer
 from app.routers.network import _extract_bearer
 
 logger = logging.getLogger(__name__)
@@ -62,8 +60,7 @@ def _authed_email(authorization: Optional[str]) -> Optional[str]:
     return email.strip().lower() if email else None
 
 
-def _canonical_workspace_row(ws: Workspace, user: Optional[User] = None,
-                             session_id: Optional[str] = None) -> dict:
+def _canonical_workspace_row(ws: Workspace, user: Optional[User] = None) -> dict:
     """The workspace as the browser sees it. Deliberately WITHOUT its token.
 
     This used to return `ws.password_hash` — the workspace machine token, the
@@ -80,7 +77,7 @@ def _canonical_workspace_row(ws: Workspace, user: Optional[User] = None,
         "lastActivityAt": ws.last_activity_at.isoformat() if ws.last_activity_at else None,
     }
     if user is not None:
-        row["streamTicket"] = mint_stream_ticket(ws, str(user.id), session_id)
+        row["streamTicket"] = mint_stream_ticket(ws, str(user.id), user.firebase_uid)
         row["streamTicketTtl"] = TICKET_TTL_SECONDS
     return row
 
@@ -105,12 +102,10 @@ def get_account_workspace(
         return json_response(ResponseCode.UNAUTHORIZED, "Invalid identity token")
 
     workspace = get_or_create_owned_workspace(db, user)
-    session = resolve_session(db, extract_bearer(authorization) or "")
     db.commit()
     db.refresh(workspace)
 
-    return success_response(_canonical_workspace_row(
-        workspace, user, str(session[0].id) if session else None))
+    return success_response(_canonical_workspace_row(workspace, user))
 
 
 @router.post("/account/stream-ticket")
@@ -129,14 +124,12 @@ def refresh_stream_ticket(
         return json_response(ResponseCode.UNAUTHORIZED, "Invalid identity token")
 
     workspace = resolve_owned_workspace(db, user)
-    session = resolve_session(db, extract_bearer(authorization) or "")
     db.commit()
     if not workspace:
         return json_response(ResponseCode.NOT_FOUND, "No workspace")
 
     return success_response({
-        "streamTicket": mint_stream_ticket(
-            workspace, str(user.id), str(session[0].id) if session else None),
+        "streamTicket": mint_stream_ticket(workspace, str(user.id), user.firebase_uid),
         "streamTicketTtl": TICKET_TTL_SECONDS,
     })
 
@@ -158,12 +151,10 @@ def list_account_workspaces(
         return json_response(ResponseCode.UNAUTHORIZED, "Invalid identity token")
 
     workspace = get_or_create_owned_workspace(db, user)
-    session = resolve_session(db, extract_bearer(authorization) or "")
     db.commit()
     db.refresh(workspace)
 
-    return success_response([{**_canonical_workspace_row(
-        workspace, user, str(session[0].id) if session else None), "role": "owner"}])
+    return success_response([{**_canonical_workspace_row(workspace, user), "role": "owner"}])
 
 
 # ---------------------------------------------------------------------------

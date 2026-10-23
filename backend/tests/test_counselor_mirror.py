@@ -25,7 +25,6 @@ from app.database import get_db
 from app.journey import JourneyService
 from app.main import app
 from app.models import BackgroundJob, EventRecord
-from app.security.app_session import TOKEN_PREFIX
 from scripts.counselor_eval_support import StudentSession
 
 FIXTURE = Path(__file__).parent / "fixtures/mirror/valid.json"
@@ -315,7 +314,7 @@ def test_edit_posts_normal_student_event_and_returns_to_discovery():
                  patch("app.infrastructure.cache.publish_event"), patch("app.routers.events._invalidate_poll_cache"):
                 response = client.post(f"/v1/counselor/summary/edit?network={student.workspace_id}",
                     json={"version": 1, "text": "My main constraint is time, not money."},
-                    headers={"X-Workspace-Token": "synthetic-test-only", "Authorization": f"Bearer {TOKEN_PREFIX}offline-owner"})
+                    headers={"X-Workspace-Token": "synthetic-test-only", "Authorization": "Bearer offline-owner-id-token"})
             assert response.status_code == 200, response.text
             counselor.assert_awaited_once()
             db.expire_all()

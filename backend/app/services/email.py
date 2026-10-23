@@ -20,7 +20,7 @@ def email_configured() -> bool:
     return bool(config.RESEND_API_KEY)
 
 
-def send_email(to: str, subject: str, html_body: str) -> bool:
+def send_email(to: str, subject: str, html_body: str, text_body: str | None = None) -> bool:
     """Send one email; returns True on acceptance by the provider.
 
     Never raises — callers must succeed even when the provider is down or
@@ -33,7 +33,8 @@ def send_email(to: str, subject: str, html_body: str) -> bool:
         resp = httpx.post(
             RESEND_URL,
             headers={"Authorization": f"Bearer {config.RESEND_API_KEY}"},
-            json={"from": config.EMAIL_FROM, "to": [to], "subject": subject, "html": html_body},
+            json={"from": config.EMAIL_FROM, "to": [to], "subject": subject, "html": html_body,
+                  **({"text": text_body} if text_body else {})},
             timeout=10.0,
         )
         if resp.status_code in (200, 201):

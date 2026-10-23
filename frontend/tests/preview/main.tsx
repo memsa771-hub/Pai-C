@@ -10,9 +10,9 @@ import {KitGallery} from './kit-gallery';
 import SignIn from '@/app/sign-in/page';
 import SignUp from '@/app/sign-up/page';
 import ForgotPassword from '@/app/forgot-password/page';
-import ResetPassword from '@/app/auth/reset-password/page';
-import AuthCallback from '@/app/auth/callback/page';
-const authPages:Record<string,()=>React.JSX.Element>={'/sign-in':SignIn,'/sign-up':SignUp,'/forgot-password':ForgotPassword,'/auth/reset-password':ResetPassword,'/auth/callback':AuthCallback};
+import AuthAction from '@/app/auth/action/page';
+import VerifyEmail from '@/app/auth/verify-email/page';
+const authPages:Record<string,()=>React.JSX.Element|null>={'/sign-in':SignIn,'/sign-up':SignUp,'/forgot-password':ForgotPassword,'/auth/action':AuthAction,'/auth/verify-email':VerifyEmail};
 import '@/styles/globals.css';
 // Fixture-only entry point: deliberately cannot contact the application or a provider.
 window.fetch=async()=>{throw new Error('Network disabled in offline UI review');};

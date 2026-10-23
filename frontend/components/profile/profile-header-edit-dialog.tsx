@@ -128,7 +128,7 @@ export function ProfileHeaderEditDialog({
       const accountChanged =
         name.trim() !== (header.displayName || '') || avatarDraft !== null;
       if (accountChanged && idToken && name.trim()) {
-        await updateAccountProfile(idToken, {
+        await updateAccountProfile({
           ...(name.trim() !== (header.displayName || '') ? { displayName: name.trim() } : {}),
           ...(avatarDraft !== null ? { avatarUrl: avatarDraft } : {}),
         });

@@ -56,12 +56,15 @@ def _sign(secret: str, payload: bytes) -> str:
 def mint(
     workspace,
     user_id: str,
-    session_id: str | None = None,
+    subject: str | None = None,
     ttl_seconds: int = TICKET_TTL_SECONDS,
     scopes: Iterable[str] = (EVENTS_SCOPE, FILES_SCOPE),
 ) -> Optional[str]:
-    """Mint a bounded, signed ticket for one user, workspace, and route set."""
-    if (not workspace.password_hash or not user_id or not session_id
+    """Mint a bounded, signed ticket for one user, workspace, and route set.
+
+    `subject` is the account's Firebase uid: the ticket stops working if the
+    account is ever linked to a different sign-in identity."""
+    if (not workspace.password_hash or not user_id or not subject
             or str(workspace.owner_user_id) != user_id):
         return None
     requested_scopes = sorted(set(scopes) & _ALLOWED_SCOPES)
@@ -69,7 +72,7 @@ def mint(
         return None
     ttl_seconds = min(max(int(ttl_seconds), 1), TICKET_TTL_SECONDS)
     expires = int(time.time()) + ttl_seconds
-    payload = f"{workspace.id}:{user_id}:{session_id}:{expires}:{','.join(requested_scopes)}".encode()
+    payload = f"{workspace.id}:{user_id}:{subject}:{expires}:{','.join(requested_scopes)}".encode()
     return f"{_b64(payload)}.{_sign(workspace.password_hash, payload)}"
 
 
@@ -87,7 +90,7 @@ def verify(workspace, ticket: Optional[str], required_scope: str, db=None) -> bo
         return False
     try:
         payload = _unb64(encoded)
-        workspace_id, user_id, session_id, expires, scopes_text = payload.decode().split(":", 4)
+        workspace_id, user_id, subject, expires, scopes_text = payload.decode().split(":", 4)
         expires_at = int(expires)
         scopes = set(scopes_text.split(","))
     except Exception:
@@ -102,9 +105,6 @@ def verify(workspace, ticket: Optional[str], required_scope: str, db=None) -> bo
         return False
     if time.time() >= expires_at:
         return False
-    from app.models import PaiSession
-    from datetime import datetime, timezone
-    session = db.get(PaiSession, session_id)
-    return bool(session and str(session.user_id) == user_id
-                and session.revoked_at is None
-                and session.expires_at > datetime.now(timezone.utc))
+    from app.models import User
+    user = db.get(User, user_id)
+    return bool(user and user.firebase_uid and hmac.compare_digest(user.firebase_uid, subject))

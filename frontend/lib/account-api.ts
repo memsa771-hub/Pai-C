@@ -26,14 +26,14 @@ export interface AccountWorkspace {
   streamTicketTtl: number;
 }
 
-async function bearerFetch<T>(path: string, idToken: string, options: RequestInit = {}): Promise<T> {
+async function bearerFetch<T>(path: string, options: RequestInit = {}): Promise<T> {
   const res = await authenticatedFetch(path, {
     ...options,
     headers: {
       'Content-Type': 'application/json',
       ...options.headers,
     },
-  }, idToken);
+  });
   if (!res.ok) {
     const body = await res.json().catch(() => null);
     throw new Error(body?.message || body?.detail || `API error (${res.status})`);
@@ -44,16 +44,14 @@ async function bearerFetch<T>(path: string, idToken: string, options: RequestIni
 
 /** The signed-in student's one canonical personal workspace — created on
  * first call, the same one returned on every call after that. */
-export function getAccountWorkspace(idToken: string): Promise<AccountWorkspace> {
-  return bearerFetch<AccountWorkspace>('/v1/account/workspace', idToken);
+export function getAccountWorkspace(): Promise<AccountWorkspace> {
+  return bearerFetch<AccountWorkspace>('/v1/account/workspace');
 }
 
 /** A fresh read-only ticket. Called on a timer, and after a 401 on a
  * ticketed URL, since tickets expire in minutes by design. */
-export function refreshStreamTicket(
-  idToken: string,
-): Promise<{ streamTicket: string | null; streamTicketTtl: number }> {
-  return bearerFetch('/v1/account/stream-ticket', idToken, { method: 'POST' });
+export function refreshStreamTicket(): Promise<{ streamTicket: string | null; streamTicketTtl: number }> {
+  return bearerFetch('/v1/account/stream-ticket', { method: 'POST' });
 }
 
 /** The signed-in user's cross-workspace profile (name + avatar). */
@@ -66,16 +64,15 @@ export interface AccountProfile {
   welcomeSeen?: boolean;
 }
 
-export function getAccountProfile(idToken: string): Promise<AccountProfile> {
-  return bearerFetch<AccountProfile>('/v1/account/profile', idToken);
+export function getAccountProfile(): Promise<AccountProfile> {
+  return bearerFetch<AccountProfile>('/v1/account/profile');
 }
 
 /** Omitted fields are left untouched; an empty-string avatarUrl clears it. */
 export function updateAccountProfile(
-  idToken: string,
   updates: { displayName?: string; avatarUrl?: string; welcomeSeen?: boolean },
 ): Promise<AccountProfile> {
-  return bearerFetch<AccountProfile>('/v1/account/profile', idToken, {
+  return bearerFetch<AccountProfile>('/v1/account/profile', {
     method: 'PATCH',
     body: JSON.stringify({
       ...(updates.displayName !== undefined ? { display_name: updates.displayName } : {}),

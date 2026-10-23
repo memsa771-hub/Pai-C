@@ -2,7 +2,6 @@
 
 import time
 import unittest
-from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
 from unittest.mock import patch
 
@@ -14,14 +13,11 @@ class StreamTicketSecurityTests(unittest.TestCase):
         self.workspace = SimpleNamespace(
             id="workspace-a", owner_user_id="user-a", password_hash="test-only-secret"
         )
-        self.session = SimpleNamespace(
-            user_id="user-a", revoked_at=None,
-            expires_at=datetime.now(timezone.utc) + timedelta(hours=1),
-        )
-        self.db = SimpleNamespace(get=lambda model, session_id: self.session if session_id == "session-a" else None)
+        self.user = SimpleNamespace(id="user-a", firebase_uid="uid-a")
+        self.db = SimpleNamespace(get=lambda model, user_id: self.user if user_id == "user-a" else None)
 
     def mint(self, *args, **kwargs):
-        return stream_ticket.mint(*args, session_id="session-a", **kwargs)
+        return stream_ticket.mint(*args, subject="uid-a", **kwargs)
 
     def verify(self, workspace, ticket, scope):
         return stream_ticket.verify(workspace, ticket, scope, db=self.db)
@@ -46,11 +42,14 @@ class StreamTicketSecurityTests(unittest.TestCase):
             self.assertFalse(self.verify(self.workspace, ticket, stream_ticket.EVENTS_SCOPE))
         self.assertFalse(self.verify(self.workspace, ticket + "x", stream_ticket.EVENTS_SCOPE))
 
-    def test_revoked_session_invalidates_ticket(self):
+    def test_relinked_identity_invalidates_ticket(self):
         ticket = self.mint(self.workspace, "user-a")
         self.assertTrue(self.verify(self.workspace, ticket, stream_ticket.EVENTS_SCOPE))
-        self.session.revoked_at = datetime.now(timezone.utc)
+        self.user.firebase_uid = "uid-b"
         self.assertFalse(self.verify(self.workspace, ticket, stream_ticket.EVENTS_SCOPE))
+
+    def test_no_ticket_without_a_firebase_identity(self):
+        self.assertIsNone(stream_ticket.mint(self.workspace, "user-a", subject=None))
 
     def test_ticket_lifetime_is_clamped(self):
         now = int(time.time())

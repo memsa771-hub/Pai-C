@@ -31,7 +31,7 @@ import type {
 import { eventToMessage } from './types';
 
 import { API_URL } from './config';
-import { AUTH_INVALID_EVENT, COOKIE_SESSION } from './auth/service';
+import { AUTH_INVALID_EVENT, AUTH_UNVERIFIED_EVENT, currentIdToken } from './auth/service';
 
 /** Map a snake_case custom-skill entry from the backend to camelCase. */
 /** Map snake_case file response from backend to camelCase WorkspaceFile. */
@@ -78,7 +78,8 @@ class WorkspaceApi {
    * into ?token= and there is no bearer to use instead.
    */
   private token: string = '';
-  private bearerToken: string = '';
+  /** Signed in with Firebase: every request then carries a fresh ID token. */
+  private signedIn = false;
   /** Short-lived, read-only. The only credential that goes into a URL. */
   private streamTicket: string = '';
   private workspaceId: string = '';
@@ -86,19 +87,27 @@ class WorkspaceApi {
   configure(workspaceId: string, token: string, bearerToken?: string, streamTicket?: string) {
     this.workspaceId = workspaceId;
     this.token = token;
-    if (bearerToken !== undefined) this.bearerToken = bearerToken === COOKIE_SESSION ? '' : bearerToken;
+    if (bearerToken !== undefined) this.signedIn = !!bearerToken;
     if (streamTicket !== undefined) this.streamTicket = streamTicket;
   }
 
   reset() {
     this.workspaceId = '';
     this.token = '';
-    this.bearerToken = '';
+    this.signedIn = false;
     this.streamTicket = '';
   }
 
   setBearerToken(bearerToken: string) {
-    this.bearerToken = bearerToken === COOKIE_SESSION ? '' : bearerToken;
+    this.signedIn = !!bearerToken;
+  }
+
+  private async authHeaders(): Promise<Record<string, string>> {
+    const headers: Record<string, string> = {};
+    if (this.token) headers['X-Workspace-Token'] = this.token;
+    const idToken = this.signedIn ? await currentIdToken() : null;
+    if (idToken) headers['Authorization'] = `Bearer ${idToken}`;
+    return headers;
   }
 
   setStreamTicket(streamTicket: string) {
@@ -158,18 +167,10 @@ class WorkspaceApi {
   }
 
   private async request<T>(path: string, options: RequestInit = {}): Promise<T> {
-    const authHeaders: Record<string, string> = {};
-    if (this.token) {
-      authHeaders['X-Workspace-Token'] = this.token;
-    }
-    if (this.bearerToken) {
-      authHeaders['Authorization'] = `Bearer ${this.bearerToken}`;
-    }
-
+    const authHeaders = await this.authHeaders();
     const url = `${API_URL}${path}`;
     const res = await fetch(url, {
       ...options,
-      credentials: 'include',
       cache: 'no-store',
       headers: {
         'Content-Type': 'application/json',
@@ -179,10 +180,13 @@ class WorkspaceApi {
     });
 
     if (!res.ok) {
+      const body = await res.text();
       if (res.status === 401 && typeof window !== 'undefined') {
         window.dispatchEvent(new Event(AUTH_INVALID_EVENT));
       }
-      const body = await res.text();
+      if (res.status === 403 && body.includes('AUTH_EMAIL_NOT_VERIFIED') && typeof window !== 'undefined') {
+        window.dispatchEvent(new Event(AUTH_UNVERIFIED_EVENT));
+      }
       throw new Error(`API ${res.status}: ${body}`);
     }
 
@@ -913,12 +917,10 @@ class WorkspaceApi {
     formData.append('network', this.workspaceId);
     if (channelName) formData.append('channel_name', channelName);
 
-    return new Promise<WorkspaceFile>((resolve, reject) => {
+    return this.authHeaders().then((headers) => new Promise<WorkspaceFile>((resolve, reject) => {
       const xhr = new XMLHttpRequest();
       xhr.open('POST', `${API_URL}/v1/files`);
-      xhr.withCredentials = true;
-      if (this.token) xhr.setRequestHeader('X-Workspace-Token', this.token);
-      if (this.bearerToken) xhr.setRequestHeader('Authorization', `Bearer ${this.bearerToken}`);
+      for (const [name, value] of Object.entries(headers)) xhr.setRequestHeader(name, value);
 
       if (options?.onProgress) {
         xhr.upload.onprogress = (e) => {
@@ -949,7 +951,7 @@ class WorkspaceApi {
       }
 
       xhr.send(formData);
-    });
+    }));
   }
 
   /**

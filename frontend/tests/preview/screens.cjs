@@ -29,9 +29,11 @@ module.exports = [
     await fill(page, 'Email address', 'sam@example.test'); await submit(page, 'Send reset link');
     await page.getByRole('heading', { name: 'Reset link sent' }).waitFor();
   } },
-  { id: 'auth-reset', path: '/auth/reset-password?code=offline' },
-  { id: 'auth-reset-expired', path: '/auth/reset-password', ready: 'h1' },
-  { id: 'auth-callback-failed', path: '/auth/callback?error=access_denied', ready: 'h1' },
+  { id: 'auth-reset', path: '/auth/action?mode=resetPassword&oobCode=offline', ready: 'h1' },
+  { id: 'auth-reset-expired', path: '/auth/action?mode=resetPassword&oobCode=expired', ready: 'h1' },
+  { id: 'auth-verify-expired', path: '/auth/action?mode=verifyEmail&oobCode=expired', ready: 'h1' },
+  { id: 'auth-verified', path: '/auth/action?mode=verifyEmail&oobCode=offline', ready: 'h1' },
+  { id: 'auth-verify-email', path: '/auth/verify-email', ready: 'h1' },
 
   { id: 'onboarding-name', path: '/student?onboarding=1' },
   { id: 'onboarding-name-error', path: '/student?onboarding=1', crawl: false, setup: async (page) => {

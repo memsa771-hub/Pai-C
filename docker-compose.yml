@@ -30,10 +30,19 @@ x-backend: &backend
     FILE_STORAGE_PATH: /data/files
     CORS_ORIGINS: http://localhost:3000,http://127.0.0.1:3000
     FRONTEND_BASE_URL: http://localhost:3000
+    APP_URL: ${APP_URL:-http://localhost:3000}
     PUBLIC_API_BASE: http://localhost:8000
     WORKSPACE_ENDPOINT: http://localhost:8000
+    # Firebase Auth: the service-account JSON is mounted read-only below and
+    # never committed (secrets/ is git-ignored).
+    FIREBASE_PROJECT_ID: ${FIREBASE_PROJECT_ID:-}
+    FIREBASE_SERVICE_ACCOUNT: /run/secrets/firebase-service-account.json
   volumes:
     - files:/data/files
+    - type: bind
+      source: ${FIREBASE_SERVICE_ACCOUNT_FILE:-./secrets/firebase-service-account.json}
+      target: /run/secrets/firebase-service-account.json
+      read_only: true
   logging: *logging
 
 services:
@@ -120,8 +129,10 @@ services:
       # NEXT_PUBLIC_* values are compiled into the bundle at build time.
       args:
         NEXT_PUBLIC_API_URL: http://localhost:8000
-        NEXT_PUBLIC_SUPABASE_URL: ${SUPABASE_URL:-}
-        NEXT_PUBLIC_SUPABASE_ANON_KEY: ${SUPABASE_ANON_KEY:-}
+        NEXT_PUBLIC_FIREBASE_API_KEY: ${NEXT_PUBLIC_FIREBASE_API_KEY:-}
+        NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: ${NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN:-}
+        NEXT_PUBLIC_FIREBASE_PROJECT_ID: ${FIREBASE_PROJECT_ID:-}
+        NEXT_PUBLIC_FIREBASE_APP_ID: ${NEXT_PUBLIC_FIREBASE_APP_ID:-}
         NEXT_PUBLIC_ENABLE_DMS: ${NEXT_PUBLIC_ENABLE_DMS:-false}
     depends_on:
       backend: {condition: service_healthy}

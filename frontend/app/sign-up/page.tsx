@@ -2,13 +2,13 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Loader2, MailCheck } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
-import { AuthAlert, AuthField, AuthShell, AuthStatus, FooterLink, GoogleButton, OrDivider, InkLink, PasswordInput, SubmitButton, authInputClass, isEmail } from '@/components/auth/auth-shell';
+import { AuthAlert, AuthField, AuthShell, FooterLink, GoogleButton, OrDivider, PasswordInput, SubmitButton, authInputClass, isEmail } from '@/components/auth/auth-shell';
+import { CheckEmailStatus } from '@/components/auth/check-email';
 import { usePaiAuth } from '@/lib/pai-auth-context';
-import { signUpWithPassword, signInWithOAuth } from '@/lib/auth/service';
+import { SignInCancelled, signInWithGoogle, signUpWithPassword } from '@/lib/auth/service';
 import { registrationPasswordError } from '@/lib/password-policy';
-import { desktopHost } from '@/lib/desktop-host';
 import { useT } from '@/lib/i18n';
 
 type FieldError = 'email' | 'password' | 'confirm' | null;
@@ -40,14 +40,9 @@ export default function SignUpPage() {
 
     setBusy(true);
     try {
-      const { session, needsEmailConfirmation } = await signUpWithPassword(email.trim(), password);
-      // No session yet means Supabase requires confirming the email first.
-      if (needsEmailConfirmation || !session) {
-        setCheckEmail(true);
-        return;
-      }
-      await applySession(session);
-      router.replace('/');
+      // Email accounts verify their address first; our backend sends the link.
+      await signUpWithPassword(email.trim(), password);
+      setCheckEmail(true);
     } catch (err) {
       fail(err instanceof Error && err.message ? err.message : t('auth.errorSignUp'));
     } finally {
@@ -57,28 +52,24 @@ export default function SignUpPage() {
 
   const google = async () => {
     setError(null);
-    // Inside the desktop app's embedded view, OAuth can't complete on this
-    // origin — delegate to the launcher's own native sign-in/sign-up instead.
-    const host = desktopHost();
-    if (host) { host.signIn(); return; }
+    setBusy(true);
     try {
-      await signInWithOAuth('google');
+      await signInWithGoogle();
+      await applySession();
+      router.replace('/');
     } catch (err) {
-      fail(err instanceof Error && err.message ? err.message : t('auth.errorOAuth'));
+      if (!(err instanceof SignInCancelled)) {
+        fail(err instanceof Error && err.message ? err.message : t('auth.errorOAuth'));
+      }
+    } finally {
+      setBusy(false);
     }
   };
 
   if (checkEmail) {
     return (
       <AuthShell>
-        <AuthStatus icon={MailCheck} tone="success" title={t('auth.checkEmailTitle')} body={t('auth.checkEmailBody', { email: email.trim() })}>
-          <p className="text-xs text-auth-muted">{t('auth.checkEmailHint')}</p>
-          <InkLink href="/sign-in">{t('auth.backToSignIn')}</InkLink>
-          <button type="button" onClick={() => setCheckEmail(false)}
-            className="min-h-11 text-sm font-medium text-auth-ink underline-offset-4 hover:underline">
-            {t('auth.useDifferentEmail')}
-          </button>
-        </AuthStatus>
+        <CheckEmailStatus email={email.trim()} onDifferentEmail={() => setCheckEmail(false)} />
       </AuthShell>
     );
   }

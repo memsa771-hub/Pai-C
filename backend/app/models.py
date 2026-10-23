@@ -367,7 +367,7 @@ class Invitation(Base):
 
 
 class User(Base):
-    """A human end-user identity resolved from a verified Supabase token.
+    """A human end-user identity resolved from a verified Firebase ID token.
 
     Distinct from `WorkspaceMember`, which represents AGENTS and is keyed by
     agent_name. A user reaches exactly one workspace: the one whose
@@ -378,7 +378,8 @@ class User(Base):
 
     id = Column(UUID(as_uuid=False), primary_key=True, default=_uuid, server_default=text("gen_random_uuid()"))
     email = Column(Text, nullable=False)                 # normalized lowercase
-    supabase_uid = Column(Text, nullable=True)           # Supabase auth.users `id`
+    supabase_uid = Column(Text, nullable=True)           # legacy: the earlier Supabase identity
+    firebase_uid = Column(Text, nullable=True)           # Firebase Auth uid, the sign-in identity
     # Legacy login handle: usernames are no longer created or used. The column and its
     # unique index stay so existing rows and migrations are untouched.
     username = Column(Text, nullable=True)
@@ -401,6 +402,31 @@ class User(Base):
         UniqueConstraint("email", name="uq_users_email"),
         Index("uq_users_username_lower", func.lower(username), unique=True,
               postgresql_where=username.isnot(None)),
+        Index("uq_users_firebase_uid", firebase_uid, unique=True,
+              postgresql_where=firebase_uid.isnot(None)),
+    )
+
+
+class AuthDevice(Base):
+    """A browser or app a student has signed in from, for new-sign-in alerts.
+
+    Only a hash of the client's random device id is kept, never the id itself.
+    """
+    __tablename__ = "auth_devices"
+
+    id = Column(UUID(as_uuid=False), primary_key=True, default=_uuid,
+                server_default=text("gen_random_uuid()"))
+    user_id = Column(UUID(as_uuid=False), ForeignKey("users.id", ondelete="CASCADE"),
+                     nullable=False)
+    device_hash = Column(Text, nullable=False)
+    user_agent = Column(Text, nullable=True)
+    first_seen_at = Column(DateTime(timezone=True), default=_now,
+                           server_default=text("NOW()"), nullable=False)
+    last_seen_at = Column(DateTime(timezone=True), default=_now,
+                          server_default=text("NOW()"), nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint("user_id", "device_hash", name="uq_auth_device_user_hash"),
     )
 
 

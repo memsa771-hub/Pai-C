@@ -20,7 +20,7 @@ from fastapi.middleware.gzip import GZipMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from app.config import config
-from app.security.errors import IdentityUnavailable
+from app.security.errors import EmailNotVerified, IdentityUnavailable
 from app.api.response import ResponseCode, json_response
 from app.routers import counselor_possibilities, account, app_version, auth, browser, counselor_summary, counselor_voice, decision_records, escalations, events, feedback, fetch, files, integrations, knowledge, network, notifications, operator, roadmaps, routines, search, shares, student_profile, student_requests, tasks, timers, todos, workflows, workspaces
 
@@ -389,14 +389,14 @@ async def lifespan(app: FastAPI):
     from app.pai_c.playbooks.registry import BOOKS
     logger.info("counselor_playbooks_loaded count=%d", len(BOOKS))
 
-    # Human sign-in (Supabase) is core, not optional — warn loudly at boot
-    # rather than let every login attempt fail with an obscure connection
-    # error against an empty URL.
-    if not config.SUPABASE_URL or not config.SUPABASE_ANON_KEY:
+    # Human sign-in (Firebase) is core, not optional: say so at boot rather
+    # than let every sign-in fail with an obscure error.
+    import os as _os
+    if not config.FIREBASE_PROJECT_ID or not (config.FIREBASE_SERVICE_ACCOUNT
+                                              or _os.environ.get("FIREBASE_AUTH_EMULATOR_HOST")):
         logger.error(
-            "LIFESPAN: SUPABASE_URL/SUPABASE_ANON_KEY are not set — human "
-            "sign-in will not work. Set them in workspace/.env (see "
-            "workspace/.env.example)."
+            "LIFESPAN: FIREBASE_PROJECT_ID/FIREBASE_SERVICE_ACCOUNT are not set — human "
+            "sign-in will not work. Set them in workspace/.env (see workspace/.env.example)."
         )
 
     from app.services.pai import validate_config as validate_pai_config
@@ -518,52 +518,22 @@ class NoTransformCompressionHeadersMiddleware(BaseHTTPMiddleware):
 app.add_middleware(NoTransformCompressionHeadersMiddleware)
 
 
-class PaiSessionBoundaryMiddleware(BaseHTTPMiddleware):
-    """Cookie authority for web requests; reject provider JWTs on business APIs."""
+class PrivateApiMiddleware(BaseHTTPMiddleware):
+    """API answers are per-student: never let a cache keep them.
+
+    Authentication itself is the Firebase ID token each request carries as its
+    Bearer, checked by the route (app.security.human_auth). There is no cookie,
+    so there is no cross-site request to forge.
+    """
 
     async def dispatch(self, request: Request, call_next):
-        from app.security.app_session import COOKIE_NAME, TOKEN_PREFIX
-        from urllib.parse import urlparse
-
-        path = request.url.path
-        if not path.startswith("/v1/"):
-            return await call_next(request)
-        cookie = request.cookies.get(COOKIE_NAME)
-        is_exchange = path == "/v1/auth/session" and request.method == "POST"
-        if path == "/v1/auth/session" and request.method == "POST":
-            origin = request.headers.get("origin", "")
-            desktop = (request.headers.get("x-pai-desktop") == "1"
-                       and origin in {"", desktop_origin})
-            if origin not in origins and not desktop:
-                return json_response(ResponseCode.FORBIDDEN, "AUTH_CSRF_REJECTED")
-        if cookie and request.method not in {"GET", "HEAD", "OPTIONS"}:
-            origin = request.headers.get("origin")
-            if not origin:
-                referer = request.headers.get("referer", "")
-                parsed = urlparse(referer)
-                origin = f"{parsed.scheme}://{parsed.netloc}" if parsed.scheme and parsed.netloc else ""
-            if origin not in allowed_origins:
-                return json_response(ResponseCode.FORBIDDEN, "AUTH_CSRF_REJECTED")
-
-        if not is_exchange:
-            auth = request.headers.get("authorization", "")
-            bearer = auth[7:].strip() if auth.lower().startswith("bearer ") else ""
-            # A browser cookie wins over any caller-supplied header. Without a
-            # PAI session, an old Supabase JWT alone cannot authorize an API.
-            allowed = cookie or (bearer if bearer.startswith(TOKEN_PREFIX) else "")
-            request.scope["headers"] = [
-                (name, value) for name, value in request.scope["headers"]
-                if name.lower() != b"authorization"
-            ]
-            if allowed:
-                request.scope["headers"].append(
-                    (b"authorization", ("Bearer " + allowed).encode("ascii")))
         response = await call_next(request)
-        response.headers["Cache-Control"] = "private, no-store"
+        if request.url.path.startswith("/v1/"):
+            response.headers["Cache-Control"] = "private, no-store"
         return response
 
 
-app.add_middleware(PaiSessionBoundaryMiddleware)
+app.add_middleware(PrivateApiMiddleware)
 
 
 _REQUEST_ID_RE = re.compile(r"^[A-Za-z0-9._-]{1,128}$")
@@ -634,13 +604,19 @@ def _redacted_validation_errors(exc: RequestValidationError) -> list[dict]:
     return redacted
 
 
+@app.exception_handler(EmailNotVerified)
+async def _email_not_verified(request: Request, exc: EmailNotVerified):
+    """Signed in with email and password, but the address is not verified yet."""
+    return json_response(ResponseCode.FORBIDDEN, "AUTH_EMAIL_NOT_VERIFIED")
+
+
 @app.exception_handler(IdentityUnavailable)
 async def _identity_unavailable(request: Request, exc: IdentityUnavailable):
     """We could not verify the caller, as distinct from refusing them.
 
     This must NOT be a 401. A client that receives 401 is right to conclude its
     session is over and sign the user out — that is exactly what both of our
-    clients do. Answering 401 because Supabase was briefly unreachable would
+    clients do. Answering 401 because Firebase was briefly unreachable would
     therefore sign a student out for our outage, mid-session, with nothing on
     screen to explain it. 503 says "ask again", which is the truth, and both
     clients treat it as retryable.

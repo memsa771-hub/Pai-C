@@ -1,7 +1,6 @@
 """Provider-neutral authenticated identity contract."""
 
 from dataclasses import dataclass
-from typing import Protocol
 
 
 @dataclass(frozen=True)
@@ -11,21 +10,10 @@ class AuthenticatedIdentity:
     email: str
     email_verified: bool
     display_name: str | None = None
+    # How the person signed in ("password", "google.com", ...).
+    sign_in_provider: str = ""
 
-
-class IdentityVerifier(Protocol):
-    def verify(self, token: str) -> AuthenticatedIdentity | None: ...
-
-
-class SupabaseIdentityVerifier:
-    def verify(self, token: str) -> AuthenticatedIdentity | None:
-        from .human_auth import verify_supabase_claims
-        claims = verify_supabase_claims(token)
-        if not claims or not claims.get("supabase_uid"):
-            return None
-        return AuthenticatedIdentity(
-            provider="supabase", subject=str(claims["supabase_uid"]),
-            email=claims["email"],
-            email_verified=bool(claims.get("email_verified", True)),
-            display_name=claims.get("display_name"),
-        )
+    @property
+    def needs_email_verification(self) -> bool:
+        """Email/password accounts must prove the address before using the app."""
+        return self.sign_in_provider == "password" and not self.email_verified

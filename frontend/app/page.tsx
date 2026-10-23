@@ -285,7 +285,7 @@ function ResolvingWorkspace({
     for (const delay of backoffs) {
       if (delay) await new Promise((r) => setTimeout(r, delay));
       try {
-        const ws = await getAccountWorkspace(idToken);
+        const ws = await getAccountWorkspace();
         if (enteredRef.current) return;
         enteredRef.current = true;
         group('workspace', ws.slug);

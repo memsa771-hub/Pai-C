@@ -12,7 +12,6 @@ import { Bug, Lightbulb, Loader2, Send } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { useWorkspace } from '@/lib/workspace-context';
-import { usePaiAuth } from '@/lib/pai-auth-context';
 import { useT } from '@/lib/i18n';
 import { cn } from '@/lib/utils';
 
@@ -22,7 +21,6 @@ import { authenticatedFetch } from '@/lib/auth/service';
 export function FeedbackDialog({ onClose }: { onClose: () => void }) {
   const t = useT();
   const { workspace } = useWorkspace();
-  const { idToken } = usePaiAuth();
   const [kind, setKind] = useState<'bug' | 'feature'>('feature');
   const [message, setMessage] = useState('');
   const [sending, setSending] = useState(false);
@@ -46,7 +44,7 @@ export function FeedbackDialog({ onClose }: { onClose: () => void }) {
             locale: navigator.language,
           },
         }),
-      }, idToken || undefined);
+      });
       const json = await res.json().catch(() => null);
       if (!res.ok || (json && json.code !== 0)) {
         throw new Error(json?.message || `HTTP ${res.status}`);

@@ -54,8 +54,9 @@ services:
       context: ../../../frontend
       args:
         NEXT_PUBLIC_API_URL: http://localhost:18000
-        NEXT_PUBLIC_SUPABASE_URL: http://localhost:18000
-        NEXT_PUBLIC_SUPABASE_ANON_KEY: offline-anon-key
+        NEXT_PUBLIC_FIREBASE_PROJECT_ID: demo-pai
+        NEXT_PUBLIC_FIREBASE_API_KEY: offline-demo-key
+        NEXT_PUBLIC_FIREBASE_AUTH_EMULATOR_HOST: localhost:9099
     networks: [offline, host_access]
     ports: ["127.0.0.1:13000:3000"]
 

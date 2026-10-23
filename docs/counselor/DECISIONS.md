@@ -328,3 +328,26 @@ The Counselor shell accidentally omitted the shared UserMenu when replacing the 
 - The old "Sign in to Placement AI" gate on `/` is gone; a signed-out student goes straight to `/sign-in`.
 - The auth tokens follow the design and are light only.
 - Undesigned states are open questions for the founder: the selected chip, errors, the date picker, the sign-up / forgot / reset / check-email screens, and dark mode.
+
+## 23 October: Firebase Auth replaces Supabase (founder)
+
+- **One identity provider: Firebase Auth.** Hosting stays on our own server.
+- **Every protected route checks the Firebase ID token** (Bearer), verified locally by the Admin SDK (`app/security/firebase_auth.py`, `human_auth.py`).
+  - The old `pai_session` cookie layer is removed, and with it the cookie CSRF checks; there are no cookies left.
+  - Stream tickets are now bound to the account's Firebase uid instead of a cookie session.
+  - Unverified email/password accounts get 403 `AUTH_EMAIL_NOT_VERIFIED`.
+- **Accounts.**
+  - `users.firebase_uid` (migration 113) links the Firebase identity.
+  - The first verified request creates the PAI user, or links the existing account with the same email and its Vault.
+  - Nothing is migrated or deleted: `supabase_uid` and the old session tables stay.
+- **Endpoints for web and the coming mobile app**, all rate-limited:
+  - `POST /v1/auth/session`: after each sign-in; records the device and emails a new-sign-in alert for an unknown device, but not for an account's first device.
+  - `POST /v1/auth/send-verification`.
+  - `POST /v1/auth/forgot-password`: gives the same answer whether or not the account exists.
+- **Emails.** Every account email is ours, sent through Resend (`app/services/auth_emails.py`, HTML plus plain text). Links open `APP_URL/auth/action`, and Firebase never sends one.
+- **Frontend.**
+  - The Firebase SDK; a fresh ID token on every call; `onAuthStateChanged` as the source of truth.
+  - Google sign-in uses a popup.
+  - New routes `/auth/action` and `/auth/verify-email`.
+  - The Supabase callback, reset and desktop-handoff routes are removed.
+- **Tests.** Account flows run against the Firebase Auth emulator (`tests/test_firebase_auth.py`, demo project); other tests use stand-in tokens (`tests/auth_fakes.py`).
