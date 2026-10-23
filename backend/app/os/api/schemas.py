@@ -44,6 +44,8 @@ class NoteOut(BaseModel):
 class InboxOut(BaseModel):
     items: list[TaskOut]
     notes: list[NoteOut] = []  # Slice 4: eligibility changes
+    proposals: list[dict] = []  # Slice 7: suggested plan changes waiting for the student's answer
+    changes_paused: bool = False  # Slice 7: a person is checking the plan (S7-D9)
 
 
 class CompleteIn(BaseModel):
