@@ -53,7 +53,10 @@ class PlanService:
                 P.c.tenant_id == self.kernel.tenant_id, P.c.source == contract.source,
                 P.c.external_ref == contract.external_ref))).scalar_one_or_none()
 
-    def compile(self, contract: RouteContract, playbook: Playbook) -> PlanDraft:
+    def compile(self, contract: RouteContract, playbook: Playbook, plan_id: int | None = None) -> PlanDraft:
+        """`plan_id`: a running plan, whose replan overrides (Slice 7) are applied, so every recompile keeps them."""
+        from app.os.replan.store import OverrideStore  # imported here: replan imports the service
+
         route_fields, programme_fields = needed_fields(playbook)
         year = contract.target_intake.year
         refs = [p.programme_ref for p in contract.programmes]
@@ -62,6 +65,7 @@ class PlanService:
             self.knowledge.route_facts(playbook.key, sorted(route_fields), year),
             self.knowledge.programme_facts(refs, sorted(programme_fields), year),
             self.today(), self.disabled_types(),
+            overrides=OverrideStore(self.engine, self.kernel.tenant_id).active(plan_id),
         )
 
     def start_plan(self, contract: RouteContract) -> PlanRef:
@@ -85,7 +89,7 @@ class PlanService:
         (StaleDraft otherwise: recompile from the new contract, a few times at most)."""
         for _ in range(3):
             contract, sha = self._contract(plan_id)
-            draft = self.compile(contract, self._pinned(plan_id))
+            draft = self.compile(contract, self._pinned(plan_id), plan_id)
             try:
                 return self.kernel.revise(plan_id, cause, draft, based_on=sha)
             except StaleDraft:
@@ -100,7 +104,7 @@ class PlanService:
             contract, sha = self._contract(plan_id)
             new = RouteContract.model_validate({**contract.model_dump(mode="json"),
                                                 "programmes": [p.model_dump() for p in edit(contract)]})
-            draft = self.compile(new, self._pinned(plan_id))
+            draft = self.compile(new, self._pinned(plan_id), plan_id)
             try:
                 return self.kernel.change_contract(plan_id, new, draft, cause, based_on=sha)
             except StaleDraft:
@@ -111,7 +115,7 @@ class PlanService:
         """Moves a running plan to the newest playbook for its route (parent §4.3)."""
         contract, sha = self._contract(plan_id)
         newest = select_playbook(self.playbooks, contract.origin_country, contract.destination_country, contract.level)
-        return self.kernel.upgrade_playbook(plan_id, self.compile(contract, newest), based_on=sha)
+        return self.kernel.upgrade_playbook(plan_id, self.compile(contract, newest, plan_id), based_on=sha)
 
     def anchor_fields(self) -> set[str]:
         return {t.anchor.fact for book in self.playbooks.values() for t in book.tasks if t.anchor}

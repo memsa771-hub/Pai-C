@@ -3,8 +3,8 @@
 Pure: no database, no clock, no randomness. The same input always gives the same draft.
 """
 
-from collections.abc import Mapping
-from dataclasses import dataclass, field
+from collections.abc import Mapping, Sequence
+from dataclasses import dataclass, field, replace
 from datetime import date, datetime, timedelta
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
@@ -141,6 +141,56 @@ def _topological(keys: list[str], deps: Mapping[str, list[tuple[str, bool]]]) ->
     return order
 
 
+def _waits_for(insts: dict[str, _Inst], key: str) -> set[str]:
+    """Every step `key` waits for, directly or through others."""
+    seen: set[str] = set()
+    todo = [key]
+    while todo:
+        for d, _ in insts[todo.pop()].deps:
+            if d in insts and d not in seen:
+                seen.add(d)
+                todo.append(d)
+    return seen
+
+
+def _apply_overrides(insts: dict[str, _Inst], confirms: dict[str, tuple[str, str]], overrides: Sequence) -> None:
+    def drop(keys: set[str]) -> None:
+        for k in keys:
+            insts.pop(k, None)
+        for inst in insts.values():
+            inst.deps = [d for d in inst.deps if d[0] not in keys]
+
+    for o in overrides:
+        if o.op in ("skip", "cancel"):
+            drop({o.target} & set(insts))
+        elif o.op == "cancel_programme":
+            drop({k for k, i in insts.items() if i.ref == o.target})
+            for k in [k for k, (ref, _) in confirms.items() if ref == o.target]:
+                del confirms[k]
+        elif o.op == "add":
+            ref = o.payload.get("programme_ref")
+            base_key = o.target if ref is None else f"{o.target}@{ref}"
+            base = insts.get(base_key)
+            if base is None:
+                continue
+            n = 2
+            while f"{base_key}#{n}" in insts:
+                n += 1
+            key = f"{base_key}#{n}"
+            insts[key] = replace(base, key=key, deps=list(base.deps), citations=list(base.citations),
+                                 fact_refs=list(base.fact_refs))
+            for inst in insts.values():  # what waited for the base step now also waits for the new one
+                if inst.key != key and (base_key, True) in inst.deps:
+                    inst.deps.append((key, True))
+                    inst.deps.sort()
+        elif o.op == "reprioritise":
+            before = insts.get(o.payload.get("before", ""))
+            if before is not None and o.target in insts and before.key not in _waits_for(insts, o.target) \
+                    and (o.target, False) not in before.deps and (o.target, True) not in before.deps:
+                before.deps.append((o.target, False))  # never a cycle: `target` does not already wait for `before`
+                before.deps.sort()
+
+
 def compile_plan(
     contract: RouteContract,
     playbook: Playbook,
@@ -148,7 +198,10 @@ def compile_plan(
     programme_facts: Mapping[tuple[str, str], Fact],
     today: date,
     disabled_types: frozenset[str] = frozenset(),
+    overrides: Sequence = (),
 ) -> PlanDraft:
+    """`overrides`: a replan's plan overrides (Slice 7 S7-D5), each with `op`, `target` and `payload`, applied after
+    the playbook is expanded, so every recompile keeps them. An override whose target is gone is ignored."""
     refs = [p.programme_ref for p in sorted(contract.programmes, key=lambda p: p.rank)]
     route_key = playbook.key
     insts: dict[str, _Inst] = {}
@@ -226,6 +279,8 @@ def compile_plan(
                 targets = [x for x in targets if x.ref == inst.ref]
             inst.deps.extend((x.key, dep.hard) for x in targets)
         inst.deps.sort()
+
+    _apply_overrides(insts, confirms, overrides)
 
     for key, (ref, name) in confirms.items():
         insts[key] = _Inst(key=key, tmpl=None, ref=None if ref == route_key else ref, task_type=CONFIRM_TYPE,
