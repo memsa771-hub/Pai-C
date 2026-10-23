@@ -8,6 +8,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import select
 
 from app.os import models
+from app.os.api import self_serve
 from app.os.api.deps import current_student_ref, current_student_ref_for_write
 from app.os.api.services import Services
 from app.os.outbox import Outbox
@@ -53,16 +54,27 @@ def add_replan_routes(router: APIRouter, services: Callable[[], Services], requi
         if owner != student:
             raise HTTPException(status_code=404, detail="plan not found")
 
-    @router.get("/plans/{plan_id}/changes")
-    def changes(plan_id: int, student: str = Depends(current_student_ref), svc: Services = Depends(services)) -> dict:
-        own_plan(svc, student, plan_id)
+    def plan_changes(svc: Services, plan_id: int) -> dict:
         found = ProposalStore(svc.engine, svc.settings.tenant_id).for_plan(plan_id)
         with svc.engine.connect() as conn:
             paused = conn.execute(select(P.c.changes_paused).where(P.c.id == plan_id)).scalar_one()
         return {"changes": [{**proposal_out(p), "proposal_id": p.id, "at": p.answered_at or p.created_at}
                             for p in found if p.status in ("applied", "accepted") and p.ops],
                 "pending": [proposal_out(p) for p in found if p.status == "pending"],
-                "changes_paused": paused}
+                "changes_paused": paused, "plan_id": plan_id}
+
+    @router.get("/plans/{plan_id}/changes")
+    def changes(plan_id: int, student: str = Depends(current_student_ref), svc: Services = Depends(services)) -> dict:
+        own_plan(svc, student, plan_id)
+        return plan_changes(svc, plan_id)
+
+    @router.get("/changes")
+    def my_changes(student: str = Depends(current_student_ref), svc: Services = Depends(services)) -> dict:
+        """The changes of the student's open plan (the screens do not know its id)."""
+        plan = self_serve.student_plan(svc.plans, student)
+        if plan is None:
+            raise HTTPException(status_code=404, detail="no plan yet")
+        return plan_changes(svc, plan.plan_id)
 
     def answer(svc: Services, student: str, proposal_id: int, accept: bool) -> dict:
         r = replanner_for(svc)

@@ -138,3 +138,11 @@ def test_admin_requires_admin_401(api):
     assert api.get("/v1/os/admin/support").status_code == 401
     assert api.post("/v1/os/admin/support/1/resolve", json={"note": "x"}).status_code == 401
     assert api.post("/v1/os/admin/support/999/resolve", headers=ADMIN, json={"note": "x"}).status_code == 404
+
+
+def test_my_changes_without_a_plan_id(api):
+    """The screens read the student's open plan's changes without knowing its id."""
+    pid = propose(api)
+    body = api.get("/v1/os/changes", headers=ME).json()
+    assert body["plan_id"] == api.plan_id and [p["id"] for p in body["pending"]] == [pid]
+    assert api.get("/v1/os/changes", headers=OTHER).status_code == 404  # no plan
