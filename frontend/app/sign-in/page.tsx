@@ -59,11 +59,11 @@ export default function SignInPage() {
   return (
     <AuthShell title={t('auth.signInTitle')} subtitle={t('auth.signInSubtitle')} links
       footer={<><span className="text-auth-muted">{t('auth.noAccount')}</span><FooterLink href="/sign-up">{t('auth.signUp')}</FooterLink></>}>
-      <div className="flex flex-col gap-7">
+      <div className="flex flex-col gap-[var(--auth-gap)]">
         <GoogleButton label={t('auth.googleSignIn')} onClick={() => void google()} disabled={busy} />
         <OrDivider />
-        <form onSubmit={submit} className="flex flex-col gap-7" noValidate>
-          <div className="flex flex-col gap-[18px]">
+        <form onSubmit={submit} className="flex flex-col gap-[var(--auth-gap)]" noValidate>
+          <div className="flex flex-col gap-[var(--auth-gap-fields)]">
             <AuthField label={t('auth.email')} error={field === 'email' ? error : null}>
               {(props) => <Input {...props} className={authInputClass} type="email" autoComplete="email" autoCapitalize="none"
                 spellCheck={false} placeholder={t('auth.emailPlaceholder')} required value={email}

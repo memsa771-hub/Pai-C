@@ -75,7 +75,7 @@ export function DobPicker({ id, field, value, onChange, invalid, describedBy }: 
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <button id={id} data-field={field} type="button" aria-invalid={invalid || undefined} aria-describedby={describedBy}
-          className={cn('flex h-[52px] w-full items-center gap-3 overflow-clip rounded-[12px] border bg-white px-4 text-left leading-[1.45] transition-colors focus-visible:border-auth-blue focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-auth-blue/20',
+          className={cn('flex h-[var(--auth-control)] w-full items-center gap-3 overflow-clip rounded-[12px] border bg-white px-4 text-left leading-[1.45] transition-colors focus-visible:border-auth-blue focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-auth-blue/20',
             invalid ? 'border-danger' : 'border-auth-line')}>
           <img alt="" src="/auth/calendar.svg" className="size-5 shrink-0" />
           <span className={cn('flex-1 truncate', selected ? 'text-[16px] text-auth-label' : 'text-[14px] text-auth-placeholder')}>

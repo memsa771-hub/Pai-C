@@ -8,6 +8,47 @@
 /* Wide and tall enough for a one-screen page; shorter windows scroll the page instead. */
 @custom-variant fit (@media (min-width: 64rem) and (min-height: 44rem));
 
+/* Sign-in and onboarding spacing, from the Figma frames (900px tall). On
+   shorter laptop windows the same screen tightens its spacing instead of
+   scrolling; the look (colours, type, components) never changes. */
+.auth-frame {
+  /* Figma's 1440 x 900 frame at this window height, and its panel column. */
+  --auth-frame-w: min(100vw, calc((100svh - 48px) * 1.64319 + 40px));
+  --auth-aside-w: min(calc(var(--auth-frame-w) * 0.525), calc((100svh - 48px) * 0.840376 + 40px));
+  --auth-pad: 32px;
+  --auth-gap: 28px;
+  --auth-gap-onb: 22px;
+  --auth-gap-fields: 18px;
+  --auth-control: 52px;
+  --auth-title: 40px;
+  --auth-title-onb: 34px;
+  --auth-logo-scale: 1;
+}
+@media (min-width: 64rem) and (max-height: 51.25rem) {
+  .auth-frame {
+    --auth-pad: 16px;
+    --auth-gap: 18px;
+    --auth-gap-onb: 14px;
+    --auth-gap-fields: 12px;
+    --auth-control: 46px;
+    --auth-title: 36px;
+    --auth-title-onb: 30px;
+    --auth-logo-scale: 0.5;
+  }
+}
+@media (min-width: 64rem) and (max-height: 43.75rem) {
+  .auth-frame {
+    --auth-pad: 8px;
+    --auth-gap: 12px;
+    --auth-gap-onb: 10px;
+    --auth-gap-fields: 8px;
+    --auth-control: 42px;
+    --auth-title: 32px;
+    --auth-title-onb: 28px;
+    --auth-logo-scale: 0.25;
+  }
+}
+
 /** PAI design tokens: the single source for colour, radius, shadow and type.
     Light and dark are tuned separately (not inverted). Text/background pairs
     are checked for WCAG AA (4.5:1 body text, 3:1 large text and UI). **/

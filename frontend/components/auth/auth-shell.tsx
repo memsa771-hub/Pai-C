@@ -202,28 +202,34 @@ export function AuthShell({ title, subtitle, panel = 'sign-in', prompt, logoGap 
   const t = useT();
   const [ref, { scale, beside }] = usePanelScale();
   return (
-    <div className="min-h-svh w-full bg-auth-page font-display text-auth-ink lg:flex lg:h-svh lg:overflow-hidden">
-      <main className="relative flex min-w-0 flex-col lg:w-[47.5%] lg:overflow-y-auto">
-        <div aria-hidden className="pointer-events-none absolute inset-0 bg-[url(/auth/pattern.png)] bg-[length:684px_auto] bg-repeat opacity-10" />
-        <div className="relative mx-auto flex w-full max-w-[442px] flex-1 flex-col justify-center px-4 py-10 lg:py-8">
-          <div style={{ marginBottom: logoGap }}><PaiLogo /></div>
+    <div className="auth-frame relative min-h-svh w-full bg-auth-page font-display text-auth-ink lg:h-svh lg:overflow-hidden">
+      {/* Beside each other, the pattern runs from the screen's left edge up to the panel column. */}
+      <div aria-hidden className="pointer-events-none absolute inset-y-0 left-0 hidden w-[calc((100vw-var(--auth-frame-w))/2+var(--auth-frame-w)-var(--auth-aside-w))] bg-[url(/auth/pattern.png)] bg-[length:684px_auto] bg-repeat opacity-10 lg:block" />
+      {/* Beside each other the frame keeps Figma's proportions (1440 × 900): the
+          panel column is exactly as wide as the panel at this height, and the
+          whole frame is centred, so the form sits the same distance from PAI. */}
+      <div className="relative lg:mx-auto lg:flex lg:h-full lg:w-[var(--auth-frame-w)]">
+      <main className="relative flex min-w-0 flex-col lg:flex-1 lg:overflow-y-auto">
+        <div aria-hidden className="pointer-events-none absolute inset-0 bg-[url(/auth/pattern.png)] bg-[length:684px_auto] bg-repeat opacity-10 lg:hidden" />
+        <div className="relative mx-auto flex w-full max-w-[442px] flex-1 flex-col justify-center px-4 py-10 lg:py-[var(--auth-pad)]">
+          <div style={{ marginBottom: `calc(${logoGap}px * var(--auth-logo-scale))` }}><PaiLogo /></div>
           {(title || subtitle) && (
-            <div className="mb-7 flex flex-col items-center gap-2 text-center leading-[1.45]">
-              {title && <h1 className="w-full text-[40px] font-bold text-auth-ink">{title}</h1>}
+            <div className="mb-[var(--auth-gap)] flex flex-col items-center gap-2 text-center leading-[1.45]">
+              {title && <h1 className="w-full text-[length:var(--auth-title)] font-bold text-auth-ink">{title}</h1>}
               {subtitle && <p className="w-full text-[16px] text-auth-muted">{subtitle}</p>}
             </div>
           )}
           {children}
-          {footer && <div className="mt-7 flex flex-wrap items-start justify-center gap-[5px] text-[13px] leading-[1.45]">{footer}</div>}
+          {footer && <div className="mt-[var(--auth-gap)] flex flex-wrap items-start justify-center gap-[5px] text-[13px] leading-[1.45]">{footer}</div>}
         </div>
         {links && (
-          <div className="relative flex justify-center gap-6 pb-10 text-[12px] leading-[1.45] text-auth-muted">
+          <div className="relative flex justify-center gap-6 pb-10 text-[12px] leading-[1.45] text-auth-muted lg:pb-[calc(var(--auth-pad)+8px)]">
             <span>{t('auth.privacyPolicy')}</span>
             <span>{t('auth.termsOfUse')}</span>
           </div>
         )}
       </main>
-      <aside aria-label={t('auth.previewLabel')} className="px-4 pb-4 lg:w-[52.5%] lg:pb-[25px] lg:pl-0 lg:pr-[40px] lg:pt-[23px]">
+      <aside aria-label={t('auth.previewLabel')} className="px-4 pb-4 lg:w-[var(--auth-aside-w)] lg:shrink-0 lg:pb-[25px] lg:pl-0 lg:pr-[40px] lg:pt-[23px]">
         <div ref={ref} className="relative w-full lg:h-full" style={beside ? undefined : { height: PANEL_H * scale }}>
           <div aria-hidden className={cn('absolute left-1/2 top-1/2', !scale && 'invisible')}
             style={{ width: PANEL_W, height: PANEL_H, transform: `translate(-50%, -50%) scale(${scale || 1})` }}>
@@ -231,6 +237,7 @@ export function AuthShell({ title, subtitle, panel = 'sign-in', prompt, logoGap 
           </div>
         </div>
       </aside>
+      </div>
     </div>
   );
 }
@@ -259,7 +266,7 @@ export function AuthField({ label, hint, error, size = 'sm', children }: {
 export const isEmail = (value: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
 
 /** The frame's text input: 52px tall, 12px corners, a quiet blue-grey border. */
-export const authInputClass = 'h-[52px] w-full rounded-[12px] border border-auth-line bg-white px-4 text-[16px] font-normal text-auth-label shadow-none placeholder:text-[14px] placeholder:text-auth-placeholder focus-visible:border-auth-blue focus-visible:ring-2 focus-visible:ring-auth-blue/20 aria-invalid:border-danger';
+export const authInputClass = 'h-[var(--auth-control)] w-full rounded-[12px] border border-auth-line bg-white px-4 text-[16px] font-normal text-auth-label shadow-none placeholder:text-[14px] placeholder:text-auth-placeholder focus-visible:border-auth-blue focus-visible:ring-2 focus-visible:ring-auth-blue/20 aria-invalid:border-danger';
 
 export function PasswordInput({ className, ...props }: React.ComponentProps<typeof Input>) {
   const t = useT();
@@ -283,7 +290,7 @@ export function AuthAlert({ children }: { children: React.ReactNode }) {
   );
 }
 
-const primaryButton = 'flex h-[52px] w-full items-center justify-center gap-2 overflow-clip rounded-[12px] bg-auth-blue text-[20px] font-bold leading-[28px] text-white shadow-[0px_3px_10px_0px_rgba(18,51,128,0.13)] transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60';
+const primaryButton = 'flex h-[var(--auth-control)] w-full items-center justify-center gap-2 overflow-clip rounded-[12px] bg-auth-blue text-[20px] font-bold leading-[28px] text-white shadow-[0px_3px_10px_0px_rgba(18,51,128,0.13)] transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60';
 
 /** Always pressable; forms validate on submit and say exactly what is missing. */
 export function SubmitButton({ busy, busyLabel, children }: {
@@ -311,7 +318,7 @@ export function FooterLink({ href, children }: { href: string; children: React.R
 export function GoogleButton({ label, onClick, disabled }: { label: string; onClick: () => void; disabled?: boolean }) {
   return (
     <button type="button" onClick={onClick} disabled={disabled}
-      className="flex h-[52px] w-full items-center justify-center gap-2.5 overflow-clip rounded-[12px] border border-auth-google-line bg-auth-google text-[20px] font-bold leading-[28px] text-auth-ink shadow-[0px_1px_3px_0px_rgba(18,51,128,0.06)] transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60">
+      className="flex h-[var(--auth-control)] w-full items-center justify-center gap-2.5 overflow-clip rounded-[12px] border border-auth-google-line bg-auth-google text-[20px] font-bold leading-[28px] text-auth-ink shadow-[0px_1px_3px_0px_rgba(18,51,128,0.06)] transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60">
       <img alt="" src="/auth/google.svg" className="size-7" />{label}
     </button>
   );

@@ -99,8 +99,8 @@ export function OnboardingView({ state, onDone }: {
     <MotionConfig reducedMotion="user">
       <AuthShell panel={panel} prompt={translated(`onboarding.steps.${stepKey}.bubble`, t('onboarding.subtitle'))}
         logoGap={first ? 29 : 31}>
-        <form onSubmit={next} noValidate className={cn('flex flex-col', first ? 'gap-7' : 'gap-[22px]')}>
-          <h1 className={cn('text-center text-[34px] font-bold text-auth-ink', first ? 'leading-[1.45]' : 'leading-[42px]')}>
+        <form onSubmit={next} noValidate className={cn('flex flex-col', first ? 'gap-[var(--auth-gap)]' : 'gap-[var(--auth-gap-onb)]')}>
+          <h1 className={cn('text-center text-[length:var(--auth-title-onb)] font-bold text-auth-ink', first ? 'leading-[1.45]' : 'leading-[1.24]')}>
             {translated(`onboarding.steps.${stepKey}.title`, t('onboarding.title'))}
           </h1>
           <div className="flex flex-col gap-2.5">
@@ -120,7 +120,7 @@ export function OnboardingView({ state, onDone }: {
             <motion.div key={step} custom={direction}
               initial={{ opacity: 0, x: direction * 24 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: direction * -24 }}
               transition={{ duration: 0.2, ease: 'easeOut' }}
-              className={cn('grid', first ? 'grid-cols-2 gap-4' : 'gap-[22px]')}>
+              className={cn('grid', first ? 'grid-cols-2 gap-4' : 'gap-[var(--auth-gap-onb)]')}>
               {fields.map((field) => (
                 <Field key={field.name} field={field} value={answers[field.name] || ''} error={errors[field.name]} size={first ? 'sm' : 'md'}
                   label={translated(`onboarding.field.${field.name}`, field.name)}
@@ -133,7 +133,7 @@ export function OnboardingView({ state, onDone }: {
           <div className="flex items-start gap-3.5">
             {!first && (
               <button type="button" onClick={back} disabled={busy}
-                className="flex h-[52px] w-24 shrink-0 items-center justify-center gap-2 text-[17px] leading-[22px] text-auth-back">
+                className="flex h-[var(--auth-control)] w-24 shrink-0 items-center justify-center gap-2 text-[17px] leading-[22px] text-auth-back">
                 <img alt="" src="/auth/back.svg" className="size-[18px]" />{t('onboarding.back')}
               </button>
             )}
