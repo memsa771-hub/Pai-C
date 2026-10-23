@@ -1,0 +1,21 @@
+<svg preserveAspectRatio="none" overflow="visible" style="display: block;" width="270.534" height="431.936" viewBox="0 0 270.534 431.936" fill="none" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+<g id="Black portal / opening" filter="url(#filter0_d_0_40)">
+<use xlink:href="#stroke0_0_40" fill="#93B3FF"/>
+<mask id="stroke1_0_40" fill="white">
+<use xlink:href="#stroke0_0_40"/>
+</mask>
+<path d="M239.44 345C225.348 389.461 187.94 421.287 118.44 412.461C24.8393 400.575 25.44 370.574 25.44 349.581C25.44 328.587 -21.06 27.5 118.44 18C239.44 23.5 274.94 233 239.44 345Z" stroke-width="4" stroke="#7699EF" mask="url(#stroke1_0_40)"/>
+</g>
+<defs>
+<filter id="filter0_d_0_40" x="-2.28907e-07" y="0" width="270.534" height="431.936" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+<feFlood flood-opacity="0" result="BackgroundImageFix"/>
+<feColorMatrix in="SourceAlpha" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0" result="hardAlpha"/>
+<feOffset/>
+<feGaussianBlur stdDeviation="9"/>
+<feColorMatrix type="matrix" values="0 0 0 0 0.15 0 0 0 0 0.35 0 0 0 0 1 0 0 0 0.22 0"/>
+<feBlend mode="normal" in2="BackgroundImageFix" result="effect1_dropShadow_0_40"/>
+<feBlend mode="normal" in="SourceGraphic" in2="effect1_dropShadow_0_40" result="shape"/>
+</filter>
+<path id="stroke0_0_40" d="M239.44 345C225.348 389.461 187.94 421.287 118.44 412.461C24.8393 400.575 25.44 370.574 25.44 349.581C25.44 328.587 -21.06 27.5 118.44 18C239.44 23.5 274.94 233 239.44 345Z"/>
+</defs>
+</svg>

@@ -57,28 +57,30 @@ export default function SignInPage() {
   };
 
   return (
-    <AuthShell title={t('auth.signInTitle')}
-      footer={<>{t('auth.noAccount')}{' '}<FooterLink href="/sign-up">{t('auth.signUp')}</FooterLink></>}>
-      <GoogleButton label={t('auth.googleSignIn')} onClick={() => void google()} disabled={busy} />
-      <OrDivider />
-      <form onSubmit={submit} className="grid gap-4 [@media(max-height:780px)]:gap-3 [@media(max-height:680px)]:gap-2.5" noValidate>
-        <AuthField label={t('auth.email')} error={field === 'email' ? error : null}>
-          {(props) => <Input {...props} className={authInputClass} type="email" autoComplete="email" autoCapitalize="none"
-            spellCheck={false} placeholder={t('auth.emailPlaceholder')} required value={email}
-            onChange={(e) => setEmail(e.target.value)} disabled={busy} />}
-        </AuthField>
-        <AuthField label={t('auth.password')} error={field === 'password' ? error : null}>
-          {(props) => <PasswordInput {...props} autoComplete="current-password" placeholder="•••••••" required value={password}
-            onChange={(e) => setPassword(e.target.value)} disabled={busy} />}
-        </AuthField>
-        <div className="-mt-2">
-          <Link href="/forgot-password" className="inline-flex min-h-11 items-center text-sm font-semibold text-auth-ink underline underline-offset-4 hover:opacity-80">
-            {t('auth.forgot')}
-          </Link>
-        </div>
-        {error && !field && <AuthAlert>{error}</AuthAlert>}
-        <SubmitButton busy={busy} busyLabel={t('auth.signingIn')}>{t('auth.signIn')}</SubmitButton>
-      </form>
+    <AuthShell title={t('auth.signInTitle')} subtitle={t('auth.signInSubtitle')} links
+      footer={<><span className="text-auth-muted">{t('auth.noAccount')}</span><FooterLink href="/sign-up">{t('auth.signUp')}</FooterLink></>}>
+      <div className="flex flex-col gap-7">
+        <GoogleButton label={t('auth.googleSignIn')} onClick={() => void google()} disabled={busy} />
+        <OrDivider />
+        <form onSubmit={submit} className="flex flex-col gap-7" noValidate>
+          <div className="flex flex-col gap-[18px]">
+            <AuthField label={t('auth.email')} error={field === 'email' ? error : null}>
+              {(props) => <Input {...props} className={authInputClass} type="email" autoComplete="email" autoCapitalize="none"
+                spellCheck={false} placeholder={t('auth.emailPlaceholder')} required value={email}
+                onChange={(e) => setEmail(e.target.value)} disabled={busy} />}
+            </AuthField>
+            <AuthField label={t('auth.password')} error={field === 'password' ? error : null}>
+              {(props) => <PasswordInput {...props} autoComplete="current-password" placeholder={t('auth.passwordPlaceholder')} required value={password}
+                onChange={(e) => setPassword(e.target.value)} disabled={busy} />}
+            </AuthField>
+            <Link href="/forgot-password" className="-my-3 self-end py-3 text-[13px] font-bold leading-[1.45] text-auth-blue hover:underline">
+              {t('auth.forgot')}
+            </Link>
+          </div>
+          {error && !field && <AuthAlert>{error}</AuthAlert>}
+          <SubmitButton busy={busy} busyLabel={t('auth.signingIn')}>{t('auth.signIn')}</SubmitButton>
+        </form>
+      </div>
     </AuthShell>
   );
 }

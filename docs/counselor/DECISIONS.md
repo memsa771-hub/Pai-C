@@ -317,3 +317,14 @@ The Counselor shell accidentally omitted the shared UserMenu when replacing the 
 - **Known limits:**
   - data stored before this change stays in the student's language until it is re-extracted or corrected;
   - the planner's possibility and the Mirror's lanes follow the field rule through the prompt and `valid_title`, but are not yet checked against the field catalog.
+
+## 23 October: sign-in and onboarding from Figma
+
+- Built from the Figma frames "PAI / Sign in / Refined" and "PAI / Onboarding / 01 Your name, 02 About you, 03 Your location" (file ICKgQnHlT4z8qqK7XeQDsr), with the frames' assets in `public/auth/` and Manjari Regular added.
+- The frames are 1440 × 900 only:
+  - from 1024px wide, the form and panel sit side by side;
+  - below that, the panel follows the form.
+  - The panel is drawn at its design size and scaled, so it never changes look.
+- The old "Sign in to Placement AI" gate on `/` is gone; a signed-out student goes straight to `/sign-in`.
+- The auth tokens follow the design and are light only.
+- Undesigned states are open questions for the founder: the selected chip, errors, the date picker, the sign-up / forgot / reset / check-email screens, and dark mode.

@@ -1,0 +1,18 @@
+<svg preserveAspectRatio="none" overflow="visible" style="display: block;" width="716" height="852" viewBox="0 0 716 852" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g id="Your journey / background accents" clip-path="url(#clip0_0_49)">
+<circle id="Quiet white arc" opacity="0.58" cx="604" cy="30" r="350" fill="white"/>
+<g id="Lower blue arc" opacity="0.45">
+</g>
+<mask id="stroke0_0_49" fill="white">
+<path d="M615 352C615 474.607 499.937 574 358 574C216.063 574 101 474.607 101 352C101 229.393 216.063 130 358 130C499.937 130 615 229.393 615 352Z"/>
+</mask>
+<path id="Journey orbit / inner" opacity="0.75" d="M615 352C615 474.607 499.937 574 358 574C216.063 574 101 474.607 101 352C101 229.393 216.063 130 358 130C499.937 130 615 229.393 615 352Z" stroke-width="2.4" stroke="white" mask="url(#stroke0_0_49)"/>
+<circle id="Lime accent" cx="105" cy="222" r="6" fill="#D4FF59"/>
+<circle id="Blue accent" opacity="0.65" cx="612" cy="453" r="4" fill="#155EEF"/>
+</g>
+<defs>
+<clipPath id="clip0_0_49">
+<rect width="716" height="852" fill="white"/>
+</clipPath>
+</defs>
+</svg>

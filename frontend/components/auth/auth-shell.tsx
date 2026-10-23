@@ -1,104 +1,265 @@
 'use client';
 
-import { useId, useState } from 'react';
+/** The sign-in and onboarding frame from Figma ("PAI / Sign in / Refined" and
+ * "PAI / Onboarding / 01–03"): a white column with a soft pattern, the PAI
+ * logo and the form; beside it a pale-blue panel where PAI waves from a
+ * portal above a chat prompt. The panel is drawn at its design size
+ * (716 × 852) and scaled to fit, so it looks the same on every screen; on
+ * screens narrower than a laptop it follows the form instead of sitting
+ * beside it. */
+
+import { useEffect, useId, useRef, useState } from 'react';
 import Link from 'next/link';
 import type { LucideIcon } from 'lucide-react';
-import { AlertCircle, ArrowUp, ChevronDown, Compass, Eye, EyeOff, Loader2, Mic, Plus } from 'lucide-react';
+import { AlertCircle, Loader2 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { useT } from '@/lib/i18n';
 import { cn } from '@/lib/utils';
 
-/** Decorative preview of talking with PAI, under the mascot. Not interactive. */
-function PromptPreview() {
+export type AuthPanel = 'sign-in' | 'name' | 'about' | 'location';
+
+const PANEL_W = 716;
+const PANEL_H = 852;
+
+/** Scale for the panel: beside the form it fits the column's width and
+ * height; stacked under the form it fits the width. */
+function usePanelScale() {
+  const ref = useRef<HTMLDivElement>(null);
+  const [fit, setFit] = useState({ scale: 0, beside: true });
+  useEffect(() => {
+    const element = ref.current;
+    if (!element) return;
+    const wide = window.matchMedia('(min-width: 1024px)');
+    const measure = () => {
+      const { width, height } = element.getBoundingClientRect();
+      setFit(wide.matches
+        ? { scale: Math.min(width / PANEL_W, height / PANEL_H), beside: true }
+        : { scale: width / PANEL_W, beside: false });
+    };
+    const observer = new ResizeObserver(measure);
+    observer.observe(element);
+    wide.addEventListener('change', measure);
+    measure();
+    return () => { observer.disconnect(); wide.removeEventListener('change', measure); };
+  }, []);
+  return [ref, fit] as const;
+}
+
+/** The PAI logo as placed in the frame: a 100 × 63 crop of the logo artwork. */
+function PaiLogo() {
+  return (
+    <div className="relative mx-auto h-[63px] w-[100px] [filter:drop-shadow(1.942px_1.942px_6.604px_rgb(0_0_0/0.25))]">
+      {/* The design stacks the artwork four times to deepen its edges. */}
+      {[0, 1, 2, 3].map((layer) => (
+        <div key={layer} aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden">
+          <img src="/auth/logo.png" alt="" className="absolute left-[-65.89%] top-[-1.4%] h-[156.27%] w-[232.32%] max-w-none" />
+        </div>
+      ))}
+      <span className="sr-only">Placement AI</span>
+    </div>
+  );
+}
+
+/** Three short strokes beside PAI's waving hand. (x, y) is the top stroke's start. */
+function MotionLines({ x, y }: { x: number; y: number }) {
+  return (
+    <>
+      <div className="absolute flex h-[0.585px] w-[25px] items-center justify-center" style={{ left: x, top: y + 9 }}>
+        <div className="flex-none rotate-[-1.34deg]">
+          <div className="relative h-0 w-[25.007px]">
+            <div className="absolute inset-[-0.5px_7.22%_-0.5px_-2%]"><img alt="" src="/auth/motion-1.svg" className="block size-full max-w-none" /></div>
+          </div>
+        </div>
+      </div>
+      <div className="absolute flex h-[4px] w-[23px] items-center justify-center" style={{ left: x, top: y }}>
+        <div className="flex-none rotate-[9.87deg]">
+          <div className="relative h-0 w-[23.345px]">
+            <div className="absolute inset-[-0.5px_7.08%_-0.5px_-2.14%]"><img alt="" src="/auth/motion-2.svg" className="block size-full max-w-none" /></div>
+          </div>
+        </div>
+      </div>
+      <div className="absolute flex h-[3.675px] w-[23.203px] items-center justify-center" style={{ left: x + 1.72, top: y + 15.64 }}>
+        <div className="flex-none -rotate-9">
+          <div className="relative h-0 w-[23.492px]">
+            <div className="absolute inset-[-0.5px_-0.95%_-0.5px_-2.13%]"><img alt="" src="/auth/motion-3.svg" className="block size-full max-w-none" /></div>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}
+
+/** The chat prompt under PAI ("Prompt Panel / Blue glow"). Decorative. */
+function PromptPanel({ text, chip, left, top }: { text: string; chip: string; left: number; top: number }) {
   const t = useT();
   return (
-    <div aria-hidden className="w-full max-w-[505px] rounded-2xl bg-auth-card p-3 shadow-[0_1px_2px_rgb(0_0_0/0.06),0_12px_32px_-12px_rgb(0_0_0/0.18)]">
-      <p className="px-1.5 pt-1 text-[15px] leading-relaxed text-auth-ink">
-        {t('auth.previewPrompt')}<span className="ms-0.5 inline-block h-4 w-px translate-y-0.5 bg-brand" />
-      </p>
-      <div className="mt-3 flex items-center gap-2">
-        <span className="flex size-9 items-center justify-center rounded-lg border border-auth-line text-auth-ink"><Plus className="size-4" /></span>
-        <span className="flex h-9 items-center gap-1.5 rounded-lg border border-auth-line px-3 text-sm text-auth-muted">
-          <Compass className="size-4 text-success" />{t('auth.previewChip')}<ChevronDown className="size-3.5" />
-        </span>
-        <span className="ms-auto flex h-9 items-center gap-1.5 rounded-lg bg-auth-page px-3 text-sm font-medium text-auth-ink">
-          {t('auth.previewModel')}<ChevronDown className="size-3.5" />
-        </span>
-        <span className="flex size-9 items-center justify-center text-auth-muted"><Mic className="size-4" /></span>
-        <span className="flex size-10 items-center justify-center rounded-[10px] bg-gradient-to-b from-[var(--auth-button-from)] to-[var(--auth-button-to)] text-auth-button-ink">
-          <ArrowUp className="size-4" />
-        </span>
+    <div className="absolute flex w-[588px] flex-col items-start gap-4 rounded-[32px] border-[1.3px] border-auth-prompt-line bg-white px-[22.7px] pb-[18px] pt-[22px] shadow-[0px_6px_14px_0px_rgba(15,51,140,0.08),0px_3px_22px_0px_rgba(20,84,242,0.25)]"
+      style={{ left, top }}>
+      <p className="min-h-[50px] w-[540px] text-[17px] font-bold leading-[25px] text-auth-prompt-ink">{text}</p>
+      <div className="flex h-10 w-[540px] items-center justify-between overflow-clip">
+        <div className="flex h-10 w-[202px] items-center gap-2.5 overflow-clip">
+          <span className="flex size-[38px] items-center justify-center overflow-clip rounded-[19px] border border-auth-chip-line">
+            <img alt="" src="/auth/plus.svg" className="size-[22px]" />
+          </span>
+          <span className="flex h-9 w-[154px] items-center gap-[7px] overflow-clip rounded-[18px] border border-auth-chip-line pl-2.5">
+            <img alt="" src="/auth/compass.svg" className="size-[18px]" />
+            <span className="whitespace-nowrap text-[14px] leading-normal text-auth-prompt-ink">{chip}</span>
+            <img alt="" src="/auth/chevron-small.svg" className="size-3" />
+          </span>
+        </div>
+        <div className="relative flex h-10 w-[244px] items-center gap-3 overflow-clip">
+          <span className="flex h-9 w-[140px] items-center justify-center overflow-clip rounded-[18px] border border-auth-pill-line bg-auth-pill pl-3">
+            <span className="whitespace-nowrap text-[14px] leading-normal text-auth-prompt-ink">{t('auth.previewModel')}</span>
+          </span>
+          <div className="absolute left-[163.7px] top-[0.7px] h-[36.906px] w-[75.755px] overflow-clip">
+            <div className="absolute left-0 top-1/2 h-[29.137px] w-[21.367px] -translate-y-1/2">
+              <span className="absolute inset-[0_34.62%] rounded-[19px] border-[0.943px] border-[rgba(0,0,0,0.28)] bg-auth-blue" />
+              <span className="absolute inset-[19.05%_0_19.05%_73.08%] rounded-[19px] border-[0.943px] border-[rgba(0,0,0,0.29)] bg-auth-blue" />
+              <span className="absolute inset-[19.05%_73.08%_19.05%_0] rounded-[19px] border-[0.943px] border-[rgba(0,0,0,0.28)] bg-auth-blue" />
+            </div>
+            <img alt="" src="/auth/send.svg" className="absolute left-[42.79px] top-[6.98px] h-[25px] w-[26px]" />
+          </div>
+        </div>
       </div>
     </div>
   );
 }
 
-/** PAI speaking in the showcase: a white bubble with the PAI mark. */
-export function SpeechBubble({ children }: { children: React.ReactNode }) {
+/** PAI rising out of the portal, as on the onboarding frames. */
+function OnboardingMascot({ lines }: { lines?: { x: number; y: number } }) {
   return (
-    <div className="flex w-full max-w-[505px] items-start gap-3 rounded-2xl bg-auth-card p-4 shadow-[0_1px_2px_rgb(0_0_0/0.06),0_12px_32px_-12px_rgb(0_0_0/0.18)]">
-      <span aria-hidden className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-white ring-1 ring-auth-line">
-        <img src="/pai-emblem.png" alt="" className="size-6 object-contain" />
-      </span>
-      <p aria-live="polite" className="pt-0.5 text-[15px] font-medium leading-relaxed text-auth-ink">{children}</p>
+    <div className="absolute left-[67.42px] top-[127px] h-[445.44px] w-[581.16px]">
+      <div className="absolute left-[166.53px] top-[-13.34px] h-[459.286px] w-[272.06px]">
+        <div className="absolute inset-[-4.55%_-7.67%]"><img alt="" src="/auth/portal-glow.svg" className="block size-full max-w-none" /></div>
+      </div>
+      <img alt="" src="/auth/portal.svg" className="absolute left-[167.04px] top-[-12.76px] h-[462.84px] w-[271.44px] max-w-none" />
+      <div className="absolute left-0 top-0 h-[444.28px] w-[581.16px] overflow-clip">
+        <img alt="" src="/auth/mascot.png" width={580} height={444.28} className="absolute left-[9.28px] top-[32.48px] h-[444.28px] w-[580px] max-w-none" />
+        {lines && <MotionLines {...lines} />}
+      </div>
     </div>
   );
 }
 
-/** One auth layout that fits the screen: the form on the left with the PAI
- * logo, and a full-height showcase with the mascot on the right. Desktop never
- * scrolls; very short screens scroll only the form column. Phones show the form. */
-export function AuthShell({ title, children, footer, showcase }: {
+/** The right-hand panel of each frame, at design size (716 × 852). */
+function PanelArt({ panel, prompt }: { panel: AuthPanel; prompt: string }) {
+  const t = useT();
+  if (panel === 'sign-in') {
+    return (
+      <div className="relative size-full overflow-clip rounded-[24px] bg-auth-panel">
+        <img alt="" src="/auth/arc.svg" className="absolute left-[254px] top-[-320px] size-[700px] max-w-none" />
+        <div className="absolute left-[244.56px] top-[221.5px] h-[395.936px] w-[234.534px]">
+          <div className="absolute inset-[-4.55%_-7.67%]"><img alt="" src="/auth/portal-glow-sign-in.svg" className="block size-full max-w-none" /></div>
+        </div>
+        <img alt="" src="/auth/portal-sign-in.svg" className="absolute left-[245px] top-[222px] h-[399px] w-[234px] max-w-none" />
+        <div className="absolute left-[101px] top-[233px] h-[383px] w-[501px] overflow-clip">
+          <img alt="" src="/auth/mascot-sign-in.png" width={500} height={383} className="absolute left-2 top-7 h-[383px] w-[500px] max-w-none" />
+        </div>
+        <div className="absolute left-16 top-[54px] flex w-[588px] flex-col items-start gap-3 overflow-clip">
+          <p className="w-[588px] whitespace-pre-line text-[38px] font-bold leading-[1.45] text-auth-heading">{t('auth.panelTitle')}</p>
+          <p className="w-[588px] text-[14px] leading-[1.45] text-auth-sub">{t('auth.panelSubtitle')}</p>
+        </div>
+        <PromptPanel text={prompt} chip={t('auth.previewChip')} left={64} top={677} />
+        <MotionLines x={189} y={412} />
+      </div>
+    );
+  }
+  const step = panel === 'about' ? '2' : '3';
+  return (
+    <div className={cn('relative size-full overflow-clip rounded-[24px]', panel === 'name' ? 'bg-auth-panel' : 'bg-auth-panel-alt')}>
+      {panel === 'name'
+        ? <img alt="" src="/auth/arc.svg" className="absolute left-[254px] top-[-320px] size-[700px] max-w-none" />
+        : <img alt="" src={panel === 'about' ? '/auth/accents-about.svg' : '/auth/accents-location.svg'} className="absolute left-0 top-0 h-[852px] w-[716px] max-w-none" />}
+      <OnboardingMascot lines={panel === 'about' ? { x: 112.58, y: 203 } : panel === 'location' ? { x: 110.58, y: 198 } : undefined} />
+      <PromptPanel text={prompt} chip={t('onboarding.chip')} left={69} top={656} />
+      {panel === 'name' && <MotionLines x={177} y={336} />}
+      {panel === 'about' && <MotionLines x={380} y={453} />}
+      {panel !== 'name' && (
+        <div className="absolute left-16 top-[35px] flex w-[588px] flex-col items-start gap-1.5 font-bold">
+          <p className="whitespace-nowrap text-[11px] leading-[22px] tracking-[1.1px] text-auth-blue">{t(`onboarding.steps.${step}.eyebrow` as never)}</p>
+          <p className="w-[588px] text-[27px] leading-[34px] text-auth-heading">{t(`onboarding.steps.${step}.heading` as never)}</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** One frame for every sign-in and onboarding screen. */
+export function AuthShell({ title, subtitle, panel = 'sign-in', prompt, logoGap = 22, links = false, children, footer }: {
   title?: string;
+  subtitle?: string;
+  /** Which Figma frame's panel to show beside the form. */
+  panel?: AuthPanel;
+  /** The line in the chat prompt under PAI. */
+  prompt?: string;
+  /** Space between the logo and the form, as on the frame. */
+  logoGap?: number;
+  /** Privacy policy and terms at the foot of the form column (sign-in frame). */
+  links?: boolean;
   children: React.ReactNode;
   footer?: React.ReactNode;
-  /** What sits under the mascot; the chat preview by default. */
-  showcase?: React.ReactNode;
 }) {
   const t = useT();
+  const [ref, { scale, beside }] = usePanelScale();
   return (
-    <div className="grid min-h-svh w-full bg-auth-card lg:h-svh lg:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)] lg:gap-4 lg:overflow-hidden lg:p-4">
-      <main className="flex items-center justify-center px-6 py-10 sm:px-10 lg:overflow-y-auto lg:py-6 [@media(max-height:680px)]:lg:py-1">
-        <div className="w-full max-w-[400px]">
-          <img src="/pai-emblem.png" alt="Placement AI" width={56} height={56}
-            className="mx-auto mb-5 size-14 object-contain dark:rounded-2xl dark:bg-white dark:p-2 [@media(max-height:780px)]:mb-3 [@media(max-height:780px)]:size-11 [@media(max-height:680px)]:mb-2 [@media(max-height:680px)]:size-9" />
-          {title && <h1 className="mb-8 text-center text-[32px] font-bold leading-tight tracking-tight text-auth-ink [@media(max-height:780px)]:mb-5 [@media(max-height:780px)]:text-[28px] [@media(max-height:680px)]:mb-4 [@media(max-height:680px)]:text-[26px]">{title}</h1>}
+    <div className="min-h-svh w-full bg-auth-page font-display text-auth-ink lg:flex lg:h-svh lg:overflow-hidden">
+      <main className="relative flex min-w-0 flex-col lg:w-[47.5%] lg:overflow-y-auto">
+        <div aria-hidden className="pointer-events-none absolute inset-0 bg-[url(/auth/pattern.png)] bg-[length:684px_auto] bg-repeat opacity-10" />
+        <div className="relative mx-auto flex w-full max-w-[442px] flex-1 flex-col justify-center px-4 py-10 lg:py-8">
+          <div style={{ marginBottom: logoGap }}><PaiLogo /></div>
+          {(title || subtitle) && (
+            <div className="mb-7 flex flex-col items-center gap-2 text-center leading-[1.45]">
+              {title && <h1 className="w-full text-[40px] font-bold text-auth-ink">{title}</h1>}
+              {subtitle && <p className="w-full text-[16px] text-auth-muted">{subtitle}</p>}
+            </div>
+          )}
           {children}
-          {footer && <div className="mt-6 text-center text-sm font-medium text-auth-ink [@media(max-height:780px)]:mt-4 [@media(max-height:680px)]:mt-2">{footer}</div>}
+          {footer && <div className="mt-7 flex flex-wrap items-start justify-center gap-[5px] text-[13px] leading-[1.45]">{footer}</div>}
         </div>
+        {links && (
+          <div className="relative flex justify-center gap-6 pb-10 text-[12px] leading-[1.45] text-auth-muted">
+            <span>{t('auth.privacyPolicy')}</span>
+            <span>{t('auth.termsOfUse')}</span>
+          </div>
+        )}
       </main>
-      <aside aria-label={t('auth.previewLabel')}
-        className="relative hidden flex-col items-center justify-end overflow-hidden rounded-[28px] bg-auth-panel px-8 pb-6 lg:flex">
-          <img src="/pai-mascot.webp" alt={t('auth.mascotAlt')} width={702} height={855}
-            className="absolute left-1/2 top-[8%] h-[60%] w-auto -translate-x-1/2 object-contain drop-shadow-[0_24px_30px_rgb(0_0_0/0.12)]" />
-          {showcase ?? <PromptPreview />}
-        </aside>
+      <aside aria-label={t('auth.previewLabel')} className="px-4 pb-4 lg:w-[52.5%] lg:pb-[25px] lg:pl-0 lg:pr-[40px] lg:pt-[23px]">
+        <div ref={ref} className="relative w-full lg:h-full" style={beside ? undefined : { height: PANEL_H * scale }}>
+          <div aria-hidden className={cn('absolute left-1/2 top-1/2', !scale && 'invisible')}
+            style={{ width: PANEL_W, height: PANEL_H, transform: `translate(-50%, -50%) scale(${scale || 1})` }}>
+            <PanelArt panel={panel} prompt={prompt ?? t('auth.previewPrompt')} />
+          </div>
+        </div>
+      </aside>
     </div>
   );
 }
 
-/** Label + control + optional hint/error, wired for screen readers. */
-export function AuthField({ label, hint, error, children }: {
+/** Label + control + optional hint/error, wired for screen readers. `md` is
+ * the onboarding label (15px), `sm` the sign-in label (14px). */
+export function AuthField({ label, hint, error, size = 'sm', children }: {
   label: string;
   hint?: string;
   error?: string | null;
+  size?: 'sm' | 'md';
   children: (props: { id: string; 'aria-describedby'?: string; 'aria-invalid'?: boolean }) => React.ReactNode;
 }) {
   const id = useId();
   const described = error ? `${id}-error` : hint ? `${id}-hint` : undefined;
   return (
-    <div className="grid gap-1.5">
-      <label htmlFor={id} className="text-sm font-semibold text-auth-ink">{label}</label>
+    <div className="flex flex-col gap-2">
+      <label htmlFor={id} className={size === 'md' ? 'text-[15px] font-bold leading-[22px] text-auth-label' : 'text-[14px] font-bold leading-[1.45] text-auth-ink'}>{label}</label>
       {children({ id, 'aria-describedby': described, 'aria-invalid': error ? true : undefined })}
       {error ? <p id={`${id}-error`} className="flex items-center gap-1.5 text-xs font-medium text-danger-ink"><AlertCircle aria-hidden className="size-3.5" />{error}</p>
-        : hint ? <p id={`${id}-hint`} className="text-[11px] leading-snug text-auth-muted">{hint}</p> : null}
+        : hint ? <p id={`${id}-hint`} className="text-[12px] leading-[22px] text-auth-muted">{hint}</p> : null}
     </div>
   );
 }
 
 export const isEmail = (value: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
 
-export const authInputClass = 'h-12 rounded-xl border-auth-line bg-auth-field px-4 text-[15px] font-medium text-auth-ink shadow-[inset_0_1px_2px_rgb(0_0_0/0.04)] placeholder:font-normal placeholder:text-auth-muted/80 [@media(max-height:780px)]:h-11 [@media(max-height:680px)]:h-10!';
+/** The frame's text input: 52px tall, 12px corners, a quiet blue-grey border. */
+export const authInputClass = 'h-[52px] w-full rounded-[12px] border border-auth-line bg-white px-4 text-[16px] font-normal text-auth-label shadow-none placeholder:text-[14px] placeholder:text-auth-placeholder focus-visible:border-auth-blue focus-visible:ring-2 focus-visible:ring-auth-blue/20 aria-invalid:border-danger';
 
 export function PasswordInput({ className, ...props }: React.ComponentProps<typeof Input>) {
   const t = useT();
@@ -107,8 +268,8 @@ export function PasswordInput({ className, ...props }: React.ComponentProps<type
     <div className="relative">
       <Input {...props} type={visible ? 'text' : 'password'} className={cn(authInputClass, 'pe-12', className)} />
       <button type="button" onClick={() => setVisible(!visible)} aria-pressed={visible} aria-label={t('auth.showPassword')}
-        className="absolute inset-y-0 end-0 flex w-12 items-center justify-center rounded-e-xl text-auth-muted hover:text-auth-ink">
-        {visible ? <EyeOff aria-hidden className="size-4" /> : <Eye aria-hidden className="size-4" />}
+        className="absolute inset-y-0 end-0 flex w-12 items-center justify-center rounded-e-[12px]">
+        <img alt="" src="/auth/eye.svg" className="size-5" />
       </button>
     </div>
   );
@@ -116,53 +277,42 @@ export function PasswordInput({ className, ...props }: React.ComponentProps<type
 
 export function AuthAlert({ children }: { children: React.ReactNode }) {
   return (
-    <p role="alert" className="flex items-start gap-2 rounded-lg bg-danger-soft px-3 py-2.5 text-xs font-medium text-danger-ink">
+    <p role="alert" className="flex items-start gap-2 rounded-[12px] bg-danger-soft px-3 py-2.5 text-xs font-medium text-danger-ink">
       <AlertCircle aria-hidden className="mt-px size-4 shrink-0" />{children}
     </p>
   );
 }
 
-const inkButton = 'flex h-12 w-full items-center justify-center gap-2 rounded-xl [@media(max-height:780px)]:h-11 [@media(max-height:680px)]:h-10! bg-gradient-to-b from-[var(--auth-button-from)] to-[var(--auth-button-to)] text-[15px] font-semibold text-auth-button-ink shadow-[0_1px_2px_rgb(0_0_0/0.2),inset_0_1px_0_rgb(255_255_255/0.12)] transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50';
+const primaryButton = 'flex h-[52px] w-full items-center justify-center gap-2 overflow-clip rounded-[12px] bg-auth-blue text-[20px] font-bold leading-[28px] text-white shadow-[0px_3px_10px_0px_rgba(18,51,128,0.13)] transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60';
 
-/** Always pressable (as in the design); forms validate on submit and say
- * exactly what is missing, instead of a silently disabled button. */
+/** Always pressable; forms validate on submit and say exactly what is missing. */
 export function SubmitButton({ busy, busyLabel, children }: {
   busy: boolean; busyLabel: string; children: React.ReactNode;
 }) {
   return (
-    <button type="submit" className={inkButton} disabled={busy} aria-busy={busy}>
-      {busy ? <><Loader2 aria-hidden className="size-4 animate-spin" />{busyLabel}</> : children}
+    <button type="submit" className={primaryButton} disabled={busy} aria-busy={busy}>
+      {busy ? <><Loader2 aria-hidden className="size-5 animate-spin" />{busyLabel}</> : children}
     </button>
   );
 }
 
 /** A link styled like the primary button, for status screens. */
 export function InkLink({ href, children }: { href: string; children: React.ReactNode }) {
-  return <Link href={href} className={inkButton}>{children}</Link>;
+  return <Link href={href} className={primaryButton}>{children}</Link>;
 }
 
-/** The small grey footer link under each form. */
+/** The blue link in the line under a form ("Create account"). */
 export function FooterLink({ href, children }: { href: string; children: React.ReactNode }) {
-  return <Link href={href} className="inline-flex min-h-11 items-center font-bold text-auth-ink underline underline-offset-4 hover:opacity-80">{children}</Link>;
+  // The padding widens the tap target without moving anything.
+  return <Link href={href} className="-my-3 py-3 font-bold text-auth-blue hover:underline">{children}</Link>;
 }
 
-/** Google's multicolour "G", as Google's sign-in guidelines require. */
-function GoogleMark() {
-  return (
-    <svg aria-hidden viewBox="0 0 48 48" className="size-[18px]">
-      <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z" />
-      <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z" />
-      <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z" />
-      <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z" />
-    </svg>
-  );
-}
-
+/** "Continue with Google", with Google's mark as drawn in the frame. */
 export function GoogleButton({ label, onClick, disabled }: { label: string; onClick: () => void; disabled?: boolean }) {
   return (
     <button type="button" onClick={onClick} disabled={disabled}
-      className="flex h-12 w-full items-center justify-center gap-3 rounded-xl border border-auth-line bg-gradient-to-b from-[var(--auth-google-from)] to-[var(--auth-google-to)] text-[15px] font-semibold text-auth-ink [@media(max-height:780px)]:h-11 [@media(max-height:680px)]:h-10! shadow-[0_1px_2px_rgb(0_0_0/0.08),inset_0_1px_0_rgb(255_255_255/0.7)] transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50">
-      <GoogleMark />{label}
+      className="flex h-[52px] w-full items-center justify-center gap-2.5 overflow-clip rounded-[12px] border border-auth-google-line bg-auth-google text-[20px] font-bold leading-[28px] text-auth-ink shadow-[0px_1px_3px_0px_rgba(18,51,128,0.06)] transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60">
+      <img alt="" src="/auth/google.svg" className="size-7" />{label}
     </button>
   );
 }
@@ -170,8 +320,10 @@ export function GoogleButton({ label, onClick, disabled }: { label: string; onCl
 export function OrDivider() {
   const t = useT();
   return (
-    <div className="my-6 flex items-center gap-4 text-xs font-semibold uppercase tracking-wider text-auth-muted [@media(max-height:780px)]:my-4 [@media(max-height:680px)]:my-3">
-      <span aria-hidden className="h-px flex-1 bg-auth-line" />{t('auth.or')}<span aria-hidden className="h-px flex-1 bg-auth-line" />
+    <div className="flex items-center justify-center gap-4">
+      <span aria-hidden className="h-px max-w-[135px] flex-1 bg-auth-divider" />
+      <span className="whitespace-nowrap text-[12px] leading-[1.45] text-auth-muted">{t('auth.or')}</span>
+      <span aria-hidden className="h-px max-w-[135px] flex-1 bg-auth-divider" />
     </div>
   );
 }
@@ -183,12 +335,12 @@ export function AuthStatus({ icon: Icon, tone = 'neutral', title, body, children
   return (
     <div role="status" className="text-center">
       <span aria-hidden className={cn('mx-auto mb-5 flex size-14 items-center justify-center rounded-2xl',
-        tone === 'neutral' && 'bg-auth-page text-auth-ink', tone === 'success' && 'bg-success-soft text-success-ink',
+        tone === 'neutral' && 'bg-auth-panel text-auth-blue', tone === 'success' && 'bg-success-soft text-success-ink',
         tone === 'warning' && 'bg-warning-soft text-warning-ink')}>
         <Icon className="size-7" />
       </span>
-      <h1 className="text-[28px] font-bold leading-tight tracking-tight text-auth-ink">{title}</h1>
-      {body && <p className="mt-3 text-pretty text-sm text-auth-muted">{body}</p>}
+      <h1 className="text-[34px] font-bold leading-[1.45] text-auth-ink">{title}</h1>
+      {body && <p className="mt-2 text-pretty text-[16px] leading-[1.45] text-auth-muted">{body}</p>}
       {children && <div className="mt-7 grid gap-3">{children}</div>}
     </div>
   );

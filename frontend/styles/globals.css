@@ -30,6 +30,14 @@
 @font-face {
   font-family: 'Manjari';
   font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/fonts/manjari-latin-400.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'Manjari';
+  font-style: normal;
   font-weight: 700;
   font-display: swap;
   src: url('/fonts/manjari-latin-700.woff2') format('woff2');
@@ -118,19 +126,32 @@
   --elev-card: 0 1px 2px rgb(15 23 42 / 0.04), 0 10px 30px -18px rgb(21 94 239 / 0.22);
   --elev-lift: 0 2px 4px rgb(15 23 42 / 0.05), 0 18px 40px -14px rgb(21 94 239 / 0.30);
 
-  /* Auth screens: warm neutral page, white card, beige showcase, ink buttons. */
-  --auth-page: #f2f0eb;
-  --auth-card: #fdfdfc;
-  --auth-panel: #f3efe6;
-  --auth-ink: #161616;
-  --auth-muted: #6b6b6b; /* 5.3:1 on card */
-  --auth-line: #e2e0da;
-  --auth-field: #ffffff;
-  --auth-button-from: #3a3a3a;
-  --auth-button-to: #161616;
-  --auth-button-ink: #ffffff;
-  --auth-google-from: #fbfbfa;
-  --auth-google-to: #ebebea;
+  /* Auth screens (Figma "PAI / Sign in / Refined" and "PAI / Onboarding"):
+     white frame with a soft pattern, a pale-blue panel with PAI, blue actions.
+     The design is light only, so these have no dark override. */
+  --auth-page: #ffffff;
+  --auth-panel: #eef3fb;
+  --auth-panel-alt: #eaf1ff;
+  --auth-ink: #000000;
+  --auth-label: #131a27;
+  --auth-muted: #667085;
+  --auth-placeholder: #66758d;
+  --auth-line: #cfd8e7;
+  --auth-divider: #e0e6ef;
+  --auth-blue: #155eef;
+  --auth-heading: #002c7e;
+  --auth-sub: #526581;
+  --auth-google: #c5d9ff;
+  --auth-google-line: #a2c7ff;
+  --auth-choice-ink: #0f172a;
+  --auth-choice-line: #e1e9f5;
+  --auth-track: #dfe6f0;
+  --auth-back: #344054;
+  --auth-prompt-ink: #263752;
+  --auth-prompt-line: #7da4ff;
+  --auth-chip-line: #d5e1fc;
+  --auth-pill: #f0f4fc;
+  --auth-pill-line: #e2eaf9;
 
   /* Hero gradient for auth, onboarding and the profile header. */
   --hero-from: #155eef;
@@ -241,19 +262,6 @@
   --elev-card: 0 1px 0 rgb(255 255 255 / 0.03) inset, 0 10px 30px -12px rgb(0 0 0 / 0.55);
   --elev-lift: 0 1px 0 rgb(255 255 255 / 0.05) inset, 0 18px 40px -14px rgb(124 156 255 / 0.35);
 
-  --auth-page: #0e0e0f;
-  --auth-card: #17171a;
-  --auth-panel: #222226;
-  --auth-ink: #f3f3f3;
-  --auth-muted: #a3a3a3;
-  --auth-line: #323236;
-  --auth-field: #1d1d21;
-  --auth-button-from: #fafafa;
-  --auth-button-to: #dcdcdc;
-  --auth-button-ink: #121212;
-  --auth-google-from: #2b2b2f;
-  --auth-google-to: #222226;
-
   --hero-from: #3a63f0;
   --hero-via: #2a49c4;
   --hero-to: #1a2a6c;
@@ -350,13 +358,28 @@
 
   /** Auth screens **/
   --color-auth-page: var(--auth-page);
-  --color-auth-card: var(--auth-card);
   --color-auth-panel: var(--auth-panel);
+  --color-auth-panel-alt: var(--auth-panel-alt);
   --color-auth-ink: var(--auth-ink);
+  --color-auth-label: var(--auth-label);
   --color-auth-muted: var(--auth-muted);
+  --color-auth-placeholder: var(--auth-placeholder);
   --color-auth-line: var(--auth-line);
-  --color-auth-field: var(--auth-field);
-  --color-auth-button-ink: var(--auth-button-ink);
+  --color-auth-divider: var(--auth-divider);
+  --color-auth-blue: var(--auth-blue);
+  --color-auth-heading: var(--auth-heading);
+  --color-auth-sub: var(--auth-sub);
+  --color-auth-google: var(--auth-google);
+  --color-auth-google-line: var(--auth-google-line);
+  --color-auth-choice-ink: var(--auth-choice-ink);
+  --color-auth-choice-line: var(--auth-choice-line);
+  --color-auth-track: var(--auth-track);
+  --color-auth-back: var(--auth-back);
+  --color-auth-prompt-ink: var(--auth-prompt-ink);
+  --color-auth-prompt-line: var(--auth-prompt-line);
+  --color-auth-chip-line: var(--auth-chip-line);
+  --color-auth-pill: var(--auth-pill);
+  --color-auth-pill-line: var(--auth-pill-line);
 
   /** Elevation **/
   --shadow-soft: var(--elev-soft);

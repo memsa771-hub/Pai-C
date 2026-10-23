@@ -6,10 +6,9 @@
 
 import * as React from 'react';
 import { AnimatePresence, MotionConfig, motion } from 'motion/react';
-import { ArrowLeft, ChevronDown } from 'lucide-react';
 import { toast } from 'sonner';
 import { Input } from '@/components/ui/input';
-import { AuthField, AuthShell, SpeechBubble, SubmitButton, authInputClass } from '@/components/auth/auth-shell';
+import { AuthField, AuthShell, SubmitButton, authInputClass, type AuthPanel } from '@/components/auth/auth-shell';
 import { workspaceApi } from '@/lib/api';
 import { useT, type MessageKey } from '@/lib/i18n';
 import { cn } from '@/lib/utils';
@@ -93,32 +92,37 @@ export function OnboardingView({ state, onDone }: {
   const back = () => { setDirection(-1); setIndex(index - 1); };
 
   const stepKey = String(step);
+  // One Figma frame per step: 01 Your name, 02 About you, 03 Your location.
+  const panel: AuthPanel = (['name', 'about', 'location'] as const)[Math.min(index, 2)];
+  const first = index === 0;
   return (
     <MotionConfig reducedMotion="user">
-      <AuthShell title={translated(`onboarding.steps.${stepKey}.title`, t('onboarding.title'))}
-        showcase={<SpeechBubble>{translated(`onboarding.steps.${stepKey}.bubble`, t('onboarding.subtitle'))}</SpeechBubble>}
-        footer={<span className="text-xs font-normal text-auth-muted">{t('onboarding.privacy')}</span>}>
-        <div className="-mt-4 mb-7 [@media(max-height:780px)]:mb-5">
-          <div className="flex items-center justify-between text-xs font-semibold text-auth-muted">
-            <span>{t('onboarding.step', { current: index + 1, total: steps.length })}</span>
+      <AuthShell panel={panel} prompt={translated(`onboarding.steps.${stepKey}.bubble`, t('onboarding.subtitle'))}
+        logoGap={first ? 29 : 31}>
+        <form onSubmit={next} noValidate className={cn('flex flex-col', first ? 'gap-7' : 'gap-[22px]')}>
+          <h1 className={cn('text-center text-[34px] font-bold text-auth-ink', first ? 'leading-[1.45]' : 'leading-[42px]')}>
+            {translated(`onboarding.steps.${stepKey}.title`, t('onboarding.title'))}
+          </h1>
+          <div className="flex flex-col gap-2.5">
+            <p className={cn('text-[13px] text-auth-muted', first ? 'leading-[1.45]' : 'leading-[22px]')}>
+              {t('onboarding.step', { current: index + 1, total: steps.length })}
+            </p>
+            <ol className="flex h-1.5 gap-2" aria-label={t('onboarding.step', { current: index + 1, total: steps.length })}>
+              {steps.map((s, i) => (
+                <li key={s} aria-current={i === index ? 'step' : undefined}
+                  className={cn('h-1.5 flex-1 rounded-[3px] transition-colors duration-300',
+                    i <= index ? 'bg-auth-blue' : first ? 'bg-auth-track' : 'bg-auth-choice-line')} />
+              ))}
+            </ol>
           </div>
-          <ol className="mt-2 grid gap-1.5" style={{ gridTemplateColumns: `repeat(${steps.length}, minmax(0, 1fr))` }}
-            aria-label={t('onboarding.step', { current: index + 1, total: steps.length })}>
-            {steps.map((s, i) => (
-              <li key={s} aria-current={i === index ? 'step' : undefined}
-                className={cn('h-1.5 rounded-full transition-colors duration-300', i <= index ? 'bg-auth-ink' : 'bg-auth-line')} />
-            ))}
-          </ol>
-        </div>
 
-        <form onSubmit={next} noValidate>
           <AnimatePresence mode="wait" initial={false} custom={direction}>
             <motion.div key={step} custom={direction}
               initial={{ opacity: 0, x: direction * 24 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: direction * -24 }}
               transition={{ duration: 0.2, ease: 'easeOut' }}
-              className={cn('grid gap-4 [@media(max-height:780px)]:gap-3', fields.every((f) => !f.choices.length && !f.isDate && !f.options?.length) && fields.length === 2 && 'sm:grid-cols-2')}>
+              className={cn('grid', first ? 'grid-cols-2 gap-4' : 'gap-[22px]')}>
               {fields.map((field) => (
-                <Field key={field.name} field={field} value={answers[field.name] || ''} error={errors[field.name]}
+                <Field key={field.name} field={field} value={answers[field.name] || ''} error={errors[field.name]} size={first ? 'sm' : 'md'}
                   label={translated(`onboarding.field.${field.name}`, field.name)}
                   placeholder={translated(`onboarding.placeholder.${field.name}`, '')}
                   onChange={(v) => set(field.name, v)} />
@@ -126,31 +130,31 @@ export function OnboardingView({ state, onDone }: {
             </motion.div>
           </AnimatePresence>
 
-          <div className="mt-7 flex items-center gap-3 [@media(max-height:780px)]:mt-5">
-            {index > 0 && (
+          <div className="flex items-start gap-3.5">
+            {!first && (
               <button type="button" onClick={back} disabled={busy}
-                className="flex h-12 items-center gap-2 rounded-xl px-4 text-[15px] font-semibold text-auth-ink transition-colors hover:bg-auth-page [@media(max-height:780px)]:h-11">
-                <ArrowLeft aria-hidden className="size-4" />{t('onboarding.back')}
+                className="flex h-[52px] w-24 shrink-0 items-center justify-center gap-2 text-[17px] leading-[22px] text-auth-back">
+                <img alt="" src="/auth/back.svg" className="size-[18px]" />{t('onboarding.back')}
               </button>
             )}
-            <div className="flex-1">
-              <SubmitButton busy={busy} busyLabel={t('onboarding.continue')}>
-                {last ? t('onboarding.continue') : t('onboarding.next')}
-              </SubmitButton>
-            </div>
+            <SubmitButton busy={busy} busyLabel={t('onboarding.continue')}>
+              {last ? t('onboarding.continue') : t('onboarding.next')}
+            </SubmitButton>
           </div>
+          <p className="text-center text-[13px] leading-[21px] text-auth-muted">{t('onboarding.privacy')}</p>
         </form>
       </AuthShell>
     </MotionConfig>
   );
 }
 
-function Field({ field, label, placeholder, value, error, onChange }: {
+function Field({ field, label, placeholder, value, error, size, onChange }: {
   field: OnboardingFieldSpec;
   label: string;
   placeholder: string;
   value: string;
   error?: boolean;
+  size: 'sm' | 'md';
   onChange: (value: string) => void;
 }) {
   const t = useT();
@@ -161,32 +165,37 @@ function Field({ field, label, placeholder, value, error, onChange }: {
     return translated === key ? choice : translated;
   };
   const id = `onb-${field.name}`;
+  // "PAI / Onboarding / Choice": 42px tall, 16px corners, sized to its label.
   const chip = (on: boolean) => cn(
-    'min-h-11 rounded-xl border px-4 text-sm font-semibold transition-colors [@media(max-height:780px)]:min-h-10',
-    on ? 'border-auth-ink bg-auth-ink text-auth-card' : 'border-auth-line bg-auth-field text-auth-ink hover:border-auth-muted/60',
+    'flex h-[42px] items-center justify-center whitespace-nowrap rounded-[16px] border px-4 text-[16px] leading-[22px] transition-colors',
+    on ? 'border-auth-blue bg-auth-panel text-auth-blue' : 'border-auth-choice-line bg-white text-auth-choice-ink',
   );
   const errorText = error ? t('onboarding.required') : null;
 
   if (field.choices.length > 0) {
     return (
-      <div className="grid gap-1.5">
-        <span id={`${id}-label`} className="text-sm font-semibold text-auth-ink">{label}</span>
-        <div role="group" aria-labelledby={`${id}-label`} aria-describedby={error ? `${id}-error` : undefined} className="flex flex-wrap gap-2">
-          {field.choices.map((choice, i) => (
-            <button key={choice} data-field={i === 0 ? field.name : undefined} type="button" aria-pressed={value === choice && !other}
-              className={chip(value === choice && !other)} onClick={() => { setOther(false); onChange(choice); }}>
-              {choiceLabel(choice)}
-            </button>
-          ))}
+      <div className="flex flex-col gap-2.5">
+        <span id={`${id}-label`} className="text-[15px] font-bold leading-[22px] text-auth-label">{label}</span>
+        <div role="group" aria-labelledby={`${id}-label`} aria-describedby={error ? `${id}-error` : undefined} className="flex flex-col gap-2.5">
+          <div className="flex flex-wrap gap-2.5">
+            {field.choices.map((choice, i) => (
+              <button key={choice} data-field={i === 0 ? field.name : undefined} type="button" aria-pressed={value === choice && !other}
+                className={chip(value === choice && !other)} onClick={() => { setOther(false); onChange(choice); }}>
+                {choiceLabel(choice)}
+              </button>
+            ))}
+          </div>
           {field.allowOther && (
-            <button type="button" aria-pressed={other} className={chip(other)} onClick={() => { setOther(true); onChange(''); }}>
-              {choiceLabel('other')}
-            </button>
+            <div className="flex">
+              <button type="button" aria-pressed={other} className={chip(other)} onClick={() => { setOther(true); onChange(''); }}>
+                {choiceLabel('other')}
+              </button>
+            </div>
           )}
         </div>
         {other && (
           <Input aria-labelledby={`${id}-label`} autoFocus value={value} placeholder={t('onboarding.otherPlaceholder')}
-            className={cn(authInputClass, 'mt-1')} onChange={(event) => onChange(event.target.value)} />
+            className={authInputClass} onChange={(event) => onChange(event.target.value)} />
         )}
         {errorText && <p id={`${id}-error`} className="text-xs font-medium text-danger-ink">{errorText}</p>}
       </div>
@@ -194,17 +203,17 @@ function Field({ field, label, placeholder, value, error, onChange }: {
   }
 
   return (
-    <AuthField label={label} error={errorText}>
+    <AuthField label={label} error={errorText} size={size}
+      hint={field.options && field.options.length === 1 ? t('onboarding.countryNote') : undefined}>
       {(props) => field.isDate ? (
         <DobPicker id={props.id} field={field.name} value={value} onChange={onChange} invalid={!!error} describedBy={props['aria-describedby']} />
       ) : field.options && field.options.length > 0 ? (
         <div className="relative">
           <select {...props} data-field={field.name} value={value} onChange={(e) => onChange(e.target.value)}
-            className={cn(authInputClass, 'w-full appearance-none border pe-10 outline-none')}>
+            className={cn(authInputClass, 'appearance-none pe-10 outline-none')}>
             {field.options.map((option) => <option key={option} value={option}>{option}</option>)}
           </select>
-          <ChevronDown aria-hidden className="pointer-events-none absolute end-4 top-1/2 size-4 -translate-y-1/2 text-auth-muted" />
-          {field.options.length === 1 && <p className="mt-1.5 text-[11px] text-auth-muted">{t('onboarding.countryNote')}</p>}
+          <img alt="" src="/auth/chevron.svg" className="pointer-events-none absolute end-4 top-1/2 size-4 -translate-y-1/2" />
         </div>
       ) : (
         <Input {...props} data-field={field.name} value={value} placeholder={placeholder || undefined}

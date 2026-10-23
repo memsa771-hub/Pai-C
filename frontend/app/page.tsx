@@ -1,6 +1,5 @@
 'use client';
 
-import { desktopHost } from '@/lib/desktop-host';
 import { signOutAndReturnToSignIn } from '@/lib/auth-redirects';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
@@ -337,31 +336,12 @@ function ResolvingWorkspace({
   return <FullscreenSpinner />;
 }
 
-// Not signed in. Desktop delegates to the launcher's own native sign-in UI
-// (it owns the session and pushes it back over the host bridge); the web app
-// signs in locally on this origin via /sign-in — Supabase Auth directly, no
-// bounce to an external site.
-function SignInGate({ signIn }: { signIn: () => Promise<void> }) {
+// Not signed in: go straight to the sign-in screen. On the desktop app the
+// sign-in page hands Google sign-in to the launcher, as before.
+function SignInRedirect() {
   const router = useRouter();
-  const host = desktopHost();
-
-  return (
-    <div
-      className="flex flex-col items-center justify-center min-h-screen gap-6 p-8 text-neutral-900"
-      style={{ background: PAGE_BG }}
-    >
-      <div className="flex flex-col items-center gap-3">
-        <Image src="/pai-emblem.png" alt="Placement AI" width={44} height={44} />
-        <h1 className="text-2xl font-black tracking-tight">Sign in to Placement AI</h1>
-        <p className="text-neutral-600 text-sm text-center max-w-md">
-          Sign in to see your workspaces.
-        </p>
-      </div>
-      <BrutalBtn onClick={host ? signIn : () => router.push('/sign-in')} color="blue">
-        Sign in to Placement AI
-      </BrutalBtn>
-    </div>
-  );
+  useEffect(() => { router.replace('/sign-in'); }, [router]);
+  return <FullscreenSpinner />;
 }
 
 // ---------------------------------------------------------------------------
@@ -381,7 +361,7 @@ export default function HomePage() {
   // On the OpenAgents-hosted app, `/` resolves the signed-in student's one
   // canonical workspace and redirects straight in.
   if (oa.isPaiDeployment) {
-    if (!oa.user || !oa.idToken) return <SignInGate signIn={oa.signIn} />;
+    if (!oa.user || !oa.idToken) return <SignInRedirect />;
     return <ResolvingWorkspace idToken={oa.idToken} onSignOut={oa.signOut} />;
   }
 

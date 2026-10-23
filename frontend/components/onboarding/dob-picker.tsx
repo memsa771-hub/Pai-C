@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { CalendarDays, ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { DEFAULT_LOCALE } from '@/lib/i18n/locales';
 import { useT } from '@/lib/i18n';
@@ -75,37 +75,37 @@ export function DobPicker({ id, field, value, onChange, invalid, describedBy }: 
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <button id={id} data-field={field} type="button" aria-invalid={invalid || undefined} aria-describedby={describedBy}
-          className={cn('flex h-12 w-full items-center gap-3 rounded-xl border bg-auth-field px-4 text-left text-[15px] font-medium shadow-[inset_0_1px_2px_rgb(0_0_0/0.04)] transition-colors [@media(max-height:780px)]:h-11',
-            invalid ? 'border-danger' : 'border-auth-line hover:border-auth-muted/50')}>
-          <CalendarDays aria-hidden className="size-[18px] shrink-0 text-auth-muted" />
-          <span className={cn('flex-1 truncate', selected ? 'text-auth-ink' : 'font-normal text-auth-muted/80')}>
+          className={cn('flex h-[52px] w-full items-center gap-3 overflow-clip rounded-[12px] border bg-white px-4 text-left leading-[1.45] transition-colors focus-visible:border-auth-blue focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-auth-blue/20',
+            invalid ? 'border-danger' : 'border-auth-line')}>
+          <img alt="" src="/auth/calendar.svg" className="size-5 shrink-0" />
+          <span className={cn('flex-1 truncate', selected ? 'text-[16px] text-auth-label' : 'text-[14px] text-auth-placeholder')}>
             {selected ? label : t('onboarding.date.placeholder')}
           </span>
           {age !== null && age >= 0 && (
-            <span className="shrink-0 rounded-full bg-auth-page px-2.5 py-0.5 text-xs font-semibold text-auth-muted">
+            <span className="shrink-0 rounded-full bg-auth-panel px-2.5 py-0.5 text-xs font-semibold text-auth-muted">
               {t('onboarding.date.age', { age })}
             </span>
           )}
         </button>
       </PopoverTrigger>
       <PopoverContent align="start" sideOffset={8}
-        className="w-[min(330px,calc(100vw-2rem))] gap-3 rounded-2xl border border-auth-line bg-auth-card p-3 text-auth-ink shadow-[0_24px_60px_-20px_rgb(0_0_0/0.35)] ring-0">
+        className="w-[min(330px,calc(100vw-2rem))] gap-3 rounded-2xl border border-auth-line bg-white p-3 font-display text-auth-ink shadow-[0_24px_60px_-20px_rgb(0_0_0/0.35)] ring-0">
         <div className="flex items-center gap-1">
           <button type="button" onClick={() => shift(-1)} aria-label={t('onboarding.date.previous')} disabled={view !== 'days'}
-            className="flex size-9 items-center justify-center rounded-lg hover:bg-auth-page disabled:invisible">
+            className="flex size-9 items-center justify-center rounded-lg hover:bg-auth-panel disabled:invisible">
             <ChevronLeft className="size-4" />
           </button>
           <button type="button" onClick={() => setView(view === 'months' ? 'days' : 'months')} aria-label={t('onboarding.date.chooseMonth')}
-            className={cn('flex h-9 flex-1 items-center justify-center gap-1 rounded-lg text-sm font-semibold hover:bg-auth-page', view === 'months' && 'bg-auth-page')}>
+            className={cn('flex h-9 flex-1 items-center justify-center gap-1 rounded-lg text-sm font-semibold hover:bg-auth-panel', view === 'months' && 'bg-auth-panel')}>
             {monthName.format(new Date(year, month, 1))}<ChevronDown aria-hidden className="size-3.5 text-auth-muted" />
           </button>
           <button type="button" onClick={() => setView(view === 'years' ? 'days' : 'years')} aria-label={t('onboarding.date.chooseYear')}
-            className={cn('flex h-9 flex-1 items-center justify-center gap-1 rounded-lg text-sm font-semibold hover:bg-auth-page', view === 'years' && 'bg-auth-page')}>
+            className={cn('flex h-9 flex-1 items-center justify-center gap-1 rounded-lg text-sm font-semibold hover:bg-auth-panel', view === 'years' && 'bg-auth-panel')}>
             {year}<ChevronDown aria-hidden className="size-3.5 text-auth-muted" />
           </button>
           <button type="button" onClick={() => shift(1)} aria-label={t('onboarding.date.nextMonth')}
             disabled={view !== 'days' || new Date(year, month + 1, 1) > today}
-            className="flex size-9 items-center justify-center rounded-lg hover:bg-auth-page disabled:invisible">
+            className="flex size-9 items-center justify-center rounded-lg hover:bg-auth-panel disabled:invisible">
             <ChevronRight className="size-4" />
           </button>
         </div>
@@ -115,7 +115,7 @@ export function DobPicker({ id, field, value, onChange, invalid, describedBy }: 
             {years.map((y) => (
               <button key={y} type="button" role="option" aria-selected={y === year} data-current={y === year}
                 onClick={() => { setYear(y); if (new Date(y, month, 1) > today) setMonth(today.getMonth()); setView('months'); }}
-                className={cn(cell, 'h-11', y === year ? 'bg-gradient-to-b from-[var(--auth-button-from)] to-[var(--auth-button-to)] text-auth-button-ink' : 'hover:bg-auth-page')}>
+                className={cn(cell, 'h-11', y === year ? 'bg-auth-blue text-white' : 'hover:bg-auth-panel')}>
                 {y}
               </button>
             ))}
@@ -127,7 +127,7 @@ export function DobPicker({ id, field, value, onChange, invalid, describedBy }: 
             {Array.from({ length: 12 }, (_, m) => (
               <button key={m} type="button" role="option" aria-selected={m === month} disabled={new Date(year, m, 1) > today}
                 onClick={() => { setMonth(m); setView('days'); }}
-                className={cn(cell, 'h-12', m === month ? 'bg-gradient-to-b from-[var(--auth-button-from)] to-[var(--auth-button-to)] text-auth-button-ink' : 'hover:bg-auth-page')}>
+                className={cn(cell, 'h-12', m === month ? 'bg-auth-blue text-white' : 'hover:bg-auth-panel')}>
                 {monthShort.format(new Date(2000, m, 1))}
               </button>
             ))}
@@ -148,7 +148,7 @@ export function DobPicker({ id, field, value, onChange, invalid, describedBy }: 
                     aria-label={long.format(new Date(year, month, d))}
                     onClick={() => { onChange(iso(year, month, d)); setOpen(false); }}
                     className={cn(cell, 'aspect-square rounded-full',
-                      on ? 'bg-gradient-to-b from-[var(--auth-button-from)] to-[var(--auth-button-to)] text-auth-button-ink' : 'hover:bg-auth-page',
+                      on ? 'bg-auth-blue text-white' : 'hover:bg-auth-panel',
                       isToday && !on && 'ring-1 ring-auth-line')}>
                     {d}
                   </button>
