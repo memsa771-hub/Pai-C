@@ -1,9 +1,8 @@
 'use client';
 
 import * as React from 'react';
-import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { ArrowUp, Paperclip, X, FileIcon, ImageIcon, Plus, CalendarClock } from 'lucide-react';
+import { Paperclip, X, FileIcon, ImageIcon, CalendarClock } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -45,6 +44,8 @@ interface ChatInputProps {
   /** Auto-focus the textarea when mounted or when this key changes. */
   focusKey?: number;
   onCreateRoutine?: () => void;
+  /** The voice button, shown beside send when the conversation supports voice. */
+  voice?: React.ReactNode;
 }
 
 function isImageFile(file: File): boolean {
@@ -57,7 +58,7 @@ function isImageFile(file: File): boolean {
 // lib/document-types.ts; the server re-validates from the file's bytes.
 const FILE_ACCEPT = `image/*,${DOCUMENT_ACCEPT}`;
 
-export function ChatInput({ onSend, disabled, className, agents = [], knowledge = [], draft, onDraftChange, onFocusChange, focusKey, onCreateRoutine }: ChatInputProps) {
+export function ChatInput({ onSend, disabled, className, agents = [], knowledge = [], draft, onDraftChange, onFocusChange, focusKey, onCreateRoutine, voice }: ChatInputProps) {
   const t = useT();
   const [message, setMessage] = React.useState(draft ?? '');
   const [showMentions, setShowMentions] = React.useState(false);
@@ -442,24 +443,24 @@ export function ChatInput({ onSend, disabled, className, agents = [], knowledge 
         </div>
       )}
 
-      {/* ChatGPT-style composer: one rounded bar with every control on a single
-          row — the `+` menu on the left, the growing textarea in the middle and
-          the send button on the right. Attachments stack above that row. */}
+      {/* The composer from Figma ("Prompt Panel"): one white pill with a soft
+          blue glow; the `+` menu on the left, the growing textarea in the
+          middle, voice and send on the right. Attachments stack above. */}
       <div className={cn(
-        'relative flex flex-col gap-1.5 rounded-3xl border border-input bg-card px-2 py-2 shadow-card transition-colors',
+        'relative flex flex-col gap-2 rounded-[42px] border-[0.971px] border-[#d2ddef] bg-card px-2 py-[15.5px] shadow-[0px_2px_23.6px_0px_#7ca7fc,0px_9.712px_23.309px_9px_rgba(21,38,74,0.1)] transition-colors dark:border-input sm:px-[22px]',
         isDragging && 'border-primary border-dashed bg-primary/5',
-        isFocused && !isDragging && 'border-primary/45 ring-4 ring-primary/10'
+        isFocused && !isDragging && 'border-[#7da4ff]'
       )}>
         {/* Drag overlay */}
         {isDragging && (
-          <div className="absolute inset-0 flex items-center justify-center rounded-2xl z-10 pointer-events-none">
+          <div className="absolute inset-0 flex items-center justify-center rounded-[42px] z-10 pointer-events-none">
             <span className="text-sm font-medium text-primary">{t('chatInput.dropFilesHere')}</span>
           </div>
         )}
 
         {/* Pending file previews */}
         {pendingFiles.length > 0 && (
-          <div className="flex flex-wrap gap-2 px-1 pt-1">
+          <div className="flex flex-wrap gap-2 px-3 pt-1">
             {pendingFiles.map((pf, i) => (
               <div
                 key={i}
@@ -490,7 +491,7 @@ export function ChatInput({ onSend, disabled, className, agents = [], knowledge 
           </div>
         )}
 
-        <div className="flex items-end gap-1">
+        <div className="flex min-h-[53px] items-center gap-1 sm:gap-4">
           <input
             ref={fileInputRef}
             type="file"
@@ -505,11 +506,15 @@ export function ChatInput({ onSend, disabled, className, agents = [], knowledge 
             <DropdownMenuTrigger asChild>
               <button
                 type="button"
-                className="flex size-11 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                className="flex size-11 shrink-0 items-center justify-center rounded-full transition-colors hover:bg-[#f0f4fc] focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
                 title={t('chatInput.addAttachments')}
                 aria-label={t('chatInput.addAttachments')}
               >
-                <Plus className="size-5" />
+                <span aria-hidden className="relative block h-[18px] w-[17px]">
+                  <span className="absolute inset-[-36.11%_-26.47%_-23.83%_-50%]">
+                    <img alt="" src="/composer/plus.svg" className="block size-full max-w-none" />
+                  </span>
+                </span>
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start" side="top" className="min-w-50">
@@ -542,39 +547,26 @@ export function ChatInput({ onSend, disabled, className, agents = [], knowledge 
             rows={1}
             disabled={disabled}
             data-chat-input
-            className="min-w-0 flex-1 resize-none border-0 bg-transparent px-1 py-2.5 text-base shadow-none placeholder:text-muted-foreground focus:outline-none sm:text-[15px]"
+            title={isFocused ? t('chatInput.escHint') : t('chatInput.typeHint')}
+            className="min-w-0 flex-1 resize-none border-0 bg-transparent px-1 py-2.5 font-sans text-base text-foreground shadow-none placeholder:text-[#7d8a9e] focus:outline-none sm:text-[14.568px]"
           />
 
-          {/* Keyboard affordance for the global 'type anywhere' shortcut */}
-          {isFocused ? (
-            <kbd
-              className="pointer-events-none mb-3.5 hidden h-4 shrink-0 items-center justify-center rounded border border-input bg-muted px-1 font-mono text-[9px] font-medium text-muted-foreground sm:flex"
-              title={t('chatInput.escHint')}
+          <div className="flex shrink-0 items-center">
+            {voice}
+            <button
+              type="button"
+              className={cn(
+                // Full colour as in the design; it only sends once there is something to send.
+                'flex size-11 shrink-0 items-center justify-center rounded-full transition-opacity focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none disabled:cursor-default',
+                hasContent && 'hover:opacity-90'
+              )}
+              onClick={handleSend}
+              disabled={!hasContent || disabled}
+              aria-label={t('chatInput.sendMessage')}
             >
-              esc
-            </kbd>
-          ) : !message ? (
-            <kbd
-              className="pointer-events-none mb-3.5 hidden size-4 shrink-0 items-center justify-center rounded border border-input bg-muted font-mono text-[9px] font-medium text-muted-foreground sm:flex"
-              title={t('chatInput.typeHint')}
-            >
-              i
-            </kbd>
-          ) : null}
-
-          <Button
-            variant={hasContent ? 'primary' : 'secondary'}
-            size="icon"
-            className={cn(
-              'size-11 shrink-0 rounded-full transition-all',
-              hasContent ? 'opacity-100 shadow-lift' : 'opacity-50'
-            )}
-            onClick={handleSend}
-            disabled={!hasContent || disabled}
-            aria-label={t('chatInput.sendMessage')}
-          >
-            <ArrowUp className="size-5" />
-          </Button>
+              <img alt="" src="/auth/send.svg" className="h-[25px] w-[26px]" />
+            </button>
+          </div>
         </div>
       </div>
     </div>

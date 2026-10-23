@@ -255,8 +255,8 @@ export const messages = {
     workflowsBanner: 'Meet Workflows — chain agents into multi-step pipelines that hand work to each other.',
   },
   chatInput: {
-    placeholder: 'Message...',
-    placeholderWithMentions: 'Message... (use @ to mention agents or knowledge)',
+    placeholder: 'Ask Away',
+    placeholderWithMentions: 'Ask Away (use @ to mention agents or knowledge)',
     dropFilesHere: 'Drop files here',
     addAttachments: 'Add attachments and more',
     attachFile: 'Attach file',

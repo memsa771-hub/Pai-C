@@ -5,7 +5,7 @@ import { ChatMessages } from './chat-messages';
 import { TypingBubble } from './working-indicator';
 import { PaiDmIntro } from './pai-dm-intro';
 import { ChatInput, type PendingFile } from './chat-input';
-import { CounselorVoiceControl } from './counselor-voice-control';
+import { VoiceModeButton, VoiceStatus, useCounselorVoice } from './counselor-voice-control';
 import { CounselorMirrorCard } from '@/components/counselor/counselor-mirror-card';
 import counselorCopy from '@/components/counselor/workspace/copy.json';
 import { CounselorRequestPanel } from './counselor-request-panel';
@@ -315,6 +315,12 @@ export function ChatView({counselorOnly=false,initialDraft=""}:{counselorOnly?:b
         : dmPairAddrs.map(dmAddrLabel).join(' ↔ '))
     : null;
   const currentSession = sessions.find((s) => s.sessionId === currentSessionId);
+  // Voice is for conversations PAI takes part in; its button sits in the composer.
+  const voiceEnabled = !!currentSessionId && !!currentUser.id && !isDM
+    && (currentSessionId === 'pai-counselor' || currentSession?.master === 'pai' || !!currentSession?.participants.includes('pai'));
+  const voice = useCounselorVoice({
+    conversation: currentSessionId || '', senderName: currentUser.name, senderId: currentUser.id, onMessagePosted: forceRefresh,
+  });
   const sessionOptimisticMessages = useMemo(
     () => currentSessionId ? messagesForSession(currentSessionId, optimisticMessages) : [],
     [currentSessionId, optimisticMessages]
@@ -1019,17 +1025,7 @@ export function ChatView({counselorOnly=false,initialDraft=""}:{counselorOnly?:b
                 onUpdated={forceRefresh} />
               <CounselorRequestPanel refreshKey={displayMessages.length} />
             </div>}
-            {currentSessionId && currentUser.id && (
-              !isDM && (currentSessionId === 'pai-counselor' || currentSession?.master === 'pai' || currentSession?.participants.includes('pai'))
-            ) && (
-              <CounselorVoiceControl
-                key={currentSessionId}
-                conversation={currentSessionId}
-                senderName={currentUser.name}
-                senderId={currentUser.id}
-                onMessagePosted={forceRefresh}
-              />
-            )}
+            {voiceEnabled && <VoiceStatus voice={voice} />}
             {!counselorOnly && currentSessionId && <ThreadStatusBar channelName={currentSessionId} messages={displayMessages} />}
             <ChatInput
               onSend={handleSend}
@@ -1041,6 +1037,7 @@ export function ChatView({counselorOnly=false,initialDraft=""}:{counselorOnly?:b
               focusKey={focusKey}
               onCreateRoutine={() => setShowCreateRoutine(true)}
               disabled={!currentUser.name.trim()}
+              voice={voiceEnabled ? <VoiceModeButton voice={voice} /> : undefined}
             />
           </div>
         )}

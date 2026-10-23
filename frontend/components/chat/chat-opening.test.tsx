@@ -22,7 +22,7 @@ vi.mock('@/components/layout/pai-system-status', () => ({
 vi.mock('@/components/layout/app-header', () => ({ DetailHeader: () => null }));
 vi.mock('./chat-input', () => ({ ChatInput: () => null }));
 vi.mock('./thread-status-bar', () => ({ ThreadStatusBar: () => null }));
-vi.mock('./counselor-voice-control', () => ({ CounselorVoiceControl: () => null }));
+vi.mock('./counselor-voice-control', () => ({ useCounselorVoice: () => ({}), VoiceModeButton: () => null, VoiceStatus: () => null }));
 vi.mock('./counselor-request-panel', () => ({ CounselorRequestPanel: () => null }));
 vi.mock('./counselor-research-status', () => ({ CounselorResearchStatus: () => null }));
 vi.mock('@/components/counselor/counselor-mirror-card', () => ({ CounselorMirrorCard: () => null }));

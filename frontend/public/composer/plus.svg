@@ -1,0 +1,36 @@
+<svg preserveAspectRatio="none" overflow="visible" style="display: block;" width="30" height="28.7901" viewBox="0 0 30 28.7901" fill="none" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+<g id="Component 2">
+<g id="Line 1" filter="url(#filter0_df_0_15)">
+<path d="M8.5 14.5001H25.5" stroke-width="2" stroke-linecap="round" stroke="#042974"/>
+</g>
+<g id="Line 2" filter="url(#filter1_df_0_15)">
+<use xlink:href="#stroke0_0_15" stroke="#042974"/>
+<use xlink:href="#stroke0_0_15" stroke="#053CA7" stroke-opacity="0.71"/>
+</g>
+</g>
+<defs>
+<filter id="filter0_df_0_15" x="0" y="8.00006" width="30" height="13" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+<feFlood flood-opacity="0" result="BackgroundImageFix"/>
+<feColorMatrix in="SourceAlpha" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0" result="hardAlpha"/>
+<feOffset dx="-2"/>
+<feGaussianBlur stdDeviation="2.75"/>
+<feComposite in2="hardAlpha" operator="out"/>
+<feColorMatrix type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.25 0"/>
+<feBlend mode="normal" in2="BackgroundImageFix" result="effect1_dropShadow_0_15"/>
+<feBlend mode="normal" in="SourceGraphic" in2="effect1_dropShadow_0_15" result="shape"/>
+<feGaussianBlur stdDeviation="0.1" result="effect2_foregroundBlur_0_15"/>
+</filter>
+<filter id="filter1_df_0_15" x="8.99998" y="2.38419e-07" width="13" height="28.7901" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+<feFlood flood-opacity="0" result="BackgroundImageFix"/>
+<feColorMatrix in="SourceAlpha" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0" result="hardAlpha"/>
+<feOffset dx="-2"/>
+<feGaussianBlur stdDeviation="2.75"/>
+<feComposite in2="hardAlpha" operator="out"/>
+<feColorMatrix type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.25 0"/>
+<feBlend mode="normal" in2="BackgroundImageFix" result="effect1_dropShadow_0_15"/>
+<feBlend mode="normal" in="SourceGraphic" in2="effect1_dropShadow_0_15" result="shape"/>
+<feGaussianBlur stdDeviation="0.05" result="effect2_foregroundBlur_0_15"/>
+</filter>
+<path id="stroke0_0_15" d="M17.5 6.5V22.2901" stroke-width="2" stroke-linecap="round"/>
+</defs>
+</svg>

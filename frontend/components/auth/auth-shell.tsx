@@ -12,6 +12,7 @@ import Link from 'next/link';
 import type { LucideIcon } from 'lucide-react';
 import { AlertCircle, Loader2 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
+import { VoiceBars } from '@/components/chat/voice-bars';
 import { useT } from '@/lib/i18n';
 import { cn } from '@/lib/utils';
 
@@ -106,11 +107,7 @@ function PromptPanel({ text, chip, left, top }: { text: string; chip: string; le
             <span className="whitespace-nowrap text-[14px] leading-normal text-auth-prompt-ink">{t('auth.previewModel')}</span>
           </span>
           <div className="absolute left-[163.7px] top-[0.7px] h-[36.906px] w-[75.755px] overflow-clip">
-            <div className="absolute left-0 top-1/2 h-[29.137px] w-[21.367px] -translate-y-1/2">
-              <span className="absolute inset-[0_34.62%] rounded-[19px] border-[0.943px] border-[rgba(0,0,0,0.28)] bg-auth-blue" />
-              <span className="absolute inset-[19.05%_0_19.05%_73.08%] rounded-[19px] border-[0.943px] border-[rgba(0,0,0,0.29)] bg-auth-blue" />
-              <span className="absolute inset-[19.05%_73.08%_19.05%_0] rounded-[19px] border-[0.943px] border-[rgba(0,0,0,0.28)] bg-auth-blue" />
-            </div>
+            <VoiceBars className="absolute left-0 top-1/2 -translate-y-1/2" />
             <img alt="" src="/auth/send.svg" className="absolute left-[42.79px] top-[6.98px] h-[25px] w-[26px]" />
           </div>
         </div>
