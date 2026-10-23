@@ -66,6 +66,7 @@ plans = Table(
     Column("current_revision", Integer, nullable=False, server_default="1"),
     _created(),
     Column("updated_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
+    Column("changes_paused", Boolean, nullable=False, server_default=text("false")),  # Slice 7 (os_0012), S7-D9
     UniqueConstraint("tenant_id", "source", "external_ref", name="uq_os_plans_identity"),
     _in("status", ("active", "at_risk", "paused", "done"), "ck_os_plans_status"),
 )
@@ -289,6 +290,9 @@ agent_runs = Table(
     # Slice 5 (os_0008): a Writer or Critic reading belongs to an artifact.
     Column("artifact_id", BigInteger, ForeignKey("os.os_artifacts.id", ondelete="SET NULL")),
     UniqueConstraint("artifact_id", "reading", name="uq_os_agent_runs_artifact"),
+    # Slice 7 (os_0012): a Supervisor reading belongs to a plan.
+    Column("plan_id", BigInteger, ForeignKey("os.os_plans.id", ondelete="SET NULL")),
+    UniqueConstraint("plan_id", "reading", name="uq_os_agent_runs_plan"),
 )
 
 # --- Slice 3: Documents (spec 2026-10-20 §3, os_0004) ------------------------------------------------------
@@ -527,4 +531,61 @@ visa_choices = Table(
     Column("updated_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
     UniqueConstraint("tenant_id", "student_ref", name="uq_os_visa_choices"),
     CheckConstraint("reduction >= 0", name="ck_os_visa_choices_reduction"),
+)
+
+# --- Slice 7: replanning (spec 2026-10-23 S7 §3, os_0012) ---------------------------------------------------
+
+PROPOSAL_STATUSES = ("applied", "pending", "accepted", "declined", "expired", "refused")
+OVERRIDE_OPS = ("skip", "cancel", "cancel_programme", "add", "reprioritise")
+
+
+def _plan_fk() -> Column:
+    return Column("plan_id", BigInteger, ForeignKey("os.os_plans.id", ondelete="CASCADE"), nullable=False)
+
+
+proposals = Table(
+    "os_proposals", md,
+    _id(), _tenant(), _plan_fk(),
+    Column("event_ids", JSONB, nullable=False, server_default=text("'[]'::jsonb")),
+    Column("source", Text, nullable=False),
+    Column("ops", JSONB, nullable=False, server_default=text("'[]'::jsonb")),
+    Column("refused", JSONB, nullable=False, server_default=text("'[]'::jsonb")),
+    Column("big", Boolean, nullable=False, server_default=text("false")),
+    Column("status", Text, nullable=False),
+    Column("revision", Integer),
+    Column("based_on", Text),  # the plan's contract SHA-256 when proposed (final review I4)
+    Column("base_revision", Integer),  # and its revision: accepting after either changed is refused
+    Column("expires_at", DateTime(timezone=True)),
+    _created(),
+    Column("answered_at", DateTime(timezone=True)),
+    _in("source", ("rules", "supervisor"), "ck_os_proposals_source"),
+    _in("status", PROPOSAL_STATUSES, "ck_os_proposals_status"),
+    Index("ix_os_proposals_plan", "plan_id"),
+)
+
+plan_overrides = Table(
+    "os_plan_overrides", md,
+    _id(), _tenant(), _plan_fk(),
+    Column("proposal_id", BigInteger, ForeignKey("os.os_proposals.id", ondelete="CASCADE"), nullable=False),
+    Column("op", Text, nullable=False),
+    Column("target", Text, nullable=False),  # an instance key, a template key, or a programme ref
+    Column("payload", JSONB, nullable=False, server_default=text("'{}'::jsonb")),
+    Column("active", Boolean, nullable=False, server_default=text("true")),
+    _created(),
+    _in("op", OVERRIDE_OPS, "ck_os_plan_overrides_op"),
+    Index("ix_os_plan_overrides_plan", "plan_id"),
+)
+
+support_cases = Table(
+    "os_support_cases", md,
+    _id(), _tenant(), _plan_fk(),
+    Column("student_ref", Text, nullable=False),
+    Column("reason", Text, nullable=False),
+    Column("event_ids", JSONB, nullable=False, server_default=text("'[]'::jsonb")),
+    Column("proposal_id", BigInteger, ForeignKey("os.os_proposals.id", ondelete="SET NULL")),
+    Column("status", Text, nullable=False, server_default="open"),
+    Column("resolution", Text),
+    _created(),
+    Column("resolved_at", DateTime(timezone=True)),
+    _in("status", ("open", "resolved"), "ck_os_support_cases_status"),
 )
