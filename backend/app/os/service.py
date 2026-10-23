@@ -1,6 +1,6 @@
 """PlanService: select playbook -> read facts -> compile -> kernel. Shared by the API and the workers."""
 
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Mapping, Sequence
 from datetime import date
 
 from sqlalchemy import Engine, and_, select
@@ -53,8 +53,10 @@ class PlanService:
                 P.c.tenant_id == self.kernel.tenant_id, P.c.source == contract.source,
                 P.c.external_ref == contract.external_ref))).scalar_one_or_none()
 
-    def compile(self, contract: RouteContract, playbook: Playbook, plan_id: int | None = None) -> PlanDraft:
-        """`plan_id`: a running plan, whose replan overrides (Slice 7) are applied, so every recompile keeps them."""
+    def compile(self, contract: RouteContract, playbook: Playbook, plan_id: int | None = None,
+                extra_overrides: Sequence = ()) -> PlanDraft:
+        """`plan_id`: a running plan, whose replan overrides (Slice 7) are applied, so every recompile keeps them.
+        `extra_overrides`: a replan's candidate overrides, compiled to check them before they are stored."""
         from app.os.replan.store import OverrideStore  # imported here: replan imports the service
 
         route_fields, programme_fields = needed_fields(playbook)
@@ -65,7 +67,7 @@ class PlanService:
             self.knowledge.route_facts(playbook.key, sorted(route_fields), year),
             self.knowledge.programme_facts(refs, sorted(programme_fields), year),
             self.today(), self.disabled_types(),
-            overrides=OverrideStore(self.engine, self.kernel.tenant_id).active(plan_id),
+            overrides=[*OverrideStore(self.engine, self.kernel.tenant_id).active(plan_id), *extra_overrides],
         )
 
     def start_plan(self, contract: RouteContract) -> PlanRef:

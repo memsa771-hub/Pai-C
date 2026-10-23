@@ -100,6 +100,9 @@ def is_big(op: Op, tasks: Mapping[str, TaskRow], playbook) -> bool:
         t = tasks.get(op.instance_key)
         return t is not None and t.critical
     if isinstance(op, AddTask):
+        base = op.template_key if op.programme_ref is None else f"{op.template_key}@{op.programme_ref}"
+        if base in tasks:  # doing a step of the plan again (e.g. approving a changed file, S7-D11): small
+            return False
         tmpl = next((t for t in playbook.tasks if t.template_key == op.template_key), None)
         if tmpl is None or tmpl.kind != "student":
             return False
