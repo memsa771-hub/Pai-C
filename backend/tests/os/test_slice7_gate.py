@@ -112,7 +112,7 @@ def test_slice7_gate(gate, engine, case):
     if "outbox" in want:
         with engine.connect() as conn:
             keys = conn.execute(select(models.outbox.c.idempotency_key)).scalars().all()
-        assert f"replan:{p.id}:{want['outbox']}" in keys
+        assert f"replan:{plan_id}:{want['outbox']}:{NOW.date().isoformat()}" in keys  # one nudge per step per day
     if "task" in want:
         with engine.connect() as conn:
             assert conn.execute(select(T.c.id).where(T.c.plan_id == plan_id,

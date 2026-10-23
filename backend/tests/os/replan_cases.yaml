@@ -28,10 +28,10 @@
   event: {type: task_failed, instance_key: applications_submitted, attempt: 2}
   expect: {status: applied, ops: [escalate], support: true}
 
-- id: germany_newer_guide_needs_accept
+- id: germany_newer_guide_missing_refused
   route: germany_master
-  event: {type: playbook_newer, version: 2}
-  expect: {status: pending, ops: [upgrade_playbook]}
+  event: {type: playbook_newer, version: 99}  # no such version: refused, a person checks (invariant 10)
+  expect: {status: refused, support: true}
 
 - id: germany_deadline_at_risk_asks_student
   route: germany_master
