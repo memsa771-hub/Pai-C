@@ -49,8 +49,8 @@ def run_reminders(engine: Engine, outbox: Outbox, now: datetime, tenant_id: str)
                    "slot": slot}
         if outbox.add(f"reminder:{r.id}:{slot}", "email", r.student_ref, "inbox_reminder", payload):
             added += 1
-            if slot.startswith("esc:"):  # slack is gone: Slice 7's rules act on this event
+            if slot.startswith("esc:"):  # slack is gone: Slice 7's replan acts on this event
                 with engine.begin() as conn:
-                    conn.execute(insert(models.events).values(
-                        tenant_id=tenant_id, plan_id=r.plan_id, task_id=r.id, type="escalate", payload=payload))
+                    events.record(conn, tenant_id, r.plan_id, "escalate", {**payload, "instance_key": r.instance_key},
+                                  f"{r.id}:{slot}", r.id)
     return added

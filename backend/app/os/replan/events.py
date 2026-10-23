@@ -42,6 +42,7 @@ def pending(engine: Engine, tenant_id: str, plan_id: int | None = None) -> list[
     named = lambda table: exists().where(table.c.tenant_id == tenant_id,  # noqa: E731
                                          table.c.event_ids.contains(func.jsonb_build_array(EV.c.id)))
     q = select(EV).where(EV.c.tenant_id == tenant_id, EV.c.type.in_(EVENT_TYPES), EV.c.plan_id.is_not(None),
+                         EV.c.payload.has_key("dedupe"),  # recorded by `record` (Slice 7), not an older log line
                          ~named(PR), ~named(C))
     if plan_id is not None:
         q = q.where(EV.c.plan_id == plan_id)

@@ -146,3 +146,23 @@ def test_approved_changed_recorded_once(svc, engine):
     assert events.detect_approved_changed(engine, "pai", plan_id) == 0
     got = of_type(engine, plan_id, "approved_changed")
     assert got[0].payload["template_key"] == "review_visa_file"
+
+
+def test_old_events_are_not_pending(svc, engine):
+    """Final review I11: events logged before Slice 7 (no dedupe key) never flood the replan job at deploy."""
+    plan_id = svc.start_plan(TEST_STUDENT).plan_id
+    with engine.begin() as conn:
+        conn.execute(EV.insert().values(tenant_id="pai", plan_id=plan_id, type="escalate", payload={"task_id": 1}))
+    assert events.pending(engine, "pai") == []
+
+
+def test_escalation_names_its_step(svc, engine):
+    """Final review I11: the reminders' escalation carries the step's key (the only field the Supervisor may see)."""
+    plan_id = svc.start_plan(TEST_STUDENT).plan_id
+    due = datetime(2027, 2, 10, 22, 59, tzinfo=timezone.utc)
+    set_state(engine, plan_id, "travel_insurance", state="waiting_student", due_at=due)
+    outbox = Outbox(engine, "pai")
+    run_reminders(engine, outbox, due + timedelta(minutes=30), "pai")
+    run_reminders(engine, outbox, due + timedelta(minutes=50), "pai")  # the same day's slot: no second escalation
+    got = [e for e in events.pending(engine, "pai") if e.type == "escalate"]
+    assert len(got) == 1 and got[0].payload["instance_key"] == "travel_insurance"
