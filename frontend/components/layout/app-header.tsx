@@ -114,7 +114,6 @@ export const VIEW_TITLE_KEYS: Record<ViewMode, MessageKey> = {
   profile: "views.profile",
   notifications: "views.notifications",
   files: "views.files",
-  browser: "views.browser",
   inbox: "views.inbox",
 }
 
@@ -207,8 +206,6 @@ export function AppHeader() {
     files,
     selectedFileId,
     currentFilePath,
-    browserTabs,
-    selectedBrowserTabId,
     agents,
     sessions,
   } = useWorkspace()
@@ -223,13 +220,6 @@ export function AppHeader() {
     title = (
       <h3 className="w-0 flex-1 truncate text-sm leading-snug font-semibold text-foreground">
         {name || t("views.files")}
-      </h3>
-    )
-  } else if (viewMode === "browser") {
-    const tab = browserTabs.find((tabItem) => tabItem.id === selectedBrowserTabId)
-    title = (
-      <h3 className="w-0 flex-1 truncate text-sm leading-snug font-semibold text-foreground">
-        {tab?.title || tab?.url || t("views.browser")}
       </h3>
     )
   } else {

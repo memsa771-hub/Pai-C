@@ -22,7 +22,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from app.config import config
 from app.security.errors import EmailNotVerified, IdentityUnavailable
 from app.api.response import ResponseCode, json_response
-from app.routers import counselor_possibilities, account, app_version, auth, browser, counselor_summary, counselor_voice, decision_records, escalations, events, feedback, fetch, files, network, notifications, operator, roadmaps, search, shares, student_profile, student_requests, tasks, workflows, workspaces
+from app.routers import counselor_possibilities, account, app_version, auth, counselor_summary, counselor_voice, decision_records, escalations, events, feedback, fetch, files, network, notifications, operator, roadmaps, search, shares, student_profile, student_requests, tasks, workflows, workspaces
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -86,18 +86,11 @@ def _run_maintenance():
 
 async def _maintenance_loop():
     """Background loop: heavy expiry/archival scans every few minutes, run
-    off the event loop via ``asyncio.to_thread``, plus the browser sweep."""
-    from app.browser.maintenance import sweep_browser_tabs
-
-    browser_sweep_task = None
+    off the event loop via ``asyncio.to_thread``."""
     while True:
         await asyncio.sleep(MAINTENANCE_INTERVAL_SECONDS)
         try:
             await asyncio.to_thread(_run_maintenance)
-            # Browser sweep is async (BF HTTP calls) and self-contained; run it
-            # as its own task. Overlap guard: skip if the last one still runs.
-            if browser_sweep_task is None or browser_sweep_task.done():
-                browser_sweep_task = asyncio.create_task(sweep_browser_tabs())
         except Exception:
             logger.exception("Maintenance loop error")
 
@@ -156,12 +149,6 @@ async def lifespan(app: FastAPI):
 
     logger.info("LIFESPAN: creating maintenance task")
     maintenance_task = asyncio.create_task(_maintenance_loop())
-
-    # One-off browser sweep at boot: sessions leaked before a restart (or
-    # closes that failed mid-deploy) get released now instead of waiting
-    # for the first periodic maintenance cycle.
-    from app.browser.maintenance import sweep_browser_tabs
-    startup_browser_sweep = asyncio.create_task(sweep_browser_tabs())  # noqa: F841 — keep ref so it isn't GC'd
 
     logger.info("LIFESPAN: yielding (startup complete)")
     yield
@@ -394,7 +381,6 @@ app.include_router(app_version.router)
 app.include_router(decision_records.router)
 app.include_router(escalations.router)
 app.include_router(auth.router)
-app.include_router(browser.router)
 app.include_router(counselor_voice.router)
 app.include_router(counselor_summary.router)
 from app.routers import counselor_fact_cards, counselor_profile_cards, counselor_paths, counselor_health, counselor_workspace

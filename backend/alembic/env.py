@@ -15,7 +15,6 @@ from app.models import (  # noqa: F401
     Channel,
     ChannelMember,
     EventRecord,
-    Invitation,
     User,
     Workspace,
     WorkspaceMember,

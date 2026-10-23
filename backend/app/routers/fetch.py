@@ -33,7 +33,8 @@ from fastapi import APIRouter, Depends, Header
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from app.browser.manager import BrowserManager, BrowserNavigationError, classify_navigation_error
+from app.browser.credentials import SOURCE_GLOBAL, SOURCE_WORKSPACE
+from app.browser.manager import BROWSERFABRIC_API_KEY, BrowserManager, BrowserNavigationError, classify_navigation_error
 from app.database import get_db
 from app.security.network import (
     OUTBOUND_USER_AGENT,
@@ -42,12 +43,40 @@ from app.security.network import (
     validate_public_url,
 )
 from app.api.response import ResponseCode, json_response, success_response
-from app.routers.browser import _resolve_bf_key
+from app.models import Workspace
 from app.routers.network import _resolve_workspace, _verify_workspace_access
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/v1", tags=["Fetch"])
+
+
+async def _resolve_bf_key(workspace: Workspace, db: Session) -> tuple:
+    """Resolve the Browser Fabric API key for a new rendering session.
+
+    Returns (key, source) where source is 'workspace' | 'global' | None.
+    Priority: a key stored in workspace settings (user-provided or
+    auto-provisioned), then the global BROWSERFABRIC_API_KEY, then a newly
+    auto-provisioned key stored on the workspace.
+    """
+    settings = workspace.settings or {}
+    stored_key = settings.get("browserfabric_api_key")
+    if stored_key:
+        return stored_key, SOURCE_WORKSPACE
+
+    if BROWSERFABRIC_API_KEY:
+        return BROWSERFABRIC_API_KEY, SOURCE_GLOBAL
+
+    new_key = await BrowserManager.provision_workspace_key(str(workspace.id))
+    if new_key:
+        current = dict(workspace.settings or {})
+        current["browserfabric_api_key"] = new_key
+        workspace.settings = current
+        db.commit()
+        logger.info("Auto-provisioned BF API key for workspace %s", workspace.id)
+        return new_key, SOURCE_WORKSPACE
+
+    return None, None
 
 STATIC_TIMEOUT_SECONDS = 15.0
 MAX_RESPONSE_BYTES = 2 * 1024 * 1024

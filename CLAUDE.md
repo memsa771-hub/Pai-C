@@ -23,7 +23,9 @@ Figma board (locked): https://www.figma.com/board/NjVJfdxERWfRHPycy1wDkF
 - Reuse: Model Gateway, Task Runtime, Operator (workflow mode), research gateway, Memory Service, reconciler.
 - No hardcoding of country, institution, exam, language or persona. Policies, copy and catalogs live in data files.
 - Prompts live in .md files. When a prompt changes, sync docs/counselor/COUNSELOR_V3_PROMPTS.md (tests compare them).
-- DB changes only via Alembic migrations, never drop tables. Never edit .env. Never print secrets.
+- DB changes only via Alembic migrations. Drop a table only with the founder's explicit approval (migration 115
+  dropped the PAI OS tables). Never edit .env. Never print secrets.
+- This repo is PAI C only. PAI OS meets it through the decision record (handoff), student requests and escalations.
 - No live model/API calls without the founder's approval and a cost cap.
 
 ## Commands

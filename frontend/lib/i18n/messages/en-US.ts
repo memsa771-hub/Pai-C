@@ -159,7 +159,6 @@ export const messages = {
     notifications: 'Notifications',
     threads: 'Threads',
     files: 'Documents',
-    browser: 'Research Browser',
     tasks: 'Tasks',
     workflows: 'Workflows',
     inbox: 'Inbox',
@@ -232,35 +231,6 @@ export const messages = {
   },
 
 
-  paiGuide: {
-    title: 'PAI Counselor can help you get set up',
-    itemConnect: 'Build your student profile and keep important details up to date',
-    itemAgents: 'Explore suitable programs, universities, and education pathways',
-    itemManage: 'Plan applications, tasks, documents, and deadlines in one workspace',
-    itemDebug: 'Use PAI Operator for approved browser and file actions',
-    hint: 'Just ask in this thread — e.g. “Help me plan my university applications”.',
-    minimize: 'Minimize',
-    collapsedHint: 'What can PAI Counselor do? View the guide',
-  },
-  paiDmIntro: {
-    greeting: 'Hi, I’m your workspace guide! I can help you manage agents, create tasks, and answer questions about the workspace.',
-    quickWhat: 'What can you help me with?',
-  },
-  featureTours: {
-    kicker: 'Tour',
-    watch: 'Watch the 20s tour',
-    replay: 'Replay',
-    done: 'Done',
-    dismiss: 'Dismiss',
-    browserTitle: 'Shared Browser',
-    routinesTitle: 'Routines',
-    tasksTitle: 'Tasks',
-    workflowsTitle: 'Workflows',
-    browserBanner: 'Meet the Shared Browser — agents browse the web in a pane you both see, and you can take over anytime.',
-    routinesBanner: 'Meet Routines — schedule an agent to run on its own and post results, no one at the keyboard.',
-    tasksBanner: 'Meet Tasks — assign a card to an agent and watch it move across the board as work happens.',
-    workflowsBanner: 'Meet Workflows — chain agents into multi-step pipelines that hand work to each other.',
-  },
   chatInput: {
     placeholder: 'Ask Away',
     placeholderWithMentions: 'Ask Away (use @ to mention agents or knowledge)',
@@ -300,8 +270,6 @@ export const messages = {
     stopping: 'Stopping...',
     showAllSteps: 'Showing all intermediate steps',
     showLatestSteps: 'Showing only latest steps',
-    hideBrowserPreview: 'Hide browser preview',
-    showBrowserPreview: 'Show browser preview',
     shareConversation: 'Share conversation',
     copyMessage: 'Copy message',
     copyFailed: 'Failed to copy',
@@ -717,15 +685,6 @@ export const messages = {
     signOutDescription: "You'll be signed out on this device.",
   },
 
-  qrcode: {
-    trigger: 'Open on another device',
-    dialogTitle: 'Open on another device',
-    dialogDescription: 'Scan with your phone and sign in as you — it opens straight into your Placement AI workspace, not anyone else’s.',
-    clickToCopy: 'Click the code to copy the link',
-    copied: 'Link copied',
-    copyFailed: 'Failed to copy link',
-  },
-
   settings: {
     title: 'Workspace Settings',
     saved: 'Settings saved',
@@ -739,108 +698,10 @@ export const messages = {
     monitorModeHint: 'Show a 2x3 grid overview of recent threads instead of the thread list.',
     notificationSound: 'Notification Sound',
     notificationSoundHint: 'Play a sound when an agent completes a task.',
-    splitBrowser: 'Split Browser View',
-    splitBrowserHint: 'Show browser tab side-by-side with chat when viewing threads.',
-    browserFabricKey: 'Browser Fabric API Key',
-    browserFabricCurrent: 'Current: {key}',
-    browserFabricReplace: 'Enter new key to replace',
-    browserFabricPlaceholder: 'bf_... (optional — auto-provisioned if empty)',
     agentDescriptions: 'Agent Descriptions',
     agentDescriptionsHint:
       "Describe each agent's role and capabilities so other agents know when to delegate work.",
     agentDescriptionPlaceholder: 'Describe what {agent} does, e.g. "Manages the Python SDK codebase"',
-    browserFabricHint:
-      'Each workspace gets a free-tier key automatically. Set a custom key to use your own BrowserFabric account.',
-  },
-
-  admin: {
-    title: 'Workspace settings',
-    backToWorkspace: 'Back to workspace',
-    loading: 'Loading workspace…',
-    loadFailed: 'Failed to load the workspace.',
-    retry: 'Retry',
-    accessDeniedTitle: 'No access',
-    accessDeniedBody: "You don't have access to this workspace's settings.",
-    readOnlyBanner: 'These settings are read-only for this connection.',
-
-    navProfile: 'Profile',
-    navGeneral: 'General',
-    navSecurity: 'Security',
-    navDevices: 'Devices',
-    navIntegrations: 'Integrations',
-    navPreferences: 'Preferences',
-
-    generalTitle: 'General',
-    generalDescription: 'Workspace name, language and display options.',
-
-    securityTitle: 'Security & access',
-    securityDescription: 'Login enforcement and workspace credentials.',
-    requireLogin: 'Require login',
-    requireLoginHint: 'When on, you must sign in with your Placement AI account to open this workspace.',
-    requireLoginOn: 'Login now required',
-    requireLoginOff: 'Login no longer required',
-    requireLoginFailed: 'You do not have permission to change this setting',
-    workspaceToken: 'Workspace token',
-    workspaceTokenHint:
-      'The machine credential agents and devices use to connect. Anyone with this token has full access — share it carefully.',
-
-    lastSeen: 'Last seen {time}',
-
-    integrationsTitle: 'Integrations',
-    integrationsDescription: 'API keys and external services for this workspace.',
-
-    chatPlatformsTitle: 'Chat platforms',
-    chatPlatformsHint:
-      'Connect a Slack or Telegram bot so people can chat with this workspace’s agents from there. Each external conversation becomes its own thread here.',
-    connectTelegram: 'Connect Telegram',
-    connectSlack: 'Connect Slack',
-    addToSlack: 'Add to Slack',
-    useCustomSlackApp: 'use a custom Slack app instead',
-    integrationDefaultAgent: 'Default agent',
-    integrationNoDefaultAgent: 'Automatic (router decides)',
-    integrationConnected: 'Connected {name}',
-    integrationConnectFailed: 'Could not connect: {error}',
-    integrationRemove: 'Disconnect',
-    integrationRemoveTitle: 'Disconnect this integration?',
-    integrationRemoveDescription:
-      '{name} will stop bridging messages. Existing threads are kept.',
-    integrationRemoved: 'Integration removed',
-    integrationRemoveFailed: 'Could not remove the integration',
-    integrationUpdated: 'Integration updated',
-    integrationUpdateFailed: 'Could not update the integration',
-    integrationLastError: 'Last error: {error}',
-    integrationDisabled: 'Disabled',
-    noIntegrations: 'No chat platforms connected yet.',
-    telegramTokenLabel: 'Bot token',
-    telegramTokenPlaceholder: '123456789:AA…',
-    telegramHelp:
-      'Create a bot with @BotFather in Telegram (/newbot), then paste its token here. Messages sent to the bot are answered by this workspace’s agents.',
-    slackTokenLabel: 'Bot OAuth token',
-    slackTokenPlaceholder: 'xoxb-…',
-    slackSigningSecretLabel: 'Signing secret',
-    slackSigningSecretPlaceholder: 'From the app’s Basic Information page',
-    slackHelp:
-      'Create a Slack app (api.slack.com/apps), add the bot scopes chat:write, chat:write.customize, users:read and the event subscriptions message.im, message.channels, then install it and paste the bot token and signing secret here.',
-    slackEventsUrlLabel: 'Events request URL',
-    slackEventsUrlHint:
-      'Paste this URL into your Slack app under Event Subscriptions → Request URL.',
-    connectLark: 'Connect Lark / Feishu',
-    larkHelp:
-      'Create a custom app in the Lark/Feishu developer console, enable the Bot capability and the im:message permissions, subscribe to the "Receive messages" (im.message.receive_v1) event, then paste the app credentials here. Works with both Feishu (China) and Lark (international) — the region is detected automatically.',
-    larkAppIdLabel: 'App ID',
-    larkAppSecretLabel: 'App Secret',
-    larkVerificationTokenLabel: 'Verification Token',
-    larkCredentialsHint: 'From Event Subscriptions → Encryption Strategy',
-    larkEncryptKeyLabel: 'Encrypt Key (optional)',
-    larkEncryptKeyPlaceholder: 'Leave empty if event encryption is off',
-    larkEventsUrlLabel: 'Event request URL',
-    larkEventsUrlHint:
-      'Paste this URL into your Lark/Feishu app under Event Subscriptions → Request URL.',
-    copied: 'Copied',
-
-    preferencesTitle: 'Preferences',
-    preferencesDescription:
-      'Options for this browser only — they do not affect other members.',
   },
 
   /**
@@ -1144,111 +1005,6 @@ export const messages = {
     you: 'You',
   },
 
-  newThread: {
-    title: 'New Thread',
-    descriptionMulti: 'Pick which agents join this conversation.',
-    descriptionSingle: 'Start a new conversation with your agent.',
-    allSelected: 'All agents selected',
-    selectAll: 'Select all agents',
-    partialSelected: '{selected} of {total} agents selected',
-    noneOnline: 'No agents are currently online.',
-    offlineExcluded: {
-      one: '{count} offline agent not included',
-      other: '{count} offline agents not included',
-    },
-    start: 'Start Thread',
-  },
-
-  landing: {
-    docs: 'Docs',
-    signIn: 'Sign In',
-
-    heroTitle: 'Your agents, working together',
-    heroBody:
-      'Placement AI is a shared workspace for your AI agents — chat, collaborate on tasks, share files and a browser, and get guidance from a built-in PAI Counselor, all in real time.',
-    heroNote: 'Install in seconds. Works on macOS, Linux, and Windows.',
-
-    stepsTitle: 'Get started in three steps',
-    step1Title: 'Create a workspace',
-    step1Body:
-      'Creates a workspace and gives you a shareable token. Share it with teammates or other agents.',
-    step2Title: 'Connect your agents',
-    step2Body:
-      'Create an agent, start the daemon, and connect it with the token from step 1. Add as many agents as you need.',
-    step3Title: 'Collaborate',
-    step3Card:
-      'Your agents and teammates appear here in a shared workspace — exchanging messages, sharing files, and working on tasks together.',
-    step3BodyBefore: 'Open your workspace at',
-    step3BodyAfter: 'to see everything in real time.',
-
-    agentsTitle: 'Supported agents',
-    agentsBody:
-      'Install any of these agents with a single command, then connect them to your workspace. More agents are added regularly.',
-    agentsSearchBefore: 'Search for more:',
-
-    featuresTitle: 'Why Placement AI',
-    featureNetworksTitle: 'Agent Networks',
-    featureNetworksBody:
-      'Agents discover, communicate, and collaborate in shared environments — hosted or self-hosted.',
-    featureSetupTitle: 'One-Command Setup',
-    featureSetupBody:
-      'agn create installs, configures, and runs your agent in one step. Background daemon auto-restarts on crash.',
-    featureProtocolTitle: 'Protocol Support',
-    featureProtocolBody: 'Native MCP and A2A support. Also works with gRPC, WebSocket, and HTTP.',
-    featureCrossPlatformTitle: 'Cross-Platform',
-    featureCrossPlatformBody:
-      'macOS (launchd), Linux (systemd), Windows (Task Scheduler). Works everywhere.',
-
-    cliTitle: 'CLI quick reference',
-    cliGroupAgent: 'Agent Management',
-    cliGroupDaemon: 'Daemon',
-    cliGroupWorkspace: 'Workspace',
-    cliScanMachine: 'Scan machine, show agent status',
-    cliInstallRuntime: 'Install an agent runtime',
-    cliCreateInstance: 'Create an agent instance',
-    cliConnectWorkspace: 'Connect an agent to a workspace',
-    cliStartAgent: 'Start a configured agent via the daemon',
-    cliStopAgent: 'Stop a specific agent',
-    cliSearchAgents: 'Search available agents',
-    cliDaemonUp: 'Start daemon (all configured agents)',
-    cliDaemonDown: 'Stop daemon',
-    cliDaemonStatus: 'Show running agents and daemon health',
-    cliAutostart: 'Auto-start on login',
-    cliLogs: 'Show recent daemon logs',
-    cliWorkspaceCreate: 'Create a workspace, get shareable token',
-    cliWorkspaceJoin: 'Join with a token',
-    cliWorkspaceList: 'List configured workspaces',
-    cliDisconnect: 'Disconnect an agent from its workspace',
-
-    ctaTitle: 'Ready to get started?',
-    ctaBody: 'Install Placement AI and have your first agent running in under a minute.',
-    ctaReadDocs: 'Read the Docs',
-    ctaViewGitHub: 'View on GitHub',
-    ctaJoinDiscord: 'Join Discord',
-
-    footerWebsite: 'Website',
-
-    copy: 'Copy',
-  },
-
-  dashboard: {
-    title: 'Workspaces',
-    workspaceCount: { one: '{count} workspace', other: '{count} workspaces' },
-    agentCount: { one: '{count} agent', other: '{count} agents' },
-    newWorkspace: 'New Workspace',
-    emptyTitle: 'No workspaces yet',
-    emptyBody: 'Create one to get started',
-    loadFailed: 'Failed to load workspaces',
-
-    createTitle: 'New Workspace',
-    agentNamePlaceholder: 'Agent name (required)',
-    workspaceNamePlaceholder: 'Workspace name (optional)',
-    createFailed: 'Failed to create workspace',
-
-    statusActive: 'active',
-    statusArchived: 'archived',
-  },
-
   notFound: {
     title: 'Workspace not found.',
   },
@@ -1288,58 +1044,6 @@ export const messages = {
   },
 
 
-  browser: {
-    title: 'Browser',
-    openNewTab: 'Open new tab',
-    openTabTitle: 'Open a browser tab',
-    openTabDescription: 'Enter a URL, or leave blank for about:blank.',
-    tabOpened: 'Browser tab opened',
-    tabOpenFailed: 'Failed to open tab',
-    closeTab: 'Close tab',
-    tabClosed: 'Tab closed',
-    tabCloseFailed: 'Failed to close tab',
-    openWithSession: 'Open tab with this session',
-    openedWithSession: 'Tab opened with saved session',
-    deleteSavedSession: 'Delete saved session',
-    deleteSavedSessionTitle: 'Delete saved session?',
-    savedSessionDeleted: 'Saved session deleted',
-    savedSessionDeleteFailed: 'Failed to delete session',
-    emptyTitle: 'No browser tabs',
-    emptyBody: 'Open a tab or ask an agent to browse',
-    persistent: 'Persistent',
-    activeTabs: 'Active Tabs',
-
-    selectTabTitle: 'Select a browser tab',
-    selectTabBody: 'Choose a tab from the list or open a new one',
-    untitled: 'Untitled',
-    reconnected: 'Tab reconnected',
-    reconnectFailed: 'Failed to reconnect',
-    navigateFailed: 'Failed to navigate',
-    makePersistent: 'Make Persistent',
-    makePersistentHint: 'Make persistent — preserve login state for agents to reuse',
-    makePersistentFailed: 'Failed to make persistent',
-    savePersistentTitle: 'Save this session',
-    savePersistentDescription: 'Give it a name so you can reuse the saved login later.',
-    savePersistentPlaceholder: 'e.g. LinkedIn Account, Google Search Console',
-    nowPersistent: '"{name}" is now persistent',
-    thisTab: 'this tab',
-    removePersistentHint: 'Remove persistent state — revert to temporal tab',
-    removePersistentTitle: 'Remove persistent state?',
-    removePersistentDescription: 'The saved cookies and login state for "{label}" will be deleted.',
-    nowTemporal: 'Tab is now temporal',
-    removePersistentFailed: 'Failed to remove persistent state',
-    reconnectHint: 'Reconnect — create a new browser session',
-    reconnect: 'Reconnect',
-    restoreSize: 'Restore size',
-    expandFullPage: 'Expand to full page',
-    editUrl: 'Click to edit URL',
-    expiredTitle: 'Browser session expired',
-    expiredBody: 'The remote browser timed out. Click reconnect to start a new session.',
-    liveBrowser: 'Live browser: {url}',
-    screenshotOf: 'Screenshot of {url}',
-    noScreenshot: 'No screenshot available',
-  },
-
   inbox: {
     title: 'Inbox',
     dismiss: 'Dismiss',
@@ -1350,71 +1054,6 @@ export const messages = {
     unread: 'Unread',
     read: 'Read',
     goToThread: 'Go to thread',
-  },
-
-  invitations: {
-    inviteAgent: 'Invite agent',
-    title: 'Invite Agent',
-    description:
-      'Invite an agent that is already registered on the platform to join this workspace.',
-    hint: 'After inviting, use the invite token to connect the agent.',
-    agentName: 'Agent Name',
-    agentNamePlaceholder: 'e.g. claude-abc123',
-    invite: 'Invite',
-    inviting: 'Inviting...',
-    sent: 'Invitation sent to {agent}',
-    failed: 'Failed to create invitation',
-    listTitle: 'Invitations',
-    copyToken: 'Copy invite token',
-  },
-
-  monitor: {
-    searchThreads: 'Search threads (/)',
-    searchPlaceholder: 'Search threads...',
-    noThreadsFound: 'No threads found',
-    noThread: 'No thread',
-    untitled: 'Untitled',
-    noMessages: 'No messages yet',
-    threadFallback: 'Thread',
-  },
-
-  sessions: {
-    label: 'Sessions',
-    empty: 'No sessions yet',
-    new: 'New Session',
-  },
-
-  agents: {
-    label: 'Agents',
-    online: 'Online',
-    offline: 'Offline',
-    lastSeen: 'Last seen {time}',
-    setAsMaster: 'Set as Master',
-    promoted: '{agent} promoted to master',
-    removeDescription: '{agent} will be removed from this workspace.',
-    removed: '{agent} removed',
-    roleFailed: 'Failed to update role',
-    removeTitle: 'Remove agent?',
-    remove: 'Remove',
-    removeFailed: 'Failed to remove agent',
-    dangerZone: 'Danger zone',
-    removeAgentHint: 'Remove this agent from the workspace.',
-    removeAgentTitle: 'Remove {agent}?',
-    removeAgentBody: 'This removes the agent from the workspace. If its launcher is still running on the node, stop or remove it there too — otherwise it may rejoin.',
-
-    startThread: 'Start a Thread',
-    description: 'Description',
-    descriptionPlaceholder:
-      'Describe what {agent} does so other agents know when to delegate work...',
-    displayNameSaved: 'Name saved',
-    displayNameSaveFailed: 'Failed to save name',
-    editDisplayName: 'Edit name',
-    descriptionSaved: 'Description saved',
-    descriptionSaveFailed: 'Failed to save description',
-    connectionDetails: 'Connection Details',
-    fieldType: 'Type',
-    fieldAgentId: 'Agent ID',
-    copyField: 'Copy {field}',
   },
 
   counselorRoadmaps: {

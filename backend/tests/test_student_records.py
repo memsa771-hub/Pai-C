@@ -669,13 +669,12 @@ def test_rich_profile_records_are_repeatable_and_validated(db, kind, value):
     assert len(StudentRecordService(db).list(db.info["workspace"], kind)) == 1
 
 
-def test_operator_can_propose_but_cannot_directly_manage_profile():
+def test_operator_has_no_profile_or_memory_tools():
     from app.memory.permissions import OPERATOR_CAPABILITIES
     from app.tools import AUDIENCE_OPERATOR, get_tool_registry
     tools = {entry["function"]["name"] for entry in
              get_tool_registry().openai_tools_for_audience(AUDIENCE_OPERATOR, OPERATOR_CAPABILITIES)}
-    assert "profile__propose" in tools
-    assert "memory__remember" not in tools and "memory__forget" not in tools
+    assert not any(name.startswith(("profile__", "memory__", "vault__")) for name in tools)
 
 
 def test_complex_introduction_extracts_separate_structured_claims(db):

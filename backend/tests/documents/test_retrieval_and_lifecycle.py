@@ -165,11 +165,8 @@ class TestPurgeLifecycle:
 
 
 class TestCounselorToolBoundary:
-    def test_counselor_tools_keep_known_context_available(self):
-        assert "files.read" in PAI_ALLOWED_TOOLS
-        for tool in ("memory.context", "vault.get", "memory.search", "memory.episodes"):
-            assert tool in PAI_ALLOWED_TOOLS
-        assert "profile.answer" not in PAI_ALLOWED_TOOLS
+    def test_counselor_may_only_queue_research(self):
+        assert PAI_ALLOWED_TOOLS == ("operator.delegate",)
 
     def test_ingestion_is_infrastructure_not_a_counselor_tool(self):
         """Automatic ingestion remains infrastructure, not a Counselor tool.

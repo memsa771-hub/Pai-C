@@ -13,15 +13,15 @@ from app.services.pai import WorkspaceApi
     "/v1/application-workspace/institutions", "/v1/application-workspace/applications",
     "/v1/deadlines", "/v1/deadlines/settings/reminders",
     "/v1/integrations", "/v1/routines", "/v1/todos", "/v1/timers", "/v1/knowledge",
+    "/v1/browser/tabs",
 ])
 def test_os_routes_are_not_exposed_by_counselor_app(path):
     assert TestClient(main.app).get(path).status_code == 404
 
 
-def test_shared_contract_routes_and_browser_integration_backends_stay_mounted():
+def test_counselor_and_os_contract_routes_stay_mounted():
     paths = {route.path for route in main.app.routes if hasattr(route, "path")}
-    for prefix in ("/v1/tasks", "/v1/workflows", "/v1/browser",
-                   "/v1/escalations", "/v1/student-requests", "/v1/decision-records",
+    for prefix in ("/v1/fetch", "/v1/escalations", "/v1/student-requests", "/v1/decision-records",
                    "/v1/counselor", "/v1/roadmaps", "/v1/student-profile", "/v1/files"):
         assert any(path.startswith(prefix) for path in paths), prefix
 

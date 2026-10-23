@@ -20,8 +20,8 @@ async def test_delegate_atomically_persists_run_and_one_job_without_starting_exe
     with StudentSession() as student:
         ctx = ToolContext(student.workspace_id, "pai", None, conversation="pai-counselor")
         with patch.object(operator, "is_available", return_value=True), patch.object(operator, "_execute", AsyncMock()) as execute:
-            first = await operator.delegate(ctx, "Fixed work", {}, [], task_type="unowned_task")
-            second = await operator.delegate(ctx, "Fixed work", {}, [], task_type="unowned_task")
+            first = await operator.delegate(ctx, "Fixed work", {"capability_input": {}}, [], task_type="roadmap_research")
+            second = await operator.delegate(ctx, "Fixed work", {"capability_input": {}}, [], task_type="roadmap_research")
         execute.assert_not_awaited()
         assert first["data"]["run_id"] == second["data"]["run_id"]
         with student.factory() as db:
@@ -41,7 +41,7 @@ async def test_enqueue_failure_does_not_leave_an_unscheduled_run():
         with patch.object(operator, "is_available", return_value=True), \
              patch("app.runtime.task_runtime.enqueue", side_effect=RuntimeError("queue unavailable")):
             with pytest.raises(RuntimeError):
-                await operator.delegate(ctx, "Fixed work", {}, [])
+                await operator.delegate(ctx, "Fixed work", {"capability_input": {}}, [], task_type="roadmap_research")
         with student.factory() as db:
             assert db.scalars(select(ExecutionRun)).all() == []
             assert db.scalars(select(BackgroundJob)).all() == []
@@ -52,7 +52,7 @@ async def test_operator_job_survives_claiming_worker_crash_and_restart():
     from app.jobs.worker import _process_one
     with StudentSession() as student:
         with patch.object(operator, "is_available", return_value=True):
-            result = await operator.delegate(ToolContext(student.workspace_id, "pai", None), "Work", {}, [])
+            result = await operator.delegate(ToolContext(student.workspace_id, "pai", None), "Work", {"capability_input": {}}, [], task_type="roadmap_research")
         run_id = result["data"]["run_id"]
         with student.factory() as db:
             job = BackgroundJobService(db).claim(worker_id="crashed-worker")[0]
@@ -84,7 +84,7 @@ async def test_operator_job_survives_claiming_worker_crash_and_restart():
 async def test_resume_enqueues_new_generation_same_run_and_old_job_is_superseded():
     with StudentSession() as student:
         with patch.object(operator, "is_available", return_value=True):
-            result = await operator.delegate(ToolContext(student.workspace_id, "pai", None), "Work", {}, [])
+            result = await operator.delegate(ToolContext(student.workspace_id, "pai", None), "Work", {"capability_input": {}}, [], task_type="roadmap_research")
         run_id = result["data"]["run_id"]
         with student.factory() as db:
             run = db.get(ExecutionRun, run_id)
@@ -113,7 +113,7 @@ async def test_resume_enqueues_new_generation_same_run_and_old_job_is_superseded
 async def test_redelivered_operator_job_does_not_restart_terminal_or_paused_run(status):
     with StudentSession() as student:
         with patch.object(operator, "is_available", return_value=True):
-            result = await operator.delegate(ToolContext(student.workspace_id, "pai", None), "Work", {}, [])
+            result = await operator.delegate(ToolContext(student.workspace_id, "pai", None), "Work", {"capability_input": {}}, [], task_type="roadmap_research")
         with student.factory() as db:
             run = db.get(ExecutionRun, result["data"]["run_id"])
             run.status = status; db.commit()

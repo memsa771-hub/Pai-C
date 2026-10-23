@@ -12,9 +12,8 @@ from app.capabilities.manifest import CapabilitySchemaError
 from app.capabilities.permissions import OPERATOR_PLATFORM_PERMISSIONS
 from app.capabilities.tool_broker import CapabilityToolBroker, CapabilityToolUnavailable
 from app.models import ExecutionRun
-from app.services import operator, pai
+from app.services import operator
 from app.tools import AUDIENCE_OPERATOR, ToolContext, ToolDefinition, ToolExecutor, ToolRegistry, ToolRisk
-from app.tools.builtin import capabilities as capability_tools
 from scripts.counselor_eval_support import StudentSession
 
 
@@ -42,29 +41,48 @@ def test_task_owner_resolution_duplicate_rejection_and_per_run_surface():
     with pytest.raises(ValueError, match="Duplicate task ownership"):
         registry.register(contract(capability_id="example.other"))
 
-    available = frozenset({"capability.list", "capability.describe", "capability.invoke",
-                           "profile.propose", "files.read", "web.search", "browser.open"})
+    available = frozenset({"capability.invoke", "web.search", "web.fetch"})
     owned = resolve_run_policy(registry, "owned_task")
-    assert owned.allowed_tools(available) == frozenset({
-        "capability.list", "capability.describe", "capability.invoke", "profile.propose",
-    })
+    assert owned.allowed_tools(available) == frozenset({"capability.invoke"})
     assert resolve_run_policy(registry, "unowned_task").allowed_tools(available) == available
 
 
 @pytest.mark.asyncio
 async def test_task_type_is_persisted_by_delegation():
+    from app.capabilities import get_capability_registry
+    registry = CapabilityRegistry()
+    registry.register(get_capability_registry().get("operator.run"))
+    registry.register(contract())
     with StudentSession() as student:
         ctx = ToolContext(student.workspace_id, "pai", object(), conversation="pai-counselor")
-        with patch.object(operator, "is_available", return_value=True), \
+        with patch.object(capability_module, "_registry", registry), \
+                patch.object(operator, "is_available", return_value=True), \
                 patch.object(operator, "_execute", AsyncMock()):
             result = await operator.delegate(
-                ctx, "Do the owned work", {}, None, "discovery", "owned_task",
+                ctx, "Do the owned work", {"capability_input": {}}, None, "discovery", "owned_task",
             )
             await asyncio.sleep(0)
         with student.factory() as db:
             run = db.get(ExecutionRun, result["data"]["run_id"])
             assert run.task_type == "owned_task"
             assert operator.serialize_run(run)["task_type"] == "owned_task"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("task_type,constraints", [
+    ("unowned_task", {"capability_input": {}}), ("owned_task", {}),
+])
+async def test_delegation_refuses_work_no_capability_owns(task_type, constraints):
+    registry = CapabilityRegistry()
+    registry.register(contract())
+    with StudentSession() as student:
+        ctx = ToolContext(student.workspace_id, "pai", object(), conversation="pai-counselor")
+        with patch.object(capability_module, "_registry", registry), \
+                patch.object(operator, "is_available", return_value=True):
+            result = await operator.delegate(ctx, "Work", constraints, None, None, task_type)
+        assert result["ok"] is False and result["error"]["code"] == "unsupported_task"
+        with student.factory() as db:
+            assert db.query(ExecutionRun).count() == 0
 
 
 @pytest.mark.asyncio
@@ -140,80 +158,37 @@ async def test_discovery_and_recursive_input_output_validation():
     with pytest.raises(CapabilitySchemaError):
         await CapabilityRouter(registry).execute(item.id, {"student": {"scores": [8]}}, context)
 
-    with patch.object(capability_module, "_registry", registry):
-        listed = await capability_tools.list_capabilities(None, {})
-        described = await capability_tools.describe(None, {"capability_id": item.id})
-    assert listed["data"]["capabilities"][0]["owned_task_types"] == ["owned_task"]
-    assert described["data"]["input_schema"] == nested_input
-    assert described["data"]["required_tools"] == []
 
 
 async def _run_owned(student, fallback, capability_result):
     registry = CapabilityRegistry()
-    owner = registry.register(contract(fallback=fallback))
+    registry.register(contract(fallback=fallback))
     with student.factory() as db:
         run = ExecutionRun(workspace_id=student.workspace_id, requested_by="openagents:pai",
-                           objective="Owned objective", task_type="owned_task", constraints={}, context_refs=[])
+                           objective="Owned objective", task_type="owned_task",
+                           constraints={"capability_input": {}}, context_refs=[])
         db.add(run)
         db.commit()
         run_id = run.id
-
-    phases = AsyncMock(side_effect=[
-        "Understand owned work.",
-        '[{"id":"invoke","title":"Invoke owner"}]',
-        '{"status":"completed","completed_step_ids":["invoke"],"missing":[],"summary":"Done"}',
-    ])
-    seen_surfaces = []
-
-    async def model(**kwargs):
-        seen_surfaces.append({entry["function"]["name"] for entry in (kwargs.get("tools") or [])})
-        if len(seen_surfaces) == 1:
-            return {"role": "assistant", "tool_calls": [{"id": "cap", "type": "function", "function": {
-                "name": "capability__invoke", "arguments": f'{{"capability_id":"{owner.id}","input":{{}}}}'}}]}
-        if len(seen_surfaces) == 2 and fallback is FallbackPolicy.GENERIC_ALLOWED:
-            return {"role": "assistant", "tool_calls": [{"id": "web", "type": "function", "function": {
-                "name": "web__search", "arguments": '{"query":"fallback"}'}}]}
-        return {"role": "assistant", "content": "Finished."}
-
-    executor = SimpleNamespace(execute=AsyncMock(side_effect=[
-        capability_result,
-        *([{"ok": True, "data": {"items": []}}] if fallback is FallbackPolicy.GENERIC_ALLOWED else []),
-    ]))
+    executor = SimpleNamespace(execute=AsyncMock(return_value=capability_result))
     with patch.object(capability_module, "_registry", registry), \
-            patch.object(operator, "chat_completion", phases), \
-            patch.object(operator, "chat_completion_tools", model), \
-            patch.object(operator, "_resolve_memory_context", return_value=""), \
-            patch.object(pai, "workspace_state_summary", AsyncMock(return_value="workspace")), \
             patch("app.tools.get_tool_executor", return_value=executor), \
             patch.object(operator, "_publish_run_updated"), \
             patch.object(operator, "_post_result", AsyncMock()):
         await operator._execute(run_id, student.workspace_id, None, "Owned objective", {}, [], None)
     with student.factory() as db:
-        return db.get(ExecutionRun, run_id), seen_surfaces, executor
+        return db.get(ExecutionRun, run_id), executor
 
 
 @pytest.mark.asyncio
-async def test_owned_failure_policies_and_reduced_surface_are_deterministic():
+@pytest.mark.parametrize("fallback", list(FallbackPolicy))
+async def test_owned_failure_is_failed_whatever_the_fallback_policy(fallback):
     failure = {"ok": False, "error": {"code": "capability_failed", "message": "provider down"}}
     with StudentSession() as student:
-        forbidden, surfaces, executor = await _run_owned(student, FallbackPolicy.FORBIDDEN, failure)
-        assert forbidden.status == "failed"
+        run, executor = await _run_owned(student, fallback, failure)
+        assert run.status == "failed"
         assert executor.execute.await_count == 1
-        assert "web__search" not in surfaces[0] and "capability__invoke" in surfaces[0]
-
-    with StudentSession() as student:
-        generic, surfaces, executor = await _run_owned(student, FallbackPolicy.GENERIC_ALLOWED, failure)
-        assert generic.status == "completed"
-        assert executor.execute.await_count == 2
-        assert "web__search" not in surfaces[0]
-        assert "web__search" in surfaces[1]
-
-    with StudentSession() as student:
-        approval, surfaces, executor = await _run_owned(student, FallbackPolicy.APPROVAL_REQUIRED, failure)
-        assert approval.status == "needs_user_action"
-        assert approval.completed_at is None
-        assert approval.pending_action["purpose"] == "capability_fallback"
-        assert executor.execute.await_count == 1
+        assert executor.execute.await_args.args[0] == "capability.invoke"
 
 
 @pytest.mark.asyncio
@@ -224,7 +199,7 @@ async def test_capability_approval_signal_immediately_pauses_same_run():
                                  "required": True, "purpose": "capability_invoke",
                                  "capability_id": "example.owner"}}}
     with StudentSession() as student:
-        paused, _, executor = await _run_owned(student, FallbackPolicy.GENERIC_ALLOWED, signal)
+        paused, executor = await _run_owned(student, FallbackPolicy.FORBIDDEN, signal)
         assert paused.status == "needs_user_action"
         assert paused.completed_at is None
         assert paused.pending_action["purpose"] == "capability_invoke"

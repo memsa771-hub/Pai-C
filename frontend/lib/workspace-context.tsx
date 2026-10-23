@@ -10,7 +10,7 @@ import { defaultWorkspaceConversation } from './primary-conversation';
 import { DMS_UI_ENABLED } from './config';
 import { useUploadQueue } from '@/hooks/use-upload-queue';
 import type { PendingUpload } from '@/hooks/use-upload-queue';
-import type { BrowserPersistentContext, BrowserTab, DMConversation, KanbanTask, Workflow, WorkflowStep, NotificationItem, OnlineUser, TrashEntry, Workspace, WorkspaceAgent, WorkspaceFile, WorkspaceIdentity, WorkspaceSession } from './types';
+import type { DMConversation, KanbanTask, Workflow, WorkflowStep, NotificationItem, OnlineUser, TrashEntry, Workspace, WorkspaceAgent, WorkspaceFile, WorkspaceIdentity, WorkspaceSession } from './types';
 
 function useWorkspaceIdentity() {
   const { user } = usePaiAuth();
@@ -183,20 +183,6 @@ interface WorkspaceContextValue {
   /** Destroy entries — bytes included. Not undoable. */
   purgeTrash: (trashIds: string[]) => Promise<void>;
   emptyTrash: () => Promise<void>;
-  browserTabs: BrowserTab[];
-  selectedBrowserTabId: string | null;
-  setSelectedBrowserTabId: (id: string | null) => void;
-  refreshBrowserTabs: () => Promise<void>;
-  openBrowserTab: (url?: string, contextId?: string) => Promise<BrowserTab>;
-  closeBrowserTab: (tabId: string) => Promise<void>;
-  navigateBrowserTab: (tabId: string, url: string) => Promise<BrowserTab>;
-  reconnectBrowserTab: (tabId: string) => Promise<BrowserTab>;
-  browserContexts: BrowserPersistentContext[];
-  refreshBrowserContexts: () => Promise<void>;
-  persistBrowserTab: (tabId: string, name: string) => Promise<BrowserPersistentContext>;
-  unpersistBrowserTab: (tabId: string) => Promise<void>;
-  deleteBrowserContext: (contextId: string) => Promise<void>;
-  openBrowserTabWithContext: (contextId: string, url?: string) => Promise<BrowserTab>;
   dmConversations: DMConversation[];
   refreshDMConversations: () => Promise<void>;
   tasks: KanbanTask[];
@@ -334,44 +320,12 @@ export function WorkspaceProvider({
   }, []);
   const [selectedFileId, setSelectedFileId] = useState<string | null>(null);
   const [currentFilePath, setCurrentFilePath] = useState('');
-  const [browserTabs, setBrowserTabs] = useState<BrowserTab[]>([]);
-  const [selectedBrowserTabId, setSelectedBrowserTabId] = useState<string | null>(null);
-  const [browserContexts, setBrowserContexts] = useState<BrowserPersistentContext[]>([]);
   const [dmConversations, setDMConversations] = useState<DMConversation[]>([]);
   const [tasks, setTasks] = useState<KanbanTask[]>([]);
   const [workflows, setWorkflows] = useState<Workflow[]>([]);
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
   const [manuallyRenamedSessions, setManuallyRenamedSessions] = useState<Set<string>>(new Set());
-
-  // Auto-select browser tabs for split browser view:
-  // - On first load: select the most recently created agent tab (if any)
-  // - On subsequent polls: select any newly appearing tab
-  const prevTabIdsRef = useRef<Set<string>>(new Set());
-  const initialSelectDoneRef = useRef(false);
-  useEffect(() => {
-    if (browserTabs.length === 0) return;
-    const currentIds = new Set(browserTabs.map(t => t.id));
-    const prevIds = prevTabIdsRef.current;
-
-    if (!initialSelectDoneRef.current) {
-      // First load — pick the most recent agent-opened tab if nothing is selected
-      initialSelectDoneRef.current = true;
-      if (!selectedBrowserTabId) {
-        const agentTabs = browserTabs.filter(t => t.createdBy?.startsWith('openagents:'));
-        if (agentTabs.length > 0) {
-          setSelectedBrowserTabId(agentTabs[agentTabs.length - 1].id);
-        }
-      }
-    } else {
-      // Subsequent polls — auto-select any newly appearing tab
-      const newTabs = browserTabs.filter(t => !prevIds.has(t.id));
-      if (newTabs.length > 0) {
-        setSelectedBrowserTabId(newTabs[newTabs.length - 1].id);
-      }
-    }
-    prevTabIdsRef.current = currentIds;
-  }, [browserTabs]);
 
   // Notification sound — client-side preference stored in localStorage
   const [notificationSound, _setNotificationSound] = useState(false);
@@ -767,11 +721,9 @@ export function WorkspaceProvider({
         }
       }
 
-      // Also refresh files, browser tabs, persistent contexts, and DM conversations so sidebar counts stay current
+      // Also refresh files and DM conversations so sidebar counts stay current
       const filesEpoch = filesEpochRef.current;
       workspaceApi.listFiles().then((r) => commitFiles(r.files, filesEpoch)).catch(() => {});
-      workspaceApi.listBrowserTabs().then((r) => setBrowserTabs(r.tabs)).catch(() => {});
-      workspaceApi.listBrowserContexts().then((r) => setBrowserContexts(r.contexts)).catch(() => {});
       workspaceApi.listConversations().then((c) => setDMConversations(c)).catch(() => {});
       workspaceApi.listTasks().then((r) => setTasks(r.tasks)).catch(() => {});
       workspaceApi.listWorkflows().then((r) => setWorkflows(r.workflows)).catch(() => {});
@@ -1062,78 +1014,6 @@ export function WorkspaceProvider({
     return map;
   }, [pendingFolderOps]);
 
-  const refreshBrowserTabs = useCallback(async () => {
-    try {
-      const result = await workspaceApi.listBrowserTabs();
-      setBrowserTabs(result.tabs);
-    } catch {
-      // Non-critical
-    }
-  }, []);
-
-  const openBrowserTab = useCallback(async (url = 'about:blank') => {
-    const tab = await workspaceApi.openBrowserTab(url);
-    await refreshBrowserTabs();
-    return tab;
-  }, [refreshBrowserTabs]);
-
-  const closeBrowserTab = useCallback(async (tabId: string) => {
-    await workspaceApi.closeBrowserTab(tabId);
-    setBrowserTabs((prev) => prev.filter((t) => t.id !== tabId));
-    if (selectedBrowserTabId === tabId) setSelectedBrowserTabId(null);
-  }, [selectedBrowserTabId]);
-
-  const navigateBrowserTab = useCallback(async (tabId: string, url: string) => {
-    const tab = await workspaceApi.navigateBrowserTab(tabId, url);
-    setBrowserTabs((prev) => prev.map((t) => (t.id === tabId ? tab : t)));
-    return tab;
-  }, []);
-
-  const reconnectBrowserTab = useCallback(async (tabId: string) => {
-    const tab = await workspaceApi.reconnectBrowserTab(tabId);
-    setBrowserTabs((prev) => prev.map((t) => (t.id === tabId ? tab : t)));
-    return tab;
-  }, []);
-
-  const refreshBrowserContexts = useCallback(async () => {
-    try {
-      const result = await workspaceApi.listBrowserContexts();
-      setBrowserContexts(result.contexts);
-    } catch {
-      // Non-critical
-    }
-  }, []);
-
-  const persistBrowserTab = useCallback(async (tabId: string, name: string) => {
-    const result = await workspaceApi.persistBrowserTab(tabId, name);
-    // Update the tab in state with the new context_id
-    setBrowserTabs((prev) => prev.map((t) => (t.id === tabId ? result.tab : t)));
-    // Add the new context to state
-    setBrowserContexts((prev) => [result.context, ...prev]);
-    return result.context;
-  }, []);
-
-  const unpersistBrowserTab = useCallback(async (tabId: string) => {
-    const updatedTab = await workspaceApi.unpersistBrowserTab(tabId);
-    setBrowserTabs((prev) => prev.map((t) => (t.id === tabId ? updatedTab : t)));
-    // Refresh contexts to remove the deleted one
-    await refreshBrowserContexts();
-  }, [refreshBrowserContexts]);
-
-  const deleteBrowserContext = useCallback(async (contextId: string) => {
-    await workspaceApi.deleteBrowserContext(contextId);
-    setBrowserContexts((prev) => prev.filter((c) => c.id !== contextId));
-    // Clear context_id from any tabs that referenced it
-    setBrowserTabs((prev) => prev.map((t) => (t.contextId === contextId ? { ...t, contextId: null } : t)));
-  }, []);
-
-  const openBrowserTabWithContext = useCallback(async (contextId: string, url = 'about:blank') => {
-    const tab = await workspaceApi.openBrowserTab(url, contextId);
-    await refreshBrowserTabs();
-    setSelectedBrowserTabId(tab.id);
-    return tab;
-  }, [refreshBrowserTabs]);
-
   const refreshDMConversations = useCallback(async () => {
     try {
       const convos = await workspaceApi.listConversations();
@@ -1156,8 +1036,6 @@ export function WorkspaceProvider({
           // The folder panel shows the trash count from the first paint, so it
           // loads with the files rather than when the Trash view opens.
           workspaceApi.listTrash().then((r) => setTrashEntries(r.entries)).catch(() => {}),
-          workspaceApi.listBrowserTabs().then((r) => setBrowserTabs(r.tabs)).catch(() => {}),
-          workspaceApi.listBrowserContexts().then((r) => setBrowserContexts(r.contexts)).catch(() => {}),
           workspaceApi.listTasks().then((r) => setTasks(r.tasks)).catch(() => {}),
           workspaceApi.listWorkflows().then((r) => setWorkflows(r.workflows)).catch(() => {}),
           workspaceApi.listNotifications().then((r) => {
@@ -1625,20 +1503,6 @@ export function WorkspaceProvider({
         restoreFromTrash,
         purgeTrash,
         emptyTrash,
-        browserTabs,
-        selectedBrowserTabId,
-        setSelectedBrowserTabId,
-        refreshBrowserTabs,
-        openBrowserTab,
-        closeBrowserTab,
-        navigateBrowserTab,
-        reconnectBrowserTab,
-        browserContexts,
-        refreshBrowserContexts,
-        persistBrowserTab,
-        unpersistBrowserTab,
-        deleteBrowserContext,
-        openBrowserTabWithContext,
         dmConversations,
         refreshDMConversations,
         tasks,

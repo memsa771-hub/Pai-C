@@ -25,7 +25,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { ListTree, MessageSquare, Square, ChevronLeft, X, Plus, Globe, Share2, Crown, AlertTriangle, RefreshCw, Sparkles, Cog, CalendarCheck } from 'lucide-react';
+import { ListTree, MessageSquare, Square, ChevronLeft, X, Plus, Share2, Crown, AlertTriangle, RefreshCw, Sparkles, Cog, CalendarCheck } from 'lucide-react';
 import { ShareDialog } from './share-dialog';
 import { OrchestrationControl } from './orchestration-control';
 import { useLayout } from '@/components/layout/layout-context';
@@ -158,10 +158,6 @@ export function ChatView({counselorOnly=false,initialDraft=""}:{counselorOnly?:b
     isMobile,
     openMobileList,
     viewMode,
-    splitBrowser,
-    setSplitBrowser,
-    showBrowserPreview,
-    setShowBrowserPreview,
     openNewThread,
     setSelectedAgentName,
   } = useLayout();
@@ -772,25 +768,6 @@ export function ChatView({counselorOnly=false,initialDraft=""}:{counselorOnly?:b
               title={showAllSteps ? t('chat.showAllSteps') : t('chat.showLatestSteps')}
             >
               <ListTree className="size-3.5" />
-            </Button>
-          )}
-
-          {/* Browser live preview toggle */}
-          {!isMobile && (
-            <Button
-              variant={splitBrowser && showBrowserPreview ? 'outline' : 'ghost'}
-              size="sm"
-              onClick={() => {
-                if (!splitBrowser) setSplitBrowser(true);
-                setShowBrowserPreview(!(splitBrowser && showBrowserPreview));
-              }}
-              className={cn(
-                'gap-1.5 h-7 text-xs font-medium',
-                splitBrowser && showBrowserPreview && 'border-primary/30 text-primary bg-primary/5'
-              )}
-              title={splitBrowser && showBrowserPreview ? t('chat.hideBrowserPreview') : t('chat.showBrowserPreview')}
-            >
-              <Globe className="size-3.5" />
             </Button>
           )}
 

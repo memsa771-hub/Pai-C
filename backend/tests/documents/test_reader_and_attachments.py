@@ -1,8 +1,6 @@
 # -*- coding: utf-8 -*-
 """Phase C — agent reading, processing states, attachment normalization."""
 
-import asyncio
-from types import SimpleNamespace
 from unittest.mock import patch
 
 from app.documents.attachments import (
@@ -10,7 +8,6 @@ from app.documents.attachments import (
 )
 from app.documents.reader import read_document
 from app.documents.service import DocumentArtifactService
-from app.tools.builtin.files import read_file
 from tests.documents.conftest import make_file
 from tests.documents.fixtures import (
     DOCX_CONTENT_TYPE, TRANSCRIPT_PAGES, make_docx, make_fake_pdf, make_pdf,
@@ -127,55 +124,6 @@ class TestReadDocument:
 
         assert result["ok"] is False
         assert result["reason"] == "not_a_document"
-
-
-class TestFilesReadTool:
-    def _ctx(self, db, workspace_id, payload):
-        class _Api:
-            def __init__(self):
-                self.text_calls = []
-
-            async def get(self, path, **params):
-                return payload
-
-            async def get_text(self, path, max_chars=50000):
-                self.text_calls.append(path)
-                return {"ok": True, "content": "RAW", "content_type": "text/plain"}
-
-        api = _Api()
-        return SimpleNamespace(api=api, workspace_id=workspace_id), api
-
-    def test_parsed_document_is_returned(self, db, workspace_id):
-        ctx, api = self._ctx(db, workspace_id, {
-            "data": {"ok": True, "status": "ready", "content": "[p1]\nCGPA: 3.41"},
-        })
-
-        result = asyncio.run(read_file(ctx, {"file_id": "f1"}))
-
-        assert result["content"] == "[p1]\nCGPA: 3.41"
-        # Crucially: the raw-bytes path was never used.
-        assert api.text_calls == []
-
-    def test_processing_state_is_surfaced_not_swallowed(self, db, workspace_id):
-        ctx, api = self._ctx(db, workspace_id, {
-            "data": {"ok": False, "status": "processing", "reason": "processing"},
-        })
-
-        result = asyncio.run(read_file(ctx, {"file_id": "f1"}))
-
-        assert result["status"] == "processing"
-        assert api.text_calls == []
-
-    def test_plain_text_still_reads_raw(self, db, workspace_id):
-        # A .txt is not a student document; the tool stays a general reader.
-        ctx, api = self._ctx(db, workspace_id, {
-            "data": {"ok": False, "reason": "not_a_document"},
-        })
-
-        result = asyncio.run(read_file(ctx, {"file_id": "f1"}))
-
-        assert result["content"] == "RAW"
-        assert api.text_calls == ["/v1/files/f1"]
 
 
 class TestAttachmentNormalization:

@@ -24,11 +24,8 @@ def test_existing_job_is_a_system_capability(job_type):
         CapabilityRouter(get_capability_registry()).resolve(job_type)
 
 @pytest.mark.asyncio
-async def test_systems_hidden_from_agent_list_describe_and_invoke():
-    result = await capabilities.list_capabilities(None, {})
-    assert all(item["id"] not in JOB_TYPES for item in result["data"]["capabilities"])
+async def test_systems_cannot_be_invoked_as_capabilities():
     for job_type in JOB_TYPES:
-        assert (await capabilities.describe(None, {"capability_id": job_type}))["ok"] is False
         assert (await capabilities.invoke(SimpleNamespace(), {"capability_id": job_type, "input": {}}))["error"]["code"] == "capability_not_found"
 
 @pytest.mark.parametrize("changes", [{"kind": "other"}, {"kind": "system", "owns_task_types": {"test_task"}}])

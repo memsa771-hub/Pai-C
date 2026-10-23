@@ -42,13 +42,9 @@ async def test_workflow_checked_invocation_zero_operator_calls_same_run_and_resu
     with StudentSession() as student:
         run_id = create_run(student)
         with patch.object(capability_module, "_registry", registry), \
-             patch.object(operator, "chat_completion", AsyncMock(side_effect=AssertionError("model called"))) as plain, \
-             patch.object(operator, "chat_completion_tools", AsyncMock(side_effect=AssertionError("model called"))) as tools, \
-             patch.object(operator, "_resolve_memory_context", side_effect=AssertionError("generic context read")), \
              patch.object(operator, "_post_result", AsyncMock()) as post, \
              patch.object(operator, "_publish_run_updated"):
             await operator._execute(run_id, student.workspace_id, object(), "Do the fixed work", {}, [], None)
-        plain.assert_not_awaited(); tools.assert_not_awaited()
         assert len(seen) == 1 and seen[0][1] == {"item": "value"}
         assert seen[0][0].workspace_id == student.workspace_id
         assert seen[0][0].permissions == OPERATOR_PLATFORM_PERMISSIONS
@@ -72,8 +68,6 @@ async def test_workflow_approval_resume_uses_same_row_and_permission_path():
     with StudentSession() as student:
         run_id = create_run(student)
         with patch.object(capability_module, "_registry", registry), \
-             patch.object(operator, "chat_completion", AsyncMock(side_effect=AssertionError("model called"))), \
-             patch.object(operator, "chat_completion_tools", AsyncMock(side_effect=AssertionError("model called"))), \
              patch.object(operator, "_post_result", AsyncMock()), \
              patch.object(operator, "_publish_run_updated"):
             await operator._execute(run_id, student.workspace_id, object(), "Work", {}, [], None)
@@ -104,8 +98,6 @@ async def test_workflow_capability_pending_action_pauses_without_model(pending):
     with StudentSession() as student:
         run_id = create_run(student)
         with patch.object(capability_module, "_registry", registry), \
-             patch.object(operator, "chat_completion", AsyncMock(side_effect=AssertionError("model called"))), \
-             patch.object(operator, "chat_completion_tools", AsyncMock(side_effect=AssertionError("model called"))), \
              patch.object(operator, "_post_result", AsyncMock()), patch.object(operator, "_publish_run_updated"):
             await operator._execute(run_id, student.workspace_id, object(), "Work", {}, [], None)
         with student.factory() as db:
@@ -126,8 +118,6 @@ async def test_workflow_error_is_failed_no_generic_fallback(changes):
     with StudentSession() as student:
         run_id = create_run(student)
         with patch.object(capability_module, "_registry", registry), \
-             patch.object(operator, "chat_completion", AsyncMock(side_effect=AssertionError("model called"))), \
-             patch.object(operator, "chat_completion_tools", AsyncMock(side_effect=AssertionError("model called"))), \
              patch.object(operator, "_post_result", AsyncMock()) as post, patch.object(operator, "_publish_run_updated"):
             await operator._execute(run_id, student.workspace_id, object(), "Work", {}, [], None)
         with student.factory() as db:
@@ -174,8 +164,6 @@ async def test_roadmap_research_installed_owner_uses_workflow_without_operator_p
             db.commit()
         run_id = create_run(student, task_type="roadmap_research", capability_input={"brief": {"mirror_version": 1}})
         with patch.object(capability_module, "_registry", registry), \
-             patch.object(operator, "chat_completion", AsyncMock(side_effect=AssertionError("model called"))), \
-             patch.object(operator, "chat_completion_tools", AsyncMock(side_effect=AssertionError("model called"))), \
              patch.object(operator, "_post_result", AsyncMock()), patch.object(operator, "_publish_run_updated"):
             await operator._execute(run_id, student.workspace_id, object(), "Work", {}, [], None)
         handler.assert_awaited_once()
@@ -187,7 +175,7 @@ async def test_roadmap_research_installed_owner_uses_workflow_without_operator_p
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("owned", [False, True])
-async def test_no_owner_or_no_fixed_input_keeps_existing_model_phases(owned):
+async def test_no_owner_or_no_fixed_input_fails_without_running(owned):
     registry = workflow_registry()
     handler = AsyncMock()
     if owned:
@@ -197,26 +185,13 @@ async def test_no_owner_or_no_fixed_input_keeps_existing_model_phases(owned):
         with student.factory() as db:
             run = db.get(ExecutionRun, run_id)
             run.constraints = {}; db.commit()
-        phases = AsyncMock(side_effect=["Understood", '[{"id":"work","title":"Work"}]',
-                           '{"status":"completed","summary":"Done","completed_step_ids":["work"]}'])
-        execute = AsyncMock(side_effect=[
-            {"role": "assistant", "tool_calls": [{"id": "call", "type": "function", "function": {
-                "name": "capability__invoke" if owned else "web__search",
-                "arguments": '{"capability_id":"example.workflow","input":{}}' if owned else '{"query":"example"}'}}]},
-            {"role": "assistant", "content": "Done"},
-        ])
         with patch.object(capability_module, "_registry", registry), \
-             patch.object(operator, "chat_completion", phases), \
-             patch.object(operator, "chat_completion_tools", execute), \
-             patch.object(operator, "_resolve_memory_context", return_value=""), \
-             patch("app.services.pai.workspace_state_summary", AsyncMock(return_value="")), \
-             patch("app.tools.get_tool_executor", return_value=SimpleNamespace(execute=AsyncMock(return_value={"ok": True, "data": {"result": {}}}))), \
-             patch.object(operator, "_post_result", AsyncMock()), patch.object(operator, "_publish_run_updated"):
+             patch.object(operator, "_post_result", AsyncMock()) as post, patch.object(operator, "_publish_run_updated"):
             await operator._execute(run_id, student.workspace_id, object(), "Work", {}, [], None)
-        assert phases.await_count == 3 and execute.await_count == 2
         handler.assert_not_awaited()
         with student.factory() as db:
-            assert db.get(ExecutionRun, run_id).status == "completed"
+            assert db.get(ExecutionRun, run_id).status == "failed"
+        assert post.await_args.args[4] == "failed"
 
 
 @pytest.mark.asyncio
@@ -229,8 +204,6 @@ async def test_workflow_text_pending_resume_keeps_same_input_and_row():
     with StudentSession() as student:
         run_id = create_run(student)
         with patch.object(capability_module, "_registry", registry), \
-             patch.object(operator, "chat_completion", AsyncMock(side_effect=AssertionError("model called"))), \
-             patch.object(operator, "chat_completion_tools", AsyncMock(side_effect=AssertionError("model called"))), \
              patch.object(operator, "_post_result", AsyncMock()), patch.object(operator, "_publish_run_updated"):
             await operator._execute(run_id, student.workspace_id, object(), "Work", {}, [], None)
             result = await operator.resume(ToolContext(student.workspace_id, "pai", object()), run_id, {"text": "Detail"})

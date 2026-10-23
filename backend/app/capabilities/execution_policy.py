@@ -4,10 +4,7 @@ from dataclasses import dataclass
 
 from .contract import CapabilityContract, FallbackPolicy
 
-CAPABILITY_ORCHESTRATION_TOOLS = frozenset({
-    "capability.list", "capability.describe", "capability.invoke",
-    "profile.propose",
-})
+CAPABILITY_ORCHESTRATION_TOOLS = frozenset({"capability.invoke"})
 
 
 @dataclass(frozen=True)

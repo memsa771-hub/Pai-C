@@ -1,48 +1,9 @@
-"""Model-safe discovery and policy-enforced capability invocation."""
+"""Policy-enforced capability invocation."""
 
 import logging
 import time
 
 logger = logging.getLogger(__name__)
-
-
-def _summary(contract):
-    return {
-        "id": contract.id, "version": contract.version,
-        "description": contract.description,
-        "owned_task_types": sorted(contract.owns_task_types),
-        "risk": contract.risk.value, "approval": contract.approval,
-        "fallback_policy": contract.fallback_policy.value,
-    }
-
-
-async def list_capabilities(ctx, args):
-    from app.capabilities import get_capability_registry
-
-    return {"ok": True, "data": {"capabilities": [
-        _summary(item) for item in get_capability_registry().all()
-    ]}}
-
-
-async def describe(ctx, args):
-    from app.capabilities import get_capability_router
-    from app.capabilities.router import CapabilityNotFound
-
-    try:
-        contract = get_capability_router().resolve(str(args.get("capability_id") or ""))
-    except CapabilityNotFound as exc:
-        return {"ok": False, "error": {"code": "capability_not_found", "message": str(exc)}}
-    return {"ok": True, "data": {
-        **_summary(contract), "name": contract.name,
-        "input_schema": contract.input_schema, "output_schema": contract.output_schema,
-        "vault_scopes": sorted(contract.vault_scopes),
-        "journey_fields": sorted(contract.journey_fields),
-        "required_tools": sorted(contract.required_tools),
-        "uses_capabilities": sorted(contract.uses_capabilities),
-        "permissions": sorted(contract.permissions),
-        "artifacts": sorted(contract.artifacts),
-        "evidence_expectations": contract.evidence_expectations,
-    }}
 
 
 async def invoke(ctx, args):

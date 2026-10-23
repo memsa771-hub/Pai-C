@@ -2,7 +2,6 @@
 
 import asyncio
 import json
-from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -11,7 +10,7 @@ from sqlalchemy import select
 from app.config import config
 from app.models import BackgroundJob, ExecutionRun, ProfileRequirement
 from app.pai_c import runtime
-from app.services import operator, pai
+from app.services import operator
 from app.tools import ToolContext
 from scripts.counselor_eval_support import StudentSession
 
@@ -62,8 +61,8 @@ async def test_delegation_returns_while_execution_is_still_waiting():
 
         ctx = ToolContext(student.workspace_id, "pai", None, conversation="pai-counselor")
         with patch.object(operator, "_execute", slow), patch.object(operator, "is_available", return_value=True):
-            result = await asyncio.wait_for(operator.delegate(ctx, "Research programs", {}, None,
-                                                             "study_abroad_matching"), 0.5)
+            result = await asyncio.wait_for(operator.delegate(ctx, "Research programs", {"capability_input": {}}, None,
+                                                             "study_abroad_matching", "roadmap_research"), 0.5)
             assert not started.is_set()
             assert result["ok"] and not release.is_set()
             with student.factory() as db:
@@ -77,47 +76,6 @@ async def test_delegation_returns_while_execution_is_still_waiting():
 
 
 
-
-
-@pytest.mark.asyncio
-@pytest.mark.parametrize("verification,expected", [
-    ('{"status":"completed","summary":"Found programs","completed_step_ids":["research"]}', "completed"),
-    ("not valid JSON", "failed"),
-])
-async def test_operator_keeps_context_and_verifies_evidence_before_counselor_handoff(verification, expected):
-    with StudentSession() as student:
-        with student.factory() as db:
-            run = ExecutionRun(workspace_id=student.workspace_id, requested_by="openagents:pai",
-                               objective="Find AI MSc programs", constraints={}, context_refs=["vault"])
-            db.add(run)
-            db.commit()
-            run_id = run.id
-        phases = AsyncMock(side_effect=["Use the budget to assess fit.",
-                                         '[{"id":"research","title":"Read official programs"}]', verification])
-        execution = AsyncMock(side_effect=[
-            {"role": "assistant", "tool_calls": [{"id": "call1", "type": "function", "function": {
-                "name": "web__fetch", "arguments": '{"url":"https://university.example/ai"}'}}]},
-            {"role": "assistant", "content": "Program X requires CS credits: https://university.example/ai"},
-        ])
-        executor = SimpleNamespace(execute=AsyncMock(return_value={"ok": True, "data": {
-            "url": "https://university.example/ai", "content": "CS credits required; fees EUR 0."}}))
-        with patch.object(operator, "chat_completion", phases), \
-                patch.object(operator, "chat_completion_tools", execution), \
-                patch.object(operator, "_resolve_memory_context", return_value="Known budget EUR 12000 per year"), \
-                patch.object(pai, "workspace_state_summary", AsyncMock(return_value="workspace")), \
-                patch("app.tools.get_tool_executor", return_value=executor), \
-                patch.object(operator, "_publish_run_updated"), \
-                patch.object(operator, "_post_result", AsyncMock()) as handoff:
-            await operator._execute(run_id, student.workspace_id, None, "Find AI MSc programs",
-                                    {"no_submission": True}, ["vault"], "channel/pai-counselor")
-        assert "EUR 12000" in execution.call_args_list[0].kwargs["system_prompt"]
-        assert "no_submission" in execution.call_args_list[0].kwargs["messages"][0]["content"]
-        assert "CS credits required" in phases.call_args_list[-1].kwargs["messages"][0]["content"]
-        with student.factory() as db:
-            run = db.get(ExecutionRun, run_id)
-            assert run.status == expected
-            assert run.result["observations"][0]["url"] == "https://university.example/ai"
-        handoff.assert_awaited_once()
 
 
 @pytest.mark.asyncio

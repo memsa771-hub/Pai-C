@@ -14,10 +14,6 @@ def permission_for_tool(name: str) -> str:
         return "files.read"
     if name == "files.write":
         return "files.write"
-    if name in {"browser.tabs.list", "browser.contexts.list", "browser.read", "browser.screenshot"}:
-        return "browser.read"
-    if name.startswith("browser."):
-        return "browser.write"
     if name == "profile.propose":
         return "profile.propose"
     return name

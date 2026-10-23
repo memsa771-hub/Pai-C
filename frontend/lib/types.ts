@@ -4,7 +4,6 @@ export interface Workspace {
   name: string;
   requireLogin: boolean;
   settings: Record<string, unknown>;
-  browserfabricApiKey: string | null;
   status: string;
   createdAt: string | null;
   lastActivityAt: string | null;
@@ -128,31 +127,6 @@ export interface TrashEntry {
   fileCount: number;
   size: number;
   files: TrashFile[];
-}
-
-export interface BrowserTab {
-  id: string;
-  url: string;
-  title: string | null;
-  status: string;
-  createdBy: string;
-  sharedWith: string[];
-  liveUrl: string | null;
-  sessionId: string | null;
-  contextId: string | null;
-  createdAt: string | null;
-  lastActiveAt: string | null;
-}
-
-export interface BrowserPersistentContext {
-  id: string;
-  name: string;
-  domain: string | null;
-  status: string;
-  createdBy: string;
-  sharedWith: string[];
-  createdAt: string | null;
-  lastUsedAt: string | null;
 }
 
 // ---------------------------------------------------------------------------

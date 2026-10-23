@@ -114,7 +114,6 @@ class Workspace(Base):
 
     members = relationship("WorkspaceMember", back_populates="workspace", cascade="all, delete-orphan")
     channels = relationship("Channel", back_populates="workspace", cascade="all, delete-orphan")
-    invitations = relationship("Invitation", back_populates="workspace", cascade="all, delete-orphan")
 
     __table_args__ = (
         # The actual "one active personal workspace per user" guarantee —
@@ -350,22 +349,6 @@ class ChannelHumanMember(Base):
     )
 
 
-class Invitation(Base):
-    """Workspace invitation."""
-    __tablename__ = "invitations"
-
-    id = Column(UUID(as_uuid=False), primary_key=True, default=_uuid, server_default=text("gen_random_uuid()"))
-    workspace_id = Column(UUID(as_uuid=False), ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False)
-    target_agent = Column(Text, nullable=False)
-    invite_token = Column(Text, nullable=False, unique=True)
-    status = Column(Text, default="pending")         # pending | accepted | rejected | expired
-    created_at = Column(DateTime(timezone=True), default=_now, server_default=text("NOW()"))
-    expires_at = Column(DateTime(timezone=True), nullable=False)
-
-    workspace = relationship("Workspace", back_populates="invitations")
-
-
-
 class User(Base):
     """A human end-user identity resolved from a verified Firebase ID token.
 
@@ -429,7 +412,6 @@ class AuthDevice(Base):
     )
 
 
-
 class KnowledgeEntry(Base):
     """A knowledge base entry — workspace-global markdown document."""
     __tablename__ = "knowledge_entries"
@@ -486,122 +468,6 @@ class FileRecord(Base):
     __table_args__ = (
         Index("idx_files_workspace_status", "workspace_id", "status"),
         Index("idx_files_trash", "workspace_id", "trash_id"),
-    )
-
-
-# ---------------------------------------------------------------------------
-# Shared browser
-# ---------------------------------------------------------------------------
-
-class BrowserTab(Base):
-    """A shared browser tab in the workspace."""
-    __tablename__ = "browser_tabs"
-
-    id = Column(Text, primary_key=True, default=_uuid)
-    workspace_id = Column(UUID(as_uuid=False), ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False)
-    url = Column(Text, nullable=False, default="about:blank")
-    title = Column(Text, nullable=True)
-    status = Column(Text, nullable=False, default="active")       # active | closed
-    created_by = Column(Text, nullable=False)                      # "human:user" or "openagents:agent-name"
-    shared_with = Column(JSONB, default=[])                        # list of agent names with access
-    context_id = Column(Text, ForeignKey("browser_contexts.id", ondelete="SET NULL"), nullable=True)  # persistent context
-    session_id = Column(Text, nullable=True)                       # Browserbase session ID
-    live_url = Column(Text, nullable=True)                         # Browserbase live view URL
-    # --- BF credential reference (never the key itself; see app/browser_creds.py) ---
-    bf_key_source = Column(Text, nullable=True)                    # 'workspace' | 'global' | NULL (local/legacy)
-    bf_key_fingerprint = Column(Text, nullable=True)               # SHA-256 hex of the creating key
-    # --- Remote session release tracking ---
-    session_closed = Column(Boolean, nullable=False, default=False, server_default=text("FALSE"))  # BF session confirmed released
-    close_status = Column(Text, nullable=False, default="none", server_default=text("'none'"))  # none|open|closing|closed|close_failed|retry_exhausted
-    close_attempts = Column(Integer, nullable=False, default=0, server_default=text("0"))
-    last_close_attempt_at = Column(DateTime(timezone=True), nullable=True)
-    last_close_error = Column(Text, nullable=True)                 # redacted — never contains key material
-    last_error = Column(Text, nullable=True)                       # last init/navigation error (redacted)
-    created_at = Column(DateTime(timezone=True), default=_now, server_default=text("NOW()"))
-    last_active_at = Column(DateTime(timezone=True), default=_now, server_default=text("NOW()"))
-
-    __table_args__ = (
-        Index("idx_browser_tabs_workspace_status", "workspace_id", "status"),
-    )
-
-
-# ---------------------------------------------------------------------------
-# Persistent browser contexts (BrowserBase contexts for session persistence)
-# ---------------------------------------------------------------------------
-
-class BrowserContext(Base):
-    """A persistent browser context that preserves cookies/storage across sessions.
-
-    Users mark a tab as persistent by giving it a name (e.g. "LinkedIn Account").
-    A BrowserBase context is created and reused across tab open/close cycles,
-    so the logged-in state survives indefinitely.
-    """
-    __tablename__ = "browser_contexts"
-
-    id = Column(Text, primary_key=True, default=_uuid)
-    workspace_id = Column(UUID(as_uuid=False), ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False)
-    name = Column(Text, nullable=False)                          # user-provided label, e.g. "LinkedIn Account"
-    bb_context_id = Column(Text, nullable=True)                  # BrowserBase context ID (null in local mode)
-    domain = Column(Text, nullable=True)                         # auto-captured from tab URL, e.g. "linkedin.com"
-    status = Column(Text, nullable=False, default="active")      # active | expired
-    created_by = Column(Text, nullable=False)                    # "human:user" or "openagents:agent-name"
-    shared_with = Column(JSONB, default=[])                      # list of agent names that can use this context
-    created_at = Column(DateTime(timezone=True), default=_now, server_default=text("NOW()"))
-    last_used_at = Column(DateTime(timezone=True), default=_now, server_default=text("NOW()"))
-
-    __table_args__ = (
-        UniqueConstraint("workspace_id", "name", name="uq_browser_context_workspace_name"),
-        Index("idx_browser_contexts_workspace_status", "workspace_id", "status"),
-    )
-
-
-# ---------------------------------------------------------------------------
-# Browser usage tracking
-# ---------------------------------------------------------------------------
-
-class BrowserUsage(Base):
-    """Tracks browser session duration for billing/monitoring."""
-    __tablename__ = "browser_usage"
-
-    id = Column(Text, primary_key=True, default=_uuid)
-    workspace_id = Column(UUID(as_uuid=False), ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False)
-    tab_id = Column(Text, nullable=False)
-    session_id = Column(Text, nullable=True)             # Browserbase session ID
-    opened_by = Column(Text, nullable=False)               # source: "human:user" or "openagents:agent-name"
-    started_at = Column(DateTime(timezone=True), nullable=False, default=_now, server_default=text("NOW()"))
-    ended_at = Column(DateTime(timezone=True), nullable=True)
-    duration_seconds = Column(Integer, nullable=True)     # computed on close
-
-    __table_args__ = (
-        Index("idx_browser_usage_workspace", "workspace_id"),
-        Index("idx_browser_usage_opened_by", "opened_by"),
-        Index("idx_browser_usage_started", "started_at"),
-    )
-
-
-# ---------------------------------------------------------------------------
-# Planning: To-dos & Timers
-# ---------------------------------------------------------------------------
-
-class TodoRecord(Base):
-    """A single to-do item belonging to an agent in a channel."""
-    __tablename__ = "todos"
-
-    id = Column(Text, primary_key=True, default=_uuid)
-    workspace_id = Column(UUID(as_uuid=False), ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False)
-    channel_name = Column(Text, nullable=False)
-    thread_id = Column(Text, nullable=True)
-    created_by = Column(Text, nullable=False)              # "openagents:agent-name"
-    assignee = Column(Text, nullable=False)                # defaults to created_by agent
-    content = Column(Text, nullable=False)
-    status = Column(Text, nullable=False, default="pending")  # pending | in_progress | completed
-    position = Column(Integer, nullable=False, default=0)
-    created_at = Column(DateTime(timezone=True), default=_now, server_default=text("NOW()"))
-    updated_at = Column(DateTime(timezone=True), default=_now, server_default=text("NOW()"))
-
-    __table_args__ = (
-        Index("idx_todos_workspace_channel", "workspace_id", "channel_name"),
-        Index("idx_todos_workspace_created_by", "workspace_id", "created_by"),
     )
 
 
@@ -1013,62 +879,6 @@ class StudentRequest(Base):
     )
 
 
-class TimerRecord(Base):
-    """A scheduled timer that posts a message when it fires."""
-    __tablename__ = "timers"
-
-    id = Column(Text, primary_key=True, default=_uuid)
-    workspace_id = Column(UUID(as_uuid=False), ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False)
-    channel_name = Column(Text, nullable=False)
-    thread_id = Column(Text, nullable=True)
-    created_by = Column(Text, nullable=False)              # "openagents:agent-name"
-    message = Column(Text, nullable=False)
-    delay_seconds = Column(Integer, nullable=False)
-    fires_at = Column(DateTime(timezone=True), nullable=False)
-    status = Column(Text, nullable=False, default="active")  # active | fired | cancelled
-    created_at = Column(DateTime(timezone=True), default=_now, server_default=text("NOW()"))
-
-    __table_args__ = (
-        Index("idx_timers_fires_at_status", "fires_at", "status"),
-        Index("idx_timers_workspace_channel", "workspace_id", "channel_name"),
-    )
-
-
-# ---------------------------------------------------------------------------
-# Routines (recurring scheduled tasks)
-# ---------------------------------------------------------------------------
-
-class RoutineRecord(Base):
-    """A recurring scheduled task that fires on a repeating schedule."""
-    __tablename__ = "routines"
-
-    id = Column(Text, primary_key=True, default=_uuid)
-    workspace_id = Column(UUID(as_uuid=False), ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False)
-    channel_name = Column(Text, nullable=False)
-    thread_id = Column(Text, nullable=True)
-    created_by = Column(Text, nullable=False)              # "openagents:agent-name"
-    name = Column(Text, nullable=False)                     # human-readable label
-    message = Column(Text, nullable=False)                  # message posted when routine fires
-    context = Column(Text, nullable=True)                    # comprehensive background for the routine
-    # Daily schedule mode: hour + minute (+ optional days). One of the two
-    # modes must be set when the row is created (enforced in the router).
-    schedule_hour = Column(Integer, nullable=True)          # 0-23 UTC
-    schedule_minute = Column(Integer, nullable=True)        # 0-59
-    schedule_days = Column(JSONB, nullable=True)            # null=every day, or [0..6] (0=Mon)
-    # Interval mode: fire every N minutes. Mutually exclusive with hour/minute.
-    schedule_interval_minutes = Column(Integer, nullable=True)
-    timezone = Column(Text, default="UTC")
-    next_fires_at = Column(DateTime(timezone=True), nullable=False)
-    last_fired_at = Column(DateTime(timezone=True), nullable=True)
-    status = Column(Text, nullable=False, default="active")  # active | paused | cancelled
-    created_at = Column(DateTime(timezone=True), default=_now, server_default=text("NOW()"))
-
-    __table_args__ = (
-        Index("idx_routines_workspace_channel", "workspace_id", "channel_name"),
-        Index("idx_routines_next_fires_status", "next_fires_at", "status"),
-    )
-
-
 # ---------------------------------------------------------------------------
 # Inbox / Notifications
 # ---------------------------------------------------------------------------
@@ -1097,50 +907,6 @@ class NotificationRecord(Base):
         Index("idx_notifications_workspace_read", "workspace_id", "is_read"),
         Index("idx_notifications_created_at", "created_at"),
         UniqueConstraint("workspace_id", "dedupe_key", name="uq_notifications_workspace_dedupe"),
-    )
-
-
-# ---------------------------------------------------------------------------
-# Chat-platform integrations (Slack / Telegram bridges)
-# ---------------------------------------------------------------------------
-
-class IntegrationBinding(Base):
-    """A connection between this workspace and an external chat platform bot.
-
-    One binding = one bot (a Telegram bot from BotFather, or a Slack app's bot
-    user). Each external conversation the bot participates in is bridged to a
-    dedicated workspace channel named ``ext-<platform>-<binding8>-<chat id>``
-    (deterministic — no per-conversation mapping table). Inbound platform
-    messages flow through the normal event pipeline as ``human:`` sources, so
-    routing/leader/mention logic applies unchanged; outbound agent ``chat``
-    replies are relayed back by ``services/integrations.relay_for_event``.
-    """
-    __tablename__ = "integration_bindings"
-
-    id = Column(UUID(as_uuid=False), primary_key=True, default=_uuid, server_default=text("gen_random_uuid()"))
-    workspace_id = Column(UUID(as_uuid=False), ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False)
-    platform = Column(Text, nullable=False)               # "telegram" | "slack"
-    name = Column(Text, nullable=True)                    # display label, e.g. bot username
-    bot_token = Column(Text, nullable=False)              # Telegram bot token / Slack xoxb- token
-    signing_secret = Column(Text, nullable=True)          # Slack request-signing secret (custom apps only)
-    webhook_secret = Column(Text, nullable=True)          # Telegram X-Telegram-Bot-Api-Secret-Token
-    # Slack team id. The official OpenAgents Slack app delivers every team's
-    # events to ONE shared endpoint — this column is how an event finds its
-    # binding (indexed; also set for custom Slack apps, unused by Telegram).
-    external_team_id = Column(Text, nullable=True)
-    # Route every bridged message to this agent (becomes master_agent of the
-    # auto-created channels). Null = let the router/leader logic decide.
-    default_agent = Column(Text, nullable=True)
-    config = Column(JSONB, default=dict)                  # {botUsername, teamName, botUserId, ...}
-    status = Column(Text, nullable=False, default="active")  # active | disabled
-    last_error = Column(Text, nullable=True)              # last relay/webhook failure (redacted)
-    last_event_at = Column(DateTime(timezone=True), nullable=True)
-    created_by = Column(Text, nullable=True)              # email of the admin who connected it
-    created_at = Column(DateTime(timezone=True), default=_now, server_default=text("NOW()"))
-
-    __table_args__ = (
-        Index("idx_integration_bindings_workspace", "workspace_id"),
-        Index("idx_integration_bindings_team", "external_team_id"),
     )
 
 
@@ -1177,28 +943,6 @@ class Agent(Base):
     agent_name = Column(Text, primary_key=True)
     display_name = Column(Text, nullable=True)
     agent_type = Column(Text, nullable=True)         # "claude", "codex", "gemini", etc.
-    created_at = Column(DateTime(timezone=True), default=_now, server_default=text("NOW()"))
-
-
-class ModelAccess(Base):
-    """A saved inference credential ("model access") for a workspace.
-
-    One entry = provider + API key (+ optional custom base URL). Managed on the
-    Model access settings page and reused across agent configs: forms reference
-    the entry by id, the backend resolves the real key server-side (node-command
-    enqueue, probes), so the raw key never has to round-trip via the browser
-    after creation.
-    """
-    __tablename__ = "model_access"
-
-    id = Column(UUID(as_uuid=False), primary_key=True, default=_uuid, server_default=text("gen_random_uuid()"))
-    workspace_id = Column(UUID(as_uuid=False), ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False)
-    label = Column(Text, nullable=False)               # display name, defaults to provider label
-    provider = Column(Text, nullable=False)            # PROVIDERS name, or "custom"
-    base_url = Column(Text, nullable=True)             # custom/relay endpoint override
-    api_key = Column(Text, nullable=False)             # stored server-side; only masked form is listed
-    created_by = Column(Text, nullable=True)           # email or identity of the creator
-    status = Column(Text, default="active")            # active | disabled
     created_at = Column(DateTime(timezone=True), default=_now, server_default=text("NOW()"))
 
 
@@ -1370,8 +1114,6 @@ class ProfileFieldResponse(Base):
         ),
         UniqueConstraint("workspace_id", "requirement_key", name="uq_profile_field_response"),
     )
-
-
 
 
 class CounselorTurnDecision(Base):
@@ -1651,102 +1393,6 @@ class Institution(Base):
         Index("uq_pai_institution_owner_country_name", "owner_workspace_id", "country_code", "normalized_name", unique=True),
         Index("uq_pai_institution_provider", "provider", "provider_id", unique=True),
     )
-
-
-class SavedInstitution(Base):
-    __tablename__ = "pai_saved_institutions"
-    id = Column(Text, primary_key=True, default=_uuid)
-    workspace_id = Column(UUID(as_uuid=False), ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False)
-    institution_id = Column(Text, ForeignKey("pai_institutions.id", ondelete="CASCADE"), nullable=False)
-    created_at = Column(DateTime(timezone=True), default=_now, server_default=text("NOW()"))
-    __table_args__ = (UniqueConstraint("workspace_id", "institution_id", name="uq_pai_saved_institution"),)
-
-
-class ApplicationPlan(Base):
-    """Operational application work; canonical student claims stay in Vault."""
-    __tablename__ = "pai_application_plans"
-    id = Column(Text, primary_key=True, default=_uuid)
-    workspace_id = Column(UUID(as_uuid=False), ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False)
-    institution_id = Column(Text, ForeignKey("pai_institutions.id", ondelete="CASCADE"), nullable=False)
-    program_name = Column(Text, nullable=True)
-    intake = Column(Text, nullable=True)
-    route = Column(Text, nullable=True)
-    status = Column(Text, nullable=False, default="planning", server_default="planning")
-    status_origin = Column(Text, nullable=False, default="student", server_default="student")
-    deadline_at = Column(DateTime(timezone=True), nullable=True)
-    application_url = Column(Text, nullable=True)
-    notes = Column(Text, nullable=True)
-    external_provider = Column(Text, nullable=True)
-    external_id = Column(Text, nullable=True)
-    submitted_at = Column(DateTime(timezone=True), nullable=True)
-    submission_reference = Column(Text, nullable=True)
-    created_at = Column(DateTime(timezone=True), default=_now, server_default=text("NOW()"))
-    updated_at = Column(DateTime(timezone=True), default=_now, onupdate=_now, server_default=text("NOW()"))
-    __table_args__ = (
-        Index("idx_pai_application_plans_ws_status", "workspace_id", "status"),
-        Index("idx_pai_application_plans_ws_deadline", "workspace_id", "deadline_at"),
-        Index("idx_pai_application_plans_deadline", "deadline_at"),
-        Index("uq_pai_application_plan_identity", "workspace_id", "institution_id",
-              func.lower(func.coalesce(program_name, "")),
-              func.lower(func.coalesce(intake, "")), unique=True),
-    )
-
-
-class ApplicationRequirement(Base):
-    """Per-application work item, optionally linked to an existing task/file."""
-    __tablename__ = "pai_application_requirements"
-    id = Column(Text, primary_key=True, default=_uuid)
-    application_id = Column(Text, ForeignKey("pai_application_plans.id", ondelete="CASCADE"), nullable=False)
-    label = Column(Text, nullable=False)
-    kind = Column(Text, nullable=False, default="other", server_default="other")
-    status = Column(Text, nullable=False, default="todo", server_default="todo")
-    source_type = Column(Text, nullable=False, default="student", server_default="student")
-    source_checked_at = Column(DateTime(timezone=True), nullable=True)
-    due_at = Column(DateTime(timezone=True), nullable=True)
-    source_url = Column(Text, nullable=True)
-    notes = Column(Text, nullable=True)
-    task_id = Column(Text, ForeignKey("kanban_tasks.id", ondelete="SET NULL"), nullable=True)
-    file_id = Column(Text, ForeignKey("files.id", ondelete="SET NULL"), nullable=True)
-    position = Column(Integer, nullable=False, default=0, server_default="0")
-    created_at = Column(DateTime(timezone=True), default=_now, server_default=text("NOW()"))
-    updated_at = Column(DateTime(timezone=True), default=_now, onupdate=_now, server_default=text("NOW()"))
-    __table_args__ = (Index("idx_pai_application_requirements_app", "application_id", "position"),
-                      Index("idx_pai_application_requirements_due", "due_at"))
-
-
-class ApplicationRoutine(Base):
-    """Scope an existing scheduler routine to one application plan."""
-    __tablename__ = "pai_application_routines"
-    application_id = Column(Text, ForeignKey("pai_application_plans.id", ondelete="CASCADE"), primary_key=True)
-    routine_id = Column(Text, ForeignKey("routines.id", ondelete="CASCADE"), primary_key=True)
-    created_at = Column(DateTime(timezone=True), default=_now, server_default=text("NOW()"))
-    __table_args__ = (Index("idx_pai_application_routines_routine", "routine_id"),)
-
-
-class StudentDeadline(Base):
-    """Student-owned date outside an application; never a verified external deadline."""
-    __tablename__ = "pai_student_deadlines"
-    id = Column(Text, primary_key=True, default=_uuid)
-    workspace_id = Column(UUID(as_uuid=False), ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False)
-    title = Column(Text, nullable=False)
-    due_on = Column(Date, nullable=False)
-    category = Column(Text, nullable=False, default="other", server_default="other")
-    notes = Column(Text, nullable=True)
-    source_url = Column(Text, nullable=True)
-    status = Column(Text, nullable=False, default="open", server_default="open")
-    created_at = Column(DateTime(timezone=True), default=_now, server_default=text("NOW()"))
-    updated_at = Column(DateTime(timezone=True), default=_now, onupdate=_now, server_default=text("NOW()"))
-    __table_args__ = (Index("idx_pai_student_deadlines_workspace_due", "workspace_id", "due_on"),
-                      Index("idx_pai_student_deadlines_due", "due_on"))
-
-
-class DeadlineSettings(Base):
-    """Student-selected calendar zone and reminder cadence for in-app notices."""
-    __tablename__ = "pai_deadline_settings"
-    workspace_id = Column(UUID(as_uuid=False), ForeignKey("workspaces.id", ondelete="CASCADE"), primary_key=True)
-    timezone = Column(Text, nullable=False, default="UTC", server_default="UTC")
-    reminder_days = Column(JSONB, nullable=False, default=lambda: [7, 1, 0])
-    updated_at = Column(DateTime(timezone=True), default=_now, onupdate=_now, server_default=text("NOW()"))
 
 
 class StudentDocument(_StudentRecord, Base):

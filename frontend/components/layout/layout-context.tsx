@@ -13,7 +13,7 @@ import { useIsMobile } from '@/hooks/use-mobile';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import type { FileSortKey, FileTypeFilter } from '@/components/files/file-utils';
 
-export type ViewMode = 'overview' | 'journey' | 'paths' | 'compare' | 'plan' | 'settings' | 'threads' | 'roadmaps' | 'profile' | 'notifications' | 'files' | 'browser' | 'inbox';
+export type ViewMode = 'overview' | 'journey' | 'paths' | 'compare' | 'plan' | 'settings' | 'threads' | 'roadmaps' | 'profile' | 'notifications' | 'files' | 'inbox';
 
 /** The Files view has two halves the folder panel switches between. */
 export type FilesSection = 'folders' | 'trash';
@@ -57,7 +57,7 @@ const DEFAULT_FILES_BROWSE: FilesBrowseState = {
  * over the full detail area, so the sidebar collapses down to the rail.
  */
 export const VIEWS_WITH_LIST: ReadonlySet<ViewMode> = new Set<ViewMode>([
-  'threads', 'files', 'browser',
+  'threads', 'files',
 ]);
 
 /**
@@ -157,12 +157,6 @@ interface LayoutState {
    */
   railDragWidth: number | null;
   setRailDragWidth: (width: number | null) => void;
-  /** Experimental: show browser tab side-by-side with chat */
-  splitBrowser: boolean;
-  setSplitBrowser: (v: boolean) => void;
-  /** Whether the browser live preview panel is currently showing */
-  showBrowserPreview: boolean;
-  setShowBrowserPreview: (v: boolean) => void;
   /** Whether the New Thread dialog (agent picker) is open */
   newThreadOpen: boolean;
   setNewThreadOpen: (v: boolean) => void;
@@ -193,19 +187,8 @@ export function LayoutProvider({ children }: { children: ReactNode }) {
   const [listPrefs, setListPrefs] = useState<ListPrefs>({});
   const [selectedAgentName, setSelectedAgentName] = useState<string | null>(null);
   const [mobilePane, setMobilePane] = useState<MobilePane>('list');
-  const [splitBrowser, setSplitBrowser] = useState(() => {
-    if (typeof window === 'undefined') return false;
-    return localStorage.getItem('x-split-browser') === '1';
-  });
-
-  const handleSetSplitBrowser = (v: boolean) => {
-    setSplitBrowser(v);
-    localStorage.setItem('x-split-browser', v ? '1' : '0');
-  };
-
   const [isRailExpanded, setIsRailExpanded] = useState(false);
   const [railDragWidth, setRailDragWidth] = useState<number | null>(null);
-  const [showBrowserPreview, setShowBrowserPreview] = useState(false);
   const [newThreadOpen, setNewThreadOpen] = useState(false);
   const openNewThread = () => setNewThreadOpen(true);
 
@@ -323,10 +306,6 @@ export function LayoutProvider({ children }: { children: ReactNode }) {
       setRailExpanded,
       railDragWidth,
       setRailDragWidth,
-      splitBrowser,
-      setSplitBrowser: handleSetSplitBrowser,
-      showBrowserPreview,
-      setShowBrowserPreview,
       newThreadOpen,
       setNewThreadOpen,
       openNewThread,

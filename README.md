@@ -40,9 +40,10 @@ Useful commands: `docker compose logs -f backend`, `docker compose ps`,
 `NEXT_PUBLIC_*` variables are compiled into the frontend image, so rerun
 `scripts/run.py` after changing them, and never put backend secrets into them.
 
-The backend image includes Chromium for local browser tools. If every browser
-operation uses Browser Fabric (`BROWSERFABRIC_API_KEY` set), put
-`BACKEND_IMAGE_TARGET=cloud` in `.env` to skip Chromium and its libraries.
+The backend image includes Chromium so research can render JavaScript-heavy
+pages that a plain fetch cannot read. If rendering uses Browser Fabric
+(`BROWSERFABRIC_API_KEY` set), put `BACKEND_IMAGE_TARGET=cloud` in `.env` to skip
+Chromium and its libraries.
 
 Back up the local database with `./scripts/backup-postgres.sh` (writes to the
 ignored `backups/` directory).

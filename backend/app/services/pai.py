@@ -33,32 +33,13 @@ logger = logging.getLogger(__name__)
 PAI_AGENT_NAME = "pai"
 PAI_AGENT_TYPE = "system:pai"
 PAI_PRIMARY_CHANNEL = "pai-counselor"
-# PAI Counselor's tool boundary: lightweight reads/context-inspection plus the
-# two Operator hand-off tools — nothing that performs real execution (writes,
-# browser automation, destructive or multi-step actions) and nothing that lets
-# the student manage agents or spin up threads (PAI has no agent picker; see
-# the deep Counselor prompt — that's Operator's business, not a conversational
-# one). Those live behind PAI Operator (see app/services/operator.py), which
-# discovers them itself via the "operator" tool audience (see
-# app/tools/registry.py) rather than a list maintained here.
-#
-# This tuple must stay a subset of what app/tools/builtin/__init__.py tags
-# audiences=..."counselor"... for every non-operator.* entry — see
-# TestToolBoundary.test_allowed_tools_match_counselor_audience in
-# tests/test_pai.py, which fails loudly if the two ever drift apart again
-# (they already have once: workspace.agents.list/workspace.thread.create used
-# to be listed here despite being real execution, not lightweight reads).
-#
-# Do not add write/execution tools to this tuple — route that work through
-# operator.delegate instead; the deep Counselor never calls tools itself
-# (research goes through app/research/gateway.py).
+# PAI Counselor's tool boundary. The deep Counselor never calls tools itself;
+# research goes through app/research/gateway.py, which may only queue a
+# capability workflow on PAI Operator. Nothing here performs execution.
 PAI_ALLOWED_TOOLS = (
-    "workspace.threads.list", "tasks.list", "files.list", "files.read",
-    # PAI Operator — see app/services/operator.py. Counselor never touches
-    # execution tools directly; it delegates and reads status back through these.
-    "operator.delegate", "operator.status", "operator.resume",
-    # Counselor reads canonical context; Operator intake proposes structured deltas.
-    "memory.context", "vault.get", "memory.search", "memory.episodes",
+    # The research gateway's only tool: queue one capability workflow on
+    # PAI Operator (see app/services/operator.py).
+    "operator.delegate",
 )
 
 

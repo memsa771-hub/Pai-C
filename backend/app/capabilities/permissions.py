@@ -5,7 +5,7 @@ class CapabilityAccessDenied(PermissionError):
 # Host-owned grant for Operator. Application submission is intentionally
 # absent; adding it later must include an explicit approval design.
 OPERATOR_PLATFORM_PERMISSIONS = frozenset({
-    "files.read", "files.write", "web.read", "browser.read", "browser.write",
+    "files.read", "files.write", "web.read",
     "application.prepare",
     "profile.propose",
 })
