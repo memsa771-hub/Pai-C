@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { InboxList } from './inbox-list';
-import type { OsInboxItem } from '@/lib/os-inbox';
+import { completeActions, type OsInboxItem } from '@/lib/os-inbox';
 
 const NOW = new Date('2027-03-10T09:00:00Z');
 
@@ -40,5 +40,20 @@ describe('InboxList', () => {
 
   it('shows an empty state', () => {
     expect(renderToStaticMarkup(<InboxList items={[]} now={NOW} onComplete={() => {}} />)).toContain('Nothing to do');
+  });
+});
+
+describe('admission result (Slice 6b final review I2)', () => {
+  it('asks admitted or not, and sends the choice the visa page pre-selects from', () => {
+    const admission = item({ instance_key: 'admission_result@p1', inbox_kind: 'choose', programme_ref: 'p1' });
+    expect(completeActions(admission)).toEqual([
+      { label: 'Admitted', payload: { choice: 'admitted' } },
+      { label: 'Not admitted', payload: { choice: 'rejected' } },
+    ]);
+    expect(completeActions(item({ inbox_kind: 'choose' }))).toEqual([{ label: 'Confirm', payload: {} }]);
+    expect(completeActions(item({}))).toEqual([{ label: 'Done', payload: {} }]);
+    const html = renderToStaticMarkup(<InboxList items={[admission]} now={NOW} onComplete={() => {}} />);
+    expect(html).toContain('>Admitted<');
+    expect(html).toContain('>Not admitted<');
   });
 });

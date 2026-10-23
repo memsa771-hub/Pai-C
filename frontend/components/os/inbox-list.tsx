@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import {
   GROUP_TITLES,
   KIND_LABELS,
+  completeActions,
   dateLabels,
   formatDue,
   groupItems,
@@ -17,7 +18,7 @@ import { checkLabel, chipLabel, chipTone, lineText, type OsNote } from '@/lib/os
 interface InboxListProps {
   items: OsInboxItem[];
   now: Date;
-  onComplete: (item: OsInboxItem) => void;
+  onComplete: (item: OsInboxItem, payload?: Record<string, unknown>) => void;
   busyId?: number | null;
   /** Programme ref -> the status of its date facts (Slice 2): shown next to provisional/estimated. */
   factStatus?: Record<string, FactStatus | null>;
@@ -128,14 +129,14 @@ export function InboxList({ items, now, onComplete, busyId = null, factStatus = 
                         </a>
                       )}
                     </div>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      disabled={busyId === item.id}
-                      onClick={() => onComplete(item)}
-                    >
-                      {item.inbox_kind === 'choose' ? 'Confirm' : 'Done'}
-                    </Button>
+                    <div className="flex shrink-0 flex-col gap-1">
+                      {completeActions(item).map((a) => (
+                        <Button key={a.label} size="sm" variant="outline" disabled={busyId === item.id}
+                                onClick={() => onComplete(item, a.payload)}>
+                          {a.label}
+                        </Button>
+                      ))}
+                    </div>
                   </div>
                 </li>
               );

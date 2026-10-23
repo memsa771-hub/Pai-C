@@ -41,20 +41,23 @@ interface PackViewProps {
   onDownload: (file: OsPackFile) => void;
   onRebuild: () => void;
   onDetails: () => void;
+  noun?: string; // what is shown: 'pack' (default) or 'visa file' (Slice 6b)
+  notice?: string;
 }
 
 /** One programme's pack: how to apply, fees, the checklist with downloads, the data sheet, and Approve. */
-export function PackView({ pack, busy, onTick, onAdd, onApprove, onDownload, onRebuild, onDetails }: PackViewProps) {
+export function PackView({ pack, busy, onTick, onAdd, onApprove, onDownload, onRebuild, onDetails, noun = 'pack',
+                           notice = 'You submit and pay yourself. We never send anything for you.' }: PackViewProps) {
   const [extra, setExtra] = useState('');
   const sheet = fileFor(pack, DATA_SHEET_KEY);
   const sections = [...new Set(pack.data_sheet.map((r) => r.section))];
   return (
     <div className="mx-auto flex w-full max-w-md flex-col gap-4 text-sm">
-      <p className="rounded-md bg-muted p-2">You submit and pay yourself. We never send anything for you.</p>
-      {pack.status === 'building' && <p className="text-muted-foreground">Your pack is being prepared…</p>}
+      <p className="rounded-md bg-muted p-2">{notice}</p>
+      {pack.status === 'building' && <p className="text-muted-foreground">Your {noun} is being prepared…</p>}
       {pack.status === 'failed' && (
         <p className="text-destructive">
-          We could not prepare this pack.{' '}
+          We could not prepare this {noun}.{' '}
           <Button size="sm" variant="outline" disabled={busy} onClick={onRebuild}>Try again</Button>
         </p>
       )}
@@ -158,7 +161,7 @@ export function PackView({ pack, busy, onTick, onAdd, onApprove, onDownload, onR
       {pack.approved ? (
         <p className="font-medium">Approved ✓</p>
       ) : (
-        <Button disabled={busy || !canApprove(pack)} onClick={onApprove}>Approve pack</Button>
+        <Button disabled={busy || !canApprove(pack)} onClick={onApprove}>Approve {noun}</Button>
       )}
     </div>
   );
