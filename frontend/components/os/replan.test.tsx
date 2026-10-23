@@ -130,3 +130,20 @@ describe('replan API calls', () => {
     expect(new Headers(adminInit.headers).get('X-OS-Admin-Token')).toBe('admin-secret');
   });
 });
+
+describe('admin token (final review I12)', () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it('a wrong admin token fails the call without signing the user out', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response('{"detail":"admin token required"}', { status: 401 })));
+    const { AUTH_INVALID_EVENT } = await import('@/lib/auth/service');
+    const signedOut = vi.fn();
+    const win = new EventTarget();  // the browser window the app's sign-out listens on
+    vi.stubGlobal('window', win);
+    win.addEventListener(AUTH_INVALID_EVENT, signedOut);
+    workspaceApi.configure('ws-1', '', 'bearer-x');
+    await expect(workspaceApi.getOsSupportCases('wrong', 'open')).rejects.toThrow('API 401');
+    await expect(workspaceApi.resolveOsSupportCase('wrong', 1, 'x', false)).rejects.toThrow('API 401');
+    expect(signedOut).not.toHaveBeenCalled();
+  });
+});

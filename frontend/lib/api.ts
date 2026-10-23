@@ -499,19 +499,31 @@ class WorkspaceApi {
     return this.requestJson(`/v1/os/proposals/${id}/decline?${params}`, { method: 'POST' });
   }
 
-  /** PAI OS admin: support cases. The admin token goes in its own header only, never in a URL. */
+  /**
+   * PAI OS admin calls: the admin token goes in its own header only, never in a URL. A 401 here means a wrong admin
+   * token, not an expired session, so it never signs the user out (unlike requestJson).
+   */
+  private async adminJson<T>(path: string, adminToken: string, options: RequestInit = {}): Promise<T> {
+    const headers: Record<string, string> = { 'Content-Type': 'application/json', 'X-OS-Admin-Token': adminToken };
+    if (this.token) headers['X-Workspace-Token'] = this.token;
+    if (this.bearerToken) headers['Authorization'] = `Bearer ${this.bearerToken}`;
+    const res = await fetch(`${API_URL}${path}`, { ...options, credentials: 'include', cache: 'no-store', headers });
+    if (!res.ok) throw new Error(`API ${res.status}: ${await res.text()}`);
+    return (await res.json()) as T;
+  }
+
+  /** PAI OS admin: support cases. */
   async getOsSupportCases(adminToken: string, status?: 'open' | 'resolved'): Promise<import('./os-replan').OsSupportCase[]> {
     const params = new URLSearchParams({ network: this.requireWorkspace(), ...(status ? { status } : {}) });
-    const body = await this.requestJson<{ cases: import('./os-replan').OsSupportCase[] }>(`/v1/os/admin/support?${params}`, {
-      headers: { 'X-OS-Admin-Token': adminToken },
-    });
+    const body = await this.adminJson<{ cases: import('./os-replan').OsSupportCase[] }>(
+      `/v1/os/admin/support?${params}`, adminToken);
     return body.cases;
   }
 
   async resolveOsSupportCase(adminToken: string, id: number, note: string, unpause: boolean): Promise<import('./os-replan').OsSupportCase> {
     const params = new URLSearchParams({ network: this.requireWorkspace() });
-    return this.requestJson(`/v1/os/admin/support/${id}/resolve?${params}`, {
-      method: 'POST', headers: { 'X-OS-Admin-Token': adminToken }, body: JSON.stringify({ note, unpause }),
+    return this.adminJson(`/v1/os/admin/support/${id}/resolve?${params}`, adminToken, {
+      method: 'POST', body: JSON.stringify({ note, unpause }),
     });
   }
 
