@@ -7,25 +7,21 @@ the Vault never holds the student's original wording; that stays only in the
 evidence quote. A value that cannot be made English is rejected, never guessed.
 """
 
+import json
 import re
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any, Optional
 
 from app.memory.catalog import norm, vault_catalog
 
+# Language word lists live in normalize_words.json (no language lists in code),
+# loaded once.
+_WORDS = json.loads((Path(__file__).with_name("normalize_words.json")).read_text(encoding="utf-8"))
 # Words that only occur in untranslated Roman Urdu; English values never hold them.
-ROMAN_URDU = frozenset({
-    "hai", "hain", "nahi", "nahin", "kiya", "tha", "thi", "hoon", "mera", "meri",
-    "mujhe", "bohat", "bahut", "raha", "rahi", "abbu", "ammi", "acha", "achi",
-    "karna", "karni", "wala", "wali", "lekin", "kyunke", "sakta", "sakti",
-})
-# Function words plus a few common ones: enough to tell "Roman Urdu with some
-# English mixed in" from pure Roman Urdu. Deliberately excludes proper nouns
-# students use inside Urdu sentences (board, college names).
-_ENGLISH = frozenset({
-    "i", "im", "my", "the", "and", "from", "is", "are", "was", "with", "for", "a", "an", "bro", "next", "month", "result", "but", "have", "got",
-    "did", "just", "now", "on", "at", "be", "it", "me", "want", "like", "this", "around", "thousand", "sorry", "teacher", "housewife", "fees",
-})
+ROMAN_URDU = frozenset(_WORDS["roman_urdu"])
+# Enough English to tell "Roman Urdu with some English mixed in" from pure Roman Urdu.
+_ENGLISH = frozenset(_WORDS["english"])
 ARABIC_SCRIPT = re.compile(r"[؀-ۿݐ-ݿﭐ-﷿ﹰ-﻿]")
 _LATIN = re.compile(r"[A-Za-z]")
 
@@ -33,7 +29,7 @@ _DIGITS = str.maketrans(
     "۰۱۲۳۴۵۶۷۸۹٠١٢٣٤٥٦٧٨٩", "01234567890123456789")
 
 NAME_PATHS = {"identity.full_name", "identity.preferred_name"}
-_RUPEE_WORDS = {"rupees", "rupee", "rs", "pkr", "روپے", "روپیہ"}
+_RUPEE_WORDS = frozenset(_WORDS["rupee_words"])
 _DATE_NAMES = {"start_date", "end_date", "started_at", "completed_at", "target_date"}
 _MONTH_NAMES = [("jan", "january"), ("feb", "february"), ("mar", "march"), ("apr", "april"),
                 ("may",), ("jun", "june"), ("jul", "july"), ("aug", "august"),

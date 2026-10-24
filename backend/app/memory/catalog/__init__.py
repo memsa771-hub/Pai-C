@@ -49,7 +49,7 @@ class TypeSpec:
     shown_on: str
     inputs: tuple[str, ...]
     sensitivity: str
-    conflict: str
+    conflict: str  # facts use their DB field definition's conflict_policy, not this
     freshness_days: int | None
     version: int
     schema: dict | None = None
