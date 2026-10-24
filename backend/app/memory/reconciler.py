@@ -78,7 +78,8 @@ def provenance_for(candidate: MemoryCandidate) -> tuple[str, str, Optional[str]]
         return origin, "document_extraction", verification
     if source == "user_explicit" and candidate.input_channel == "profile":
         evidence = candidate.evidence or {}
-        if evidence.get("capture") == "profile_review" and evidence.get("action") == "confirm":
+        # The Profile review and the Vault page both confirm with a value digest.
+        if evidence.get("capture") in ("profile_review", "vault_api") and evidence.get("action") == "confirm":
             from .evidence import value_digest, evidence_policy
             value = MemoryReconciler._unwrap(candidate.proposed_value)
             if (evidence.get("confirmation") or {}).get("value_digest") == value_digest(value):
