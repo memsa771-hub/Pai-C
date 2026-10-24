@@ -5,14 +5,16 @@ from typing import Any
 
 from sqlalchemy import select
 
-from app.models import MemoryCandidate, ProfileIssue
+from app.models import MemoryCandidate, ProfileIssue, VaultItem
 from .candidates import MemoryCandidateService
 from .errors import MemoryDataError
 from .reconciler import MemoryReconciler
 from .vault_intake import VaultAssertionService
 
 
-ISSUE_ACTIONS = frozenset({"keep_current", "accept_proposed", "provide_new"})
+# both_true: the new value holds now and the old one held before; the old
+# value is kept as past (VAULT_SPEC §Conflicts, the four card answers).
+ISSUE_ACTIONS = frozenset({"keep_current", "accept_proposed", "both_true", "provide_new"})
 
 
 def _unwrap(value: Any) -> Any:
@@ -54,6 +56,11 @@ class ProfileIssueService:
             if original is not None and original.status in ("pending", "needs_review"):
                 self.candidates.mark_rejected(original, "Student kept the current canonical value")
                 VaultAssertionService(self.db).refresh_decision(original)
+            if issue.affected_type == "vault_item" and issue.affected_id:
+                # The question is settled: the entry is no longer "In question".
+                item = self.db.get(VaultItem, issue.affected_id)
+                if item is not None and item.status == "active":
+                    item.conflict_state = "none"
             self._close(issue, action, note, None)
             return {"resolved": True, "action": action, "id": None}
 
@@ -61,6 +68,9 @@ class ProfileIssueService:
             raise MemoryDataError("A new value is required")
 
         spec = self._candidate_spec(issue, original)
+        if issue.affected_type == "vault_item" and issue.affected_id:
+            # Answer about the entry the card names, never a loose look-alike.
+            spec["entities"] = {**(spec["entities"] or {}), "item_id": issue.affected_id}
         proposed_value = value if action == "provide_new" else spec["proposed_value"]
         candidate = self.candidates.propose(
             workspace_id=workspace_id,
@@ -79,6 +89,7 @@ class ProfileIssueService:
                 "profile_issue_id": issue.id,
                 "resolution_action": action,
                 "original_candidate_id": original.id if original else None,
+                **({"semantic_temporal_change": True} if action == "both_true" else {}),
             },
             subject_user_id=issue.subject_user_id,
         )
@@ -108,6 +119,13 @@ class ProfileIssueService:
                 "key": original.key,
                 "proposed_value": _unwrap(original.proposed_value),
                 "entities": entities,
+            }
+        if evidence.get("item_type"):
+            return {
+                "candidate_type": "vault_item",
+                "key": evidence["item_type"],
+                "proposed_value": evidence.get("proposed_value"),
+                "entities": {},
             }
         if evidence.get("field_key"):
             return {

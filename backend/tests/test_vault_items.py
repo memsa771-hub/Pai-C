@@ -325,3 +325,32 @@ def test_one_card_at_a_time_per_entry():
         assert two.outcome == VaultOutcome.NEEDS_REVIEW and two.issue_id == one.issue_id
         cards = _open(db, ws)
         assert len(cards) == 1 and cards[0].evidence["proposed_value"] == {"province": "Balochistan"}
+
+
+# ---- carried into task 5 ---------------------------------------------------
+
+def test_enrich_keeps_open_card_on_the_new_row():
+    with StudentSession() as student, student.factory() as db:
+        svc, ws = VaultItemService(db), student.workspace_id
+        first = _apply(svc, ws, "domicile", {"province": "Sindh"}).item
+        card = _apply(svc, ws, "domicile", {"province": "KP"})
+        out = _apply(svc, ws, "domicile", {"province": "Sindh", "area": "rural"})
+        assert out.outcome == VaultOutcome.SUPERSEDED
+        open_cards = _open(db, ws)
+        assert [c.id for c in open_cards] == [card.issue_id]
+        assert open_cards[0].affected_id == out.item.id
+        assert open_cards[0].evidence["current_value"] == {"province": "Sindh", "area": "rural"}
+        assert out.item.conflict_state == "in_question"
+        assert db.get(VaultItem, first.id).conflict_state == "none"
+
+
+def test_loose_guess_against_stated_is_retained():
+    with StudentSession() as student, student.factory() as db:
+        svc, ws = VaultItemService(db), student.workspace_id
+        ali = _apply(svc, ws, "family_member", {"relation": "brother", "name": "Ali", "occupation": "Doctor"}).item
+        out = _apply(svc, ws, "family_member", {"relation": "brother", "occupation": "Engineer"}, level="inferred")
+        assert out.outcome == VaultOutcome.RETAINED and out.reason == "guess_against_stated"
+        row = db.get(VaultItem, ali.id)
+        assert row.status == "active" and row.conflict_state == "none"
+        assert row.value == {"relation": "brother", "name": "Ali", "occupation": "Doctor"}
+        assert _open(db, ws) == []

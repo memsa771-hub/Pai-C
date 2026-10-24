@@ -35,6 +35,10 @@ class RecordNeedsReview(MemoryDataError):
     """A proposal was retained for review without changing canonical values."""
 
 
+class RecordRetained(MemoryDataError):
+    """The existing record won; nothing was written and no question is needed."""
+
+
 class AmbiguousRecordMatch(RecordNeedsReview):
     def __init__(self, record_ids: list[str]):
         super().__init__("Several existing records match; confirm this is a separate record")
@@ -227,6 +231,11 @@ class StudentRecordService:
         identity_change = bool(current and kind == "education" and any(
             key in values and key in before and not _same(before[key], values[key])
             for key in ("qualification_name", "canonical_level", "field_of_study")))
+        # A guess neither replaces nor extends what the student said or showed
+        # (VAULT_SPEC §Conflicts step 4); the student's own edit comes first.
+        if (current is not None and merged != before and (evidence or {}).get("inferred")
+                and source_type != "user_explicit" and not (current.evidence or {}).get("inferred")):
+            raise RecordRetained("guess_against_stated")
         os_progress = (kind == "exploration_experience" and source_type in {"agent", "system"}
                        and set(values).issubset({"activity_status", "completed_at", "evidence_refs"})
                        and bool((evidence or {}).get("execution_run_id")))

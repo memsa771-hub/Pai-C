@@ -24,8 +24,9 @@ from .candidates import MemoryCandidateService
 from .episodic import EpisodicMemoryService
 from .errors import MemoryDataError
 from .semantic import MemoryService
-from .student_records import RecordNeedsReview, StudentRecordService
+from .student_records import RecordNeedsReview, RecordRetained, StudentRecordService
 from .vault import VaultOutcome, VaultService
+from .vault_items import VaultItemService
 from .vault_intake import VaultAssertionService
 from .vault_relations import VaultRelationService
 
@@ -53,6 +54,10 @@ _DOCUMENT_PROVENANCE = {
 }
 _UNKNOWN_DOCUMENT_PROVENANCE = ("unknown_document", "extracted")
 
+# Sources that are not the student speaking: they may not bring back an entry
+# the student removed (VAULT_SPEC §Conflicts).
+_NON_STUDENT_SOURCES = ("document", "agent", "system")
+
 
 def provenance_for(candidate: MemoryCandidate) -> tuple[str, str, Optional[str]]:
     """(claim_origin, capture_method, verification_status) for a candidate.
@@ -64,6 +69,10 @@ def provenance_for(candidate: MemoryCandidate) -> tuple[str, str, Optional[str]]
     if source == "document":
         authority = str((candidate.evidence or {}).get("authority") or "")
         origin, verification = _DOCUMENT_PROVENANCE.get(authority, _UNKNOWN_DOCUMENT_PROVENANCE)
+        # An OCR reading can misread a digit; it is not document support until
+        # the student confirms it, whoever issued the paper.
+        if (candidate.evidence or {}).get("ocr") and verification == "document_supported":
+            verification = "extracted"
         return origin, "document_extraction", verification
     if source == "user_explicit" and candidate.input_channel == "profile":
         evidence = candidate.evidence or {}
@@ -103,6 +112,7 @@ class MemoryReconciler:
         self.memories = MemoryService(db)
         self.episodes = EpisodicMemoryService(db)
         self.records = StudentRecordService(db)
+        self.items = VaultItemService(db)
         self.assertions = VaultAssertionService(db)
 
     # -- entry points ------------------------------------------------------
@@ -133,6 +143,8 @@ class MemoryReconciler:
                 result = self._reconcile_episode(candidate)
             elif candidate.candidate_type == "student_record":
                 result = self._reconcile_student_record(candidate)
+            elif candidate.candidate_type == "vault_item":
+                result = self._reconcile_item(candidate)
             else:
                 result = self._reject(candidate, f"unknown candidate_type: {candidate.candidate_type}")
         except RecordNeedsReview as exc:
@@ -140,16 +152,21 @@ class MemoryReconciler:
             candidate.rejection_reason = str(exc)
             self.db.flush()
             result = ReconcileResult(False, candidate.id, reason="needs_review", outcome="needs_review")
+        except RecordRetained as exc:
+            self.candidates.mark_rejected(candidate, str(exc))
+            result = ReconcileResult(False, candidate.id, reason=str(exc), outcome=VaultOutcome.RETAINED.value)
         except MemoryDataError as exc:
             # A statement about the candidate — the expected rejection path.
             result = self._reject(candidate, str(exc))
         if result.accepted and candidate.candidate_type == "student_record" and candidate.key in {"project", "skill"}:
             VaultRelationService(self.db).sync_demonstrations(candidate.workspace_id, assertion.id)
         self.assertions.finish(assertion, result, candidate)
-        if result.accepted and candidate.candidate_type in {"vault_fact", "student_record"}:
+        if result.accepted and candidate.candidate_type in {"vault_fact", "student_record", "vault_item"}:
             from app.runtime.task_runtime import enqueue
             from app.config import config
-            if config.PAI_SEMANTIC_RECALL_ENABLED and result.result_id and candidate.operation != "retract":
+            # The embed job reads facts and records only; items are not indexed yet.
+            if (config.PAI_SEMANTIC_RECALL_ENABLED and result.result_id and candidate.operation != "retract"
+                    and candidate.candidate_type != "vault_item"):
                 payload = ({"fact_ids": [result.result_id]} if candidate.candidate_type == "vault_fact"
                            else {"record_refs": [{"kind": candidate.key, "id": result.result_id}]})
                 enqueue(self.db, job_type="memory.embed", workspace_id=candidate.workspace_id,
@@ -273,10 +290,10 @@ class MemoryReconciler:
         if result.outcome is VaultOutcome.RETAINED:
             self.candidates.mark_rejected(
                 candidate,
-                f"retained existing value (policy: conflict lost for {candidate.key})",
+                result.reason or f"retained existing value (policy: conflict lost for {candidate.key})",
             )
             return ReconcileResult(
-                False, candidate.id, reason="retained",
+                False, candidate.id, reason=result.reason or "retained",
                 outcome=VaultOutcome.RETAINED.value,
             )
 
@@ -299,6 +316,72 @@ class MemoryReconciler:
             True, candidate.id, result_id=result.fact.id,
             outcome=result.outcome.value,
         )
+
+    def _reconcile_item(self, candidate: MemoryCandidate) -> ReconcileResult:
+        """Catalog items: identity and the conflict order live in VaultItemService."""
+        if not candidate.key:
+            return self._reject(candidate, "vault_item candidate requires a key")
+        evidence = candidate.evidence or {}
+        item_id = (candidate.entities or {}).get("item_id")
+        if candidate.operation == "retract":
+            if candidate.source_type != "user_explicit" or not item_id:
+                return self._reject(candidate, "Only the student may remove a Vault entry")
+            item = self.items.retract(candidate.workspace_id, item_id, evidence)
+            self.candidates.mark_accepted(candidate, item.id)
+            return ReconcileResult(True, candidate.id, result_id=item.id)
+        if candidate.operation != "upsert" or not self._confident_enough(candidate):
+            return self._reject(candidate, "invalid operation or insufficient confidence")
+        value = self._unwrap(candidate.proposed_value)
+        if not isinstance(value, dict):
+            return self._reject(candidate, "vault_item requires an object")
+        if (candidate.source_type in _NON_STUDENT_SOURCES and not item_id
+                and self.items.was_retracted(candidate.workspace_id, candidate.key, value)):
+            return self._reject(candidate, "retracted_by_student")
+
+        write = self.items.apply(
+            candidate.workspace_id, candidate.key, value,
+            source_type=candidate.source_type, level=self._item_level(candidate),
+            confidence=candidate.confidence or 1.0, evidence=evidence, candidate_id=candidate.id,
+            item_id=item_id, correction=evidence.get("semantic_correction") is True,
+            temporal=evidence.get("semantic_temporal_change") is True,
+        )
+        if write.outcome is VaultOutcome.RETAINED:
+            reason = write.reason or f"retained existing value (policy: conflict lost for {candidate.key})"
+            self.candidates.mark_rejected(candidate, reason)
+            return ReconcileResult(False, candidate.id, reason=write.reason or "retained",
+                                   outcome=VaultOutcome.RETAINED.value)
+        if write.outcome is VaultOutcome.NEEDS_REVIEW:
+            # Deferred, not refused: the service opened (or took over) the card.
+            candidate.status = "needs_review"
+            candidate.rejection_reason = f"{candidate.key} differs from the Vault; the student is asked"
+            self._retire_earlier_proposals(candidate, write.issue_id)
+            self.db.flush()
+            return ReconcileResult(False, candidate.id, reason="needs_review",
+                                   outcome=VaultOutcome.NEEDS_REVIEW.value)
+        self.candidates.mark_accepted(candidate, write.item.id)
+        return ReconcileResult(True, candidate.id, result_id=write.item.id, outcome=write.outcome.value)
+
+    @staticmethod
+    def _item_level(candidate: MemoryCandidate) -> str:
+        """Evidence ladder rung for this proposal. An OCR reading is not "shown"
+        until confirmed, so it enters as PAI's reading, like any other guess."""
+        evidence = candidate.evidence or {}
+        if evidence.get("inferred") or candidate.source_type in ("agent", "system"):
+            return "inferred"
+        if candidate.source_type == "document":
+            return "inferred" if evidence.get("ocr") else "shown"
+        return "stated"
+
+    def _retire_earlier_proposals(self, candidate: MemoryCandidate, issue_id: Optional[str]) -> None:
+        """One question at a time: proposals the open card no longer asks about
+        are closed, so none waits forever in needs_review."""
+        from app.models import ProfileIssue
+        issue = self.db.get(ProfileIssue, issue_id) if issue_id else None
+        for earlier_id in ((issue.evidence or {}).get("earlier_candidate_ids", []) if issue else []):
+            earlier = self.candidates.get(candidate.workspace_id, earlier_id)
+            if earlier is not None and earlier.id != candidate.id and earlier.status in ("pending", "needs_review"):
+                self.candidates.mark_rejected(earlier, "superseded_by_newer_proposal")
+                self.assertions.refresh_decision(earlier)
 
     def _reconcile_semantic(self, candidate: MemoryCandidate) -> ReconcileResult:
         if candidate.operation == "forget":

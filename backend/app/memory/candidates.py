@@ -21,7 +21,7 @@ from app.models import MemoryCandidate, VaultDrop
 
 logger = logging.getLogger(__name__)
 
-CANDIDATE_TYPES = ("vault_fact", "semantic_memory", "episode", "student_record")
+CANDIDATE_TYPES = ("vault_fact", "semantic_memory", "episode", "student_record", "vault_item")
 OPERATIONS = ("upsert", "retract", "forget")
 
 # `source_type` decides how much a proposal is trusted — `user_explicit`

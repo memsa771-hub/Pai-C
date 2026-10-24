@@ -63,7 +63,7 @@ def envelope_for(candidate) -> VaultInputEnvelope:
         source_event_id=str(event_id) if event_id else None,
         source_ref=str(file_id or event_id) if file_id or event_id else None,
         channel=channel, captured_at=candidate.created_at,
-        language=None, trust_metadata={"authority": authority} if authority else {},
+        language=evidence.get("source_language"), trust_metadata={"authority": authority} if authority else {},
     )
 
 
@@ -77,6 +77,12 @@ class VaultDomainRouter:
         if candidate.candidate_type == "vault_fact":
             definition = self.fields.get(candidate.key) if candidate.key else None
             return definition.category if definition else "unclassified"
+        if candidate.candidate_type == "vault_item":
+            # Items carry no domain of their own; the catalog's display group is
+            # the domain, so a new item type routes from its catalog entry alone.
+            from .catalog import vault_catalog
+            spec = vault_catalog().type(candidate.key or "")
+            return spec.shown_on if spec else "unclassified"
         return "memory"
 
 

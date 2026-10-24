@@ -77,6 +77,7 @@ MAX_CORROBORATIONS = 10
 class VaultWriteResult:
     outcome: VaultOutcome
     fact: Optional[VaultFact]
+    reason: Optional[str] = None
 
     @property
     def changed(self) -> bool:
@@ -254,6 +255,13 @@ class VaultService:
                 and _unwrap(current.value) == value):
             self._corroborate(current, evidence)
             return VaultWriteResult(VaultOutcome.CORROBORATED, current)
+
+        # A guess never replaces what the student said or showed (VAULT_SPEC
+        # §Conflicts step 4). Retained quietly: a guess is not worth a question.
+        # The student's own edit comes first (step 2), even when marked inferred.
+        if (current is not None and (evidence or {}).get("inferred") and source_type != "user_explicit"
+                and not (current.evidence or {}).get("inferred") and _unwrap(current.value) != value):
+            return VaultWriteResult(VaultOutcome.RETAINED, current, reason="guess_against_stated")
 
         # An institutional document disagreeing with self-report is evidence
         # of a conflict, not authority to silently replace the student's claim.

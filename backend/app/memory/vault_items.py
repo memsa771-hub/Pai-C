@@ -177,8 +177,9 @@ class VaultItemService:
             carried = {**{k: v for k, v in evidence.items() if k != "corroborations"},
                        **{k: v for k, v in (current.evidence or {}).items() if k != "retraction"}}
             carried = _with_sighting(carried, source_type, level, evidence, candidate_id)
+            # Adding detail answers nothing: an open question follows the entry.
             return self._supersede(current, spec, merged, source_type, LEVELS[top], confidence,
-                                   carried, candidate_id)
+                                   carried, candidate_id, keep_cards=True)
 
         # A loose match (one side lacks a name) may only corroborate or enrich:
         # superseding here could erase a name or merge two people.
@@ -282,11 +283,18 @@ class VaultItemService:
         self.db.flush()
         return item
 
-    def _supersede(self, current, spec, value, source_type, level, confidence, evidence, candidate_id):
+    def _supersede(self, current, spec, value, source_type, level, confidence, evidence, candidate_id,
+                   keep_cards=False):
         new = self._insert(current.workspace_id, spec, value, source_type, level, confidence, evidence, candidate_id)
         current.status, current.superseded_by, current.valid_until = "superseded", new.id, new.valid_from
+        if keep_cards:
+            for issue in self._open_cards(current):
+                issue.affected_id = new.id
+                issue.evidence = {**(issue.evidence or {}), "current_value": new.value}
+                new.conflict_state = "in_question"
+        else:
+            self._close_cards(current, "superseded")
         current.conflict_state = "none"
-        self._close_cards(current, "superseded")
         self.db.flush()
         return ItemWrite(VaultOutcome.SUPERSEDED, new)
 
