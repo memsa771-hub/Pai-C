@@ -560,6 +560,12 @@ def test_onboarding_state_and_answers_through_the_vault(api):
     after = _ok(client.get(_url(ws, "/onboarding"), headers=HEADERS))
     assert after["required"] is False and after["completedAt"]
     assert after["prefill"]["currentCity"] == "Lahore"
+    # The answers land in the Vault itself, on the Details page, as the student's own statement.
+    view = _ok(client.get(_url(ws, ""), headers=HEADERS))
+    entries = {e["type"]: e for section in view["details"].values() for e in section["entries"]}
+    assert entries["identity.full_name"]["value"] == "Test Student"
+    assert entries["location.current_city"]["value"] == "Lahore"
+    assert entries["location.current_city"]["badge"] == "Stated"
     # A missing required answer is a 400 with the field named, not a half-written Vault.
     bad = client.post(_url(ws, "/onboarding"), headers=HEADERS, json={"answers": {"fullName": "Only a name"}})
     assert bad.status_code == 400 and "statusCategory" in bad.text
