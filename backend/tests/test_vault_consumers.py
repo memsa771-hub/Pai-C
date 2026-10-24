@@ -229,24 +229,51 @@ def test_extractor_drops_an_item_id_not_in_its_context():
 # ---- fix round 1 -------------------------------------------------------------
 
 def test_notebook_and_vault_are_not_summed_in_coverage():
-    """Until the notebook sources go, the same father (or interest) in both
-    stores is one, not two: an area counts the larger of the two sides."""
+    """In an area that still reads both stores, the same thing in both is one,
+    not two: the area counts the larger of the two sides."""
     from types import SimpleNamespace
     from app.pai_c.deep.notebook_schema import CounselorNotebookData
     from app.pai_c.understanding.views import coverage_areas
     from tests.truth_map_fixtures import STAMP, item
     notebook = CounselorNotebookData.model_validate({
-        "world": {"people": [{"id": "p1", "role": "father", "evidence": "my father is a shopkeeper",
-                              "first_seen": STAMP, "last_confirmed": STAMP}]},
-        "self": [item(id="s1", key="interest.robotics", value="Robotics", evidence="I like robotics")]})
+        "source": [item(id="s1", key="value.helping", value="Helping people", evidence="I want to help people")]})
     with VaultSession() as student, student.factory() as db:
         ws = student.workspace_id
-        _item(db, ws, "family_member", {"relation": "father", "occupation": "Shopkeeper"})
-        _item(db, ws, "interest", {"text": "Robotics"})
+        _item(db, ws, "value", {"text": "Helping people"})
         db.commit()
         areas = coverage_areas(notebook, SimpleNamespace(facts={}, records={}), VaultItemService(db).active(ws))
-    assert areas["family_social"]["item_count"] == 1 and not areas["family_social"]["covered"]
-    assert areas["interests"]["item_count"] == 1 and not areas["interests"]["covered"]
+    assert areas["values"]["item_count"] == 1
+
+
+# Areas with a Vault item source read the Vault alone; a notebook source stays
+# only where the Vault has nothing that covers the same thing.
+NOTEBOOK_SOURCES_KEPT = {
+    "status": [], "history": ["world.education_story", "shown"], "interests": [], "strengths": [],
+    "family_social": ["world.social"], "values": ["source"], "pressures": [], "sure": [], "goals": [],
+    "options": [],
+}
+
+
+def test_vault_areas_drop_their_notebook_duplicates():
+    from types import SimpleNamespace
+    from app.pai_c.deep.notebook_schema import CounselorNotebookData
+    from app.pai_c.understanding.views import coverage_areas
+    from tests.truth_map_fixtures import STAMP, item
+    areas = json.loads((DATA_DIR / "areas.json").read_text(encoding="utf-8"))
+    kept = {area: [s["path"] for s in spec["sources"] if "path" in s] for area, spec in areas.items()}
+    assert kept == NOTEBOOK_SOURCES_KEPT
+    notebook = CounselorNotebookData.model_validate({
+        "world": {"people": [{"id": "p1", "role": "Father", "wish": "Doctor", "worry": "Fees",
+                              "evidence": "my father", "first_seen": STAMP, "last_confirmed": STAMP}],
+                  "daily_life": [item(id="d1", key="day.school", value="School then cricket")]},
+        "self": [item(id="s1", key="interest.robotics", value="Robotics"),
+                 item(id="s2", key="value.family", value="Family first")],
+        "said": [item(id="o1", key="option.medicine", value="Medicine")],
+        "pressures": {"items": [item(id="p2", key="pressure.fees", value="Fees")]},
+        "sure": {"score": 6, "asked_at": STAMP}})
+    coverage = coverage_areas(notebook, SimpleNamespace(facts={}, records={}), ())
+    for area in ("status", "interests", "family_social", "values", "pressures", "sure", "goals", "options"):
+        assert coverage[area]["item_count"] == 0, area
 
 
 def _disputed_option(db, ws):

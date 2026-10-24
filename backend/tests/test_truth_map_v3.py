@@ -138,8 +138,10 @@ def test_areas_use_active_evidence_and_json_mapping_changes_result(tmp_path, mon
     assert not result["family_social"]["covered"] and result["history"]["covered"]
     # The notebook and Vault sides are not added (they may hold the same thing): the larger side counts.
     assert result["status"]["item_count"] == 1 and result["history"]["item_count"] == 2
-    assert result["family_social"]["item_count"] == 1
-    assert result["strengths"]["item_count"] == 2 and result["sure"]["last_confirmed"] == NOW
+    # People, self-reported strengths and the sure rating have Vault equivalents,
+    # so their notebook copies no longer count.
+    assert result["family_social"]["item_count"] == 0
+    assert result["strengths"]["item_count"] == 0 and result["sure"]["item_count"] == 0
     (tmp_path / "areas.json").write_text(json.dumps({"changed": [{"path": "world.social"}]}))
     monkeypatch.setattr(views, "DATA_DIR", tmp_path)
     assert views.coverage_areas(notebook, snapshot) == {"changed": {"covered": False, "item_count": 0, "min_items": 1, "last_confirmed": None, "evidence": None}}

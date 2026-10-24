@@ -17,9 +17,16 @@ from tests.test_student_profile_api import api, HEADERS
 from tests.truth_map_fixtures import item
 
 
-def coverage(data=None, facts=None, records=None):
+def coverage(data=None, facts=None, records=None, items=()):
     return coverage_areas(CounselorNotebookData.model_validate(data or {}),
-                          SimpleNamespace(facts=facts or {}, records=records or {}))
+                          SimpleNamespace(facts=facts or {}, records=records or {}), items)
+
+
+def vault_item(item_type, value, *, id="i1", level="stated"):
+    """An active Vault item as coverage reads it."""
+    return SimpleNamespace(item_type=item_type, value=value, id=id, status="active", level=level,
+                           evidence={"quote": "Student's words"}, confirmed_at=None, updated_at=None,
+                           observed_at=None)
 
 
 def test_empty_profile_has_ten_uncovered_areas():
@@ -29,29 +36,31 @@ def test_empty_profile_has_ten_uncovered_areas():
     assert not any(area["covered"] for area in areas.values())
 
 
-@pytest.mark.parametrize("category,covered", [("self", True), ("family", True), ("unknown", False)])
-def test_goal_requires_evidence_of_whose_wish_it_is(category, covered):
-    goal = item(key="goal.direction", category=category, evidence="I want to build things")
-    assert coverage({"source": [goal]})["goals"]["covered"] is covered
-    goal["status"] = "retired"
+@pytest.mark.parametrize("value,covered", [({"relation": "father", "wish": "A stable profession"}, True),
+                                           ({"relation": "father"}, False)])
+def test_goal_is_the_students_own_goal_or_a_familys_stated_wish(value, covered):
+    assert coverage(items=[vault_item("family_member", value)])["goals"]["covered"] is covered
+    own = {"id": "g1", "title": "Creative work", "evidence": {"quote": "I want creative work"}}
+    assert coverage(records={"goal": [own]})["goals"]["covered"]
+    # The Vault holds goals now; the notebook's goal source is not read for coverage.
+    goal = item(key="goal.direction", category="self", evidence="I want to build things")
     assert not coverage({"source": [goal]})["goals"]["covered"]
 
 
 def test_family_wish_and_own_wish_are_separate_evidenced_items():
-    notebook = CounselorNotebookData.model_validate({"source": [
-        item(id="own", key="goal.own", value="Creative work", category="self", evidence="I want creative work"),
-        item(id="family", key="goal.family", value="A stable profession", category="family", evidence="My guardian wants a stable profession"),
-    ]})
-    assert notebook.source[0].category == "self"
-    assert notebook.source[1].category == "family"
-    assert coverage_areas(notebook, SimpleNamespace(facts={}, records={}))["goals"]["item_count"] == 2
+    own = {"id": "own", "title": "Creative work", "evidence": {"quote": "I want creative work"}}
+    family = vault_item("family_member", {"relation": "guardian", "wish": "A stable profession"})
+    assert coverage(records={"goal": [own]}, items=[family])["goals"]["item_count"] == 2
 
 
-@pytest.mark.parametrize("key", ["option.known", "myth.belief"])
-def test_options_and_reported_myths_count_as_student_evidence_only(key):
-    assert coverage({"said": [item(key=key, evidence="I have heard of this path")]})["options"]["covered"]
+@pytest.mark.parametrize("item_type", ["option", "myth"])
+def test_options_and_reported_myths_count_as_student_evidence_only(item_type):
+    assert coverage(items=[vault_item(item_type, {"text": "A path I have heard of"})])["options"]["covered"]
+    # PAI's guess is not coverage.
+    guess = vault_item(item_type, {"text": "A path I have heard of"}, level="inferred")
+    assert not coverage(items=[guess])["options"]["covered"]
     with pytest.raises(ValidationError):
-        CounselorNotebookData.model_validate({"said": [item(key=key, evidence="")]})
+        CounselorNotebookData.model_validate({"said": [item(key=item_type + ".belief", evidence="")]})
 
 
 def test_identity_name_is_not_current_status_and_bare_rows_are_not_coverage():
@@ -112,9 +121,9 @@ def test_upload_candidates_count_only_after_reconciliation(api):
 
 def test_coverage_reports_strongest_public_evidence_level_per_area():
     assert coverage()["interests"]["evidence"] is None
-    said = item(id="said", key="interest.making", evidence="I like making things")
-    shown = item(id="shown", key="interest.repair", evidence="Photo of my repair", kind="shown")
-    assert coverage({"self": [said]})["interests"]["evidence"] == "stated"
-    assert coverage({"self": [said, shown]})["interests"]["evidence"] == "shown"
+    said = vault_item("interest", {"text": "Making things"}, id="said")
+    shown = vault_item("interest", {"text": "Repairing devices"}, id="shown", level="shown")
+    assert coverage(items=[said])["interests"]["evidence"] == "stated"
+    assert coverage(items=[said, shown])["interests"]["evidence"] == "shown"
     confirmed = {"value": "Studying", "evidence": {"quote": "I study"}, "evidence_level": "confirmed"}
     assert coverage(facts={"identity.current_status": confirmed})["status"]["evidence"] == "confirmed"

@@ -81,9 +81,10 @@ def coverage_areas(notebook, snapshot, items=()):
                 strength[identity] = _strength(row)
         dates = [stamp for stamp in evidence.values() if stamp is not None]
         levels = [level for level in strength.values() if level]
-        # The notebook and the Vault often hold the same thing twice (one
-        # father, one interest) with no shared id, so the two sides are not
-        # added: the area counts the larger side until the notebook sources go.
+        # Areas with a Vault equivalent read the Vault alone (areas.json). The
+        # few that still read both (history, family_social, values) may hold
+        # the same thing twice with no shared id, so the two sides are not
+        # added: the area counts the larger side.
         notebook_side = sum(1 for identity in evidence if identity.startswith(notebook_prefixes))
         count = max(notebook_side, len(evidence) - notebook_side)
         result[area] = {"covered": count >= min_items, "item_count": count,

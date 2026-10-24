@@ -20,9 +20,6 @@
         }
       },
       {
-        "path": "world.daily_life"
-      },
-      {
         "vault_items": [
           "daily_life"
         ]
@@ -56,15 +53,6 @@
     "min_items": 2,
     "sources": [
       {
-        "path": "self",
-        "key_prefixes": [
-          "interest."
-        ]
-      },
-      {
-        "path": "world.daily_life"
-      },
-      {
         "vault_items": [
           "interest",
           "daily_life"
@@ -75,14 +63,6 @@
   "strengths": {
     "min_items": 1,
     "sources": [
-      {
-        "path": "self",
-        "nonempty": "capability_status"
-      },
-      {
-        "path": "shown",
-        "nonempty": "capability_status"
-      },
       {
         "vault_records": [
           "skill",
@@ -101,9 +81,6 @@
     "min_items": 2,
     "sources": [
       {
-        "path": "world.people"
-      },
-      {
         "path": "world.social"
       },
       {
@@ -117,13 +94,6 @@
     "min_items": 1,
     "sources": [
       {
-        "path": "self",
-        "key_prefixes": [
-          "value.",
-          "motivation."
-        ]
-      },
-      {
         "path": "source"
       },
       {
@@ -136,13 +106,6 @@
   "pressures": {
     "min_items": 1,
     "sources": [
-      {
-        "path": "pressures.items"
-      },
-      {
-        "path": "world.people",
-        "nonempty": "worry"
-      },
       {
         "vault_items": [
           "pressure"
@@ -160,11 +123,6 @@
     "min_items": 1,
     "sources": [
       {
-        "path": "sure",
-        "not_null": "score",
-        "timestamp": "asked_at"
-      },
-      {
         "vault_items": [
           "certainty"
         ]
@@ -174,26 +132,6 @@
   "goals": {
     "min_items": 1,
     "sources": [
-      {
-        "path": "source",
-        "key_prefixes": [
-          "goal."
-        ],
-        "where": {
-          "category": [
-            "self",
-            "family",
-            "peers",
-            "media",
-            "need",
-            "other"
-          ]
-        }
-      },
-      {
-        "path": "world.people",
-        "nonempty": "wish"
-      },
       {
         "vault_records": [
           "goal"
@@ -210,13 +148,6 @@
   "options": {
     "min_items": 1,
     "sources": [
-      {
-        "path": "said",
-        "key_prefixes": [
-          "option.",
-          "myth."
-        ]
-      },
       {
         "vault_items": [
           "option",
