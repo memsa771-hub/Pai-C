@@ -1,0 +1,1713 @@
+{
+ "version": 1,
+ "choices": {
+  "levels": [
+   {
+    "code": "matric",
+    "label": "Matric",
+    "synonyms": [
+     "SSC",
+     "secondary school",
+     "10th",
+     "metric"
+    ]
+   },
+   {
+    "code": "o_level",
+    "label": "O Level",
+    "synonyms": [
+     "O levels",
+     "olevel",
+     "igcse"
+    ]
+   },
+   {
+    "code": "fsc",
+    "label": "FSc",
+    "synonyms": [
+     "F.Sc",
+     "intermediate",
+     "HSSC",
+     "12th",
+     "inter"
+    ]
+   },
+   {
+    "code": "ics",
+    "label": "ICS",
+    "synonyms": [
+     "intermediate computer science"
+    ]
+   },
+   {
+    "code": "icom",
+    "label": "I.Com",
+    "synonyms": [
+     "ICom",
+     "intermediate commerce"
+    ]
+   },
+   {
+    "code": "fa",
+    "label": "FA",
+    "synonyms": [
+     "F.A",
+     "faculty of arts"
+    ]
+   },
+   {
+    "code": "a_level",
+    "label": "A Level",
+    "synonyms": [
+     "A levels",
+     "alevel"
+    ]
+   },
+   {
+    "code": "dae",
+    "label": "DAE",
+    "synonyms": [
+     "diploma of associate engineering"
+    ]
+   },
+   {
+    "code": "bachelor",
+    "label": "Bachelor",
+    "synonyms": [
+     "bachelors",
+     "BS",
+     "BSc",
+     "undergraduate"
+    ]
+   },
+   {
+    "code": "other",
+    "label": "Other",
+    "synonyms": []
+   }
+  ],
+  "intermediate_groups": [
+   {
+    "code": "pre_medical",
+    "label": "Pre-Medical",
+    "synonyms": [
+     "pre med",
+     "premedical",
+     "medical group"
+    ]
+   },
+   {
+    "code": "pre_engineering",
+    "label": "Pre-Engineering",
+    "synonyms": [
+     "pre eng",
+     "preengineering",
+     "engineering group"
+    ]
+   },
+   {
+    "code": "ics",
+    "label": "ICS",
+    "synonyms": [
+     "computer science group"
+    ]
+   },
+   {
+    "code": "icom",
+    "label": "I.Com",
+    "synonyms": [
+     "commerce group"
+    ]
+   },
+   {
+    "code": "fa_humanities",
+    "label": "FA / Humanities",
+    "synonyms": [
+     "fa",
+     "arts",
+     "humanities"
+    ]
+   },
+   {
+    "code": "general_science",
+    "label": "General Science",
+    "synonyms": [
+     "gen science",
+     "science general"
+    ]
+   }
+  ],
+  "boards": [
+   {
+    "code": "bise_lahore",
+    "label": "BISE Lahore",
+    "synonyms": [
+     "Lahore board",
+     "BISE Lahore",
+     "Lahore"
+    ]
+   },
+   {
+    "code": "bise_rawalpindi",
+    "label": "BISE Rawalpindi",
+    "synonyms": [
+     "Rawalpindi board",
+     "BISE Rawalpindi",
+     "Rawalpindi"
+    ]
+   },
+   {
+    "code": "bise_faisalabad",
+    "label": "BISE Faisalabad",
+    "synonyms": [
+     "Faisalabad board",
+     "BISE Faisalabad",
+     "Faisalabad"
+    ]
+   },
+   {
+    "code": "bise_gujranwala",
+    "label": "BISE Gujranwala",
+    "synonyms": [
+     "Gujranwala board",
+     "BISE Gujranwala",
+     "Gujranwala"
+    ]
+   },
+   {
+    "code": "bise_multan",
+    "label": "BISE Multan",
+    "synonyms": [
+     "Multan board",
+     "BISE Multan",
+     "Multan"
+    ]
+   },
+   {
+    "code": "bise_sargodha",
+    "label": "BISE Sargodha",
+    "synonyms": [
+     "Sargodha board",
+     "BISE Sargodha",
+     "Sargodha"
+    ]
+   },
+   {
+    "code": "bise_bahawalpur",
+    "label": "BISE Bahawalpur",
+    "synonyms": [
+     "Bahawalpur board",
+     "BISE Bahawalpur",
+     "Bahawalpur"
+    ]
+   },
+   {
+    "code": "bise_dg_khan",
+    "label": "BISE DG Khan",
+    "synonyms": [
+     "DG Khan board",
+     "BISE DG Khan",
+     "DG Khan"
+    ]
+   },
+   {
+    "code": "bise_sahiwal",
+    "label": "BISE Sahiwal",
+    "synonyms": [
+     "Sahiwal board",
+     "BISE Sahiwal",
+     "Sahiwal"
+    ]
+   },
+   {
+    "code": "bise_karachi",
+    "label": "BISE Karachi",
+    "synonyms": [
+     "Karachi board",
+     "BISE Karachi",
+     "Karachi"
+    ]
+   },
+   {
+    "code": "bise_hyderabad",
+    "label": "BISE Hyderabad",
+    "synonyms": [
+     "Hyderabad board",
+     "BISE Hyderabad",
+     "Hyderabad"
+    ]
+   },
+   {
+    "code": "bise_sukkur",
+    "label": "BISE Sukkur",
+    "synonyms": [
+     "Sukkur board",
+     "BISE Sukkur",
+     "Sukkur"
+    ]
+   },
+   {
+    "code": "bise_larkana",
+    "label": "BISE Larkana",
+    "synonyms": [
+     "Larkana board",
+     "BISE Larkana",
+     "Larkana"
+    ]
+   },
+   {
+    "code": "bise_mirpurkhas",
+    "label": "BISE Mirpurkhas",
+    "synonyms": [
+     "Mirpurkhas board",
+     "BISE Mirpurkhas",
+     "Mirpurkhas"
+    ]
+   },
+   {
+    "code": "bise_peshawar",
+    "label": "BISE Peshawar",
+    "synonyms": [
+     "Peshawar board",
+     "BISE Peshawar",
+     "Peshawar"
+    ]
+   },
+   {
+    "code": "bise_mardan",
+    "label": "BISE Mardan",
+    "synonyms": [
+     "Mardan board",
+     "BISE Mardan",
+     "Mardan"
+    ]
+   },
+   {
+    "code": "bise_abbottabad",
+    "label": "BISE Abbottabad",
+    "synonyms": [
+     "Abbottabad board",
+     "BISE Abbottabad",
+     "Abbottabad"
+    ]
+   },
+   {
+    "code": "bise_swat",
+    "label": "BISE Swat",
+    "synonyms": [
+     "Swat board",
+     "BISE Swat",
+     "Swat"
+    ]
+   },
+   {
+    "code": "bise_kohat",
+    "label": "BISE Kohat",
+    "synonyms": [
+     "Kohat board",
+     "BISE Kohat",
+     "Kohat"
+    ]
+   },
+   {
+    "code": "bise_bannu",
+    "label": "BISE Bannu",
+    "synonyms": [
+     "Bannu board",
+     "BISE Bannu",
+     "Bannu"
+    ]
+   },
+   {
+    "code": "bise_malakand",
+    "label": "BISE Malakand",
+    "synonyms": [
+     "Malakand board",
+     "BISE Malakand",
+     "Malakand"
+    ]
+   },
+   {
+    "code": "bise_quetta",
+    "label": "BISE Quetta",
+    "synonyms": [
+     "Quetta board",
+     "BISE Quetta",
+     "Quetta"
+    ]
+   },
+   {
+    "code": "bise_ajk",
+    "label": "BISE AJK",
+    "synonyms": [
+     "AJK board",
+     "BISE AJK",
+     "AJK"
+    ]
+   },
+   {
+    "code": "bise_gilgit_baltistan",
+    "label": "BISE Gilgit-Baltistan",
+    "synonyms": [
+     "Gilgit-Baltistan board",
+     "BISE Gilgit-Baltistan",
+     "Gilgit-Baltistan"
+    ]
+   },
+   {
+    "code": "fbise",
+    "label": "Federal Board (FBISE)",
+    "synonyms": [
+     "federal board",
+     "FBISE",
+     "federal board islamabad"
+    ]
+   },
+   {
+    "code": "aga_khan",
+    "label": "Aga Khan Examination Board",
+    "synonyms": [
+     "AKU-EB",
+     "aga khan board",
+     "aga khan"
+    ]
+   },
+   {
+    "code": "cambridge",
+    "label": "Cambridge International",
+    "synonyms": [
+     "cambridge",
+     "caie",
+     "cie",
+     "cambridge board"
+    ]
+   }
+  ],
+  "tests": [
+   {
+    "code": "mdcat",
+    "label": "MDCAT",
+    "synonyms": [
+     "MCAT"
+    ]
+   },
+   {
+    "code": "ecat",
+    "label": "ECAT",
+    "synonyms": []
+   },
+   {
+    "code": "nat",
+    "label": "NAT",
+    "synonyms": [
+     "NTS NAT"
+    ]
+   },
+   {
+    "code": "net",
+    "label": "NET",
+    "synonyms": [
+     "NUST entry test",
+     "nust net"
+    ]
+   },
+   {
+    "code": "sat",
+    "label": "SAT",
+    "synonyms": []
+   },
+   {
+    "code": "ielts",
+    "label": "IELTS",
+    "synonyms": []
+   },
+   {
+    "code": "toefl",
+    "label": "TOEFL",
+    "synonyms": []
+   },
+   {
+    "code": "gat",
+    "label": "GAT",
+    "synonyms": [
+     "GAT general"
+    ]
+   },
+   {
+    "code": "nts_other",
+    "label": "Other NTS test",
+    "synonyms": [
+     "nts"
+    ]
+   }
+  ],
+  "provinces": [
+   {
+    "code": "punjab",
+    "label": "Punjab",
+    "synonyms": []
+   },
+   {
+    "code": "sindh",
+    "label": "Sindh",
+    "synonyms": []
+   },
+   {
+    "code": "kpk",
+    "label": "Khyber Pakhtunkhwa",
+    "synonyms": [
+     "KP",
+     "KPK",
+     "NWFP"
+    ]
+   },
+   {
+    "code": "balochistan",
+    "label": "Balochistan",
+    "synonyms": [
+     "baluchistan"
+    ]
+   },
+   {
+    "code": "islamabad",
+    "label": "Islamabad",
+    "synonyms": [
+     "ICT",
+     "islamabad capital territory"
+    ]
+   },
+   {
+    "code": "gilgit_baltistan",
+    "label": "Gilgit-Baltistan",
+    "synonyms": [
+     "GB",
+     "gilgit baltistan"
+    ]
+   },
+   {
+    "code": "ajk",
+    "label": "Azad Jammu and Kashmir",
+    "synonyms": [
+     "AJK",
+     "azad kashmir",
+     "AJ&K"
+    ]
+   }
+  ],
+  "quotas": [
+   {
+    "code": "hafiz_e_quran",
+    "label": "Hafiz-e-Quran",
+    "synonyms": [
+     "hafiz",
+     "hafiz e quran",
+     "hafiz quota"
+    ]
+   },
+   {
+    "code": "sports",
+    "label": "Sports",
+    "synonyms": [
+     "sports quota"
+    ]
+   },
+   {
+    "code": "disability",
+    "label": "Disability",
+    "synonyms": [
+     "disabled quota",
+     "special person"
+    ]
+   },
+   {
+    "code": "minority",
+    "label": "Minority",
+    "synonyms": [
+     "minority quota"
+    ]
+   },
+   {
+    "code": "armed_forces",
+    "label": "Armed forces",
+    "synonyms": [
+     "army quota",
+     "armed forces quota",
+     "forces kids"
+    ]
+   },
+   {
+    "code": "other",
+    "label": "Other",
+    "synonyms": []
+   }
+  ],
+  "relations": [
+   {
+    "code": "father",
+    "label": "Father",
+    "synonyms": [
+     "abbu",
+     "abba",
+     "abu",
+     "baba",
+     "papa",
+     "dad",
+     "walid"
+    ]
+   },
+   {
+    "code": "mother",
+    "label": "Mother",
+    "synonyms": [
+     "ammi",
+     "amma",
+     "mama",
+     "mom",
+     "mum",
+     "walida"
+    ]
+   },
+   {
+    "code": "brother",
+    "label": "Brother",
+    "synonyms": [
+     "bhai",
+     "bro"
+    ]
+   },
+   {
+    "code": "sister",
+    "label": "Sister",
+    "synonyms": [
+     "behan",
+     "bahen",
+     "baji",
+     "api"
+    ]
+   },
+   {
+    "code": "uncle",
+    "label": "Uncle",
+    "synonyms": [
+     "chacha",
+     "mamu",
+     "taya",
+     "phupha"
+    ]
+   },
+   {
+    "code": "aunt",
+    "label": "Aunt",
+    "synonyms": [
+     "khala",
+     "phupho",
+     "chachi",
+     "mami",
+     "tayi"
+    ]
+   },
+   {
+    "code": "grandparent",
+    "label": "Grandparent",
+    "synonyms": [
+     "dada",
+     "dadi",
+     "nana",
+     "nani",
+     "grandfather",
+     "grandmother"
+    ]
+   },
+   {
+    "code": "guardian",
+    "label": "Guardian",
+    "synonyms": []
+   },
+   {
+    "code": "cousin",
+    "label": "Cousin",
+    "synonyms": [
+     "cousin brother",
+     "cousin sister"
+    ]
+   },
+   {
+    "code": "other",
+    "label": "Other",
+    "synonyms": []
+   }
+  ],
+  "budget_bands": [
+   {
+    "code": "under_1_lakh",
+    "label": "Under 1 lakh",
+    "synonyms": [
+     "less than 1 lakh",
+     "below 1 lakh"
+    ]
+   },
+   {
+    "code": "1_3_lakh",
+    "label": "1-3 lakh",
+    "synonyms": [
+     "1 to 3 lakh"
+    ]
+   },
+   {
+    "code": "3_6_lakh",
+    "label": "3-6 lakh",
+    "synonyms": [
+     "3 to 6 lakh"
+    ]
+   },
+   {
+    "code": "6_10_lakh",
+    "label": "6-10 lakh",
+    "synonyms": [
+     "6 to 10 lakh"
+    ]
+   },
+   {
+    "code": "over_10_lakh",
+    "label": "Over 10 lakh",
+    "synonyms": [
+     "more than 10 lakh",
+     "above 10 lakh"
+    ]
+   },
+   {
+    "code": "not_sure",
+    "label": "Not sure yet",
+    "synonyms": [
+     "not sure"
+    ]
+   }
+  ],
+  "budget_covers": [
+   {
+    "code": "fees_only",
+    "label": "Fees only",
+    "synonyms": [
+     "only fees",
+     "tuition only"
+    ]
+   },
+   {
+    "code": "fees_and_living",
+    "label": "Fees and living",
+    "synonyms": [
+     "fees and hostel"
+    ]
+   }
+  ]
+ },
+ "types": [
+  {
+   "key": "finance.budget",
+   "label": "Budget",
+   "storage": "fact",
+   "shown_on": "details",
+   "inputs": [
+    "chat",
+    "document",
+    "details"
+   ],
+   "sensitivity": "sensitive",
+   "conflict": "latest_wins",
+   "freshness_days": 180,
+   "version": 1,
+   "choice_fields": {
+    "band": "budget_bands",
+    "covers": "budget_covers"
+   }
+  },
+  {
+   "key": "preferences.study_mode",
+   "label": "Study mode",
+   "storage": "fact",
+   "shown_on": "story",
+   "inputs": [
+    "chat",
+    "story"
+   ],
+   "sensitivity": "normal",
+   "conflict": "latest_wins",
+   "freshness_days": 365,
+   "version": 1
+  },
+  {
+   "key": "identity.full_name",
+   "label": "Full name",
+   "storage": "fact",
+   "shown_on": "details",
+   "inputs": [
+    "chat",
+    "document",
+    "details"
+   ],
+   "sensitivity": "sensitive",
+   "conflict": "ask_student",
+   "freshness_days": null,
+   "version": 1,
+   "onboarding": {
+    "order": 1,
+    "prompt": "What is your full name?",
+    "input": "text"
+   }
+  },
+  {
+   "key": "identity.preferred_name",
+   "label": "Preferred name",
+   "storage": "fact",
+   "shown_on": "details",
+   "inputs": [
+    "chat",
+    "document",
+    "details"
+   ],
+   "sensitivity": "normal",
+   "conflict": "latest_wins",
+   "freshness_days": null,
+   "version": 1
+  },
+  {
+   "key": "identity.current_status",
+   "label": "Current status",
+   "storage": "fact",
+   "shown_on": "details",
+   "inputs": [
+    "chat",
+    "document",
+    "details"
+   ],
+   "sensitivity": "normal",
+   "conflict": "latest_wins",
+   "freshness_days": 180,
+   "version": 1
+  },
+  {
+   "key": "identity.nationality",
+   "label": "Nationality",
+   "storage": "fact",
+   "shown_on": "details",
+   "inputs": [
+    "chat",
+    "document",
+    "details"
+   ],
+   "sensitivity": "sensitive",
+   "conflict": "evidence_wins",
+   "freshness_days": null,
+   "version": 1
+  },
+  {
+   "key": "identity.date_of_birth",
+   "label": "Date of birth",
+   "storage": "fact",
+   "shown_on": "details",
+   "inputs": [
+    "chat",
+    "document",
+    "details"
+   ],
+   "sensitivity": "restricted",
+   "conflict": "ask_student",
+   "freshness_days": null,
+   "version": 1,
+   "onboarding": {
+    "order": 3,
+    "prompt": "When were you born?",
+    "input": "date"
+   }
+  },
+  {
+   "key": "identity.passport_number",
+   "label": "Passport number",
+   "storage": "fact",
+   "shown_on": "details",
+   "inputs": [
+    "chat",
+    "document",
+    "details"
+   ],
+   "sensitivity": "restricted",
+   "conflict": "evidence_wins",
+   "freshness_days": null,
+   "version": 1
+  },
+  {
+   "key": "contact.email",
+   "label": "Email",
+   "storage": "fact",
+   "shown_on": "details",
+   "inputs": [
+    "chat",
+    "document",
+    "details"
+   ],
+   "sensitivity": "restricted",
+   "conflict": "latest_wins",
+   "freshness_days": 365,
+   "version": 1
+  },
+  {
+   "key": "contact.phone",
+   "label": "Phone",
+   "storage": "fact",
+   "shown_on": "details",
+   "inputs": [
+    "chat",
+    "document",
+    "details"
+   ],
+   "sensitivity": "restricted",
+   "conflict": "latest_wins",
+   "freshness_days": 365,
+   "version": 1
+  },
+  {
+   "key": "location.current_country",
+   "label": "Current country",
+   "storage": "fact",
+   "shown_on": "details",
+   "inputs": [
+    "chat",
+    "document",
+    "details"
+   ],
+   "sensitivity": "normal",
+   "conflict": "latest_wins",
+   "freshness_days": 180,
+   "version": 1,
+   "onboarding": {
+    "order": 5,
+    "prompt": "Which country do you live in?",
+    "input": "text",
+    "default": "Pakistan"
+   }
+  },
+  {
+   "key": "location.current_city",
+   "label": "Current city",
+   "storage": "fact",
+   "shown_on": "details",
+   "inputs": [
+    "chat",
+    "document",
+    "details"
+   ],
+   "sensitivity": "normal",
+   "conflict": "latest_wins",
+   "freshness_days": 180,
+   "version": 1,
+   "onboarding": {
+    "order": 6,
+    "prompt": "Which city do you live in?",
+    "input": "text"
+   }
+  },
+  {
+   "key": "mobility.relocation_willingness",
+   "label": "Relocation willingness",
+   "storage": "fact",
+   "shown_on": "details",
+   "inputs": [
+    "chat",
+    "document",
+    "details"
+   ],
+   "sensitivity": "normal",
+   "conflict": "latest_wins",
+   "freshness_days": 180,
+   "version": 1
+  },
+  {
+   "key": "preferences.target_countries",
+   "label": "Target countries",
+   "storage": "fact",
+   "shown_on": "story",
+   "inputs": [
+    "chat",
+    "story"
+   ],
+   "sensitivity": "normal",
+   "conflict": "latest_wins",
+   "freshness_days": 90,
+   "version": 1
+  },
+  {
+   "key": "preferences.preferred_language",
+   "label": "Preferred language",
+   "storage": "fact",
+   "shown_on": "story",
+   "inputs": [
+    "chat",
+    "story"
+   ],
+   "sensitivity": "normal",
+   "conflict": "latest_wins",
+   "freshness_days": 365,
+   "version": 1
+  },
+  {
+   "key": "preferences.learning_style",
+   "label": "Learning style",
+   "storage": "fact",
+   "shown_on": "story",
+   "inputs": [
+    "chat",
+    "story"
+   ],
+   "sensitivity": "normal",
+   "conflict": "latest_wins",
+   "freshness_days": 365,
+   "version": 1
+  },
+  {
+   "key": "finance.funding_status",
+   "label": "Funding status",
+   "storage": "fact",
+   "shown_on": "details",
+   "inputs": [
+    "chat",
+    "document",
+    "details"
+   ],
+   "sensitivity": "sensitive",
+   "conflict": "latest_wins",
+   "freshness_days": 180,
+   "version": 1
+  },
+  {
+   "key": "finance.scholarship_interest",
+   "label": "Scholarship interest",
+   "storage": "fact",
+   "shown_on": "details",
+   "inputs": [
+    "chat",
+    "document",
+    "details"
+   ],
+   "sensitivity": "sensitive",
+   "conflict": "latest_wins",
+   "freshness_days": 180,
+   "version": 1
+  },
+  {
+   "key": "career.primary_interest",
+   "label": "Primary interest",
+   "storage": "fact",
+   "shown_on": "story",
+   "inputs": [
+    "chat",
+    "story"
+   ],
+   "sensitivity": "normal",
+   "conflict": "latest_wins",
+   "freshness_days": 180,
+   "version": 1
+  },
+  {
+   "key": "accessibility.accommodation_needs",
+   "label": "Accommodation needs",
+   "storage": "fact",
+   "shown_on": "details",
+   "inputs": [
+    "chat",
+    "document",
+    "details"
+   ],
+   "sensitivity": "restricted",
+   "conflict": "latest_wins",
+   "freshness_days": 365,
+   "version": 1
+  },
+  {
+   "key": "identity.gender",
+   "label": "Gender",
+   "storage": "fact",
+   "shown_on": "details",
+   "inputs": [
+    "chat",
+    "document",
+    "details"
+   ],
+   "sensitivity": "sensitive",
+   "conflict": "evidence_wins",
+   "freshness_days": null,
+   "version": 1,
+   "onboarding": {
+    "order": 4,
+    "prompt": "What is your gender?",
+    "input": "choice",
+    "choices": [
+     "male",
+     "female",
+     "undisclosed"
+    ]
+   }
+  },
+  {
+   "key": "identity.status_category",
+   "label": "Status category",
+   "storage": "fact",
+   "shown_on": "details",
+   "inputs": [
+    "chat",
+    "document",
+    "details"
+   ],
+   "sensitivity": "normal",
+   "conflict": "latest_wins",
+   "freshness_days": 365,
+   "version": 1
+  },
+  {
+   "key": "preferences.location_limits",
+   "label": "Location limits",
+   "storage": "fact",
+   "shown_on": "story",
+   "inputs": [
+    "chat",
+    "story"
+   ],
+   "sensitivity": "normal",
+   "conflict": "latest_wins",
+   "freshness_days": 365,
+   "version": 1
+  },
+  {
+   "key": "preferences.study_load",
+   "label": "Study load",
+   "storage": "fact",
+   "shown_on": "story",
+   "inputs": [
+    "chat",
+    "story"
+   ],
+   "sensitivity": "normal",
+   "conflict": "latest_wins",
+   "freshness_days": 365,
+   "version": 1
+  },
+  {
+   "key": "education",
+   "label": "Education",
+   "storage": "record",
+   "shown_on": "details",
+   "inputs": [
+    "chat",
+    "document",
+    "details"
+   ],
+   "sensitivity": "normal",
+   "conflict": "evidence_wins",
+   "freshness_days": null,
+   "version": 1,
+   "choice_fields": {
+    "qualification_name": "levels",
+    "details.awarding_body": "boards"
+   },
+   "onboarding": {
+    "order": 2,
+    "prompt": "What is your current or latest qualification?",
+    "input": "choice",
+    "choices": "levels"
+   }
+  },
+  {
+   "key": "course",
+   "label": "Course",
+   "storage": "record",
+   "shown_on": "details",
+   "inputs": [
+    "chat",
+    "document",
+    "details"
+   ],
+   "sensitivity": "normal",
+   "conflict": "evidence_wins",
+   "freshness_days": null,
+   "version": 1
+  },
+  {
+   "key": "test_attempt",
+   "label": "Test",
+   "storage": "record",
+   "shown_on": "details",
+   "inputs": [
+    "chat",
+    "document",
+    "details"
+   ],
+   "sensitivity": "normal",
+   "conflict": "evidence_wins",
+   "freshness_days": null,
+   "version": 1,
+   "choice_fields": {
+    "test_type": "tests"
+   }
+  },
+  {
+   "key": "goal",
+   "label": "Goal",
+   "storage": "record",
+   "shown_on": "story",
+   "inputs": [
+    "chat",
+    "story"
+   ],
+   "sensitivity": "normal",
+   "conflict": "latest_wins",
+   "freshness_days": 90,
+   "version": 1
+  },
+  {
+   "key": "activity",
+   "label": "Activity",
+   "storage": "record",
+   "shown_on": "story",
+   "inputs": [
+    "chat",
+    "document",
+    "story"
+   ],
+   "sensitivity": "normal",
+   "conflict": "latest_wins",
+   "freshness_days": 365,
+   "version": 1
+  },
+  {
+   "key": "project",
+   "label": "Project",
+   "storage": "record",
+   "shown_on": "story",
+   "inputs": [
+    "chat",
+    "document",
+    "story"
+   ],
+   "sensitivity": "normal",
+   "conflict": "latest_wins",
+   "freshness_days": 365,
+   "version": 1
+  },
+  {
+   "key": "achievement",
+   "label": "Achievement",
+   "storage": "record",
+   "shown_on": "story",
+   "inputs": [
+    "chat",
+    "document",
+    "story"
+   ],
+   "sensitivity": "normal",
+   "conflict": "latest_wins",
+   "freshness_days": 365,
+   "version": 1
+  },
+  {
+   "key": "work_experience",
+   "label": "Work experience",
+   "storage": "record",
+   "shown_on": "story",
+   "inputs": [
+    "chat",
+    "document",
+    "story"
+   ],
+   "sensitivity": "normal",
+   "conflict": "latest_wins",
+   "freshness_days": 365,
+   "version": 1
+  },
+  {
+   "key": "exploration_experience",
+   "label": "Exploration",
+   "storage": "record",
+   "shown_on": "story",
+   "inputs": [
+    "chat",
+    "story"
+   ],
+   "sensitivity": "normal",
+   "conflict": "latest_wins",
+   "freshness_days": 365,
+   "version": 1
+  },
+  {
+   "key": "skill",
+   "label": "Skill",
+   "storage": "record",
+   "shown_on": "story",
+   "inputs": [
+    "chat",
+    "document",
+    "story"
+   ],
+   "sensitivity": "normal",
+   "conflict": "latest_wins",
+   "freshness_days": 365,
+   "version": 1
+  },
+  {
+   "key": "language_proficiency",
+   "label": "Language",
+   "storage": "record",
+   "shown_on": "story",
+   "inputs": [
+    "chat",
+    "document",
+    "story"
+   ],
+   "sensitivity": "normal",
+   "conflict": "latest_wins",
+   "freshness_days": 365,
+   "version": 1
+  },
+  {
+   "key": "certification",
+   "label": "Certification",
+   "storage": "record",
+   "shown_on": "story",
+   "inputs": [
+    "chat",
+    "document",
+    "story"
+   ],
+   "sensitivity": "normal",
+   "conflict": "evidence_wins",
+   "freshness_days": null,
+   "version": 1
+  },
+  {
+   "key": "interest",
+   "label": "Interest",
+   "storage": "item",
+   "shown_on": "story",
+   "inputs": [
+    "chat",
+    "story"
+   ],
+   "sensitivity": "normal",
+   "conflict": "latest_wins",
+   "freshness_days": 365,
+   "version": 1,
+   "schema": {
+    "type": "object",
+    "properties": {
+     "text": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 500
+     },
+     "example": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 500
+     }
+    },
+    "required": [
+     "text"
+    ],
+    "additionalProperties": false
+   },
+   "identity": [
+    "text"
+   ]
+  },
+  {
+   "key": "strength",
+   "label": "Strength",
+   "storage": "item",
+   "shown_on": "story",
+   "inputs": [
+    "chat",
+    "story"
+   ],
+   "sensitivity": "normal",
+   "conflict": "latest_wins",
+   "freshness_days": 365,
+   "version": 1,
+   "schema": {
+    "type": "object",
+    "properties": {
+     "text": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 500
+     },
+     "evidence": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 500
+     }
+    },
+    "required": [
+     "text"
+    ],
+    "additionalProperties": false
+   },
+   "identity": [
+    "text"
+   ]
+  },
+  {
+   "key": "value",
+   "label": "Value",
+   "storage": "item",
+   "shown_on": "story",
+   "inputs": [
+    "chat",
+    "story"
+   ],
+   "sensitivity": "normal",
+   "conflict": "latest_wins",
+   "freshness_days": 365,
+   "version": 1,
+   "schema": {
+    "type": "object",
+    "properties": {
+     "text": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 500
+     }
+    },
+    "required": [
+     "text"
+    ],
+    "additionalProperties": false
+   },
+   "identity": [
+    "text"
+   ]
+  },
+  {
+   "key": "pressure",
+   "label": "Pressure",
+   "storage": "item",
+   "shown_on": "story",
+   "inputs": [
+    "chat",
+    "story"
+   ],
+   "sensitivity": "sensitive",
+   "conflict": "latest_wins",
+   "freshness_days": 365,
+   "version": 1,
+   "schema": {
+    "type": "object",
+    "properties": {
+     "text": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 500
+     },
+     "kind": {
+      "type": "string",
+      "enum": [
+       "money",
+       "time",
+       "expectation",
+       "family",
+       "health",
+       "other"
+      ]
+     }
+    },
+    "required": [
+     "text"
+    ],
+    "additionalProperties": false
+   },
+   "identity": [
+    "text"
+   ]
+  },
+  {
+   "key": "option",
+   "label": "Option",
+   "storage": "item",
+   "shown_on": "story",
+   "inputs": [
+    "chat",
+    "story"
+   ],
+   "sensitivity": "normal",
+   "conflict": "latest_wins",
+   "freshness_days": 180,
+   "version": 1,
+   "schema": {
+    "type": "object",
+    "properties": {
+     "text": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 500
+     },
+     "status": {
+      "type": "string",
+      "enum": [
+       "considering",
+       "ruled_out"
+      ]
+     }
+    },
+    "required": [
+     "text"
+    ],
+    "additionalProperties": false
+   },
+   "identity": [
+    "text"
+   ]
+  },
+  {
+   "key": "myth",
+   "label": "Myth",
+   "storage": "item",
+   "shown_on": "story",
+   "inputs": [
+    "chat",
+    "story"
+   ],
+   "sensitivity": "normal",
+   "conflict": "latest_wins",
+   "freshness_days": 365,
+   "version": 1,
+   "schema": {
+    "type": "object",
+    "properties": {
+     "text": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 500
+     },
+     "about": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 500
+     }
+    },
+    "required": [
+     "text"
+    ],
+    "additionalProperties": false
+   },
+   "identity": [
+    "text"
+   ]
+  },
+  {
+   "key": "certainty",
+   "label": "Certainty",
+   "storage": "item",
+   "shown_on": "story",
+   "inputs": [
+    "chat",
+    "story"
+   ],
+   "sensitivity": "normal",
+   "conflict": "ask_student",
+   "freshness_days": 90,
+   "version": 1,
+   "schema": {
+    "type": "object",
+    "properties": {
+     "score": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 10
+     },
+     "about": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 500
+     }
+    },
+    "required": [
+     "score"
+    ],
+    "additionalProperties": false
+   },
+   "identity": []
+  },
+  {
+   "key": "family_member",
+   "label": "Family member",
+   "storage": "item",
+   "shown_on": "story",
+   "inputs": [
+    "chat",
+    "story"
+   ],
+   "sensitivity": "sensitive",
+   "conflict": "latest_wins",
+   "freshness_days": 365,
+   "version": 1,
+   "schema": {
+    "type": "object",
+    "properties": {
+     "relation": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 50
+     },
+     "name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200
+     },
+     "occupation": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200
+     },
+     "education": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200
+     },
+     "wish": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 500
+     },
+     "concern": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 500
+     },
+     "influence": {
+      "type": "string",
+      "enum": [
+       "low",
+       "medium",
+       "high",
+       "unknown"
+      ]
+     }
+    },
+    "required": [
+     "relation"
+    ],
+    "additionalProperties": false
+   },
+   "identity": [
+    "relation",
+    "name"
+   ],
+   "choice_fields": {
+    "relation": "relations"
+   }
+  },
+  {
+   "key": "domicile",
+   "label": "Domicile",
+   "storage": "item",
+   "shown_on": "details",
+   "inputs": [
+    "chat",
+    "document",
+    "details"
+   ],
+   "sensitivity": "sensitive",
+   "conflict": "ask_student",
+   "freshness_days": 365,
+   "version": 1,
+   "schema": {
+    "type": "object",
+    "properties": {
+     "province": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 50
+     },
+     "area": {
+      "type": "string",
+      "enum": [
+       "urban",
+       "rural"
+      ]
+     }
+    },
+    "required": [
+     "province"
+    ],
+    "additionalProperties": false
+   },
+   "identity": [],
+   "choice_fields": {
+    "province": "provinces"
+   }
+  },
+  {
+   "key": "quota",
+   "label": "Quota",
+   "storage": "item",
+   "shown_on": "details",
+   "inputs": [
+    "chat",
+    "document",
+    "details"
+   ],
+   "sensitivity": "sensitive",
+   "conflict": "ask_student",
+   "freshness_days": 365,
+   "version": 1,
+   "schema": {
+    "type": "object",
+    "properties": {
+     "kind": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 50
+     }
+    },
+    "required": [
+     "kind"
+    ],
+    "additionalProperties": false
+   },
+   "identity": [
+    "kind"
+   ],
+   "choice_fields": {
+    "kind": "quotas"
+   }
+  },
+  {
+   "key": "daily_life",
+   "label": "Daily life",
+   "storage": "item",
+   "shown_on": "story",
+   "inputs": [
+    "chat",
+    "story"
+   ],
+   "sensitivity": "normal",
+   "conflict": "latest_wins",
+   "freshness_days": 365,
+   "version": 1,
+   "schema": {
+    "type": "object",
+    "properties": {
+     "text": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 500
+     }
+    },
+    "required": [
+     "text"
+    ],
+    "additionalProperties": false
+   },
+   "identity": [
+    "text"
+   ]
+  }
+ ]
+}
