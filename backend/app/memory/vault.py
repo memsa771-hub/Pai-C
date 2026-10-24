@@ -270,8 +270,12 @@ class VaultService:
         if (current is not None and source_type == "document"
                 and _unwrap(current.value) == value):
             self._corroborate(current, evidence)
-            if (current.evidence or {}).get("inferred"):
-                # Backed by a document, it is no longer only PAI's guess.
+            from .evidence import evidence_level
+
+            trusted = evidence_level({"source_type": source_type, "evidence": evidence}, value) == "shown"
+            if (current.evidence or {}).get("inferred") and trusted:
+                # Backed by a trusted document, it is no longer only PAI's
+                # guess. An OCR reading or an unverified paper is a guess too.
                 current.evidence = {**current.evidence, "inferred": False}
                 self.db.flush()
             return VaultWriteResult(VaultOutcome.CORROBORATED, current)

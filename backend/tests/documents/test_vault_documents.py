@@ -621,3 +621,166 @@ def test_student_statement_replaces_an_ocr_fact():
             assert _rows(db, ProfileIssue, student.workspace_id, issue_type="conflicting_fact") == []
             facts = StudentSnapshotService(db).build(student.workspace_id).facts
             assert facts["identity.full_name"]["evidence_level"] == "stated"
+
+
+# -- fix round 2 ---------------------------------------------------------------
+
+def _chat_extract(proposals):
+    from app.memory import extractor as ex
+
+    turn = SimpleNamespace(user_text="Abbu ki tankhwah 80000 hai", user_event_id="e1", records={},
+                           is_empty=lambda: False)
+
+    async def fake(**kwargs):
+        return json.dumps({"candidates": proposals})
+
+    with patch.object(ex, "_model_config", return_value=("k", "m", None)), \
+            patch.object(ex, "chat_completion", fake), \
+            patch.object(ex, "build_user_prompt", lambda *a, **k: "p"), \
+            patch.object(ex, "workspace_language_block", lambda *a, **k: ""):
+        return asyncio.run(ex.extract_candidates(turn, {"finance.budget"}))
+
+
+def test_chat_income_is_dropped_before_the_limit_and_over_limit_drops_hold_no_values():
+    from app.memory import extractor as ex
+
+    filler = [{"candidate_type": "vault_fact", "key": "finance.budget",
+               "proposed_value": {"amount": 80000 + i}, "quote": "hai", "confidence": 0.9}
+              for i in range(ex.MAX_CANDIDATES)]
+    income = {"candidate_type": "vault_fact", "key": "finance.budget",
+              "proposed_value": "father's income 80000 a month", "quote": "Abbu ki tankhwah 80000 hai",
+              "confidence": 0.9}
+    out = _chat_extract([income, *filler, dict(filler[0])])
+    reasons = [d["reason"] for d in out.drops]
+    assert reasons.count("household_income") == 1
+    # The income proposal did not use up a slot: all the filler was validated, and
+    # only the one past the limit was cut.
+    assert reasons.count("over_candidate_limit") == 1
+    over = next(d for d in out.drops if d["reason"] == "over_candidate_limit")
+    assert set(over["payload"]) == {"candidate_type", "key"}
+    assert not any("80000" in json.dumps(d) for d in out.drops if d["reason"] != "over_candidate_limit"
+                   and d["reason"] == "household_income")
+
+
+def test_document_income_is_dropped_before_the_limit():
+    from app.documents import extractor as dx
+
+    income = _finding("vault_fact", "finance.budget", {"amount": 80000}, "Father's monthly income: 80000")
+    filler = [_finding("vault_item", "hobby", {"name": f"x{i}"}, "Name: Ali Khan") for i in range(dx.MAX_CANDIDATES)]
+    with VaultSession() as student:
+        _process(student, "c.jpg", JPEG, "image/jpeg", [income, *filler], ocr=_FakeOcr(INCOME_TEXT))
+        with student.factory() as db:
+            reasons = [d.reason for d in _rows(db, VaultDrop, student.workspace_id)]
+    assert reasons.count("household_income") == 1
+    assert "over_candidate_limit" not in reasons
+
+
+@pytest.mark.parametrize("raw, dropped", [
+    ({"candidate_type": "student_record", "key": "financial_sponsor",
+      "proposed_value": {"sponsor_type": "parent", "details": {"amount": 80000}},
+      "quote": "Abbu ki tankhwah 80000 hai", "confidence": 0.9}, True),
+    ({"candidate_type": "student_record", "key": "financial_sponsor",
+      "proposed_value": {"sponsor_type": "parent", "details": {"amount": 300000, "currency": "PKR"}},
+      "quote": "Abbu fees ke liye 3 lakh denge", "confidence": 0.9}, False),
+])
+def test_finance_record_kinds_are_income_guarded(raw, dropped):
+    from app.memory.extractor import _validate
+
+    turn = SimpleNamespace(user_text=raw["quote"], user_event_id="e1", records={})
+    drops = []
+    candidate = _validate(raw, turn, {"finance.budget"}, drops)
+    if dropped:
+        assert candidate is None and [d["reason"] for d in drops] == ["household_income"]
+        assert "80000" not in json.dumps(drops[0]["payload"])
+    else:
+        assert candidate is not None and "household_income" not in [d["reason"] for d in drops]
+
+
+def test_owner_card_provide_new_with_another_name_applies_nothing():
+    from app.memory.profile_issues import ProfileIssueService
+
+    with VaultSession() as student:
+        _state_name(student, "Sara Ahmed")
+        _process(student, "r.jpg", JPEG, "image/jpeg", RESULT_FINDINGS)
+        with student.factory() as db:
+            issue = _owner_issues(db, student.workspace_id)[0]
+            ProfileIssueService(db).resolve(student.workspace_id, issue.id, "provide_new",
+                                            value="It's my brother Ali's")
+            db.commit()
+            db.refresh(issue)
+            assert issue.status == "resolved" and issue.resolution["action"] == "keep_current"
+            assert issue.resolution["note"]
+        _replay(student, RESULT_FINDINGS)
+        with student.factory() as db:
+            assert _rows(db, CourseRecord, student.workspace_id) == []
+            assert _rows(db, MemoryCandidate, student.workspace_id, source_type="document") == []
+
+
+def test_owner_card_provide_new_with_the_holder_name_applies_the_document():
+    from app.memory.profile_issues import ProfileIssueService
+
+    with VaultSession() as student:
+        _state_name(student, "Sara Ahmed")
+        _process(student, "r.jpg", JPEG, "image/jpeg", RESULT_FINDINGS)
+        with student.factory() as db:
+            issue = _owner_issues(db, student.workspace_id)[0]
+            ProfileIssueService(db).resolve(student.workspace_id, issue.id, "provide_new",
+                                            value="Muhammad Ali Khan")
+            db.commit()
+        _replay(student, RESULT_FINDINGS)
+        with student.factory() as db:
+            assert len(_rows(db, CourseRecord, student.workspace_id)) == 2
+
+
+def test_owner_confirmed_replay_runs_once():
+    from app.memory.profile_issues import ProfileIssueService
+
+    with VaultSession() as student:
+        _state_name(student, "Sara Ahmed")
+        file_id, _ = _process(student, "r.jpg", JPEG, "image/jpeg", RESULT_FINDINGS)
+        with student.factory() as db:
+            issue = _owner_issues(db, student.workspace_id)[0]
+            ProfileIssueService(db).resolve(student.workspace_id, issue.id, "accept_proposed")
+            db.commit()
+            payload = db.scalars(select(BackgroundJob).where(
+                BackgroundJob.workspace_id == student.workspace_id,
+                BackgroundJob.job_type == "document.extract",
+                BackgroundJob.status == "pending")).one().payload
+        _replay(student, RESULT_FINDINGS)
+        with student.factory() as db:
+            first = len(_rows(db, MemoryCandidate, student.workspace_id, source_type="document"))
+            assert first > 0
+            assert _owner_issues(db, student.workspace_id)[0].evidence.get("replayed_at")
+            job = SimpleNamespace(id="retry", workspace_id=student.workspace_id, payload=payload,
+                                  job_type="document.extract")
+            with patch("app.inference.gateway.complete", _model(RESULT_FINDINGS)), \
+                    patch("app.documents.extractor._model_config", return_value=("test", "test", None)):
+                result = asyncio.run(extract_document_job(job, db))
+            db.commit()
+            assert result["extracted"] is False
+            assert len(_rows(db, MemoryCandidate, student.workspace_id, source_type="document")) == first
+
+
+def _fact(student, value, source_type, evidence):
+    with student.factory() as db:
+        candidate = MemoryCandidateService(db).propose(
+            workspace_id=student.workspace_id, candidate_type="vault_fact", key="identity.full_name",
+            proposed_value=value, confidence=0.95, source_type=source_type,
+            input_channel="conversation" if source_type == "conversation" else "document",
+            evidence=evidence)
+        MemoryReconciler(db).reconcile(candidate)
+        db.commit()
+
+
+@pytest.mark.parametrize("extra, clears", [
+    ({"ocr": True}, False), ({"owner_unverified": True}, False), ({}, True)])
+def test_only_a_trusted_document_clears_a_chat_guess(extra, clears):
+    from app.memory.vault import VaultService
+
+    with VaultSession() as student:
+        _fact(student, "Ali Khan", "conversation", {"quote": "Ali Khan", "inferred": True})
+        _fact(student, "Ali Khan", "document",
+              {"quote": "Name: Ali Khan", "authority": "institution_issued", "file_id": "f1", **extra})
+        with student.factory() as db:
+            fact = VaultService(db).get_fact(student.workspace_id, "identity.full_name")
+            assert bool(fact.evidence.get("inferred")) is (not clears)

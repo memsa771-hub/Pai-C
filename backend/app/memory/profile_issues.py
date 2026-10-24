@@ -116,13 +116,23 @@ class ProfileIssueService:
         file_id = (issue.evidence or {}).get("file_id")
         if action == "both_true":
             raise MemoryDataError("This answer does not apply to a document owner question")
+        if action == "provide_new":
+            from app.documents.owner import same_person
+
+            # A typed answer counts as "it's mine" only when it names the
+            # document's holder ("It's my brother Ali's" does not).
+            names = (issue.evidence or {}).get("document_names") or []
+            if not (isinstance(value, str) and any(same_person(value, name) for name in names)):
+                self._close(issue, "keep_current",
+                            note or "The typed name does not match the name on the document.", None)
+                return {"resolved": True, "action": "keep_current", "id": None}
         if action in ("accept_proposed", "provide_new"):
             if not file_id:
                 raise MemoryDataError("This document owner question names no file")
             from app.runtime.task_runtime import enqueue
 
             enqueue(self.db, job_type="document.extract", workspace_id=workspace_id,
-                    payload={"file_id": file_id, "owner_confirmed": True},
+                    payload={"file_id": file_id, "owner_confirmed": True, "owner_issue_id": issue.id},
                     idempotency_key=f"document.extract:owner_confirmed:{issue.id}")
         self._close(issue, action, note, None)
         return {"resolved": True, "action": action, "id": None}

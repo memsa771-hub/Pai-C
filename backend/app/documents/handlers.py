@@ -258,6 +258,31 @@ def _owner_mismatch(db, workspace_id: str, understanding) -> dict | None:
             "vault_names": vault["full"] + vault["preferred"]}
 
 
+def _claim_owner_replay(db, workspace_id: str, file_id: str, issue_id) -> str | None:
+    """Mark the owner card's one replay as used; a reason when it may not run.
+
+    The card's answer bypasses the owner check exactly once: a worker retry,
+    or the same job run again, must not propose the document a second time.
+    """
+    from datetime import datetime, timezone
+
+    from sqlalchemy import select
+
+    from app.models import ProfileIssue
+
+    issue = db.execute(select(ProfileIssue).where(
+        ProfileIssue.id == issue_id, ProfileIssue.workspace_id == workspace_id,
+        ProfileIssue.issue_type == "document_owner",
+    ).with_for_update()).scalar_one_or_none() if issue_id else None
+    if issue is None or (issue.evidence or {}).get("file_id") != file_id:
+        return "owner_confirmation_missing"
+    if (issue.evidence or {}).get("replayed_at"):
+        return "already_replayed"
+    issue.evidence = {**issue.evidence, "replayed_at": datetime.now(timezone.utc).isoformat()}
+    db.flush()
+    return None
+
+
 def _open_owner_issue(db, workspace_id: str, file_id: str, filename: str, names: dict) -> None:
     from app.models import ProfileIssue
 
@@ -295,6 +320,10 @@ async def extract_document_job(job, db) -> dict:
     # The student answered "it's mine" on the owner card: this one replay
     # skips the owner check and re-reads a document already understood.
     owner_confirmed = bool((job.payload or {}).get("owner_confirmed"))
+    if owner_confirmed:
+        claimed = _claim_owner_replay(db, workspace_id, file_id, (job.payload or {}).get("owner_issue_id"))
+        if claimed is not None:
+            return {"extracted": False, "reason": claimed}
 
     service = DocumentArtifactService(db)
     artifact = service.get(workspace_id, file_id)

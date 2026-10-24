@@ -373,6 +373,9 @@ _INCOME, _NOT_INCOME, _AMOUNT_CUE = _income_rules()
 # Only these can carry a household's money; the student's own records (their
 # pay at a job, "low-income families" in an activity) are not household income.
 _INCOME_GUARDED_ITEMS = frozenset({"family_member", "pressure"})
+# Record kinds that hold money. They are not catalog entries (the catalog has
+# no finance marker for records), so the set is named here, next to the guard.
+_INCOME_GUARDED_RECORDS = frozenset({"financial_sponsor", "scholarship_application"})
 
 
 def _text_of(value) -> str:
@@ -405,13 +408,32 @@ def states_household_income(raw: dict, allowed_vault_keys) -> bool:
     elif candidate_type == "vault_item":
         guarded = not known or vault_catalog().type(key) is None or key in _INCOME_GUARDED_ITEMS
     elif candidate_type == "student_record":
-        guarded = not known or key not in ENTITY_MODELS
+        guarded = not known or key not in ENTITY_MODELS or key in _INCOME_GUARDED_RECORDS
     else:
         guarded = True
     if not guarded:
         return False
     quote = raw.get("quote") if isinstance(raw.get("quote"), str) else ""
     return any(_states_income(text) for text in (quote, raw.get("proposed_value"), raw.get("content") or ""))
+
+
+def drop_household_income(proposals: list, allowed_vault_keys, drops: list, coerce=None) -> list:
+    """The proposals with every household income removed, each logged redacted.
+
+    Run before the candidate limit: an income proposal must not be cut into
+    the over-limit log with its value, nor take a slot from a real one.
+    """
+    kept = []
+    for raw in proposals:
+        shaped = coerce(raw) if coerce and isinstance(raw, dict) else raw
+        if isinstance(shaped, dict) and states_household_income(shaped, allowed_vault_keys):
+            logger.info("memory: dropped candidate — household_income")
+            drops.append({"reason": "household_income", "payload": {
+                "candidate_type": shaped.get("candidate_type"), "key": shaped.get("key"),
+                "reason": "household_income"}})
+            continue
+        kept.append(raw)
+    return kept
 
 
 def _carries_money_figure(text: str) -> bool:
@@ -698,16 +720,19 @@ async def extract_candidates(
         system_prompt=SYSTEM_PROMPT, max_tokens=4000, base_url=base_url,
     )
 
-    proposals = _parse_response(raw)
     drops: list[dict] = []
+    # Income first, so it neither reaches the over-limit log nor uses a slot.
+    proposals = drop_household_income(_parse_response(raw), allowed_vault_keys, drops,
+                                      coerce=_coerce_proposal)
     if len(proposals) > MAX_CANDIDATES:
         logger.warning(
             "memory: extraction returned %d candidates, truncating to %d",
             len(proposals), MAX_CANDIDATES,
         )
+        # Unvalidated, so only what names the proposal is kept.
         for extra in proposals[MAX_CANDIDATES:]:
-            payload = ({k: extra.get(k) for k in ("candidate_type", "key", "proposed_value")}
-                       if isinstance(extra, dict) else {"raw": extra})
+            payload = ({k: extra.get(k) for k in ("candidate_type", "key")}
+                       if isinstance(extra, dict) else {})
             drops.append({"reason": "over_candidate_limit", "payload": payload})
         proposals = proposals[:MAX_CANDIDATES]
 

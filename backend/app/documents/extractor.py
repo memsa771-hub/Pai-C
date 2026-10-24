@@ -30,7 +30,7 @@ import re
 from dataclasses import dataclass, field
 from typing import Any, Optional
 
-from app.memory.extractor import render_item, states_household_income
+from app.memory.extractor import drop_household_income, render_item, states_household_income
 
 from .classify import DOCUMENT_CLASSES
 from .content import Segment
@@ -598,6 +598,8 @@ async def understand_document(
     if not isinstance(findings_raw, list):
         raise DocumentExtractionError("'findings' was not a list")
     drops: list = []
+    # Income first, so it neither reaches the over-limit log nor uses a slot.
+    findings_raw = drop_household_income(findings_raw, allowed_vault_keys, drops)
     if len(findings_raw) > MAX_CANDIDATES:
         logger.warning(
             "document extraction returned %d findings, truncating to %d",
