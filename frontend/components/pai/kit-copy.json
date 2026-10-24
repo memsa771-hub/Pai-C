@@ -7,13 +7,24 @@
     "none": "Not yet",
     "stated": "Stated",
     "shown": "Shown",
-    "confirmed": "Confirmed"
+    "confirmed": "Confirmed",
+    "inferred": "PAI's guess",
+    "question": "In question"
+  },
+  "vaultEvidence": {
+    "stated": "Stated",
+    "shown": "From document",
+    "confirmed": "Confirmed",
+    "inferred": "PAI's guess",
+    "question": "In question"
   },
   "evidenceHelp": {
     "none": "Nothing shared yet",
     "stated": "You said it",
     "shown": "You showed it, for example with a document or something you did",
-    "confirmed": "You confirmed it"
+    "confirmed": "You confirmed it",
+    "inferred": "PAI worked this out from your conversation; you have not said or shown it",
+    "question": "Two answers disagree; PAI will ask you which one is right"
   },
   "heatmapLegend": "Colour shows how strong the evidence is. Dots show how much there is. This is never a score.",
   "heatmapItems": { "one": "{count} piece of evidence", "other": "{count} pieces of evidence" },

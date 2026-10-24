@@ -41,141 +41,6 @@
       "tone": "teal"
     }
   },
-  "detailGroups": [
-    {
-      "id": "about",
-      "title": "About you",
-      "icon": "home",
-      "areas": [
-        "status"
-      ],
-      "keys": [
-        "identity.",
-        "location."
-      ]
-    },
-    {
-      "id": "education",
-      "title": "Education",
-      "icon": "graduation",
-      "areas": [
-        "history"
-      ],
-      "keys": [
-        "education",
-        "course",
-        "test_attempt",
-        "certification",
-        "academic"
-      ]
-    },
-    {
-      "id": "experience",
-      "title": "Experience",
-      "icon": "lightbulb",
-      "areas": [
-        "history",
-        "strengths"
-      ],
-      "keys": [
-        "experience",
-        "activity",
-        "project",
-        "award",
-        "publication",
-        "skill",
-        "research"
-      ]
-    },
-    {
-      "id": "goals",
-      "title": "Goals and plans",
-      "icon": "target",
-      "areas": [
-        "goals",
-        "options"
-      ],
-      "keys": [
-        "goal",
-        "preferences.target_countries",
-        "preferences.study_mode",
-        "application",
-        "scholarship_application"
-      ]
-    },
-    {
-      "id": "money",
-      "title": "Money and support",
-      "icon": "scale",
-      "areas": [
-        "pressures"
-      ],
-      "keys": [
-        "finance.",
-        "financial",
-        "financial_sponsor"
-      ]
-    },
-    {
-      "id": "preferences",
-      "title": "Your preferences",
-      "icon": "message",
-      "areas": [],
-      "keys": [
-        "preferences."
-      ]
-    },
-    {
-      "id": "other",
-      "title": "Other details",
-      "icon": "file",
-      "areas": [],
-      "keys": []
-    }
-  ],
-  "sharedGroups": [
-    {
-      "area": "interests",
-      "source": "sections.interests"
-    },
-    {
-      "area": "strengths",
-      "source": "personal.self"
-    },
-    {
-      "area": "values",
-      "source": "sections.values"
-    },
-    {
-      "area": "family_social",
-      "source": "personal.world.people"
-    },
-    {
-      "area": "pressures",
-      "source": "personal.pressures.items"
-    },
-    {
-      "area": "goals",
-      "source": "sections.goals"
-    },
-    {
-      "area": "options",
-      "source": "sections.options"
-    }
-  ],
-  "sensitive": {
-    "areas": [
-      "pressures",
-      "family_social"
-    ],
-    "keys": [
-      "identity.date_of_birth",
-      "identity.gender",
-      "finance.",
-      "financial",
-      "financial_sponsor"
-    ]
-  },
   "titleFields": [
     "qualification_name",
     "test_name",
@@ -237,12 +102,6 @@
     "educationEmpty": "Add your current or last qualification in a chat, or upload a result card.",
     "stillWants": "PAI still wants to know",
     "stillWantsIntro": "Tap a topic to talk about it.",
-    "detailsIntro": "Everything PAI has saved, in plain words. Tap a row to see where it came from.",
-    "filterBy": "Showing: {area}",
-    "clearFilter": "Show everything",
-    "sharedTitle": "What you have shared about {area}",
-    "sharedNote": "These come from your conversations. To change one, tell PAI.",
-    "tellPai": "Tell PAI",
     "sensitiveHidden": "Hidden for your privacy",
     "showSensitive": "Show private details",
     "hideSensitive": "Hide private details",
@@ -250,9 +109,17 @@
     "sourceSaid": "You said on {date}",
     "sourceShown": "From a document you shared on {date}",
     "sourceConfirmed": "You confirmed this on {date}",
+    "sourceGuess": "PAI's guess from your conversation on {date}",
     "sourceNoDate": "From your conversation with PAI",
+    "sourceGuessNoDate": "PAI's guess from your conversation",
+    "openDocument": "Open {filename}",
+    "staleMarker": "Check this is still right",
+    "staleHelp": "It may have changed since you shared it. Confirm it if it is still right, or edit it.",
+    "disagreeDocument": "A document says {display}",
+    "disagreeOther": "Another source says {display}",
+    "fileRecordNote": "This comes from a file. Open it in Documents to change or remove it.",
+    "saveFailed": "Could not save that. Please try again.",
     "noFacts": "Nothing saved here yet.",
-    "areaEmpty": "PAI has not learned about this yet. Tap “Tell PAI” to start.",
     "confirmed": "Confirmed",
     "removed": "Removed",
     "expand": "Show source and actions for {label}",
@@ -277,21 +144,30 @@
     "sharedCount": "{count} shared",
     "storyTalk": "Talk about this",
     "storyDraft": "Can we talk about {area}?",
+    "storyAddLabel": "Add to {label}",
+    "storyAddSave": "Add",
+    "optional": "{label} (optional)",
+    "listHint": "Separate more than one with commas.",
+    "choose": "Choose",
     "emptyGroup": "Nothing here yet",
     "emptyGroupAction": "Add with PAI",
     "emptyDrafts": {
       "about": "I want to add something about me.",
       "education": "I want to add my education.",
-      "experience": "I want to add an experience: a job, a project, an activity or an award."
+      "tests": "I want to add a test or exam result.",
+      "money_and_place": "I want to add something about money or where I can study.",
+      "documents": "I want to add a document."
     },
     "checkTitle": "Please check",
-    "checkIntro": "Something you said is different from your profile. Which is right?",
-    "checkLine": "Your profile says {current}. You also said {proposed}.",
+    "checkIntro": "Two answers do not match. Which one is right?",
+    "checkLine": "Saved: {current}. New: {proposed}.",
     "checkKeep": "Keep {value}",
     "checkUse": "Use {value}",
-    "checkOther": "PAI needs to check one detail with you.",
-    "checkTalk": "Talk about it",
-    "checkDraft": "Can we check my {label}?",
+    "checkKeepSaved": "Keep what is saved",
+    "checkUseNew": "Use the new answer",
+    "checkBoth": "Both were true at different times",
+    "checkNew": "Neither, I'll write it",
+    "checkNewLabel": "The right answer",
     "checkFailed": "Could not save that. Please try again.",
     "proofTitle": "Confirm with a document",
     "proofIntro": "You told PAI your marks. A photo of your result card lets PAI use them when checking where you can apply.",
@@ -337,22 +213,13 @@
       "label": "Where you would like to study"
     }
   ],
-  "story": {
-    "interests": "What you enjoy doing, in class and outside it.",
-    "strengths": "What you are good at, and how you know it.",
-    "values": "What matters to you in work and in life.",
-    "family_social": "The people whose opinion matters, and what they hope for you.",
-    "pressures": "Money, time and expectations: what weighs on your choice.",
-    "goals": "What you want, and whose wish it really is.",
-    "options": "The directions you are weighing, and what you have heard about them."
-  },
   "hiddenKeys": [
     "identity.preferred_name"
   ],
   "alwaysShow": [
     "about",
     "education",
-    "experience"
+    "tests"
   ],
   "proofRecords": [
     {
@@ -363,5 +230,16 @@
       "record": "test_attempt",
       "field": "overall_score"
     }
+  ],
+  "vaultSections": {
+    "about": "About you",
+    "education": "Education",
+    "tests": "Tests",
+    "money_and_place": "Money and place",
+    "documents": "Documents"
+  },
+  "fileRecordTypes": [
+    "document",
+    "credential"
   ]
 }

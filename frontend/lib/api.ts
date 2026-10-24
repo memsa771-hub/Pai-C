@@ -335,11 +335,35 @@ class WorkspaceApi {
   async getCounselorHealth(): Promise<import('./counselor-workspace').CounselorHealth> {
     return this.request(`/v1/counselor/health?network=${this.requireWorkspace()}`);
   }
-  async getProfileCards(): Promise<{cards:import('./counselor-workspace').ProfileCard[]}> {
-    return this.request(`/v1/counselor/profile-cards?network=${this.requireWorkspace()}`);
+  // ---- The student's Vault (/v1/vault): one view, the catalog and the student's own edits.
+  // Writes need the signed-in owner; a refused write's message is for the student (see lib/vault.ts vaultError).
+  async getVault():Promise<import('./vault').VaultView> {
+    return this.request(`/v1/vault?network=${this.requireWorkspace()}`);
   }
-  async reviewProfileCard(card:import('./counselor-workspace').ProfileCard,body:Record<string,unknown>):Promise<unknown> {
-    return this.request(`/v1/counselor/profile-cards/${encodeURIComponent(card.kind)}/${encodeURIComponent(card.id)}?network=${this.requireWorkspace()}`,{method:'POST',body:JSON.stringify(body)});
+  async getVaultCatalog():Promise<import('./vault').VaultCatalog> {
+    return this.request(`/v1/vault/catalog?network=${this.requireWorkspace()}`);
+  }
+  async addVaultEntry(type:string,value:unknown):Promise<import('./vault').VaultWriteResult> {
+    return this.request(`/v1/vault/entries?network=${this.requireWorkspace()}`,{method:'POST',body:JSON.stringify({type,value})});
+  }
+  async editVaultEntry(kind:string,id:string,value:unknown):Promise<import('./vault').VaultWriteResult> {
+    return this.request(`/v1/vault/entries/${encodeURIComponent(kind)}/${encodeURIComponent(id)}?network=${this.requireWorkspace()}`,{method:'PATCH',body:JSON.stringify({value})});
+  }
+  async confirmVaultEntry(kind:string,id:string):Promise<import('./vault').VaultWriteResult> {
+    return this.request(`/v1/vault/entries/${encodeURIComponent(kind)}/${encodeURIComponent(id)}/confirm?network=${this.requireWorkspace()}`,{method:'POST'});
+  }
+  async removeVaultEntry(kind:string,id:string):Promise<import('./vault').VaultWriteResult> {
+    return this.request(`/v1/vault/entries/${encodeURIComponent(kind)}/${encodeURIComponent(id)}?network=${this.requireWorkspace()}`,{method:'DELETE'});
+  }
+  async vaultHistory(kind:string,id:string):Promise<{kind:string;type:string;id:string;history:Record<string,unknown>[]}> {
+    return this.request(`/v1/vault/entries/${encodeURIComponent(kind)}/${encodeURIComponent(id)}/history?network=${this.requireWorkspace()}`);
+  }
+  async resolveVaultConflict(issueId:string,answer:import('./vault').VaultAnswer,value?:unknown):Promise<Record<string,unknown>> {
+    return this.request(`/v1/vault/conflicts/${encodeURIComponent(issueId)}/resolve?network=${this.requireWorkspace()}`,
+      {method:'POST',body:JSON.stringify({answer,...(value!==undefined?{value}:{})})});
+  }
+  async getVaultDocumentEntries(fileId:string):Promise<{file_id:string;entries:import('./vault').VaultEntry[]}> {
+    return this.request(`/v1/vault/documents/${encodeURIComponent(fileId)}/entries?network=${this.requireWorkspace()}`);
   }
   async answerFactCard(id:string,body:Record<string,unknown>):Promise<unknown> {
     return this.request(`/v1/counselor/fact-cards/${encodeURIComponent(id)}?network=${this.requireWorkspace()}`,{method:'POST',body:JSON.stringify(body)});
@@ -474,22 +498,6 @@ class WorkspaceApi {
       `/v1/files/${encodeURIComponent(fileId)}/info`,
     );
     return info?.document_stage ?? 'unsupported';
-  }
-
-  /** Resolve a conflict through candidate -> reconciler, never by cosmetic dismissal. */
-  async resolveProfileIssue(
-    issueId: string,
-    action: 'keep_current' | 'accept_proposed' | 'provide_new',
-    value?: unknown,
-    note?: string,
-  ): Promise<{ resolved: boolean; action: string; id: string | null }> {
-    return this.request<{ resolved: boolean; action: string; id: string | null }>(
-      `/v1/student-profile/issues/${encodeURIComponent(issueId)}/resolve?network=${this.requireWorkspace()}`,
-      {
-        method: 'POST',
-        body: JSON.stringify({ action, ...(value !== undefined ? { value } : {}), ...(note ? { note } : {}) }),
-      },
-    );
   }
 
   // ---------------------------------------------------------------------------

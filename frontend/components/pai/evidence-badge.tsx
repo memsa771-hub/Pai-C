@@ -1,10 +1,13 @@
-import { BadgeCheck, Eye, MessageCircle, Circle } from 'lucide-react';
+import { BadgeCheck, Eye, MessageCircle, Circle, CircleHelp, Sparkles } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import copy from './kit-copy.json';
 
 export type EvidenceLevel = 'none' | 'stated' | 'shown' | 'confirmed';
 export const EVIDENCE_LEVELS: EvidenceLevel[] = ['none', 'stated', 'shown', 'confirmed'];
-const icons = { none: Circle, stated: MessageCircle, shown: Eye, confirmed: BadgeCheck };
+/** Two more badges the Vault uses: a value PAI only guessed, and one waiting
+ * on the student's answer. They sit outside the ladder (and the heatmap). */
+export type BadgeLevel = EvidenceLevel | 'inferred' | 'question';
+const icons = { none: Circle, stated: MessageCircle, shown: Eye, confirmed: BadgeCheck, inferred: Sparkles, question: CircleHelp };
 const styles: Record<EvidenceLevel, string> = {
   none: 'bg-evidence-0 text-evidence-0-ink',
   stated: 'bg-evidence-1 text-evidence-1-ink',
@@ -14,8 +17,10 @@ const styles: Record<EvidenceLevel, string> = {
 
 /** Badges stay quiet: a word and an icon in muted ink; only "confirmed"
  * carries colour, because it is the one the student did themselves. */
-const quiet: Record<EvidenceLevel, string> = {
+const quiet: Record<BadgeLevel, string> = {
   none: 'text-muted-foreground',
+  inferred: 'text-muted-foreground',
+  question: 'text-warning-ink',
   stated: 'text-muted-foreground',
   shown: 'text-foreground',
   confirmed: 'text-success-ink',
@@ -26,7 +31,7 @@ export function evidenceLevel(value: unknown): EvidenceLevel {
 }
 
 /** Evidence is shown with an icon and a word, never by colour alone. */
-export function EvidenceBadge({ level, className, label, compact = false }: { level: EvidenceLevel; className?: string; label?: string; compact?: boolean }) {
+export function EvidenceBadge({ level, className, label, compact = false }: { level: BadgeLevel; className?: string; label?: string; compact?: boolean }) {
   const Icon = icons[level];
   return (
     <span title={`${label || copy.evidence[level]}: ${copy.evidenceHelp[level]}`}
@@ -36,5 +41,8 @@ export function EvidenceBadge({ level, className, label, compact = false }: { le
     </span>
   );
 }
+/** The Vault's badge words (VAULT_SPEC: Stated, From document, PAI's guess,
+ * Confirmed, In question); "shown" there always means a document. */
+export const vaultBadgeLabel = (level: Exclude<BadgeLevel, 'none'>) => copy.vaultEvidence[level];
 export const evidenceFill = styles;
 export const evidenceIcons = icons;

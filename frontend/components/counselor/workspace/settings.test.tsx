@@ -7,7 +7,7 @@ import {RecentSignInRequired,requestPasswordReset} from '@/lib/auth/service';
 import {signOutAndGoToLanding} from '@/lib/auth-redirects';
 const theme=vi.hoisted(()=>({setTheme:vi.fn(),theme:'light'}));
 vi.mock('next-themes',()=>({useTheme:()=>theme}));
-vi.mock('@/lib/api',()=>({workspaceApi:{deleteMyAccount:vi.fn(),editStudentProfile:vi.fn(),getProfileCards:vi.fn(),exportCounselorData:vi.fn(),listShares:vi.fn(),deleteShare:vi.fn()}}));
+vi.mock('@/lib/api',()=>({workspaceApi:{deleteMyAccount:vi.fn(),editStudentProfile:vi.fn(),getVault:vi.fn(),exportCounselorData:vi.fn(),listShares:vi.fn(),deleteShare:vi.fn()}}));
 vi.mock('@/lib/auth/service',()=>({requestPasswordReset:vi.fn(),RecentSignInRequired:class extends Error{}}));
 vi.mock('@/lib/auth-redirects',()=>({signOutAndReturnToSignIn:vi.fn(),signOutAndGoToLanding:vi.fn()}));
 vi.mock('@/components/ui/dialogs-provider',()=>({useConfirm:()=>vi.fn().mockResolvedValue(false)}));
@@ -87,7 +87,7 @@ it('exports through the owner-scoped data API and reports download failure',asyn
   open('Privacy & data');
   fireEvent.click(screen.getByRole('button',{name:'Export my Counselor data'}));
   expect(await screen.findByRole('alert')).toBeTruthy();expect(workspaceApi.exportCounselorData).toHaveBeenCalledTimes(1);
-  expect(workspaceApi.getProfileCards).not.toHaveBeenCalled();
+  expect(workspaceApi.getVault).not.toHaveBeenCalled();
 });
 it('opens feedback from Help',()=>{
   render(<CounselorSettings/>);

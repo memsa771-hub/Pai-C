@@ -1,12 +1,12 @@
 // @vitest-environment jsdom
 import { it, expect, vi, afterEach } from "vitest";
-import { render, screen, fireEvent, cleanup, within } from "@testing-library/react";
+import { render, screen, fireEvent, cleanup, within, waitFor } from "@testing-library/react";
 import { Overview } from "./overview";
 import { journeyProgress, type JourneySignals } from "./use-journey";
 import { workspaceApi } from "@/lib/api";
-import { picture, cards } from "@/tests/fixtures/counselor";
+import { picture, vault } from "@/tests/fixtures/counselor";
 import type { Possibility } from "@/lib/possibilities";
-vi.mock("@/lib/api", () => ({ workspaceApi: { getProfileCards: vi.fn() } }));
+vi.mock("@/lib/api", () => ({ workspaceApi: { getVault: vi.fn() } }));
 afterEach(() => { cleanup(); vi.clearAllMocks(); });
 
 const path = (id: string, title: string, status: Possibility["status"]) =>
@@ -20,7 +20,7 @@ const data: JourneySignals = {
 const journey = { data, error: false, busy: false, refresh: vi.fn(), progress: journeyProgress(data) };
 
 it("shows signals from the student's own data and never a score", async () => {
-  vi.mocked(workspaceApi.getProfileCards).mockResolvedValue({ cards });
+  vi.mocked(workspaceApi.getVault).mockResolvedValue(vault);
   const navigate = vi.fn(), openPath = vi.fn(), onChat = vi.fn();
   render(<Overview journey={journey} navigate={navigate} openPath={openPath} onChat={onChat} />);
   expect(screen.getByRole("heading", { level: 1, name: "Find the path that fits you." })).toBeTruthy();
@@ -37,4 +37,12 @@ it("shows signals from the student's own data and never a score", async () => {
   await screen.findByText(/Your profile is missing \d+ details\./, undefined, { timeout: 2000 }).catch(() => null);
   fireEvent.click(screen.getByRole("button", { name: "Next recommendation" }));
   expect(screen.getByText(/^02 \/ 0\d$/)).toBeTruthy();
+});
+it("counts Vault entries and the ones the student confirmed", async () => {
+  vi.mocked(workspaceApi.getVault).mockResolvedValue(vault);
+  render(<Overview journey={journey} navigate={vi.fn()} openPath={vi.fn()} onChat={vi.fn()} />);
+  const metric = screen.getByText("Saved in your Vault").parentElement!;
+  // Four About entries, two education, one test and two story items; one is confirmed.
+  await waitFor(() => expect(metric.textContent).toContain("9"));
+  expect(metric.textContent).toContain("1 confirmed by you");
 });

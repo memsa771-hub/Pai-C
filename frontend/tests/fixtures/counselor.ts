@@ -1,10 +1,10 @@
 import type {
   LivingPicture,
-  ProfileCard,
   PathResult,
   Programs,
 } from "@/lib/counselor-workspace";
 import type { Possibility } from "@/lib/possibilities";
+import type { VaultCatalog, VaultEntry, VaultView } from "@/lib/vault";
 export const possibilities: Possibility[] = [
   {
     id: "path-one",
@@ -134,79 +134,81 @@ export const picture: LivingPicture = {
   moments: { explore_area: "m1", first_picture: "m2", mirror: "m3" },
   ratings: [{ version: 1, understood: 5, before: 3, after: 6 }],
 };
-export const cards: ProfileCard[] = [
-  {
-    kind: "vault_fact",
-    key: "identity.full_name",
-    id: "name",
-    value: "Sam Taylor",
-    digest: "a".repeat(64),
-    evidence_level: "confirmed",
-    source: { quote: "My name is Sam Taylor." },
-    updated_at: "2026-10-18",
+/** One Vault entry as /v1/vault shapes it; only what a case needs is overridden. */
+export const entry = (over: Partial<VaultEntry> & Pick<VaultEntry, "type" | "id" | "value" | "display" | "label">): VaultEntry => ({
+  kind: "fact", level: "stated", badge: "Stated", source: "user_explicit", document: null,
+  observed_at: "2026-10-16T09:00:00+00:00", confirmed_at: null, fresh_until: null, stale: false,
+  in_question: false, disagreements: [], ...over,
+});
+const resultCard = { file_id: "result-card", page: 1, filename: "Result card.jpg" };
+export const vault: VaultView = {
+  details: {
+    about: { label: "About you", entries: [
+      entry({ type: "identity.full_name", id: "name", value: "Sam Taylor", display: "Sam Taylor", label: "Full name",
+        level: "confirmed", badge: "Confirmed", confirmed_at: "2026-10-18T09:00:00+00:00" }),
+      entry({ type: "location.current_city", id: "city", value: "My city", display: "My city", label: "Current city",
+        stale: true, fresh_until: "2026-10-20T09:00:00+00:00" }),
+      entry({ type: "identity.date_of_birth", id: "dob", value: "2008-03-12", display: "2008-03-12", label: "Date of birth",
+        level: "inferred", badge: "PAI's guess" }),
+      entry({ type: "location.current_country", id: "country", value: "Pakistan", display: "Pakistan", label: "Current country",
+        in_question: true, badge: "In question" }),
+    ] },
+    education: { label: "Education", entries: [
+      entry({ kind: "record", type: "education", id: "education-earlier", label: "Education", level: "shown", badge: "From document",
+        value: { qualification_name: "matric", institution_name: "Community school", percentage: 81, academic_status: "completed", end_date: "2024-05-30" },
+        display: "Matric, Community school, 81, completed, 2024-05-30", document: resultCard,
+        disagreements: [{ value: { percentage: 79 }, display: "79", source: "document", document: { file_id: "old-card", page: null, filename: "Old card.pdf" } }] }),
+      entry({ kind: "record", type: "education", id: "education", label: "Education", level: "shown", badge: "From document",
+        value: { qualification_name: "Secondary education", institution_name: "Community school", academic_status: "current" },
+        display: "Secondary education, Community school, current", document: { file_id: "document", page: null, filename: "Student record.pdf" } }),
+    ] },
+    tests: { label: "Tests", entries: [
+      entry({ kind: "record", type: "test_attempt", id: "test-one", label: "Test",
+        value: { test_type: "Practice aptitude test", overall_score: "64", test_date: "2026-09-20" },
+        display: "Practice aptitude test, 64, 2026-09-20" }),
+    ] },
+    money_and_place: { label: "Money and place", entries: [] },
+    documents: { label: "Documents", entries: [] },
   },
-  {
-    kind: "vault_fact",
-    key: "location.current_city",
-    id: "city",
-    value: "My city",
-    digest: "c".repeat(64),
-    evidence_level: "stated",
-    source: { quote: "I live in my city with my family." },
-    updated_at: "2026-10-16",
-  },
-  {
-    kind: "vault_fact",
-    key: "identity.date_of_birth",
-    id: "dob",
-    value: "2008-03-12",
-    digest: "d".repeat(64),
-    evidence_level: "stated",
-    source: {},
-    updated_at: "2026-10-16",
-  },
-  {
-    kind: "education",
-    key: "education",
-    id: "education-earlier",
-    value: {
-      qualification_name: "Lower secondary certificate",
-      institution_name: "Community school",
-      board: "Regional board",
-      percentage: 81,
-      academic_status: "completed",
-      end_date: "2024-05-30",
-    },
-    digest: "e".repeat(64),
-    evidence_level: "shown",
-    source: { quote: "Result card", file_id: "result-card" },
-    updated_at: "2026-10-14",
-  },
-  {
-    kind: "test_attempt",
-    key: "test_attempt",
-    id: "test-one",
-    value: { test_name: "Practice aptitude test", obtained_marks: 64, total_marks: 100, test_date: "2026-09-20" },
-    digest: "f".repeat(64),
-    evidence_level: "stated",
-    source: { quote: "I got 64 out of 100 on the practice test." },
-    updated_at: "2026-09-21",
-  },
-  {
-    kind: "education",
-    key: "education",
-    id: "education",
-    value: {
-      qualification_name: "Secondary education",
-      institution_name: "Community school",
-      academic_status: "current",
-    },
-    digest: "b".repeat(64),
-    evidence_level: "shown",
-    source: { quote: "Current student record", file_id: "document" },
-    updated_at: "2026-10-18",
-  },
-];
+  story: [
+    { type: "interest", label: "Interest", rich: false, next_step: null, entries: [
+      entry({ kind: "item", type: "interest", id: "fixing", value: { text: "Fixing things" }, display: "Fixing things", label: "Interest" }),
+    ] },
+    { type: "family_member", label: "Family member", rich: false, next_step: null, entries: [
+      entry({ kind: "item", type: "family_member", id: "parent", value: { relation: "mother", wish: "Financial security" },
+        display: "Mother, Financial security", label: "Family member" }),
+    ] },
+    { type: "pressure", label: "Pressure", rich: false, next_step: "What weighs on your choice?", entries: [] },
+  ],
+  conflicts: [
+    { id: "c-city", kind: "fact", type: "location.current_city", entry_id: "city",
+      summary: "Two different answers for your current city.", question: "Which current city is right?",
+      current: "Islamabad", proposed: "Lahore", current_display: "Islamabad", proposed_display: "Lahore",
+      answers: ["keep_current", "accept_proposed", "both_true", "provide_new"] },
+    { id: "c-owner", kind: "document_owner", type: null, entry_id: null,
+      summary: "A document may belong to someone else.", question: "Is Result card.jpg your document?",
+      current: ["Sam Taylor"], proposed: ["Alex Doe"], current_display: "Sam Taylor", proposed_display: "Alex Doe",
+      answers: ["keep_current", "accept_proposed"] },
+  ],
+  stale: [],
+};
+export const vaultCatalog: VaultCatalog = { types: [
+  { key: "identity.full_name", label: "Full name", storage: "fact", shown_on: "details", section: "about",
+    inputs: ["chat", "details"], schema: { type: "string" }, choices: {} },
+  { key: "location.current_city", label: "Current city", storage: "fact", shown_on: "details", section: "about",
+    inputs: ["chat", "details"], schema: { type: "string" }, choices: {} },
+  { key: "education", label: "Education", storage: "record", shown_on: "details", section: "education", inputs: ["chat", "document", "details"],
+    schema: { type: "object", required: ["qualification_name"], properties: {
+      qualification_name: { type: "string" }, institution_name: { type: "string" }, academic_status: { type: "string" }, details: { type: "object" } } },
+    choices: { qualification_name: [{ code: "matric", label: "Matric" }, { code: "fsc", label: "FSc" }] } },
+  { key: "interest", label: "Interest", storage: "item", shown_on: "story", section: null, inputs: ["chat", "story"],
+    schema: { type: "object", required: ["text"], properties: { text: { type: "string" }, example: { type: "string" } } }, choices: {} },
+  { key: "family_member", label: "Family member", storage: "item", shown_on: "story", section: null, inputs: ["chat", "story"],
+    schema: { type: "object", required: ["relation"], properties: { relation: { type: "string" }, wish: { type: "string" }, lives_with: { type: "boolean" } } },
+    choices: { relation: [{ code: "father", label: "Father" }, { code: "mother", label: "Mother" }] } },
+  { key: "pressure", label: "Pressure", storage: "item", shown_on: "story", section: null, inputs: ["chat", "story"],
+    schema: { type: "object", required: ["text"], properties: { text: { type: "string" }, kind: { type: "string", enum: ["money", "time"] } } }, choices: {} },
+] };
 export const pathResult: PathResult = {
   possibility: possibilities[0],
   status: "completed",

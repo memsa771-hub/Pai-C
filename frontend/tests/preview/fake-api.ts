@@ -1,4 +1,4 @@
-import {picture,cards,possibilities,pathResult,programs} from '../fixtures/counselor';
+import {picture,vault,vaultCatalog,possibilities,pathResult,programs} from '../fixtures/counselor';
 export const calls:{method:string;args:unknown[]}[]=[];
 export const mirror={type:'mirror',version:1,status:'awaiting_confirmation',mirror:{
   intro:'Here is the picture I have so far.',confidence:'focused',
@@ -24,7 +24,7 @@ const richPrograms={status:'completed',missing:[],programs:[
 let searched=new URLSearchParams(location.search).has('programs'), prepared=new URLSearchParams(location.search).has('roadmap'), chosen=new URLSearchParams(location.search).has('family');
 const roadmap={id:'roadmap-one',journey_id:'journey-one',goal_id:null,title:'Practical design',origin:'stated_goal',route:{},
   fit_level:'partial',fit_dimensions:{},gaps:[],steps:[{action:'Try a small project'},{action:'Talk with a student on this route'},{action:'Read one course outline together with family'}],total_cost:null,time_to_start:null,risks:['Test the daily study before deciding.','Check the cost of materials.'],try_it:{kind:'taste_the_work',what:'Build a paper prototype of an everyday object and change it once.',time_needed:'About two hours',questions:['Which part did you enjoy most?']},scholarships:[],sources:[],generation_status:'ready',stale_reason:null,execution_run_id:'offline',version:1,favorite:false,exploring:true,dismissed_at:null,chosen_at:null,focused_at:null,created_at:'2026-10-18T12:00:00Z',updated_at:'2026-10-18T12:00:00Z'};
-const api={getCounselorWorkspace:async()=>picture,getProfileCards:async()=>({cards}),getPossibilities:async()=>prepared?possibilities.map(p=>p.id==='path-one'?{...p,roadmap_id:'roadmap-one'}:p):possibilities,
+const api={getCounselorWorkspace:async()=>picture,getVault:async()=>vault,getVaultCatalog:async()=>vaultCatalog,getPossibilities:async()=>prepared?possibilities.map(p=>p.id==='path-one'?{...p,roadmap_id:'roadmap-one'}:p):possibilities,
   getFamilyTalk:async()=>({ready:true,path_id:'path-one',path:'Practical design',message:'Prepare around what you know, without assuming that a concern has been resolved.',family:[{id:'person-one',role:'Parent',wish:'A dependable career',worry:'Whether the work will be stable',evidence:'My parent wants me to have dependable work.'}],evidence:[{id:'quote-one',quote:'I fixed a broken lamp with my friend.'}]}),
   prepareFamilyTalk:async()=>({event_id:'offline-family',script:'I understand that dependable work matters to you. I want to explore practical design. I fixed a broken lamp with my friend. I would like us to look at the evidence together before deciding.'}),
   acceptPathActivity:async()=>({scheduled:true}),
@@ -39,7 +39,8 @@ const api={getCounselorWorkspace:async()=>picture,getProfileCards:async()=>({car
   getRoadmaps:async()=>prepared?[{...roadmap,chosen_at:chosen?'2026-10-18T12:01:00Z':null}]:[],getStudentRequests:async()=>[],getCurrentDecision:async()=>chosen?{real_objective:'A path I can test in practice.'}:null,
   getCounselorRequests:async()=>[],getCounselorResearchStatus:async()=>null,getOperatorRun:async()=>null,
   loadMessageHistory:async()=>({events:[]}),pollMessages:async()=>({messages:[]}),editStudentProfile:async()=>({saved:true}),
-  answerFactCard:async()=>({saved:true}),reviewProfileCard:async()=>({saved:true}),
+  answerFactCard:async()=>({saved:true}),
+  addVaultEntry:async()=>({saved:true}),editVaultEntry:async()=>({saved:true}),confirmVaultEntry:async()=>({saved:true}),removeVaultEntry:async()=>({saved:true}),resolveVaultConflict:async()=>({resolved:true}),
   submitOnboarding:async()=>({completed:true,rejected:{},saved:[]}),
   listShares:async()=>[{id:'share-1',workspaceId:'offline',channelName:'pai-counselor',title:'My conversation with PAI',shareToken:'offline-token',messageCount:12,status:'active',createdAt:'2026-10-18T09:00:00Z'}],
 };
@@ -49,7 +50,7 @@ const emptyReads:Record<string,unknown>={
   getCounselorWorkspace:{coverage:Object.fromEntries(Object.keys(picture.coverage).map(k=>[k,{covered:false,item_count:0,evidence:null}])),
     personal:{world:{},self:[],source:[],pressures:{items:[]},sure:{score:null,history:[]}},capabilities:[],academic:{records:{}},sections:{},
     picture:null,mirror_status:null,moments:{},ratings:[]},
-  getProfileCards:{cards:[]},getPossibilities:[],getRoadmaps:[],getCurrentDecision:null,getCounselorSummary:{type:null,status:null,version:null},
+  getVault:{details:{},story:[],conflicts:[],stale:[]},getPossibilities:[],getRoadmaps:[],getCurrentDecision:null,getCounselorSummary:{type:null,status:null,version:null},
 };
 const read=(method:string)=>method.startsWith('get')&&method!=='getCounselorHealth'&&method!=='getFileUrl';
 export const workspaceApi=new Proxy(api,{get:(target,key)=>{const method=String(key);return (...args:unknown[])=>{calls.push({method,args});

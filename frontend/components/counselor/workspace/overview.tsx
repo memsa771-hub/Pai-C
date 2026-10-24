@@ -7,7 +7,7 @@ import { useCallback, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { ArrowRight, ChevronLeft, ChevronRight } from "lucide-react";
 import { workspaceApi } from "@/lib/api";
-import type { ProfileCard } from "@/lib/counselor-workspace";
+import { vaultEntries, type VaultEntry } from "@/lib/vault";
 import { cn } from "@/lib/utils";
 import { LoadState, useResource } from "./resource";
 import type { useJourney } from "./use-journey";
@@ -38,8 +38,9 @@ export function Overview({ journey, navigate, openPath, onChat }: {
   openPath: (id: string) => void;
   onChat: (topic?: string) => void;
 }) {
-  const loadCards = useCallback(() => workspaceApi.getProfileCards().then((r) => r.cards).catch(() => [] as ProfileCard[]), []);
-  const cards = useResource(loadCards);
+  // The Vault metric counts what the Vault holds; a failed read shows a dash, never blocks the overview.
+  const loadEntries = useCallback(() => workspaceApi.getVault().then(vaultEntries).catch(() => null as VaultEntry[] | null), []);
+  const vault = useResource(loadEntries);
   const [rec, setRec] = useState(0);
 
   if (!journey.data || journey.error || !journey.progress)
@@ -49,7 +50,7 @@ export function Overview({ journey, navigate, openPath, onChat }: {
   const progress = journey.progress;
   const total = copy.stages.length;
   const live = possibilities.filter((p) => p.status !== "dismissed");
-  const facts = (cards.data || []).filter((c) => !layout.hiddenKeys.includes(c.key));
+  const facts = (vault.data || []).filter((e) => !layout.hiddenKeys.includes(e.type));
   const missing = missingBasics(facts);
   const stage = progress.stage;
   const moment = "action" in stage ? picture.moments?.[stage.action!] : undefined;
@@ -68,7 +69,7 @@ export function Overview({ journey, navigate, openPath, onChat }: {
       action: moment ? copy.moment : fill(text.nextOpen, { view: copy.nav[stage.view as keyof typeof copy.nav] }),
       run: () => navigate(stage.view, moment),
     },
-    ...(missing.length && cards.data ? [{
+    ...(missing.length && vault.data ? [{
       key: "missing",
       title: fill(text.recMissingTitle, { count: missing.length }),
       body: `${text.recMissingBody} ${missing.slice(0, 3).map((m) => m.label).join(", ")}.`,
@@ -98,9 +99,9 @@ export function Overview({ journey, navigate, openPath, onChat }: {
           sub={live.length ? fill(text.metrics.pathsSub, { saved: live.filter((p) => p.status === "saved").length, exploring: live.filter((p) => p.status === "exploring" || p.status === "chosen").length }) : text.metrics.pathsNone} />
         <Metric label={text.metrics.journey} value={<>{progress.current}<span className="text-lg font-semibold text-muted-foreground"> / {total}</span></>}
           sub={fill(text.metrics.journeySub, { title: stage.title })} />
-        <Metric label={text.metrics.vault} value={cards.data ? facts.length : "–"}
-          sub={fill(text.metrics.vaultSub, { confirmed: facts.filter((c) => c.evidence_level === "confirmed").length })} />
-        <Metric tone="peach" label={text.metrics.attention} value={cards.data ? missing.length : "–"}
+        <Metric label={text.metrics.vault} value={vault.data ? facts.length : "–"}
+          sub={fill(text.metrics.vaultSub, { confirmed: facts.filter((e) => e.level === "confirmed").length })} />
+        <Metric tone="peach" label={text.metrics.attention} value={vault.data ? missing.length : "–"}
           sub={missing.length ? text.metrics.attentionSub : text.metrics.attentionNone} />
       </section>
 

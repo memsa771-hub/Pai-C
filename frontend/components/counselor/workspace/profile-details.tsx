@@ -1,32 +1,60 @@
 "use client";
-import { useId, useState } from "react";
-import { ChevronDown, Lock, MessageCircle, X } from "lucide-react";
+import { useState } from "react";
+import { FileText, RefreshCw } from "lucide-react";
 import { workspaceApi } from "@/lib/api";
-import type { EvidenceItem, LivingPicture, ProfileCard } from "@/lib/counselor-workspace";
+import { useWorkspace } from "@/lib/workspace-context";
+import { badgeLevel, vaultError, withChoiceLabels, type VaultCatalogType, type VaultChoice, type VaultDocument, type VaultEntry } from "@/lib/vault";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { EmptyState, EvidenceBadge, SectionCard, StatChip, evidenceLevel } from "@/components/pai";
-import { cn } from "@/lib/utils";
-import { human, evidenceLabel, shortDate } from "./resource";
-import { ICONS, areaIcon, areaTone, fill, kindLevel, text } from "./profile-parts";
+import { EvidenceBadge, vaultBadgeLabel } from "@/components/pai";
+import { human, shortDate } from "./resource";
+import { fill, text } from "./profile-parts";
 import copy from "./copy.json";
 import layout from "./profile-layout.json";
 import labels from "@/lib/evidence-labels.json";
 
-const matches = (key: string, patterns: string[]) =>
-  patterns.some((p) => (p.endsWith(".") ? key.startsWith(p) : key === p || key.startsWith(p + ".")));
-export const isSensitive = (key: string) => matches(key, layout.sensitive.keys);
-export function groupOf(card: ProfileCard) {
-  return layout.detailGroups.find((g) => g.keys.length && matches(card.key, g.keys)) || layout.detailGroups.at(-1)!;
+/** A field's label: the shared label list first, else its own words
+ * ("target_date" -> "Target date"), so no schema key is ever shown raw. */
+export function fieldLabel(key: string) {
+  const known = labels.labels[key as keyof typeof labels.labels];
+  if (known) return known;
+  const words = key.split(".").at(-1)!.replace(/_/g, " ").trim();
+  return words.charAt(0).toUpperCase() + words.slice(1);
 }
 
-function ValueEditor({ value, onChange, label }: { value: unknown; onChange: (value: unknown) => void; label: string }) {
+/** A choice code's words when no catalog label exists ("on_campus" -> "On campus"). */
+export const codeLabel = (code: string) => labels.values[code as keyof typeof labels.values] || fieldLabel(code);
+
+export const fieldClass = "mt-1 h-11 w-full rounded-xl";
+const selectClass = "mt-1 h-11 w-full rounded-xl border border-input bg-card px-3 text-sm shadow-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
+
+/** A select of catalog choices, styled like the page's inputs. */
+export function ChoiceSelect({ label, value, choices, onChange, required }: {
+  label: string; value: string; choices: VaultChoice[]; onChange: (code: string) => void; required?: boolean;
+}) {
+  return (
+    <label className="block text-sm font-medium">
+      {label}
+      <select className={selectClass} value={value} required={required} onChange={(e) => onChange(e.target.value)}>
+        <option value="">{text.choose}</option>
+        {choices.map((c) => <option key={c.code} value={c.code}>{c.label}</option>)}
+      </select>
+    </label>
+  );
+}
+
+/** Edits a stored value in its own shape. Fields with catalog choices are a
+ * select, so a correction stays a valid code. */
+export function ValueEditor({ value, onChange, label, choices = {}, path = "" }: {
+  value: unknown; onChange: (value: unknown) => void; label: string;
+  choices?: Record<string, VaultChoice[]>; path?: string;
+}) {
   if (value && typeof value === "object")
     return (
       <div className="grid gap-3 sm:grid-cols-2">
         {Object.entries(value).filter(([key]) => !labels.hidden.includes(key)).map(([key, item]) => (
-          <ValueEditor key={key} label={evidenceLabel(key)} value={item}
+          <ValueEditor key={key} label={Array.isArray(value) ? label : fieldLabel(key)} value={item} choices={choices}
+            path={Array.isArray(value) ? path : path ? `${path}.${key}` : key}
             onChange={(next) => onChange(Array.isArray(value)
               ? value.map((v, i) => (String(i) === key ? next : v))
               : { ...value, [key]: next })} />
@@ -40,10 +68,12 @@ function ValueEditor({ value, onChange, label }: { value: unknown; onChange: (va
         {label}
       </label>
     );
+  if (choices[path])
+    return <ChoiceSelect label={label} value={value === null || value === undefined ? "" : String(value)} choices={choices[path]} onChange={onChange} />;
   return (
     <label className="block text-sm font-medium">
       {label}
-      <Input className="mt-1 h-11 rounded-xl" value={value === null ? "" : String(value)} type={typeof value === "number" ? "number" : "text"}
+      <Input className={fieldClass} value={value === null || value === undefined ? "" : String(value)} type={typeof value === "number" ? "number" : "text"}
         onChange={(e) => onChange(typeof value === "number" ? Number(e.target.value) : e.target.value)} />
     </label>
   );
@@ -57,7 +87,7 @@ export function ReadableValue({ value }: { value: unknown }) {
       <dl className="grid gap-x-6 gap-y-1.5 sm:grid-cols-2">
         {rows.map(([key, v]) => (
           <div key={key} className="min-w-0">
-            <dt className="text-xs text-muted-foreground">{evidenceLabel(key)}</dt>
+            <dt className="text-xs text-muted-foreground">{fieldLabel(key)}</dt>
             <dd className="break-words text-sm font-medium">{human(v)}</dd>
           </div>
         ))}
@@ -67,186 +97,135 @@ export function ReadableValue({ value }: { value: unknown }) {
   return <p className="break-words text-sm font-semibold">{human(value)}</p>;
 }
 
-function sourceLine(card: ProfileCard) {
-  const date = shortDate(card.updated_at);
-  const template = card.evidence_level === "confirmed" ? text.sourceConfirmed
-    : card.source?.file_id ? text.sourceShown : text.sourceSaid;
-  return date ? fill(template, { date }) : text.sourceNoDate;
+/** Opens the Documents view on one file (the shell's own navigation). */
+export function useOpenDocument(onNavigate?: (view: string) => void) {
+  const { setSelectedFileId } = useWorkspace();
+  if (!onNavigate) return null;
+  return (fileId: string) => { setSelectedFileId(fileId); onNavigate("files"); };
 }
 
-/** The source of one Vault fact and the existing Confirm / Edit / Remove
- * review actions (exact digest, never a guess). */
-export function FactReview({ card, onSaved }: { card: ProfileCard; onSaved: () => void }) {
+/** A small file icon that opens the document behind a value. */
+export function DocumentLink({ document, open, className }: { document: VaultDocument; open: (fileId: string) => void; className?: string }) {
+  return (
+    <button type="button" onClick={() => open(document.file_id)} aria-label={fill(text.openDocument, { filename: document.filename })}
+      title={fill(text.openDocument, { filename: document.filename })}
+      className={`flex size-9 shrink-0 items-center justify-center rounded-full border text-muted-foreground transition-colors hover:border-primary hover:text-primary ${className || ""}`}>
+      <FileText aria-hidden className="size-4" />
+    </button>
+  );
+}
+
+/** The quiet re-check marker for a value whose freshness window has passed. */
+export function StaleMarker() {
+  return (
+    <p className="mt-1.5 flex items-center gap-1.5 text-xs font-semibold text-muted-foreground">
+      <RefreshCw aria-hidden className="size-3.5" />{text.staleMarker}
+    </p>
+  );
+}
+
+/** The badge for an entry: its level, or "In question" while a card asks. */
+export function EntryBadge({ entry, compact }: { entry: VaultEntry; compact?: boolean }) {
+  const level = badgeLevel(entry);
+  return <EvidenceBadge compact={compact} level={level} label={vaultBadgeLabel(level)} />;
+}
+
+/** The entry with its choice codes read as words. */
+export const readable = (entry: VaultEntry, type?: VaultCatalogType | null) => withChoiceLabels(entry.value, type);
+
+function sourceLine(entry: VaultEntry) {
+  const date = shortDate(entry.level === "confirmed" ? entry.confirmed_at || entry.observed_at : entry.observed_at);
+  const template = { confirmed: text.sourceConfirmed, shown: text.sourceShown, inferred: text.sourceGuess, stated: text.sourceSaid }[entry.level];
+  return date ? fill(template, { date }) : entry.level === "inferred" ? text.sourceGuessNoDate : text.sourceNoDate;
+}
+
+/** Where one Vault entry came from, what disagrees with it, and the
+ * student's Confirm / Edit / Remove through the Vault API. A refused write
+ * shows the backend's own sentence (for example the household-income rule). */
+export function FactReview({ entry, type, onSaved, openDocument }: {
+  entry: VaultEntry;
+  type: VaultCatalogType | null;
+  onSaved: () => void;
+  openDocument: ((fileId: string) => void) | null;
+}) {
   const [editing, setEditing] = useState(false),
     [removing, setRemoving] = useState(false),
-    [value, setValue] = useState(card.value),
-    [note, setNote] = useState(""),
+    [value, setValue] = useState(entry.value),
     [busy, setBusy] = useState(false),
-    [error, setError] = useState(false);
-  const label = evidenceLabel(card.key);
-  async function review(action: "confirm" | "edit" | "remove") {
+    [error, setError] = useState<string | null>(null);
+  // A file's own record changes in Documents; adding and editing are for catalog types only.
+  const fromFile = layout.fileRecordTypes.includes(entry.type);
+  const canEdit = !!type && !fromFile;
+  async function run(action: "confirm" | "edit" | "remove") {
     setBusy(true);
-    setError(false);
+    setError(null);
     try {
-      await workspaceApi.reviewProfileCard(card, {
-        submission_id: crypto.randomUUID(),
-        action,
-        expected_digest: card.digest,
-        value: action === "edit" ? value : null,
-        text: note,
-      });
+      if (action === "confirm") await workspaceApi.confirmVaultEntry(entry.kind, entry.id);
+      else if (action === "edit") await workspaceApi.editVaultEntry(entry.kind, entry.id, value);
+      else await workspaceApi.removeVaultEntry(entry.kind, entry.id);
       setEditing(false);
       setRemoving(false);
       onSaved();
-    } catch {
-      setError(true);
+    } catch (failure) {
+      setError(vaultError(failure) || text.saveFailed);
     } finally {
       setBusy(false);
     }
   }
   return (
     <div className="space-y-3">
-      <div className="rounded-xl bg-muted/60 px-4 py-3 text-sm">
-        <p className="text-xs font-semibold text-muted-foreground">{sourceLine(card)}</p>
-        {/* The student's raw words stay backend evidence: the workspace shows only the stored value, in the workspace language. */}
-      </div>
-      {editing && (
-        <div className="space-y-3">
-          <ValueEditor value={value} onChange={setValue} label={label} />
-          <label className="block text-sm font-medium">{copy.explainEdit}
-            <Textarea className="mt-1 rounded-xl" value={note} onChange={(e) => setNote(e.target.value)} />
-          </label>
+      <div className="space-y-2 rounded-xl bg-muted/60 px-4 py-3 text-sm">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <p className="text-xs font-semibold text-muted-foreground">{sourceLine(entry)}</p>
+          <EntryBadge entry={entry} />
         </div>
+        {entry.document && openDocument && (
+          <button type="button" onClick={() => openDocument(entry.document!.file_id)}
+            className="flex items-center gap-1.5 text-xs font-semibold text-primary hover:underline">
+            <FileText aria-hidden className="size-3.5" />{fill(text.openDocument, { filename: entry.document.filename })}
+          </button>
+        )}
+        {entry.stale && <p className="text-xs text-muted-foreground"><span className="font-semibold">{text.staleMarker}.</span> {text.staleHelp}</p>}
+        {/* The student's raw words stay backend evidence: the page shows only the stored English value. */}
+      </div>
+      {entry.disagreements.length > 0 && (
+        <ul className="space-y-2 rounded-xl border border-warning/40 px-4 py-3 text-sm">
+          {entry.disagreements.map((d, i) => (
+            <li key={i} className="flex items-center justify-between gap-3">
+              <span>{fill(d.document ? text.disagreeDocument : text.disagreeOther, { display: d.display })}</span>
+              {d.document && openDocument && <DocumentLink document={d.document} open={openDocument} />}
+            </li>
+          ))}
+        </ul>
       )}
+      {fromFile && <p className="text-sm text-muted-foreground">{text.fileRecordNote}</p>}
+      {editing && <ValueEditor value={value} onChange={setValue} label={entry.label} choices={type?.choices} />}
       {removing && (
         <div className="rounded-xl border border-danger/30 bg-danger-soft p-4 text-sm text-danger-ink">
           <p>{copy.removeHelp}</p>
           <div className="mt-3 flex flex-wrap gap-2">
-            <Button size="tap" variant="destructive" disabled={busy} onClick={() => review("remove")}>{copy.removeConfirm}</Button>
+            <Button size="tap" variant="destructive" disabled={busy} onClick={() => run("remove")}>{copy.removeConfirm}</Button>
             <Button size="tap" variant="ghost" onClick={() => setRemoving(false)}>{copy.cancel}</Button>
           </div>
         </div>
       )}
-      {error && <p role="alert" className="text-sm font-medium text-danger-ink">{copy.error}</p>}
-      {!removing && (
+      {error && <p role="alert" className="text-sm font-medium text-danger-ink">{error}</p>}
+      {!removing && !fromFile && (
         <div className="flex flex-wrap gap-2">
           {editing ? (
             <>
-              <Button size="tap" disabled={busy || !note.trim()} onClick={() => review("edit")}>{copy.save}</Button>
-              <Button size="tap" variant="ghost" onClick={() => setEditing(false)}>{copy.cancel}</Button>
+              <Button size="tap" disabled={busy || JSON.stringify(value) === JSON.stringify(entry.value)} onClick={() => run("edit")}>{copy.save}</Button>
+              <Button size="tap" variant="ghost" onClick={() => { setEditing(false); setValue(entry.value); }}>{copy.cancel}</Button>
             </>
           ) : (
             <>
-              <Button size="tap" disabled={busy} onClick={() => review("confirm")}>{copy.confirm}</Button>
-              <Button size="tap" variant="outline" onClick={() => setEditing(true)}>{copy.edit}</Button>
+              <Button size="tap" disabled={busy} onClick={() => run("confirm")}>{copy.confirm}</Button>
+              {canEdit && <Button size="tap" variant="outline" onClick={() => setEditing(true)}>{copy.edit}</Button>}
               <Button size="tap" variant="ghost" onClick={() => setRemoving(true)}>{copy.remove}</Button>
             </>
           )}
         </div>
       )}
-    </div>
-  );
-}
-
-/** One Vault fact as a readable row. Tap for its source and review actions. */
-export function FactRow({ card, onSaved, hidden = false }: { card: ProfileCard; onSaved: () => void; hidden?: boolean }) {
-  const [open, setOpen] = useState(false);
-  const panel = useId();
-  const label = evidenceLabel(card.key);
-  return (
-    <li className="border-b last:border-b-0">
-      <button type="button" onClick={() => setOpen(!open)} aria-expanded={open} aria-controls={panel}
-        className="flex min-h-14 w-full items-start gap-3 py-3 text-left">
-        <span className="sr-only">{fill(text.expand, { label })}: </span>
-        <div className="min-w-0 flex-1 sm:grid sm:grid-cols-[minmax(8rem,14rem)_1fr] sm:gap-4">
-          <p className="text-sm text-muted-foreground">{label}</p>
-          {hidden ? <p className="flex items-center gap-1.5 text-sm italic text-muted-foreground"><Lock aria-hidden className="size-3.5" />{text.sensitiveHidden}</p>
-            : <div className="mt-0.5 sm:mt-0"><ReadableValue value={card.value} /></div>}
-        </div>
-        <EvidenceBadge level={evidenceLevel(card.evidence_level)} />
-        <ChevronDown aria-hidden className={cn("mt-0.5 size-5 shrink-0 text-muted-foreground transition-transform", open && "rotate-180")} />
-      </button>
-      <div id={panel} hidden={!open} className="pb-4 sm:ps-[calc(14rem+1rem)]">
-        {open && <FactReview card={card} onSaved={onSaved} />}
-      </div>
-    </li>
-  );
-}
-
-export const at = (data: unknown, path: string): EvidenceItem[] => {
-  const value = path.split(".").reduce<unknown>((node, key) => (node && typeof node === "object" ? (node as Record<string, unknown>)[key] : undefined), data);
-  return Array.isArray(value) ? value as EvidenceItem[] : [];
-};
-
-/** Read-only rows for what the student shared in conversation (not Vault
- * facts), so every area has a readable home. Changes go through PAI. */
-function SharedGroup({ area, items, hidden, onChat }: { area: string; items: EvidenceItem[]; hidden: boolean; onChat: (topic?: string) => void }) {
-  const label = copy.areas[area as keyof typeof copy.areas] || evidenceLabel(area);
-  return (
-    <SectionCard title={fill(text.sharedTitle, { area: label })} description={text.sharedNote} icon={areaIcon(area)} tone={areaTone(area)}
-      action={<Button size="tap" variant="soft" onClick={() => onChat(label)}><MessageCircle aria-hidden />{text.tellPai}</Button>}>
-      {!items.length ? <p className="text-sm text-muted-foreground">{text.areaEmpty}</p> : (
-        <ul className="divide-y">
-          {items.map((item, i) => {
-            const value = human(item.value || [item.role, item.wish]);
-            return (
-              <li key={item.id || i} className="flex items-start gap-3 py-3">
-                <div className="min-w-0 flex-1">
-                  {hidden ? <p className="flex items-center gap-1.5 text-sm italic text-muted-foreground"><Lock aria-hidden className="size-3.5" />{text.sensitiveHidden}</p>
-                    : <>
-                      <p className="break-words text-sm font-semibold">{value}</p>
-                      {item.evidence && <p className="mt-1 text-sm text-muted-foreground">“{item.evidence}”</p>}
-                      {item.category && <p className="mt-1 text-xs text-muted-foreground">{copy.whoseWish}: {copy.wishSources[item.category as keyof typeof copy.wishSources] || copy.wishSources.other}</p>}
-                    </>}
-                </div>
-                <EvidenceBadge level={kindLevel(item.kind)} />
-              </li>
-            );
-          })}
-        </ul>
-      )}
-    </SectionCard>
-  );
-}
-
-export function DetailsView({ picture, cards, filter, onFilter, showPrivate, onSaved, onChat }: {
-  picture: LivingPicture;
-  cards: ProfileCard[];
-  filter: string | null;
-  onFilter: (area: string | null) => void;
-  showPrivate: boolean;
-  onSaved: () => void;
-  onChat: (topic?: string) => void;
-}) {
-  const groups = layout.detailGroups
-    .map((group) => ({ group, rows: cards.filter((card) => groupOf(card).id === group.id) }))
-    .filter(({ group, rows }) => rows.length && (!filter || group.areas.includes(filter)));
-  const shared = layout.sharedGroups.filter((g) => !filter || g.area === filter);
-  const filterLabel = filter ? copy.areas[filter as keyof typeof copy.areas] : null;
-  return (
-    <div className="space-y-5">
-      <p className="text-sm text-muted-foreground">{text.detailsIntro}</p>
-      {filterLabel && (
-        <div className="flex flex-wrap items-center gap-2">
-          <StatChip tone={areaTone(filter!)} icon={areaIcon(filter!)}>{fill(text.filterBy, { area: filterLabel })}</StatChip>
-          <Button size="tap" variant="ghost" onClick={() => onFilter(null)}><X aria-hidden />{text.clearFilter}</Button>
-        </div>
-      )}
-      {groups.map(({ group, rows }) => (
-        <SectionCard key={group.id} title={group.title} icon={ICONS[group.icon]} tone={areaTone(group.areas[0] || "status")}>
-          <ul>
-            {rows.map((card) => <FactRow key={card.id} card={card} onSaved={onSaved} hidden={!showPrivate && isSensitive(card.key)} />)}
-          </ul>
-        </SectionCard>
-      ))}
-      {filter && !groups.length && !shared.length && (
-        <EmptyState icon={areaIcon(filter)} tone={areaTone(filter)} title={filterLabel || ""} description={text.areaEmpty}
-          action={<Button size="tap" onClick={() => onChat(filterLabel || undefined)}><MessageCircle aria-hidden />{text.tellPai}</Button>} />
-      )}
-      {shared.map(({ area, source }) => (
-        <SharedGroup key={area} area={area} items={at(picture, source)} onChat={onChat}
-          hidden={!showPrivate && layout.sensitive.areas.includes(area)} />
-      ))}
     </div>
   );
 }

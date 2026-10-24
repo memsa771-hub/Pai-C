@@ -42,7 +42,6 @@
   "cancel": "Cancel",
   "save": "Save",
   "saved": "Saved",
-  "explainEdit": "What should PAI know about this correction?",
   "confirmation": "I confirm this is accurate",
   "review": "Review this fact",
   "upload": "Upload a result card",
@@ -248,8 +247,8 @@
       "tone": "rose"
     }
   ],
-  "removeHelp": "Remove this active fact from your profile? Its evidence remains in your private history.",
-  "removeConfirm": "Yes, remove this fact",
+  "removeHelp": "Remove this from your Vault? It stays in your private history and comes back only if you share it again.",
+  "removeConfirm": "Yes, remove it",
   "deleteHelp": "This will permanently delete your account and all your data.",
   "deleteNow": "Delete my account",
   "deleteNeedsSignIn": "For your safety, sign in again, then delete your account.",
