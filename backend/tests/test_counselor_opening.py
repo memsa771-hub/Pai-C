@@ -92,4 +92,4 @@ def test_prefixed_identity_is_in_never_ask_block():
         db.commit()
         profile = _profile(db, student.workspace_id)
         assert profile["identity_never_ask"]["identity.preferred_name"]["value"] == "Alex"
-        assert "identity.preferred_name" not in profile["facts"]
+        assert "identity.preferred_name" not in {entry["type"] for entry in profile["entries"]}

@@ -170,6 +170,9 @@ class VaultCatalog:
                 if (storage is None or t.storage == storage)
                 and (shown_on is None or t.shown_on == shown_on)]
 
+    def choice_names(self) -> list[str]:
+        return list(self._choices)
+
     def choices(self, name: str) -> list[Choice]:
         return list(self._choices.get(name, ()))
 

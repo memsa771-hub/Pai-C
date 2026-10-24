@@ -199,6 +199,9 @@ def build_user_prompt(turn, field_specs=None) -> str:
         parts.append("EXISTING RECORDS (reuse the exact id when updating; do not duplicate):\n"
                      + json.dumps(turn.records, ensure_ascii=False))
 
+    if getattr(turn, "items", None):
+        parts.append("EXISTING VAULT ITEMS (to correct one, name its exact id in entities.item_id):\n"
+                     + json.dumps(turn.items, ensure_ascii=False))
     if turn.vault:
         parts.append(
             "EXISTING PROFILE (do not re-propose these unless corrected):\n"
@@ -659,11 +662,17 @@ def _validate(raw: dict, turn, allowed_vault_keys: set[str],
             validate_schema_instance(spec.schema, value)
         except SchemaValidationError as exc:
             return drop(f"{key} item invalid: {exc}")
-        # Item ids are not in the turn context; only the student's own edit
-        # names one, so a model-supplied id is never passed on.
+        # An id is passed on only when it names one of this student's items of
+        # this type that the turn context showed, as record ids are.
+        clean_entities = {}
+        if "item_id" in entities:
+            known = {row["id"] for row in (getattr(turn, "items", None) or []) if row.get("type") == key}
+            if not isinstance(entities["item_id"], str) or entities["item_id"] not in known:
+                return drop("item reference was not in this student's context")
+            clean_entities["item_id"] = entities["item_id"]
         return ExtractedCandidate(
             candidate_type="vault_item", operation="upsert", key=key,
-            proposed_value=value, content=None, entities={},
+            proposed_value=value, content=None, entities=clean_entities,
             confidence=confidence, evidence=evidence,
         )
 

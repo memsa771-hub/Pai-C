@@ -13,6 +13,8 @@ What the extractor gets instead:
     a few prior turns         bounded — to resolve "that country", "same budget"
     the Vault snapshot        so it can tell a correction from a restatement
     a few existing memories   so it does not re-propose what we already know
+    the active Vault items    compact (type, id, display), so a correction can
+                              name the item it corrects
 
 Everything is loaded from PostgreSQL by event ID, so the job row stays small.
 """
@@ -47,6 +49,7 @@ class TurnContext:
     recent: list[dict] = field(default_factory=list)      # [{role, text}]
     vault: dict = field(default_factory=dict)
     records: dict = field(default_factory=dict)
+    items: list[dict] = field(default_factory=list)       # [{type, id, display}]
     existing_memories: list[str] = field(default_factory=list)
 
     def is_empty(self) -> bool:
@@ -161,8 +164,25 @@ def build_turn_context(
     context.vault = VaultService(db).snapshot(workspace_id, include_sensitive=True)
     from .student_records import StudentRecordService
     context.records = StudentRecordService(db).snapshot(workspace_id, limit=12)
+    context.items = vault_items_for_extraction(db, workspace_id, context.user_text)
     context.existing_memories = [
         m.content
         for m in MemoryService(db).list_memories(workspace_id, limit=MAX_EXISTING_MEMORIES)
     ]
     return context
+
+
+def vault_items_for_extraction(db, workspace_id: str, user_text: str) -> list[dict]:
+    """The student's active Vault items most relevant to this turn, by the
+    counselor's selector, in the compact form the extractor needs. The
+    extractor already sees sensitive facts, so sensitive items come too; no
+    evidence is carried, so no earlier quote reaches the prompt."""
+    from .vault_context import context_policy, select_context_entries
+    from .vault_view import VaultView
+
+    policy = context_policy()
+    view = VaultView(db).build(workspace_id, include_sensitive=True)
+    return [{"type": entry["type"], "id": entry["id"], "display": entry["display"]}
+            for entry in select_context_entries(
+                view, user_text, kinds={"item"}, budget_tokens=policy["extraction_budget_tokens"],
+                limit=policy["extraction_max_entries"])]

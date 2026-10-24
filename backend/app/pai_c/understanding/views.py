@@ -30,7 +30,17 @@ def _strength(row):
     return _KIND_LEVEL.get(row.get("kind"), "stated")
 
 
-def coverage_areas(notebook, snapshot):
+def _item_row(item):
+    """A Vault item as a coverage row: its English fields plus what the area
+    filters read. A guess (inferred) is not evidence of coverage."""
+    return {**(item.value or {}), "id": item.id, "status": item.status,
+            "evidence": item.evidence if item.level != "inferred" else None,
+            "evidence_level": item.level, "last_confirmed": item.confirmed_at,
+            "updated_at": item.updated_at or item.observed_at}
+
+
+def coverage_areas(notebook, snapshot, items=()):
+    """`items` are the active Vault items; areas.json names their types."""
     data = notebook.model_dump(mode="json")
     areas = json.loads((DATA_DIR / "areas.json").read_text(encoding="utf-8"))
     result = {}
@@ -42,6 +52,9 @@ def coverage_areas(notebook, snapshot):
                 rows = [("fact:" + key, row) for key, row in snapshot.facts.items()
                         if key in location.get("vault_fields", []) or
                         any(key.startswith(prefix) for prefix in location.get("vault_field_prefixes", []))]
+            elif "vault_items" in location:
+                rows = [("item:" + str(item.id), _item_row(item)) for item in items
+                        if item.item_type in location["vault_items"]]
             elif "vault_records" in location:
                 rows = [(kind + ":" + str(row["id"]), row) for kind in location["vault_records"] for row in snapshot.records.get(kind, [])]
             else:

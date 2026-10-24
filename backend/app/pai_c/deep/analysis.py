@@ -183,7 +183,7 @@ def _input(db, workspace_id: str, student: EventRecord, assistant: EventRecord,
             + "</notebook_schema>\n"
             + "<understanding_spine>" + capabilities + "</understanding_spine>\n"
             + view.text + "\n<dismissed_possibilities>" + _json(dismissed) + "</dismissed_possibilities>\n"
-            + "<profile>" + _json(_profile(db, workspace_id)) + "</profile>\n"
+            + "<profile>" + _json(_profile(db, workspace_id, student_text=(student.payload or {}).get("content") or "")) + "</profile>\n"
             + "<older_episode_summary>" + _json(episode[0].summary if episode else "")
             + "</older_episode_summary>\n"
             + "<transcript>" + _json(transcript) + "</transcript>\n"

@@ -239,9 +239,12 @@ async def test_planner_rejects_whole_patch_with_objective_item_without_reference
 
 
 def test_snapshot_ids_are_available_for_vault_references():
-    from types import SimpleNamespace
     from app.pai_c.deep.context import _profile
-    db = SimpleNamespace(get=lambda *args: None)
-    snapshot = SimpleNamespace(facts={"objective.fact": {"id": "fact-id", "value": "Fact", "source_type": "document"}}, records={}, issues=[])
-    with patch.object(MemoryService, "profile", return_value=snapshot):
-        assert _profile(db, "workspace")["facts"]["objective.fact"]["id"] == "fact-id"
+    from app.memory.vault import VaultService
+    from scripts.eval_vault import VaultSession
+    with VaultSession() as student, student.factory() as db:
+        fact = VaultService(db).apply_fact(student.workspace_id, "location.current_city", "Multan", "document")
+        db.commit()
+        entries = _profile(db, student.workspace_id)["entries"]
+        assert {"id": fact.fact.id, "type": "location.current_city"}.items() <= next(
+            e for e in entries if e["type"] == "location.current_city").items()

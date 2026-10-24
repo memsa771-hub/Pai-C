@@ -28,7 +28,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from functools import lru_cache
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Iterable, Optional
 
 from sqlalchemy import select
 
@@ -140,13 +140,22 @@ class VaultView:
     # ---- the view ----------------------------------------------------------
 
     def build(self, workspace_id: str, *, include_sensitive: bool = True,
-              now: Optional[datetime] = None) -> dict:
+              now: Optional[datetime] = None, sensitive_types: Iterable[str] = ()) -> dict:
+        """`sensitive_types` lets a counselor view show a sensitive type the
+        turn needs (spec Access) while every other sensitive type and every
+        restricted one stays hidden."""
         copy = view_copy()
+        allowed = set(sensitive_types)
+
+        def hidden(type_key: Optional[str], sensitivity: str) -> bool:
+            if include_sensitive or sensitivity not in HIDDEN_WHEN_NOT_SENSITIVE:
+                return False
+            return not (sensitivity == "sensitive" and type_key in allowed)
+
         issues = self._open_issues(workspace_id)
         files = self._files(workspace_id)
         rows = self._rows(workspace_id, issues, files, _aware(now) or datetime.now(timezone.utc))
-        if not include_sensitive:
-            rows = [r for r in rows if r.sensitivity not in HIDDEN_WHEN_NOT_SENSITIVE]
+        rows = [r for r in rows if not hidden(r.entry["type"], r.sensitivity)]
 
         details = {s["key"]: {"label": s["label"], "entries": []} for s in copy["sections"]}
         for row in rows:
@@ -155,7 +164,7 @@ class VaultView:
 
         story = []
         for spec in self.catalog.types(shown_on="story"):
-            if not include_sensitive and spec.sensitivity in HIDDEN_WHEN_NOT_SENSITIVE:
+            if hidden(spec.key, spec.sensitivity):
                 continue
             entries = [r.entry for r in rows if r.section is None and r.entry["type"] == spec.key]
             story.append({
@@ -169,8 +178,8 @@ class VaultView:
         return {
             "details": details,
             "story": story,
-            "conflicts": [card for card, sensitivity in cards if sensitivity != NEVER_SHOWN and (
-                include_sensitive or sensitivity not in HIDDEN_WHEN_NOT_SENSITIVE)],
+            "conflicts": [card for card, sensitivity in cards if sensitivity != NEVER_SHOWN
+                          and not hidden(card["type"], sensitivity)],
             "stale": [r.entry for r in rows if r.entry["stale"]],
         }
 

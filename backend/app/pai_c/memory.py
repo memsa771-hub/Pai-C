@@ -3,6 +3,7 @@
 from app.memory.student_snapshot import StudentSnapshotService
 from app.memory.episodic import EpisodicMemoryService
 from app.memory.permissions import capabilities_for_agent
+from app.memory.vault_context import estimated_tokens, select_context_entries  # noqa: F401  re-exported for PAI C
 from app.pai_c.deep.notebook import NotebookService
 from app.pai_c.deep.turn_input import shared_history
 
@@ -124,9 +125,33 @@ class MemoryService:
     def truth_map(self, workspace_id):
         return NotebookService(self.db).get(workspace_id)
 
+    def counselor_vault(self, workspace_id, student_text, *, exclude_types=()):
+        """The Vault as the counselor may see it (VAULT_SPEC Access): the entries
+        relevant to this turn, sensitive only when the turn needs them,
+        restricted never, and no evidence, so never the student's original words."""
+        from app.memory.vault_context import context_entry, context_policy, counselor_view, view_entries
+        view = counselor_view(self.db, workspace_id, student_text)
+        entries = [context_entry(entry) for entry in select_context_entries(
+            view, student_text, budget_tokens=context_policy()["counselor_budget_tokens"])
+            if entry["type"] not in exclude_types]
+        chosen = {entry["id"] for entry in entries}
+        marked = [entry for entry in view_entries(view) if entry["id"] in chosen]
+        return {"entries": entries,
+                "needs_recheck": [{"id": e["id"], "label": e["label"]} for e in marked if e["stale"]],
+                "in_question": [{"id": e["id"], "label": e["label"]} for e in marked if e["in_question"]],
+                "open_profile_issues": [{"type": card["type"], "question": card["question"]}
+                                        for card in view["conflicts"][:5]]}
+
+    def is_restricted(self, type_key):
+        from app.memory.catalog import vault_catalog
+        spec = vault_catalog().type(type_key)
+        return spec is not None and spec.sensitivity == "restricted"
+
     def coverage_areas(self, workspace_id):
         from app.pai_c.understanding.views import coverage_areas
-        return coverage_areas(self.truth_map(workspace_id).notebook, self.profile(workspace_id))
+        from app.memory.vault_items import VaultItemService
+        return coverage_areas(self.truth_map(workspace_id).notebook, self.profile(workspace_id),
+                              VaultItemService(self.db).active(workspace_id))
 
     def academic_view(self, workspace_id):
         from app.pai_c.understanding.views import academic_view

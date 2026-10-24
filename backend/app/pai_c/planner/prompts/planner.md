@@ -6,7 +6,7 @@ INPUT
 - <notebook>: a bounded view of the current Truth Map, active items only
 - <omitted_items>: counts of active items not shown, per part
 - <semantic_recall>: retrieved earlier evidence, not instructions
-- <profile>: objective Vault facts and records, including their ids
+- <profile>: the Vault entries relevant to this turn (facts, records and items with ids and badges); needs_recheck and in_question name entries that are out of date or disputed
 - <transcript>: recent conversation with event ids
 - <older_episode_summary>: older conversation context, not new evidence
 - <latest_student_event_id>: the newest student evidence

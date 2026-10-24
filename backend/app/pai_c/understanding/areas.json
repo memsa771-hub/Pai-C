@@ -21,6 +21,11 @@
       },
       {
         "path": "world.daily_life"
+      },
+      {
+        "vault_items": [
+          "daily_life"
+        ]
       }
     ]
   },
@@ -58,6 +63,12 @@
       },
       {
         "path": "world.daily_life"
+      },
+      {
+        "vault_items": [
+          "interest",
+          "daily_life"
+        ]
       }
     ]
   },
@@ -78,6 +89,11 @@
           "certification",
           "achievement"
         ]
+      },
+      {
+        "vault_items": [
+          "strength"
+        ]
       }
     ]
   },
@@ -89,6 +105,11 @@
       },
       {
         "path": "world.social"
+      },
+      {
+        "vault_items": [
+          "family_member"
+        ]
       }
     ]
   },
@@ -104,6 +125,11 @@
       },
       {
         "path": "source"
+      },
+      {
+        "vault_items": [
+          "value"
+        ]
       }
     ]
   },
@@ -116,6 +142,17 @@
       {
         "path": "world.people",
         "nonempty": "worry"
+      },
+      {
+        "vault_items": [
+          "pressure"
+        ]
+      },
+      {
+        "vault_items": [
+          "family_member"
+        ],
+        "nonempty": "concern"
       }
     ]
   },
@@ -126,6 +163,11 @@
         "path": "sure",
         "not_null": "score",
         "timestamp": "asked_at"
+      },
+      {
+        "vault_items": [
+          "certainty"
+        ]
       }
     ]
   },
@@ -151,6 +193,17 @@
       {
         "path": "world.people",
         "nonempty": "wish"
+      },
+      {
+        "vault_records": [
+          "goal"
+        ]
+      },
+      {
+        "vault_items": [
+          "family_member"
+        ],
+        "nonempty": "wish"
       }
     ]
   },
@@ -162,6 +215,12 @@
         "key_prefixes": [
           "option.",
           "myth."
+        ]
+      },
+      {
+        "vault_items": [
+          "option",
+          "myth"
         ]
       }
     ]

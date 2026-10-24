@@ -1,0 +1,50 @@
+{
+  "_about": "Which Vault entries a model sees for one turn (VAULT_SPEC Access: counselor gets relevant entries, sensitive only when needed, restricted never). Read by app/memory/vault_context.py.",
+  "core_types": [
+    "identity.preferred_name",
+    "identity.current_status",
+    "identity.status_category",
+    "location.current_country",
+    "location.current_city",
+    "education",
+    "goal"
+  ],
+  "counselor_budget_tokens": 1500,
+  "extraction_budget_tokens": 1200,
+  "extraction_max_entries": 40,
+  "sensitive_topics": {
+    "family": {
+      "words": ["family", "parent", "parents", "ghar", "gharwale", "gharwalay", "khandan", "walidain"],
+      "choices": ["relations"],
+      "types": ["family_member", "pressure", "external_influence"]
+    },
+    "money": {
+      "words": ["money", "fee", "fees", "budget", "afford", "cost", "costs", "expensive", "scholarship",
+                "funding", "loan", "sponsor", "paisa", "paise", "paisay", "kharcha", "kharch", "lakh", "rupees", "mehenga", "mehnga"],
+      "choices": ["budget_bands", "budget_covers"],
+      "types": ["finance.budget", "finance.funding_status", "finance.scholarship_interest", "pressure",
+                "financial_sponsor", "scholarship_application"]
+    },
+    "pressure": {
+      "words": ["pressure", "stress", "stressed", "worry", "worried", "scared", "afraid", "tension", "pareshan",
+                "pareshani", "fikar", "fikr", "dar", "darr", "ghabrahat"],
+      "choices": [],
+      "types": ["pressure"]
+    },
+    "place": {
+      "words": ["domicile", "quota", "province", "seat", "seats", "reserved", "merit"],
+      "choices": ["provinces", "quotas"],
+      "types": ["domicile", "quota"]
+    }
+  },
+  "roman_urdu_words": {
+    "shauq": "interest", "shoq": "interest", "parhai": "study", "parhna": "study",
+    "kaam": "work", "naukri": "job", "nokri": "job", "kamai": "work", "khel": "sport", "khoobi": "strength", "kamzori": "weakness", "dost": "friend", "dosti": "friend", "sapna": "goal",
+    "khwab": "goal", "maqsad": "goal", "imtihan": "test", "imtehan": "test", "nambar": "marks",
+    "uni": "university", "yaqeen": "sure", "pakka": "sure"
+  },
+  "stopwords": ["the", "and", "for", "you", "your", "with", "this", "that", "are", "was", "but", "not", "have",
+                "has", "had", "want", "what", "about", "from", "they", "them", "very", "just", "like", "yes",
+                "hai", "hain", "nahi", "nahin", "mera", "meri", "mere", "mujhe", "main", "mein", "aur", "kya",
+                "bhi", "kar", "raha", "rahi", "tha", "thi", "bohat", "bahut", "lekin", "wala", "wali"]
+}
