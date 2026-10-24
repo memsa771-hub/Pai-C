@@ -2198,8 +2198,8 @@ product/deployment limitations are recorded in BLOCKERS.md and DECISIONS.md.
 
 Added data: paths/policy.json, reliability.json, policy/inline_cards.json,
 understanding/profile_sections.json and frontend workspace copy/settings data.
-The entry-level catalog supplied by the board is in memory/entry_fields.json;
-Other is editable. Missing board/subject catalogs use text/upload, never invented
+The entry-level catalog is the Vault catalog (memory/catalog/vault_catalog.json,
+the `levels` list and the types marked `onboarding`); Other is editable. Missing board/subject catalogs use text/upload, never invented
 options. The seasonal rules and reviewed occupational-source packs have no
 invented authoritative entries. See BUILD_REPORT_V1.md for partial board items.
 
