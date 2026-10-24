@@ -23,3 +23,6 @@ backups/
 
 # Mounted credentials (Firebase service account); never committed.
 secrets/
+
+# Subagent-driven development workspaces
+.superpowers/
