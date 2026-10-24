@@ -212,37 +212,50 @@ def _is_education(finding) -> bool:
     return finding.candidate_type == "student_record" and finding.key == "education"
 
 
-def _name_tokens(value) -> frozenset:
-    from app.memory.catalog import norm
+def _names(pairs) -> dict:
+    """{"full": [...], "preferred": [...]} from (key, value) pairs."""
+    out: dict = {"full": [], "preferred": []}
+    for key, value in pairs:
+        if isinstance(value, dict):
+            value = value.get("value")
+        if isinstance(value, str) and value.strip():
+            out["full" if key == "identity.full_name" else "preferred"].append(value.strip())
+    return out
 
-    return frozenset(norm(value).split()) if isinstance(value, str) else frozenset()
 
+def _owner_mismatch(db, workspace_id: str, understanding) -> dict | None:
+    """The names on the document and the student's names, when no pair agrees.
 
-def _owner_mismatch(db, workspace_id: str, findings) -> dict | None:
-    """The names on the document and in the Vault, when no pair agrees.
-
-    One name may be part of the other ("Ali Khan" on a result card, "Muhammad
-    Ali Khan" in the Vault): that is the same person. A Vault with no name
-    yet, or a document with none, has nothing to disagree with.
+    The student's side is the active Vault name plus any name proposal not
+    yet decided (a name said a moment ago still counts). The document's side
+    is its holder name and any name it proposes. See `owner.py` for the rules.
     """
-    from app.memory.vault import VaultService
+    from sqlalchemy import select
 
-    document_names = [f.proposed_value for f in findings
-                      if f.candidate_type == "vault_fact" and f.key in _NAME_KEYS
-                      and _name_tokens(f.proposed_value)]
-    vault = VaultService(db)
-    vault_names = [fact.value for key in _NAME_KEYS
-                   if (fact := vault.get_fact(workspace_id, key)) is not None]
-    vault_names = [v.get("value") if isinstance(v, dict) else v for v in vault_names]
-    vault_names = [v for v in vault_names if _name_tokens(v)]
-    if not document_names or not vault_names:
+    from app.memory.vault import VaultService
+    from app.models import MemoryCandidate
+    from .owner import names_disagree
+
+    document = _names(
+        [("identity.full_name", understanding.holder_name)]
+        + [(f.key, f.proposed_value) for f in understanding.findings
+           if f.candidate_type == "vault_fact" and f.key in _NAME_KEYS])
+    vault_service = VaultService(db)
+    pending = db.execute(select(MemoryCandidate).where(
+        MemoryCandidate.workspace_id == workspace_id,
+        MemoryCandidate.candidate_type == "vault_fact",
+        MemoryCandidate.key.in_(_NAME_KEYS),
+        MemoryCandidate.status == "pending",
+        MemoryCandidate.source_type != "document",
+    )).scalars().all()
+    vault = _names(
+        [(key, fact.value) for key in _NAME_KEYS
+         if (fact := vault_service.get_fact(workspace_id, key)) is not None]
+        + [(c.key, c.proposed_value) for c in pending])
+    if not names_disagree(document, vault):
         return None
-    for document_name in document_names:
-        for vault_name in vault_names:
-            a, b = _name_tokens(document_name), _name_tokens(vault_name)
-            if a <= b or b <= a:
-                return None
-    return {"document_names": document_names, "vault_names": vault_names}
+    return {"document_names": document["full"] + document["preferred"],
+            "vault_names": vault["full"] + vault["preferred"]}
 
 
 def _open_owner_issue(db, workspace_id: str, file_id: str, filename: str, names: dict) -> None:
@@ -279,6 +292,9 @@ async def extract_document_job(job, db) -> dict:
     file_id = (job.payload or {}).get("file_id")
     if not workspace_id or not file_id:
         raise ValueError("document.extract requires workspace_id and file_id")
+    # The student answered "it's mine" on the owner card: this one replay
+    # skips the owner check and re-reads a document already understood.
+    owner_confirmed = bool((job.payload or {}).get("owner_confirmed"))
 
     service = DocumentArtifactService(db)
     artifact = service.get(workspace_id, file_id)
@@ -286,7 +302,8 @@ async def extract_document_job(job, db) -> dict:
         return {"extracted": False, "reason": "artifact_missing"}
     if artifact.status not in ("ready", "partial"):
         return {"extracted": False, "reason": f"not_readable:{artifact.status}"}
-    if artifact.extractor_version == EXTRACTOR_VERSION and artifact.classification:
+    if (artifact.extractor_version == EXTRACTOR_VERSION and artifact.classification
+            and not owner_confirmed):
         # Already understood at this version — a retry must not propose the
         # same candidates twice.
         return {"extracted": False, "reason": "already_extracted"}
@@ -341,26 +358,38 @@ async def extract_document_job(job, db) -> dict:
 
     from app.memory.candidates import record_drop
 
-    for dropped in understanding.drops:
-        record_drop(db, workspace_id, "document", "extract", dropped["reason"],
-                    dropped["payload"], source_ref=file_id)
-
     candidates = MemoryCandidateService(db)
     proposed: list[str] = []
 
     # Another person's document is not applied, and the student is asked
     # (VAULT_SPEC §Conflicts). Decided over all of the document's names at
     # once, before anything from it is proposed.
-    mismatch = _owner_mismatch(db, workspace_id, understanding.findings)
+    mismatch = None if owner_confirmed else _owner_mismatch(db, workspace_id, understanding)
     if mismatch is not None:
         _open_owner_issue(db, workspace_id, file_id, filename, mismatch)
+        # One row for the whole document: its values are someone else's.
+        record_drop(db, workspace_id, "document", "extract", "document_owner_mismatch",
+                    {"file_id": file_id}, source_ref=file_id)
         findings = []
     else:
+        for dropped in understanding.drops:
+            record_drop(db, workspace_id, "document", "extract", dropped["reason"],
+                        dropped["payload"], source_ref=file_id)
         # Qualifications first, so a course can name the record its
         # qualification became when the reconciler reaches it.
         findings = sorted(understanding.findings, key=lambda f: not _is_education(f))
     educations = [f for f in findings if _is_education(f)]
     education_candidate_id = None
+    # A result card with no readable holder name cannot be tied to this
+    # student, so like an OCR reading it waits for the student to confirm.
+    owner_unverified = (not owner_confirmed and not understanding.holder_name
+                        and any(f.candidate_type == "student_record" and f.key in ("education", "course")
+                                for f in findings))
+    trust = {
+        **({"ocr": True} if artifact.ocr_used else {}),
+        **({"owner_unverified": True} if owner_unverified else {}),
+        **({"owner_confirmed": True} if owner_confirmed else {}),
+    }
 
     # A StudentDocument record: "this file is a meaningful journey document".
     # The file_id is SERVER-owned — taken from the job, never from model
@@ -387,6 +416,7 @@ async def extract_document_job(job, db) -> dict:
                         "file_id": file_id, "filename": filename,
                         "authority": authority,
                         "extractor_version": EXTRACTOR_VERSION,
+                        **({"ocr": True} if artifact.ocr_used else {}),
                     },
                 )
             except MemoryDataError as exc:
@@ -439,7 +469,7 @@ async def extract_document_job(job, db) -> dict:
                     "parser": artifact.parser,
                     "parser_version": artifact.parser_version,
                     "extractor_version": EXTRACTOR_VERSION,
-                    **({"ocr": True} if artifact.ocr_used else {}),
+                    **trust,
                 },
             )
         except MemoryDataError as exc:
@@ -478,7 +508,8 @@ async def extract_document_job(job, db) -> dict:
             job_type=JOB_RECONCILE,
             workspace_id=workspace_id,
             payload={"candidate_ids": proposed, "document_file_id": file_id},
-            idempotency_key=f"reconcile:document:{file_id}:{EXTRACTOR_VERSION}",
+            idempotency_key=(f"reconcile:document:{file_id}:{EXTRACTOR_VERSION}"
+                             + (":owner_confirmed" if owner_confirmed else "")),
         )
     else:
         # Nothing to reconcile: tell the student now rather than never.

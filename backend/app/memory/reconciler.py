@@ -23,6 +23,7 @@ from app.models import EventRecord, MemoryCandidate
 from .candidates import MemoryCandidateService
 from .episodic import EpisodicMemoryService
 from .errors import MemoryDataError
+from .evidence import needs_student_confirmation
 from .semantic import MemoryService
 from .student_records import RecordNeedsReview, RecordRetained, StudentRecordService
 from .vault import VaultOutcome, VaultService
@@ -69,9 +70,10 @@ def provenance_for(candidate: MemoryCandidate) -> tuple[str, str, Optional[str]]
     if source == "document":
         authority = str((candidate.evidence or {}).get("authority") or "")
         origin, verification = _DOCUMENT_PROVENANCE.get(authority, _UNKNOWN_DOCUMENT_PROVENANCE)
-        # An OCR reading can misread a digit; it is not document support until
-        # the student confirms it, whoever issued the paper.
-        if (candidate.evidence or {}).get("ocr") and verification == "document_supported":
+        # An OCR reading can misread a digit, and a paper with no holder name
+        # may be someone else's; neither is document support until the student
+        # confirms it, whoever issued the paper.
+        if needs_student_confirmation(candidate.evidence) and verification == "document_supported":
             verification = "extracted"
         return origin, "document_extraction", verification
     if source == "user_explicit" and candidate.input_channel == "profile":
@@ -88,6 +90,20 @@ def provenance_for(candidate: MemoryCandidate) -> tuple[str, str, Optional[str]]
             None,
         )
     return "agent_inference", "agent_proposal", None
+
+
+#: A course whose qualification is on a card stays pending until it is answered.
+_WAITING = object()
+
+
+def drop_course(db, candidate: MemoryCandidate, reason: str) -> None:
+    """Log a document course that has no qualification to belong to."""
+    from .candidates import record_drop
+
+    record_drop(db, candidate.workspace_id, "document", "validate", reason,
+                {"candidate_type": candidate.candidate_type, "key": candidate.key,
+                 "proposed_value": MemoryReconciler._unwrap(candidate.proposed_value)},
+                source_ref=(candidate.evidence or {}).get("file_id"))
 
 
 @dataclass(frozen=True)
@@ -196,6 +212,48 @@ class MemoryReconciler:
 
     # -- per-type handling -------------------------------------------------
 
+    def _course_education(self, candidate: MemoryCandidate, education_candidate_id: str):
+        """The education record a document's course belongs to, `_WAITING`
+        while its qualification is on a card, or None when there is none.
+
+        A course is never lost to its qualification's card (VAULT_SPEC
+        §Conflicts: one question at a time): it waits, named on that card, and
+        ProfileIssueService replays it when the card is answered.
+        """
+        from sqlalchemy import select
+
+        from app.models import ProfileIssue
+        from .student_records import EntityAmbiguity
+
+        education = self.candidates.get(candidate.workspace_id, education_candidate_id)
+        if education is None:
+            return None
+        if education.status == "accepted" and education.result_id:
+            return education.result_id
+        if education.status == "needs_review":
+            issue = self.db.execute(select(ProfileIssue).where(
+                ProfileIssue.workspace_id == candidate.workspace_id,
+                ProfileIssue.candidate_id == education.id,
+                ProfileIssue.status == "open",
+            )).scalars().first()
+            if issue is not None:
+                waiting = list((issue.evidence or {}).get("pending_course_candidate_ids") or [])
+                if candidate.id not in waiting:
+                    issue.evidence = {**(issue.evidence or {}),
+                                      "pending_course_candidate_ids": [*waiting, candidate.id]}
+                    self.db.flush()
+                return _WAITING
+        # Retained or otherwise not written, but the record it describes may
+        # already be there: the subjects belong to that one.
+        values = self._unwrap(education.proposed_value)
+        if not isinstance(values, dict):
+            return None
+        try:
+            match = self.records._match(candidate.workspace_id, "education", values)
+        except EntityAmbiguity:
+            return None
+        return match.id if match is not None else None
+
     def _reconcile_student_record(self, candidate: MemoryCandidate) -> ReconcileResult:
         if candidate.operation == "retract":
             if candidate.source_type != "user_explicit" or candidate.input_channel != "profile":
@@ -213,10 +271,14 @@ class MemoryReconciler:
         if candidate.key == "course" and "education_id" not in values and education_candidate_id:
             # A subject from a new transcript joins the qualification the same
             # document proposed, once that has become (or matched) a record.
-            education = self.candidates.get(candidate.workspace_id, education_candidate_id)
-            if education is None or education.status != "accepted" or not education.result_id:
+            education_id = self._course_education(candidate, education_candidate_id)
+            if education_id is _WAITING:
+                return ReconcileResult(False, candidate.id, reason="waiting_for_education",
+                                       outcome="waiting")
+            if education_id is None:
+                drop_course(self.db, candidate, "course_education_not_saved")
                 return self._reject(candidate, "course_education_not_saved")
-            values = {**values, "education_id": education.result_id}
+            values = {**values, "education_id": education_id}
         claim_origin, capture_method, verification = provenance_for(candidate)
         record = self.records.apply(
             candidate.workspace_id, candidate.key or "", values,
@@ -384,7 +446,7 @@ class MemoryReconciler:
         if evidence.get("inferred") or candidate.source_type in ("agent", "system"):
             return "inferred"
         if candidate.source_type == "document":
-            return "inferred" if evidence.get("ocr") else "shown"
+            return "inferred" if needs_student_confirmation(evidence) else "shown"
         return "stated"
 
     def _retire_earlier_proposals(self, candidate: MemoryCandidate, issue_id: Optional[str]) -> bool:

@@ -44,6 +44,8 @@ class ProfileIssueService:
         ).scalar_one_or_none()
         if issue is None:
             raise MemoryDataError("Profile issue not found or already resolved")
+        if issue.issue_type == "document_owner":
+            return self._resolve_document_owner(workspace_id, issue, action, value, note)
 
         original = None
         if issue.candidate_id:
@@ -62,6 +64,7 @@ class ProfileIssueService:
                 if item is not None and item.status == "active":
                     item.conflict_state = "none"
             self._close(issue, action, note, None)
+            self._replay_waiting_courses(issue, self._kept_education_id(issue))
             return {"resolved": True, "action": action, "id": None}
 
         if action == "provide_new" and value is None:
@@ -103,7 +106,58 @@ class ProfileIssueService:
             original.reconciled_at = datetime.now(timezone.utc)
             VaultAssertionService(self.db).refresh_decision(original)
         self._close(issue, action, note, candidate.id)
+        self._replay_waiting_courses(issue, result.result_id if spec["key"] == "education" else None)
         return {"resolved": True, "action": action, "id": result.result_id}
+
+    def _resolve_document_owner(self, workspace_id: str, issue: ProfileIssue, action: str,
+                                value: Any, note: str | None) -> dict:
+        """"Is this your document?" Yes re-reads it with the owner check
+        skipped for that one file; no closes the card and applies nothing."""
+        file_id = (issue.evidence or {}).get("file_id")
+        if action == "both_true":
+            raise MemoryDataError("This answer does not apply to a document owner question")
+        if action in ("accept_proposed", "provide_new"):
+            if not file_id:
+                raise MemoryDataError("This document owner question names no file")
+            from app.runtime.task_runtime import enqueue
+
+            enqueue(self.db, job_type="document.extract", workspace_id=workspace_id,
+                    payload={"file_id": file_id, "owner_confirmed": True},
+                    idempotency_key=f"document.extract:owner_confirmed:{issue.id}")
+        self._close(issue, action, note, None)
+        return {"resolved": True, "action": action, "id": None}
+
+    def _kept_education_id(self, issue: ProfileIssue) -> str | None:
+        """The education record a "keep current" answer left in place."""
+        if issue.affected_type != "education":
+            return None
+        from .student_records import StudentRecordService
+
+        record_id = issue.affected_id or (issue.evidence or {}).get("record_id")
+        if record_id and StudentRecordService(self.db).get(issue.workspace_id, "education", record_id):
+            return record_id
+        return None
+
+    def _replay_waiting_courses(self, issue: ProfileIssue, education_id: str | None) -> None:
+        """Courses that waited on this qualification card join the education
+        record that is active now; with none, they are refused and logged."""
+        from .reconciler import drop_course
+
+        for candidate_id in (issue.evidence or {}).get("pending_course_candidate_ids") or []:
+            course = self.candidates.get(issue.workspace_id, candidate_id)
+            if course is None or course.status != "pending":
+                continue
+            if education_id is None:
+                drop_course(self.db, course, "course_education_not_saved")
+                self.candidates.mark_rejected(course, "course_education_not_saved")
+                VaultAssertionService(self.db).refresh_decision(course)
+                continue
+            values = _unwrap(course.proposed_value)
+            course.proposed_value = {"value": {**values, "education_id": education_id}}
+            course.entities = {k: v for k, v in (course.entities or {}).items()
+                               if k != "education_candidate_id"} or None
+            self.db.flush()
+            self.reconciler.reconcile(course)
 
     @staticmethod
     def _candidate_spec(issue: ProfileIssue, original: MemoryCandidate | None) -> dict:

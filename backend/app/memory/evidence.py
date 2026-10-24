@@ -13,6 +13,14 @@ def value_digest(value):
         separators=(",", ":"), default=str).encode()).hexdigest()
 
 
+def needs_student_confirmation(evidence) -> bool:
+    """A document reading that is not "shown" until the student confirms it:
+    OCR can misread a digit, and a paper with no holder name may be someone
+    else's (VAULT_SPEC §Conflicts)."""
+    evidence = evidence or {}
+    return bool(evidence.get("ocr") or evidence.get("owner_unverified"))
+
+
 def evidence_level(row, value):
     policy = evidence_policy()
     evidence = row.get("evidence") or {}
@@ -22,6 +30,8 @@ def evidence_level(row, value):
             and confirmation.get("value_digest") == value_digest(value)
             and confirmation.get("confirmed_at")):
         return "confirmed"
+    if needs_student_confirmation(evidence):
+        return "stated"
     if (row.get("verification_status") in policy["shown_verification"]
             or (row.get("source_type") == "document" and evidence.get("authority") in policy["shown_authorities"]
                 and evidence.get("file_id"))):

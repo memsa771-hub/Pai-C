@@ -30,7 +30,7 @@ import re
 from dataclasses import dataclass, field
 from typing import Any, Optional
 
-from app.memory.extractor import _INCOME_GUARDED_ITEMS, _states_income, render_item
+from app.memory.extractor import render_item, states_household_income
 
 from .classify import DOCUMENT_CLASSES
 from .content import Segment
@@ -73,6 +73,9 @@ class DocumentUnderstanding:
     #: Every finding dropped, as {reason, payload}; the handler writes them
     #: to the Vault drop log (zero silent drops).
     drops: list = field(default_factory=list)
+    #: The person the document is about, when a quoted, located name survived
+    #: validation. None means the document could not be tied to anyone.
+    holder_name: Optional[str] = None
 
 
 SYSTEM_PROMPT = f"""\
@@ -155,7 +158,14 @@ Return ONLY a JSON object, no prose and no markdown fences:
 {{"classification": "<one class name>",
   "classification_confidence": 0.0-1.0,
   "title": "<short human title for this document>",
+  "holder_name": {{"value": "<the name of the person this document is about, as printed>",
+                  "quote": "<exact text containing it>", "locator": "<e.g. p1>"}} or null,
   "findings": [ ... ]}}
+
+`holder_name` is REQUIRED in every answer: the student, candidate or
+applicant the document belongs to (not a parent, signatory or institution).
+Use null only when no such name is printed. It is checked against the student
+before anything from the document is saved.
 
 Each finding is one of:
 
@@ -340,6 +350,10 @@ def _validate_finding(
 
     if not isinstance(raw, dict):
         return drop("not an object")
+    # First, before any rule that could drop it with its value in the log:
+    # a household income is never stored or logged, from any source (VAULT_SPEC).
+    if states_household_income(raw, allowed_vault_keys):
+        return drop("household_income", redact=True)
 
     candidate_type = raw.get("candidate_type")
     if candidate_type not in CANDIDATE_TYPES:
@@ -376,11 +390,6 @@ def _validate_finding(
     evidence = {"quote": quote[:500], "locator": locator}
 
     key = raw.get("key")
-    if (candidate_type == "vault_fact" and isinstance(key, str) and key.startswith("finance.")
-            or candidate_type == "vault_item" and key in _INCOME_GUARDED_ITEMS):
-        # A household income is never stored, from any source (VAULT_SPEC).
-        if _states_income(quote) or _states_income(raw.get("proposed_value")):
-            return drop("household_income", redact=True)
 
     if candidate_type == "vault_item":
         from app.memory.catalog import vault_catalog
@@ -480,6 +489,20 @@ def _validate_finding(
     )
 
 
+def _validate_holder(raw, document_text: str, locators: set[str]) -> Optional[str]:
+    """The holder name, held to the same evidence rule as any finding."""
+    if not isinstance(raw, dict):
+        return None
+    value, quote, locator = raw.get("value"), raw.get("quote"), raw.get("locator")
+    if not isinstance(value, str) or _strip_placeholders(value.strip()) is None:
+        return None
+    if not isinstance(quote, str) or not quote.strip() or _normalize(quote) not in document_text:
+        return None
+    if not isinstance(locator, str) or locator.strip().strip("[]").strip() not in locators:
+        return None
+    return value.strip()[:200]
+
+
 #: Per-document ceilings on UNSTRUCTURED findings. The same CV run three times
 #: at one setting produced 1, 2 and 6 semantic memories: the prompt asks for
 #: restraint, and this makes it a guarantee. Structured records are not capped
@@ -564,6 +587,11 @@ async def understand_document(
     title = parsed.get("title")
     title = title.strip()[:200] if isinstance(title, str) and title.strip() else None
 
+    # Normalize ONCE: every quote is checked against this.
+    document_text = _normalize("\n".join(s.text for s in segments))
+    locators = {s.locator for s in segments}
+    holder_name = _validate_holder(parsed.get("holder_name"), document_text, locators)
+
     findings_raw = parsed.get("findings")
     if findings_raw is None:
         raise DocumentExtractionError("output has no 'findings' key")
@@ -583,9 +611,6 @@ async def understand_document(
             drops.append({"reason": "over_candidate_limit", "payload": payload})
         findings_raw = findings_raw[:MAX_CANDIDATES]
 
-    # Normalize ONCE: every quote is checked against this.
-    document_text = _normalize("\n".join(s.text for s in segments))
-    locators = {s.locator for s in segments}
     record_ids = {
         kind: {row.get("id") for row in rows if isinstance(row, dict)}
         for kind, rows in (existing_records or {}).items()
@@ -609,4 +634,5 @@ async def understand_document(
         title=title,
         findings=findings,
         drops=drops,
+        holder_name=holder_name,
     )

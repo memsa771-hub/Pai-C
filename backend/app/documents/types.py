@@ -137,6 +137,42 @@ def is_student_document_candidate(filename: str, content_type: str = "") -> bool
     )
 
 
+def claims_pdf_or_docx(filename: str, content_type: str = "") -> bool:
+    """Does the name or declared type promise a PDF or Word document?
+
+    Only that promise is enforced at upload. A name or type that says "image"
+    promises nothing about documents: a GIF or WebP called photo.png is still
+    an ordinary workspace picture, as it always was.
+    """
+    if _extension(filename) in ("pdf", "docx"):
+        return True
+    return (content_type or "").split(";")[0].strip().lower() in set(DOCUMENT_CONTENT_TYPES.values())
+
+
+def claims_only_image(filename: str, content_type: str = "") -> bool:
+    """The name or declared type says JPEG/PNG and promises no PDF/DOCX."""
+    image = (_extension(filename) in ("jpg", "jpeg", "png")
+             or (content_type or "").split(";")[0].strip().lower() in IMAGE_CONTENT_TYPES)
+    return image and not claims_pdf_or_docx(filename, content_type)
+
+
+def upload_rejection(
+    data: bytes, filename: str, content_type: str = "",
+) -> Optional[DocumentTypeError]:
+    """Why an upload must be refused, or None to store it.
+
+    Refused only when it claims to be a PDF or DOCX and is not. Everything
+    else is stored; whether it is also a student document is decided later.
+    """
+    if not claims_pdf_or_docx(filename, content_type):
+        return None
+    try:
+        detect_document_type(data, filename, content_type)
+    except DocumentTypeError as exc:
+        return exc
+    return None
+
+
 def detect_document_type(
     data: bytes, filename: str = "", declared_content_type: str = "",
 ) -> tuple[str, str]:

@@ -973,18 +973,16 @@ async def upload_files_to_folder(
         # A file NAMED like a student document must actually be one. Rejecting
         # here — before any bytes are stored — is what keeps a renamed binary
         # out of the parser, the OCR provider and the extraction prompt.
-        # Files that make no document claim (images, code) skip this entirely
-        # and keep their existing behaviour.
-        from app.documents import DocumentTypeError, detect_document_type, is_student_document_candidate
+        # Files that make no PDF/DOCX claim (images, code) are stored as
+        # before: a GIF called .png is a plain picture with no document pipeline.
+        from app.documents.types import upload_rejection
 
-        if is_student_document_candidate(name, content_type):
-            try:
-                detect_document_type(data, name, content_type)
-            except DocumentTypeError as exc:
-                skipped.append({
-                    "filename": name, "reason": exc.code, "detail": exc.message,
-                })
-                continue
+        rejection = upload_rejection(data, name, content_type)
+        if rejection is not None:
+            skipped.append({
+                "filename": name, "reason": rejection.code, "detail": rejection.message,
+            })
+            continue
 
         file_id = str(uuid.uuid4())
         try:

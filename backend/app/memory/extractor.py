@@ -386,6 +386,34 @@ def _states_income(value) -> bool:
     return bool(_INCOME.search(text)) and bool(re.search(r"\d", text))
 
 
+def states_household_income(raw: dict, allowed_vault_keys) -> bool:
+    """True when a proposal would carry a household income into memory.
+
+    Checked before every other rule, by both extractors: a proposal dropped
+    for a bad quote or locator still reaches the drop log, and the log must
+    not hold the figure either. Guarded targets are where a household's money
+    could land (finance facts, family and pressure items, free-text memories)
+    and any key or type we do not know, such as an invented `household_income`.
+    """
+    from .catalog import vault_catalog
+    from .student_records import ENTITY_MODELS
+
+    candidate_type, key = raw.get("candidate_type"), raw.get("key")
+    known = isinstance(key, str)
+    if candidate_type == "vault_fact":
+        guarded = not known or key not in allowed_vault_keys or key.startswith("finance.")
+    elif candidate_type == "vault_item":
+        guarded = not known or vault_catalog().type(key) is None or key in _INCOME_GUARDED_ITEMS
+    elif candidate_type == "student_record":
+        guarded = not known or key not in ENTITY_MODELS
+    else:
+        guarded = True
+    if not guarded:
+        return False
+    quote = raw.get("quote") if isinstance(raw.get("quote"), str) else ""
+    return any(_states_income(text) for text in (quote, raw.get("proposed_value"), raw.get("content") or ""))
+
+
 def _carries_money_figure(text: str) -> bool:
     """A free-text field with a figure and a money cue ("about 50,000 a month")."""
     return _states_income(text) or (bool(re.search(r"\d", text)) and bool(_AMOUNT_CUE.search(text)))
@@ -459,6 +487,10 @@ def _validate(raw: dict, turn, allowed_vault_keys: set[str],
         return drop("not an object")
 
     raw = _coerce_proposal(raw)
+    # The quote is checked too: a budget of {"amount": 80000} is only numbers,
+    # but "Abbu ki tankhwah 80 hazar hai" says whose money it is.
+    if states_household_income(raw, allowed_vault_keys):
+        return drop("household_income", redact=True)
 
     candidate_type = raw.get("candidate_type")
     if raw.get("key") in _STOPPED_RECORD_KINDS or raw.get("key") == "career.primary_interest":
@@ -497,12 +529,6 @@ def _validate(raw: dict, turn, allowed_vault_keys: set[str],
     if raw.get("inferred") is True:
         evidence["inferred"] = True
     key = raw.get("key")
-    guarded = ((candidate_type == "vault_fact" and isinstance(key, str) and key.startswith("finance."))
-               or (candidate_type == "vault_item" and key in _INCOME_GUARDED_ITEMS))
-    # The quote is checked too: a budget of {"amount": 80000} is only numbers,
-    # but "Abbu ki tankhwah 80 hazar hai" says whose money it is.
-    if guarded and (_states_income(quote) or _states_income(raw.get("proposed_value"))):
-        return drop("household_income", redact=True)
     from .voice_attribution import contained, validated_attribution
     attribution = raw.get("attribution")
     if (isinstance(attribution, dict) and attribution.get("correction") is True

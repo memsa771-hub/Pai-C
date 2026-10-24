@@ -26,7 +26,7 @@ from typing import Optional
 from sqlalchemy import select
 
 from app.models import DocumentArtifact, FileRecord
-from .types import DocumentTypeError, detect_document_type
+from .types import DocumentTypeError, claims_only_image, detect_document_type
 
 logger = logging.getLogger(__name__)
 
@@ -102,6 +102,10 @@ class DocumentArtifactService:
                 data, filename, declared_content_type,
             )
         except DocumentTypeError as exc:
+            if claims_only_image(filename, declared_content_type):
+                # Named or typed as an image but not a JPEG/PNG: an ordinary
+                # workspace file, with no document row, exactly as before photos.
+                return None
             logger.info(
                 "document rejected workspace=%s file=%s code=%s",
                 workspace_id, file_id, exc.code,
