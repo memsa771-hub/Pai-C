@@ -7,7 +7,7 @@ import {RecentSignInRequired,requestPasswordReset} from '@/lib/auth/service';
 import {signOutAndGoToLanding} from '@/lib/auth-redirects';
 const theme=vi.hoisted(()=>({setTheme:vi.fn(),theme:'light'}));
 vi.mock('next-themes',()=>({useTheme:()=>theme}));
-vi.mock('@/lib/api',()=>({workspaceApi:{deleteMyAccount:vi.fn(),editStudentProfile:vi.fn(),getVault:vi.fn(),exportCounselorData:vi.fn(),listShares:vi.fn(),deleteShare:vi.fn()}}));
+vi.mock('@/lib/api',()=>({workspaceApi:{deleteMyAccount:vi.fn(),getVault:vi.fn(),exportCounselorData:vi.fn(),listShares:vi.fn(),deleteShare:vi.fn()}}));
 vi.mock('@/lib/auth/service',()=>({requestPasswordReset:vi.fn(),RecentSignInRequired:class extends Error{}}));
 vi.mock('@/lib/auth-redirects',()=>({signOutAndReturnToSignIn:vi.fn(),signOutAndGoToLanding:vi.fn()}));
 vi.mock('@/components/ui/dialogs-provider',()=>({useConfirm:()=>vi.fn().mockResolvedValue(false)}));
@@ -38,7 +38,6 @@ it('changes theme and the notification sound locally',()=>{
   render(<CounselorSettings/>);
   open('Appearance');fireEvent.click(screen.getByRole('radio',{name:'Dark'}));expect(theme.setTheme).toHaveBeenCalledWith('dark');
   open('Notifications');fireEvent.click(screen.getByRole('switch',{name:'Sound for new messages'}));expect(ws.setNotificationSound).toHaveBeenCalledWith(true);
-  expect(workspaceApi.editStudentProfile).not.toHaveBeenCalled();
 });
 it('lists shared links and stops sharing one',async()=>{
   vi.mocked(workspaceApi.listShares).mockResolvedValue([{id:'s1',workspaceId:'w',channelName:'pai-counselor',title:'My chat',shareToken:'tok',messageCount:3,status:'active',createdAt:'2026-10-18T00:00:00Z'}]);

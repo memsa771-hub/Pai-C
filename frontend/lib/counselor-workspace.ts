@@ -47,16 +47,6 @@ export type LivingPicture = {
     after: number | null;
   }[];
 };
-export type ProfileCard = {
-  kind: string;
-  key: string;
-  id: string;
-  value: unknown;
-  digest: string;
-  evidence_level: "stated" | "shown" | "confirmed";
-  source: Record<string, unknown>;
-  updated_at: string;
-};
 export type FactCard = {
   id: string;
   label?: string;

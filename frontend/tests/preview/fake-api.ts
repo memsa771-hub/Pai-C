@@ -38,7 +38,7 @@ const api={getCounselorWorkspace:async()=>picture,getVault:async()=>vault,getVau
   getCounselorSummary:async()=>new URLSearchParams(location.search).has('mirror')?mirror:{type:null,status:null,version:null},
   getRoadmaps:async()=>prepared?[{...roadmap,chosen_at:chosen?'2026-10-18T12:01:00Z':null}]:[],getStudentRequests:async()=>[],getCurrentDecision:async()=>chosen?{real_objective:'A path I can test in practice.'}:null,
   getCounselorRequests:async()=>[],getCounselorResearchStatus:async()=>null,getOperatorRun:async()=>null,
-  loadMessageHistory:async()=>({events:[]}),pollMessages:async()=>({messages:[]}),editStudentProfile:async()=>({saved:true}),
+  loadMessageHistory:async()=>({events:[]}),pollMessages:async()=>({messages:[]}),
   answerFactCard:async()=>({saved:true}),
   addVaultEntry:async()=>({saved:true}),editVaultEntry:async()=>({saved:true}),confirmVaultEntry:async()=>({saved:true}),removeVaultEntry:async()=>({saved:true}),resolveVaultConflict:async()=>({resolved:true}),
   submitOnboarding:async()=>({completed:true,rejected:{},saved:[]}),
