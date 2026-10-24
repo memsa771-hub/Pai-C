@@ -28,8 +28,6 @@ one source — a first-hand statement. Asking the student directly is that
 statement, so the answer applies immediately instead of parking as an issue.
 """
 
-import json
-from pathlib import Path
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any, Optional
@@ -39,6 +37,7 @@ from sqlalchemy import select
 from app.models import User
 
 from .candidates import MemoryCandidateService
+from .catalog import vault_catalog
 from .errors import MemoryDataError
 from .reconciler import MemoryReconciler
 from .vault import VaultService
@@ -61,12 +60,13 @@ class OnboardingField:
     # A part of another answer (first + last name make fullName); parts are
     # composed, never written on their own.
     part_of: str | None = None
-    # Also use this answer for another field (first name is the greeting name).
-    copy_to: str | None = None
     # Shown pre-selected when nothing is known yet (data, not code).
     default: str | None = None
     # Suggested values for the UI. Unlike `choices`, these do not restrict.
     options: tuple[str, ...] = ()
+    # The catalog choice list an answer is read against: "O-Level" or "inter"
+    # becomes its code, while `choices` are only the codes offered as chips.
+    choice_list: str | None = None
 
 
 # The order here is the order the form asks them in.
@@ -87,13 +87,45 @@ LEGACY_FIELDS: tuple[OnboardingField, ...] = (
     OnboardingField("currentCity", "location.current_city", required=True),
 )
 
-ONBOARDING_FIELDS = tuple(OnboardingField(**{**entry, "choices": tuple(entry["choices"]),
-                                              "options": tuple(entry.get("options", ()))})
-    for entry in json.loads(Path(__file__).with_name("entry_fields.json").read_text(encoding="utf-8")))
+def _catalog_fields() -> tuple[OnboardingField, ...]:
+    """The current form, in order: the catalog types marked `onboarding`.
+
+    The catalog is the one place a question lives; its `name` and `parts` are
+    the answer keys the frontend sends, its `step` groups the screens.
+    """
+    asked = sorted((t for t in vault_catalog().types() if t.onboarding), key=lambda t: t.onboarding["order"])
+    fields = []
+    for spec in asked:
+        ask = spec.onboarding
+        choices = ask.get("choices")
+        choice_list = choices if isinstance(choices, str) else None
+        common = dict(
+            field_key=spec.key, required=ask.get("required", True), step=ask.get("step", 1),
+            is_date=ask["input"] == "date", record_field=ask.get("record_field"),
+            allow_other=ask.get("allow_other", False), default=ask.get("default"),
+            options=tuple(ask.get("options", ())), choice_list=choice_list,
+            choices=tuple(ask.get("shown", ())) if choice_list else tuple(choices or ()))
+        parts = ask.get("parts") or ()
+        fields += [OnboardingField(part["name"], max_length=part.get("max_length", 200),
+                                   part_of=ask["name"], **common) for part in parts]
+        if not parts:
+            fields.append(OnboardingField(ask["name"], max_length=ask.get("max_length", 200), **common))
+    return tuple(fields)
+
+
+ONBOARDING_FIELDS = _catalog_fields()
 # Answers older clients may still send. They are accepted and dropped, so an
 # open tab from before a field was retired cannot fail the whole submission.
 RETIRED_ANSWERS = frozenset({"replyLanguage"})
 FIELDS_BY_NAME = {field.name: field for field in (*LEGACY_FIELDS, *ONBOARDING_FIELDS)}
+
+
+def _choice_code(field: OnboardingField, text: str) -> Optional[str]:
+    """The choice an answer names (an offered chip or any wording of the
+    catalog list), or None for the student's own words."""
+    if text.casefold() in field.choices:
+        return text.casefold()
+    return vault_catalog().choice_code(field.choice_list, text) if field.choice_list else None
 
 
 def _clean(value: Any, field: OnboardingField) -> Optional[str]:
@@ -112,10 +144,11 @@ def _clean(value: Any, field: OnboardingField) -> Optional[str]:
         return None
     if len(text) > field.max_length:
         raise MemoryDataError(f"{field.name} is too long")
-    if field.choices and text.casefold() not in field.choices and not field.allow_other:
+    code = _choice_code(field, text)
+    if (field.choices or field.choice_list) and code is None and not field.allow_other:
         raise MemoryDataError(f"{field.name} must be one of: {', '.join(field.choices)}")
-    if field.choices and text.casefold() in field.choices:
-        text = text.casefold()
+    if code is not None:
+        text = code
     if field.is_date:
         import re
         if not re.fullmatch(r"\d{4}(?:-\d{2})?(?:-\d{2})?", text):
@@ -225,15 +258,11 @@ class OnboardingService:
         if missing:
             raise MemoryDataError(f"Missing required answer: {', '.join(missing)}")
         # Compose split answers (first + last name) into the field they form,
-        # in declared order, and copy answers that also serve another field.
+        # in declared order.
         for target in {f.part_of for f in FIELDS_BY_NAME.values() if f.part_of}:
             parts = [cleaned.pop(f.name) for f in ONBOARDING_FIELDS if f.part_of == target and f.name in cleaned]
             if parts:
                 cleaned[target] = " ".join(parts)
-        for field in ONBOARDING_FIELDS:
-            source = answers.get(field.name)
-            if field.copy_to and isinstance(source, str) and source.strip() and field.copy_to not in cleaned:
-                cleaned[field.copy_to] = " ".join(source.split())
 
         workspace_id = str(workspace.id)
         user = self.owner(workspace)
@@ -255,7 +284,7 @@ class OnboardingService:
                 subject_user_id=str(user.id) if user else None,
                 evidence={"reason": "Stated during onboarding", "capture": "onboarding", "quote": value,
                     **({"catalog_review": {"catalog": field.name, "status": "pending", "student_text": value}}
-                       if field.allow_other and value.casefold() not in field.choices else {})},
+                       if field.allow_other and _choice_code(field, value) is None else {})},
             )
             result = MemoryReconciler(self.db).reconcile(candidate)
             if result.accepted:

@@ -56,8 +56,19 @@ def test_facets_from_profile_maps_todays_vault():
                            "result": {"marks_obtained": 1012, "marks_total": 1100}}],
             "test_attempt": [{"test_type": "MDCAT", "overall_score": "140"}],
             "activity": [{"title": "Organized a school cricket tournament", "id": "a1"}],
-            "external_influence": [{"influencer_type": "father", "suggested_direction": "Electrical engineering"}],
         },
+        "items": [
+            {"type": "family_member", "value": {"relation": "father", "wish": "Electrical engineering"}},
+            {"type": "interest", "value": {"text": "Robotics", "example": "Built a line follower"}},
+            {"type": "strength", "value": {"text": "Patient", "basis": "Tutors younger cousins"}},
+            {"type": "value", "value": {"text": "Helping family"}},
+            {"type": "pressure", "value": {"text": "Fees are hard", "kind": "money"}},
+            {"type": "option", "value": {"text": "Medicine", "status": "ruled_out"}},
+            {"type": "myth", "value": {"text": "Arts has no jobs", "about": "Arts"}},
+            {"type": "certainty", "value": {"score": 4, "about": "Engineering"}},
+            {"type": "domicile", "value": {"province": "sindh", "area": "rural"}},
+            {"type": "quota", "value": {"kind": "hafiz_e_quran"}},
+        ],
     }
     facets = vault_golden.facets_from_profile(profile)
     by_name = {f["facet"]: f for f in facets}
@@ -69,6 +80,27 @@ def test_facets_from_profile_maps_todays_vault():
     assert vault_golden.facet_matches({"text": {"all": ["cricket", "tournament"]}}, by_name["experience"])
     assert "a1" not in by_name["experience"]["text"]
     assert vault_golden.facet_matches({"text": {"all": ["father", "engineering"]}}, by_name["family_member"])
+    # Choice codes read back as labels, and the code is kept for coding checks.
+    assert by_name["family_member"]["who"] == "Father" and by_name["family_member"]["code"] == "father"
+    assert vault_golden.facet_matches({"text": {"all": ["sindh", "rural"]}}, by_name["domicile"])
+    assert by_name["domicile"]["code"] == "sindh"
+    assert vault_golden.facet_matches({"text": "hafiz"}, by_name["quota"]) and by_name["quota"]["code"] == "hafiz_e_quran"
+    assert vault_golden.facet_matches({"value": {"num": 4}}, by_name["certainty"])
+    for facet, words in [("interest", ["robotics", "line follower"]), ("strength", ["patient", "tutors"]),
+                         ("value", ["helping"]), ("pressure", ["fees"]), ("option", ["medicine", "ruled"]),
+                         ("myth", ["arts", "jobs"])]:
+        assert vault_golden.facet_matches({"text": {"all": words}}, by_name[facet]), facet
+
+
+def test_budget_ranges_read_as_one_amount():
+    """Budget v2: an exact amount stays exact, a range reads as its midpoint."""
+    def amount(budget):
+        [facet] = [f for f in vault_golden.facets_from_profile({"facts": {"finance.budget": budget}})
+                   if f["facet"] == "budget"]
+        return facet.get("amount")
+    assert amount({"amount": 300000, "min": 1, "max": 2}) == 300000
+    assert amount({"min": 200000, "max": 300000, "period": "per_year"}) == 250000
+    assert amount({"max": 300000}) == 300000 and amount({"band": "1_3_lakh"}) is None
 
 
 @pytest.mark.parametrize("text,flagged", [
@@ -95,15 +127,27 @@ def test_scoring_counts_recall_and_must_not_violations():
     assert summary["must_not_violations"] == 1
 
 
-def test_production_fields_match_the_migrations():
+def test_production_fields_come_from_the_catalog():
+    """The eval's fields are the catalog's fact definitions, including migration
+    116's ranged budget, so an eval run sees what production's extractor sees."""
+    import importlib.util
+    from pathlib import Path
+    from app.memory.catalog import vault_catalog
     specs = eval_vault.production_field_definitions()
     keys = {spec["key"] for spec in specs}
     assert len(specs) == len(keys) == 24
-    assert {"location.current_city", "finance.budget", "preferences.location_limits"} <= keys
+    assert keys == {t.key for t in vault_catalog().types("fact")}
     by_key = {spec["key"]: spec for spec in specs}
     assert by_key["mobility.relocation_willingness"]["source_policy"]["allowed_sources"] == ["user_explicit", "conversation"]
     assert by_key["location.current_city"]["source_policy"] == {"temporal_change": "student_transition"}
     assert "source_policy" not in by_key["preferences.location_limits"]
+    assert all(spec["sensitivity"] == vault_catalog().type(spec["key"]).sensitivity for spec in specs)
+    path = Path(eval_vault.__file__).resolve().parents[1] / "alembic/versions/116_vault_items.py"
+    module_spec = importlib.util.spec_from_file_location("migration_116_eval", path)
+    migration = importlib.util.module_from_spec(module_spec)
+    module_spec.loader.exec_module(migration)
+    assert by_key["finance.budget"]["validation_schema"] == migration.BUDGET_SCHEMA
+    assert not hasattr(eval_vault, "_migration")
 
 
 @pytest.mark.asyncio

@@ -118,16 +118,31 @@ def _render_codes(text: str) -> str:
 SYSTEM_PROMPT = _render_codes((Path(__file__).with_name("prompts") / "extractor.md").read_text(
     encoding="utf-8")).replace("<vault_catalog/>", _render_catalog())
 
-_STOPPED_RECORD_KINDS = frozenset({"student_voice_statement", "external_influence"})
 _GOAL_TARGET_DETAILS = frozenset({"stated_preference", "target_countries", "degree_level", "field_of_study", "target_intake"})
+
+
+def _chat_proposable(raw: dict) -> bool:
+    """Whether chat may propose this key, from data: a catalog type needs
+    "chat" in its inputs (career.primary_interest is the Story card's own);
+    an uncatalogued record kind is stopped by `chat_input: false` in
+    vault_view.json (voice statements and outside influences: a family's wish
+    is a family_member item now)."""
+    from .catalog import vault_catalog
+    from .vault_view import view_copy
+    key = raw.get("key")
+    if not isinstance(key, str):
+        return True
+    spec = vault_catalog().type(key)
+    if spec is not None:
+        return "chat" in spec.inputs
+    return view_copy()["uncatalogued_records"].get(key, {}).get("chat_input", True)
 
 
 def _extractor_specs():
     from copy import deepcopy
     from .student_schema import extraction_specs
-    specs = deepcopy(extraction_specs())
-    for kind in _STOPPED_RECORD_KINDS:
-        specs.pop(kind, None)
+    specs = {kind: spec for kind, spec in deepcopy(extraction_specs()).items()
+             if _chat_proposable({"key": kind})}
     details = specs.get("goal", {}).get("properties", {}).get("details", {})
     if "properties" in details:
         details["properties"] = {k: v for k, v in details["properties"].items() if k in _GOAL_TARGET_DETAILS}
@@ -165,7 +180,7 @@ def _render_field_specs(field_specs) -> str:
     lines = []
     for spec in field_specs:
         key = spec.get("key")
-        if not key or key == "career.primary_interest":
+        if not key or not _chat_proposable({"key": key}):
             continue
         bits = [f"- {key}"]
         if spec.get("data_type"):
@@ -524,8 +539,8 @@ def _validate(raw: dict, turn, allowed_vault_keys: set[str],
         return drop("household_income", redact=True)
 
     candidate_type = raw.get("candidate_type")
-    if raw.get("key") in _STOPPED_RECORD_KINDS or raw.get("key") == "career.primary_interest":
-        return drop("interpretation belongs to the Truth Map")
+    if not _chat_proposable(raw):
+        return drop("not a chat input for this type")
     if candidate_type not in CANDIDATE_TYPES:
         return drop(f"unknown candidate_type {candidate_type!r}")
 

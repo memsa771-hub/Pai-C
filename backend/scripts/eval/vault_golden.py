@@ -164,7 +164,7 @@ def _percent(result: dict):
 
 
 def facets_from_profile(profile: dict) -> list[dict]:
-    """Map today's Vault (facts + typed records) onto the facet vocabulary.
+    """Map today's Vault (facts, typed records and items) onto the facet vocabulary.
 
     Only the Vault counts. The Truth Map notebook is deliberately excluded:
     the plan's target is that everything about the student lives in the Vault.
@@ -183,8 +183,9 @@ def facets_from_profile(profile: dict) -> list[dict]:
         out.append(_facet("status", value=facts["identity.current_status"]))
     budget = facts.get("finance.budget")
     if isinstance(budget, dict):
-        out.append(_facet("budget", amount=budget.get("amount"), currency=budget.get("currency"),
-                          period=budget.get("period")))
+        out.append(_facet("budget", amount=_budget_amount(budget), currency=budget.get("currency"),
+                          period=budget.get("period"), band=_label("budget_bands", budget.get("band")),
+                          covers=_label("budget_covers", budget.get("covers"))))
     if facts.get("finance.scholarship_interest") is not None or facts.get("finance.funding_status"):
         out.append(_facet("scholarship", value=_text(facts.get("finance.scholarship_interest"),
                                                      facts.get("finance.funding_status"))))
@@ -192,8 +193,6 @@ def facets_from_profile(profile: dict) -> list[dict]:
         out.append(_facet("mobility", value=facts["mobility.relocation_willingness"]))
     for limit in facts.get("preferences.location_limits") or []:
         out.append(_facet("mobility", value=limit))
-    if facts.get("career.primary_interest"):
-        out.append(_facet("interest", value=facts["career.primary_interest"]))
     for country in facts.get("preferences.target_countries") or []:
         out.append(_facet("option", value=country))
 
@@ -223,10 +222,43 @@ def facets_from_profile(profile: dict) -> list[dict]:
         for row in records.get(kind, []):
             out.append(_facet("skill", value=_text(row.get("name"), row.get("language"), row.get("title"),
                                                    row.get("proficiency"))))
-    for row in records.get("external_influence", []):
-        out.append(_facet("family_member", who=_text(row.get("influencer_type"), row.get("source_label")),
-                          wish=row.get("suggested_direction")))
+    for item in profile.get("items") or []:
+        facet = _item_facet(item["type"], item.get("value") or {})
+        if facet is not None:
+            out.append(facet)
     return out
+
+
+def _budget_amount(budget: dict):
+    """Budget v2 as one number: an exact amount stays exact, a range reads as
+    its midpoint, one bound as itself; a band alone has no amount."""
+    if isinstance(budget.get("amount"), (int, float)):
+        return budget["amount"]
+    low, high = budget.get("min"), budget.get("max")
+    if isinstance(low, (int, float)) and isinstance(high, (int, float)):
+        return (low + high) / 2
+    return next((bound for bound in (low, high) if isinstance(bound, (int, float))), None)
+
+
+def _item_facet(item_type: str, value: dict):
+    """A Vault item as a facet. A choice field reads back as its label and
+    keeps its `code`, so a case can check the coding as well as the meaning."""
+    if item_type in ("interest", "strength", "value", "pressure", "option", "myth"):
+        return _facet(item_type, **value)
+    if item_type == "certainty":
+        return _facet("certainty", value=value.get("score"), about=value.get("about"))
+    spec = vault_catalog().type(item_type)
+    choice_field = spec.choice_fields if spec else {}
+    if item_type == "family_member":
+        relation = value.get("relation")
+        return _facet("family_member", who=_label(choice_field.get("relation", ""), relation),
+                      **{k: v for k, v in value.items() if k != "relation"}, code=relation)
+    if item_type in ("domicile", "quota"):
+        field = "province" if item_type == "domicile" else "kind"
+        code = value.get(field)
+        return _facet(item_type, **{field: _label(choice_field.get(field, ""), code)},
+                      **{k: v for k, v in value.items() if k != field}, code=code)
+    return None
 
 
 def not_english(facet: dict) -> bool:

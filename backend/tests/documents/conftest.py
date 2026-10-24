@@ -19,7 +19,7 @@ from app.models import (
     VaultFieldDefinition, Workspace, VAULT_INTAKE_MODELS,
     Roadmap, RoadmapStudentState,
 )
-from app.memory.field_definitions import SEED_FIELD_DEFINITIONS, VaultFieldDefinitionService
+from app.memory.field_definitions import VaultFieldDefinitionService, catalog_field_definitions
 from app.memory.student_records import ENTITY_MODELS
 
 
@@ -57,7 +57,7 @@ def db():
         session.flush()
         session.info.update(workspace=workspace.id, other=other.id, user=user.id)
         fields = VaultFieldDefinitionService(session)
-        for spec in SEED_FIELD_DEFINITIONS:
+        for spec in catalog_field_definitions():
             fields.upsert_definition({**spec, "context_tags": [], "profile_priority": 50})
         session.commit()
         yield session

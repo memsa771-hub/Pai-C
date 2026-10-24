@@ -26,13 +26,15 @@ def test_thread_request_safety_order_and_question_cap():
     assert decide(sample).action == "care"
 
 
-def test_choices_are_catalog_only_with_other(monkeypatch):
-    data = fact_cards.load_data("fact_cards.json")
-    data["catalogs"]["levels"] = [{"value": "Catalog level", "label": "Catalog level"}]
-    monkeypatch.setattr(fact_cards, "load_data", lambda _: data)
+def test_choices_are_catalog_only_with_other():
+    """Card choices are the Vault catalog's lists; fact_cards.json keeps none of its own."""
+    from app.memory.catalog import vault_catalog
+    assert "catalogs" not in fact_cards.load_data("fact_cards.json")
     cards = fact_cards.available_cards(SimpleNamespace(facts={}, records={}))
     level = next(card for card in cards if card["key"] == "qualification")
-    assert level["choices"] == data["catalogs"]["levels"] and level["other"]["editable"]
+    assert level["choices"] == [{"value": c.code, "label": c.label} for c in vault_catalog().choices("levels")]
+    assert level["other"]["editable"]
+    # No catalog list for cities: a free-text card.
     assert next(card for card in cards if card["key"] == "city")["kind"] == "text"
     assert fact_cards.validated_card({"type": "collect_fact", "card_key": "qualification", "choices": ["invented"]}, cards, "") is None
 

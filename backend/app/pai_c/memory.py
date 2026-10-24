@@ -3,7 +3,9 @@
 from app.memory.student_snapshot import StudentSnapshotService
 from app.memory.episodic import EpisodicMemoryService
 from app.memory.permissions import capabilities_for_agent
-from app.memory.vault_context import estimated_tokens, select_context_entries  # noqa: F401  re-exported for PAI C
+from app.memory.catalog import vault_catalog  # noqa: F401  re-exported for PAI C
+from app.memory.vault_context import (  # noqa: F401  re-exported for PAI C
+    context_policy, estimated_tokens, select_context_entries, sensitive_types_for)
 from app.pai_c.deep.notebook import NotebookService
 from app.pai_c.deep.turn_input import shared_history
 

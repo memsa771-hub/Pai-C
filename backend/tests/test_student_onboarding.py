@@ -20,7 +20,7 @@ from sqlalchemy.pool import StaticPool
 
 from app.database import Base
 from app.memory.errors import MemoryDataError
-from app.memory.field_definitions import SEED_FIELD_DEFINITIONS, VaultFieldDefinitionService
+from app.memory.field_definitions import VaultFieldDefinitionService, catalog_field_definitions
 from app.memory.onboarding import ONBOARDING_FIELDS, OnboardingService
 from app.memory.student_profile_view import StudentProfileView
 from app.memory.student_records import ENTITY_MODELS
@@ -76,7 +76,7 @@ def db():
         session.add(workspace)
         session.flush()
         fields = VaultFieldDefinitionService(session)
-        for spec in SEED_FIELD_DEFINITIONS:
+        for spec in catalog_field_definitions():
             fields.upsert_definition(spec)
         for key, sensitivity, choices in FIELD_SPECS:
             schema = {"type": "string"}
@@ -377,3 +377,31 @@ def test_entry_other_preserves_student_words_and_requests_catalog_review(db):
     assert candidate.evidence['quote']=='My education system'
     assert candidate.evidence['catalog_review']['status']=='pending'
     assert next(f for f in service.state(workspace)['fields'] if f['name'] == 'level')['allowOther'] is True
+
+
+def test_the_form_is_read_from_the_catalog(db):
+    """No second field list: onboarding asks the catalog types marked `onboarding`."""
+    from pathlib import Path
+    from app.memory import onboarding
+    from app.memory.catalog import vault_catalog
+    assert not (Path(onboarding.__file__).parent / "entry_fields.json").exists()
+    asked = sorted((t for t in vault_catalog().types() if t.onboarding), key=lambda t: t.onboarding["order"])
+    keys = list(dict.fromkeys(f.field_key for f in ONBOARDING_FIELDS))
+    assert keys == [t.key for t in asked]
+    state = OnboardingService(db).state(db.info["workspace"])
+    level = next(f for f in state["fields"] if f["name"] == "level")
+    # The offered chips are catalog level codes; every one is a real code.
+    codes = {c.code for c in vault_catalog().choices("levels")}
+    assert level["choices"] == ["matric", "o_level", "fsc", "a_level"] and set(level["choices"]) <= codes
+
+
+def test_a_level_in_the_students_wording_is_the_catalog_code_without_review(db):
+    from app.models import MemoryCandidate
+    from sqlalchemy import select
+    workspace = db.info["workspace"]
+    OnboardingService(db).apply(workspace, {**THREE_STEPS, "level": "O-Level"})
+    db.commit()
+    candidate = db.scalar(select(MemoryCandidate).where(MemoryCandidate.workspace_id == workspace.id,
+                                                        MemoryCandidate.key == "education"))
+    assert candidate.proposed_value["value"] == {"qualification_name": "o_level"}
+    assert "catalog_review" not in candidate.evidence

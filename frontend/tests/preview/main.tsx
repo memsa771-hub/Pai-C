@@ -20,7 +20,7 @@ const q=new URLSearchParams(location.search);
 const entry={required:true,completedAt:null,prefill:{currentCountry:'Pakistan'},fields:[
   {name:'firstName',fieldKey:'identity.full_name',required:true,choices:[],isDate:false,step:1},
   {name:'lastName',fieldKey:'identity.full_name',required:true,choices:[],isDate:false,step:1},
-  {name:'level',fieldKey:'education',required:true,choices:['matric','o-level','fsc','a-level'],allowOther:true,isDate:false,step:2},
+  {name:'level',fieldKey:'education',required:true,choices:['matric','o_level','fsc','a_level'],allowOther:true,isDate:false,step:2},
   {name:'dateOfBirth',fieldKey:'identity.date_of_birth',required:true,choices:[],isDate:true,step:2},
   {name:'gender',fieldKey:'identity.gender',required:true,choices:['male','female','undisclosed'],isDate:false,step:2},
   {name:'currentCountry',fieldKey:'location.current_country',required:true,choices:[],isDate:false,step:3,default:'Pakistan',options:['Pakistan']},

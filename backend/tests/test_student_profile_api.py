@@ -24,7 +24,7 @@ from sqlalchemy.pool import StaticPool
 
 from app.database import Base, get_db
 from app.main import app
-from app.memory.field_definitions import SEED_FIELD_DEFINITIONS, VaultFieldDefinitionService
+from app.memory.field_definitions import VaultFieldDefinitionService, catalog_field_definitions
 from app.memory.student_context import StudentContextBuilder
 from app.memory.student_records import ENTITY_MODELS
 from app.memory.vault import VaultService
@@ -88,7 +88,7 @@ def api():
     session.add(workspace)
     session.flush()
     fields = VaultFieldDefinitionService(session)
-    for spec in SEED_FIELD_DEFINITIONS:
+    for spec in catalog_field_definitions():
         fields.upsert_definition(spec)
     for key, sensitivity in EXTRA_FIELDS:
         fields.upsert_definition({"key": key, "category": key.split(".")[0],

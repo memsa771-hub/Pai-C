@@ -752,7 +752,7 @@ export const messages = {
     },
     countryNote: 'More countries are coming soon.',
     choice: {
-      matric: 'Matric', 'o-level': 'O-level', fsc: 'FSc', 'a-level': 'A-level',
+      matric: 'Matric', o_level: 'O-level', fsc: 'FSc', a_level: 'A-level',
       student: 'Student',
       professional: 'Working professional',
       other: 'Other',

@@ -703,7 +703,7 @@
  },
  "types": [
   {
-   "key": "finance.budget", "money": true,
+   "key": "finance.budget",
    "label": "Budget",
    "storage": "fact",
    "shown_on": "details",
@@ -714,12 +714,86 @@
     "details"
    ],
    "sensitivity": "sensitive",
+   "money": true,
    "conflict": "latest_wins",
    "freshness_days": 180,
    "version": 1,
    "choice_fields": {
     "band": "budget_bands",
     "covers": "budget_covers"
+   },
+   "field_definition": {
+    "category": "finance",
+    "data_type": "object",
+    "validation_schema": {
+     "type": "object",
+     "properties": {
+      "band": {
+       "type": "string",
+       "enum": [
+        "under_1_lakh",
+        "1_3_lakh",
+        "3_6_lakh",
+        "6_10_lakh",
+        "over_10_lakh",
+        "not_sure"
+       ]
+      },
+      "min": {
+       "type": "number",
+       "minimum": 0
+      },
+      "max": {
+       "type": "number",
+       "minimum": 0
+      },
+      "amount": {
+       "type": "number",
+       "minimum": 0
+      },
+      "currency": {
+       "type": "string"
+      },
+      "period": {
+       "type": "string",
+       "enum": [
+        "per_year",
+        "per_month",
+        "total"
+       ]
+      },
+      "covers": {
+       "type": "string",
+       "enum": [
+        "fees_only",
+        "fees_and_living"
+       ]
+      },
+      "approximate": {
+       "type": "boolean"
+      },
+      "possible_without_scholarship": {
+       "type": "string",
+       "enum": [
+        "yes",
+        "no",
+        "not_sure"
+       ]
+      }
+     },
+     "additionalProperties": false
+    },
+    "cardinality": "single",
+    "conflict_policy": "latest_wins",
+    "searchable": false,
+    "context_tags": [
+     "counseling",
+     "matching",
+     "career"
+    ],
+    "required_for": null,
+    "profile_priority": 100,
+    "description": "Budget the student can fund, with currency and period."
    }
   },
   {
@@ -734,7 +808,36 @@
    "sensitivity": "normal",
    "conflict": "latest_wins",
    "freshness_days": 365,
-   "version": 1
+   "version": 1,
+   "field_definition": {
+    "category": "preferences",
+    "data_type": "string",
+    "validation_schema": {
+     "type": "string",
+     "enum": [
+      "on_campus",
+      "online",
+      "hybrid"
+     ]
+    },
+    "cardinality": "single",
+    "conflict_policy": "latest_wins",
+    "searchable": false,
+    "context_tags": null,
+    "required_for": null,
+    "profile_priority": 50,
+    "description": "How the student wants to study.",
+    "source_policy": {
+     "allowed_sources": [
+      "user_explicit",
+      "conversation"
+     ],
+     "authority_rank": {
+      "user_explicit": 100,
+      "conversation": 80
+     }
+    }
+   }
   },
   {
    "key": "identity.full_name",
@@ -754,7 +857,39 @@
    "onboarding": {
     "order": 1,
     "prompt": "What is your full name?",
-    "input": "text"
+    "input": "text",
+    "name": "fullName",
+    "step": 1,
+    "parts": [
+     {
+      "name": "firstName",
+      "max_length": 80
+     },
+     {
+      "name": "lastName",
+      "max_length": 80
+     }
+    ]
+   },
+   "field_definition": {
+    "category": "identity",
+    "data_type": "string",
+    "validation_schema": {
+     "type": "string"
+    },
+    "cardinality": "single",
+    "conflict_policy": "latest_wins",
+    "searchable": false,
+    "context_tags": [
+     "application",
+     "visa"
+    ],
+    "required_for": [
+     "application",
+     "visa"
+    ],
+    "profile_priority": 90,
+    "description": "identity full name"
    }
   },
   {
@@ -771,7 +906,25 @@
    "sensitivity": "normal",
    "conflict": "latest_wins",
    "freshness_days": null,
-   "version": 1
+   "version": 1,
+   "field_definition": {
+    "category": "identity",
+    "data_type": "string",
+    "validation_schema": {
+     "type": "string"
+    },
+    "cardinality": "single",
+    "conflict_policy": "latest_wins",
+    "searchable": false,
+    "context_tags": [
+     "discovery"
+    ],
+    "required_for": [
+     "discovery"
+    ],
+    "profile_priority": 95,
+    "description": "identity preferred name"
+   }
   },
   {
    "key": "identity.current_status",
@@ -787,7 +940,27 @@
    "sensitivity": "normal",
    "conflict": "latest_wins",
    "freshness_days": 180,
-   "version": 1
+   "version": 1,
+   "field_definition": {
+    "category": "identity",
+    "data_type": "string",
+    "validation_schema": {
+     "type": "string"
+    },
+    "cardinality": "single",
+    "conflict_policy": "latest_wins",
+    "searchable": false,
+    "context_tags": [
+     "discovery",
+     "counseling"
+    ],
+    "required_for": [
+     "discovery",
+     "counseling"
+    ],
+    "profile_priority": 90,
+    "description": "identity current status"
+   }
   },
   {
    "key": "identity.nationality",
@@ -803,7 +976,26 @@
    "sensitivity": "sensitive",
    "conflict": "evidence_wins",
    "freshness_days": null,
-   "version": 1
+   "version": 1,
+   "field_definition": {
+    "category": "identity",
+    "data_type": "string",
+    "validation_schema": {
+     "type": "string"
+    },
+    "cardinality": "single",
+    "conflict_policy": "latest_wins",
+    "searchable": false,
+    "context_tags": [
+     "visa",
+     "counseling"
+    ],
+    "required_for": [
+     "visa"
+    ],
+    "profile_priority": 60,
+    "description": "identity nationality"
+   }
   },
   {
    "key": "identity.date_of_birth",
@@ -823,7 +1015,29 @@
    "onboarding": {
     "order": 3,
     "prompt": "When were you born?",
-    "input": "date"
+    "input": "date",
+    "name": "dateOfBirth",
+    "step": 2
+   },
+   "field_definition": {
+    "category": "identity",
+    "data_type": "string",
+    "validation_schema": {
+     "type": "string"
+    },
+    "cardinality": "single",
+    "conflict_policy": "manual_review",
+    "searchable": false,
+    "context_tags": [
+     "application",
+     "visa"
+    ],
+    "required_for": [
+     "application",
+     "visa"
+    ],
+    "profile_priority": 40,
+    "description": "identity date of birth"
    }
   },
   {
@@ -840,7 +1054,27 @@
    "sensitivity": "restricted",
    "conflict": "evidence_wins",
    "freshness_days": null,
-   "version": 1
+   "version": 1,
+   "field_definition": {
+    "category": "identity",
+    "data_type": "string",
+    "validation_schema": {
+     "type": "string"
+    },
+    "cardinality": "single",
+    "conflict_policy": "manual_review",
+    "searchable": false,
+    "context_tags": [
+     "application",
+     "visa"
+    ],
+    "required_for": [
+     "application",
+     "visa"
+    ],
+    "profile_priority": 20,
+    "description": "identity passport number"
+   }
   },
   {
    "key": "contact.email",
@@ -856,7 +1090,25 @@
    "sensitivity": "restricted",
    "conflict": "latest_wins",
    "freshness_days": 365,
-   "version": 1
+   "version": 1,
+   "field_definition": {
+    "category": "contact",
+    "data_type": "string",
+    "validation_schema": {
+     "type": "string"
+    },
+    "cardinality": "single",
+    "conflict_policy": "manual_review",
+    "searchable": false,
+    "context_tags": [
+     "application"
+    ],
+    "required_for": [
+     "application"
+    ],
+    "profile_priority": 20,
+    "description": "contact email"
+   }
   },
   {
    "key": "contact.phone",
@@ -872,7 +1124,25 @@
    "sensitivity": "restricted",
    "conflict": "latest_wins",
    "freshness_days": 365,
-   "version": 1
+   "version": 1,
+   "field_definition": {
+    "category": "contact",
+    "data_type": "string",
+    "validation_schema": {
+     "type": "string"
+    },
+    "cardinality": "single",
+    "conflict_policy": "manual_review",
+    "searchable": false,
+    "context_tags": [
+     "application"
+    ],
+    "required_for": [
+     "application"
+    ],
+    "profile_priority": 20,
+    "description": "contact phone"
+   }
   },
   {
    "key": "location.current_country",
@@ -893,7 +1163,35 @@
     "order": 5,
     "prompt": "Which country do you live in?",
     "input": "text",
-    "default": "Pakistan"
+    "default": "Pakistan",
+    "name": "currentCountry",
+    "step": 3,
+    "options": [
+     "Pakistan"
+    ]
+   },
+   "field_definition": {
+    "category": "location",
+    "data_type": "string",
+    "validation_schema": {
+     "type": "string"
+    },
+    "cardinality": "single",
+    "conflict_policy": "latest_wins",
+    "searchable": false,
+    "context_tags": [
+     "discovery",
+     "matching"
+    ],
+    "required_for": [
+     "discovery",
+     "matching"
+    ],
+    "profile_priority": 90,
+    "description": "location current country",
+    "source_policy": {
+     "temporal_change": "student_transition"
+    }
    }
   },
   {
@@ -914,7 +1212,30 @@
    "onboarding": {
     "order": 6,
     "prompt": "Which city do you live in?",
-    "input": "text"
+    "input": "text",
+    "name": "currentCity",
+    "step": 3
+   },
+   "field_definition": {
+    "category": "location",
+    "data_type": "string",
+    "validation_schema": {
+     "type": "string"
+    },
+    "cardinality": "single",
+    "conflict_policy": "latest_wins",
+    "searchable": false,
+    "context_tags": [
+     "counseling"
+    ],
+    "required_for": [
+     "counseling"
+    ],
+    "profile_priority": 60,
+    "description": "location current city",
+    "source_policy": {
+     "temporal_change": "student_transition"
+    }
    }
   },
   {
@@ -931,7 +1252,37 @@
    "sensitivity": "normal",
    "conflict": "latest_wins",
    "freshness_days": 180,
-   "version": 1
+   "version": 1,
+   "field_definition": {
+    "category": "mobility",
+    "data_type": "string",
+    "validation_schema": {
+     "type": "string"
+    },
+    "cardinality": "single",
+    "conflict_policy": "latest_wins",
+    "searchable": false,
+    "context_tags": [
+     "matching",
+     "career"
+    ],
+    "required_for": [
+     "matching",
+     "career"
+    ],
+    "profile_priority": 70,
+    "description": "mobility relocation willingness",
+    "source_policy": {
+     "allowed_sources": [
+      "user_explicit",
+      "conversation"
+     ],
+     "authority_rank": {
+      "user_explicit": 100,
+      "conversation": 80
+     }
+    }
+   }
   },
   {
    "key": "preferences.target_countries",
@@ -945,7 +1296,35 @@
    "sensitivity": "normal",
    "conflict": "latest_wins",
    "freshness_days": 90,
-   "version": 1
+   "version": 1,
+   "field_definition": {
+    "category": "preferences",
+    "data_type": "array",
+    "validation_schema": {
+     "type": "array"
+    },
+    "cardinality": "multi",
+    "conflict_policy": "latest_wins",
+    "searchable": false,
+    "context_tags": [
+     "matching"
+    ],
+    "required_for": [
+     "matching"
+    ],
+    "profile_priority": 85,
+    "description": "preferences target countries",
+    "source_policy": {
+     "allowed_sources": [
+      "user_explicit",
+      "conversation"
+     ],
+     "authority_rank": {
+      "user_explicit": 100,
+      "conversation": 80
+     }
+    }
+   }
   },
   {
    "key": "preferences.preferred_language",
@@ -959,7 +1338,35 @@
    "sensitivity": "normal",
    "conflict": "latest_wins",
    "freshness_days": 365,
-   "version": 1
+   "version": 1,
+   "field_definition": {
+    "category": "preferences",
+    "data_type": "string",
+    "validation_schema": {
+     "type": "string"
+    },
+    "cardinality": "single",
+    "conflict_policy": "latest_wins",
+    "searchable": false,
+    "context_tags": [
+     "counseling"
+    ],
+    "required_for": [
+     "counseling"
+    ],
+    "profile_priority": 40,
+    "description": "preferences preferred language",
+    "source_policy": {
+     "allowed_sources": [
+      "user_explicit",
+      "conversation"
+     ],
+     "authority_rank": {
+      "user_explicit": 100,
+      "conversation": 80
+     }
+    }
+   }
   },
   {
    "key": "preferences.learning_style",
@@ -973,10 +1380,38 @@
    "sensitivity": "normal",
    "conflict": "latest_wins",
    "freshness_days": 365,
-   "version": 1
+   "version": 1,
+   "field_definition": {
+    "category": "preferences",
+    "data_type": "string",
+    "validation_schema": {
+     "type": "string"
+    },
+    "cardinality": "single",
+    "conflict_policy": "latest_wins",
+    "searchable": false,
+    "context_tags": [
+     "counseling"
+    ],
+    "required_for": [
+     "counseling"
+    ],
+    "profile_priority": 30,
+    "description": "preferences learning style",
+    "source_policy": {
+     "allowed_sources": [
+      "user_explicit",
+      "conversation"
+     ],
+     "authority_rank": {
+      "user_explicit": 100,
+      "conversation": 80
+     }
+    }
+   }
   },
   {
-   "key": "finance.funding_status", "money": true,
+   "key": "finance.funding_status",
    "label": "Funding status",
    "storage": "fact",
    "shown_on": "details",
@@ -987,12 +1422,34 @@
     "details"
    ],
    "sensitivity": "sensitive",
+   "money": true,
    "conflict": "latest_wins",
    "freshness_days": 180,
-   "version": 1
+   "version": 1,
+   "field_definition": {
+    "category": "finance",
+    "data_type": "string",
+    "validation_schema": {
+     "type": "string"
+    },
+    "cardinality": "single",
+    "conflict_policy": "latest_wins",
+    "searchable": false,
+    "context_tags": [
+     "counseling",
+     "matching",
+     "career"
+    ],
+    "required_for": [
+     "matching",
+     "application"
+    ],
+    "profile_priority": 100,
+    "description": "finance funding status"
+   }
   },
   {
-   "key": "finance.scholarship_interest", "money": true,
+   "key": "finance.scholarship_interest",
    "label": "Scholarship interest",
    "storage": "fact",
    "shown_on": "details",
@@ -1003,9 +1460,30 @@
     "details"
    ],
    "sensitivity": "sensitive",
+   "money": true,
    "conflict": "latest_wins",
    "freshness_days": 180,
-   "version": 1
+   "version": 1,
+   "field_definition": {
+    "category": "finance",
+    "data_type": "boolean",
+    "validation_schema": {
+     "type": "boolean"
+    },
+    "cardinality": "single",
+    "conflict_policy": "latest_wins",
+    "searchable": false,
+    "context_tags": [
+     "counseling",
+     "matching",
+     "career"
+    ],
+    "required_for": [
+     "scholarship"
+    ],
+    "profile_priority": 100,
+    "description": "finance scholarship interest"
+   }
   },
   {
    "key": "career.primary_interest",
@@ -1018,7 +1496,35 @@
    "sensitivity": "normal",
    "conflict": "latest_wins",
    "freshness_days": 180,
-   "version": 1
+   "version": 1,
+   "field_definition": {
+    "category": "career",
+    "data_type": "string",
+    "validation_schema": {
+     "type": "string"
+    },
+    "cardinality": "single",
+    "conflict_policy": "latest_wins",
+    "searchable": false,
+    "context_tags": [
+     "career"
+    ],
+    "required_for": [
+     "career"
+    ],
+    "profile_priority": 80,
+    "description": "career primary interest",
+    "source_policy": {
+     "allowed_sources": [
+      "user_explicit",
+      "conversation"
+     ],
+     "authority_rank": {
+      "user_explicit": 100,
+      "conversation": 80
+     }
+    }
+   }
   },
   {
    "key": "accessibility.accommodation_needs",
@@ -1034,7 +1540,25 @@
    "sensitivity": "restricted",
    "conflict": "latest_wins",
    "freshness_days": 365,
-   "version": 1
+   "version": 1,
+   "field_definition": {
+    "category": "accessibility",
+    "data_type": "string",
+    "validation_schema": {
+     "type": "string"
+    },
+    "cardinality": "single",
+    "conflict_policy": "manual_review",
+    "searchable": false,
+    "context_tags": [
+     "application"
+    ],
+    "required_for": [
+     "application"
+    ],
+    "profile_priority": 20,
+    "description": "accessibility accommodation needs"
+   }
   },
   {
    "key": "identity.gender",
@@ -1059,7 +1583,34 @@
      "male",
      "female",
      "undisclosed"
-    ]
+    ],
+    "name": "gender",
+    "step": 2
+   },
+   "field_definition": {
+    "category": "identity",
+    "data_type": "string",
+    "validation_schema": {
+     "type": "string",
+     "enum": [
+      "male",
+      "female",
+      "other",
+      "undisclosed"
+     ]
+    },
+    "cardinality": "single",
+    "conflict_policy": "latest_wins",
+    "searchable": false,
+    "context_tags": [
+     "scholarship",
+     "counseling"
+    ],
+    "required_for": [
+     "scholarship"
+    ],
+    "profile_priority": 50,
+    "description": "identity gender"
    }
   },
   {
@@ -1076,7 +1627,30 @@
    "sensitivity": "normal",
    "conflict": "latest_wins",
    "freshness_days": 365,
-   "version": 1
+   "version": 1,
+   "field_definition": {
+    "category": "identity",
+    "data_type": "string",
+    "validation_schema": {
+     "type": "string",
+     "enum": [
+      "student",
+      "professional",
+      "other"
+     ]
+    },
+    "cardinality": "single",
+    "conflict_policy": "latest_wins",
+    "searchable": false,
+    "context_tags": [
+     "discovery"
+    ],
+    "required_for": [
+     "discovery"
+    ],
+    "profile_priority": 95,
+    "description": "identity status category"
+   }
   },
   {
    "key": "preferences.location_limits",
@@ -1090,7 +1664,32 @@
    "sensitivity": "normal",
    "conflict": "latest_wins",
    "freshness_days": 365,
-   "version": 1
+   "version": 1,
+   "field_definition": {
+    "category": "preferences",
+    "data_type": "array",
+    "validation_schema": {
+     "type": "array",
+     "maxItems": 30,
+     "items": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200
+     }
+    },
+    "cardinality": "single",
+    "conflict_policy": "latest_wins",
+    "searchable": true,
+    "description": "Places the student can or cannot study or work",
+    "context_tags": [
+     "counseling",
+     "matching"
+    ],
+    "required_for": [
+     "counseling"
+    ],
+    "profile_priority": 65
+   }
   },
   {
    "key": "preferences.study_load",
@@ -1104,7 +1703,30 @@
    "sensitivity": "normal",
    "conflict": "latest_wins",
    "freshness_days": 365,
-   "version": 1
+   "version": 1,
+   "field_definition": {
+    "category": "preferences",
+    "data_type": "string",
+    "validation_schema": {
+     "type": "string",
+     "enum": [
+      "full_time",
+      "part_time",
+      "flexible"
+     ]
+    },
+    "cardinality": "single",
+    "conflict_policy": "latest_wins",
+    "searchable": false,
+    "description": "Full-time or part-time study availability",
+    "context_tags": [
+     "counseling"
+    ],
+    "required_for": [
+     "counseling"
+    ],
+    "profile_priority": 55
+   }
   },
   {
    "key": "education",
@@ -1130,7 +1752,17 @@
     "order": 2,
     "prompt": "What is your current or latest qualification?",
     "input": "choice",
-    "choices": "levels"
+    "choices": "levels",
+    "name": "level",
+    "step": 2,
+    "record_field": "qualification_name",
+    "allow_other": true,
+    "shown": [
+     "matric",
+     "o_level",
+     "fsc",
+     "a_level"
+    ]
    }
   },
   {
@@ -1405,7 +2037,7 @@
    ]
   },
   {
-   "key": "pressure", "money": true,
+   "key": "pressure",
    "label": "Pressure",
    "storage": "item",
    "shown_on": "story",
@@ -1414,6 +2046,7 @@
     "story"
    ],
    "sensitivity": "sensitive",
+   "money": true,
    "conflict": "latest_wins",
    "freshness_days": 365,
    "version": 1,
@@ -1555,7 +2188,7 @@
    "identity": []
   },
   {
-   "key": "family_member", "money": true,
+   "key": "family_member",
    "label": "Family member",
    "storage": "item",
    "shown_on": "story",
@@ -1564,6 +2197,7 @@
     "story"
    ],
    "sensitivity": "sensitive",
+   "money": true,
    "conflict": "latest_wins",
    "freshness_days": 365,
    "version": 1,

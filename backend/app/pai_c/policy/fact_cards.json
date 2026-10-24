@@ -5,13 +5,6 @@
     "upload": "Upload a result card or certificate",
     "text": "Your answer"
   },
-  "catalogs": {
-    "levels": [],
-    "boards": [],
-    "subjects": [],
-    "skills": [],
-    "cities": []
-  },
   "cards": {
     "qualification": {
       "area": "status",

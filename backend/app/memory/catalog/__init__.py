@@ -62,6 +62,10 @@ class TypeSpec:
     # Can hold a household's money (finance facts, family and pressure items):
     # the extractor's income guard covers exactly the types marked here.
     money: bool = False
+    # A fact's Vault field definition (category, data_type, validation_schema,
+    # policies) as production's migrations seed it; the eval and tests build
+    # their field rows from this instead of copying the migrations.
+    field_definition: dict | None = None
 
 
 def _check_schema(schema: dict, where: str) -> None:
@@ -118,9 +122,26 @@ def _build_type(raw: dict, choices: dict) -> TypeSpec:
                 raise ValueError("onboarding needs order, prompt and input (text|choice|date)")
             if isinstance(onboarding.get("choices"), str) and onboarding["choices"] not in choices:
                 raise ValueError("onboarding uses an unknown choice list")
+            # The form's own names (the frontend's answer keys) and parts.
+            names = [onboarding.get("name"), *(p.get("name") for p in onboarding.get("parts", []))]
+            if not all(isinstance(n, str) and n for n in names):
+                raise ValueError("onboarding needs a name, and every part a name")
+            if onboarding.get("shown"):
+                codes = {c.code for c in choices.get(onboarding.get("choices"), [])}
+                if not isinstance(onboarding.get("choices"), str) or not set(onboarding["shown"]) <= codes:
+                    raise ValueError("onboarding shown choices must be codes of its choice list")
         money = raw.get("money", False)
         if not isinstance(money, bool):
             raise ValueError("money must be true or false")
+        field_definition = raw.get("field_definition")
+        if field_definition is not None:
+            if storage != "fact":
+                raise ValueError("only a fact has a field_definition")
+            if not isinstance(field_definition, dict) or not {
+                    "category", "data_type", "validation_schema"} <= set(field_definition):
+                raise ValueError("field_definition needs category, data_type and validation_schema")
+            if {"key", "sensitivity"} & set(field_definition):
+                raise ValueError("field_definition takes key and sensitivity from the type")
         section = raw.get("section")
         if section is not None and (not isinstance(section, str) or not section.strip()):
             raise ValueError("section must be a non-empty string")
@@ -128,7 +149,8 @@ def _build_type(raw: dict, choices: dict) -> TypeSpec:
             key=key, label=raw.get("label", key), storage=storage, shown_on=raw["shown_on"],
             inputs=inputs, sensitivity=raw["sensitivity"], conflict=raw["conflict"],
             freshness_days=days, version=raw["version"], schema=schema, identity=identity,
-            choice_fields=choice_fields, onboarding=onboarding, section=section, money=money)
+            choice_fields=choice_fields, onboarding=onboarding, section=section, money=money,
+            field_definition=field_definition)
     except (KeyError, TypeError, AttributeError, ValueError) as exc:
         detail = f"missing {exc}" if isinstance(exc, KeyError) else str(exc)
         raise ValueError(f"Invalid catalog type {key!r}: {detail}") from exc

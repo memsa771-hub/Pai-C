@@ -46,10 +46,10 @@ def _trim_notebook(notebook, sensitive_types=frozenset()) -> dict:
     worries) and pressures are as sensitive as the Vault types they mirror, so
     they come in only when `sensitive_types` (the Vault topic gate for this
     turn) holds that type."""
-    from app.memory.vault_context import context_policy
     source = notebook.model_dump(mode="json")
     selected: dict = {}
     active_paths = (*load_policy()["item_paths"], load_policy()["person_path"])
+    from app.pai_c.memory import context_policy
     gates = context_policy()["notebook_gates"]
     for key in _NOTEBOOK_ORDER:
         if key in gates and gates[key] not in sensitive_types:
@@ -211,7 +211,7 @@ async def build_context(db, workspace_id: str, turn: CounselorTurnInput, *,
             {"between": item.between, "evidence": item.evidence, "status": item.status}
             for item in notebook.tensions])
     else:
-        from app.memory.vault_context import sensitive_types_for
+        from app.pai_c.memory import sensitive_types_for
         sections["notebook"] = _json(_trim_notebook(
             notebook, sensitive_types_for(f"{trigger_text} {turn.student_text}", topics)))
     from app.pai_c.deep.noted_questions import NotedQuestionService

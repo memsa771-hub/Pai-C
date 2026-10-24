@@ -19,7 +19,6 @@ import argparse
 import asyncio
 import contextlib
 import hashlib
-import importlib.util
 import json
 import logging
 import time
@@ -35,46 +34,14 @@ ROOT = Path(__file__).resolve().parent
 RECORDINGS = vault_golden.CASES / "recordings"
 RESULTS = ROOT / "results" / "vault_eval"
 PRICES = ROOT / "eval" / "model_prices.json"
-VERSIONS = ROOT.parent / "alembic" / "versions"
-
-
-def _migration(name: str):
-    spec = importlib.util.spec_from_file_location(f"migration_{name}", VERSIONS / f"{name}.py")
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
 
 
 def production_field_definitions() -> list[dict]:
-    """The Vault fields production has after every migration, as upsert specs.
-
-    074 seeds the base fields; 078 gives preferences, career, mobility and
-    location a source policy; 085 adds two preference fields without one.
-    The eval must see the same fields the real extractor is shown.
-    """
-    specs = []
-    for field in _migration("074_pai_os_baseline")._VAULT_FIELDS:
-        spec = {k: v for k, v in field.items() if k != "id"}
-        if spec["category"] == "location":
-            spec["source_policy"] = {"temporal_change": "student_transition"}
-        elif spec["category"] in ("preferences", "career", "mobility"):
-            spec["source_policy"] = {"allowed_sources": ["user_explicit", "conversation"],
-                                     "authority_rank": {"user_explicit": 100, "conversation": 80}}
-        specs.append(spec)
-    # Mirrors the two INSERTs in alembic/versions/085_counselor_discovery_slots.py.
-    specs.append({"key": "preferences.location_limits", "category": "preferences", "data_type": "array",
-                  "validation_schema": {"type": "array", "maxItems": 30,
-                                        "items": {"type": "string", "minLength": 1, "maxLength": 200}},
-                  "cardinality": "single", "conflict_policy": "latest_wins", "sensitivity": "normal",
-                  "searchable": True, "description": "Places the student can or cannot study or work",
-                  "context_tags": ["counseling", "matching"], "required_for": ["counseling"],
-                  "profile_priority": 65})
-    specs.append({"key": "preferences.study_load", "category": "preferences", "data_type": "string",
-                  "validation_schema": {"type": "string", "enum": ["full_time", "part_time", "flexible"]},
-                  "cardinality": "single", "conflict_policy": "latest_wins", "sensitivity": "normal",
-                  "searchable": False, "description": "Full-time or part-time study availability",
-                  "context_tags": ["counseling"], "required_for": ["counseling"], "profile_priority": 55})
-    return specs
+    """The Vault fields production has, as upsert specs, from the catalog
+    (which carries migration 116's ranged budget). The eval must see the same
+    fields the real extractor is shown."""
+    from app.memory.field_definitions import catalog_field_definitions
+    return catalog_field_definitions()
 
 
 def prompt_fingerprint() -> str:
@@ -86,17 +53,8 @@ def prompt_fingerprint() -> str:
 
 
 class VaultSession(StudentSession):
-    """A StudentSession whose Vault has production's field definitions."""
-
-    def __enter__(self):
-        super().__enter__()
-        from app.memory.field_definitions import VaultFieldDefinitionService
-        with self.factory() as db:
-            fields = VaultFieldDefinitionService(db)
-            for spec in production_field_definitions():
-                fields.upsert_definition(spec)
-            db.commit()
-        return self
+    """A StudentSession (production's field definitions) that can post student
+    messages and count open questions, as a Vault eval run needs."""
 
     def student_message(self, text: str) -> str:
         """Persist one student message and queue its extraction, as a turn does."""

@@ -23,7 +23,7 @@ from app.models import Roadmap, RoadmapStudentState, VaultItem
 from app.memory.context import MemoryContextService
 from app.memory.extraction_context import TurnContext, build_turn_context
 from app.memory.extractor import _validate, build_user_prompt, extract_candidates
-from app.memory.field_definitions import SEED_FIELD_DEFINITIONS, VaultFieldDefinitionService
+from app.memory.field_definitions import VaultFieldDefinitionService, catalog_field_definitions
 from app.memory.foreground import render_block
 from app.memory.reconciler import MemoryReconciler
 from app.memory.profile_issues import ProfileIssueService
@@ -67,7 +67,7 @@ def db():
         session.flush()
         session.info.update(workspace=workspace.id, other=other.id, user=user.id)
         fields = VaultFieldDefinitionService(session)
-        for spec in SEED_FIELD_DEFINITIONS:
+        for spec in catalog_field_definitions():
             fields.upsert_definition({**spec, "context_tags": ["counseling"] if spec["key"] == "finance.budget" else [],
                                       "profile_priority": 100 if spec["key"] == "finance.budget" else 50})
         # Mirrors migration 063's sensitivity classes: the Profile projection is

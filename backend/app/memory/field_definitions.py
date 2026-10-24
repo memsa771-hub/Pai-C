@@ -9,9 +9,9 @@ retrieval. So every rule that varies per field lives in a row:
     conflict_policy     how a new value resolves against an existing one
     sensitivity         whether it may go into prompt context freely
 
-The seed set below is a *starting* set, not a hardcoded one — it is data
-inserted by a migration, and nothing in this package branches on any of these
-keys. Deleting them all would leave a Vault with no fields, not broken code.
+Production's rows are data inserted by migrations, and nothing in this package
+branches on any of these keys. The Vault catalog keeps the same definitions
+(`catalog_field_definitions`) for isolated test and eval students.
 """
 
 import logging
@@ -42,52 +42,14 @@ def usable_in_counseling(definition) -> bool:
     )
 
 
-# Seeded by migration 055. Illustrative coverage of the shapes the validator
-# must handle (number with range, enum, string, array, boolean), NOT an
-# attempt to model the domain — Phase 2 adds fields as data.
-SEED_FIELD_DEFINITIONS: tuple[dict, ...] = (
-    {
-        "key": "finance.budget",
-        "category": "finance",
-        "data_type": "object",
-        "validation_schema": {
-            "type": "object",
-            "properties": {
-                "amount": {"type": "number", "minimum": 0},
-                "currency": {"type": "string"},
-                "period": {"type": "string", "enum": ["total", "per_year"]},
-            },
-            "required": ["amount", "currency"],
-            "additionalProperties": False,
-        },
-        "cardinality": "single",
-        "conflict_policy": "latest_wins",
-        "sensitivity": "sensitive",
-        "description": "Budget the student can fund, with currency and period.",
-    },
-    {
-        "key": "preferences.target_countries",
-        "category": "preferences",
-        "data_type": "array",
-        "validation_schema": {"type": "array", "items": {"type": "string"}},
-        "cardinality": "multi",
-        "conflict_policy": "latest_wins",
-        "searchable": True,
-        "description": "Preferred destination countries, most preferred first.",
-    },
-    {
-        "key": "preferences.study_mode",
-        "category": "preferences",
-        "data_type": "string",
-        "validation_schema": {
-            "type": "string",
-            "enum": ["on_campus", "online", "hybrid"],
-        },
-        "cardinality": "single",
-        "conflict_policy": "latest_wins",
-        "description": "How the student wants to study.",
-    },
-)
+def catalog_field_definitions() -> list[dict]:
+    """Upsert specs for every catalog fact: the definitions production's
+    migrations seed, kept as data in the Vault catalog. Isolated students in
+    tests and evals are seeded from this, so they validate like production."""
+    from copy import deepcopy
+    from .catalog import vault_catalog
+    return [{"key": spec.key, "sensitivity": spec.sensitivity, **deepcopy(spec.field_definition)}
+            for spec in vault_catalog().types("fact") if spec.field_definition]
 
 
 class VaultFieldDefinitionService:

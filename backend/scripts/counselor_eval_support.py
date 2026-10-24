@@ -14,9 +14,10 @@ from sqlalchemy.ext.compiler import compiles
 from sqlalchemy.orm import sessionmaker
 
 from app.database import Base, set_session_factory
-from app.memory.field_definitions import SEED_FIELD_DEFINITIONS, VaultFieldDefinitionService
+from app.memory.field_definitions import VaultFieldDefinitionService, catalog_field_definitions
 from app.memory.student_records import ENTITY_MODELS, StudentRecordService
 from app.memory.vault import VaultService
+from app.memory.vault_items import VaultItemService
 from app.models import (
     BackgroundJob, DocumentArtifact, EventRecord, ExecutionRun, FileRecord, CounselorNotedQuestion, PaiTurnPlan, CounselorMirrorFeedback, PaiPossibility,
     CounselorTurnDecision, CounselorNotebook, CounselorNotebookHistory, MemoryCandidate, PaiEpisode, PaiMemory, ProfileFieldResponse, ProfileIssue, ProfileRequirement, StudentRecordRevision,
@@ -102,7 +103,8 @@ class StudentSession:
                 display_name="PAI Counselor",
             ))
             fields = VaultFieldDefinitionService(db)
-            for spec in SEED_FIELD_DEFINITIONS:
+            # Production's field definitions, from the Vault catalog.
+            for spec in catalog_field_definitions():
                 fields.upsert_definition(spec)
             db.commit()
             self.user_id = str(user.id)
@@ -190,6 +192,8 @@ class StudentSession:
             return {
                 "facts": VaultService(db).snapshot(self.workspace_id, include_sensitive=True),
                 "records": StudentRecordService(db).snapshot(self.workspace_id),
+                "items": [{"type": row.item_type, "value": row.value, "level": row.level}
+                          for row in VaultItemService(db).active(self.workspace_id)],
                 "memories": [row.content for row in db.execute(select(PaiMemory).where(
                     PaiMemory.workspace_id == self.workspace_id)).scalars()],
                 "candidates": [{"type": row.candidate_type, "key": row.key,

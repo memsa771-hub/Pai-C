@@ -285,3 +285,25 @@ def test_money_kinds_come_from_the_catalog_and_the_view_data(monkeypatch):
     copy["uncatalogued_records"]["application"]["money"] = True
     monkeypatch.setattr(vault_view, "view_copy", lambda: copy)
     assert extractor.states_household_income(raw, ())
+
+
+def test_what_chat_may_propose_is_data_not_a_ban_list(monkeypatch):
+    """A fact is proposable from chat when its catalog inputs include chat; an
+    uncatalogued record kind unless vault_view.json says `chat_input: false`."""
+    from types import SimpleNamespace
+    from app.memory import vault_view
+    from app.memory.extractor import _validate
+    assert not hasattr(extractor, "_STOPPED_RECORD_KINDS")
+    assert "Do not propose student_voice_statement" not in SYSTEM_PROMPT
+    text = "I applied for a visa last month"
+    turn = SimpleNamespace(user_text=text, user_event_id="event", records={}, vault={}, existing_memories=[],
+                           recent=[], assistant_text="")
+    raw = {"candidate_type": "student_record", "key": "visa", "quote": text, "confidence": 0.9,
+           "proposed_value": {"status": "applied"}}
+    assert extractor._chat_proposable(raw)
+    copy = json.loads(json.dumps(vault_view.view_copy()))
+    copy["uncatalogued_records"]["visa"]["chat_input"] = False
+    monkeypatch.setattr(vault_view, "view_copy", lambda: copy)
+    assert not extractor._chat_proposable(raw)
+    assert _validate(raw, turn, set()) is None
+    assert "visa" not in extractor._extractor_specs()

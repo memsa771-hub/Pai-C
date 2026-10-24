@@ -27,8 +27,9 @@
     "credential": {"label": "Credential", "section": "education", "sensitivity": "normal",
                    "file_field": "raw_document_ref"},
     "external_influence": {"label": "What others want for you", "section": "about", "sensitivity": "sensitive",
-                           "omit_fields": ["student_response"]},
-    "student_voice_statement": {"hidden": true, "reason": "holds original words; spec Language"}
+                           "omit_fields": ["student_response"], "chat_input": false},
+    "student_voice_statement": {"hidden": true, "reason": "holds original words; spec Language",
+                                "chat_input": false}
   },
   "file_record_kind": "document",
   "story_rich_min_entries": 2,

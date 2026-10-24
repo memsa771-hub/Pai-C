@@ -26,9 +26,11 @@ class CardAnswer(BaseModel):
     education_id: str | None = None
 
 
-def choices_for(spec, data, record=None):
-    return [deepcopy(row) for row in data["catalogs"].get(spec["catalog"], [])
-            if not row.get("levels") or (record or {}).get("canonical_level") in row["levels"]]
+def choices_for(spec):
+    """A card's choices are the Vault catalog list it names; a name with no
+    list there (subjects, skills, cities) is a free-text card."""
+    from app.pai_c.memory import vault_catalog
+    return [{"value": choice.code, "label": choice.label} for choice in vault_catalog().choices(spec["catalog"])]
 
 
 def available_cards(snapshot, area=None):
@@ -47,7 +49,7 @@ def available_cards(snapshot, area=None):
             continue
         if not spec.get("requires_record") and not spec.get("parent_type") and rows:
             continue
-        choices = choices_for(spec, data, record)
+        choices = choices_for(spec)
         cards.append({"key": key, "area": spec["area"], "label": spec["label"],
             "kind": "choice" if choices else "text", "choices": choices,
             "other": {"label": data["copy"]["other"], "editable": True},
@@ -87,7 +89,7 @@ def submit_answer(db, workspace_id, key, answer):
     value = answer.value.strip()
     if not value:
         raise ValueError("An answer is required")
-    choices = choices_for(spec, data, record)
+    choices = choices_for(spec)
     known = value in {row["value"] for row in choices}
     if choices and not known and not answer.other:
         raise ValueError("Select a catalog choice or use Other")
