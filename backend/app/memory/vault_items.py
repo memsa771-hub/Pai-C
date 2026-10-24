@@ -45,6 +45,18 @@ def _naive(moment: datetime | None) -> datetime | None:
     return moment.astimezone(timezone.utc).replace(tzinfo=None) if moment.tzinfo else moment
 
 
+def _with_sighting(evidence: dict | None, source_type: str, level: str, incoming: dict,
+                   candidate_id: str | None) -> dict:
+    """Append one sighting (never the raw value) to corroborations, capped."""
+    corr = list((evidence or {}).get("corroborations", []))
+    sighting = {"source_type": source_type, "level": level, "quote": incoming.get("quote"),
+                "source_language": incoming.get("source_language"),
+                "observed_at": _now().isoformat(), "candidate_id": candidate_id}
+    sighting.update({k: incoming[k] for k in ("file_id", "page") if k in incoming})
+    corr.append(sighting)
+    return {**(evidence or {}), "corroborations": corr[-CORROBORATION_CAP:]}
+
+
 def _same(a, b) -> bool:
     if isinstance(a, str) and isinstance(b, str):
         return norm(a) == norm(b)
@@ -93,13 +105,13 @@ class VaultItemService:
                 break
             chain |= grow
         key = _key(spec, item.value)
-        found = [r for r in rows if r.id in chain or _identity_match(spec, key, _key(spec, r.value))]
+        found = [r for r in rows if r.id in chain or _key(spec, r.value) == key]
         return sorted(found, key=lambda r: _naive(r.created_at))
 
     def was_retracted(self, workspace_id: str, item_type: str, value: dict) -> bool:
         spec = self._spec(item_type)
         key = _key(spec, value)
-        rows = [r for r in self._rows(workspace_id, item_type) if _identity_match(spec, key, _key(spec, r.value))]
+        rows = [r for r in self._rows(workspace_id, item_type) if _key(spec, r.value) == key]
         retracted = [_naive(r.valid_until) for r in rows if r.status == "retracted" and r.valid_until]
         if not retracted:
             return False
@@ -131,7 +143,7 @@ class VaultItemService:
         self._lock(workspace_id)
         evidence = dict(evidence or {})
 
-        current = self._target(workspace_id, spec, value, item_id)
+        current, loose = self._target(workspace_id, spec, value, item_id)
         if current is None:
             return ItemWrite(VaultOutcome.CREATED, self._insert(
                 workspace_id, spec, value, source_type, level, confidence, evidence, candidate_id))
@@ -139,11 +151,7 @@ class VaultItemService:
 
         # 1. Same meaning: one entry, more evidence.
         if all(k in old and _same(v, old[k]) for k, v in value.items()):
-            corr = list((current.evidence or {}).get("corroborations", []))
-            corr.append({"source_type": source_type, "level": level, "quote": evidence.get("quote"),
-                         "source_language": evidence.get("source_language"),
-                         "observed_at": _now().isoformat(), "candidate_id": candidate_id})
-            current.evidence = {**(current.evidence or {}), "corroborations": corr[-CORROBORATION_CAP:]}
+            current.evidence = _with_sighting(current.evidence, source_type, level, evidence, candidate_id)
             if _RANK[level] > _RANK[current.level]:
                 current.level = level
                 if level == "confirmed":
@@ -151,13 +159,34 @@ class VaultItemService:
             self.db.flush()
             return ItemWrite(VaultOutcome.CORROBORATED, current)
 
-        # 1b. Enrich: only adds fields the entry lacks, contradicts none.
+        # Step 4 also guards enrich: a guess neither replaces nor extends what
+        # the student said or showed.
+        guess = level == "inferred" and current.level != "inferred"
+
+        # 1b. Enrich: only adds fields the entry lacks, contradicts none. The
+        # existing row's fields (a name included) are kept as they are.
         if all(k not in old or _same(v, old[k]) for k, v in value.items()):
+            if guess:
+                return ItemWrite(VaultOutcome.RETAINED, current, reason="guess_against_stated")
             merged = {**old, **{k: v for k, v in value.items() if k not in old}}
-            # The student approved the old fields, not the new ones.
-            top = max(_RANK[level], min(_RANK[current.level], _RANK["shown"]))
+            # Never auto-confirmed: the student approved the old fields, not the new ones.
+            top = max(_RANK[level], _RANK[current.level])
+            if not (level == "confirmed" and current.level == "confirmed"):
+                top = min(top, _RANK["shown"])
+            # The old row's evidence (document reference included) stays on top;
+            # the new evidence is kept as a sighting.
+            carried = {**{k: v for k, v in evidence.items() if k != "corroborations"},
+                       **{k: v for k, v in (current.evidence or {}).items() if k != "retraction"}}
+            carried = _with_sighting(carried, source_type, level, evidence, candidate_id)
             return self._supersede(current, spec, merged, source_type, LEVELS[top], confidence,
-                                   evidence, candidate_id)
+                                   carried, candidate_id)
+
+        # A loose match (one side lacks a name) may only corroborate or enrich:
+        # superseding here could erase a name or merge two people.
+        if loose:
+            if guess:
+                return ItemWrite(VaultOutcome.RETAINED, current, reason="guess_against_stated")
+            return self._ask_student(current, spec, value, candidate_id)
 
         # 2. The student's own edit always wins; a disagreeing document stays visible.
         if source_type == "user_explicit":
@@ -174,7 +203,7 @@ class VaultItemService:
             return self._supersede(current, spec, value, source_type, level, confidence, evidence, candidate_id)
 
         # 4. A guess never replaces what the student said or showed.
-        if level == "inferred" and current.level != "inferred":
+        if guess:
             return ItemWrite(VaultOutcome.RETAINED, current, reason="guess_against_stated")
 
         # 5. Catalog rule.
@@ -191,6 +220,7 @@ class VaultItemService:
         item = self._get(workspace_id, item_id, active=True)
         item.status, item.valid_until = "retracted", _now()
         item.evidence = {**(item.evidence or {}), "retraction": dict(evidence or {})}
+        self._close_cards(item, "retracted")
         self.db.flush()
         return item
 
@@ -198,6 +228,7 @@ class VaultItemService:
         self._lock(workspace_id)
         item = self._get(workspace_id, item_id, active=True)
         item.level, item.confirmed_at, item.conflict_state = "confirmed", _now(), "none"
+        self._close_cards(item, "confirmed")
         self.db.flush()
         return item
 
@@ -224,21 +255,22 @@ class VaultItemService:
             raise MemoryDataError("Vault item does not exist or is no longer active")
         return item
 
-    def _target(self, workspace_id: str, spec: TypeSpec, value: dict, item_id: str | None) -> VaultItem | None:
+    def _target(self, workspace_id: str, spec: TypeSpec, value: dict,
+                item_id: str | None) -> tuple[VaultItem | None, bool]:
         """The active entry this value speaks about: the one named by an edit,
         else an exact identity match, else the single loose match."""
         if item_id:
             item = self._get(workspace_id, item_id, active=True)
             if item.item_type != spec.key:
                 raise MemoryDataError(f"Vault item {item_id!r} is not a {spec.key!r}")
-            return item
+            return item, False
         key = _key(spec, value)
         live = self.active(workspace_id, [spec.key])
         exact = [r for r in live if _key(spec, r.value) == key]
         if exact:
-            return exact[0]
+            return exact[0], False
         loose = [r for r in live if _identity_match(spec, key, _key(spec, r.value))]
-        return loose[0] if len(loose) == 1 else None
+        return (loose[0], True) if len(loose) == 1 else (None, False)
 
     def _insert(self, workspace_id, spec, value, source_type, level, confidence, evidence, candidate_id):
         now = _now()
@@ -255,16 +287,40 @@ class VaultItemService:
         new = self._insert(current.workspace_id, spec, value, source_type, level, confidence, evidence, candidate_id)
         current.status, current.superseded_by, current.valid_until = "superseded", new.id, new.valid_from
         current.conflict_state = "none"
+        self._close_cards(current, "superseded")
         self.db.flush()
         return ItemWrite(VaultOutcome.SUPERSEDED, new)
+
+    def _open_cards(self, item: VaultItem) -> list[ProfileIssue]:
+        return list(self.db.scalars(select(ProfileIssue).where(
+            ProfileIssue.workspace_id == item.workspace_id, ProfileIssue.status == "open",
+            ProfileIssue.affected_type == "vault_item", ProfileIssue.affected_id == item.id)
+            .order_by(ProfileIssue.created_at)))
+
+    def _close_cards(self, item: VaultItem, note: str) -> None:
+        """A card about a row that is no longer the live, unsettled entry is obsolete."""
+        for issue in self._open_cards(item):
+            issue.status, issue.resolved_at = "resolved", _now()
+            issue.resolution = {"action": "obsolete", "note": note, "resolved_by": "system",
+                                "candidate_id": None}
 
     def _ask_student(self, current, spec, value, candidate_id) -> ItemWrite:
         """Stable facts are not overwritten silently: open one conflict card."""
         evidence = {"item_type": spec.key, "proposed_value": value, "current_value": current.value}
-        existing = self.db.scalar(select(ProfileIssue).where(
-            ProfileIssue.workspace_id == current.workspace_id, ProfileIssue.status == "open",
-            ProfileIssue.affected_type == "vault_item", ProfileIssue.affected_id == current.id))
-        if existing is not None and existing.evidence == evidence:
+        cards = self._open_cards(current)
+        if cards:
+            # One question at a time: the open card now asks about the newest proposal.
+            existing = cards[0]
+            if (existing.evidence or {}).get("proposed_value") != value:
+                earlier = list((existing.evidence or {}).get("earlier_candidate_ids", []))
+                if candidate_id and existing.candidate_id and existing.candidate_id != candidate_id:
+                    earlier.append(existing.candidate_id)
+                if earlier:
+                    evidence["earlier_candidate_ids"] = earlier
+                existing.evidence = evidence
+                existing.candidate_id = candidate_id or existing.candidate_id
+            current.conflict_state = "in_question"
+            self.db.flush()
             return ItemWrite(VaultOutcome.NEEDS_REVIEW, None, issue_id=existing.id)
         label = spec.label.lower()
         issue = ProfileIssue(

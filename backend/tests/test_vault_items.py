@@ -202,3 +202,126 @@ def test_retract_then_was_retracted():
         assert svc.was_retracted(ws, "interest", {"text": "cricket"}) is True
         _apply(svc, ws, "interest", {"text": "Cricket"}, source_type="conversation")
         assert svc.was_retracted(ws, "interest", {"text": "cricket"}) is False
+
+
+# ---- fix round 1 -----------------------------------------------------------
+
+def test_loose_match_contradiction_keeps_name_and_opens_card():
+    with StudentSession() as student, student.factory() as db:
+        svc, ws = VaultItemService(db), student.workspace_id
+        ali = _apply(svc, ws, "family_member", {"relation": "brother", "name": "Ali", "occupation": "Doctor"}).item
+        out = _apply(svc, ws, "family_member", {"relation": "brother", "occupation": "Engineer"})
+        assert out.outcome == VaultOutcome.NEEDS_REVIEW and out.issue_id and out.item is None
+        row = db.get(VaultItem, ali.id)
+        assert row.status == "active" and row.value["name"] == "Ali" and row.value["occupation"] == "Doctor"
+        assert row.conflict_state == "in_question"
+        assert len(_rows(db, ws, "family_member")) == 1
+
+
+def test_unnamed_and_named_contradiction_leaves_original_untouched():
+    with StudentSession() as student, student.factory() as db:
+        svc, ws = VaultItemService(db), student.workspace_id
+        first = _apply(svc, ws, "family_member", {"relation": "brother", "occupation": "Doctor"}).item
+        out = _apply(svc, ws, "family_member", {"relation": "brother", "name": "Omar", "occupation": "Engineer"},
+                     source_type="user_explicit")
+        assert out.outcome == VaultOutcome.NEEDS_REVIEW
+        row = db.get(VaultItem, first.id)
+        assert row.status == "active" and row.value == {"relation": "brother", "occupation": "Doctor"}
+
+
+def test_loose_enrich_fills_missing_name():
+    with StudentSession() as student, student.factory() as db:
+        svc, ws = VaultItemService(db), student.workspace_id
+        _apply(svc, ws, "family_member", {"relation": "father", "occupation": "Farmer"})
+        out = _apply(svc, ws, "family_member", {"relation": "father", "name": "Ahmed"})
+        assert out.outcome == VaultOutcome.SUPERSEDED
+        assert out.item.value == {"relation": "father", "occupation": "Farmer", "name": "Ahmed"}
+        assert len(svc.active(ws, ["family_member"])) == 1
+
+
+def test_history_and_was_retracted_use_exact_identity():
+    with StudentSession() as student, student.factory() as db:
+        svc, ws = VaultItemService(db), student.workspace_id
+        unnamed = _apply(svc, ws, "family_member", {"relation": "brother"}).item
+        svc.retract(ws, unnamed.id, {"reason": "removed"})
+        assert svc.was_retracted(ws, "family_member", {"relation": "brother"}) is True
+        assert svc.was_retracted(ws, "family_member", {"relation": "brother", "name": "Omar"}) is False
+        omar = _apply(svc, ws, "family_member", {"relation": "brother", "name": "Omar"}).item
+        assert [r.id for r in svc.history(ws, omar.id)] == [omar.id]
+
+
+def test_guess_cannot_enrich_a_stated_entry():
+    with StudentSession() as student, student.factory() as db:
+        svc, ws = VaultItemService(db), student.workspace_id
+        first = _apply(svc, ws, "certainty", {"score": 6}).item
+        out = _apply(svc, ws, "certainty", {"score": 6, "about": "engineering"}, level="inferred")
+        assert out.outcome == VaultOutcome.RETAINED and out.reason == "guess_against_stated"
+        row = db.get(VaultItem, first.id)
+        assert row.status == "active" and row.value == {"score": 6} and row.level == "stated"
+
+
+def test_enrich_carries_document_evidence_forward():
+    with StudentSession() as student, student.factory() as db:
+        svc, ws = VaultItemService(db), student.workspace_id
+        _apply(svc, ws, "domicile", {"province": "Punjab"}, source_type="document", level="shown",
+               evidence={"quote": "Domicile: Punjab", "file_id": "f1", "page": 3})
+        out = _apply(svc, ws, "domicile", {"province": "Punjab", "area": "rural"},
+                     evidence={"quote": "we live in a village", "source_language": "en"}, candidate_id="c9")
+        assert out.outcome == VaultOutcome.SUPERSEDED and out.item.level == "shown"
+        ev = out.item.evidence
+        assert ev["file_id"] == "f1" and ev["page"] == 3 and ev["quote"] == "Domicile: Punjab"
+        assert ev["corroborations"][-1]["quote"] == "we live in a village"
+        assert ev["corroborations"][-1]["candidate_id"] == "c9"
+
+
+def test_enrich_never_auto_confirms():
+    with StudentSession() as student, student.factory() as db:
+        svc, ws = VaultItemService(db), student.workspace_id
+        first = _apply(svc, ws, "domicile", {"province": "Punjab"}).item
+        svc.confirm(ws, first.id)
+        out = _apply(svc, ws, "domicile", {"province": "Punjab", "area": "urban"})
+        assert out.item.level == "shown"
+        again = _apply(svc, ws, "domicile", {"province": "Punjab", "area": "urban"}, level="confirmed")
+        assert again.outcome == VaultOutcome.CORROBORATED and again.item.level == "confirmed"
+
+
+def _open(db, ws):
+    return db.scalars(select(ProfileIssue).where(ProfileIssue.workspace_id == ws,
+                                                 ProfileIssue.status == "open")).all()
+
+
+def test_student_edit_closes_open_card():
+    with StudentSession() as student, student.factory() as db:
+        svc, ws = VaultItemService(db), student.workspace_id
+        _apply(svc, ws, "domicile", {"province": "Sindh"})
+        card = _apply(svc, ws, "domicile", {"province": "KP"})
+        assert card.outcome == VaultOutcome.NEEDS_REVIEW and len(_open(db, ws)) == 1
+        edit = _apply(svc, ws, "domicile", {"province": "Punjab"}, source_type="user_explicit")
+        assert edit.outcome == VaultOutcome.SUPERSEDED and edit.item.value == {"province": "Punjab"}
+        assert _open(db, ws) == []
+        closed = db.get(ProfileIssue, card.issue_id)
+        assert closed.status == "resolved" and closed.resolution["note"] == "superseded" and closed.resolved_at
+
+
+def test_confirm_and_retract_close_open_card():
+    with StudentSession() as student, student.factory() as db:
+        svc, ws = VaultItemService(db), student.workspace_id
+        first = _apply(svc, ws, "domicile", {"province": "Sindh"}).item
+        _apply(svc, ws, "domicile", {"province": "KP"})
+        svc.confirm(ws, first.id)
+        assert _open(db, ws) == []
+        _apply(svc, ws, "domicile", {"province": "KP"}, source_type="document", level="shown")
+        assert len(_open(db, ws)) == 1
+        svc.retract(ws, first.id, {"reason": "student removed it"})
+        assert _open(db, ws) == []
+
+
+def test_one_card_at_a_time_per_entry():
+    with StudentSession() as student, student.factory() as db:
+        svc, ws = VaultItemService(db), student.workspace_id
+        _apply(svc, ws, "domicile", {"province": "Sindh"})
+        one = _apply(svc, ws, "domicile", {"province": "KP"})
+        two = _apply(svc, ws, "domicile", {"province": "Balochistan"})
+        assert two.outcome == VaultOutcome.NEEDS_REVIEW and two.issue_id == one.issue_id
+        cards = _open(db, ws)
+        assert len(cards) == 1 and cards[0].evidence["proposed_value"] == {"province": "Balochistan"}
