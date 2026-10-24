@@ -1,0 +1,84 @@
+[
+  {
+    "id": "mx-preeng-ecat-net",
+    "language": "mixed",
+    "synthetic": true,
+    "description": "Code-switched message with a result and two planned entry tests.",
+    "turns": [
+      "Bro mera FSc pre-eng ka result 88% aaya, Federal board. ECAT next month hai.",
+      "NUST ke liye NET bhi dena hai."
+    ],
+    "expected": [
+      {"facet": "education", "match": {"group": ["pre-engineering", "pre engineering", "pre-eng"], "board": "Federal", "marks": {"num": 88}}},
+      {"facet": "test", "match": {"name": "ECAT"}},
+      {"facet": "test", "match": {"name": "NET"}}
+    ],
+    "must_not": []
+  },
+  {
+    "id": "mx-domicile-sindh-rural",
+    "language": "mixed",
+    "synthetic": true,
+    "description": "City, a rural Sindh domicile and a pre-medical result.",
+    "turns": [
+      "I'm from Hyderabad, Sindh. Mera domicile Sindh rural ka hai.",
+      "Pre-medical with 79% from BISE Hyderabad."
+    ],
+    "expected": [
+      {"facet": "city", "match": {"value": "Hyderabad"}},
+      {"facet": "domicile", "match": {"text": {"all": ["sindh", "rural"]}}},
+      {"facet": "education", "match": {"group": ["pre-medical", "pre medical"], "board": "Hyderabad", "marks": {"num": 79}}}
+    ],
+    "must_not": []
+  },
+  {
+    "id": "mx-monthly-budget",
+    "language": "mixed",
+    "synthetic": true,
+    "description": "A monthly fee budget (or its yearly equivalent) and a wish to study in her own city.",
+    "turns": [
+      "Hum har mahine around 25 thousand de sakte hain fees ke liye.",
+      "Main Karachi mein hi parhna chahti hoon."
+    ],
+    "expected": [
+      {"facet": "budget", "match": {"amount": {"one_of": [25000, 300000]}}},
+      {"facet": "mobility", "match": {"text": "Karachi"}}
+    ],
+    "must_not": []
+  },
+  {
+    "id": "mx-family-correction",
+    "language": "mixed",
+    "synthetic": true,
+    "description": "The student corrects which relative is a teacher; the wrong pairing must not remain.",
+    "turns": [
+      "Meri ammi teacher hain.",
+      "Sorry, ammi nahi, meri khala teacher hain. Ammi housewife hain."
+    ],
+    "expected": [
+      {"facet": "family_member", "match": {"text": {"all": ["mother"]}}},
+      {"facet": "family_member", "match": {"text": {"all": ["aunt", "teacher"]}}}
+    ],
+    "must_not": [
+      {"facet": "family_member", "match": {"text": {"all": ["mother", "teacher"]}}, "why": "the student corrected this: the aunt is the teacher"}
+    ]
+  },
+  {
+    "id": "mx-cv-style-skills",
+    "language": "mixed",
+    "synthetic": true,
+    "description": "A CV-style list of skills and volunteering, with a stated degree goal.",
+    "turns": [
+      "Skills: MS Excel, Canva, public speaking. Volunteered with Edhi Foundation for 6 months.",
+      "Mera goal hai IBA Karachi se BBA karna."
+    ],
+    "expected": [
+      {"facet": "skill", "match": {"text": "excel"}},
+      {"facet": "skill", "match": {"text": "canva"}},
+      {"facet": "skill", "match": {"text": "public speaking"}},
+      {"facet": "experience", "match": {"text": "edhi"}},
+      {"facet": "goal", "match": {"text": {"all": ["bba", "iba"]}}}
+    ],
+    "must_not": []
+  }
+]

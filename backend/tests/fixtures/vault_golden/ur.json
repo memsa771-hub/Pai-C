@@ -1,0 +1,82 @@
+[
+  {
+    "id": "ur-matric-marks-urdu-digits",
+    "language": "ur",
+    "synthetic": true,
+    "description": "Urdu script with Urdu digits; the name must come out in Latin script and the marks as numbers.",
+    "turns": [
+      "میرا نام عائشہ خان ہے۔ میں نے میٹرک ۲۰۲۴ میں لاہور بورڈ سے ۱۲۰۰ میں سے ۱۰۴۵ نمبر لے کر پاس کیا۔",
+      "اب میں ایف ایس سی پری میڈیکل کر رہی ہوں۔"
+    ],
+    "expected": [
+      {"facet": "name", "match": {"value": ["ayesha", "aisha", "aysha"]}},
+      {"facet": "education", "match": {"level": ["matric", "secondary", "school"], "board": "Lahore", "marks": {"num": 87.08, "tol": 0.05}}},
+      {"facet": "education", "match": {"group": ["pre-medical", "pre medical"]}}
+    ],
+    "must_not": []
+  },
+  {
+    "id": "ur-father-wish-design",
+    "language": "ur",
+    "synthetic": true,
+    "description": "The father's wish versus the student's own interest, in Urdu script.",
+    "turns": [
+      "میرے ابو چاہتے ہیں کہ میں ڈاکٹر بنوں، لیکن مجھے آرٹس اور ڈیزائن پسند ہے۔",
+      "میں کراچی میں رہتی ہوں۔"
+    ],
+    "expected": [
+      {"facet": "family_member", "match": {"text": ["father", "dad"]}},
+      {"facet": "interest", "match": {"text": ["design", "art"]}},
+      {"facet": "city", "match": {"value": "Karachi"}}
+    ],
+    "must_not": [
+      {"facet": "goal", "match": {"text": ["doctor", "medicine"]}, "why": "becoming a doctor is the father's wish"}
+    ]
+  },
+  {
+    "id": "ur-budget-one-lakh",
+    "language": "ur",
+    "synthetic": true,
+    "description": "A yearly budget in Urdu words, with city and an arts intermediate.",
+    "turns": [
+      "ہم سالانہ تقریباً ایک لاکھ روپے تک خرچ کر سکتے ہیں۔",
+      "میں پشاور میں رہتا ہوں اور ایف اے کر رہا ہوں۔"
+    ],
+    "expected": [
+      {"facet": "budget", "match": {"amount": {"num": 100000}, "period": "year"}},
+      {"facet": "city", "match": {"value": "Peshawar"}},
+      {"facet": "education", "match": {"text": ["fa", "f.a", "arts", "humanities"]}}
+    ],
+    "must_not": []
+  },
+  {
+    "id": "ur-ecat-score",
+    "language": "ur",
+    "synthetic": true,
+    "description": "An entry test score out of a total, and an interest in a branch of engineering.",
+    "turns": [
+      "میں نے ای کیٹ کا ٹیسٹ دیا اور ۴۰۰ میں سے ۲۸۰ نمبر آئے۔",
+      "مجھے مکینیکل انجینئرنگ میں دلچسپی ہے۔"
+    ],
+    "expected": [
+      {"facet": "test", "match": {"name": "ECAT", "score": {"num": 280}}},
+      {"facet": "interest", "match": {"text": "mechanical"}}
+    ],
+    "must_not": []
+  },
+  {
+    "id": "ur-tutoring-experience",
+    "language": "ur",
+    "synthetic": true,
+    "description": "Teaching experience and what the student enjoys about it.",
+    "turns": [
+      "میں نے اپنے محلے کے بچوں کو دو سال ریاضی پڑھائی ہے۔",
+      "مجھے بچوں کو سمجھانا اچھا لگتا ہے۔"
+    ],
+    "expected": [
+      {"facet": "experience", "match": {"text": ["tutor", "teach", "math"]}},
+      {"facet": "interest", "match": {"text": ["teach", "explain", "children"]}}
+    ],
+    "must_not": []
+  }
+]

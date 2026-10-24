@@ -1,0 +1,138 @@
+[
+  {
+    "id": "en-premed-mdcat",
+    "language": "en",
+    "synthetic": true,
+    "description": "Pre-medical student with raw marks, a planned entry test, a shared family wish and a yearly budget.",
+    "turns": [
+      "Hi, I'm Ayesha. I just finished FSc Pre-Medical from Punjab Group of Colleges in Faisalabad, Faisalabad board, with 1012 out of 1100.",
+      "I'm preparing for MDCAT this year. My parents want me to become a doctor, and honestly I want it too.",
+      "We can spend around 400,000 rupees a year on studies including hostel, but I would prefer to stay in Faisalabad."
+    ],
+    "expected": [
+      {"facet": "name", "match": {"value": "Ayesha"}},
+      {"facet": "education", "match": {"group": ["pre-medical", "pre medical", "premedical"], "board": "Faisalabad", "marks": {"num": 92.0, "tol": 0.1}}},
+      {"facet": "test", "match": {"name": "MDCAT"}},
+      {"facet": "goal", "match": {"text": ["doctor", "medicine", "mbbs"]}},
+      {"facet": "family_member", "match": {"text": ["parent", "mother", "father"]}},
+      {"facet": "budget", "match": {"amount": {"num": 400000}, "period": "year"}},
+      {"facet": "mobility", "match": {"text": "Faisalabad"}}
+    ],
+    "must_not": []
+  },
+  {
+    "id": "en-ics-gap-year-builder",
+    "language": "en",
+    "synthetic": true,
+    "description": "ICS student on a gap year with self-taught skills and projects.",
+    "turns": [
+      "My name is Hamza Iqbal. I did ICS from Federal board, got 78 percent, and now I'm on a gap year in Islamabad.",
+      "I've built two small Android apps with Kotlin and I taught myself Python from YouTube.",
+      "I really enjoy solving puzzles and building things people can actually use. I hate memorizing."
+    ],
+    "expected": [
+      {"facet": "name", "match": {"value": "Hamza"}},
+      {"facet": "city", "match": {"value": "Islamabad"}},
+      {"facet": "status", "match": {"value": "gap year"}},
+      {"facet": "education", "match": {"group": ["ics", "computer"], "board": "Federal", "marks": {"num": 78}}},
+      {"facet": "experience", "match": {"text": {"all": ["android", "app"]}}},
+      {"facet": "skill", "match": {"text": "Kotlin"}},
+      {"facet": "skill", "match": {"text": "Python"}},
+      {"facet": "interest", "match": {"text": "puzzle"}},
+      {"facet": "value", "match": {"text": ["useful", "people can use", "people use"]}}
+    ],
+    "must_not": []
+  },
+  {
+    "id": "en-marks-correction",
+    "language": "en",
+    "synthetic": true,
+    "description": "The student corrects their percentage in the next message; only the corrected value stays current.",
+    "turns": [
+      "I got 85% in my FSc Pre-Engineering from Lahore board.",
+      "Sorry, I checked my result card again, it was actually 87%, not 85."
+    ],
+    "expected": [
+      {"facet": "education", "match": {"group": ["pre-engineering", "pre engineering"], "board": "Lahore", "marks": {"num": 87}}}
+    ],
+    "must_not": [
+      {"facet": "education", "match": {"marks": {"num": 85}}, "why": "the student corrected 85% to 87%"}
+    ]
+  },
+  {
+    "id": "en-goal-changed-over-time",
+    "language": "en",
+    "synthetic": true,
+    "description": "An old goal replaced by a new one; the past goal must not stay current.",
+    "turns": [
+      "Two years ago I wanted to be a pilot.",
+      "Now I want to study architecture, mainly because I love sketching buildings.",
+      "I'm in A Levels second year at Beaconhouse in Karachi, doing Maths, Physics and Art."
+    ],
+    "expected": [
+      {"facet": "goal", "match": {"text": "architect"}},
+      {"facet": "interest", "match": {"text": "sketch"}},
+      {"facet": "education", "match": {"level": ["a level", "a-level", "upper_secondary"], "institution": "Beaconhouse"}},
+      {"facet": "city", "match": {"value": "Karachi"}}
+    ],
+    "must_not": [
+      {"facet": "goal", "match": {"text": "pilot"}, "why": "being a pilot was a past wish, not a current goal"}
+    ]
+  },
+  {
+    "id": "en-father-wish-not-student-goal",
+    "language": "en",
+    "synthetic": true,
+    "description": "The father's wish differs from the student's own goal; the wish must not become the student's goal.",
+    "turns": [
+      "My father is an engineer at WAPDA and he wants me to do electrical engineering.",
+      "But I don't want engineering. I want to do a BBA and start my own business one day.",
+      "I'm in I.Com part 2 from Rawalpindi board."
+    ],
+    "expected": [
+      {"facet": "family_member", "match": {"text": {"all": ["father", "engineer"]}}},
+      {"facet": "goal", "match": {"text": ["bba", "business"]}},
+      {"facet": "education", "match": {"group": ["i.com", "icom", "commerce"], "board": "Rawalpindi"}}
+    ],
+    "must_not": [
+      {"facet": "goal", "match": {"text": "engineering"}, "why": "engineering is the father's wish, which the student rejected"}
+    ]
+  },
+  {
+    "id": "en-tight-money-no-number",
+    "language": "en",
+    "synthetic": true,
+    "description": "Money is tight but no amount is given; no budget number may be invented.",
+    "turns": [
+      "We can't afford private universities, money is very tight at home.",
+      "I live in Multan and I can't move to another city because I help my mother at home."
+    ],
+    "expected": [
+      {"facet": "city", "match": {"value": "Multan"}},
+      {"facet": "mobility", "match": {"text": ["cannot", "can't", "not", "no", "unwilling", "unable", "multan"]}},
+      {"facet": "pressure", "match": {"text": ["money", "afford", "financ"]}},
+      {"facet": "pressure", "match": {"text": ["mother", "home"]}}
+    ],
+    "must_not": [
+      {"facet": "budget", "match": {"amount": {"between": [1, 100000000]}}, "why": "the student gave no amount"}
+    ]
+  },
+  {
+    "id": "en-olevels-ielts-scholarship",
+    "language": "en",
+    "synthetic": true,
+    "description": "O Level grades, an IELTS score and a scholarship condition for studying abroad.",
+    "turns": [
+      "I completed O Levels with 6 A*s and 2 As from Lahore Grammar School.",
+      "I took IELTS last month and got 7.5 overall.",
+      "I can only go abroad for my bachelor's with a full scholarship."
+    ],
+    "expected": [
+      {"facet": "education", "match": {"level": ["o level", "o-level", "secondary"], "institution": "Lahore Grammar"}},
+      {"facet": "test", "match": {"name": "IELTS", "score": {"num": 7.5}}},
+      {"facet": "scholarship", "match": {"value": ["true", "full", "scholarship"]}},
+      {"facet": "goal", "match": {"text": ["abroad", "bachelor"]}}
+    ],
+    "must_not": []
+  }
+]

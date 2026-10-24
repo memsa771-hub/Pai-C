@@ -1,0 +1,163 @@
+[
+  {
+    "id": "ru-fsc-cricket",
+    "language": "roman_ur",
+    "synthetic": true,
+    "description": "The plan's own example: education, city and an experience, all to be stored in English.",
+    "turns": [
+      "Mera naam Bilal hai aur main Lahore mein rehta hoon.",
+      "Main ne FSc pre-engineering Lahore board se 85% ke saath ki hai.",
+      "School ka cricket tournament bhi maine organize kiya tha."
+    ],
+    "expected": [
+      {"facet": "name", "match": {"value": "Bilal"}},
+      {"facet": "city", "match": {"value": "Lahore"}},
+      {"facet": "education", "match": {"group": ["pre-engineering", "pre engineering"], "board": "Lahore", "marks": {"num": 85}}},
+      {"facet": "experience", "match": {"text": {"all": ["cricket", "tournament"]}}}
+    ],
+    "must_not": []
+  },
+  {
+    "id": "ru-premed-mdcat-cannot-relocate",
+    "language": "roman_ur",
+    "synthetic": true,
+    "description": "Raw marks with a year, a taken MDCAT score, a parental wish, a second option and a relocation limit.",
+    "turns": [
+      "Assalam o alaikum, mera naam Fatima hai. Maine FSc pre-medical 2025 mein Gujranwala board se ki, 980 marks aaye 1100 mein se.",
+      "MDCAT diya tha lekin 140 marks aaye, merit nahi bana.",
+      "Ammi abbu kehte hain dobara MDCAT do, lekin mujhe lagta hai main pharmacy bhi kar sakti hoon.",
+      "Main Gujranwala se bahar nahi ja sakti, ghar wale allow nahi karte."
+    ],
+    "expected": [
+      {"facet": "name", "match": {"value": "Fatima"}},
+      {"facet": "education", "match": {"group": ["pre-medical", "pre medical"], "board": "Gujranwala", "year": "2025", "marks": {"num": 89.09, "tol": 0.05}}},
+      {"facet": "test", "match": {"name": "MDCAT", "score": {"num": 140}}},
+      {"facet": "family_member", "match": {"text": ["mother", "father", "parent"]}},
+      {"facet": "option", "match": {"text": "pharmacy"}},
+      {"facet": "mobility", "match": {"text": "Gujranwala"}}
+    ],
+    "must_not": []
+  },
+  {
+    "id": "ru-budget-range",
+    "language": "roman_ur",
+    "synthetic": true,
+    "description": "A yearly budget given as a range, and willingness to move to one city.",
+    "turns": [
+      "Saal ka kharcha takreeban 2 se 3 lakh tak ho sakta hai, hostel ke saath.",
+      "Main Sahiwal mein rehta hoon, lekin zaroorat ho to Lahore ja sakta hoon."
+    ],
+    "expected": [
+      {"facet": "budget", "match": {"amount": {"between": [200000, 300000]}, "period": "year"}},
+      {"facet": "city", "match": {"value": "Sahiwal"}},
+      {"facet": "mobility", "match": {"text": "Lahore"}}
+    ],
+    "must_not": []
+  },
+  {
+    "id": "ru-matric-then-dae",
+    "language": "roman_ur",
+    "synthetic": true,
+    "description": "Matric followed by a diploma route (DAE) and a hands-on interest.",
+    "turns": [
+      "Main ne matric science 2023 mein ki thi, Multan board se, 820 marks aaye the.",
+      "Uske baad DAE electrical kar raha hoon, abhi third year mein hoon, Government College of Technology Multan se.",
+      "Mujhe wiring aur motors kholna bandhna bohat pasand hai."
+    ],
+    "expected": [
+      {"facet": "education", "match": {"level": ["matric", "secondary", "school"], "board": "Multan", "result": "820"}},
+      {"facet": "education", "match": {"level": ["dae", "diploma"], "group": "electrical", "institution": "Technology"}},
+      {"facet": "interest", "match": {"text": ["wiring", "motor"]}}
+    ],
+    "must_not": []
+  },
+  {
+    "id": "ru-hafiz-domicile",
+    "language": "roman_ur",
+    "synthetic": true,
+    "description": "Quota and domicile facts that eligibility depends on.",
+    "turns": [
+      "Main Hafiz-e-Quran hoon aur mera domicile Balochistan ka hai, Quetta.",
+      "Abhi FSc pre-engineering first year mein hoon, Quetta board se."
+    ],
+    "expected": [
+      {"facet": "quota", "match": {"text": "hafiz"}},
+      {"facet": "domicile", "match": {"text": "Balochistan"}},
+      {"facet": "city", "match": {"value": "Quetta"}},
+      {"facet": "education", "match": {"group": ["pre-engineering", "pre engineering"], "board": "Quetta"}}
+    ],
+    "must_not": []
+  },
+  {
+    "id": "ru-myth-options-certainty",
+    "language": "roman_ur",
+    "synthetic": true,
+    "description": "A belief about a field, two options and a certainty rating; none of them is a committed goal.",
+    "turns": [
+      "Log kehte hain computer science mein sirf coding hoti hai aur naukri nahi milti.",
+      "Main 10 mein se 3 sure hoon ke mujhe kya karna hai. Design ya CS soch raha hoon."
+    ],
+    "expected": [
+      {"facet": "myth", "match": {"text": {"all": ["computer", "coding"]}}},
+      {"facet": "option", "match": {"text": "design"}},
+      {"facet": "option", "match": {"text": ["computer science", "cs"]}},
+      {"facet": "certainty", "match": {"value": {"num": 3}}}
+    ],
+    "must_not": [
+      {"facet": "goal", "match": {"text": ["sure", "certain", "3 out of 10"]}, "why": "a certainty rating is never a goal"}
+    ]
+  },
+  {
+    "id": "ru-family-and-whose-wish",
+    "language": "roman_ur",
+    "synthetic": true,
+    "description": "Two family members with occupations; the brother's wish must not become the student's goal.",
+    "turns": [
+      "Mere abbu dukaandar hain aur bade bhai Saudi Arabia mein kaam karte hain.",
+      "Bhai chahte hain main bhi bahar jaun, lekin mujhe yahin Pakistan mein software engineering karni hai."
+    ],
+    "expected": [
+      {"facet": "family_member", "match": {"text": ["father", "dad"]}},
+      {"facet": "family_member", "match": {"text": {"all": ["brother", "saudi"]}}},
+      {"facet": "goal", "match": {"text": "software"}}
+    ],
+    "must_not": [
+      {"facet": "goal", "match": {"text": ["abroad", "saudi", "outside pakistan"]}, "why": "going abroad is the brother's wish"}
+    ]
+  },
+  {
+    "id": "ru-identity-dob",
+    "language": "roman_ur",
+    "synthetic": true,
+    "description": "Full name, date of birth and current study, with the date stored in one format.",
+    "turns": [
+      "Meri date of birth 14 August 2007 hai. Naam Zainab Ali, Rawalpindi se.",
+      "Main girls college mein ICS kar rahi hoon, second year."
+    ],
+    "expected": [
+      {"facet": "name", "match": {"value": "Zainab"}},
+      {"facet": "dob", "match": {"value": ["2007-08-14", "14 august 2007"]}},
+      {"facet": "city", "match": {"value": "Rawalpindi"}},
+      {"facet": "education", "match": {"group": ["ics", "computer"]}}
+    ],
+    "must_not": []
+  },
+  {
+    "id": "ru-past-goal-and-strength",
+    "language": "roman_ur",
+    "synthetic": true,
+    "description": "A dropped goal, an achievement and a strength others see in the student.",
+    "turns": [
+      "Pehle mujhe doctor banna tha lekin ab mera dil nahi karta, blood dekh kar ghabrahat hoti hai.",
+      "Main debate competition mein district level pe first aaya tha.",
+      "Log kehte hain main baat bohat achi samjha leta hoon."
+    ],
+    "expected": [
+      {"facet": "experience", "match": {"text": "debate"}},
+      {"facet": "strength", "match": {"text": ["explain", "communicat", "speak", "persua"]}}
+    ],
+    "must_not": [
+      {"facet": "goal", "match": {"text": ["doctor", "medicine", "mbbs"]}, "why": "becoming a doctor was a past goal the student gave up"}
+    ]
+  }
+]
