@@ -169,10 +169,9 @@ class VaultItemService:
             if guess:
                 return ItemWrite(VaultOutcome.RETAINED, current, reason="guess_against_stated")
             merged = {**old, **{k: v for k, v in value.items() if k not in old}}
-            # Never auto-confirmed: the student approved the old fields, not the new ones.
-            top = max(_RANK[level], _RANK[current.level])
-            if not (level == "confirmed" and current.level == "confirmed"):
-                top = min(top, _RANK["shown"])
+            # The badge shows the weakest evidence behind any field, so it never
+            # overstates; the document link survives via the carried file_id.
+            top = min(_RANK[level], _RANK[current.level])
             # The old row's evidence (document reference included) stays on top;
             # the new evidence is kept as a sighting.
             carried = {**{k: v for k, v in evidence.items() if k != "corroborations"},

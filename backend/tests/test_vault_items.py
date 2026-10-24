@@ -267,7 +267,7 @@ def test_enrich_carries_document_evidence_forward():
                evidence={"quote": "Domicile: Punjab", "file_id": "f1", "page": 3})
         out = _apply(svc, ws, "domicile", {"province": "Punjab", "area": "rural"},
                      evidence={"quote": "we live in a village", "source_language": "en"}, candidate_id="c9")
-        assert out.outcome == VaultOutcome.SUPERSEDED and out.item.level == "shown"
+        assert out.outcome == VaultOutcome.SUPERSEDED and out.item.level == "stated"
         ev = out.item.evidence
         assert ev["file_id"] == "f1" and ev["page"] == 3 and ev["quote"] == "Domicile: Punjab"
         assert ev["corroborations"][-1]["quote"] == "we live in a village"
@@ -280,7 +280,7 @@ def test_enrich_never_auto_confirms():
         first = _apply(svc, ws, "domicile", {"province": "Punjab"}).item
         svc.confirm(ws, first.id)
         out = _apply(svc, ws, "domicile", {"province": "Punjab", "area": "urban"})
-        assert out.item.level == "shown"
+        assert out.item.level == "stated"
         again = _apply(svc, ws, "domicile", {"province": "Punjab", "area": "urban"}, level="confirmed")
         assert again.outcome == VaultOutcome.CORROBORATED and again.item.level == "confirmed"
 
