@@ -211,18 +211,144 @@ def test_extractor_drops_an_item_id_not_in_its_context():
         assert {"type": "interest", "id": painting.id, "display": "Painting"} in turn.items
         assert len(turn.items) <= context_policy()["extraction_max_entries"]
         drops = []
-        ok = extractor._validate({"candidate_type": "vault_item", "key": "interest",
-                                  "proposed_value": {"text": "Sketching"}, "quote": "I meant sketching",
-                                  "confidence": 0.9, "entities": {"item_id": painting.id}},
-                                 turn, set(), drops)
-        assert ok.entities == {"item_id": painting.id}
-        wrong_type = extractor._validate({"candidate_type": "vault_item", "key": "value",
-                                          "proposed_value": {"text": "Sketching"}, "quote": "I meant sketching",
-                                          "confidence": 0.9, "entities": {"item_id": painting.id}},
-                                         turn, set(), drops)
-        unknown = extractor._validate({"candidate_type": "vault_item", "key": "interest",
-                                       "proposed_value": {"text": "Sketching"}, "quote": "I meant sketching",
-                                       "confidence": 0.9, "entities": {"item_id": "someone-else"}},
-                                      turn, set(), drops)
-        assert wrong_type is None and unknown is None
-        assert all("item reference" in d["reason"] for d in drops)
+
+        def propose(key, item_id):
+            return extractor._validate({"candidate_type": "vault_item", "key": key,
+                                        "proposed_value": {"text": "Sketching"}, "quote": "I meant sketching",
+                                        "confidence": 0.9, "entities": {"item_id": item_id}}, turn, set(), drops)
+
+        assert propose("interest", painting.id).entities == {"item_id": painting.id}
+        assert drops == []
+        # A wrong-type or unknown id drops only the id: the candidate goes on as a new item.
+        for key, item_id in (("value", painting.id), ("interest", "someone-else")):
+            kept = propose(key, item_id)
+            assert kept is not None and kept.entities == {} and kept.proposed_value == {"text": "Sketching"}
+        assert len(drops) == 2 and all("item reference" in d["reason"] for d in drops)
+
+
+# ---- fix round 1 -------------------------------------------------------------
+
+def test_notebook_and_vault_are_not_summed_in_coverage():
+    """Until the notebook sources go, the same father (or interest) in both
+    stores is one, not two: an area counts the larger of the two sides."""
+    from types import SimpleNamespace
+    from app.pai_c.deep.notebook_schema import CounselorNotebookData
+    from app.pai_c.understanding.views import coverage_areas
+    from tests.truth_map_fixtures import STAMP, item
+    notebook = CounselorNotebookData.model_validate({
+        "world": {"people": [{"id": "p1", "role": "father", "evidence": "my father is a shopkeeper",
+                              "first_seen": STAMP, "last_confirmed": STAMP}]},
+        "self": [item(id="s1", key="interest.robotics", value="Robotics", evidence="I like robotics")]})
+    with VaultSession() as student, student.factory() as db:
+        ws = student.workspace_id
+        _item(db, ws, "family_member", {"relation": "father", "occupation": "Shopkeeper"})
+        _item(db, ws, "interest", {"text": "Robotics"})
+        db.commit()
+        areas = coverage_areas(notebook, SimpleNamespace(facts={}, records={}), VaultItemService(db).active(ws))
+    assert areas["family_social"]["item_count"] == 1 and not areas["family_social"]["covered"]
+    assert areas["interests"]["item_count"] == 1 and not areas["interests"]["covered"]
+
+
+def _disputed_option(db, ws):
+    disputed = _item(db, ws, "option", {"text": "Medicine", "status": "considering"})
+    db.add(ProfileIssue(workspace_id=ws, issue_type="conflicting_value", severity="blocking",
+                        affected_type="vault_item", affected_id=disputed.id, summary="x",
+                        clarification_question="Still considering medicine?",
+                        evidence={"item_type": "option", "current_value": disputed.value,
+                                  "proposed_value": {"text": "Medicine", "status": "ruled_out"}}))
+    return disputed
+
+
+def test_core_records_are_capped_and_in_question_keeps_its_share():
+    from app.memory.student_records import StudentRecordService
+    from app.memory.vault_context import _json, context_entry, estimated_tokens
+    from app.models import StudentGoal
+    with VaultSession() as student, student.factory() as db:
+        ws = student.workspace_id
+        for n in range(15):
+            StudentRecordService(db).apply(
+                ws, "education", {"qualification_name": f"Qualification {n} " + "x" * 400,
+                                  "institution_name": f"School {n}"},
+                source_type="conversation", claim_origin="student", capture_method="chat", force_new=True)
+            db.add(StudentGoal(workspace_id=ws, goal_type="career", title=f"Goal number {n} " + "y" * 400,
+                               source_type="conversation", claim_origin="student", capture_method="chat",
+                               status="active"))
+        disputed = _disputed_option(db, ws)
+        db.commit()
+        view = VaultView(db).build(ws, include_sensitive=False)
+        budget = context_policy()["counselor_budget_tokens"]
+        chosen = select_context_entries(view, "Hello", budget_tokens=budget)
+        compact = [context_entry(e) for e in chosen]
+        assert sum(estimated_tokens(_json(c)) for c in compact) <= budget
+        assert disputed.id in {e["id"] for e in chosen}
+        caps = context_policy()["core_caps"]
+        assert sum(e["type"] == "education" for e in chosen) <= caps["education"]
+        assert sum(e["type"] == "goal" for e in chosen) <= caps["goal"]
+        assert all(len(c["display"]) <= 350 and "value" not in c for c in compact if c["kind"] == "record")
+
+
+def test_identity_types_are_excluded_before_the_budget_is_counted():
+    with VaultSession() as student, student.factory() as db:
+        ws = student.workspace_id
+        VaultService(db).apply_fact(ws, "identity.preferred_name", "Sana", "user_explicit")
+        _item(db, ws, "interest", {"text": "Robotics"})
+        db.commit()
+        view = VaultView(db).build(ws, include_sensitive=False)
+        only = select_context_entries(view, "Hello", budget_tokens=60,
+                                      exclude_types={"identity.preferred_name"})
+        assert [e["type"] for e in only] == ["interest"]
+
+
+def test_ambiguous_relation_words_do_not_trigger_family():
+    assert "family_member" not in sensitive_types_for("I built an API")
+    assert "family_member" not in sensitive_types_for("Thanks bro")
+    assert "family_member" in sensitive_types_for("mere abbu")
+
+
+@pytest.mark.asyncio
+async def test_family_follow_up_answer_brings_family_entries():
+    from uuid import uuid4
+    from app.models import EventRecord
+    with VaultSession() as student, student.factory() as db:
+        ws = student.workspace_id
+        father = _item(db, ws, "family_member", {"relation": "father", "wish": "Wants a doctor in the family"})
+        db.add(EventRecord(id=str(uuid4()), network_id=ws, type="workspace.message.posted",
+                           source="openagents:pai", target="channel/chat",
+                           payload={"content": "Aap ke ghar wale aap ke liye kya chahte hain?"},
+                           timestamp=student.next_timestamp()))
+        db.commit()
+        context = await build_context(db, ws, _turn(student, "haan woh chahte hain main doctor banun"))
+        assert father.id in context.text
+    # The planned area alone also names the topic.
+    assert "family_member" in sensitive_types_for("haan", topics=["family_social"])
+
+
+def test_citable_records_are_included_for_the_planner():
+    from app.memory.student_records import StudentRecordService
+    with VaultSession() as student, student.factory() as db:
+        ws = student.workspace_id
+        skill = StudentRecordService(db).apply(
+            ws, "skill", {"name": "Python"}, source_type="document", claim_origin="institution_document",
+            capture_method="document_extraction", verification_status="document_supported",
+            evidence={"file_id": "f1", "authority": "institution_issued", "quote": "Python"})
+        for n in range(60):
+            _item(db, ws, "value", {"text": f"Value number {n} about helping people"})
+        db.commit()
+        view = VaultView(db).build(ws, include_sensitive=False)
+        chosen = select_context_entries(view, "Hello", budget_tokens=300)
+        assert skill.id in {e["id"] for e in chosen}
+
+
+def test_restricted_issue_never_reaches_the_counselor():
+    with VaultSession() as student, student.factory() as db:
+        ws = student.workspace_id
+        fact = VaultService(db).apply_fact(ws, "contact.email", "old@example.test", "user_explicit").fact
+        db.add(ProfileIssue(workspace_id=ws, issue_type="conflicting_value", severity="blocking",
+                            affected_type="vault_fact", affected_id=fact.id, summary="x",
+                            clarification_question="Which email is right?",
+                            evidence={"field_key": "contact.email", "current_fact_id": fact.id,
+                                      "current_value": "old@example.test", "proposed_value": "new@example.test"}))
+        db.commit()
+        profile = _profile(db, ws, student_text="my email changed")
+        assert profile["open_profile_issues"] == [] and profile["in_question"] == []
+        assert "example.test" not in json.dumps(profile)

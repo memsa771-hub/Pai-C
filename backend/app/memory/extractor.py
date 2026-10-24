@@ -663,13 +663,16 @@ def _validate(raw: dict, turn, allowed_vault_keys: set[str],
         except SchemaValidationError as exc:
             return drop(f"{key} item invalid: {exc}")
         # An id is passed on only when it names one of this student's items of
-        # this type that the turn context showed, as record ids are.
+        # this type that the turn context showed. Any other id is dropped on
+        # its own (and logged): the value is still the student's words, so it
+        # goes on as a new item rather than being lost.
         clean_entities = {}
         if "item_id" in entities:
             known = {row["id"] for row in (getattr(turn, "items", None) or []) if row.get("type") == key}
-            if not isinstance(entities["item_id"], str) or entities["item_id"] not in known:
-                return drop("item reference was not in this student's context")
-            clean_entities["item_id"] = entities["item_id"]
+            if isinstance(entities["item_id"], str) and entities["item_id"] in known:
+                clean_entities["item_id"] = entities["item_id"]
+            else:
+                drop("item reference was not in this student's context; kept as a new item")
         return ExtractedCandidate(
             candidate_type="vault_item", operation="upsert", key=key,
             proposed_value=value, content=None, entities=clean_entities,

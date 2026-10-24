@@ -71,7 +71,24 @@ _IDENTITY_KEYS = ("identity.preferred_name", "identity.full_name", "identity.dat
                   "identity.current_status", "identity.status_category")
 
 
-def _profile(db, workspace_id: str, snapshot=None, *, student_text: str = "") -> dict:
+def _previous_counselor_text(db, workspace_id: str, turn) -> str:
+    """The counselor's last chat message before this turn: a short answer
+    ("haan, woh chahte hain") names its topic only through that question."""
+    from app.models import EventRecord
+    query = select(EventRecord).where(
+        EventRecord.network_id == workspace_id, EventRecord.type == "workspace.message.posted",
+        EventRecord.source == "openagents:pai")
+    query = (query.where(EventRecord.timestamp < turn.timestamp) if turn.timestamp is not None
+             else query.where(EventRecord.id != turn.source_event_id))
+    for row in db.scalars(query.order_by(EventRecord.timestamp.desc(), EventRecord.id.desc()).limit(3)):
+        payload = row.payload or {}
+        if payload.get("message_type", "chat") == "chat" and isinstance(payload.get("content"), str):
+            return payload["content"][:1500]
+    return ""
+
+
+def _profile(db, workspace_id: str, snapshot=None, *, student_text: str = "", trigger_text: str = "",
+             topics=()) -> dict:
     """Identity never to ask again, plus the Vault entries this turn may see."""
     workspace = db.get(Workspace, workspace_id)
     owner = db.get(User, workspace.owner_user_id) if workspace and workspace.owner_user_id else None
@@ -85,7 +102,8 @@ def _profile(db, workspace_id: str, snapshot=None, *, student_text: str = "") ->
             identity[key] = {"value": _short(snapshot.facts[key].get("value")),
                              "source": snapshot.facts[key].get("source_type") or "unknown"}
     return {"identity_never_ask": identity,
-            **memory.counselor_vault(workspace_id, student_text, exclude_types=set(identity))}
+            **memory.counselor_vault(workspace_id, student_text, trigger_text=trigger_text, topics=topics,
+                                     exclude_types=set(identity))}
 
 
 def _research(db, workspace_id: str, journey) -> dict | None:
@@ -154,6 +172,9 @@ async def build_context(db, workspace_id: str, turn: CounselorTurnInput, *,
     if workspace_id != turn.workspace_id:
         raise ValueError("turn belongs to another workspace")
     snapshot = MemoryService(db).profile(workspace_id)
+    plan = MemoryService(db).latest_plan(workspace_id)
+    # The areas the counselor is exploring also name a sensitive topic.
+    topics = [topic for topic in (getattr(decision, "topic", None), getattr(plan, "target_gap", None)) if topic]
     sections: dict[str, str] = {
         "today": datetime.now(timezone.utc).date().isoformat(),
         "language_policy": _json({
@@ -162,7 +183,8 @@ async def build_context(db, workspace_id: str, turn: CounselorTurnInput, *,
             "replacement": config.PAI_LANGUAGE_BLOCKED_SCRIPT_REPLACEMENT,
             "fallback_reply": config.PAI_COUNSELOR_FALLBACK_REPLY,
         }),
-        "profile": _json(_profile(db, workspace_id, snapshot, student_text=turn.student_text)),
+        "profile": _json(_profile(db, workspace_id, snapshot, student_text=turn.student_text,
+                                  trigger_text=_previous_counselor_text(db, workspace_id, turn), topics=topics)),
     }
     memory = MemoryService(db)
     notebook = memory.truth_map(workspace_id).notebook
@@ -192,7 +214,6 @@ async def build_context(db, workspace_id: str, turn: CounselorTurnInput, *,
         "session_summaries": [{"summary": row.summary, "entities": row.entities} for row in recent],
         "open_threads": [item.question_intent for item in notebook.open_questions[:3]],
     })
-    plan = memory.latest_plan(workspace_id)
     if plan is not None and not mirror:
         if not wellbeing and plan.next_move != "care" and plan.playbooks:
             from app.pai_c.playbooks.registry import selected_playbooks

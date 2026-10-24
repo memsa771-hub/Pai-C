@@ -125,15 +125,15 @@ class MemoryService:
     def truth_map(self, workspace_id):
         return NotebookService(self.db).get(workspace_id)
 
-    def counselor_vault(self, workspace_id, student_text, *, exclude_types=()):
+    def counselor_vault(self, workspace_id, student_text, *, trigger_text="", topics=(), exclude_types=()):
         """The Vault as the counselor may see it (VAULT_SPEC Access): the entries
         relevant to this turn, sensitive only when the turn needs them,
         restricted never, and no evidence, so never the student's original words."""
         from app.memory.vault_context import context_entry, context_policy, counselor_view, view_entries
-        view = counselor_view(self.db, workspace_id, student_text)
+        view = counselor_view(self.db, workspace_id, student_text, trigger_text=trigger_text, topics=topics)
         entries = [context_entry(entry) for entry in select_context_entries(
-            view, student_text, budget_tokens=context_policy()["counselor_budget_tokens"])
-            if entry["type"] not in exclude_types]
+            view, student_text, budget_tokens=context_policy()["counselor_budget_tokens"],
+            exclude_types=exclude_types)]
         chosen = {entry["id"] for entry in entries}
         marked = [entry for entry in view_entries(view) if entry["id"] in chosen]
         return {"entries": entries,

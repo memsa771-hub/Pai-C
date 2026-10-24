@@ -47,6 +47,7 @@ def coverage_areas(notebook, snapshot, items=()):
     for area, spec in areas.items():
         locations, min_items = (spec["sources"], spec.get("min_items", 1)) if isinstance(spec, dict) else (spec, 1)
         evidence, strength = {}, {}
+        notebook_prefixes = tuple(location["path"] + ":" for location in locations if "path" in location)
         for location in locations:
             if "vault_fields" in location or "vault_field_prefixes" in location:
                 rows = [("fact:" + key, row) for key, row in snapshot.facts.items()
@@ -80,7 +81,12 @@ def coverage_areas(notebook, snapshot, items=()):
                 strength[identity] = _strength(row)
         dates = [stamp for stamp in evidence.values() if stamp is not None]
         levels = [level for level in strength.values() if level]
-        result[area] = {"covered": len(evidence) >= min_items, "item_count": len(evidence),
+        # The notebook and the Vault often hold the same thing twice (one
+        # father, one interest) with no shared id, so the two sides are not
+        # added: the area counts the larger side until the notebook sources go.
+        notebook_side = sum(1 for identity in evidence if identity.startswith(notebook_prefixes))
+        count = max(notebook_side, len(evidence) - notebook_side)
+        result[area] = {"covered": count >= min_items, "item_count": count,
                         "min_items": min_items, "last_confirmed": max(dates) if dates else None,
                         "evidence": max(levels, key=EVIDENCE_ORDER.index) if levels else None}
     return result

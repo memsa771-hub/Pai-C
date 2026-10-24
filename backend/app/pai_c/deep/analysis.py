@@ -173,6 +173,9 @@ def _input(db, workspace_id: str, student: EventRecord, assistant: EventRecord,
         if len(transcript) == config.PAI_PLANNER_HISTORY_TURNS:
             break
     transcript.reverse()
+    # The counselor question the latest student message answers names its topic.
+    asked = [row for row in transcript[:next((i for i, row in enumerate(transcript) if row["event_id"] == student.id),
+                                             len(transcript))] if row["role"] == "counselor"]
     view = view if view is not None else build_planner_view(notebook)
     episode = MemoryService(db).session_summaries(workspace_id, limit=1)
     from app.pai_c.possibilities import PossibilityService
@@ -183,7 +186,8 @@ def _input(db, workspace_id: str, student: EventRecord, assistant: EventRecord,
             + "</notebook_schema>\n"
             + "<understanding_spine>" + capabilities + "</understanding_spine>\n"
             + view.text + "\n<dismissed_possibilities>" + _json(dismissed) + "</dismissed_possibilities>\n"
-            + "<profile>" + _json(_profile(db, workspace_id, student_text=(student.payload or {}).get("content") or "")) + "</profile>\n"
+            + "<profile>" + _json(_profile(db, workspace_id, student_text=(student.payload or {}).get("content") or "",
+                                   trigger_text=asked[-1]["content"] if asked else "")) + "</profile>\n"
             + "<older_episode_summary>" + _json(episode[0].summary if episode else "")
             + "</older_episode_summary>\n"
             + "<transcript>" + _json(transcript) + "</transcript>\n"
