@@ -16,7 +16,7 @@ from tests.test_p2b_sessions import message
 
 def test_extractor_only_proposes_objective_candidates():
     from app.memory.extractor import CANDIDATE_TYPES, SYSTEM_PROMPT
-    assert set(CANDIDATE_TYPES) == {"vault_fact", "student_record"}
+    assert set(CANDIDATE_TYPES) == {"vault_fact", "student_record", "vault_item"}
     assert "semantic_memory with" not in SYSTEM_PROMPT
     assert "episode with" not in SYSTEM_PROMPT
 

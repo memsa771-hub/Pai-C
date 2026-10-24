@@ -704,7 +704,7 @@ def test_complex_introduction_extracts_separate_structured_claims(db):
         extracted = asyncio.run(extract_candidates(
             turn, {field.key for field in fields},
             [{"key": field.key, "data_type": field.data_type,
-              "validation_schema": field.validation_schema} for field in fields]))
+              "validation_schema": field.validation_schema} for field in fields])).candidates
     assert [item.key for item in extracted].count("education") == 2
     assert {item.key for item in extracted} >= {"education", "test_attempt", "goal", "finance.budget"}
     assert all("expiry_date" not in (item.proposed_value or {}) for item in extracted)

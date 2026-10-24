@@ -271,3 +271,18 @@ def test_item_assertion_domain_and_language_for_details_and_story():
         by = {a.candidate_id: a for a in db.scalars(select(VaultAssertion))}
         assert (by[details.id].domain, by[details.id].language) == ("details", "roman_ur")
         assert (by[story.id].domain, by[story.id].language) == ("story", "en")
+
+
+# ---- carried from the Task 5 review (N1) ------------------------------------
+
+def test_document_temporal_flag_is_ignored():
+    with StudentSession() as student, student.factory() as db:
+        ws = student.workspace_id
+        _run(db, ws, "vault_item", "domicile", {"province": "Sindh"})
+        _, result = _run(db, ws, "vault_item", "domicile", {"province": "Punjab"}, source_type="document",
+                         evidence={"file_id": "f", "authority": "government_issued",
+                                   "semantic_temporal_change": True}, input_channel="document")
+        rows = _items(db, ws, "domicile")
+        assert all((r.evidence or {}).get("change") != "temporal" for r in rows)
+        if result.result_id:
+            assert (db.get(VaultItem, result.result_id).evidence or {}).get("change") != "temporal"

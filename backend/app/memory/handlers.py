@@ -17,7 +17,7 @@ a half-tuned prompt silently writing wrong facts is not.
 import logging
 from sqlalchemy import select
 
-from app.memory.candidates import MemoryCandidateService
+from app.memory.candidates import MemoryCandidateService, record_drop
 from app.memory.errors import MemoryDataError
 from app.memory.index import MemoryRecord, get_memory_index
 from app.memory.reconciler import MemoryReconciler
@@ -144,7 +144,13 @@ async def extract_memory(job, db) -> dict:
         ]
         # ExtractionError propagates: malformed model output fails the job so
         # the durable worker retries it, rather than writing half-trusted rows.
-        extracted = await extract_candidates(turn, allowed_keys, field_specs)
+        output = await extract_candidates(turn, allowed_keys, field_specs)
+        # Zero silent drops: every proposal the extractor refused is logged
+        # once this job's transaction ends (see candidates.record_drop).
+        for dropped in output.drops:
+            record_drop(db, workspace_id, "chat", "extract", dropped["reason"], dropped["payload"],
+                        source_ref=turn.user_event_id)
+        extracted = output.candidates
         source_event = db.execute(select(EventRecord).where(
             EventRecord.id == turn.user_event_id,
             EventRecord.network_id == workspace_id,

@@ -68,6 +68,24 @@ def _write_pending_drops(session, transaction):
         logger.warning("vault drop log not written (%d rows): %s", len(pending), type(exc).__name__)
 
 
+def record_drop(db, workspace_id: str, source: str, stage: str, reason: str,
+                payload: Any, source_ref: Optional[str] = None) -> None:
+    """Queue one drop-log row; the listener above writes it when the root transaction ends.
+
+    Deferred, not written here: a second connection could wait on a row lock
+    the caller's transaction holds. The payload is capped so the log never
+    becomes a second copy of student data.
+    """
+    text = json.dumps(payload, ensure_ascii=False, default=str)
+    if len(text.encode("utf-8")) > _DROP_PAYLOAD_LIMIT:
+        key = payload.get("key") if isinstance(payload, dict) else None
+        payload = {"key": key, "value": text.encode("utf-8")[:1500].decode("utf-8", "ignore")}
+    db.info.setdefault("pending_vault_drops", []).append(dict(
+        workspace_id=workspace_id, source=source, stage=stage, reason=str(reason)[:1000],
+        payload=payload, source_ref=str(source_ref) if source_ref else None))
+    db.connection()  # make sure a transaction exists to end, so the drop is written
+
+
 def _now() -> datetime:
     return datetime.now(timezone.utc)
 
@@ -171,19 +189,9 @@ class MemoryCandidateService:
             spec = vault_catalog().type(key or "")
             if source == "details" and spec is not None and spec.shown_on == "story":
                 source = "story"
-            payload = {"key": key, "value": value}
-            text = json.dumps(payload, ensure_ascii=False, default=str)
-            if len(text.encode("utf-8")) > _DROP_PAYLOAD_LIMIT:
-                payload = {"key": key, "value": text.encode("utf-8")[:1500].decode("utf-8", "ignore")}
             ref = (source_event_ids[0] if source_event_ids else None) or evidence.get("file_id")
-            # Deferred, not written here: a second connection could wait on a
-            # row lock this caller's transaction holds. The listener below
-            # writes it once the root transaction ends, commit or rollback.
-            self.db.info.setdefault("pending_vault_drops", []).append(dict(
-                workspace_id=workspace_id, source=source, stage="normalize",
-                reason=result.rejected_reason, payload=payload,
-                source_ref=str(ref) if ref else None))
-            self.db.connection()  # make sure a transaction exists to end, so the drop is written
+            record_drop(self.db, workspace_id, source, "normalize", result.rejected_reason,
+                        {"key": key, "value": value}, source_ref=ref)
             raise MemoryDataError(result.rejected_reason)
         evidence["source_language"] = result.source_language
         if result.needs_confirmation:

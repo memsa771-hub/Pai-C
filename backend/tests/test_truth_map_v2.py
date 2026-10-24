@@ -183,7 +183,8 @@ def test_vault_extractor_stops_interpretation_but_preserves_objective_targets():
     prompt = build_user_prompt(turn, [{"key": "career.primary_interest"}, {"key": "identity.preferred_name"}])
     assert "career.primary_interest" not in prompt
     assert "identity.preferred_name" in prompt
-    assert "Truth Map" in SYSTEM_PROMPT
+    # Interests, motivations and certainty are Vault items now (VAULT_SPEC, Storage).
+    assert "Truth Map" not in SYSTEM_PROMPT and "- certainty:" in SYSTEM_PROMPT
     # Live audit: stated board marks and the home city were lost.
     assert "result.marks_obtained and result.marks_total" in SYSTEM_PROMPT
     assert "location.current_city" in SYSTEM_PROMPT

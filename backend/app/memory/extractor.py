@@ -20,6 +20,7 @@ import logging
 import re
 import math
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any, Optional
 
 from app.workspace_language import workspace_language_block
@@ -28,7 +29,7 @@ from app.inference.gateway import complete as chat_completion, resolve_model
 
 logger = logging.getLogger(__name__)
 
-CANDIDATE_TYPES = ("vault_fact", "student_record")
+CANDIDATE_TYPES = ("vault_fact", "student_record", "vault_item")
 OPERATIONS = ("upsert",)          # extraction may only ADD proposals
 MEMORY_TYPES = ("preference", "goal", "constraint", "interest", "context")
 MAX_CANDIDATES = 16                # allow a useful multi-fact introduction
@@ -53,17 +54,43 @@ class ExtractedCandidate:
     evidence: dict
 
 
-SYSTEM_PROMPT = """You extract durable objective student facts from one counseling turn.
-The student's message is the only evidence. The assistant and earlier context only resolve references. Return JSON {"candidates": [...]} and no prose.
-Use the supplied Vault fields and record schemas. Write every proposed value in <workspace_language>, translating the student's meaning, because values are shown in the workspace; keep proper names, places, institutions and official qualification titles as written. Reuse exact existing record ids for corrections. Propose only stated fields; never infer dates, scores, currency, institutions or commitment. Every candidate needs a quote copied from the student's message and confidence 0-1.
-For currency, write the ISO 4217 code when the student's currency is clear; otherwise copy it as the student wrote it.
-A result the student states for a qualification (for example 780 out of 1100) belongs on that education record as result.marks_obtained and result.marks_total, patching the existing record by id; copy the numbers, never compute a percentage.
-Where the student says they live (for example "I live in X" or "I cannot leave X") is location.current_city with that quote; a city that only says where they studied stays on the education record. A value that differs from the Vault is still proposed; the reconciler asks the student which is right.
-Candidates: vault_fact with key/proposed_value; student_record with key/proposed_value. All use candidate_type, operation upsert, quote, confidence and optional entities. Existing record patches use entities.record_id; goal replacement uses entities.supersedes_record_id. Course references need an existing education_id.
-Goals record only the student's expressed objective target: stated_preference, target_countries, degree_level, field_of_study, target_intake. Preserve exploratory/considering commitment when stated; never upgrade it. Use attribution.claim_owner student/external/mixed/uncertain; mixed goals need attribution.student_clause_quote. Outside suggestions never become student goals. How sure the student feels, a certainty rating (for example 4 out of 10), doubt or confusion is never a goal and never a stated_preference; it belongs to the Truth Map, so it produces no candidate.
-Do not propose student_voice_statement, external_influence, career.primary_interest, or interpretive goal details. Motivations, drivers, underlying objectives, limits and career interpretations belong to the separate Truth Map, not the Vault. Do not invent personality or affiliations. Greetings and transient logistics produce no candidates.
-For explicit corrections include attribution.correction and correction_quote; for explicit changes over time include attribution.temporal_change and change_quote. Copy their evidence, never infer change from a contradiction. Dates may retain year/month precision; do not invent a date. Nothing already recorded is reproposed unless corrected. No evidence means no candidate.
-"""
+@dataclass(frozen=True)
+class ExtractionOutput:
+    """What one turn produced: the valid proposals, and every proposal dropped
+    with its reason. The caller persists the drops (zero silent drops)."""
+
+    candidates: list
+    drops: list
+
+
+def _render_catalog() -> str:
+    """Item types and record kinds, read from the catalog so a new catalog
+    entry reaches the model without a prompt edit."""
+    from app.memory.catalog import vault_catalog
+    catalog = vault_catalog()
+    lines = ["VAULT ITEMS (candidate_type vault_item, key = the item type; * = required):"]
+    for spec in catalog.types(storage="item"):
+        required = set(spec.schema.get("required", []))
+        fields = []
+        for name, prop in spec.schema["properties"].items():
+            bit = name + ("*" if name in required else "")
+            if name in spec.choice_fields:
+                bit += " (" + "|".join(c.code for c in catalog.choices(spec.choice_fields[name])) + ")"
+            elif "enum" in prop:
+                bit += " (" + "|".join(prop["enum"]) + ")"
+            elif prop.get("type") == "number":
+                bit += f" (number {prop.get('minimum', '')}-{prop.get('maximum', '')})"
+            fields.append(bit)
+        lines.append(f"- {spec.key}: " + ", ".join(fields))
+    kinds = ", ".join(spec.key for spec in catalog.types(storage="record"))
+    lines.append(f"RECORD KINDS (candidate_type student_record): {kinds}")
+    return "\n".join(lines)
+
+
+# Loaded once; the catalog block is filled in here so the eval fingerprint
+# (scripts/eval_vault.py) changes whenever the catalog does.
+SYSTEM_PROMPT = (Path(__file__).with_name("prompts") / "extractor.md").read_text(
+    encoding="utf-8").replace("<vault_catalog/>", _render_catalog())
 
 _STOPPED_RECORD_KINDS = frozenset({"student_voice_statement", "external_influence"})
 _GOAL_TARGET_DETAILS = frozenset({"stated_preference", "target_countries", "degree_level", "field_of_study", "target_intake"})
@@ -217,11 +244,16 @@ def _coerce_proposal(raw: dict) -> dict:
     still verified against the student's message, and the key is still matched
     against ENTITY_MODELS by the caller.
     """
+    from .catalog import vault_catalog
     from .student_records import ENTITY_MODELS
 
     kind = raw.get("candidate_type")
     if isinstance(kind, str) and kind not in CANDIDATE_TYPES and kind in ENTITY_MODELS:
         raw = {**raw, "candidate_type": "student_record", "key": raw.get("key") or kind}
+    elif isinstance(kind, str) and kind not in CANDIDATE_TYPES:
+        spec = vault_catalog().type(kind)
+        if spec is not None and spec.storage == "item":
+            raw = {**raw, "candidate_type": "vault_item", "key": raw.get("key") or kind}
 
     value = raw.get("proposed_value")
     if isinstance(value, dict) and ("quote" in value or "confidence" in value):
@@ -298,7 +330,18 @@ def _normalize_currencies(value):
     return value
 
 
-_MONEY_FIELDS = ("amount", "value", "tuition", "cost")
+_MONEY_FIELDS = ("amount", "value", "tuition", "cost", "min", "max")
+_INCOME = re.compile(r"\b(income|salary|salaries|earnings|earns|tankhwah|kamai)\b", re.IGNORECASE)
+
+
+def _states_income(value) -> bool:
+    """A family's income figure in a proposal. The spec never stores one,
+    whatever the student volunteered; the budget for study is asked instead."""
+    text = json.dumps(value, ensure_ascii=False, default=str)
+    return bool(_INCOME.search(text)) and bool(re.search(r"\d", text))
+
+
+_MULTIPLIERS = {"k": 1e3, "thousand": 1e3, "m": 1e6, "million": 1e6, "lakh": 1e5, "crore": 1e7}
 
 
 def _stated_amounts(text: str) -> set:
@@ -318,13 +361,17 @@ def _stated_amounts(text: str) -> set:
         except ValueError:
             continue
         found.add(number)
-        multiplier = {"k": 1e3, "thousand": 1e3, "m": 1e6, "million": 1e6,
-                      "lakh": 1e5, "crore": 1e7}.get((suffix or "").lower())
+        multiplier = _MULTIPLIERS.get((suffix or "").lower())
         if multiplier:
             found.add(number * multiplier)
         # "12,000" also reads as a bare 12 followed by 000 in sloppy output.
         if "." not in digits:
             found.add(number * 1000)
+    # "2 se 3 lakh" / "2-3 lakh": the unit after a range covers its low end too.
+    for low, unit in re.findall(
+            r"(\d+(?:\.\d+)?)\s*(?:-|–|to|se|sy|or|ya)\s*\d+(?:\.\d+)?\s*(k|m|thousand|million|lakh|crore)\b",
+            text or "", flags=re.IGNORECASE):
+        found.add(float(low) * _MULTIPLIERS[unit.lower()])
     return found
 
 
@@ -335,14 +382,22 @@ def _money_is_evidenced(figure, text: str) -> bool:
     return any(abs(figure - candidate) < 0.01 for candidate in _stated_amounts(text))
 
 
-def _validate(raw: dict, turn, allowed_vault_keys: set[str]) -> Optional[ExtractedCandidate]:
+def _validate(raw: dict, turn, allowed_vault_keys: set[str],
+              drops: Optional[list] = None) -> Optional[ExtractedCandidate]:
     """Validate one proposal. None (with a reason logged) if unusable.
 
     Dropping the individual candidate rather than raising is what lets a good
-    grade survive a bad sibling from the same turn.
+    grade survive a bad sibling from the same turn. Each drop is also appended
+    to `drops` so the caller can write it to the Vault drop log.
     """
+    original = raw
+
     def drop(reason: str) -> None:
         logger.info("memory: dropped candidate — %s", reason)
+        if drops is not None:
+            payload = ({k: original.get(k) for k in ("candidate_type", "key", "proposed_value")}
+                       if isinstance(original, dict) else {"raw": original})
+            drops.append({"reason": reason, "payload": payload})
         return None
 
     if not isinstance(raw, dict):
@@ -384,6 +439,10 @@ def _validate(raw: dict, turn, allowed_vault_keys: set[str]) -> Optional[Extract
         entities = {}
 
     evidence = {"quote": quote[:500], "user_event_id": turn.user_event_id}
+    if raw.get("inferred") is True:
+        evidence["inferred"] = True
+    if _states_income(raw.get("proposed_value")):
+        return drop("household income is never stored")
     from .voice_attribution import contained, validated_attribution
     attribution = raw.get("attribution")
     if (isinstance(attribution, dict) and attribution.get("correction") is True
@@ -408,7 +467,7 @@ def _validate(raw: dict, turn, allowed_vault_keys: set[str]) -> Optional[Extract
         # Storing it as canonical makes every affordability check wrong; no
         # budget at all is recoverable, because PAI can simply ask.
         if isinstance(proposed, dict):
-            for money in ("amount", "value", "tuition", "cost"):
+            for money in _MONEY_FIELDS:
                 figure = proposed.get(money)
                 if isinstance(figure, bool) or figure is None:
                     continue
@@ -471,6 +530,31 @@ def _validate(raw: dict, turn, allowed_vault_keys: set[str]) -> Optional[Extract
             confidence=confidence, evidence=evidence,
         )
 
+    if candidate_type == "vault_item":
+        from app.memory.catalog import vault_catalog
+        from app.tools.schema import SchemaValidationError, validate_schema_instance
+        key = raw.get("key")
+        spec = vault_catalog().type(key) if isinstance(key, str) else None
+        if spec is None or spec.storage != "item" or "chat" not in spec.inputs:
+            return drop(f"unknown item type {key!r}")
+        value = _strip_placeholders(raw.get("proposed_value"))
+        if not isinstance(value, dict):
+            return drop(f"{key} item stated no actual values")
+        try:
+            validate_schema_instance(spec.schema, value)
+        except SchemaValidationError as exc:
+            return drop(f"{key} item invalid: {exc}")
+        # "Can't afford" is a stated pressure, never a number (VAULT_SPEC, Money).
+        if key == "pressure" and value.get("kind") == "money" and re.search(r"\d", value["text"]):
+            return drop("money pressure carries a number")
+        # Item ids are not in the turn context; only the student's own edit
+        # names one, so a model-supplied id is never passed on.
+        return ExtractedCandidate(
+            candidate_type="vault_item", operation="upsert", key=key,
+            proposed_value=value, content=None, entities={},
+            confidence=confidence, evidence=evidence,
+        )
+
     if not isinstance(raw.get("content"), str):
         return drop("content not a string")
     content = raw["content"].strip()
@@ -500,17 +584,18 @@ def _normalize(text: str) -> str:
 
 async def extract_candidates(
     turn, allowed_vault_keys: set[str], field_specs=None,
-) -> list[ExtractedCandidate]:
+) -> ExtractionOutput:
     """Run extraction for one turn. Raises ExtractionError on bad output.
 
     `allowed_vault_keys` is the authorization boundary — `_validate` drops
     anything outside it regardless of what the model returns. `field_specs`
     (key/type/description) is the same set rendered INTO the prompt so the
     model can hit those keys exactly; callers that pass only keys still get
-    them listed, just without type hints.
+    them listed, just without type hints. Every dropped proposal comes back in
+    `drops` for the caller to log.
     """
     if turn.is_empty():
-        return []
+        return ExtractionOutput([], [])
 
     api_key, model, base_url = _model_config()
     if not api_key:
@@ -524,16 +609,21 @@ async def extract_candidates(
     )
 
     proposals = _parse_response(raw)
+    drops: list[dict] = []
     if len(proposals) > MAX_CANDIDATES:
         logger.warning(
             "memory: extraction returned %d candidates, truncating to %d",
             len(proposals), MAX_CANDIDATES,
         )
+        for extra in proposals[MAX_CANDIDATES:]:
+            payload = ({k: extra.get(k) for k in ("candidate_type", "key", "proposed_value")}
+                       if isinstance(extra, dict) else {"raw": extra})
+            drops.append({"reason": "over_candidate_limit", "payload": payload})
         proposals = proposals[:MAX_CANDIDATES]
 
     validated = [
         candidate for candidate in (
-            _validate(p, turn, allowed_vault_keys) for p in proposals
+            _validate(p, turn, allowed_vault_keys, drops) for p in proposals
         ) if candidate is not None
     ]
-    return validated
+    return ExtractionOutput(validated, drops)
