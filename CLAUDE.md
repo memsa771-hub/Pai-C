@@ -11,6 +11,7 @@
 3. docs/counselor/AGENT_MASTER_PROMPT_V1.md (rules, phases)
 4. docs/counselor/COUNSELING_POLICY.md and docs/counselor/SPINE.md (how the code is built)
 5. docs/counselor/BUILD_REPORT_V1.md, DECISIONS.md, BLOCKERS.md (what is built, what is missing)
+6. docs/counselor/VAULT_SPEC.md (the student Vault: spec and build status)
 Figma board (locked): https://www.figma.com/board/NjVJfdxERWfRHPycy1wDkF
 
 ## Product rules

@@ -71,3 +71,23 @@ PAI OS: the handoff summary only.
 Golden set recall ≥ 95% on core facts; zero silent drops (every drop logged with its reason); 100% of
 values in English with the original quote kept; one place for everything; a new item type works from a
 catalog entry alone; document entries open the right file and page; every conflict type has a test.
+
+## Status (24 Oct 2026, branch vault-core)
+Built (backend, plan docs/superpowers/plans/2026-10-24-vault-core.md, tasks 1-12):
+- One catalog (backend/app/memory/catalog/vault_catalog.json) for every type, choice list, onboarding
+  question, money marker and fact field definition; onboarding and fact cards read it.
+- Item store and drop log (migration 116), normalization to English and codes, the conflict engine and the
+  evidence ladder, chat and document extraction for every catalog type, household income never stored.
+- One Vault view (badges, document links, freshness, conflict cards) and the /v1/vault API; writes need the
+  signed-in student. The old /v1/student-profile and /v1/counselor/profile-cards routes stay, owner-only
+  for writes, until the frontend moves to /v1/vault.
+- Counselor context, coverage and the extractor read the Vault; notebook people and pressures pass the same
+  topic gate as sensitive Vault entries, and coverage reads notebook sources only where the Vault has no
+  equivalent (history, family_social social life, values sources).
+- The golden set eval reads Vault items and the catalog's field definitions (offline replay only).
+
+Deferred:
+- Frontend: the Vault page and moving the profile screens to /v1/vault.
+- Item embedding for semantic recall.
+- Live eval baseline: recordings need live extractor calls, which wait for the founder's approval and a
+  cost cap; until then recall against the golden set is unmeasured.
