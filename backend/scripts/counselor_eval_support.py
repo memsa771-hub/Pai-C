@@ -22,7 +22,7 @@ from app.models import (
     CounselorTurnDecision, CounselorNotebook, CounselorNotebookHistory, MemoryCandidate, PaiEpisode, PaiMemory, ProfileFieldResponse, ProfileIssue, ProfileRequirement, StudentRecordRevision,
     StudentJourney, StudentJourneyEvent, Institution, InstitutionDomain,
     Opportunity, RequirementSet, Roadmap, RoadmapStudentState, DecisionRecord, StudentRequest,
-    NotificationRecord, User, VaultFact, VaultFieldDefinition, Workspace,
+    NotificationRecord, User, VaultDrop, VaultFact, VaultFieldDefinition, VaultItem, Workspace,
     WorkspaceMember, VAULT_INTAKE_MODELS,
 )
 from app.pai_c import runtime
@@ -72,7 +72,7 @@ class StudentSession:
 
         models = [User, Workspace, WorkspaceMember, ExecutionRun, EventRecord, FileRecord,
                   DocumentArtifact,
-                  VaultFact, VaultFieldDefinition, MemoryCandidate, PaiMemory, PaiEpisode,
+                  VaultFact, VaultItem, VaultDrop, VaultFieldDefinition, MemoryCandidate, PaiMemory, PaiEpisode,
                   ProfileFieldResponse, ProfileIssue, ProfileRequirement,
                   CounselorTurnDecision, CounselorNotebook, CounselorNotebookHistory, CounselorNotedQuestion, PaiTurnPlan, CounselorMirrorFeedback, PaiPossibility,
                   StudentRecordRevision, BackgroundJob,

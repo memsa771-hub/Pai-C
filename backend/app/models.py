@@ -1718,6 +1718,69 @@ class VaultRelation(Base):
     )
 
 
+class VaultItem(Base):
+    """One catalog-typed Vault item with its evidence level (migration 116).
+
+    History rather than overwrite, like VaultFact: a superseded or retracted
+    item keeps its row and `valid_until`, so "what did we believe, and why"
+    stays answerable. `level` is the evidence ladder (inferred < stated <
+    shown < confirmed); `evidence.corroborations` may hold repeat sightings.
+    """
+    __tablename__ = "pai_vault_items"
+
+    id = Column(Text, primary_key=True, default=_uuid)
+    workspace_id = Column(UUID(as_uuid=False), ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False)
+    item_type = Column(Text, nullable=False)             # catalog type name
+    type_version = Column(Integer, nullable=False, default=1, server_default=text("1"))
+    value = Column(JSONB, nullable=False)
+    level = Column(Text, nullable=False)                 # inferred | stated | shown | confirmed
+    source_type = Column(Text, nullable=False)
+    source_language = Column(Text, nullable=True)
+    confidence = Column(Float, nullable=False, default=1.0, server_default=text("1.0"))
+    evidence = Column(JSONB, nullable=True)
+    status = Column(Text, nullable=False, default="active", server_default=text("'active'"))
+    conflict_state = Column(Text, nullable=False, default="none", server_default=text("'none'"))
+    observed_at = Column(DateTime(timezone=True), nullable=True)
+    confirmed_at = Column(DateTime(timezone=True), nullable=True)
+    valid_from = Column(DateTime(timezone=True), default=_now, server_default=text("NOW()"))
+    valid_until = Column(DateTime(timezone=True), nullable=True)
+    superseded_by = Column(Text, nullable=True)
+    candidate_id = Column(Text, nullable=True)
+    created_at = Column(DateTime(timezone=True), default=_now, server_default=text("NOW()"))
+    updated_at = Column(DateTime(timezone=True), default=_now, onupdate=_now, server_default=text("NOW()"))
+
+    __table_args__ = (
+        Index("idx_vault_items_ws_type_status", "workspace_id", "item_type", "status"),
+        CheckConstraint("level IN ('inferred', 'stated', 'shown', 'confirmed')", name="ck_vault_item_level"),
+        CheckConstraint("status IN ('active', 'superseded', 'retracted')", name="ck_vault_item_status"),
+        CheckConstraint("conflict_state IN ('none', 'in_question')", name="ck_vault_item_conflict_state"),
+    )
+
+
+class VaultDrop(Base):
+    """Log of a value that was dropped on the way into the Vault, and why.
+
+    Payload is capped at 2 KB by the writer so the log never becomes a second
+    copy of student data.
+    """
+    __tablename__ = "pai_vault_drops"
+
+    id = Column(Text, primary_key=True, default=_uuid)
+    workspace_id = Column(UUID(as_uuid=False), ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False)
+    source = Column(Text, nullable=False)                # chat | document | details | story
+    stage = Column(Text, nullable=False)                 # extract | normalize | validate
+    reason = Column(Text, nullable=False)
+    payload = Column(JSONB, nullable=True)
+    source_ref = Column(Text, nullable=True)
+    created_at = Column(DateTime(timezone=True), default=_now, server_default=text("NOW()"))
+
+    __table_args__ = (
+        Index("idx_vault_drops_ws_created", "workspace_id", "created_at"),
+        CheckConstraint("source IN ('chat', 'document', 'details', 'story')", name="ck_vault_drop_source"),
+        CheckConstraint("stage IN ('extract', 'normalize', 'validate')", name="ck_vault_drop_stage"),
+    )
+
+
 VAULT_INTAKE_MODELS = (VaultAssertion, VaultEvidence, VaultAssertionEvidence, VaultRelation)
 
 
