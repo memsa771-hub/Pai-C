@@ -25,6 +25,7 @@ from app.memory.vault import VaultService
 from app.models import User
 from app.api.response import ResponseCode, json_response, success_response
 from app.routers.network import _resolve_workspace, _verify_workspace_access
+from app.security.access import is_workspace_owner
 
 router = APIRouter(prefix="/v1/student-profile", tags=["Student Profile"])
 
@@ -58,6 +59,21 @@ def _workspace(db, network, token, authorization):
         return None, json_response(ResponseCode.NOT_FOUND, "Network not found")
     if not _verify_workspace_access(workspace, token, authorization):
         return None, json_response(ResponseCode.UNAUTHORIZED, "Invalid credentials")
+    return workspace, None
+
+
+def _owner_workspace(db, network, token, authorization):
+    """The workspace, for a write: only the signed-in owner may change the profile.
+
+    The machine token reads, but an edit, an answered card or onboarding is the
+    student's own statement (source `user_explicit`), so an agent holding the
+    token must not make one in the student's name. Same rule as /v1/vault.
+    """
+    workspace, error = _workspace(db, network, token, authorization)
+    if error:
+        return None, error
+    if not is_workspace_owner(db, workspace, authorization):
+        return None, json_response(ResponseCode.FORBIDDEN, "Only the student can change their profile")
     return workspace, None
 
 
@@ -149,7 +165,7 @@ def edit_student_profile(
     x_workspace_token: Optional[str] = Header(None), authorization: Optional[str] = Header(None),
 ):
     """A student's own correction — the canonical, validated write path."""
-    workspace, error = _workspace(db, network, x_workspace_token, authorization)
+    workspace, error = _owner_workspace(db, network, x_workspace_token, authorization)
     if error:
         return error
     if bool(edit.record_type) == bool(edit.field_key):
@@ -182,7 +198,7 @@ def resolve_profile_issue(
     issue_id: str, resolution: IssueResolution, network: str = Query(...), db: Session = Depends(get_db),
     x_workspace_token: Optional[str] = Header(None), authorization: Optional[str] = Header(None),
 ):
-    workspace, error = _workspace(db, network, x_workspace_token, authorization)
+    workspace, error = _owner_workspace(db, network, x_workspace_token, authorization)
     if error:
         return error
     try:
@@ -226,7 +242,7 @@ def submit_onboarding(
     x_workspace_token: Optional[str] = Header(None), authorization: Optional[str] = Header(None),
 ):
     """Write the student's answers canonically and mark onboarding done."""
-    workspace, error = _workspace(db, network, x_workspace_token, authorization)
+    workspace, error = _owner_workspace(db, network, x_workspace_token, authorization)
     if error:
         return error
     try:

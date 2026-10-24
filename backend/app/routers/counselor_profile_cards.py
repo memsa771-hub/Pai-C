@@ -7,6 +7,7 @@ from app.api.response import success_response
 from app.memory.errors import MemoryDataError
 from app.database import get_db
 from app.routers.roadmaps import _authorized
+from app.security.access import is_workspace_owner
 from app.pai_c.memory import MemoryService
 
 router = APIRouter(prefix="/v1/counselor/profile-cards", tags=["Counselor"])
@@ -30,6 +31,10 @@ def cards(network: str = Query(...), db=Depends(get_db), x_workspace_token: str 
 @router.post("/{kind}/{record_id}")
 def review(kind: str, record_id: str, body: Review, network: str = Query(...), db=Depends(get_db), x_workspace_token: str | None = Header(None), authorization: str | None = Header(None)):
     workspace = _authorized(db, network, x_workspace_token, authorization)
+    # A confirm marks a value "Confirmed": only the signed-in student may give it,
+    # never an agent holding the machine token (same rule as /v1/vault).
+    if not is_workspace_owner(db, workspace, authorization):
+        raise HTTPException(403, "Only the student can change their profile")
     try:
         result = MemoryService(db).review_profile_card(str(workspace.id), kind, record_id, body)
         db.commit()

@@ -6,7 +6,7 @@ from app.memory.candidates import MemoryCandidateService
 from app.memory.reconciler import MemoryReconciler
 from app.memory.evidence import evidence_level, value_digest
 from app.models import MemoryCandidate
-from tests.test_student_profile_api import api, HEADERS
+from tests.test_student_profile_api import api, HEADERS, MACHINE_ONLY
 
 
 def seed(db, workspace, kind):
@@ -68,3 +68,18 @@ def test_restricted_facts_not_exposed(api):
     db.commit()
     response = client.get(f"/v1/counselor/profile-cards?network={workspace}", headers=HEADERS)
     assert response.status_code == 200 and "private-number" not in response.text
+
+
+def test_review_refuses_the_machine_token_alone(api):
+    """A confirm marks a value "Confirmed"; only the signed-in student may give it."""
+    client, db, workspace = api
+    seed(db, workspace, "vault_fact")
+    url = f"/v1/counselor/profile-cards?network={workspace}"
+    card = next(row for row in client.get(url, headers=MACHINE_ONLY).json()["data"]["cards"]
+                if row["kind"] == "vault_fact")
+    body = {"submission_id": str(uuid4()), "action": "confirm", "expected_digest": card["digest"]}
+    endpoint = f"/v1/counselor/profile-cards/vault_fact/{card['id']}?network={workspace}"
+    assert client.post(endpoint, headers=MACHINE_ONLY, json=body).status_code == 403
+    unchanged = next(row for row in client.get(url, headers=HEADERS).json()["data"]["cards"]
+                     if row["kind"] == "vault_fact")
+    assert unchanged["evidence_level"] == "stated"

@@ -12,6 +12,7 @@ on another thread, so the SQLite connection has to be shareable across threads.
 
 import json
 from datetime import datetime, timezone
+from unittest.mock import patch
 
 import pytest
 from fastapi.testclient import TestClient
@@ -41,7 +42,16 @@ def _compile_jsonb(type_, compiler, **kw):
 
 
 TOKEN = "machine-secret"
-HEADERS = {"X-Workspace-Token": TOKEN}
+# The signed-in owner: the frontend sends the machine token and the bearer together.
+HEADERS = {"X-Workspace-Token": TOKEN, "Authorization": "Bearer owner"}
+MACHINE_ONLY = {"X-Workspace-Token": TOKEN}
+# Bearer -> verified user id; only "owner" owns the fixture's workspace.
+BEARERS = {}
+
+
+def _claims(bearer):
+    user_id = BEARERS.get(bearer)
+    return {"session_user_id": user_id} if user_id else None
 
 # One of each sensitivity class, mirroring migration 063.
 EXTRA_FIELDS = (
@@ -85,10 +95,13 @@ def api():
                                   "sensitivity": sensitivity, "data_type": "string",
                                   "validation_schema": {"type": "string"}})
     session.commit()
+    BEARERS.clear()
+    BEARERS.update({"owner": str(user.id), "stranger": "someone-else"})
 
     app.dependency_overrides[get_db] = lambda: session
     try:
-        yield TestClient(app), session, str(workspace.id)
+        with patch("app.security.access.verify_identity_claims", side_effect=_claims):
+            yield TestClient(app), session, str(workspace.id)
     finally:
         app.dependency_overrides.pop(get_db, None)
         session.close()
@@ -297,3 +310,19 @@ def test_edit_endpoint_returns_a_bad_request_for_a_value_that_is_not_english(api
     set_session_factory(previous)
     body = response.json()
     assert body["code"] != 0 and "not_english" in str(body)
+
+
+def test_writes_refuse_the_machine_token_alone(api):
+    """An agent holding the token reads, but cannot write in the student's name."""
+    client, db, network = api
+    writes = [("/edits", {"field_key": "location.current_city", "value": "Lahore", "reason": "Moved"}),
+              ("/issues/no-such-issue/resolve", {"action": "keep_current"}),
+              ("/onboarding", {"answers": {}})]
+    stranger = {"X-Workspace-Token": TOKEN, "Authorization": "Bearer stranger"}
+    for path, body in writes:
+        url = f"/v1/student-profile{path}?network={network}"
+        assert client.post(url, headers=MACHINE_ONLY, json=body).status_code == 403, path
+        assert client.post(url, headers=stranger, json=body).status_code == 403, path
+    assert db.query(VaultFact).count() == 0
+    assert client.get(f"/v1/student-profile?network={network}", headers=MACHINE_ONLY).status_code == 200
+    assert client.get(f"/v1/student-profile/onboarding?network={network}", headers=MACHINE_ONLY).status_code == 200
