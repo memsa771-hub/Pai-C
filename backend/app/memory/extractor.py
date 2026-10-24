@@ -63,25 +63,32 @@ class ExtractionOutput:
     drops: list
 
 
+def render_item(spec) -> str:
+    """One item type as a prompt line: fields, required marks, codes, ranges.
+    Shared with the document extractor so both read the catalog the same way."""
+    from app.memory.catalog import vault_catalog
+    catalog = vault_catalog()
+    required = set(spec.schema.get("required", []))
+    fields = []
+    for name, prop in spec.schema["properties"].items():
+        bit = name + ("*" if name in required else "")
+        if name in spec.choice_fields:
+            bit += " (" + "|".join(c.code for c in catalog.choices(spec.choice_fields[name])) + ")"
+        elif "enum" in prop:
+            bit += " (" + "|".join(prop["enum"]) + ")"
+        elif prop.get("type") == "number":
+            bit += f" (number {prop.get('minimum', '')}-{prop.get('maximum', '')})"
+        fields.append(bit)
+    return f"- {spec.key}: " + ", ".join(fields)
+
+
 def _render_catalog() -> str:
     """Item types and record kinds, read from the catalog so a new catalog
     entry reaches the model without a prompt edit."""
     from app.memory.catalog import vault_catalog
     catalog = vault_catalog()
     lines = ["VAULT ITEMS (candidate_type vault_item, key = the item type; * = required):"]
-    for spec in catalog.types(storage="item"):
-        required = set(spec.schema.get("required", []))
-        fields = []
-        for name, prop in spec.schema["properties"].items():
-            bit = name + ("*" if name in required else "")
-            if name in spec.choice_fields:
-                bit += " (" + "|".join(c.code for c in catalog.choices(spec.choice_fields[name])) + ")"
-            elif "enum" in prop:
-                bit += " (" + "|".join(prop["enum"]) + ")"
-            elif prop.get("type") == "number":
-                bit += f" (number {prop.get('minimum', '')}-{prop.get('maximum', '')})"
-            fields.append(bit)
-        lines.append(f"- {spec.key}: " + ", ".join(fields))
+    lines += [render_item(spec) for spec in catalog.types(storage="item")]
     kinds = ", ".join(spec.key for spec in catalog.types(storage="record"))
     lines.append(f"RECORD KINDS (candidate_type student_record): {kinds}")
     return "\n".join(lines)

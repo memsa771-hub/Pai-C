@@ -209,6 +209,14 @@ class MemoryReconciler:
         values = self._unwrap(candidate.proposed_value)
         if not isinstance(values, dict):
             return self._reject(candidate, "student record requires an object")
+        education_candidate_id = (candidate.entities or {}).get("education_candidate_id")
+        if candidate.key == "course" and "education_id" not in values and education_candidate_id:
+            # A subject from a new transcript joins the qualification the same
+            # document proposed, once that has become (or matched) a record.
+            education = self.candidates.get(candidate.workspace_id, education_candidate_id)
+            if education is None or education.status != "accepted" or not education.result_id:
+                return self._reject(candidate, "course_education_not_saved")
+            values = {**values, "education_id": education.result_id}
         claim_origin, capture_method, verification = provenance_for(candidate)
         record = self.records.apply(
             candidate.workspace_id, candidate.key or "", values,

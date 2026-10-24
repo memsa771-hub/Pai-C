@@ -175,8 +175,8 @@ def attachment_prompt_block(attachments: list[dict], can_read: bool = True) -> s
             "them to re-upload it."
         ),
         "unsupported": (
-            "An attached file is not a supported document. Only PDF and Word "
-            "(.docx) files can be read."
+            "An attached file is not a supported document. Only PDF, Word "
+            "(.docx), JPG and PNG files can be read."
         ),
     }
     if not can_read:

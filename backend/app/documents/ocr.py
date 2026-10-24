@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""OCR for scanned PDFs, behind a provider seam.
+"""OCR for scanned PDFs and JPEG/PNG photos, behind a provider seam.
 
 Default provider is the OpenAI-compatible vision model already configured for
 PAI (`PAI_API_KEY`/`PAI_BASE_URL`), so a scanned transcript costs one more
@@ -18,6 +18,8 @@ import base64
 import logging
 from dataclasses import dataclass
 from typing import Optional, Protocol
+
+from .types import image_mime
 
 logger = logging.getLogger(__name__)
 
@@ -50,7 +52,7 @@ class OcrProvider(Protocol):
     name: str
 
     async def transcribe(self, images: list[tuple[int, bytes]]) -> list[OcrPage]:
-        """Transcribe (page_number, png_bytes) pairs."""
+        """Transcribe (page_number, image_bytes) pairs: rendered PNG pages or an uploaded photo."""
         ...
 
 
@@ -74,15 +76,18 @@ class VisionModelOcr:
         client = get_client("ocr", api_key=self.api_key, model=self.model, base_url=self.base_url)
         pages: list[OcrPage] = []
         try:
-            for page_number, png in images:
-                encoded = base64.b64encode(png).decode("ascii")
+            for page_number, image in images:
+                encoded = base64.b64encode(image).decode("ascii")
+                # A photo is sent as uploaded, so its label must match its
+                # bytes; rendered PDF pages are always PNG.
+                mime = image_mime(image) or "image/png"
                 response = await client.chat.completions.create(
                     model=self.model,
                     messages=[
                         {"role": "system", "content": OCR_SYSTEM_PROMPT},
                         {"role": "user", "content": [
                             {"type": "image_url", "image_url": {
-                                "url": f"data:image/png;base64,{encoded}",
+                                "url": f"data:{mime};base64,{encoded}",
                             }},
                         ]},
                     ],

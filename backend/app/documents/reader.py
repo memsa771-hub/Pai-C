@@ -69,7 +69,7 @@ def read_document(
             "status": "unsupported",
             "reason": "not_a_document",
             "message": (
-                "This file is not a PDF or Word document, so it has no parsed "
+                "This file is not a PDF, Word document or JPG/PNG photo, so it has no parsed "
                 "text. Use the raw file download if you need its bytes."
             ),
         }

@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """What a student document actually IS, decided from bytes.
 
-Phase 1 accepts exactly two formats: PDF and DOCX. The restriction applies to
+Accepted formats: PDF, DOCX, and JPEG/PNG photos (read by OCR). The restriction applies to
 the student-document intelligence path only — generic workspace file storage
 keeps accepting whatever it accepted before (see `app/file_types.py`).
 
@@ -11,6 +11,12 @@ prompt, so every check here reads the leading bytes:
 
     PDF    %PDF-                     (allowed a small leading offset)
     DOCX   PK zip container holding `word/` parts
+    JPEG   FF D8 FF
+    PNG    89 50 4E 47 0D 0A 1A 0A
+
+A photo is one document type, "image": a JPEG named `.png` is still a photo
+of a result card, and phones do that, so the two image extensions never
+mismatch each other.
 
 Legacy `.doc` is the trap worth naming: it is an OLE2 compound file
 (``D0CF11E0``), shares a stem with `.docx`, and is explicitly rejected rather
@@ -24,13 +30,22 @@ import zipfile
 from typing import Optional
 
 #: Extensions the student-document path accepts. Nothing else is processed.
-DOCUMENT_EXTENSIONS = ("pdf", "docx")
+DOCUMENT_EXTENSIONS = ("pdf", "docx", "jpg", "jpeg", "png")
+
+#: Which document type each accepted extension claims.
+_EXTENSION_TYPES = {"pdf": "pdf", "docx": "docx", "jpg": "image", "jpeg": "image", "png": "image"}
 
 #: Canonical content types, keyed by the detected document type.
 DOCUMENT_CONTENT_TYPES = {
     "pdf": "application/pdf",
     "docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
 }
+
+#: A photo's content type depends on which image format the bytes are.
+IMAGE_CONTENT_TYPES = ("image/jpeg", "image/png")
+
+_JPEG_MAGIC = b"\xff\xd8\xff"
+_PNG_MAGIC = b"\x89PNG\r\n\x1a\n"
 
 _PDF_MAGIC = b"%PDF-"
 #: Some producers emit junk before the header; the spec tolerates a small
@@ -87,8 +102,20 @@ def _is_docx_container(data: bytes) -> bool:
     return _DOCX_REQUIRED_ENTRY in names
 
 
+def image_mime(data: bytes) -> Optional[str]:
+    """`image/jpeg` or `image/png` from the leading bytes, else None."""
+    if data.startswith(_JPEG_MAGIC):
+        return "image/jpeg"
+    if data.startswith(_PNG_MAGIC):
+        return "image/png"
+    return None
+
+
 def sniff_content_type(data: bytes) -> Optional[str]:
     """Detected canonical content type, or None when unrecognised."""
+    image = image_mime(data)
+    if image:
+        return image
     if _looks_like_pdf(data):
         return DOCUMENT_CONTENT_TYPES["pdf"]
     if _is_docx_container(data):
@@ -105,8 +132,8 @@ def is_student_document_candidate(filename: str, content_type: str = "") -> bool
     """
     if _extension(filename) in DOCUMENT_EXTENSIONS:
         return True
-    return (content_type or "").split(";")[0].strip().lower() in set(
-        DOCUMENT_CONTENT_TYPES.values()
+    return (content_type or "").split(";")[0].strip().lower() in (
+        set(DOCUMENT_CONTENT_TYPES.values()) | set(IMAGE_CONTENT_TYPES)
     )
 
 
@@ -115,12 +142,12 @@ def detect_document_type(
 ) -> tuple[str, str]:
     """Decide the document type from CONTENT, cross-checked against the name.
 
-    Returns ``(document_type, content_type)`` where `document_type` is "pdf"
-    or "docx".
+    Returns ``(document_type, content_type)`` where `document_type` is "pdf",
+    "docx" or "image" (content type `image/jpeg` or `image/png`).
 
     Raises `DocumentTypeError` with a stable `code`:
 
-        unsupported_type   not a PDF or DOCX at all (includes legacy .doc)
+        unsupported_type   not a PDF, DOCX, JPEG or PNG (includes legacy .doc)
         content_mismatch   real document, but not the type the name claims
 
     The browser's declared MIME is accepted as a hint and never as proof: it
@@ -140,7 +167,10 @@ def detect_document_type(
         )
 
     detected: Optional[str] = None
-    if _looks_like_pdf(data):
+    content_type = image_mime(data)
+    if content_type:
+        detected = "image"
+    elif _looks_like_pdf(data):
         detected = "pdf"
     elif _is_docx_container(data):
         detected = "docx"
@@ -148,16 +178,16 @@ def detect_document_type(
     if detected is None:
         raise DocumentTypeError(
             "unsupported_type",
-            "Only PDF and Word (.docx) documents can be processed.",
+            "Only PDF, Word (.docx), JPG and PNG files can be processed.",
         )
 
     # A name that claims the other supported type is a mismatch worth
     # reporting; a name with no/unknown extension simply defers to content.
-    if extension in DOCUMENT_EXTENSIONS and extension != detected:
+    if extension in _EXTENSION_TYPES and _EXTENSION_TYPES[extension] != detected:
         raise DocumentTypeError(
             "content_mismatch",
             f"This file is named .{extension} but its contents are a "
             f"{detected.upper()} document.",
         )
 
-    return detected, DOCUMENT_CONTENT_TYPES[detected]
+    return detected, content_type or DOCUMENT_CONTENT_TYPES[detected]

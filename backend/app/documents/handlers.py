@@ -76,6 +76,10 @@ async def _apply_ocr(data: bytes, parsed: ParsedDocument) -> ParsedDocument:
     targets = blank_pages[:MAX_OCR_PAGES]
     images: list[tuple[int, bytes]] = []
     for page_number in targets:
+        if parsed.document_type == "image":
+            # The photo itself: re-encoding it would only lose detail.
+            images.append((page_number, data))
+            continue
         try:
             images.append((page_number, render_pdf_page_png(data, page_number)))
         except Exception:  # noqa: BLE001 — one unrenderable page is not fatal
@@ -157,7 +161,7 @@ async def parse_document_job(job, db) -> dict:
         service.mark_failed(artifact, exc.code, exc.message)
         return {"parsed": False, "reason": exc.code}
 
-    if parsed.document_type == "pdf":
+    if parsed.document_type in ("pdf", "image"):
         parsed = await _apply_ocr(data, parsed)
 
     service.mark_parsed(
@@ -201,6 +205,62 @@ async def parse_document_job(job, db) -> dict:
     }
 
 
+_NAME_KEYS = ("identity.full_name", "identity.preferred_name")
+
+
+def _is_education(finding) -> bool:
+    return finding.candidate_type == "student_record" and finding.key == "education"
+
+
+def _name_tokens(value) -> frozenset:
+    from app.memory.catalog import norm
+
+    return frozenset(norm(value).split()) if isinstance(value, str) else frozenset()
+
+
+def _owner_mismatch(db, workspace_id: str, findings) -> dict | None:
+    """The names on the document and in the Vault, when no pair agrees.
+
+    One name may be part of the other ("Ali Khan" on a result card, "Muhammad
+    Ali Khan" in the Vault): that is the same person. A Vault with no name
+    yet, or a document with none, has nothing to disagree with.
+    """
+    from app.memory.vault import VaultService
+
+    document_names = [f.proposed_value for f in findings
+                      if f.candidate_type == "vault_fact" and f.key in _NAME_KEYS
+                      and _name_tokens(f.proposed_value)]
+    vault = VaultService(db)
+    vault_names = [fact.value for key in _NAME_KEYS
+                   if (fact := vault.get_fact(workspace_id, key)) is not None]
+    vault_names = [v.get("value") if isinstance(v, dict) else v for v in vault_names]
+    vault_names = [v for v in vault_names if _name_tokens(v)]
+    if not document_names or not vault_names:
+        return None
+    for document_name in document_names:
+        for vault_name in vault_names:
+            a, b = _name_tokens(document_name), _name_tokens(vault_name)
+            if a <= b or b <= a:
+                return None
+    return {"document_names": document_names, "vault_names": vault_names}
+
+
+def _open_owner_issue(db, workspace_id: str, file_id: str, filename: str, names: dict) -> None:
+    from app.models import ProfileIssue
+
+    db.add(ProfileIssue(
+        workspace_id=workspace_id, issue_type="document_owner", severity="blocking",
+        affected_type="document", affected_id=file_id,
+        summary=f"The name on {filename or 'this document'} does not match the student's name",
+        clarification_question=(
+            f"The name on {filename or 'this document'} is different from yours. "
+            "Is this your document?"),
+        evidence={"file_id": file_id, "filename": filename, **names},
+    ))
+    db.flush()
+    logger.info("document.extract: owner mismatch, nothing applied file=%s", file_id)
+
+
 async def extract_document_job(job, db) -> dict:
     """Understand a parsed document and propose candidates.
 
@@ -232,7 +292,8 @@ async def extract_document_job(job, db) -> dict:
         return {"extracted": False, "reason": "already_extracted"}
 
     segments = segments_from_content(artifact.content)
-    if not segments:
+    if not any(segment.text.strip() for segment in segments):
+        # A photo OCR could not read has one empty page: nothing to send a model.
         return {"extracted": False, "reason": "no_content"}
 
     # Existing state comes from the shared snapshot — never a second view of
@@ -278,13 +339,33 @@ async def extract_document_job(job, db) -> dict:
         summary={"findings": len(understanding.findings)},
     )
 
+    from app.memory.candidates import record_drop
+
+    for dropped in understanding.drops:
+        record_drop(db, workspace_id, "document", "extract", dropped["reason"],
+                    dropped["payload"], source_ref=file_id)
+
     candidates = MemoryCandidateService(db)
     proposed: list[str] = []
+
+    # Another person's document is not applied, and the student is asked
+    # (VAULT_SPEC §Conflicts). Decided over all of the document's names at
+    # once, before anything from it is proposed.
+    mismatch = _owner_mismatch(db, workspace_id, understanding.findings)
+    if mismatch is not None:
+        _open_owner_issue(db, workspace_id, file_id, filename, mismatch)
+        findings = []
+    else:
+        # Qualifications first, so a course can name the record its
+        # qualification became when the reconciler reaches it.
+        findings = sorted(understanding.findings, key=lambda f: not _is_education(f))
+    educations = [f for f in findings if _is_education(f)]
+    education_candidate_id = None
 
     # A StudentDocument record: "this file is a meaningful journey document".
     # The file_id is SERVER-owned — taken from the job, never from model
     # output — so a model cannot name a file it was not given.
-    if is_journey_document(understanding.classification) and record is not None:
+    if mismatch is None and is_journey_document(understanding.classification) and record is not None:
         existing_documents = {
             row.get("file_id") for row in snapshot.records.get("document", [])
         }
@@ -313,11 +394,28 @@ async def extract_document_job(job, db) -> dict:
             else:
                 proposed.append(candidate.id)
 
-    for finding in understanding.findings:
+    for finding in findings:
         proposed_value = finding.proposed_value
+        entities = dict(finding.entities or {})
         if finding.candidate_type == "student_record" and finding.key == "credential" and isinstance(proposed_value, dict):
             # The source file belongs to this job, not to the extractor's JSON.
             proposed_value = {**proposed_value, "raw_document_ref": file_id}
+        if entities.pop("education_from_document", False):
+            # A subject's marks belong to the one qualification this document
+            # names; with none, or several, there is no honest link to make.
+            existing_id = (educations[0].entities or {}).get("record_id") if len(educations) == 1 else None
+            if existing_id:
+                proposed_value = {**proposed_value, "education_id": existing_id}
+            elif len(educations) == 1 and education_candidate_id:
+                entities["education_candidate_id"] = education_candidate_id
+            else:
+                reason = ("course_without_education" if len(educations) != 1
+                          else "course_education_not_proposed")
+                logger.info("document.extract: dropped course file=%s: %s", file_id, reason)
+                record_drop(db, workspace_id, "document", "extract", reason,
+                            {"candidate_type": finding.candidate_type, "key": finding.key,
+                             "proposed_value": proposed_value}, source_ref=file_id)
+                continue
         try:
             candidate = candidates.propose(
                 workspace_id=workspace_id,
@@ -326,7 +424,7 @@ async def extract_document_job(job, db) -> dict:
                 key=finding.key,
                 proposed_value=proposed_value,
                 content=finding.content,
-                entities=finding.entities or None,
+                entities=entities or None,
                 confidence=finding.confidence,
                 # Server-assigned, from the channel this job read. The extractor
                 # has no field for it and cannot reach `user_explicit`.
@@ -348,6 +446,8 @@ async def extract_document_job(job, db) -> dict:
             logger.info("document.extract: normalize rejected %s file=%s: %s", finding.key, file_id, exc)
             continue
         proposed.append(candidate.id)
+        if _is_education(finding):
+            education_candidate_id = candidate.id
 
     logger.info(
         "document.extract: workspace=%s file=%s class=%s authority=%s "

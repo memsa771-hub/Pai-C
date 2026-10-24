@@ -27,8 +27,10 @@ import json
 import logging
 import math
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Optional
+
+from app.memory.extractor import _INCOME_GUARDED_ITEMS, _states_income, render_item
 
 from .classify import DOCUMENT_CLASSES
 from .content import Segment
@@ -38,10 +40,10 @@ logger = logging.getLogger(__name__)
 
 #: Bump when the prompt or validation changes meaning: an artifact extracted
 #: under an older version is then eligible for deliberate re-extraction.
-EXTRACTOR_VERSION = "3"
+EXTRACTOR_VERSION = "4"
 
-CANDIDATE_TYPES = ("vault_fact", "student_record", "semantic_memory", "episode")
-MAX_CANDIDATES = 40          # a transcript legitimately carries many facts
+CANDIDATE_TYPES = ("vault_fact", "student_record", "vault_item", "semantic_memory", "episode")
+MAX_CANDIDATES = 80          # a transcript's subjects are each a course record
 MAX_PROMPT_CHARS = 60_000
 
 
@@ -68,6 +70,9 @@ class DocumentUnderstanding:
     classification_confidence: float
     title: Optional[str]
     findings: list[DocumentFinding]
+    #: Every finding dropped, as {reason, payload}; the handler writes them
+    #: to the Vault drop log (zero silent drops).
+    drops: list = field(default_factory=list)
 
 
 SYSTEM_PROMPT = f"""\
@@ -107,18 +112,25 @@ Do NOT infer educational history that is not evidenced. A Master's transcript
 is not evidence of a Bachelor's degree, even though one normally precedes the
 other. Propose only what the document itself supports.
 
-Do NOT copy the whole document into memory. A transcript's fifty courses are
-not fifty memories — and not fifty records of ANY kind. Individual course
-names, marks and grades are never achievements, skills, projects or
-episodes. They stay in the document, where they remain searchable. What a
-transcript contributes to the profile is the qualification itself and its
-OVERALL result (CGPA/percentage and scale). An `achievement` is a distinction
-the document names as one: an award, prize, honour, dean's list, medal or
-scholarship — not a good grade in a course. Use:
+Do NOT copy the whole document into memory. A transcript or result card
+contributes the qualification itself with its OVERALL result (CGPA,
+percentage or total marks, with the scale), and ONE `course` record per
+subject listed with its marks. A course record carries the subject `name`,
+the `grade` as printed, and `score` with the raw figures and their scale
+exactly as printed: marks_obtained and marks_total, or gpa and gpa_scale, or
+percentage. Never convert between scales, never compute a percentage, and
+include a total only when the document prints one. Leave `education_id` out
+unless the course belongs to an EXISTING RECORD; the course is linked to
+this document's own qualification. Individual subjects and marks are never
+achievements, skills, projects, memories or episodes. An `achievement` is a
+distinction the document names as one: an award, prize, honour, dean's list,
+medal or scholarship — not a good grade in a course. Use:
 
-  student_record  identified qualifications, test attempts, work, projects,
-                  certifications, achievements, applications, visas, sponsors
+  student_record  identified qualifications, courses (subject marks), test
+                  attempts, work, projects, certifications, achievements,
+                  applications, visas, sponsors
   vault_fact      registered scalar profile fields
+  vault_item      only the VAULT ITEMS listed below
   semantic_memory ONLY durable context that matters beyond this document
                   (e.g. a motivation stated in an SOP). Not a summary of the
                   document, and not one entry per sentence.
@@ -156,6 +168,15 @@ Each finding is one of:
     "proposed_value": <value of the declared type>,
     "confidence": 0.0-1.0, "quote": "<exact text>", "locator": "<e.g. p1>"}}
 
+  {{"candidate_type": "vault_item", "key": "<item type from VAULT ITEMS>",
+    "proposed_value": {{<that item's fields the document states>}},
+    "confidence": 0.0-1.0, "quote": "<exact text>", "locator": "<e.g. p1>"}}
+
+<vault_items/>
+
+Never report a household's or family's income, salary or earnings, even when
+the document prints it.
+
   {{"candidate_type": "semantic_memory",
     "content": "<one short third-person sentence about the student>",
     "memory_type": "preference|goal|constraint|interest|context",
@@ -170,6 +191,23 @@ list. That is a correct answer.
 
 {DOCUMENT_RULES_TRAILER}
 """
+
+
+def document_item_types() -> list:
+    """Catalog item types a document may write: those whose `inputs` name it."""
+    from app.memory.catalog import vault_catalog
+
+    return [spec for spec in vault_catalog().types(storage="item") if "document" in spec.inputs]
+
+
+def _render_items() -> str:
+    lines = ["VAULT ITEMS (candidate_type vault_item, key = the item type; * = required):"]
+    lines += [render_item(spec) for spec in document_item_types()]
+    return "\n".join(lines)
+
+
+# Filled from the catalog once, so a catalog change reaches the prompt without an edit.
+SYSTEM_PROMPT = SYSTEM_PROMPT.replace("<vault_items/>", _render_items())
 
 
 def _model_config() -> tuple[str, str, Optional[str]]:
@@ -278,15 +316,26 @@ def _strip_placeholders(value):
 def _validate_finding(
     raw: dict, *, document_text: str, locators: set[str],
     allowed_vault_keys: set[str], record_ids: dict[str, set[str]],
+    drops: Optional[list] = None,
 ) -> Optional[DocumentFinding]:
     """Validate one proposal. None (logged) if unusable.
 
     Dropping the individual finding rather than raising is deliberate: one
     hallucinated field must not discard a correctly extracted CGPA from the
-    same transcript.
+    same transcript. Each drop is also appended to `drops` for the drop log.
     """
-    def drop(reason: str):
+    def drop(reason: str, redact: bool = False):
         logger.info("document extraction: dropped finding — %s", reason)
+        if drops is not None:
+            if not isinstance(raw, dict):
+                payload = {"raw": raw}
+            elif redact:
+                # Same rule as chat: the log never holds the figure, so no value and no quote.
+                payload = {"candidate_type": raw.get("candidate_type"), "key": raw.get("key"),
+                           "reason": reason}
+            else:
+                payload = {k: raw.get(k) for k in ("candidate_type", "key", "proposed_value", "locator")}
+            drops.append({"reason": reason, "payload": payload})
         return None
 
     if not isinstance(raw, dict):
@@ -326,6 +375,33 @@ def _validate_finding(
 
     evidence = {"quote": quote[:500], "locator": locator}
 
+    key = raw.get("key")
+    if (candidate_type == "vault_fact" and isinstance(key, str) and key.startswith("finance.")
+            or candidate_type == "vault_item" and key in _INCOME_GUARDED_ITEMS):
+        # A household income is never stored, from any source (VAULT_SPEC).
+        if _states_income(quote) or _states_income(raw.get("proposed_value")):
+            return drop("household_income", redact=True)
+
+    if candidate_type == "vault_item":
+        from app.memory.catalog import vault_catalog
+        from app.tools.schema import SchemaValidationError, validate_schema_instance
+
+        spec = vault_catalog().type(key) if isinstance(key, str) else None
+        if spec is None or spec.storage != "item" or "document" not in spec.inputs:
+            return drop(f"item type {key!r} is not one a document may write")
+        value = _strip_placeholders(raw.get("proposed_value"))
+        if not isinstance(value, dict):
+            return drop(f"{key} item stated no actual values")
+        try:
+            validate_schema_instance(spec.schema, value)
+        except SchemaValidationError as exc:
+            return drop(f"{key} item invalid: {exc}")
+        # Item ids are never in the prompt, so a model-supplied one is not passed on.
+        return DocumentFinding(
+            candidate_type="vault_item", key=key, proposed_value=value,
+            content=None, entities={}, confidence=confidence, evidence=evidence,
+        )
+
     if candidate_type == "vault_fact":
         key = raw.get("key")
         if not key or key not in allowed_vault_keys:
@@ -364,10 +440,20 @@ def _validate_finding(
         value = _strip_placeholders(value)
         if not isinstance(value, dict) or not value:
             return drop(f"{kind} record stated no actual values")
+        # A subject on a new transcript belongs to the qualification this same
+        # document names, which has no id yet; the handler links the two.
+        link_to_document = (kind == "course" and "education_id" not in value
+                            and "record_id" not in clean_entities)
         try:
-            value = validate_record(kind, value, partial="record_id" in clean_entities)
+            if link_to_document:
+                value = validate_record(kind, {**value, "education_id": "document"})
+                value.pop("education_id")
+            else:
+                value = validate_record(kind, value, partial="record_id" in clean_entities)
         except MemoryDataError as exc:
             return drop(str(exc))
+        if link_to_document:
+            clean_entities["education_from_document"] = True
         return DocumentFinding(
             candidate_type="student_record", key=kind, proposed_value=value,
             content=None, entities=clean_entities, confidence=confidence,
@@ -483,11 +569,18 @@ async def understand_document(
         raise DocumentExtractionError("output has no 'findings' key")
     if not isinstance(findings_raw, list):
         raise DocumentExtractionError("'findings' was not a list")
+    drops: list = []
     if len(findings_raw) > MAX_CANDIDATES:
         logger.warning(
             "document extraction returned %d findings, truncating to %d",
             len(findings_raw), MAX_CANDIDATES,
         )
+        # Unvalidated, so only what names the finding is kept: an unchecked
+        # value could be a household income the guard never saw.
+        for extra in findings_raw[MAX_CANDIDATES:]:
+            payload = ({k: extra.get(k) for k in ("candidate_type", "key", "locator")}
+                       if isinstance(extra, dict) else {})
+            drops.append({"reason": "over_candidate_limit", "payload": payload})
         findings_raw = findings_raw[:MAX_CANDIDATES]
 
     # Normalize ONCE: every quote is checked against this.
@@ -503,6 +596,7 @@ async def understand_document(
             _validate_finding(
                 raw_finding, document_text=document_text, locators=locators,
                 allowed_vault_keys=allowed_vault_keys, record_ids=record_ids,
+                drops=drops,
             )
             for raw_finding in findings_raw
         ) if finding is not None
@@ -514,4 +608,5 @@ async def understand_document(
         classification_confidence=classification_confidence,
         title=title,
         findings=findings,
+        drops=drops,
     )

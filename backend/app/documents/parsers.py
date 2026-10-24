@@ -5,7 +5,7 @@ No LLM runs here. Given the same bytes these functions return the same
 segments, which is what lets an evidence quote be checked against the
 document rather than trusted.
 
-The one non-deterministic path — OCR for scanned PDFs — is isolated behind
+The one non-deterministic path — OCR for scanned PDFs and photos — is isolated behind
 `app.documents.ocr` and only reached when deterministic extraction comes back
 effectively empty.
 """
@@ -104,7 +104,7 @@ def parse_pdf(data: bytes) -> ParsedDocument:
 
 def needs_ocr(parsed: ParsedDocument) -> bool:
     """True when deterministic extraction found essentially no text."""
-    return parsed.document_type == "pdf" and parsed.char_count < _OCR_TRIGGER_CHARS
+    return parsed.document_type in ("pdf", "image") and parsed.char_count < _OCR_TRIGGER_CHARS
 
 
 def pages_needing_ocr(parsed: ParsedDocument) -> list[int]:
@@ -224,6 +224,21 @@ def parse_document(data: bytes, document_type: str) -> ParsedDocument:
         return parse_pdf(data)
     if document_type == "docx":
         return parse_docx(data)
+    if document_type == "image":
+        return parse_image(data)
     raise DocumentParseError(
-        "unsupported_type", "Only PDF and Word (.docx) documents can be processed.",
+        "unsupported_type", "Only PDF, Word (.docx), JPG and PNG files can be processed.",
+    )
+
+
+def parse_image(data: bytes) -> ParsedDocument:  # noqa: ARG001 — OCR reads the bytes later
+    """A photo is one page with no deterministic text.
+
+    The empty page is what sends it down the OCR path, and its locator "p1"
+    is the evidence address every value read from the photo quotes against.
+    """
+    return ParsedDocument(
+        document_type="image", parser="image",
+        segments=[Segment(locator="p1", text="", kind="text")],
+        page_count=1,
     )

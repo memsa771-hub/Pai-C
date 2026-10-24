@@ -76,7 +76,10 @@ class DetectDocumentTypeTests(unittest.TestCase):
         for name, data in (
             ("notes.txt", b"just text"),
             ("data.csv", b"a,b,c\n1,2,3"),
-            ("photo.png", b"\x89PNG\r\n\x1a\n" + b"\x00" * 64),
+            # Photos are JPEG or PNG; other image formats are not read.
+            ("photo.gif", b"GIF89a" + b"\x00" * 64),
+            # Named a photo, but not one: content decides.
+            ("photo.png", b"GIF89a" + b"\x00" * 64),
         ):
             with self.subTest(name=name):
                 with self.assertRaises(DocumentTypeError):
@@ -97,12 +100,15 @@ class CandidateTests(unittest.TestCase):
         self.assertTrue(is_student_document_candidate("transcript.pdf", ""))
         self.assertTrue(is_student_document_candidate("cv.docx", ""))
         self.assertTrue(is_student_document_candidate("x", "application/pdf"))
+        # A photographed result card is a document too (VAULT_SPEC Inputs).
+        self.assertTrue(is_student_document_candidate("result.jpg", ""))
+        self.assertTrue(is_student_document_candidate("x", "image/png"))
 
     def test_unrelated_files_are_not_candidates(self):
         # The guarantee that generic workspace uploads keep working untouched.
-        for name in ("photo.png", "main.py", "data.csv", "notes.md", "song.mp3"):
+        for name in ("photo.gif", "main.py", "data.csv", "notes.md", "song.mp3"):
             with self.subTest(name=name):
-                self.assertFalse(is_student_document_candidate(name, "image/png"))
+                self.assertFalse(is_student_document_candidate(name, "image/gif"))
 
 
 if __name__ == "__main__":
