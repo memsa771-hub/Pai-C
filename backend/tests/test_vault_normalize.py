@@ -54,6 +54,7 @@ def test_urdu_script_value_is_rejected_and_logged():
                 student.workspace_id, "student_record", key="education",
                 proposed_value={"institution": "لاہور کالج"}, source_type="conversation",
                 input_channel="conversation", source_event_ids=["evt-1"])
+        db.rollback()  # the drop is logged when the caller's transaction ends
         drop = db.scalar(select(VaultDrop))
         assert (drop.source, drop.stage, drop.source_ref) == ("chat", "normalize", "evt-1")
         assert drop.reason == "not_english: institution"
@@ -113,18 +114,51 @@ def test_drop_source_mapping_and_file_id_ref():
                 svc.propose(student.workspace_id, "student_record", key=key, proposed_value={"institution": "لاہور"},
                             source_type="document" if channel == "document" else "conversation",
                             input_channel=channel, **extra)
+        db.rollback()
         rows = db.scalars(select(VaultDrop).order_by(VaultDrop.created_at)).all()
         assert [(r.source, r.source_ref) for r in rows] == [("document", "file-9"), ("story", None), ("details", None)]
 
 
+def _reject(db, workspace_id):
+    with pytest.raises(MemoryDataError):
+        MemoryCandidateService(db).propose(
+            workspace_id, "student_record", key="education",
+            proposed_value={"institution": "لاہور"})
+
+
 def test_drop_survives_callers_rollback():
     with StudentSession() as student, student.factory() as db:
-        with pytest.raises(MemoryDataError):
-            MemoryCandidateService(db).propose(
-                student.workspace_id, "student_record", key="education",
-                proposed_value={"institution": "لاہور"})
+        _reject(db, student.workspace_id)
         db.rollback()
         assert db.scalar(select(VaultDrop.reason)) == "not_english: institution"
+
+
+def test_drop_persists_after_callers_commit():
+    with StudentSession() as student, student.factory() as db:
+        _reject(db, student.workspace_id)
+        db.commit()
+        assert db.scalar(select(VaultDrop.reason)) == "not_english: institution"
+
+
+def test_drop_waits_for_the_callers_transaction_to_end():
+    from app.models import Workspace
+    with StudentSession() as student, student.factory() as db, student.factory() as other:
+        db.execute(select(Workspace).where(Workspace.id == student.workspace_id).with_for_update()).scalar_one()
+        _reject(db, student.workspace_id)
+        assert other.scalar(select(VaultDrop.id)) is None
+        db.rollback()
+        other.rollback()
+        assert other.scalar(select(VaultDrop.reason)) == "not_english: institution"
+
+
+def test_failing_drop_write_keeps_the_rejection_and_warns(caplog):
+    from unittest.mock import patch
+    with StudentSession() as student, student.factory() as db:
+        with patch("app.database.new_session", side_effect=RuntimeError("db down")),              caplog.at_level("WARNING", logger="app.memory.candidates"):
+            _reject(db, student.workspace_id)
+            db.rollback()
+        assert "vault drop log not written" in caplog.text and "لاہور" not in caplog.text
+        assert db.scalar(select(VaultDrop.id)) is None
 
 
 def test_retract_is_not_normalized():
@@ -144,4 +178,5 @@ def test_extract_loop_continues_past_a_rejected_candidate():
             {"candidate_type": "vault_fact", "key": "location.current_city", "proposed_value": "Lahore"}]})
         result = asyncio.run(extract_memory(job, db))
         assert result["candidates_proposed"] == 1
+        db.rollback()
         assert db.scalar(select(VaultDrop.reason)) == "not_english: institution"

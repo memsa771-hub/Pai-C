@@ -13,7 +13,8 @@ import logging
 from datetime import datetime, timezone
 from typing import Any, Optional
 
-from sqlalchemy import select
+from sqlalchemy import event, select
+from sqlalchemy.orm import Session
 
 from app.memory.errors import MemoryDataError
 from app.models import MemoryCandidate, VaultDrop
@@ -44,6 +45,27 @@ PRIVILEGED_SOURCE_TYPES = ("user_explicit",)
 NORMALIZED_TYPES = ("vault_fact", "student_record", "vault_item")
 _DROP_SOURCE = {"conversation": "chat", "voice": "chat", "document": "document", "profile": "details"}
 _DROP_PAYLOAD_LIMIT = 2048
+
+
+@event.listens_for(Session, "after_transaction_end")
+def _write_pending_drops(session, transaction):
+    """Persist rejected-value logs after the caller's locks are gone.
+
+    Runs for every session; only a root transaction ending with queued drops
+    does anything. It never raises: the MemoryDataError already left propose.
+    """
+    if transaction.parent is not None or transaction.nested:
+        return
+    pending = session.info.pop("pending_vault_drops", None)
+    if not pending:
+        return
+    try:
+        from app.database import new_session
+        with new_session() as log:
+            log.add_all([VaultDrop(**row) for row in pending])
+            log.commit()
+    except Exception as exc:  # noqa: BLE001 - logging must not mask the rejection
+        logger.warning("vault drop log not written (%d rows): %s", len(pending), type(exc).__name__)
 
 
 def _now() -> datetime:
@@ -154,15 +176,14 @@ class MemoryCandidateService:
             if len(text.encode("utf-8")) > _DROP_PAYLOAD_LIMIT:
                 payload = {"key": key, "value": text.encode("utf-8")[:1500].decode("utf-8", "ignore")}
             ref = (source_event_ids[0] if source_event_ids else None) or evidence.get("file_id")
-            # Own session, committed at once: the drop must outlive the
-            # caller's rollback, or a rejected value would vanish silently.
-            from app.database import new_session
-            with new_session() as log:
-                log.add(VaultDrop(
-                    workspace_id=workspace_id, source=source, stage="normalize",
-                    reason=result.rejected_reason, payload=payload,
-                    source_ref=str(ref) if ref else None))
-                log.commit()
+            # Deferred, not written here: a second connection could wait on a
+            # row lock this caller's transaction holds. The listener below
+            # writes it once the root transaction ends, commit or rollback.
+            self.db.info.setdefault("pending_vault_drops", []).append(dict(
+                workspace_id=workspace_id, source=source, stage="normalize",
+                reason=result.rejected_reason, payload=payload,
+                source_ref=str(ref) if ref else None))
+            self.db.connection()  # make sure a transaction exists to end, so the drop is written
             raise MemoryDataError(result.rejected_reason)
         evidence["source_language"] = result.source_language
         if result.needs_confirmation:
