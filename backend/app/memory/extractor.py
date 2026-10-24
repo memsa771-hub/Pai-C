@@ -601,8 +601,10 @@ def _validate(raw: dict, turn, allowed_vault_keys: set[str],
         if isinstance(proposed, dict):
             # A figure already saved for this field is the student's own earlier
             # answer, repeated as context; only a changed figure needs their words.
+            # A saved guess is not their answer, so its figures still need them.
             saved = (getattr(turn, "vault", None) or {}).get(key)
-            saved = saved if isinstance(saved, dict) else {}
+            guessed = key in (getattr(turn, "vault_guesses", None) or ())
+            saved = saved if isinstance(saved, dict) and not guessed else {}
             for money in _MONEY_FIELDS:
                 figure = proposed.get(money)
                 if isinstance(figure, bool) or figure is None or figure == saved.get(money):

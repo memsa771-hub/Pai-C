@@ -48,6 +48,7 @@ class TurnContext:
     assistant_text: str = ""
     recent: list[dict] = field(default_factory=list)      # [{role, text}]
     vault: dict = field(default_factory=dict)
+    vault_guesses: set = field(default_factory=set)       # fact keys held only as PAI's guess
     records: dict = field(default_factory=dict)
     items: list[dict] = field(default_factory=list)       # [{type, id, display, needs_recheck?}]
     existing_memories: list[str] = field(default_factory=list)
@@ -162,6 +163,12 @@ def build_turn_context(
     from .vault import VaultService
 
     context.vault = VaultService(db).snapshot(workspace_id, include_sensitive=True)
+    # Which of those are only PAI's guess: a guessed figure is not the student's answer.
+    from app.models import VaultFact
+    from .vault import is_fact_guess
+    context.vault_guesses = {f.field_key for f in db.scalars(select(VaultFact).where(
+        VaultFact.workspace_id == workspace_id, VaultFact.status == "active"))
+        if is_fact_guess(f.source_type, f.evidence)}
     from .student_records import StudentRecordService
     context.records = StudentRecordService(db).snapshot(workspace_id, limit=12)
     context.items = vault_items_for_extraction(db, workspace_id, context.user_text)

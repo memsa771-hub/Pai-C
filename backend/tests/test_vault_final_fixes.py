@@ -264,6 +264,47 @@ async def test_only_changed_budget_figures_must_be_in_the_students_words():
     assert len(out.drops) == 1 and "min=400000" in out.drops[0]["reason"]
 
 
+def test_a_guessed_budget_is_never_promoted_by_a_follow_up():
+    for source, extra in (("agent", {}), ("conversation", {"inferred": True})):
+        with StudentSession() as s, s.factory() as db:
+            ws = s.workspace_id
+            assert _run(db, ws, "vault_fact", "finance.budget", {"band": "3_6_lakh"}, source_type=source,
+                        evidence=extra, quote="3 se 6 lakh")[1].accepted
+            db.commit()
+            with pytest.raises(MemoryDataError, match="empty_budget"):
+                _propose(db, ws, "vault_fact", "finance.budget", {"covers": "fees_only"},
+                         quote="sirf fees, hostel nahi")
+            db.rollback()
+            fact = VaultService(db).get_fact(ws, "finance.budget")
+            assert fact.source_type == source and fact.value == {"value": {"band": "3_6_lakh"}}
+
+
+@pytest.mark.asyncio
+async def test_a_guessed_figure_still_needs_the_students_words():
+    turn = SimpleNamespace(user_text="Sirf fees, hostel nahi", user_event_id="evt", records={},
+                           vault={"finance.budget": {"min": 300000, "max": 600000}},
+                           vault_guesses={"finance.budget"},
+                           existing_memories=[], recent=[], assistant_text="", is_empty=lambda: False)
+    candidates = [_budget({"min": 300000, "max": 600000, "covers": "fees_only"}, "Sirf fees")]
+    with patch.object(extractor, "chat_completion", return_value=json.dumps({"candidates": candidates})),             patch.object(extractor, "_model_config", return_value=("test", "test", None)):
+        out = await extractor.extract_candidates(turn, {"finance.budget"}, [])
+    assert out.candidates == [] and "min=300000" in out.drops[0]["reason"]
+
+
+def test_turn_context_names_guessed_facts():
+    from app.memory.extraction_context import build_turn_context
+    with VaultSession() as student:
+        ws = student.workspace_id
+        with student.factory() as db:
+            _run(db, ws, "vault_fact", "finance.budget", {"band": "3_6_lakh"}, source_type="agent")
+            _run(db, ws, "vault_fact", "location.current_city", "Lahore")
+            db.commit()
+        event_id = student.student_message("Sirf fees")
+        with student.factory() as db:
+            context = build_turn_context(db, ws, event_id)
+            assert context.vault_guesses == {"finance.budget"}
+
+
 # ---- 5. no proposal stuck behind an obsolete card ---------------------------------
 
 

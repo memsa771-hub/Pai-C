@@ -238,12 +238,16 @@ class MemoryCandidateService:
         """A budget follow-up ("only fees, not hostel") completes the saved
         budget instead of replacing it. A new amount replaces the saved amount
         as a whole, so a band and an old range never sit side by side."""
-        from .vault import VaultService, _unwrap
+        from .vault import VaultService, _unwrap, is_fact_guess
 
         if not isinstance(value, dict):
             return value
         fact = VaultService(self.db).get_fact(workspace_id, "finance.budget")
-        saved = _unwrap(fact.value) if fact is not None else None
+        if fact is None or is_fact_guess(fact.source_type, fact.evidence):
+            # PAI's guess is not the student's budget: merged in, it would be
+            # saved as something the student said. The follow-up stands alone.
+            return value
+        saved = _unwrap(fact.value)
         if not isinstance(saved, dict):
             return value
         given = {k: v for k, v in value.items() if v not in (None, "")}
