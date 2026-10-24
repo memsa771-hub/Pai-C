@@ -207,3 +207,51 @@ def test_report_is_written_in_json_and_markdown(tmp_path):
     text = path.read_text(encoding="utf-8")
     assert "Not English: کراچی" in text and "Missed: city" in text
     assert json.loads((tmp_path / "vault_eval.json").read_text(encoding="utf-8"))["mode"] == "recorded"
+
+
+def _migration(name):
+    import importlib.util
+    from pathlib import Path
+    path = Path(eval_vault.__file__).resolve().parents[1] / "alembic/versions" / f"{name}.py"
+    spec = importlib.util.spec_from_file_location(f"parity_{name}", path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def test_catalog_field_definitions_match_the_migrations():
+    """Parity guard. The catalog carries production's field definitions for the
+    eval and tests; production gets them from migrations. A new migration that
+    adds or changes a Vault field definition must update the catalog's
+    `field_definition` blocks too, or this test fails."""
+    from app.memory.field_definitions import catalog_field_definitions
+    production = {}
+    for field in _migration("074_pai_os_baseline")._VAULT_FIELDS:
+        spec = {k: v for k, v in field.items() if k != "id"}
+        # 078: source policies for location and the student's own preferences.
+        if spec["category"] == "location":
+            spec["source_policy"] = {"temporal_change": "student_transition"}
+        elif spec["category"] in ("preferences", "career", "mobility"):
+            spec["source_policy"] = {"allowed_sources": ["user_explicit", "conversation"],
+                                     "authority_rank": {"user_explicit": 100, "conversation": 80}}
+        production[spec["key"]] = spec
+    # 085: the two INSERTs, literally.
+    production["preferences.location_limits"] = {
+        "key": "preferences.location_limits", "category": "preferences", "data_type": "array",
+        "validation_schema": {"type": "array", "maxItems": 30,
+                              "items": {"type": "string", "minLength": 1, "maxLength": 200}},
+        "cardinality": "single", "conflict_policy": "latest_wins", "sensitivity": "normal",
+        "searchable": True, "description": "Places the student can or cannot study or work",
+        "context_tags": ["counseling", "matching"], "required_for": ["counseling"], "profile_priority": 65}
+    production["preferences.study_load"] = {
+        "key": "preferences.study_load", "category": "preferences", "data_type": "string",
+        "validation_schema": {"type": "string", "enum": ["full_time", "part_time", "flexible"]},
+        "cardinality": "single", "conflict_policy": "latest_wins", "sensitivity": "normal",
+        "searchable": False, "description": "Full-time or part-time study availability",
+        "context_tags": ["counseling"], "required_for": ["counseling"], "profile_priority": 55}
+    # 116: the ranged budget is the enabled version.
+    production["finance.budget"]["validation_schema"] = _migration("116_vault_items").BUDGET_SCHEMA
+    catalog = {spec["key"]: spec for spec in catalog_field_definitions()}
+    assert set(catalog) == set(production)
+    for key, spec in production.items():
+        assert catalog[key] == spec, key

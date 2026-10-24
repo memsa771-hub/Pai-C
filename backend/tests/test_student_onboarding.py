@@ -405,3 +405,15 @@ def test_a_level_in_the_students_wording_is_the_catalog_code_without_review(db):
                                                         MemoryCandidate.key == "education"))
     assert candidate.proposed_value["value"] == {"qualification_name": "o_level"}
     assert "catalog_review" not in candidate.evidence
+
+
+def test_a_legacy_stored_level_prefills_as_its_catalog_chip(db):
+    """Older rows hold "o-level" (the retired chip value); the prefill shows the
+    catalog code so the chip is selected rather than an Other box."""
+    from app.memory.student_records import ENTITY_MODELS
+    workspace = db.info["workspace"]
+    db.add(ENTITY_MODELS["education"](workspace_id=workspace.id, qualification_name="o-level",
+                                       source_type="user_explicit", claim_origin="student",
+                                       capture_method="onboarding"))
+    db.commit()
+    assert OnboardingService(db).state(workspace)["prefill"]["level"] == "o_level"

@@ -20,9 +20,14 @@
         }
       },
       {
+        "path": "world.daily_life",
+        "group": "daily_life"
+      },
+      {
         "vault_items": [
           "daily_life"
-        ]
+        ],
+        "group": "daily_life"
       }
     ]
   },
@@ -30,7 +35,8 @@
     "min_items": 2,
     "sources": [
       {
-        "path": "world.education_story"
+        "path": "world.education_story",
+        "group": "education"
       },
       {
         "path": "shown"
@@ -45,7 +51,8 @@
           "achievement",
           "activity",
           "work_experience"
-        ]
+        ],
+        "group": "education"
       }
     ]
   },
@@ -53,16 +60,43 @@
     "min_items": 2,
     "sources": [
       {
+        "path": "self",
+        "key_prefixes": [
+          "interest."
+        ],
+        "group": "interest"
+      },
+      {
         "vault_items": [
-          "interest",
+          "interest"
+        ],
+        "group": "interest"
+      },
+      {
+        "path": "world.daily_life",
+        "group": "daily_life"
+      },
+      {
+        "vault_items": [
           "daily_life"
-        ]
+        ],
+        "group": "daily_life"
       }
     ]
   },
   "strengths": {
     "min_items": 1,
     "sources": [
+      {
+        "path": "self",
+        "nonempty": "capability_status",
+        "group": "strength"
+      },
+      {
+        "path": "shown",
+        "nonempty": "capability_status",
+        "group": "strength"
+      },
       {
         "vault_records": [
           "skill",
@@ -73,7 +107,8 @@
       {
         "vault_items": [
           "strength"
-        ]
+        ],
+        "group": "strength"
       }
     ]
   },
@@ -81,12 +116,17 @@
     "min_items": 2,
     "sources": [
       {
-        "path": "world.social"
+        "path": "world.people",
+        "group": "family"
       },
       {
         "vault_items": [
           "family_member"
-        ]
+        ],
+        "group": "family"
+      },
+      {
+        "path": "world.social"
       }
     ]
   },
@@ -94,12 +134,21 @@
     "min_items": 1,
     "sources": [
       {
-        "path": "source"
+        "path": "self",
+        "key_prefixes": [
+          "value.",
+          "motivation."
+        ],
+        "group": "value"
       },
       {
         "vault_items": [
           "value"
-        ]
+        ],
+        "group": "value"
+      },
+      {
+        "path": "source"
       }
     ]
   },
@@ -107,15 +156,26 @@
     "min_items": 1,
     "sources": [
       {
+        "path": "pressures.items",
+        "group": "pressure"
+      },
+      {
         "vault_items": [
           "pressure"
-        ]
+        ],
+        "group": "pressure"
+      },
+      {
+        "path": "world.people",
+        "nonempty": "worry",
+        "group": "family_concern"
       },
       {
         "vault_items": [
           "family_member"
         ],
-        "nonempty": "concern"
+        "nonempty": "concern",
+        "group": "family_concern"
       }
     ]
   },
@@ -123,9 +183,16 @@
     "min_items": 1,
     "sources": [
       {
+        "path": "sure",
+        "not_null": "score",
+        "timestamp": "asked_at",
+        "group": "certainty"
+      },
+      {
         "vault_items": [
           "certainty"
-        ]
+        ],
+        "group": "certainty"
       }
     ]
   },
@@ -133,15 +200,39 @@
     "min_items": 1,
     "sources": [
       {
+        "path": "source",
+        "key_prefixes": [
+          "goal."
+        ],
+        "where": {
+          "category": [
+            "self",
+            "family",
+            "peers",
+            "media",
+            "need",
+            "other"
+          ]
+        },
+        "group": "goal"
+      },
+      {
         "vault_records": [
           "goal"
-        ]
+        ],
+        "group": "goal"
+      },
+      {
+        "path": "world.people",
+        "nonempty": "wish",
+        "group": "family_wish"
       },
       {
         "vault_items": [
           "family_member"
         ],
-        "nonempty": "wish"
+        "nonempty": "wish",
+        "group": "family_wish"
       }
     ]
   },
@@ -149,10 +240,19 @@
     "min_items": 1,
     "sources": [
       {
+        "path": "said",
+        "key_prefixes": [
+          "option.",
+          "myth."
+        ],
+        "group": "options"
+      },
+      {
         "vault_items": [
           "option",
           "myth"
-        ]
+        ],
+        "group": "options"
       }
     ]
   }

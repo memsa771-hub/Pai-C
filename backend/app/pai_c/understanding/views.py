@@ -46,9 +46,11 @@ def coverage_areas(notebook, snapshot, items=()):
     result = {}
     for area, spec in areas.items():
         locations, min_items = (spec["sources"], spec.get("min_items", 1)) if isinstance(spec, dict) else (spec, 1)
-        evidence, strength = {}, {}
-        notebook_prefixes = tuple(location["path"] + ":" for location in locations if "path" in location)
-        for location in locations:
+        evidence, strength, sides = {}, {}, {}
+        for index, location in enumerate(locations):
+            # Equivalent notebook and Vault sources share a `group` (areas.json);
+            # a source without one is its own group.
+            group = location.get("group", f"#{index}")
             if "vault_fields" in location or "vault_field_prefixes" in location:
                 rows = [("fact:" + key, row) for key, row in snapshot.facts.items()
                         if key in location.get("vault_fields", []) or
@@ -79,14 +81,16 @@ def coverage_areas(notebook, snapshot, items=()):
                 stamp = row.get(location.get("timestamp", "last_confirmed")) or row.get("updated_at") or row.get("valid_from") or row.get("created_at")
                 evidence[identity] = _date(stamp)
                 strength[identity] = _strength(row)
+                sides.setdefault((group, "path" in location), set()).add(identity)
         dates = [stamp for stamp in evidence.values() if stamp is not None]
         levels = [level for level in strength.values() if level]
-        # Areas with a Vault equivalent read the Vault alone (areas.json). The
-        # few that still read both (history, family_social, values) may hold
-        # the same thing twice with no shared id, so the two sides are not
-        # added: the area counts the larger side.
-        notebook_side = sum(1 for identity in evidence if identity.startswith(notebook_prefixes))
-        count = max(notebook_side, len(evidence) - notebook_side)
+        # The notebook and the Vault often hold the same thing twice (one father,
+        # one interest) with no shared id. Within a group the larger side counts;
+        # groups add up. Both stay read until a recorded eval proves extraction
+        # recall (no backfill: existing students have notebooks, not items).
+        groups = {group for group, _ in sides}
+        count = sum(max(len(sides.get((group, True), ())), len(sides.get((group, False), ())))
+                    for group in groups)
         result[area] = {"covered": count >= min_items, "item_count": count,
                         "min_items": min_items, "last_confirmed": max(dates) if dates else None,
                         "evidence": max(levels, key=EVIDENCE_ORDER.index) if levels else None}

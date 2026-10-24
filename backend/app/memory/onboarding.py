@@ -209,7 +209,10 @@ class OnboardingService:
             if field.record_field:
                 rows = StudentRecordService(self.db).list(str(workspace.id), field.field_key)
                 if rows:
-                    prefill[field.name] = getattr(rows[0], field.record_field, "")
+                    stored = getattr(rows[0], field.record_field, "") or ""
+                    # A value saved before the chips were catalog codes ("o-level")
+                    # reads as its code, so the chip is selected.
+                    prefill[field.name] = (_choice_code(field, stored) or stored) if stored else stored
         # Full name is deliberately collected here, not at signup, and is never
         # guessed from an email address or an OAuth display name.
         return {

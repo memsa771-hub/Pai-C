@@ -429,6 +429,8 @@
     "matric": "Matric",
     "o-level": "O-level",
     "fsc": "FSc",
-    "a-level": "A-level"
+    "a-level": "A-level",
+    "o_level": "O-level",
+    "a_level": "A-level"
   }
 }

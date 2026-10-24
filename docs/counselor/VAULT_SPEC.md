@@ -81,13 +81,16 @@ Built (backend, plan docs/superpowers/plans/2026-10-24-vault-core.md, tasks 1-12
 - One Vault view (badges, document links, freshness, conflict cards) and the /v1/vault API; writes need the
   signed-in student. The old /v1/student-profile and /v1/counselor/profile-cards routes stay, owner-only
   for writes, until the frontend moves to /v1/vault.
-- Counselor context, coverage and the extractor read the Vault; notebook people and pressures pass the same
-  topic gate as sensitive Vault entries, and coverage reads notebook sources only where the Vault has no
-  equivalent (history, family_social social life, values sources).
+- Counselor context, coverage and the extractor read the Vault. Notebook people and pressures pass the same
+  topic gate as sensitive Vault entries in per-turn context. Coverage reads both the notebook and the Vault,
+  counting each equivalent pair once (groups in understanding/areas.json), until a recorded eval proves
+  extraction recall; existing students have notebooks and no items (no backfill).
 - The golden set eval reads Vault items and the catalog's field definitions (offline replay only).
 
 Deferred:
 - Frontend: the Vault page and moving the profile screens to /v1/vault.
 - Item embedding for semantic recall.
+- Notebook source, tensions, goal_history and private_notes can still carry a family wish into per-turn
+  context without a topic match; only people and pressures are gated.
 - Live eval baseline: recordings need live extractor calls, which wait for the founder's approval and a
   cost cap; until then recall against the golden set is unmeasured.

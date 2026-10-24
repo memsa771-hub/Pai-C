@@ -307,3 +307,13 @@ def test_what_chat_may_propose_is_data_not_a_ban_list(monkeypatch):
     assert not extractor._chat_proposable(raw)
     assert _validate(raw, turn, set()) is None
     assert "visa" not in extractor._extractor_specs()
+
+
+def test_every_finance_fact_is_a_money_kind():
+    finance = {t.key for t in vault_catalog().types("fact") if t.key.startswith("finance.")}
+    assert finance and finance <= extractor.money_kinds()
+    from app.memory.catalog import VaultCatalog
+    with pytest.raises(ValueError, match="finance.extra"):
+        VaultCatalog.from_dict({"choices": {}, "types": [
+            {"key": "finance.extra", "storage": "fact", "shown_on": "details", "inputs": ["chat"],
+             "sensitivity": "sensitive", "conflict": "latest_wins", "freshness_days": None, "version": 1}]})

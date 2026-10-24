@@ -133,6 +133,10 @@ def _build_type(raw: dict, choices: dict) -> TypeSpec:
         money = raw.get("money", False)
         if not isinstance(money, bool):
             raise ValueError("money must be true or false")
+        if storage == "fact" and key.startswith("finance.") and not money:
+            # A finance fact is where a household income would land; the
+            # income guard only covers types marked money.
+            raise ValueError("a finance fact needs money: true")
         field_definition = raw.get("field_definition")
         if field_definition is not None:
             if storage != "fact":

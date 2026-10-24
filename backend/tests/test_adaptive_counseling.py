@@ -129,8 +129,7 @@ def test_rich_message_records_multiple_dimensions_without_inflated_ability():
         addition("self", "creative", "I am creative", capability_status="untested", level="claimed")]
     notebook = apply_patch(CounselorNotebookData(), operations, set(), "Student's account")
     covered = coverage_areas(notebook, SimpleNamespace(facts={}, records={}))
-    # Only the areas without a Vault equivalent still read the notebook.
-    assert all(covered[key]["item_count"] for key in ("history", "family_social"))
+    assert all(covered[key]["item_count"] for key in ("status", "history", "interests", "family_social", "strengths"))
     assert notebook.self[-1].kind == "said" and notebook.self[-1].capability_status == "untested"
     assert notebook.world.education_story[0].kind == "said"
 

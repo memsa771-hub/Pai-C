@@ -236,7 +236,12 @@ def test_inferred_correction_never_replaces_in_any_engine():
 def test_agent_fact_cannot_replace_stated_value():
     with StudentSession() as student, student.factory() as db:
         ws = student.workspace_id
-        # A field production lets an agent assert (preferences.* refuse agents by source policy).
+        # preferences.* refuse an agent by production's source policy, before any guess rule.
+        _run(db, ws, "vault_fact", "preferences.study_mode", "on_campus")
+        _, refused = _run(db, ws, "vault_fact", "preferences.study_mode", "online", source_type="agent")
+        assert not refused.accepted and refused.reason == "Source agent cannot assert preferences.study_mode"
+        assert VaultService(db).snapshot(ws)["preferences.study_mode"] == "on_campus"
+        # A field production lets an agent assert reaches the guess guard.
         _run(db, ws, "vault_fact", "identity.current_status", "FSc student")
         _, agent = _run(db, ws, "vault_fact", "identity.current_status", "Working", source_type="agent")
         assert agent.outcome == "retained" and agent.reason == "guess_against_stated"
