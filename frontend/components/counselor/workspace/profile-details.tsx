@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { FileText, RefreshCw } from "lucide-react";
 import { workspaceApi } from "@/lib/api";
 import { useWorkspace } from "@/lib/workspace-context";
@@ -70,11 +70,18 @@ export function ValueEditor({ value, onChange, label, choices = {}, path = "" }:
     );
   if (choices[path])
     return <ChoiceSelect label={label} value={value === null || value === undefined ? "" : String(value)} choices={choices[path]} onChange={onChange} />;
+  return <TextLeaf value={value} onChange={onChange} label={label} />;
+}
+
+/** A text or number input. A number stays a number while it is cleared
+ * (empty is null, never 0), so the field keeps its kind. */
+function TextLeaf({ value, onChange, label }: { value: unknown; onChange: (value: unknown) => void; label: string }) {
+  const numeric = useRef(typeof value === "number").current;
   return (
     <label className="block text-sm font-medium">
       {label}
-      <Input className={fieldClass} value={value === null || value === undefined ? "" : String(value)} type={typeof value === "number" ? "number" : "text"}
-        onChange={(e) => onChange(typeof value === "number" ? Number(e.target.value) : e.target.value)} />
+      <Input className={fieldClass} value={value === null || value === undefined ? "" : String(value)} type={numeric ? "number" : "text"}
+        onChange={(e) => onChange(numeric ? (e.target.value === "" ? null : Number(e.target.value)) : e.target.value)} />
     </label>
   );
 }
@@ -109,7 +116,7 @@ export function DocumentLink({ document, open, className }: { document: VaultDoc
   return (
     <button type="button" onClick={() => open(document.file_id)} aria-label={fill(text.openDocument, { filename: document.filename })}
       title={fill(text.openDocument, { filename: document.filename })}
-      className={`flex size-9 shrink-0 items-center justify-center rounded-full border text-muted-foreground transition-colors hover:border-primary hover:text-primary ${className || ""}`}>
+      className={`flex size-11 shrink-0 items-center justify-center rounded-full border text-muted-foreground transition-colors hover:border-primary hover:text-primary ${className || ""}`}>
       <FileText aria-hidden className="size-4" />
     </button>
   );
@@ -156,6 +163,9 @@ export function FactReview({ entry, type, onSaved, openDocument }: {
   // A file's own record changes in Documents; adding and editing are for catalog types only.
   const fromFile = layout.fileRecordTypes.includes(entry.type);
   const canEdit = !!type && !fromFile;
+  // The backend confirms and removes every record kind it shows, but facts
+  // and items only when the catalog knows their type.
+  const canChange = !fromFile && (entry.kind === "record" || !!type);
   async function run(action: "confirm" | "edit" | "remove") {
     setBusy(true);
     setError(null);
@@ -185,7 +195,7 @@ export function FactReview({ entry, type, onSaved, openDocument }: {
             <FileText aria-hidden className="size-3.5" />{fill(text.openDocument, { filename: entry.document.filename })}
           </button>
         )}
-        {entry.stale && <p className="text-xs text-muted-foreground"><span className="font-semibold">{text.staleMarker}.</span> {text.staleHelp}</p>}
+        {entry.stale && <p className="text-xs text-muted-foreground"><span className="font-semibold">{text.staleSentence}</span> {text.staleHelp}</p>}
         {/* The student's raw words stay backend evidence: the page shows only the stored English value. */}
       </div>
       {entry.disagreements.length > 0 && (
@@ -210,7 +220,7 @@ export function FactReview({ entry, type, onSaved, openDocument }: {
         </div>
       )}
       {error && <p role="alert" className="text-sm font-medium text-danger-ink">{error}</p>}
-      {!removing && !fromFile && (
+      {!removing && canChange && (
         <div className="flex flex-wrap gap-2">
           {editing ? (
             <>
@@ -219,7 +229,7 @@ export function FactReview({ entry, type, onSaved, openDocument }: {
             </>
           ) : (
             <>
-              <Button size="tap" disabled={busy} onClick={() => run("confirm")}>{copy.confirm}</Button>
+              {(entry.level !== "confirmed" || entry.stale) && <Button size="tap" disabled={busy} onClick={() => run("confirm")}>{copy.confirm}</Button>}
               {canEdit && <Button size="tap" variant="outline" onClick={() => setEditing(true)}>{copy.edit}</Button>}
               <Button size="tap" variant="ghost" onClick={() => setRemoving(true)}>{copy.remove}</Button>
             </>

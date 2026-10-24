@@ -3,10 +3,10 @@ import { useEffect, useState } from "react";
 import { AlertCircle, MessageCircle, PencilLine } from "lucide-react";
 import { workspaceApi } from "@/lib/api";
 import type { LivingPicture } from "@/lib/counselor-workspace";
-import { vaultEntries, vaultError, type VaultAnswer, type VaultCatalog, type VaultCatalogType, type VaultConflict, type VaultEntry } from "@/lib/vault";
+import { badgeLevel, vaultEntries, vaultError, type VaultAnswer, type VaultCatalog, type VaultCatalogType, type VaultConflict, type VaultEntry } from "@/lib/vault";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { AreaHeatmap, evidenceLevel, type HeatmapArea } from "@/components/pai";
+import { AreaHeatmap, evidenceLevel, vaultBadgeLabel, type HeatmapArea } from "@/components/pai";
 import { cn } from "@/lib/utils";
 import copy from "./copy.json";
 import layout from "./profile-layout.json";
@@ -17,7 +17,7 @@ import { MirrorPanel, areaIcon, fill, text } from "./profile-parts";
 import {
   DocumentLink, EntryBadge, FactReview, ReadableValue, StaleMarker, ValueEditor, readable, useOpenDocument,
 } from "./profile-details";
-import { StoryCard } from "./profile-story";
+import { StoryArea, areaOf } from "./profile-story";
 export { CertaintyChart } from "./profile-parts";
 
 const load = async () => {
@@ -50,7 +50,7 @@ export function CoverageHeatmap({ coverage, selected, onSelect }: {
 
 /** One open conflict card. It offers only the answers the backend gave this
  * card; "Neither" opens a small editor for the right value. */
-function CheckItem({ conflict, onDone }: { conflict: VaultConflict; onDone: () => void }) {
+function CheckItem({ conflict, type, onDone }: { conflict: VaultConflict; type: VaultCatalogType | null; onDone: () => void }) {
   const [busy, setBusy] = useState(false),
     [error, setError] = useState<string | null>(null),
     [writing, setWriting] = useState(false),
@@ -61,19 +61,23 @@ function CheckItem({ conflict, onDone }: { conflict: VaultConflict; onDone: () =
     try { await workspaceApi.resolveVaultConflict(conflict.id, answer, next); onDone(); }
     catch (failure) { setError(vaultError(failure) || text.checkFailed); setBusy(false); }
   }
+  // A document-owner card asks about the file, so its answers name no values.
+  const owner = conflict.kind === "document_owner";
   const words: Record<VaultAnswer, string> = {
-    keep_current: current ? fill(text.checkKeep, { value: current }) : text.checkKeepSaved,
-    accept_proposed: proposed ? fill(text.checkUse, { value: proposed }) : text.checkUseNew,
+    keep_current: owner ? text.ownerNo : text.checkKeep,
+    accept_proposed: owner ? text.ownerYes : text.checkUse,
     both_true: text.checkBoth,
     provide_new: text.checkNew,
   };
+  const line = owner ? "" : current && proposed ? fill(text.checkLine, { current, proposed })
+    : proposed ? fill(text.checkLineNew, { proposed }) : "";
   return (
     <li className="py-3">
       <p className="text-sm font-semibold">{conflict.question}</p>
-      {current && proposed && <p className="mt-0.5 text-sm text-muted-foreground">{fill(text.checkLine, { current, proposed })}</p>}
+      {line && <p className="mt-0.5 break-words text-sm text-muted-foreground">{line}</p>}
       {writing ? (
         <div className="mt-2.5 space-y-3">
-          <ValueEditor value={value} onChange={setValue} label={text.checkNewLabel} />
+          <ValueEditor value={value} onChange={setValue} label={text.checkNewLabel} choices={type?.choices} />
           <div className="flex flex-wrap gap-2">
             <Button size="tap" disabled={busy || !human(value)} onClick={() => resolve("provide_new", value)}>{copy.save}</Button>
             <Button size="tap" variant="ghost" onClick={() => setWriting(false)}>{copy.cancel}</Button>
@@ -82,7 +86,7 @@ function CheckItem({ conflict, onDone }: { conflict: VaultConflict; onDone: () =
       ) : (
         <div className="mt-2.5 flex flex-wrap gap-2">
           {conflict.answers.map((answer) => (
-            <Button key={answer} size="tap" disabled={busy} variant={answer === "accept_proposed" ? "primary" : answer === "provide_new" ? "ghost" : "outline"}
+            <Button key={answer} size="tap" disabled={busy} className="h-auto whitespace-normal text-left" variant={answer === "accept_proposed" ? "primary" : answer === "provide_new" ? "ghost" : "outline"}
               onClick={() => (answer === "provide_new" ? setWriting(true) : resolve(answer))}>
               {words[answer]}
             </Button>
@@ -118,7 +122,7 @@ function FactField({ entry, type, onOpen, openDocument }: {
       <p className="mb-1.5 text-sm font-semibold">{entry.label}</p>
       <div className="flex min-h-12 w-full items-center rounded-xl border bg-card shadow-[inset_0_1px_2px_rgb(22_34_75/0.04)] transition-colors focus-within:border-primary/50 hover:border-primary/50">
         <button type="button" onClick={onOpen} aria-haspopup="dialog"
-          aria-label={`${fill(text.expand, { label: entry.label })}: ${shown}${entry.stale ? `. ${text.staleMarker}` : ""}`}
+          aria-label={fill(entry.stale ? text.fieldAriaStale : text.fieldAria, { label: entry.label, value: shown, badge: vaultBadgeLabel(badgeLevel(entry)) })}
           className="group flex min-h-12 min-w-0 flex-1 items-center gap-3 rounded-xl px-4 py-2.5 text-left">
           <span className="min-w-0 flex-1">
             <span className="block truncate text-[15px] font-semibold">{shown}</span>
@@ -263,7 +267,9 @@ export function LivingProfile({
                 </h2>
                 <p className="mt-1 text-sm text-muted-foreground">{text.checkIntro}</p>
                 <ul className="mt-1 divide-y">
-                  {vault.conflicts.map((conflict) => <CheckItem key={conflict.id} conflict={conflict} onDone={refresh} />)}
+                  {vault.conflicts.map((conflict) => (
+                    <CheckItem key={conflict.id} conflict={conflict} type={conflict.type ? typeOf(conflict.type) : null} onDone={refresh} />
+                  ))}
                 </ul>
               </section>
             )}
@@ -304,10 +310,12 @@ export function LivingProfile({
               <h2 id="story-title" className="text-xl font-bold tracking-tight">{text.storyTitle}</h2>
               <p className="mt-1 max-w-2xl text-sm text-muted-foreground">{text.storyIntro}</p>
               <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-                {vault.story.map((card) => (
-                  <StoryCard key={card.type} card={{ ...card, entries: card.entries.filter(visible) }} type={typeOf(card.type)}
-                    onChat={onChat} onOpen={setOpenId} onSaved={refresh} />
-                ))}
+                {Object.keys(layout.storyAreas).map((area) => {
+                  const cards = vault.story.filter((card) => areaOf(card.type) === area)
+                    .map((card) => ({ ...card, entries: card.entries.filter(visible) }));
+                  const types = cards.map((card) => typeOf(card.type)).filter((t): t is VaultCatalogType => t !== null);
+                  return <StoryArea key={area} area={area} cards={cards} types={types} onChat={onChat} onOpen={setOpenId} onSaved={refresh} />;
+                })}
               </div>
             </section>
           </div>

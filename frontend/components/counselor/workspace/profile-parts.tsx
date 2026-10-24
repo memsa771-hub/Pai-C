@@ -1,20 +1,16 @@
 "use client";
 import { useEffect, useId, useState } from "react";
 import {
-  CircleAlert, Eye, FileText, Gauge, Gem, GraduationCap, Heart, Home, Lightbulb, MessageCircle,
-  Scale, Signpost, Sparkles, Target, UserRound, Users, type LucideIcon,
+  Eye, FileText, Gauge, Gem, GraduationCap, Heart, Home, Lightbulb, MessageCircle,
+  Scale, Signpost, Sparkles, Target, Users, type LucideIcon,
 } from "lucide-react";
 import { workspaceApi } from "@/lib/api";
-import type { EvidenceItem, LivingPicture, ProfileCard } from "@/lib/counselor-workspace";
+import type { LivingPicture } from "@/lib/counselor-workspace";
 import type { CounselorMirrorDraft } from "@/lib/counselor-mirror";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  EmptyState, EvidenceBadge, SectionCard, StatChip, Timeline, evidenceLevel,
-  toneClass, toneFor, type EvidenceLevel, type Quadrant, type Tone,
-} from "@/components/pai";
+import { EmptyState, SectionCard, StatChip, type Quadrant, type Tone } from "@/components/pai";
 import { cn } from "@/lib/utils";
-import { human, evidenceLabel, shortDate } from "./resource";
 import copy from "./copy.json";
 import layout from "./profile-layout.json";
 
@@ -25,9 +21,6 @@ export const ICONS: Record<string, LucideIcon> = {
 };
 export const areaIcon = (area: string) => ICONS[layout.areaMeta[area as keyof typeof layout.areaMeta]?.icon] || Sparkles;
 export const areaTone = (area: string) => (layout.areaMeta[area as keyof typeof layout.areaMeta]?.tone || "blue") as Tone;
-/** Notebook evidence kinds map onto the public evidence ladder. */
-export const kindLevel = (kind?: string): EvidenceLevel =>
-  kind === "said" ? "stated" : kind && ["shown", "document", "action"].includes(kind) ? "shown" : "stated";
 const fill = (template: string, values: Record<string, string | number>) =>
   Object.entries(values).reduce((out, [key, value]) => out.replaceAll(`{${key}}`, String(value)), template);
 export { fill };
@@ -75,139 +68,6 @@ export function CertaintyChart({ ratings }: { ratings: LivingPicture["ratings"] 
       </svg>
       <p className="sr-only">{text.certaintyAxis}</p>
     </div>
-  );
-}
-
-/** Chips with an evidence icon; tapping one shows the student's own words. */
-export function ChipCloud({ items, tone }: { items: EvidenceItem[]; tone: Tone }) {
-  const [open, setOpen] = useState<number | null>(null);
-  if (!items.length) return <p className="text-sm text-muted-foreground">{text.chipsEmpty}</p>;
-  const quote = open === null ? null : items[open];
-  return (
-    <div>
-      <ul className="flex flex-wrap gap-2">
-        {items.map((item, i) => {
-          const status = item.capability_status
-            ? copy.capabilityLabels[item.capability_status as keyof typeof copy.capabilityLabels] : null;
-          return (
-            <li key={item.id || i}>
-              <button type="button" aria-pressed={open === i} onClick={() => setOpen(open === i ? null : i)}
-                className={cn("inline-flex min-h-11 max-w-full items-center gap-2 rounded-full border-2 border-transparent px-4 py-2 text-left text-sm font-semibold transition-colors",
-                  toneClass[tone].soft, toneClass[tone].ink, open === i && "border-current")}>
-                <span className="break-words">{human(item.value)}</span>
-                <EvidenceBadge level={kindLevel(item.kind)} className="bg-card/80 text-foreground" />
-                {status && <span className="rounded-full bg-card/80 px-2 py-0.5 text-xs font-medium text-foreground">{status}</span>}
-              </button>
-            </li>
-          );
-        })}
-      </ul>
-      <div aria-live="polite">
-        {quote?.evidence && (
-          <blockquote className="mt-3 rounded-xl border-l-4 bg-muted/60 px-4 py-3 text-sm" style={{ borderLeftColor: `var(--tone-${tone})` }}>
-            <span className="block text-xs font-semibold text-muted-foreground">{text.fromYourWords}</span>
-            “{quote.evidence}”
-          </blockquote>
-        )}
-      </div>
-    </div>
-  );
-}
-
-/** You in the middle, the people who matter around you, with their hopes
- * and worries in the student's own framing. Worries can be hidden. */
-export function PeopleMap({ people, showPrivate, initials }: { people: EvidenceItem[]; showPrivate: boolean; initials: string }) {
-  if (!people.length) return <p className="text-sm text-muted-foreground">{text.peopleEmpty}</p>;
-  return (
-    <div className="flex flex-col items-center">
-      <span className="flex size-14 items-center justify-center rounded-full bg-gradient-to-br from-[var(--hero-from)] to-[var(--hero-via)] text-lg font-bold text-white shadow-lift" aria-hidden>
-        {initials || <UserRound className="size-6" />}
-      </span>
-      <span className="mt-1 text-xs font-semibold text-muted-foreground">{text.you}</span>
-      <span aria-hidden className="h-5 w-0.5 bg-border" />
-      <ul className="flex w-full flex-wrap justify-center gap-3 border-t-2 border-dashed border-border pt-5">
-        {people.map((person, i) => {
-          const role = String(person.role || human(person.value) || "");
-          const tone = toneFor(role);
-          const worry = person.worry || person.concern;
-          return (
-            <li key={person.id || i} className="w-full rounded-2xl border bg-card p-4 shadow-soft sm:w-[calc(50%-0.375rem)] lg:w-72">
-              <div className="flex items-center gap-3">
-                <span aria-hidden className={cn("flex size-10 shrink-0 items-center justify-center rounded-full text-sm font-bold", toneClass[tone].solid)}>
-                  {role.charAt(0).toUpperCase()}
-                </span>
-                <p className="min-w-0 font-semibold">{role}</p>
-              </div>
-              {person.wish && (
-                <p className="mt-3 flex gap-2 text-sm"><Heart aria-hidden className="mt-0.5 size-4 shrink-0 text-tone-teal" />
-                  <span><span className="font-medium text-muted-foreground">{text.wish}: </span>{person.wish}</span></p>
-              )}
-              {worry && (
-                <p className="mt-2 flex gap-2 text-sm"><CircleAlert aria-hidden className="mt-0.5 size-4 shrink-0 text-tone-amber" />
-                  <span><span className="font-medium text-muted-foreground">{text.worry}: </span>
-                    {showPrivate ? worry : <span className="italic text-muted-foreground">{text.sensitiveHidden}</span>}</span></p>
-              )}
-              {person.evidence && showPrivate && <p className="mt-2 text-xs italic text-muted-foreground">“{person.evidence}”</p>}
-            </li>
-          );
-        })}
-      </ul>
-    </div>
-  );
-}
-
-const record = (card: ProfileCard) => (card.value && typeof card.value === "object" ? card.value as Record<string, unknown> : {});
-export const cardTitle = (card: ProfileCard) => {
-  const value = record(card);
-  const field = layout.titleFields.find((key) => typeof value[key] === "string" && value[key]);
-  return field ? human(value[field]) : evidenceLabel(card.key);
-};
-const HIDDEN_IN_TIMELINE = new Set(["academic_status", ...layout.titleFields]);
-const percent = (value: Record<string, unknown>) => {
-  const p = Number(value.percentage);
-  if (Number.isFinite(p) && p > 0 && p <= 100) return p;
-  const got = Number(value.obtained_marks ?? value.marks_obtained), total = Number(value.total_marks ?? value.marks_total);
-  return Number.isFinite(got) && Number.isFinite(total) && total > 0 ? Math.round((got / total) * 100) : null;
-};
-
-/** Qualifications and tests in order, with marks as a bar and a Shown badge
- * when the student uploaded a document for it. */
-export function EducationTimeline({ cards }: { cards: ProfileCard[] }) {
-  if (!cards.length) return <p className="text-sm text-muted-foreground">{text.educationEmpty}</p>;
-  return (
-    <Timeline items={cards.map((card) => {
-      const value = record(card);
-      const marks = percent(value);
-      const status = String(value.academic_status || "");
-      const fields = Object.entries(value).filter(([key, v]) => !HIDDEN_IN_TIMELINE.has(key) && human({ [key]: v }) && !/marks|percentage/.test(key));
-      return {
-        id: card.id,
-        icon: GraduationCap,
-        state: status === "current" ? "now" : "done",
-        title: <h3 className="text-base">{cardTitle(card)}</h3>,
-        meta: <EvidenceBadge level={evidenceLevel(card.evidence_level)} />,
-        children: (
-          <>
-            {fields.length > 0 && (
-              <dl className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
-                {fields.map(([key, v]) => (
-                  <div key={key} className="flex gap-1"><dt className="text-muted-foreground">{evidenceLabel(key)}:</dt><dd className="font-medium">{human(v)}</dd></div>
-                ))}
-              </dl>
-            )}
-            {status && <StatChip size="sm" tone={status === "current" ? "blue" : "success"} className="mt-2">{human(status)}</StatChip>}
-            {marks !== null && (
-              <div className="mt-3">
-                <div className="flex justify-between text-xs text-muted-foreground"><span>{evidenceLabel("percentage")}</span><span className="font-semibold text-foreground">{marks}%</span></div>
-                <div className="mt-1 h-2 overflow-hidden rounded-full bg-muted" role="img" aria-label={`${evidenceLabel("percentage")}: ${marks}%`}>
-                  <div className="h-full rounded-full bg-tone-violet" style={{ width: `${marks}%` }} />
-                </div>
-              </div>
-            )}
-          </>
-        ),
-      };
-    })} />
   );
 }
 

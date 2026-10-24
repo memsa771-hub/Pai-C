@@ -51,10 +51,6 @@
     "scholarship_name"
   ],
   "copy": {
-    "visual": "Visual",
-    "details": "Details",
-    "viewLabel": "Profile view",
-    "updated": "Updated {date}",
     "mirrorTitle": "How PAI sees you",
     "mirrorIntro": "Four short lines PAI built from your words. You decide if they are right.",
     "mirrorConfirmed": "You agreed with this picture",
@@ -82,29 +78,12 @@
     "firstPicture": "PAI's first picture of you",
     "openChat": "Talk with PAI",
     "heatmapTitle": "What PAI understands so far",
-    "heatmapIntro": "Ten areas of your life. Tap one to see what it is based on.",
     "certaintyTitle": "Your certainty over time",
     "certaintyEmpty": "When you rate how sure you feel, it will show up here.",
     "certaintyAxis": "How sure, 0 to 10",
     "certaintyPoint": "{label}: {value} of 10",
     "before": "Before Mirror {version}",
     "after": "After Mirror {version}",
-    "interestsTitle": "What you enjoy",
-    "strengthsTitle": "What you are good at",
-    "chipsEmpty": "Nothing here yet. Tell PAI about something you enjoyed or did well.",
-    "fromYourWords": "From your words",
-    "peopleTitle": "People around you",
-    "peopleEmpty": "Tell PAI about the people whose opinion matters to you.",
-    "you": "You",
-    "wish": "Hopes for you",
-    "worry": "Worries about",
-    "educationTitle": "Your education",
-    "educationEmpty": "Add your current or last qualification in a chat, or upload a result card.",
-    "stillWants": "PAI still wants to know",
-    "stillWantsIntro": "Tap a topic to talk about it.",
-    "sensitiveHidden": "Hidden for your privacy",
-    "showSensitive": "Show private details",
-    "hideSensitive": "Hide private details",
     "privacyNote": "PAI's private notes are never shown or shared. Nothing goes to a university without your permission.",
     "sourceSaid": "You said on {date}",
     "sourceShown": "From a document you shared on {date}",
@@ -119,17 +98,7 @@
     "disagreeOther": "Another source says {display}",
     "fileRecordNote": "This comes from a file. Open it in Documents to change or remove it.",
     "saveFailed": "Could not save that. Please try again.",
-    "noFacts": "Nothing saved here yet.",
-    "confirmed": "Confirmed",
-    "removed": "Removed",
     "expand": "Show source and actions for {label}",
-    "onThisPage": "On this page",
-    "fromChat": "From your conversations",
-    "fromChatNote": "What you told PAI in chat. To change something, tell PAI.",
-    "fromChatEmpty": "Nothing yet. As you talk with PAI, what you share shows up here.",
-    "privateLabel": "Private details",
-    "privateHelp": "Date of birth, gender, money and family worries stay hidden until you choose.",
-    "factsCount": "{count} saved",
     "tabDetails": "Details",
     "tabBackground": "Background",
     "tabsLabel": "Profile sections",
@@ -142,7 +111,6 @@
     "storyTitle": "Your story",
     "storyIntro": "Built from your conversations with PAI. The more you share, the better PAI's suggestions get.",
     "sharedCount": "{count} shared",
-    "storyTalk": "Talk about this",
     "storyDraft": "Can we talk about {area}?",
     "storyAddLabel": "Add to {label}",
     "storyAddSave": "Add",
@@ -161,17 +129,24 @@
     "checkTitle": "Please check",
     "checkIntro": "Two answers do not match. Which one is right?",
     "checkLine": "Saved: {current}. New: {proposed}.",
-    "checkKeep": "Keep {value}",
-    "checkUse": "Use {value}",
-    "checkKeepSaved": "Keep what is saved",
-    "checkUseNew": "Use the new answer",
+    "checkKeep": "Keep saved",
+    "checkUse": "Use new",
     "checkBoth": "Both were true at different times",
     "checkNew": "Neither, I'll write it",
     "checkNewLabel": "The right answer",
     "checkFailed": "Could not save that. Please try again.",
     "proofTitle": "Confirm with a document",
     "proofIntro": "You told PAI your marks. A photo of your result card lets PAI use them when checking where you can apply.",
-    "proofAction": "Upload result card"
+    "proofAction": "Upload result card",
+    "storyTalkLabel": "Talk about this: {label}",
+    "storyAddType": "What do you want to add?",
+    "requiredInChat": "PAI will ask you about {label} in chat.",
+    "fieldAria": "Show source and actions for {label}: {value}, {badge}",
+    "fieldAriaStale": "Show source and actions for {label}: {value}, {badge}. Check this is still right",
+    "staleSentence": "Check this is still right.",
+    "checkLineNew": "New: {proposed}.",
+    "ownerYes": "Yes, it's mine",
+    "ownerNo": "No, it isn't mine"
   },
   "basics": [
     {
@@ -241,5 +216,56 @@
   "fileRecordTypes": [
     "document",
     "credential"
-  ]
+  ],
+  "story": {
+    "interests": "What you enjoy doing, in class and outside it.",
+    "strengths": "What you are good at, and how you know it.",
+    "values": "What matters to you in work and in life.",
+    "family_social": "The people whose opinion matters, and what they hope for you.",
+    "pressures": "Money, time and expectations: what weighs on your choice.",
+    "goals": "What you want, and whose wish it really is.",
+    "options": "The directions you are weighing, and what you have heard about them."
+  },
+  "storyAreas": {
+    "interests": [
+      "interest",
+      "career.primary_interest",
+      "activity",
+      "exploration_experience"
+    ],
+    "strengths": [
+      "strength",
+      "skill",
+      "achievement",
+      "project",
+      "work_experience",
+      "language_proficiency",
+      "certification"
+    ],
+    "values": [
+      "value",
+      "preferences.learning_style",
+      "preferences.preferred_language"
+    ],
+    "family_social": [
+      "family_member",
+      "daily_life"
+    ],
+    "pressures": [
+      "pressure",
+      "preferences.location_limits"
+    ],
+    "goals": [
+      "goal",
+      "preferences.target_countries",
+      "preferences.study_mode",
+      "preferences.study_load"
+    ],
+    "options": [
+      "option",
+      "myth",
+      "certainty"
+    ]
+  },
+  "storyFallbackArea": "options"
 }

@@ -179,6 +179,8 @@ export const vault: VaultView = {
         display: "Mother, Financial security", label: "Family member" }),
     ] },
     { type: "pressure", label: "Pressure", rich: false, next_step: "What weighs on your choice?", entries: [] },
+    { type: "option", label: "Option", rich: false, next_step: null, entries: [] },
+    { type: "myth", label: "Myth", rich: false, next_step: null, entries: [] },
   ],
   conflicts: [
     { id: "c-city", kind: "fact", type: "location.current_city", entry_id: "city",
@@ -208,6 +210,10 @@ export const vaultCatalog: VaultCatalog = { types: [
     choices: { relation: [{ code: "father", label: "Father" }, { code: "mother", label: "Mother" }] } },
   { key: "pressure", label: "Pressure", storage: "item", shown_on: "story", section: null, inputs: ["chat", "story"],
     schema: { type: "object", required: ["text"], properties: { text: { type: "string" }, kind: { type: "string", enum: ["money", "time"] } } }, choices: {} },
+  { key: "option", label: "Option", storage: "item", shown_on: "story", section: null, inputs: ["chat", "story"],
+    schema: { type: "object", required: ["text"], properties: { text: { type: "string" } } }, choices: {} },
+  { key: "myth", label: "Myth", storage: "item", shown_on: "story", section: null, inputs: ["chat", "story"],
+    schema: { type: "object", required: ["text"], properties: { text: { type: "string" }, about: { type: "string" } } }, choices: {} },
 ] };
 export const pathResult: PathResult = {
   possibility: possibilities[0],
