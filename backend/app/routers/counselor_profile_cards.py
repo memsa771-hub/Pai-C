@@ -4,6 +4,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from pydantic import BaseModel, ConfigDict, Field
 from app.api.response import success_response
+from app.memory.errors import MemoryDataError
 from app.database import get_db
 from app.routers.roadmaps import _authorized
 from app.pai_c.memory import MemoryService
@@ -32,6 +33,9 @@ def review(kind: str, record_id: str, body: Review, network: str = Query(...), d
     try:
         result = MemoryService(db).review_profile_card(str(workspace.id), kind, record_id, body)
         db.commit()
+    except MemoryDataError as exc:
+        db.rollback()
+        raise HTTPException(400, str(exc)) from exc
     except ValueError as exc:
         db.rollback()
         raise HTTPException(409, str(exc)) from exc

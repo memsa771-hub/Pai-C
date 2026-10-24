@@ -156,16 +156,20 @@ def edit_student_profile(
         return json_response(ResponseCode.BAD_REQUEST, "Choose exactly one record_type or field_key")
     if edit.record_type and edit.record_type not in ENTITY_MODELS:
         return json_response(ResponseCode.BAD_REQUEST, "Unsupported record type")
-    candidate = MemoryCandidateService(db).propose(
-        workspace_id=str(workspace.id),
-        candidate_type="student_record" if edit.record_type else "vault_fact",
-        key=edit.record_type or edit.field_key, proposed_value=edit.value,
-        entities={"record_id": edit.record_id} if edit.record_id else {},
-        confidence=1.0, source_type="user_explicit", allow_user_explicit=True,
-        input_channel="profile",
-        evidence={"reason": edit.reason, "capture": "profile_edit"},
-        effective_at=edit.effective_at,
-    )
+    try:
+        candidate = MemoryCandidateService(db).propose(
+            workspace_id=str(workspace.id),
+            candidate_type="student_record" if edit.record_type else "vault_fact",
+            key=edit.record_type or edit.field_key, proposed_value=edit.value,
+            entities={"record_id": edit.record_id} if edit.record_id else {},
+            confidence=1.0, source_type="user_explicit", allow_user_explicit=True,
+            input_channel="profile",
+            evidence={"reason": edit.reason, "capture": "profile_edit"},
+            effective_at=edit.effective_at,
+        )
+    except MemoryDataError as exc:
+        db.rollback()
+        return json_response(ResponseCode.BAD_REQUEST, str(exc))
     result = MemoryReconciler(db).reconcile(candidate)
     db.commit()
     if not result.accepted:

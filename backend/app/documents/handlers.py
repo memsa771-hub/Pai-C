@@ -289,25 +289,29 @@ async def extract_document_job(job, db) -> dict:
             row.get("file_id") for row in snapshot.records.get("document", [])
         }
         if file_id not in existing_documents:
-            candidate = candidates.propose(
-                workspace_id=workspace_id,
-                candidate_type="student_record",
-                key="document",
-                proposed_value={
-                    "file_id": file_id,
-                    "document_type": understanding.classification,
-                    **({"title": understanding.title} if understanding.title else {}),
-                },
-                confidence=max(0.5, understanding.classification_confidence),
-                source_type="document",
-                input_channel="document",
-                evidence={
-                    "file_id": file_id, "filename": filename,
-                    "authority": authority,
-                    "extractor_version": EXTRACTOR_VERSION,
-                },
-            )
-            proposed.append(candidate.id)
+            try:
+                candidate = candidates.propose(
+                    workspace_id=workspace_id,
+                    candidate_type="student_record",
+                    key="document",
+                    proposed_value={
+                        "file_id": file_id,
+                        "document_type": understanding.classification,
+                        **({"title": understanding.title} if understanding.title else {}),
+                    },
+                    confidence=max(0.5, understanding.classification_confidence),
+                    source_type="document",
+                    input_channel="document",
+                    evidence={
+                        "file_id": file_id, "filename": filename,
+                        "authority": authority,
+                        "extractor_version": EXTRACTOR_VERSION,
+                    },
+                )
+            except MemoryDataError as exc:
+                logger.info("document.extract: normalize rejected document record file=%s: %s", file_id, exc)
+            else:
+                proposed.append(candidate.id)
 
     for finding in understanding.findings:
         proposed_value = finding.proposed_value

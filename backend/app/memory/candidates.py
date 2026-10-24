@@ -109,7 +109,7 @@ class MemoryCandidateService:
         if candidate_type == "vault_fact" and key:
             from .field_definitions import FIELD_ALIASES
             key = FIELD_ALIASES.get(key, key)
-        if candidate_type in NORMALIZED_TYPES and proposed_value is not None:
+        if candidate_type in NORMALIZED_TYPES and operation == "upsert" and proposed_value is not None:
             proposed_value, evidence = self._normalize(
                 workspace_id, candidate_type, key, proposed_value, evidence,
                 input_channel, source_event_ids)
@@ -154,11 +154,15 @@ class MemoryCandidateService:
             if len(text.encode("utf-8")) > _DROP_PAYLOAD_LIMIT:
                 payload = {"key": key, "value": text.encode("utf-8")[:1500].decode("utf-8", "ignore")}
             ref = (source_event_ids[0] if source_event_ids else None) or evidence.get("file_id")
-            self.db.add(VaultDrop(
-                workspace_id=workspace_id, source=source, stage="normalize",
-                reason=result.rejected_reason, payload=payload,
-                source_ref=str(ref) if ref else None))
-            self.db.flush()
+            # Own session, committed at once: the drop must outlive the
+            # caller's rollback, or a rejected value would vanish silently.
+            from app.database import new_session
+            with new_session() as log:
+                log.add(VaultDrop(
+                    workspace_id=workspace_id, source=source, stage="normalize",
+                    reason=result.rejected_reason, payload=payload,
+                    source_ref=str(ref) if ref else None))
+                log.commit()
             raise MemoryDataError(result.rejected_reason)
         evidence["source_language"] = result.source_language
         if result.needs_confirmation:

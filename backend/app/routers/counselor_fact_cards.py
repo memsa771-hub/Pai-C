@@ -1,6 +1,7 @@
 """Workspace-authorized catalog card submission."""
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from app.api.response import success_response
+from app.memory.errors import MemoryDataError
 from app.database import get_db
 from app.routers.roadmaps import _authorized
 from app.pai_c.memory import MemoryService
@@ -21,6 +22,9 @@ def answer(key: str, body: CardAnswer, network: str = Query(...), db=Depends(get
     try:
         result = submit_answer(db, str(workspace.id), key, body)
         db.commit()
+    except MemoryDataError as exc:
+        db.rollback()
+        raise HTTPException(400, str(exc)) from exc
     except ValueError as exc:
         db.rollback()
         raise HTTPException(422, str(exc)) from exc

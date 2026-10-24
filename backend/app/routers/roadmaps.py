@@ -9,6 +9,7 @@ from sqlalchemy import select
 
 from app.database import get_db
 from app.api.response import success_response
+from app.memory.errors import MemoryDataError
 from app.models import Roadmap
 from app.pai_c.roadmaps.service import RoadmapError, RoadmapService
 from app.research.requirements import RequirementStore, ResearchEvidenceError
@@ -231,12 +232,16 @@ async def add_custom_goal(body: CustomGoal, network: str = Query(...), db=Depend
         details["field_of_study"] = body.field
     if body.why:
         details["underlying_objective"] = body.why
-    candidate = MemoryCandidateService(db).propose(
-        workspace_id, "student_record", key="goal",
-        proposed_value={"goal_type": "education", "title": body.title,
-                        "commitment": "exploratory", "details": details},
-        source_type="user_explicit", allow_user_explicit=True,
-        input_channel="profile", confidence=1.0)
+    try:
+        candidate = MemoryCandidateService(db).propose(
+            workspace_id, "student_record", key="goal",
+            proposed_value={"goal_type": "education", "title": body.title,
+                            "commitment": "exploratory", "details": details},
+            source_type="user_explicit", allow_user_explicit=True,
+            input_channel="profile", confidence=1.0)
+    except MemoryDataError as exc:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     result = MemoryReconciler(db).reconcile(candidate)
     if not result.accepted or not result.result_id:
         db.commit()  # Keep the candidate and its conflict or rejection history.

@@ -31,7 +31,7 @@ from app.models import (
     BackgroundJob, EventRecord, FileRecord, MemoryCandidate, PaiEpisode, PaiMemory,
     ProfileFieldResponse, ProfileIssue, ProfileRequirement, StudentRecordRevision, User, VaultFact,
     VaultFieldDefinition, Workspace, VAULT_INTAKE_MODELS,
-    Roadmap, RoadmapStudentState,
+    Roadmap, RoadmapStudentState, VaultDrop,
 )
 
 
@@ -67,7 +67,7 @@ def api():
               ProfileFieldResponse,
               StudentRecordRevision,
               BackgroundJob, *ENTITY_MODELS.values(), *VAULT_INTAKE_MODELS]
-    tables.extend([Roadmap, RoadmapStudentState])
+    tables.extend([Roadmap, RoadmapStudentState, VaultDrop])
     Base.metadata.create_all(engine, tables=[model.__table__ for model in tables])
 
     session = Session(engine, autoflush=False)
@@ -285,3 +285,15 @@ def test_projection_carries_every_section_and_stage(api):
     assert all(isinstance(kinds, dict) and all(isinstance(v, list) for v in kinds.values())
                for kinds in data["sections"].values())
     json.dumps(data)  # the whole projection must be JSON-serializable
+
+
+def test_edit_endpoint_returns_a_bad_request_for_a_value_that_is_not_english(api):
+    from sqlalchemy.orm import sessionmaker
+    from app.database import set_session_factory
+    client, session, network = api
+    previous = set_session_factory(sessionmaker(bind=session.get_bind()))  # the drop log uses its own session
+    response = client.post(f"/v1/student-profile/edits?network={network}", headers=HEADERS, json={
+        "record_type": "education", "value": {"institution_name": "لاہور کالج"}, "reason": "r"})
+    set_session_factory(previous)
+    body = response.json()
+    assert body["code"] != 0 and "not_english" in str(body)

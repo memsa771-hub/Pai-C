@@ -88,3 +88,60 @@ def test_dates_and_semantic_memory_skipped():
     with StudentSession() as student, student.factory() as db:
         c = MemoryCandidateService(db).propose(student.workspace_id, "semantic_memory", content="لاہور")
         assert c.evidence is None
+
+
+def test_family_member_name_in_urdu_is_a_guess():
+    r = normalize_candidate("vault_item", "family_member", {"name": "احمد", "relation": "Father"}, student_text="")
+    assert r.rejected_reason is None and r.needs_confirmation
+    r = normalize_candidate("vault_item", "family_member", {"notes": "احمد"}, student_text="")
+    assert r.rejected_reason == "not_english: notes"
+
+
+def test_arabic_value_inside_a_list_is_rejected_with_its_path():
+    r = normalize_candidate("student_record", "education", {"details": {"subjects": ["Physics", "کیمیا"]}}, student_text="")
+    assert r.rejected_reason == "not_english: details.subjects"
+
+
+def test_drop_source_mapping_and_file_id_ref():
+    from app.memory.catalog import vault_catalog
+    story = next(t.key for t in vault_catalog().types() if t.shown_on == "story" and t.storage == "record")
+    with StudentSession() as student, student.factory() as db:
+        svc = MemoryCandidateService(db)
+        for key, channel, extra in (("education", "document", {"evidence": {"file_id": "file-9"}}),
+                                    (story, "profile", {}), ("education", "profile", {})):
+            with pytest.raises(MemoryDataError):
+                svc.propose(student.workspace_id, "student_record", key=key, proposed_value={"institution": "لاہور"},
+                            source_type="document" if channel == "document" else "conversation",
+                            input_channel=channel, **extra)
+        rows = db.scalars(select(VaultDrop).order_by(VaultDrop.created_at)).all()
+        assert [(r.source, r.source_ref) for r in rows] == [("document", "file-9"), ("story", None), ("details", None)]
+
+
+def test_drop_survives_callers_rollback():
+    with StudentSession() as student, student.factory() as db:
+        with pytest.raises(MemoryDataError):
+            MemoryCandidateService(db).propose(
+                student.workspace_id, "student_record", key="education",
+                proposed_value={"institution": "لاہور"})
+        db.rollback()
+        assert db.scalar(select(VaultDrop.reason)) == "not_english: institution"
+
+
+def test_retract_is_not_normalized():
+    with StudentSession() as student, student.factory() as db:
+        c = MemoryCandidateService(db).propose(
+            student.workspace_id, "vault_fact", key="identity.full_name", operation="retract")
+        assert c.evidence is None
+
+
+def test_extract_loop_continues_past_a_rejected_candidate():
+    import asyncio
+    from types import SimpleNamespace
+    from app.memory.handlers import extract_memory
+    with StudentSession() as student, student.factory() as db:
+        job = SimpleNamespace(id="j1", workspace_id=student.workspace_id, payload={"candidates": [
+            {"candidate_type": "student_record", "key": "education", "proposed_value": {"institution": "لاہور"}},
+            {"candidate_type": "vault_fact", "key": "location.current_city", "proposed_value": "Lahore"}]})
+        result = asyncio.run(extract_memory(job, db))
+        assert result["candidates_proposed"] == 1
+        assert db.scalar(select(VaultDrop.reason)) == "not_english: institution"
