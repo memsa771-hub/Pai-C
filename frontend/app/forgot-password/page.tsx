@@ -1,7 +1,6 @@
 'use client';
 
 import { useState } from 'react';
-import { Send } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { AuthField, AuthShell, AuthStatus, FooterLink, InkLink, SubmitButton, authInputClass, isEmail } from '@/components/auth/auth-shell';
 import { requestPasswordReset } from '@/lib/auth/service';
@@ -32,7 +31,7 @@ export default function ForgotPasswordPage() {
   if (sent) {
     return (
       <AuthShell>
-        <AuthStatus icon={Send} tone="success" title={t('auth.resetSentTitle')} body={t('auth.resetSentBody', { email: email.trim() })}>
+        <AuthStatus title={t('auth.resetSentTitle')} body={t('auth.resetSentBody', { email: email.trim() })}>
           <InkLink href="/sign-in">{t('auth.backToSignIn')}</InkLink>
         </AuthStatus>
       </AuthShell>

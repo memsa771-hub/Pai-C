@@ -144,7 +144,8 @@ module.exports = [
   { id: 'settings-privacy', path: '/student?view=settings&section=privacy', ready: 'main h1', full: true },
   { id: 'settings-appearance', path: '/student?view=settings&section=appearance', ready: 'main h1', crawl: false },
   { id: 'settings-delete', path: '/student?view=settings&section=privacy', ready: 'main h1', full: true, crawl: false, setup: async (page) => {
-    await page.getByRole('button', { name: 'Delete my app data' }).click(); await page.getByRole('checkbox').waitFor();
+    await page.getByRole('button', { name: 'Delete my account' }).click();
+    await page.getByText('This will permanently delete your account and all your data.').waitFor();
   } },
 
   { id: 'states-profile-loading', path: '/student?view=profile&state=loading', ready: 'main [role=status], main [role=alert], main h1', crawl: false },

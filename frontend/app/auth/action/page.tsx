@@ -8,7 +8,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { CheckCircle2, KeyRound, Link as LinkIcon, Loader2 } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 import {
   AuthAlert, AuthField, AuthShell, AuthStatus, FooterLink, InkLink, PasswordInput, SubmitButton,
 } from '@/components/auth/auth-shell';
@@ -71,7 +71,7 @@ export default function AuthActionPage() {
       : '/forgot-password';
     return (
       <AuthShell footer={<FooterLink href="/sign-in">{t('auth.backToSignIn')}</FooterLink>}>
-        <AuthStatus icon={LinkIcon} tone="warning" title={t('auth.linkInvalidTitle')} body={state.message}>
+        <AuthStatus title={t('auth.linkInvalidTitle')} body={state.message}>
           <InkLink href={newLink}>{t('auth.requestNewLink')}</InkLink>
         </AuthStatus>
       </AuthShell>
@@ -80,7 +80,7 @@ export default function AuthActionPage() {
   if (state.kind === 'verified') {
     return (
       <AuthShell>
-        <AuthStatus icon={CheckCircle2} tone="success" title={t('auth.verifiedTitle')} body={t('auth.verifiedBody')}>
+        <AuthStatus title={t('auth.verifiedTitle')} body={t('auth.verifiedBody')}>
           <InkLink href="/sign-in">{t('auth.signIn')}</InkLink>
         </AuthStatus>
       </AuthShell>
@@ -89,7 +89,7 @@ export default function AuthActionPage() {
   if (state.kind === 'reset-done') {
     return (
       <AuthShell>
-        <AuthStatus icon={KeyRound} tone="success" title={t('auth.resetDoneTitle')} body={t('auth.resetDoneBody')}>
+        <AuthStatus title={t('auth.resetDoneTitle')} body={t('auth.resetDoneBody')}>
           <InkLink href="/sign-in">{t('auth.signIn')}</InkLink>
         </AuthStatus>
       </AuthShell>
@@ -125,7 +125,6 @@ function ResetForm({ code, onDone }: { code: string; onDone: () => void }) {
 
   return (
     <AuthShell title={t('auth.resetTitle')} footer={<FooterLink href="/sign-in">{t('auth.backToSignIn')}</FooterLink>}>
-      <p className="-mt-5 mb-7 text-center text-sm text-auth-muted">{t('auth.resetSubtitle')}</p>
       <form onSubmit={submit} className="grid gap-4" noValidate>
         <AuthField label={t('auth.newPassword')} hint={t('auth.passwordHint')} error={field === 'password' ? error : null}>
           {(props) => <PasswordInput {...props} autoComplete="new-password" placeholder="•••••••" required autoFocus value={password}

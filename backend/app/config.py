@@ -74,9 +74,10 @@ class Config:
     # set (local tests) the SDK uses the Auth emulator and needs no account.
     FIREBASE_PROJECT_ID: str = os.environ.get("FIREBASE_PROJECT_ID", "")
     FIREBASE_SERVICE_ACCOUNT: str = os.environ.get("FIREBASE_SERVICE_ACCOUNT", "")
-    # Abuse limits for the account-email endpoints, per process and per hour.
-    AUTH_EMAILS_PER_ADDRESS_PER_HOUR: int = int(os.environ.get("AUTH_EMAILS_PER_ADDRESS_PER_HOUR", "5"))
-    AUTH_REQUESTS_PER_IP_PER_HOUR: int = int(os.environ.get("AUTH_REQUESTS_PER_IP_PER_HOUR", "30"))
+    # The public web API key; the backend uses it to complete password resets.
+    FIREBASE_WEB_API_KEY: str = (os.environ.get("FIREBASE_WEB_API_KEY")
+                                 or os.environ.get("NEXT_PUBLIC_FIREBASE_API_KEY", "")).strip()
+    # Limits on the account endpoints live in app/security/auth_limits.json.
 
     # Identity mode: "standalone" (own agent table) or "shared" (external agent_ids)
     IDENTITY_MODE: str = os.environ.get("IDENTITY_MODE", "standalone")

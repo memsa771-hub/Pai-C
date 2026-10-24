@@ -4,7 +4,7 @@
  * as its Bearer. Our backend sends every account email (verification, reset,
  * new sign-in) through Resend, so nothing here asks Firebase to email anyone. */
 import {
-  applyActionCode, confirmPasswordReset, createUserWithEmailAndPassword, GoogleAuthProvider,
+  applyActionCode, createUserWithEmailAndPassword, GoogleAuthProvider,
   onAuthStateChanged, signInWithEmailAndPassword, signInWithPopup, signOut as firebaseSignOut,
   verifyPasswordResetCode, type User,
 } from 'firebase/auth';
@@ -28,6 +28,8 @@ export class AuthInvalid extends Error {}
 export class EmailNotVerified extends Error {}
 /** The student closed the Google window; not an error worth showing. */
 export class SignInCancelled extends Error {}
+/** Deleting the account needs a fresh sign-in. */
+export class RecentSignInRequired extends Error {}
 
 /** The signed-in Firebase user, if any. */
 export function signedInUser(): User | null {
@@ -89,6 +91,8 @@ async function data<T>(response: Response): Promise<T> {
     const messages: Record<string, string> = {
       AUTH_INVALID_CREDENTIALS: 'Sign-in failed. Please try again.',
       AUTH_ACCOUNT_CONFLICT: 'This email is linked to another account. Contact support.',
+      AUTH_RESET_LINK_INVALID: 'This link is invalid or has already been used. Ask for a new one.',
+      AUTH_WEAK_PASSWORD: 'Password is too weak. Use 8+ characters with a mix of letters, numbers and symbols.',
     };
     throw new AuthInvalid(messages[body?.message] || 'Authentication failed. Please try again.');
   }
@@ -125,6 +129,7 @@ function friendly(error: unknown, fallback: string): Error {
     'auth/user-not-found': 'That email or password does not match an account.',
     'auth/email-already-in-use': 'An account with this email already exists. Sign in instead.',
     'auth/weak-password': 'Password is too weak. Use 8+ characters with a mix of letters, numbers and symbols.',
+    'auth/password-does-not-meet-requirements': 'Password is too weak. Use 8+ characters with a mix of letters, numbers and symbols.',
     'auth/invalid-email': 'Enter a valid email address.',
     'auth/too-many-requests': 'Too many attempts. Please wait a little and try again.',
     'auth/user-disabled': 'This account has been turned off. Contact support.',
@@ -212,12 +217,20 @@ export async function checkPasswordResetCode(code: string): Promise<string> {
   }
 }
 
+/** Set the new password through our backend, which then signs the account out everywhere. */
 export async function completePasswordReset(code: string, password: string): Promise<void> {
+  let response: Response;
   try {
-    await confirmPasswordReset(firebaseAuth(), code, password);
-  } catch (error) {
-    throw friendly(error, 'We could not update your password. Please try again.');
+    response = await fetch(`${API_URL}/v1/auth/reset-password`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ oobCode: code, newPassword: password }),
+    });
+  } catch {
+    throw new AuthUnavailable('Placement AI is temporarily unavailable');
   }
+  await data(response);
+  // This browser's session was revoked with all the others.
+  if (firebaseAuth().currentUser) await firebaseSignOut(firebaseAuth());
 }
 
 export async function signOut(): Promise<void> {

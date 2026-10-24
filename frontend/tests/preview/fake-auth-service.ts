@@ -6,6 +6,7 @@ export const FIREBASE_SESSION = 'firebase';
 export const AUTH_INVALID_EVENT = 'pai:auth-invalid';
 export const AUTH_UNVERIFIED_EVENT = 'pai:auth-unverified';
 export class SignInCancelled extends Error {}
+export class RecentSignInRequired extends Error {}
 const student = { email: 'student@example.test', emailVerified: false };
 export const signInWithPassword = async (_email: string, password: string) => {
   await wait(); if (password === 'wrong') throw new Error('That email or password does not match an account.'); return { ...student, emailVerified: true } as never;

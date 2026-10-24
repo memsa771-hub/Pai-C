@@ -12,6 +12,9 @@ class AuthenticatedIdentity:
     display_name: str | None = None
     # How the person signed in ("password", "google.com", ...).
     sign_in_provider: str = ""
+    # When the person last entered their credentials, and when this token was issued (epoch seconds).
+    auth_time: int = 0
+    issued_at: int = 0
 
     @property
     def needs_email_verification(self) -> bool:

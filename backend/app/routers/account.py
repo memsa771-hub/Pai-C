@@ -10,17 +10,16 @@ the app. Auth is the user's identity bearer token (Authorization: Bearer <id>)
 — NOT a workspace token — because deletion spans every workspace the user
 touched, so it can't be scoped to a single workspace's token.
 
-Scope of deletion: the user is identified only by email (the app has no
-app-managed credential; identity is delegated to Firebase Auth).
-Placement AI v2.0: the user's own personal workspace (`owner_user_id`) is
-private to them, so it is soft-deleted along with every other email-keyed
-row and channel human memberships across any workspace they touched.
+Scope of deletion: the account linked to the token's Firebase uid, every
+workspace it owns, and its channel memberships elsewhere, all hard-deleted.
+The Firebase account is disabled, not deleted (see delete_account).
 """
 
 import logging
+import time
 from typing import Optional
 
-from fastapi import APIRouter, Depends, Header
+from fastapi import APIRouter, BackgroundTasks, Depends, Header
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -31,7 +30,9 @@ from app.security.access import (
     resolve_owned_workspace,
 )
 from app.database import get_db
-from app.security.human_auth import verify_identity_token
+from app.security import firebase_auth
+from app.security.errors import EmailNotVerified
+from app.services import auth_emails
 from app.models import (
     ChannelHumanMember,
     EventRecord,
@@ -49,15 +50,8 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/v1", tags=["Account"])
 
-
-def _authed_email(authorization: Optional[str]) -> Optional[str]:
-    """Resolve the calling user's normalized email from the identity bearer,
-    or None if absent/invalid."""
-    bearer = _extract_bearer(authorization)
-    if not bearer:
-        return None
-    email = verify_identity_token(bearer)
-    return email.strip().lower() if email else None
+# Deleting the account needs a sign-in this recent (seconds).
+RECENT_SIGN_IN_SECONDS = 5 * 60
 
 
 def _canonical_workspace_row(ws: Workspace, user: Optional[User] = None) -> dict:
@@ -312,43 +306,38 @@ def _erase_workspace(db: Session, workspace: Workspace) -> dict:
 
 @router.delete("/account")
 def delete_account(
+    background: BackgroundTasks,
     db: Session = Depends(get_db),
     authorization: Optional[str] = Header(None),
 ):
     """Permanently erase the calling user's account and everything in it.
 
-    This used to only mark the workspace `status = "deleted"`. Everything that
-    actually matters survived: the student's memories and episodes, their
-    vault facts (CGPA, test scores), every file
-    they had uploaded — transcripts, passports — their whole chat history, and
-    the index vectors built from all of it. "Delete my account" has to mean
-    the data is gone, not hidden behind a status column.
+    A hard delete in one transaction: every workspace they own (with its
+    files, vectors, events and every cascaded row, the Vault included), their
+    channel memberships elsewhere, and the `users` row (which takes their
+    devices with it). Then the Firebase account is disabled, not deleted, and
+    its sessions end; then the "account deleted" email goes out via Resend.
 
-    So it is now a hard delete, in one transaction: either every row goes or
-    none does. The `users` row goes too, which frees the email and the
-    username. Signing in again with the same Firebase account is a new start —
-    a fresh user, a fresh empty workspace — not a recovery.
+    Needs a recent sign-in (RECENT_SIGN_IN_SECONDS): a token left open on
+    some laptop must not be able to erase an account.
 
-    What this does NOT delete, because it does not own them: the Firebase auth
-    record (the identity provider holds that), and `feedback` rows, whose
-    `user_id` is `ondelete="SET NULL"` so the text survives, detached, as
-    product feedback.
+    Not deleted, because it is not clearly only theirs: `feedback` rows (their
+    `user_id` is set to NULL, the text and `user_email` stay).
 
-    Idempotent: a second call, or one from a user with nothing stored,
-    succeeds with zero deletions.
+    Idempotent: a second call deletes nothing and disables an already
+    disabled account.
     """
-    bearer = _extract_bearer(authorization)
-    if not bearer:
-        return json_response(ResponseCode.UNAUTHORIZED, "Missing identity token")
+    identity = firebase_auth.verify_token(_extract_bearer(authorization) or "")
+    if identity is None:
+        return json_response(ResponseCode.UNAUTHORIZED, "AUTH_INVALID_CREDENTIALS")
+    if identity.needs_email_verification:
+        raise EmailNotVerified()
+    if time.time() - identity.auth_time > RECENT_SIGN_IN_SECONDS:
+        return json_response(ResponseCode.FORBIDDEN, "AUTH_RECENT_SIGN_IN_REQUIRED", status_code=403)
 
-    email = verify_identity_token(bearer)
-    if not email:
-        return json_response(ResponseCode.UNAUTHORIZED, "Invalid identity token")
-
-    email_lower = email.strip().lower()
+    email_lower = identity.email
     erased: list = []
-
-    user = db.execute(select(User).where(User.email == email_lower)).scalar_one_or_none()
+    user = db.execute(select(User).where(User.firebase_uid == identity.subject)).scalar_one_or_none()
     if user is not None:
         # Every workspace they own, not only the active one: a workspace left
         # behind by an earlier soft delete holds exactly the same data.
@@ -378,6 +367,12 @@ def delete_account(
         channel_memberships_deleted,
     )
 
+    # The data is gone either way; if Firebase is unreachable the client
+    # retries, and the retry finds nothing left to delete.
+    firebase_auth.disable_user(identity.subject)
+    if user is not None:
+        background.add_task(auth_emails.send_account_deleted_email, email_lower)
+
     return success_response({
         "email": email_lower,
         "deleted": {
@@ -386,4 +381,5 @@ def delete_account(
             "events": sum(e["events"] for e in erased),
             "channel_memberships": channel_memberships_deleted,
         },
+        "firebaseDisabled": True,
     })

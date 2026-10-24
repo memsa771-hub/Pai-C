@@ -18,10 +18,11 @@ vi.mock('firebase/auth', () => ({
   GoogleAuthProvider: class { setCustomParameters() {} },
 }));
 
+import { signOut as firebaseSignOut } from 'firebase/auth';
 import {
   AUTH_INVALID_EVENT, AUTH_UNVERIFIED_EVENT, AuthInvalid, AuthUnavailable, authenticatedFetch,
-  EmailNotVerified, requestPasswordReset, SignInCancelled, signInWithGoogle, signInWithPassword,
-  signUpWithPassword, startSession,
+  completePasswordReset, EmailNotVerified, requestPasswordReset, SignInCancelled, signInWithGoogle, signInWithPassword,
+  signOut, signUpWithPassword, startSession,
 } from './service';
 
 const fetchMock = vi.fn();
@@ -94,4 +95,21 @@ it('a reset request posts only the email and needs no sign-in', async () => {
   expect(url).toMatch(/\/v1\/auth\/forgot-password$/);
   expect(JSON.parse(init.body)).toEqual({ email: 'Someone@example.test' });
   expect(init.headers.Authorization).toBeUndefined();
+});
+
+it('logging out signs out this device only and calls no backend', async () => {
+  await signOut();
+  expect(firebaseSignOut).toHaveBeenCalledWith(firebase);
+  expect(fetchMock).not.toHaveBeenCalled();
+});
+
+it('a password reset goes through our backend, then this browser signs out too', async () => {
+  fetchMock.mockResolvedValue(ok({ reset: true }));
+  await completePasswordReset('reset-code', 'Newer-pass2');
+  const [url, init] = fetchMock.mock.calls[0];
+  expect(url).toMatch(/\/v1\/auth\/reset-password$/);
+  expect(JSON.parse(init.body)).toEqual({ oobCode: 'reset-code', newPassword: 'Newer-pass2' });
+  expect(firebaseSignOut).toHaveBeenCalledOnce();
+  fetchMock.mockResolvedValue(new Response(JSON.stringify({ message: 'AUTH_RESET_LINK_INVALID' }), { status: 400 }));
+  await expect(completePasswordReset('used', 'Newer-pass2')).rejects.toThrow('already been used');
 });

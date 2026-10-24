@@ -24,7 +24,7 @@ import type {
 import { eventToMessage } from './types';
 
 import { API_URL } from './config';
-import { AUTH_INVALID_EVENT, AUTH_UNVERIFIED_EVENT, currentIdToken } from './auth/service';
+import { AUTH_INVALID_EVENT, AUTH_UNVERIFIED_EVENT, currentIdToken, RecentSignInRequired } from './auth/service';
 
 /** Map a snake_case custom-skill entry from the backend to camelCase. */
 /** Map snake_case file response from backend to camelCase WorkspaceFile. */
@@ -324,7 +324,12 @@ class WorkspaceApi {
     return this.request(`/v1/counselor/export?network=${this.requireWorkspace()}`);
   }
   async deleteMyAccount(): Promise<void> {
-    await this.request('/v1/account', {method:'DELETE'});
+    try {
+      await this.request('/v1/account', {method:'DELETE'});
+    } catch (error) {
+      if (error instanceof Error && error.message.includes('AUTH_RECENT_SIGN_IN_REQUIRED')) throw new RecentSignInRequired();
+      throw error;
+    }
   }
 
   async getCounselorHealth(): Promise<import('./counselor-workspace').CounselorHealth> {

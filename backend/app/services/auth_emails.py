@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
-"""The account emails: verify your email, reset your password, new sign-in.
+"""The account emails: verify your email, reset your password, new sign-in, account deleted.
 
-One place for all three, each as simple branded HTML with a plain-text twin,
+One place for all of them, each as simple branded HTML with a plain-text twin,
 in English, sent through Resend. Firebase never sends its own emails.
 """
 
@@ -86,4 +86,14 @@ def send_new_sign_in_email(to: str, device: str, when: str) -> bool:
          "If this was you, there is nothing to do."],
         ("Reset your password", f"{config.APP_URL.rstrip('/')}/forgot-password"),
         "If this was not you, reset your password now to keep your account safe.",
+    )
+
+
+def send_account_deleted_email(to: str) -> bool:
+    return _send(
+        to, "Your Placement AI account has been deleted", "Your account has been deleted",
+        ["Your Placement AI account and all your data have been permanently deleted, as you asked.",
+         "You can no longer sign in with this email."],
+        None,
+        "If you did not ask for this, reply to this email.",
     )

@@ -3,12 +3,13 @@ import {it,expect,vi,afterEach} from 'vitest';
 import {render,screen,fireEvent,cleanup,waitFor,within} from '@testing-library/react';
 import {CounselorSettings} from './settings';
 import {workspaceApi} from '@/lib/api';
-import {requestPasswordReset} from '@/lib/auth/service';
+import {RecentSignInRequired,requestPasswordReset} from '@/lib/auth/service';
+import {signOutAndGoToLanding} from '@/lib/auth-redirects';
 const theme=vi.hoisted(()=>({setTheme:vi.fn(),theme:'light'}));
 vi.mock('next-themes',()=>({useTheme:()=>theme}));
 vi.mock('@/lib/api',()=>({workspaceApi:{deleteMyAccount:vi.fn(),editStudentProfile:vi.fn(),getProfileCards:vi.fn(),exportCounselorData:vi.fn(),listShares:vi.fn(),deleteShare:vi.fn()}}));
-vi.mock('@/lib/auth/service',()=>({requestPasswordReset:vi.fn()}));
-vi.mock('@/lib/auth-redirects',()=>({signOutAndReturnToSignIn:vi.fn()}));
+vi.mock('@/lib/auth/service',()=>({requestPasswordReset:vi.fn(),RecentSignInRequired:class extends Error{}}));
+vi.mock('@/lib/auth-redirects',()=>({signOutAndReturnToSignIn:vi.fn(),signOutAndGoToLanding:vi.fn()}));
 vi.mock('@/components/ui/dialogs-provider',()=>({useConfirm:()=>vi.fn().mockResolvedValue(false)}));
 vi.mock('@/components/feedback/feedback-dialog',()=>({FeedbackDialog:()=><div role="dialog">feedback</div>}));
 const ws=vi.hoisted(()=>({notificationSound:false,setNotificationSound:vi.fn()}));
@@ -49,16 +50,35 @@ it('lists shared links and stops sharing one',async()=>{
   await waitFor(()=>expect(screen.queryByText('My chat')).toBeNull());
   expect(workspaceApi.deleteShare).toHaveBeenCalledWith('s1');
 });
-it('requires an explicit irreversible-deletion acknowledgement and surfaces failure',async()=>{
+it('asks once before deleting the account and surfaces failure',async()=>{
   vi.mocked(workspaceApi.listShares).mockResolvedValue([]);
   vi.mocked(workspaceApi.deleteMyAccount).mockRejectedValue(new Error());
   render(<CounselorSettings/>);
   open('Privacy & data');
-  fireEvent.click(screen.getByRole('button',{name:'Delete my app data',exact:true}));
-  const submit=screen.getByRole('button',{name:'Permanently delete my app data'});
-  expect((submit as HTMLButtonElement).disabled).toBe(true);expect(workspaceApi.deleteMyAccount).not.toHaveBeenCalled();
-  fireEvent.click(screen.getByRole('checkbox'));fireEvent.click(submit);
+  fireEvent.click(screen.getByRole('button',{name:'Delete my account'}));
+  expect(screen.getByText('This will permanently delete your account and all your data.')).toBeTruthy();
+  expect(workspaceApi.deleteMyAccount).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByRole('button',{name:'Delete my account'}));
   expect(await screen.findByRole('alert')).toBeTruthy();expect(workspaceApi.deleteMyAccount).toHaveBeenCalledTimes(1);
+});
+it('after deleting, signs out here and goes to the landing page',async()=>{
+  vi.mocked(workspaceApi.listShares).mockResolvedValue([]);
+  vi.mocked(workspaceApi.deleteMyAccount).mockResolvedValue();
+  render(<CounselorSettings/>);
+  open('Privacy & data');
+  fireEvent.click(screen.getByRole('button',{name:'Delete my account'}));
+  fireEvent.click(screen.getByRole('button',{name:'Delete my account'}));
+  await waitFor(()=>expect(signOutAndGoToLanding).toHaveBeenCalledTimes(1));
+});
+it('asks for a fresh sign-in when the last one is too old',async()=>{
+  vi.mocked(workspaceApi.listShares).mockResolvedValue([]);
+  vi.mocked(workspaceApi.deleteMyAccount).mockRejectedValue(new RecentSignInRequired());
+  render(<CounselorSettings/>);
+  open('Privacy & data');
+  fireEvent.click(screen.getByRole('button',{name:'Delete my account'}));
+  fireEvent.click(screen.getByRole('button',{name:'Delete my account'}));
+  expect(await screen.findByText('For your safety, sign in again, then delete your account.')).toBeTruthy();
+  expect(screen.getByRole('button',{name:'Sign in again'})).toBeTruthy();
 });
 it('exports through the owner-scoped data API and reports download failure',async()=>{
   vi.mocked(workspaceApi.listShares).mockResolvedValue([]);

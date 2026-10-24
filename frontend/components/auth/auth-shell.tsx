@@ -296,6 +296,11 @@ export function SubmitButton({ busy, busyLabel, children }: {
   );
 }
 
+/** A plain button styled like the primary one, for status screens. */
+export function ActionButton({ busy, onClick, children }: { busy?: boolean; onClick: () => void; children: React.ReactNode }) {
+  return <button type="button" className={primaryButton} disabled={busy} aria-busy={busy} onClick={onClick}>{children}</button>;
+}
+
 /** A link styled like the primary button, for status screens. */
 export function InkLink({ href, children }: { href: string; children: React.ReactNode }) {
   return <Link href={href} className={primaryButton}>{children}</Link>;
@@ -329,19 +334,16 @@ export function OrDivider() {
 }
 
 /** A finished or blocked step: an icon, a message, and one way forward. */
-export function AuthStatus({ icon: Icon, tone = 'neutral', title, body, children }: {
-  icon: LucideIcon; tone?: 'neutral' | 'success' | 'warning'; title: string; body?: string; children?: React.ReactNode;
+export function AuthStatus({ title, body, children }: {
+  title: string; body?: string; children?: React.ReactNode;
 }) {
   return (
     <div role="status" className="text-center">
-      <span aria-hidden className={cn('mx-auto mb-5 flex size-14 items-center justify-center rounded-2xl',
-        tone === 'neutral' && 'bg-auth-panel text-auth-blue', tone === 'success' && 'bg-success-soft text-success-ink',
-        tone === 'warning' && 'bg-warning-soft text-warning-ink')}>
-        <Icon className="size-7" />
-      </span>
-      <h1 className="text-[34px] font-bold leading-[1.45] text-auth-ink">{title}</h1>
-      {body && <p className="mt-2 text-pretty text-[16px] leading-[1.45] text-auth-muted">{body}</p>}
-      {children && <div className="mt-7 grid gap-3">{children}</div>}
+      <div className="mb-[var(--auth-gap)] flex flex-col items-center gap-2 leading-[1.45]">
+        <h1 className="w-full text-[length:var(--auth-title)] font-bold text-auth-ink">{title}</h1>
+        {body && <p className="w-full text-pretty text-[16px] text-auth-muted">{body}</p>}
+      </div>
+      {children && <div className="grid gap-3">{children}</div>}
     </div>
   );
 }

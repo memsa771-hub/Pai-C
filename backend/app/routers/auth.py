@@ -15,6 +15,7 @@ from typing import Optional
 from fastapi import APIRouter, BackgroundTasks, Depends, Header, Request
 from pydantic import BaseModel, Field
 from sqlalchemy import func, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.api.response import ResponseCode, json_response, success_response
@@ -26,27 +27,15 @@ from app.security.access import (
 )
 from app.security.errors import EmailNotVerified
 from app.security import firebase_auth
-from app.security.rate_limit import RateLimiter
+from app.security import rate_limit
 from app.services import auth_emails
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/v1/auth", tags=["Auth"])
 
-_HOUR = 3600.0
-_per_address = RateLimiter(config.AUTH_EMAILS_PER_ADDRESS_PER_HOUR, _HOUR)
-_per_ip = RateLimiter(config.AUTH_REQUESTS_PER_IP_PER_HOUR, _HOUR)
-
-
 def _client_ip(request: Request) -> str:
     return request.client.host if request.client else "unknown"
-
-
-def _limited(request: Request, email: str | None = None) -> bool:
-    """True when this IP, or this address, has used up its hourly allowance."""
-    if not _per_ip.allow(f"ip:{_client_ip(request)}"):
-        return True
-    return bool(email) and not _per_address.allow(f"email:{email}")
 
 
 def _rate_limited():
@@ -60,6 +49,11 @@ class SessionRequest(BaseModel):
 
 class ForgotPasswordRequest(BaseModel):
     email: str = Field(min_length=3, max_length=320)
+
+
+class ResetPasswordRequest(BaseModel):
+    oobCode: str = Field(min_length=1, max_length=2048)
+    newPassword: str = Field(min_length=1, max_length=4096)
 
 
 def _device_label(user_agent: str) -> str:
@@ -78,11 +72,11 @@ def start_session(
     db: Session = Depends(get_db), authorization: Optional[str] = Header(None),
 ):
     """Called after every sign-in: links the account, notes the device, alerts on a new one."""
-    if _limited(request):
-        return _rate_limited()
     identity = firebase_auth.verify_token(extract_bearer(authorization) or "")
     if identity is None:
         return json_response(ResponseCode.UNAUTHORIZED, "AUTH_INVALID_CREDENTIALS")
+    if not rate_limit.allow("session", user=identity.subject):
+        return _rate_limited()
     if identity.needs_email_verification:
         raise EmailNotVerified()
     try:
@@ -101,18 +95,24 @@ def start_session(
     device = db.execute(select(AuthDevice).where(
         AuthDevice.user_id == user.id, AuthDevice.device_hash == device_hash)).scalar_one_or_none()
     new_device = device is None
+    known = 0
     if device is None:
         # The first device an account ever uses (right after sign-up) is not "new".
         known = db.execute(select(func.count()).select_from(AuthDevice)
                            .where(AuthDevice.user_id == user.id)).scalar_one()
         db.add(AuthDevice(user_id=user.id, device_hash=device_hash, user_agent=user_agent))
-        if known:
-            background.add_task(auth_emails.send_new_sign_in_email, user.email,
-                                _device_label(user_agent), now.strftime("%d %b %Y, %H:%M UTC"))
     else:
         device.last_seen_at = now
         device.user_agent = user_agent or device.user_agent
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        # A parallel sign-in from this device recorded it first; that one sends the alert.
+        db.rollback()
+        new_device = False
+    if new_device and known:
+        background.add_task(auth_emails.send_new_sign_in_email, user.email,
+                            _device_label(user_agent), now.strftime("%d %b %Y, %H:%M UTC"))
     logger.info("auth: session user=%s new_device=%s", user.id, new_device)
     return success_response({
         "user": {"id": str(user.id), "email": user.email, "displayName": user.display_name or user.email},
@@ -131,7 +131,7 @@ def send_verification(
         return json_response(ResponseCode.UNAUTHORIZED, "AUTH_INVALID_CREDENTIALS")
     if identity.email_verified:
         return success_response({"sent": False, "alreadyVerified": True})
-    if _limited(request, identity.email):
+    if not rate_limit.allow("send_verification", user=identity.subject):
         return _rate_limited()
     code = firebase_auth.email_verification_code(identity.email)
     background.add_task(auth_emails.send_verification_email, identity.email, code)
@@ -142,10 +142,25 @@ def send_verification(
 def forgot_password(body: ForgotPasswordRequest, request: Request, background: BackgroundTasks):
     """Email a reset link. The answer is the same whether or not the account exists."""
     email = body.email.strip().lower()
-    if _limited(request, email):
+    if not rate_limit.allow("forgot_password", email=email, ip=_client_ip(request)):
         return _rate_limited()
     if "@" in email:
         code = firebase_auth.password_reset_code(email)
         if code:
             background.add_task(auth_emails.send_password_reset_email, email, code)
     return success_response({"sent": True})
+
+
+@router.post("/reset-password")
+def reset_password(body: ResetPasswordRequest, request: Request):
+    """Set the new password from a reset link, then sign the account out everywhere."""
+    if not rate_limit.allow("reset_password", ip=_client_ip(request)):
+        return _rate_limited()
+    try:
+        firebase_auth.reset_password(body.oobCode, body.newPassword)
+    except firebase_auth.ResetLinkInvalid:
+        return json_response(ResponseCode.BAD_REQUEST, "AUTH_RESET_LINK_INVALID", status_code=400)
+    except firebase_auth.WeakPassword:
+        return json_response(ResponseCode.BAD_REQUEST, "AUTH_WEAK_PASSWORD", status_code=400)
+    logger.info("auth: password reset, every session revoked")
+    return success_response({"reset": True})

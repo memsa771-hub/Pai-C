@@ -1,0 +1,17 @@
+{
+  "_about": "Every limit on the account endpoints. Each rule counts attempts per user (Firebase uid), per email or per IP over a sliding window.",
+  "send_verification": [
+    {"per": "user", "limit": 1, "window_seconds": 60},
+    {"per": "user", "limit": 5, "window_seconds": 3600}
+  ],
+  "forgot_password": [
+    {"per": "email", "limit": 3, "window_seconds": 3600},
+    {"per": "ip", "limit": 10, "window_seconds": 3600}
+  ],
+  "reset_password": [
+    {"per": "ip", "limit": 10, "window_seconds": 3600}
+  ],
+  "session": [
+    {"per": "user", "limit": 30, "window_seconds": 3600}
+  ]
+}

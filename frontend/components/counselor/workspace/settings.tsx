@@ -11,8 +11,8 @@ import { Switch } from "@/components/ui/switch";
 import { useConfirm } from "@/components/ui/dialogs-provider";
 import { FeedbackDialog } from "@/components/feedback/feedback-dialog";
 import { workspaceApi } from "@/lib/api";
-import { requestPasswordReset } from "@/lib/auth/service";
-import { signOutAndReturnToSignIn } from "@/lib/auth-redirects";
+import { RecentSignInRequired, requestPasswordReset } from "@/lib/auth/service";
+import { signOutAndGoToLanding, signOutAndReturnToSignIn } from "@/lib/auth-redirects";
 import { publicAppUrl } from "@/lib/desktop-host";
 import { usePaiAuth } from "@/lib/pai-auth-context";
 import { useWorkspace } from "@/lib/workspace-context";
@@ -71,7 +71,7 @@ export function CounselorSettings({ onNavigate }: { base?: string; onNavigate?: 
   const [shares, setShares] = useState<ShareSummary[] | null>(null);
   const [sharesFailed, setSharesFailed] = useState(false);
   const [copied, setCopied] = useState<string | null>(null);
-  const [deleting, setDeleting] = useState(false), [confirmDelete, setConfirmDelete] = useState(false), [busy, setBusy] = useState(false);
+  const [deleting, setDeleting] = useState(false), [needsSignIn, setNeedsSignIn] = useState(false), [busy, setBusy] = useState(false);
 
   useEffect(() => {
     const requested = new URLSearchParams(window.location.search).get("section");
@@ -130,13 +130,13 @@ export function CounselorSettings({ onNavigate }: { base?: string; onNavigate?: 
     }
   }
   async function remove() {
-    if (!confirmDelete) return;
     setBusy(true);
     try {
       await workspaceApi.deleteMyAccount();
-      window.location.assign("/sign-in");
-    } catch {
-      setError(true);
+      await signOutAndGoToLanding(signOut);
+    } catch (reason) {
+      if (reason instanceof RecentSignInRequired) setNeedsSignIn(true);
+      else setError(true);
     } finally {
       setBusy(false);
     }
@@ -258,15 +258,12 @@ export function CounselorSettings({ onNavigate }: { base?: string; onNavigate?: 
                 </Row>
                 {deleting && (
                   <div className="bg-danger-soft px-5 py-4 text-danger-ink sm:px-6">
-                    <p className="text-sm">{copy.deleteHelp}</p>
-                    <label className="mt-3 flex min-h-11 cursor-pointer items-start gap-3 text-sm font-medium">
-                      <input type="checkbox" className="mt-0.5 size-5 shrink-0 accent-[var(--danger)]" checked={confirmDelete}
-                        onChange={(e) => setConfirmDelete(e.target.checked)} />
-                      {copy.deleteConfirm}
-                    </label>
+                    <p className="text-sm">{needsSignIn ? copy.deleteNeedsSignIn : copy.deleteHelp}</p>
                     <div className="mt-3 flex flex-wrap gap-2">
-                      <Button size="tap" variant="destructive" disabled={!confirmDelete || busy} onClick={remove}>{copy.deleteNow}</Button>
-                      <Button size="tap" variant="ghost" onClick={() => { setDeleting(false); setConfirmDelete(false); }}>{copy.cancel}</Button>
+                      {needsSignIn
+                        ? <Button size="tap" variant="destructive" onClick={() => void signOutAndReturnToSignIn(signOut)}>{copy.deleteSignInAgain}</Button>
+                        : <Button size="tap" variant="destructive" disabled={busy} onClick={remove}>{copy.deleteNow}</Button>}
+                      <Button size="tap" variant="ghost" onClick={() => { setDeleting(false); setNeedsSignIn(false); }}>{copy.cancel}</Button>
                     </div>
                   </div>
                 )}

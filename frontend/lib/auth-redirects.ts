@@ -65,3 +65,12 @@ export async function signOutAndReturnToSignIn(signOut: () => Promise<void>): Pr
   if (typeof window === 'undefined' || desktopHost()) return;
   window.location.replace(SIGN_IN_PATH);
 }
+
+/** After the account is deleted: sign out here and land on the public landing page. */
+export async function signOutAndGoToLanding(signOut: () => Promise<void>): Promise<void> {
+  const host = desktopHost();
+  if (host) { host.signOut(); return; }
+  await signOut();
+  if (typeof document !== 'undefined') clearWorkspaceCookies();
+  if (typeof window !== 'undefined') window.location.replace('/');
+}
