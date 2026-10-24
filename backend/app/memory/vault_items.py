@@ -23,8 +23,14 @@ from .vault import VaultOutcome
 LEVELS = ("inferred", "stated", "shown", "confirmed")
 _RANK = {name: i for i, name in enumerate(LEVELS)}
 CORROBORATION_CAP = 10
-# Only the student's own voice can bring back an entry they removed.
+# Rows read after the workspace lock are reloaded, not taken from the session's
+# identity map: a row read before the lock may have been changed by another
+# write in the meantime, and deciding on its old status or value would be wrong.
+_FRESH = {"populate_existing": True}
+# Only the student's own voice can bring back an entry they removed; these
+# sources are not the student speaking and may not (VAULT_SPEC §Conflicts).
 _RESTATING_SOURCES = ("user_explicit", "conversation")
+_NON_STUDENT_SOURCES = ("document", "agent", "system")
 
 
 class ItemConfirmRefused(MemoryDataError):
@@ -94,11 +100,17 @@ class VaultItemService:
 
     # ---- reads -------------------------------------------------------------
 
+    def _fresh(self) -> dict:
+        """Read options that reload rows. Sessions run without autoflush, so
+        pending changes are flushed first and the reload never discards them."""
+        self.db.flush()
+        return _FRESH
+
     def active(self, workspace_id: str, types: list[str] | None = None) -> list[VaultItem]:
         stmt = select(VaultItem).where(VaultItem.workspace_id == workspace_id, VaultItem.status == "active")
         if types:
             stmt = stmt.where(VaultItem.item_type.in_(list(types)))
-        return list(self.db.scalars(stmt.order_by(VaultItem.created_at)))
+        return list(self.db.scalars(stmt.order_by(VaultItem.created_at), execution_options=self._fresh()))
 
     def history(self, workspace_id: str, item_id: str) -> list[VaultItem]:
         """Every row of this entry, oldest first: the superseded_by chain (which
@@ -151,6 +163,8 @@ class VaultItemService:
         except SchemaValidationError as exc:
             raise MemoryDataError(f"Vault item {item_type!r} is invalid: {exc}") from exc
         self._lock(workspace_id)
+        if source_type in _NON_STUDENT_SOURCES and not item_id and self.was_retracted(workspace_id, item_type, value):
+            raise MemoryDataError("retracted_by_student")
         evidence = dict(evidence or {})
 
         current, loose = self._target(workspace_id, spec, value, item_id)
@@ -251,7 +265,12 @@ class VaultItemService:
         between would be confirmed without the student ever seeing it.
         """
         self._lock(workspace_id)
-        current = self._get(workspace_id, item_id, active=True)
+        current = self._get(workspace_id, item_id)
+        if current.status == "superseded" and expected_digest is not None:
+            # A newer version replaced the one the student saw.
+            raise ItemConfirmRefused("value_changed")
+        if current.status != "active":
+            raise MemoryDataError("Vault item does not exist or is no longer active")
         if expected_type is not None and current.item_type != expected_type:
             raise ItemConfirmRefused("wrong_type")
         if expected_digest is not None and value_digest(current.value) != expected_digest:
@@ -275,18 +294,8 @@ class VaultItemService:
 
     def _keep_current(self, cards: list[ProfileIssue], candidate_id: str | None) -> None:
         """Settle cards as the student's keep_current, the steps ProfileIssueService takes."""
-        from .candidates import MemoryCandidateService
-        from .vault_intake import VaultAssertionService
-
-        candidates = MemoryCandidateService(self.db)
         for issue in cards:
-            evidence = issue.evidence or {}
-            for proposal_id in [issue.candidate_id, *evidence.get("earlier_candidate_ids", [])]:
-                proposal = candidates.get(issue.workspace_id, proposal_id) if proposal_id else None
-                if (proposal is not None and proposal.id != candidate_id
-                        and proposal.status in ("pending", "needs_review")):
-                    candidates.mark_rejected(proposal, "Student kept the current canonical value")
-                    VaultAssertionService(self.db).refresh_decision(proposal)
+            self._reject_proposals(issue, candidate_id, "Student kept the current canonical value")
             issue.status, issue.resolved_at = "resolved", _now()
             issue.resolution = {"action": "keep_current", "note": "Student confirmed the saved value",
                                 "resolved_by": "student", "candidate_id": candidate_id}
@@ -306,10 +315,10 @@ class VaultItemService:
 
     def _rows(self, workspace_id: str, item_type: str) -> list[VaultItem]:
         return list(self.db.scalars(select(VaultItem).where(
-            VaultItem.workspace_id == workspace_id, VaultItem.item_type == item_type)))
+            VaultItem.workspace_id == workspace_id, VaultItem.item_type == item_type), execution_options=self._fresh()))
 
     def _get(self, workspace_id: str, item_id: str, active: bool = False) -> VaultItem:
-        item = self.db.get(VaultItem, item_id)
+        item = self.db.get(VaultItem, item_id, **self._fresh())
         if item is None or str(item.workspace_id) != str(workspace_id) or (active and item.status != "active"):
             raise MemoryDataError("Vault item does not exist or is no longer active")
         return item
@@ -346,6 +355,7 @@ class VaultItemService:
                    keep_cards=False):
         # Every new version carries the disagreements of the one it replaces
         # (capped, de-duplicated, dropped once the value matches them).
+        answering = (evidence or {}).get("profile_issue_id")
         evidence = merge_disagreements(evidence, current.evidence, value)
         new = self._insert(current.workspace_id, spec, value, source_type, level, confidence, evidence, candidate_id)
         current.status, current.superseded_by, current.valid_until = "superseded", new.id, new.valid_from
@@ -355,7 +365,7 @@ class VaultItemService:
                 issue.evidence = {**(issue.evidence or {}), "current_value": new.value}
                 new.conflict_state = "in_question"
         else:
-            self._close_cards(current, "superseded")
+            self._close_cards(current, "superseded", candidate_id, answering)
         current.conflict_state = "none"
         self.db.flush()
         return ItemWrite(VaultOutcome.SUPERSEDED, new)
@@ -364,11 +374,34 @@ class VaultItemService:
         return list(self.db.scalars(select(ProfileIssue).where(
             ProfileIssue.workspace_id == item.workspace_id, ProfileIssue.status == "open",
             ProfileIssue.affected_type == "vault_item", ProfileIssue.affected_id == item.id)
-            .order_by(ProfileIssue.created_at)))
+            .order_by(ProfileIssue.created_at), execution_options=self._fresh()))
 
-    def _close_cards(self, item: VaultItem, note: str) -> None:
-        """A card about a row that is no longer the live, unsettled entry is obsolete."""
+    def _reject_proposals(self, issue: ProfileIssue, candidate_id: str | None, reason: str) -> None:
+        """Close every proposal a card asked about, so none waits in needs_review
+        for an answer that can no longer come."""
+        from .candidates import MemoryCandidateService
+        from .vault_intake import VaultAssertionService
+
+        candidates = MemoryCandidateService(self.db)
+        evidence = issue.evidence or {}
+        for proposal_id in [issue.candidate_id, *evidence.get("earlier_candidate_ids", [])]:
+            proposal = candidates.get(issue.workspace_id, proposal_id) if proposal_id else None
+            if (proposal is not None and proposal.id != candidate_id
+                    and proposal.status in ("pending", "needs_review")):
+                candidates.mark_rejected(proposal, reason)
+                VaultAssertionService(self.db).refresh_decision(proposal)
+
+    def _close_cards(self, item: VaultItem, note: str, candidate_id: str | None = None,
+                     answering: str | None = None) -> None:
+        """A card about a row that is no longer the live, unsettled entry is
+        obsolete, and so are the proposals it asked about. The card a conflict
+        answer is answering stays for ProfileIssueService to close as the
+        student's decision."""
+        reason = "superseded_by_student_edit" if note == "superseded" else "entry_removed"
         for issue in self._open_cards(item):
+            if answering and issue.id == answering:
+                continue
+            self._reject_proposals(issue, candidate_id, reason)
             issue.status, issue.resolved_at = "resolved", _now()
             issue.resolution = {"action": "obsolete", "note": note, "resolved_by": "system",
                                 "candidate_id": None}

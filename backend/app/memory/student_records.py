@@ -97,23 +97,32 @@ _VERIFICATION_RANK = {
     "externally_verified": 3, "verified": 3,
 }
 MAX_CORROBORATIONS = 10
+# Reads reload rows rather than trust the identity map: apply decides after the
+# workspace lock, and a row cached before it may have changed since.
+_FRESH = {"populate_existing": True}
 
 
 class StudentRecordService:
     def __init__(self, db):
         self.db = db
 
+    def _fresh(self) -> dict:
+        """Read options that reload rows. Sessions run without autoflush, so
+        pending changes are flushed first and the reload never discards them."""
+        self.db.flush()
+        return _FRESH
+
     def list(self, workspace_id: str, kind: str, limit: int | None = None):
         model = ENTITY_MODELS[kind]
         statement = select(model).where(model.workspace_id == workspace_id, model.status == "active").order_by(model.updated_at.desc(), model.id)
         if limit is not None:
             statement = statement.limit(limit)
-        return list(self.db.execute(statement).scalars())
+        return list(self.db.execute(statement, execution_options=self._fresh()).scalars())
 
     def get(self, workspace_id: str, kind: str, record_id: str):
         model = ENTITY_MODELS[kind]
         return self.db.execute(select(model).where(model.workspace_id == workspace_id,
-            model.id == record_id, model.status == "active")).scalar_one_or_none()
+            model.id == record_id, model.status == "active"), execution_options=self._fresh()).scalar_one_or_none()
 
     def retract(self, workspace_id, kind, record_id, evidence):
         """Keep the original evidence and append a student-requested retirement."""
@@ -129,6 +138,26 @@ class StudentRecordService:
                        "explicit_correction", evidence)
         self.db.flush()
         return row
+
+    def was_retracted(self, workspace_id: str, kind: str, values: dict) -> bool:
+        """The student removed a record with this identity (the steward's
+        matching rule) and no active record of theirs carries it again."""
+        model = ENTITY_MODELS.get(kind)
+        if model is None or not isinstance(values, dict):
+            return False
+        removed = list(self.db.execute(select(model).where(
+            model.workspace_id == workspace_id, model.status == "retracted")).scalars())
+        if not removed:
+            return False
+        try:
+            if RecordDomainSteward(kind).resolve_entity(values, removed, lambda row: self._values(kind, row)) is None:
+                return False
+        except EntityAmbiguity:
+            pass  # removed more than once: still removed
+        try:
+            return self._match(workspace_id, kind, values) is None
+        except EntityAmbiguity:
+            return False
 
     def _values(self, kind, row):
         return {key: deepcopy(getattr(row, key)) for key in ALLOWED[kind] if getattr(row, key) is not None}

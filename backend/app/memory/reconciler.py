@@ -280,6 +280,9 @@ class MemoryReconciler:
                 drop_course(self.db, candidate, "course_education_not_saved")
                 return self._reject(candidate, "course_education_not_saved")
             values = {**values, "education_id": education_id}
+        if (candidate.source_type in _NON_STUDENT_SOURCES and not (candidate.entities or {}).get("record_id")
+                and self._removed(candidate, self.records.was_retracted, values)):
+            return self._reject(candidate, "retracted_by_student")
         claim_origin, capture_method, verification = provenance_for(candidate)
         record = self.records.apply(
             candidate.workspace_id, candidate.key or "", values,
@@ -326,6 +329,10 @@ class MemoryReconciler:
         value = self._unwrap(candidate.proposed_value)
         if value is None:
             return self._reject(candidate, "vault_fact upsert requires a proposed_value")
+
+        if (candidate.source_type in _NON_STUDENT_SOURCES
+                and self._removed(candidate, self.vault.was_retracted, value)):
+            return self._reject(candidate, "retracted_by_student")
 
         # Validates against the field definition; raises VaultFieldError, which
         # `reconcile` converts into a recorded rejection.
@@ -407,9 +414,14 @@ class MemoryReconciler:
         value = self._unwrap(candidate.proposed_value)
         if not isinstance(value, dict):
             return self._reject(candidate, "vault_item requires an object")
-        if (candidate.source_type in _NON_STUDENT_SOURCES and not item_id
-                and self.items.was_retracted(candidate.workspace_id, candidate.key, value)):
-            return self._reject(candidate, "retracted_by_student")
+        if (candidate.source_type == "conversation" and item_id
+                and evidence.get("semantic_correction") is not True
+                and evidence.get("semantic_temporal_change") is not True):
+            # A chat id only says which entry a correction or change replaces.
+            # Without one of those flags the student said something, not that an
+            # entry is wrong: the value goes on as a new proposal.
+            logger.info("chat item_id dropped without a change flag candidate=%s", candidate.id)
+            item_id = None
 
         # Change flags describe the student's own words, so only the student's
         # channels may raise them (as vault.py does for facts).
@@ -545,6 +557,18 @@ class MemoryReconciler:
         return ReconcileResult(True, candidate.id, result_id=episode.id)
 
     # -- helpers -----------------------------------------------------------
+
+    def _removed(self, candidate: MemoryCandidate, was_retracted, value) -> bool:
+        """Did the student remove this entry (and not state it again)?
+
+        Asked under the workspace lock, the same one every Vault write takes,
+        so a removal or restatement cannot land between the check and the write.
+        """
+        from app.models import Workspace
+
+        if self.db.get(Workspace, candidate.workspace_id, with_for_update=True) is None:
+            raise MemoryDataError("Student workspace does not exist")
+        return was_retracted(candidate.workspace_id, candidate.key, value)
 
     def _confident_enough(self, candidate: MemoryCandidate) -> bool:
         return (candidate.confidence or 0) >= self._min_confidence_for(candidate.source_type)

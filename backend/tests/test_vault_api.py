@@ -438,7 +438,9 @@ def test_rejected_values_are_400_and_logged_for_the_owner(api):
 
     drops = _ok(client.get(_url(ws, "/drops"), headers=HEADERS))["drops"]
     assert [(d["source"], d["stage"], d["reason"]) for d in drops] == [("details", "normalize", "empty_budget")]
-    assert set(drops[0]) == {"id", "source", "stage", "reason", "payload", "created_at"}
+    # Where, why and which type only: never the stored value or the student's words.
+    assert set(drops[0]) == {"source", "stage", "reason", "key", "created_at"}
+    assert drops[0]["key"] == "finance.budget"
     later = _ok(client.get(_url(ws, "/drops") + "&since=2999-01-01T00:00:00Z", headers=HEADERS))["drops"]
     assert later == []
     since = _ok(client.get(_url(ws, "/drops") + "&since=2000-01-01T00:00:00Z", headers=HEADERS))["drops"]
@@ -464,22 +466,31 @@ def test_document_entries(api):
 
 
 def test_income_in_a_rejected_value_is_not_logged(api):
-    """The normalize-stage drop is redacted too, for any caller of propose
-    (the Vault page refuses income before this, so propose is called directly)."""
+    """Any caller of propose meets the income door, and a value rejected later
+    (normalize) for a key outside it is logged redacted too. The drop list
+    itself never carries a payload."""
     from app.memory.candidates import MemoryCandidateService
     from app.memory.errors import MemoryDataError
 
     client, db, ws = api
-    with pytest.raises(MemoryDataError):
+    with pytest.raises(MemoryDataError, match="Household income"):
         MemoryCandidateService(db).propose(
             ws, "vault_fact", key="finance.budget", proposed_value={"covers": "fees_only"},
             source_type="user_explicit", allow_user_explicit=True, input_channel="profile",
             evidence={"quote": "Abba ki income 80000 hai, fees only"})
     db.rollback()
-    [drop] = _ok(client.get(_url(ws, "/drops"), headers=HEADERS))["drops"]
-    assert drop["reason"] == "empty_budget"
-    assert drop["payload"] == {"key": "finance.budget", "reason": "empty_budget"}
-    assert "80000" not in json.dumps(drop)
+    with pytest.raises(MemoryDataError, match="not_english"):
+        MemoryCandidateService(db).propose(
+            ws, "vault_fact", key="family.earnings", proposed_value="ابو کی income 80000",
+            source_type="user_explicit", allow_user_explicit=True, input_channel="profile",
+            evidence={"quote": "Abba ki income 80000 hai"})
+    db.rollback()
+    drops = _ok(client.get(_url(ws, "/drops"), headers=HEADERS))["drops"]
+    assert sorted((d["reason"].split(":")[0], d["key"]) for d in drops) == [
+        ("household_income", "finance.budget"), ("not_english", "family.earnings")]
+    stored = {d.reason.split(":")[0]: d.payload for d in db.scalars(select(VaultDrop))}
+    assert stored["household_income"] == {"key": "finance.budget", "reason": "household_income"}
+    assert "80000" not in json.dumps(stored) and "80000" not in json.dumps(drops)
 
 
 INCOME_REFUSED = "Household income isn't stored. You can add an approximate study budget instead."
@@ -498,8 +509,9 @@ def test_household_income_is_refused_roman_urdu(api):
     assert VaultItemService(db).active(ws) == []
     assert db.scalars(select(MemoryCandidate)).all() == []
     [drop] = _income_drops(client, ws)
-    assert drop["payload"] == {"key": "pressure", "reason": "household_income"}
-    assert "40000" not in json.dumps(drop)
+    assert drop["key"] == "pressure" and "40000" not in json.dumps(drop)
+    [stored] = db.scalars(select(VaultDrop)).all()
+    assert stored.payload == {"key": "pressure", "reason": "household_income"}
 
 
 def test_household_income_is_refused_english_and_on_edit(api):

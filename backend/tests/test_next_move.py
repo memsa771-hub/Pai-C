@@ -10,7 +10,7 @@ from app.pai_c import fact_cards
 from app.pai_c.policy.controller import decide, Decision
 from app.pai_c.deep.turn import run_deep_turn
 from tests.test_policy_guided import state
-from tests.test_student_profile_api import api, HEADERS
+from tests.test_student_profile_api import api, HEADERS, MACHINE_ONLY
 from tests.test_counselor_deep_pr3 import _turn
 from scripts.counselor_eval_support import StudentSession
 
@@ -70,6 +70,18 @@ def test_other_reconciles_with_stated_review_evidence_once(api):
     assert client.post(url, headers=HEADERS, json={**answer, "value": "Reused id"}).status_code == 422
     assert client.post(url, json=answer).status_code == 401
     assert client.post(url, headers=HEADERS, json={**answer, "confirmed": False}).status_code == 422
+
+
+def test_card_answers_need_the_signed_in_student(api):
+    """An answer is saved as user_explicit, so the machine token alone may read cards but not answer."""
+    client, db, workspace = api
+    answer = {"submission_id": str(uuid4()), "value": "My qualification", "other": True, "confirmed": True}
+    url = f"/v1/counselor/fact-cards/qualification?network={workspace}"
+    assert client.post(url, headers=MACHINE_ONLY, json=answer).status_code == 403
+    assert client.post(url, headers={**MACHINE_ONLY, "Authorization": "Bearer stranger"},
+                       json=answer).status_code == 403
+    assert db.scalars(select(MemoryCandidate)).all() == []
+    assert client.get(f"/v1/counselor/fact-cards?network={workspace}", headers=MACHINE_ONLY).status_code == 200
 
 
 @pytest.mark.asyncio

@@ -599,9 +599,13 @@ def _validate(raw: dict, turn, allowed_vault_keys: set[str],
         # Storing it as canonical makes every affordability check wrong; no
         # budget at all is recoverable, because PAI can simply ask.
         if isinstance(proposed, dict):
+            # A figure already saved for this field is the student's own earlier
+            # answer, repeated as context; only a changed figure needs their words.
+            saved = (getattr(turn, "vault", None) or {}).get(key)
+            saved = saved if isinstance(saved, dict) else {}
             for money in _MONEY_FIELDS:
                 figure = proposed.get(money)
-                if isinstance(figure, bool) or figure is None:
+                if isinstance(figure, bool) or figure is None or figure == saved.get(money):
                     continue
                 if isinstance(figure, (int, float)) and figure <= 0:
                     return drop(f"vault_fact {key!r} proposed a non-positive {money}")

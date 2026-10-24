@@ -19,7 +19,7 @@ from sqlalchemy.orm import Session
 
 from app.api.response import ResponseCode, json_response, success_response
 from app.database import get_db
-from app.memory.candidates import MemoryCandidateService, carries_household_income, record_drop
+from app.memory.candidates import MemoryCandidateService
 from app.memory.catalog import TypeSpec, vault_catalog
 from app.memory.errors import MemoryDataError
 from app.memory.evidence import value_digest
@@ -41,7 +41,6 @@ router = APIRouter(prefix="/v1/vault", tags=["Vault"])
 # Entry kinds as the view names them -> the candidate type that writes them.
 CANDIDATE_TYPES = {"fact": "vault_fact", "record": "student_record", "item": "vault_item"}
 DROP_LIMIT = 200
-INCOME_REFUSED = "Household income isn't stored. You can add an approximate study budget instead."
 
 
 class NewEntry(BaseModel):
@@ -165,19 +164,6 @@ def _write(db: Session, workspace_id: str, entry_kind: str, key: str, *, value: 
         # Not refused: the entry is now "In question" and a card asks the student.
         return success_response({"saved": False, "kind": entry_kind, "type": key, "in_question": True})
     return json_response(ResponseCode.BAD_REQUEST, result.reason or "Vault edit rejected")
-
-
-def _refuse_income(db: Session, workspace_id: str, spec: TypeSpec, value: Any, text: Optional[str]):
-    """400 when a student's entry would store a household income (VAULT_SPEC §Money:
-    never stored, from any source). The extractors' check decides what is guarded
-    (finance facts, family and pressure items, money records); nothing is written,
-    and the drop is logged with the key and reason only, never the figure."""
-    if not carries_household_income(CANDIDATE_TYPES[spec.storage], spec.key, value, text or ""):
-        return None
-    record_drop(db, workspace_id, "story" if spec.shown_on == "story" else "details", "validate",
-                "household_income", {"key": spec.key, "reason": "household_income"})
-    db.rollback()  # ends the transaction, which writes the queued drop
-    return json_response(ResponseCode.BAD_REQUEST, INCOME_REFUSED)
 
 
 def _editable(type_key: str) -> Optional[TypeSpec]:
@@ -311,7 +297,8 @@ def get_drops(
 ):
     """The student's own drop log, newest first (VAULT_SPEC §Measures: no silent drops).
 
-    Payloads are shown as stored: the writer already capped them and redacted income.
+    Only where, why and which type: never the payload's value or quote, since the
+    UI never shows the student's original words (VAULT_SPEC §Language).
     """
     workspace, error = _workspace(db, network, x_workspace_token, authorization)
     if error:
@@ -322,7 +309,8 @@ def get_drops(
         statement = statement.where(VaultDrop.created_at >= since)
     rows = db.scalars(statement.order_by(VaultDrop.created_at.desc(), VaultDrop.id).limit(limit))
     return success_response({"drops": [
-        {"id": d.id, "source": d.source, "stage": d.stage, "reason": d.reason, "payload": d.payload,
+        {"source": d.source, "stage": d.stage, "reason": d.reason,
+         "key": d.payload.get("key") if isinstance(d.payload, dict) else None,
          "created_at": _iso(d.created_at)} for d in rows]})
 
 
@@ -341,9 +329,6 @@ def add_entry(
     spec = _editable(body.type)
     if spec is None:
         return json_response(ResponseCode.BAD_REQUEST, f"Unknown Vault type {body.type!r}")
-    refused = _refuse_income(db, str(workspace.id), spec, body.value, body.text)
-    if refused:
-        return refused
     return _write(db, str(workspace.id), spec.storage, spec.key, value=body.value, text=body.text)
 
 
@@ -363,9 +348,6 @@ def edit_entry(
     spec = _editable(entry.type)
     if spec is None:
         return json_response(ResponseCode.BAD_REQUEST, "This entry cannot be edited here")
-    refused = _refuse_income(db, workspace_id, spec, body.value, body.text)
-    if refused:
-        return refused
     return _write(db, workspace_id, kind, entry.type, value=body.value, entities=_entities(entry),
                   text=body.text,
                   extra={"semantic_correction": True})

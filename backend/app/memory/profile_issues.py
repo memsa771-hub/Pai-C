@@ -5,7 +5,7 @@ from typing import Any
 
 from sqlalchemy import select
 
-from app.models import MemoryCandidate, ProfileIssue, VaultItem
+from app.models import MemoryCandidate, ProfileIssue, VaultItem, Workspace
 from .candidates import MemoryCandidateService
 from .errors import MemoryDataError
 from .reconciler import MemoryReconciler
@@ -36,6 +36,10 @@ class ProfileIssueService:
         """`capture` names the surface that took the answer (e.g. "vault_api") on its evidence."""
         if action not in ISSUE_ACTIONS:
             raise MemoryDataError("Unsupported issue resolution action")
+        # Workspace before issue, the order every Vault write takes its locks in,
+        # so an answer and a concurrent write cannot wait on each other.
+        if self.db.get(Workspace, workspace_id, with_for_update=True) is None:
+            raise MemoryDataError("Profile issue not found or already resolved")
         issue = self.db.execute(
             select(ProfileIssue).where(
                 ProfileIssue.id == issue_id,

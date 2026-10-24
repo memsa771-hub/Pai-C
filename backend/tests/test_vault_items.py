@@ -197,8 +197,10 @@ def test_retract_then_was_retracted():
         assert svc.active(ws, ["interest"]) == []
         assert svc.was_retracted(ws, "interest", {"text": "cricket"}) is True
         assert svc.was_retracted(ws, "interest", {"text": "Chess"}) is False
-        # A document mentioning it again does not bring it back; the student saying it does.
-        _apply(svc, ws, "interest", {"text": "Cricket"}, source_type="document", level="shown")
+        # A document mentioning it again does not bring it back (refused under the
+        # write lock); the student saying it does.
+        with pytest.raises(MemoryDataError, match="retracted_by_student"):
+            _apply(svc, ws, "interest", {"text": "Cricket"}, source_type="document", level="shown")
         assert svc.was_retracted(ws, "interest", {"text": "cricket"}) is True
         _apply(svc, ws, "interest", {"text": "Cricket"}, source_type="conversation")
         assert svc.was_retracted(ws, "interest", {"text": "cricket"}) is False

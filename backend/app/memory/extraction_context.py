@@ -49,7 +49,7 @@ class TurnContext:
     recent: list[dict] = field(default_factory=list)      # [{role, text}]
     vault: dict = field(default_factory=dict)
     records: dict = field(default_factory=dict)
-    items: list[dict] = field(default_factory=list)       # [{type, id, display}]
+    items: list[dict] = field(default_factory=list)       # [{type, id, display, needs_recheck?}]
     existing_memories: list[str] = field(default_factory=list)
 
     def is_empty(self) -> bool:
@@ -182,7 +182,9 @@ def vault_items_for_extraction(db, workspace_id: str, user_text: str) -> list[di
 
     policy = context_policy()
     view = VaultView(db).build(workspace_id, include_sensitive=True)
-    return [{"type": entry["type"], "id": entry["id"], "display": entry["display"]}
+    # Stale entries say so, so a student's "still the same" can refresh them.
+    return [{"type": entry["type"], "id": entry["id"], "display": entry["display"],
+             **({"needs_recheck": True} if entry["stale"] else {})}
             for entry in select_context_entries(
                 view, user_text, kinds={"item"}, budget_tokens=policy["extraction_budget_tokens"],
                 limit=policy["extraction_max_entries"])]

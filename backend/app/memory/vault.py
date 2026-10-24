@@ -99,6 +99,29 @@ def _now() -> datetime:
     return datetime.now(timezone.utc)
 
 
+# Only the student's own voice can bring back a value they removed.
+_RESTATING_SOURCES = ("conversation", "user_explicit")
+
+
+def _naive(moment: datetime) -> datetime:
+    """SQLite hands back naive UTC; compare everything that way."""
+    return moment.astimezone(timezone.utc).replace(tzinfo=None) if moment.tzinfo else moment
+
+
+def _folded_digest(value: Any) -> str:
+    from .evidence import value_digest
+
+    def fold(node):
+        if isinstance(node, str):
+            return " ".join(node.casefold().split())
+        if isinstance(node, dict):
+            return {k: fold(v) for k, v in node.items()}
+        if isinstance(node, list):
+            return [fold(v) for v in node]
+        return node
+    return value_digest(fold(value))
+
+
 def is_guess(source_type: Optional[str], evidence: Optional[dict]) -> bool:
     """The bottom rung of the evidence ladder: marked inferred, or produced by
     an agent or the system rather than said or shown."""
@@ -207,6 +230,22 @@ class VaultService:
             .order_by(VaultFact.valid_from.desc())
         ).scalars().all())
 
+    def was_retracted(self, workspace_id: str, field_key: str, value: Any) -> bool:
+        """The student removed this value and has not stated it again since.
+
+        Matched on the key and the value's digest (case and spacing folded),
+        so a document reading "lahore" does not bring back a removed "Lahore",
+        while a different value is not blocked.
+        """
+        digest = _folded_digest(value)
+        rows = [f for f in self.history(workspace_id, field_key) if _folded_digest(_unwrap(f.value)) == digest]
+        removed = [_naive(f.valid_until) for f in rows if f.status == "retracted" and f.valid_until]
+        if not removed:
+            return False
+        since = max(removed)
+        return not any(f.source_type in _RESTATING_SOURCES and f.valid_from and _naive(f.valid_from) >= since
+                       for f in rows if f.status != "retracted")
+
     # -- writes (reconciler-only) -----------------------------------------
 
     def apply_fact(
@@ -290,6 +329,15 @@ class VaultService:
         replaces_guess = (current is not None and source_type in ("conversation", "user_explicit")
                           and not is_fact_guess(source_type, evidence)
                           and is_fact_guess(current.source_type, current.evidence))
+        # ...and what the student adds to an object value without changing any
+        # part of it ("only fees, not hostel" on a saved budget band) is more
+        # detail, not a disagreement (VAULT_SPEC §Conflicts step 1).
+        saved = _unwrap(current.value) if current is not None else None
+        enriches = (isinstance(saved, dict) and isinstance(value, dict) and saved != value
+                    and source_type in ("conversation", "user_explicit")
+                    and not is_fact_guess(source_type, evidence)
+                    and all(k in value and value[k] == v for k, v in saved.items()))
+        replaces_guess = replaces_guess or enriches
 
         # An institutional document disagreeing with self-report is evidence
         # of a conflict, not authority to silently replace the student's claim.

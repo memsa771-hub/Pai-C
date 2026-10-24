@@ -45,6 +45,10 @@ PRIVILEGED_SOURCE_TYPES = ("user_explicit",)
 NORMALIZED_TYPES = ("vault_fact", "student_record", "vault_item")
 _DROP_SOURCE = {"conversation": "chat", "voice": "chat", "document": "document", "profile": "details"}
 _DROP_PAYLOAD_LIMIT = 2048
+# What the student is told when a write would store a household income.
+INCOME_REFUSED = "Household income isn't stored. You can add an approximate study budget instead."
+# A budget's amount: a new one replaces the saved one as a whole.
+_BUDGET_AMOUNT = ("band", "min", "max", "amount")
 
 
 @event.listens_for(Session, "after_transaction_end")
@@ -94,6 +98,18 @@ def carries_household_income(candidate_type, key, value, quote) -> bool:
     facts = {spec.key for spec in vault_catalog().types(storage="fact")}
     return states_household_income({"candidate_type": candidate_type, "key": key,
                                     "proposed_value": value, "quote": quote}, facts)
+
+
+def income_guarded(candidate_type, key) -> bool:
+    """Where a household's money could land: finance facts and the catalog's
+    money kinds (family members, pressures, sponsor and scholarship records)."""
+    from .extractor import money_kinds
+
+    if not isinstance(key, str):
+        return False
+    if candidate_type == "vault_fact":
+        return key.startswith("finance.") or key in money_kinds()
+    return candidate_type in ("vault_item", "student_record") and key in money_kinds()
 
 
 def _now() -> datetime:
@@ -159,6 +175,11 @@ class MemoryCandidateService:
         if candidate_type == "vault_fact" and key:
             from .field_definitions import FIELD_ALIASES
             key = FIELD_ALIASES.get(key, key)
+        if operation == "upsert":
+            self._refuse_income(workspace_id, candidate_type, key, proposed_value, evidence,
+                                input_channel, source_event_ids)
+        if candidate_type == "vault_fact" and key == "finance.budget" and operation == "upsert":
+            proposed_value = self._merge_budget(workspace_id, proposed_value)
         if candidate_type in NORMALIZED_TYPES and operation == "upsert" and proposed_value is not None:
             proposed_value, evidence = self._normalize(
                 workspace_id, candidate_type, key, proposed_value, evidence,
@@ -185,20 +206,61 @@ class MemoryCandidateService:
         self.db.flush()
         return candidate
 
+    @staticmethod
+    def _drop_source(key, input_channel) -> str:
+        """The drop log's source: the surface the value came through."""
+        from app.memory.catalog import vault_catalog
+
+        source = _DROP_SOURCE.get(input_channel or "", "chat")
+        spec = vault_catalog().type(key or "")
+        if source == "details" and spec is not None and spec.shown_on == "story":
+            source = "story"
+        return source
+
+    def _refuse_income(self, workspace_id, candidate_type, key, value, evidence,
+                       input_channel, source_event_ids) -> None:
+        """Household income is never stored, from any source (VAULT_SPEC §Money).
+
+        Checked here, at the one door, so conflict answers, profile and fact
+        cards and the Vault API meet the same rule as the extractors. The drop
+        is logged with the key and reason only, never the figure or the quote.
+        """
+        quote = (evidence or {}).get("quote")
+        if not income_guarded(candidate_type, key) or not carries_household_income(
+                candidate_type, key, value, quote if isinstance(quote, str) else ""):
+            return
+        ref = (source_event_ids[0] if source_event_ids else None) or (evidence or {}).get("file_id")
+        record_drop(self.db, workspace_id, self._drop_source(key, input_channel), "validate",
+                    "household_income", {"key": key, "reason": "household_income"}, source_ref=ref)
+        raise MemoryDataError(INCOME_REFUSED)
+
+    def _merge_budget(self, workspace_id, value):
+        """A budget follow-up ("only fees, not hostel") completes the saved
+        budget instead of replacing it. A new amount replaces the saved amount
+        as a whole, so a band and an old range never sit side by side."""
+        from .vault import VaultService, _unwrap
+
+        if not isinstance(value, dict):
+            return value
+        fact = VaultService(self.db).get_fact(workspace_id, "finance.budget")
+        saved = _unwrap(fact.value) if fact is not None else None
+        if not isinstance(saved, dict):
+            return value
+        given = {k: v for k, v in value.items() if v not in (None, "")}
+        if any(k in given for k in _BUDGET_AMOUNT):
+            saved = {k: v for k, v in saved.items() if k not in _BUDGET_AMOUNT}
+        return {**saved, **given}
+
     def _normalize(self, workspace_id, candidate_type, key, value, evidence,
                    input_channel, source_event_ids):
         """English/codes/ISO before the row exists; a rejection is logged, then raised."""
-        from app.memory.catalog import vault_catalog
         from app.memory.normalize import normalize_candidate
 
         evidence = dict(evidence or {})
         result = normalize_candidate(
             candidate_type, key, value, student_text=evidence.get("quote", "") or "")
         if result.rejected_reason:
-            source = _DROP_SOURCE.get(input_channel or "", "chat")
-            spec = vault_catalog().type(key or "")
-            if source == "details" and spec is not None and spec.shown_on == "story":
-                source = "story"
+            source = self._drop_source(key, input_channel)
             ref = (source_event_ids[0] if source_event_ids else None) or evidence.get("file_id")
             payload = {"key": key, "value": value}
             if carries_household_income(candidate_type, key, value, evidence.get("quote")):
