@@ -105,6 +105,16 @@ def is_guess(source_type: Optional[str], evidence: Optional[dict]) -> bool:
     return bool((evidence or {}).get("inferred")) or source_type in ("agent", "system")
 
 
+def is_fact_guess(source_type: Optional[str], evidence: Optional[dict]) -> bool:
+    """A guess, or a document reading the student has not confirmed (OCR, no
+    holder name). Facts carry no verification column, so for them such a
+    reading sits on the guess rung, as the same reading does for items."""
+    from .evidence import needs_student_confirmation
+
+    return is_guess(source_type, evidence) or (
+        source_type == "document" and needs_student_confirmation(evidence))
+
+
 def _unwrap(value: Any) -> Any:
     """Vault values are stored wrapped as {"value": ...}.
 
@@ -269,9 +279,13 @@ class VaultService:
         # A guess never replaces what the student said or showed (VAULT_SPEC
         # §Conflicts step 4). Retained quietly: a guess is not worth a question.
         # The student's own edit comes first (step 2), even when marked inferred.
-        if (current is not None and source_type != "user_explicit" and is_guess(source_type, evidence)
-                and not is_guess(current.source_type, current.evidence) and _unwrap(current.value) != value):
+        if (current is not None and source_type != "user_explicit" and is_fact_guess(source_type, evidence)
+                and not is_fact_guess(current.source_type, current.evidence) and _unwrap(current.value) != value):
             return VaultWriteResult(VaultOutcome.RETAINED, current, reason="guess_against_stated")
+        # ...and what the student says replaces a guess (stated > inferred).
+        replaces_guess = (current is not None and source_type in ("conversation", "user_explicit")
+                          and not is_fact_guess(source_type, evidence)
+                          and is_fact_guess(current.source_type, current.evidence))
 
         # An institutional document disagreeing with self-report is evidence
         # of a conflict, not authority to silently replace the student's claim.
@@ -285,7 +299,7 @@ class VaultService:
             policy == "latest_wins"
             and definition.category in ("preferences", "career", "mobility")
         )
-        if (current is not None and _unwrap(current.value) != value
+        if (current is not None and _unwrap(current.value) != value and not replaces_guess
                 and source_type != "user_explicit" and not safe_latest_wins and (
                     source_type in ("document", "agent", "system") or
                     (source_type == "conversation" and not explicit_correction and not temporal_transition))):
@@ -348,7 +362,8 @@ class VaultService:
                 existing.valid_until = _now()
                 superseded = True
         elif current is not None:
-            if not temporal_transition and not self._should_supersede(current, definition, source_type, confidence):
+            if (not temporal_transition and not replaces_guess
+                    and not self._should_supersede(current, definition, source_type, confidence)):
                 logger.info(
                     "vault fact retained key=%s workspace=%s policy=%s",
                     field_key, workspace_id, policy,

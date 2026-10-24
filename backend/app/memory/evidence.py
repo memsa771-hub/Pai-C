@@ -31,7 +31,8 @@ def evidence_level(row, value):
             and confirmation.get("confirmed_at")):
         return "confirmed"
     if needs_student_confirmation(evidence):
-        return "stated"
+        # The student never said it and it is not yet shown: PAI's reading.
+        return "inferred"
     if (row.get("verification_status") in policy["shown_verification"]
             or (row.get("source_type") == "document" and evidence.get("authority") in policy["shown_authorities"]
                 and evidence.get("file_id"))):

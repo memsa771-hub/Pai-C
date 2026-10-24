@@ -193,7 +193,7 @@ def test_jpeg_result_card_is_accepted_and_ocr_read():
             assert {r.verification_status for r in [*courses, *education]} == {"extracted"}
             snapshot = StudentSnapshotService(db).build(student.workspace_id)
             name = snapshot.facts["identity.full_name"]
-            assert name["evidence_level"] != "shown"
+            assert name["evidence_level"] == "inferred"
             assert all(row["evidence_level"] != "shown"
                        for kind in ("education", "course") for row in snapshot.records[kind])
 
@@ -574,3 +574,50 @@ def test_a_fake_pdf_is_still_rejected_at_upload():
     from app.documents.types import upload_rejection
 
     assert upload_rejection(GIF, "transcript.pdf", "application/pdf").code == "unsupported_type"
+
+
+# -- fix round 1, follow-up: an OCR fact is PAI's guess -------------------------
+
+def _active_name(db, workspace_id):
+    from app.memory.vault import VaultService
+
+    fact = VaultService(db).get_fact(workspace_id, "identity.full_name")
+    return fact.value.get("value") if isinstance(fact.value, dict) else fact.value
+
+
+@pytest.mark.parametrize("evidence", [{"ocr": True}, {"owner_unverified": True}])
+def test_unconfirmed_document_reading_is_pais_guess(evidence):
+    from app.memory.evidence import evidence_level
+
+    row = {"source_type": "document", "verification_status": "document_supported",
+           "evidence": {"authority": "institution_issued", "file_id": "f1", **evidence}}
+    assert evidence_level(row, "Ali Khan") == "inferred"
+
+
+def test_ocr_fact_cannot_replace_a_stated_fact():
+    with VaultSession() as student:
+        _state_name(student, "Ali Khan Durrani")
+        _process(student, "r.jpg", JPEG, "image/jpeg", RESULT_FINDINGS)
+        with student.factory() as db:
+            assert _active_name(db, student.workspace_id) == "Ali Khan Durrani"
+            assert _rows(db, ProfileIssue, student.workspace_id, issue_type="conflicting_fact") == []
+            ocr_name = [c for c in _rows(db, MemoryCandidate, student.workspace_id, key="identity.full_name")
+                        if c.source_type == "document"]
+            assert [c.status for c in ocr_name] == ["rejected"]
+
+
+def test_student_statement_replaces_an_ocr_fact():
+    from app.memory.student_snapshot import StudentSnapshotService
+
+    with VaultSession() as student:
+        _process(student, "r.jpg", JPEG, "image/jpeg", RESULT_FINDINGS)
+        with student.factory() as db:
+            assert _active_name(db, student.workspace_id) == "Ali Khan"
+            facts = StudentSnapshotService(db).build(student.workspace_id).facts
+            assert facts["identity.full_name"]["evidence_level"] == "inferred"
+        _state_name(student, "Muhammad Ali Khan")
+        with student.factory() as db:
+            assert _active_name(db, student.workspace_id) == "Muhammad Ali Khan"
+            assert _rows(db, ProfileIssue, student.workspace_id, issue_type="conflicting_fact") == []
+            facts = StudentSnapshotService(db).build(student.workspace_id).facts
+            assert facts["identity.full_name"]["evidence_level"] == "stated"
