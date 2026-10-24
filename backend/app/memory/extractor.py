@@ -373,12 +373,17 @@ def _income_rules():
 
 
 _INCOME, _NOT_INCOME, _AMOUNT_CUE = _income_rules()
-# Only these can carry a household's money; the student's own records (their
-# pay at a job, "low-income families" in an activity) are not household income.
-_INCOME_GUARDED_ITEMS = frozenset({"family_member", "pressure"})
-# Record kinds that hold money. They are not catalog entries (the catalog has
-# no finance marker for records), so the set is named here, next to the guard.
-_INCOME_GUARDED_RECORDS = frozenset({"financial_sponsor", "scholarship_application"})
+
+
+def money_kinds() -> set[str]:
+    """Types and record kinds that can carry a household's money, from data:
+    the catalog's `money` flag and vault_view.json's uncatalogued records. The
+    student's own records (their pay at a job, "low-income families" in an
+    activity) are not marked, so they are not household income."""
+    from .catalog import vault_catalog
+    from .vault_view import view_copy
+    return ({spec.key for spec in vault_catalog().types() if spec.money}
+            | {kind for kind, place in view_copy()["uncatalogued_records"].items() if place.get("money")})
 
 
 def _text_of(value) -> str:
@@ -406,12 +411,13 @@ def states_household_income(raw: dict, allowed_vault_keys) -> bool:
 
     candidate_type, key = raw.get("candidate_type"), raw.get("key")
     known = isinstance(key, str)
+    money = money_kinds()
     if candidate_type == "vault_fact":
-        guarded = not known or key not in allowed_vault_keys or key.startswith("finance.")
+        guarded = not known or key not in allowed_vault_keys or key in money
     elif candidate_type == "vault_item":
-        guarded = not known or vault_catalog().type(key) is None or key in _INCOME_GUARDED_ITEMS
+        guarded = not known or vault_catalog().type(key) is None or key in money
     elif candidate_type == "student_record":
-        guarded = not known or key not in ENTITY_MODELS or key in _INCOME_GUARDED_RECORDS
+        guarded = not known or key not in ENTITY_MODELS or key in money
     else:
         guarded = True
     if not guarded:

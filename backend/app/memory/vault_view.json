@@ -17,9 +17,10 @@
   "uncatalogued_records": {
     "document": {"label": "Document", "section": "documents", "sensitivity": "sensitive",
                  "file_field": "file_id"},
-    "financial_sponsor": {"label": "Financial sponsor", "section": "money_and_place", "sensitivity": "sensitive"},
+    "financial_sponsor": {"label": "Financial sponsor", "section": "money_and_place", "sensitivity": "sensitive",
+                          "money": true},
     "scholarship_application": {"label": "Scholarship application", "section": "money_and_place",
-                                "sensitivity": "sensitive"},
+                                "sensitivity": "sensitive", "money": true},
     "application": {"label": "Application", "section": "money_and_place", "sensitivity": "normal"},
     "visa": {"label": "Visa", "section": "money_and_place", "sensitivity": "sensitive"},
     "research": {"label": "Research", "section": "education", "sensitivity": "normal"},

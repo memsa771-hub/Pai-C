@@ -268,3 +268,20 @@ async def test_candidates_over_the_limit_are_logged_not_silently_cut():
 def test_primary_interest_is_not_a_chat_input():
     # Interests from chat are interest items; the catalog must agree with the extractor.
     assert "chat" not in vault_catalog().type("career.primary_interest").inputs
+
+
+def test_money_kinds_come_from_the_catalog_and_the_view_data(monkeypatch):
+    """Where a household's money could land is data: catalog `money` flags and
+    vault_view.json's uncatalogued records, never a set in the extractor."""
+    from app.memory import vault_view
+    kinds = extractor.money_kinds()
+    assert {"financial_sponsor", "scholarship_application", "family_member", "pressure",
+            "finance.budget", "finance.funding_status", "finance.scholarship_interest"} <= kinds
+    assert not hasattr(extractor, "_INCOME_GUARDED_RECORDS")
+    raw = {"candidate_type": "student_record", "key": "application", "confidence": 0.9,
+           "quote": "Abbu ki tankhwah 80 hazar hai", "proposed_value": {"notes": "80 hazar"}}
+    assert not extractor.states_household_income(raw, ())
+    copy = json.loads(json.dumps(vault_view.view_copy()))
+    copy["uncatalogued_records"]["application"]["money"] = True
+    monkeypatch.setattr(vault_view, "view_copy", lambda: copy)
+    assert extractor.states_household_income(raw, ())

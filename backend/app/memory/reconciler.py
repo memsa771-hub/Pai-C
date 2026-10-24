@@ -444,14 +444,18 @@ class MemoryReconciler:
     def _confirm_item(self, candidate: MemoryCandidate, item_id: Optional[str], evidence: dict) -> ReconcileResult:
         """The student confirms an item as it stands. The digest names the value
         they saw, so a value that changed in the meantime is not confirmed."""
-        from .evidence import value_digest
+        from .vault_items import ItemConfirmRefused
 
         if candidate.source_type != "user_explicit" or candidate.input_channel != "profile" or not item_id:
             return self._reject(candidate, "Only the student may confirm a Vault entry")
-        current = self.items._get(candidate.workspace_id, item_id, active=True)
-        if (evidence.get("confirmation") or {}).get("value_digest") != value_digest(current.value):
+        digest = (evidence.get("confirmation") or {}).get("value_digest")
+        if not digest:
             return self._reject(candidate, "value_changed")
-        item = self.items.confirm(candidate.workspace_id, item_id, evidence, candidate.id)
+        try:
+            item = self.items.confirm(candidate.workspace_id, item_id, evidence, candidate.id,
+                                      expected_type=candidate.key, expected_digest=digest)
+        except ItemConfirmRefused as exc:
+            return self._reject(candidate, exc.reason)
         self.candidates.mark_accepted(candidate, item.id)
         return ReconcileResult(True, candidate.id, result_id=item.id, outcome="confirmed")
 

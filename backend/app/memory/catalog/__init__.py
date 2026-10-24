@@ -59,6 +59,9 @@ class TypeSpec:
     # Which Details section shows a details type (about, education, ...).
     # Optional so older catalog files still load.
     section: str | None = None
+    # Can hold a household's money (finance facts, family and pressure items):
+    # the extractor's income guard covers exactly the types marked here.
+    money: bool = False
 
 
 def _check_schema(schema: dict, where: str) -> None:
@@ -115,6 +118,9 @@ def _build_type(raw: dict, choices: dict) -> TypeSpec:
                 raise ValueError("onboarding needs order, prompt and input (text|choice|date)")
             if isinstance(onboarding.get("choices"), str) and onboarding["choices"] not in choices:
                 raise ValueError("onboarding uses an unknown choice list")
+        money = raw.get("money", False)
+        if not isinstance(money, bool):
+            raise ValueError("money must be true or false")
         section = raw.get("section")
         if section is not None and (not isinstance(section, str) or not section.strip()):
             raise ValueError("section must be a non-empty string")
@@ -122,7 +128,7 @@ def _build_type(raw: dict, choices: dict) -> TypeSpec:
             key=key, label=raw.get("label", key), storage=storage, shown_on=raw["shown_on"],
             inputs=inputs, sensitivity=raw["sensitivity"], conflict=raw["conflict"],
             freshness_days=days, version=raw["version"], schema=schema, identity=identity,
-            choice_fields=choice_fields, onboarding=onboarding, section=section)
+            choice_fields=choice_fields, onboarding=onboarding, section=section, money=money)
     except (KeyError, TypeError, AttributeError, ValueError) as exc:
         detail = f"missing {exc}" if isinstance(exc, KeyError) else str(exc)
         raise ValueError(f"Invalid catalog type {key!r}: {detail}") from exc

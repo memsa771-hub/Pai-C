@@ -703,7 +703,7 @@
  },
  "types": [
   {
-   "key": "finance.budget",
+   "key": "finance.budget", "money": true,
    "label": "Budget",
    "storage": "fact",
    "shown_on": "details",
@@ -976,7 +976,7 @@
    "version": 1
   },
   {
-   "key": "finance.funding_status",
+   "key": "finance.funding_status", "money": true,
    "label": "Funding status",
    "storage": "fact",
    "shown_on": "details",
@@ -992,7 +992,7 @@
    "version": 1
   },
   {
-   "key": "finance.scholarship_interest",
+   "key": "finance.scholarship_interest", "money": true,
    "label": "Scholarship interest",
    "storage": "fact",
    "shown_on": "details",
@@ -1405,7 +1405,7 @@
    ]
   },
   {
-   "key": "pressure",
+   "key": "pressure", "money": true,
    "label": "Pressure",
    "storage": "item",
    "shown_on": "story",
@@ -1555,7 +1555,7 @@
    "identity": []
   },
   {
-   "key": "family_member",
+   "key": "family_member", "money": true,
    "label": "Family member",
    "storage": "item",
    "shown_on": "story",

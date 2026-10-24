@@ -286,3 +286,19 @@ def test_document_temporal_flag_is_ignored():
         assert all((r.evidence or {}).get("change") != "temporal" for r in rows)
         if result.result_id:
             assert (db.get(VaultItem, result.result_id).evidence or {}).get("change") != "temporal"
+
+
+def test_item_confirm_must_name_the_items_own_type():
+    from app.memory.evidence import value_digest
+    with StudentSession() as student, student.factory() as db:
+        ws = student.workspace_id
+        _, created = _run(db, ws, "vault_item", "interest", {"text": "Robotics"}, quote="I love robotics")
+        item = db.get(VaultItem, created.result_id)
+        evidence = {"action": "confirm", "confirmation": {"value_digest": value_digest(item.value)}}
+        _, result = _run(db, ws, "vault_item", "strength", {"text": "Robotics"}, source_type="user_explicit",
+                         input_channel="profile", entities={"item_id": item.id}, evidence=evidence)
+        assert not result.accepted and result.reason == "wrong_type"
+        assert db.get(VaultItem, item.id).level == "stated"
+        _, result = _run(db, ws, "vault_item", "interest", {"text": "Robotics"}, source_type="user_explicit",
+                         input_channel="profile", entities={"item_id": item.id}, evidence=evidence)
+        assert result.accepted and db.get(VaultItem, result.result_id).level == "confirmed"

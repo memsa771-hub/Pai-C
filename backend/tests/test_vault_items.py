@@ -354,3 +354,28 @@ def test_loose_guess_against_stated_is_retained():
         assert row.status == "active" and row.conflict_state == "none"
         assert row.value == {"relation": "brother", "name": "Ali", "occupation": "Doctor"}
         assert _open(db, ws) == []
+
+
+def test_confirm_checks_the_digest_after_the_lock():
+    """A writer holding the lock may change the value; the digest is read after it."""
+    from app.memory.evidence import value_digest
+    from app.memory.vault_items import ItemConfirmRefused
+    with StudentSession() as student, student.factory() as db:
+        svc, ws = VaultItemService(db), student.workspace_id
+        item = _apply(svc, ws, "interest", {"text": "Robotics"}).item
+        seen = value_digest(item.value)
+        lock = svc._lock
+
+        def concurrent_edit(workspace_id):
+            lock(workspace_id)
+            item.value = {"text": "Chess"}
+
+        svc._lock = concurrent_edit
+        with pytest.raises(ItemConfirmRefused, match="value_changed"):
+            svc.confirm(ws, item.id, expected_type="interest", expected_digest=seen)
+        svc._lock = lock
+        assert item.level == "stated" and item.status == "active"
+        with pytest.raises(ItemConfirmRefused, match="wrong_type"):
+            svc.confirm(ws, item.id, expected_type="strength", expected_digest=value_digest(item.value))
+        confirmed = svc.confirm(ws, item.id, expected_type="interest", expected_digest=value_digest(item.value))
+        assert confirmed.level == "confirmed"

@@ -17,7 +17,7 @@ from app.tools.schema import SchemaValidationError, validate_schema_instance
 
 from .catalog import TypeSpec, norm, vault_catalog
 from .errors import MemoryDataError
-from .evidence import merge_disagreements, page_of
+from .evidence import merge_disagreements, page_of, value_digest
 from .vault import VaultOutcome
 
 LEVELS = ("inferred", "stated", "shown", "confirmed")
@@ -25,6 +25,15 @@ _RANK = {name: i for i, name in enumerate(LEVELS)}
 CORROBORATION_CAP = 10
 # Only the student's own voice can bring back an entry they removed.
 _RESTATING_SOURCES = ("user_explicit", "conversation")
+
+
+class ItemConfirmRefused(MemoryDataError):
+    """A confirm that no longer names the entry the student saw (`reason`:
+    value_changed or wrong_type)."""
+
+    def __init__(self, reason: str):
+        super().__init__(reason)
+        self.reason = reason
 
 
 @dataclass
@@ -230,16 +239,23 @@ class VaultItemService:
         return item
 
     def confirm(self, workspace_id: str, item_id: str, evidence: dict | None = None,
-                candidate_id: str | None = None) -> VaultItem:
+                candidate_id: str | None = None, *, expected_type: str | None = None,
+                expected_digest: str | None = None) -> VaultItem:
         """The student confirms the entry as it stands.
 
         A new confirmed version, so history keeps the level it had before. An
         open card about the entry is answered: confirming the saved value is the
         student's "keep current", so the card closes as their decision and the
-        proposal it asked about is rejected.
+        proposal it asked about is rejected. The type and digest the student saw
+        are checked after the lock: checked before it, a write that landed in
+        between would be confirmed without the student ever seeing it.
         """
         self._lock(workspace_id)
         current = self._get(workspace_id, item_id, active=True)
+        if expected_type is not None and current.item_type != expected_type:
+            raise ItemConfirmRefused("wrong_type")
+        if expected_digest is not None and value_digest(current.value) != expected_digest:
+            raise ItemConfirmRefused("value_changed")
         cards = self._open_cards(current)
         if current.level == "confirmed" and not cards:
             return current
