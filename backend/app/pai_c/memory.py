@@ -10,6 +10,24 @@ from app.pai_c.deep.notebook import NotebookService
 from app.pai_c.deep.turn_input import shared_history
 
 
+# Sensitive Vault fields shown back to their own subject (planning context:
+# where they are a citizen of, what they can fund). Anything not listed stays
+# withheld, so adding a sensitive field to the Vault does not publish it here.
+PROFILE_SAFE_SENSITIVE_FIELDS = frozenset({
+    "identity.full_name", "identity.nationality", "identity.gender",
+    "finance.funding_status", "finance.scholarship_interest", "finance.budget",
+})
+# Restricted fields shown back to their own subject: the date of birth they gave
+# at onboarding (founder decision, 21 Oct 2026). Every other restricted field
+# (passport, contact details, accessibility needs) stays out.
+PROFILE_OWNER_RESTRICTED_FIELDS = frozenset({"identity.date_of_birth"})
+PROFILE_RECORD_KINDS = (
+    "education", "course", "test_attempt", "language_proficiency", "work_experience", "project",
+    "skill", "certification", "research", "achievement", "goal", "financial_sponsor",
+    "scholarship_application", "application", "visa", "document",
+)
+
+
 class MemoryService:
     def __init__(self, db):
         self.db = db
@@ -38,11 +56,17 @@ class MemoryService:
         return {"saved": result.accepted, "id": result.result_id, "candidate_id": candidate.id}
 
     def profile_cards(self, workspace_id):
-        from app.memory.student_profile_view import StudentProfileView, PROFILE_SECTIONS
+        """The student's facts and records with their evidence level, for the
+        data export and the path analyzer's citable evidence."""
         from app.memory.student_records import StudentRecordService
         from app.memory.evidence import evidence_level, evidence_policy, value_digest
+        from app.memory.vault import VaultService
         snapshot = self.profile(workspace_id)
-        safe = StudentProfileView(self.db).safe_facts(workspace_id)
+        vault = VaultService(self.db)
+        safe = vault.snapshot(workspace_id, include_sensitive=False,
+                              allowed_sensitive_keys=set(PROFILE_SAFE_SENSITIVE_FIELDS))
+        everything = vault.snapshot(workspace_id, include_sensitive=True)
+        safe.update({key: everything[key] for key in PROFILE_OWNER_RESTRICTED_FIELDS if key in everything})
         cards = []
         def append(kind, key, row, value):
             evidence = row.get("evidence") or {}
@@ -55,52 +79,11 @@ class MemoryService:
             if key in snapshot.facts:
                 append("vault_fact", key, snapshot.facts[key], snapshot.facts[key]["value"])
         records = StudentRecordService(self.db)
-        for kind in dict.fromkeys(kind for _, kinds in PROFILE_SECTIONS for kind in kinds):
+        for kind in PROFILE_RECORD_KINDS:
             metadata = {row["id"]: row for row in snapshot.records.get(kind, [])}
             for row in records.list(workspace_id, kind):
                 append(kind, kind, metadata[row.id], records._values(kind, row))
         return cards
-
-    def review_profile_card(self, workspace_id, kind, record_id, review):
-        import json
-        from datetime import datetime, timezone
-        from sqlalchemy import select
-        from app.models import MemoryCandidate, Workspace
-        from app.memory.candidates import MemoryCandidateService
-        from app.memory.reconciler import MemoryReconciler
-        from app.memory.evidence import value_digest
-        self.db.get(Workspace, workspace_id, with_for_update=True)
-        prior = self.db.scalar(select(MemoryCandidate).where(
-            MemoryCandidate.workspace_id == workspace_id,
-            MemoryCandidate.evidence["capture"].as_string() == "profile_review",
-            MemoryCandidate.evidence["submission_id"].as_string() == str(review.submission_id)))
-        request = {"kind": kind, "id": record_id, "action": review.action,
-                   "digest": review.expected_digest, "value": review.value, "text": review.text}
-        if prior:
-            if (prior.evidence or {}).get("request_digest") != value_digest(request):
-                raise ValueError("Submission id already used for another review")
-            return {"saved": prior.status == "accepted", "candidate_id": prior.id}
-        card = next((row for row in self.profile_cards(workspace_id) if row["kind"] == kind and row["id"] == record_id), None)
-        if card is None or card["digest"] != review.expected_digest:
-            raise ValueError("This fact changed. Reload it before reviewing")
-        value = card["value"] if review.action in {"confirm", "remove"} else review.value
-        if value is None or (review.action == "edit" and not review.text.strip()):
-            raise ValueError("An edited value and your explanation are required")
-        evidence = {"capture": "profile_review", "action": review.action,
-            "submission_id": str(review.submission_id), "request_digest": value_digest(request),
-            "quote": review.text.strip() or json.dumps(value, ensure_ascii=False, default=str),
-            "previous_source": card["source"], "semantic_correction": review.action == "edit"}
-        if review.action == "confirm":
-            evidence["confirmation"] = {"value_digest": card["digest"],
-                "confirmed_at": datetime.now(timezone.utc).isoformat()}
-        candidate = MemoryCandidateService(self.db).propose(workspace_id,
-            candidate_type="vault_fact" if kind == "vault_fact" else "student_record",
-            key=card["key"], proposed_value=value, operation="retract" if review.action == "remove" else "upsert",
-            entities={"record_id": record_id} if kind != "vault_fact" else {},
-            source_type="user_explicit", allow_user_explicit=True, input_channel="profile",
-            confidence=1, evidence=evidence)
-        result = MemoryReconciler(self.db).reconcile(candidate)
-        return {"saved": result.accepted, "id": result.result_id, "candidate_id": candidate.id}
 
     def recent_turns(self, turn, owner_id, *, limit=24):
         return shared_history(self.db, turn, owner_id, limit=limit)

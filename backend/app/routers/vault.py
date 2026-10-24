@@ -1,12 +1,13 @@
 """The student's Vault over HTTP: one view, the catalog, and the student's own edits.
 
-Owner-only, with the same credential check as the Profile routes. Reads come
+Reads take the machine token or the owner; writes are owner-only. Reads come
 from `VaultView`, the one read model, so this router never shapes entries
 itself. Every write is one candidate through `MemoryCandidateService.propose`
 and `MemoryReconciler.reconcile` (VAULT_SPEC §Inputs: one door), marked as the
 student's own statement from the Vault page, so an edit here carries the same
 provenance and meets the same normalization, validation and conflict rules as
-anything PAI extracted.
+anything PAI extracted. First-run onboarding lives here too: its answers are
+Vault facts like any other.
 """
 import json
 from datetime import datetime, timezone
@@ -25,6 +26,7 @@ from app.memory.errors import MemoryDataError
 from app.memory.evidence import value_digest
 from app.memory.field_definitions import VaultFieldDefinitionService
 from app.memory.normalize import detect_language
+from app.memory.onboarding import OnboardingService
 from app.memory.profile_issues import ProfileIssueService
 from app.memory.reconciler import MemoryReconciler
 from app.memory.student_records import ENTITY_MODELS, StudentRecordService
@@ -424,4 +426,49 @@ def resolve_conflict(
     db.commit()
     if not result["resolved"]:
         return json_response(ResponseCode.BAD_REQUEST, result.get("reason") or "Answer not applied")
+    return success_response(result)
+
+
+# ---------------------------------------------------------------------------
+# First-run onboarding
+#
+# Its own endpoints rather than a flag on the view: the gate runs before the
+# workspace UI mounts, and it must not depend on the whole Vault view being
+# buildable for an account that has no facts yet.
+# ---------------------------------------------------------------------------
+
+
+class OnboardingAnswers(BaseModel):
+    """Free-form by design: the field set lives in ONBOARDING_FIELDS, so adding
+    a question is a change in one place rather than a schema edit here too."""
+    answers: dict[str, Any] = Field(default_factory=dict)
+
+
+@router.get("/onboarding")
+def get_onboarding(
+    network: str = Query(...), db: Session = Depends(get_db),
+    x_workspace_token: Optional[str] = Header(None), authorization: Optional[str] = Header(None),
+):
+    """Whether the first-run form is still owed, and anything already known."""
+    workspace, error = _workspace(db, network, x_workspace_token, authorization)
+    if error:
+        return error
+    return success_response(OnboardingService(db).state(workspace))
+
+
+@router.post("/onboarding")
+def submit_onboarding(
+    body: OnboardingAnswers, network: str = Query(...), db: Session = Depends(get_db),
+    x_workspace_token: Optional[str] = Header(None), authorization: Optional[str] = Header(None),
+):
+    """Write the student's answers canonically and mark onboarding done."""
+    workspace, error = _owner_workspace(db, network, x_workspace_token, authorization)
+    if error:
+        return error
+    try:
+        result = OnboardingService(db).apply(workspace, body.answers)
+    except MemoryDataError as exc:
+        db.rollback()
+        return json_response(ResponseCode.BAD_REQUEST, str(exc))
+    db.commit()
     return success_response(result)

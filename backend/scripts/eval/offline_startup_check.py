@@ -20,7 +20,7 @@ async def main():
         assert login.status == 200, await login.text()
         workspace = (await login.json())["data"]["workspace"]["workspaceId"]
         onboarding = await api.post(
-            f"http://backend:8000/v1/student-profile/onboarding?network={workspace}",
+            f"http://backend:8000/v1/vault/onboarding?network={workspace}",
             headers=auth, data={"answers": {
                 "fullName": "Offline Student", "preferredName": "Student",
                 "statusCategory": "student", "nationality": "Test nationality",

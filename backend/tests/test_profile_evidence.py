@@ -1,12 +1,9 @@
-"""Student-reviewed evidence follows the canonical reconciler and tenant rules."""
-from uuid import uuid4
-import pytest
-from sqlalchemy import select
+"""Evidence levels follow the canonical rules, and the student's evidence cards keep restricted facts out."""
 from app.memory.candidates import MemoryCandidateService
 from app.memory.reconciler import MemoryReconciler
 from app.memory.evidence import evidence_level, value_digest
-from app.models import MemoryCandidate
-from tests.test_student_profile_api import api, HEADERS, MACHINE_ONLY
+from app.pai_c.memory import MemoryService
+from tests.http_student import api
 
 
 def seed(db, workspace, kind):
@@ -21,33 +18,6 @@ def seed(db, workspace, kind):
     return result.result_id
 
 
-@pytest.mark.parametrize("kind", ["vault_fact", "education"])
-def test_confirm_edit_idempotency_and_stale_values(api, kind):
-    client, db, workspace = api
-    seed(db, workspace, kind)
-    url = f"/v1/counselor/profile-cards?network={workspace}"
-    card = next(row for row in client.get(url, headers=HEADERS).json()["data"]["cards"] if row["kind"] == kind)
-    assert card["evidence_level"] == "stated" and card["source"]["quote"]
-    endpoint = f"/v1/counselor/profile-cards/{kind}/{card['id']}?network={workspace}"
-    body = {"submission_id": str(uuid4()), "action": "confirm", "expected_digest": card["digest"]}
-    for _ in range(2):
-        result = client.post(endpoint, headers=HEADERS, json=body)
-        assert result.status_code == 200, result.text
-    cards = client.get(url, headers=HEADERS).json()["data"]["cards"]
-    confirmed = next(row for row in cards if row["kind"] == kind)
-    assert confirmed["evidence_level"] == "confirmed" and confirmed["value"] == card["value"]
-    changes = db.scalars(select(MemoryCandidate).where(MemoryCandidate.evidence["capture"].as_string() == "profile_review")).all()
-    assert len(changes) == 1 and changes[0].status == "accepted"
-    endpoint = f"/v1/counselor/profile-cards/{kind}/{confirmed['id']}?network={workspace}"
-    value = "A different city" if kind == "vault_fact" else {"qualification_name": "Corrected qualification"}
-    edited = client.post(endpoint, headers=HEADERS, json={"submission_id": str(uuid4()), "action": "edit", "expected_digest": confirmed["digest"], "value": value, "text": "I corrected this value"})
-    assert edited.status_code == 200, edited.text
-    assert client.post(endpoint, headers=HEADERS, json={**body, "submission_id": str(uuid4())}).status_code == 409
-    current = next(row for row in client.get(url, headers=HEADERS).json()["data"]["cards"] if row["kind"] == kind)
-    assert current["value"] == value and current["evidence_level"] == "stated"
-    assert client.post(endpoint, json=body).status_code == 401
-
-
 def test_model_cannot_claim_confirmed_or_shown():
     value = {"qualification_name": "A qualification"}
     row = {"source_type": "conversation", "capture_method": "profile_confirmation", "evidence": {
@@ -59,27 +29,16 @@ def test_model_cannot_claim_confirmed_or_shown():
     assert evidence_level(row, value) == "shown"
 
 
-def test_restricted_facts_not_exposed(api):
-    client, db, workspace = api
+def test_profile_cards_keep_restricted_facts_out(api):
+    """The cards feed the data export and the path analyzer: no passport number in either."""
+    _, db, workspace = api
+    seed(db, workspace, "education")
     candidate = MemoryCandidateService(db).propose(workspace, "vault_fact", key="identity.passport_number",
         proposed_value="private-number", confidence=1, source_type="user_explicit", allow_user_explicit=True,
         evidence={"quote": "private-number"})
     assert MemoryReconciler(db).reconcile(candidate).accepted
     db.commit()
-    response = client.get(f"/v1/counselor/profile-cards?network={workspace}", headers=HEADERS)
-    assert response.status_code == 200 and "private-number" not in response.text
-
-
-def test_review_refuses_the_machine_token_alone(api):
-    """A confirm marks a value "Confirmed"; only the signed-in student may give it."""
-    client, db, workspace = api
-    seed(db, workspace, "vault_fact")
-    url = f"/v1/counselor/profile-cards?network={workspace}"
-    card = next(row for row in client.get(url, headers=MACHINE_ONLY).json()["data"]["cards"]
-                if row["kind"] == "vault_fact")
-    body = {"submission_id": str(uuid4()), "action": "confirm", "expected_digest": card["digest"]}
-    endpoint = f"/v1/counselor/profile-cards/vault_fact/{card['id']}?network={workspace}"
-    assert client.post(endpoint, headers=MACHINE_ONLY, json=body).status_code == 403
-    unchanged = next(row for row in client.get(url, headers=HEADERS).json()["data"]["cards"]
-                     if row["kind"] == "vault_fact")
-    assert unchanged["evidence_level"] == "stated"
+    cards = MemoryService(db).profile_cards(workspace)
+    assert [card["kind"] for card in cards] == ["education"]
+    assert "private-number" not in str(cards)
+    assert cards[0]["evidence_level"] == "stated" and cards[0]["source"]["quote"]

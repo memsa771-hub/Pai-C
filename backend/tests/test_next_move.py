@@ -10,7 +10,7 @@ from app.pai_c import fact_cards
 from app.pai_c.policy.controller import decide, Decision
 from app.pai_c.deep.turn import run_deep_turn
 from tests.test_policy_guided import state
-from tests.test_student_profile_api import api, HEADERS, MACHINE_ONLY
+from tests.http_student import api, HEADERS, MACHINE_ONLY
 from tests.test_counselor_deep_pr3 import _turn
 from scripts.counselor_eval_support import StudentSession
 

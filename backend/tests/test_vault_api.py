@@ -190,12 +190,12 @@ def test_cross_workspace_access_denied(api):
         ("get", ""), ("get", "/catalog"), ("get", "/drops"), ("get", f"{entry}/history"),
         ("get", f"/documents/{f.id}/entries"),
         ("post", "/entries"), ("patch", entry), ("post", f"{entry}/confirm"), ("delete", entry),
-        ("post", f"/conflicts/{issue.id}/resolve"),
+        ("post", f"/conflicts/{issue.id}/resolve"), ("get", "/onboarding"), ("post", "/onboarding"),
     ]
-    body = {"type": "interest", "value": {"text": "x"}, "answer": "keep_current"}
+    body = {"type": "interest", "value": {"text": "x"}, "answer": "keep_current", "answers": {}}
     for method, path in calls:
         kwargs = {"json": body} if method in ("post", "patch") else {}
-        # The other student's credentials on this student's Vault: same refusal as the Profile routes.
+        # The other student's credentials on this student's Vault: refused.
         assert getattr(client, method)(_url(ws, path), headers=theirs, **kwargs).status_code == 401, path
         assert getattr(client, method)(_url(ws, path), **kwargs).status_code == 401, path
 
@@ -235,7 +235,9 @@ def test_writes_need_the_owner_bearer(api):
               ("patch", entry, {"value": {"text": "Chess"}}),
               ("post", f"{entry}/confirm", None),
               ("delete", entry, None),
-              ("post", f"/conflicts/{card.issue_id}/resolve", {"answer": "keep_current"})]
+              ("post", f"/conflicts/{card.issue_id}/resolve", {"answer": "keep_current"}),
+              # Onboarding answers become the student's own facts: owner-only like any write.
+              ("post", "/onboarding", {"answers": {"fullName": "Not the student"}})]
     stranger = {"X-Workspace-Token": TOKEN, "Authorization": "Bearer stranger"}
     for method, path, body in writes:
         kwargs = {"json": body} if body is not None else {}
@@ -248,6 +250,7 @@ def test_writes_need_the_owner_bearer(api):
     # Reads keep the usual rule: the token or the owner.
     assert client.get(_url(ws), headers=MACHINE_ONLY).status_code == 200
     assert client.get(_url(ws), headers={"Authorization": "Bearer owner"}).status_code == 200
+    assert client.get(_url(ws, "/onboarding"), headers=MACHINE_ONLY).status_code == 200
 
     [entry_row] = _entries(_ok(client.get(_url(ws), headers=HEADERS)), "interest")
     assert entry_row["value"] == {"text": "Robotics"} and entry_row["level"] == "stated"
@@ -541,3 +544,30 @@ def test_a_study_budget_is_still_accepted(api):
     [entry] = _entries(_ok(client.get(_url(ws), headers=HEADERS)), "finance.budget")
     assert entry["value"]["band"] == "3_6_lakh"
     assert _income_drops(client, ws) == []
+
+
+def test_onboarding_state_and_answers_through_the_vault(api):
+    client, db, ws = api
+    db.get(User, BEARERS["owner"]).onboarded_at = None
+    db.commit()
+    state = _ok(client.get(_url(ws, "/onboarding"), headers=HEADERS))
+    assert state["required"] is True and state["fields"]
+    answers = dict(fullName="Test Student", preferredName="Student", statusCategory="student",
+                   nationality="Pakistani", gender="undisclosed", dateOfBirth="2000-01-01",
+                   currentCountry="Pakistan", currentCity="Lahore")
+    saved = _ok(client.post(_url(ws, "/onboarding"), headers=HEADERS, json={"answers": answers}))
+    assert saved["completed"] is True
+    after = _ok(client.get(_url(ws, "/onboarding"), headers=HEADERS))
+    assert after["required"] is False and after["completedAt"]
+    assert after["prefill"]["currentCity"] == "Lahore"
+    # A missing required answer is a 400 with the field named, not a half-written Vault.
+    bad = client.post(_url(ws, "/onboarding"), headers=HEADERS, json={"answers": {"fullName": "Only a name"}})
+    assert bad.status_code == 400 and "statusCategory" in bad.text
+
+
+def test_the_old_profile_routes_are_gone(api):
+    client, _, ws = api
+    for method, path in (("get", "/v1/student-profile"), ("get", "/v1/student-profile/raw"),
+                         ("post", "/v1/student-profile/edits"), ("get", "/v1/student-profile/onboarding"),
+                         ("get", "/v1/counselor/profile-cards")):
+        assert getattr(client, method)(f"{path}?network={ws}", headers=HEADERS).status_code == 404, path

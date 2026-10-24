@@ -25,7 +25,6 @@ from app.memory.extractor import _validate, build_user_prompt, extract_candidate
 from app.memory.field_definitions import VaultFieldDefinitionService, catalog_field_definitions
 from app.memory.reconciler import MemoryReconciler
 from app.memory.profile_issues import ProfileIssueService
-from app.memory.readiness import STAGES
 from app.memory.student_records import ENTITY_MODELS, RecordNeedsReview, StudentRecordService
 from app.memory.student_schema import validate_record
 from app.memory.errors import MemoryDataError
@@ -549,14 +548,6 @@ def test_ambiguous_degree_does_not_guess_institution(db):
     assert all(row.result is None for row in StudentRecordService(db).list(db.info["workspace"], "education"))
 
 
-def test_readiness_reports_document_record_conflict(db):
-    from app.memory.readiness import ReadinessService
-    _, initial = propose(db, "education", {"qualification_name": "BS CS", "result": {"gpa": 3.4}})
-    propose(db, "education", {"result": {"gpa": 3.1}}, source="document",
-            entities={"record_id": initial.result_id})
-    assert ReadinessService(db).evaluate(db.info["workspace"], "matching")["conflicts"]
-
-
 @pytest.mark.parametrize("score", [float("nan"), float("inf")])
 def test_nonfinite_test_score_is_not_converted_to_text(score):
     with pytest.raises(MemoryDataError):
@@ -611,16 +602,6 @@ def test_disabled_field_candidate_is_rejected_without_creating_fact(db, operatio
     assert not result.accepted and candidate.status == "rejected"
     assert result.reason == f"no enabled field definition for {key}"
     assert VaultService(db).get_fact(db.info["workspace"], key) is None
-
-
-def test_country_alias_has_one_canonical_readiness_requirement(db):
-    workspace = db.info["workspace"]
-    VaultService(db).apply_fact(workspace, "preferences.target_countries", ["Germany"], "user_explicit")
-    propose(db, "education", {"qualification_name": "BS CS"})
-    propose(db, "goal", {"goal_type": "education", "title": "MSc AI"})
-    readiness = __import__("app.memory.readiness", fromlist=["ReadinessService"]).ReadinessService(db).evaluate(workspace, "matching")
-    assert "preferences.target_countries" in readiness["filled"]
-    assert "preferences.countries" not in readiness["missing"]
 
 
 @pytest.mark.parametrize("kind,value", [
@@ -680,71 +661,23 @@ def test_complex_introduction_extracts_separate_structured_claims(db):
 
 
 # ---------------------------------------------------------------------------
-# The Profile projection — the student-facing view over the same canonical
-# state the Counselor reads. These tests exist to hold three lines: the page
-# shows every record (not a reduced "one degree, one GPA" summary), it never
-# leaks a restricted identifier, and an edit made on the page is the same
-# canonical write an extraction makes.
+# Every record is kept, and a student's own correction is the same canonical
+# write an extraction makes, visible to the Counselor on its next turn.
 # ---------------------------------------------------------------------------
 
 
-def _profile(db, account=None):
-    from app.memory.student_profile_view import StudentProfileView
-    return StudentProfileView(db).build(db.info["workspace"], account)
+def _records(db, kind):
+    return StudentRecordService(db).snapshot(db.info["workspace"]).get(kind, [])
 
 
-def _call_profile_endpoint(db):
-    """Drive the real endpoint, through the real credential check."""
-    from app.routers import student_profile as router
-
-    workspace = db.execute(select(Workspace).where(Workspace.id == db.info["workspace"])).scalar_one()
-    workspace.password_hash = "machine-secret"
-    db.flush()
-    return router.get_student_profile(
-        network=str(workspace.id), db=db,
-        x_workspace_token="machine-secret", authorization=None)
-
-
-def test_profile_header_combines_account_identity_vault_and_records(db):
-    workspace = db.info["workspace"]
-    vault = VaultService(db)
-    vault.apply_fact(workspace, "identity.current_status", "Final-year BS Computer Science Student", "user_explicit")
-    vault.apply_fact(workspace, "location.current_city", "Islamabad", "user_explicit")
-    vault.apply_fact(workspace, "location.current_country", "Pakistan", "user_explicit")
-    vault.apply_fact(workspace, "career.primary_interest", "Interested in AI and MSc opportunities", "user_explicit")
-    db.commit()
-
-    header = _profile(db, {"displayName": "Ali Ahmed", "avatarUrl": "https://img.test/a.png",
-                           "email": "ali@example.test"})["header"]
-    assert header["displayName"] == "Ali Ahmed"
-    assert header["avatarUrl"] == "https://img.test/a.png"
-    assert header["email"] == "ali@example.test"
-    assert header["status"] == "Final-year BS Computer Science Student"
-    assert header["location"] == "Islamabad, Pakistan"
-    assert header["headline"] == "Interested in AI and MSc opportunities"
-
-
-def test_profile_header_falls_back_to_stated_records_not_invented_text(db):
-    propose(db, "education", {"qualification_name": "BS Computer Science",
-                              "institution_name": "COMSATS", "academic_status": "current"})
-    propose(db, "goal", {"goal_type": "education", "title": "MSc AI in Germany",
-                         "commitment": "committed"})
-    header = _profile(db)["header"]
-    assert header["status"] == "BS Computer Science student at COMSATS"
-    assert header["headline"] == "MSc AI in Germany"
-    # Nothing stated a location, so the header simply has no location field —
-    # the page hides it rather than rendering a placeholder.
-    assert "location" not in header
-
-
-def test_profile_renders_every_education_record_with_its_own_result(db):
+def test_every_education_record_keeps_its_own_result(db):
     propose(db, "education", {"qualification_name": "BS Computer Science", "institution_name": "COMSATS",
                               "start_date": "2022", "end_date": "2026",
                               "result": {"gpa": 3.42, "gpa_scale": 4}})
     propose(db, "education", {"qualification_name": "FSc Pre-Engineering", "institution_name": "Punjab College",
                               "start_date": "2020", "end_date": "2022",
                               "result": {"percentage": 87}})
-    education = _profile(db)["sections"]["education"]["education"]
+    education = _records(db, "education")
     assert len(education) == 2
     by_name = {row["qualification_name"]: row for row in education}
     assert by_name["BS Computer Science"]["result"] == {"gpa": 3.42, "gpa_scale": 4}
@@ -752,88 +685,20 @@ def test_profile_renders_every_education_record_with_its_own_result(db):
     assert by_name["FSc Pre-Engineering"]["institution_name"] == "Punjab College"
 
 
-def test_profile_keeps_every_repeatable_record_kind_separate(db):
+def test_every_repeatable_record_kind_stays_separate(db):
     for attempt, band in ((1, "6.5"), (2, "7.5")):
         propose(db, "test_attempt", {"test_type": "IELTS", "attempt_number": attempt, "overall_score": band})
     propose(db, "project", {"name": "Portfolio"})
     propose(db, "project", {"name": "Research prototype"})
     propose(db, "work_experience", {"organization": "Acme", "role": "Intern"})
     propose(db, "work_experience", {"organization": "Globex", "role": "Engineer"})
-    sections = _profile(db)["sections"]
-    assert len(sections["tests"]["test_attempt"]) == 2
-    assert len(sections["projects"]["project"]) == 2
-    assert len(sections["experience"]["work_experience"]) == 2
+    assert len(_records(db, "test_attempt")) == 2
+    assert len(_records(db, "project")) == 2
+    assert len(_records(db, "work_experience")) == 2
 
 
-def test_profile_withholds_restricted_identifiers_but_keeps_safe_planning_facts(db):
-    workspace = db.info["workspace"]
-    vault = VaultService(db)
-    vault.apply_fact(workspace, "identity.passport_number", "SECRET-PASSPORT", "user_explicit")
-    vault.apply_fact(workspace, "accessibility.accommodation_needs", "PRIVATE-NEED", "user_explicit")
-    vault.apply_fact(workspace, "identity.nationality", "Pakistani", "user_explicit")
-    vault.apply_fact(workspace, "finance.budget", {"amount": 12000, "currency": "EUR", "period": "per_year"}, "user_explicit")
-    db.commit()
-
-    profile = _profile(db)
-    assert "identity.passport_number" not in profile["facts"]
-    assert "accessibility.accommodation_needs" not in profile["facts"]
-    assert profile["facts"]["identity.nationality"] == "Pakistani"
-    assert profile["facts"]["finance.budget"]["amount"] == 12000
-    assert "SECRET-PASSPORT" not in json.dumps(profile)
-    assert "PRIVATE-NEED" not in json.dumps(profile)
-
-
-def test_profile_issue_evidence_never_echoes_a_restricted_value(db):
-    workspace = db.info["workspace"]
-    vault = VaultService(db)
-    # Two conversational claims about the same field raise an issue whose
-    # evidence carries the proposed value inline.
-    vault.apply_fact(workspace, "identity.passport_number", "FIRST-PASSPORT", "conversation")
-    vault.apply_fact(workspace, "identity.passport_number", "SECOND-PASSPORT", "conversation")
-    db.commit()
-
-    profile = _profile(db)
-    assert profile["issues"], "the conflicting claim should surface as an issue"
-    assert "SECOND-PASSPORT" not in json.dumps(profile)
-    assert all(issue["values"] is None and issue["fieldKey"] is None
-               for issue in profile["issues"])
-    # The student still learns that something needs their attention.
-    assert any(issue["severity"] == "blocking" for issue in profile["issues"])
-
-
-def test_profile_issue_keeps_record_values_the_page_would_show_anyway(db):
-    _, first = propose(db, "education", {"qualification_name": "BS CS", "institution_name": "COMSATS",
-                                         "result": {"gpa": 3.42}}, evidence={"quote": "My GPA is 3.42"})
-    assert first.accepted
-    propose(db, "education", {"qualification_name": "BS CS", "institution_name": "COMSATS",
-                              "result": {"gpa": 2.1}}, evidence={"quote": "my gpa is 2.1"})
-    issues = _profile(db)["issues"]
-    conflict = next(i for i in issues if i["type"] == "conflicting_record")
-    assert conflict["recordType"] == "education"
-    assert conflict["recordId"] == first.result_id
-    assert conflict["values"]["proposed"]["result"]["gpa"] == 2.1
-    assert conflict["clarificationQuestion"]
-
-
-def test_empty_profile_reports_itself_empty(db):
-    profile = _profile(db, {"displayName": "Ali Ahmed", "email": "ali@example.test"})
-    assert profile["meta"]["isEmpty"] is True
-    assert profile["meta"]["recordCount"] == 0
-    # Account identity alone is not a profile PAI has learned anything from,
-    # but it is still rendered at the top of the page.
-    assert profile["header"]["displayName"] == "Ali Ahmed"
-
-
-def test_profile_reports_readiness_for_every_stage(db):
-    propose(db, "education", {"qualification_name": "BS CS"})
-    readiness = _profile(db)["readiness"]
-    assert set(readiness["stages"]) == set(STAGES)
-    assert readiness["primary"]["stage"] == "discovery"
-    assert "records.goal" in readiness["primary"]["missing"]
-
-
-def test_counselor_extraction_reaches_profile_and_profile_edit_reaches_counselor(db):
-    """The full loop: conversation -> canonical record -> Profile -> Counselor."""
+def test_counselor_extraction_and_student_correction_share_one_record(db):
+    """The full loop: conversation -> canonical record -> student correction -> Counselor."""
     workspace = db.info["workspace"]
 
     # 1. The student tells the Counselor; extraction proposes, reconciliation
@@ -844,54 +709,26 @@ def test_counselor_extraction_reaches_profile_and_profile_edit_reaches_counselor
                            source="conversation",
                            evidence={"quote": "I completed BS CS at COMSATS with 3.42 CGPA."})
     assert extracted.accepted
-
-    # 2. Opening the Profile shows that record.
-    education = _profile(db)["sections"]["education"]["education"]
+    education = _records(db, "education")
     assert [row["qualification_name"] for row in education] == ["BS CS"]
     assert education[0]["result"]["gpa"] == 3.42
 
-    # 3. The student corrects it on the Profile page — the same canonical path.
+    # 2. The student corrects it by hand: the same canonical path.
     _, corrected = propose(db, "education", {"result": {"gpa": 3.52, "gpa_scale": 4}},
                            source="user_explicit", entities={"record_id": extracted.result_id},
                            evidence={"reason": "Corrected on my profile", "capture": "profile_edit"})
     assert corrected.accepted and corrected.result_id == extracted.result_id
+    assert _records(db, "education")[0]["result"]["gpa"] == 3.52
 
-    # 4. The correction is what the Profile now shows...
-    assert _profile(db)["sections"]["education"]["education"][0]["result"]["gpa"] == 3.52
-
-    # 5. ...and what the Counselor sees in its next conversation.
+    # 3. ...and it is what the Counselor sees in its next conversation.
     entries = MemoryService(db).counselor_vault(workspace, "What should I study?")["entries"]
     counselor_education = json.dumps([e for e in entries if e["type"] == "education"])
     assert "3.52" in counselor_education and "3.42" not in counselor_education
 
-    # 6. Provenance survived the hand edit: both claims are still on the record.
+    # 4. Provenance survived the hand edit: both claims are still on the record.
     revisions = StudentRecordService(db).history(workspace, "education", extracted.result_id)
     assert [r.source_type for r in revisions] == ["conversation", "user_explicit"]
     assert revisions[-1].capture_method == "explicit_correction"
-
-
-def test_profile_endpoint_returns_the_projection_not_raw_memory(db):
-    workspace = db.info["workspace"]
-    VaultService(db).apply_fact(workspace, "identity.passport_number", "SECRET-PASSPORT", "user_explicit")
-    db.commit()
-    propose(db, "education", {"qualification_name": "BS CS", "institution_name": "COMSATS"})
-
-    response = _call_profile_endpoint(db)
-    assert response["code"] == 0
-    data = response["data"]
-    assert set(data) == {"header", "facts", "factGroups", "sections", "readiness", "issues", "meta"}
-    assert data["sections"]["education"]["education"][0]["qualification_name"] == "BS CS"
-    assert "SECRET-PASSPORT" not in json.dumps(data)
-
-
-def test_profile_endpoint_rejects_a_caller_without_credentials(db):
-    from app.routers import student_profile as router
-    workspace = db.execute(select(Workspace).where(Workspace.id == db.info["workspace"])).scalar_one()
-    workspace.password_hash = "machine-secret"
-    db.flush()
-    response = router.get_student_profile(network=str(workspace.id), db=db,
-                                          x_workspace_token="wrong", authorization=None)
-    assert response.status_code == 401
 
 
 # --- Transport-shape repair -------------------------------------------------
@@ -1039,9 +876,8 @@ def test_newer_models_get_the_token_parameter_they_accept():
         assert _token_limit_kwarg(modern) == "max_completion_tokens"
 
 
-def test_retired_definition_preserves_vault_snapshot_profile_and_history(db):
+def test_retired_definition_preserves_vault_snapshot_and_history(db):
     from app.memory.student_snapshot import StudentSnapshotService
-    from app.memory.student_profile_view import StudentProfileView
 
     key = "synthetic.retired_attribute"
     fields = VaultFieldDefinitionService(db)
@@ -1059,4 +895,3 @@ def test_retired_definition_preserves_vault_snapshot_profile_and_history(db):
     assert vault.snapshot(workspace, include_sensitive=True)[key] == 12
     assert vault.history(workspace, key)[0].value == {"value": 12}
     assert StudentSnapshotService(db).build(workspace).facts[key]["value"] == 12
-    assert StudentProfileView(db).build(workspace)["facts"][key] == 12

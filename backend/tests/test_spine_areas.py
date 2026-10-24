@@ -13,7 +13,7 @@ from app.pai_c.deep.notebook_schema import CounselorNotebookData
 from app.pai_c.memory import MemoryService
 from app.pai_c.policy.classifier import Signals, fallback_signals
 from app.pai_c.understanding.views import coverage_areas
-from tests.test_student_profile_api import api, HEADERS
+from tests.http_student import api, HEADERS
 from tests.truth_map_fixtures import item
 
 
@@ -71,16 +71,15 @@ def test_classifier_accepts_the_two_new_areas_without_language_logic(text):
         Signals.model_validate(raw)
 
 
-def test_tap_choices_use_existing_reconciled_profile_api(api):
+def test_student_entries_count_toward_the_same_areas(api):
     client, db, workspace_id = api
     for payload in [
-        {"field_key": "location.current_city", "value": "Student's city"},
-        {"record_type": "education", "value": {"qualification_name": "Upper secondary",
+        {"type": "location.current_city", "value": "Student's city"},
+        {"type": "education", "value": {"qualification_name": "Upper secondary",
           "canonical_level": "upper_secondary", "academic_status": "current", "details": {"awarding_body": "Student's board"}}},
-        {"record_type": "skill", "value": {"name": "Repairing devices"}},
+        {"type": "skill", "value": {"name": "Repairing devices"}},
     ]:
-        response = client.post(f"/v1/student-profile/edits?network={workspace_id}", headers=HEADERS,
-                               json={**payload, "reason": "Selected by the student on a tap card"})
+        response = client.post(f"/v1/vault/entries?network={workspace_id}", headers=HEADERS, json=payload)
         assert response.status_code == 200, response.text
     rows = db.scalars(select(MemoryCandidate)).all()
     assert len(rows) == 3 and all(row.status == "accepted" for row in rows)

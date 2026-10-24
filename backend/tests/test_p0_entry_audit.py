@@ -58,12 +58,12 @@ def test_verified_identity_to_onboarding_and_unverified_is_blocked():
             login = client.post('/v1/auth/session', headers=auth, json={'deviceId': 'device-one-fixture'})
             assert login.status_code == 200, login.text
             workspace_id = login.json()['data']['workspace']['workspaceId']
-            state = client.get('/v1/student-profile/onboarding', params={'network': workspace_id}, headers=auth)
+            state = client.get('/v1/vault/onboarding', params={'network': workspace_id}, headers=auth)
             assert state.status_code == 200 and state.json()['data']['required']
             answers = dict(fullName='Test Student', preferredName='Student', statusCategory='student',
                 nationality='Nationality', gender='undisclosed', dateOfBirth='2000-01-01',
                 currentCountry='Country', currentCity='City')
-            saved = client.post('/v1/student-profile/onboarding', params={'network': workspace_id},
+            saved = client.post('/v1/vault/onboarding', params={'network': workspace_id},
                                 headers=auth, json={'answers': answers})
             assert saved.status_code == 200
             assert saved.json()['data']['completed'], saved.json()
@@ -109,7 +109,7 @@ def sample(schema, schemas):
 
 
 SPEC = app.openapi()
-PREFIXES = ('/v1/events', '/v1/counselor/', '/v1/roadmaps', '/v1/student-profile',
+PREFIXES = ('/v1/events', '/v1/counselor/', '/v1/roadmaps', '/v1/vault',
             '/v1/student-requests', '/v1/files')
 CASES = [(path, method, spec) for path, methods in SPEC['paths'].items()
          if path.startswith(PREFIXES) for method, spec in methods.items()

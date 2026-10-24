@@ -1,36 +1,13 @@
 """Offline student-facing workspace, retirement and explicit roadmap handoff."""
-from uuid import uuid4
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 import pytest
 from sqlalchemy import select
-from app.models import ExecutionRun, Roadmap, StudentRecordRevision
-from app.pai_c.memory import MemoryService
+from app.models import ExecutionRun, Roadmap
 from app.pai_c.possibilities import PossibilityService
 from app.routers.counselor_paths import prepare_roadmap
-from app.routers.counselor_profile_cards import Review
 from scripts.counselor_eval_support import StudentSession
-from tests.test_profile_evidence import seed
 from tests.test_counselor_deep_lean import research_journey
-
-
-@pytest.mark.parametrize('kind', ['vault_fact', 'education'])
-def test_remove_is_reconciled_idempotent_and_history_is_kept(kind):
-    with StudentSession() as student, student.factory() as db:
-        from app.memory.field_definitions import VaultFieldDefinitionService
-        VaultFieldDefinitionService(db).upsert_definition({'key':'location.current_city',
-            'category':'location','data_type':'string','validation_schema':{'type':'string'}})
-        seed(db, student.workspace_id, kind)
-        memory = MemoryService(db)
-        card = next(c for c in memory.profile_cards(student.workspace_id) if c['kind'] == kind)
-        request = Review(submission_id=uuid4(), action='remove', expected_digest=card['digest'])
-        assert memory.review_profile_card(student.workspace_id, kind, card['id'], request)['saved']
-        assert memory.review_profile_card(student.workspace_id, kind, card['id'], request)['saved']
-        assert not any(c['id'] == card['id'] for c in memory.profile_cards(student.workspace_id))
-        if kind == 'education':
-            revisions = db.scalars(select(StudentRecordRevision).where(StudentRecordRevision.record_id == card['id'])).all()
-            assert revisions[-1].after['status'] == 'retracted'
-            assert revisions[-1].before['qualification_name'] == 'My qualification'
 
 
 @pytest.mark.asyncio

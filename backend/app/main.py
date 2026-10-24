@@ -22,7 +22,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from app.config import config
 from app.security.errors import EmailNotVerified, IdentityUnavailable
 from app.api.response import ResponseCode, json_response
-from app.routers import counselor_possibilities, account, app_version, auth, counselor_summary, counselor_voice, decision_records, escalations, events, feedback, fetch, files, network, notifications, operator, roadmaps, search, shares, student_profile, student_requests, tasks, vault, workflows, workspaces
+from app.routers import counselor_possibilities, account, app_version, auth, counselor_summary, counselor_voice, decision_records, escalations, events, feedback, fetch, files, network, notifications, operator, roadmaps, search, shares, student_requests, tasks, vault, workflows, workspaces
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -383,9 +383,8 @@ app.include_router(escalations.router)
 app.include_router(auth.router)
 app.include_router(counselor_voice.router)
 app.include_router(counselor_summary.router)
-from app.routers import counselor_fact_cards, counselor_profile_cards, counselor_paths, counselor_health, counselor_workspace
+from app.routers import counselor_fact_cards, counselor_paths, counselor_health, counselor_workspace
 app.include_router(counselor_fact_cards.router)
-app.include_router(counselor_profile_cards.router)
 app.include_router(counselor_paths.router)
 app.include_router(counselor_health.router)
 app.include_router(counselor_workspace.router)
@@ -400,7 +399,6 @@ app.include_router(operator.router)
 app.include_router(roadmaps.router)
 app.include_router(search.router)
 app.include_router(shares.router)
-app.include_router(student_profile.router)
 app.include_router(student_requests.router)
 app.include_router(tasks.router)
 app.include_router(vault.router)

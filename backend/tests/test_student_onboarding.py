@@ -22,7 +22,6 @@ from app.database import Base
 from app.memory.errors import MemoryDataError
 from app.memory.field_definitions import VaultFieldDefinitionService, catalog_field_definitions
 from app.memory.onboarding import ONBOARDING_FIELDS, OnboardingService
-from app.memory.student_profile_view import StudentProfileView
 from app.memory.student_records import ENTITY_MODELS
 from app.memory.vault import VaultService
 from app.models import (
@@ -190,21 +189,6 @@ def test_onboarding_category_does_not_freeze_the_living_status(db):
     refined = vault.snapshot(workspace_id, include_sensitive=True)
     assert refined["identity.current_status"] == "Final-year BS Computer Science student"
     assert refined["identity.status_category"] == "student"
-
-
-def test_profile_shows_onboarding_facts_including_the_students_own_date_of_birth(db):
-    workspace = db.info["workspace"]
-    OnboardingService(db).apply(workspace, ANSWERS)
-    db.commit()
-
-    profile = StudentProfileView(db).build(str(workspace.id), {"displayName": "Ali Ahmed"})
-    assert profile["header"]["location"] == "Islamabad, Pakistan"
-    # No richer status yet, so the header falls back to the category.
-    assert profile["header"]["status"] == "Student"
-    assert profile["facts"]["identity.gender"] == "male"
-    # Date of birth is `restricted` in the Vault, but the student's own
-    # Profile shows it back to them; no other restricted field is opened.
-    assert profile["facts"]["identity.date_of_birth"] == "2003-04-15"
 
 
 def test_required_answers_are_enforced_and_nothing_is_half_written(db):
