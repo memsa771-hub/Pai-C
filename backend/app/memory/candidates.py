@@ -86,6 +86,16 @@ def record_drop(db, workspace_id: str, source: str, stage: str, reason: str,
     db.connection()  # make sure a transaction exists to end, so the drop is written
 
 
+def _states_income(candidate_type, key, value, quote) -> bool:
+    """The extractors' household-income check, on a value about to be logged."""
+    from .catalog import vault_catalog
+    from .extractor import states_household_income
+
+    facts = {spec.key for spec in vault_catalog().types(storage="fact")}
+    return states_household_income({"candidate_type": candidate_type, "key": key,
+                                    "proposed_value": value, "quote": quote}, facts)
+
+
 def _now() -> datetime:
     return datetime.now(timezone.utc)
 
@@ -190,8 +200,12 @@ class MemoryCandidateService:
             if source == "details" and spec is not None and spec.shown_on == "story":
                 source = "story"
             ref = (source_event_ids[0] if source_event_ids else None) or evidence.get("file_id")
+            payload = {"key": key, "value": value}
+            if _states_income(candidate_type, key, value, evidence.get("quote")):
+                # Household income is never stored, the drop log included (VAULT_SPEC §Money).
+                payload = {"key": key, "reason": result.rejected_reason}
             record_drop(self.db, workspace_id, source, "normalize", result.rejected_reason,
-                        {"key": key, "value": value}, source_ref=ref)
+                        payload, source_ref=ref)
             raise MemoryDataError(result.rejected_reason)
         evidence["source_language"] = result.source_language
         if result.needs_confirmation:

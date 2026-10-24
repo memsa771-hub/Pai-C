@@ -229,13 +229,51 @@ class VaultItemService:
         self.db.flush()
         return item
 
-    def confirm(self, workspace_id: str, item_id: str) -> VaultItem:
+    def confirm(self, workspace_id: str, item_id: str, evidence: dict | None = None,
+                candidate_id: str | None = None) -> VaultItem:
+        """The student confirms the entry as it stands.
+
+        A new confirmed version, so history keeps the level it had before. An
+        open card about the entry is answered: confirming the saved value is the
+        student's "keep current", so the card closes as their decision and the
+        proposal it asked about is rejected.
+        """
         self._lock(workspace_id)
-        item = self._get(workspace_id, item_id, active=True)
-        item.level, item.confirmed_at, item.conflict_state = "confirmed", _now(), "none"
-        self._close_cards(item, "confirmed")
+        current = self._get(workspace_id, item_id, active=True)
+        cards = self._open_cards(current)
+        if current.level == "confirmed" and not cards:
+            return current
+        incoming = dict(evidence or {})
+        carried = {k: v for k, v in (current.evidence or {}).items() if k != "retraction"}
+        if incoming.get("confirmation"):
+            carried["confirmation"] = incoming["confirmation"]
+        carried = _with_sighting(carried, "user_explicit", "confirmed", incoming, candidate_id)
+        new = self._insert(workspace_id, self._spec(current.item_type), current.value, current.source_type,
+                           "confirmed", current.confidence, carried, candidate_id)
+        new.source_language = current.source_language
+        current.status, current.superseded_by, current.valid_until = "superseded", new.id, new.valid_from
+        current.conflict_state = "none"
+        self._keep_current(cards, candidate_id)
         self.db.flush()
-        return item
+        return new
+
+    def _keep_current(self, cards: list[ProfileIssue], candidate_id: str | None) -> None:
+        """Settle cards as the student's keep_current, the steps ProfileIssueService takes."""
+        from .candidates import MemoryCandidateService
+        from .vault_intake import VaultAssertionService
+
+        candidates = MemoryCandidateService(self.db)
+        for issue in cards:
+            evidence = issue.evidence or {}
+            for proposal_id in [issue.candidate_id, *evidence.get("earlier_candidate_ids", [])]:
+                proposal = candidates.get(issue.workspace_id, proposal_id) if proposal_id else None
+                if (proposal is not None and proposal.id != candidate_id
+                        and proposal.status in ("pending", "needs_review")):
+                    candidates.mark_rejected(proposal, "Student kept the current canonical value")
+                    VaultAssertionService(self.db).refresh_decision(proposal)
+            issue.status, issue.resolved_at = "resolved", _now()
+            issue.resolution = {"action": "keep_current", "note": "Student confirmed the saved value",
+                                "resolved_by": "student", "candidate_id": candidate_id}
 
     # ---- internals ---------------------------------------------------------
 

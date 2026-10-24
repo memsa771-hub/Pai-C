@@ -34,6 +34,7 @@ from app.memory.vault_items import VaultItemService
 from app.memory.vault_view import VaultView, _display, _without, level_of, view_copy
 from app.models import FileRecord, VaultDrop, VaultFact, VaultItem
 from app.routers.network import _resolve_workspace, _verify_workspace_access
+from app.security.access import is_workspace_owner
 
 router = APIRouter(prefix="/v1/vault", tags=["Vault"])
 
@@ -67,6 +68,21 @@ def _workspace(db, network, token, authorization):
         return None, json_response(ResponseCode.NOT_FOUND, "Network not found")
     if not _verify_workspace_access(workspace, token, authorization):
         return None, json_response(ResponseCode.UNAUTHORIZED, "Invalid credentials")
+    return workspace, None
+
+
+def _owner_workspace(db, network, token, authorization):
+    """The workspace, for a write: only the signed-in owner may change the Vault.
+
+    The machine token reads, but a write is the student's own statement (and a
+    confirm marks a value "Confirmed"), so an agent holding the token must not
+    be able to make one in the student's name.
+    """
+    workspace, error = _workspace(db, network, token, authorization)
+    if error:
+        return None, error
+    if not is_workspace_owner(db, workspace, authorization):
+        return None, json_response(ResponseCode.FORBIDDEN, "Only the student can change their Vault")
     return workspace, None
 
 
@@ -151,8 +167,23 @@ def _write(db: Session, workspace_id: str, entry_kind: str, key: str, *, value: 
 
 
 def _editable(type_key: str) -> Optional[TypeSpec]:
-    """Writes go to catalog types only; a kind outside the catalog is read-only here."""
+    """Adding and editing go to catalog types only: their schema is the form."""
     return vault_catalog().type(type_key)
+
+
+def _removable(entry: _Entry) -> bool:
+    """Confirm and remove work on every record kind the view shows, except a
+    file's own record, which goes when the file is deleted in Documents."""
+    if entry.kind == "record":
+        return not view_copy()["uncatalogued_records"].get(entry.type, {}).get("file_field")
+    return _editable(entry.type) is not None
+
+
+def _entities(entry: _Entry) -> dict:
+    """Aim the candidate at exactly this entry."""
+    if entry.kind == "item":
+        return {"item_id": entry.id}
+    return {"record_id": entry.id} if entry.kind == "record" else {}
 
 
 # ---- reads -------------------------------------------------------------------
@@ -290,7 +321,7 @@ def add_entry(
     x_workspace_token: Optional[str] = Header(None), authorization: Optional[str] = Header(None),
 ):
     """A detail or story entry the student adds; the catalog's storage picks the store."""
-    workspace, error = _workspace(db, network, x_workspace_token, authorization)
+    workspace, error = _owner_workspace(db, network, x_workspace_token, authorization)
     if error:
         return error
     spec = _editable(body.type)
@@ -305,7 +336,7 @@ def edit_entry(
     x_workspace_token: Optional[str] = Header(None), authorization: Optional[str] = Header(None),
 ):
     """The student's correction of one entry (VAULT_SPEC §Conflicts step 2: the student wins)."""
-    workspace, error = _workspace(db, network, x_workspace_token, authorization)
+    workspace, error = _owner_workspace(db, network, x_workspace_token, authorization)
     if error:
         return error
     workspace_id = str(workspace.id)
@@ -314,8 +345,8 @@ def edit_entry(
         return error
     if _editable(entry.type) is None:
         return json_response(ResponseCode.BAD_REQUEST, "This entry cannot be edited here")
-    entities = {"item_id": entry.id} if kind == "item" else {"record_id": entry.id} if kind == "record" else {}
-    return _write(db, workspace_id, kind, entry.type, value=body.value, entities=entities, text=body.text,
+    return _write(db, workspace_id, kind, entry.type, value=body.value, entities=_entities(entry),
+                  text=body.text,
                   extra={"semantic_correction": True})
 
 
@@ -326,32 +357,23 @@ def confirm_entry(
 ):
     """The student confirms the value as it stands (evidence ladder: confirmed).
 
-    Items have their own confirm in the item store. Facts and records confirm
-    by restating the current value with a confirmation digest, the path
-    `evidence_level` recognises, so a value changed in the meantime is not
-    confirmed by accident.
+    One candidate restating the current value with a confirmation digest. For
+    facts and records `evidence_level` recognises it; for items the reconciler
+    confirms into a new version. Either way a value that changed in the
+    meantime is not confirmed by accident.
     """
-    workspace, error = _workspace(db, network, x_workspace_token, authorization)
+    workspace, error = _owner_workspace(db, network, x_workspace_token, authorization)
     if error:
         return error
     workspace_id = str(workspace.id)
     entry, error = _locate(db, workspace_id, kind, entry_id)
     if error:
         return error
-    if _editable(entry.type) is None:
+    if not _removable(entry):
         return json_response(ResponseCode.BAD_REQUEST, "This entry cannot be confirmed here")
-    if kind == "item":
-        try:
-            item = VaultItemService(db).confirm(workspace_id, entry.id)
-        except MemoryDataError as exc:
-            db.rollback()
-            return json_response(ResponseCode.BAD_REQUEST, str(exc))
-        db.commit()
-        return success_response({"saved": True, "kind": kind, "type": entry.type, "id": item.id})
     confirmation = {"value_digest": value_digest(entry.value),
                     "confirmed_at": datetime.now(timezone.utc).isoformat()}
-    return _write(db, workspace_id, kind, entry.type, value=entry.value,
-                  entities={"record_id": entry.id} if kind == "record" else {},
+    return _write(db, workspace_id, kind, entry.type, value=entry.value, entities=_entities(entry),
                   extra={"action": "confirm", "confirmation": confirmation})
 
 
@@ -361,17 +383,16 @@ def remove_entry(
     x_workspace_token: Optional[str] = Header(None), authorization: Optional[str] = Header(None),
 ):
     """Retract one entry; it stays in history and returns only when the student states it again."""
-    workspace, error = _workspace(db, network, x_workspace_token, authorization)
+    workspace, error = _owner_workspace(db, network, x_workspace_token, authorization)
     if error:
         return error
     workspace_id = str(workspace.id)
     entry, error = _locate(db, workspace_id, kind, entry_id)
     if error:
         return error
-    if _editable(entry.type) is None:
+    if not _removable(entry):
         return json_response(ResponseCode.BAD_REQUEST, "This entry cannot be removed here")
-    entities = {"item_id": entry.id} if kind == "item" else {"record_id": entry.id} if kind == "record" else {}
-    return _write(db, workspace_id, kind, entry.type, operation="retract", entities=entities,
+    return _write(db, workspace_id, kind, entry.type, operation="retract", entities=_entities(entry),
                   quote_value=entry.value)
 
 
@@ -381,7 +402,7 @@ def resolve_conflict(
     x_workspace_token: Optional[str] = Header(None), authorization: Optional[str] = Header(None),
 ):
     """Answer one conflict card with one of the answers the view offered for it."""
-    workspace, error = _workspace(db, network, x_workspace_token, authorization)
+    workspace, error = _owner_workspace(db, network, x_workspace_token, authorization)
     if error:
         return error
     workspace_id = str(workspace.id)
@@ -393,7 +414,7 @@ def resolve_conflict(
                              f"This question takes one of: {', '.join(card['answers'])}")
     try:
         result = ProfileIssueService(db).resolve(workspace_id, issue_id, body.answer,
-                                                 value=body.value, note=body.note)
+                                                 value=body.value, note=body.note, capture="vault_api")
     except MemoryDataError as exc:
         db.rollback()
         return json_response(ResponseCode.BAD_REQUEST, str(exc))

@@ -308,11 +308,11 @@ def test_confirm_and_retract_close_open_card():
         svc, ws = VaultItemService(db), student.workspace_id
         first = _apply(svc, ws, "domicile", {"province": "Sindh"}).item
         _apply(svc, ws, "domicile", {"province": "KP"})
-        svc.confirm(ws, first.id)
+        confirmed = svc.confirm(ws, first.id)  # a new version; history keeps the stated one
         assert _open(db, ws) == []
         _apply(svc, ws, "domicile", {"province": "KP"}, source_type="document", level="shown")
         assert len(_open(db, ws)) == 1
-        svc.retract(ws, first.id, {"reason": "student removed it"})
+        svc.retract(ws, confirmed.id, {"reason": "student removed it"})
         assert _open(db, ws) == []
 
 

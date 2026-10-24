@@ -31,8 +31,9 @@ class ProfileIssueService:
 
     def resolve(
         self, workspace_id: str, issue_id: str, action: str, *,
-        value: Any = None, note: str | None = None,
+        value: Any = None, note: str | None = None, capture: str | None = None,
     ) -> dict:
+        """`capture` names the surface that took the answer (e.g. "vault_api") on its evidence."""
         if action not in ISSUE_ACTIONS:
             raise MemoryDataError("Unsupported issue resolution action")
         issue = self.db.execute(
@@ -93,6 +94,7 @@ class ProfileIssueService:
                 "resolution_action": action,
                 "original_candidate_id": original.id if original else None,
                 **({"semantic_temporal_change": True} if action == "both_true" else {}),
+                **({"capture": capture} if capture else {}),
             },
             subject_user_id=issue.subject_user_id,
         )

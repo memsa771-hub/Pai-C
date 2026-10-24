@@ -400,6 +400,8 @@ class MemoryReconciler:
             item = self.items.retract(candidate.workspace_id, item_id, evidence)
             self.candidates.mark_accepted(candidate, item.id)
             return ReconcileResult(True, candidate.id, result_id=item.id)
+        if candidate.operation == "upsert" and evidence.get("action") == "confirm":
+            return self._confirm_item(candidate, item_id, evidence)
         if candidate.operation != "upsert" or not self._confident_enough(candidate):
             return self._reject(candidate, "invalid operation or insufficient confidence")
         value = self._unwrap(candidate.proposed_value)
@@ -438,6 +440,20 @@ class MemoryReconciler:
                                    outcome=VaultOutcome.NEEDS_REVIEW.value)
         self.candidates.mark_accepted(candidate, write.item.id)
         return ReconcileResult(True, candidate.id, result_id=write.item.id, outcome=write.outcome.value)
+
+    def _confirm_item(self, candidate: MemoryCandidate, item_id: Optional[str], evidence: dict) -> ReconcileResult:
+        """The student confirms an item as it stands. The digest names the value
+        they saw, so a value that changed in the meantime is not confirmed."""
+        from .evidence import value_digest
+
+        if candidate.source_type != "user_explicit" or candidate.input_channel != "profile" or not item_id:
+            return self._reject(candidate, "Only the student may confirm a Vault entry")
+        current = self.items._get(candidate.workspace_id, item_id, active=True)
+        if (evidence.get("confirmation") or {}).get("value_digest") != value_digest(current.value):
+            return self._reject(candidate, "value_changed")
+        item = self.items.confirm(candidate.workspace_id, item_id, evidence, candidate.id)
+        self.candidates.mark_accepted(candidate, item.id)
+        return ReconcileResult(True, candidate.id, result_id=item.id, outcome="confirmed")
 
     @staticmethod
     def _item_level(candidate: MemoryCandidate) -> str:
