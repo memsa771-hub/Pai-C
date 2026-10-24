@@ -395,7 +395,7 @@ def test_conflicting_fsc_stream_without_record_id_needs_profile_review(db, sourc
     rows = StudentRecordService(db).list(workspace, "education")
     assert len(rows) == 1 and rows[0].id == initial.result_id
     assert rows[0].qualification_name == "FSc Pre-Medical"
-    assert rows[0].field_of_study == "Pre-Medical"
+    assert rows[0].field_of_study == "pre_medical"  # stored as catalog code
 
 
 def test_sparse_fsc_streams_still_raise_review_without_model_level(db):
@@ -418,7 +418,7 @@ def test_model_correction_label_cannot_replace_education_identity(db):
         evidence={"quote": "I did FSc Pre-Medical", "semantic_correction": True},
     )
     assert MemoryReconciler(db).reconcile(spoken).reason == "needs_review"
-    assert StudentRecordService(db).get(workspace, "education", initial.result_id).field_of_study == "Pre-Engineering"
+    assert StudentRecordService(db).get(workspace, "education", initial.result_id).field_of_study == "pre_engineering"
     assert StudentRecordService(db).issues(workspace)[0].candidate_id == spoken.id
 
 

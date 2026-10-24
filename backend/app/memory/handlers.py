@@ -18,6 +18,7 @@ import logging
 from sqlalchemy import select
 
 from app.memory.candidates import MemoryCandidateService
+from app.memory.errors import MemoryDataError
 from app.memory.index import MemoryRecord, get_memory_index
 from app.memory.reconciler import MemoryReconciler
 from app.memory.semantic import MemoryService
@@ -85,19 +86,23 @@ async def extract_memory(job, db) -> dict:
     # Path A — pre-parsed proposals. Used by tests and by any caller that has
     # already decided what to propose.
     for spec in payload.get("candidates") or []:
-        candidate = candidates.propose(
-            workspace_id=workspace_id,
-            candidate_type=spec.get("candidate_type", "semantic_memory"),
-            operation=spec.get("operation", "upsert"),
-            key=spec.get("key"),
-            proposed_value=spec.get("proposed_value"),
-            content=spec.get("content"),
-            entities=spec.get("entities"),
-            confidence=float(spec.get("confidence", 0.5)),
-            source_type=source_type,
-            source_event_ids=spec.get("source_event_ids"),
-            evidence=spec.get("evidence"),
-        )
+        try:
+            candidate = candidates.propose(
+                workspace_id=workspace_id,
+                candidate_type=spec.get("candidate_type", "semantic_memory"),
+                operation=spec.get("operation", "upsert"),
+                key=spec.get("key"),
+                proposed_value=spec.get("proposed_value"),
+                content=spec.get("content"),
+                entities=spec.get("entities"),
+                confidence=float(spec.get("confidence", 0.5)),
+                source_type=source_type,
+                source_event_ids=spec.get("source_event_ids"),
+                evidence=spec.get("evidence"),
+            )
+        except MemoryDataError as exc:
+            logger.info("memory.extract: normalize rejected %s job=%s: %s", spec.get("key"), job.id, exc)
+            continue
         proposed.append(candidate.id)
 
     # Path B — extract from a persisted conversational turn. The payload holds
@@ -153,34 +158,38 @@ async def extract_memory(job, db) -> dict:
                     "memory.extract: skipped duplicate %s job=%s", item.candidate_type, job.id
                 )
                 continue
-            candidate = candidates.propose(
-                workspace_id=workspace_id,
-                candidate_type=item.candidate_type,
-                operation=item.operation,
-                key=item.key,
-                proposed_value=item.proposed_value,
-                content=item.content,
-                entities=item.entities,
-                confidence=item.confidence,
-                # Server-assigned. The extractor has no field for this and
-                # cannot reach `user_explicit` — `propose()` refuses it without
-                # `allow_user_explicit`, which this path never passes.
-                source_type=source_type,
-                input_channel=input_channel,
-                # EVIDENCE — the student's event only. The assistant reply is
-                # context for resolving references, never a factual source; a
-                # memory attributed to it would let PAI's own words become
-                # student truth via the provenance trail.
-                source_event_ids=[turn.user_event_id],
-                # The assistant event stays reachable for debugging ("what was
-                # PAI saying when this was extracted?") but as context, clearly
-                # separated from what evidences the claim.
-                evidence={
-                    **item.evidence,
-                    **({"context_assistant_event_id": turn.assistant_event_id}
-                       if turn.assistant_event_id else {}),
-                },
-            )
+            try:
+                candidate = candidates.propose(
+                    workspace_id=workspace_id,
+                    candidate_type=item.candidate_type,
+                    operation=item.operation,
+                    key=item.key,
+                    proposed_value=item.proposed_value,
+                    content=item.content,
+                    entities=item.entities,
+                    confidence=item.confidence,
+                    # Server-assigned. The extractor has no field for this and
+                    # cannot reach `user_explicit` — `propose()` refuses it without
+                    # `allow_user_explicit`, which this path never passes.
+                    source_type=source_type,
+                    input_channel=input_channel,
+                    # EVIDENCE — the student's event only. The assistant reply is
+                    # context for resolving references, never a factual source; a
+                    # memory attributed to it would let PAI's own words become
+                    # student truth via the provenance trail.
+                    source_event_ids=[turn.user_event_id],
+                    # The assistant event stays reachable for debugging ("what was
+                    # PAI saying when this was extracted?") but as context, clearly
+                    # separated from what evidences the claim.
+                    evidence={
+                        **item.evidence,
+                        **({"context_assistant_event_id": turn.assistant_event_id}
+                           if turn.assistant_event_id else {}),
+                    },
+                )
+            except MemoryDataError as exc:
+                logger.info("memory.extract: normalize rejected %s job=%s: %s", item.key, job.id, exc)
+                continue
             proposed.append(candidate.id)
             types_proposed.append(item.candidate_type)
 

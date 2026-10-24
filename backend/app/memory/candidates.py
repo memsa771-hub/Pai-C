@@ -8,13 +8,15 @@ hallucinated grade is a rejected candidate row you can inspect, rather than a
 corrupted Vault you have to notice.
 """
 
+import json
 import logging
 from datetime import datetime, timezone
 from typing import Any, Optional
 
 from sqlalchemy import select
 
-from app.models import MemoryCandidate
+from app.memory.errors import MemoryDataError
+from app.models import MemoryCandidate, VaultDrop
 
 logger = logging.getLogger(__name__)
 
@@ -37,6 +39,11 @@ TRUSTED_SOURCE_TYPES = ("user_explicit", "document", "conversation", "agent", "s
 # Only the explicit remember/forget tools may claim this. Enforced in
 # `propose()` via `allow_user_explicit`, which extraction never sets.
 PRIVILEGED_SOURCE_TYPES = ("user_explicit",)
+
+# Types whose values land in the Vault and so must be English, coded and ISO.
+NORMALIZED_TYPES = ("vault_fact", "student_record", "vault_item")
+_DROP_SOURCE = {"conversation": "chat", "voice": "chat", "document": "document", "profile": "details"}
+_DROP_PAYLOAD_LIMIT = 2048
 
 
 def _now() -> datetime:
@@ -102,6 +109,10 @@ class MemoryCandidateService:
         if candidate_type == "vault_fact" and key:
             from .field_definitions import FIELD_ALIASES
             key = FIELD_ALIASES.get(key, key)
+        if candidate_type in NORMALIZED_TYPES and proposed_value is not None:
+            proposed_value, evidence = self._normalize(
+                workspace_id, candidate_type, key, proposed_value, evidence,
+                input_channel, source_event_ids)
         candidate = MemoryCandidate(
             workspace_id=workspace_id,
             subject_user_id=subject_user_id,
@@ -123,6 +134,36 @@ class MemoryCandidateService:
         self.db.add(candidate)
         self.db.flush()
         return candidate
+
+    def _normalize(self, workspace_id, candidate_type, key, value, evidence,
+                   input_channel, source_event_ids):
+        """English/codes/ISO before the row exists; a rejection is logged, then raised."""
+        from app.memory.catalog import vault_catalog
+        from app.memory.normalize import normalize_candidate
+
+        evidence = dict(evidence or {})
+        result = normalize_candidate(
+            candidate_type, key, value, student_text=evidence.get("quote", "") or "")
+        if result.rejected_reason:
+            source = _DROP_SOURCE.get(input_channel or "", "chat")
+            spec = vault_catalog().type(key or "")
+            if source == "details" and spec is not None and spec.shown_on == "story":
+                source = "story"
+            payload = {"key": key, "value": value}
+            text = json.dumps(payload, ensure_ascii=False, default=str)
+            if len(text.encode("utf-8")) > _DROP_PAYLOAD_LIMIT:
+                payload = {"key": key, "value": text.encode("utf-8")[:1500].decode("utf-8", "ignore")}
+            ref = (source_event_ids[0] if source_event_ids else None) or evidence.get("file_id")
+            self.db.add(VaultDrop(
+                workspace_id=workspace_id, source=source, stage="normalize",
+                reason=result.rejected_reason, payload=payload,
+                source_ref=str(ref) if ref else None))
+            self.db.flush()
+            raise MemoryDataError(result.rejected_reason)
+        evidence["source_language"] = result.source_language
+        if result.needs_confirmation:
+            evidence["inferred"] = True
+        return result.value, evidence
 
     def get(self, workspace_id: str, candidate_id: str) -> Optional[MemoryCandidate]:
         return self.db.execute(

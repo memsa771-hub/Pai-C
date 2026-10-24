@@ -18,6 +18,7 @@ from __future__ import annotations
 import logging
 
 from app.files.storage import get_file_store
+from app.memory.errors import MemoryDataError
 from .content import ParsedDocument, Segment, segments_from_content
 from .parsers import (
     DocumentParseError, MAX_CONTENT_CHARS, parse_document, pages_needing_ocr,
@@ -313,31 +314,35 @@ async def extract_document_job(job, db) -> dict:
         if finding.candidate_type == "student_record" and finding.key == "credential" and isinstance(proposed_value, dict):
             # The source file belongs to this job, not to the extractor's JSON.
             proposed_value = {**proposed_value, "raw_document_ref": file_id}
-        candidate = candidates.propose(
-            workspace_id=workspace_id,
-            candidate_type=finding.candidate_type,
-            operation="upsert",
-            key=finding.key,
-            proposed_value=proposed_value,
-            content=finding.content,
-            entities=finding.entities or None,
-            confidence=finding.confidence,
-            # Server-assigned, from the channel this job read. The extractor
-            # has no field for it and cannot reach `user_explicit`.
-            source_type="document",
-            input_channel="document",
-            evidence={
-                **finding.evidence,
-                "file_id": file_id,
-                "filename": filename,
-                "document_type": understanding.classification,
-                "authority": authority,
-                "parser": artifact.parser,
-                "parser_version": artifact.parser_version,
-                "extractor_version": EXTRACTOR_VERSION,
-                **({"ocr": True} if artifact.ocr_used else {}),
-            },
-        )
+        try:
+            candidate = candidates.propose(
+                workspace_id=workspace_id,
+                candidate_type=finding.candidate_type,
+                operation="upsert",
+                key=finding.key,
+                proposed_value=proposed_value,
+                content=finding.content,
+                entities=finding.entities or None,
+                confidence=finding.confidence,
+                # Server-assigned, from the channel this job read. The extractor
+                # has no field for it and cannot reach `user_explicit`.
+                source_type="document",
+                input_channel="document",
+                evidence={
+                    **finding.evidence,
+                    "file_id": file_id,
+                    "filename": filename,
+                    "document_type": understanding.classification,
+                    "authority": authority,
+                    "parser": artifact.parser,
+                    "parser_version": artifact.parser_version,
+                    "extractor_version": EXTRACTOR_VERSION,
+                    **({"ocr": True} if artifact.ocr_used else {}),
+                },
+            )
+        except MemoryDataError as exc:
+            logger.info("document.extract: normalize rejected %s file=%s: %s", finding.key, file_id, exc)
+            continue
         proposed.append(candidate.id)
 
     logger.info(

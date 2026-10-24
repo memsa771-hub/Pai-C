@@ -10,6 +10,9 @@ import re
 import unicodedata
 from pathlib import Path
 
+from app.memory.catalog import vault_catalog
+from app.memory.normalize import ROMAN_URDU as _ROMAN_URDU
+
 CASES = Path(__file__).resolve().parents[2] / "tests" / "fixtures" / "vault_golden"
 LANGUAGES = ("en", "roman_ur", "ur", "mixed")
 
@@ -27,12 +30,6 @@ FACETS = {
 _EXPERIENCE_KINDS = ("activity", "project", "achievement", "work_experience",
                      "exploration_experience", "research")
 _SKILL_KINDS = ("skill", "language_proficiency", "certification")
-# Words that only occur in untranslated Roman Urdu; English values never hold them.
-_ROMAN_URDU = frozenset({
-    "hai", "hain", "nahi", "nahin", "kiya", "tha", "thi", "hoon", "mera", "meri",
-    "mujhe", "bohat", "bahut", "raha", "rahi", "abbu", "ammi", "acha", "achi",
-    "karna", "karni", "wala", "wali", "lekin", "kyunke", "sakta", "sakti",
-})
 _ARABIC_SCRIPT = re.compile(r"[؀-ۿݐ-ݿﭐ-﷿ﹰ-﻿]")
 
 
@@ -130,6 +127,11 @@ def facet_matches(match: dict, facet: dict) -> bool:
     return all(spec_matches(spec, facet.get(field)) for field, spec in match.items())
 
 
+def _label(list_name: str, code):
+    """Stored choice codes read back as their English label; other text passes through."""
+    return vault_catalog().label(list_name, code) if isinstance(code, str) else code
+
+
 def _text(*values) -> str:
     parts = []
     for value in values:
@@ -199,8 +201,8 @@ def facets_from_profile(profile: dict) -> list[dict]:
         details = row.get("details") or {}
         out.append(_facet(
             "education", level=_text(row.get("canonical_level"), row.get("qualification_name")),
-            group=_text(row.get("field_of_study"), details.get("specialization"), details.get("major")),
-            board=details.get("awarding_body"), institution=row.get("institution_name"),
+            group=_text(_label("intermediate_groups", row.get("field_of_study")), details.get("specialization"), details.get("major")),
+            board=_label("boards", details.get("awarding_body")), institution=row.get("institution_name"),
             year=_text(row.get("graduation_year"), row.get("end_date")),
             status=row.get("academic_status"), marks=_percent(row.get("result")),
             result=row.get("result")))
