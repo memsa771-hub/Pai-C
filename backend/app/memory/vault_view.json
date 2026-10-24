@@ -1,0 +1,51 @@
+{
+  "badges": {
+    "inferred": "PAI's guess",
+    "stated": "Stated",
+    "shown": "From document",
+    "confirmed": "Confirmed",
+    "in_question": "In question"
+  },
+  "sections": [
+    {"key": "about", "label": "About you"},
+    {"key": "education", "label": "Education"},
+    {"key": "tests", "label": "Tests"},
+    {"key": "money_and_place", "label": "Money and place"},
+    {"key": "documents", "label": "Documents"}
+  ],
+  "default_section": "about",
+  "document_records": {
+    "kind": "document",
+    "label": "Document",
+    "section": "documents",
+    "sensitivity": "sensitive"
+  },
+  "story_rich_min_entries": 2,
+  "answers": {
+    "default": ["keep_current", "accept_proposed", "both_true", "provide_new"],
+    "document_owner": ["keep_current", "accept_proposed"]
+  },
+  "conflict_copy": {
+    "item": {
+      "summary": "Two different answers for your {label}.",
+      "question": "Your {label} is saved differently from what you just shared. Which one is right?"
+    },
+    "fact": {
+      "summary": "Two different answers for your {label}.",
+      "question": "Which {label} is right?"
+    },
+    "record": {
+      "summary": "Two different versions of your {label}.",
+      "question": "Which {label} details are right?"
+    },
+    "document_owner": {
+      "summary": "A document may belong to someone else.",
+      "question": "Is {filename} your document?",
+      "sensitivity": "sensitive"
+    },
+    "other": {
+      "summary": "PAI needs you to check something in your Vault.",
+      "question": "Can you check this entry?"
+    }
+  }
+}

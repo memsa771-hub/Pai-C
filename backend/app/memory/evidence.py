@@ -1,6 +1,7 @@
 """Evidence labels derived from trusted provenance, not a model's claimed level."""
 import hashlib
 import json
+import re
 from pathlib import Path
 
 
@@ -38,3 +39,45 @@ def evidence_level(row, value):
                 and evidence.get("file_id"))):
         return "shown"
     return "stated"
+
+
+_PAGE_LOCATOR = re.compile(r"^p(\d+)$")
+
+
+def page_of(evidence) -> int | None:
+    """The page a document reading came from. Items carry `page`; document
+    findings carry a parser locator, where "p3" is page 3 of a PDF or photo
+    (a DOCX paragraph or table locator has no page)."""
+    evidence = evidence or {}
+    page = evidence.get("page")
+    if isinstance(page, int) and not isinstance(page, bool):
+        return page
+    match = _PAGE_LOCATOR.match(str(evidence.get("locator") or "").strip().strip("[]").strip())
+    return int(match.group(1)) if match else None
+
+
+def agrees(reading, value) -> bool:
+    """A document's reading matches the new value (a record's reading holds
+    only the fields the student changed)."""
+    if isinstance(reading, dict) and isinstance(value, dict):
+        return all(value.get(k) == v for k, v in reading.items())
+    return reading == value
+
+
+def with_disagreements(evidence, prior_row: dict, prior_value, reading, new_value, *, temporal=False) -> dict:
+    """Evidence for a student's edit that keeps a disagreeing document visible
+    (VAULT_SPEC §Evidence ladder: the student's edit wins, the document stays
+    on the entry). `prior_row` is the replaced entry as {source_type,
+    verification_status, capture_method, evidence}; `reading` is what the
+    document said, shown on the entry. Earlier disagreements are carried over
+    a later edit and dropped once the student's value matches them. A change
+    over time is not a disagreement."""
+    out = dict(evidence or {})
+    prior = prior_row.get("evidence") or {}
+    kept = [d for d in prior.get("disagreements", []) if not agrees(d.get("value"), new_value)]
+    if not temporal and evidence_level(prior_row, prior_value) == "shown" and not agrees(reading, new_value):
+        kept.append({"value": reading, "source_type": prior_row.get("source_type"),
+                     "file_id": prior.get("file_id"), "page": page_of(prior)})
+    if kept:
+        out["disagreements"] = [*out.get("disagreements", []), *kept]
+    return out

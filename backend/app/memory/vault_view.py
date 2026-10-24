@@ -1,0 +1,335 @@
+# -*- coding: utf-8 -*-
+"""The Vault view: one read model of everything the Vault holds about a student.
+
+A VIEW, never a second source of truth: facts, records and catalog items are
+read from their own stores and shaped into the Details sections, the story
+cards, the open conflict cards and the entries due for re-confirmation. Nothing
+here writes.
+
+Rules this module exists to enforce (VAULT_SPEC §Language, §Evidence ladder,
+§Conflicts, §Freshness, §Access):
+
+1. **Never the student's original words.** Entries are built from an explicit
+   list of keys; `evidence` (the verbatim quote, corroborations, model output)
+   never passes through. Values are the stored English values, and choice
+   codes are also rendered as their catalog labels in `display`.
+2. **One evidence ladder.** Facts and records take their level from
+   `evidence.evidence_level` plus the guess rung; items carry their own level.
+   The badge copy comes from vault_view.json, and an open question overrides it.
+3. **Documents open the right file.** The link is the evidence's file id and
+   page, with the filename from the workspace file table. A deleted file drops
+   the link, never the value.
+4. **The catalog decides placement.** A type's section, label, sensitivity and
+   freshness window come from its catalog entry, so a new type needs no code.
+"""
+
+import json
+from dataclasses import dataclass
+from datetime import datetime, timedelta, timezone
+from functools import lru_cache
+from pathlib import Path
+from typing import Any, Optional
+
+from sqlalchemy import select
+
+from app.models import FileRecord, ProfileIssue, VaultFact
+
+from .catalog import TypeSpec, vault_catalog
+from .evidence import evidence_level, page_of
+from .student_records import StudentRecordService
+from .vault import _unwrap, is_guess
+from .vault_items import VaultItemService
+
+HIDDEN_WHEN_NOT_SENSITIVE = ("sensitive", "restricted")
+
+
+@lru_cache(maxsize=1)
+def view_copy() -> dict:
+    """Badge copy, section labels and conflict card wording live in data."""
+    return json.loads(Path(__file__).with_name("vault_view.json").read_text(encoding="utf-8"))
+
+
+def level_of(source_type: Optional[str], verification_status: Optional[str], evidence: Optional[dict], *,
+             value: Any = None, capture_method: Optional[str] = None) -> str:
+    """The evidence ladder for a fact or record: inferred < stated < shown < confirmed.
+
+    Built on `evidence_level` (confirmation, unconfirmed OCR or unverified
+    owner, document authority) and adds the guess rung it does not know: a
+    value PAI inferred, or one an agent or the system produced, is PAI's guess.
+    `value` and `capture_method` are needed only to recognise a confirmation.
+    """
+    row = {"source_type": source_type, "verification_status": verification_status,
+           "capture_method": capture_method, "evidence": evidence or {}}
+    level = evidence_level(row, value)
+    if level in ("confirmed", "inferred"):
+        return level
+    return "inferred" if is_guess(source_type, evidence) else level
+
+
+def badge_for(level: str, in_question: bool) -> str:
+    badges = view_copy()["badges"]
+    return badges["in_question"] if in_question else badges[level]
+
+
+def _aware(moment: Any) -> Optional[datetime]:
+    """SQLite hands back naive UTC and evidence holds ISO text; compare as aware UTC."""
+    if moment is None:
+        return None
+    if isinstance(moment, str):
+        try:
+            moment = datetime.fromisoformat(moment)
+        except ValueError:
+            return None
+    return moment.replace(tzinfo=timezone.utc) if moment.tzinfo is None else moment.astimezone(timezone.utc)
+
+
+def _iso(moment: Optional[datetime]) -> Optional[str]:
+    return moment.isoformat() if moment else None
+
+
+def _skip_in_display(key: str) -> bool:
+    return key == "id" or key.endswith("_id") or key.endswith("_ids") or key == "evidence_refs"
+
+
+def _display(spec: Optional[TypeSpec], value: Any) -> str:
+    """English text for a value: choice codes become catalog labels, ids are left out."""
+    catalog = vault_catalog()
+    choices = spec.choice_fields if spec else {}
+
+    def render(node: Any, path: str) -> str:
+        if node is None:
+            return ""
+        if isinstance(node, bool):
+            return "Yes" if node else "No"
+        if isinstance(node, dict):
+            parts = [render(v, f"{path}.{k}" if path else k) for k, v in node.items() if not _skip_in_display(k)]
+            return ", ".join(p for p in parts if p)
+        if isinstance(node, list):
+            return ", ".join(p for p in (render(v, path) for v in node) if p)
+        if isinstance(node, str) and path in choices:
+            return catalog.label(choices[path], node)
+        return str(node)
+
+    return render(value, "")
+
+
+@dataclass
+class _Row:
+    """An entry plus what the view needs to place and filter it."""
+    entry: dict
+    section: Optional[str]          # Details section, or None for a story type
+    sensitivity: str
+    file_ids: set
+
+
+class VaultView:
+    def __init__(self, db):
+        self.db = db
+        self.catalog = vault_catalog()
+        self.records = StudentRecordService(db)
+        self.items = VaultItemService(db)
+
+    # ---- the view ----------------------------------------------------------
+
+    def build(self, workspace_id: str, *, include_sensitive: bool = True,
+              now: Optional[datetime] = None) -> dict:
+        copy = view_copy()
+        issues = self._open_issues(workspace_id)
+        files = self._files(workspace_id)
+        rows = self._rows(workspace_id, issues, files, _aware(now) or datetime.now(timezone.utc))
+        if not include_sensitive:
+            rows = [r for r in rows if r.sensitivity not in HIDDEN_WHEN_NOT_SENSITIVE]
+
+        details = {s["key"]: {"label": s["label"], "entries": []} for s in copy["sections"]}
+        for row in rows:
+            if row.section is not None:
+                details[row.section]["entries"].append(row.entry)
+
+        story = []
+        for spec in self.catalog.types(shown_on="story"):
+            if not include_sensitive and spec.sensitivity in HIDDEN_WHEN_NOT_SENSITIVE:
+                continue
+            entries = [r.entry for r in rows if r.section is None and r.entry["type"] == spec.key]
+            story.append({
+                "type": spec.key, "label": spec.label, "entries": entries,
+                "rich": (len(entries) >= copy["story_rich_min_entries"]
+                         or any(e["level"] == "confirmed" for e in entries)),
+                "next_step": (spec.onboarding or {}).get("prompt"),
+            })
+
+        cards = [self._card(issue, files) for issue in issues]
+        return {
+            "details": details,
+            "story": story,
+            "conflicts": [card for card, sensitivity in cards
+                          if include_sensitive or sensitivity not in HIDDEN_WHEN_NOT_SENSITIVE],
+            "stale": [r.entry for r in rows if r.entry["stale"]],
+        }
+
+    def entries_for_document(self, workspace_id: str, file_id: str) -> list[dict]:
+        """Every entry this file backs (its own evidence or a corroboration);
+        the document's own record is the file itself, not an entry from it."""
+        rows = self._rows(workspace_id, self._open_issues(workspace_id), self._files(workspace_id),
+                          datetime.now(timezone.utc))
+        kind = view_copy()["document_records"]["kind"]
+        return [r.entry for r in rows if file_id in r.file_ids and r.entry["type"] != kind]
+
+    # ---- reads -------------------------------------------------------------
+
+    def _open_issues(self, workspace_id: str) -> list[ProfileIssue]:
+        return list(self.db.scalars(select(ProfileIssue).where(
+            ProfileIssue.workspace_id == workspace_id, ProfileIssue.status == "open")
+            .order_by(ProfileIssue.created_at, ProfileIssue.id)))
+
+    def _files(self, workspace_id: str) -> dict[str, str]:
+        """file id -> filename for files still in the workspace (not in the trash)."""
+        return dict(self.db.execute(select(FileRecord.id, FileRecord.filename).where(
+            FileRecord.workspace_id == workspace_id, FileRecord.status == "active")).all())
+
+    def _rows(self, workspace_id: str, issues: list[ProfileIssue], files: dict, now: datetime) -> list[_Row]:
+        questioned = set()
+        for issue in issues:
+            evidence = issue.evidence or {}
+            if issue.affected_id:
+                questioned.add((issue.affected_type, issue.affected_id))
+            if evidence.get("current_fact_id"):
+                questioned.add(("vault_fact", evidence["current_fact_id"]))
+            if evidence.get("record_type") and evidence.get("record_id"):
+                questioned.add((evidence["record_type"], evidence["record_id"]))
+
+        rows: list[_Row] = []
+        facts = self.db.scalars(select(VaultFact).where(
+            VaultFact.workspace_id == workspace_id, VaultFact.status == "active")
+            .order_by(VaultFact.valid_from.desc()))
+        seen = set()
+        for fact in facts:
+            spec = self.catalog.type(fact.field_key)
+            if spec is None or spec.storage != "fact" or fact.field_key in seen:
+                continue  # the catalog defines what the Vault shows
+            seen.add(fact.field_key)
+            value = _unwrap(fact.value)
+            level = level_of(fact.source_type, None, fact.evidence, value=value,
+                             capture_method=fact.capture_method)
+            rows.append(self._row(
+                spec, "fact", fact.id, value, level, fact.source_type, fact.evidence, files, now,
+                observed=[fact.valid_from or fact.created_at],
+                confirmed_at=self._confirmed_at(level, fact.evidence),
+                in_question=("vault_fact", fact.id) in questioned))
+
+        document_kind = view_copy()["document_records"]["kind"]
+        kinds = [spec.key for spec in self.catalog.types(storage="record")] + [document_kind]
+        for kind in kinds:
+            spec = self.catalog.type(kind)
+            for record in self.records.list(workspace_id, kind):
+                value = self.records._values(kind, record)
+                level = level_of(record.source_type, record.verification_status, record.evidence,
+                                 value=value, capture_method=record.capture_method)
+                rows.append(self._row(
+                    spec, "record", record.id, value, level, record.source_type, record.evidence, files, now,
+                    observed=[record.updated_at or record.created_at],
+                    confirmed_at=self._confirmed_at(level, record.evidence),
+                    in_question=(kind, record.id) in questioned, record_kind=kind))
+
+        for item in self.items.active(workspace_id):
+            spec = self.catalog.type(item.item_type)
+            if spec is None:
+                continue
+            sightings = [c.get("observed_at") for c in (item.evidence or {}).get("corroborations", [])]
+            rows.append(self._row(
+                spec, "item", item.id, item.value, item.level, item.source_type, item.evidence, files, now,
+                observed=[item.observed_at or item.created_at, *sightings],
+                confirmed_at=_aware(item.confirmed_at) if item.level == "confirmed" else None,
+                in_question=item.conflict_state == "in_question" or ("vault_item", item.id) in questioned,
+                source_language=item.source_language))
+        return rows
+
+    # ---- shaping -----------------------------------------------------------
+
+    def _row(self, spec: Optional[TypeSpec], kind: str, entry_id: str, value: Any, level: str,
+             source_type: str, evidence: Optional[dict], files: dict, now: datetime, *, observed: list,
+             confirmed_at: Optional[datetime], in_question: bool, record_kind: Optional[str] = None,
+             source_language: Optional[str] = None) -> _Row:
+        evidence = evidence or {}
+        documents = view_copy()["document_records"]
+        if spec is None:  # a document record: not a catalog type, placed by vault_view.json
+            type_key, label, section, sensitivity, days = (
+                record_kind, documents["label"], documents["section"], documents["sensitivity"], None)
+            refs = [{"file_id": value.get("file_id")}]
+        else:
+            type_key, label, sensitivity, days = spec.key, spec.label, spec.sensitivity, spec.freshness_days
+            section = (spec.section or view_copy()["default_section"]) if spec.shown_on == "details" else None
+            refs = [evidence, *reversed(evidence.get("corroborations", []))]
+
+        moments = [m for m in (_aware(m) for m in [*observed, confirmed_at]) if m]
+        fresh_until = max(moments) + timedelta(days=days) if days and moments else None
+        entry = {
+            "kind": kind, "type": type_key, "id": entry_id, "value": value, "label": label,
+            "display": _display(spec, value), "level": level, "badge": badge_for(level, in_question),
+            "source": source_type, "source_language": source_language or evidence.get("source_language"),
+            "document": self._link(refs, files),
+            "observed_at": _iso(_aware(observed[0])), "confirmed_at": _iso(confirmed_at),
+            "fresh_until": _iso(fresh_until), "stale": bool(fresh_until and now > fresh_until),
+            "in_question": in_question,
+            "disagreements": [{
+                "value": d.get("value"), "display": _display(spec, d.get("value")),
+                "source": d.get("source_type"), "document": self._link([d], files),
+            } for d in evidence.get("disagreements", [])],
+        }
+        file_ids = {r.get("file_id") for r in refs if isinstance(r, dict) and r.get("file_id")}
+        return _Row(entry, section, sensitivity, file_ids)
+
+    @staticmethod
+    def _link(refs: list, files: dict) -> Optional[dict]:
+        """The first reference whose file is still in the workspace; null when gone."""
+        for ref in refs:
+            file_id = (ref or {}).get("file_id")
+            if file_id in files:
+                return {"file_id": file_id, "page": page_of(ref), "filename": files[file_id]}
+        return None
+
+    @staticmethod
+    def _confirmed_at(level: str, evidence: Optional[dict]) -> Optional[datetime]:
+        if level != "confirmed":
+            return None
+        return _aware(((evidence or {}).get("confirmation") or {}).get("confirmed_at"))
+
+    def _card(self, issue: ProfileIssue, files: dict) -> tuple[dict, str]:
+        """One conflict card (short English copy and the two values, never evidence)
+        and the sensitivity that decides whether a counselor view shows it."""
+        copy = view_copy()
+        evidence = issue.evidence or {}
+        if issue.issue_type == "document_owner":
+            form, type_key = "document_owner", None
+            current, proposed = evidence.get("vault_names"), evidence.get("document_names")
+        elif issue.affected_type == "vault_item" or evidence.get("item_type"):
+            form, type_key = "item", evidence.get("item_type")
+            current, proposed = evidence.get("current_value"), evidence.get("proposed_value")
+        elif evidence.get("field_key"):
+            form, type_key = "fact", evidence.get("field_key")
+            current, proposed = evidence.get("current_value"), evidence.get("proposed_value")
+        elif evidence.get("record_type"):
+            form, type_key = "record", evidence.get("record_type")
+            current, proposed = evidence.get("current"), evidence.get("proposed")
+        else:
+            form, type_key, current, proposed = "other", None, None, None
+
+        spec = self.catalog.type(type_key) if type_key else None
+        words = copy["conflict_copy"][form]
+        label = spec.label.lower() if spec else (type_key or "entry").replace("_", " ").replace(".", " ")
+        filename = files.get(evidence.get("file_id")) or evidence.get("filename") or "this document"
+        if spec is not None:
+            sensitivity = spec.sensitivity
+        elif type_key == copy["document_records"]["kind"]:
+            sensitivity = copy["document_records"]["sensitivity"]
+        elif type_key:
+            sensitivity = "restricted"  # not in the catalog: withheld unless everything is shown
+        else:
+            sensitivity = words.get("sensitivity", "normal")
+        return {
+            "id": issue.id, "kind": form, "type": type_key, "entry_id": issue.affected_id,
+            "summary": words["summary"].format(label=label, filename=filename),
+            "question": words["question"].format(label=label, filename=filename),
+            "current": current, "proposed": proposed,
+            "current_display": _display(spec, current), "proposed_display": _display(spec, proposed),
+            "answers": list(copy["answers"].get(issue.issue_type, copy["answers"]["default"])),
+        }, sensitivity

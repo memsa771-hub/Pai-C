@@ -12,6 +12,7 @@ from app.models import (
     ScholarshipApplication, VisaRecord,
 )
 from .errors import MemoryDataError
+from .evidence import with_disagreements
 from .domain_stewards import EntityAmbiguity, RecordDomainSteward
 from .student_schema import RECORD_SPECS, validate_record
 from .vault import is_guess
@@ -257,6 +258,18 @@ class StudentRecordService:
                           "current_evidence": current.evidence, "proposed_evidence": evidence}))
             self.db.flush()
             raise RecordNeedsReview("The new evidence conflicts with an existing record")
+        if current is not None and source_type == "user_explicit" and merged != before:
+            # The student's edit wins; the fields a document read differently
+            # stay visible on the record (VAULT_SPEC §Evidence ladder).
+            reading = {key: before[key] for key in values
+                       if key in before and not _same(before[key], merged.get(key))}
+            kept = with_disagreements(
+                evidence, {"source_type": current.source_type, "verification_status": current.verification_status,
+                           "capture_method": current.capture_method, "evidence": current.evidence},
+                before, reading, merged,
+                temporal=(evidence or {}).get("semantic_temporal_change") is True)
+            if "disagreements" in kept:
+                evidence = kept
         if current:
             if merged != before:
                 for key, value in merged.items():
