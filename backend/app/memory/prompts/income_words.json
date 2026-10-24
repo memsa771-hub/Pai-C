@@ -1,0 +1,18 @@
+{
+  "_note": "Household income is never collected or stored (VAULT_SPEC, Money). The extractor drops a money fact, family_member or pressure whose quote or value states an income figure. Words match on word boundaries, case-insensitive. Phrases in 'never' are removed first, so 'low-income families' is not income. 'amount_cues' mark a free-text family field as carrying a money figure.",
+  "words": [
+    "income", "incomes", "salary", "salaries", "wage", "wages", "pension", "pensions",
+    "earn", "earns", "earning", "earnings", "earned", "is paid", "are paid", "gets paid",
+    "tankhwah", "tankhwa", "tankha", "tankhah", "kamai", "kamata", "kamate", "kamati",
+    "amdani", "amdni", "aamdani"
+  ],
+  "patterns": [
+    "makes?\\b.{0,40}?\\b(?:a|per|every|each) month",
+    "makes?\\b.{0,40}?\\bmonthly"
+  ],
+  "never": ["low-income", "low income"],
+  "amount_cues": [
+    "a month", "per month", "monthly", "a year", "per year", "yearly", "rupees", "rs", "pkr",
+    "lakh", "lac", "hazar", "thousand", "mahine", "mahina", "salana"
+  ]
+}

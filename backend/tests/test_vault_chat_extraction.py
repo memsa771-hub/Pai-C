@@ -135,6 +135,12 @@ def test_prompt_mentions_every_item_type():
         assert spec.key in SYSTEM_PROMPT, spec.key
     assert '"inferred": true' in SYSTEM_PROMPT
     assert "household" in SYSTEM_PROMPT and "income" in SYSTEM_PROMPT
+    assert "goes to finance.budget" in SYSTEM_PROMPT
+    assert "pressure item with kind money and no number" in SYSTEM_PROMPT
+    assert "status considering|ruled_out" in SYSTEM_PROMPT
+    assert "PAI's own interpretations only with" in SYSTEM_PROMPT
+    assert "doubt or confusion" in SYSTEM_PROMPT
+    assert "<code" not in SYSTEM_PROMPT and "<enum" not in SYSTEM_PROMPT
     assert "Latin script" in SYSTEM_PROMPT and "verbatim" in SYSTEM_PROMPT
     # The old Truth Map bans are gone.
     assert "Motivations, drivers" not in SYSTEM_PROMPT
@@ -153,24 +159,101 @@ async def _extract(text, candidates, keys=("finance.budget",)):
 
 
 @pytest.mark.asyncio
-async def test_budget_range_must_be_in_the_students_words_and_income_is_never_kept():
-    text = "Hum saal ka 2 se 3 lakh de sakte hain. Abbu ki income 80 hazar hai. Fees afford nahi hoti"
+async def test_budget_range_must_be_in_the_students_words():
+    text = "Hum saal ka 2 se 3 lakh de sakte hain."
     budget = {"candidate_type": "vault_fact", "key": "finance.budget", "quote": "2 se 3 lakh",
               "confidence": 0.9}
     out = await _extract(text, [
         {**budget, "proposed_value": {"min": 200000, "max": 300000, "currency": "PKR", "period": "per_year"}},
         {**budget, "proposed_value": {"min": 500000, "currency": "PKR"}},
-        _item("family_member", {"relation": "father", "occupation": "Income 80,000 a month"},
-              "Abbu ki income 80 hazar hai"),
-        _item("pressure", {"text": "Cannot afford the fees", "kind": "money"}, "Fees afford nahi hoti"),
     ])
     assert isinstance(out, ExtractionOutput)
-    assert [(c.candidate_type, c.key) for c in out.candidates] == [
-        ("vault_fact", "finance.budget"), ("vault_item", "pressure")]
-    assert out.candidates[0].proposed_value["min"] == 200000
-    reasons = [d["reason"] for d in out.drops]
-    assert len(reasons) == 2
-    assert any("min" in r for r in reasons) and any("income" in r for r in reasons)
+    assert [c.proposed_value.get("min") for c in out.candidates] == [200000]
+    assert len(out.drops) == 1 and "min" in out.drops[0]["reason"]
+
+
+def _budget(quote, amount, period="per_month"):
+    return {"candidate_type": "vault_fact", "key": "finance.budget", "quote": quote, "confidence": 0.9,
+            "proposed_value": {"amount": amount, "currency": "PKR", "period": period}}
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("text,amount", [
+    ("Abbu ki tankhwah 80 hazar hai", 80000),
+    ("Abbu ki tankhwa 80 hazar", 80000),
+    ("Family earns 1 lakh a month", 100000),
+    ("Father makes 80,000 a month", 80000),
+    ("Ammi ki pension 30 hazar aati hai", 30000),
+])
+async def test_income_in_the_quote_drops_money_facts_and_family(text, amount):
+    out = await _extract(text, [
+        _budget(text, amount),
+        _item("family_member", {"relation": "father", "occupation": "Teacher"}, text),
+        _item("pressure", {"text": "Money is tight", "kind": "money"}, text),
+    ])
+    assert out.candidates == []
+    assert [d["reason"] for d in out.drops] == ["household_income"] * 3
+    for d in out.drops:
+        # The figure never reaches the drop log: no value, no quote.
+        assert set(d["payload"]) == {"candidate_type", "key", "reason"}
+        assert not any(ch.isdigit() for ch in json.dumps(d["payload"]))
+
+
+@pytest.mark.asyncio
+async def test_money_for_study_is_kept():
+    text = "Mere paas fees ke liye 3 lakh hain"
+    out = await _extract(text, [_budget(text, 300000, "total")])
+    assert [c.key for c in out.candidates] == ["finance.budget"] and out.drops == []
+
+
+@pytest.mark.asyncio
+async def test_family_member_figure_is_stripped():
+    text = "Abbu dukandar hain, mahine ka 50 hazar"
+    out = await _extract(text, [_item("family_member", {
+        "relation": "father", "occupation": "Shopkeeper, about 50,000 a month",
+        "wish": "Wants me to study medicine"}, text)])
+    assert [c.proposed_value for c in out.candidates] == [
+        {"relation": "father", "wish": "Wants me to study medicine"}]
+
+
+@pytest.mark.asyncio
+async def test_students_own_pay_and_low_income_are_not_income_drops():
+    text = ("Main shop par cashier hoon, meri tankhwah 20 hazar hai. Main low-income families ke bachon "
+            "ko parhata hoon. We are a low income family, 3 lakh se zyada fees afford nahi kar sakte")
+    out = await _extract(text, [
+        {"candidate_type": "student_record", "key": "work_experience", "confidence": 0.9,
+         "quote": "Main shop par cashier hoon, meri tankhwah 20 hazar hai",
+         "proposed_value": {"organization": "Shop", "role": "Cashier",
+                            "details": {"responsibilities": ["Paid a salary of 20,000 a month"]}}},
+        {"candidate_type": "student_record", "key": "activity", "confidence": 0.9,
+         "quote": "Main low-income families ke bachon ko parhata hoon",
+         "proposed_value": {"title": "Teaches children from low-income families", "activity_type": "volunteering"}},
+        _item("pressure", {"text": "Low income family", "kind": "money"}, "We are a low income family"),
+        # An affordability limit is a budget clue, not income (ruling M1).
+        _item("pressure", {"text": "Cannot afford fees above 3 lakh", "kind": "money"},
+              "3 lakh se zyada fees afford nahi kar sakte"),
+    ], keys=())
+    assert [c.key for c in out.candidates] == ["work_experience", "activity", "pressure", "pressure"]
+    assert out.drops == []
+
+
+@pytest.mark.asyncio
+async def test_drops_reach_the_vault_drop_log_without_the_income_figure():
+    text = "Abbu ki tankhwah 85 hazar hai. Mujhe robotics pasand hai"
+    outputs = [[
+        _budget("Abbu ki tankhwah 85 hazar hai", 85000),
+        _item("interest", {"text": "Chess"}, "I love chess"),
+        _item("interest", {"text": "Robotics"}, "Mujhe robotics pasand hai"),
+    ]]
+    state = await _run_turns([text], outputs)
+    assert [i.value for i in state.items] == [{"text": "Robotics"}]
+    by_reason = {d.reason: d for d in state.drops}
+    assert set(by_reason) == {"household_income", "quote not found in the student's message"}
+    income = by_reason["household_income"]
+    assert income.payload == {"candidate_type": "vault_fact", "key": "finance.budget",
+                              "reason": "household_income"}
+    assert "85" not in json.dumps([income.reason, income.payload])
+    assert by_reason["quote not found in the student's message"].payload["proposed_value"] == {"text": "Chess"}
 
 
 @pytest.mark.asyncio
@@ -180,3 +263,8 @@ async def test_candidates_over_the_limit_are_logged_not_silently_cut():
     out = await _extract(text, many)
     assert len(out.candidates) == extractor.MAX_CANDIDATES
     assert [d["reason"] for d in out.drops] == ["over_candidate_limit"] * 2
+
+
+def test_primary_interest_is_not_a_chat_input():
+    # Interests from chat are interest items; the catalog must agree with the extractor.
+    assert "chat" not in vault_catalog().type("career.primary_interest").inputs

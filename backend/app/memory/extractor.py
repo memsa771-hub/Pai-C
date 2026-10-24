@@ -87,10 +87,29 @@ def _render_catalog() -> str:
     return "\n".join(lines)
 
 
+def _render_codes(text: str) -> str:
+    """Fill <enum type.field/> with that field's codes and <code type.field c/>
+    with c, failing at import if the catalog no longer has it, so the prose
+    can never name a code the validator would reject."""
+    from app.memory.catalog import vault_catalog
+
+    def enum(type_field: str) -> list[str]:
+        type_key, field_name = type_field.rsplit(".", 1)
+        return list(vault_catalog().type(type_key).schema["properties"][field_name]["enum"])
+
+    def code(match) -> str:
+        if match.group(2) not in enum(match.group(1)):
+            raise ValueError(f"extractor prompt names unknown code {match.group(2)!r} for {match.group(1)}")
+        return match.group(2)
+
+    text = re.sub(r"<enum ([\w.]+)/>", lambda m: "|".join(enum(m.group(1))), text)
+    return re.sub(r"<code ([\w.]+) (\w+)/>", code, text)
+
+
 # Loaded once; the catalog block is filled in here so the eval fingerprint
 # (scripts/eval_vault.py) changes whenever the catalog does.
-SYSTEM_PROMPT = (Path(__file__).with_name("prompts") / "extractor.md").read_text(
-    encoding="utf-8").replace("<vault_catalog/>", _render_catalog())
+SYSTEM_PROMPT = _render_codes((Path(__file__).with_name("prompts") / "extractor.md").read_text(
+    encoding="utf-8")).replace("<vault_catalog/>", _render_catalog())
 
 _STOPPED_RECORD_KINDS = frozenset({"student_voice_statement", "external_influence"})
 _GOAL_TARGET_DETAILS = frozenset({"stated_preference", "target_countries", "degree_level", "field_of_study", "target_intake"})
@@ -331,14 +350,38 @@ def _normalize_currencies(value):
 
 
 _MONEY_FIELDS = ("amount", "value", "tuition", "cost", "min", "max")
-_INCOME = re.compile(r"\b(income|salary|salaries|earnings|earns|tankhwah|kamai)\b", re.IGNORECASE)
+def _income_rules():
+    """Compile prompts/income_words.json (a data file: no language lists in code)."""
+    data = json.loads((Path(__file__).with_name("prompts") / "income_words.json").read_text(encoding="utf-8"))
+
+    def words(items):
+        return re.compile(r"\b(?:" + "|".join(re.escape(w).replace(r"\ ", r"\s+") for w in items) + r")\b",
+                          re.IGNORECASE)
+
+    income = re.compile("|".join([words(data["words"]).pattern, *data["patterns"]]), re.IGNORECASE)
+    return income, words(data["never"]), words(data["amount_cues"])
+
+
+_INCOME, _NOT_INCOME, _AMOUNT_CUE = _income_rules()
+# Only these can carry a household's money; the student's own records (their
+# pay at a job, "low-income families" in an activity) are not household income.
+_INCOME_GUARDED_ITEMS = frozenset({"family_member", "pressure"})
+
+
+def _text_of(value) -> str:
+    return value if isinstance(value, str) else json.dumps(value, ensure_ascii=False, default=str)
 
 
 def _states_income(value) -> bool:
-    """A family's income figure in a proposal. The spec never stores one,
-    whatever the student volunteered; the budget for study is asked instead."""
-    text = json.dumps(value, ensure_ascii=False, default=str)
+    """An income word and a figure together: a household income was stated.
+    The spec never stores one, whatever the student volunteered."""
+    text = _NOT_INCOME.sub(" ", _text_of(value))
     return bool(_INCOME.search(text)) and bool(re.search(r"\d", text))
+
+
+def _carries_money_figure(text: str) -> bool:
+    """A free-text field with a figure and a money cue ("about 50,000 a month")."""
+    return _states_income(text) or (bool(re.search(r"\d", text)) and bool(_AMOUNT_CUE.search(text)))
 
 
 _MULTIPLIERS = {"k": 1e3, "thousand": 1e3, "m": 1e6, "million": 1e6, "lakh": 1e5, "crore": 1e7}
@@ -392,11 +435,16 @@ def _validate(raw: dict, turn, allowed_vault_keys: set[str],
     """
     original = raw
 
-    def drop(reason: str) -> None:
+    def drop(reason: str, redact: bool = False) -> None:
         logger.info("memory: dropped candidate — %s", reason)
         if drops is not None:
-            payload = ({k: original.get(k) for k in ("candidate_type", "key", "proposed_value")}
-                       if isinstance(original, dict) else {"raw": original})
+            if redact:
+                # The drop log must never hold the figure either: no value, no quote.
+                payload = {"candidate_type": raw.get("candidate_type"), "key": raw.get("key"), "reason": reason}
+            elif isinstance(original, dict):
+                payload = {k: original.get(k) for k in ("candidate_type", "key", "proposed_value")}
+            else:
+                payload = {"raw": original}
             drops.append({"reason": reason, "payload": payload})
         return None
 
@@ -441,8 +489,13 @@ def _validate(raw: dict, turn, allowed_vault_keys: set[str],
     evidence = {"quote": quote[:500], "user_event_id": turn.user_event_id}
     if raw.get("inferred") is True:
         evidence["inferred"] = True
-    if _states_income(raw.get("proposed_value")):
-        return drop("household income is never stored")
+    key = raw.get("key")
+    guarded = ((candidate_type == "vault_fact" and isinstance(key, str) and key.startswith("finance."))
+               or (candidate_type == "vault_item" and key in _INCOME_GUARDED_ITEMS))
+    # The quote is checked too: a budget of {"amount": 80000} is only numbers,
+    # but "Abbu ki tankhwah 80 hazar hai" says whose money it is.
+    if guarded and (_states_income(quote) or _states_income(raw.get("proposed_value"))):
+        return drop("household_income", redact=True)
     from .voice_attribution import contained, validated_attribution
     attribution = raw.get("attribution")
     if (isinstance(attribution, dict) and attribution.get("correction") is True
@@ -540,13 +593,17 @@ def _validate(raw: dict, turn, allowed_vault_keys: set[str],
         value = _strip_placeholders(raw.get("proposed_value"))
         if not isinstance(value, dict):
             return drop(f"{key} item stated no actual values")
+        if key == "family_member":
+            # A parent's pay in a free-text field ("Shopkeeper, about 50,000 a
+            # month") loses that field; the rest of the person is kept.
+            kept = {f: v for f, v in value.items() if not (isinstance(v, str) and _carries_money_figure(v))}
+            if kept != value:
+                drop("household_income", redact=True)
+                value = kept
         try:
             validate_schema_instance(spec.schema, value)
         except SchemaValidationError as exc:
             return drop(f"{key} item invalid: {exc}")
-        # "Can't afford" is a stated pressure, never a number (VAULT_SPEC, Money).
-        if key == "pressure" and value.get("kind") == "money" and re.search(r"\d", value["text"]):
-            return drop("money pressure carries a number")
         # Item ids are not in the turn context; only the student's own edit
         # names one, so a model-supplied id is never passed on.
         return ExtractedCandidate(

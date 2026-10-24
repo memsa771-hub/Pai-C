@@ -999,7 +999,6 @@
    "storage": "fact",
    "shown_on": "story",
    "inputs": [
-    "chat",
     "story"
    ],
    "sensitivity": "normal",
