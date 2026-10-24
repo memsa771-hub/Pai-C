@@ -44,6 +44,12 @@ def test_every_type_is_valid():
     assert catalog.type("family_member").identity == ["relation", "name"]
     assert catalog.type("finance.budget").freshness_days == 180
     assert catalog.type("goal").freshness_days == 90
+    assert catalog.type("certainty").conflict == "latest_wins"
+    assert catalog.type("education").choice_fields == {
+        "qualification_name": "levels", "details.awarding_body": "boards",
+        "field_of_study": "intermediate_groups"}
+    assert "basis" in catalog.type("strength").schema["properties"]
+    assert "evidence" not in catalog.type("strength").schema["properties"]
     assert catalog.type("education").freshness_days is None
     assert [t.key for t in catalog.types(shown_on="details", storage="item")] == ["domicile", "quota"]
     onboarding = [t for t in types if t.onboarding]
@@ -100,3 +106,18 @@ def test_bad_type_raises_value_error_naming_it():
         VaultCatalog.from_dict({"choices": {}, "types": [
             {"key": "broken_type", "storage": "item", "shown_on": "nowhere", "inputs": ["chat"],
              "sensitivity": "normal", "conflict": "latest_wins", "freshness_days": 1, "version": 1}]})
+
+
+def _choice(code, label, *synonyms):
+    return {"code": code, "label": label, "synonyms": list(synonyms)}
+
+
+def test_clashing_choice_wording_is_rejected():
+    from app.memory.catalog import VaultCatalog
+    clash = {"choices": {"relations": [_choice("father", "Father", "abu"), _choice("uncle", "Uncle", "Abu")]},
+             "types": []}
+    with pytest.raises(ValueError, match="relations.*Abu"):
+        VaultCatalog.from_dict(clash)
+    duplicate = {"choices": {"tests": [_choice("sat", "SAT"), _choice("sat", "SAT again")]}, "types": []}
+    with pytest.raises(ValueError, match="tests"):
+        VaultCatalog.from_dict(duplicate)

@@ -126,13 +126,24 @@ class VaultCatalog:
     def __init__(self, types: list[TypeSpec], choices: dict[str, list[Choice]]):
         self._types = {t.key: t for t in types}
         self._choices = choices
-        self._lookup = {
-            name: {norm(text): c.code for c in items for text in (c.code, c.label, *c.synonyms)}
-            for name, items in choices.items()}
-        # Underscores in codes read as spaces to a person ("pre_medical").
-        for name, items in choices.items():
-            for c in items:
-                self._lookup[name].setdefault(norm(c.code.replace("_", " ")), c.code)
+        self._lookup = {name: self._index(name, items) for name, items in choices.items()}
+
+    @staticmethod
+    def _index(name: str, items: list) -> dict:
+        """Wording -> code for one list; the same wording for two codes is a catalog bug."""
+        index: dict = {}
+        codes = [c.code for c in items]
+        for code in set(codes):
+            if codes.count(code) > 1:
+                raise ValueError(f"Invalid choice list {name!r}: code {code!r} is defined twice")
+        for c in items:
+            wordings = [c.code, c.label, *c.synonyms, c.code.replace("_", " ")]
+            for text in wordings:
+                seen = index.setdefault(norm(text), c.code)
+                if seen != c.code:
+                    raise ValueError(
+                        f"Invalid choice list {name!r}: {text!r} maps to both {seen!r} and {c.code!r}")
+        return index
 
     @classmethod
     def from_dict(cls, data: dict) -> "VaultCatalog":

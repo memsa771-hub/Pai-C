@@ -1106,7 +1106,8 @@
    "version": 1,
    "choice_fields": {
     "qualification_name": "levels",
-    "details.awarding_body": "boards"
+    "details.awarding_body": "boards",
+    "field_of_study": "intermediate_groups"
    },
    "onboarding": {
     "order": 2,
@@ -1338,7 +1339,7 @@
       "minLength": 1,
       "maxLength": 500
      },
-     "evidence": {
+     "basis": {
       "type": "string",
       "minLength": 1,
       "maxLength": 500
@@ -1510,7 +1511,7 @@
     "story"
    ],
    "sensitivity": "normal",
-   "conflict": "ask_student",
+   "conflict": "latest_wins",
    "freshness_days": 90,
    "version": 1,
    "schema": {
