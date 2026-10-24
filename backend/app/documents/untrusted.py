@@ -8,9 +8,8 @@ A PDF or DOCX is attacker-supplied text. Anyone can write
 into a document and upload it. That sentence must be readable as *content*
 and inert as *instruction*.
 
-The shape mirrors `app/memory/foreground.py`'s MEMORY_RULES/TRAILER: rules
-before the data, the data inside a named tag, and the boundary restated
-afterwards — because the block is otherwise the last thing the model reads,
+The shape: rules before the data, the data inside a named tag, and the
+boundary restated afterwards — because the block is otherwise the last thing the model reads,
 which is exactly when injected text gets obeyed.
 
 Defence is layered rather than clever:

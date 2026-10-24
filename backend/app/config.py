@@ -272,14 +272,6 @@ class Config:
     MEMORY_RETRIEVAL_LIMIT: int = int(os.environ.get("MEMORY_RETRIEVAL_LIMIT", "8"))
     MEMORY_RERANKER: str = os.environ.get("MEMORY_RERANKER", "")
 
-    # ---- Shared student-context rendering (app/memory/foreground.py) ------
-    # Hard ceiling on the rendered student-context block. MemoryContextService
-    # already caps per section; this is the backstop so pathological values
-    # (a very long free-text Vault field) cannot expand the system prompt.
-    # Conservative on purpose — this is context, not the conversation.
-    PAI_MEMORY_CONTEXT_MAX_CHARS: int = int(
-        os.environ.get("PAI_MEMORY_CONTEXT_MAX_CHARS", "6000")
-    )
     # --- Per-agent model configuration ---------------------------------
     # Counselor turns always carry function tools, and /v1/chat/completions
     # pins a tool-calling request to reasoning_effort="none" (see

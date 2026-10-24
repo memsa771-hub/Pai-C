@@ -33,15 +33,6 @@ class VaultFieldError(MemoryDataError):
     """A proposed value does not satisfy its field definition."""
 
 
-def usable_in_counseling(definition) -> bool:
-    """Restricted identifiers never enter routine conversation prompts."""
-    return definition is not None and (
-        definition.sensitivity == "normal" or
-        (definition.sensitivity == "sensitive" and
-         "counseling" in (definition.context_tags or []))
-    )
-
-
 def catalog_field_definitions() -> list[dict]:
     """Upsert specs for every catalog fact: the definitions production's
     migrations seed, kept as data in the Vault catalog. Isolated students in

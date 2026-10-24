@@ -25,14 +25,14 @@ from sqlalchemy.pool import StaticPool
 from app.database import Base, get_db
 from app.main import app
 from app.memory.field_definitions import VaultFieldDefinitionService, catalog_field_definitions
-from app.memory.student_context import StudentContextBuilder
 from app.memory.student_records import ENTITY_MODELS
 from app.memory.vault import VaultService
+from app.pai_c.memory import MemoryService
 from app.models import (
     BackgroundJob, EventRecord, FileRecord, MemoryCandidate, PaiEpisode, PaiMemory,
     ProfileFieldResponse, ProfileIssue, ProfileRequirement, StudentRecordRevision, User, VaultFact,
     VaultFieldDefinition, Workspace, VAULT_INTAKE_MODELS,
-    Roadmap, RoadmapStudentState, VaultDrop,
+    Roadmap, RoadmapStudentState, VaultDrop, VaultItem,
 )
 
 
@@ -77,7 +77,7 @@ def api():
               ProfileFieldResponse,
               StudentRecordRevision,
               BackgroundJob, *ENTITY_MODELS.values(), *VAULT_INTAKE_MODELS]
-    tables.extend([Roadmap, RoadmapStudentState, VaultDrop])
+    tables.extend([Roadmap, RoadmapStudentState, VaultDrop, VaultItem])
     Base.metadata.create_all(engine, tables=[model.__table__ for model in tables])
 
     session = Session(engine, autoflush=False)
@@ -218,9 +218,9 @@ def test_profile_edit_is_visible_to_the_counselor(api):
     _edit(client, network, record_type="education", record_id=created["id"],
           value={"result": {"gpa": 3.52, "gpa_scale": 4}})
 
-    context = StudentContextBuilder(session).build_context(
-        network, query="What should I study?")
-    assert context.records["education"][0]["result"]["gpa"] == 3.52
+    entries = MemoryService(session).counselor_vault(network, "What should I study?")["entries"]
+    education = json.dumps([e for e in entries if e["type"] == "education"])
+    assert "3.52" in education and "3.42" not in education
 
 
 def test_edit_endpoint_rejects_an_unknown_record_type_and_ambiguous_payloads(api):

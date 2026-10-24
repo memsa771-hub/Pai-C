@@ -9,7 +9,7 @@
             |
     Vault / Semantic / Episodes
             |
-      MemoryContextService    (the single read path for prompts)
+      Vault view              (vault_view.py; vault_context.py picks each turn's slice)
           /            \
   PAI Counselor      PAI Operator
 
