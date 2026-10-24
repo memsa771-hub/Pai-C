@@ -464,12 +464,68 @@ def test_document_entries(api):
 
 
 def test_income_in_a_rejected_value_is_not_logged(api):
+    """The normalize-stage drop is redacted too, for any caller of propose
+    (the Vault page refuses income before this, so propose is called directly)."""
+    from app.memory.candidates import MemoryCandidateService
+    from app.memory.errors import MemoryDataError
+
     client, db, ws = api
-    rejected = client.post(_url(ws, "/entries"), headers=HEADERS, json={
-        "type": "finance.budget", "value": {"covers": "fees_only"},
-        "text": "Abba ki income 80000 hai, fees only"})
-    assert rejected.status_code == 400
+    with pytest.raises(MemoryDataError):
+        MemoryCandidateService(db).propose(
+            ws, "vault_fact", key="finance.budget", proposed_value={"covers": "fees_only"},
+            source_type="user_explicit", allow_user_explicit=True, input_channel="profile",
+            evidence={"quote": "Abba ki income 80000 hai, fees only"})
+    db.rollback()
     [drop] = _ok(client.get(_url(ws, "/drops"), headers=HEADERS))["drops"]
     assert drop["reason"] == "empty_budget"
     assert drop["payload"] == {"key": "finance.budget", "reason": "empty_budget"}
     assert "80000" not in json.dumps(drop)
+
+
+INCOME_REFUSED = "Household income isn't stored. You can add an approximate study budget instead."
+
+
+def _income_drops(client, ws):
+    return [d for d in _ok(client.get(_url(ws, "/drops"), headers=HEADERS))["drops"]
+            if d["reason"] == "household_income"]
+
+
+def test_household_income_is_refused_roman_urdu(api):
+    client, db, ws = api
+    refused = client.post(_url(ws, "/entries"), headers=HEADERS, json={
+        "type": "pressure", "value": {"text": "Abba ki tankhwah 40000 hai"}})
+    assert refused.status_code == 400 and refused.json()["message"] == INCOME_REFUSED
+    assert VaultItemService(db).active(ws) == []
+    assert db.scalars(select(MemoryCandidate)).all() == []
+    [drop] = _income_drops(client, ws)
+    assert drop["payload"] == {"key": "pressure", "reason": "household_income"}
+    assert "40000" not in json.dumps(drop)
+
+
+def test_household_income_is_refused_english_and_on_edit(api):
+    client, db, ws = api
+    refused = client.post(_url(ws, "/entries"), headers=HEADERS, json={
+        "type": "finance.budget", "value": {"amount": 30000, "currency": "PKR", "period": "per_month"},
+        "text": "My father's salary is 30000 a month"})
+    assert refused.status_code == 400 and refused.json()["message"] == INCOME_REFUSED
+    member = _ok(client.post(_url(ws, "/entries"), headers=HEADERS,
+                             json={"type": "family_member", "value": {"relation": "father"}}))
+    edited = client.patch(_url(ws, f"/entries/item/{member['id']}"), headers=HEADERS, json={
+        "value": {"relation": "father", "occupation": "Teacher, his income is 50000 per month"}})
+    assert edited.status_code == 400 and edited.json()["message"] == INCOME_REFUSED
+    [entry] = _entries(_ok(client.get(_url(ws), headers=HEADERS)), "family_member")
+    assert entry["value"] == {"relation": "father"}
+    assert _entries(_ok(client.get(_url(ws), headers=HEADERS)), "finance.budget") == []
+    drops = _income_drops(client, ws)
+    assert len(drops) == 2 and "30000" not in json.dumps(drops) and "50000" not in json.dumps(drops)
+
+
+def test_a_study_budget_is_still_accepted(api):
+    client, db, ws = api
+    saved = _ok(client.post(_url(ws, "/entries"), headers=HEADERS, json={
+        "type": "finance.budget", "value": {"band": "3_6_lakh", "period": "per_year", "covers": "fees_only"},
+        "text": "We can spend about 3 to 6 lakh a year on fees"}))
+    assert saved["saved"] is True
+    [entry] = _entries(_ok(client.get(_url(ws), headers=HEADERS)), "finance.budget")
+    assert entry["value"]["band"] == "3_6_lakh"
+    assert _income_drops(client, ws) == []
