@@ -198,14 +198,16 @@ def test_migrated_family_visible_in_same_context_budget_and_retired_excluded(mon
     monkeypatch.setattr(config, "PAI_COUNSELOR_NOTEBOOK_CONTEXT_TOKENS", 1800)
     original = v2()
     notebook = CounselorNotebookData.model_validate(migrate_v2(original))
-    context = _trim_notebook(notebook)
+    # The turn named the family, so the topic gate lets notebook people through.
+    context = _trim_notebook(notebook, {"family_member"})
     person = context["world"]["people"][0]
     previous = original["pressures"]["people"][0]
     assert (person["role"], person["wish"], person["worry"]) == (previous["role"], previous["wish"], previous["concern"])
     assert estimated_tokens(_json(context)) <= 1800
     assert list(context["world"]) == ["people", "daily_life", "social", "responsibilities", "education_story"]
     notebook.world.people[0].status = "retired"
-    assert not _trim_notebook(notebook)["world"]["people"]
+    assert not _trim_notebook(notebook, {"family_member"})["world"]["people"]
+    assert "people" not in _trim_notebook(notebook)["world"]
 
 
 def test_readiness_foundation_and_prompt_guard_unchanged():

@@ -1,5 +1,5 @@
 {
-  "_about": "Which Vault entries a model sees for one turn (VAULT_SPEC Access: counselor gets relevant entries, sensitive only when needed, restricted never). Read by app/memory/vault_context.py. trigger_exclude: relation wordings too common outside family talk (api is also an English word; bro/bhai/baba/dada are forms of address) to unlock family entries on their own.",
+  "_about": "Which Vault entries a model sees for one turn (VAULT_SPEC Access: counselor gets relevant entries, sensitive only when needed, restricted never). Read by app/memory/vault_context.py. notebook_gates: Truth Map notebook paths that pass the same gate as the Vault type they mirror (a person with their wish and worry is a family_member). trigger_exclude: relation wordings too common outside family talk (api is also an English word; bro/bhai/baba/dada are forms of address) to unlock family entries on their own.",
   "core_types": [
     "identity.preferred_name",
     "identity.current_status",
@@ -138,6 +138,10 @@
     "dada",
     "baba"
   ],
+  "notebook_gates": {
+    "world.people": "family_member",
+    "pressures": "pressure"
+  },
   "area_topics": {
     "family_social": "family",
     "pressures": "pressure"

@@ -41,11 +41,19 @@ def _short(value: object, limit: int = 350) -> object:
     return value
 
 
-def _trim_notebook(notebook) -> dict:
+def _trim_notebook(notebook, sensitive_types=frozenset()) -> dict:
+    """The notebook within its token budget. People (with their wishes and
+    worries) and pressures are as sensitive as the Vault types they mirror, so
+    they come in only when `sensitive_types` (the Vault topic gate for this
+    turn) holds that type."""
+    from app.memory.vault_context import context_policy
     source = notebook.model_dump(mode="json")
     selected: dict = {}
     active_paths = (*load_policy()["item_paths"], load_policy()["person_path"])
+    gates = context_policy()["notebook_gates"]
     for key in _NOTEBOOK_ORDER:
+        if key in gates and gates[key] not in sensitive_types:
+            continue
         value = _short(at_path(source, key))
         if key in active_paths:
             value = [item for item in value if item.get("status", "active") == "active"]
@@ -175,6 +183,7 @@ async def build_context(db, workspace_id: str, turn: CounselorTurnInput, *,
     plan = MemoryService(db).latest_plan(workspace_id)
     # The areas the counselor is exploring also name a sensitive topic.
     topics = [topic for topic in (getattr(decision, "topic", None), getattr(plan, "target_gap", None)) if topic]
+    trigger_text = _previous_counselor_text(db, workspace_id, turn)
     sections: dict[str, str] = {
         "today": datetime.now(timezone.utc).date().isoformat(),
         "language_policy": _json({
@@ -184,7 +193,7 @@ async def build_context(db, workspace_id: str, turn: CounselorTurnInput, *,
             "fallback_reply": config.PAI_COUNSELOR_FALLBACK_REPLY,
         }),
         "profile": _json(_profile(db, workspace_id, snapshot, student_text=turn.student_text,
-                                  trigger_text=_previous_counselor_text(db, workspace_id, turn), topics=topics)),
+                                  trigger_text=trigger_text, topics=topics)),
     }
     memory = MemoryService(db)
     notebook = memory.truth_map(workspace_id).notebook
@@ -202,7 +211,9 @@ async def build_context(db, workspace_id: str, turn: CounselorTurnInput, *,
             {"between": item.between, "evidence": item.evidence, "status": item.status}
             for item in notebook.tensions])
     else:
-        sections["notebook"] = _json(_trim_notebook(notebook))
+        from app.memory.vault_context import sensitive_types_for
+        sections["notebook"] = _json(_trim_notebook(
+            notebook, sensitive_types_for(f"{trigger_text} {turn.student_text}", topics)))
     from app.pai_c.deep.noted_questions import NotedQuestionService
     sections["open_requests"] = _json(NotedQuestionService(db).open_requests(workspace_id))
     journey = next((item for item in JourneyService(db).list(workspace_id, status="active")

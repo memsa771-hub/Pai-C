@@ -352,3 +352,44 @@ def test_restricted_issue_never_reaches_the_counselor():
         profile = _profile(db, ws, student_text="my email changed")
         assert profile["open_profile_issues"] == [] and profile["in_question"] == []
         assert "example.test" not in json.dumps(profile)
+
+
+def _notebook_with_family_and_pressure():
+    from app.pai_c.deep.notebook_schema import CounselorNotebookData
+    from tests.truth_map_fixtures import STAMP, item
+    return CounselorNotebookData.model_validate({
+        "world": {"people": [{"id": "p1", "role": "Father", "relation": "parent", "wish": "NOTEBOOK-WISH",
+                              "worry": "NOTEBOOK-WORRY", "evidence": "Student described him",
+                              "first_seen": STAMP, "last_confirmed": STAMP}]},
+        "pressures": {"items": [item("NOTEBOOK-PRESSURE", key="pressure.fees", id="pr1")]},
+        "said": [item("Likes painting", key="interest.painting", id="s1")]})
+
+
+def test_notebook_people_and_pressures_pass_the_vault_topic_gate():
+    """Notebook people (with their wishes and worries) and pressures are as
+    sensitive as the Vault's family and pressure entries, so they pass the same gate."""
+    from app.pai_c.deep.context import _trim_notebook
+    notebook = _notebook_with_family_and_pressure()
+    plain = json.dumps(_trim_notebook(notebook, sensitive_types_for("I like painting")))
+    assert "Likes painting" in plain
+    assert not any(word in plain for word in ("NOTEBOOK-WISH", "NOTEBOOK-WORRY", "NOTEBOOK-PRESSURE"))
+    family = json.dumps(_trim_notebook(notebook, sensitive_types_for("mere abbu kehte hain")))
+    assert "NOTEBOOK-WISH" in family and "NOTEBOOK-WORRY" in family
+    worried = json.dumps(_trim_notebook(notebook, sensitive_types_for("I am so worried")))
+    assert "NOTEBOOK-PRESSURE" in worried and "NOTEBOOK-WISH" not in worried
+    planned = json.dumps(_trim_notebook(notebook, sensitive_types_for("haan", topics=["family_social"])))
+    assert "NOTEBOOK-WISH" in planned
+
+
+@pytest.mark.asyncio
+async def test_counselor_context_gates_the_notebook_by_the_turn():
+    from app.models import CounselorNotebook
+    with VaultSession() as student, student.factory() as db:
+        ws = student.workspace_id
+        db.add(CounselorNotebook(workspace_id=ws, version=1, last_event_id="seed",
+                                 notebook=_notebook_with_family_and_pressure().storage_data()))
+        db.commit()
+        plain = await build_context(db, ws, _turn(student, "I like painting"))
+        assert "NOTEBOOK-WISH" not in plain.text and "NOTEBOOK-PRESSURE" not in plain.text
+        family = await build_context(db, ws, _turn(student, "Abbu kehte hain fees bohat zyada hai"))
+        assert "NOTEBOOK-WISH" in family.text and "NOTEBOOK-PRESSURE" in family.text
