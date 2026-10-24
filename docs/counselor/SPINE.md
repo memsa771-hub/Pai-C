@@ -756,7 +756,7 @@ an explicitly authorized later evaluation; neither was invented in this task.
 | CounselorSlotAnswer | Only ORM declaration and offline counselor_eval_support fixture references remained; removed both |
 | FoundationChecklist, completion state/type and API methods | Removed the form-based collection UI; existing Profile sections and canonical edit flow remain |
 
-ReadinessService / STAGES remain. The available origin branches at the audit were
+ReadinessService / STAGES remained (deleted 24 Oct 2026 with the old Profile). The available origin branches at the audit were
 main, dev and pai-c; there was no pai-os branch to grep. No shared OS contract,
 queue, inference configuration or environment file was changed.
 
@@ -793,14 +793,15 @@ The builtin tool example now uses a generic field example.
 ### Existing fact reads and stopped reader items
 
 The offline retirement regression checks Vault get_fact, snapshot (safe and
-internal), history, StudentSnapshotService and StudentProfileView facts after a
-definition is disabled. Stored accepted values and provenance are retained.
+internal), history and StudentSnapshotService facts after a definition is
+disabled. Stored accepted values and provenance are retained.
 Migration tests also prove definition rows/all versions and existing fact rows
-survive. The student_profile/raw export view uses the internal Vault snapshot.
+survive. (StudentProfileView and the student_profile/raw view were deleted on
+24 Oct 2026; the Vault view at /v1/vault replaced them.)
 No reader implementation was changed (only generic wording in Vault comments).
 
 Two boundaries found during the required reader inspection remain unchanged:
-- StudentProfileView._safe_field_key/_safe_values hide **issue** field names and
+- (Deleted 24 Oct 2026 with StudentProfileView.) StudentProfileView._safe_field_key/_safe_values hid **issue** field names and
   evidence values when get() finds no enabled definition. The accepted fact is
   still in the Profile facts dictionary. Whether historical issue evidence should
   use its original definition is an open question; no reader fix was authorized.
@@ -2102,7 +2103,8 @@ The six internal Truth Map coverage keys and Mirror readiness are unchanged.
   A student's belief does not become a verified world fact.
 - Current status uses current-status/category/city facts, current education, and
   daily-life evidence. A name alone is not status evidence.
-- Tap cards reuse `POST /v1/student-profile/edits`: level -> education record,
+- Tap cards write through `POST /v1/counselor/fact-cards/{id}` (the old
+  `POST /v1/student-profile/edits` was deleted 24 Oct 2026): level -> education record,
   board -> `education.details.awarding_body`, subjects -> linked course records,
   city -> the existing location fact, skills -> skill records. No parallel write
   endpoint, storage, queue or direct table write was added. Awarding body is an
@@ -2158,6 +2160,9 @@ and all existing safety, request persistence and contract tests remain intact.
 
 ## Locked workflow Phase 2, step 3
 
+(The profile-cards routes below were deleted on 24 Oct 2026; confirm/edit/remove
+now go through /v1/vault. MemoryService.profile_cards stays for the data export
+and the path analyzer.)
 GET /v1/counselor/profile-cards exposes safe active facts/records, provenance,
 evidence labels and a value digest. POST /{kind}/{id} confirms or edits through
 MemoryService and the reconciler. A server-created, value-bound confirmation
