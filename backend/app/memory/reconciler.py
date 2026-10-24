@@ -338,12 +338,15 @@ class MemoryReconciler:
                 and self.items.was_retracted(candidate.workspace_id, candidate.key, value)):
             return self._reject(candidate, "retracted_by_student")
 
+        # Change flags describe the student's own words, so only the student's
+        # channels may raise them (as vault.py does for facts).
+        spoken = candidate.source_type in ("conversation", "user_explicit")
         write = self.items.apply(
             candidate.workspace_id, candidate.key, value,
             source_type=candidate.source_type, level=self._item_level(candidate),
             confidence=candidate.confidence or 1.0, evidence=evidence, candidate_id=candidate.id,
-            item_id=item_id, correction=evidence.get("semantic_correction") is True,
-            temporal=evidence.get("semantic_temporal_change") is True,
+            item_id=item_id, correction=spoken and evidence.get("semantic_correction") is True,
+            temporal=spoken and evidence.get("semantic_temporal_change") is True,
         )
         if write.outcome is VaultOutcome.RETAINED:
             reason = write.reason or f"retained existing value (policy: conflict lost for {candidate.key})"
@@ -351,10 +354,14 @@ class MemoryReconciler:
             return ReconcileResult(False, candidate.id, reason=write.reason or "retained",
                                    outcome=VaultOutcome.RETAINED.value)
         if write.outcome is VaultOutcome.NEEDS_REVIEW:
+            if self._retire_earlier_proposals(candidate, write.issue_id):
+                # The open card already asks exactly this; the first proposal answers for both.
+                self.candidates.mark_rejected(candidate, "duplicate_proposal")
+                return ReconcileResult(False, candidate.id, reason="duplicate_proposal",
+                                       outcome=VaultOutcome.NEEDS_REVIEW.value)
             # Deferred, not refused: the service opened (or took over) the card.
             candidate.status = "needs_review"
             candidate.rejection_reason = f"{candidate.key} differs from the Vault; the student is asked"
-            self._retire_earlier_proposals(candidate, write.issue_id)
             self.db.flush()
             return ReconcileResult(False, candidate.id, reason="needs_review",
                                    outcome=VaultOutcome.NEEDS_REVIEW.value)
@@ -372,16 +379,19 @@ class MemoryReconciler:
             return "inferred" if evidence.get("ocr") else "shown"
         return "stated"
 
-    def _retire_earlier_proposals(self, candidate: MemoryCandidate, issue_id: Optional[str]) -> None:
+    def _retire_earlier_proposals(self, candidate: MemoryCandidate, issue_id: Optional[str]) -> bool:
         """One question at a time: proposals the open card no longer asks about
-        are closed, so none waits forever in needs_review."""
+        are closed, so none waits forever in needs_review. True when this
+        candidate is itself listed, i.e. it repeats the card's proposal."""
         from app.models import ProfileIssue
         issue = self.db.get(ProfileIssue, issue_id) if issue_id else None
-        for earlier_id in ((issue.evidence or {}).get("earlier_candidate_ids", []) if issue else []):
+        listed = (issue.evidence or {}).get("earlier_candidate_ids", []) if issue else []
+        for earlier_id in listed:
             earlier = self.candidates.get(candidate.workspace_id, earlier_id)
             if earlier is not None and earlier.id != candidate.id and earlier.status in ("pending", "needs_review"):
                 self.candidates.mark_rejected(earlier, "superseded_by_newer_proposal")
                 self.assertions.refresh_decision(earlier)
+        return candidate.id in listed
 
     def _reconcile_semantic(self, candidate: MemoryCandidate) -> ReconcileResult:
         if candidate.operation == "forget":

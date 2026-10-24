@@ -154,7 +154,9 @@ def test_newer_proposal_rejects_the_earlier_one():
 def test_issue_both_true_keeps_old_as_past():
     with StudentSession() as student, student.factory() as db:
         ws = student.workspace_id
-        _, old = _run(db, ws, "vault_item", "domicile", {"province": "Sindh"})
+        _, old = _run(db, ws, "vault_item", "domicile", {"province": "Sindh"}, source_type="document",
+                      evidence={"file_id": "f1", "authority": "government_issued"}, input_channel="document")
+        assert db.get(VaultItem, old.result_id).level == "shown"
         proposal, _ = _run(db, ws, "vault_item", "domicile", {"province": "Punjab"})
         issue = db.scalar(select(ProfileIssue).where(ProfileIssue.status == "open"))
         out = ProfileIssueService(db).resolve(ws, issue.id, "both_true")
@@ -164,6 +166,8 @@ def test_issue_both_true_keeps_old_as_past():
         assert past.status == "superseded" and past.valid_until and past.superseded_by == now.id
         assert now.status == "active" and now.value == {"province": "punjab"}
         assert now.evidence["semantic_temporal_change"] is True
+        # A change over time, not a disagreement with the document.
+        assert now.evidence["change"] == "temporal" and "disagreements" not in now.evidence
         assert issue.status == "resolved" and issue.resolution["action"] == "both_true"
         assert proposal.status == "superseded"
 
@@ -177,3 +181,93 @@ def test_keep_current_settles_item_in_question():
         issue = db.scalar(select(ProfileIssue).where(ProfileIssue.status == "open"))
         ProfileIssueService(db).resolve(ws, issue.id, "keep_current")
         assert db.get(VaultItem, old.result_id).conflict_state == "none"
+
+
+# ---- fix round 1 -----------------------------------------------------------
+
+def _active(db, ws, item_type):
+    return [r.value for r in _items(db, ws, item_type) if r.status == "active"]
+
+
+def test_change_flags_only_count_from_the_student():
+    with StudentSession() as student, student.factory() as db:
+        ws = student.workspace_id
+        _run(db, ws, "vault_item", "domicile", {"province": "Sindh"})
+        _, agent = _run(db, ws, "vault_item", "domicile", {"province": "KP"}, source_type="agent",
+                        evidence={"semantic_correction": True})
+        assert not agent.accepted
+        _, ocr = _run(db, ws, "vault_item", "domicile", {"province": "Punjab"}, source_type="document",
+                      evidence={"file_id": "f", "authority": "government_issued", "ocr": True,
+                                "semantic_temporal_change": True}, input_channel="document")
+        assert not ocr.accepted
+        assert _active(db, ws, "domicile") == [{"province": "sindh"}]
+
+
+def test_repeated_proposal_is_a_duplicate():
+    with StudentSession() as student, student.factory() as db:
+        ws = student.workspace_id
+        _run(db, ws, "vault_item", "domicile", {"province": "Sindh"})
+        a, _ = _run(db, ws, "vault_item", "domicile", {"province": "KP"})
+        b, rb = _run(db, ws, "vault_item", "domicile", {"province": "KP"})
+        assert not rb.accepted and rb.reason == "duplicate_proposal"
+        assert b.status == "rejected" and b.rejection_reason == "duplicate_proposal"
+        assert a.status == "needs_review"
+        cards = db.scalars(select(ProfileIssue).where(ProfileIssue.status == "open")).all()
+        assert len(cards) == 1 and cards[0].candidate_id == a.id
+        out = ProfileIssueService(db).resolve(ws, cards[0].id, "accept_proposed")
+        assert out["resolved"]
+        assert _active(db, ws, "domicile") == [{"province": "kpk"}]
+
+
+def test_inferred_correction_never_replaces_in_any_engine():
+    with StudentSession() as student, student.factory() as db:
+        ws = student.workspace_id
+        _run(db, ws, "vault_fact", "preferences.study_mode", "on_campus")
+        _, fact = _run(db, ws, "vault_fact", "preferences.study_mode", "online",
+                       evidence={"inferred": True, "semantic_correction": True})
+        assert fact.outcome == "retained" and fact.reason == "guess_against_stated"
+        _run(db, ws, "vault_item", "domicile", {"province": "Sindh"})
+        _, item = _run(db, ws, "vault_item", "domicile", {"province": "KP"},
+                       evidence={"inferred": True, "semantic_correction": True})
+        assert item.outcome == "retained" and item.reason == "guess_against_stated"
+        assert _active(db, ws, "domicile") == [{"province": "sindh"}]
+
+
+def test_agent_fact_cannot_replace_stated_value():
+    with StudentSession() as student, student.factory() as db:
+        ws = student.workspace_id
+        _run(db, ws, "vault_fact", "preferences.study_mode", "on_campus")
+        _, agent = _run(db, ws, "vault_fact", "preferences.study_mode", "online", source_type="agent")
+        assert agent.outcome == "retained" and agent.reason == "guess_against_stated"
+        assert VaultService(db).snapshot(ws)["preferences.study_mode"] == "on_campus"
+        _run(db, ws, "student_record", "skill", {"name": "Python", "proficiency": "beginner"})
+        _, rec = _run(db, ws, "student_record", "skill", {"name": "Python", "proficiency": "expert"},
+                      source_type="agent")
+        assert rec.outcome == "retained" and rec.reason == "guess_against_stated"
+
+
+def test_document_backed_guess_record_stops_being_a_guess():
+    with StudentSession() as student, student.factory() as db:
+        ws = student.workspace_id
+        value = {"name": "Python", "proficiency": "beginner"}
+        _, guess = _run(db, ws, "student_record", "skill", value, evidence={"inferred": True})
+        assert guess.accepted
+        _, doc = _run(db, ws, "student_record", "skill", value, source_type="document",
+                      evidence={"file_id": "f1", "authority": "institution_issued"}, input_channel="document")
+        assert doc.accepted
+        row = StudentRecordService(db).list(ws, "skill")[0]
+        assert row.evidence["inferred"] is False
+        _, later = _run(db, ws, "student_record", "skill", {"name": "Python", "proficiency": "expert"},
+                        evidence={"inferred": True})
+        assert later.outcome == "retained" and later.reason == "guess_against_stated"
+
+
+def test_item_assertion_domain_and_language_for_details_and_story():
+    with StudentSession() as student, student.factory() as db:
+        ws = student.workspace_id
+        details, _ = _run(db, ws, "vault_item", "domicile", {"province": "Punjab"},
+                          quote="mera domicile Punjab ka hai")
+        story, _ = _run(db, ws, "vault_item", "interest", {"text": "Robotics"}, quote="I love robotics")
+        by = {a.candidate_id: a for a in db.scalars(select(VaultAssertion))}
+        assert (by[details.id].domain, by[details.id].language) == ("details", "roman_ur")
+        assert (by[story.id].domain, by[story.id].language) == ("story", "en")

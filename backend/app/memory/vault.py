@@ -99,6 +99,12 @@ def _now() -> datetime:
     return datetime.now(timezone.utc)
 
 
+def is_guess(source_type: Optional[str], evidence: Optional[dict]) -> bool:
+    """The bottom rung of the evidence ladder: marked inferred, or produced by
+    an agent or the system rather than said or shown."""
+    return bool((evidence or {}).get("inferred")) or source_type in ("agent", "system")
+
+
 def _unwrap(value: Any) -> Any:
     """Vault values are stored wrapped as {"value": ...}.
 
@@ -254,13 +260,17 @@ class VaultService:
         if (current is not None and source_type == "document"
                 and _unwrap(current.value) == value):
             self._corroborate(current, evidence)
+            if (current.evidence or {}).get("inferred"):
+                # Backed by a document, it is no longer only PAI's guess.
+                current.evidence = {**current.evidence, "inferred": False}
+                self.db.flush()
             return VaultWriteResult(VaultOutcome.CORROBORATED, current)
 
         # A guess never replaces what the student said or showed (VAULT_SPEC
         # §Conflicts step 4). Retained quietly: a guess is not worth a question.
         # The student's own edit comes first (step 2), even when marked inferred.
-        if (current is not None and (evidence or {}).get("inferred") and source_type != "user_explicit"
-                and not (current.evidence or {}).get("inferred") and _unwrap(current.value) != value):
+        if (current is not None and source_type != "user_explicit" and is_guess(source_type, evidence)
+                and not is_guess(current.source_type, current.evidence) and _unwrap(current.value) != value):
             return VaultWriteResult(VaultOutcome.RETAINED, current, reason="guess_against_stated")
 
         # An institutional document disagreeing with self-report is evidence

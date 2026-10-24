@@ -189,22 +189,26 @@ class VaultItemService:
             return self._ask_student(current, spec, value, candidate_id)
 
         # 2. The student's own edit always wins; a disagreeing document stays visible.
+        # "Both true at different times" is a change over time, not a disagreement.
         if source_type == "user_explicit":
-            if current.level == "shown":
+            if correction or temporal:
+                evidence["change"] = "temporal" if temporal else "correction"
+            if current.level == "shown" and not temporal:
                 prior = current.evidence or {}
                 evidence["disagreements"] = [*evidence.get("disagreements", []), {
                     "value": old, "source_type": current.source_type,
                     "file_id": prior.get("file_id"), "page": prior.get("page")}]
             return self._supersede(current, spec, value, source_type, level, confidence, evidence, candidate_id)
 
+        # 4, checked before 3: a guess never replaces what the student said or
+        # showed, whatever its change flags claim (same as facts and records).
+        if guess:
+            return ItemWrite(VaultOutcome.RETAINED, current, reason="guess_against_stated")
+
         # 3. The student's words say it is a correction or a change over time.
         if correction or temporal:
             evidence["change"] = "temporal" if temporal else "correction"
             return self._supersede(current, spec, value, source_type, level, confidence, evidence, candidate_id)
-
-        # 4. A guess never replaces what the student said or showed.
-        if guess:
-            return ItemWrite(VaultOutcome.RETAINED, current, reason="guess_against_stated")
 
         # 5. Catalog rule.
         if spec.conflict == "latest_wins":
@@ -326,6 +330,11 @@ class VaultItemService:
                     evidence["earlier_candidate_ids"] = earlier
                 existing.evidence = evidence
                 existing.candidate_id = candidate_id or existing.candidate_id
+            elif candidate_id and existing.candidate_id and existing.candidate_id != candidate_id:
+                # The same proposal again: the card keeps asking about the first
+                # one, and the repeat is listed so the caller can close it.
+                earlier = list((existing.evidence or {}).get("earlier_candidate_ids", []))
+                existing.evidence = {**existing.evidence, "earlier_candidate_ids": [*earlier, candidate_id]}
             current.conflict_state = "in_question"
             self.db.flush()
             return ItemWrite(VaultOutcome.NEEDS_REVIEW, None, issue_id=existing.id)

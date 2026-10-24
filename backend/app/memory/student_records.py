@@ -14,6 +14,7 @@ from app.models import (
 from .errors import MemoryDataError
 from .domain_stewards import EntityAmbiguity, RecordDomainSteward
 from .student_schema import RECORD_SPECS, validate_record
+from .vault import is_guess
 
 ENTITY_MODELS = {
     "education": EducationRecord, "course": CourseRecord, "test_attempt": TestAttempt,
@@ -231,14 +232,15 @@ class StudentRecordService:
         identity_change = bool(current and kind == "education" and any(
             key in values and key in before and not _same(before[key], values[key])
             for key in ("qualification_name", "canonical_level", "field_of_study")))
-        # A guess neither replaces nor extends what the student said or showed
-        # (VAULT_SPEC §Conflicts step 4); the student's own edit comes first.
-        if (current is not None and merged != before and (evidence or {}).get("inferred")
-                and source_type != "user_explicit" and not (current.evidence or {}).get("inferred")):
-            raise RecordRetained("guess_against_stated")
         os_progress = (kind == "exploration_experience" and source_type in {"agent", "system"}
                        and set(values).issubset({"activity_status", "completed_at", "evidence_refs"})
                        and bool((evidence or {}).get("execution_run_id")))
+        # A guess neither replaces nor extends what the student said or showed
+        # (VAULT_SPEC §Conflicts step 4); the student's own edit comes first.
+        # OS progress backed by a completed execution run is evidence, not a guess.
+        if (current is not None and merged != before and not os_progress and source_type != "user_explicit"
+                and is_guess(source_type, evidence) and not is_guess(current.source_type, current.evidence)):
+            raise RecordRetained("guess_against_stated")
         if steward.needs_conflict_review(changed=changed, source_type=source_type,
                                          current=current, evidence=evidence,
                                          os_progress=os_progress,
@@ -284,6 +286,9 @@ class StudentRecordService:
             # append this document as supporting evidence, instead of the old
             # behaviour of overwriting the original provenance.
             self._corroborate(row, evidence)
+            if (row.evidence or {}).get("inferred"):
+                # Backed by a document, it is no longer only PAI's guess.
+                row.evidence = {**row.evidence, "inferred": False}
             proposed = verification_status or default_verification
             if _VERIFICATION_RANK.get(proposed, 0) > _VERIFICATION_RANK.get(row.verification_status, 0):
                 row.verification_status = proposed
