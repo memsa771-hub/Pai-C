@@ -17,7 +17,7 @@ from app.tools.schema import SchemaValidationError, validate_schema_instance
 
 from .catalog import TypeSpec, norm, vault_catalog
 from .errors import MemoryDataError
-from .evidence import agrees, page_of
+from .evidence import merge_disagreements, page_of
 from .vault import VaultOutcome
 
 LEVELS = ("inferred", "stated", "shown", "confirmed")
@@ -194,15 +194,11 @@ class VaultItemService:
         if source_type == "user_explicit":
             if correction or temporal:
                 evidence["change"] = "temporal" if temporal else "correction"
-            prior = current.evidence or {}
-            # A later edit keeps an earlier document's disagreement visible
-            # until the student's value matches it.
-            kept = [d for d in prior.get("disagreements", []) if not agrees(d.get("value"), value)]
             if current.level == "shown" and not temporal:
-                kept.append({"value": old, "source_type": current.source_type,
-                             "file_id": prior.get("file_id"), "page": page_of(prior)})
-            if kept:
-                evidence["disagreements"] = [*evidence.get("disagreements", []), *kept]
+                prior = current.evidence or {}
+                evidence["disagreements"] = [*evidence.get("disagreements", []), {
+                    "value": old, "source_type": current.source_type,
+                    "file_id": prior.get("file_id"), "page": page_of(prior)}]
             return self._supersede(current, spec, value, source_type, level, confidence, evidence, candidate_id)
 
         # 4, checked before 3: a guess never replaces what the student said or
@@ -294,6 +290,9 @@ class VaultItemService:
 
     def _supersede(self, current, spec, value, source_type, level, confidence, evidence, candidate_id,
                    keep_cards=False):
+        # Every new version carries the disagreements of the one it replaces
+        # (capped, de-duplicated, dropped once the value matches them).
+        evidence = merge_disagreements(evidence, current.evidence, value)
         new = self._insert(current.workspace_id, spec, value, source_type, level, confidence, evidence, candidate_id)
         current.status, current.superseded_by, current.valid_until = "superseded", new.id, new.valid_from
         if keep_cards:

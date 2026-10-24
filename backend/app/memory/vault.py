@@ -381,17 +381,21 @@ class VaultService:
         # This ordering matters under PostgreSQL's immediate unique checks.
         if superseded:
             self.db.flush()
-        if source_type == "user_explicit" and current is not None and superseded:
+        if current is not None and superseded:
             # The student's edit wins; a document that said otherwise stays
-            # visible on the entry (VAULT_SPEC §Evidence ladder).
-            from .evidence import with_disagreements
+            # visible on the entry (VAULT_SPEC §Evidence ladder), and so do
+            # earlier disagreements across any later replacement.
+            from .evidence import merge_disagreements, with_disagreements
 
             prior = _unwrap(current.value)
-            kept = with_disagreements(
-                evidence, {"source_type": current.source_type, "capture_method": current.capture_method,
-                           "evidence": current.evidence}, prior, prior, value,
-                temporal=(evidence or {}).get("semantic_temporal_change") is True)
-            if "disagreements" in kept:
+            if source_type == "user_explicit":
+                kept = with_disagreements(
+                    evidence, {"source_type": current.source_type, "capture_method": current.capture_method,
+                               "evidence": current.evidence}, prior, prior, value,
+                    temporal=(evidence or {}).get("semantic_temporal_change") is True)
+            else:
+                kept = merge_disagreements(evidence, current.evidence, value)
+            if "disagreements" in kept or "disagreements" in (evidence or {}):
                 evidence = kept
 
         fact = VaultFact(

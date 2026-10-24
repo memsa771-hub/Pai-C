@@ -41,6 +41,8 @@ from .vault import _unwrap, is_guess
 from .vault_items import VaultItemService
 
 HIDDEN_WHEN_NOT_SENSITIVE = ("sensitive", "restricted")
+# A record kind vault_view.json marks hidden is never shown, to anyone.
+NEVER_SHOWN = "hidden"
 
 
 @lru_cache(maxsize=1)
@@ -55,15 +57,14 @@ def level_of(source_type: Optional[str], verification_status: Optional[str], evi
 
     Built on `evidence_level` (confirmation, unconfirmed OCR or unverified
     owner, document authority) and adds the guess rung it does not know: a
-    value PAI inferred, or one an agent or the system produced, is PAI's guess.
+    value PAI inferred, or one an agent or the system produced, is PAI's guess
+    unless a document or the student's confirmation stands behind it.
     `value` and `capture_method` are needed only to recognise a confirmation.
     """
     row = {"source_type": source_type, "verification_status": verification_status,
            "capture_method": capture_method, "evidence": evidence or {}}
     level = evidence_level(row, value)
-    if level in ("confirmed", "inferred"):
-        return level
-    return "inferred" if is_guess(source_type, evidence) else level
+    return "inferred" if level == "stated" and is_guess(source_type, evidence) else level
 
 
 def badge_for(level: str, in_question: bool) -> str:
@@ -111,6 +112,13 @@ def _display(spec: Optional[TypeSpec], value: Any) -> str:
         return str(node)
 
     return render(value, "")
+
+
+def _without(value: Any, fields) -> Any:
+    """A record value minus fields that hold the student's own words."""
+    if isinstance(value, dict) and fields:
+        return {k: v for k, v in value.items() if k not in fields}
+    return value
 
 
 @dataclass
@@ -161,8 +169,8 @@ class VaultView:
         return {
             "details": details,
             "story": story,
-            "conflicts": [card for card, sensitivity in cards
-                          if include_sensitive or sensitivity not in HIDDEN_WHEN_NOT_SENSITIVE],
+            "conflicts": [card for card, sensitivity in cards if sensitivity != NEVER_SHOWN and (
+                include_sensitive or sensitivity not in HIDDEN_WHEN_NOT_SENSITIVE)],
             "stale": [r.entry for r in rows if r.entry["stale"]],
         }
 
@@ -171,7 +179,7 @@ class VaultView:
         the document's own record is the file itself, not an entry from it."""
         rows = self._rows(workspace_id, self._open_issues(workspace_id), self._files(workspace_id),
                           datetime.now(timezone.utc))
-        kind = view_copy()["document_records"]["kind"]
+        kind = view_copy()["file_record_kind"]
         return [r.entry for r in rows if file_id in r.file_ids and r.entry["type"] != kind]
 
     # ---- reads -------------------------------------------------------------
@@ -216,8 +224,11 @@ class VaultView:
                 confirmed_at=self._confirmed_at(level, fact.evidence),
                 in_question=("vault_fact", fact.id) in questioned))
 
-        document_kind = view_copy()["document_records"]["kind"]
-        kinds = [spec.key for spec in self.catalog.types(storage="record")] + [document_kind]
+        # Catalog record types, then the kinds vault_view.json places (spec
+        # Access: the student sees everything); a kind marked hidden is skipped.
+        uncatalogued = view_copy()["uncatalogued_records"]
+        kinds = [spec.key for spec in self.catalog.types(storage="record")]
+        kinds += [kind for kind, place in uncatalogued.items() if not place.get("hidden")]
         for kind in kinds:
             spec = self.catalog.type(kind)
             for record in self.records.list(workspace_id, kind):
@@ -250,15 +261,18 @@ class VaultView:
              confirmed_at: Optional[datetime], in_question: bool, record_kind: Optional[str] = None,
              source_language: Optional[str] = None) -> _Row:
         evidence = evidence or {}
-        documents = view_copy()["document_records"]
-        if spec is None:  # a document record: not a catalog type, placed by vault_view.json
+        omit = view_copy()["uncatalogued_records"].get(record_kind or "", {}).get("omit_fields", ())
+        refs = [evidence, *reversed(evidence.get("corroborations", []))]
+        if spec is None:  # a record kind outside the catalog, placed by vault_view.json
+            place = view_copy()["uncatalogued_records"][record_kind]
             type_key, label, section, sensitivity, days = (
-                record_kind, documents["label"], documents["section"], documents["sensitivity"], None)
-            refs = [{"file_id": value.get("file_id")}]
+                record_kind, place["label"], place["section"], place["sensitivity"], None)
+            value = _without(value, place.get("omit_fields", ()))
+            if place.get("file_field"):
+                refs = [{"file_id": value.get(place["file_field"])}, *refs]
         else:
             type_key, label, sensitivity, days = spec.key, spec.label, spec.sensitivity, spec.freshness_days
             section = (spec.section or view_copy()["default_section"]) if spec.shown_on == "details" else None
-            refs = [evidence, *reversed(evidence.get("corroborations", []))]
 
         moments = [m for m in (_aware(m) for m in [*observed, confirmed_at]) if m]
         fresh_until = max(moments) + timedelta(days=days) if days and moments else None
@@ -271,9 +285,10 @@ class VaultView:
             "fresh_until": _iso(fresh_until), "stale": bool(fresh_until and now > fresh_until),
             "in_question": in_question,
             "disagreements": [{
-                "value": d.get("value"), "display": _display(spec, d.get("value")),
+                "value": shown, "display": _display(spec, shown),
                 "source": d.get("source_type"), "document": self._link([d], files),
-            } for d in evidence.get("disagreements", [])],
+            } for d in evidence.get("disagreements", [])
+                for shown in [_without(d.get("value"), omit)] if shown not in (None, {})],
         }
         file_ids = {r.get("file_id") for r in refs if isinstance(r, dict) and r.get("file_id")}
         return _Row(entry, section, sensitivity, file_ids)
@@ -314,13 +329,25 @@ class VaultView:
             form, type_key, current, proposed = "other", None, None, None
 
         spec = self.catalog.type(type_key) if type_key else None
+        place = copy["uncatalogued_records"].get(type_key) if spec is None and type_key else None
         words = copy["conflict_copy"][form]
-        label = spec.label.lower() if spec else (type_key or "entry").replace("_", " ").replace(".", " ")
+        label = (spec.label if spec else (place or {}).get("label")
+                 or (type_key or "entry").replace("_", " ").replace(".", " ")).lower()
         filename = files.get(evidence.get("file_id")) or evidence.get("filename") or "this document"
+        if place and place.get("omit_fields"):
+            current, proposed = _without(current, place["omit_fields"]), _without(proposed, place["omit_fields"])
+        if issue.issue_type in copy["answers"]:
+            answers = copy["answers"][issue.issue_type]
+        elif current is None and form in ("item", "fact", "record"):
+            # Nothing is saved yet (a future-dated change, a possible new
+            # record): there is no current value to keep.
+            answers = copy["answers"]["no_current_value"]
+        else:
+            answers = copy["answers"]["default"]
         if spec is not None:
             sensitivity = spec.sensitivity
-        elif type_key == copy["document_records"]["kind"]:
-            sensitivity = copy["document_records"]["sensitivity"]
+        elif place is not None:
+            sensitivity = NEVER_SHOWN if place.get("hidden") else place["sensitivity"]
         elif type_key:
             sensitivity = "restricted"  # not in the catalog: withheld unless everything is shown
         else:
@@ -331,5 +358,5 @@ class VaultView:
             "question": words["question"].format(label=label, filename=filename),
             "current": current, "proposed": proposed,
             "current_display": _display(spec, current), "proposed_display": _display(spec, proposed),
-            "answers": list(copy["answers"].get(issue.issue_type, copy["answers"]["default"])),
+            "answers": list(answers),
         }, sensitivity

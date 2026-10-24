@@ -8,15 +8,21 @@ the timestamps matter (freshness).
 
 import json
 import uuid
+
+import pytest
 from datetime import datetime, timedelta, timezone
 
 from app.memory.catalog import vault_catalog
 from app.memory.evidence import evidence_policy, value_digest
-from app.memory.student_records import StudentRecordService
+from app.memory.evidence import merge_disagreements
+from app.memory.profile_issues import ProfileIssueService
+from app.memory.student_records import ENTITY_MODELS, RecordNeedsReview, StudentRecordService
 from app.memory.vault import VaultService
 from app.memory.vault_items import VaultItemService
 from app.memory.vault_view import VaultView, badge_for, level_of, view_copy
-from app.models import FileRecord, ProfileIssue, StudentGoal, VaultFact
+from app.models import (
+    ExternalInfluence, FileRecord, ProfileIssue, StudentGoal, StudentVoiceStatement, VaultFact,
+)
 from scripts.eval_vault import VaultSession
 
 SECRET = "Mera domicile Sindh ka hai SECRET-QUOTE"
@@ -130,9 +136,27 @@ def test_quote_never_in_view():
         vault = VaultService(db)
         vault.apply_fact(ws, "identity.full_name", "Ali Khan", "conversation", evidence={"quote": SECRET})
         vault.apply_fact(ws, "identity.full_name", "Ali Raza", "document", evidence={**DOC, "file_id": f.id})
+        # A fact disagreement: the document read the preferred name differently.
+        vault.apply_fact(ws, "identity.preferred_name", "Ali", "document", evidence={**DOC, "file_id": f.id})
+        vault.apply_fact(ws, "identity.preferred_name", "Alee", "user_explicit", evidence={"quote": SECRET})
+        # A record disagreement, then a record conflict card carrying the quote.
+        records = StudentRecordService(db)
+        row = records.apply(ws, "education", {"qualification_name": "hssc", "institution_name": "BISE Lahore"},
+                            source_type="document", claim_origin="institution_document",
+                            capture_method="document_extraction", evidence={**DOC, "file_id": f.id},
+                            verification_status="document_supported")
+        records.apply(ws, "education", {"institution_name": "BISE Multan"}, source_type="user_explicit",
+                      claim_origin="student", capture_method="explicit_correction", record_id=row.id,
+                      evidence={"quote": SECRET})
+        with pytest.raises(RecordNeedsReview):
+            records.apply(ws, "education", {"institution_name": "BISE Sargodha"}, source_type="conversation",
+                          claim_origin="student", capture_method="conversation_extraction", record_id=row.id,
+                          evidence={"quote": SECRET})
         db.commit()
         view = VaultView(db).build(ws)
-        assert view["conflicts"]  # the name card carries both quotes in its evidence
+        assert {c["kind"] for c in view["conflicts"]} == {"fact", "record"}  # both carry quotes in evidence
+        assert _entry(view, "identity.preferred_name")["disagreements"]
+        assert _entry(view, "education")["disagreements"]
         text = json.dumps(view, default=str)
         assert "SECRET-QUOTE" not in text
         assert '"quote"' not in text
@@ -330,3 +354,154 @@ def test_sections_story_and_sensitivity():
         assert _entries(counselor, "identity.passport_number") == []
         assert _entries(counselor, "family_member") == []
         assert len(_entries(counselor, "interest")) == 2
+
+
+def test_every_record_kind_is_shown_or_hidden_on_purpose():
+    catalogued = {t.key for t in vault_catalog().types(storage="record")}
+    listed = view_copy()["uncatalogued_records"]
+    assert set(ENTITY_MODELS) == catalogued | set(listed)
+    assert not catalogued & set(listed)
+    sections = {s["key"] for s in view_copy()["sections"]}
+    for kind, spec in listed.items():
+        if spec.get("hidden"):
+            assert spec["reason"], kind
+        else:
+            assert spec["section"] in sections and spec["label"] and spec["sensitivity"], kind
+
+
+def _complete(kind, values):
+    """Fill the kind's other required fields with plain English placeholders."""
+    from app.memory.student_records import REQUIRED
+    from app.memory.student_schema import RECORD_SPECS
+    out = dict(values)
+    for key in REQUIRED[kind]:
+        if key not in out:
+            prop = RECORD_SPECS[kind]["properties"][key]
+            out[key] = prop["enum"][0] if "enum" in prop else "Placeholder"
+    return out
+
+
+def test_uncatalogued_records_are_visible():
+    with VaultSession() as student, student.factory() as db:
+        ws = student.workspace_id
+        records = StudentRecordService(db)
+        common = dict(source_type="conversation", claim_origin="student", capture_method="conversation_extraction",
+                      evidence={"quote": SECRET})
+        records.apply(ws, "research", _complete("research", {"title": "Solar dryer study"}), **common)
+        records.apply(ws, "application", _complete("application", {}), **common)
+        db.add(ExternalInfluence(workspace_id=ws, influencer_type="parent", source_label="Father",
+                                 suggested_direction="Medicine", influence_type="career_suggestion",
+                                 student_response=SECRET, source_type="conversation", claim_origin="student",
+                                 capture_method="conversation_extraction", status="active"))
+        db.add(StudentVoiceStatement(workspace_id=ws, voice_type="interest", statement=SECRET,
+                                     source_type="conversation", claim_origin="student",
+                                     capture_method="conversation_extraction", status="active"))
+        db.commit()
+        view = VaultView(db).build(ws)
+        assert _entry(view, "research") in view["details"]["education"]["entries"]
+        assert _entry(view, "application") in view["details"]["money_and_place"]["entries"]
+        influence = _entry(view, "external_influence")
+        assert influence in view["details"]["about"]["entries"]
+        assert influence["label"] == "What others want for you"
+        assert "student_response" not in influence["value"]  # the student's own words
+        assert _entries(view, "student_voice_statement") == []
+        assert "SECRET-QUOTE" not in json.dumps(view, default=str)
+        assert _entries(VaultView(db).build(ws, include_sensitive=False), "external_influence") == []
+
+
+def test_guess_override_applies_only_to_stated():
+    assert level_of("agent", "document_supported", {}) == "shown"
+    assert level_of("agent", "self_reported", {}) == "inferred"
+    with VaultSession() as student, student.factory() as db:
+        ws = student.workspace_id
+        f = _file(db, ws)
+        records = StudentRecordService(db)
+        records.apply(ws, "education", {"qualification_name": "hssc"}, source_type="agent",
+                      claim_origin="agent_inference", capture_method="agent_proposal", evidence={})
+        assert _entry(VaultView(db).build(ws), "education")["badge"] == "PAI's guess"
+        records.apply(ws, "education", {"qualification_name": "hssc"}, source_type="document",
+                      claim_origin="institution_document", capture_method="document_extraction",
+                      evidence={**DOC, "file_id": f.id}, verification_status="document_supported")
+        db.commit()
+        entry = _entry(VaultView(db).build(ws), "education")
+        assert entry["source"] == "agent" and entry["badge"] == "From document"
+
+
+def test_disagreements_are_capped_and_deduplicated():
+    many = [{"value": f"v{i}", "source_type": "document", "file_id": "f", "page": 1} for i in range(12)]
+    out = merge_disagreements({}, {"disagreements": many + [dict(many[3])]}, "new")
+    values = [d["value"] for d in out["disagreements"]]
+    assert len(values) == 10 and values[-1] == "v3" and values.count("v3") == 1
+    assert "v0" not in values and "v1" not in values
+    # Dropped once the new value matches the reading; the key goes when none are left.
+    assert merge_disagreements({"disagreements": many[:1]}, {}, "v0") == {}
+
+    with VaultSession() as student, student.factory() as db:
+        ws = student.workspace_id
+        current = _item(db, ws, "domicile", {"province": "sindh"}).item
+        current.evidence = {**current.evidence, "disagreements": [
+            {"value": {"province": f"p{i}"}, "source_type": "document", "file_id": "f", "page": i}
+            for i in range(12)]}
+        db.flush()
+        edit = _item(db, ws, "domicile", {"province": "punjab"}, source_type="user_explicit").item
+        assert len(edit.evidence["disagreements"]) == 10
+
+
+def test_disagreements_survive_non_student_supersede():
+    with VaultSession() as student, student.factory() as db:
+        ws = student.workspace_id
+        f = _file(db, ws, "card.pdf")
+        _item(db, ws, "domicile", {"province": "sindh"}, source_type="document", level="shown",
+              evidence={**DOC, "file_id": f.id})
+        _item(db, ws, "domicile", {"province": "punjab"}, source_type="user_explicit")
+        later = _item(db, ws, "domicile", {"province": "balochistan"}, correction=True)
+        assert [d["value"] for d in later.item.evidence["disagreements"]] == [{"province": "sindh"}]
+
+        records = StudentRecordService(db)
+        row = records.apply(ws, "goal", {"goal_type": "career", "title": "Doctor"}, source_type="document",
+                            claim_origin="institution_document", capture_method="document_extraction",
+                            evidence={**DOC, "file_id": f.id}, verification_status="document_supported")
+        records.apply(ws, "goal", {"title": "Engineer"}, source_type="user_explicit", claim_origin="student",
+                      capture_method="explicit_correction", record_id=row.id, evidence={"quote": "q"})
+        records.apply(ws, "goal", {"commitment": "committed"}, source_type="conversation", claim_origin="student",
+                      capture_method="conversation_extraction", record_id=row.id,
+                      evidence={"quote": "q", "semantic_correction": True})
+        goal = records.get(ws, "goal", row.id)
+        assert goal.commitment == "committed"
+        assert [d["value"] for d in goal.evidence["disagreements"]] == [{"title": "Doctor"}]
+
+        vault = VaultService(db)
+        # A city moves over time: the student's later move replaces the edit
+        # through chat, and the document's reading stays visible.
+        vault.apply_fact(ws, "location.current_city", "Lahore", "document", evidence={**DOC, "file_id": f.id})
+        vault.apply_fact(ws, "location.current_city", "Karachi", "user_explicit", evidence={"quote": "q"})
+        vault.apply_fact(ws, "location.current_city", "Islamabad", "conversation",
+                         evidence={"quote": "q", "semantic_temporal_change": True})
+        fact = vault.get_fact(ws, "location.current_city")
+        assert fact.value["value"] == "Islamabad"
+        assert [d["value"] for d in fact.evidence["disagreements"]] == ["Lahore"]
+
+
+def test_cards_without_a_current_value_offer_two_answers():
+    with VaultSession() as student, student.factory() as db:
+        ws = student.workspace_id
+        future = datetime.now(timezone.utc) + timedelta(days=30)
+        VaultService(db).apply_fact(ws, "location.current_city", "Lahore", "conversation",
+                                    evidence={"quote": "q"}, effective_at=future)
+        ambiguous = ProfileIssue(workspace_id=ws, issue_type="conflicting_record", conflict_kind="entity_ambiguity",
+                                 severity="blocking", affected_type="education", summary="x",
+                                 evidence={"record_type": "education", "proposed": {"qualification_name": "hssc"},
+                                           "matching_record_ids": [], "force_new_on_accept": True})
+        db.add(ambiguous)
+        db.commit()
+        cards = VaultView(db).build(ws)["conflicts"]
+        assert len(cards) == 2
+        assert all(c["current"] is None and c["answers"] == ["accept_proposed", "provide_new"] for c in cards)
+        # Both answers work for these cards.
+        issues = ProfileIssueService(db)
+        fact_card = next(c for c in cards if c["kind"] == "fact")
+        assert issues.resolve(ws, fact_card["id"], "accept_proposed")["resolved"] is True
+        assert issues.resolve(ws, ambiguous.id, "provide_new", value={"qualification_name": "matric"})["resolved"]
+        db.commit()
+        assert VaultService(db).get_fact(ws, "location.current_city") is not None
+        assert [r.qualification_name for r in StudentRecordService(db).list(ws, "education")] == ["matric"]

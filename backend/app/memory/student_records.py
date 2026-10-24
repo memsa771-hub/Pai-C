@@ -12,7 +12,7 @@ from app.models import (
     ScholarshipApplication, VisaRecord,
 )
 from .errors import MemoryDataError
-from .evidence import with_disagreements
+from .evidence import merge_disagreements, with_disagreements
 from .domain_stewards import EntityAmbiguity, RecordDomainSteward
 from .student_schema import RECORD_SPECS, validate_record
 from .vault import is_guess
@@ -270,6 +270,10 @@ class StudentRecordService:
                 temporal=(evidence or {}).get("semantic_temporal_change") is True)
             if "disagreements" in kept:
                 evidence = kept
+        elif current is not None and merged != before and evidence:
+            # Any later change keeps earlier disagreements until the value
+            # matches them. Without new evidence the row keeps its own.
+            evidence = merge_disagreements(evidence, current.evidence, merged)
         if current:
             if merged != before:
                 for key, value in merged.items():

@@ -14,16 +14,27 @@
     {"key": "documents", "label": "Documents"}
   ],
   "default_section": "about",
-  "document_records": {
-    "kind": "document",
-    "label": "Document",
-    "section": "documents",
-    "sensitivity": "sensitive"
+  "uncatalogued_records": {
+    "document": {"label": "Document", "section": "documents", "sensitivity": "sensitive",
+                 "file_field": "file_id"},
+    "financial_sponsor": {"label": "Financial sponsor", "section": "money_and_place", "sensitivity": "sensitive"},
+    "scholarship_application": {"label": "Scholarship application", "section": "money_and_place",
+                                "sensitivity": "sensitive"},
+    "application": {"label": "Application", "section": "money_and_place", "sensitivity": "normal"},
+    "visa": {"label": "Visa", "section": "money_and_place", "sensitivity": "sensitive"},
+    "research": {"label": "Research", "section": "education", "sensitivity": "normal"},
+    "credential": {"label": "Credential", "section": "education", "sensitivity": "normal",
+                   "file_field": "raw_document_ref"},
+    "external_influence": {"label": "What others want for you", "section": "about", "sensitivity": "sensitive",
+                           "omit_fields": ["student_response"]},
+    "student_voice_statement": {"hidden": true, "reason": "holds original words; spec Language"}
   },
+  "file_record_kind": "document",
   "story_rich_min_entries": 2,
   "answers": {
     "default": ["keep_current", "accept_proposed", "both_true", "provide_new"],
-    "document_owner": ["keep_current", "accept_proposed"]
+    "document_owner": ["keep_current", "accept_proposed"],
+    "no_current_value": ["accept_proposed", "provide_new"]
   },
   "conflict_copy": {
     "item": {

@@ -64,20 +64,43 @@ def agrees(reading, value) -> bool:
     return reading == value
 
 
+MAX_DISAGREEMENTS = 10
+
+
+def merge_disagreements(evidence, prior_evidence, new_value, added=()) -> dict:
+    """Evidence for a new version of an entry, carrying the disagreements of
+    the version it replaces. Order is oldest first: the replaced version's,
+    the incoming evidence's own, then `added`. A disagreement is dropped once
+    the new value matches it, repeats of one (file, page, value) keep the
+    newest, and only the newest MAX_DISAGREEMENTS stay."""
+    out = dict(evidence or {})
+    merged = [*(prior_evidence or {}).get("disagreements", []), *out.get("disagreements", []), *added]
+    kept, seen = [], set()
+    for d in reversed(merged):
+        if agrees(d.get("value"), new_value):
+            continue
+        key = (d.get("file_id"), d.get("page"), json.dumps(d.get("value"), sort_keys=True, default=str))
+        if key not in seen:
+            seen.add(key)
+            kept.append(d)
+    kept = list(reversed(kept))[-MAX_DISAGREEMENTS:]
+    if kept:
+        out["disagreements"] = kept
+    else:
+        out.pop("disagreements", None)
+    return out
+
+
 def with_disagreements(evidence, prior_row: dict, prior_value, reading, new_value, *, temporal=False) -> dict:
     """Evidence for a student's edit that keeps a disagreeing document visible
     (VAULT_SPEC §Evidence ladder: the student's edit wins, the document stays
     on the entry). `prior_row` is the replaced entry as {source_type,
     verification_status, capture_method, evidence}; `reading` is what the
-    document said, shown on the entry. Earlier disagreements are carried over
-    a later edit and dropped once the student's value matches them. A change
-    over time is not a disagreement."""
-    out = dict(evidence or {})
+    document said, shown on the entry. A change over time is not a
+    disagreement."""
     prior = prior_row.get("evidence") or {}
-    kept = [d for d in prior.get("disagreements", []) if not agrees(d.get("value"), new_value)]
+    added = []
     if not temporal and evidence_level(prior_row, prior_value) == "shown" and not agrees(reading, new_value):
-        kept.append({"value": reading, "source_type": prior_row.get("source_type"),
-                     "file_id": prior.get("file_id"), "page": page_of(prior)})
-    if kept:
-        out["disagreements"] = [*out.get("disagreements", []), *kept]
-    return out
+        added.append({"value": reading, "source_type": prior_row.get("source_type"),
+                      "file_id": prior.get("file_id"), "page": page_of(prior)})
+    return merge_disagreements(evidence, prior, new_value, added)
