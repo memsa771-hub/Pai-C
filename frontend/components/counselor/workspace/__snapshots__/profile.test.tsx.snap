@@ -928,7 +928,7 @@ exports[`labels evidence in words, not colour alone, in dark 1`] = `
       >
         <defs>
           <lineargradient
-            id="_r_1e_"
+            id="_r_53_"
             x1="0"
             x2="0"
             y1="0"
@@ -1004,7 +1004,7 @@ exports[`labels evidence in words, not colour alone, in dark 1`] = `
         </g>
         <path
           d="M26 96.6 L308 61.2 L308 132 L26 132 Z"
-          fill="url(#_r_1e_)"
+          fill="url(#_r_53_)"
         />
         <path
           d="M26 96.6 L308 61.2"
@@ -1981,7 +1981,7 @@ exports[`labels evidence in words, not colour alone, in light 1`] = `
       >
         <defs>
           <lineargradient
-            id="_r_1d_"
+            id="_r_52_"
             x1="0"
             x2="0"
             y1="0"
@@ -2057,7 +2057,7 @@ exports[`labels evidence in words, not colour alone, in light 1`] = `
         </g>
         <path
           d="M26 96.6 L308 61.2 L308 132 L26 132 Z"
-          fill="url(#_r_1d_)"
+          fill="url(#_r_52_)"
         />
         <path
           d="M26 96.6 L308 61.2"

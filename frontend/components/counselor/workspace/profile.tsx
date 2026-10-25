@@ -1,9 +1,9 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AlertCircle, MessageCircle, PencilLine } from "lucide-react";
 import { workspaceApi } from "@/lib/api";
 import type { LivingPicture } from "@/lib/counselor-workspace";
-import { badgeLevel, vaultEntries, vaultError, type VaultAnswer, type VaultCatalog, type VaultCatalogType, type VaultConflict, type VaultEntry } from "@/lib/vault";
+import { badgeLevel, conflictFor, vaultEntries, type VaultCatalog, type VaultCatalogType, type VaultEntry } from "@/lib/vault";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AreaHeatmap, evidenceLevel, vaultBadgeLabel, type HeatmapArea } from "@/components/pai";
@@ -18,6 +18,7 @@ import {
   DocumentLink, EntryBadge, FactReview, ReadableValue, StaleMarker, ValueEditor, readable, useOpenDocument,
 } from "./profile-details";
 import { StoryArea, areaOf } from "./profile-story";
+import { ConflictBanner, ConflictReview, ConflictSummary } from "./vault-conflicts";
 export { CertaintyChart } from "./profile-parts";
 
 const load = async () => {
@@ -48,56 +49,6 @@ export function CoverageHeatmap({ coverage, selected, onSelect }: {
   return <AreaHeatmap title={text.heatmapTitle} areas={heatmapAreas(coverage)} selected={selected} onSelect={onSelect} />;
 }
 
-/** One open conflict card. It offers only the answers the backend gave this
- * card; "Neither" opens a small editor for the right value. */
-function CheckItem({ conflict, type, onDone }: { conflict: VaultConflict; type: VaultCatalogType | null; onDone: () => void }) {
-  const [busy, setBusy] = useState(false),
-    [error, setError] = useState<string | null>(null),
-    [writing, setWriting] = useState(false),
-    [value, setValue] = useState<unknown>(conflict.proposed ?? conflict.current ?? "");
-  const current = conflict.current_display, proposed = conflict.proposed_display;
-  async function resolve(answer: VaultAnswer, next?: unknown) {
-    setBusy(true); setError(null);
-    try { await workspaceApi.resolveVaultConflict(conflict.id, answer, next); onDone(); }
-    catch (failure) { setError(vaultError(failure) || text.checkFailed); setBusy(false); }
-  }
-  // A document-owner card asks about the file, so its answers name no values.
-  const owner = conflict.kind === "document_owner";
-  const words: Record<VaultAnswer, string> = {
-    keep_current: owner ? text.ownerNo : text.checkKeep,
-    accept_proposed: owner ? text.ownerYes : text.checkUse,
-    both_true: text.checkBoth,
-    provide_new: text.checkNew,
-  };
-  const line = owner ? "" : current && proposed ? fill(text.checkLine, { current, proposed })
-    : proposed ? fill(text.checkLineNew, { proposed }) : "";
-  return (
-    <li className="py-3">
-      <p className="text-sm font-semibold">{conflict.question}</p>
-      {line && <p className="mt-0.5 break-words text-sm text-muted-foreground">{line}</p>}
-      {writing ? (
-        <div className="mt-2.5 space-y-3">
-          <ValueEditor value={value} onChange={setValue} label={text.checkNewLabel} choices={type?.choices} />
-          <div className="flex flex-wrap gap-2">
-            <Button size="tap" disabled={busy || !human(value)} onClick={() => resolve("provide_new", value)}>{copy.save}</Button>
-            <Button size="tap" variant="ghost" onClick={() => setWriting(false)}>{copy.cancel}</Button>
-          </div>
-        </div>
-      ) : (
-        <div className="mt-2.5 flex flex-wrap gap-2">
-          {conflict.answers.map((answer) => (
-            <Button key={answer} size="tap" disabled={busy} className="h-auto whitespace-normal text-left" variant={answer === "accept_proposed" ? "primary" : answer === "provide_new" ? "ghost" : "outline"}
-              onClick={() => (answer === "provide_new" ? setWriting(true) : resolve(answer))}>
-              {words[answer]}
-            </Button>
-          ))}
-        </div>
-      )}
-      {error && <p role="alert" className="mt-2 text-sm text-danger-ink">{error}</p>}
-    </li>
-  );
-}
-
 /** A record's headline: its title field, then up to two other values. */
 function summary(value: unknown): { title: string; sub: string } {
   if (!value || typeof value !== "object" || Array.isArray(value)) return { title: human(value), sub: "" };
@@ -112,17 +63,21 @@ function summary(value: unknown): { title: string; sub: string } {
 /** One Vault entry as a form-like field: the label above, the value in a
  * box with its badge, a file link when a document backs it, and a quiet
  * re-check marker when it may be out of date. */
-function FactField({ entry, type, onOpen, openDocument }: {
+function FactField({ entry, type, onOpen, openDocument, questioned }: {
   entry: VaultEntry; type: VaultCatalogType | null; onOpen: () => void; openDocument: ((fileId: string) => void) | null;
+  /** An open conflict asks about this entry: tapping it reviews that conflict. */
+  questioned?: boolean;
 }) {
   const { title, sub } = summary(readable(entry, type));
   const shown = title || entry.display;
+  const aria = questioned ? fill(text.conflictFieldAria, { label: entry.label, value: shown })
+    : fill(entry.stale ? text.fieldAriaStale : text.fieldAria, { label: entry.label, value: shown, badge: vaultBadgeLabel(badgeLevel(entry)) });
   return (
     <div className="min-w-0">
       <p className="mb-1.5 text-sm font-semibold">{entry.label}</p>
       <div className="flex min-h-12 w-full items-center rounded-xl border bg-card shadow-[inset_0_1px_2px_rgb(22_34_75/0.04)] transition-colors focus-within:border-primary/50 hover:border-primary/50">
         <button type="button" onClick={onOpen} aria-haspopup="dialog"
-          aria-label={fill(entry.stale ? text.fieldAriaStale : text.fieldAria, { label: entry.label, value: shown, badge: vaultBadgeLabel(badgeLevel(entry)) })}
+          aria-label={aria}
           className="group flex min-h-12 min-w-0 flex-1 items-center gap-3 rounded-xl px-4 py-2.5 text-left">
           <span className="min-w-0 flex-1">
             <span className="block truncate text-[15px] font-semibold">{shown}</span>
@@ -168,6 +123,9 @@ export function LivingProfile({
   const openDocument = useOpenDocument(onNavigate);
   const [tab, setTab] = useState<Tab>("details");
   const [openId, setOpenId] = useState<string | null>(null);
+  // The conflict review: open with the card to start at (null: the first).
+  const [review, setReview] = useState<{ start: string | null } | null>(null);
+  const answered = useRef(false);
   useEffect(() => {
     if (new URLSearchParams(window.location.search).get("tab") === "background") setTab("background");
   }, []);
@@ -198,6 +156,17 @@ export function LivingProfile({
     .filter(({ id, rows }) => rows.length || layout.alwaysShow.includes(id));
   const opened = entries.find((e) => e.id === openId) || null;
   const refresh = () => void resource.refresh();
+  const conflicts = vault.conflicts;
+  // An entry "In question" opens the review on its own conflict, not the entry dialog.
+  const openEntry = (id: string) => {
+    const entry = entries.find((e) => e.id === id);
+    const conflict = entry && conflictFor(conflicts, entry);
+    if (conflict) setReview({ start: conflict.id }); else setOpenId(id);
+  };
+  const closeReview = () => {
+    setReview(null);
+    if (answered.current) { answered.current = false; refresh(); }
+  };
   const tabs: { id: Tab; label: string }[] = [
     { id: "details", label: text.tabDetails },
     { id: "background", label: text.tabBackground },
@@ -214,6 +183,8 @@ export function LivingProfile({
           </p>
         </div>
       </header>
+
+      <ConflictBanner count={conflicts.length} onReview={() => setReview({ start: null })} />
 
       {/* The tabs stay in view while the page scrolls, so the student can always switch. */}
       <div role="tablist" aria-label={text.tabsLabel} className="sticky top-0 z-10 -mx-4 mt-6 flex gap-6 border-b bg-background/95 px-4 backdrop-blur sm:-mx-8 sm:px-8">
@@ -244,7 +215,8 @@ export function LivingProfile({
                   <h2 id={`group-${id}`} className="mb-4 text-xl font-bold tracking-tight">{title}</h2>
                   <div className="grid gap-x-4 gap-y-5 sm:grid-cols-2 lg:grid-cols-3">
                     {rows.map((entry) => (
-                      <FactField key={entry.id} entry={entry} type={typeOf(entry.type)} openDocument={openDocument} onOpen={() => setOpenId(entry.id)} />
+                      <FactField key={entry.id} entry={entry} type={typeOf(entry.type)} openDocument={openDocument}
+                        questioned={!!conflictFor(conflicts, entry)} onOpen={() => openEntry(entry.id)} />
                     ))}
                     {!rows.length && (
                       <div className="min-w-0">
@@ -260,19 +232,7 @@ export function LivingProfile({
               ))}
             </div>
             <div className="space-y-4">
-            {vault.conflicts.length > 0 && (
-              <section aria-labelledby="check-title" className="rounded-2xl border border-warning/40 bg-card p-5 shadow-soft">
-                <h2 id="check-title" className="flex items-center gap-2 text-lg font-bold">
-                  <AlertCircle aria-hidden className="size-5 text-warning" />{text.checkTitle}
-                </h2>
-                <p className="mt-1 text-sm text-muted-foreground">{text.checkIntro}</p>
-                <ul className="mt-1 divide-y">
-                  {vault.conflicts.map((conflict) => (
-                    <CheckItem key={conflict.id} conflict={conflict} type={conflict.type ? typeOf(conflict.type) : null} onDone={refresh} />
-                  ))}
-                </ul>
-              </section>
-            )}
+            <ConflictSummary conflicts={conflicts} onReview={(start) => setReview({ start })} />
             {toProve.length > 0 && onNavigate && (
               <section aria-labelledby="proof-title" className="rounded-2xl border bg-card p-5 shadow-soft">
                 <h2 id="proof-title" className="text-lg font-bold">{text.proofTitle}</h2>
@@ -314,13 +274,16 @@ export function LivingProfile({
                   const cards = vault.story.filter((card) => areaOf(card.type) === area)
                     .map((card) => ({ ...card, entries: card.entries.filter(visible) }));
                   const types = cards.map((card) => typeOf(card.type)).filter((t): t is VaultCatalogType => t !== null);
-                  return <StoryArea key={area} area={area} cards={cards} types={types} onChat={onChat} onOpen={setOpenId} onSaved={refresh} />;
+                  return <StoryArea key={area} area={area} cards={cards} types={types} onChat={onChat} onOpen={openEntry} onSaved={refresh} />;
                 })}
               </div>
             </section>
           </div>
         )}
       </div>
+
+      <ConflictReview conflicts={conflicts} startId={review?.start ?? null} open={!!review} typeOf={typeOf}
+        openDocument={openDocument} onAnswered={() => { answered.current = true; }} onClose={closeReview} />
 
       <Dialog open={!!opened} onOpenChange={(open) => { if (!open) setOpenId(null); }}>
         <DialogContent className="max-w-lg">

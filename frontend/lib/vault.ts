@@ -46,6 +46,15 @@ export type VaultStoryCard = {
 
 export type VaultAnswer = 'keep_current' | 'accept_proposed' | 'both_true' | 'provide_new';
 
+/** Where one side of a conflict came from: the same ladder and badge words as
+ * entries, the day it was said or read, and the file behind it. Never words. */
+export type VaultConflictSource = {
+  level: VaultLevel;
+  badge: string;
+  said_on: string | null;
+  document: VaultDocument | null;
+};
+
 export type VaultConflict = {
   id: string;
   kind: 'fact' | 'record' | 'item' | 'document_owner' | 'other';
@@ -59,7 +68,18 @@ export type VaultConflict = {
   proposed_display: string;
   /** Only the answers this card offers; they differ per card. */
   answers: VaultAnswer[];
+  /** The saved entry's source, and the new answer's (null when unknown). */
+  current_source: VaultConflictSource | null;
+  proposed_source: VaultConflictSource | null;
+  created_at: string | null;
 };
+
+/** The open conflict an entry's "In question" badge points at: the card about
+ * that entry, else the card about its type. */
+export function conflictFor(conflicts: VaultConflict[], entry: Pick<VaultEntry, 'id' | 'type' | 'in_question'>): VaultConflict | null {
+  if (!entry.in_question) return null;
+  return conflicts.find((c) => c.entry_id === entry.id) || conflicts.find((c) => c.type === entry.type) || null;
+}
 
 export type VaultView = {
   details: Record<string, VaultSection>;

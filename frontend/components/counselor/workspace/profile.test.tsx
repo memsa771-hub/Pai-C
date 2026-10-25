@@ -62,10 +62,10 @@ it("reads Details from the Vault: sections, badges, document links, re-check mar
   // Every badge is a word, and "In question" overrides the level.
   expect(field("Full name").textContent).toContain("Confirmed");
   expect(field("Date of birth").textContent).toContain("PAI's guess");
-  expect(field("Current country").textContent).toContain("In question");
+  expect(screen.getByRole("button", { name: /^Review the answers for Current country/ }).textContent).toContain("In question");
   expect(field("Current city").textContent).toContain("Stated");
-  // The badge word is part of the field's accessible name.
-  expect(screen.getByRole("button", { name: "Show source and actions for Current country: Pakistan, In question" })).toBeTruthy();
+  // The badge word is part of the field's accessible name; an entry in question reviews its conflict.
+  expect(screen.getByRole("button", { name: "Review the answers for Current country: Pakistan, In question" })).toBeTruthy();
   expect(screen.getByRole("button", { name: /^Show source and actions for Date of birth: .*2008, PAI's guess$/ })).toBeTruthy();
   // Choice codes read as catalog labels.
   expect(screen.getAllByRole("button", { name: /^Show source and actions for Education: Matric/ })).toHaveLength(1);
@@ -96,63 +96,203 @@ it("offers an empty always-shown section to PAI", async () => {
   expect(chat).toHaveBeenCalledWith("I want to add a test or exam result.");
 });
 
-it("shows only the answers each conflict card offers, four or two", async () => {
-  setup();
-  const check = await screen.findByRole("region", { name: "Please check" });
-  const [city, owner] = within(check).getAllByRole("listitem");
-  expect(within(city).getByText("Which current city is right?")).toBeTruthy();
-  expect(within(city).getByText("Saved: Islamabad. New: Lahore.")).toBeTruthy();
-  // Short labels, with the values on the line above, so the buttons fit a 360px phone.
-  expect(within(city).getAllByRole("button").map((b) => b.textContent)).toEqual(
-    ["Keep saved", "Use new", "Both were true at different times", "Neither, I'll write it"]);
-  // A document-owner card asks about the file; its answers name no values.
-  expect(within(owner).getByText("Is Result card.jpg your document?")).toBeTruthy();
-  expect(within(owner).getAllByRole("button").map((b) => b.textContent)).toEqual(["No, it isn't mine", "Yes, it's mine"]);
-  expect(owner.textContent).not.toContain("Alex Doe");
-  fireEvent.click(within(owner).getByRole("button", { name: "Yes, it's mine" }));
-  await waitFor(() => expect(workspaceApi.resolveVaultConflict).toHaveBeenCalledWith("c-owner", "accept_proposed", undefined));
-  fireEvent.click(within(city).getByRole("button", { name: "Use new" }));
-  await waitFor(() => expect(workspaceApi.resolveVaultConflict).toHaveBeenCalledWith("c-city", "accept_proposed", undefined));
-});
-
 const card = (over: Partial<VaultConflict>): VaultConflict => ({ ...vault.conflicts[0], ...over });
+const [cityCard, ownerCard, countryCard] = vault.conflicts;
+const review = () => screen.findByRole("dialog");
+async function startReview() {
+  fireEvent.click(await screen.findByRole("button", { name: /Review now/ }));
+  return review();
+}
+const tile = (dialog: HTMLElement, name: RegExp | string) => within(dialog).getByRole("radio", { name });
 
-it("offers Use and Neither when nothing is saved yet", async () => {
-  setup({ ...vault, conflicts: [card({ id: "c-new", current: null, current_display: "", answers: ["accept_proposed", "provide_new"] })] });
-  const check = await screen.findByRole("region", { name: "Please check" });
-  expect(within(check).getByText("New: Lahore.")).toBeTruthy();
-  expect(within(check).getAllByRole("button").map((b) => b.textContent)).toEqual(["Use new", "Neither, I'll write it"]);
-});
-
-it("shows why a conflict answer was not saved", async () => {
+it("shows a banner with the conflict count on both tabs, and hides it when there are none", async () => {
   setup();
-  vi.mocked(workspaceApi.resolveVaultConflict).mockRejectedValue(
-    new Error('API 404: {"code":404,"message":"Conflict not found or already answered","data":null}'));
-  const check = await screen.findByRole("region", { name: "Please check" });
-  fireEvent.click(within(check).getAllByRole("button", { name: "Use new" })[0]);
-  expect((await within(check).findByRole("alert")).textContent).toBe("Conflict not found or already answered");
+  const banner = await screen.findByRole("region", { name: "3 answers don't match" });
+  expect(within(banner).getByText("Help PAI keep your Vault right. It takes a few seconds.")).toBeTruthy();
+  expect(within(banner).getByRole("button", { name: /Review now/ })).toBeTruthy();
+  // Above the tabs, so it stays on Background too.
+  fireEvent.click(screen.getByRole("tab", { name: "Background" }));
+  expect(screen.getByRole("region", { name: "3 answers don't match" })).toBeTruthy();
+  cleanup();
+  setup({ ...vault, conflicts: [cityCard] });
+  expect(await screen.findByRole("region", { name: "1 answer doesn't match" })).toBeTruthy();
+  cleanup();
+  setup({ ...vault, conflicts: [] });
+  await screen.findByRole("heading", { level: 1 });
+  expect(screen.queryByRole("region", { name: /match/ })).toBeNull();
+  expect(screen.queryByRole("region", { name: /Please check/ })).toBeNull();
 });
 
-it("writes a new answer with the catalog's choices", async () => {
-  setup({ ...vault, conflicts: [card({ id: "c-edu", type: "education", kind: "record",
-    current: { qualification_name: "matric" }, proposed: { qualification_name: "fsc" }, current_display: "Matric", proposed_display: "FSc" })] });
-  const check = await screen.findByRole("region", { name: "Please check" });
-  fireEvent.click(within(check).getByRole("button", { name: "Neither, I'll write it" }));
-  const select = within(check).getByRole("combobox", { name: "Qualification" }) as HTMLSelectElement;
-  expect([...select.options].map((o) => o.textContent)).toEqual(["Choose", "Matric", "FSc"]);
-  fireEvent.change(select, { target: { value: "matric" } });
-  fireEvent.click(within(check).getByRole("button", { name: "Save" }));
-  await waitFor(() => expect(workspaceApi.resolveVaultConflict).toHaveBeenCalledWith("c-edu", "provide_new", { qualification_name: "matric" }));
+it("summarises conflicts in Please check and opens the review at a row", async () => {
+  setup();
+  const check = await screen.findByRole("region", { name: /Please check/ });
+  const rows = within(check).getAllByRole("listitem");
+  expect(rows.map((r) => r.textContent)).toEqual(["Which current city is right?", "Is Result card.jpg your document?"]);
+  expect(within(check).getByText("And 1 more")).toBeTruthy();
+  fireEvent.click(within(rows[1]).getByRole("button"));
+  const dialog = await review();
+  expect(within(dialog).getByRole("heading", { name: "Is Result card.jpg your document?" })).toBeTruthy();
+  expect(within(dialog).getByText("2 of 3")).toBeTruthy();
+});
+
+it("walks two conflicts with progress, choosing a tile resolves with its answer", async () => {
+  setup({ ...vault, conflicts: [cityCard, countryCard] });
+  const dialog = await startReview();
+  expect(within(dialog).getByRole("heading", { name: "Which current city is right?" })).toBeTruthy();
+  expect(within(dialog).getByText("1 of 2")).toBeTruthy();
+  expect(within(dialog).getByRole("progressbar", { name: "Question 1 of 2" }).getAttribute("aria-valuenow")).toBe("1");
+  const group = within(dialog).getByRole("radiogroup", { name: "Which current city is right?" });
+  expect(within(group).getAllByRole("radio").map((r) => r.getAttribute("aria-label"))).toEqual(["Saved: Islamabad", "New: Lahore"]);
+  fireEvent.click(tile(dialog, "New: Lahore"));
+  await waitFor(() => expect(workspaceApi.resolveVaultConflict).toHaveBeenCalledWith("c-city", "accept_proposed", undefined));
+  expect((await within(dialog).findByRole("status")).textContent).toBe("Saved. Current city is now Lahore.");
+  fireEvent.click(within(dialog).getByRole("button", { name: "Next" }));
+  expect(within(dialog).getByRole("heading", { name: "Which current country is right?" })).toBeTruthy();
+  expect(within(dialog).getByText("2 of 2")).toBeTruthy();
+  fireEvent.click(tile(dialog, "Saved: Pakistan"));
+  await waitFor(() => expect(workspaceApi.resolveVaultConflict).toHaveBeenCalledWith("c-country", "keep_current", undefined));
+  expect((await within(dialog).findByRole("status")).textContent).toBe("Kept Pakistan.");
+  fireEvent.click(within(dialog).getByRole("button", { name: "Next" }));
+  // The last one ends on "All done", and closing reloads the Vault once.
+  expect(within(dialog).getByRole("heading", { name: "All done. Your Vault is up to date." })).toBeTruthy();
+  expect(workspaceApi.getVault).toHaveBeenCalledTimes(1);
+  fireEvent.click(within(dialog).getAllByRole("button", { name: "Close" }).at(-1)!);
+  await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+  await waitFor(() => expect(workspaceApi.getVault).toHaveBeenCalledTimes(2));
+});
+
+it("moves on by itself after an answer", async () => {
+  setup({ ...vault, conflicts: [cityCard, countryCard] });
+  const dialog = await startReview();
+  fireEvent.click(tile(dialog, "New: Lahore"));
+  await within(dialog).findByRole("status");
+  expect(await within(dialog).findByRole("heading", { name: "Which current country is right?" }, { timeout: 2500 })).toBeTruthy();
+});
+
+it("shows where each answer came from, with the badge words and the document link", async () => {
+  setup({ ...vault, conflicts: [cityCard, countryCard] });
+  const dialog = await startReview();
+  const [saved, fresh] = within(dialog).getAllByRole("radio").map((r) => r.parentElement!);
+  expect(saved.textContent).toContain("Stated");
+  expect(saved.textContent).toMatch(/You said this · .*12.*2026/);
+  expect(fresh.textContent).toContain("From document");
+  const link = within(fresh).getByRole("button", { name: "Open Result card.jpg" });
+  expect(link.textContent).toBe("From Result card.jpg · page 1");
+  expect(link.querySelector("svg")).toBeTruthy();
+  fireEvent.click(within(dialog).getByRole("button", { name: "Skip for now" }));
+  const [kept, guess] = within(dialog).getAllByRole("radio").map((r) => r.parentElement!);
+  expect(kept.textContent).toMatch(/Confirmed.*You confirmed this/);
+  expect(guess.textContent).toMatch(/PAI's guess.*From your conversation/);
+  // The file opens in Documents and the dialog closes.
+  fireEvent.click(within(dialog).getByRole("button", { name: "Skip for now" }));
+  cleanup();
+  const { navigate } = setup({ ...vault, conflicts: [cityCard] });
+  const again = await startReview();
+  fireEvent.click(within(again).getByRole("button", { name: "Open Result card.jpg" }));
+  expect(setSelectedFileId).toHaveBeenCalledWith("result-card");
+  expect(navigate).toHaveBeenCalledWith("files");
+  await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+});
+
+it("saves both as true at different times", async () => {
+  setup({ ...vault, conflicts: [cityCard] });
+  const dialog = await startReview();
+  const both = within(dialog).getByRole("button", { name: /Both were true at different times/ });
+  expect(both.textContent).toContain("Keeps the old one as your past");
+  fireEvent.click(both);
+  await waitFor(() => expect(workspaceApi.resolveVaultConflict).toHaveBeenCalledWith("c-city", "both_true", undefined));
+  expect((await within(dialog).findByRole("status")).textContent).toBe("Saved both: Islamabad is now your past.");
 });
 
 it("lets the student write the right answer when neither is", async () => {
-  setup();
-  const check = await screen.findByRole("region", { name: "Please check" });
-  const [city] = within(check).getAllByRole("listitem");
-  fireEvent.click(within(city).getByRole("button", { name: "Neither, I'll write it" }));
-  fireEvent.change(within(city).getByRole("textbox", { name: "The right answer" }), { target: { value: "Karachi" } });
-  fireEvent.click(within(city).getByRole("button", { name: "Save" }));
+  setup({ ...vault, conflicts: [cityCard] });
+  const dialog = await startReview();
+  fireEvent.click(within(dialog).getByRole("button", { name: "Neither, I'll write it" }));
+  expect(within(dialog).queryByRole("radiogroup")).toBeNull();
+  fireEvent.change(within(dialog).getByRole("textbox", { name: "The right answer" }), { target: { value: "Karachi" } });
+  fireEvent.click(within(dialog).getByRole("button", { name: "Save" }));
   await waitFor(() => expect(workspaceApi.resolveVaultConflict).toHaveBeenCalledWith("c-city", "provide_new", "Karachi"));
+  expect((await within(dialog).findByRole("status")).textContent).toBe("Saved. Current city is now Karachi.");
+});
+
+it("writes a new answer with the catalog's choices", async () => {
+  setup({ ...vault, conflicts: [card({ id: "c-edu", type: "education", kind: "record", entry_id: "education-earlier",
+    current: { qualification_name: "matric" }, proposed: { qualification_name: "fsc" }, current_display: "Matric", proposed_display: "FSc" })] });
+  const dialog = await startReview();
+  fireEvent.click(within(dialog).getByRole("button", { name: "Neither, I'll write it" }));
+  const select = within(dialog).getByRole("combobox", { name: "Qualification" }) as HTMLSelectElement;
+  expect([...select.options].map((o) => o.textContent)).toEqual(["Choose", "Matric", "FSc"]);
+  fireEvent.change(select, { target: { value: "matric" } });
+  fireEvent.click(within(dialog).getByRole("button", { name: "Save" }));
+  await waitFor(() => expect(workspaceApi.resolveVaultConflict).toHaveBeenCalledWith("c-edu", "provide_new", { qualification_name: "matric" }));
+});
+
+it("offers only the answers a card has: New and Neither when nothing is saved yet", async () => {
+  setup({ ...vault, conflicts: [card({ id: "c-new", current: null, current_display: "", current_source: null, answers: ["accept_proposed", "provide_new"] })] });
+  const dialog = await startReview();
+  expect(within(dialog).getAllByRole("radio").map((r) => r.getAttribute("aria-label"))).toEqual(["New: Lahore"]);
+  expect(within(dialog).queryByRole("button", { name: /Both were true/ })).toBeNull();
+  expect(within(dialog).getByRole("button", { name: "Neither, I'll write it" })).toBeTruthy();
+});
+
+it("asks about a document's owner in its own words", async () => {
+  setup({ ...vault, conflicts: [ownerCard] });
+  const dialog = await startReview();
+  expect(within(dialog).getByRole("heading", { name: "Is Result card.jpg your document?" })).toBeTruthy();
+  expect(within(dialog).getAllByRole("radio").map((r) => r.textContent)).toEqual(["Yes, it's mine", "No, it isn't mine"]);
+  expect(dialog.textContent).not.toMatch(/\bSaved\b|\bNew\b/);
+  expect(within(dialog).getByText("Name on it: Alex Doe")).toBeTruthy();
+  expect(within(dialog).getByRole("button", { name: "Open Result card.jpg" })).toBeTruthy();
+  expect(within(dialog).queryByRole("button", { name: /Both were true|Neither/ })).toBeNull();
+  fireEvent.click(tile(dialog, "Yes, it's mine"));
+  await waitFor(() => expect(workspaceApi.resolveVaultConflict).toHaveBeenCalledWith("c-owner", "accept_proposed", undefined));
+  expect((await within(dialog).findByRole("status")).textContent).toBe("Saved. Result card.jpg is in your Vault as yours.");
+});
+
+it("skips a card without answering and says what is left", async () => {
+  setup({ ...vault, conflicts: [cityCard, countryCard] });
+  const dialog = await startReview();
+  fireEvent.click(within(dialog).getByRole("button", { name: "Skip for now" }));
+  expect(within(dialog).getByRole("heading", { name: "Which current country is right?" })).toBeTruthy();
+  fireEvent.click(within(dialog).getByRole("button", { name: "Skip for now" }));
+  expect(workspaceApi.resolveVaultConflict).not.toHaveBeenCalled();
+  expect(within(dialog).getByRole("heading", { name: "That's all for now." })).toBeTruthy();
+  expect(within(dialog).getByRole("status").textContent).toMatch(/^2 answers are left to check/);
+  fireEvent.click(within(dialog).getAllByRole("button", { name: "Close" }).at(-1)!);
+  await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+  // Nothing was answered, so nothing reloads.
+  expect(workspaceApi.getVault).toHaveBeenCalledTimes(1);
+});
+
+it("shows why a conflict answer was not saved and keeps the card", async () => {
+  setup({ ...vault, conflicts: [cityCard] });
+  vi.mocked(workspaceApi.resolveVaultConflict).mockRejectedValue(
+    new Error('API 404: {"code":404,"message":"Conflict not found or already answered","data":null}'));
+  const dialog = await startReview();
+  fireEvent.click(tile(dialog, "New: Lahore"));
+  expect((await within(dialog).findByRole("alert")).textContent).toBe("Conflict not found or already answered");
+  expect(within(dialog).getByRole("radiogroup")).toBeTruthy();
+  expect(within(dialog).queryByRole("status")).toBeNull();
+});
+
+it("opens an In-question field's own conflict instead of the entry dialog", async () => {
+  setup();
+  fireEvent.click(await screen.findByRole("button", { name: /^Review the answers for Current country/ }));
+  const dialog = await review();
+  expect(within(dialog).getByRole("heading", { name: "Which current country is right?" })).toBeTruthy();
+  expect(within(dialog).getByText("3 of 3")).toBeTruthy();
+  expect(within(dialog).queryByRole("button", { name: "Confirm" })).toBeNull();
+});
+
+it("moves between the two tiles with the arrow keys", async () => {
+  setup({ ...vault, conflicts: [cityCard] });
+  const dialog = await startReview();
+  const [saved, fresh] = within(dialog).getAllByRole("radio") as HTMLButtonElement[];
+  expect([saved.tabIndex, fresh.tabIndex]).toEqual([0, -1]);
+  saved.focus();
+  fireEvent.keyDown(saved, { key: "ArrowRight" });
+  expect(document.activeElement).toBe(fresh);
+  expect([saved.tabIndex, fresh.tabIndex]).toEqual([-1, 0]);
 });
 
 it("confirms, edits and removes through the Vault API", async () => {
