@@ -451,6 +451,32 @@ def test_crash_during_visa_build(os_db, engine, clean, tmp_path):
     assert len(files) == len(set(files)) == len(students) * per_student
 
 
+def _hold_replan_locks(engine, plan_ids: list[int]):
+    """Takes every plan's replan lock (the session advisory lock Replanner.plan_lock waits on) on its own connection."""
+    from app.os.replan.apply import LOCK_CLASS
+
+    conn = engine.connect()
+    for plan_id in plan_ids:
+        conn.execute(text("SELECT pg_advisory_lock(:c, :p)"), {"c": LOCK_CLASS, "p": plan_id})
+    conn.commit()
+    return conn
+
+
+def _replan_waiting(engine) -> bool:
+    """True while a worker's replan waits on a lock the test holds: a kill now lands in flight."""
+    from app.os.replan.apply import LOCK_CLASS
+
+    with engine.connect() as conn:
+        return conn.execute(text("SELECT count(*) FROM pg_locks WHERE locktype = 'advisory' AND NOT granted "
+                                 "AND classid::int = :c"), {"c": LOCK_CLASS}).scalar_one() > 0
+
+
+def _release(conn) -> None:
+    conn.execute(text("SELECT pg_advisory_unlock_all()"))  # a pooled connection keeps session locks after close
+    conn.commit()
+    conn.close()
+
+
 def test_crash_during_replan(os_db, engine, clean, tmp_path):
     """Slice 7 spec §8: SIGKILL workers while replans run. Every event ends with exactly one proposal, one override
     and one replan revision: nothing lost, nothing duplicated."""
@@ -480,6 +506,9 @@ def test_crash_during_replan(os_db, engine, clean, tmp_path):
     kills = 0
     client = None
     PR, O, REV = models.proposals, models.plan_overrides, models.plan_revisions
+    # The rules replan in milliseconds: a fast runner finished all 8 before the second kill. So the test holds every
+    # plan's replan lock: the replans wait inside decide, each kill lands while one waits, and two kills free them.
+    held = _hold_replan_locks(engine, plan_ids)
     try:
         for slot in range(2):
             pool.start(slot)
@@ -496,14 +525,19 @@ def test_crash_during_replan(os_db, engine, clean, tmp_path):
             if done == len(plan_ids):
                 break
             assert time.monotonic() < deadline, f"stuck: {done} of {len(plan_ids)} (logs: {tmp_path})"
-            if time.monotonic() >= next_kill and kills < 6:
+            if time.monotonic() >= next_kill and kills < 6 and (held is None or _replan_waiting(engine)):
                 slot = rng.randrange(2)
                 pool.kill(slot)
                 kills += 1
                 pool.start(slot)
                 next_kill = time.monotonic() + KILL_EVERY_S
+                if held is not None and kills >= 2:
+                    _release(held)
+                    held = None
             time.sleep(0.2)
     finally:
+        if held is not None:
+            _release(held)
         pool.stop_all()
         if client is not None:
             client.destroy()
