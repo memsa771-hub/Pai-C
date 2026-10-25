@@ -434,7 +434,7 @@ To re-assess an existing path, give its field_key again. A path marked "own" is 
 For each path give:
 - field_key: the key from <fields> (leave it out only for an own path).
 - title: only for an own path, its exact title.
-- why: one or two sentences on which of the student's skills, strengths or interests this field builds on.
+- why: one or two sentences on which of the student's skills, strengths or interests this field builds on, written to the student in the second person ("Builds on your repair work and your interest in circuits."), never "the student's" or "he" or "she", because the student reads it.
 - evidence_item_ids: ids from <notebook> or <records> that support the path.
 - fit: the most important requirements of this path for this student (up to the limit), each with a label, a status, a short note and evidence_item_ids.
   - have: the student's evidence shows they already have it.

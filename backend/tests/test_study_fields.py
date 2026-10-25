@@ -5,7 +5,7 @@ import re
 import pytest
 
 from app.memory.catalog import vault_catalog
-from app.pai_c.paths.fields import fields_for_group, known_groups, student_group, study_fields
+from app.pai_c.paths.fields import fields_for_group, known_groups, student_groups, study_fields
 from app.pai_c.policy.controller import load_data
 
 FAMILIES_REQUIRED = {"engineering", "computing", "health", "business", "sciences",
@@ -80,13 +80,13 @@ def test_unknown_group_opens_nothing():
     ({"qualification_name": "bachelor", "field_of_study": "bba"}, None),
     ({}, None),
 ])
-def test_student_group_from_the_education_record(record, group):
-    assert student_group(record) == group
+def test_student_groups_from_the_education_record(record, group):
+    assert student_groups(record) == ({group} if group else set())
 
 
-def test_student_group_covers_every_intermediate_group():
+def test_student_groups_cover_every_intermediate_group():
     for code in {c.code for c in vault_catalog().choices("intermediate_groups")}:
-        assert student_group({"qualification_name": "intermediate", "field_of_study": code}) == code
+        assert student_groups({"qualification_name": "intermediate", "field_of_study": code}) == {code}
 
 
 @pytest.mark.parametrize("level, subjects, group", [
@@ -95,12 +95,13 @@ def test_student_group_covers_every_intermediate_group():
     ("a_level", ["mathematics", "physics", "computer_science"], "ics"),
     ("a_level", ["accounting", "business", "economics"], "icom"),
     ("a_level", ["sociology", "history", "english_literature"], "fa_humanities"),
-    ("o_level", ["biology", "chemistry", "physics", "mathematics"], "pre_medical"),
+    ("o_level", ["biology", "chemistry", "physics", "mathematics"], "pre_medical|pre_engineering"),
     ("a_level", [], None),
 ])
-def test_student_group_from_subjects_follows_the_data_rule(level, subjects, group):
-    assert student_group({"qualification_name": level, "subjects": subjects}) == group
-    assert student_group({"qualification_name": level, "details": {"subjects": subjects}}) == group
+def test_student_groups_from_subjects_follow_the_data_rule(level, subjects, group):
+    expected = set(group.split("|")) if group else set()
+    assert student_groups({"qualification_name": level, "subjects": subjects}) == expected
+    assert student_groups({"qualification_name": level, "details": {"subjects": subjects}}) == expected
 
 
 def test_subject_rules_use_catalog_subject_codes_and_known_groups():

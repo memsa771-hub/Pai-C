@@ -59,6 +59,10 @@ class TypeSpec:
     # education field_of_study is a matric group, a DAE technology or a study
     # field: {field: {level code: list}}. choice_fields is the fallback.
     choice_by_level: dict = field(default_factory=dict)
+    # Short level wordings ("MS", "BE") read only inside a record's own level
+    # field, never in chat text where "Ms Ayesha" or "be" are everyday words:
+    # {wording: level code}.
+    level_wordings: dict = field(default_factory=dict)
     onboarding: dict | None = None
     # Which Details section shows a details type (about, education, ...).
     # Optional so older catalog files still load.
@@ -170,6 +174,11 @@ def _build_type(raw: dict, choices: dict) -> TypeSpec:
         for name, by_level in choice_by_level.items():
             if not isinstance(by_level, dict) or not set(by_level.values()) <= set(choices):
                 raise ValueError(f"choice_by_level {name!r} uses an unknown list")
+        level_wordings = {norm(w): code for w, code in dict(raw.get("level_wordings", {})).items()}
+        level_list = choice_fields.get("qualification_name")
+        if level_wordings and (level_list is None or not set(level_wordings.values())
+                               <= {c.code for c in choices[level_list]}):
+            raise ValueError("level_wordings must name codes of the qualification_name list")
         onboarding = raw.get("onboarding")
         if onboarding is not None:
             if (not isinstance(onboarding.get("order"), int) or not onboarding.get("prompt")
@@ -209,7 +218,8 @@ def _build_type(raw: dict, choices: dict) -> TypeSpec:
             key=key, label=raw.get("label", key), storage=storage, shown_on=raw["shown_on"],
             inputs=inputs, sensitivity=raw["sensitivity"], conflict=raw["conflict"],
             freshness_days=days, version=raw["version"], schema=schema, identity=identity,
-            choice_fields=choice_fields, choice_by_level=choice_by_level, onboarding=onboarding, section=section, money=money,
+            choice_fields=choice_fields, choice_by_level=choice_by_level, level_wordings=level_wordings,
+            onboarding=onboarding, section=section, money=money,
             field_definition=field_definition)
     except (KeyError, TypeError, AttributeError, ValueError) as exc:
         detail = f"missing {exc}" if isinstance(exc, KeyError) else str(exc)
@@ -273,6 +283,67 @@ class VaultCatalog:
             if c.code == code:
                 return c.label
         return code
+
+    def record_choice_fields(self, spec: TypeSpec | None, value) -> dict:
+        """field path -> choice list for one record: a field whose list depends
+        on the record's level (choice_by_level) reads that level's list, so a
+        Bachelor's field_of_study is a study field and never an intermediate
+        group. Every reader (display, normalize, the Details editor, paths)
+        resolves the lists here."""
+        if spec is None:
+            return {}
+        lists = dict(spec.choice_fields)
+        if spec.choice_by_level and isinstance(value, dict):
+            level = self.choice_code(lists.get("qualification_name", "levels"),
+                                     str(value.get("qualification_name") or ""))
+            for path, by_level in spec.choice_by_level.items():
+                if level in by_level:
+                    lists[path] = by_level[level]
+        return lists
+
+    def read_education(self, qualification, field=None) -> tuple[str | None, str | None]:
+        """(level code, group/technology/field code) for an education record in
+        any wording, or None where it names none.
+
+        Chat, documents and Other often store the whole thing in one string
+        ("FSc Pre-Engineering", "BS Computer Science") or a field outside the
+        level's list ("Intermediate" + "Computer Science"). Read in this order:
+        the level and field as given; both together as one level wording
+        ("intermediate computer science" is ICS); a level prefix followed by
+        the field, trying each tail of the remainder so "Bachelor of Science in
+        Computer Science" still finds Computer Science. Only catalog wordings
+        decide, so a new synonym is a data change.
+        """
+        q, f = norm(str(qualification or "")), norm(str(field or ""))
+        spec = self.type("education")
+
+        def level_of(text):
+            code = (self.choice_code("levels", text) or spec.level_wordings.get(text)) if text else None
+            return None if code == "other" else code
+
+        def field_of(level, text):
+            if not text:
+                return None
+            list_name = self.record_choice_fields(spec, {"qualification_name": level}).get("field_of_study")
+            return self.choice_code(list_name, text) if list_name else None
+
+        level = level_of(q)
+        if level and (not f or field_of(level, f)):
+            return level, field_of(level, f)
+        words = f"{q} {f}".split()
+        if f and level_of(" ".join(words)):
+            return level_of(" ".join(words)), None
+        fallback = level
+        for cut in range(len(words) - 1, 0, -1):
+            prefix = level_of(" ".join(words[:cut]))
+            if prefix is None:
+                continue
+            for start in range(cut, len(words)):
+                code = field_of(prefix, " ".join(words[start:]))
+                if code:
+                    return prefix, code
+            fallback = fallback or prefix
+        return fallback, None
 
 
 @lru_cache(maxsize=1)

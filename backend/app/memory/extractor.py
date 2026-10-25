@@ -95,8 +95,8 @@ def _render_catalog() -> str:
 
 
 def _render_codes(text: str) -> str:
-    """Fill <enum type.field/> with that field's codes and <code type.field c/>
-    with c, failing at import if the catalog no longer has it, so the prose
+    """Fill <enum type.field/> with that field's codes, <choices list/> with a
+    catalog choice list's codes and <code type.field c/> with c, failing at import if the catalog no longer has it, so the prose
     can never name a code the validator would reject."""
     from app.memory.catalog import vault_catalog
 
@@ -109,6 +109,13 @@ def _render_codes(text: str) -> str:
             raise ValueError(f"extractor prompt names unknown code {match.group(2)!r} for {match.group(1)}")
         return match.group(2)
 
+    def choices(name: str) -> str:
+        codes = [c.code for c in vault_catalog().choices(name)]
+        if not codes:
+            raise ValueError(f"extractor prompt names unknown choice list {name!r}")
+        return "|".join(codes)
+
+    text = re.sub(r"<choices (\w+)/>", lambda m: choices(m.group(1)), text)
     text = re.sub(r"<enum ([\w.]+)/>", lambda m: "|".join(enum(m.group(1))), text)
     return re.sub(r"<code ([\w.]+) (\w+)/>", code, text)
 

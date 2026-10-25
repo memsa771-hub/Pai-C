@@ -176,6 +176,10 @@ def _redirect(field: OnboardingField, value: Any) -> Optional[str]:
     if text in field.choices:
         return None
     code = vault_catalog().choice_code(field.choice_list, text)
+    if code is None and field.field_key == "education":
+        # "FSc Pre-Engineering" or "BS Computer Science": a level with its
+        # group or field, read the way the paths read a chat-written record.
+        code = vault_catalog().read_education(text)[0]
     if code is None or code == "other":
         return None
     chip = _PARENT_CHIP.get(code, code)
@@ -194,8 +198,21 @@ def _redirects(field: OnboardingField) -> dict:
             continue
         for wording in (choice.code, choice.label, *choice.synonyms, choice.code.replace("_", " ")):
             out[norm(wording)] = chip
+    spec = vault_catalog().type(field.field_key)
+    for wording, code in (spec.level_wordings if spec else {}).items():
+        if _PARENT_CHIP.get(code, code) in field.choices:
+            out.setdefault(wording, _PARENT_CHIP.get(code, code))
     return out
 _NUMBERED = re.compile(r"_(\d+)$")
+# A record's status field and the value that makes it the student's current one.
+_STATUS_FIELD, _CURRENT, _COMPLETED = "academic_status", "current", "completed"
+
+
+def _latest(rows):
+    """The record the student's latest answer is: the most recent current
+    one, else the most recent (rows arrive newest first). An older record
+    stays in the Vault but never wins over what the student said last."""
+    return next((row for row in rows if getattr(row, _STATUS_FIELD, None) == _CURRENT), rows[0])
 
 
 def _visible(condition: Optional[dict], answers: dict) -> bool:
@@ -275,11 +292,15 @@ def _clean(value: Any, field: OnboardingField) -> Optional[str]:
 class OnboardingService:
     """Read the onboarding state, and apply the student's answers."""
 
-    def __init__(self, db, sources: Optional[dict] = None):
+    def __init__(self, db, sources: Optional[dict] = None, on_saved=None):
         self.db = db
         self.vault = VaultService(db)
         # Choice lists that live outside the catalog: name -> [(code, label)].
         self.sources = sources or {}
+        # Called with (workspace_id, saved keys) after the answers are written,
+        # so the caller can react (PAI C re-runs the paths after an education
+        # write) without app.memory importing PAI C.
+        self.on_saved = on_saved
 
     # -- follow-ups --------------------------------------------------------
 
@@ -434,7 +455,7 @@ class OnboardingService:
                 if rows:
                     # A value saved before the chips were catalog codes ("o-level")
                     # reads as its code, so the chip is selected.
-                    prefill.update(self._record_prefill(field, rows[0]))
+                    prefill.update(self._record_prefill(field, _latest(rows)))
         # Full name is deliberately collected here, not at signup, and is never
         # guessed from an email address or an OAuth display name.
         return {
@@ -539,8 +560,8 @@ class OnboardingService:
             # level (an old fsc row now Intermediate + ICS), is corrected in
             # place rather than gaining a second education record.
             rows = StudentRecordService(self.db).list(workspace_id, main.field_key)
-            if rows and self._record_prefill(main, rows[0]).get(main.name) == cleaned.get(main.name):
-                corrects[main.field_key] = {"record_id": rows[0].id}
+            if rows and self._record_prefill(main, _latest(rows)).get(main.name) == cleaned.get(main.name):
+                corrects[main.field_key] = {"record_id": _latest(rows).id}
                 if required_follow_ups:
                     # Every onboarding answer of a question no longer shown
                     # (graduation year once studying, subjects once not O/A
@@ -576,6 +597,8 @@ class OnboardingService:
             result = MemoryReconciler(self.db).reconcile(candidate)
             if result.accepted:
                 saved.append(field.field_key)
+                if field.record_field and isinstance(value, dict) and value.get(_STATUS_FIELD) == _CURRENT:
+                    self._complete_older(workspace_id, field, result.result_id, user)
             else:
                 # Never silently swallow it: the student typed this, and a
                 # rejection means canonical state did not move.
@@ -599,6 +622,26 @@ class OnboardingService:
                     enqueue(self.db, job_type="counselor.opening", workspace_id=workspace_id,
                             payload={}, idempotency_key=f"counselor:opening:{workspace_id}")
 
+        if self.on_saved is not None and saved:
+            self.on_saved(workspace_id, set(saved))
         return {"saved": saved, "rejected": rejected,
                 "completed": bool(user and user.onboarded_at)}
+
+    def _complete_older(self, workspace_id: str, field: OnboardingField, current_id, user) -> None:
+        """A different record stated as current makes every older current one
+        completed: the student is at one level now, and a stale "current"
+        Bachelor's must not outrank the Intermediate they just chose. Each
+        change goes through propose -> reconcile like any other answer."""
+        from .student_records import StudentRecordService
+        for row in StudentRecordService(self.db).list(workspace_id, field.field_key):
+            if row.id == current_id or getattr(row, _STATUS_FIELD, None) != _CURRENT:
+                continue
+            candidate = MemoryCandidateService(self.db).propose(
+                workspace_id=workspace_id, candidate_type="student_record", key=field.field_key,
+                proposed_value={_STATUS_FIELD: _COMPLETED}, confidence=1.0, entities={"record_id": row.id},
+                source_type="user_explicit", allow_user_explicit=True, input_channel="profile",
+                subject_user_id=str(user.id) if user else None,
+                evidence={"reason": "A newer current education was stated during onboarding",
+                          "capture": "onboarding", "quote": _COMPLETED})
+            MemoryReconciler(self.db).reconcile(candidate)
 

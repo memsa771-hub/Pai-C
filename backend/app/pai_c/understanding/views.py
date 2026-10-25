@@ -39,6 +39,14 @@ def _item_row(item):
             "updated_at": item.updated_at or item.observed_at}
 
 
+def _readable_education(snapshot) -> bool:
+    from app.pai_c.paths.fields import education_readable
+    return education_readable(snapshot.records.get("education", []))
+
+
+_REQUIREMENTS = {"readable_education": _readable_education}
+
+
 def coverage_areas(notebook, snapshot, items=()):
     """`items` are the active Vault items; areas.json names their types."""
     data = notebook.model_dump(mode="json")
@@ -91,7 +99,12 @@ def coverage_areas(notebook, snapshot, items=()):
         groups = {group for group, _ in sides}
         count = sum(max(len(sides.get((group, True), ())), len(sides.get((group, False), ())))
                     for group in groups)
-        result[area] = {"covered": count >= min_items, "item_count": count,
+        # `requires` names conditions beyond a count: an education record that
+        # names no group or field ("FSc" alone) leaves the education basic
+        # open, so the counselor asks for the group before anything else.
+        required = spec.get("requires", ()) if isinstance(spec, dict) else ()
+        met = all(_REQUIREMENTS[name](snapshot) for name in required)
+        result[area] = {"covered": count >= min_items and met, "item_count": count,
                         "min_items": min_items, "last_confirmed": max(dates) if dates else None,
                         "evidence": max(levels, key=EVIDENCE_ORDER.index) if levels else None}
     return result

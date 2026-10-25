@@ -87,6 +87,12 @@ describe('Other text that names a level', () => {
     expect(levelRedirect(level, 'Cambridge Pre-U')).toBeNull();
   });
 
+  it('names the chip for a level typed with its group or field', () => {
+    expect(levelRedirect(level, 'FSc Pre-Engineering')).toBe('intermediate');
+    expect(levelRedirect(level, 'BS Computer Science')).toBe('bachelor');
+    expect(levelRedirect(level, 'Pre-Engineering')).toBeNull();
+  });
+
   it('treats every Other keystroke as the same chip', () => {
     const fields = [level];
     expect(chipKey(fields, 'level', '')).toBe(chipKey(fields, 'level', 'My own'));

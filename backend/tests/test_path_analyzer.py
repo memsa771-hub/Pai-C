@@ -186,6 +186,7 @@ async def test_job_stores_paths_updates_fit_posts_once_and_never_revives_dismiss
 async def test_job_waits_for_enough_known_and_gives_up_after_two_invalid_replies():
     with StudentSession() as student, student.factory() as db:
         turn, _, _ = prepare(student, db)
+        add_education(student, db)  # placed: only the notebook is short
         job_id = enqueue_path_analysis(db, student.workspace_id, source_event_id=None,
                                        channel=turn.channel, reason="student")
         db.commit()

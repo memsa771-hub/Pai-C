@@ -31,7 +31,7 @@ from app.pai_c.deep.analysis import _workspace_lock
 from app.pai_c.deep.context import _json
 from app.pai_c.deep.prompts import load_prompt
 from app.pai_c.memory import MemoryService, vault_catalog
-from app.pai_c.paths.fields import Candidate, candidate_fields, current_education, study_fields
+from app.pai_c.paths.fields import Candidate, candidate_fields, current_education, read_education, study_fields
 from app.pai_c.planner.view import build_planner_view
 from app.pai_c.policy.controller import load_data
 from app.pai_c.possibilities import PossibilityService
@@ -94,12 +94,8 @@ def _education_text(value: dict) -> str:
     """An education record in words: level, group or field and subjects
     through their catalog labels, so a path never shows "pre_engineering"."""
     catalog, rules = vault_catalog(), policy()
-    spec = catalog.type("education")
     level = catalog.choice_code("levels", str(value.get("qualification_name") or ""))
-    lists = dict(spec.choice_fields) if spec else {}
-    for name, by_level in (spec.choice_by_level if spec else {}).items():
-        if level in by_level:
-            lists[name] = by_level[level]
+    lists = catalog.record_choice_fields(catalog.type("education"), value)
 
     def word(list_name, text):
         code = catalog.choice_code(list_name, text) if list_name else None
@@ -240,11 +236,18 @@ def enqueue_after_planner(db, workspace_id: str, *, source_event_id: str | None)
     return enqueue_path_analysis(db, workspace_id, source_event_id=source_event_id, channel=None, reason="planner")
 
 
+def _education_candidates(education: list[dict]) -> dict[str, Candidate]:
+    """The fields the student's current education opens; records newest first."""
+    return candidate_fields(current_education(education))
+
+
 def enqueue_path_analysis(db, workspace_id: str, *, source_event_id: str | None,
                           channel: str | None, reason: str) -> str | None:
-    """Queue one analysis per input: the Truth Map version and the paths the
-    student typed in. A job not yet started is reused, since it reads both
-    when it runs. The caller commits, as with the other Counselor enqueues."""
+    """Queue one analysis per input: the Truth Map version, the paths the
+    student typed in and the fields their current education opens, so a
+    changed group or level is a new run even when nothing else changed. A job
+    not yet started is reused, since it reads all three when it runs. The
+    caller commits, as with the other Counselor enqueues."""
     snapshot = MemoryService(db).truth_map(workspace_id)
     pending = db.scalar(select(BackgroundJob.id).where(
         BackgroundJob.workspace_id == workspace_id, BackgroundJob.job_type == JOB_ANALYZE_PATHS,
@@ -253,13 +256,32 @@ def enqueue_path_analysis(db, workspace_id: str, *, source_event_id: str | None,
         return pending
     own = sorted(row.normalized_title for row in PossibilityService(db).list(workspace_id)
                  if row.source == "student" and row.status != "dismissed")
-    digest = hashlib.sha256("|".join(own).encode()).hexdigest()[:16]
+    fields = sorted(f"{key}:{c.standing}" for key, c in _education_candidates(
+        MemoryService(db).profile(workspace_id).records.get("education", [])).items())
+    digest = hashlib.sha256(("|".join(own) + "#" + "|".join(fields)).encode()).hexdigest()[:16]
     payload = {"notebook_version": snapshot.version, "reason": reason,
                "source_event_id": source_event_id, "channel": channel}
     job = enqueue(db, JOB_ANALYZE_PATHS, {key: value for key, value in payload.items() if value is not None},
         workspace_id=workspace_id,
         idempotency_key=f"counselor:paths:{workspace_id}:{snapshot.version}:{digest}")
     return job.id if job else None
+
+
+async def _needs_education(db, job, payload: dict, education: list[dict]) -> dict:
+    """A student who asked in chat hears, in one short line, what PAI still
+    needs (their group, subjects, field or education); the copy is data."""
+    rules = policy()
+    channel = payload.get("channel")
+    if not channel or payload.get("reason") not in rules["needs_education_post_reasons"]:
+        return {"status": "needs_education"}
+    current = current_education(education)
+    level = read_education(current)[0] if current else None
+    message = rules["needs_education_messages"][rules["needs_education_by_level"].get(level, "education")]
+    posted = await send_to_student(db, job.workspace_id, channel, "pai", message, 0,
+                                   metadata={"paths_job_id": job.id, "paths_found": []})
+    if not posted:
+        raise RuntimeError("path analysis message was not persisted")
+    return {"status": "needs_education", "message_id": posted}
 
 
 async def path_analysis_job(job, db) -> dict:
@@ -274,19 +296,21 @@ async def path_analysis_job(job, db) -> dict:
         if posted:
             return {"status": "posted", "message_id": posted}
         snapshot = MemoryService(db).truth_map(job.workspace_id)
+        service = PossibilityService(db)
+        records = _records(db, job.workspace_id)
+        education = [card["value"] for card in records if card["kind"] == "education"]
+        candidates = _education_candidates(education)
+        if not candidates:
+            # No education, or one PAI cannot place yet: no paths, and the
+            # workspace shows what PAI still needs instead of a guess. Decided
+            # before the notebook is counted, so a group change prunes the old
+            # suggestions even for a student who has said little yet.
+            _prune(service, service.list(job.workspace_id), {}, set())
+            db.commit()
+            return await _needs_education(db, job, payload, education)
         evidence = _evidence_index(db, job.workspace_id, snapshot.notebook)
         if len(evidence) < rules["min_notebook_items"]:
             return {"status": "not_enough_known", "items": len(evidence)}
-        service = PossibilityService(db)
-        records = _records(db, job.workspace_id)
-        candidates = candidate_fields(current_education(
-            [card["value"] for card in records if card["kind"] == "education"]))
-        if not candidates:
-            # No education, or one PAI cannot place yet: no paths, and the
-            # workspace shows what PAI still needs instead of a guess.
-            _prune(service, service.list(job.workspace_id), {}, set())
-            db.commit()
-            return {"status": "needs_education"}
         existing = service.list(job.workspace_id)
         dismissed = {row.normalized_title for row in existing if row.status == "dismissed"}
         own = {row.normalized_title for row in existing if row.source == "student" and row.status != "dismissed"}

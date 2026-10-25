@@ -122,10 +122,18 @@ export function normWording(text: string): string {
     .replace(/\s+/g, ' ').trim().toLowerCase();
 }
 
-/** The chip an Other answer really names ("FSc" -> intermediate), or null. */
+/** The chip an Other answer really names ("FSc" -> intermediate), or null.
+ * A level followed by its group or field ("FSc Pre-Engineering", "BS
+ * Computer Science") names the level's chip too: the longest leading
+ * wording that is a level wins, as the backend reads it. */
 export function levelRedirect(field: OnboardingFieldSpec, answer: OnboardingAnswer | undefined): string | null {
   if (!field.redirects || typeof answer !== 'string' || !answer.trim() || field.choices.includes(answer)) return null;
-  return field.redirects[normWording(answer)] ?? null;
+  const words = normWording(answer).split(' ');
+  for (let cut = words.length; cut > 0; cut--) {
+    const chip = field.redirects[words.slice(0, cut).join(' ')];
+    if (chip) return chip;
+  }
+  return null;
 }
 
 /** Which chip an answer is: its code, or one key for anything typed in Other. */

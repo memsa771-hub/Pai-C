@@ -10,7 +10,7 @@ from app.memory.student_records import StudentRecordService
 from app.models import BackgroundJob
 from app.pai_c.paths.analyzer import (PathAnalysis, _card_text, enqueue_path_analysis,
                                       path_analysis_job, policy, sanitize)
-from app.pai_c.paths.fields import candidate_fields, student_group, student_groups, study_fields
+from app.pai_c.paths.fields import candidate_fields, student_groups, study_fields
 from app.pai_c.possibilities import PossibilityService
 from scripts.counselor_eval_support import StudentSession
 from tests.test_counselor_mirror import fake_post
@@ -158,7 +158,6 @@ def test_a_level_subjects_open_the_union_of_their_groups():
     record = {"qualification_name": "a_level",
               "details": {"subjects": ["biology", "chemistry", "physics", "mathematics"]}}
     assert student_groups(record) == {"pre_medical", "pre_engineering"}
-    assert student_group(record) == "pre_medical"  # the old first-match answer still works
     candidates = candidate_fields(record)
     assert candidates["mbbs"].standing == candidates["electrical_engineering"].standing == "open"
     assert student_groups({"qualification_name": "a_level", "details": {"subjects": ["history"]}}) == {"fa_humanities"}
@@ -262,12 +261,39 @@ def reply_with(*keys, fits=STRONG):
 
 
 async def again(student, db, reply):
-    """Another analysis run of the same student (a fresh job, no new notebook)."""
+    """Another analysis run of the same student, queued the way the app
+    queues one. Earlier jobs are marked finished, as the worker would. When
+    nothing the idempotency key reads changed (notebook, own paths,
+    education), the enqueue rightly returns the finished job; a new turn is
+    what would start another run, so the helper records one (a new notebook
+    version) and enqueues again."""
+    from sqlalchemy import select
+    from app.pai_c.memory import MemoryService
     from app.pai_c.paths.analyzer import JOB_ANALYZE_PATHS
-    job = BackgroundJob(job_type=JOB_ANALYZE_PATHS, workspace_id=student.workspace_id,
-                        payload={"reason": "student"})
-    db.add(job)
+    from app.pai_c.deep.notebook import NotebookService
+    for old in db.scalars(select(BackgroundJob).where(BackgroundJob.workspace_id == student.workspace_id,
+                                                      BackgroundJob.job_type == JOB_ANALYZE_PATHS)):
+        old.status = "succeeded" if old.status == "pending" else old.status
     db.commit()
+
+    def queue():
+        job_id = enqueue_path_analysis(db, student.workspace_id, source_event_id=None, channel=None,
+                                       reason="student")
+        db.commit()
+        return db.get(BackgroundJob, job_id)
+
+    job = queue()
+    if job.status != "pending":
+        from app.models import EventRecord
+        said = db.scalar(select(EventRecord.id).where(
+            EventRecord.network_id == student.workspace_id, EventRecord.source.like("human:%"))
+            .order_by(EventRecord.timestamp.desc()).limit(1))
+        snapshot = MemoryService(db).truth_map(student.workspace_id)
+        NotebookService(db).apply(student.workspace_id, snapshot.notebook.model_dump(mode="json"), said,
+                                  expected_version=snapshot.version)
+        db.commit()
+        job = queue()
+        assert job.status == "pending", "a new notebook version queues a new run"
     with patch("app.pai_c.paths.analyzer.chat_completion", AsyncMock(return_value=json.dumps(reply))) as call:
         result = await path_analysis_job(job, db)
     db.expire_all()
@@ -388,17 +414,6 @@ def test_own_paths_are_reassessed_first_then_fields_fill_the_cap():
                    {"title": "Mobile repair", "why": "Yours.", "fit": []})
     titles = [row["title"] for row in sanitize(raw, EVIDENCE, set(), candidates, {normalized_title("Mobile repair")})]
     assert titles[0] == "Mobile repair" and len(titles) == 5
-
-
-def test_current_education_prefers_current_then_the_highest_level():
-    from app.pai_c.paths.fields import current_education
-    matric = {"qualification_name": "matric", "academic_status": "completed"}
-    fsc = {"qualification_name": "fsc", "academic_status": "completed"}
-    bachelor = {"qualification_name": "bachelor", "academic_status": "current"}
-    assert current_education([matric, fsc]) is fsc
-    assert current_education([fsc, bachelor, matric]) is bachelor
-    assert current_education([{**matric, "academic_status": "current"}, fsc])["qualification_name"] == "matric"
-    assert current_education([]) is None
 
 
 def test_degree_students_see_only_fields_with_a_next_level():

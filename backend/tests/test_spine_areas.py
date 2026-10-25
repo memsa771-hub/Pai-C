@@ -92,7 +92,7 @@ def test_upload_candidates_count_only_after_reconciliation(api):
     _, db, workspace_id = api
     service = MemoryCandidateService(db)
     values = [
-        ("education", {"qualification_name": "Current qualification", "academic_status": "current"}),
+        ("education", {"qualification_name": "FSc", "field_of_study": "Pre-Engineering", "academic_status": "current"}),
         ("test_attempt", {"test_type": "Entrance assessment", "overall_score": "Recorded result"}),
         ("certification", {"name": "Practical skills certificate"}),
     ]

@@ -6,7 +6,7 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from "react";
 import { AlertCircle, ArrowRight, CircleCheck, FileText, History, PencilLine } from "lucide-react";
 import { workspaceApi } from "@/lib/api";
-import { vaultError, withChoiceLabels, type VaultAnswer, type VaultCatalogType, type VaultConflict, type VaultConflictSource } from "@/lib/vault";
+import { choicesFor, vaultError, withChoiceLabels, type VaultAnswer, type VaultCatalogType, type VaultConflict, type VaultConflictSource } from "@/lib/vault";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogBody, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { EvidenceBadge, vaultBadgeLabel } from "@/components/pai";
@@ -215,7 +215,7 @@ function ConflictStep({ card, type, outcome, openDocument, headingId, onAnswered
       {!writing && <Tiles tiles={tiles} labelledBy={headingId} busy={busy} chosen={chosen} onChoose={(answer) => void resolve(answer)} openDocument={openDocument} />}
       {writing ? (
         <div className="space-y-3 rounded-2xl border bg-card p-4 shadow-soft">
-          <ValueEditor value={value} onChange={setValue} label={text.checkNewLabel} choices={type?.choices} />
+          <ValueEditor value={value} onChange={setValue} label={text.checkNewLabel} choices={choicesFor(type, value)} />
           <div className="flex flex-wrap gap-2">
             <Button size="tap" disabled={busy || !human(value)} onClick={() => void resolve("provide_new", value)}>{copy.save}</Button>
             <Button size="tap" variant="ghost" onClick={() => setWriting(false)}>{copy.cancel}</Button>

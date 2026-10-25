@@ -394,7 +394,8 @@ def test_catalog_has_no_internal_fields(api):
     client, _, ws = api
     catalog = _ok(client.get(_url(ws, "/catalog"), headers=HEADERS))
     types = {t["key"]: t for t in catalog["types"]}
-    assert all(set(t) == {"key", "label", "storage", "shown_on", "section", "inputs", "schema", "choices"}
+    assert all(set(t) == {"key", "label", "storage", "shown_on", "section", "inputs", "schema", "choices",
+                          "choice_by_level"}
                for t in types.values())
 
     def keys(node):

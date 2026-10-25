@@ -1,5 +1,5 @@
 {
-  "_note": "Fields of study a path may belong to: the detailed fields of UNESCO ISCED-F 2013, an international classification, so no country's program names are built in. Generic programmes and work skills are left out because they are not fields a student studies toward. The analyzer must name one code per path.",
+  "_note": "The ISCED-F 2013 reference used by study_fields validation: every study_fields.json isced code must be one of these detailed fields (tests/test_study_fields.py), so keep this file even though paths no longer name these codes directly.",
   "fields": {
     "0111": "Education science",
     "0112": "Training for pre-school teachers",

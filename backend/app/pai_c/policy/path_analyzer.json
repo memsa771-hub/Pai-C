@@ -16,5 +16,14 @@
     "request_kinds": ["decision_help"],
     "after_mirror_confirmed": true
   },
-  "message_type": "counselor_paths"
+  "message_type": "counselor_paths",
+  "_needs_education_note": "When a chat-requested analysis cannot place the student, PAI posts one short message saying what it needs. needs_education_by_level picks the message from the level the education record names; a level not listed (or none) asks for the education itself. Only runs the student asked for in chat (needs_education_post_reasons) post it; the Paths page says it on its own.",
+  "needs_education_post_reasons": ["asked"],
+  "needs_education_by_level": {"fsc": "group", "intermediate": "group", "a_level": "subjects", "bachelor": "field", "masters": "field"},
+  "needs_education_messages": {
+    "group": "Which group are you in, Pre-Engineering, Pre-Medical, ICS, I.Com or FA?",
+    "subjects": "Which A-level subjects are you taking?",
+    "field": "Which field are you studying, for example Computer Science or BBA?",
+    "education": "What are you studying now, and in which group or field?"
+  }
 }

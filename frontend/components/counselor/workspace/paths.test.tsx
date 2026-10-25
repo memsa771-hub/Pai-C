@@ -175,13 +175,13 @@ it("asks for the education when the last run needed it, even with kept paths, an
     vi.mocked(workspaceApi.analyzePaths).mockResolvedValue({ job_id: "job-2" });
     vi.mocked(workspaceApi.getPathAnalysis).mockResolvedValue({ job_id: "job-1", done: true, outcome: "needs_education" });
     render(<Paths onOpen={vi.fn()} />);
-    expect(await screen.findByText("Tell PAI your current education to get fields that fit you")).toBeTruthy();
+    expect(await screen.findByText("PAI needs your group or field to suggest fields of study.")).toBeTruthy();
     vi.mocked(workspaceApi.getPathAnalysis).mockResolvedValue({ job_id: "job-2", done: false, outcome: null });
     fireEvent.click(screen.getByRole("button", { name: "Find my paths" }));
     expect(await screen.findByText(/PAI is looking at everything/)).toBeTruthy();
     vi.mocked(workspaceApi.getPathAnalysis).mockResolvedValue({ job_id: "job-2", done: true, outcome: "needs_education" });
     await act(async () => { await vi.advanceTimersByTimeAsync(5000); });
-    await waitFor(() => expect(screen.getByText("Tell PAI your current education to get fields that fit you")).toBeTruthy());
+    await waitFor(() => expect(screen.getByText("PAI needs your group or field to suggest fields of study.")).toBeTruthy());
     expect(screen.queryByText(/PAI is looking at everything/)).toBeNull();
   } finally { vi.useRealTimers(); }
 });

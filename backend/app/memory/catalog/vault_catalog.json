@@ -2525,6 +2525,16 @@
     "details.awarding_body": "boards",
     "field_of_study": "intermediate_groups"
    },
+   "level_wordings": {
+    "MS": "masters",
+    "M.S": "masters",
+    "MA": "masters",
+    "M.A": "masters",
+    "BE": "bachelor",
+    "B.E": "bachelor",
+    "BA": "bachelor",
+    "B.A": "bachelor"
+   },
    "choice_by_level": {
     "field_of_study": {
      "matric": "matric_groups",

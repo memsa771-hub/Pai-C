@@ -10,6 +10,7 @@ anything PAI extracted. First-run onboarding lives here too: its answers are
 Vault facts like any other.
 """
 import json
+import logging
 from datetime import datetime, timezone
 from typing import Any, Optional
 
@@ -161,11 +162,31 @@ def _write(db: Session, workspace_id: str, entry_kind: str, key: str, *, value: 
         return json_response(ResponseCode.BAD_REQUEST, str(exc))
     db.commit()
     if result.accepted:
+        _education_written(db, workspace_id, {key})
         return success_response({"saved": True, "kind": entry_kind, "type": key, "id": result.result_id})
     if result.outcome == "needs_review":
         # Not refused: the entry is now "In question" and a card asks the student.
         return success_response({"saved": False, "kind": entry_kind, "type": key, "in_question": True})
     return json_response(ResponseCode.BAD_REQUEST, result.reason or "Vault edit rejected")
+
+
+def _education_written(db: Session, workspace_id: str, keys: set, *, commit: bool = True) -> None:
+    """An education write (added, edited, confirmed, removed or answered in
+    onboarding) changes which fields of study are open, so the path analyzer
+    looks again; its idempotency key includes the education, so an unchanged
+    record queues nothing new."""
+    if "education" not in keys:
+        return
+    from app.pai_c.paths.analyzer import enqueue_path_analysis
+    try:
+        # Best effort, in a savepoint: the student's write already stands
+        # and must never fail because the re-run could not be queued.
+        with db.begin_nested():
+            enqueue_path_analysis(db, workspace_id, source_event_id=None, channel=None, reason="education")
+    except Exception as exc:
+        logging.getLogger(__name__).warning("education_path_enqueue_failed error_type=%s", type(exc).__name__)
+    if commit:
+        db.commit()
 
 
 def _editable(type_key: str) -> Optional[TypeSpec]:
@@ -234,6 +255,12 @@ def get_catalog(
             "section": spec.section, "inputs": list(spec.inputs), "schema": schema,
             "choices": {name: [{"code": c.code, "label": c.label} for c in catalog.choices(list_name)]
                         for name, list_name in spec.choice_fields.items()},
+            # A field whose list depends on the record's level: the editor
+            # offers a Bachelor's study fields, never intermediate groups.
+            "choice_by_level": {name: {level: [{"code": c.code, "label": c.label}
+                                               for c in catalog.choices(list_name)]
+                                       for level, list_name in by_level.items()}
+                                for name, by_level in spec.choice_by_level.items()},
         })
     return success_response({"types": types})
 
@@ -452,7 +479,8 @@ def _onboarding(db: Session) -> OnboardingService:
     fields = study_fields().values()
     return OnboardingService(db, sources={
         f"study_fields.{level}": [(f.key, f.title) for f in fields if level in f.levels]
-        for level in ("bachelor", "master")})
+        for level in ("bachelor", "master")},
+        on_saved=lambda workspace_id, keys: _education_written(db, workspace_id, keys, commit=False))
 
 
 @router.get("/onboarding")

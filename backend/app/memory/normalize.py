@@ -107,7 +107,8 @@ def normalize_candidate(candidate_type: str, key: Optional[str], value: Any, *,
     language = detect_language(student_text)
     catalog = vault_catalog()
     spec = catalog.type(key or "")
-    choice_fields = spec.choice_fields if spec else {}
+    # Level-aware: a Bachelor's field_of_study is read against study fields.
+    choice_fields = catalog.record_choice_fields(spec, value)
     state = {"confirm": False, "reject": None}
 
     def walk(node: Any, path: str) -> Any:

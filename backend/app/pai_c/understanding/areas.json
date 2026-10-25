@@ -33,6 +33,7 @@
   },
   "history": {
     "min_items": 2,
+    "requires": ["readable_education"],
     "sources": [
       {
         "path": "world.education_story",

@@ -3,7 +3,7 @@ import { useRef, useState } from "react";
 import { FileText, RefreshCw } from "lucide-react";
 import { workspaceApi } from "@/lib/api";
 import { useWorkspace } from "@/lib/workspace-context";
-import { badgeLevel, vaultError, withChoiceLabels, type VaultCatalogType, type VaultChoice, type VaultDocument, type VaultEntry } from "@/lib/vault";
+import { badgeLevel, choicesFor, vaultError, withChoiceLabels, type VaultCatalogType, type VaultChoice, type VaultDocument, type VaultEntry } from "@/lib/vault";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { EvidenceBadge, vaultBadgeLabel } from "@/components/pai";
@@ -209,7 +209,7 @@ export function FactReview({ entry, type, onSaved, openDocument }: {
         </ul>
       )}
       {fromFile && <p className="text-sm text-muted-foreground">{text.fileRecordNote}</p>}
-      {editing && <ValueEditor value={value} onChange={setValue} label={entry.label} choices={type?.choices} />}
+      {editing && <ValueEditor value={value} onChange={setValue} label={entry.label} choices={choicesFor(type, value)} />}
       {removing && (
         <div className="rounded-xl border border-danger/30 bg-danger-soft p-4 text-sm text-danger-ink">
           <p>{copy.removeHelp}</p>

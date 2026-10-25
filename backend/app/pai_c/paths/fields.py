@@ -71,35 +71,29 @@ def _subject_groups(rules: list[dict], subjects: set[str]) -> list[str]:
     return matched or [rule["group"] for rule in rules if not rule.get("all") and not rule.get("any")][:1]
 
 
+def read_education(education_record: dict) -> tuple[str | None, str | None]:
+    """(level, group or field code) of an education record in any wording:
+    chat, documents and Other often store "FSc Pre-Engineering" in one field."""
+    from app.pai_c.memory import vault_catalog
+    return vault_catalog().read_education(education_record.get("qualification_name"),
+                                          education_record.get("field_of_study"))
+
+
 def student_groups(education_record: dict) -> set[str]:
     """Every group an education record names. A-level subjects can satisfy
     more than one group (Biology, Chemistry, Physics and Maths open both
-    Pre-Medical and Pre-Engineering fields), so paths use the union."""
+    Pre-Medical and Pre-Engineering fields), so paths use the union. An empty
+    set is an answer, not a gap to guess over: FSc without its group, Matric,
+    or a degree level leaves the paths waiting for what PAI still needs."""
     rules = _data()["group_rules"]
-    level = _code("levels", education_record.get("qualification_name"))
+    level, field = read_education(education_record)
     if level in rules["from_field_of_study"]:
-        group = _code("intermediate_groups", education_record.get("field_of_study"))
-        return {group} if group in known_groups() else set()
+        return {field} if field in known_groups() else set()
     if level in rules["from_level"]:
         return {rules["from_level"][level]}
     if level in rules["subject_rules"]:
         return set(_subject_groups(rules["subject_rules"][level], _subjects(level, education_record)))
     return set()
-
-
-def student_group(education_record: dict) -> str | None:
-    """The first group an education record names, or None when it names none yet.
-
-    None is an answer, not a gap to guess over: FSc without its group, Matric,
-    or a degree level leaves the paths waiting for what PAI still needs.
-    """
-    rules = _data()["group_rules"]
-    level = _code("levels", education_record.get("qualification_name"))
-    if level in rules["subject_rules"]:
-        groups = _subject_groups(rules["subject_rules"][level], _subjects(level, education_record))
-        return groups[0] if groups else None
-    groups = student_groups(education_record)
-    return next(iter(groups)) if groups else None
 
 
 @dataclass(frozen=True)
@@ -119,7 +113,7 @@ def candidate_fields(education_record: dict | None) -> dict[str, Candidate]:
     if not education_record:
         return {}
     fields = study_fields()
-    level = _code("levels", education_record.get("qualification_name"))
+    level, field_code = read_education(education_record)
     rules = _data()["group_rules"]
     if level in rules["before_intermediate"]:
         intermediate = known_groups() - set(rules["not_intermediate"])
@@ -132,13 +126,15 @@ def candidate_fields(education_record: dict | None) -> dict[str, Candidate]:
                            else Candidate(field, "needs_group", needs))
         return result
     if level in rules["degree_levels"]:
-        current = fields.get(_code("study_fields", education_record.get("field_of_study")) or "")
+        current = fields.get(field_code or "")
         if current is None:
             return {}
         # A degree student's next step is the level above: only fields offered there.
         following = set(rules["degree_levels"][level])
+        same_family_only = level in rules["family_only"]
         return {key: Candidate(field, "open" if field.family == current.family else "check")
-                for key, field in fields.items() if following & set(field.levels)}
+                for key, field in fields.items() if following & set(field.levels)
+                and (field.family == current.family or not same_family_only)}
     groups = student_groups(education_record)
     result: dict[str, Candidate] = {}
     for group in sorted(groups):
@@ -151,12 +147,17 @@ def candidate_fields(education_record: dict | None) -> dict[str, Candidate]:
 
 
 def current_education(records: list[dict]) -> dict | None:
-    """The education record paths read: a current one first, then the highest
-    level (the order lives in study_fields.json), then the first stored."""
-    order = _data()["group_rules"]["level_order"]
+    """The education record paths read: the most recent current one, else the
+    most recent. Records arrive newest first (StudentRecordService.list
+    orders by updated_at), so the student's latest answer wins even when it is
+    a lower level than an older record, as when a Bachelor's typed by mistake
+    is corrected to Intermediate."""
+    return next((row for row in records if row.get("academic_status") == "current"),
+                records[0] if records else None)
 
-    def rank(row: dict) -> tuple[bool, int]:
-        level = _code("levels", row.get("qualification_name"))
-        return row.get("academic_status") == "current", order.index(level) if level in order else -1
 
-    return max(records, key=rank, default=None)
+def education_readable(records: list[dict]) -> bool:
+    """Whether PAI can place the student: the current education names a group
+    or field that opens study fields. Coverage of the education basic and the
+    path analyzer share this answer."""
+    return bool(candidate_fields(current_education(records)))

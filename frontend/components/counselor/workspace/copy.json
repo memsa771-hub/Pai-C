@@ -74,7 +74,7 @@
   "pathOutdated": "Older suggestion, from before fields of study",
   "pathOutOfGroup": "Not open to your current group",
   "pathRemove": "Remove",
-  "pathsNeedEducation": "Tell PAI your current education to get fields that fit you",
+  "pathsNeedEducation": "PAI needs your group or field to suggest fields of study.",
   "findPaths": "Find my paths",
   "findingPaths": "PAI is looking at everything you have shared. New paths and how they fit you appear here in a minute. If nothing changes, tell PAI a little more about yourself first.",
   "addOwn": "Add your own path",

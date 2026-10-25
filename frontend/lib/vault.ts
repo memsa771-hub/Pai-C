@@ -110,6 +110,9 @@ export type VaultCatalogType = {
   schema: JsonSchema | null;
   /** Field path ("" for the whole value, "details.board" for nested) -> choices. */
   choices: Record<string, VaultChoice[]>;
+  /** A field whose list depends on the record's level: path -> level code ->
+   * choices (a Bachelor's field_of_study is a study field). */
+  choice_by_level?: Record<string, Record<string, VaultChoice[]>>;
 };
 
 export type VaultCatalog = { types: VaultCatalogType[] };
@@ -151,8 +154,24 @@ export function vaultError(error: unknown): string | null {
 
 /** A value with its choice codes replaced by the catalog's labels, so the
  * page reads "FSc", never "fsc". Paths follow the catalog ("" or "a.b"). */
-export function withChoiceLabels(value: unknown, type?: VaultCatalogType | null): unknown {
+/** The choices for one value: the type's lists, with a level-aware field
+ * read against the value's own level (qualification_name, as code or label),
+ * so a Bachelor's field offers study fields and never intermediate groups. */
+export function choicesFor(type: VaultCatalogType | null | undefined, value: unknown): Record<string, VaultChoice[]> {
   const choices = type?.choices || {};
+  const byLevel = type?.choice_by_level;
+  const raw = value && typeof value === 'object' ? (value as Record<string, unknown>).qualification_name : undefined;
+  if (!byLevel || typeof raw !== 'string') return choices;
+  const wording = raw.trim().toLowerCase();
+  const level = (choices.qualification_name || [])
+    .find((c) => c.code === wording || c.label.toLowerCase() === wording)?.code ?? wording;
+  const lists = Object.fromEntries(Object.entries(byLevel)
+    .filter(([, levels]) => levels[level]).map(([path, levels]) => [path, levels[level]]));
+  return { ...choices, ...lists };
+}
+
+export function withChoiceLabels(value: unknown, type?: VaultCatalogType | null): unknown {
+  const choices = choicesFor(type, value);
   if (!Object.keys(choices).length) return value;
   const walk = (node: unknown, path: string): unknown => {
     if (typeof node === 'string' && choices[path]) return choices[path].find((c) => c.code === node)?.label ?? node;
