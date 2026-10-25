@@ -301,6 +301,10 @@ class VaultView:
             } for d in evidence.get("disagreements", [])
                 for shown in [_without(d.get("value"), omit)] if shown not in (None, {})],
         }
+        if spec is not None and spec.choice_by_level:
+            # The level the editor reads lists by, even for an older row
+            # whose title is a wording ("BS Computer Science").
+            entry["record_level"] = vault_catalog().record_level(spec, value)
         file_ids = {r.get("file_id") for r in refs if isinstance(r, dict) and r.get("file_id")}
         return _Row(entry, section, sensitivity, file_ids)
 

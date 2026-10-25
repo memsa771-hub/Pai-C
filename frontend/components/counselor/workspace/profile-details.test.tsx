@@ -3,7 +3,7 @@ import { it, expect, vi, afterEach } from "vitest";
 import { render, screen, cleanup, fireEvent } from "@testing-library/react";
 import { useState } from "react";
 import { ValueEditor } from "./profile-details";
-import { choicesFor, withChoiceLabels, type VaultCatalogType } from "@/lib/vault";
+import { choicesFor, withChoiceLabels, withoutOffListChoices, type VaultCatalogType, type VaultEntry } from "@/lib/vault";
 
 vi.mock("@/lib/workspace-context", () => ({ useWorkspace: () => ({ setSelectedFileId: vi.fn() }) }));
 afterEach(cleanup);
@@ -21,9 +21,10 @@ const education: VaultCatalogType = {
   } },
 };
 
-function Editor({ initial }: { initial: Record<string, unknown> }) {
+function Editor({ initial, stored }: { initial: Record<string, unknown>; stored?: VaultEntry }) {
   const [value, setValue] = useState<unknown>(initial);
-  return <ValueEditor value={value} onChange={setValue} label="Education" choices={choicesFor(education, value)} />;
+  return <ValueEditor value={value} label="Education" choices={choicesFor(education, value, stored)}
+    onChange={(next) => setValue(withoutOffListChoices(education, next, value, stored))} />;
 }
 
 const options = (name: string) =>
@@ -46,4 +47,18 @@ it("reads a level-aware code as its label", () => {
   expect(withChoiceLabels({ qualification_name: "bachelor", field_of_study: "computer_science" }, education))
     .toEqual({ qualification_name: "Bachelor", field_of_study: "Computer Science" });
   expect(choicesFor(education, { qualification_name: "Bachelor" }).field_of_study[0].code).toBe("computer_science");
+});
+
+it("clears a field from the old level when the level changes", () => {
+  render(<Editor initial={{ qualification_name: "fsc", field_of_study: "pre_medical" }} />);
+  fireEvent.change(screen.getByRole("combobox", { name: "Qualification" }), { target: { value: "bachelor" } });
+  const field = screen.getByRole("combobox", { name: "Field of study" }) as HTMLSelectElement;
+  expect(field.value).toBe("");
+  expect(options("Field of study")).toEqual(["Choose", "Computer Science", "BBA"]);
+});
+
+it("reads an old wording through the level the backend read for it", () => {
+  const stored = { value: { qualification_name: "BS Computer Science", field_of_study: "" }, record_level: "bachelor" } as unknown as VaultEntry;
+  expect(choicesFor(education, stored.value, stored).field_of_study[0].code).toBe("computer_science");
+  expect(choicesFor(education, { qualification_name: "Something else" }, stored).field_of_study[0].code).toBe("pre_medical");
 });

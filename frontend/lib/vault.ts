@@ -32,6 +32,9 @@ export type VaultEntry = {
   stale: boolean;
   in_question: boolean;
   disagreements: VaultDisagreement[];
+  /** A record's level as the backend reads it, even when its title is a
+   * wording ("BS Computer Science"); only for types with level-aware lists. */
+  record_level?: string | null;
 };
 
 export type VaultSection = { label: string; entries: VaultEntry[] };
@@ -154,20 +157,43 @@ export function vaultError(error: unknown): string | null {
 
 /** A value with its choice codes replaced by the catalog's labels, so the
  * page reads "FSc", never "fsc". Paths follow the catalog ("" or "a.b"). */
+const qualificationOf = (value: unknown) =>
+  value && typeof value === 'object' ? (value as Record<string, unknown>).qualification_name : undefined;
+
 /** The choices for one value: the type's lists, with a level-aware field
- * read against the value's own level (qualification_name, as code or label),
- * so a Bachelor's field offers study fields and never intermediate groups. */
-export function choicesFor(type: VaultCatalogType | null | undefined, value: unknown): Record<string, VaultChoice[]> {
+ * read against the value's own level, so a Bachelor's field offers study
+ * fields and never intermediate groups. The level is the qualification's code
+ * or label; an older wording ("BS") uses the level the backend read for the
+ * stored entry while the draft still holds that wording. */
+export function choicesFor(type: VaultCatalogType | null | undefined, value: unknown,
+  stored?: VaultEntry | null): Record<string, VaultChoice[]> {
   const choices = type?.choices || {};
   const byLevel = type?.choice_by_level;
-  const raw = value && typeof value === 'object' ? (value as Record<string, unknown>).qualification_name : undefined;
+  const raw = qualificationOf(value);
   if (!byLevel || typeof raw !== 'string') return choices;
   const wording = raw.trim().toLowerCase();
-  const level = (choices.qualification_name || [])
-    .find((c) => c.code === wording || c.label.toLowerCase() === wording)?.code ?? wording;
+  const known = (choices.qualification_name || []).find((c) => c.code === wording || c.label.toLowerCase() === wording)?.code;
+  const level = known ?? (stored?.record_level && qualificationOf(stored.value) === raw ? stored.record_level : wording);
   const lists = Object.fromEntries(Object.entries(byLevel)
     .filter(([, levels]) => levels[level]).map(([path, levels]) => [path, levels[level]]));
   return { ...choices, ...lists };
+}
+
+/** When the draft's level changes, every level-aware field whose code is not
+ * in the new level's list is cleared (""), so switching FSc to Bachelor's
+ * never keeps Pre-Medical as a Bachelor's field. Other edits leave it be. */
+export function withoutOffListChoices(type: VaultCatalogType | null | undefined, value: unknown,
+  previous: unknown, stored?: VaultEntry | null): unknown {
+  if (!type?.choice_by_level || !value || typeof value !== 'object' || Array.isArray(value)) return value;
+  if (qualificationOf(value) === qualificationOf(previous)) return value;
+  const choices = choicesFor(type, value, stored);
+  const next = { ...(value as Record<string, unknown>) };
+  for (const path of Object.keys(type.choice_by_level)) {
+    const current = next[path];
+    if (typeof current === 'string' && current && choices[path] && !choices[path].some((c) => c.code === current))
+      next[path] = '';
+  }
+  return next;
 }
 
 export function withChoiceLabels(value: unknown, type?: VaultCatalogType | null): unknown {

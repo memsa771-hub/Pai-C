@@ -628,13 +628,28 @@ class OnboardingService:
                 "completed": bool(user and user.onboarded_at)}
 
     def _complete_older(self, workspace_id: str, field: OnboardingField, current_id, user) -> None:
-        """A different record stated as current makes every older current one
-        completed: the student is at one level now, and a stale "current"
-        Bachelor's must not outrank the Intermediate they just chose. Each
+        """A step up completes the step below: a new current record marks
+        older current records of a LOWER rank completed (FSc -> Bachelor's).
+        A higher one is never touched, since that would claim a credential the
+        student never stated, nor another track at the same rank (DAE beside
+        A-level); the paths read the most recent current record anyway. Each
         change goes through propose -> reconcile like any other answer."""
         from .student_records import StudentRecordService
-        for row in StudentRecordService(self.db).list(workspace_id, field.field_key):
+        catalog = vault_catalog()
+        spec = catalog.type(field.field_key)
+        ranks = spec.level_ranks if spec else {}
+        rows = StudentRecordService(self.db).list(workspace_id, field.field_key)
+
+        def rank(row):
+            return ranks.get(catalog.record_level(spec, {field.record_field: _read(row, field.record_field)}))
+
+        new_rank = next((rank(row) for row in rows if row.id == current_id), None)
+        if new_rank is None:
+            return
+        for row in rows:
             if row.id == current_id or getattr(row, _STATUS_FIELD, None) != _CURRENT:
+                continue
+            if rank(row) is None or rank(row) >= new_rank:
                 continue
             candidate = MemoryCandidateService(self.db).propose(
                 workspace_id=workspace_id, candidate_type="student_record", key=field.field_key,

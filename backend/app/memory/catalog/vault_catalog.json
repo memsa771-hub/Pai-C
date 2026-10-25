@@ -2535,6 +2535,19 @@
     "BA": "bachelor",
     "B.A": "bachelor"
    },
+   "level_ranks": {
+    "matric": 1,
+    "o_level": 1,
+    "fsc": 2,
+    "ics": 2,
+    "icom": 2,
+    "fa": 2,
+    "intermediate": 2,
+    "a_level": 2,
+    "dae": 2,
+    "bachelor": 3,
+    "masters": 4
+   },
    "choice_by_level": {
     "field_of_study": {
      "matric": "matric_groups",

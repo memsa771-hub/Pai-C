@@ -244,10 +244,10 @@ def _education_candidates(education: list[dict]) -> dict[str, Candidate]:
 def enqueue_path_analysis(db, workspace_id: str, *, source_event_id: str | None,
                           channel: str | None, reason: str) -> str | None:
     """Queue one analysis per input: the Truth Map version, the paths the
-    student typed in and the fields their current education opens, so a
-    changed group or level is a new run even when nothing else changed. A job
-    not yet started is reused, since it reads all three when it runs. The
-    caller commits, as with the other Counselor enqueues."""
+    student typed in and their education records as last written, so any
+    education change is a new run even when nothing else changed. A job not
+    yet started is reused, since it reads all three when it runs. The caller
+    commits, as with the other Counselor enqueues."""
     snapshot = MemoryService(db).truth_map(workspace_id)
     pending = db.scalar(select(BackgroundJob.id).where(
         BackgroundJob.workspace_id == workspace_id, BackgroundJob.job_type == JOB_ANALYZE_PATHS,
@@ -256,9 +256,12 @@ def enqueue_path_analysis(db, workspace_id: str, *, source_event_id: str | None,
         return pending
     own = sorted(row.normalized_title for row in PossibilityService(db).list(workspace_id)
                  if row.source == "student" and row.status != "dismissed")
-    fields = sorted(f"{key}:{c.standing}" for key, c in _education_candidates(
-        MemoryService(db).profile(workspace_id).records.get("education", [])).items())
-    digest = hashlib.sha256(("|".join(own) + "#" + "|".join(fields)).encode()).hexdigest()[:16]
+    # Every education write changes the key (each record's id and
+    # updated_at), so going back to an earlier group is a fresh run too, not
+    # the finished job from the first time the student was in it.
+    education = sorted(f"{row['id']}@{row.get('updated_at')}" for row in
+                       MemoryService(db).profile(workspace_id).records.get("education", []))
+    digest = hashlib.sha256(("|".join(own) + "#" + "|".join(education)).encode()).hexdigest()[:16]
     payload = {"notebook_version": snapshot.version, "reason": reason,
                "source_event_id": source_event_id, "channel": channel}
     job = enqueue(db, JOB_ANALYZE_PATHS, {key: value for key, value in payload.items() if value is not None},

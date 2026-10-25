@@ -103,7 +103,7 @@ def _is_name_field(candidate_type: str, key: str, path: str) -> bool:
 
 
 def normalize_candidate(candidate_type: str, key: Optional[str], value: Any, *,
-                        student_text: str = "") -> NormalizeResult:
+                        student_text: str = "", strict_choices: bool = False) -> NormalizeResult:
     language = detect_language(student_text)
     catalog = vault_catalog()
     spec = catalog.type(key or "")
@@ -140,4 +140,25 @@ def normalize_candidate(candidate_type: str, key: Optional[str], value: Any, *,
         return NormalizeResult(value, language, False, "empty_budget")
 
     out = walk(value, "")
+    if strict_choices and state["reject"] is None:
+        state["reject"] = _off_list(catalog, spec, out)
     return NormalizeResult(out, language, state["confirm"], state["reject"])
+
+
+def _off_list(catalog, spec, value) -> Optional[str]:
+    """A level-aware field the student picked from a form must be a code of
+    its level's list: a Bachelor's field_of_study of pre_medical is a stale
+    choice from another level, refused with words the student can act on.
+    Chat and documents are not held to this; they keep the student's words."""
+    if spec is None or not spec.choice_by_level or not isinstance(value, dict):
+        return None
+    level = catalog.record_level(spec, value)
+    for path, by_level in spec.choice_by_level.items():
+        node = value
+        for part in path.split("."):
+            node = node.get(part) if isinstance(node, dict) else None
+        if (level in by_level and isinstance(node, str) and node.strip()
+                and node not in {c.code for c in catalog.choices(by_level[level])}):
+            level_label = catalog.label(spec.choice_fields.get("qualification_name", "levels"), level)
+            return f"Choose a {path.replace('_', ' ')} from the {level_label} list"
+    return None

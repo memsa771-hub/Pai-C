@@ -262,7 +262,10 @@ class MemoryCandidateService:
 
         evidence = dict(evidence or {})
         result = normalize_candidate(
-            candidate_type, key, value, student_text=evidence.get("quote", "") or "")
+            candidate_type, key, value, student_text=evidence.get("quote", "") or "",
+            # A form (Details, onboarding, a conflict answer) offers only
+            # the level's own list, so an off-list code there is refused.
+            strict_choices=input_channel == "profile")
         if result.rejected_reason:
             source = self._drop_source(key, input_channel)
             ref = (source_event_ids[0] if source_event_ids else None) or evidence.get("file_id")

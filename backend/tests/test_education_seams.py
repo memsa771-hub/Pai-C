@@ -242,7 +242,9 @@ def test_a_downward_correction_reads_as_the_latest_answer():
         rows = StudentRecordService(db).list(student.workspace_id, "education")
         values = [{"qualification_name": r.qualification_name, "field_of_study": r.field_of_study,
                    "academic_status": r.academic_status} for r in rows]
-        assert sorted(v["academic_status"] for v in values) == ["completed", "current"]
+        # A higher level is never marked completed: that would claim a degree
+        # the student never stated. The latest current record still wins.
+        assert [v["academic_status"] for v in values] == ["current", "current"]
         assert current_education(values)["qualification_name"] == "fsc"
         prefill = _onboarding(db).state(workspace)["prefill"]
         assert prefill["level"] == "intermediate" and prefill["group"] == "pre_engineering"
@@ -267,3 +269,112 @@ def test_path_why_is_written_in_the_second_person():
     assert "second person" in prompt and "never \"the student's\"" in prompt
     doc = (ROOT / "docs/counselor/COUNSELOR_V3_PROMPTS.md").read_text(encoding="utf-8")
     assert prompt.strip() in doc
+
+
+# ---- Re-review residuals ------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_going_back_to_an_earlier_education_is_a_fresh_run():
+    with StudentSession() as student, student.factory() as db:
+        await run(student, db, reply_with("mbbs"))
+        [job_a] = _jobs(db, student.workspace_id)
+        _finish(db, student.workspace_id)
+        set_education(student, db, FA)
+        job_b = enqueue_path_analysis(db, student.workspace_id, source_event_id=None, channel=None, reason="student")
+        db.commit()
+        with patch("app.pai_c.paths.analyzer.chat_completion", AsyncMock(return_value=json.dumps(reply_with("bba")))):
+            await path_analysis_job(db.get(BackgroundJob, job_b), db)
+        db.expire_all()
+        assert title("mbbs") not in by_title(student, db)
+        _finish(db, student.workspace_id)
+        set_education(student, db, {"qualification_name": "fsc", "field_of_study": "pre_medical",
+                                    "academic_status": "current"})
+        job_c = enqueue_path_analysis(db, student.workspace_id, source_event_id=None, channel=None, reason="student")
+        db.commit()
+        assert len({job_a.id, job_b, job_c}) == 3
+        with patch("app.pai_c.paths.analyzer.chat_completion", AsyncMock(return_value=json.dumps(reply_with("mbbs")))):
+            await path_analysis_job(db.get(BackgroundJob, job_c), db)
+        db.expire_all()
+        assert title("mbbs") in by_title(student, db)
+
+
+def test_a_field_outside_the_levels_list_is_refused_from_the_profile():
+    from app.memory.normalize import normalize_candidate
+    from fastapi.testclient import TestClient
+    from app.database import get_db
+    from app.main import app
+    refused = normalize_candidate("student_record", "education", {
+        "qualification_name": "bachelor", "field_of_study": "pre_medical"}, strict_choices=True)
+    assert refused.rejected_reason and "Bachelor" in refused.rejected_reason
+    # Chat and documents keep the student's words; the paths read them tolerantly.
+    assert not normalize_candidate("student_record", "education", {
+        "qualification_name": "bachelor", "field_of_study": "pre_medical"}).rejected_reason
+    assert not normalize_candidate("student_record", "education", {
+        "qualification_name": "bachelor", "field_of_study": ""}, strict_choices=True).rejected_reason
+    with StudentSession() as student, student.factory() as db,          patch("app.security.access.verify_identity_claims",
+               side_effect=lambda bearer: {"session_user_id": student.user_id}):
+        app.dependency_overrides[get_db] = lambda: db
+        try:
+            response = TestClient(app).post(f"/v1/vault/entries?network={student.workspace_id}", headers={
+                "X-Workspace-Token": "synthetic-test-only", "Authorization": "Bearer owner"},
+                json={"type": "education", "value": {"qualification_name": "bachelor",
+                                                     "field_of_study": "pre_medical"}})
+        finally:
+            app.dependency_overrides.pop(get_db, None)
+    assert response.status_code == 400 and "Bachelor" in response.json()["message"]
+
+
+def test_an_old_level_wording_reads_its_levels_list():
+    catalog = vault_catalog()
+    spec = catalog.type("education")
+    assert catalog.record_choice_fields(spec, {"qualification_name": "BS"})["field_of_study"] == "study_fields"
+    assert catalog.record_choice_fields(spec, {"qualification_name": "BS Computer Science"})[
+        "field_of_study"] == "study_fields"
+    assert catalog.record_level(spec, {"qualification_name": "BS Computer Science"}) == "bachelor"
+
+
+def test_details_entries_carry_the_records_level():
+    from app.memory.vault_view import VaultView
+    with StudentSession() as student, student.factory() as db:
+        StudentRecordService(db).apply(student.workspace_id, "education",
+                                       {"qualification_name": "BS Computer Science", "academic_status": "current"},
+                                       source_type="user_explicit", claim_origin="student",
+                                       capture_method="explicit_correction")
+        db.commit()
+        view = VaultView(db).build(student.workspace_id, include_sensitive=True)
+        [entry] = [e for section in view["details"].values() for e in section["entries"] if e["type"] == "education"]
+        assert entry["record_level"] == "bachelor"
+
+
+def _onboard(db, workspace, **answers):
+    from app.routers.vault import _onboarding
+    _onboarding(db).apply(workspace, {**PERSON, "status": "current", **answers})
+    db.commit()
+
+
+def _statuses(db, workspace_id):
+    return {r.qualification_name: r.academic_status for r in StudentRecordService(db).list(workspace_id, "education")}
+
+
+def test_a_step_up_completes_the_lower_current_record():
+    with StudentSession() as student, student.factory() as db:
+        workspace = db.get(Workspace, student.workspace_id)
+        _onboard(db, workspace, level="intermediate", group="pre_engineering", year="year_2")
+        _onboard(db, workspace, level="bachelor", field="computer_science", year="semester_1")
+        assert _statuses(db, student.workspace_id) == {"fsc": "completed", "bachelor": "current"}
+
+
+def test_another_track_at_the_same_rank_is_left_alone():
+    with StudentSession() as student, student.factory() as db:
+        workspace = db.get(Workspace, student.workspace_id)
+        _onboard(db, workspace, level="dae", technology="electrical", year="year_2")
+        _onboard(db, workspace, level="a_level", subjects=["physics", "mathematics"], year="year_1")
+        assert _statuses(db, student.workspace_id) == {"dae": "current", "a_level": "current"}
+
+
+def test_a_higher_record_is_never_marked_completed():
+    with StudentSession() as student, student.factory() as db:
+        workspace = db.get(Workspace, student.workspace_id)
+        _onboard(db, workspace, level="bachelor", field="computer_science", year="semester_1")
+        _onboard(db, workspace, level="intermediate", group="pre_engineering", year="year_2")
+        assert _statuses(db, student.workspace_id) == {"bachelor": "current", "fsc": "current"}

@@ -63,6 +63,10 @@ class TypeSpec:
     # field, never in chat text where "Ms Ayesha" or "be" are everyday words:
     # {wording: level code}.
     level_wordings: dict = field(default_factory=dict)
+    # How far along each level is ({level code: rank}): a new current record
+    # completes only older current ones of a lower rank (FSc -> Bachelor's),
+    # never a higher one or another track at the same rank (DAE beside A-level).
+    level_ranks: dict = field(default_factory=dict)
     onboarding: dict | None = None
     # Which Details section shows a details type (about, education, ...).
     # Optional so older catalog files still load.
@@ -179,6 +183,10 @@ def _build_type(raw: dict, choices: dict) -> TypeSpec:
         if level_wordings and (level_list is None or not set(level_wordings.values())
                                <= {c.code for c in choices[level_list]}):
             raise ValueError("level_wordings must name codes of the qualification_name list")
+        level_ranks = dict(raw.get("level_ranks", {}))
+        if level_ranks and (level_list is None or not set(level_ranks) <= {c.code for c in choices[level_list]}
+                            or not all(isinstance(r, int) and not isinstance(r, bool) for r in level_ranks.values())):
+            raise ValueError("level_ranks must map codes of the qualification_name list to integers")
         onboarding = raw.get("onboarding")
         if onboarding is not None:
             if (not isinstance(onboarding.get("order"), int) or not onboarding.get("prompt")
@@ -219,7 +227,7 @@ def _build_type(raw: dict, choices: dict) -> TypeSpec:
             inputs=inputs, sensitivity=raw["sensitivity"], conflict=raw["conflict"],
             freshness_days=days, version=raw["version"], schema=schema, identity=identity,
             choice_fields=choice_fields, choice_by_level=choice_by_level, level_wordings=level_wordings,
-            onboarding=onboarding, section=section, money=money,
+            level_ranks=level_ranks, onboarding=onboarding, section=section, money=money,
             field_definition=field_definition)
     except (KeyError, TypeError, AttributeError, ValueError) as exc:
         detail = f"missing {exc}" if isinstance(exc, KeyError) else str(exc)
@@ -294,12 +302,23 @@ class VaultCatalog:
             return {}
         lists = dict(spec.choice_fields)
         if spec.choice_by_level and isinstance(value, dict):
-            level = self.choice_code(lists.get("qualification_name", "levels"),
-                                     str(value.get("qualification_name") or ""))
+            level = self.record_level(spec, value)
             for path, by_level in spec.choice_by_level.items():
                 if level in by_level:
                     lists[path] = by_level[level]
         return lists
+
+    def record_level(self, spec: TypeSpec | None, value) -> str | None:
+        """A record's level code in any wording: the code or a synonym, else
+        (for an education record) the level an older row's title names, so
+        "BS" or "BS Computer Science" reads as bachelor."""
+        if spec is None or not isinstance(value, dict):
+            return None
+        text = str(value.get("qualification_name") or "")
+        level = self.choice_code(spec.choice_fields.get("qualification_name", "levels"), text)
+        if level is None and spec.key == "education" and text:
+            level = self.read_education(text)[0]
+        return level
 
     def read_education(self, qualification, field=None) -> tuple[str | None, str | None]:
         """(level code, group/technology/field code) for an education record in
