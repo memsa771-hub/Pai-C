@@ -39,7 +39,7 @@ def _parse_response(raw: str, *, violations=None) -> tuple[str, dict, list[str]]
             return None
         action = parsed.get("action")
         moves = parsed.get("moves")
-        allowed = {"reflect", "affirm", "give", "summarize", "ask"}
+        allowed = {"reflect", "give", "summarize", "ask"}
         moves = [move for move in moves if isinstance(move, str) and move in allowed] if isinstance(moves, list) else []
         return parsed["reply"], action if isinstance(action, dict) else {"type": "none"}, moves
 

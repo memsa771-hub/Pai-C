@@ -88,3 +88,25 @@ def test_extractor_prompt_third_person_done_vs_planned_and_hobbies_as_evidence()
         "preferences.location_limits",
     ):
         assert line in prompt
+
+
+def test_shared_voice_tail_has_no_affirm_move_and_hobbies_only_as_evidence():
+    from app.pai_c.deep.turn import _parse_response
+    for name in ("voice", "voice_guided"):
+        prompt = load_prompt(name)
+        assert '"affirm"' not in prompt and "Engage with these naturally" not in prompt
+        assert "count only as supporting evidence when they help decide between fields" in prompt
+    reply = '{"reply": "Theek hai.", "moves": ["affirm", "give"], "action": {"type": "none"}}'
+    assert _parse_response(reply)[2] == ["give"]
+
+
+def test_classifier_asks_when_an_education_basic_is_missing():
+    prompt = (BACKEND / "app/pai_c/policy/prompts/turn_classifier.md").read_text(encoding="utf-8")
+    assert "uncovered profile area alone is NOT a reason to ask" not in prompt
+    assert "valid whole-person counseling context" not in prompt
+    for line in ("an education basic is missing", "entry test plans", "the turn is not care"):
+        assert line in prompt
+    docs = BACKEND.parent / "docs/counselor/COUNSELOR_V3_PROMPTS.md"
+    if docs.exists():
+        section = docs.read_text(encoding="utf-8").split("## 8.", 1)[1].split("\n## ", 1)[0]
+        assert section.split("```text\n", 1)[1].split("\n```", 1)[0].rstrip() == prompt.rstrip()

@@ -105,7 +105,7 @@ async def test_personal_sharing_stays_in_domain_without_forced_questions(monkeyp
             result = await run_deep_turn(db, _turn(student, text), history=[], decision=decision, signals=sig)
         assert result.reply == response
         assert "question_removed" in result.guard_violations
-        assert "Whole-person context" in model.await_args.kwargs["system_prompt"]
+        assert "count only as supporting evidence" in model.await_args.kwargs["system_prompt"]
 
 
 def test_useful_clarification_not_a_fixed_ratio_and_safety_precedes_request():
