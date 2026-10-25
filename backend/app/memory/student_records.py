@@ -60,6 +60,19 @@ def _merge(previous, patch):
     return result
 
 
+def _without(values: dict, paths) -> dict:
+    """A copy of a record's values minus dotted paths (details.current_year)."""
+    result = deepcopy(values)
+    for path in paths:
+        *parents, leaf = path.split(".")
+        node = result
+        for part in parents:
+            node = node.get(part) if isinstance(node, dict) else None
+        if isinstance(node, dict):
+            node.pop(leaf, None)
+    return result
+
+
 def _conflicts(previous, patch):
     return any(key in previous and (
         _conflicts(previous[key], value) if isinstance(previous[key], dict) and isinstance(value, dict)
@@ -176,7 +189,7 @@ class StudentRecordService:
               evidence: dict | None = None, subject_user_id: str | None = None,
               record_id: str | None = None, supersedes_record_id: str | None = None,
               candidate_id: str | None = None, force_new: bool = False,
-              verification_status: str | None = None):
+              verification_status: str | None = None, clear_fields: tuple = ()):
         values = validate_record(kind, values, partial=bool(record_id))
         # Serialize even first writes where there is no entity row to lock.
         owner = self.db.execute(select(Workspace).where(Workspace.id == workspace_id).with_for_update()).scalar_one_or_none()
@@ -231,7 +244,10 @@ class StudentRecordService:
                 self.db.flush()
                 raise RecordNeedsReview("Confirm whether this is the same qualification")
         before = self._values(kind, current) if current else None
-        merged = validate_record(kind, _merge(before or {}, values))
+        # A student's correction can also take answers away: fields of the
+        # status, level or group they no longer hold are cleared, not kept.
+        cleared = tuple(clear_fields) if current is not None and source_type == "user_explicit" else ()
+        merged = validate_record(kind, _without(_merge(before or {}, values), cleared))
         steward = RecordDomainSteward(kind)
         steward.validate_attribution(values, merged, source_type, evidence)
         if kind == "exploration_experience":
@@ -307,6 +323,8 @@ class StudentRecordService:
             if merged != before:
                 for key, value in merged.items():
                     setattr(current, key, value)
+                for key in {path.split(".")[0] for path in cleared} - set(merged):
+                    setattr(current, key, None)
                 current.updated_at = datetime.now(timezone.utc)
                 current.source_type = source_type
                 current.claim_origin = claim_origin

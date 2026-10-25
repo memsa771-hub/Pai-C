@@ -484,7 +484,8 @@ class OnboardingService:
         # The current contract is the three-step form. Older in-flight clients
         # (the eight-field form, or the four-card form with a full name) still
         # complete with their own required set; their old facts are retained.
-        if "firstName" in answers or "lastName" in answers:
+        required_follow_ups = "firstName" in answers or "lastName" in answers
+        if required_follow_ups:
             required = (*(f for f in ONBOARDING_FIELDS if not f.depends_on), *asked.values())
         elif "level" in answers:
             required = tuple(FIELDS_BY_NAME[name] for name in ("fullName", "level", "currentCity"))
@@ -539,7 +540,18 @@ class OnboardingService:
             # place rather than gaining a second education record.
             rows = StudentRecordService(self.db).list(workspace_id, main.field_key)
             if rows and self._record_prefill(main, rows[0]).get(main.name) == cleaned.get(main.name):
-                corrects[main.field_key] = rows[0].id
+                corrects[main.field_key] = {"record_id": rows[0].id}
+                if required_follow_ups:
+                    # Every onboarding answer of a question no longer shown
+                    # (graduation year once studying, subjects once not O/A
+                    # level) is cleared from the corrected record.
+                    asked_paths = {f.record_field for f in asked.values()}
+                    record_paths = {f"{k}.{d}" for k, v in record.items() if isinstance(v, dict) for d in v}
+                    record_paths |= set(record)
+                    stale = {f.record_field for f in FOLLOW_UPS if f.field_key == main.field_key}
+                    stale -= asked_paths | record_paths
+                    if stale:
+                        corrects[main.field_key]["clear_fields"] = sorted(stale)
 
         for field, value, quote in writes:
             # A returning student's prefilled canonical answer is already
@@ -552,7 +564,7 @@ class OnboardingService:
             candidate = MemoryCandidateService(self.db).propose(
                 workspace_id=workspace_id, candidate_type="student_record" if field.record_field else "vault_fact",
                 key=field.field_key, proposed_value=value, confidence=1.0,
-                entities={"record_id": corrects[field.field_key]} if field.field_key in corrects else None,
+                entities=corrects.get(field.field_key),
                 source_type="user_explicit", allow_user_explicit=True,
                 input_channel="profile",
                 subject_user_id=str(user.id) if user else None,

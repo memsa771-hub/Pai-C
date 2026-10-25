@@ -681,3 +681,50 @@ def test_details_label_the_field_from_the_records_own_level(value, shown):
     from app.memory.vault_view import _display
     display = _display(vault_catalog().type("education"), value)
     assert shown in display and value["field_of_study"] not in display
+
+
+# -- Review round 2: an in-place correction leaves nothing from the old answers --
+
+def test_switching_to_studying_now_clears_the_graduation_year(db):
+    _add_education(db, qualification_name="fsc", field_of_study="pre_medical", academic_status="completed",
+                   graduation_year=2023)
+    OnboardingService(db).apply(db.info["workspace"], {
+        **PERSON, "level": "intermediate", "group": "pre_medical", "status": "current", "year": "year_2"})
+    db.commit()
+    [row] = _education_rows(db)
+    assert (row.academic_status, row.graduation_year, row.details["current_year"]) == ("current", None, 2)
+
+
+def test_switching_to_completed_clears_the_current_year_and_semester(db):
+    _add_education(db, qualification_name="bachelor", field_of_study="computer_science",
+                   academic_status="current", details={"current_semester": 3, "current_year": 2})
+    OnboardingService(db, sources=STUDY_FIELDS).apply(db.info["workspace"], {
+        **PERSON, "level": "bachelor", "field": "computer_science", "status": "completed", "year": "2025"})
+    db.commit()
+    [row] = _education_rows(db)
+    assert (row.academic_status, row.graduation_year) == ("completed", 2025)
+    assert "current_year" not in (row.details or {}) and "current_semester" not in (row.details or {})
+
+
+def test_subjects_that_belong_to_no_question_of_the_level_are_cleared(db):
+    """Subjects are an O/A-level answer: an Intermediate record corrected in
+    place keeps none (here a legacy fsc row that carried subjects)."""
+    _add_education(db, qualification_name="fsc", details={"subjects": ["physics", "chemistry"]})
+    OnboardingService(db).apply(db.info["workspace"], {
+        **PERSON, "level": "intermediate", "group": "pre_engineering", "status": "current", "year": "year_1"})
+    db.commit()
+    [row] = _education_rows(db)
+    assert row.field_of_study == "pre_engineering" and "subjects" not in (row.details or {})
+
+
+def test_leaving_o_level_keeps_its_subjects_off_the_new_level(db):
+    """A different level is a different qualification: the O-level row keeps
+    its subjects as history and the A-level record has only its own."""
+    _add_education(db, qualification_name="o_level", academic_status="completed", graduation_year=2022,
+                   details={"subjects": ["biology", "physics"]})
+    OnboardingService(db).apply(db.info["workspace"], {
+        **PERSON, "level": "a_level", "subjects": ["mathematics"], "status": "current", "year": "year_1"})
+    db.commit()
+    rows = {row.qualification_name: row for row in _education_rows(db)}
+    assert rows["a_level"].details["subjects"] == ["mathematics"] and rows["a_level"].graduation_year is None
+    assert rows["o_level"].details["subjects"] == ["biology", "physics"]

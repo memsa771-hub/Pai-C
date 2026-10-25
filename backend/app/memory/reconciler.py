@@ -293,6 +293,7 @@ class MemoryReconciler:
             evidence=candidate.evidence, subject_user_id=candidate.subject_user_id,
             record_id=(candidate.entities or {}).get("record_id"),
             supersedes_record_id=(candidate.entities or {}).get("supersedes_record_id"),
+            clear_fields=tuple((candidate.entities or {}).get("clear_fields") or ()),
             candidate_id=candidate.id,
             force_new=(candidate.source_type == "user_explicit"
                        and bool((candidate.entities or {}).get("force_new"))),
