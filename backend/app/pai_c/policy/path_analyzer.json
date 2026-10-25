@@ -3,6 +3,7 @@
   "max_paths": 5,
   "_min_fit_note": "A suggested field is kept only with at least min_fit_evidence fit items in fit_evidence_statuses, each citing the student. Fewer or zero paths is the correct answer when the fit is weak; never pad to max_paths.",
   "min_fit_evidence": 2,
+  "planner_cooldown_minutes": 30,
   "fit_evidence_statuses": ["have", "partial"],
   "_education_note": "How an education record reads as path evidence: catalog labels, never codes. Hidden fields are internal levels; status codes have no catalog list, so their words live here.",
   "education_hidden_fields": ["canonical_level", "normalized_name"],

@@ -30,7 +30,7 @@ it('exploring has only dismiss, and chosen has no actions', () => {
 it('shows the paths PAI found in chat and opens them in the workspace', async () => {
   const fit = [{ label: 'Hands-on work', status: 'have' as const, note: '', evidence: ['I fix phones'] }];
   vi.mocked(workspaceApi.getPossibilities).mockResolvedValue([
-    { ...value, id: 'a', title: 'Mobile repair', fit },
+    { ...value, id: 'a', title: 'Mobile repair', fit, study_field: { key: 'x', needs_check: true, needs_group: [] } },
     { ...value, id: 'b', title: 'Dismissed one', status: 'dismissed' },
     { ...value, id: 'c', title: 'Not in this message' },
   ]);
@@ -39,6 +39,7 @@ it('shows the paths PAI found in chat and opens them in the workspace', async ()
   window.addEventListener('popstate', moved);
   render(<PathsFound ids={['a', 'b']} />);
   expect(await screen.findByText('Mobile repair')).toBeTruthy();
+  expect(screen.getByText('Needs checking for your group')).toBeTruthy();
   expect(screen.queryByText('Dismissed one')).toBeNull();
   expect(screen.queryByText('Not in this message')).toBeNull();
   expect(screen.getByText('One path, checked against what you shared.')).toBeTruthy();

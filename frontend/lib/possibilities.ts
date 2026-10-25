@@ -16,7 +16,8 @@ export type Possibility = {
   fit?: FitItem[];
   /** The study field an analyzer path names. needs_check: the student's group
    * may qualify only with conditions; needs_group: the intermediate group a
-   * Matric student would need; outdated: a kept path from before fields. */
+   * Matric student would need; outdated: a kept path from before fields;
+   * out_of_group: a kept field the student's current group does not open. */
   study_field?: StudyField | null;
   unknowns: string[]; roadmap_id: string | null;
 };
@@ -26,4 +27,8 @@ export type StudyField = {
   needs_check?: boolean;
   needs_group?: { code: string; label: string }[];
   outdated?: boolean;
+  out_of_group?: boolean;
 };
+
+/** The latest path analysis, so the Paths page knows when to stop waiting. */
+export type PathAnalysisStatus = { job_id: string | null; done: boolean; outcome: string | null };

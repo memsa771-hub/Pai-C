@@ -7,11 +7,13 @@ import copy from './workspace/copy.json';
 
 /** The notes a study-field path carries: needs checking for the student's
  * group, the intermediate group a Matric student would need, or an older
- * generic path the student can replace by finding paths again. */
+ * generic path from before fields of study, or a kept field the student's
+ * current group no longer opens. */
 export function FieldNotes({ field, className }: { field?: StudyField | null; className?: string }) {
   if (!field) return null;
   const notes = [
     field.outdated && copy.pathOutdated,
+    field.out_of_group && copy.pathOutOfGroup,
     field.needs_check && copy.pathNeedsCheck,
     field.needs_group?.length && copy.pathNeedsGroup.replace('{groups}', field.needs_group.map((g) => g.label).join(' / ')),
   ].filter((note): note is string => typeof note === 'string');

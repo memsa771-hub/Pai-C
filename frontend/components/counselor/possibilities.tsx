@@ -6,7 +6,7 @@ import { useT } from '@/lib/i18n';
 import { DEFAULT_LOCALE } from '@/lib/i18n/locales';
 import type { Possibility } from '@/lib/possibilities';
 import { Button } from '@/components/ui/button';
-import { FitList, PathCardView } from './path-card';
+import { FieldNotes, FitList, PathCardView } from './path-card';
 import { openWorkspaceView } from './workspace-link';
 import { tonesByOrder, type Tone } from '@/components/pai';
 import copy from './workspace/copy.json';
@@ -72,6 +72,7 @@ export function PathsFound({ ids }: { ids: string[] }) {
         {found.map(row => (
           <li key={row.id} className="border-t pt-4 first:border-t-0 first:pt-0">
             <p className="font-semibold">{row.title}</p>
+            <FieldNotes field={row.study_field} className="mt-1.5" />
             {!!row.fit?.length && <div className="mt-2"><FitList items={row.fit} limit={3} /></div>}
           </li>
         ))}

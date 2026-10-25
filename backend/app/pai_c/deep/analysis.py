@@ -310,20 +310,16 @@ async def analyze_job(job, db) -> dict:
                 if plan is not None:
                     db.add(PaiTurnPlan(workspace_id=job.workspace_id, source_event_id=user_event_id,
                         notebook_version=previous.version + 1, plan=plan.model_dump(mode="json")))
-                if plan is not None and plan.possibility is not None:
-                    from app.pai_c.possibilities import PossibilityService
-                    from app.pai_c.understanding.data import load_policy, at_path
-                    stored = previous.notebook.model_dump(mode="json")
-                    items = {row["id"]: row for path in load_policy()["item_paths"] for row in at_path(stored, path)}
-                    journey = JourneyService(db).ensure_counselor(job.workspace_id)
-                    proposed = plan.possibility
-                    PossibilityService(db).add(job.workspace_id, journey.id,
-                        title=proposed.title, why=proposed.why, kind="discovered", source="planner", status="suggested",
-                        evidence=[{"text": items[id]["evidence"], "item_id": id} for id in dict.fromkeys(proposed.evidence_item_ids)])
                 snapshot, storage_issues = service.apply_truth_map(
                     job.workspace_id, candidate, user_event_id,
                     expected_version=previous.version)
                 _advance_stage(db, job.workspace_id, snapshot.notebook)
+                if plan is not None and plan.possibility is not None:
+                    # The planner never writes a path: the analyzer is the one
+                    # source of paths, so a proposed direction asks it to look.
+                    from app.pai_c.paths.analyzer import enqueue_after_planner
+                    enqueue_after_planner(db, job.workspace_id, source_event_id=user_event_id)
+                    db.commit()
                 return {"status": "applied", "version": snapshot.version,
                         "sanitized": len(storage_issues), "sensitive_removed": 0,
                         "model_calls": model_calls}

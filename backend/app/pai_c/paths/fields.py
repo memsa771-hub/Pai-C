@@ -135,8 +135,10 @@ def candidate_fields(education_record: dict | None) -> dict[str, Candidate]:
         current = fields.get(_code("study_fields", education_record.get("field_of_study")) or "")
         if current is None:
             return {}
+        # A degree student's next step is the level above: only fields offered there.
+        following = set(rules["degree_levels"][level])
         return {key: Candidate(field, "open" if field.family == current.family else "check")
-                for key, field in fields.items()}
+                for key, field in fields.items() if following & set(field.levels)}
     groups = student_groups(education_record)
     result: dict[str, Candidate] = {}
     for group in sorted(groups):
@@ -149,6 +151,12 @@ def candidate_fields(education_record: dict | None) -> dict[str, Candidate]:
 
 
 def current_education(records: list[dict]) -> dict | None:
-    """The education record paths read: the current one, else the first."""
-    return next((row for row in records if row.get("academic_status") == "current"),
-                next(iter(records), None))
+    """The education record paths read: a current one first, then the highest
+    level (the order lives in study_fields.json), then the first stored."""
+    order = _data()["group_rules"]["level_order"]
+
+    def rank(row: dict) -> tuple[bool, int]:
+        level = _code("levels", row.get("qualification_name"))
+        return row.get("academic_status") == "current", order.index(level) if level in order else -1
+
+    return max(records, key=rank, default=None)

@@ -148,13 +148,18 @@ def sanitize(analysis: PathAnalysis, evidence: dict[str, str], dismissed: set[st
     never by the model) or the student's own paths, drop world numbers,
     dismissed paths and fields without enough evidenced fit, cap the count,
     and turn any uncited verdict into "unknown". Zero paths is a valid result.
-    A field outside the candidates is one the student's group rules out."""
+    A field outside the candidates is one the student's group rules out. The
+    student's own paths are re-assessed first; fields fill the rest of the cap."""
     rules = policy()
     world_number = re.compile(load_data("grounding.json")["numeric_world_pattern"])
     evidenced = set(rules["evidenced_statuses"])
     fitting = set(rules["fit_evidence_statuses"])
     kept, seen = [], set()
-    for path in analysis.paths:
+
+    def is_own(path):
+        return path.field_key not in candidates and normalized_title(path.title) in own
+
+    for path in sorted(analysis.paths, key=lambda path: not is_own(path)):
         candidate = candidates.get(path.field_key)
         if candidate is not None:
             title = candidate.field.title
@@ -189,22 +194,50 @@ def sanitize(analysis: PathAnalysis, evidence: dict[str, str], dismissed: set[st
     return kept
 
 
-def _replace_generic(service: PossibilityService, rows) -> None:
-    """Paths from before fields of study (generic titles such as "Computer
-    use") give way: a suggested one is removed; one the student saved or is
-    exploring stays, marked so they can find paths again. The student's own
-    paths and dismissed ones are left alone."""
+def _prune(service: PossibilityService, rows, candidates: dict[str, Candidate], returned: set[str]) -> None:
+    """Every finished run leaves only what this run stands behind.
+
+    A suggested field that is outside today's candidates or was not returned
+    again (weak fit, the group changed) is removed. A field the student saved,
+    is exploring or chose stays, with its group notes refreshed, and is marked
+    out_of_group when the student's current group no longer opens it (not when
+    the education is simply unknown). Paths from before fields of study
+    (generic titles such as "Computer use") give way the same way: removed
+    when suggested, kept and marked outdated otherwise. The student's own
+    paths, Mirror lanes (general directions, not fields) and dismissed rows
+    are left alone."""
     titles = {normalized_title(field.title) for field in study_fields().values()}
     for row in rows:
-        if row.source == "student" or row.status == "dismissed":
+        if row.source in {"student", "mirror"} or row.status == "dismissed":
             continue
-        if (row.study_field or {}).get("key") or row.normalized_title in titles:
-            continue
+        key = (row.study_field or {}).get("key")
         if row.status == "suggested" and row.roadmap_id is None:
-            service.db.delete(row)
-        elif row.study_field != {"outdated": True}:
+            if key not in candidates or key not in returned:
+                service.db.delete(row)
+            continue
+        if key in candidates:
+            row.study_field = _study_field(candidates[key])
+        elif key:
+            if candidates and not row.study_field.get("out_of_group"):
+                row.study_field = {**row.study_field, "out_of_group": True}
+        elif row.normalized_title not in titles and row.study_field != {"outdated": True}:
             row.study_field = {"outdated": True}
     service.db.flush()
+
+
+def enqueue_after_planner(db, workspace_id: str, *, source_event_id: str | None) -> str | None:
+    """The planner saw a direction worth checking. The analyzer stays the one
+    source of paths, so the planner only asks it to look again, at most once
+    per cooldown so a run of turns does not re-analyse every time."""
+    from datetime import datetime, timedelta, timezone
+    latest = db.scalar(select(BackgroundJob.created_at).where(
+        BackgroundJob.workspace_id == workspace_id, BackgroundJob.job_type == JOB_ANALYZE_PATHS)
+        .order_by(BackgroundJob.created_at.desc()).limit(1))
+    if latest is not None:
+        latest = latest if latest.tzinfo else latest.replace(tzinfo=timezone.utc)
+        if datetime.now(timezone.utc) - latest < timedelta(minutes=policy()["planner_cooldown_minutes"]):
+            return None
+    return enqueue_path_analysis(db, workspace_id, source_event_id=source_event_id, channel=None, reason="planner")
 
 
 def enqueue_path_analysis(db, workspace_id: str, *, source_event_id: str | None,
@@ -251,7 +284,7 @@ async def path_analysis_job(job, db) -> dict:
         if not candidates:
             # No education, or one PAI cannot place yet: no paths, and the
             # workspace shows what PAI still needs instead of a guess.
-            _replace_generic(service, service.list(job.workspace_id))
+            _prune(service, service.list(job.workspace_id), {}, set())
             db.commit()
             return {"status": "needs_education"}
         existing = service.list(job.workspace_id)
@@ -299,7 +332,8 @@ async def path_analysis_job(job, db) -> dict:
             Workspace.id == job.workspace_id, Workspace.status == "active").with_for_update())
         if workspace is None:
             return {"status": "inactive"}
-        _replace_generic(service, service.list(job.workspace_id))
+        _prune(service, service.list(job.workspace_id), candidates,
+               {path["study_field"]["key"] for path in paths if path["study_field"]})
         if not paths:
             db.commit()
             return {"status": "no_paths"}
@@ -313,6 +347,10 @@ async def path_analysis_job(job, db) -> dict:
             if row.status == "dismissed":
                 continue
             row.fit = path["fit"]
+            if row.source != "mirror":
+                # Re-rendered evidence: older rows may still quote raw codes.
+                row.evidence = path["evidence"] or [
+                    {**item, "text": evidence.get(item.get("item_id"), item["text"])} for item in row.evidence]
             if path["study_field"] is not None:
                 row.study_field = path["study_field"]
             ids.append(row.id)

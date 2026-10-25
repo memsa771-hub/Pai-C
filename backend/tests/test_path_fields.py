@@ -134,7 +134,7 @@ def test_matric_sees_every_field_with_the_group_it_needs():
 def test_degree_students_see_their_family_open_and_the_rest_to_check():
     candidates = candidate_fields({"qualification_name": "bachelor", "field_of_study": "computer_science"})
     assert candidates["data_science"].standing == "open"
-    assert candidates["mbbs"].standing == "check"
+    assert candidates["electrical_engineering"].standing == "check"
     assert candidate_fields({"qualification_name": "masters", "field_of_study": "Electrical Engineering"})[
         "civil_engineering"].standing == "open"
 
@@ -250,3 +250,204 @@ async def test_old_generic_paths_replaced():
         assert rows[gone_id].status == "dismissed" and rows[gone_id].study_field is None
         assert rows[own_id].study_field is None and rows[own_id].fit[0]["status"] == "have"
         assert title("mbbs") in {row.title for row in rows.values()}
+
+
+# ---- fix round 1 -------------------------------------------------------------
+
+FA = {"qualification_name": "fa", "academic_status": "current"}
+
+
+def reply_with(*keys, fits=STRONG):
+    return {"message": "Here are some fields.", "paths": [path(key, fits=fits) for key in keys]}
+
+
+async def again(student, db, reply):
+    """Another analysis run of the same student (a fresh job, no new notebook)."""
+    from app.pai_c.paths.analyzer import JOB_ANALYZE_PATHS
+    job = BackgroundJob(job_type=JOB_ANALYZE_PATHS, workspace_id=student.workspace_id,
+                        payload={"reason": "student"})
+    db.add(job)
+    db.commit()
+    with patch("app.pai_c.paths.analyzer.chat_completion", AsyncMock(return_value=json.dumps(reply))) as call:
+        result = await path_analysis_job(job, db)
+    db.expire_all()
+    return result, call
+
+
+def set_education(student, db, values):
+    records = StudentRecordService(db)
+    row = records.list(student.workspace_id, "education")[0]
+    records.apply(student.workspace_id, "education", values, source_type="user_explicit",
+                  claim_origin="student", capture_method="explicit_correction", record_id=row.id)
+    db.commit()
+
+
+def by_title(student, db):
+    return {row.title: row for row in PossibilityService(db).list(student.workspace_id)}
+
+
+@pytest.mark.asyncio
+async def test_group_change_prunes_suggested_fields_and_flags_kept_ones():
+    with StudentSession() as student, student.factory() as db:
+        await run(student, db, reply_with("mbbs", "bds", "pharm_d"))
+        service = PossibilityService(db)
+        service.transition(student.workspace_id, by_title(student, db)[title("pharm_d")].id, "save")
+        db.commit()
+        set_education(student, db, FA)
+        await again(student, db, reply_with("bba"))
+        rows = by_title(student, db)
+        assert title("mbbs") not in rows and title("bds") not in rows
+        assert rows[title("bba")].study_field["key"] == "bba"
+        kept = rows[title("pharm_d")]
+        assert kept.status == "saved" and kept.study_field["out_of_group"] is True
+
+
+@pytest.mark.asyncio
+async def test_back_in_group_refreshes_the_kept_field_flags():
+    with StudentSession() as student, student.factory() as db:
+        await run(student, db, reply_with("electrical_engineering"), education=ICS)
+        row = by_title(student, db)[title("electrical_engineering")]
+        assert row.study_field["needs_check"] is True
+        PossibilityService(db).transition(student.workspace_id, row.id, "save")
+        db.commit()
+        set_education(student, db, {"qualification_name": "fsc", "field_of_study": "pre_engineering"})
+        await again(student, db, reply_with("civil_engineering"))
+        kept = by_title(student, db)[title("electrical_engineering")]
+        assert kept.study_field["needs_check"] is False and not kept.study_field.get("out_of_group")
+
+
+@pytest.mark.asyncio
+async def test_needs_education_prunes_suggested_fields_and_keeps_saved_without_a_group_flag():
+    with StudentSession() as student, student.factory() as db:
+        turn, journey, _ = seed(student, db)
+        service = PossibilityService(db)
+        field = {"key": "mbbs", "isced": "0912", "needs_check": False, "needs_group": []}
+        old = service.add(student.workspace_id, journey.id, title=title("mbbs"), why="Earlier",
+                          kind="discovered", source="analyzer", status="suggested")
+        old.study_field = field
+        kept = service.add(student.workspace_id, journey.id, title=title("bds"), why="Earlier",
+                           kind="discovered", source="analyzer", status="saved")
+        kept.study_field = {**field, "key": "bds"}
+        db.commit()
+        kept_id = kept.id
+        result, call = await again(student, db, reply_with("mbbs"))
+        assert result["status"] == "needs_education"
+        call.assert_not_awaited()
+        rows = {row.id: row for row in service.list(student.workspace_id)}
+        assert list(rows) == [kept_id] and not rows[kept_id].study_field.get("out_of_group")
+
+
+@pytest.mark.asyncio
+async def test_weak_fit_on_rerun_removes_the_suggested_field():
+    with StudentSession() as student, student.factory() as db:
+        await run(student, db, reply_with("mbbs", "bds"))
+        await again(student, db, {"message": "x", "paths": [path("mbbs", fits=[fit("Interest", "have")]), path("bds")]})
+        assert set(by_title(student, db)) == {title("bds")}
+
+
+@pytest.mark.asyncio
+async def test_a_second_run_replaces_the_first_suggestions():
+    with StudentSession() as student, student.factory() as db:
+        await run(student, db, reply_with("mbbs", "bds", "pharm_d", "nursing", "zoology"))
+        assert len(by_title(student, db)) == 5
+        await again(student, db, reply_with("botany", "biotechnology", "microbiology"))
+        assert set(by_title(student, db)) == {title("botany"), title("biotechnology"), title("microbiology")}
+
+
+@pytest.mark.asyncio
+async def test_mirror_lanes_are_not_marked_outdated():
+    with StudentSession() as student, student.factory() as db:
+        turn, journey, _ = seed(student, db)
+        lane = PossibilityService(db).add(student.workspace_id, journey.id, title="Engineering", why="Lane",
+                                          kind="stated_goal", source="mirror", status="exploring")
+        lane_id = lane.id
+        db.commit()
+        add_education(student, db, FSC_MEDICAL)
+        await again(student, db, reply_with("mbbs"))
+        row = by_title(student, db)["Engineering"]
+        assert row.id == lane_id and row.status == "exploring" and row.study_field is None
+
+
+@pytest.mark.asyncio
+async def test_reassessment_rewrites_evidence_through_labels():
+    with StudentSession() as student, student.factory() as db:
+        await run(student, db, reply_with("mbbs"))
+        row = by_title(student, db)[title("mbbs")]
+        education_id = StudentRecordService(db).list(student.workspace_id, "education")[0].id
+        row.evidence = [{"text": "pre_medical, current, fsc, upper_secondary", "item_id": education_id}]
+        db.commit()
+        await again(student, db, {"message": "x", "paths": [path("mbbs", ids=["c1", education_id])]})
+        texts = " ".join(item["text"] for item in by_title(student, db)[title("mbbs")].evidence)
+        assert "pre_medical" not in texts and "upper_secondary" not in texts and "Pre-Medical" in texts
+
+
+def test_own_paths_are_reassessed_first_then_fields_fill_the_cap():
+    from app.pai_c.possibility_titles import normalized_title
+    candidates = candidate_fields(FSC_MEDICAL)
+    raw = analysis(*[path(k) for k in ("mbbs", "bds", "pharm_d", "nursing", "zoology")],
+                   {"title": "Mobile repair", "why": "Yours.", "fit": []})
+    titles = [row["title"] for row in sanitize(raw, EVIDENCE, set(), candidates, {normalized_title("Mobile repair")})]
+    assert titles[0] == "Mobile repair" and len(titles) == 5
+
+
+def test_current_education_prefers_current_then_the_highest_level():
+    from app.pai_c.paths.fields import current_education
+    matric = {"qualification_name": "matric", "academic_status": "completed"}
+    fsc = {"qualification_name": "fsc", "academic_status": "completed"}
+    bachelor = {"qualification_name": "bachelor", "academic_status": "current"}
+    assert current_education([matric, fsc]) is fsc
+    assert current_education([fsc, bachelor, matric]) is bachelor
+    assert current_education([{**matric, "academic_status": "current"}, fsc])["qualification_name"] == "matric"
+    assert current_education([]) is None
+
+
+def test_degree_students_see_only_fields_with_a_next_level():
+    candidates = candidate_fields({"qualification_name": "bachelor", "field_of_study": "computer_science"})
+    assert candidates and all("master" in c.field.levels for c in candidates.values())
+    bachelor_only = [k for k, f in study_fields().items() if "master" not in f.levels]
+    assert bachelor_only and not set(bachelor_only) & set(candidates)
+
+
+@pytest.mark.asyncio
+async def test_planner_proposal_enqueues_analysis_and_creates_no_row():
+    from sqlalchemy import select
+    from app.pai_c.deep.analysis import analyze_job
+    from app.pai_c.memory import MemoryService
+    from app.pai_c.paths.analyzer import JOB_ANALYZE_PATHS
+    from app.pai_c.planner.plan import validate_plan
+    from scripts.eval.recorded_planner import PLAN
+    from tests.test_counselor_deep_pr4 import _turn_job
+    with StudentSession() as student, student.factory() as db:
+        plan = validate_plan({**PLAN, "possibility": {"title": "Graphic Design", "why": "You draw a lot.",
+                                                      "evidence_item_ids": ["a", "b"]}})
+        for _ in range(2):
+            job, _event = _turn_job(student, db)
+            previous = MemoryService(db).truth_map(student.workspace_id)
+            with patch("app.pai_c.deep.analysis._candidate",
+                       AsyncMock(return_value=(previous.notebook, plan, 1))):
+                assert (await analyze_job(job, db))["status"] == "applied"
+            job.status = "succeeded"  # what the worker records; the next turn waits for it
+            db.commit()
+        assert PossibilityService(db).list(student.workspace_id) == []
+        jobs = db.scalars(select(BackgroundJob).where(BackgroundJob.job_type == JOB_ANALYZE_PATHS)).all()
+        assert len(jobs) == 1 and jobs[0].payload["reason"] == "planner"  # the cooldown holds the second
+
+
+def test_analysis_status_endpoint_reports_the_last_outcome():
+    from app.main import app
+    from app.pai_c.paths.analyzer import JOB_ANALYZE_PATHS
+    from tests.test_counselor_mirror import client_for
+    from tests.test_path_analyzer import HEADERS
+    with StudentSession() as student, student.factory() as db:
+        client = client_for(student)
+        url = f"/v1/counselor/possibilities/analysis?network={student.workspace_id}"
+        try:
+            assert client.get(url, headers=HEADERS).json()["data"] == {"job_id": None, "done": True, "outcome": None}
+            job = BackgroundJob(job_type=JOB_ANALYZE_PATHS, workspace_id=student.workspace_id, payload={},
+                                status="succeeded", result={"status": "needs_education"})
+            db.add(job)
+            db.commit()
+            assert client.get(url, headers=HEADERS).json()["data"] == {
+                "job_id": job.id, "done": True, "outcome": "needs_education"}
+        finally:
+            app.dependency_overrides.clear()

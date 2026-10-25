@@ -288,7 +288,7 @@ def test_choose_sets_possibility_chosen_and_preserves_decision_record():
 
 
 @pytest.mark.asyncio
-async def test_planner_stores_valid_possibility_once_with_plan_log():
+async def test_planner_possibility_is_logged_and_queues_analysis_without_a_row():
     import json
     from unittest.mock import AsyncMock
     from app.models import CounselorNotebook, PaiTurnPlan
@@ -304,5 +304,9 @@ async def test_planner_stores_valid_possibility_once_with_plan_log():
         with patch('app.pai_c.deep.analysis.chat_completion',AsyncMock(return_value=json.dumps({'patch':[],'plan':plan}))):
             assert (await analyze_job(job,db))['status']=='applied'
             assert (await analyze_job(job,db))['status']=='duplicate'
-        assert len(PossibilityService(db).list(student.workspace_id))==1
+        # The planner never writes a path: it asks the path analyzer to look, once.
+        from app.models import BackgroundJob
+        from app.pai_c.paths.analyzer import JOB_ANALYZE_PATHS
+        assert PossibilityService(db).list(student.workspace_id)==[]
+        assert len(db.scalars(select(BackgroundJob).where(BackgroundJob.job_type==JOB_ANALYZE_PATHS)).all())==1
         assert db.scalar(select(PaiTurnPlan)).plan['possibility']['title']=='Practical collaboration'

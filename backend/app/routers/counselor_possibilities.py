@@ -69,6 +69,23 @@ def analyze_paths(network: str = Query(...), db=Depends(get_db),
     return success_response({"job_id": job_id})
 
 
+@router.get("/analysis")
+def path_analysis_status(network: str = Query(...), db=Depends(get_db),
+                         x_workspace_token: str | None = Header(None), authorization: str | None = Header(None)):
+    """The latest path analysis: whether it is done and how it ended, so the
+    Paths page can stop waiting and say when PAI needs the education first."""
+    from app.models import BackgroundJob
+    from app.pai_c.paths.analyzer import JOB_ANALYZE_PATHS
+    workspace = _authorized(db, network, x_workspace_token, authorization)
+    job = db.scalar(select(BackgroundJob).where(
+        BackgroundJob.workspace_id == str(workspace.id), BackgroundJob.job_type == JOB_ANALYZE_PATHS)
+        .order_by(BackgroundJob.created_at.desc(), BackgroundJob.id.desc()).limit(1))
+    if job is None:
+        return success_response({"job_id": None, "done": True, "outcome": None})
+    return success_response({"job_id": job.id, "done": job.status not in {"pending", "running"},
+                             "outcome": (job.result or {}).get("status")})
+
+
 @router.post("/{possibility_id}/{action}")
 async def change_possibility(possibility_id: str, action: str, network: str = Query(...), db=Depends(get_db),
                              x_workspace_token: str | None = Header(None), authorization: str | None = Header(None)):

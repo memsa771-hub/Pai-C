@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { it, expect, vi, afterEach } from "vitest";
+import { it, expect, vi, afterEach, beforeEach } from "vitest";
 import {
   render,
   screen,
@@ -24,11 +24,15 @@ vi.mock("@/lib/api", () => ({
     searchPrograms: vi.fn(),
     addOwnPath: vi.fn(),
     analyzePaths: vi.fn(),
+    getPathAnalysis: vi.fn(),
   },
 }));
 afterEach(() => {
   cleanup();
   vi.clearAllMocks();
+});
+beforeEach(() => {
+  vi.mocked(workspaceApi.getPathAnalysis).mockResolvedValue({ job_id: null, done: true, outcome: null });
 });
 it("opens a path without initiating program research", async () => {
   vi.mocked(workspaceApi.getPossibilities).mockResolvedValue(possibilities);
@@ -148,4 +152,36 @@ it("shows a study field's group notes on the path row and the path page, never r
   vi.mocked(workspaceApi.getPath).mockResolvedValue({ ...pathResult, possibility: field });
   render(<PathPage id="path-one" onBack={vi.fn()} onPlaces={vi.fn()} onChat={vi.fn()} />);
   expect(await screen.findByText("Needs checking for your group")).toBeTruthy();
+});
+
+it("marks a kept field outside the current group and lets the student remove an older suggestion", async () => {
+  const kept = { ...possibilities[0], title: "Pharm-D", status: "saved" as const,
+    study_field: { key: "pharm_d", needs_check: false, needs_group: [], out_of_group: true } };
+  const older = { ...possibilities[1], id: "older", title: "Computer use", status: "saved" as const, study_field: { outdated: true } };
+  vi.mocked(workspaceApi.getPossibilities).mockResolvedValue([kept, older]);
+  vi.mocked(workspaceApi.changePossibility).mockResolvedValue({ ...older, status: "dismissed" });
+  render(<Paths onOpen={vi.fn()} />);
+  expect((await screen.findByText("Pharm-D")).closest("li")!.textContent).toContain("Not open to your current group");
+  const row = screen.getByText("Computer use").closest("li")!;
+  expect(row.textContent).toContain("Older suggestion, from before fields of study");
+  fireEvent.click(screen.getByRole("button", { name: "Remove" }));
+  await waitFor(() => expect(workspaceApi.changePossibility).toHaveBeenCalledWith("older", "dismiss"));
+});
+
+it("asks for the education when the last run needed it, even with kept paths, and stops finding", async () => {
+  vi.useFakeTimers({ shouldAdvanceTime: true });
+  try {
+    vi.mocked(workspaceApi.getPossibilities).mockResolvedValue(possibilities);
+    vi.mocked(workspaceApi.analyzePaths).mockResolvedValue({ job_id: "job-2" });
+    vi.mocked(workspaceApi.getPathAnalysis).mockResolvedValue({ job_id: "job-1", done: true, outcome: "needs_education" });
+    render(<Paths onOpen={vi.fn()} />);
+    expect(await screen.findByText("Tell PAI your current education to get fields that fit you")).toBeTruthy();
+    vi.mocked(workspaceApi.getPathAnalysis).mockResolvedValue({ job_id: "job-2", done: false, outcome: null });
+    fireEvent.click(screen.getByRole("button", { name: "Find my paths" }));
+    expect(await screen.findByText(/PAI is looking at everything/)).toBeTruthy();
+    vi.mocked(workspaceApi.getPathAnalysis).mockResolvedValue({ job_id: "job-2", done: true, outcome: "needs_education" });
+    await act(async () => { await vi.advanceTimersByTimeAsync(5000); });
+    await waitFor(() => expect(screen.getByText("Tell PAI your current education to get fields that fit you")).toBeTruthy());
+    expect(screen.queryByText(/PAI is looking at everything/)).toBeNull();
+  } finally { vi.useRealTimers(); }
 });

@@ -385,6 +385,10 @@ class WorkspaceApi {
   }
 
   /** Ask PAI to work out the student's paths now; results arrive in the background. */
+  async getPathAnalysis(): Promise<import('./possibilities').PathAnalysisStatus> {
+    return this.request(`/v1/counselor/possibilities/analysis?network=${this.requireWorkspace()}`);
+  }
+
   async analyzePaths(): Promise<{ job_id: string | null }> {
     return this.request(`/v1/counselor/possibilities/analyze?network=${this.requireWorkspace()}`, { method: 'POST' });
   }

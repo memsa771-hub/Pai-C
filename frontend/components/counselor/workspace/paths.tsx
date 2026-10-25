@@ -23,6 +23,8 @@ import { DEFAULT_LOCALE } from "@/lib/i18n/locales";
 import copy from "./copy.json";
 
 const list = () => workspaceApi.getPossibilities();
+// async, so a failing call becomes a load error rather than a throw.
+const analysisStatus = async () => workspaceApi.getPathAnalysis();
 /** The workspace card surface (as on the Overview). */
 const CARD = "rounded-[22px] bg-card shadow-card ring-1 ring-border/70";
 const statusTone = { suggested: "blue", exploring: "blue", saved: "success", dismissed: "neutral", chosen: "success" } as const;
@@ -101,9 +103,11 @@ export function PathRow({
         {["suggested", "dismissed"].includes(path.status) && (
           <Button size="icon" variant="ghost" disabled={busy} aria-label={copy.save} title={copy.save} onClick={() => act("save")}><Bookmark aria-hidden /></Button>
         )}
-        {!["dismissed", "chosen"].includes(path.status) && (
+        {!["dismissed", "chosen"].includes(path.status) && (path.study_field?.outdated ? (
+          <Button size="md" variant="ghost" disabled={busy} onClick={() => act("dismiss")}><X aria-hidden />{copy.pathRemove}</Button>
+        ) : (
           <Button size="icon" variant="ghost" disabled={busy} aria-label={copy.notForMe} title={copy.notForMe} onClick={() => act("dismiss")}><X aria-hidden /></Button>
-        )}
+        ))}
       </div>
       {error && <p role="alert" className="text-sm font-medium text-danger-ink sm:basis-full">{copy.error}</p>}
     </li>
@@ -176,23 +180,32 @@ const FINDING_POLLS = 12, FINDING_EVERY_MS = 5000;
 
 export function Paths({ onOpen, onChat }: { onOpen: (id: string) => void; onChat?: (topic?: string) => void }) {
   const resource = useResource(list);
+  const analysis = useResource(analysisStatus);
   const [adding, setAdding] = useState(false),
     [finding, setFinding] = useState(0),
+    [requested, setRequested] = useState<string | null>(null),
     [findError, setFindError] = useState(false);
   const live = resource.data?.filter((p) => p.status !== "dismissed") || [];
   const dismissed = resource.data?.filter((p) => p.status === "dismissed") || [];
   const tones = tonesByOrder((resource.data || []).map((p) => p.id));
   const { refresh } = resource;
+  const refreshAnalysis = analysis.refresh;
+  const needsEducation = analysis.data?.done && analysis.data.outcome === "needs_education";
   // The analyzer works in the background; look again a few times, then stop.
   useEffect(() => {
     if (!finding) return;
-    const timer = setTimeout(() => { void refresh(); setFinding((left) => left - 1); }, FINDING_EVERY_MS);
+    const timer = setTimeout(() => { void refresh(); void refreshAnalysis(); setFinding((left) => left - 1); }, FINDING_EVERY_MS);
     return () => clearTimeout(timer);
-  }, [finding, refresh]);
+  }, [finding, refresh, refreshAnalysis]);
+  // The requested run has ended: stop the finding banner, whatever the outcome.
+  useEffect(() => {
+    if (finding && requested && analysis.data?.job_id === requested && analysis.data.done) setFinding(0);
+  }, [finding, requested, analysis.data]);
   async function find() {
     setFindError(false);
     try {
-      await workspaceApi.analyzePaths();
+      const started = await workspaceApi.analyzePaths();
+      setRequested(started.job_id);
       setFinding(FINDING_POLLS);
     } catch {
       setFindError(true);
@@ -216,6 +229,11 @@ export function Paths({ onOpen, onChat }: { onOpen: (id: string) => void; onChat
         </p>
       )}
       {findError && <p role="alert" className="mb-5 text-sm font-medium text-danger-ink">{copy.error}</p>}
+      {needsEducation && !finding && (
+        <p role="status" className="mb-5 flex items-start gap-2.5 rounded-2xl bg-info-soft px-4 py-3 text-sm text-info-ink">
+          <Info aria-hidden className="mt-0.5 size-4 shrink-0" />{copy.pathsNeedEducation}
+        </p>
+      )}
       {!resource.data || resource.error ? (
         <LoadState error={resource.error} busy={resource.busy} retry={resource.refresh} />
       ) : !resource.data.length ? (
