@@ -16,7 +16,7 @@ import {
   Dialog, DialogBody, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from "@/components/ui/responsive-dialog";
 import { EmptyState, Skeletons, StatChip, toneClass, toneFor, tonesByOrder, type Tone } from "@/components/pai";
-import { FitDots, FitList, initials } from "@/components/counselor/path-card";
+import { FieldNotes, FitDots, FitList, initials } from "@/components/counselor/path-card";
 import { cn } from "@/lib/utils";
 import { Heading, LoadState, useResource, human, evidenceLabel, shortDate } from "./resource";
 import { DEFAULT_LOCALE } from "@/lib/i18n/locales";
@@ -88,6 +88,7 @@ export function PathRow({
           <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
             <h2 className="font-semibold leading-snug">{path.title}</h2>
             <FitDots items={path.fit || []} summary={copy.overview.fitDots} />
+            <FieldNotes field={path.study_field} />
           </div>
           <p className="mt-0.5 line-clamp-2 text-sm text-muted-foreground sm:line-clamp-1">{path.why}</p>
         </div>
@@ -332,6 +333,7 @@ export function PathPage({
           </span>
           <h1 className="min-w-0 text-balance font-display text-[1.85rem] leading-[1.15] sm:text-[2.1rem]">{result.possibility.title}</h1>
         </div>
+        <FieldNotes field={result.possibility.study_field} className="mt-3" />
         <p className="mt-4 max-w-3xl text-pretty text-[15px] leading-relaxed">
           <span className="font-semibold text-muted-foreground">{copy.why}: </span>{result.possibility.why}
         </p>

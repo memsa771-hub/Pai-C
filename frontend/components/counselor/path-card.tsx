@@ -1,9 +1,27 @@
 'use client';
 import { CircleCheck, CircleDashed, CircleHelp, CircleX, Compass, Quote, type LucideIcon } from 'lucide-react';
 import { StatChip, toneClass, toneFor, type Tone } from '@/components/pai';
-import type { FitItem } from '@/lib/possibilities';
+import type { FitItem, StudyField } from '@/lib/possibilities';
 import { cn } from '@/lib/utils';
 import copy from './workspace/copy.json';
+
+/** The notes a study-field path carries: needs checking for the student's
+ * group, the intermediate group a Matric student would need, or an older
+ * generic path the student can replace by finding paths again. */
+export function FieldNotes({ field, className }: { field?: StudyField | null; className?: string }) {
+  if (!field) return null;
+  const notes = [
+    field.outdated && copy.pathOutdated,
+    field.needs_check && copy.pathNeedsCheck,
+    field.needs_group?.length && copy.pathNeedsGroup.replace('{groups}', field.needs_group.map((g) => g.label).join(' / ')),
+  ].filter((note): note is string => typeof note === 'string');
+  if (!notes.length) return null;
+  return (
+    <span className={cn('inline-flex flex-wrap gap-1.5', className)}>
+      {notes.map((note) => <StatChip key={note} size="sm" tone="warning">{note}</StatChip>)}
+    </span>
+  );
+}
 
 /** Shape and colour together, so the verdict never rests on colour alone. */
 const FIT: Record<FitItem['status'], { icon: LucideIcon; className: string }> = {
@@ -64,7 +82,7 @@ export function FitDots({ items, summary }: { items: FitItem[]; summary: string 
 
 /** The one path card: a colour accent per path (stable by id), the reason it
  * fits in the student's own words, and the actions the caller provides. */
-export function PathCardView({ id, tone: given, title, whyLabel, why, quote, fit = [], status, statusTone = 'neutral', actions, error, compact = false, headingLevel = 2 }: {
+export function PathCardView({ id, tone: given, title, whyLabel, why, quote, fit = [], studyField, status, statusTone = 'neutral', actions, error, compact = false, headingLevel = 2 }: {
   id: string;
   /** From tonesByOrder; falls back to a hash of the id. */
   tone?: Tone;
@@ -74,6 +92,7 @@ export function PathCardView({ id, tone: given, title, whyLabel, why, quote, fit
   quote?: string;
   /** The analyzer's check of this path against the student, when there is one. */
   fit?: FitItem[];
+  studyField?: StudyField | null;
   status?: string;
   statusTone?: 'neutral' | 'success' | 'warning' | 'blue';
   actions: React.ReactNode;
@@ -94,6 +113,7 @@ export function PathCardView({ id, tone: given, title, whyLabel, why, quote, fit
           {status && <StatChip size="sm" tone={statusTone}>{status}</StatChip>}
         </div>
         <Heading className={cn('mt-3 break-words font-bold tracking-tight', compact ? 'text-lg' : 'text-xl')}>{title}</Heading>
+        <FieldNotes field={studyField} className="mt-2" />
         <p className={'mt-3 text-xs font-semibold text-muted-foreground'}>{whyLabel}</p>
         <p className="mt-1 text-pretty text-sm leading-relaxed text-muted-foreground">{why}</p>
         {quote && (

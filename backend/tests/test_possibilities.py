@@ -258,8 +258,9 @@ def test_migration_111_upgrade_constraints_and_downgrade():
             PaiPossibility.__table__.drop(connection)
             operations=Operations(MigrationContext.configure(connection))
             with patch.object(migration,'op',operations): migration.upgrade()
-            # The model is at head; 112 only adds this column (SQLite cannot swap its check).
+            # The model is at head; 112 and 117 only add these columns (SQLite cannot swap 112's check).
             operations.add_column('pai_possibilities',sa.Column('fit',JSONB(),nullable=False,server_default=sa.text("'[]'")))
+            operations.add_column('pai_possibilities',sa.Column('study_field',JSONB(),nullable=True))
         with student.factory() as db:
             _,journey,_=prepare(student,db)
             row=PossibilityService(db).add(student.workspace_id,journey.id,title='Practical route',why='Evidence',kind='discovered',source='planner',status='suggested')

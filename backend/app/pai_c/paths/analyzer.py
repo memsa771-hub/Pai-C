@@ -1,13 +1,17 @@
 """The 360-degree path analyzer: one background worker behind the Counselor.
 
 It looks at everything the student has shared (the Truth Map) and their
-records, suggests general paths, and checks each path against the student:
-what they already have, what they partly have, what blocks it, and what is not
-known yet. Every known status cites the student's own evidence; anything the
-model cannot cite becomes "unknown" here, in code, not by asking nicely.
+records, suggests paths, and checks each path against the student: what they
+already have, what they partly have, what blocks it, and what is not known yet.
+Every known status cites the student's own evidence; anything the model cannot
+cite becomes "unknown" here, in code, not by asking nicely.
 
-Paths stay general (fields, kinds of qualification or work). Institutions,
-fees and merit are research, not analysis, and never appear here.
+Paths are real fields of study (Electrical Engineering, MBBS, BBA), chosen
+only from the fields the student's current education opens or may open
+(paths/fields.candidate_fields). The saved title is the field's own title, and
+there are 0 to 5 paths: a field without enough evidenced fit is dropped, never
+padded. Institutions, fees and merit are research, not analysis, and never
+appear here.
 """
 
 import hashlib
@@ -26,11 +30,12 @@ from app.models import BackgroundJob, EventRecord, Workspace
 from app.pai_c.deep.analysis import _workspace_lock
 from app.pai_c.deep.context import _json
 from app.pai_c.deep.prompts import load_prompt
-from app.pai_c.memory import MemoryService
+from app.pai_c.memory import MemoryService, vault_catalog
+from app.pai_c.paths.fields import Candidate, candidate_fields, current_education, study_fields
 from app.pai_c.planner.view import build_planner_view
 from app.pai_c.policy.controller import load_data
 from app.pai_c.possibilities import PossibilityService
-from app.pai_c.possibility_titles import normalized_title, valid_title
+from app.pai_c.possibility_titles import normalized_title
 from app.pai_c.posting import send_to_student
 from app.pai_c.understanding.data import at_path, load_policy as understanding_policy
 from app.workspace_language import workspace_language_block
@@ -42,10 +47,6 @@ JOB_ANALYZE_PATHS = "counselor.paths"
 
 def policy() -> dict:
     return load_data("path_analyzer.json")
-
-
-def fields_of_study() -> dict[str, str]:
-    return load_data("fields_of_study.json")["fields"]
 
 
 class _Strict(BaseModel):
@@ -60,8 +61,10 @@ class FitItem(_Strict):
 
 
 class AnalyzedPath(_Strict):
-    title: str = Field(min_length=1, max_length=120)
-    field_code: str = ""
+    # field_key names a candidate study field; title is read only to
+    # re-assess a path the student added in their own words.
+    field_key: str = ""
+    title: str = Field(default="", max_length=120)
     why: str = Field(min_length=1, max_length=600)
     evidence_item_ids: list[str] = Field(default_factory=list)
     fit: list[FitItem] = Field(default_factory=list)
@@ -83,11 +86,43 @@ def _evidence_index(db, workspace_id: str, notebook) -> dict[str, str]:
     for card in MemoryService(db).profile_cards(workspace_id):
         # The stored value, in the workspace language; the raw quote stays
         # backend evidence and is never shown on a path.
-        index[card["id"]] = _card_text(card.get("value"))[:300]
+        index[card["id"]] = _card_text(card.get("value"), card.get("kind"))[:300]
     return index
 
 
-def _card_text(value) -> str:
+def _education_text(value: dict) -> str:
+    """An education record in words: level, group or field and subjects
+    through their catalog labels, so a path never shows "pre_engineering"."""
+    catalog, rules = vault_catalog(), policy()
+    spec = catalog.type("education")
+    level = catalog.choice_code("levels", str(value.get("qualification_name") or ""))
+    lists = dict(spec.choice_fields) if spec else {}
+    for name, by_level in (spec.choice_by_level if spec else {}).items():
+        if level in by_level:
+            lists[name] = by_level[level]
+
+    def word(list_name, text):
+        code = catalog.choice_code(list_name, text) if list_name else None
+        return catalog.label(list_name, code) if code else text.replace("_", " ")
+
+    parts = []
+    for key, node in value.items():
+        if key in rules["education_hidden_fields"] or key == "id" or key.endswith("_id"):
+            continue
+        if key == "academic_status":
+            parts.append(rules["education_status_labels"].get(node, ""))
+        elif key == "details" and isinstance(node, dict):
+            parts.extend(word(f"{level}_subjects", str(s)) for s in node.get("subjects") or [])
+        elif isinstance(node, str):
+            parts.append(word(lists.get(key), node))
+        elif isinstance(node, (int, float)) and not isinstance(node, bool):
+            parts.append(str(node))
+    return ", ".join(part for part in parts if part and part.strip())
+
+
+def _card_text(value, kind: str | None = None) -> str:
+    if kind == "education" and isinstance(value, dict):
+        return _education_text(value)
     if isinstance(value, dict):
         return ", ".join(str(item) for item in value.values() if isinstance(item, (str, int, float)) and str(item).strip())
     return str(value)
@@ -99,29 +134,41 @@ def _records(db, workspace_id: str) -> list[dict]:
             for card in MemoryService(db).profile_cards(workspace_id)]
 
 
-def sanitize(analysis: PathAnalysis, evidence: dict[str, str], dismissed: set[str]) -> list[dict]:
-    """Code-level honesty: drop world numbers, malformed titles, paths outside
-    the fields of study and dismissed paths, cap counts, and turn any uncited
-    verdict into "unknown"."""
+def _study_field(candidate: Candidate) -> dict:
+    """What the workspace shows and PAI OS reads; the ISCED code is never shown."""
+    return {"key": candidate.field.key, "isced": candidate.field.isced,
+            "needs_check": candidate.standing == "check",
+            "needs_group": [{"code": code, "label": vault_catalog().label("intermediate_groups", code)}
+                            for code in candidate.needs_group]}
+
+
+def sanitize(analysis: PathAnalysis, evidence: dict[str, str], dismissed: set[str],
+             candidates: dict[str, Candidate], own: set[str] = frozenset()) -> list[dict]:
+    """Code-level honesty: keep only candidate fields (titled by the field,
+    never by the model) or the student's own paths, drop world numbers,
+    dismissed paths and fields without enough evidenced fit, cap the count,
+    and turn any uncited verdict into "unknown". Zero paths is a valid result.
+    A field outside the candidates is one the student's group rules out."""
     rules = policy()
     world_number = re.compile(load_data("grounding.json")["numeric_world_pattern"])
     evidenced = set(rules["evidenced_statuses"])
-    fields = fields_of_study()
+    fitting = set(rules["fit_evidence_statuses"])
     kept, seen = [], set()
     for path in analysis.paths:
-        key = normalized_title(path.title)
+        candidate = candidates.get(path.field_key)
+        if candidate is not None:
+            title = candidate.field.title
+        elif path.title.strip() and normalized_title(path.title) in own:
+            title = path.title.strip()
+        else:
+            logger.warning("path_analyzer_dropped_not_a_candidate")
+            continue
+        key = normalized_title(title)
         if key in dismissed or key in seen:
             continue
-        if not valid_title(path.title):
-            logger.warning("path_analyzer_dropped_title words=%d", len(path.title.split()))
-            continue
-        if path.field_code not in fields:
-            logger.warning("path_analyzer_dropped_not_a_field")
-            continue
-        if any(world_number.search(text) for text in (path.title, path.why)):
+        if world_number.search(path.why):
             logger.warning("path_analyzer_dropped_world_number")
             continue
-        seen.add(key)
         fit = []
         for item in path.fit[:rules["max_fit_items"]]:
             ids = [i for i in dict.fromkeys(item.evidence_item_ids) if i in evidence]
@@ -129,12 +176,35 @@ def sanitize(analysis: PathAnalysis, evidence: dict[str, str], dismissed: set[st
             note = "" if world_number.search(item.note) else item.note
             fit.append({"label": item.label, "status": status, "note": note,
                         "evidence": [evidence[i] for i in ids] if status in evidenced else []})
+        if candidate is not None and sum(item["status"] in fitting for item in fit) < rules["min_fit_evidence"]:
+            logger.warning("path_analyzer_dropped_weak_fit field=%s", candidate.field.key)
+            continue
+        seen.add(key)
         ids = [i for i in dict.fromkeys(path.evidence_item_ids) if i in evidence]
-        kept.append({"title": path.title.strip(), "why": path.why.strip(), "fit": fit,
-                     "evidence": [{"text": evidence[i], "item_id": i} for i in ids]})
+        kept.append({"title": title, "why": path.why.strip(), "fit": fit,
+                     "evidence": [{"text": evidence[i], "item_id": i} for i in ids],
+                     "study_field": _study_field(candidate) if candidate is not None else None})
         if len(kept) == rules["max_paths"]:
             break
     return kept
+
+
+def _replace_generic(service: PossibilityService, rows) -> None:
+    """Paths from before fields of study (generic titles such as "Computer
+    use") give way: a suggested one is removed; one the student saved or is
+    exploring stays, marked so they can find paths again. The student's own
+    paths and dismissed ones are left alone."""
+    titles = {normalized_title(field.title) for field in study_fields().values()}
+    for row in rows:
+        if row.source == "student" or row.status == "dismissed":
+            continue
+        if (row.study_field or {}).get("key") or row.normalized_title in titles:
+            continue
+        if row.status == "suggested" and row.roadmap_id is None:
+            service.db.delete(row)
+        elif row.study_field != {"outdated": True}:
+            row.study_field = {"outdated": True}
+    service.db.flush()
 
 
 def enqueue_path_analysis(db, workspace_id: str, *, source_event_id: str | None,
@@ -175,14 +245,36 @@ async def path_analysis_job(job, db) -> dict:
         if len(evidence) < rules["min_notebook_items"]:
             return {"status": "not_enough_known", "items": len(evidence)}
         service = PossibilityService(db)
+        records = _records(db, job.workspace_id)
+        candidates = candidate_fields(current_education(
+            [card["value"] for card in records if card["kind"] == "education"]))
+        if not candidates:
+            # No education, or one PAI cannot place yet: no paths, and the
+            # workspace shows what PAI still needs instead of a guess.
+            _replace_generic(service, service.list(job.workspace_id))
+            db.commit()
+            return {"status": "needs_education"}
         existing = service.list(job.workspace_id)
         dismissed = {row.normalized_title for row in existing if row.status == "dismissed"}
-        analyst_input = ("<limits>" + _json({"max_paths": rules["max_paths"], "max_fit_items": rules["max_fit_items"]}) + "</limits>\n"
+        own = {row.normalized_title for row in existing if row.source == "student" and row.status != "dismissed"}
+        fields = [{"key": c.field.key, "title": c.field.title, "family": c.field.family, "standing": c.standing}
+                  | ({"needs_group": [vault_catalog().label("intermediate_groups", g) for g in c.needs_group]}
+                     if c.needs_group else {}) for c in candidates.values()]
+        reassess = []
+        for row in existing:
+            if row.status == "dismissed":
+                continue
+            if (row.study_field or {}).get("key"):
+                reassess.append({"field_key": row.study_field["key"], "title": row.title, "why": row.why})
+            elif row.source == "student":
+                reassess.append({"title": row.title, "why": row.why, "own": True})
+        analyst_input = ("<limits>" + _json({"max_paths": rules["max_paths"], "max_fit_items": rules["max_fit_items"],
+                                             "min_fit_evidence": rules["min_fit_evidence"]}) + "</limits>\n"
             + build_planner_view(snapshot.notebook).text + "\n"
-            + "<records>" + _json(_records(db, job.workspace_id)) + "</records>\n"
-            + "<fields>" + _json(fields_of_study()) + "</fields>\n"
+            + "<records>" + _json(records) + "</records>\n"
+            + "<fields>" + _json(fields) + "</fields>\n"
             + workspace_language_block() + "\n"
-            + "<existing_paths>" + _json([{"title": row.title, "why": row.why} for row in existing if row.status != "dismissed"]) + "</existing_paths>\n"
+            + "<existing_paths>" + _json(reassess) + "</existing_paths>\n"
             + "<dismissed_paths>" + _json([row.title for row in existing if row.status == "dismissed"]) + "</dismissed_paths>")
         db.rollback()
         prompt = load_prompt("path_analyzer")
@@ -202,13 +294,15 @@ async def path_analysis_job(job, db) -> dict:
                 prompt += "\nReturn one complete JSON object that follows every output rule."
         if analysis is None:
             return {"status": "invalid", "model_calls": 2}
-        paths = sanitize(analysis, evidence, dismissed)
-        if not paths:
-            return {"status": "no_paths"}
+        paths = sanitize(analysis, evidence, dismissed, candidates, own)
         workspace = db.scalar(select(Workspace).where(
             Workspace.id == job.workspace_id, Workspace.status == "active").with_for_update())
         if workspace is None:
             return {"status": "inactive"}
+        _replace_generic(service, service.list(job.workspace_id))
+        if not paths:
+            db.commit()
+            return {"status": "no_paths"}
         journey = JourneyService(db).ensure_counselor(job.workspace_id)
         ids = []
         for path in paths:
@@ -219,6 +313,8 @@ async def path_analysis_job(job, db) -> dict:
             if row.status == "dismissed":
                 continue
             row.fit = path["fit"]
+            if path["study_field"] is not None:
+                row.study_field = path["study_field"]
             ids.append(row.id)
         db.commit()
         channel = payload.get("channel")

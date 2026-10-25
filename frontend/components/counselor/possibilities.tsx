@@ -25,7 +25,7 @@ export function PossibilityCard({ value, onChange, tone }: { value: Possibility;
     finally { setBusy(false); }
   };
   return <PathCardView compact headingLevel={3} id={value.id} tone={tone} title={value.title} whyLabel={copy.why} why={value.why}
-    quote={value.evidence[0]?.text} fit={value.fit} status={t(`possibilities.${value.status}`)} statusTone={statusTone[value.status]} error={error}
+    quote={value.evidence[0]?.text} fit={value.fit} studyField={value.study_field} status={t(`possibilities.${value.status}`)} statusTone={statusTone[value.status]} error={error}
     actions={<>
       {(['suggested', 'saved', 'dismissed'].includes(value.status)) && <Button size="tap" disabled={busy} onClick={() => void action('explore')}><Compass aria-hidden />{t('possibilities.explore')}</Button>}
       {(['suggested', 'dismissed'].includes(value.status)) && <Button size="tap" variant="soft" disabled={busy} onClick={() => void action('save')}><Bookmark aria-hidden />{t('possibilities.save')}</Button>}

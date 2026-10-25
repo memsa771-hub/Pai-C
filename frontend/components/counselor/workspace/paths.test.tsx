@@ -132,3 +132,20 @@ it('polls durable pending jobs until a result exists',async()=>{
   expect(workspaceApi.getPath).toHaveBeenCalledTimes(2);
  } finally {cleanup();vi.useRealTimers();}
 });
+
+it("shows a study field's group notes on the path row and the path page, never raw codes", async () => {
+  const field = { ...possibilities[0], title: "Electrical Engineering",
+    study_field: { key: "electrical_engineering", needs_check: true, needs_group: [{ code: "pre_engineering", label: "Pre-Engineering" }] } };
+  const older = { ...possibilities[1], id: "older", title: "Mechanics and metal trades", status: "saved" as const, study_field: { outdated: true } };
+  vi.mocked(workspaceApi.getPossibilities).mockResolvedValue([field, older]);
+  render(<Paths onOpen={vi.fn()} />);
+  const row = (await screen.findByText("Electrical Engineering")).closest("li")!;
+  expect(row.textContent).toContain("Needs checking for your group");
+  expect(row.textContent).toContain("Needs Pre-Engineering in intermediate");
+  expect(row.textContent).not.toContain("pre_engineering");
+  expect(screen.getByText("Mechanics and metal trades").closest("li")!.textContent).toContain("Older suggestion");
+  cleanup();
+  vi.mocked(workspaceApi.getPath).mockResolvedValue({ ...pathResult, possibility: field });
+  render(<PathPage id="path-one" onBack={vi.fn()} onPlaces={vi.fn()} onChat={vi.fn()} />);
+  expect(await screen.findByText("Needs checking for your group")).toBeTruthy();
+});

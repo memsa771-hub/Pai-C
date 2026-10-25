@@ -170,6 +170,10 @@ class PaiPossibility(Base):
     # Analyzer indicators: [{"label", "status": have|partial|blocker|unknown,
     # "note", "evidence_item_ids"}]. A known status always cites the student.
     fit = Column(JSONB, nullable=False, default=list)
+    # The study field an analyzer path names: {"key", "isced", "needs_check",
+    # "needs_group": [{"code", "label"}]}; {"outdated": true} marks a kept path
+    # from before fields of study; null for the student's own and older rows.
+    study_field = Column(JSONB, nullable=True)
     mentioned_at = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True), nullable=False, default=_now)
     updated_at = Column(DateTime(timezone=True), nullable=False, default=_now)

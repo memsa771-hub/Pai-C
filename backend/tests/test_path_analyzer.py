@@ -15,6 +15,7 @@ from app.pai_c.deep.notebook import NotebookService
 from app.pai_c.deep.prompts import load_prompt
 from app.pai_c.paths.analyzer import (JOB_ANALYZE_PATHS, PathAnalysis, enqueue_path_analysis,
                                       path_analysis_job, policy, sanitize)
+from app.pai_c.paths.fields import candidate_fields, study_fields
 from app.pai_c.possibilities import PossibilityService
 from app.pai_c.possibility_titles import normalized_title
 from scripts.counselor_eval_support import StudentSession
@@ -32,8 +33,24 @@ def fit(label, status, ids=(), note=""):
     return {"label": label, "status": status, "note": note, "evidence_item_ids": list(ids)}
 
 
-def path(title, *, why="It follows what you said.", ids=("c1",), fits=(), field_code="0714"):
-    return {"title": title, "field_code": field_code, "why": why, "evidence_item_ids": list(ids), "fit": list(fits)}
+FSC_ENGINEERING = {"qualification_name": "fsc", "field_of_study": "pre_engineering", "academic_status": "current"}
+CANDIDATES = candidate_fields(FSC_ENGINEERING)
+STRONG = (fit("Hands-on skill", "have", ["c1"]), fit("Interest", "partial", ["c3"]))
+
+
+def path(field_key, *, why="It follows what you said.", ids=("c1",), fits=STRONG, title=""):
+    return {"field_key": field_key, "title": title, "why": why, "evidence_item_ids": list(ids), "fit": list(fits)}
+
+
+def title(key):
+    return study_fields()[key].title
+
+
+def add_education(student, db, values=FSC_ENGINEERING):
+    from app.memory.student_records import StudentRecordService
+    StudentRecordService(db).apply(student.workspace_id, "education", values, source_type="user_explicit",
+                                   claim_origin="student", capture_method="explicit_correction")
+    db.commit()
 
 
 def analysis(*paths, message="I have put together a few paths from what you shared."):
@@ -63,14 +80,16 @@ def test_policy_prompt_and_document_agree():
 
 
 def test_sanitize_makes_uncited_verdicts_unknown_and_keeps_student_words():
-    result = sanitize(PathAnalysis.model_validate(analysis(path("Electronics repair", fits=[
+    result = sanitize(PathAnalysis.model_validate(analysis(path("electronic_engineering", fits=[
         fit("Hands-on skill", "have", ["c1"]),
+        fit("Interest", "partial", ["c3"]),
         fit("Afford fees", "blocker", ["made-up"]),
         fit("Maths level", "partial"),
         fit("Family support", "unknown", ["c3"]),
-    ]))), EVIDENCE, set())
+    ]))), EVIDENCE, set(), CANDIDATES)
     assert [(row["label"], row["status"], row["evidence"]) for row in result[0]["fit"]] == [
         ("Hands-on skill", "have", [EVIDENCE["c1"]]),
+        ("Interest", "partial", [EVIDENCE["c3"]]),
         ("Afford fees", "unknown", []),
         ("Maths level", "unknown", []),
         ("Family support", "unknown", []),
@@ -80,26 +99,26 @@ def test_sanitize_makes_uncited_verdicts_unknown_and_keeps_student_words():
 
 def test_sanitize_drops_world_numbers_dismissed_duplicates_and_caps():
     rules = policy()
-    many = [path(f"General direction {name}") for name in "ABCDEFGHIJ"]
+    many = [path(key) for key in ("civil_engineering", "chemical_engineering", "physics", "mathematics",
+                                  "statistics", "bba", "economics")]
     raw = analysis(
-        path("Engineering", why="Merit closed at 85% last year."),
-        path("Teaching"),
-        path("teaching"),
-        path("Local phone/electronics repair technician (self-employed or small shop)"),
-        path("Electronics", fits=[fit(f"Need {n}", "unknown") for n in range(10)]),
+        path("electrical_engineering", why="Merit closed at 85% last year."),
+        path("education"),
+        path("education"),
+        path("mechanical_engineering", fits=[*STRONG, *[fit(f"Need {n}", "unknown") for n in range(10)]]),
         *many)
-    result = sanitize(PathAnalysis.model_validate(raw), EVIDENCE, {normalized_title("Teaching")})
+    result = sanitize(PathAnalysis.model_validate(raw), EVIDENCE, {normalized_title(title("education"))}, CANDIDATES)
     titles = [row["title"] for row in result]
-    assert "Engineering" not in titles and "Teaching" not in titles and "teaching" not in titles
-    assert not any("/" in title for title in titles)
+    assert title("electrical_engineering") not in titles and title("education") not in titles
     assert len(result) == rules["max_paths"]
-    assert len(next(row for row in result if row["title"] == "Electronics")["fit"]) == rules["max_fit_items"]
+    assert len(next(row for row in result if row["title"] == title("mechanical_engineering"))["fit"]) == rules["max_fit_items"]
 
 
 def test_sanitize_keeps_only_fields_of_study():
-    raw = analysis(path("Electrical Engineering"), path("Phone Repair Shop", field_code=""),
-                   path("Online Resale", field_code="9999"))
-    assert [row["title"] for row in sanitize(PathAnalysis.model_validate(raw), EVIDENCE, set())] == ["Electrical Engineering"]
+    raw = analysis(path("electrical_engineering"), path("", title="Phone Repair Shop"),
+                   path("9999", title="Online Resale"))
+    assert [row["title"] for row in sanitize(PathAnalysis.model_validate(raw), EVIDENCE, set(), CANDIDATES)] == [
+        title("electrical_engineering")]
 
 
 def test_profile_evidence_is_the_stored_value_not_the_raw_quote():
@@ -109,9 +128,9 @@ def test_profile_evidence_is_the_stored_value_not_the_raw_quote():
 
 
 def test_sanitize_clears_a_note_that_carries_a_world_number():
-    result = sanitize(PathAnalysis.model_validate(analysis(path("Electronics", fits=[
-        fit("Fees", "unknown", note="Usually $500 per semester."),
-    ]))), EVIDENCE, set())
+    result = sanitize(PathAnalysis.model_validate(analysis(path("electronic_engineering", fits=[
+        fit("Fees", "unknown", note="Usually $500 per semester."), *STRONG,
+    ]))), EVIDENCE, set(), CANDIDATES)
     assert result[0]["fit"][0]["note"] == ""
 
 
@@ -122,22 +141,23 @@ async def test_job_stores_paths_updates_fit_posts_once_and_never_revives_dismiss
         service = PossibilityService(db)
         own = service.add(student.workspace_id, journey.id, title="Mobile repair", why="Mine",
                           kind="student_added", source="student", status="saved")
-        gone = service.add(student.workspace_id, journey.id, title="Medicine", why="Earlier",
+        gone = service.add(student.workspace_id, journey.id, title=title("civil_engineering"), why="Earlier",
                            kind="discovered", source="planner", status="dismissed")
+        add_education(student, db)
         job_id = enqueue_path_analysis(db, student.workspace_id, source_event_id=turn.source_event_id,
                                        channel=turn.channel, reason="asked")
         db.commit()
         reply_json = json.dumps(analysis(
-            path("Mobile repair", fits=[fit("Hands-on skill", "have", ["c1"])]),
-            path("Electrical engineering", ids=["c3"], fits=[fit("Afford fees", "blocker", ["c2"])]),
-            path("Medicine")))
+            path("", title="Mobile repair", fits=[fit("Hands-on skill", "have", ["c1"])]),
+            path("electrical_engineering", ids=["c3"], fits=[*STRONG, fit("Afford fees", "blocker", ["c2"])]),
+            path("civil_engineering")))
 
         async def model(**kwargs):
             assert not db.in_transaction()
             assert kwargs["role"] == "analyst"
             sent = kwargs["messages"][0]["content"]
-            assert "<dismissed_paths>" in sent and "Medicine" in sent and "Mobile repair" in sent
-            assert '"0714":"Electronics and automation"' in sent and "<workspace_language>" in sent
+            assert "<dismissed_paths>" in sent and title("civil_engineering") in sent and "Mobile repair" in sent
+            assert '"key":"electrical_engineering"' in sent and "<workspace_language>" in sent
             return reply_json
 
         job = db.get(BackgroundJob, job_id)
@@ -151,10 +171,11 @@ async def test_job_stores_paths_updates_fit_posts_once_and_never_revives_dismiss
         rows = {row.title: row for row in service.list(student.workspace_id)}
         assert rows["Mobile repair"].id == own.id and rows["Mobile repair"].source == "student"
         assert rows["Mobile repair"].fit[0]["status"] == "have"
-        added = rows["Electrical engineering"]
+        added = rows[title("electrical_engineering")]
         assert (added.source, added.kind, added.status) == ("analyzer", "discovered", "suggested")
-        assert added.fit == [{"label": "Afford fees", "status": "blocker", "note": "",
-                              "evidence": [EVIDENCE["c2"]]}]
+        assert added.fit[-1] == {"label": "Afford fees", "status": "blocker", "note": "",
+                                 "evidence": [EVIDENCE["c2"]]}
+        assert added.study_field["key"] == "electrical_engineering"
         assert db.get(PaiPossibility, gone.id).status == "dismissed"
         event = db.scalar(select(EventRecord).where(EventRecord.source == "openagents:pai"))
         assert event.metadata_["paths_job_id"] == job.id
@@ -173,6 +194,7 @@ async def test_job_waits_for_enough_known_and_gives_up_after_two_invalid_replies
         call.assert_not_awaited()
     with StudentSession() as student, student.factory() as db:
         turn, _, _ = seed(student, db)
+        add_education(student, db)
         job_id = enqueue_path_analysis(db, student.workspace_id, source_event_id=None,
                                        channel=turn.channel, reason="student")
         db.commit()

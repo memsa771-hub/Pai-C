@@ -10,7 +10,10 @@
     "dae"
   ],
   "group_rules": {
-    "_note": "How an education record names its group. FSc and Intermediate carry it in field_of_study; ICS, I.Com, FA and DAE carry it in the qualification; A-level and O-level are read from their subjects, first matching rule wins (a rule with no subjects listed matches any non-empty set). Matric, bachelor's and master's name no group.",
+    "_note": "How an education record names its group. FSc and Intermediate carry it in field_of_study; ICS, I.Com, FA and DAE carry it in the qualification; A-level and O-level are read from their subjects, first matching rule wins (a rule with no subjects listed matches any non-empty set). Matric, bachelor's and master's name no group. Paths: before_intermediate levels see every field with the intermediate group it needs (not_intermediate groups are not counted); degree_levels see their own field's family as open and every other field as check; A-level and O-level subjects that match several rules open the union of their groups.",
+    "before_intermediate": ["matric", "o_level"],
+    "degree_levels": ["bachelor", "masters"],
+    "not_intermediate": ["dae"],
     "from_field_of_study": [
       "fsc",
       "intermediate"
