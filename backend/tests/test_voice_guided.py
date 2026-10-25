@@ -28,7 +28,7 @@ def section(prompt, name):
 def test_guided_prompt_keeps_shared_sections_from_voice():
     guided, strict = load_prompt("voice_guided"), load_prompt("voice")
     assert guided.startswith("You are PAI, a counselor who stays with one student over a long time.")
-    assert "THE COUNSELING LOOP" in guided and "Often the best reply has no question." in guided
+    assert "THE COUNSELING LOOP" in guided and "often the best reply has no question." in guided
     shared = strict[strict.index("WHAT YOU ANSWER AND WHAT YOU DO NOT"):]
     assert guided.endswith(shared)
 

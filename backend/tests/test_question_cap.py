@@ -52,7 +52,8 @@ def test_selected_action_survives_two_asking_replies(changes, action):
 ])
 def test_cadence_is_observed_but_does_not_decide_necessity(replies, capped):
     signals = classifier.fallback_signals().model_copy(update={"intent": "deciding"})
-    inputs = derive_state(signals, coverage={}, mirror_ready=False, plan=None,
+    inputs = derive_state(signals, coverage={area: {"covered": True} for area in
+        controller.load_data("areas_policy.json")["priority"]}, mirror_ready=False, plan=None,
         student_count=10, prior_decisions=[], replies=replies, student_ordinals={},
         current_event_id="current", summary_confirmed=True)
     result = controller.decide(inputs)

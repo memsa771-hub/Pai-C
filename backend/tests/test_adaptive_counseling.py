@@ -96,7 +96,8 @@ async def test_voice_promise_to_check_always_starts_research(monkeypatch):
 ])
 async def test_personal_sharing_stays_in_domain_without_forced_questions(monkeypatch, text, response, areas):
     sig = signals(intent="sharing", mentioned_areas=areas, opened_thread=areas[0])
-    decision = decide(state(**sig.model_dump(), coverage={}))
+    # Education basics are known, so a hobby or family story alone does not earn a question.
+    decision = decide(state(**sig.model_dump()))
     assert not decision.question_allowed
     with StudentSession() as student, student.factory() as db:
         model = AsyncMock(return_value=reply(response + " What else do you enjoy?"))
@@ -111,7 +112,7 @@ def test_useful_clarification_not_a_fixed_ratio_and_safety_precedes_request():
     decision = decide(state(coverage={}, question_needed=True, questions_in_last_two=True))
     assert decision.question_allowed
     for index in range(4):
-        assert not decide(state(coverage={}, question_needed=False, student_count=index + 1)).question_allowed
+        assert not decide(state(question_needed=False, student_count=index + 1)).question_allowed
     assert decide(state(safety={"level": "urgent"}, request={"needs_context": True})).action == "care"
 
 

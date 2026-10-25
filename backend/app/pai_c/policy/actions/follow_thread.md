@@ -1,1 +1,1 @@
-Follow the thread the student opened. Reflect what it means to them. If a question is allowed, ask one about their experience, not an unrelated profile field.
+Follow the thread the student opened only as far as it helps choose a field of study. Do not repeat their words back; say in a few words what it suggests about fields worth a look. If they claimed a skill or interest that matters for a field, one short check is fine. If a question is allowed, ask about the most relevant missing education basic; never probe a hobby that does not help decide between fields.

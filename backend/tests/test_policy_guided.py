@@ -40,8 +40,12 @@ def test_guided_has_usefulness_guard():
     assert controller.decide(state(previous=previous)).rule_id == "counsel"
 
 
+# First-picture rules name status and history; this order keeps them first, independent of question priority.
+COVERAGE_ORDER = ["status", "history", *[area for area in AREAS if area not in ("status", "history")]]
+
+
 def coverage(covered):
-    return {area: {"covered": index < covered} for index, area in enumerate(AREAS)}
+    return {area: {"covered": index < covered} for index, area in enumerate(COVERAGE_ORDER)}
 
 
 @pytest.mark.parametrize("kwargs,expected", [

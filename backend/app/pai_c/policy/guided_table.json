@@ -12,6 +12,33 @@
     "short_reply_intent": "short_reply",
     "summary_action": "summarize"
   },
+  "question_due": {
+    "any": [
+      {
+        "ref": "question_needed"
+      },
+      {
+        "all": [
+          {
+            "ne": [
+              {
+                "ref": "askable_basic"
+              },
+              null
+            ]
+          },
+          {
+            "ne": [
+              {
+                "ref": "questions_in_last_two"
+              },
+              true
+            ]
+          }
+        ]
+      }
+    ]
+  },
   "rows": [
     {
       "id": "care",
@@ -84,7 +111,7 @@
       "set": {
         "action": "follow_thread",
         "question_allowed": {
-          "ref": "question_needed"
+          "ref": "question_due"
         },
         "topic": {
           "ref": "opened_thread"
@@ -145,7 +172,7 @@
       "set": {
         "action": "guide",
         "question_allowed": {
-          "ref": "question_needed"
+          "ref": "question_due"
         },
         "topic": null,
         "invite": false
@@ -159,7 +186,7 @@
       "set": {
         "action": "discover",
         "question_allowed": {
-          "ref": "question_needed"
+          "ref": "question_due"
         },
         "topic": {
           "ref": "possibility_id"
@@ -180,17 +207,27 @@
             ]
           },
           {
-            "ref": "question_needed"
+            "ref": "question_due"
           }
         ]
       },
       "set": {
         "action": "explore_area",
         "question_allowed": {
-          "ref": "question_needed"
+          "ref": "question_due"
         },
         "topic": {
-          "ref": "askable_area"
+          "if": [
+            {
+              "ref": "askable_basic"
+            },
+            {
+              "ref": "askable_basic"
+            },
+            {
+              "ref": "askable_area"
+            }
+          ]
         },
         "invite": false
       }
@@ -201,7 +238,7 @@
       "set": {
         "action": "counsel",
         "question_allowed": {
-          "ref": "question_needed"
+          "ref": "question_due"
         },
         "topic": null,
         "invite": false
@@ -219,7 +256,7 @@
           {
             "eq": [
               {
-                "ref": "question_needed"
+                "ref": "question_due"
               },
               false
             ]

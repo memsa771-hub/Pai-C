@@ -7,6 +7,7 @@ from sqlalchemy import select
 from app.config import config
 from app.models import CounselorNotedQuestion, CounselorTurnDecision
 from app.pai_c.policy.classifier import fallback_signals
+from app.pai_c.policy import controller
 from app.pai_c.policy.controller import Decision
 from app.pai_c.deep.turn import run_deep_turn
 from scripts.counselor_eval_support import StudentSession
@@ -62,7 +63,10 @@ async def test_classifier_request_is_stored_before_voice_and_answered_once_after
 @pytest.mark.asyncio
 async def test_statement_fallback_posted_and_logged():
     signals=fallback_signals().model_dump();signals["emotion"]="stressed"
-    with StudentSession() as student:
+    # Pretend every education basic is known so this turn allows no question and the fallback fires.
+    load=controller.load_data
+    known=lambda name:{**load(name),"education_basics":[]} if name=="areas_policy.json" else load(name)
+    with StudentSession() as student, patch.object(controller,"load_data",known):
         with patch("app.pai_c.policy.classifier.complete",AsyncMock(return_value=json.dumps(signals))),patch("app.pai_c.deep.turn.chat_completion",AsyncMock(side_effect=[output("First?"),output("Second?")])):
             await student.turn("A difficult day")
         assert student.transcript[-1]["content"]==config.PAI_STATEMENT_FALLBACK_REPLY

@@ -26,6 +26,8 @@ def evaluate(expression, state):
         return evaluate(value[1] if evaluate(value[0], state) else value[2], state)
     if operation == "all":
         return all(evaluate(item, state) for item in value)
+    if operation == "any":
+        return any(evaluate(item, state) for item in value)
     if operation == "first":
         return next(iter(evaluate(value, state) or []), None)
     left, right = (evaluate(item, state) for item in value)
@@ -65,6 +67,9 @@ def askable_areas(state, policy=None, excluded=()):
         declined_at = state.get("declined_at", {}).get(area)
         if declined_at is not None and count - declined_at < policy["declined_cooldown_student_messages"]:
             continue
+        # Values and strengths are not education basics; PAI follows them only once the student raises them.
+        if area in policy.get("only_if_mentioned", []) and area not in [*mentioned, *previous]:
+            continue
         rule = policy["sensitive"].get(area)
         if rule and count < rule["min_student_messages"]:
             if not (rule["unless_mentioned"] and area in [*mentioned, *previous]):
@@ -81,8 +86,12 @@ def decide(state):
     candidates = askable_areas(state)
     previous = state.get("previous") or {}
     alternatives = askable_areas(state, excluded=(previous.get("topic"),))
+    basics = load_data("areas_policy.json").get("education_basics", [])
     state.update(askable_area=next(iter(candidates), None),
-                 next_askable_area=next(iter(alternatives), None), previous=previous)
+                 next_askable_area=next(iter(alternatives), None), previous=previous,
+                 askable_basic=next((area for area in candidates if area in basics), None))
+    # The classifier judges one message; a missing education basic is a reason to ask that it cannot see.
+    state["question_due"] = evaluate(table.get("question_due", {"ref": "question_needed"}), state)
     row = next(row for row in table["rows"] if evaluate(row["when"], state))
     chosen = {key: evaluate(value, state) for key, value in row["set"].items()}
     rule_id = row["id"]

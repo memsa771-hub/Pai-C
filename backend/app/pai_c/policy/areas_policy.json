@@ -1,15 +1,26 @@
 {
   "priority": [
-    "status",
-    "interests",
     "history",
-    "family_social",
-    "values",
-    "strengths",
-    "pressures",
-    "sure",
     "goals",
-    "options"
+    "options",
+    "pressures",
+    "interests",
+    "status",
+    "family_social",
+    "sure",
+    "values",
+    "strengths"
+  ],
+  "education_basics": [
+    "history",
+    "goals",
+    "options",
+    "pressures",
+    "interests"
+  ],
+  "only_if_mentioned": [
+    "values",
+    "strengths"
   ],
   "sensitive": {
     "family_social": {
@@ -23,15 +34,15 @@
   },
   "declined_cooldown_student_messages": 12,
   "topic_text": {
-    "status": "what they are doing these days",
-    "history": "their journey so far in studies and experiences",
-    "interests": "what they enjoy, in or outside their studies",
-    "family_social": "the people around them, their family and friends, and how those people see the student's path",
-    "values": "what matters most to them when they choose",
-    "strengths": "what they have done well, or what others come to them for",
-    "pressures": "what makes their choices hard: expectations, money, time or comparison",
-    "sure": "how sure they feel about their direction, on a scale from 0 to 10",
-    "goals": "what they want and whose wish that direction is",
-    "options": "the fields and kinds of work they know, and beliefs they want to check"
+    "status": "what they are studying now, their class, group or year",
+    "history": "their education so far: the qualification, group and marks they have",
+    "interests": "which subjects they like and are good at",
+    "family_social": "what their family wants them to study",
+    "values": "what matters most to them when they choose a field of study",
+    "strengths": "which subjects or study tasks they do well in",
+    "pressures": "their budget range for study and whether they can move to another city",
+    "sure": "how sure they feel about the field they lean toward, on a scale from 0 to 10",
+    "goals": "the field of study they lean toward and why",
+    "options": "the fields of study and entrance tests (ECAT, MDCAT, NAT, SAT) they are considering"
   }
 }

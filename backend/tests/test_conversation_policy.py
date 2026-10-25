@@ -22,18 +22,18 @@ def test_data_edits_change_decisions(tmp_path,monkeypatch):
     for name in ("guided_table.json","areas_policy.json"):
         shutil.copyfile(controller.POLICY_DIR/name,tmp_path/name)
     monkeypatch.setattr(controller,"POLICY_DIR",tmp_path)
-    assert controller.decide(state(coverage={})).topic == "status"
+    assert controller.decide(state(coverage={})).topic == "history"
     path=tmp_path/"areas_policy.json"; data=json.loads(path.read_text());data["priority"].reverse();path.write_text(json.dumps(data))
-    assert controller.decide(state(coverage={})).topic == "options"
+    assert controller.decide(state(coverage={})).topic == "interests"
     path=tmp_path/"guided_table.json";data=json.loads(path.read_text());data["rows"][0]["when"]=True;path.write_text(json.dumps(data))
     assert controller.decide(state(coverage={})).action == "care"
 
 
 def test_area_gating_mentions_priority_and_decline_cooldown():
     sample=state(coverage={},student_count=1)
-    assert controller.askable_areas(sample)==["status","interests","history","values","strengths","sure","goals","options"]
+    assert controller.askable_areas(sample)==["history","goals","options","interests","status","sure"]
     sample["mentioned_areas"]=["pressures","family_social"]
-    assert controller.askable_areas(sample)[:2]==["family_social","pressures"]
+    assert controller.askable_areas(sample)[:2]==["pressures","family_social"]
     sample["mentioned_areas"]=[];sample["previous_mentioned_areas"]=["pressures"]
     assert controller.askable_areas(sample)[0]=="pressures"
     sample.update(student_count=13,declined_at={"status":2})

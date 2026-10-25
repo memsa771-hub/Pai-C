@@ -88,9 +88,9 @@ def test_correction_row_after_care_instruction_and_no_repeat_exemption(areas):
         "mirror_changes", "explore_correction", True, False)
     assert decision.topic == (areas[0] if areas else None)
     instruction = decision_context(decision, signals, None)["instruction"]
-    topic = " (about the people around them, their family and friends, and how those people see the student's path)" if areas else ""
+    topic = " (about what their family wants them to study)" if areas else ""
     assert instruction.strip() == (
-        "The student corrected your picture of them. Thank them in a few words, without apologising at length. "
+        "The student corrected your picture of them. Acknowledge it in a few words, without thanking or apologising at length. "
         "Reflect the correction in your own words so they know you understood what was wrong. "
         "Then ask one open question that helps you understand that part better" + topic +
         ". Do not repeat the old picture.")
