@@ -1,5 +1,7 @@
 """Study fields are real fields of study, each tied to the groups that open it."""
 
+import re
+
 import pytest
 
 from app.memory.catalog import vault_catalog
@@ -124,3 +126,51 @@ def test_catalog_has_the_onboarding_education_lists():
     assert catalog.choice_code("levels", "Intermediate") == "intermediate"
     assert catalog.choice_code("levels", "HSSC") == "fsc"  # existing wordings keep their codes
     assert catalog.choice_code("a_level_subjects", "Maths") == "mathematics"
+
+
+@pytest.mark.parametrize("group, closed_families", [
+    ("icom", {"health", "engineering"}),
+    ("fa_humanities", {"health", "engineering"}),
+    ("ics", {"health"}),
+])
+def test_groups_do_not_open_fields_they_cannot_enter(group, closed_families):
+    open_, _ = fields_for_group(group)
+    assert not [f.title for f in open_ if f.family in closed_families]
+
+
+def test_every_check_has_a_note():
+    assert not [f.key for f in study_fields().values() if f.check and not f.check_note.strip()]
+
+
+GROUP_WORDS = {"ics": "ICS", "icom": "I.Com", "pre_medical": "Pre-Medical", "pre_engineering": "Pre-Engineering",
+               "fa_humanities": "FA", "general_science": "General Science", "dae": "DAE"}
+
+
+def test_engineering_check_notes_name_only_their_own_check_groups():
+    for field in study_fields().values():
+        if field.family != "engineering":
+            continue
+        named = {code for code, word in GROUP_WORDS.items()
+                 if re.search(rf"(?<![\w.-]){re.escape(word)}(?![\w-])", field.check_note)}
+        assert named <= set(field.check), field.key
+
+
+def test_architecture_does_not_check_fa():
+    assert "fa_humanities" not in study_fields()["architecture"].check
+
+
+def test_round_two_fields_are_present():
+    titles = _titles(study_fields().values())
+    for title in ("Mining Engineering", "Geological Engineering", "Automotive Engineering", "Geography",
+                  "Philosophy", "Public Health", "Management Sciences / HRM", "Actuarial Science",
+                  "Aviation Management", "Anesthesia / Operation Theatre Technology"):
+        assert title in titles
+
+
+def test_masters_wordings_do_not_catch_everyday_words():
+    from app.memory.vault_context import turn_words
+    catalog = vault_catalog()
+    for text in ("Ms", "master", "ma", "MA"):
+        assert catalog.choice_code("levels", text) is None, text
+    assert catalog.choice_code("levels", "MPhil") == "masters"
+    assert "master" not in turn_words("Ms Ayesha ne kaha ma bhi aaungi")

@@ -111,7 +111,7 @@
         "pre_medical",
         "dae"
       ],
-      "check_note": "Some universities admit ICS (with Physics and Maths), Pre-Medical (with a Maths deficiency course) or DAE holders; check the engineering council's and the university's current rule."
+      "check_note": "Some universities admit the groups listed here, sometimes after a deficiency course or with set subjects; check the engineering council's and the university's current rule."
     },
     {
       "key": "electronic_engineering",
@@ -130,7 +130,7 @@
         "pre_medical",
         "dae"
       ],
-      "check_note": "Some universities admit ICS (with Physics and Maths), Pre-Medical (with a Maths deficiency course) or DAE holders; check the engineering council's and the university's current rule."
+      "check_note": "Some universities admit the groups listed here, sometimes after a deficiency course or with set subjects; check the engineering council's and the university's current rule."
     },
     {
       "key": "computer_engineering",
@@ -149,7 +149,7 @@
         "pre_medical",
         "dae"
       ],
-      "check_note": "Some universities admit ICS (with Physics and Maths), Pre-Medical (with a Maths deficiency course) or DAE holders; check the engineering council's and the university's current rule."
+      "check_note": "Some universities admit the groups listed here, sometimes after a deficiency course or with set subjects; check the engineering council's and the university's current rule."
     },
     {
       "key": "telecommunication_engineering",
@@ -168,7 +168,7 @@
         "pre_medical",
         "dae"
       ],
-      "check_note": "Some universities admit ICS (with Physics and Maths), Pre-Medical (with a Maths deficiency course) or DAE holders; check the engineering council's and the university's current rule."
+      "check_note": "Some universities admit the groups listed here, sometimes after a deficiency course or with set subjects; check the engineering council's and the university's current rule."
     },
     {
       "key": "mechanical_engineering",
@@ -186,7 +186,7 @@
         "pre_medical",
         "dae"
       ],
-      "check_note": "Some universities admit ICS (with Physics and Maths), Pre-Medical (with a Maths deficiency course) or DAE holders; check the engineering council's and the university's current rule."
+      "check_note": "Some universities admit the groups listed here, sometimes after a deficiency course or with set subjects; check the engineering council's and the university's current rule."
     },
     {
       "key": "mechatronics_engineering",
@@ -205,7 +205,7 @@
         "pre_medical",
         "dae"
       ],
-      "check_note": "Some universities admit ICS (with Physics and Maths), Pre-Medical (with a Maths deficiency course) or DAE holders; check the engineering council's and the university's current rule."
+      "check_note": "Some universities admit the groups listed here, sometimes after a deficiency course or with set subjects; check the engineering council's and the university's current rule."
     },
     {
       "key": "civil_engineering",
@@ -223,7 +223,7 @@
         "pre_medical",
         "dae"
       ],
-      "check_note": "Some universities admit ICS (with Physics and Maths), Pre-Medical (with a Maths deficiency course) or DAE holders; check the engineering council's and the university's current rule."
+      "check_note": "Some universities admit the groups listed here, sometimes after a deficiency course or with set subjects; check the engineering council's and the university's current rule."
     },
     {
       "key": "chemical_engineering",
@@ -241,7 +241,7 @@
         "pre_medical",
         "dae"
       ],
-      "check_note": "Some universities admit ICS (with Physics and Maths), Pre-Medical (with a Maths deficiency course) or DAE holders; check the engineering council's and the university's current rule."
+      "check_note": "Some universities admit the groups listed here, sometimes after a deficiency course or with set subjects; check the engineering council's and the university's current rule."
     },
     {
       "key": "biomedical_engineering",
@@ -260,7 +260,7 @@
         "ics",
         "dae"
       ],
-      "check_note": "Some universities admit ICS (with Physics and Maths), Pre-Medical (with a Maths deficiency course) or DAE holders; check the engineering council's and the university's current rule."
+      "check_note": "Some universities admit the groups listed here, sometimes after a deficiency course or with set subjects; check the engineering council's and the university's current rule."
     },
     {
       "key": "industrial_engineering",
@@ -278,7 +278,7 @@
         "pre_medical",
         "dae"
       ],
-      "check_note": "Some universities admit ICS (with Physics and Maths), Pre-Medical (with a Maths deficiency course) or DAE holders; check the engineering council's and the university's current rule."
+      "check_note": "Some universities admit the groups listed here, sometimes after a deficiency course or with set subjects; check the engineering council's and the university's current rule."
     },
     {
       "key": "aerospace_engineering",
@@ -295,7 +295,7 @@
       "check": [
         "dae"
       ],
-      "check_note": "Some universities admit ICS (with Physics and Maths), Pre-Medical (with a Maths deficiency course) or DAE holders; check the engineering council's and the university's current rule."
+      "check_note": "Some universities admit the groups listed here, sometimes after a deficiency course or with set subjects; check the engineering council's and the university's current rule."
     },
     {
       "key": "petroleum_engineering",
@@ -313,7 +313,7 @@
         "pre_medical",
         "dae"
       ],
-      "check_note": "Some universities admit ICS (with Physics and Maths), Pre-Medical (with a Maths deficiency course) or DAE holders; check the engineering council's and the university's current rule."
+      "check_note": "Some universities admit the groups listed here, sometimes after a deficiency course or with set subjects; check the engineering council's and the university's current rule."
     },
     {
       "key": "materials_engineering",
@@ -331,7 +331,7 @@
         "pre_medical",
         "dae"
       ],
-      "check_note": "Some universities admit ICS (with Physics and Maths), Pre-Medical (with a Maths deficiency course) or DAE holders; check the engineering council's and the university's current rule."
+      "check_note": "Some universities admit the groups listed here, sometimes after a deficiency course or with set subjects; check the engineering council's and the university's current rule."
     },
     {
       "key": "textile_engineering",
@@ -349,7 +349,7 @@
         "pre_medical",
         "dae"
       ],
-      "check_note": "Some universities admit ICS (with Physics and Maths), Pre-Medical (with a Maths deficiency course) or DAE holders; check the engineering council's and the university's current rule."
+      "check_note": "Some universities admit the groups listed here, sometimes after a deficiency course or with set subjects; check the engineering council's and the university's current rule."
     },
     {
       "key": "environmental_engineering",
@@ -367,7 +367,60 @@
         "pre_medical",
         "dae"
       ],
-      "check_note": "Some universities admit ICS (with Physics and Maths), Pre-Medical (with a Maths deficiency course) or DAE holders; check the engineering council's and the university's current rule."
+      "check_note": "Some universities admit the groups listed here, sometimes after a deficiency course or with set subjects; check the engineering council's and the university's current rule."
+    },
+    {
+      "key": "mining_engineering",
+      "title": "Mining Engineering",
+      "family": "engineering",
+      "levels": [
+        "bachelor",
+        "master"
+      ],
+      "isced": "0724",
+      "open_to": [
+        "pre_engineering"
+      ],
+      "check": [
+        "pre_medical",
+        "dae"
+      ],
+      "check_note": "Some universities admit the groups listed here, sometimes after a deficiency course or with set subjects; check the engineering council's and the university's current rule."
+    },
+    {
+      "key": "geological_engineering",
+      "title": "Geological Engineering",
+      "family": "engineering",
+      "levels": [
+        "bachelor",
+        "master"
+      ],
+      "isced": "0724",
+      "open_to": [
+        "pre_engineering"
+      ],
+      "check": [
+        "pre_medical",
+        "dae"
+      ],
+      "check_note": "Some universities admit the groups listed here, sometimes after a deficiency course or with set subjects; check the engineering council's and the university's current rule."
+    },
+    {
+      "key": "automotive_engineering",
+      "title": "Automotive Engineering",
+      "family": "engineering",
+      "levels": [
+        "bachelor",
+        "master"
+      ],
+      "isced": "0716",
+      "open_to": [
+        "pre_engineering"
+      ],
+      "check": [
+        "dae"
+      ],
+      "check_note": "Some universities admit the groups listed here, sometimes after a deficiency course or with set subjects; check the engineering council's and the university's current rule."
     },
     {
       "key": "engineering_technology",
@@ -384,7 +437,7 @@
       "check": [
         "ics"
       ],
-      "check_note": "Some universities admit ICS (with Physics and Maths), Pre-Medical (with a Maths deficiency course) or DAE holders; check the engineering council's and the university's current rule."
+      "check_note": "Some universities admit the groups listed here, sometimes after a deficiency course or with set subjects; check the engineering council's and the university's current rule."
     },
     {
       "key": "computer_science",
@@ -527,7 +580,6 @@
         "ics",
         "pre_medical",
         "general_science",
-        "fa_humanities",
         "dae"
       ],
       "check_note": "Many schools of architecture take other groups after an aptitude test; check the council's and the university's current rule."
@@ -795,12 +847,46 @@
       ],
       "isced": "1014",
       "open_to": [
-        "pre_engineering",
         "pre_medical",
+        "pre_engineering",
+        "general_science"
+      ],
+      "check": [
         "ics",
         "icom",
-        "fa_humanities",
+        "fa_humanities"
+      ],
+      "check_note": "Check the council's and the university's current rule for this group."
+    },
+    {
+      "key": "public_health",
+      "title": "Public Health",
+      "family": "health",
+      "levels": [
+        "bachelor",
+        "master"
+      ],
+      "isced": "0912",
+      "open_to": [
+        "pre_medical"
+      ],
+      "check": [
+        "pre_engineering",
         "general_science"
+      ],
+      "check_note": "Check the council's and the university's current rule for this group."
+    },
+    {
+      "key": "anesthesia_ot_technology",
+      "title": "Anesthesia / Operation Theatre Technology",
+      "family": "health",
+      "levels": [
+        "bachelor",
+        "diploma"
+      ],
+      "isced": "0914",
+      "open_to": [
+        "pre_medical"
       ],
       "check": []
     },
@@ -998,6 +1084,26 @@
       "check": []
     },
     {
+      "key": "actuarial_science",
+      "title": "Actuarial Science",
+      "family": "sciences",
+      "levels": [
+        "bachelor",
+        "master"
+      ],
+      "isced": "0542",
+      "open_to": [
+        "pre_engineering",
+        "ics",
+        "general_science"
+      ],
+      "check": [
+        "icom",
+        "pre_medical"
+      ],
+      "check_note": "May need the relevant subject at intermediate or a deficiency course; check the university's current rule."
+    },
+    {
       "key": "agriculture",
       "title": "Agriculture",
       "family": "agriculture",
@@ -1145,6 +1251,43 @@
         "master"
       ],
       "isced": "0413",
+      "open_to": [
+        "pre_engineering",
+        "pre_medical",
+        "ics",
+        "icom",
+        "fa_humanities",
+        "general_science"
+      ],
+      "check": []
+    },
+    {
+      "key": "management_sciences",
+      "title": "Management Sciences / HRM",
+      "family": "business",
+      "levels": [
+        "bachelor",
+        "master"
+      ],
+      "isced": "0413",
+      "open_to": [
+        "pre_engineering",
+        "pre_medical",
+        "ics",
+        "icom",
+        "fa_humanities",
+        "general_science"
+      ],
+      "check": []
+    },
+    {
+      "key": "aviation_management",
+      "title": "Aviation Management",
+      "family": "business",
+      "levels": [
+        "bachelor"
+      ],
+      "isced": "1041",
       "open_to": [
         "pre_engineering",
         "pre_medical",
@@ -1402,6 +1545,46 @@
         "general_science"
       ],
       "check": []
+    },
+    {
+      "key": "philosophy",
+      "title": "Philosophy",
+      "family": "arts_humanities",
+      "levels": [
+        "bachelor",
+        "master"
+      ],
+      "isced": "0223",
+      "open_to": [
+        "pre_engineering",
+        "pre_medical",
+        "ics",
+        "icom",
+        "fa_humanities",
+        "general_science"
+      ],
+      "check": []
+    },
+    {
+      "key": "geography",
+      "title": "Geography",
+      "family": "social_sciences",
+      "levels": [
+        "bachelor",
+        "master"
+      ],
+      "isced": "0532",
+      "open_to": [
+        "pre_engineering",
+        "pre_medical",
+        "general_science",
+        "fa_humanities"
+      ],
+      "check": [
+        "ics",
+        "icom"
+      ],
+      "check_note": "May need the relevant subject at intermediate or a deficiency course; check the university's current rule."
     },
     {
       "key": "islamic_studies",
