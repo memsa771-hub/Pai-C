@@ -571,6 +571,23 @@ def test_onboarding_state_and_answers_through_the_vault(api):
     assert bad.status_code == 400 and "statusCategory" in bad.text
 
 
+def test_onboarding_offers_study_fields_and_writes_one_education_record(api):
+    client, db, ws = api
+    state = _ok(client.get(_url(ws, "/onboarding"), headers=HEADERS))
+    bachelor = next(f for f in state["fields"]
+                    if f["name"] == "field" and f["depends_on"] == {"field": "level", "values": ["bachelor"]})
+    assert "electrical_engineering" in bachelor["choices"]
+    assert bachelor["labels"]["electrical_engineering"] == "Electrical Engineering"
+    answers = dict(firstName="Test", lastName="Student", level="bachelor", field="electrical_engineering",
+                   status="current", year="semester_5", dateOfBirth="2004-01-01", gender="undisclosed",
+                   currentCountry="Pakistan", currentCity="Lahore")
+    saved = _ok(client.post(_url(ws, "/onboarding"), headers=HEADERS, json={"answers": answers}))
+    assert not saved["rejected"], saved
+    after = _ok(client.get(_url(ws, "/onboarding"), headers=HEADERS))["prefill"]
+    assert (after["level"], after["field"], after["status"], after["year"]) == (
+        "bachelor", "electrical_engineering", "current", "semester_5")
+
+
 def test_the_old_profile_routes_are_gone(api):
     client, _, ws = api
     for method, path in (("get", "/v1/student-profile"), ("get", "/v1/student-profile/raw"),

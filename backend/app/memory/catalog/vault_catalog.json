@@ -180,7 +180,8 @@
     "synonyms": [
      "humanities",
      "arts group",
-     "general group"
+     "general group",
+     "fa_humanities"
     ]
    }
   ],
@@ -1449,7 +1450,7 @@
     "prompt": "When were you born?",
     "input": "date",
     "name": "dateOfBirth",
-    "step": 2
+    "step": 3
    },
    "field_definition": {
     "category": "identity",
@@ -2017,7 +2018,7 @@
      "undisclosed"
     ],
     "name": "gender",
-    "step": 2
+    "step": 3
    },
    "field_definition": {
     "category": "identity",
@@ -2182,7 +2183,7 @@
    },
    "onboarding": {
     "order": 2,
-    "prompt": "What is your current or latest qualification?",
+    "prompt": "Where are you now?",
     "input": "choice",
     "choices": "levels",
     "name": "level",
@@ -2192,8 +2193,229 @@
     "shown": [
      "matric",
      "o_level",
-     "fsc",
-     "a_level"
+     "intermediate",
+     "a_level",
+     "dae",
+     "bachelor",
+     "masters"
+    ],
+    "follow_ups": [
+     {
+      "name": "group",
+      "prompt": "Which group?",
+      "input": "choice",
+      "choices": "matric_groups",
+      "record_field": "field_of_study",
+      "depends_on": {
+       "field": "level",
+       "values": [
+        "matric"
+       ]
+      }
+     },
+     {
+      "name": "group",
+      "prompt": "Which group?",
+      "input": "choice",
+      "choices": "intermediate_groups",
+      "shown": [
+       "pre_engineering",
+       "pre_medical",
+       "ics",
+       "icom",
+       "fa_humanities"
+      ],
+      "record_field": "field_of_study",
+      "depends_on": {
+       "field": "level",
+       "values": [
+        "intermediate"
+       ]
+      },
+      "level_by_choice": {
+       "pre_engineering": "fsc",
+       "pre_medical": "fsc",
+       "general_science": "fsc",
+       "ics": "ics",
+       "icom": "icom",
+       "fa_humanities": "fa"
+      }
+     },
+     {
+      "name": "subjects",
+      "prompt": "Which subjects?",
+      "input": "choice",
+      "choices": "o_level_subjects",
+      "multi": true,
+      "record_field": "details.subjects",
+      "depends_on": {
+       "field": "level",
+       "values": [
+        "o_level"
+       ]
+      }
+     },
+     {
+      "name": "subjects",
+      "prompt": "Which subjects?",
+      "input": "choice",
+      "choices": "a_level_subjects",
+      "multi": true,
+      "record_field": "details.subjects",
+      "depends_on": {
+       "field": "level",
+       "values": [
+        "a_level"
+       ]
+      }
+     },
+     {
+      "name": "technology",
+      "prompt": "Which technology?",
+      "input": "choice",
+      "choices": "dae_technologies",
+      "record_field": "field_of_study",
+      "depends_on": {
+       "field": "level",
+       "values": [
+        "dae"
+       ]
+      }
+     },
+     {
+      "name": "field",
+      "prompt": "Which field?",
+      "input": "choice",
+      "source": "study_fields.bachelor",
+      "searchable": true,
+      "record_field": "field_of_study",
+      "depends_on": {
+       "field": "level",
+       "values": [
+        "bachelor"
+       ]
+      }
+     },
+     {
+      "name": "field",
+      "prompt": "Which field?",
+      "input": "choice",
+      "source": "study_fields.master",
+      "searchable": true,
+      "record_field": "field_of_study",
+      "depends_on": {
+       "field": "level",
+       "values": [
+        "masters"
+       ]
+      }
+     },
+     {
+      "name": "status",
+      "prompt": "Studying now or completed?",
+      "input": "choice",
+      "choices": [
+       "current",
+       "completed"
+      ],
+      "record_field": "academic_status",
+      "depends_on": {
+       "field": "level"
+      }
+     },
+     {
+      "name": "year",
+      "label": "currentYear",
+      "prompt": "Which year?",
+      "input": "choice",
+      "choices": [
+       "year_1",
+       "year_2"
+      ],
+      "record_field": "details.current_year",
+      "depends_on": {
+       "field": "status",
+       "values": [
+        "current"
+       ],
+       "and": {
+        "field": "level",
+        "values": [
+         "matric",
+         "o_level",
+         "intermediate",
+         "a_level",
+         "masters"
+        ]
+       }
+      }
+     },
+     {
+      "name": "year",
+      "label": "currentYear",
+      "prompt": "Which year?",
+      "input": "choice",
+      "choices": [
+       "year_1",
+       "year_2",
+       "year_3"
+      ],
+      "record_field": "details.current_year",
+      "depends_on": {
+       "field": "status",
+       "values": [
+        "current"
+       ],
+       "and": {
+        "field": "level",
+        "values": [
+         "dae"
+        ]
+       }
+      }
+     },
+     {
+      "name": "year",
+      "label": "semester",
+      "prompt": "Which semester?",
+      "input": "choice",
+      "choices": [
+       "semester_1",
+       "semester_2",
+       "semester_3",
+       "semester_4",
+       "semester_5",
+       "semester_6",
+       "semester_7",
+       "semester_8"
+      ],
+      "record_field": "details.current_semester",
+      "depends_on": {
+       "field": "status",
+       "values": [
+        "current"
+       ],
+       "and": {
+        "field": "level",
+        "values": [
+         "bachelor"
+        ]
+       }
+      }
+     },
+     {
+      "name": "year",
+      "label": "graduationYear",
+      "prompt": "Which year did you complete it?",
+      "input": "year",
+      "record_field": "graduation_year",
+      "depends_on": {
+       "field": "status",
+       "values": [
+        "completed"
+       ]
+      }
+     }
     ]
    }
   },

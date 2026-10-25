@@ -295,21 +295,25 @@ def test_every_declared_field_maps_to_a_real_vault_key(db):
     for field in ONBOARDING_FIELDS:
         if field.record_field:
             assert field.field_key in ENTITY_MODELS
-            assert hasattr(ENTITY_MODELS[field.field_key], field.record_field)
+            assert hasattr(ENTITY_MODELS[field.field_key], field.record_field.split(".")[0])
         else:
             assert fields.get(field.field_key) is not None, field.field_key
 
 
 THREE_STEPS = {"firstName": "Sam", "lastName": "Taylor", "level": "Secondary education",
-               "dateOfBirth": "2008-03-12", "gender": "female",
+               "status": "current", "dateOfBirth": "2008-03-12", "gender": "female",
                "currentCountry": "Pakistan", "currentCity": "My city"}
 
 
 def test_three_step_form_is_advertised_in_order_with_no_reply_language(db):
     state = OnboardingService(db).state(db.info["workspace"])
+    # Step 2 is the student's education alone; date of birth and gender moved
+    # beside the location so step 2 stays short on a phone.
     assert [(f["name"], f["step"]) for f in state["fields"]] == [
-        ("firstName", 1), ("lastName", 1), ("level", 2), ("dateOfBirth", 2), ("gender", 2),
-        ("currentCountry", 3), ("currentCity", 3)]
+        ("firstName", 1), ("lastName", 1), ("level", 2), ("group", 2), ("group", 2),
+        ("subjects", 2), ("subjects", 2), ("technology", 2), ("field", 2), ("field", 2),
+        ("status", 2), ("year", 2), ("year", 2), ("year", 2), ("year", 2),
+        ("dateOfBirth", 3), ("gender", 3), ("currentCountry", 3), ("currentCity", 3)]
     assert "replyLanguage" not in {f["name"] for f in state["fields"]}
     # The default country is data, shown pre-selected for a new student.
     assert state["prefill"]["currentCountry"] == "Pakistan"
@@ -376,18 +380,21 @@ def test_the_form_is_read_from_the_catalog(db):
     level = next(f for f in state["fields"] if f["name"] == "level")
     # The offered chips are catalog level codes; every one is a real code.
     codes = {c.code for c in vault_catalog().choices("levels")}
-    assert level["choices"] == ["matric", "o_level", "fsc", "a_level"] and set(level["choices"]) <= codes
+    assert level["choices"] == ["matric", "o_level", "intermediate", "a_level", "dae", "bachelor", "masters"]
+    assert set(level["choices"]) <= codes
 
 
 def test_a_level_in_the_students_wording_is_the_catalog_code_without_review(db):
     from app.models import MemoryCandidate
     from sqlalchemy import select
     workspace = db.info["workspace"]
-    OnboardingService(db).apply(workspace, {**THREE_STEPS, "level": "O-Level"})
+    OnboardingService(db).apply(workspace, {**THREE_STEPS, "level": "O-Level", "subjects": ["Maths"],
+                                            "year": "year_1"})
     db.commit()
     candidate = db.scalar(select(MemoryCandidate).where(MemoryCandidate.workspace_id == workspace.id,
                                                         MemoryCandidate.key == "education"))
-    assert candidate.proposed_value["value"] == {"qualification_name": "o_level"}
+    assert candidate.proposed_value["value"] == {"qualification_name": "o_level", "academic_status": "current",
+                                                 "details": {"subjects": ["mathematics"], "current_year": 1}}
     assert "catalog_review" not in candidate.evidence
 
 
@@ -401,3 +408,199 @@ def test_a_legacy_stored_level_prefills_as_its_catalog_chip(db):
                                        capture_method="onboarding"))
     db.commit()
     assert OnboardingService(db).state(workspace)["prefill"]["level"] == "o_level"
+
+
+# -- Exact current education (EDUCATION_FOCUS_SPEC section 1) ----------------
+
+PERSON = {"firstName": "Sam", "lastName": "Taylor", "dateOfBirth": "2008-03-12", "gender": "female",
+          "currentCountry": "Pakistan", "currentCity": "My city"}
+STUDY_FIELDS = {"study_fields.bachelor": [("computer_science", "Computer Science"), ("mbbs", "MBBS (Medicine)")],
+                "study_fields.master": [("computer_science", "Computer Science")]}
+
+
+def _education_rows(db):
+    from app.memory.student_records import StudentRecordService
+    return StudentRecordService(db).list(str(db.info["workspace"].id), "education")
+
+
+def _education_candidates(db):
+    from sqlalchemy import select
+    from app.models import MemoryCandidate
+    return db.scalars(select(MemoryCandidate).where(
+        MemoryCandidate.workspace_id == db.info["workspace"].id, MemoryCandidate.key == "education")).all()
+
+
+def _add_education(db, **values):
+    from app.memory.student_records import ENTITY_MODELS
+    db.add(ENTITY_MODELS["education"](workspace_id=db.info["workspace"].id, source_type="user_explicit",
+                                       claim_origin="student", capture_method="onboarding", **values))
+    db.commit()
+
+
+def test_intermediate_pre_med_writes_fsc_record(db):
+    result = OnboardingService(db).apply(db.info["workspace"], {
+        **PERSON, "level": "intermediate", "group": "pre_medical", "status": "current", "year": "year_2"})
+    db.commit()
+    assert result["completed"] and not result["rejected"], result
+    # ONE record, through one candidate, holding every education answer.
+    assert len(_education_candidates(db)) == 1
+    [row] = _education_rows(db)
+    assert (row.qualification_name, row.field_of_study, row.academic_status) == ("fsc", "pre_medical", "current")
+    assert row.details["current_year"] == 2
+    assert row.graduation_year is None
+    assert row.source_type == "user_explicit"
+
+
+@pytest.mark.parametrize("group, level", [("pre_engineering", "fsc"), ("ics", "ics"), ("icom", "icom"),
+                                          ("fa_humanities", "fa")])
+def test_intermediate_groups_keep_todays_codes(db, group, level):
+    OnboardingService(db).apply(db.info["workspace"], {
+        **PERSON, "level": "intermediate", "group": group, "status": "completed", "year": "2025"})
+    db.commit()
+    [row] = _education_rows(db)
+    assert (row.qualification_name, row.field_of_study) == (level, group)
+    assert (row.academic_status, row.graduation_year) == ("completed", 2025)
+
+
+def test_a_level_subjects_saved(db):
+    OnboardingService(db).apply(db.info["workspace"], {
+        **PERSON, "level": "a_level", "subjects": ["physics", "mathematics", "chemistry"],
+        "status": "completed", "year": "2024"})
+    db.commit()
+    [row] = _education_rows(db)
+    assert row.qualification_name == "a_level"
+    assert row.details["subjects"] == ["physics", "mathematics", "chemistry"]
+    assert (row.academic_status, row.graduation_year) == ("completed", 2024)
+    prefill = OnboardingService(db).state(db.info["workspace"])["prefill"]
+    assert prefill["subjects"] == ["physics", "mathematics", "chemistry"]
+    assert (prefill["level"], prefill["status"], prefill["year"]) == ("a_level", "completed", "2024")
+
+
+def test_subjects_are_read_against_the_levels_own_list(db):
+    with pytest.raises(MemoryDataError, match="subjects"):
+        OnboardingService(db).apply(db.info["workspace"], {
+            **PERSON, "level": "o_level", "subjects": ["law"], "status": "current", "year": "year_1"})
+
+
+@pytest.mark.parametrize("level", ["intermediate", "matric"])
+def test_group_required_when_level_has_groups(db, level):
+    with pytest.raises(MemoryDataError, match="group"):
+        OnboardingService(db).apply(db.info["workspace"], {
+            **PERSON, "level": level, "status": "current", "year": "year_1"})
+    assert not _education_rows(db)
+    assert VaultService(db).snapshot(str(db.info["workspace"].id), include_sensitive=True) == {}
+
+
+def test_matric_group_is_the_field_of_study(db):
+    service = OnboardingService(db)
+    service.apply(db.info["workspace"], {**PERSON, "level": "matric", "group": "arts",
+                                        "status": "current", "year": "year_1"})
+    db.commit()
+    [row] = _education_rows(db)
+    assert (row.qualification_name, row.details["current_year"]) == ("matric", 1)
+    # Read back as the matric chip, whatever the shared field normalised it to.
+    assert service.state(db.info["workspace"])["prefill"]["group"] == "arts"
+
+
+def test_dae_technology_is_the_field_of_study(db):
+    OnboardingService(db).apply(db.info["workspace"], {**PERSON, "level": "dae", "technology": "electrical",
+                                                      "status": "current", "year": "year_3"})
+    db.commit()
+    [row] = _education_rows(db)
+    assert (row.qualification_name, row.field_of_study, row.details["current_year"]) == ("dae", "electrical", 3)
+
+
+def test_bachelor_field_comes_from_study_fields_and_asks_the_semester(db):
+    service = OnboardingService(db, sources=STUDY_FIELDS)
+    field = next(f for f in service.state(db.info["workspace"])["fields"]
+                 if f["name"] == "field" and f["depends_on"]["values"] == ["bachelor"])
+    assert field["choices"] == ["computer_science", "mbbs"]
+    assert field["labels"]["mbbs"] == "MBBS (Medicine)" and field["searchable"]
+    service.apply(db.info["workspace"], {**PERSON, "level": "bachelor", "field": "computer_science",
+                                        "status": "current", "year": "semester_3"})
+    db.commit()
+    [row] = _education_rows(db)
+    assert (row.qualification_name, row.field_of_study) == ("bachelor", "computer_science")
+    # The semester is kept, and the year it falls in is what the rest of PAI reads.
+    assert (row.details["current_semester"], row.details["current_year"]) == (3, 2)
+    prefill = service.state(db.info["workspace"])["prefill"]
+    assert (prefill["level"], prefill["field"], prefill["year"]) == ("bachelor", "computer_science", "semester_3")
+
+
+def test_a_field_outside_the_study_fields_is_rejected(db):
+    with pytest.raises(MemoryDataError, match="field"):
+        OnboardingService(db, sources=STUDY_FIELDS).apply(db.info["workspace"], {
+            **PERSON, "level": "masters", "field": "mbbs", "status": "current", "year": "year_1"})
+
+
+@pytest.mark.parametrize("year", ["20", "2999", "year_1"])
+def test_completed_year_must_be_a_real_past_year(db, year):
+    with pytest.raises(MemoryDataError, match="year"):
+        OnboardingService(db).apply(db.info["workspace"], {
+            **PERSON, "level": "a_level", "subjects": ["physics"], "status": "completed", "year": year})
+
+
+def test_other_level_needs_no_group(db):
+    result = OnboardingService(db).apply(db.info["workspace"], {
+        **PERSON, "level": "My own school system", "status": "current"})
+    db.commit()
+    assert result["completed"] and not result["rejected"], result
+    [row] = _education_rows(db)
+    assert (row.qualification_name, row.academic_status, row.field_of_study) == (
+        "My own school system", "current", None)
+
+
+def test_answers_for_hidden_questions_are_dropped(db):
+    """A group left over from a level the student changed away from never lands."""
+    OnboardingService(db).apply(db.info["workspace"], {
+        **PERSON, "level": "a_level", "group": "pre_medical", "subjects": ["biology"],
+        "status": "completed", "year": "2023"})
+    db.commit()
+    [row] = _education_rows(db)
+    assert row.field_of_study is None
+
+
+def test_legacy_fsc_prefill(db):
+    """An `fsc` row with no group reads as Intermediate with the group unpicked,
+    so the student must choose one to continue."""
+    _add_education(db, qualification_name="fsc")
+    prefill = OnboardingService(db).state(db.info["workspace"])["prefill"]
+    assert prefill["level"] == "intermediate"
+    assert "group" not in prefill and "status" not in prefill
+
+
+def test_legacy_ics_record_prefills_its_group(db):
+    _add_education(db, qualification_name="ics", academic_status="completed", graduation_year=2024)
+    prefill = OnboardingService(db).state(db.info["workspace"])["prefill"]
+    assert (prefill["level"], prefill["group"], prefill["status"], prefill["year"]) == (
+        "intermediate", "ics", "completed", "2024")
+
+
+def test_completing_a_legacy_fsc_record_keeps_one_education_record(db):
+    _add_education(db, qualification_name="fsc")
+    OnboardingService(db).apply(db.info["workspace"], {
+        **PERSON, "level": "intermediate", "group": "pre_engineering", "status": "current", "year": "year_1"})
+    db.commit()
+    [row] = _education_rows(db)
+    assert (row.qualification_name, row.field_of_study, row.academic_status) == (
+        "fsc", "pre_engineering", "current")
+
+
+def test_dependent_questions_are_advertised_with_their_condition(db):
+    fields = OnboardingService(db).state(db.info["workspace"])["fields"]
+    level = next(f for f in fields if f["name"] == "level")
+    assert level["choices"] == ["matric", "o_level", "intermediate", "a_level", "dae", "bachelor", "masters"]
+    assert level["depends_on"] is None and level["multi"] is False
+    groups = [f for f in fields if f["name"] == "group"]
+    assert [g["depends_on"] for g in groups] == [{"field": "level", "values": ["matric"]},
+                                                 {"field": "level", "values": ["intermediate"]}]
+    # General Science stays in the list for older data, but is not offered.
+    assert groups[1]["choices"] == ["pre_engineering", "pre_medical", "ics", "icom", "fa_humanities"]
+    subjects = [f for f in fields if f["name"] == "subjects"]
+    assert all(s["multi"] for s in subjects) and len(subjects) == 2
+    assert subjects[0]["labels"]["english_literature"] == "Literature in English"
+    status = next(f for f in fields if f["name"] == "status")
+    assert status["choices"] == ["current", "completed"] and status["depends_on"] == {"field": "level"}
+    years = [f for f in fields if f["name"] == "year"]
+    assert all(y["depends_on"]["field"] == "status" for y in years)
+    assert any(y["isYear"] for y in years)

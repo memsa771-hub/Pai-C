@@ -22,12 +22,13 @@ module.exports = async function flow(browser, open, ORIGIN) {
     await page.getByRole('button', { name: 'Continue' }).click();
     await page.getByRole('button', { name: 'Other', exact: true }).click();
     await page.getByPlaceholder('Type it in your own words').fill('Secondary education');
+    await page.getByRole('button', { name: 'Studying now', exact: true }).click();
+    await page.getByRole('button', { name: 'Continue' }).click();
     await page.getByRole('button', { name: 'Date of birth' }).click();
     await page.getByRole('option', { name: '2008', exact: true }).click();
     await page.getByRole('option', { name: 'Mar', exact: true }).click();
     await page.getByRole('button', { name: 'March 12, 2008' }).click();
     await page.getByRole('button', { name: 'Female', exact: true }).click();
-    await page.getByRole('button', { name: 'Continue' }).click();
     assert.equal(await page.getByLabel('Country').inputValue(), 'Pakistan', 'country defaults to Pakistan');
     await page.getByLabel('City').fill('My city');
     assert.equal(await page.getByText(/reply language/i).count(), 0, 'no reply-language question');
@@ -38,7 +39,7 @@ module.exports = async function flow(browser, open, ORIGIN) {
     const entry = (await page.evaluate(() => JSON.parse(sessionStorage.getItem('entryCalls') || '[]')))
       .filter((call) => call.method === 'submitOnboarding').at(-1);
     assert.deepEqual(entry && entry.args[0], { firstName: 'Sam', lastName: 'Taylor', level: 'Secondary education',
-      dateOfBirth: '2008-03-12', gender: 'female', currentCountry: 'Pakistan', currentCity: 'My city' }, 'entry answers sent as typed');
+      status: 'current', dateOfBirth: '2008-03-12', gender: 'female', currentCountry: 'Pakistan', currentCity: 'My city' }, 'entry answers sent as typed');
 
     // B-D: the conversation, and a journey with every A-K stage present.
     await page.getByRole('navigation').getByRole('button', { name: 'Journey', exact: true }).click();

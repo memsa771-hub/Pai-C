@@ -55,7 +55,11 @@ RECORD_SPECS = {
                 "awarding_body": string(),
                 "framework": string(), "major": string(), "minor": string(),
                 "specialization": string(), "study_mode": string(), "thesis_title": string(),
-                "prerequisites": strings(), "distinctions": strings()}),
+                "prerequisites": strings(), "distinctions": strings(),
+                # Onboarding: O/A-level subject codes, and where a current student is.
+                "subjects": strings(),
+                "current_year": {"type": "integer", "minimum": 1, "maximum": 10},
+                "current_semester": {"type": "integer", "minimum": 1, "maximum": 16}}),
         },
     },
     "course": {

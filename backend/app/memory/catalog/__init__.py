@@ -80,6 +80,53 @@ def _check_schema(schema: dict, where: str) -> None:
         _check_schema(schema["items"], f"{where}[]")
 
 
+def _check_condition(condition, asked: list[str]) -> None:
+    """A `depends_on` names an answer asked before it, optionally the values
+    that show it (none: any answer), and optionally a further `and`."""
+    if not isinstance(condition, dict) or condition.get("field") not in asked:
+        raise ValueError("onboarding depends_on must name an earlier answer")
+    values = condition.get("values")
+    if values is not None and (not isinstance(values, list) or not values
+                               or not all(isinstance(v, str) for v in values)):
+        raise ValueError("onboarding depends_on values must be a non-empty list of codes")
+    if "and" in condition:
+        _check_condition(condition["and"], asked)
+
+
+def _check_follow_ups(onboarding: dict, choices: dict, storage: str) -> None:
+    """Questions shown after the main one, each a part of the same record.
+
+    Several may share a name (the group for Matric and the group for
+    Intermediate): the student only ever sees the one whose condition holds.
+    """
+    follow_ups = onboarding.get("follow_ups") or []
+    if follow_ups and storage != "record":
+        raise ValueError("onboarding follow_ups need a record type")
+    asked = [onboarding.get("name")]
+    for ask in follow_ups:
+        if not isinstance(ask.get("name"), str) or not ask["name"] or not ask.get("prompt"):
+            raise ValueError("onboarding follow-up needs a name and a prompt")
+        if ask.get("input") not in (*ONBOARDING_INPUTS, "year") or not ask.get("record_field"):
+            raise ValueError("onboarding follow-up needs an input and a record_field")
+        listed = ask.get("choices")
+        if isinstance(listed, str):
+            codes = {c.code for c in choices.get(listed, [])}
+            if not codes:
+                raise ValueError("onboarding follow-up uses an unknown choice list")
+            if not set(ask.get("shown", ())) <= codes or not set(ask.get("level_by_choice", {})) <= codes:
+                raise ValueError("onboarding follow-up names a code outside its choice list")
+        elif listed is not None and not (isinstance(listed, list) and all(isinstance(c, str) for c in listed)):
+            raise ValueError("onboarding follow-up choices must be a list name or a list of codes")
+        if ask["input"] == "choice" and listed is None and not isinstance(ask.get("source"), str):
+            raise ValueError("onboarding follow-up choice needs choices or a source")
+        levels = {c.code for c in choices.get(onboarding.get("choices"), [])} \
+            if isinstance(onboarding.get("choices"), str) else set()
+        if not set(ask.get("level_by_choice", {}).values()) <= levels:
+            raise ValueError("onboarding level_by_choice must name codes of the main choice list")
+        _check_condition(ask.get("depends_on"), asked)
+        asked.append(ask["name"])
+
+
 def _build_type(raw: dict, choices: dict) -> TypeSpec:
     """Validate one type; any problem is reported with the type key."""
     key = raw.get("key", "<missing key>")
@@ -130,6 +177,7 @@ def _build_type(raw: dict, choices: dict) -> TypeSpec:
                 codes = {c.code for c in choices.get(onboarding.get("choices"), [])}
                 if not isinstance(onboarding.get("choices"), str) or not set(onboarding["shown"]) <= codes:
                     raise ValueError("onboarding shown choices must be codes of its choice list")
+            _check_follow_ups(onboarding, choices, storage)
         money = raw.get("money", False)
         if not isinstance(money, bool):
             raise ValueError("money must be true or false")

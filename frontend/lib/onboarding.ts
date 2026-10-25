@@ -12,30 +12,28 @@
  * onboarding store and no second copy of a student's identity.
  */
 
-/** Names match `ONBOARDING_FIELDS` in the backend, which is the source. */
-export interface OnboardingAnswers {
-  firstName?: string;
-  lastName?: string;
-  level?: string;
-  fullName?: string;
-  preferredName?: string;
-  statusCategory?: string;
-  nationality?: string;
-  gender?: string;
-  dateOfBirth?: string;
-  currentCountry?: string;
-  currentCity?: string;
-}
+/** One answer: text or a chip code, or a list of codes for a multi-select. */
+export type OnboardingAnswer = string | string[];
 
-export type OnboardingFieldName = keyof OnboardingAnswers;
+/** Answers by field name. Names match `ONBOARDING_FIELDS` in the backend,
+ * which is the source; several follow-ups may share one name. */
+export type OnboardingAnswers = Record<string, OnboardingAnswer | undefined>;
+
+/** When a follow-up is shown: the named answer is one of `values` (any answer
+ * when absent), and the `and` condition holds too. */
+export interface OnboardingCondition {
+  field: string;
+  values?: string[];
+  and?: OnboardingCondition;
+}
 
 /** One question, as the backend declares it. */
 export interface OnboardingFieldSpec {
-  name: OnboardingFieldName;
+  name: string;
   /** The canonical Vault key the answer is stored under. */
   fieldKey: string;
   required: boolean;
-  /** Non-empty for the dropdowns. */
+  /** Non-empty for the chips. */
   choices: string[];
   isDate: boolean;
   allowOther?: boolean;
@@ -45,6 +43,18 @@ export interface OnboardingFieldSpec {
   default?: string | null;
   /** Suggested values; unlike `choices` they do not restrict the answer. */
   options?: string[];
+  /** Shown only while this holds (education follow-ups). */
+  depends_on?: OnboardingCondition | null;
+  /** Several chips may be picked; the answer is a list. */
+  multi?: boolean;
+  /** A four-digit year typed by the student. */
+  isYear?: boolean;
+  /** A long chip list with a search box (study fields). */
+  searchable?: boolean;
+  /** Copy key when questions share a name (the year asked three ways). */
+  labelKey?: string | null;
+  /** Catalog wording for chips the UI has no copy of its own for. */
+  labels?: Record<string, string>;
 }
 
 export interface OnboardingState {
@@ -64,12 +74,61 @@ export interface OnboardingResult {
   completed: boolean;
 }
 
+function holds(condition: OnboardingCondition | null | undefined, answers: OnboardingAnswers): boolean {
+  if (!condition) return true;
+  const answer = answers[condition.field];
+  const shown = condition.values ? typeof answer === 'string' && condition.values.includes(answer) : filledAnswer(answer);
+  return shown && holds(condition.and, answers);
+}
+
+/** Whether an answer counts as given. */
+export function filledAnswer(answer: OnboardingAnswer | undefined): boolean {
+  return Array.isArray(answer) ? answer.length > 0 : !!(answer || '').trim();
+}
+
+/** The questions shown for these answers, in order. A follow-up needs the
+ * answer it depends on to be shown itself, and a shared name resolves to the
+ * first question whose condition holds. */
+export function visibleOnboardingFields(
+  fields: OnboardingFieldSpec[], answers: OnboardingAnswers,
+): OnboardingFieldSpec[] {
+  const shown: OnboardingFieldSpec[] = [];
+  const names = new Set<string>();
+  const visibleAnswers: OnboardingAnswers = {};
+  for (const field of fields) {
+    if (names.has(field.name) || !holds(field.depends_on, visibleAnswers)) continue;
+    shown.push(field);
+    names.add(field.name);
+    visibleAnswers[field.name] = answers[field.name];
+  }
+  return shown;
+}
+
 /** Include only fields rendered to the student, even when the prefill has
  * older answers or a generated account handle. */
 export function visibleOnboardingAnswers(
   fields: OnboardingFieldSpec[], answers: OnboardingAnswers,
 ): OnboardingAnswers {
-  return Object.fromEntries(fields.map((field) => [field.name, answers[field.name] || ''])) as OnboardingAnswers;
+  return Object.fromEntries(visibleOnboardingFields(fields, answers)
+    .map((field) => [field.name, answers[field.name] || (field.multi ? [] : '')]));
+}
+
+/** Answers to clear when `name` changes: everything that depended on it,
+ * directly or through another follow-up. */
+export function clearedDependents(fields: OnboardingFieldSpec[], name: string): string[] {
+  const reads = (condition: OnboardingCondition | null | undefined, target: string): boolean =>
+    !!condition && (condition.field === target || reads(condition.and, target));
+  const cleared = new Set<string>();
+  const walk = (target: string) => {
+    for (const field of fields) {
+      if (field.name !== name && !cleared.has(field.name) && reads(field.depends_on, target)) {
+        cleared.add(field.name);
+        walk(field.name);
+      }
+    }
+  };
+  walk(name);
+  return [...cleared];
 }
 
 /**

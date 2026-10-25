@@ -109,6 +109,33 @@ def test_bad_type_raises_value_error_naming_it():
              "sensitivity": "normal", "conflict": "latest_wins", "freshness_days": 1, "version": 1}]})
 
 
+@pytest.mark.parametrize("follow_up, message", [
+    ({"depends_on": {"field": "later"}}, "earlier answer"),
+    ({"depends_on": {"field": "level", "values": []}}, "values"),
+    ({"choices": "groups", "shown": ["nope"]}, "outside its choice list"),
+    ({"choices": "groups", "level_by_choice": {"science": "nope"}}, "main choice list"),
+    ({"choices": None}, "choices or a source"),
+])
+def test_bad_onboarding_follow_up_is_rejected(follow_up, message):
+    from app.memory.catalog import VaultCatalog
+
+    def catalog(**changes):
+        ask = {"name": "group", "prompt": "Which group?", "input": "choice", "choices": "groups",
+               "record_field": "field_of_study", "depends_on": {"field": "level", "values": ["inter"]}}
+        ask = {k: v for k, v in {**ask, **changes}.items() if v is not None}
+        return VaultCatalog.from_dict({
+            "choices": {"levels": [_choice("inter", "Inter")], "groups": [_choice("science", "Science")]},
+            "types": [{"key": "education", "storage": "record", "shown_on": "details", "inputs": ["chat"],
+                       "sensitivity": "normal", "conflict": "evidence_wins", "freshness_days": None,
+                       "version": 1, "onboarding": {"order": 1, "prompt": "Level?", "input": "choice",
+                                                    "choices": "levels", "name": "level",
+                                                    "follow_ups": [ask]}}]})
+
+    assert catalog().type("education")
+    with pytest.raises(ValueError, match=message):
+        catalog(**follow_up)
+
+
 def _choice(code, label, *synonyms):
     return {"code": code, "label": label, "synonyms": list(synonyms)}
 

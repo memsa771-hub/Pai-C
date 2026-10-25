@@ -41,20 +41,23 @@ module.exports = [
   } },
   { id: 'onboarding-about', path: '/student?onboarding=1', setup: async (page) => {
     await fill(page, 'First name', 'Sam'); await fill(page, 'Last name', 'Taylor'); await submit(page, 'Continue');
-    await submit(page, 'FSc'); await submit(page, 'Female');
+    await submit(page, 'Intermediate'); await submit(page, 'FSc Pre-Medical'); await submit(page, 'Studying now'); await submit(page, '2nd year');
   } },
   { id: 'onboarding-calendar', path: '/student?onboarding=1', crawl: false, setup: async (page) => {
     await fill(page, 'First name', 'Sam'); await fill(page, 'Last name', 'Taylor'); await submit(page, 'Continue');
+    await submit(page, 'Intermediate'); await submit(page, 'FSc Pre-Medical'); await submit(page, 'Studying now'); await submit(page, '2nd year');
+    await submit(page, 'Continue');
     await page.getByRole('button', { name: 'Date of birth' }).click(); await page.getByRole('listbox').waitFor();
   } },
   { id: 'onboarding-place', path: '/student?onboarding=1', setup: async (page) => {
     await fill(page, 'First name', 'Sam'); await fill(page, 'Last name', 'Taylor'); await submit(page, 'Continue');
-    await submit(page, 'FSc'); await submit(page, 'Female');
+    await submit(page, 'Intermediate'); await submit(page, 'FSc Pre-Medical'); await submit(page, 'Studying now'); await submit(page, '2nd year');
+    await submit(page, 'Continue'); await submit(page, 'Female');
     await page.getByRole('button', { name: 'Date of birth' }).click();
     await page.getByRole('option', { name: '2008', exact: true }).click();
     await page.getByRole('option', { name: 'Mar', exact: true }).click();
     await page.getByRole('button', { name: 'March 12, 2008' }).click();
-    await submit(page, 'Continue'); await page.getByLabel('City').waitFor();
+    await page.getByLabel('City').waitFor();
   } },
 
   { id: 'shell', path: '/student?view=journey', ready: 'main h1' },

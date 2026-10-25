@@ -26,8 +26,15 @@ Two design rules this module holds:
 carries the `manual_review` conflict policy, and that policy admits exactly
 one source — a first-hand statement. Asking the student directly is that
 statement, so the answer applies immediately instead of parking as an issue.
+
+Current education is asked exactly (EDUCATION_FOCUS_SPEC section 1): the level,
+then the follow-ups that level has (group, subjects, technology or field), then
+status and year. The catalog declares them as `follow_ups` with `depends_on`,
+and all answers for one record type are written as ONE record, so the Vault
+never holds a level without the group asked beside it.
 """
 
+import re
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any, Optional
@@ -67,6 +74,18 @@ class OnboardingField:
     # The catalog choice list an answer is read against: "O-Level" or "inter"
     # becomes its code, while `choices` are only the codes offered as chips.
     choice_list: str | None = None
+    # Follow-ups: shown only while `depends_on` holds ({field, values, and}).
+    depends_on: dict | None = None
+    multi: bool = False
+    # A choice list that is not in the catalog (the study fields), handed in
+    # by the caller because app.memory does not read PAI C's policy data.
+    source: str | None = None
+    searchable: bool = False
+    # An Intermediate group decides the stored qualification (Pre-Medical -> fsc).
+    level_by_choice: dict | None = None
+    is_year: bool = False
+    # Copy key when several questions share a name (the year is asked three ways).
+    label_key: str | None = None
 
 
 # The order here is the order the form asks them in.
@@ -110,6 +129,17 @@ def _catalog_fields() -> tuple[OnboardingField, ...]:
                                    part_of=ask["name"], **common) for part in parts]
         if not parts:
             fields.append(OnboardingField(ask["name"], max_length=ask.get("max_length", 200), **common))
+        for follow in ask.get("follow_ups", ()):
+            listed = follow.get("choices")
+            listed_name = listed if isinstance(listed, str) else None
+            offered = (follow.get("shown") or [c.code for c in vault_catalog().choices(listed_name)]
+                       if listed_name else listed or ())
+            fields.append(OnboardingField(
+                follow["name"], field_key=spec.key, step=common["step"], required=follow.get("required", True),
+                record_field=follow["record_field"], choice_list=listed_name, choices=tuple(offered),
+                depends_on=follow["depends_on"], multi=follow.get("multi", False), source=follow.get("source"),
+                searchable=follow.get("searchable", False), level_by_choice=follow.get("level_by_choice"),
+                is_year=follow["input"] == "year", label_key=follow.get("label")))
     return tuple(fields)
 
 
@@ -117,7 +147,42 @@ ONBOARDING_FIELDS = _catalog_fields()
 # Answers older clients may still send. They are accepted and dropped, so an
 # open tab from before a field was retired cannot fail the whole submission.
 RETIRED_ANSWERS = frozenset({"replyLanguage"})
-FIELDS_BY_NAME = {field.name: field for field in (*LEGACY_FIELDS, *ONBOARDING_FIELDS)}
+# The questions always asked. Follow-ups may share a name (the Matric group and
+# the Intermediate group), so they are resolved against the answers instead.
+FIELDS_BY_NAME = {field.name: field for field in (*LEGACY_FIELDS, *ONBOARDING_FIELDS) if not field.depends_on}
+FOLLOW_UPS = tuple(field for field in ONBOARDING_FIELDS if field.depends_on)
+KNOWN_ANSWERS = frozenset(field.name for field in (*LEGACY_FIELDS, *ONBOARDING_FIELDS))
+_NUMBERED = re.compile(r"_(\d+)$")
+
+
+def _visible(condition: Optional[dict], answers: dict) -> bool:
+    """Whether a follow-up is shown for these answers.
+
+    Only answers that were themselves shown are in `answers`, so the chain
+    holds without walking it: year needs a status, status needs a level.
+    """
+    if not condition:
+        return True
+    answer = answers.get(condition["field"])
+    shown = bool(answer) if condition.get("values") is None else answer in condition["values"]
+    return shown and _visible(condition.get("and"), answers)
+
+
+def _record_schema(field: OnboardingField) -> dict:
+    """The record spec's schema at a field's dotted path (details.current_year)."""
+    from .student_schema import RECORD_SPECS
+    schema = {"properties": RECORD_SPECS[field.field_key]["properties"]}
+    for part in field.record_field.split("."):
+        schema = schema.get("properties", {}).get(part, {})
+    return schema
+
+
+def _read(row, path: str):
+    """A record row's value at a dotted path (details live in a JSON column)."""
+    node = row
+    for part in path.split("."):
+        node = node.get(part) if isinstance(node, dict) else getattr(node, part, None)
+    return node
 
 
 def _choice_code(field: OnboardingField, text: str) -> Optional[str]:
@@ -167,9 +232,117 @@ def _clean(value: Any, field: OnboardingField) -> Optional[str]:
 class OnboardingService:
     """Read the onboarding state, and apply the student's answers."""
 
-    def __init__(self, db):
+    def __init__(self, db, sources: Optional[dict] = None):
         self.db = db
         self.vault = VaultService(db)
+        # Choice lists that live outside the catalog: name -> [(code, label)].
+        self.sources = sources or {}
+
+    # -- follow-ups --------------------------------------------------------
+
+    def _offered(self, field: OnboardingField) -> list[tuple[str, str]]:
+        """(code, label) for each chip a follow-up shows."""
+        if field.source:
+            return [(code, label) for code, label in self.sources.get(field.source, ())]
+        if field.choice_list:
+            return [(code, vault_catalog().label(field.choice_list, code)) for code in field.choices]
+        return [(code, code) for code in field.choices]
+
+    def _code(self, field: OnboardingField, text: str) -> Optional[str]:
+        """The code an answer names for this follow-up, or None."""
+        if field.source:
+            return next((code for code, label in self._offered(field)
+                         if text.casefold() in (code.casefold(), label.casefold())), None)
+        return _choice_code(field, text)
+
+    def _clean_follow_up(self, value: Any, field: OnboardingField):
+        """A follow-up answer as its code(s) or year, or None when unanswered."""
+        if value is None or value == "" or value == []:
+            return None
+        if field.multi:
+            if not isinstance(value, list) or not all(isinstance(v, str) for v in value):
+                raise MemoryDataError(f"{field.name} must be a list")
+            codes = [self._code(field, " ".join(v.split())) for v in value if v.strip()]
+            if None in codes:
+                raise MemoryDataError(f"{field.name} must be from: {', '.join(field.choices)}")
+            return list(dict.fromkeys(codes))[:30] or None
+        if not isinstance(value, str):
+            raise MemoryDataError(f"{field.name} must be text")
+        text = " ".join(value.split())
+        if not text:
+            return None
+        if field.is_year:
+            if not re.fullmatch(r"\d{4}", text) or not 1950 <= int(text) <= datetime.now(timezone.utc).year:
+                raise MemoryDataError(f"{field.name} must be a past year, like 2024")
+            return text
+        code = self._code(field, text)
+        if code is None:
+            raise MemoryDataError(
+                f"{field.name} must be one of: {', '.join(c for c, _ in self._offered(field))}")
+        return code
+
+    @staticmethod
+    def _stored(field: OnboardingField, value):
+        """An answer as the record stores it: a number for an integer field
+        ("year_2" -> 2, "2024" -> 2024), the code otherwise."""
+        if _record_schema(field).get("type") == "integer" and isinstance(value, str):
+            numbered = _NUMBERED.search(value)
+            return int(numbered.group(1) if numbered else value)
+        return value
+
+    def _answer(self, field: OnboardingField, stored):
+        """A stored record value read back as the answer the form shows."""
+        if stored in (None, "", []):
+            return None
+        if isinstance(stored, list):
+            codes = [self._code(field, s) for s in stored if isinstance(s, str)]
+            return [c for c in codes if c] or None
+        if isinstance(stored, int) and not isinstance(stored, bool):
+            if field.is_year:
+                return str(stored)
+            return next((c for c in field.choices
+                         if _NUMBERED.search(c) and int(_NUMBERED.search(c).group(1)) == stored), None)
+        return self._code(field, stored) if isinstance(stored, str) else None
+
+    def _record_prefill(self, level: OnboardingField, row) -> dict:
+        """A stored record read back into the form's answers.
+
+        An `fsc`/`ics`/`icom`/`fa` row reads as Intermediate plus its group. An
+        `fsc` row with no group leaves the group unpicked, so the student has
+        to choose one before continuing.
+        """
+        stored = _read(row, level.record_field) or ""
+        if not stored:
+            return {}
+        answers = {level.name: _choice_code(level, stored) or stored}
+        follow_ups = [f for f in FOLLOW_UPS if f.field_key == level.field_key]
+        for field in follow_ups:
+            mapping = field.level_by_choice or {}
+            parent = (field.depends_on.get("values") or [None])[0]
+            if mapping and answers[level.name] in (*mapping.values(), parent):
+                options = [group for group, code in mapping.items() if code == answers[level.name]]
+                group = self._answer(field, _read(row, field.record_field))
+                answers[level.name] = parent
+                if group and (group in options or not options):
+                    answers[field.name] = group
+                elif len(options) == 1:
+                    answers[field.name] = options[0]
+        for field in follow_ups:
+            if field.name not in answers and _visible(field.depends_on, answers):
+                answer = self._answer(field, _read(row, field.record_field))
+                if answer:
+                    answers[field.name] = answer
+        return answers
+
+    def _field_state(self, f: OnboardingField) -> dict:
+        offered = self._offered(f)
+        return {"name": f.name, "fieldKey": f.field_key, "required": f.required,
+                "choices": [code for code, _ in offered], "isDate": f.is_date, "allowOther": f.allow_other,
+                "step": f.step, "default": f.default, "options": list(f.options),
+                "depends_on": f.depends_on, "multi": f.multi, "isYear": f.is_year,
+                "searchable": f.searchable, "labelKey": f.label_key,
+                # Catalog and study-field wording for chips the UI has no copy for.
+                "labels": {code: label for code, label in offered if label != code}}
 
     # -- state -------------------------------------------------------------
 
@@ -206,25 +379,19 @@ class OnboardingService:
                 prefill[field.name] = field.default
         from .student_records import StudentRecordService
         for field in ONBOARDING_FIELDS:
-            if field.record_field:
+            if field.record_field and not field.depends_on:
                 rows = StudentRecordService(self.db).list(str(workspace.id), field.field_key)
                 if rows:
-                    stored = getattr(rows[0], field.record_field, "") or ""
                     # A value saved before the chips were catalog codes ("o-level")
                     # reads as its code, so the chip is selected.
-                    prefill[field.name] = (_choice_code(field, stored) or stored) if stored else stored
+                    prefill.update(self._record_prefill(field, rows[0]))
         # Full name is deliberately collected here, not at signup, and is never
         # guessed from an email address or an OAuth display name.
         return {
             "required": user is not None and user.onboarded_at is None,
             "completedAt": user.onboarded_at.isoformat()
             if user is not None and user.onboarded_at else None,
-            "fields": [
-                {"name": f.name, "fieldKey": f.field_key, "required": f.required,
-                 "choices": list(f.choices), "isDate": f.is_date, "allowOther": f.allow_other,
-                 "step": f.step, "default": f.default, "options": list(f.options)}
-                for f in ONBOARDING_FIELDS
-            ],
+            "fields": [self._field_state(f) for f in ONBOARDING_FIELDS],
             "prefill": {k: v for k, v in prefill.items() if v},
         }
 
@@ -239,20 +406,33 @@ class OnboardingService:
         if not isinstance(answers, dict):
             raise MemoryDataError("Onboarding answers must be an object")
         answers = {k: v for k, v in answers.items() if k not in RETIRED_ANSWERS}
-        unknown = set(answers) - set(FIELDS_BY_NAME)
+        unknown = set(answers) - KNOWN_ANSWERS
         if unknown:
             raise MemoryDataError(f"Unknown onboarding field: {', '.join(sorted(unknown))}")
 
-        cleaned: dict[str, str] = {}
+        cleaned: dict[str, Any] = {}
         for name, field in FIELDS_BY_NAME.items():
             value = _clean(answers.get(name), field)
             if value is not None:
                 cleaned[name] = value
+        # Each follow-up name resolves to the one question its conditions show;
+        # an answer to a hidden question (a group left from a level the student
+        # changed away from) is dropped, never written.
+        asked: dict[str, OnboardingField] = {}
+        for field in FOLLOW_UPS:
+            if field.name in asked or not _visible(field.depends_on, cleaned):
+                continue
+            asked[field.name] = field
+            value = self._clean_follow_up(answers.get(field.name), field)
+            if value is not None:
+                cleaned[field.name] = value
+        for name in {f.name for f in FOLLOW_UPS} - set(asked):
+            cleaned.pop(name, None)
         # The current contract is the three-step form. Older in-flight clients
         # (the eight-field form, or the four-card form with a full name) still
         # complete with their own required set; their old facts are retained.
         if "firstName" in answers or "lastName" in answers:
-            required = ONBOARDING_FIELDS
+            required = (*(f for f in ONBOARDING_FIELDS if not f.depends_on), *asked.values())
         elif "level" in answers:
             required = tuple(FIELDS_BY_NAME[name] for name in ("fullName", "level", "currentCity"))
         else:
@@ -271,23 +451,50 @@ class OnboardingService:
         user = self.owner(workspace)
         saved, rejected = [], {}
         existing_facts = self.vault.snapshot(workspace_id, include_sensitive=True)
+        writes = []  # (field, value, quote)
+        records: dict[str, tuple[OnboardingField, dict, list]] = {}
         for name, value in cleaned.items():
-            field = FIELDS_BY_NAME[name]
+            field = FIELDS_BY_NAME.get(name) or asked[name]
+            if not field.record_field:
+                writes.append((field, value, value))
+                continue
+            # Every answer for one record type becomes ONE record.
+            main, record, quote = records.setdefault(field.field_key, (field, {}, []))
+            node = record
+            *parents, leaf = field.record_field.split(".")
+            for part in parents:
+                node = node.setdefault(part, {})
+            node[leaf] = self._stored(field, value)
+            if field.level_by_choice and value in field.level_by_choice:
+                record[main.record_field] = field.level_by_choice[value]
+            quote += [label for code in (value if isinstance(value, list) else [value])
+                      for label in [dict(self._offered(field)).get(code, code)]]
+        for main, record, quote in records.values():
+            details = record.get("details", {})
+            # A semester is kept as said; the year it falls in is what the
+            # rest of PAI reads for every current student.
+            if "current_semester" in details and "current_year" not in details:
+                details["current_year"] = (details["current_semester"] + 1) // 2
+            writes.append((main, record, " · ".join(str(q) for q in quote)))
+
+        for field, value, quote in writes:
             # A returning student's prefilled canonical answer is already
             # satisfied. Do not supersede it with an identical onboarding row
             # or erase its original provenance merely because they continued.
-            if existing_facts.get(field.field_key) == value:
+            if not field.record_field and existing_facts.get(field.field_key) == value:
                 saved.append(field.field_key)
                 continue
+            student_text = value.get(field.record_field) if field.record_field else value
             candidate = MemoryCandidateService(self.db).propose(
                 workspace_id=workspace_id, candidate_type="student_record" if field.record_field else "vault_fact",
-                key=field.field_key, proposed_value={field.record_field: value} if field.record_field else value, confidence=1.0,
+                key=field.field_key, proposed_value=value, confidence=1.0,
                 source_type="user_explicit", allow_user_explicit=True,
                 input_channel="profile",
                 subject_user_id=str(user.id) if user else None,
-                evidence={"reason": "Stated during onboarding", "capture": "onboarding", "quote": value,
-                    **({"catalog_review": {"catalog": field.name, "status": "pending", "student_text": value}}
-                       if field.allow_other and _choice_code(field, value) is None else {})},
+                evidence={"reason": "Stated during onboarding", "capture": "onboarding", "quote": quote,
+                    **({"catalog_review": {"catalog": field.name, "status": "pending", "student_text": student_text}}
+                       if field.allow_other and isinstance(student_text, str)
+                       and _choice_code(field, student_text) is None else {})},
             )
             result = MemoryReconciler(self.db).reconcile(candidate)
             if result.accepted:

@@ -1,8 +1,10 @@
 'use client';
 
 /** Three short steps of schema-driven questions; deeper discovery stays in the
- * conversation. The backend owns which fields exist, their step, choices and
- * defaults; this file owns how they look. */
+ * conversation. The backend owns which fields exist, their step, choices,
+ * defaults and which answer reveals them (step 2 asks the level, then its
+ * group, subjects, technology or field, then status and year); this file owns
+ * how they look. */
 
 import * as React from 'react';
 import { AnimatePresence, MotionConfig, motion } from 'motion/react';
@@ -13,8 +15,8 @@ import { workspaceApi } from '@/lib/api';
 import { useT, type MessageKey } from '@/lib/i18n';
 import { cn } from '@/lib/utils';
 import {
-  visibleOnboardingAnswers,
-  type OnboardingAnswers, type OnboardingFieldSpec, type OnboardingState,
+  clearedDependents, filledAnswer, visibleOnboardingAnswers, visibleOnboardingFields,
+  type OnboardingAnswer, type OnboardingAnswers, type OnboardingFieldSpec, type OnboardingState,
 } from '@/lib/onboarding';
 import { DobPicker } from './dob-picker';
 
@@ -48,14 +50,17 @@ export function OnboardingView({ state, onDone }: {
   const [index, setIndex] = React.useState(0);
   const [direction, setDirection] = React.useState(1);
   const step = steps[index];
-  const fields = state.fields.filter((f) => (f.step || 1) === step);
+  const fields = visibleOnboardingFields(state.fields, answers).filter((f) => (f.step || 1) === step);
   const last = index === steps.length - 1;
 
-  const set = (name: string, value: string) => {
-    setAnswers((prev) => ({ ...prev, [name]: value }));
+  const set = (name: string, value: OnboardingAnswer) => {
+    // A changed level clears its group, subjects, status and year: answers
+    // picked for one level are never sent under another.
+    const stale = answers[name] !== value ? clearedDependents(state.fields, name) : [];
+    setAnswers((prev) => ({ ...prev, ...Object.fromEntries(stale.map((n) => [n, undefined])), [name]: value }));
     setErrors((prev) => ({ ...prev, [name]: false }));
   };
-  const filled = (f: OnboardingFieldSpec) => !!(answers[f.name] || '').trim();
+  const filled = (f: OnboardingFieldSpec) => filledAnswer(answers[f.name]);
 
   const submit = async () => {
     setBusy(true);
@@ -122,8 +127,9 @@ export function OnboardingView({ state, onDone }: {
               transition={{ duration: 0.2, ease: 'easeOut' }}
               className={cn('grid', first ? 'grid-cols-2 gap-4' : 'gap-[var(--auth-gap-onb)]')}>
               {fields.map((field) => (
-                <Field key={field.name} field={field} value={answers[field.name] || ''} error={errors[field.name]} size={first ? 'sm' : 'md'}
-                  label={translated(`onboarding.field.${field.name}`, field.name)}
+                <Field key={`${field.name}-${state.fields.indexOf(field)}`} field={field} value={answers[field.name] || (field.multi ? [] : '')}
+                  error={errors[field.name]} size={first ? 'sm' : 'md'}
+                  label={translated(`onboarding.field.${field.labelKey || field.name}`, field.name)}
                   placeholder={translated(`onboarding.placeholder.${field.name}`, '')}
                   onChange={(v) => set(field.name, v)} />
               ))}
@@ -148,22 +154,41 @@ export function OnboardingView({ state, onDone }: {
   );
 }
 
+/** A searchable list shows this many chips before the student types... */
+const SEARCH_PREVIEW = 8;
+/** ...and never more than this many matches at once. */
+const SEARCH_LIMIT = 24;
+
 function Field({ field, label, placeholder, value, error, size, onChange }: {
   field: OnboardingFieldSpec;
   label: string;
   placeholder: string;
-  value: string;
+  value: OnboardingAnswer;
   error?: boolean;
   size: 'sm' | 'md';
-  onChange: (value: string) => void;
+  onChange: (value: OnboardingAnswer) => void;
 }) {
   const t = useT();
-  const [other, setOther] = React.useState(!!value && !!field.allowOther && !field.choices.includes(value));
+  const text = typeof value === 'string' ? value : '';
+  const picked = Array.isArray(value) ? value : text ? [text] : [];
+  const [other, setOther] = React.useState(!!text && !!field.allowOther && !field.choices.includes(text));
+  const [query, setQuery] = React.useState('');
+  // Our own copy first (FSc Pre-Medical), then the catalog's wording.
   const choiceLabel = (choice: string) => {
     const key = `onboarding.choice.${choice}`;
     const translated = t(key as MessageKey);
-    return translated === key ? choice : translated;
+    return translated !== key ? translated : field.labels?.[choice] || choice;
   };
+  const pick = (choice: string) => {
+    setOther(false);
+    if (!field.multi) onChange(choice);
+    else onChange(picked.includes(choice) ? picked.filter((c) => c !== choice) : [...picked, choice]);
+  };
+  // A long list (study fields) shows what is picked plus the first matches.
+  const needle = query.trim().toLowerCase();
+  const shown = !field.searchable ? field.choices : field.choices.filter((choice) => needle
+    ? choiceLabel(choice).toLowerCase().includes(needle)
+    : picked.includes(choice) || field.choices.indexOf(choice) < SEARCH_PREVIEW).slice(0, SEARCH_LIMIT);
   const id = `onb-${field.name}`;
   // "PAI / Onboarding / Choice": 42px tall, 16px corners, sized to its label.
   const chip = (on: boolean) => cn(
@@ -172,15 +197,19 @@ function Field({ field, label, placeholder, value, error, size, onChange }: {
   );
   const errorText = error ? t('onboarding.required') : null;
 
-  if (field.choices.length > 0) {
+  if (field.choices.length > 0 || field.searchable) {
     return (
       <div className="flex flex-col gap-2.5">
         <span id={`${id}-label`} className="text-[15px] font-bold leading-[22px] text-auth-label">{label}</span>
+        {field.searchable && (
+          <Input aria-labelledby={`${id}-label`} value={query} placeholder={t('onboarding.searchPlaceholder')}
+            className={authInputClass} onChange={(event) => setQuery(event.target.value)} />
+        )}
         <div role="group" aria-labelledby={`${id}-label`} aria-describedby={error ? `${id}-error` : undefined} className="flex flex-col gap-2.5">
           <div className="flex flex-wrap gap-2.5">
-            {field.choices.map((choice, i) => (
-              <button key={choice} data-field={i === 0 ? field.name : undefined} type="button" aria-pressed={value === choice && !other}
-                className={chip(value === choice && !other)} onClick={() => { setOther(false); onChange(choice); }}>
+            {shown.map((choice, i) => (
+              <button key={choice} data-field={i === 0 ? field.name : undefined} type="button" aria-pressed={picked.includes(choice) && !other}
+                className={chip(picked.includes(choice) && !other)} onClick={() => pick(choice)}>
                 {choiceLabel(choice)}
               </button>
             ))}
@@ -194,7 +223,7 @@ function Field({ field, label, placeholder, value, error, size, onChange }: {
           )}
         </div>
         {other && (
-          <Input aria-labelledby={`${id}-label`} autoFocus value={value} placeholder={t('onboarding.otherPlaceholder')}
+          <Input aria-labelledby={`${id}-label`} autoFocus value={text} placeholder={t('onboarding.otherPlaceholder')}
             className={authInputClass} onChange={(event) => onChange(event.target.value)} />
         )}
         {errorText && <p id={`${id}-error`} className="text-xs font-medium text-danger-ink">{errorText}</p>}
@@ -206,17 +235,20 @@ function Field({ field, label, placeholder, value, error, size, onChange }: {
     <AuthField label={label} error={errorText} size={size}
       hint={field.options && field.options.length === 1 ? t('onboarding.countryNote') : undefined}>
       {(props) => field.isDate ? (
-        <DobPicker id={props.id} field={field.name} value={value} onChange={onChange} invalid={!!error} describedBy={props['aria-describedby']} />
+        <DobPicker id={props.id} field={field.name} value={text} onChange={onChange} invalid={!!error} describedBy={props['aria-describedby']} />
+      ) : field.isYear ? (
+        <Input {...props} data-field={field.name} value={text} inputMode="numeric" maxLength={4} placeholder={t('onboarding.yearPlaceholder')}
+          className={authInputClass} onChange={(e) => onChange(e.target.value.replace(/\D/g, ''))} />
       ) : field.options && field.options.length > 0 ? (
         <div className="relative">
-          <select {...props} data-field={field.name} value={value} onChange={(e) => onChange(e.target.value)}
+          <select {...props} data-field={field.name} value={text} onChange={(e) => onChange(e.target.value)}
             className={cn(authInputClass, 'appearance-none pe-10 outline-none')}>
             {field.options.map((option) => <option key={option} value={option}>{option}</option>)}
           </select>
           <img alt="" src="/auth/chevron.svg" className="pointer-events-none absolute end-4 top-1/2 size-4 -translate-y-1/2" />
         </div>
       ) : (
-        <Input {...props} data-field={field.name} value={value} placeholder={placeholder || undefined}
+        <Input {...props} data-field={field.name} value={text} placeholder={placeholder || undefined}
           autoComplete={field.name === 'firstName' ? 'given-name' : field.name === 'lastName' ? 'family-name' : field.name === 'currentCity' ? 'address-level2' : undefined}
           className={authInputClass} onChange={(e) => onChange(e.target.value)} />
       )}

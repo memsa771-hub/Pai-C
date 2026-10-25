@@ -444,6 +444,17 @@ class OnboardingAnswers(BaseModel):
     answers: dict[str, Any] = Field(default_factory=dict)
 
 
+def _onboarding(db: Session) -> OnboardingService:
+    """The onboarding service with the study fields a Bachelor's or Master's
+    student picks from. They are PAI C's policy data, which app.memory does
+    not import, so the router hands them in."""
+    from app.pai_c.paths.fields import study_fields
+    fields = study_fields().values()
+    return OnboardingService(db, sources={
+        f"study_fields.{level}": [(f.key, f.title) for f in fields if level in f.levels]
+        for level in ("bachelor", "master")})
+
+
 @router.get("/onboarding")
 def get_onboarding(
     network: str = Query(...), db: Session = Depends(get_db),
@@ -453,7 +464,7 @@ def get_onboarding(
     workspace, error = _workspace(db, network, x_workspace_token, authorization)
     if error:
         return error
-    return success_response(OnboardingService(db).state(workspace))
+    return success_response(_onboarding(db).state(workspace))
 
 
 @router.post("/onboarding")
@@ -466,7 +477,7 @@ def submit_onboarding(
     if error:
         return error
     try:
-        result = OnboardingService(db).apply(workspace, body.answers)
+        result = _onboarding(db).apply(workspace, body.answers)
     except MemoryDataError as exc:
         db.rollback()
         return json_response(ResponseCode.BAD_REQUEST, str(exc))
