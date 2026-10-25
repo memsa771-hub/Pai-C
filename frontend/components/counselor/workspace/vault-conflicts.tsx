@@ -115,18 +115,18 @@ function Tiles({ tiles, labelledBy, busy, chosen, onChoose, openDocument }: {
     refs.current[next]?.focus();
   };
   return (
-    <div role="radiogroup" aria-labelledby={labelledBy} className={cn("grid gap-3", tiles.length > 1 && "sm:grid-cols-2")}>
+    <div role="radiogroup" aria-labelledby={labelledBy} className={cn("-m-1 grid gap-3 p-1", tiles.length > 1 && "sm:grid-cols-2")}>
       {tiles.map((tile, index) => {
         const on = chosen === tile.answer;
         return (
           <div key={tile.answer}
-            className={cn("flex min-w-0 flex-col rounded-2xl border bg-card shadow-soft transition-colors",
+            className={cn("flex min-w-0 flex-col rounded-2xl border bg-card shadow-soft transition-colors has-[button[role=radio]:focus-visible]:outline-2 has-[button[role=radio]:focus-visible]:outline-offset-2 has-[button[role=radio]:focus-visible]:outline-ring",
               on ? "border-primary ring-2 ring-primary/30" : "hover:border-primary/50")}>
             <button ref={(node) => { refs.current[index] = node; }} type="button" role="radio" aria-checked={on}
               tabIndex={index === focus ? 0 : -1} disabled={busy} onKeyDown={(e) => move(e, index)}
               onFocus={() => setFocus(index)} onClick={() => onChoose(tile.answer)}
               aria-label={tile.value ? fill(text.conflictTileAria, { tile: tile.title, value: tile.value }) : tile.title}
-              className="flex min-h-24 flex-1 flex-col items-start gap-1 rounded-2xl px-4 pb-2 pt-4 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:opacity-60">
+              className="flex min-h-24 flex-1 flex-col items-start gap-1 rounded-2xl px-4 pb-2 pt-4 text-left focus-visible:outline-none disabled:opacity-60">
               {/* A tile without a value (a file's owner) is its answer, in large type. */}
               {tile.value ? (
                 <>
