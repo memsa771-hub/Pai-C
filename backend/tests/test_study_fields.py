@@ -1,0 +1,126 @@
+"""Study fields are real fields of study, each tied to the groups that open it."""
+
+import pytest
+
+from app.memory.catalog import vault_catalog
+from app.pai_c.paths.fields import fields_for_group, known_groups, student_group, study_fields
+from app.pai_c.policy.controller import load_data
+
+FAMILIES_REQUIRED = {"engineering", "computing", "health", "business", "sciences",
+                     "arts_humanities", "law", "architecture_design"}
+
+
+def _titles(fields):
+    return {f.title for f in fields}
+
+
+def test_every_field_has_a_valid_isced_code_and_known_groups():
+    isced = load_data("fields_of_study.json")["fields"]
+    groups = known_groups()
+    fields = study_fields()
+    for key, field in fields.items():
+        assert field.key == key
+        assert field.title and field.family and field.levels, key
+        assert field.isced in isced, key
+        assert field.open_to, key
+        assert set(field.open_to) <= groups, key
+        assert set(field.check) <= groups, key
+        assert not set(field.open_to) & set(field.check), key
+
+
+def test_known_groups_are_the_catalog_intermediate_groups_plus_dae():
+    catalog_groups = {c.code for c in vault_catalog().choices("intermediate_groups")}
+    assert known_groups() == catalog_groups | {"dae"}
+
+
+def test_enough_real_fields_across_families():
+    fields = study_fields()
+    assert len(fields) >= 40
+    assert FAMILIES_REQUIRED <= {f.family for f in fields.values()}
+    titles = _titles(fields.values())
+    for title in ("Electrical Engineering", "Computer Engineering", "Software Engineering",
+                  "Computer Science", "MBBS (Medicine)", "Pharm-D (Pharmacy)", "BBA",
+                  "Architecture", "Law (LLB)"):
+        assert title in titles
+    assert len(titles) == len(fields)  # titles are what the student sees; no two alike
+
+
+def test_pre_medical_opens_mbbs_not_mechanical_engineering():
+    open_, check = fields_for_group("pre_medical")
+    assert "MBBS (Medicine)" in _titles(open_)
+    assert "Mechanical Engineering" not in _titles(open_)
+
+
+def test_ics_opens_computer_science_and_checks_some_engineering():
+    open_, check = fields_for_group("ics")
+    assert "Computer Science" in _titles(open_)
+    assert any(f.family == "engineering" for f in check)
+    assert all(f.check_note for f in check)
+
+
+def test_unknown_group_opens_nothing():
+    assert fields_for_group("astrology") == ([], [])
+
+
+@pytest.mark.parametrize("record, group", [
+    ({"qualification_name": "fsc", "field_of_study": "pre_engineering"}, "pre_engineering"),
+    ({"qualification_name": "fsc", "field_of_study": "pre_medical"}, "pre_medical"),
+    ({"qualification_name": "fsc", "field_of_study": "general_science"}, "general_science"),
+    ({"qualification_name": "FSc", "field_of_study": "Pre-Medical"}, "pre_medical"),
+    ({"qualification_name": "ics"}, "ics"),
+    ({"qualification_name": "icom"}, "icom"),
+    ({"qualification_name": "fa"}, "fa_humanities"),
+    ({"qualification_name": "intermediate", "field_of_study": "icom"}, "icom"),
+    ({"qualification_name": "dae", "field_of_study": "electrical"}, "dae"),
+    ({"qualification_name": "fsc"}, None),
+    ({"qualification_name": "intermediate"}, None),
+    ({"qualification_name": "matric", "field_of_study": "science_biology"}, None),
+    ({"qualification_name": "bachelor", "field_of_study": "bba"}, None),
+    ({}, None),
+])
+def test_student_group_from_the_education_record(record, group):
+    assert student_group(record) == group
+
+
+def test_student_group_covers_every_intermediate_group():
+    for code in {c.code for c in vault_catalog().choices("intermediate_groups")}:
+        assert student_group({"qualification_name": "intermediate", "field_of_study": code}) == code
+
+
+@pytest.mark.parametrize("level, subjects, group", [
+    ("a_level", ["physics", "mathematics", "chemistry"], "pre_engineering"),
+    ("a_level", ["Biology", "Chemistry", "Physics"], "pre_medical"),
+    ("a_level", ["mathematics", "physics", "computer_science"], "ics"),
+    ("a_level", ["accounting", "business", "economics"], "icom"),
+    ("a_level", ["sociology", "history", "english_literature"], "fa_humanities"),
+    ("o_level", ["biology", "chemistry", "physics", "mathematics"], "pre_medical"),
+    ("a_level", [], None),
+])
+def test_student_group_from_subjects_follows_the_data_rule(level, subjects, group):
+    assert student_group({"qualification_name": level, "subjects": subjects}) == group
+    assert student_group({"qualification_name": level, "details": {"subjects": subjects}}) == group
+
+
+def test_subject_rules_use_catalog_subject_codes_and_known_groups():
+    catalog = vault_catalog()
+    rules = load_data("study_fields.json")["group_rules"]
+    for level, rows in rules["subject_rules"].items():
+        codes = {c.code for c in catalog.choices(f"{level}_subjects")}
+        assert codes, level
+        for row in rows:
+            assert row["group"] in known_groups()
+            assert set(row.get("all", [])) | set(row.get("any", [])) <= codes, row
+
+
+def test_catalog_has_the_onboarding_education_lists():
+    catalog = vault_catalog()
+    levels = {c.code for c in catalog.choices("levels")}
+    assert {"matric", "o_level", "fsc", "ics", "icom", "fa", "a_level", "intermediate", "dae",
+            "bachelor", "masters", "other"} <= levels
+    assert {c.code for c in catalog.choices("matric_groups")} == {
+        "science_biology", "science_computer", "arts"}
+    for name in ("o_level_subjects", "a_level_subjects", "dae_technologies"):
+        assert len(catalog.choices(name)) >= 5, name
+    assert catalog.choice_code("levels", "Intermediate") == "intermediate"
+    assert catalog.choice_code("levels", "HSSC") == "fsc"  # existing wordings keep their codes
+    assert catalog.choice_code("a_level_subjects", "Maths") == "mathematics"

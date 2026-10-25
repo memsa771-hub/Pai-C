@@ -1,0 +1,1481 @@
+{
+  "_note": "Fields of study students in Pakistan and abroad choose, with the plain titles students know. open_to: the groups that usually qualify. check: groups that may qualify under conditions that vary by university and council; never settled here, so research decides before PAI says a student qualifies, and check_note says what to verify. isced is a code from fields_of_study.json, kept for PAI OS and never shown.",
+  "groups": [
+    "pre_engineering",
+    "pre_medical",
+    "ics",
+    "icom",
+    "fa_humanities",
+    "general_science",
+    "dae"
+  ],
+  "group_rules": {
+    "_note": "How an education record names its group. FSc and Intermediate carry it in field_of_study; ICS, I.Com, FA and DAE carry it in the qualification; A-level and O-level are read from their subjects, first matching rule wins (a rule with no subjects listed matches any non-empty set). Matric, bachelor's and master's name no group.",
+    "from_field_of_study": [
+      "fsc",
+      "intermediate"
+    ],
+    "from_level": {
+      "ics": "ics",
+      "icom": "icom",
+      "fa": "fa_humanities",
+      "dae": "dae"
+    },
+    "subject_rules": {
+      "a_level": [
+        {
+          "group": "pre_medical",
+          "all": [
+            "biology",
+            "chemistry"
+          ]
+        },
+        {
+          "group": "pre_engineering",
+          "all": [
+            "physics",
+            "mathematics",
+            "chemistry"
+          ]
+        },
+        {
+          "group": "ics",
+          "all": [
+            "mathematics",
+            "computer_science"
+          ]
+        },
+        {
+          "group": "icom",
+          "any": [
+            "accounting",
+            "business"
+          ]
+        },
+        {
+          "group": "fa_humanities"
+        }
+      ],
+      "o_level": [
+        {
+          "group": "pre_medical",
+          "all": [
+            "biology",
+            "chemistry"
+          ]
+        },
+        {
+          "group": "pre_engineering",
+          "all": [
+            "physics",
+            "mathematics",
+            "chemistry"
+          ]
+        },
+        {
+          "group": "ics",
+          "all": [
+            "mathematics",
+            "computer_science"
+          ]
+        },
+        {
+          "group": "icom",
+          "any": [
+            "accounting",
+            "business_studies",
+            "commerce"
+          ]
+        },
+        {
+          "group": "fa_humanities"
+        }
+      ]
+    }
+  },
+  "fields": [
+    {
+      "key": "electrical_engineering",
+      "title": "Electrical Engineering",
+      "family": "engineering",
+      "levels": [
+        "bachelor",
+        "master"
+      ],
+      "isced": "0713",
+      "open_to": [
+        "pre_engineering"
+      ],
+      "check": [
+        "ics",
+        "pre_medical",
+        "dae"
+      ],
+      "check_note": "Some universities admit ICS (with Physics and Maths), Pre-Medical (with a Maths deficiency course) or DAE holders; check the engineering council's and the university's current rule."
+    },
+    {
+      "key": "electronic_engineering",
+      "title": "Electronic Engineering",
+      "family": "engineering",
+      "levels": [
+        "bachelor",
+        "master"
+      ],
+      "isced": "0714",
+      "open_to": [
+        "pre_engineering"
+      ],
+      "check": [
+        "ics",
+        "pre_medical",
+        "dae"
+      ],
+      "check_note": "Some universities admit ICS (with Physics and Maths), Pre-Medical (with a Maths deficiency course) or DAE holders; check the engineering council's and the university's current rule."
+    },
+    {
+      "key": "computer_engineering",
+      "title": "Computer Engineering",
+      "family": "engineering",
+      "levels": [
+        "bachelor",
+        "master"
+      ],
+      "isced": "0714",
+      "open_to": [
+        "pre_engineering"
+      ],
+      "check": [
+        "ics",
+        "pre_medical",
+        "dae"
+      ],
+      "check_note": "Some universities admit ICS (with Physics and Maths), Pre-Medical (with a Maths deficiency course) or DAE holders; check the engineering council's and the university's current rule."
+    },
+    {
+      "key": "telecommunication_engineering",
+      "title": "Telecommunication Engineering",
+      "family": "engineering",
+      "levels": [
+        "bachelor",
+        "master"
+      ],
+      "isced": "0714",
+      "open_to": [
+        "pre_engineering"
+      ],
+      "check": [
+        "ics",
+        "pre_medical",
+        "dae"
+      ],
+      "check_note": "Some universities admit ICS (with Physics and Maths), Pre-Medical (with a Maths deficiency course) or DAE holders; check the engineering council's and the university's current rule."
+    },
+    {
+      "key": "mechanical_engineering",
+      "title": "Mechanical Engineering",
+      "family": "engineering",
+      "levels": [
+        "bachelor",
+        "master"
+      ],
+      "isced": "0715",
+      "open_to": [
+        "pre_engineering"
+      ],
+      "check": [
+        "pre_medical",
+        "dae"
+      ],
+      "check_note": "Some universities admit ICS (with Physics and Maths), Pre-Medical (with a Maths deficiency course) or DAE holders; check the engineering council's and the university's current rule."
+    },
+    {
+      "key": "mechatronics_engineering",
+      "title": "Mechatronics Engineering",
+      "family": "engineering",
+      "levels": [
+        "bachelor",
+        "master"
+      ],
+      "isced": "0714",
+      "open_to": [
+        "pre_engineering"
+      ],
+      "check": [
+        "ics",
+        "pre_medical",
+        "dae"
+      ],
+      "check_note": "Some universities admit ICS (with Physics and Maths), Pre-Medical (with a Maths deficiency course) or DAE holders; check the engineering council's and the university's current rule."
+    },
+    {
+      "key": "civil_engineering",
+      "title": "Civil Engineering",
+      "family": "engineering",
+      "levels": [
+        "bachelor",
+        "master"
+      ],
+      "isced": "0732",
+      "open_to": [
+        "pre_engineering"
+      ],
+      "check": [
+        "pre_medical",
+        "dae"
+      ],
+      "check_note": "Some universities admit ICS (with Physics and Maths), Pre-Medical (with a Maths deficiency course) or DAE holders; check the engineering council's and the university's current rule."
+    },
+    {
+      "key": "chemical_engineering",
+      "title": "Chemical Engineering",
+      "family": "engineering",
+      "levels": [
+        "bachelor",
+        "master"
+      ],
+      "isced": "0711",
+      "open_to": [
+        "pre_engineering"
+      ],
+      "check": [
+        "pre_medical",
+        "dae"
+      ],
+      "check_note": "Some universities admit ICS (with Physics and Maths), Pre-Medical (with a Maths deficiency course) or DAE holders; check the engineering council's and the university's current rule."
+    },
+    {
+      "key": "biomedical_engineering",
+      "title": "Biomedical Engineering",
+      "family": "engineering",
+      "levels": [
+        "bachelor",
+        "master"
+      ],
+      "isced": "0714",
+      "open_to": [
+        "pre_engineering"
+      ],
+      "check": [
+        "pre_medical",
+        "ics",
+        "dae"
+      ],
+      "check_note": "Some universities admit ICS (with Physics and Maths), Pre-Medical (with a Maths deficiency course) or DAE holders; check the engineering council's and the university's current rule."
+    },
+    {
+      "key": "industrial_engineering",
+      "title": "Industrial Engineering",
+      "family": "engineering",
+      "levels": [
+        "bachelor",
+        "master"
+      ],
+      "isced": "0715",
+      "open_to": [
+        "pre_engineering"
+      ],
+      "check": [
+        "pre_medical",
+        "dae"
+      ],
+      "check_note": "Some universities admit ICS (with Physics and Maths), Pre-Medical (with a Maths deficiency course) or DAE holders; check the engineering council's and the university's current rule."
+    },
+    {
+      "key": "aerospace_engineering",
+      "title": "Aerospace Engineering",
+      "family": "engineering",
+      "levels": [
+        "bachelor",
+        "master"
+      ],
+      "isced": "0716",
+      "open_to": [
+        "pre_engineering"
+      ],
+      "check": [
+        "dae"
+      ],
+      "check_note": "Some universities admit ICS (with Physics and Maths), Pre-Medical (with a Maths deficiency course) or DAE holders; check the engineering council's and the university's current rule."
+    },
+    {
+      "key": "petroleum_engineering",
+      "title": "Petroleum Engineering",
+      "family": "engineering",
+      "levels": [
+        "bachelor",
+        "master"
+      ],
+      "isced": "0724",
+      "open_to": [
+        "pre_engineering"
+      ],
+      "check": [
+        "pre_medical",
+        "dae"
+      ],
+      "check_note": "Some universities admit ICS (with Physics and Maths), Pre-Medical (with a Maths deficiency course) or DAE holders; check the engineering council's and the university's current rule."
+    },
+    {
+      "key": "materials_engineering",
+      "title": "Metallurgy and Materials Engineering",
+      "family": "engineering",
+      "levels": [
+        "bachelor",
+        "master"
+      ],
+      "isced": "0722",
+      "open_to": [
+        "pre_engineering"
+      ],
+      "check": [
+        "pre_medical",
+        "dae"
+      ],
+      "check_note": "Some universities admit ICS (with Physics and Maths), Pre-Medical (with a Maths deficiency course) or DAE holders; check the engineering council's and the university's current rule."
+    },
+    {
+      "key": "textile_engineering",
+      "title": "Textile Engineering",
+      "family": "engineering",
+      "levels": [
+        "bachelor",
+        "master"
+      ],
+      "isced": "0723",
+      "open_to": [
+        "pre_engineering"
+      ],
+      "check": [
+        "pre_medical",
+        "dae"
+      ],
+      "check_note": "Some universities admit ICS (with Physics and Maths), Pre-Medical (with a Maths deficiency course) or DAE holders; check the engineering council's and the university's current rule."
+    },
+    {
+      "key": "environmental_engineering",
+      "title": "Environmental Engineering",
+      "family": "engineering",
+      "levels": [
+        "bachelor",
+        "master"
+      ],
+      "isced": "0712",
+      "open_to": [
+        "pre_engineering"
+      ],
+      "check": [
+        "pre_medical",
+        "dae"
+      ],
+      "check_note": "Some universities admit ICS (with Physics and Maths), Pre-Medical (with a Maths deficiency course) or DAE holders; check the engineering council's and the university's current rule."
+    },
+    {
+      "key": "engineering_technology",
+      "title": "Engineering Technology (BSc / B.Tech)",
+      "family": "engineering",
+      "levels": [
+        "bachelor"
+      ],
+      "isced": "0713",
+      "open_to": [
+        "pre_engineering",
+        "dae"
+      ],
+      "check": [
+        "ics"
+      ],
+      "check_note": "Some universities admit ICS (with Physics and Maths), Pre-Medical (with a Maths deficiency course) or DAE holders; check the engineering council's and the university's current rule."
+    },
+    {
+      "key": "computer_science",
+      "title": "Computer Science",
+      "family": "computing",
+      "levels": [
+        "bachelor",
+        "master"
+      ],
+      "isced": "0613",
+      "open_to": [
+        "pre_engineering",
+        "ics"
+      ],
+      "check": [
+        "general_science",
+        "pre_medical",
+        "icom",
+        "dae"
+      ],
+      "check_note": "Computing programmes may admit these groups with Maths, sometimes after a deficiency course; check the university's current rule."
+    },
+    {
+      "key": "software_engineering",
+      "title": "Software Engineering",
+      "family": "computing",
+      "levels": [
+        "bachelor",
+        "master"
+      ],
+      "isced": "0613",
+      "open_to": [
+        "pre_engineering",
+        "ics"
+      ],
+      "check": [
+        "general_science",
+        "pre_medical",
+        "icom",
+        "dae"
+      ],
+      "check_note": "Computing programmes may admit these groups with Maths, sometimes after a deficiency course; check the university's current rule."
+    },
+    {
+      "key": "artificial_intelligence",
+      "title": "Artificial Intelligence",
+      "family": "computing",
+      "levels": [
+        "bachelor",
+        "master"
+      ],
+      "isced": "0613",
+      "open_to": [
+        "pre_engineering",
+        "ics"
+      ],
+      "check": [
+        "general_science",
+        "pre_medical",
+        "icom",
+        "dae"
+      ],
+      "check_note": "Computing programmes may admit these groups with Maths, sometimes after a deficiency course; check the university's current rule."
+    },
+    {
+      "key": "data_science",
+      "title": "Data Science",
+      "family": "computing",
+      "levels": [
+        "bachelor",
+        "master"
+      ],
+      "isced": "0542",
+      "open_to": [
+        "pre_engineering",
+        "ics"
+      ],
+      "check": [
+        "general_science",
+        "pre_medical",
+        "icom",
+        "dae"
+      ],
+      "check_note": "Computing programmes may admit these groups with Maths, sometimes after a deficiency course; check the university's current rule."
+    },
+    {
+      "key": "cyber_security",
+      "title": "Cyber Security",
+      "family": "computing",
+      "levels": [
+        "bachelor",
+        "master"
+      ],
+      "isced": "0612",
+      "open_to": [
+        "pre_engineering",
+        "ics"
+      ],
+      "check": [
+        "general_science",
+        "pre_medical",
+        "icom",
+        "dae"
+      ],
+      "check_note": "Computing programmes may admit these groups with Maths, sometimes after a deficiency course; check the university's current rule."
+    },
+    {
+      "key": "information_technology",
+      "title": "Information Technology",
+      "family": "computing",
+      "levels": [
+        "bachelor",
+        "master"
+      ],
+      "isced": "0612",
+      "open_to": [
+        "pre_engineering",
+        "ics"
+      ],
+      "check": [
+        "general_science",
+        "pre_medical",
+        "icom",
+        "dae"
+      ],
+      "check_note": "Computing programmes may admit these groups with Maths, sometimes after a deficiency course; check the university's current rule."
+    },
+    {
+      "key": "architecture",
+      "title": "Architecture",
+      "family": "architecture_design",
+      "levels": [
+        "bachelor"
+      ],
+      "isced": "0731",
+      "open_to": [
+        "pre_engineering"
+      ],
+      "check": [
+        "ics",
+        "pre_medical",
+        "general_science",
+        "fa_humanities",
+        "dae"
+      ],
+      "check_note": "Many schools of architecture take other groups after an aptitude test; check the council's and the university's current rule."
+    },
+    {
+      "key": "city_planning",
+      "title": "City and Regional Planning",
+      "family": "architecture_design",
+      "levels": [
+        "bachelor",
+        "master"
+      ],
+      "isced": "0731",
+      "open_to": [
+        "pre_engineering"
+      ],
+      "check": [
+        "ics",
+        "pre_medical",
+        "general_science"
+      ],
+      "check_note": "May need the relevant subject at intermediate or a deficiency course; check the university's current rule."
+    },
+    {
+      "key": "interior_design",
+      "title": "Interior Design",
+      "family": "architecture_design",
+      "levels": [
+        "bachelor"
+      ],
+      "isced": "0212",
+      "open_to": [
+        "pre_engineering",
+        "pre_medical",
+        "ics",
+        "icom",
+        "fa_humanities",
+        "general_science"
+      ],
+      "check": [
+        "dae"
+      ],
+      "check_note": "Check whether the university accepts this qualification for the programme."
+    },
+    {
+      "key": "textile_design",
+      "title": "Textile Design",
+      "family": "architecture_design",
+      "levels": [
+        "bachelor"
+      ],
+      "isced": "0212",
+      "open_to": [
+        "pre_engineering",
+        "pre_medical",
+        "ics",
+        "icom",
+        "fa_humanities",
+        "general_science"
+      ],
+      "check": []
+    },
+    {
+      "key": "fashion_design",
+      "title": "Fashion Design",
+      "family": "architecture_design",
+      "levels": [
+        "bachelor"
+      ],
+      "isced": "0212",
+      "open_to": [
+        "pre_engineering",
+        "pre_medical",
+        "ics",
+        "icom",
+        "fa_humanities",
+        "general_science"
+      ],
+      "check": []
+    },
+    {
+      "key": "graphic_design",
+      "title": "Graphic Design",
+      "family": "architecture_design",
+      "levels": [
+        "bachelor"
+      ],
+      "isced": "0211",
+      "open_to": [
+        "pre_engineering",
+        "pre_medical",
+        "ics",
+        "icom",
+        "fa_humanities",
+        "general_science"
+      ],
+      "check": []
+    },
+    {
+      "key": "film_animation",
+      "title": "Film, TV and Animation",
+      "family": "architecture_design",
+      "levels": [
+        "bachelor"
+      ],
+      "isced": "0211",
+      "open_to": [
+        "pre_engineering",
+        "pre_medical",
+        "ics",
+        "icom",
+        "fa_humanities",
+        "general_science"
+      ],
+      "check": []
+    },
+    {
+      "key": "mbbs",
+      "title": "MBBS (Medicine)",
+      "family": "health",
+      "levels": [
+        "bachelor"
+      ],
+      "isced": "0912",
+      "open_to": [
+        "pre_medical"
+      ],
+      "check": []
+    },
+    {
+      "key": "bds",
+      "title": "BDS (Dentistry)",
+      "family": "health",
+      "levels": [
+        "bachelor"
+      ],
+      "isced": "0911",
+      "open_to": [
+        "pre_medical"
+      ],
+      "check": []
+    },
+    {
+      "key": "pharm_d",
+      "title": "Pharm-D (Pharmacy)",
+      "family": "health",
+      "levels": [
+        "bachelor"
+      ],
+      "isced": "0916",
+      "open_to": [
+        "pre_medical"
+      ],
+      "check": [
+        "pre_engineering"
+      ],
+      "check_note": "Check the council's and the university's current rule for this group."
+    },
+    {
+      "key": "physical_therapy",
+      "title": "Doctor of Physical Therapy",
+      "family": "health",
+      "levels": [
+        "bachelor"
+      ],
+      "isced": "0915",
+      "open_to": [
+        "pre_medical"
+      ],
+      "check": []
+    },
+    {
+      "key": "nursing",
+      "title": "Nursing",
+      "family": "health",
+      "levels": [
+        "bachelor",
+        "diploma"
+      ],
+      "isced": "0913",
+      "open_to": [
+        "pre_medical"
+      ],
+      "check": []
+    },
+    {
+      "key": "medical_lab_technology",
+      "title": "Medical Laboratory Technology",
+      "family": "health",
+      "levels": [
+        "bachelor",
+        "diploma"
+      ],
+      "isced": "0914",
+      "open_to": [
+        "pre_medical"
+      ],
+      "check": []
+    },
+    {
+      "key": "radiology_imaging",
+      "title": "Radiology and Medical Imaging",
+      "family": "health",
+      "levels": [
+        "bachelor",
+        "diploma"
+      ],
+      "isced": "0914",
+      "open_to": [
+        "pre_medical"
+      ],
+      "check": []
+    },
+    {
+      "key": "optometry",
+      "title": "Optometry",
+      "family": "health",
+      "levels": [
+        "bachelor"
+      ],
+      "isced": "0914",
+      "open_to": [
+        "pre_medical"
+      ],
+      "check": []
+    },
+    {
+      "key": "human_nutrition",
+      "title": "Human Nutrition and Dietetics",
+      "family": "health",
+      "levels": [
+        "bachelor",
+        "master"
+      ],
+      "isced": "0915",
+      "open_to": [
+        "pre_medical"
+      ],
+      "check": [
+        "pre_engineering",
+        "general_science"
+      ],
+      "check_note": "Check the council's and the university's current rule for this group."
+    },
+    {
+      "key": "veterinary_medicine",
+      "title": "DVM (Veterinary Medicine)",
+      "family": "health",
+      "levels": [
+        "bachelor"
+      ],
+      "isced": "0841",
+      "open_to": [
+        "pre_medical"
+      ],
+      "check": []
+    },
+    {
+      "key": "sports_sciences",
+      "title": "Sports Sciences and Physical Education",
+      "family": "health",
+      "levels": [
+        "bachelor",
+        "master"
+      ],
+      "isced": "1014",
+      "open_to": [
+        "pre_engineering",
+        "pre_medical",
+        "ics",
+        "icom",
+        "fa_humanities",
+        "general_science"
+      ],
+      "check": []
+    },
+    {
+      "key": "biotechnology",
+      "title": "Biotechnology",
+      "family": "sciences",
+      "levels": [
+        "bachelor",
+        "master"
+      ],
+      "isced": "0512",
+      "open_to": [
+        "pre_medical"
+      ],
+      "check": [
+        "pre_engineering",
+        "general_science"
+      ],
+      "check_note": "May need the relevant subject at intermediate or a deficiency course; check the university's current rule."
+    },
+    {
+      "key": "biochemistry",
+      "title": "Biochemistry",
+      "family": "sciences",
+      "levels": [
+        "bachelor",
+        "master"
+      ],
+      "isced": "0512",
+      "open_to": [
+        "pre_medical"
+      ],
+      "check": [
+        "pre_engineering",
+        "general_science"
+      ],
+      "check_note": "May need the relevant subject at intermediate or a deficiency course; check the university's current rule."
+    },
+    {
+      "key": "microbiology",
+      "title": "Microbiology",
+      "family": "sciences",
+      "levels": [
+        "bachelor",
+        "master"
+      ],
+      "isced": "0511",
+      "open_to": [
+        "pre_medical"
+      ],
+      "check": [
+        "general_science"
+      ],
+      "check_note": "May need the relevant subject at intermediate or a deficiency course; check the university's current rule."
+    },
+    {
+      "key": "zoology",
+      "title": "Zoology",
+      "family": "sciences",
+      "levels": [
+        "bachelor",
+        "master"
+      ],
+      "isced": "0511",
+      "open_to": [
+        "pre_medical"
+      ],
+      "check": []
+    },
+    {
+      "key": "botany",
+      "title": "Botany",
+      "family": "sciences",
+      "levels": [
+        "bachelor",
+        "master"
+      ],
+      "isced": "0511",
+      "open_to": [
+        "pre_medical"
+      ],
+      "check": []
+    },
+    {
+      "key": "chemistry",
+      "title": "Chemistry",
+      "family": "sciences",
+      "levels": [
+        "bachelor",
+        "master"
+      ],
+      "isced": "0531",
+      "open_to": [
+        "pre_engineering",
+        "pre_medical"
+      ],
+      "check": [
+        "general_science"
+      ],
+      "check_note": "May need the relevant subject at intermediate or a deficiency course; check the university's current rule."
+    },
+    {
+      "key": "physics",
+      "title": "Physics",
+      "family": "sciences",
+      "levels": [
+        "bachelor",
+        "master"
+      ],
+      "isced": "0533",
+      "open_to": [
+        "pre_engineering",
+        "general_science"
+      ],
+      "check": [
+        "pre_medical",
+        "ics"
+      ],
+      "check_note": "May need the relevant subject at intermediate or a deficiency course; check the university's current rule."
+    },
+    {
+      "key": "mathematics",
+      "title": "Mathematics",
+      "family": "sciences",
+      "levels": [
+        "bachelor",
+        "master"
+      ],
+      "isced": "0541",
+      "open_to": [
+        "pre_engineering",
+        "general_science",
+        "ics"
+      ],
+      "check": [
+        "pre_medical",
+        "icom"
+      ],
+      "check_note": "May need the relevant subject at intermediate or a deficiency course; check the university's current rule."
+    },
+    {
+      "key": "statistics",
+      "title": "Statistics",
+      "family": "sciences",
+      "levels": [
+        "bachelor",
+        "master"
+      ],
+      "isced": "0542",
+      "open_to": [
+        "pre_engineering",
+        "general_science",
+        "ics"
+      ],
+      "check": [
+        "pre_medical",
+        "icom"
+      ],
+      "check_note": "May need the relevant subject at intermediate or a deficiency course; check the university's current rule."
+    },
+    {
+      "key": "environmental_science",
+      "title": "Environmental Science",
+      "family": "sciences",
+      "levels": [
+        "bachelor",
+        "master"
+      ],
+      "isced": "0521",
+      "open_to": [
+        "pre_medical",
+        "pre_engineering",
+        "general_science"
+      ],
+      "check": [
+        "ics"
+      ],
+      "check_note": "May need the relevant subject at intermediate or a deficiency course; check the university's current rule."
+    },
+    {
+      "key": "geology",
+      "title": "Geology",
+      "family": "sciences",
+      "levels": [
+        "bachelor",
+        "master"
+      ],
+      "isced": "0532",
+      "open_to": [
+        "pre_engineering",
+        "pre_medical",
+        "general_science"
+      ],
+      "check": []
+    },
+    {
+      "key": "agriculture",
+      "title": "Agriculture",
+      "family": "agriculture",
+      "levels": [
+        "bachelor",
+        "master"
+      ],
+      "isced": "0811",
+      "open_to": [
+        "pre_medical"
+      ],
+      "check": [
+        "pre_engineering",
+        "general_science"
+      ],
+      "check_note": "May need the relevant subject at intermediate or a deficiency course; check the university's current rule."
+    },
+    {
+      "key": "food_science",
+      "title": "Food Science and Technology",
+      "family": "agriculture",
+      "levels": [
+        "bachelor",
+        "master"
+      ],
+      "isced": "0721",
+      "open_to": [
+        "pre_medical",
+        "pre_engineering"
+      ],
+      "check": [
+        "general_science"
+      ],
+      "check_note": "May need the relevant subject at intermediate or a deficiency course; check the university's current rule."
+    },
+    {
+      "key": "bba",
+      "title": "BBA",
+      "family": "business",
+      "levels": [
+        "bachelor"
+      ],
+      "isced": "0413",
+      "open_to": [
+        "pre_engineering",
+        "pre_medical",
+        "ics",
+        "icom",
+        "fa_humanities",
+        "general_science"
+      ],
+      "check": [
+        "dae"
+      ],
+      "check_note": "Check whether the university accepts this qualification for the programme."
+    },
+    {
+      "key": "accounting_finance",
+      "title": "Accounting and Finance",
+      "family": "business",
+      "levels": [
+        "bachelor",
+        "master"
+      ],
+      "isced": "0411",
+      "open_to": [
+        "icom",
+        "pre_engineering",
+        "ics",
+        "general_science"
+      ],
+      "check": [
+        "pre_medical",
+        "fa_humanities"
+      ],
+      "check_note": "Some programmes want Maths or a commerce background; check the university's current rule."
+    },
+    {
+      "key": "banking_finance",
+      "title": "Banking and Finance",
+      "family": "business",
+      "levels": [
+        "bachelor",
+        "master"
+      ],
+      "isced": "0412",
+      "open_to": [
+        "icom",
+        "pre_engineering",
+        "ics",
+        "general_science"
+      ],
+      "check": [
+        "pre_medical",
+        "fa_humanities"
+      ],
+      "check_note": "Some programmes want Maths or a commerce background; check the university's current rule."
+    },
+    {
+      "key": "bcom",
+      "title": "B.Com (Commerce)",
+      "family": "business",
+      "levels": [
+        "bachelor",
+        "master"
+      ],
+      "isced": "0411",
+      "open_to": [
+        "icom",
+        "fa_humanities",
+        "ics"
+      ],
+      "check": [
+        "pre_engineering",
+        "pre_medical",
+        "general_science"
+      ],
+      "check_note": "Some programmes want Maths or a commerce background; check the university's current rule."
+    },
+    {
+      "key": "marketing",
+      "title": "Marketing",
+      "family": "business",
+      "levels": [
+        "bachelor",
+        "master"
+      ],
+      "isced": "0414",
+      "open_to": [
+        "pre_engineering",
+        "pre_medical",
+        "ics",
+        "icom",
+        "fa_humanities",
+        "general_science"
+      ],
+      "check": []
+    },
+    {
+      "key": "supply_chain",
+      "title": "Supply Chain Management",
+      "family": "business",
+      "levels": [
+        "bachelor",
+        "master"
+      ],
+      "isced": "0413",
+      "open_to": [
+        "pre_engineering",
+        "pre_medical",
+        "ics",
+        "icom",
+        "fa_humanities",
+        "general_science"
+      ],
+      "check": []
+    },
+    {
+      "key": "hospitality_tourism",
+      "title": "Tourism and Hospitality Management",
+      "family": "business",
+      "levels": [
+        "bachelor"
+      ],
+      "isced": "1015",
+      "open_to": [
+        "pre_engineering",
+        "pre_medical",
+        "ics",
+        "icom",
+        "fa_humanities",
+        "general_science"
+      ],
+      "check": []
+    },
+    {
+      "key": "economics",
+      "title": "Economics",
+      "family": "social_sciences",
+      "levels": [
+        "bachelor",
+        "master"
+      ],
+      "isced": "0311",
+      "open_to": [
+        "icom",
+        "pre_engineering",
+        "ics",
+        "general_science",
+        "fa_humanities"
+      ],
+      "check": [
+        "pre_medical"
+      ],
+      "check_note": "Some programmes want Maths or a commerce background; check the university's current rule."
+    },
+    {
+      "key": "psychology",
+      "title": "Psychology",
+      "family": "social_sciences",
+      "levels": [
+        "bachelor",
+        "master"
+      ],
+      "isced": "0313",
+      "open_to": [
+        "pre_engineering",
+        "pre_medical",
+        "ics",
+        "icom",
+        "fa_humanities",
+        "general_science"
+      ],
+      "check": []
+    },
+    {
+      "key": "international_relations",
+      "title": "International Relations",
+      "family": "social_sciences",
+      "levels": [
+        "bachelor",
+        "master"
+      ],
+      "isced": "0312",
+      "open_to": [
+        "pre_engineering",
+        "pre_medical",
+        "ics",
+        "icom",
+        "fa_humanities",
+        "general_science"
+      ],
+      "check": []
+    },
+    {
+      "key": "political_science",
+      "title": "Political Science",
+      "family": "social_sciences",
+      "levels": [
+        "bachelor",
+        "master"
+      ],
+      "isced": "0312",
+      "open_to": [
+        "pre_engineering",
+        "pre_medical",
+        "ics",
+        "icom",
+        "fa_humanities",
+        "general_science"
+      ],
+      "check": []
+    },
+    {
+      "key": "sociology",
+      "title": "Sociology",
+      "family": "social_sciences",
+      "levels": [
+        "bachelor",
+        "master"
+      ],
+      "isced": "0314",
+      "open_to": [
+        "pre_engineering",
+        "pre_medical",
+        "ics",
+        "icom",
+        "fa_humanities",
+        "general_science"
+      ],
+      "check": []
+    },
+    {
+      "key": "criminology",
+      "title": "Criminology",
+      "family": "social_sciences",
+      "levels": [
+        "bachelor",
+        "master"
+      ],
+      "isced": "0314",
+      "open_to": [
+        "pre_engineering",
+        "pre_medical",
+        "ics",
+        "icom",
+        "fa_humanities",
+        "general_science"
+      ],
+      "check": []
+    },
+    {
+      "key": "social_work",
+      "title": "Social Work",
+      "family": "social_sciences",
+      "levels": [
+        "bachelor",
+        "master"
+      ],
+      "isced": "0923",
+      "open_to": [
+        "pre_engineering",
+        "pre_medical",
+        "ics",
+        "icom",
+        "fa_humanities",
+        "general_science"
+      ],
+      "check": []
+    },
+    {
+      "key": "public_administration",
+      "title": "Public Administration",
+      "family": "social_sciences",
+      "levels": [
+        "bachelor",
+        "master"
+      ],
+      "isced": "0413",
+      "open_to": [
+        "pre_engineering",
+        "pre_medical",
+        "ics",
+        "icom",
+        "fa_humanities",
+        "general_science"
+      ],
+      "check": []
+    },
+    {
+      "key": "media_communication",
+      "title": "Media and Communication",
+      "family": "arts_humanities",
+      "levels": [
+        "bachelor",
+        "master"
+      ],
+      "isced": "0321",
+      "open_to": [
+        "pre_engineering",
+        "pre_medical",
+        "ics",
+        "icom",
+        "fa_humanities",
+        "general_science"
+      ],
+      "check": []
+    },
+    {
+      "key": "english_literature",
+      "title": "English Literature and Linguistics",
+      "family": "arts_humanities",
+      "levels": [
+        "bachelor",
+        "master"
+      ],
+      "isced": "0232",
+      "open_to": [
+        "pre_engineering",
+        "pre_medical",
+        "ics",
+        "icom",
+        "fa_humanities",
+        "general_science"
+      ],
+      "check": []
+    },
+    {
+      "key": "urdu",
+      "title": "Urdu",
+      "family": "arts_humanities",
+      "levels": [
+        "bachelor",
+        "master"
+      ],
+      "isced": "0232",
+      "open_to": [
+        "pre_engineering",
+        "pre_medical",
+        "ics",
+        "icom",
+        "fa_humanities",
+        "general_science"
+      ],
+      "check": []
+    },
+    {
+      "key": "history",
+      "title": "History",
+      "family": "arts_humanities",
+      "levels": [
+        "bachelor",
+        "master"
+      ],
+      "isced": "0222",
+      "open_to": [
+        "pre_engineering",
+        "pre_medical",
+        "ics",
+        "icom",
+        "fa_humanities",
+        "general_science"
+      ],
+      "check": []
+    },
+    {
+      "key": "islamic_studies",
+      "title": "Islamic Studies",
+      "family": "arts_humanities",
+      "levels": [
+        "bachelor",
+        "master"
+      ],
+      "isced": "0221",
+      "open_to": [
+        "pre_engineering",
+        "pre_medical",
+        "ics",
+        "icom",
+        "fa_humanities",
+        "general_science"
+      ],
+      "check": []
+    },
+    {
+      "key": "fine_arts",
+      "title": "Fine Arts",
+      "family": "arts_humanities",
+      "levels": [
+        "bachelor"
+      ],
+      "isced": "0213",
+      "open_to": [
+        "pre_engineering",
+        "pre_medical",
+        "ics",
+        "icom",
+        "fa_humanities",
+        "general_science"
+      ],
+      "check": []
+    },
+    {
+      "key": "law_llb",
+      "title": "Law (LLB)",
+      "family": "law",
+      "levels": [
+        "bachelor"
+      ],
+      "isced": "0421",
+      "open_to": [
+        "pre_engineering",
+        "pre_medical",
+        "ics",
+        "icom",
+        "fa_humanities",
+        "general_science"
+      ],
+      "check": []
+    },
+    {
+      "key": "education",
+      "title": "Education (B.Ed)",
+      "family": "education",
+      "levels": [
+        "bachelor",
+        "master"
+      ],
+      "isced": "0113",
+      "open_to": [
+        "pre_engineering",
+        "pre_medical",
+        "ics",
+        "icom",
+        "fa_humanities",
+        "general_science"
+      ],
+      "check": []
+    }
+  ]
+}

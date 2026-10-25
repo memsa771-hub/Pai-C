@@ -91,7 +91,8 @@ def test_budget_bands_exact():
     assert codes == ["under_1_lakh", "1_3_lakh", "3_6_lakh", "6_10_lakh", "over_10_lakh", "not_sure"]
     assert [c.code for c in vault_catalog().choices("budget_covers")] == ["fees_only", "fees_and_living"]
     assert [c.code for c in vault_catalog().choices("levels")] == [
-        "matric", "o_level", "fsc", "ics", "icom", "fa", "a_level", "dae", "bachelor", "other"]
+        "matric", "o_level", "fsc", "ics", "icom", "fa", "intermediate", "a_level", "dae", "bachelor", "masters",
+        "other"]
 
 
 def test_fact_keys_match_production_fields():

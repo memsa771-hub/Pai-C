@@ -26,7 +26,6 @@
     "label": "FSc",
     "synonyms": [
      "F.Sc",
-     "intermediate",
      "HSSC",
      "12th",
      "inter"
@@ -56,6 +55,14 @@
     ]
    },
    {
+    "code": "intermediate",
+    "label": "Intermediate",
+    "synonyms": [
+     "intermediate part 1",
+     "intermediate part 2"
+    ]
+   },
+   {
     "code": "a_level",
     "label": "A Level",
     "synonyms": [
@@ -78,6 +85,19 @@
      "BS",
      "BSc",
      "undergraduate"
+    ]
+   },
+   {
+    "code": "masters",
+    "label": "Master's",
+    "synonyms": [
+     "masters",
+     "master",
+     "MS",
+     "MSc",
+     "MPhil",
+     "postgraduate",
+     "graduate degree"
     ]
    },
    {
@@ -134,6 +154,420 @@
     "synonyms": [
      "gen science",
      "science general"
+    ]
+   }
+  ],
+  "matric_groups": [
+   {
+    "code": "science_biology",
+    "label": "Science (Biology)",
+    "synonyms": [
+     "biology group",
+     "matric biology",
+     "science with biology"
+    ]
+   },
+   {
+    "code": "science_computer",
+    "label": "Science (Computer)",
+    "synonyms": [
+     "computer group",
+     "matric computer",
+     "science with computer"
+    ]
+   },
+   {
+    "code": "arts",
+    "label": "Arts",
+    "synonyms": [
+     "humanities",
+     "arts group",
+     "general group"
+    ]
+   }
+  ],
+  "o_level_subjects": [
+   {
+    "code": "mathematics",
+    "label": "Mathematics",
+    "synonyms": [
+     "maths",
+     "math",
+     "D maths",
+     "syllabus D"
+    ]
+   },
+   {
+    "code": "additional_mathematics",
+    "label": "Additional Mathematics",
+    "synonyms": [
+     "add maths",
+     "additional maths"
+    ]
+   },
+   {
+    "code": "physics",
+    "label": "Physics",
+    "synonyms": []
+   },
+   {
+    "code": "chemistry",
+    "label": "Chemistry",
+    "synonyms": []
+   },
+   {
+    "code": "biology",
+    "label": "Biology",
+    "synonyms": [
+     "bio"
+    ]
+   },
+   {
+    "code": "computer_science",
+    "label": "Computer Science",
+    "synonyms": [
+     "CS",
+     "computer"
+    ]
+   },
+   {
+    "code": "english_language",
+    "label": "English Language",
+    "synonyms": [
+     "english"
+    ]
+   },
+   {
+    "code": "urdu",
+    "label": "Urdu",
+    "synonyms": [
+     "first language urdu",
+     "second language urdu"
+    ]
+   },
+   {
+    "code": "islamiyat",
+    "label": "Islamiyat",
+    "synonyms": [
+     "islamic studies"
+    ]
+   },
+   {
+    "code": "pakistan_studies",
+    "label": "Pakistan Studies",
+    "synonyms": [
+     "pak studies",
+     "pak st"
+    ]
+   },
+   {
+    "code": "accounting",
+    "label": "Accounting",
+    "synonyms": [
+     "accounts",
+     "principles of accounts"
+    ]
+   },
+   {
+    "code": "business_studies",
+    "label": "Business Studies",
+    "synonyms": [
+     "business"
+    ]
+   },
+   {
+    "code": "commerce",
+    "label": "Commerce",
+    "synonyms": []
+   },
+   {
+    "code": "economics",
+    "label": "Economics",
+    "synonyms": [
+     "econ"
+    ]
+   },
+   {
+    "code": "sociology",
+    "label": "Sociology",
+    "synonyms": []
+   },
+   {
+    "code": "english_literature",
+    "label": "Literature in English",
+    "synonyms": [
+     "english literature",
+     "literature"
+    ]
+   },
+   {
+    "code": "history",
+    "label": "History",
+    "synonyms": []
+   },
+   {
+    "code": "geography",
+    "label": "Geography",
+    "synonyms": []
+   },
+   {
+    "code": "statistics",
+    "label": "Statistics",
+    "synonyms": [
+     "stats"
+    ]
+   },
+   {
+    "code": "environmental_management",
+    "label": "Environmental Management",
+    "synonyms": []
+   },
+   {
+    "code": "art_and_design",
+    "label": "Art and Design",
+    "synonyms": [
+     "art",
+     "fine art"
+    ]
+   }
+  ],
+  "a_level_subjects": [
+   {
+    "code": "mathematics",
+    "label": "Mathematics",
+    "synonyms": [
+     "maths",
+     "math"
+    ]
+   },
+   {
+    "code": "further_mathematics",
+    "label": "Further Mathematics",
+    "synonyms": [
+     "further maths"
+    ]
+   },
+   {
+    "code": "physics",
+    "label": "Physics",
+    "synonyms": []
+   },
+   {
+    "code": "chemistry",
+    "label": "Chemistry",
+    "synonyms": []
+   },
+   {
+    "code": "biology",
+    "label": "Biology",
+    "synonyms": [
+     "bio"
+    ]
+   },
+   {
+    "code": "computer_science",
+    "label": "Computer Science",
+    "synonyms": [
+     "CS",
+     "computer"
+    ]
+   },
+   {
+    "code": "information_technology",
+    "label": "Information Technology",
+    "synonyms": []
+   },
+   {
+    "code": "accounting",
+    "label": "Accounting",
+    "synonyms": [
+     "accounts"
+    ]
+   },
+   {
+    "code": "business",
+    "label": "Business",
+    "synonyms": [
+     "business studies"
+    ]
+   },
+   {
+    "code": "economics",
+    "label": "Economics",
+    "synonyms": [
+     "econ"
+    ]
+   },
+   {
+    "code": "psychology",
+    "label": "Psychology",
+    "synonyms": []
+   },
+   {
+    "code": "sociology",
+    "label": "Sociology",
+    "synonyms": []
+   },
+   {
+    "code": "law",
+    "label": "Law",
+    "synonyms": []
+   },
+   {
+    "code": "english_literature",
+    "label": "Literature in English",
+    "synonyms": [
+     "english literature",
+     "literature"
+    ]
+   },
+   {
+    "code": "english_language",
+    "label": "English Language",
+    "synonyms": [
+     "english"
+    ]
+   },
+   {
+    "code": "history",
+    "label": "History",
+    "synonyms": []
+   },
+   {
+    "code": "geography",
+    "label": "Geography",
+    "synonyms": []
+   },
+   {
+    "code": "urdu",
+    "label": "Urdu",
+    "synonyms": []
+   },
+   {
+    "code": "media_studies",
+    "label": "Media Studies",
+    "synonyms": [
+     "media"
+    ]
+   },
+   {
+    "code": "art_and_design",
+    "label": "Art and Design",
+    "synonyms": [
+     "art",
+     "fine art"
+    ]
+   },
+   {
+    "code": "thinking_skills",
+    "label": "Thinking Skills",
+    "synonyms": []
+   }
+  ],
+  "dae_technologies": [
+   {
+    "code": "electrical",
+    "label": "Electrical",
+    "synonyms": [
+     "electrical technology"
+    ]
+   },
+   {
+    "code": "electronics",
+    "label": "Electronics",
+    "synonyms": [
+     "electronics technology"
+    ]
+   },
+   {
+    "code": "mechanical",
+    "label": "Mechanical",
+    "synonyms": [
+     "mechanical technology"
+    ]
+   },
+   {
+    "code": "civil",
+    "label": "Civil",
+    "synonyms": [
+     "civil technology"
+    ]
+   },
+   {
+    "code": "computer_information",
+    "label": "Computer Information Technology",
+    "synonyms": [
+     "computer",
+     "CIT",
+     "computer technology"
+    ]
+   },
+   {
+    "code": "chemical",
+    "label": "Chemical",
+    "synonyms": [
+     "chemical technology"
+    ]
+   },
+   {
+    "code": "mechatronics",
+    "label": "Mechatronics",
+    "synonyms": []
+   },
+   {
+    "code": "auto_diesel",
+    "label": "Auto and Diesel",
+    "synonyms": [
+     "auto diesel",
+     "automobile"
+    ]
+   },
+   {
+    "code": "architecture",
+    "label": "Architecture",
+    "synonyms": [
+     "architecture technology"
+    ]
+   },
+   {
+    "code": "telecommunication",
+    "label": "Telecommunication",
+    "synonyms": [
+     "telecom"
+    ]
+   },
+   {
+    "code": "instrumentation",
+    "label": "Instrumentation",
+    "synonyms": []
+   },
+   {
+    "code": "biomedical",
+    "label": "Biomedical",
+    "synonyms": [
+     "biomedical technology"
+    ]
+   },
+   {
+    "code": "refrigeration_air_conditioning",
+    "label": "Refrigeration and Air Conditioning",
+    "synonyms": [
+     "RAC",
+     "HVAC"
+    ]
+   },
+   {
+    "code": "textile",
+    "label": "Textile",
+    "synonyms": [
+     "textile technology"
+    ]
+   },
+   {
+    "code": "petroleum",
+    "label": "Petroleum",
+    "synonyms": [
+     "petroleum technology"
     ]
    }
   ],
