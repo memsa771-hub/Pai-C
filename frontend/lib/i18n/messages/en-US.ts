@@ -724,6 +724,7 @@ export const messages = {
     back: 'Back',
     next: 'Continue',
     required: 'Please fill this in.',
+    useChip: 'Choose {chip} above',
     otherPlaceholder: 'Type it in your own words',
     chip: 'Set Journey',
     steps: {

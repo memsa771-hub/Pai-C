@@ -121,7 +121,7 @@ def test_onboarding_is_required_until_it_is_completed(db):
 def test_four_visible_cards_make_name_the_greeting_name(db):
     workspace = db.info['workspace']
     user = db.info['user']
-    answers = {'fullName': 'Student Name', 'level': 'fsc',
+    answers = {'fullName': 'Student Name', 'level': 'matric',
                'currentCity': 'Student City', 'replyLanguage': 'english'}
     result = OnboardingService(db).apply(workspace, answers)
     db.commit()
@@ -384,11 +384,11 @@ def test_the_form_is_read_from_the_catalog(db):
     assert set(level["choices"]) <= codes
 
 
-def test_a_level_in_the_students_wording_is_the_catalog_code_without_review(db):
+def test_a_level_chip_with_subjects_in_the_students_wording_needs_no_review(db):
     from app.models import MemoryCandidate
     from sqlalchemy import select
     workspace = db.info["workspace"]
-    OnboardingService(db).apply(workspace, {**THREE_STEPS, "level": "O-Level", "subjects": ["Maths"],
+    OnboardingService(db).apply(workspace, {**THREE_STEPS, "level": "o_level", "subjects": ["Maths"],
                                             "year": "year_1"})
     db.commit()
     candidate = db.scalar(select(MemoryCandidate).where(MemoryCandidate.workspace_id == workspace.id,
@@ -604,3 +604,80 @@ def test_dependent_questions_are_advertised_with_their_condition(db):
     years = [f for f in fields if f["name"] == "year"]
     assert all(y["depends_on"]["field"] == "status" for y in years)
     assert any(y["isYear"] for y in years)
+
+
+# -- Review round 1 -------------------------------------------------------------
+
+@pytest.mark.parametrize("typed, chip", [
+    ("Intermediate", "Intermediate"), ("FSc", "Intermediate"), ("inter", "Intermediate"),
+    ("12th", "Intermediate"), ("ICS", "Intermediate"), ("BS", "Bachelor's"), ("bachelors", "Bachelor's"),
+    ("SSC", "Matric"), ("O levels", "O-level"), ("igcse", "O-level"), ("A levels", "A-level"),
+    ("MSc", "Master's"),
+])
+def test_other_text_that_names_a_level_points_to_its_chip(db, typed, chip):
+    with pytest.raises(MemoryDataError, match=f"Choose {chip} above"):
+        OnboardingService(db).apply(db.info["workspace"], {**PERSON, "level": typed, "status": "current"})
+    assert not _education_rows(db)
+
+
+@pytest.mark.parametrize("code", ["fsc", "ics", "icom", "fa"])
+def test_retired_level_codes_are_not_accepted_directly(db, code):
+    """The API takes chip codes (and Other's own words); Intermediate's codes
+    come from its group, never from the level."""
+    with pytest.raises(MemoryDataError, match="Choose Intermediate above"):
+        OnboardingService(db).apply(db.info["workspace"], {**PERSON, "level": code, "status": "current"})
+
+
+def test_other_and_the_level_wordings_are_advertised(db):
+    service = OnboardingService(db)
+    service.apply(db.info["workspace"], {**PERSON, "level": "other", "status": "current"})
+    db.commit()
+    assert _education_rows(db)[0].qualification_name == "other"
+    level = next(f for f in service.state(db.info["workspace"])["fields"] if f["name"] == "level")
+    # Normalised wordings -> the chip they mean, so the form says so before step 3.
+    assert level["redirects"]["inter"] == "intermediate"
+    assert level["redirects"]["bs"] == "bachelor"
+    assert level["redirects"]["o levels"] == "o_level"
+    assert "other" not in level["redirects"] and level["redirects"]["intermediate"] == "intermediate"
+    assert level["labels"]["bachelor"] == "Bachelor's"
+
+
+def test_matric_arts_is_stored_as_arts(db):
+    OnboardingService(db).apply(db.info["workspace"], {**PERSON, "level": "matric", "group": "arts",
+                                                      "status": "completed", "year": "2024"})
+    db.commit()
+    [row] = _education_rows(db)
+    assert row.field_of_study == "arts"
+
+
+def test_legacy_general_science_leaves_the_group_to_pick(db):
+    _add_education(db, qualification_name="fsc", field_of_study="general_science")
+    prefill = OnboardingService(db).state(db.info["workspace"])["prefill"]
+    assert prefill["level"] == "intermediate" and "group" not in prefill
+
+
+def test_confirming_a_legacy_fsc_ics_record_updates_it(db):
+    _add_education(db, qualification_name="fsc", field_of_study="ics", institution_name="Govt College")
+    [legacy] = _education_rows(db)
+    OnboardingService(db).apply(db.info["workspace"], {
+        **PERSON, "level": "intermediate", "group": "ics", "status": "current", "year": "year_2"})
+    db.commit()
+    [row] = _education_rows(db)
+    assert row.id == legacy.id
+    assert (row.qualification_name, row.field_of_study, row.academic_status) == ("ics", "ics", "current")
+    assert row.institution_name == "Govt College"
+
+
+@pytest.mark.parametrize("value, shown", [
+    ({"qualification_name": "matric", "field_of_study": "arts"}, "Arts"),
+    ({"qualification_name": "matric", "field_of_study": "science_computer"}, "Science (Computer)"),
+    ({"qualification_name": "dae", "field_of_study": "computer_information"}, "Computer Information Technology"),
+    ({"qualification_name": "bachelor", "field_of_study": "software_engineering"}, "Software Engineering"),
+    ({"qualification_name": "masters", "field_of_study": "data_science"}, "Data Science"),
+    ({"qualification_name": "fsc", "field_of_study": "pre_medical"}, "Pre-Medical"),
+])
+def test_details_label_the_field_from_the_records_own_level(value, shown):
+    from app.memory.catalog import vault_catalog
+    from app.memory.vault_view import _display
+    display = _display(vault_catalog().type("education"), value)
+    assert shown in display and value["field_of_study"] not in display

@@ -44,7 +44,7 @@ from sqlalchemy import select
 from app.models import User
 
 from .candidates import MemoryCandidateService
-from .catalog import vault_catalog
+from .catalog import norm, vault_catalog
 from .errors import MemoryDataError
 from .reconciler import MemoryReconciler
 from .vault import VaultService
@@ -86,6 +86,8 @@ class OnboardingField:
     is_year: bool = False
     # Copy key when several questions share a name (the year is asked three ways).
     label_key: str | None = None
+    # The chips' own wording (Bachelor's), over the catalog label (Bachelor).
+    chip_labels: dict | None = None
 
 
 # The order here is the order the form asks them in.
@@ -121,7 +123,7 @@ def _catalog_fields() -> tuple[OnboardingField, ...]:
         common = dict(
             field_key=spec.key, required=ask.get("required", True), step=ask.get("step", 1),
             is_date=ask["input"] == "date", record_field=ask.get("record_field"),
-            allow_other=ask.get("allow_other", False), default=ask.get("default"),
+            allow_other=ask.get("allow_other", False), default=ask.get("default"), chip_labels=ask.get("labels"),
             options=tuple(ask.get("options", ())), choice_list=choice_list,
             choices=tuple(ask.get("shown", ())) if choice_list else tuple(choices or ()))
         parts = ask.get("parts") or ()
@@ -152,6 +154,47 @@ RETIRED_ANSWERS = frozenset({"replyLanguage"})
 FIELDS_BY_NAME = {field.name: field for field in (*LEGACY_FIELDS, *ONBOARDING_FIELDS) if not field.depends_on}
 FOLLOW_UPS = tuple(field for field in ONBOARDING_FIELDS if field.depends_on)
 KNOWN_ANSWERS = frozenset(field.name for field in (*LEGACY_FIELDS, *ONBOARDING_FIELDS))
+# A level only a group decides (fsc, ics, icom, fa) -> the chip that asks it.
+_PARENT_CHIP = {code: field.depends_on["values"][0] for field in FOLLOW_UPS if field.level_by_choice
+                for code in field.level_by_choice.values()}
+
+
+def _chip_label(field: OnboardingField, code: str) -> str:
+    return (field.chip_labels or {}).get(code) or vault_catalog().label(field.choice_list, code)
+
+
+def _redirect(field: OnboardingField, value: Any) -> Optional[str]:
+    """The chip an Other answer really names ("FSc" -> intermediate), or None.
+
+    Other is for an education the chips do not cover. Typed text that is a
+    level we offer would skip that chip's group, subjects or field, and a
+    level only a group decides (fsc) is never taken as the level itself.
+    """
+    if not (field.allow_other and field.choice_list and field.choices and isinstance(value, str)):
+        return None
+    text = " ".join(value.split())
+    if text in field.choices:
+        return None
+    code = vault_catalog().choice_code(field.choice_list, text)
+    if code is None or code == "other":
+        return None
+    chip = _PARENT_CHIP.get(code, code)
+    return chip if chip in field.choices else None
+
+
+def _redirects(field: OnboardingField) -> dict:
+    """Every normalised wording of a level -> its chip, so the form can say
+    "Choose Intermediate above" on step 2 instead of failing at the end."""
+    if not (field.allow_other and field.choice_list and field.choices):
+        return {}
+    out = {}
+    for choice in vault_catalog().choices(field.choice_list):
+        chip = _PARENT_CHIP.get(choice.code, choice.code)
+        if choice.code == "other" or chip not in field.choices:
+            continue
+        for wording in (choice.code, choice.label, *choice.synonyms, choice.code.replace("_", " ")):
+            out[norm(wording)] = chip
+    return out
 _NUMBERED = re.compile(r"_(\d+)$")
 
 
@@ -245,7 +288,7 @@ class OnboardingService:
         if field.source:
             return [(code, label) for code, label in self.sources.get(field.source, ())]
         if field.choice_list:
-            return [(code, vault_catalog().label(field.choice_list, code)) for code in field.choices]
+            return [(code, _chip_label(field, code)) for code in field.choices]
         return [(code, code) for code in field.choices]
 
     def _code(self, field: OnboardingField, text: str) -> Optional[str]:
@@ -295,14 +338,20 @@ class OnboardingService:
         if stored in (None, "", []):
             return None
         if isinstance(stored, list):
-            codes = [self._code(field, s) for s in stored if isinstance(s, str)]
+            codes = [self._shown(field, self._code(field, s)) for s in stored if isinstance(s, str)]
             return [c for c in codes if c] or None
         if isinstance(stored, int) and not isinstance(stored, bool):
             if field.is_year:
                 return str(stored)
             return next((c for c in field.choices
                          if _NUMBERED.search(c) and int(_NUMBERED.search(c).group(1)) == stored), None)
-        return self._code(field, stored) if isinstance(stored, str) else None
+        return self._shown(field, self._code(field, stored)) if isinstance(stored, str) else None
+
+    @staticmethod
+    def _shown(field: OnboardingField, code: Optional[str]) -> Optional[str]:
+        """A prefilled chip must be one the form shows: an old General Science
+        group stays unpicked so the student chooses a group that is offered."""
+        return code if not field.choice_list or code in field.choices else None
 
     def _record_prefill(self, level: OnboardingField, row) -> dict:
         """A stored record read back into the form's answers.
@@ -342,7 +391,8 @@ class OnboardingService:
                 "depends_on": f.depends_on, "multi": f.multi, "isYear": f.is_year,
                 "searchable": f.searchable, "labelKey": f.label_key,
                 # Catalog and study-field wording for chips the UI has no copy for.
-                "labels": {code: label for code, label in offered if label != code}}
+                "labels": {code: label for code, label in offered if label != code},
+                "redirects": _redirects(f)}
 
     # -- state -------------------------------------------------------------
 
@@ -412,6 +462,9 @@ class OnboardingService:
 
         cleaned: dict[str, Any] = {}
         for name, field in FIELDS_BY_NAME.items():
+            chip = _redirect(field, answers.get(name))
+            if chip:
+                raise MemoryDataError(f"Choose {_chip_label(field, chip)} above")
             value = _clean(answers.get(name), field)
             if value is not None:
                 cleaned[name] = value
@@ -476,6 +529,17 @@ class OnboardingService:
             if "current_semester" in details and "current_year" not in details:
                 details["current_year"] = (details["current_semester"] + 1) // 2
             writes.append((main, record, " · ".join(str(q) for q in quote)))
+        from .student_records import StudentRecordService
+        corrects = {}
+        for main, record, _ in writes:
+            if not main.record_field:
+                continue
+            # The record the form was prefilled from, confirmed at the same
+            # level (an old fsc row now Intermediate + ICS), is corrected in
+            # place rather than gaining a second education record.
+            rows = StudentRecordService(self.db).list(workspace_id, main.field_key)
+            if rows and self._record_prefill(main, rows[0]).get(main.name) == cleaned.get(main.name):
+                corrects[main.field_key] = rows[0].id
 
         for field, value, quote in writes:
             # A returning student's prefilled canonical answer is already
@@ -488,6 +552,7 @@ class OnboardingService:
             candidate = MemoryCandidateService(self.db).propose(
                 workspace_id=workspace_id, candidate_type="student_record" if field.record_field else "vault_fact",
                 key=field.field_key, proposed_value=value, confidence=1.0,
+                entities={"record_id": corrects[field.field_key]} if field.field_key in corrects else None,
                 source_type="user_explicit", allow_user_explicit=True,
                 input_channel="profile",
                 subject_user_id=str(user.id) if user else None,

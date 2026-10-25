@@ -15,7 +15,7 @@ import { workspaceApi } from '@/lib/api';
 import { useT, type MessageKey } from '@/lib/i18n';
 import { cn } from '@/lib/utils';
 import {
-  clearedDependents, filledAnswer, visibleOnboardingAnswers, visibleOnboardingFields,
+  chipKey, clearedDependents, filledAnswer, levelRedirect, visibleOnboardingAnswers, visibleOnboardingFields,
   type OnboardingAnswer, type OnboardingAnswers, type OnboardingFieldSpec, type OnboardingState,
 } from '@/lib/onboarding';
 import { DobPicker } from './dob-picker';
@@ -45,7 +45,8 @@ export function OnboardingView({ state, onDone }: {
   const defaults = Object.fromEntries(state.fields.filter((f) => f.default).map((f) => [f.name, f.default as string]));
   const [answers, setAnswers] = React.useState<OnboardingAnswers>({ ...defaults, ...(state.prefill || {}) });
   const [busy, setBusy] = React.useState(false);
-  const [errors, setErrors] = React.useState<Record<string, boolean>>({});
+  // true: "Please fill this in."; text: a specific message (the chip to pick).
+  const [errors, setErrors] = React.useState<Record<string, boolean | string>>({});
   const steps = React.useMemo(() => [...new Set(state.fields.map((f) => f.step || 1))].sort((a, b) => a - b), [state.fields]);
   const [index, setIndex] = React.useState(0);
   const [direction, setDirection] = React.useState(1);
@@ -54,9 +55,11 @@ export function OnboardingView({ state, onDone }: {
   const last = index === steps.length - 1;
 
   const set = (name: string, value: OnboardingAnswer) => {
-    // A changed level clears its group, subjects, status and year: answers
-    // picked for one level are never sent under another.
-    const stale = answers[name] !== value ? clearedDependents(state.fields, name) : [];
+    // A level changed from one chip to another (or to Other) clears its
+    // group, subjects, status and year: answers picked for one level are
+    // never sent under another. Typing in Other changes no chip.
+    const stale = chipKey(state.fields, name, answers[name]) !== chipKey(state.fields, name, value)
+      ? clearedDependents(state.fields, name) : [];
     setAnswers((prev) => ({ ...prev, ...Object.fromEntries(stale.map((n) => [n, undefined])), [name]: value }));
     setErrors((prev) => ({ ...prev, [name]: false }));
   };
@@ -89,6 +92,15 @@ export function OnboardingView({ state, onDone }: {
     if (missing.length) {
       setErrors(Object.fromEntries(missing.map((f) => [f.name, true])));
       document.querySelector<HTMLElement>(`[data-field="${missing[0].name}"]`)?.focus();
+      return;
+    }
+    // Other text that is a level we offer ("FSc") points to that chip here,
+    // rather than failing when the last step is sent.
+    const redirected = fields.map((f) => [f, levelRedirect(f, answers[f.name])] as const).find(([, chip]) => chip);
+    if (redirected) {
+      const [f, chip] = redirected;
+      const chipName = translated(`onboarding.choice.${chip}`, f.labels?.[chip as string] || (chip as string));
+      setErrors({ [f.name]: t('onboarding.useChip', { chip: chipName }) });
       return;
     }
     if (last) void submit();
@@ -164,7 +176,7 @@ function Field({ field, label, placeholder, value, error, size, onChange }: {
   label: string;
   placeholder: string;
   value: OnboardingAnswer;
-  error?: boolean;
+  error?: boolean | string;
   size: 'sm' | 'md';
   onChange: (value: OnboardingAnswer) => void;
 }) {
@@ -191,18 +203,21 @@ function Field({ field, label, placeholder, value, error, size, onChange }: {
     : picked.includes(choice) || field.choices.indexOf(choice) < SEARCH_PREVIEW).slice(0, SEARCH_LIMIT);
   const id = `onb-${field.name}`;
   // "PAI / Onboarding / Choice": 42px tall, 16px corners, sized to its label.
+  // Study-field titles can be long, so those chips wrap to fit a phone.
   const chip = (on: boolean) => cn(
     'flex h-[42px] items-center justify-center whitespace-nowrap rounded-[16px] border px-4 text-[16px] leading-[22px] transition-colors',
+    field.searchable && 'h-auto min-h-[42px] max-w-full whitespace-normal py-2 text-center',
     on ? 'border-auth-blue bg-auth-panel text-auth-blue' : 'border-auth-choice-line bg-white text-auth-choice-ink',
   );
-  const errorText = error ? t('onboarding.required') : null;
+  const errorText = typeof error === 'string' ? error : error ? t('onboarding.required') : null;
 
   if (field.choices.length > 0 || field.searchable) {
     return (
       <div className="flex flex-col gap-2.5">
         <span id={`${id}-label`} className="text-[15px] font-bold leading-[22px] text-auth-label">{label}</span>
         {field.searchable && (
-          <Input aria-labelledby={`${id}-label`} value={query} placeholder={t('onboarding.searchPlaceholder')}
+          <Input aria-label={t('onboarding.searchPlaceholder')} value={query} placeholder={t('onboarding.searchPlaceholder')}
+            data-field={shown.length === 0 ? field.name : undefined}
             className={authInputClass} onChange={(event) => setQuery(event.target.value)} />
         )}
         <div role="group" aria-labelledby={`${id}-label`} aria-describedby={error ? `${id}-error` : undefined} className="flex flex-col gap-2.5">

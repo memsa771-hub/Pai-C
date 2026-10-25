@@ -142,7 +142,6 @@
     "label": "FA / Humanities",
     "synonyms": [
      "fa",
-     "arts",
      "humanities"
     ]
    },
@@ -180,8 +179,7 @@
     "synonyms": [
      "humanities",
      "arts group",
-     "general group",
-     "fa_humanities"
+     "general group"
     ]
    }
   ],
@@ -1131,6 +1129,352 @@
     "synonyms": [
      "fees and hostel"
     ]
+   }
+  ],
+  "study_fields": [
+   {
+    "code": "electrical_engineering",
+    "label": "Electrical Engineering"
+   },
+   {
+    "code": "electronic_engineering",
+    "label": "Electronic Engineering"
+   },
+   {
+    "code": "computer_engineering",
+    "label": "Computer Engineering"
+   },
+   {
+    "code": "telecommunication_engineering",
+    "label": "Telecommunication Engineering"
+   },
+   {
+    "code": "mechanical_engineering",
+    "label": "Mechanical Engineering"
+   },
+   {
+    "code": "mechatronics_engineering",
+    "label": "Mechatronics Engineering"
+   },
+   {
+    "code": "civil_engineering",
+    "label": "Civil Engineering"
+   },
+   {
+    "code": "chemical_engineering",
+    "label": "Chemical Engineering"
+   },
+   {
+    "code": "biomedical_engineering",
+    "label": "Biomedical Engineering"
+   },
+   {
+    "code": "industrial_engineering",
+    "label": "Industrial Engineering"
+   },
+   {
+    "code": "aerospace_engineering",
+    "label": "Aerospace Engineering"
+   },
+   {
+    "code": "petroleum_engineering",
+    "label": "Petroleum Engineering"
+   },
+   {
+    "code": "materials_engineering",
+    "label": "Metallurgy and Materials Engineering"
+   },
+   {
+    "code": "textile_engineering",
+    "label": "Textile Engineering"
+   },
+   {
+    "code": "environmental_engineering",
+    "label": "Environmental Engineering"
+   },
+   {
+    "code": "mining_engineering",
+    "label": "Mining Engineering"
+   },
+   {
+    "code": "geological_engineering",
+    "label": "Geological Engineering"
+   },
+   {
+    "code": "automotive_engineering",
+    "label": "Automotive Engineering"
+   },
+   {
+    "code": "engineering_technology",
+    "label": "Engineering Technology (BSc / B.Tech)"
+   },
+   {
+    "code": "computer_science",
+    "label": "Computer Science"
+   },
+   {
+    "code": "software_engineering",
+    "label": "Software Engineering"
+   },
+   {
+    "code": "artificial_intelligence",
+    "label": "Artificial Intelligence"
+   },
+   {
+    "code": "data_science",
+    "label": "Data Science"
+   },
+   {
+    "code": "cyber_security",
+    "label": "Cyber Security"
+   },
+   {
+    "code": "information_technology",
+    "label": "Information Technology"
+   },
+   {
+    "code": "architecture",
+    "label": "Architecture"
+   },
+   {
+    "code": "city_planning",
+    "label": "City and Regional Planning"
+   },
+   {
+    "code": "interior_design",
+    "label": "Interior Design"
+   },
+   {
+    "code": "textile_design",
+    "label": "Textile Design"
+   },
+   {
+    "code": "fashion_design",
+    "label": "Fashion Design"
+   },
+   {
+    "code": "graphic_design",
+    "label": "Graphic Design"
+   },
+   {
+    "code": "film_animation",
+    "label": "Film, TV and Animation"
+   },
+   {
+    "code": "mbbs",
+    "label": "MBBS (Medicine)"
+   },
+   {
+    "code": "bds",
+    "label": "BDS (Dentistry)"
+   },
+   {
+    "code": "pharm_d",
+    "label": "Pharm-D (Pharmacy)"
+   },
+   {
+    "code": "physical_therapy",
+    "label": "Doctor of Physical Therapy"
+   },
+   {
+    "code": "nursing",
+    "label": "Nursing"
+   },
+   {
+    "code": "medical_lab_technology",
+    "label": "Medical Laboratory Technology"
+   },
+   {
+    "code": "radiology_imaging",
+    "label": "Radiology and Medical Imaging"
+   },
+   {
+    "code": "optometry",
+    "label": "Optometry"
+   },
+   {
+    "code": "human_nutrition",
+    "label": "Human Nutrition and Dietetics"
+   },
+   {
+    "code": "veterinary_medicine",
+    "label": "DVM (Veterinary Medicine)"
+   },
+   {
+    "code": "sports_sciences",
+    "label": "Sports Sciences and Physical Education"
+   },
+   {
+    "code": "public_health",
+    "label": "Public Health"
+   },
+   {
+    "code": "anesthesia_ot_technology",
+    "label": "Anesthesia / Operation Theatre Technology"
+   },
+   {
+    "code": "biotechnology",
+    "label": "Biotechnology"
+   },
+   {
+    "code": "biochemistry",
+    "label": "Biochemistry"
+   },
+   {
+    "code": "microbiology",
+    "label": "Microbiology"
+   },
+   {
+    "code": "zoology",
+    "label": "Zoology"
+   },
+   {
+    "code": "botany",
+    "label": "Botany"
+   },
+   {
+    "code": "chemistry",
+    "label": "Chemistry"
+   },
+   {
+    "code": "physics",
+    "label": "Physics"
+   },
+   {
+    "code": "mathematics",
+    "label": "Mathematics"
+   },
+   {
+    "code": "statistics",
+    "label": "Statistics"
+   },
+   {
+    "code": "environmental_science",
+    "label": "Environmental Science"
+   },
+   {
+    "code": "geology",
+    "label": "Geology"
+   },
+   {
+    "code": "actuarial_science",
+    "label": "Actuarial Science"
+   },
+   {
+    "code": "agriculture",
+    "label": "Agriculture"
+   },
+   {
+    "code": "food_science",
+    "label": "Food Science and Technology"
+   },
+   {
+    "code": "bba",
+    "label": "BBA"
+   },
+   {
+    "code": "accounting_finance",
+    "label": "Accounting and Finance"
+   },
+   {
+    "code": "banking_finance",
+    "label": "Banking and Finance"
+   },
+   {
+    "code": "bcom",
+    "label": "B.Com (Commerce)"
+   },
+   {
+    "code": "marketing",
+    "label": "Marketing"
+   },
+   {
+    "code": "supply_chain",
+    "label": "Supply Chain Management"
+   },
+   {
+    "code": "management_sciences",
+    "label": "Management Sciences / HRM"
+   },
+   {
+    "code": "aviation_management",
+    "label": "Aviation Management"
+   },
+   {
+    "code": "hospitality_tourism",
+    "label": "Tourism and Hospitality Management"
+   },
+   {
+    "code": "economics",
+    "label": "Economics"
+   },
+   {
+    "code": "psychology",
+    "label": "Psychology"
+   },
+   {
+    "code": "international_relations",
+    "label": "International Relations"
+   },
+   {
+    "code": "political_science",
+    "label": "Political Science"
+   },
+   {
+    "code": "sociology",
+    "label": "Sociology"
+   },
+   {
+    "code": "criminology",
+    "label": "Criminology"
+   },
+   {
+    "code": "social_work",
+    "label": "Social Work"
+   },
+   {
+    "code": "public_administration",
+    "label": "Public Administration"
+   },
+   {
+    "code": "media_communication",
+    "label": "Media and Communication"
+   },
+   {
+    "code": "english_literature",
+    "label": "English Literature and Linguistics"
+   },
+   {
+    "code": "urdu",
+    "label": "Urdu"
+   },
+   {
+    "code": "history",
+    "label": "History"
+   },
+   {
+    "code": "philosophy",
+    "label": "Philosophy"
+   },
+   {
+    "code": "geography",
+    "label": "Geography"
+   },
+   {
+    "code": "islamic_studies",
+    "label": "Islamic Studies"
+   },
+   {
+    "code": "fine_arts",
+    "label": "Fine Arts"
+   },
+   {
+    "code": "law_llb",
+    "label": "Law (LLB)"
+   },
+   {
+    "code": "education",
+    "label": "Education (B.Ed)"
    }
   ]
  },
@@ -2181,6 +2525,14 @@
     "details.awarding_body": "boards",
     "field_of_study": "intermediate_groups"
    },
+   "choice_by_level": {
+    "field_of_study": {
+     "matric": "matric_groups",
+     "dae": "dae_technologies",
+     "bachelor": "study_fields",
+     "masters": "study_fields"
+    }
+   },
    "onboarding": {
     "order": 2,
     "prompt": "Where are you now?",
@@ -2199,6 +2551,15 @@
      "bachelor",
      "masters"
     ],
+    "labels": {
+     "matric": "Matric",
+     "o_level": "O-level",
+     "intermediate": "Intermediate",
+     "a_level": "A-level",
+     "dae": "DAE",
+     "bachelor": "Bachelor's",
+     "masters": "Master's"
+    },
     "follow_ups": [
      {
       "name": "group",

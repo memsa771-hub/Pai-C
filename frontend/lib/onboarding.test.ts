@@ -1,6 +1,6 @@
-﻿import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import {
-  FIELD_LAYOUT, clearedDependents, visibleOnboardingAnswers, visibleOnboardingFields,
+  FIELD_LAYOUT, chipKey, clearedDependents, levelRedirect, normWording, visibleOnboardingAnswers, visibleOnboardingFields,
   type OnboardingFieldSpec,
 } from './onboarding';
 
@@ -67,5 +67,29 @@ describe('dependent education questions', () => {
     expect(clearedDependents(EDUCATION, 'level').sort()).toEqual(['group', 'status', 'subjects', 'year']);
     expect(clearedDependents(EDUCATION, 'status')).toEqual(['year']);
     expect(clearedDependents(EDUCATION, 'year')).toEqual([]);
+  });
+});
+
+describe('Other text that names a level', () => {
+  const level = spec('level', { choices: ['intermediate', 'bachelor'], allowOther: true,
+    redirects: { 'f sc': 'intermediate', fsc: 'intermediate', bs: 'bachelor', intermediate: 'intermediate' } });
+
+  it('normalises the way the catalog does', () => {
+    expect(normWording('  F.Sc. ')).toBe('f sc');
+    expect(normWording('Bachelor’s')).toBe('bachelor s');
+  });
+
+  it('names the chip for a typed level, never for the chip itself or real Other text', () => {
+    expect(levelRedirect(level, 'F.Sc')).toBe('intermediate');
+    expect(levelRedirect(level, 'BS')).toBe('bachelor');
+    expect(levelRedirect(level, 'Intermediate')).toBe('intermediate');
+    expect(levelRedirect(level, 'intermediate')).toBeNull();
+    expect(levelRedirect(level, 'Cambridge Pre-U')).toBeNull();
+  });
+
+  it('treats every Other keystroke as the same chip', () => {
+    const fields = [level];
+    expect(chipKey(fields, 'level', '')).toBe(chipKey(fields, 'level', 'My own'));
+    expect(chipKey(fields, 'level', 'intermediate')).not.toBe(chipKey(fields, 'level', 'bachelor'));
   });
 });

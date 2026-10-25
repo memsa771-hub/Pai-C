@@ -95,7 +95,15 @@ def _skip_in_display(key: str) -> bool:
 def _display(spec: Optional[TypeSpec], value: Any) -> str:
     """English text for a value: choice codes become catalog labels, ids are left out."""
     catalog = vault_catalog()
-    choices = spec.choice_fields if spec else {}
+    choices = dict(spec.choice_fields) if spec else {}
+    if spec and spec.choice_by_level and isinstance(value, dict):
+        # A field read against the record's own level: a matric group, a DAE
+        # technology or a study field, never a raw code on the Details page.
+        level = catalog.choice_code(choices.get("qualification_name", "levels"),
+                                    str(value.get("qualification_name") or ""))
+        for path, by_level in spec.choice_by_level.items():
+            if level in by_level:
+                choices[path] = by_level[level]
 
     def render(node: Any, path: str) -> str:
         if node is None:

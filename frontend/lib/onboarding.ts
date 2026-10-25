@@ -55,6 +55,8 @@ export interface OnboardingFieldSpec {
   labelKey?: string | null;
   /** Catalog wording for chips the UI has no copy of its own for. */
   labels?: Record<string, string>;
+  /** Normalised wordings of a level -> the chip that asks it ("fsc" -> intermediate). */
+  redirects?: Record<string, string>;
 }
 
 export interface OnboardingState {
@@ -111,6 +113,25 @@ export function visibleOnboardingAnswers(
 ): OnboardingAnswers {
   return Object.fromEntries(visibleOnboardingFields(fields, answers)
     .map((field) => [field.name, answers[field.name] || (field.multi ? [] : '')]));
+}
+
+/** Text the way the catalog compares wordings: no accents, no punctuation,
+ * single spaces, lower case (app/memory/catalog `norm`). */
+export function normWording(text: string): string {
+  return text.normalize('NFKD').replace(/\p{M}/gu, '').replace(/[^\p{L}\p{N}_\s]/gu, ' ')
+    .replace(/\s+/g, ' ').trim().toLowerCase();
+}
+
+/** The chip an Other answer really names ("FSc" -> intermediate), or null. */
+export function levelRedirect(field: OnboardingFieldSpec, answer: OnboardingAnswer | undefined): string | null {
+  if (!field.redirects || typeof answer !== 'string' || !answer.trim() || field.choices.includes(answer)) return null;
+  return field.redirects[normWording(answer)] ?? null;
+}
+
+/** Which chip an answer is: its code, or one key for anything typed in Other. */
+export function chipKey(fields: OnboardingFieldSpec[], name: string, answer: OnboardingAnswer | undefined): string {
+  if (typeof answer !== 'string') return JSON.stringify(answer ?? null);
+  return fields.some((f) => f.name === name && f.choices.includes(answer)) ? answer : '\u0000other';
 }
 
 /** Answers to clear when `name` changes: everything that depended on it,

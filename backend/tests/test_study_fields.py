@@ -174,3 +174,10 @@ def test_masters_wordings_do_not_catch_everyday_words():
         assert catalog.choice_code("levels", text) is None, text
     assert catalog.choice_code("levels", "MPhil") == "masters"
     assert "master" not in turn_words("Ms Ayesha ne kaha ma bhi aaungi")
+
+
+def test_catalog_study_field_labels_mirror_the_policy_file():
+    """The Details page labels a degree's field from the catalog; it must say
+    exactly what the study fields say."""
+    assert [(c.code, c.label) for c in vault_catalog().choices("study_fields")] == [
+        (f.key, f.title) for f in study_fields().values()]

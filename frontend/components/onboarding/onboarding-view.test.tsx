@@ -22,7 +22,8 @@ const notDegree = ['matric', 'o_level', 'intermediate', 'a_level', 'masters'];
 const state: OnboardingState = {
   required: true, completedAt: null, prefill: {},
   fields: [
-    spec('level', { choices: ['matric', 'o_level', 'intermediate', 'a_level', 'dae', 'bachelor', 'masters'], allowOther: true }),
+    spec('level', { choices: ['matric', 'o_level', 'intermediate', 'a_level', 'dae', 'bachelor', 'masters'], allowOther: true,
+      redirects: { fsc: 'intermediate', inter: 'intermediate', intermediate: 'intermediate', bs: 'bachelor' } }),
     spec('group', { choices: ['science_biology', 'science_computer', 'arts'],
       labels: { science_biology: 'Science (Biology)', science_computer: 'Science (Computer)', arts: 'Arts' },
       depends_on: { field: 'level', values: ['matric'] } }),
@@ -32,6 +33,9 @@ const state: OnboardingState = {
       labels: { mathematics: 'Mathematics', physics: 'Physics', biology: 'Biology' },
       depends_on: { field: 'level', values: ['o_level'] } }),
     spec('status', { choices: ['current', 'completed'], depends_on: { field: 'level' } }),
+    spec('field', { choices: ['electrical_engineering', 'computer_science'], searchable: true,
+      labels: { electrical_engineering: 'Electrical Engineering', computer_science: 'Computer Science' },
+      depends_on: { field: 'level', values: ['bachelor'] } }),
     spec('year', { choices: ['year_1', 'year_2'], labelKey: 'currentYear',
       depends_on: { field: 'status', values: ['current'], and: { field: 'level', values: notDegree } } }),
     spec('year', { isYear: true, labelKey: 'graduationYear', depends_on: { field: 'status', values: ['completed'] } }),
@@ -97,4 +101,38 @@ it('a legacy FSc prefill opens on Intermediate with the group still to pick', ()
   view({ ...state, prefill: { level: 'intermediate' } });
   expect(chip('Intermediate').getAttribute('aria-pressed')).toBe('true');
   expect(chip('FSc Pre-Medical').getAttribute('aria-pressed')).toBe('false');
+});
+
+// -- Review round 1 ------------------------------------------------------------
+
+it('Other text that names a level points to its chip, beside the Other box', async () => {
+  view();
+  fireEvent.click(chip('Other'));
+  fireEvent.change(screen.getByPlaceholderText('Type it in your own words'), { target: { value: 'FSc' } });
+  fireEvent.click(chip('Studying now'));
+  fireEvent.click(screen.getByRole('button', { name: 'Start with PAI' }));
+  expect(await screen.findByText('Choose Intermediate above')).toBeTruthy();
+  expect(api.submit).not.toHaveBeenCalled();
+});
+
+it('typing in Other keeps the status already picked', () => {
+  view();
+  fireEvent.click(chip('Other'));
+  const box = screen.getByPlaceholderText('Type it in your own words');
+  fireEvent.change(box, { target: { value: 'My' } });
+  fireEvent.click(chip('Studying now'));
+  fireEvent.change(box, { target: { value: 'My own system' } });
+  expect(chip('Studying now').getAttribute('aria-pressed')).toBe('true');
+});
+
+it('the field search has its own label, wraps long titles and takes focus when nothing matches', async () => {
+  view();
+  fireEvent.click(chip("Bachelor's"));
+  const search = screen.getByLabelText('Search fields');
+  expect(chip('Electrical Engineering').className).toContain('whitespace-normal');
+  fireEvent.change(search, { target: { value: 'zzz' } });
+  fireEvent.click(chip('Studying now'));
+  fireEvent.click(screen.getByRole('button', { name: 'Start with PAI' }));
+  await screen.findByText('Please fill this in.');
+  expect(document.activeElement).toBe(search);
 });

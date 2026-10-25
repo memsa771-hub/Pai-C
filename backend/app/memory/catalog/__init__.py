@@ -55,6 +55,10 @@ class TypeSpec:
     schema: dict | None = None
     identity: list = field(default_factory=list)
     choice_fields: dict = field(default_factory=dict)
+    # A record field whose list depends on the record's level, e.g. an
+    # education field_of_study is a matric group, a DAE technology or a study
+    # field: {field: {level code: list}}. choice_fields is the fallback.
+    choice_by_level: dict = field(default_factory=dict)
     onboarding: dict | None = None
     # Which Details section shows a details type (about, education, ...).
     # Optional so older catalog files still load.
@@ -162,6 +166,10 @@ def _build_type(raw: dict, choices: dict) -> TypeSpec:
                 raise ValueError(f"choice field {name!r} uses unknown list {list_name!r}")
             if storage == "item" and name not in schema["properties"]:
                 raise ValueError(f"choice field {name!r} is not in the schema")
+        choice_by_level = dict(raw.get("choice_by_level", {}))
+        for name, by_level in choice_by_level.items():
+            if not isinstance(by_level, dict) or not set(by_level.values()) <= set(choices):
+                raise ValueError(f"choice_by_level {name!r} uses an unknown list")
         onboarding = raw.get("onboarding")
         if onboarding is not None:
             if (not isinstance(onboarding.get("order"), int) or not onboarding.get("prompt")
@@ -201,7 +209,7 @@ def _build_type(raw: dict, choices: dict) -> TypeSpec:
             key=key, label=raw.get("label", key), storage=storage, shown_on=raw["shown_on"],
             inputs=inputs, sensitivity=raw["sensitivity"], conflict=raw["conflict"],
             freshness_days=days, version=raw["version"], schema=schema, identity=identity,
-            choice_fields=choice_fields, onboarding=onboarding, section=section, money=money,
+            choice_fields=choice_fields, choice_by_level=choice_by_level, onboarding=onboarding, section=section, money=money,
             field_definition=field_definition)
     except (KeyError, TypeError, AttributeError, ValueError) as exc:
         detail = f"missing {exc}" if isinstance(exc, KeyError) else str(exc)
