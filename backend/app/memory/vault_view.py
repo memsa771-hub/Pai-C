@@ -32,11 +32,11 @@ from typing import Any, Iterable, Optional
 
 from sqlalchemy import select
 
-from app.models import FileRecord, ProfileIssue, VaultFact
+from app.models import FileRecord, MemoryCandidate, ProfileIssue, VaultFact, VaultItem
 
 from .catalog import TypeSpec, vault_catalog
 from .evidence import evidence_level, page_of
-from .student_records import StudentRecordService
+from .student_records import ENTITY_MODELS, StudentRecordService
 from .vault import _unwrap, is_guess
 from .vault_items import VaultItemService
 
@@ -174,7 +174,7 @@ class VaultView:
                 "next_step": (spec.onboarding or {}).get("prompt"),
             })
 
-        cards = [self._card(issue, files) for issue in issues]
+        cards = [self._card(issue, files, workspace_id) for issue in issues]
         return {
             "details": details,
             "story": story,
@@ -317,7 +317,66 @@ class VaultView:
             return None
         return _aware(((evidence or {}).get("confirmation") or {}).get("confirmed_at"))
 
-    def _card(self, issue: ProfileIssue, files: dict) -> tuple[dict, str]:
+    def _source(self, level: str, said_on: Any, refs: list, files: dict) -> dict:
+        """Where one side of a conflict came from: the entry ladder's level and
+        badge, the day it was said or read, and the file behind it. Built from
+        named keys only, so a quote on the evidence never reaches the card."""
+        return {"level": level, "badge": badge_for(level, False), "said_on": _iso(_aware(said_on)),
+                "document": self._link(refs, files)}
+
+    def _saved_source(self, issue: ProfileIssue, form: str, type_key: Optional[str], workspace_id: str,
+                      files: dict) -> Optional[dict]:
+        """The saved side is the entry the card is about, read from its own store."""
+        evidence = issue.evidence or {}
+        row = level = said_on = None
+        if form == "fact":
+            fact_id = evidence.get("current_fact_id") or (
+                issue.affected_id if issue.affected_type == "vault_fact" else None)
+            row = self.db.get(VaultFact, fact_id) if fact_id else None
+            if row is not None and row.workspace_id == workspace_id:
+                level = level_of(row.source_type, None, row.evidence, value=_unwrap(row.value),
+                                 capture_method=row.capture_method)
+                said_on = row.valid_from or row.created_at
+        elif form == "record":
+            record_id = evidence.get("record_id") or issue.affected_id
+            row = self.records.get(workspace_id, type_key, record_id) if (
+                record_id and type_key in ENTITY_MODELS) else None
+            if row is not None:
+                level = level_of(row.source_type, row.verification_status, row.evidence,
+                                 value=self.records._values(type_key, row), capture_method=row.capture_method)
+                said_on = row.updated_at or row.created_at
+        elif form == "item" and issue.affected_id:
+            row = self.db.get(VaultItem, issue.affected_id)
+            if row is not None and row.workspace_id == workspace_id:
+                level, said_on = row.level, row.observed_at or row.created_at
+        if level is None:
+            return None
+        row_evidence = row.evidence or {}
+        return self._source(level, said_on, [row_evidence, *reversed(row_evidence.get("corroborations", []))], files)
+
+    def _proposed_source(self, issue: ProfileIssue, form: str, proposed: Any, workspace_id: str,
+                         files: dict) -> Optional[dict]:
+        """The new side is the proposal the card asks about: the source the
+        writer recorded on the card, else the proposing candidate."""
+        evidence = issue.evidence or {}
+        if form == "document_owner":
+            return self._source("shown", issue.created_at, [evidence], files)
+        candidate = self.db.get(MemoryCandidate, issue.candidate_id) if issue.candidate_id else None
+        if candidate is not None and candidate.workspace_id != workspace_id:
+            candidate = None
+        said_on = candidate.created_at if candidate is not None else issue.created_at
+        recorded = evidence.get("proposed_source")
+        if isinstance(recorded, dict) and recorded.get("level"):  # an item card
+            return self._source(recorded["level"], recorded.get("observed_at") or said_on, [recorded], files)
+        if evidence.get("proposed_source_type"):
+            source_type, proposal = evidence["proposed_source_type"], evidence.get("proposed_evidence")
+        elif candidate is not None:
+            source_type, proposal = candidate.source_type, candidate.evidence
+        else:
+            return None
+        return self._source(level_of(source_type, None, proposal, value=proposed), said_on, [proposal], files)
+
+    def _card(self, issue: ProfileIssue, files: dict, workspace_id: str) -> tuple[dict, str]:
         """One conflict card (short English copy and the two values, never evidence)
         and the sensitivity that decides whether a counselor view shows it."""
         copy = view_copy()
@@ -368,4 +427,7 @@ class VaultView:
             "current": current, "proposed": proposed,
             "current_display": _display(spec, current), "proposed_display": _display(spec, proposed),
             "answers": list(answers),
+            "current_source": self._saved_source(issue, form, type_key, workspace_id, files),
+            "proposed_source": self._proposed_source(issue, form, proposed, workspace_id, files),
+            "created_at": _iso(_aware(issue.created_at)),
         }, sensitivity

@@ -130,8 +130,12 @@ def test_ask_student_rule_opens_issue():
         assert issue.affected_id == first.item.id and issue.status == "open"
         assert "Domicile" in issue.clarification_question
         assert "Punjab ka" not in issue.summary and "Sindh se" not in issue.summary
-        assert issue.evidence == {"item_type": "domicile", "proposed_value": {"province": "Punjab"},
+        evidence = dict(issue.evidence)
+        source = evidence.pop("proposed_source")
+        assert evidence == {"item_type": "domicile", "proposed_value": {"province": "Punjab"},
                                   "current_value": {"province": "Sindh"}}
+        # Where the new answer came from, never its words.
+        assert source["level"] == "stated" and source["file_id"] is None and "quote" not in source
         assert db.get(VaultItem, first.item.id).conflict_state == "in_question"
         assert len(_rows(db, ws, "domicile")) == 1
         # Confirming the current entry settles the question.

@@ -210,7 +210,7 @@ class VaultItemService:
         if loose:
             if guess:
                 return ItemWrite(VaultOutcome.RETAINED, current, reason="guess_against_stated")
-            return self._ask_student(current, spec, value, candidate_id)
+            return self._ask_student(current, spec, value, candidate_id, source_type, level, evidence)
 
         # 2. The student's own edit always wins; a disagreeing document stays visible.
         # "Both true at different times" is a change over time, not a disagreement.
@@ -241,7 +241,7 @@ class VaultItemService:
             evidence["disagreements"] = [*evidence.get("disagreements", []), {
                 "value": old, "source_type": current.source_type, "level": current.level}]
             return self._supersede(current, spec, value, source_type, level, confidence, evidence, candidate_id)
-        return self._ask_student(current, spec, value, candidate_id)
+        return self._ask_student(current, spec, value, candidate_id, source_type, level, evidence)
 
     def retract(self, workspace_id: str, item_id: str, evidence: dict | None) -> VaultItem:
         self._lock(workspace_id)
@@ -406,9 +406,15 @@ class VaultItemService:
             issue.resolution = {"action": "obsolete", "note": note, "resolved_by": "system",
                                 "candidate_id": None}
 
-    def _ask_student(self, current, spec, value, candidate_id) -> ItemWrite:
-        """Stable facts are not overwritten silently: open one conflict card."""
-        evidence = {"item_type": spec.key, "proposed_value": value, "current_value": current.value}
+    def _ask_student(self, current, spec, value, candidate_id, source_type, level, proposal) -> ItemWrite:
+        """Stable facts are not overwritten silently: open one conflict card.
+
+        The card keeps where the new answer came from (its level and file, never
+        the quote) so the Vault can say "From Result card.jpg" or "You said this"."""
+        evidence = {"item_type": spec.key, "proposed_value": value, "current_value": current.value,
+                    "proposed_source": {"source_type": source_type, "level": level,
+                                        "file_id": (proposal or {}).get("file_id"), "page": page_of(proposal),
+                                        "observed_at": _now().isoformat()}}
         cards = self._open_cards(current)
         if cards:
             # One question at a time: the open card now asks about the newest proposal.

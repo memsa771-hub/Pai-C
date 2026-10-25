@@ -505,3 +505,65 @@ def test_cards_without_a_current_value_offer_two_answers():
         db.commit()
         assert VaultService(db).get_fact(ws, "location.current_city") is not None
         assert [r.qualification_name for r in StudentRecordService(db).list(ws, "education")] == ["matric"]
+
+
+def test_conflict_cards_say_where_each_side_came_from():
+    with VaultSession() as student, student.factory() as db:
+        ws = student.workspace_id
+        f = _file(db, ws, "result_card.jpg")
+        # An item card: said in conversation, then read differently on a document.
+        _item(db, ws, "domicile", {"province": "sindh"})
+        item_write = _item(db, ws, "domicile", {"province": "punjab"}, source_type="document", level="stated",
+                           evidence={**DOC, "file_id": f.id, "page": 1})
+        # A fact card: said in conversation, then a document disagrees.
+        vault = VaultService(db)
+        vault.apply_fact(ws, "identity.full_name", "Ali Khan", "conversation", evidence={"quote": SECRET})
+        vault.apply_fact(ws, "identity.full_name", "Ali Raza", "document", evidence={**DOC, "file_id": f.id})
+        # A record card: a document reading, then a conversation disagrees.
+        records = StudentRecordService(db)
+        row = records.apply(ws, "education", {"qualification_name": "hssc", "institution_name": "BISE Lahore"},
+                            source_type="document", claim_origin="institution_document",
+                            capture_method="document_extraction", evidence={**DOC, "file_id": f.id},
+                            verification_status="document_supported")
+        with pytest.raises(RecordNeedsReview):
+            records.apply(ws, "education", {"institution_name": "BISE Sargodha"}, source_type="conversation",
+                          claim_origin="student", capture_method="conversation_extraction", record_id=row.id,
+                          evidence={"quote": SECRET})
+        owner = ProfileIssue(workspace_id=ws, issue_type="document_owner", severity="blocking",
+                             affected_type="document", affected_id=f.id, summary="x",
+                             evidence={"file_id": f.id, "filename": f.filename, "quote": SECRET,
+                                       "document_names": ["Sara Ahmed"], "vault_names": ["Ali Khan"]})
+        db.add(owner)
+        db.commit()
+
+        cards = {c["kind"]: c for c in VaultView(db).build(ws)["conflicts"]}
+        assert set(cards) == {"item", "fact", "record", "document_owner"}
+        link = {"file_id": f.id, "page": 1, "filename": "result_card.jpg"}
+        for card in cards.values():
+            assert card["created_at"]
+            for side in ("current_source", "proposed_source"):
+                source = card[side]
+                if source is not None:
+                    assert set(source) == {"level", "badge", "said_on", "document"}
+                    assert source["badge"] == badge_for(source["level"], False)
+                    assert source["said_on"]
+
+        item = cards["item"]
+        assert item["id"] == item_write.issue_id
+        assert item["current_source"]["level"] == "stated" and item["current_source"]["document"] is None
+        assert item["proposed_source"]["document"] == link
+        fact = cards["fact"]
+        assert fact["current_source"]["badge"] == "Stated" and fact["current_source"]["document"] is None
+        assert fact["proposed_source"]["badge"] == "From document"
+        assert fact["proposed_source"]["document"] == {**link, "page": 2}  # DOC's "p2" locator
+        record = cards["record"]
+        assert record["current_source"]["badge"] == "From document"
+        assert record["current_source"]["document"] == {**link, "page": 2}
+        assert record["proposed_source"]["badge"] == "Stated" and record["proposed_source"]["document"] is None
+        # An owner card asks about the file: its new side is the document itself.
+        assert cards["document_owner"]["current_source"] is None
+        assert cards["document_owner"]["proposed_source"]["document"]["file_id"] == f.id
+
+        # Never the student's words, on any card or side.
+        text = json.dumps(list(cards.values()), default=str)
+        assert "SECRET-QUOTE" not in text and "quote" not in text
