@@ -176,6 +176,17 @@
         ],
         "nonempty": "concern",
         "group": "family_concern"
+      },
+      {
+        "vault_fields": [
+          "finance.budget"
+        ]
+      },
+      {
+        "vault_fields": [
+          "mobility.relocation_willingness",
+          "preferences.location_limits"
+        ]
       }
     ]
   },
@@ -253,6 +264,11 @@
           "myth"
         ],
         "group": "options"
+      },
+      {
+        "vault_records": [
+          "test_attempt"
+        ]
       }
     ]
   }

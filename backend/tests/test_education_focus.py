@@ -11,6 +11,13 @@ BACKEND = Path(__file__).resolve().parents[1]
 ACTIONS = BACKEND / "app/pai_c/policy/actions"
 BANNED = ("great question", "amazing", "achi misaalein", "zabardast", "shukriya")
 BASICS = controller.load_data("areas_policy.json")["education_basics"]
+DOCS = BACKEND.parent / "docs/counselor/COUNSELOR_V3_PROMPTS.md"
+
+
+def documented(header):
+    """The text block of one numbered section of the prompts doc."""
+    section = DOCS.read_text(encoding="utf-8").split(header, 1)[1].split("\n## ", 1)[0]
+    return section.split("```text\n", 1)[1].split("\n```", 1)[0].rstrip()
 
 
 def test_guided_prompt_puts_education_first_without_praise_or_echo():
@@ -100,13 +107,64 @@ def test_shared_voice_tail_has_no_affirm_move_and_hobbies_only_as_evidence():
     assert _parse_response(reply)[2] == ["give"]
 
 
-def test_classifier_asks_when_an_education_basic_is_missing():
+def test_classifier_question_needed_means_the_reply_needs_input_and_unknown_is_declined():
     prompt = (BACKEND / "app/pai_c/policy/prompts/turn_classifier.md").read_text(encoding="utf-8")
-    assert "uncovered profile area alone is NOT a reason to ask" not in prompt
-    assert "valid whole-person counseling context" not in prompt
-    for line in ("an education basic is missing", "entry test plans", "the turn is not care"):
-        assert line in prompt
-    docs = BACKEND.parent / "docs/counselor/COUNSELOR_V3_PROMPTS.md"
-    if docs.exists():
-        section = docs.read_text(encoding="utf-8").split("## 8.", 1)[1].split("\n## ", 1)[0]
-        assert section.split("```text\n", 1)[1].split("\n```", 1)[0].rstrip() == prompt.rstrip()
+    # Missing basics are decided only from Vault coverage (question_due), never by the classifier.
+    for gone in ("uncovered profile area alone is NOT a reason to ask", "valid whole-person counseling context",
+                 "an education basic is missing", "entry test plans"):
+        assert gone not in prompt
+    assert "true only when this reply needs the student's input" in prompt
+    assert '"pata nahi"' in prompt and "set declined_area to that area" in prompt
+    if DOCS.exists():
+        assert documented("## 8.") == prompt.rstrip()
+
+
+def test_unsure_about_a_basic_stops_asking_it_through_the_decline_cooldown():
+    from app.pai_c.policy.classifier import fallback_signals
+    from app.pai_c.policy.state import derive_state
+    signals = fallback_signals().model_copy(update={"intent": "short_reply", "declined_area": "history"})
+    inputs = derive_state(signals, coverage={}, mirror_ready=False, plan=None, student_count=5,
+        prior_decisions=[], replies=[], student_ordinals={}, current_event_id="e5")
+    decision = controller.decide({**state(), **inputs})
+    assert decision.question_allowed and decision.topic == "goals"
+
+
+# One phrase per education basic; the prompts must list exactly the areas in areas_policy.education_basics.
+BASIC_PHRASES = {
+    "history": "their education so far (qualification, group and marks)",
+    "goals": "the field of study they lean toward and why",
+    "options": "the fields of study and entrance tests they are considering",
+    "pressures": "their budget range for study and whether they can move to another city",
+    "interests": "which subjects they like and are good at",
+}
+
+
+def test_prompt_basics_match_the_data_and_voice_heads_agree():
+    assert set(BASIC_PHRASES) == set(BASICS)
+    for name in ("voice", "voice_guided"):
+        prompt = load_prompt(name)
+        for phrase in BASIC_PHRASES.values():
+            assert phrase in prompt
+        assert "current education and group" not in prompt
+        for line in ("PAI is an educational counselor.", "No praise and no affirmations.",
+                     "Never repeat the student's words back as a summary unless they ask for one."):
+            assert line in prompt
+        assert "Affirm only with a concrete fact" not in prompt and "Reflect the meaning or the feeling" not in prompt
+        assert "may follow each other, unless an education basic is missing and question_allowed is true." in prompt
+    if DOCS.exists():
+        assert documented("## 1.") == load_prompt("voice").rstrip()
+
+
+def test_stated_test_plan_budget_and_mobility_cover_their_basics():
+    from types import SimpleNamespace
+    from app.pai_c.deep.notebook_schema import CounselorNotebookData
+    from app.pai_c.understanding.views import coverage_areas
+    quote = {"quote": "student words"}
+    def covered(facts=None, records=None):
+        return coverage_areas(CounselorNotebookData(), SimpleNamespace(facts=facts or {}, records=records or {}))
+    plan = {"id": "t1", "test_type": "MDCAT", "details": {"status": "planned"}, "evidence": quote}
+    assert covered(records={"test_attempt": [plan]})["options"]["covered"]
+    for key in ("finance.budget", "mobility.relocation_willingness", "preferences.location_limits"):
+        assert covered(facts={key: {"value": "x", "evidence": quote}})["pressures"]["covered"]
+    extractor = (BACKEND / "app/memory/prompts/extractor.md").read_text(encoding="utf-8")
+    assert "is a test_attempt record" in extractor

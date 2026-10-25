@@ -1,4 +1,4 @@
-"""Question usefulness replaces cadence caps; the existing Voice guard remains."""
+"""Question permission: classifier necessity or a missing education basic; two asking replies pause only the basic question. The Voice guard remains."""
 import copy
 import json
 from unittest.mock import AsyncMock, patch

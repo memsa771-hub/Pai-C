@@ -46,6 +46,7 @@ async def test_deep_eval_policy_mode_uses_production_runtime(tmp_path):
     # A new student is missing education basics, so the replay may ask about one; nothing else earns a question.
     assert turns and all(turn["decision"]["action"] in ("counsel", "explore_area") for turn in turns)
     assert all(turn["decision"]["question_allowed"] == (turn["decision"]["action"] == "explore_area") for turn in turns)
+    assert any(turn["decision"]["action"] == "explore_area" for turn in turns)
     assert all(turn["reply"] for turn in turns)
 
 
