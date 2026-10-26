@@ -1,0 +1,85 @@
+{
+  "$defs": {
+    "IntakeRef": {
+      "additionalProperties": false,
+      "properties": {
+        "term": {
+          "pattern": "^[a-z_]+$",
+          "title": "Term",
+          "type": "string"
+        },
+        "year": {
+          "maximum": 2100,
+          "minimum": 2025,
+          "title": "Year",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "term",
+        "year"
+      ],
+      "title": "IntakeRef",
+      "type": "object"
+    },
+    "ProgrammeEntry": {
+      "additionalProperties": false,
+      "properties": {
+        "programme_ref": {
+          "title": "Programme Ref",
+          "type": "string"
+        },
+        "university": {
+          "title": "University",
+          "type": "string"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "facts_confirmed": {
+          "title": "Facts Confirmed",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "programme_ref",
+        "university",
+        "name",
+        "facts_confirmed"
+      ],
+      "title": "ProgrammeEntry",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "schema": {
+      "const": "pai.programme_list.v1",
+      "default": "pai.programme_list.v1",
+      "title": "Schema",
+      "type": "string"
+    },
+    "route_key": {
+      "title": "Route Key",
+      "type": "string"
+    },
+    "intake": {
+      "$ref": "#/$defs/IntakeRef"
+    },
+    "programmes": {
+      "items": {
+        "$ref": "#/$defs/ProgrammeEntry"
+      },
+      "title": "Programmes",
+      "type": "array"
+    }
+  },
+  "required": [
+    "route_key",
+    "intake",
+    "programmes"
+  ],
+  "title": "ProgrammeListV1",
+  "type": "object"
+}

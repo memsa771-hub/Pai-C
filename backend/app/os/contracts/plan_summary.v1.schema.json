@@ -1,0 +1,257 @@
+{
+  "$defs": {
+    "BlockedItem": {
+      "additionalProperties": false,
+      "properties": {
+        "title": {
+          "title": "Title",
+          "type": "string"
+        },
+        "template_key": {
+          "title": "Template Key",
+          "type": "string"
+        },
+        "reason": {
+          "pattern": "^[a-z_]+$",
+          "title": "Reason",
+          "type": "string"
+        }
+      },
+      "required": [
+        "title",
+        "template_key",
+        "reason"
+      ],
+      "title": "BlockedItem",
+      "type": "object"
+    },
+    "Deadline": {
+      "additionalProperties": false,
+      "properties": {
+        "title": {
+          "title": "Title",
+          "type": "string"
+        },
+        "template_key": {
+          "title": "Template Key",
+          "type": "string"
+        },
+        "programme_ref": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Programme Ref"
+        },
+        "due_at": {
+          "format": "date-time",
+          "title": "Due At",
+          "type": "string"
+        },
+        "due_tz": {
+          "title": "Due Tz",
+          "type": "string"
+        }
+      },
+      "required": [
+        "title",
+        "template_key",
+        "programme_ref",
+        "due_at",
+        "due_tz"
+      ],
+      "title": "Deadline",
+      "type": "object"
+    },
+    "IntakeRef": {
+      "additionalProperties": false,
+      "properties": {
+        "term": {
+          "pattern": "^[a-z_]+$",
+          "title": "Term",
+          "type": "string"
+        },
+        "year": {
+          "maximum": 2100,
+          "minimum": 2025,
+          "title": "Year",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "term",
+        "year"
+      ],
+      "title": "IntakeRef",
+      "type": "object"
+    },
+    "SummaryRoute": {
+      "additionalProperties": false,
+      "properties": {
+        "origin_country": {
+          "title": "Origin Country",
+          "type": "string"
+        },
+        "destination_country": {
+          "title": "Destination Country",
+          "type": "string"
+        },
+        "level": {
+          "enum": [
+            "foundation",
+            "bachelor",
+            "master",
+            "phd"
+          ],
+          "title": "Level",
+          "type": "string"
+        },
+        "target_intake": {
+          "$ref": "#/$defs/IntakeRef"
+        }
+      },
+      "required": [
+        "origin_country",
+        "destination_country",
+        "level",
+        "target_intake"
+      ],
+      "title": "SummaryRoute",
+      "type": "object"
+    },
+    "WaitingItem": {
+      "additionalProperties": false,
+      "properties": {
+        "title": {
+          "title": "Title",
+          "type": "string"
+        },
+        "template_key": {
+          "title": "Template Key",
+          "type": "string"
+        },
+        "programme_ref": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Programme Ref"
+        },
+        "due_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Due At"
+        },
+        "due_tz": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Due Tz"
+        }
+      },
+      "required": [
+        "title",
+        "template_key",
+        "programme_ref",
+        "due_at",
+        "due_tz"
+      ],
+      "title": "WaitingItem",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "schema": {
+      "const": "pai.plan_summary.v1",
+      "default": "pai.plan_summary.v1",
+      "title": "Schema",
+      "type": "string"
+    },
+    "student_ref": {
+      "title": "Student Ref",
+      "type": "string"
+    },
+    "plan_id": {
+      "title": "Plan Id",
+      "type": "integer"
+    },
+    "route": {
+      "$ref": "#/$defs/SummaryRoute"
+    },
+    "built_at": {
+      "format": "date-time",
+      "title": "Built At",
+      "type": "string"
+    },
+    "state": {
+      "enum": [
+        "finished",
+        "paused",
+        "needs_student",
+        "on_track"
+      ],
+      "title": "State",
+      "type": "string"
+    },
+    "next_deadlines": {
+      "items": {
+        "$ref": "#/$defs/Deadline"
+      },
+      "maxItems": 3,
+      "title": "Next Deadlines",
+      "type": "array"
+    },
+    "waiting_on_student": {
+      "items": {
+        "$ref": "#/$defs/WaitingItem"
+      },
+      "title": "Waiting On Student",
+      "type": "array"
+    },
+    "blocked": {
+      "items": {
+        "$ref": "#/$defs/BlockedItem"
+      },
+      "title": "Blocked",
+      "type": "array"
+    },
+    "support_case_open": {
+      "title": "Support Case Open",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "student_ref",
+    "plan_id",
+    "route",
+    "built_at",
+    "state",
+    "next_deadlines",
+    "waiting_on_student",
+    "blocked",
+    "support_case_open"
+  ],
+  "title": "PlanSummaryV1",
+  "type": "object"
+}

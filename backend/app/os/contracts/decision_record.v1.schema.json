@@ -1,0 +1,144 @@
+{
+  "$defs": {
+    "IntakeRef": {
+      "additionalProperties": false,
+      "properties": {
+        "term": {
+          "pattern": "^[a-z_]+$",
+          "title": "Term",
+          "type": "string"
+        },
+        "year": {
+          "maximum": 2100,
+          "minimum": 2025,
+          "title": "Year",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "term",
+        "year"
+      ],
+      "title": "IntakeRef",
+      "type": "object"
+    },
+    "ProgrammeChoice": {
+      "additionalProperties": false,
+      "properties": {
+        "programme_ref": {
+          "minLength": 1,
+          "title": "Programme Ref",
+          "type": "string"
+        },
+        "rank": {
+          "minimum": 1,
+          "title": "Rank",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "programme_ref",
+        "rank"
+      ],
+      "title": "ProgrammeChoice",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "schema": {
+      "const": "pai.decision_record.v1",
+      "title": "Schema",
+      "type": "string"
+    },
+    "decision_id": {
+      "minLength": 1,
+      "title": "Decision Id",
+      "type": "string"
+    },
+    "journey_id": {
+      "minLength": 1,
+      "title": "Journey Id",
+      "type": "string"
+    },
+    "student_ref": {
+      "minLength": 1,
+      "title": "Student Ref",
+      "type": "string"
+    },
+    "chosen_at": {
+      "format": "date-time",
+      "title": "Chosen At",
+      "type": "string"
+    },
+    "authorized_at": {
+      "anyOf": [
+        {
+          "format": "date-time",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Authorized At"
+    },
+    "origin_country": {
+      "title": "Origin Country",
+      "type": "string"
+    },
+    "destination_country": {
+      "title": "Destination Country",
+      "type": "string"
+    },
+    "nationality": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Nationality"
+    },
+    "level": {
+      "enum": [
+        "foundation",
+        "bachelor",
+        "master",
+        "phd"
+      ],
+      "title": "Level",
+      "type": "string"
+    },
+    "target_intake": {
+      "$ref": "#/$defs/IntakeRef"
+    },
+    "programmes": {
+      "items": {
+        "$ref": "#/$defs/ProgrammeChoice"
+      },
+      "maxItems": 5,
+      "minItems": 1,
+      "title": "Programmes",
+      "type": "array"
+    }
+  },
+  "required": [
+    "schema",
+    "decision_id",
+    "journey_id",
+    "student_ref",
+    "chosen_at",
+    "origin_country",
+    "destination_country",
+    "level",
+    "target_intake",
+    "programmes"
+  ],
+  "title": "DecisionRecordV1",
+  "type": "object"
+}
