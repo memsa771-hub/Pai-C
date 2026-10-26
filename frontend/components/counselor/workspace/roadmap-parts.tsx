@@ -21,6 +21,8 @@ import { DEFAULT_LOCALE } from "@/lib/i18n/locales";
 import {
   educationText, fill, marksText, needItem, render, shortNeed, testsText, uncertain, yearsText,
 } from "./roadmap-text";
+import { FamilyTalk } from "./family-talk";
+import familyCopy from "./family-talk.json";
 import copy from "./copy.json";
 
 const t = copy.roadmap;
@@ -291,7 +293,8 @@ export function CompareDialog({ cards, open, onOpenChange }: {
 }
 
 /** The chosen route: its checklist the student ticks (saved at once, undone
- * if the save fails), and "Change route" behind one confirm. */
+ * if the save fails), "Change route" behind one confirm, and family-talk
+ * preparation (the backend reads the chosen path, which this route is). */
 export function YourRoute({ route, onWithdrawn, onTicked, onChat }: {
   route: ChosenRoute;
   onWithdrawn: () => Promise<void> | void;
@@ -300,7 +303,7 @@ export function YourRoute({ route, onWithdrawn, onTicked, onChat }: {
 }) {
   const [done, setDone] = useState(route.steps_done);
   const [error, setError] = useState(false), [confirming, setConfirming] = useState(false), [busy, setBusy] = useState(false),
-    [savingView, setSavingView] = useState(false);
+    [savingView, setSavingView] = useState(false), [familyOpen, setFamilyOpen] = useState(false);
   const saving = useRef(false);
   useEffect(() => { setDone(route.steps_done); }, [route]);
   // One save at a time: the checklist is disabled while a tick is saving, so
@@ -379,7 +382,16 @@ export function YourRoute({ route, onWithdrawn, onTicked, onChat }: {
         ) : (
           <div className="mt-3 flex flex-wrap gap-2">
             {onChat && <Button size="tap" variant="soft" onClick={() => onChat(copy.checkin)}><MessageCircle aria-hidden />{t.route.checkin}</Button>}
+            <Button size="tap" variant="ghost" aria-expanded={familyOpen} onClick={() => setFamilyOpen(!familyOpen)}>
+              <Users aria-hidden />{familyOpen ? copy.cancel : t.route.family}</Button>
             <Button size="tap" variant="ghost" onClick={() => setConfirming(true)}>{t.route.change}</Button>
+          </div>
+        )}
+        {familyOpen && (
+          <div className="mt-4 rounded-2xl bg-background p-4 ring-1 ring-border">
+            <h3 className="font-semibold">{familyCopy.title}</h3>
+            <p className="mb-4 mt-1 text-sm text-muted-foreground">{t.route.familyIntro}</p>
+            <FamilyTalk />
           </div>
         )}
       </div>

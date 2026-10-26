@@ -15,6 +15,8 @@ vi.mock("@/lib/api", () => ({
     chooseRoute: vi.fn(),
     setRouteStep: vi.fn(),
     withdrawRoute: vi.fn(),
+    getFamilyTalk: vi.fn(),
+    prepareFamilyTalk: vi.fn(),
   },
 }));
 afterEach(() => {
@@ -190,6 +192,28 @@ it("changes route only after a confirm, and notes a changed situation", async ()
   fireEvent.click(screen.getByRole("button", { name: "Yes, change route" }));
   await waitFor(() => expect(workspaceApi.withdrawRoute).toHaveBeenCalledTimes(1));
   await waitFor(() => expect(screen.queryByRole("region", { name: "Your route" })).toBeNull());
+});
+
+it("prepares a family talk from the chosen route", async () => {
+  vi.mocked(workspaceApi.getRoadmapPage).mockResolvedValue({ ...roadmapPage, chosen: chosenRoute });
+  vi.mocked(workspaceApi.getFamilyTalk).mockResolvedValue({
+    ready: true, message: "Prepare for your chosen path.", path_id: "path-1",
+    family: [{ id: "mother", role: "Mother", wish: "", worry: "The cost", evidence: "She asked about fees." }],
+    evidence: [{ id: "e1", quote: "I can get a scholarship." }],
+  });
+  vi.mocked(workspaceApi.prepareFamilyTalk).mockResolvedValue({ event_id: "ev", script: "Start with the fees." });
+  render(<Roadmap onNavigate={vi.fn()} />);
+  const region = await screen.findByRole("region", { name: "Your route" });
+  expect(workspaceApi.getFamilyTalk).not.toHaveBeenCalled(); // secondary: nothing loads until asked
+  const open = within(region).getByRole("button", { name: copy.roadmap.route.family });
+  fireEvent.click(open);
+  expect(open.getAttribute("aria-expanded")).toBe("true");
+  fireEvent.click(await within(region).findByRole("radio", { name: "Mother" }));
+  fireEvent.click(within(region).getByRole("checkbox", { name: /scholarship/ }));
+  fireEvent.click(within(region).getByRole("button", { name: "Prepare with PAI" }));
+  await waitFor(() => expect(workspaceApi.prepareFamilyTalk).toHaveBeenCalledWith(
+    expect.objectContaining({ path_id: "path-1", person_id: "mother", evidence_ids: ["e1"] })));
+  expect(await within(region).findByText("Start with the fees.")).toBeTruthy();
 });
 
 it("asks for education first, with a way to the Vault", async () => {

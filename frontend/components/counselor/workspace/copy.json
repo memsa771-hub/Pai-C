@@ -684,7 +684,9 @@
       "changeYes": "Yes, change route",
       "changeNo": "Keep it",
       "changed": "Your situation changed: now {status}.",
-      "checkin": "How is it going?"
+      "checkin": "How is it going?",
+      "family": "Prepare to talk with family",
+      "familyIntro": "Prepare a calm conversation with someone whose opinion matters to you."
     },
     "empty": {
       "educationTitle": "Tell PAI your education first",
