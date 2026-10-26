@@ -98,6 +98,8 @@ def _from_mirror(db, workspace_id, journey, tool_context):
     # is at the route decision as soon as the paths exist.
     journey = JourneyService(db).set_counselor_stage(workspace_id, journey.id, "PROPOSED",
                                                      actor="system:mirror_confirmed")
+    from app.pai_c.roadmap.decisions import RouteDecisionService
+    RouteDecisionService(db).follow_active(workspace_id, actor="system:mirror_confirmed")
     db.commit()
     return {"ok": True, "data": {"status": "paths_ready",
                                  "mirror_version": (journey.counselor_summary_draft or {}).get("version")}}
