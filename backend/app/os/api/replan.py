@@ -30,6 +30,14 @@ def replanner_for(svc: Services) -> Replanner:
                      escalations=svc.escalations)
 
 
+def case_fields(c) -> dict:
+    """A support case for the admin inbox; Slice 8 adds whether it went to the Counsellor and with which reason."""
+    return {"id": c.id, "plan_id": c.plan_id, "student_ref": c.student_ref, "reason": c.reason,
+            "event_ids": c.event_ids, "proposal_id": c.proposal_id, "status": c.status, "resolution": c.resolution,
+            "created_at": c.created_at, "resolved_at": c.resolved_at, "counsellor_status": c.counsellor_status,
+            "counsellor_reason": c.counsellor_reason}
+
+
 def proposal_out(p: Proposal) -> dict:
     return {"id": p.id, "plan_id": p.plan_id, "status": p.status, "big": p.big, "source": p.source, "ops": p.ops,
             "reasons": [o["reason"] for o in p.ops], "revision": p.revision, "expires_at": p.expires_at,
@@ -104,10 +112,7 @@ def add_replan_routes(router: APIRouter, services: Callable[[], Services], requi
     def case_out(svc: Services, c) -> dict:
         with svc.engine.connect() as conn:
             paused = conn.execute(select(P.c.changes_paused).where(P.c.id == c.plan_id)).scalar()
-        return {"id": c.id, "plan_id": c.plan_id, "student_ref": c.student_ref, "reason": c.reason,
-                "event_ids": c.event_ids, "proposal_id": c.proposal_id, "status": c.status,
-                "resolution": c.resolution, "created_at": c.created_at, "resolved_at": c.resolved_at,
-                "changes_paused": bool(paused)}
+        return {**case_fields(c), "changes_paused": bool(paused)}
 
     @router.get("/admin/support", dependencies=[Depends(require_admin)])
     def support(status: str | None = None, svc: Services = Depends(services)) -> dict:

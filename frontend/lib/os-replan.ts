@@ -54,6 +54,18 @@ export interface OsSupportCase {
   created_at: string;
   resolved_at: string | null;
   changes_paused: boolean;
+  /** Slice 8: a route problem on a Counsellor plan, handed to the Counsellor (null: it stays in this inbox only). */
+  counsellor_status: 'pending' | 'sent' | 'refused' | null;
+  counsellor_reason: string | null;
+}
+
+/** The support page's line for a case handed to the Counsellor, or null. */
+export function counsellorLine(kase: Pick<OsSupportCase, 'counsellor_status' | 'counsellor_reason'>): string | null {
+  const reason = kase.counsellor_reason ? ` (${kase.counsellor_reason.replace(/_/g, ' ')})` : '';
+  if (kase.counsellor_status === 'sent') return `Sent to the Counsellor${reason}`;
+  if (kase.counsellor_status === 'refused') return `Refused by the Counsellor${reason}: still open here`;
+  if (kase.counsellor_status === 'pending') return `Waiting to go to the Counsellor${reason}`;
+  return null;
 }
 
 /** "review_visa_file#2" -> "Review visa file"; "apply@prog-a" -> "Apply". */

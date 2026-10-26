@@ -85,7 +85,20 @@ describe('SupportList', () => {
   const kase: OsSupportCase = {
     id: 3, plan_id: 1, student_ref: 'stu-1', reason: 'A step failed twice.', event_ids: [4], proposal_id: null,
     status: 'open', resolution: null, created_at: '2027-03-01T09:00:00Z', resolved_at: null, changes_paused: true,
+    counsellor_status: null, counsellor_reason: null,
   };
+
+  it('shows sent to the Counsellor', () => {
+    const sent = renderToStaticMarkup(<SupportList cases={[{ ...kase, counsellor_status: 'sent',
+      counsellor_reason: 'blocking_gap' }]} busy={false} onResolve={noop} />);
+    expect(sent).toContain('Sent to the Counsellor (blocking gap)');
+    const refused = renderToStaticMarkup(<SupportList cases={[{ ...kase, counsellor_status: 'refused',
+      counsellor_reason: 'all_rejected' }]} busy={false} onResolve={noop} />);
+    expect(refused).toContain('Refused by the Counsellor (all rejected): still open here');
+    expect(refused).toContain('>Resolve<');  // a refused case stays open here
+    expect(renderToStaticMarkup(<SupportList cases={[kase]} busy={false} onResolve={noop} />))
+      .not.toContain('Counsellor');  // a system problem stays in this inbox only
+  });
 
   it('lists cases and offers a resolve form with unpause', () => {
     const html = renderToStaticMarkup(<SupportList cases={[kase]} busy={false} onResolve={noop} />);

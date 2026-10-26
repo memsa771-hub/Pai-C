@@ -9,7 +9,8 @@ from pydantic import ValidationError
 from sqlalchemy import and_, insert, select
 
 from app.os import models
-from app.os.adapters.counsellor.store import Intake, IntakeStore
+from app.os.adapters.counsellor.escalation import intake_refused
+from app.os.adapters.counsellor.store import Intake
 from app.os.compiler import CompileError
 from app.os.contracts.decision_record import DecisionRecordV1
 from app.os.contracts.route_contract import RouteContract
@@ -20,7 +21,7 @@ from app.os.playbooks import PlaybookError, select_playbook
 
 REFUSALS = ("not_authorized", "invalid_export", "route_not_supported", "unknown_programme", "self_serve_plan_open",
             "plan_closed")
-TO_COUNSELLOR = REFUSALS[:4]  # should never arrive, so the Counsellor hears of them (`other`, sent in Task 7)
+TO_COUNSELLOR = REFUSALS[:4]  # should never arrive, so the Counsellor hears of them (`other`, by journey)
 SELF_SERVE_REASON = "A Counsellor decision arrived while the student has an open self-serve plan: a person decides."
 CLOSED_REASON = "A Counsellor decision names a route whose plan was closed: a person decides."
 SOURCE = "counsellor"
@@ -42,9 +43,9 @@ def _plans_of(svc, student_ref: str, source: str) -> list:
 
 
 def _refuse(svc, intake: Intake, reason: str, plan_id: int | None = None) -> IntakeResult:
-    if reason in TO_COUNSELLOR and intake.counsellor_status is None:
-        IntakeStore(svc.engine, svc.kernel.tenant_id).set_counsellor_status(intake.decision_id, "pending")
-    elif reason not in TO_COUNSELLOR:  # a person decides: a support case on the plan concerned, once per decision
+    if reason in TO_COUNSELLOR:  # sent to the Counsellor by journey as `other`, once per decision
+        intake_refused(svc.engine, svc.kernel.tenant_id, intake)
+    else:  # a person decides: a support case on the plan concerned, once per decision
         svc.escalations.escalate(plan_id, [_intake_event(svc, plan_id, intake, reason)],
                                  SELF_SERVE_REASON if reason == "self_serve_plan_open" else CLOSED_REASON)
     return IntakeResult("refused", reason, plan_id)

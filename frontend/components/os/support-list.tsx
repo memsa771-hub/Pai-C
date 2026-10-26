@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import type { OsSupportCase } from '@/lib/os-replan';
+import { counsellorLine, type OsSupportCase } from '@/lib/os-replan';
 
 /** The admin support inbox (Slice 7 spec §5): open cases, each resolved with a note, optionally resuming changes. */
 export function SupportList({ cases, busy, onResolve }: {
@@ -29,6 +29,7 @@ function CaseItem({ kase, busy, onResolve }: { kase: OsSupportCase; busy: boolea
         Plan {kase.plan_id} · student {kase.student_ref} · {new Date(kase.created_at).toLocaleString()}
         {kase.changes_paused && ' · changes paused'}
       </p>
+      {counsellorLine(kase) && <p className="mt-0.5 break-words text-xs font-medium">{counsellorLine(kase)}</p>}
       {kase.status === 'open' && (
         <form className="mt-2 flex flex-col gap-2"
               onSubmit={(e) => { e.preventDefault(); if (note.trim()) onResolve(kase.id, note.trim(), unpause); }}>
