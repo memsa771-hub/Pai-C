@@ -23,7 +23,6 @@ vi.mock("@/lib/api", () => ({
     getPrograms: vi.fn(),
     searchPrograms: vi.fn(),
     addOwnPath: vi.fn(),
-    analyzePaths: vi.fn(),
     getPathAnalysis: vi.fn(),
   },
 }));
@@ -55,27 +54,26 @@ it("lists paths with a fit summary and shows each verdict with the student's wor
   expect(screen.getByText("You already repair and build things.")).toBeTruthy();
   expect(screen.getByText("From what you said: “I sketch before I build.”")).toBeTruthy();
 });
-it("adds the student's own path and asks PAI to find paths", async () => {
+it("adds the student's own path and follows PAI's run, with no find button", async () => {
   vi.useFakeTimers({ shouldAdvanceTime: true });
   vi.mocked(workspaceApi.getPossibilities).mockResolvedValue(possibilities);
   vi.mocked(workspaceApi.addOwnPath).mockResolvedValue({ ...possibilities[1], id: "mine", title: "Nursing" });
-  vi.mocked(workspaceApi.analyzePaths).mockResolvedValue({ job_id: "job" });
   render(<Paths onOpen={vi.fn()} />);
   fireEvent.click(await screen.findByRole("button", { name: "Add your own path" }));
+  expect(screen.queryByRole("button", { name: "Find my paths" })).toBeNull();
   const add = screen.getByRole("button", { name: "Add path" }) as HTMLButtonElement;
   expect(add.disabled).toBe(true);
   fireEvent.change(screen.getByLabelText("Path"), { target: { value: "  Nursing " } });
   fireEvent.change(screen.getByLabelText("Why it interests you (optional)"), { target: { value: "I like caring" } });
+  vi.mocked(workspaceApi.getPathAnalysis).mockResolvedValue({ job_id: "job", done: false, outcome: null });
   fireEvent.click(add);
   await waitFor(() => expect(workspaceApi.addOwnPath).toHaveBeenCalledWith("Nursing", "I like caring"));
-  expect(await screen.findByRole("status")).toBeTruthy();
+  expect(await screen.findByText(/PAI is looking at everything/)).toBeTruthy();
   await act(async () => { await vi.advanceTimersByTimeAsync(5000); });
   expect(vi.mocked(workspaceApi.getPossibilities).mock.calls.length).toBeGreaterThan(2);
-  cleanup();
-  render(<Paths onOpen={vi.fn()} />);
-  fireEvent.click(await screen.findByRole("button", { name: "Find my paths" }));
-  await waitFor(() => expect(workspaceApi.analyzePaths).toHaveBeenCalledOnce());
-  expect((screen.getByRole("button", { name: "Find my paths" }) as HTMLButtonElement).disabled).toBe(true);
+  vi.mocked(workspaceApi.getPathAnalysis).mockResolvedValue({ job_id: "job", done: true, outcome: "saved" });
+  await act(async () => { await vi.advanceTimersByTimeAsync(5000); });
+  await waitFor(() => expect(screen.queryByText(/PAI is looking at everything/)).toBeNull());
   vi.useRealTimers();
 });
 it("shows general explanation and invites deeper research only afterwards", async () => {
@@ -168,16 +166,17 @@ it("marks a kept field outside the current group and lets the student remove an 
   await waitFor(() => expect(workspaceApi.changePossibility).toHaveBeenCalledWith("older", "dismiss"));
 });
 
-it("asks for the education when the last run needed it, even with kept paths, and stops finding", async () => {
+it("asks for the education when the last run needed it, and shows PAI's own run until it ends", async () => {
   vi.useFakeTimers({ shouldAdvanceTime: true });
   try {
     vi.mocked(workspaceApi.getPossibilities).mockResolvedValue(possibilities);
-    vi.mocked(workspaceApi.analyzePaths).mockResolvedValue({ job_id: "job-2" });
     vi.mocked(workspaceApi.getPathAnalysis).mockResolvedValue({ job_id: "job-1", done: true, outcome: "needs_education" });
     render(<Paths onOpen={vi.fn()} />);
     expect(await screen.findByText("PAI needs your group or field to suggest fields of study.")).toBeTruthy();
+    cleanup();
+    // A run PAI started on its own (e.g. after an education write) shows while it works.
     vi.mocked(workspaceApi.getPathAnalysis).mockResolvedValue({ job_id: "job-2", done: false, outcome: null });
-    fireEvent.click(screen.getByRole("button", { name: "Find my paths" }));
+    render(<Paths onOpen={vi.fn()} />);
     expect(await screen.findByText(/PAI is looking at everything/)).toBeTruthy();
     vi.mocked(workspaceApi.getPathAnalysis).mockResolvedValue({ job_id: "job-2", done: true, outcome: "needs_education" });
     await act(async () => { await vi.advanceTimersByTimeAsync(5000); });

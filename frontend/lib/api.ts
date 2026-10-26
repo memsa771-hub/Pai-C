@@ -384,13 +384,9 @@ class WorkspaceApi {
       { method: 'POST', body: JSON.stringify({ title, why }) });
   }
 
-  /** Ask PAI to work out the student's paths now; results arrive in the background. */
+  /** The latest path analysis PAI ran on its own: whether it is done and how it ended. */
   async getPathAnalysis(): Promise<import('./possibilities').PathAnalysisStatus> {
     return this.request(`/v1/counselor/possibilities/analysis?network=${this.requireWorkspace()}`);
-  }
-
-  async analyzePaths(): Promise<{ job_id: string | null }> {
-    return this.request(`/v1/counselor/possibilities/analyze?network=${this.requireWorkspace()}`, { method: 'POST' });
   }
 
   async confirmCounselorMirror(version: number): Promise<void> {

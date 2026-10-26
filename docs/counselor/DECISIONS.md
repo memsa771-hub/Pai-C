@@ -251,7 +251,7 @@ The Counselor shell accidentally omitted the shared UserMenu when replacing the 
 - **Research is decision support at any stage (founder).** Whenever the student asks a fact that helps them choose (fees, a field, places), research runs. Before, it ran only when the policy chose `answer_request`; when Voice itself promised "I will check" (`note_question`), nothing started. Now either starts the same idempotent `research.claim` job. Full research of every step of a chosen path stays PAI OS work.
 - **Early directions (founder).** Voice may name one or two general fields as soon as the student's words point there, offered as ideas to test. Institutions and programs still need sourced research.
 - **The 360-degree path analyzer** (`app/pai_c/paths/analyzer.py`, prompt `path_analyzer.md`, policy `path_analyzer.json`, migration 112):
-  - It runs as a background job when the student asks for help deciding (`decision_help`), when they confirm the Mirror, when they press "Find my paths", or when they add their own path.
+  - It runs as a background job when the student asks for help deciding (`decision_help`), when they confirm the Mirror, when their education is written (onboarding or the Vault), after the planner (with a cooldown), or when they add their own path. There is no button: the Paths page only shows a run in progress.
   - It runs once per input: the Truth Map version plus the paths the student typed in. A job that has not started yet is reused.
   - It suggests up to five general paths and checks each against the student, with four statuses:
     - 🟢 have;

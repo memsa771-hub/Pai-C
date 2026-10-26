@@ -273,14 +273,11 @@ def test_student_adds_own_path_and_asks_for_analysis():
             assert back["id"] == gone.id and back["status"] == "saved"
             jobs = db.scalars(select(BackgroundJob).where(BackgroundJob.job_type == JOB_ANALYZE_PATHS)).all()
             assert len(jobs) == 1 and "channel" not in jobs[0].payload
-            analyzed = client.post(f"/v1/counselor/possibilities/analyze?network={student.workspace_id}", headers=HEADERS)
-            assert analyzed.status_code == 200
-            assert analyzed.json()["data"]["job_id"] == jobs[0].id
             db.get(BackgroundJob, jobs[0].id).status = "completed"
             db.commit()
-            analyze = f"/v1/counselor/possibilities/analyze?network={student.workspace_id}"
-            # Nothing new to look at: the finished analysis stands.
-            assert client.post(analyze, headers=HEADERS).json()["data"]["job_id"] == jobs[0].id
+            # No button route: paths run only on their own triggers.
+            assert client.post(f"/v1/counselor/possibilities/analyze?network={student.workspace_id}",
+                               headers=HEADERS).status_code in {404, 405}
             client.post(base, json={"title": "Solar installation"}, headers=HEADERS)
             db.expire_all()
             job = db.scalars(select(BackgroundJob).where(BackgroundJob.job_type == JOB_ANALYZE_PATHS,
@@ -288,14 +285,6 @@ def test_student_adds_own_path_and_asks_for_analysis():
             assert job.id != jobs[0].id
             db.get(BackgroundJob, job.id).status = "completed"
             db.commit()
-            snapshot = NotebookService(db).get(student.workspace_id)
-            data = snapshot.notebook.model_dump(mode="json")
-            data["said"].append(item("I like wiring.", key="claim_c4", id="c4", evidence="I like wiring."))
-            NotebookService(db).apply(student.workspace_id, data, turn.source_event_id,
-                                      expected_version=snapshot.version)
-            db.commit()
-            fresh = db.get(BackgroundJob, client.post(analyze, headers=HEADERS).json()["data"]["job_id"])
-            assert fresh.id not in {jobs[0].id, job.id} and fresh.payload["channel"] == turn.channel
         finally:
             app.dependency_overrides.clear()
 

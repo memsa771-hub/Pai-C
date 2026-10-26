@@ -24,14 +24,6 @@ class OwnPath(BaseModel):
     why: str = Field(default="", max_length=600)
 
 
-def _counselor_channel(db, workspace_id: str) -> str | None:
-    """Where the student talks to PAI: the target of their latest message."""
-    from app.models import EventRecord
-    return db.scalar(select(EventRecord.target).where(
-        EventRecord.network_id == workspace_id, EventRecord.type == "workspace.message.posted",
-        EventRecord.source.like("human:%")).order_by(EventRecord.timestamp.desc()).limit(1))
-
-
 @router.post("")
 def add_own_path(body: OwnPath, network: str = Query(...), db=Depends(get_db),
                  x_workspace_token: str | None = Header(None), authorization: str | None = Header(None)):
@@ -54,19 +46,6 @@ def add_own_path(body: OwnPath, network: str = Query(...), db=Depends(get_db),
     enqueue_path_analysis(db, workspace_id, source_event_id=None, channel=None, reason="student_added")
     db.commit()
     return success_response(service.serialize(row))
-
-
-@router.post("/analyze")
-def analyze_paths(network: str = Query(...), db=Depends(get_db),
-                  x_workspace_token: str | None = Header(None), authorization: str | None = Header(None)):
-    """The student asks PAI to work out their paths now."""
-    from app.pai_c.paths.analyzer import enqueue_path_analysis
-    workspace = _authorized(db, network, x_workspace_token, authorization)
-    workspace_id = str(workspace.id)
-    job_id = enqueue_path_analysis(db, workspace_id, source_event_id=None,
-                                   channel=_counselor_channel(db, workspace_id), reason="student")
-    db.commit()
-    return success_response({"job_id": job_id})
 
 
 @router.get("/analysis")

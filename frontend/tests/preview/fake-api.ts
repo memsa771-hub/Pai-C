@@ -29,7 +29,7 @@ const api={getCounselorWorkspace:async()=>picture,getVault:async()=>vault,getVau
   prepareFamilyTalk:async()=>({event_id:'offline-family',script:'I understand that dependable work matters to you. I want to explore practical design. I fixed a broken lamp with my friend. I would like us to look at the evidence together before deciding.'}),
   acceptPathActivity:async()=>({scheduled:true}),
   addOwnPath:async()=>({...possibilities[1],id:'own-path',title:'Nursing',why:'Nursing',source:'student',status:'saved',fit:[]}),
-  analyzePaths:async()=>({job_id:'offline-paths'}),
+  
   getCounselorHealth:async()=>({planner_lag_alert:false}),getPath:async()=>pathResult,
   getPrograms:async()=>searched?(new URLSearchParams(location.search).has('programs')?richPrograms:programs):{status:'not_started',programs:[],missing:[]},
   searchPrograms:async()=>{searched=true;return{};},preparePathRoadmap:async()=>{prepared=true;return {run_id:'offline'};},
