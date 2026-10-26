@@ -1,0 +1,21 @@
+{
+  "schema": "pai.decision_record.v1",
+  "decision_id": "d-sample-5",
+  "journey_id": "j-sample-1",
+  "student_ref": "ws-sample-1",
+  "chosen_at": "2027-01-17T09:00:00+05:00",
+  "authorized_at": "2027-01-17T09:00:05+05:00",
+  "origin_country": "PK",
+  "destination_country": "DE",
+  "level": "master",
+  "target_intake": {
+    "term": "winter",
+    "year": 2027
+  },
+  "programmes": [
+    {
+      "programme_ref": "no-such-programme",
+      "rank": 1
+    }
+  ]
+}

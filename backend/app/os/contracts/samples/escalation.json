@@ -1,0 +1,10 @@
+{
+  "schema": "pai.escalation.v1",
+  "key": "escalation:1",
+  "case_id": 1,
+  "journey_id": "j-sample-1",
+  "student_ref": "ws-sample-1",
+  "reason": "blocking_gap",
+  "note": "A required step is blocked and the plan cannot fix it alone.",
+  "raised_at": "2027-02-01T08:00:00+00:00"
+}
