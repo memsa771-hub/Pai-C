@@ -33,7 +33,12 @@ means off. The pilot (Slice 9) runs standalone. One PR per task, each targeting 
 - `merge-test` (local only, `~/Pai-C-merge-test`) now carries every Slice 8 commit on top of the trial merge with
   `pai-c`. **Never push it.**
 
-RESULTS_PLACEHOLDER
+**Results on the stack tip `os/s8-fix-review`** (it contains every branch before it):
+- `pytest tests/os`: **1207 passed** (Linux, WSL; the SIGKILL crash tests included);
+- legacy: **1022 passed, 4 skipped** (the 3 usual skips plus the glue's OS-database test, which passes with it);
+- `tach check` and the single-alembic-head check are clean, and the alembic head is `os_0013`;
+- frontend (from Task 7, unchanged since): Vitest **121 passed**, `tsc` clean, the OS-enabled build passes;
+- on `merge-test`: glue + contract tests **42 passed, 1 skipped**.
 
 ### What Slice 8 built
 - **Route in:**
