@@ -24,7 +24,7 @@ from app.models import (
     BackgroundJob, EventRecord, FileRecord, MemoryCandidate, PaiEpisode, PaiMemory,
     ProfileFieldResponse, ProfileIssue, ProfileRequirement, StudentRecordRevision, User, VaultFact,
     VaultFieldDefinition, Workspace, VAULT_INTAKE_MODELS,
-    Roadmap, RoadmapStudentState, VaultDrop, VaultItem,
+    VaultDrop, VaultItem,
 )
 
 
@@ -69,7 +69,7 @@ def api():
               ProfileFieldResponse,
               StudentRecordRevision,
               BackgroundJob, *ENTITY_MODELS.values(), *VAULT_INTAKE_MODELS]
-    tables.extend([Roadmap, RoadmapStudentState, VaultDrop, VaultItem])
+    tables.extend([VaultDrop, VaultItem])
     Base.metadata.create_all(engine, tables=[model.__table__ for model in tables])
 
     session = Session(engine, autoflush=False)

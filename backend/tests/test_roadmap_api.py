@@ -14,7 +14,7 @@ from sqlalchemy.exc import IntegrityError
 
 from app.database import get_db
 from app.main import app
-from app.models import DecisionRecord, Roadmap, RoadmapStudentState, RouteDecision
+from app.models import RouteDecision
 from app.pai_c.roadmap.engine import roadmap_policy
 from app.pai_c.roadmap.rules import rule_for, rules_as_of
 from tests.test_roadmap_engine import add_education, add_path, field_title, fsc
@@ -240,26 +240,6 @@ def test_live_status_unknown_when_path_gone():
             db.commit()
         page = data(client.get("/v1/roadmap", params=params, headers=TOKEN))
     assert page["chosen"]["live_status"] == "unknown"
-
-
-def test_legacy_roadmap_rows_ignored():
-    from app.journey import JourneyService
-    with pre_eng() as (client, student, params):
-        with student.factory() as db:
-            journey = JourneyService(db).ensure_counselor(student.workspace_id)
-            legacy = Roadmap(workspace_id=student.workspace_id, journey_id=journey.id, origin="alternative",
-                             title=field_title("electrical_engineering"), route={}, generation_status="ready")
-            db.add(legacy)
-            db.flush()
-            db.add(RoadmapStudentState(roadmap_id=legacy.id, journey_id=journey.id))
-            db.add(DecisionRecord(workspace_id=student.workspace_id, journey_id=journey.id,
-                                  roadmap_id=legacy.id, roadmap_version=1, confirmed_summary={},
-                                  accepted_gaps=[], accepted_risks=[], assumptions=[], choice_channel="roadmaps"))
-            db.commit()
-        page = data(client.get("/v1/roadmap", params=params, headers=TOKEN))
-        current = data(client.get("/v1/decision-records/current", params=params, headers=TOKEN))
-    assert page["chosen"] is None and current is None
-    assert page["counts"] == {"open": 2, "step": 0, "not_open": 1, "unknown": 0}
 
 
 def test_migration_118_creates_route_decisions_and_downgrades():

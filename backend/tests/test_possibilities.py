@@ -241,6 +241,8 @@ def test_migration_111_upgrade_constraints_and_downgrade():
     with StudentSession() as student:
         with student.engine.begin() as connection:
             PaiPossibility.__table__.drop(connection)
+            # 111 still points at pai_roadmaps, which migration 119 dropped from the models.
+            connection.exec_driver_sql('CREATE TABLE pai_roadmaps (id TEXT PRIMARY KEY)')
             operations=Operations(MigrationContext.configure(connection))
             with patch.object(migration,'op',operations): migration.upgrade()
             # The model is at head; 112 and 117 only add these columns (SQLite cannot swap 112's check).

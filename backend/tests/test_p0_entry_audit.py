@@ -181,9 +181,9 @@ def test_folder_noop_still_works_for_authenticated_owner():
 
 
 def test_pai_os_contract_names_and_service_token_rejection():
-    from app.models import DecisionRecord, StudentRequest
+    from app.models import RouteDecision, StudentRequest
     from app.config import config
-    assert DecisionRecord.__tablename__ == 'pai_decision_records'
+    assert RouteDecision.__tablename__ == 'pai_route_decisions'
     assert StudentRequest.__tablename__ == 'pai_student_requests'
     with StudentSession() as student, client_for(student) as client, patch.object(config, 'PAI_OS_SERVICE_TOKEN', 'fake-service-only'):
         body = {'workspace_id': student.workspace_id, 'journey_id': str(uuid4()),

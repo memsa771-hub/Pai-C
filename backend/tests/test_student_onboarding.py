@@ -27,7 +27,6 @@ from app.memory.vault import VaultService
 from app.models import (
     BackgroundJob, EventRecord, FileRecord, MemoryCandidate, PaiEpisode, PaiMemory,
     ProfileIssue, StudentRecordRevision, User, VaultFact, VaultFieldDefinition, Workspace, VAULT_INTAKE_MODELS,
-    Roadmap, RoadmapStudentState,
 )
 
 
@@ -64,7 +63,6 @@ def db():
     tables = [User, Workspace, EventRecord, FileRecord, VaultFact, VaultFieldDefinition,
               MemoryCandidate, PaiMemory, PaiEpisode, ProfileIssue, StudentRecordRevision,
               BackgroundJob, *ENTITY_MODELS.values(), *VAULT_INTAKE_MODELS]
-    tables.extend([Roadmap, RoadmapStudentState])
     Base.metadata.create_all(engine, tables=[m.__table__ for m in tables])
 
     with Session(engine, autoflush=False) as session:

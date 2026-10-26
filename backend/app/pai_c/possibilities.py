@@ -38,9 +38,8 @@ class PossibilityService:
 
     @staticmethod
     def serialize(row):
-        # roadmap_id belongs to the removed roadmap system (dropped by migration 119).
         return {column.name: (value.isoformat() if isinstance(value, datetime) else value)
-                for column in row.__table__.columns if column.name != "roadmap_id"
+                for column in row.__table__.columns
                 for value in [getattr(row, column.name)]}
 
     def add(self, workspace_id, journey_id, *, title, why, kind, source, status,

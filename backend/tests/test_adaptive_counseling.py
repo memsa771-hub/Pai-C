@@ -11,7 +11,7 @@ import pytest
 from sqlalchemy import select
 
 from app.config import config
-from app.models import BackgroundJob, CounselorNotedQuestion, CounselorTurnDecision, DecisionRecord, EventRecord, ExecutionRun
+from app.models import BackgroundJob, CounselorNotedQuestion, CounselorTurnDecision, EventRecord, ExecutionRun
 from app.pai_c import myths
 from app.pai_c.deep.context import build_context, _trim_notebook
 from app.pai_c.deep.notebook_schema import CounselorNotebookData
@@ -56,7 +56,6 @@ async def test_direct_information_empty_profile_queues_research_not_an_interview
             job = db.scalar(select(BackgroundJob).where(BackgroundJob.job_type == "research.claim"))
             assert job and job.payload["request_id"]
             assert myths.enqueue_information(db, student.workspace_id, job.payload["source_event_id"]).id == job.id
-            assert db.scalar(select(DecisionRecord.id)) is None
             assert db.scalar(select(ExecutionRun.id)) is None
             assert await request_research("information", "another-workspace", db=db, journey=None,
                 tool_context=ToolContext(workspace_id=student.workspace_id, agent_name="pai", api=None),
@@ -244,7 +243,6 @@ async def test_research_result_delivered_once_with_source_and_available_before_m
             context = await build_context(db, student.workspace_id, _turn(student))
             assert context.world_facts[0]["fact_id"] == job.id
             assert myths.information_facts(db, "another-workspace") == []
-            assert db.scalar(select(DecisionRecord.id)) is None
 
 
 @pytest.mark.asyncio
