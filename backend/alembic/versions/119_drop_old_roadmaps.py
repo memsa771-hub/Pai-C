@@ -7,15 +7,24 @@ The roadmap engine and `pai_route_decisions` (118) replaced them; no code reads
 or writes them any more. Drops `pai_decision_records`, `pai_roadmap_student_state`,
 the `pai_possibilities.roadmap_id` column and `pai_roadmaps`, in FK-safe order.
 
-Two clean-ups ride along because the dropped system left them behind:
+Clean-ups ride along because the dropped system left them behind. They run
+before the drops, in this order:
+- paths still `chosen` by the old system with no active route decision go back
+  to `saved` (nothing else could ever move them out of `chosen`);
+- counselor journeys in CHOSEN with no active route decision go back to
+  PROPOSED (DIRECTION if their Mirror is not confirmed) and lose the old goal,
+  as a withdraw does;
+- counselor journeys parked in the old research wait (RESEARCHING, ASSESSING,
+  NEEDS_INFO) with a confirmed Mirror move to CHOSEN with the route as their
+  goal when the workspace has an active route decision, else to PROPOSED;
+- every stage moved above gets a `journey.stage_changed` event, as the app writes;
+- unfinished `roadmap_research` runs are marked failed with a reason (a failed
+  run is terminal, so its queued job finishes without posting to chat);
 - queued background jobs whose type has no handler any more are deleted
-  (pending or running; succeeded, failed and cancelled rows are history);
-- journeys parked in the old research wait (RESEARCHING, ASSESSING, NEEDS_INFO)
-  with a confirmed Mirror move to PROPOSED, or CHOSEN when the workspace already
-  has an active route decision, so rethink and escalation work for them.
+  (pending or running; succeeded, failed and cancelled rows are history).
 
 Downgrade recreates the tables empty (084 -> 111 shapes). It does not bring
-back the deleted jobs or the old journey stages.
+back the clean-ups.
 """
 from alembic import op
 import sqlalchemy as sa
@@ -25,31 +34,55 @@ revision = "119"
 down_revision = "118"
 branch_labels = depends_on = None
 
+_COUNSELOR = "journey_type = 'counselor_decision'"
 _WAITING = "current_stage IN ('RESEARCHING', 'ASSESSING', 'NEEDS_INFO')"
 _CONFIRMED = "counselor_summary_draft->>'status' = 'confirmed'"
-_ACTIVE_DECISION = ("EXISTS (SELECT 1 FROM pai_route_decisions d "
-                    "WHERE d.workspace_id = pai_student_journeys.workspace_id AND d.withdrawn_at IS NULL)")
+_DECISION = ("FROM pai_route_decisions d "
+             "WHERE d.workspace_id = pai_student_journeys.workspace_id AND d.withdrawn_at IS NULL")
+_ACTIVE_DECISION = f"EXISTS (SELECT 1 {_DECISION})"
 
+
+def _move(where: str, to: str, also: str = "") -> tuple[str, str]:
+    """A stage move as the app makes it: the stage_changed event (written
+    first, while the old stage is still there to read), then the update."""
+    event = ("INSERT INTO pai_student_journey_events (id, journey_id, workspace_id, event_type, payload, actor, "
+             "created_at) SELECT CAST(gen_random_uuid() AS TEXT), id, workspace_id, 'journey.stage_changed', "
+             f"jsonb_build_object('from', current_stage, 'to', {to}), 'system:migration_119', NOW() "
+             f"FROM pai_student_journeys WHERE {where}")
+    update = f"UPDATE pai_student_journeys SET current_stage = {to}, {also}updated_at = NOW() WHERE {where}"
+    return event, update
+
+
+RESET_ORPHAN_PATHS = ("UPDATE pai_possibilities SET status = 'saved', updated_at = NOW() WHERE status = 'chosen' "
+                      "AND id NOT IN (SELECT possibility_id FROM pai_route_decisions "
+                      "WHERE withdrawn_at IS NULL AND possibility_id IS NOT NULL)")
+UNCHOOSE = _move(f"{_COUNSELOR} AND current_stage = 'CHOSEN' AND NOT {_ACTIVE_DECISION}",
+                 f"CASE WHEN {_CONFIRMED} THEN 'PROPOSED' ELSE 'DIRECTION' END",
+                 "active_goal = NULL, current_objective = NULL, ")
+# CHOSEN first: MOVE_TO_PROPOSED then only sees journeys still waiting.
+MOVE_TO_CHOSEN = _move(f"{_COUNSELOR} AND {_WAITING} AND {_CONFIRMED} AND {_ACTIVE_DECISION}", "'CHOSEN'",
+                       f"current_objective = (SELECT d.title {_DECISION}), "
+                       "active_goal = (SELECT jsonb_build_object('route_decision_id', d.id, 'field_key', d.field_key, "
+                       f"'title', d.title, 'route', d.route) {_DECISION}), ")
+MOVE_TO_PROPOSED = _move(f"{_COUNSELOR} AND {_WAITING} AND {_CONFIRMED}", "'PROPOSED'")
+RETIRE_RUNS = ("UPDATE execution_runs SET status = 'failed', pending_action = NULL, "
+               "error = 'Retired: roadmap research was replaced by the roadmap engine', "
+               "completed_at = NOW(), updated_at = NOW() "
+               "WHERE task_type = 'roadmap_research' AND status NOT IN ('completed', 'failed')")
 DELETE_DEAD_JOBS = ("DELETE FROM background_jobs WHERE job_type IN ('roadmaps.mark_stale', 'research.refresh_stale') "
                     "AND status IN ('pending', 'running')")
-# CHOSEN first: the second statement then only sees journeys still waiting.
-MOVE_TO_CHOSEN = (f"UPDATE pai_student_journeys SET current_stage = 'CHOSEN', updated_at = NOW() "
-                  f"WHERE {_WAITING} AND {_CONFIRMED} AND {_ACTIVE_DECISION}")
-MOVE_TO_PROPOSED = (f"UPDATE pai_student_journeys SET current_stage = 'PROPOSED', updated_at = NOW() "
-                    f"WHERE {_WAITING} AND {_CONFIRMED}")
+CLEANUP = (RESET_ORPHAN_PATHS, *UNCHOOSE, *MOVE_TO_CHOSEN, *MOVE_TO_PROPOSED, RETIRE_RUNS, DELETE_DEAD_JOBS)
 
 
 def upgrade():
-    op.execute(DELETE_DEAD_JOBS)
-    op.execute(MOVE_TO_CHOSEN)
-    op.execute(MOVE_TO_PROPOSED)
+    for statement in CLEANUP:
+        op.execute(statement)
 
     op.drop_index("idx_decision_workspace_current", table_name="pai_decision_records")
     op.drop_table("pai_decision_records")
     op.drop_index("idx_roadmap_student_state_journey", table_name="pai_roadmap_student_state")
     op.drop_index("uq_roadmap_chosen_per_journey", table_name="pai_roadmap_student_state")
     op.drop_table("pai_roadmap_student_state")
-    op.drop_constraint("pai_possibilities_roadmap_id_fkey", "pai_possibilities", type_="foreignkey")
     op.drop_column("pai_possibilities", "roadmap_id")
     for index in ("uq_roadmaps_journey_lane", "idx_roadmaps_requirement_set", "idx_roadmaps_run",
                   "idx_roadmaps_workspace_journey"):
