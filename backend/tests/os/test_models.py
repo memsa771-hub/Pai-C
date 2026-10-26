@@ -40,6 +40,8 @@ def test_os_tables_present():
         "os_pack_files", "os_pack_items", "os_visa_choices",
         # Slice 7 (os_0012)
         "os_proposals", "os_plan_overrides", "os_support_cases",
+        # Slice 8 (os_0013)
+        "os_counsellor_intake", "os_counsellor_sweep",
     }
 
 
