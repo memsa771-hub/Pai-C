@@ -115,7 +115,7 @@ def grade_list(text: str) -> list[str]:
 def ibcc_percent(grades: list[str]) -> float | None:
     """Average IBCC percentage of A-level/O-level grades; None when a grade is unknown."""
     table = _data()["equivalence"]["o_level_a_level"]
-    marks = dict(table["grade_to_pak_marks_a_level_o_level"], **{"A*": table["a_star_percent"]})
+    marks = {**table["grade_to_pak_marks_a_level_o_level"], **table["grade_floor_percent"]}
     values = [marks.get(str(g).strip().upper()) for g in grades]
     if not values or any(not isinstance(v, (int, float)) for v in values):
         return None

@@ -2,6 +2,7 @@
 fields are open, need a step, are not open, or cannot be checked yet. Pure and
 deterministic (spec docs/counselor/ROADMAP_ENGINE_SPEC.md §2 and §5)."""
 
+from pathlib import Path
 from unittest.mock import patch
 
 from app.journey import JourneyService
@@ -200,6 +201,20 @@ def a_level(grade=None, grades=None):
     if grade is not None:
         record["result"] = {"grade": grade}
     return record
+
+
+def test_a_grade_whose_mark_is_text_takes_its_floor_from_the_data():
+    """IBCC lists A* as "above 90": the number used comes from the rules file,
+    so no grade token lives in code."""
+    import copy
+    from app.pai_c.roadmap import rules
+    data = copy.deepcopy(rules._data())
+    table = data["equivalence"]["o_level_a_level"]
+    table["grade_floor_percent"] = {**table["grade_floor_percent"], "A*": 95}
+    with patch.object(rules, "_data", return_value=data):
+        assert ibcc_percent(["A*", "A"]) == 90
+    assert ibcc_percent(["A*", "A"]) == 87.5
+    assert '"A*"' not in Path(rules.__file__).read_text(encoding="utf-8")
 
 
 def test_grades_only_from_structured_data():

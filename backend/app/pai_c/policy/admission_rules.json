@@ -677,8 +677,10 @@
    "a_level_requirement": "3 subjects min grade E. Pre-medical equiv: Physics, Chemistry, Biology. Pre-engineering equiv: Physics, Chemistry, Maths. ICS equiv: Physics, Computer, Maths. General: any 3 academic subjects.",
    "o_level_science_electives": "Pre-medical equivalence: English, Maths plus Physics, Chemistry, Biology at O-level; pre-engineering: Physics, Chemistry, Biology/Computer electives.",
    "notes": "Subject-wise A* equivalent tables exist per session. A reported IBCC decision not to deduct 15% marks is unconfirmed here. NCEAC requires IBCC certificate for foreign systems.",
-   "a_star_percent": 90,
-   "ibcc_percent_method": "ibcc_percent(grades) maps each grade to the percentage in grade_to_pak_marks_a_level_o_level (A* uses a_star_percent=90, the floor of IBCC's 'above 90') and returns the average; None when no grades or any grade is unknown."
+   "grade_floor_percent": {
+    "A*": 90
+   },
+   "ibcc_percent_method": "ibcc_percent(grades) maps each grade to the percentage in grade_to_pak_marks_a_level_o_level; a grade IBCC gives as text uses grade_floor_percent instead (A* = 90, the floor of IBCC's 'above 90'). Returns the average; None when no grades or any grade is unknown."
   }
  }
 }
