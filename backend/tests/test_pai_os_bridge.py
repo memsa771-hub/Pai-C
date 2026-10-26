@@ -48,8 +48,9 @@ def export_fn(monkeypatch):
 
 @pytest.fixture
 def os_stub(monkeypatch):
-    """The OS ports, recorded: mounted, module off."""
+    """The OS ports, recorded: mounted; the module on for the sweep, while a submit answers `module_off`."""
     got = {"submitted": [], "mark": None, "marked": [], "pending": []}
+    monkeypatch.setattr(plan_source, "counsellor_enabled", lambda: True, raising=False)
     monkeypatch.setattr(plan_source, "submit_counsellor_decision",
                         lambda export: got["submitted"].append(export) or "module_off")
     monkeypatch.setattr(plan_source, "sweep_mark", lambda: got["mark"])
@@ -194,3 +195,42 @@ def test_module_off_by_default_end_to_end(student, export_fn):
     finally:
         ports.configure(None)
         engine.dispose()
+
+
+# --- the final review's fix pass ---------------------------------------------------------------------------------
+
+def test_sweep_submits_nothing_while_module_off(student, export_fn, os_stub, monkeypatch):
+    """S8-D2: while the module is off the sweep submits nothing and keeps its mark, so switching on replays from
+    there; escalations (none can be raised while off) are still delivered."""
+    monkeypatch.setattr(plan_source, "counsellor_enabled", lambda: False)
+    os_stub["pending"] = [escalation(student, journey_at(student, "CHOSEN"))]
+    with patch.object(config, "PAI_OS_SERVICE_TOKEN", TOKEN), student.factory() as db:
+        record(db, student.workspace_id, 1, T0)
+        got = bridge.sweep_once(db)
+    assert got["submitted"] == 0 and os_stub["submitted"] == [] and os_stub["mark"] is None
+    assert got["sent"] == 1
+
+
+def test_sweep_survives_a_bad_export(student, os_stub, monkeypatch):
+    """One export that cannot be submitted never stops the sweep: the mark moves and escalations go out."""
+    module = types.ModuleType("app.pai_c.os_export")
+    module.decision_record_v1 = lambda db, ws: {"schema": "pai.decision_record.v1"}  # no decision_id
+    monkeypatch.setitem(sys.modules, "app.pai_c.os_export", module)
+    monkeypatch.setattr(plan_source, "submit_counsellor_decision",
+                        lambda export: (_ for _ in ()).throw(ValueError("export lacks decision_id")))
+    os_stub["pending"] = [escalation(student, journey_at(student, "CHOSEN"))]
+    with patch.object(config, "PAI_OS_SERVICE_TOKEN", TOKEN), student.factory() as db:
+        last = record(db, student.workspace_id, 1, T0)
+        got = bridge.sweep_once(db)
+    assert (got["submitted"], got["failed"], got["sent"]) == (0, 1, 1)
+    assert os_stub["mark"]["decision_id"] == last
+
+
+def test_decision_changed_with_a_bad_export_is_none(student, os_stub, monkeypatch):
+    module = types.ModuleType("app.pai_c.os_export")
+    module.decision_record_v1 = lambda db, ws: {"schema": "pai.decision_record.v1"}
+    monkeypatch.setitem(sys.modules, "app.pai_c.os_export", module)
+    monkeypatch.setattr(plan_source, "submit_counsellor_decision",
+                        lambda export: (_ for _ in ()).throw(ValueError("export lacks decision_id")))
+    with student.factory() as db:
+        assert bridge.decision_changed(student.workspace_id, db) is None  # logged; never raised at the Counsellor

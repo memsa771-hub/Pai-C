@@ -153,7 +153,8 @@ def test_first_four_refusals_marked_for_counsellor(svc):
     store = IntakeStore(svc.engine, "pai")
     for name in ("export_not_authorized.json", "export_unknown_programme.json", "export_pk_pk.json"):
         run(svc, sample(name))
-    run(svc, sample("export_valid_de.json", decision_id="d-bad", level="degree"))
+    run(svc, sample("export_valid_de.json", decision_id="d-bad", level="degree", journey_id="j-bad"))  # own journey:
+    # the samples above are newer decisions on j-sample-1, which would make it outdated (final review I3)
     for decision in ("d-sample-4", "d-sample-5", "d-sample-6", "d-bad"):
         assert store.get(decision).counsellor_status == "pending"  # Task 7 sends them by journey as `other`
     svc.plans.start_plan(TEST_STUDENT.model_copy(update={"student_ref": "ws-sample-1"}))

@@ -26,13 +26,19 @@ means off. The pilot (Slice 9) runs standalone. One PR per task, each targeting 
 | 6 | `os/s8-t6-summary` | #150 | `plan_summary` and `programme_list` |
 | 7 | `os/s8-t7-escalations` | #151 | Route problems to the Counsellor through the outbox; the support page shows it |
 | 8 | `os/s8-t8-glue` | #152 | `backend/app/pai_os_bridge.py` + `main.py` (shared: @memsa771-hub reviews) |
-| 9 | `os/s8-t9-gate` | (this) | The gate, the intake crash test, the Counsellor hand-over, this handoff |
+| 9 | `os/s8-t9-gate` | #153 | The gate, the intake crash test, the Counsellor hand-over, this handoff |
+| 10 | `os/s8-fix-review` | (fix pass) | The final review's four Important findings, each with a RED→GREEN test |
 
 - **Never open or prepare a `pai-os` → `dev` PR.** The owners merge once, at the very end.
 - `merge-test` (local only, `~/Pai-C-merge-test`) now carries every Slice 8 commit on top of the trial merge with
   `pai-c`. **Never push it.**
 
-RESULTS_PLACEHOLDER
+**Results on the stack tip `os/s8-fix-review`** (it contains every branch before it):
+- `pytest tests/os`: **1207 passed** (Linux, WSL; the SIGKILL crash tests included);
+- legacy: **1022 passed, 4 skipped** (the 3 usual skips plus the glue's OS-database test, which passes with it);
+- `tach check` and the single-alembic-head check are clean, and the alembic head is `os_0013`;
+- frontend (from Task 7, unchanged since): Vitest **121 passed**, `tsc` clean, the OS-enabled build passes;
+- on `merge-test`: glue + contract tests **42 passed, 1 skipped**.
 
 ### What Slice 8 built
 - **Route in:**
@@ -75,21 +81,52 @@ RESULTS_PLACEHOLDER
 - Each student's oldest pending decision per tick, so decisions run in `chosen_at` order. The workflow doesn't
   re-check the switch (a workflow ID runs once). Submit doesn't enqueue (#149).
 - A blocked reason is shown only as a code, else `blocked`. `build_summary` takes `now` (#150).
-- "Supervisor unavailable" is a system problem. A plan that no longer compiles is `not_eligible` whatever the event.
-  The worker's replanner uses the same composite sink. `api.ts` is unchanged (#151).
+- A plan that no longer compiles is `not_eligible` whatever the event. The worker's replanner uses the same
+  composite sink. `api.ts` is unchanged (#151).
+- **Changed by the fix pass:** #151 treated a rules hand-over with no Supervisor ("No automatic change: …") as a
+  system problem. The fix pass sends it by its triggering event, so a route problem reaches the Counsellor with or
+  without a Supervisor (spec §2.5 table). System problems are still: over budget, an invalid answer, the daily limit,
+  every operation refused, a step failing twice, a stale draft.
 - Until the Counsellor's endpoint takes the five reasons, `not_eligible`, `deadline_passed` and `other` go as
   `route_not_possible`. The glue calls `escalate()` directly with the token check (#152).
 - The intake crash test takes its row lock only after the worker is up: DBOS's startup migrations wait for open
-  transactions (this PR).
+  transactions (#153).
+- Most review findings' branches were already merged, so the fix pass is one PR stacked on #153 (as in Slice 4),
+  with a RED→GREEN test per finding (`tests/os/test_slice8_review_fixes.py`, plus 3 glue tests).
 
-## 3. Deferred minors (for the final review)
-1. Paths other than the intake (the replan job, admin retries) don't refuse to revise a closed plan. Every task on it
-   is cancelled, so nothing runs (#148).
-2. A decision whose workflow fails for good stays `pending` and blocks that student's later decisions (#149).
-3. Two API replicas sweeping at the same moment could both deliver one escalation; the second's 409 would mark it
-   `refused` (#152).
+## 3. Final review and the fix pass
+One fresh reviewer read the whole slice. Review focus 1–5: **all hold.** Invariants 1, 7, 8, 11, 12 and 13 hold, the
+module is off by default everywhere, and no student, document or Supervisor text leaves PAI OS.
 
-REVIEW_PLACEHOLDER
+**Fixed (Important):**
+1. **I1.** With no Supervisor, route problems never reached the Counsellor: rules hand-overs were treated as a system
+   problem. They now go by their triggering event.
+2. **I2.** A closed plan could come back to life: a pending suggestion could still be accepted, and three screens read
+   "not done" as live.
+   - `close_plan` now expires the plan's pending proposals.
+   - The kernel refuses to revise a closed plan.
+   - `pending_for`, the student's programmes, `changes_paused` and `student_plan` read open plans only.
+3. **I3.** An outdated refused decision could take a student whose newer decision is fine back to choosing. It is no
+   longer sent when a newer decision exists for the journey. The glue's sweep submits nothing while the module is off
+   (S8-D2), and its mark waits.
+4. **I4.** One bad export stopped the glue's sweep for everyone. Each submit is now caught and logged, the mark still
+   moves, delivery always runs, and `decision_changed` never raises at the Counsellor.
+
+**Deferred minors** (not fixed; for a later pass):
+1. A decision whose workflow fails for good stays `pending` and blocks that student's later decisions (#149).
+2. Two API replicas sweeping at the same moment (or a crash between the Counsellor's commit and the delivery mark)
+   can deliver one escalation twice; the second's 409 marks it `refused` (#152).
+3. M1: after a crash inside the `process` step, the re-run can record `revised` where it was `planned` or
+   `replaced`. The plan itself is made once.
+4. M2: revising a `done` plan leaves it `done` with live tasks.
+5. M3: a `CompileError` on a revision is refused as `route_not_supported`. The spec's other path is a `route_invalid`
+   event.
+6. M4: the `late` escalation (a deadline on a non-programme step) is sent as `deadline_passed`, whose note says
+   "programme deadline".
+7. M5: a changed origin on the same journey, destination and level revises with the old route's pinned playbook.
+8. M6: an export with a bare `chosen_at` is stored as server time before the worker refuses it (invariant 13).
+9. M7: the job reads 500 pending rows ordered by student, so one student with more than 500 waiting decisions
+   delays the others.
 
 ## 4. Open items for the owners
 1. **The pilot gate (S8-D3):** confirm that the pilot opens when Slice 8 passes on the PAI OS side. The Counsellor

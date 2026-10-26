@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import select
 
+from app.os.kernel.states import PLAN_OPEN
 from app.os import models
 from app.os.api import self_serve
 from app.os.api.deps import current_student_ref, current_student_ref_for_write
@@ -51,7 +52,7 @@ def student_proposals(svc: Services, student: str) -> list[dict]:
 def changes_paused(svc: Services, student: str) -> bool:
     with svc.engine.connect() as conn:
         return bool(conn.execute(select(P.c.id).where(P.c.tenant_id == svc.settings.tenant_id,
-                                                      P.c.student_ref == student, P.c.status != "done",
+                                                      P.c.student_ref == student, P.c.status.in_(PLAN_OPEN),
                                                       P.c.changes_paused.is_(True))).first())
 
 

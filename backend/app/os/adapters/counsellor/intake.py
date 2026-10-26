@@ -42,9 +42,20 @@ def _plans_of(svc, student_ref: str, source: str) -> list:
             .order_by(P.c.id)).all()
 
 
+def _superseded(svc, intake: Intake) -> bool:
+    """A newer decision for the same journey is already in: this refusal is outdated, and telling the Counsellor
+    would take a student whose current decision is fine back to choosing (final review I3)."""
+    I = models.counsellor_intake
+    with svc.engine.connect() as conn:
+        return conn.execute(select(I.c.id).where(
+            I.c.tenant_id == svc.kernel.tenant_id, I.c.journey_id == intake.journey_id,
+            I.c.chosen_at > intake.chosen_at).limit(1)).first() is not None
+
+
 def _refuse(svc, intake: Intake, reason: str, plan_id: int | None = None) -> IntakeResult:
     if reason in TO_COUNSELLOR:  # sent to the Counsellor by journey as `other`, once per decision
-        intake_refused(svc.engine, svc.kernel.tenant_id, intake)
+        if not _superseded(svc, intake):
+            intake_refused(svc.engine, svc.kernel.tenant_id, intake)
     else:  # a person decides: a support case on the plan concerned, once per decision
         svc.escalations.escalate(plan_id, [_intake_event(svc, plan_id, intake, reason)],
                                  SELF_SERVE_REASON if reason == "self_serve_plan_open" else CLOSED_REASON)

@@ -8,6 +8,7 @@ from datetime import datetime
 from sqlalchemy import Engine, func, insert, select, update
 
 from app.os import models
+from app.os.kernel.states import PLAN_OPEN
 
 PR, O, C, P = models.proposals, models.plan_overrides, models.support_cases, models.plans
 
@@ -91,8 +92,8 @@ class ProposalStore:
     def pending_for(self, student_ref: str) -> list[Proposal]:
         with self.engine.connect() as conn:
             rows = conn.execute(select(PR).join(P, P.c.id == PR.c.plan_id).where(
-                PR.c.tenant_id == self.tenant_id, P.c.student_ref == student_ref, PR.c.status == "pending")
-                .order_by(PR.c.id)).all()
+                PR.c.tenant_id == self.tenant_id, P.c.student_ref == student_ref, PR.c.status == "pending",
+                P.c.status.in_(PLAN_OPEN)).order_by(PR.c.id)).all()  # never a closed plan's (final review I2)
         return [_proposal(r) for r in rows]
 
     def for_plan(self, plan_id: int) -> list[Proposal]:
