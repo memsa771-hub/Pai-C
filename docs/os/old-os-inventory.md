@@ -17,7 +17,7 @@ Only watched modules get a row (the `WATCHED_*` constants in the script). "Impor
 
 "Used by Counsellor" means a direct importer is a Counsellor root (a module under `app.pai_c` or a router named `app.routers.counselor*`). "Reachable from Counsellor" is transitive; "Counsellor path" is one shortest import chain from a root.
 
-Summary (81 modules): keep: 54, read-only: 18, retire: 9, undecided: 0.
+Summary (81 modules): keep: 55, read-only: 18, retire: 8, undecided: 0.
 
 | Module | Imported by | Used by Counsellor | Fate (keep / read-only / retire) | Reachable from Counsellor | Counsellor path | Frontend calls | Replaced by slice | Reason |
 |---|---|---|---|---|---|---|---|---|
@@ -88,7 +88,7 @@ Summary (81 modules): keep: 54, read-only: 18, retire: 9, undecided: 0.
 | `app.routers.application_workspace` | app.main | no | read-only | no | — | frontend/lib/api.ts | Slices 1 and 6 (deadlines/inbox, application pack) | The live application tracker and its review routines; frozen until Slices 1 and 6 replace them, then retired. |
 | `app.routers.browser` | app.main, app.routers.fetch | no | keep | no | — | frontend/lib/api.ts | — | `/v1/fetch` imports its `_resolve_bf_key` (`routers/fetch.py:45`), so it stays for the Counsellor's research fetches; only that helper and the ephemeral render path are needed, so the interactive tab endpoints and credential flows are candidates to split out and switch off. |
 | `app.routers.deadlines` | app.main | no | read-only | no | — | frontend/lib/api.ts | Slice 1 (deadline engine + inbox reminders) | A live Deadlines screen with in-app reminders that students use today; it stays running, frozen, until Slice 1 ships its replacement, then it is retired. |
-| `app.routers.escalations` | app.main | no | retire | no | — | — | Slice 8 EscalationSink (outside slices 0–7) | Nothing calls it today; it is a tested intake the Slice 8 adapter may reuse from git history, and it is retired only after the pilot. |
+| `app.routers.escalations` | app.main, app.pai_os_bridge | no | keep | no | — | — | Slice 8 glue (app.pai_os_bridge) | The Counsellor's escalation intake: since Slice 8 the glue hands PAI OS route problems to it. Counsellor-owned; it takes the five shared reasons once the Counsellor team adopts them (hand-over doc). |
 | `app.routers.operator` | app.main | no | keep | no | — | frontend/lib/api.ts | — | It feeds the "PAI is researching" status on Counsellor screens while per-student roadmap research runs. Kept: Slice 2 researches a fixed programme list into OS Knowledge and does not replace the Counsellor's per-student research; revisit when the Slice 8 spec decides whether the Counsellor reads OS Knowledge. |
 | `app.routers.routines` | app.application_workspace.operations, app.main | no | read-only | no | — | frontend/lib/api.ts | Slices 1 and 6 (deadlines/inbox, application pack) | The live application tracker and its review routines; frozen until Slices 1 and 6 replace them, then retired. |
 | `app.routers.tasks` | app.main | no | read-only | no | — | frontend/lib/api.ts | Slices 1 and 6 (plan tasks + inbox, application pack) | The live application workspace links requirements to these tasks (`application_workspace/operations.py`, `calendar.py`, `serializers.py`) and the deadlines service reads them, so it is frozen until those features are replaced, then retired with them. |
@@ -128,4 +128,4 @@ Signed off 2026-10-14: the Counsellor lead delegated sign-off to the project own
 - `plugins/roadmap_builder/__init__.py:5-8` `DEPENDENCIES` names `qualification.recognize`, `scholarship.discover` and `gap.assess`: remove those names before deleting the three plugins.
 - `app.plugins.qualification_recognition` packs (`packs/de.json`, `pk.json`, `uk.json`: DAAD, uni-assist, HEC attestation, APS, with official URLs) must be copied into the Slice 1 Germany playbook/Knowledge before the plugin is deleted.
 - `app.plugins.gap_assessment` meets / does-not-meet / unknown logic is a reference for the Slice 1 eligibility checks: read it before deleting.
-- `routers/escalations.py:109-116` needs `PAI_OS_SERVICE_TOKEN`: the Slice 8 EscalationSink adapter may reuse this tested intake (`tests/test_counselor_escalations.py`) from git history.
+- `routers/escalations.py` needs `PAI_OS_SERVICE_TOKEN`: the Slice 8 glue (`app/pai_os_bridge.py`) calls it, so it is kept (`tests/test_counselor_escalations.py`, `tests/test_pai_os_bridge.py`).

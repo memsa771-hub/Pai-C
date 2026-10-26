@@ -468,8 +468,16 @@ async def lifespan(app: FastAPI):
     from app.browser.maintenance import sweep_browser_tabs
     startup_browser_sweep = asyncio.create_task(sweep_browser_tabs())  # noqa: F841 — keep ref so it isn't GC'd
 
+    # PAI OS ↔ Counsellor glue (PAI OS Slice 8): only when PAI OS is mounted.
+    os_sweep = None
+    if OS_MOUNTED:
+        from app.pai_os_bridge import start_sweep
+        os_sweep = start_sweep()
+
     logger.info("LIFESPAN: yielding (startup complete)")
     yield
+    if os_sweep is not None:
+        os_sweep.cancel()
     timer_task.cancel()
     try:
         await timer_task
@@ -784,7 +792,7 @@ def _os_student_ref_for_write(
     return _os_student(db, network, x_workspace_token, authorization, write=True)
 
 
-mount_os(app, student_dependency=_os_student_ref, student_write_dependency=_os_student_ref_for_write)
+OS_MOUNTED = mount_os(app, student_dependency=_os_student_ref, student_write_dependency=_os_student_ref_for_write)
 
 
 @app.get("/health")
