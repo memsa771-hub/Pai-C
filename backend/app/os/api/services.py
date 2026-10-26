@@ -7,7 +7,7 @@ from functools import cache
 
 from sqlalchemy import Engine
 
-from app.os.adapters.standalone.escalation import CompositeSink, StandaloneSink
+from app.os.adapters.counsellor.escalation import escalation_sink
 from app.os.db import make_engine
 from app.os.documents.checks import load_name_variants
 from app.os.documents.types import DocumentType, load_document_types
@@ -72,4 +72,4 @@ def make_services(settings: OsSettings, *, engine: Engine | None = None,
                     statement_configs if statement_configs is not None else load_statement_configs(),
                     pack_configs if pack_configs is not None else load_pack_configs(),
                     visa_configs if visa_configs is not None else load_pack_configs(kind="visa"),
-                    CompositeSink([StandaloneSink(engine, settings.tenant_id)]))
+                    escalation_sink(engine, settings.tenant_id))  # Slice 8: loads the notes, so a bad file stops startup

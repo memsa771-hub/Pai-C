@@ -157,7 +157,10 @@ def register_replan_always(settings: OsSettings, engine: Engine, kernel: Kernel,
 
     plans = PlanService(engine, settings, kernel, SqlKnowledge(engine, settings.tenant_id), books,
                         today=lambda: datetime.now(timezone.utc).date())
-    replanner = Replanner(engine, plans, load_replan_configs(), Outbox(engine, settings.tenant_id))
+    from app.os.adapters.counsellor.escalation import escalation_sink
+
+    replanner = Replanner(engine, plans, load_replan_configs(), Outbox(engine, settings.tenant_id),
+                          escalations=escalation_sink(engine, settings.tenant_id))  # Slice 8: also tells the Counsellor
     supervisor = None
     test_model = os.environ.get("OS_TEST_REPLAN_MODEL", "").strip()
     if settings.openai_api_key or test_model:

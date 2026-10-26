@@ -19,6 +19,9 @@ from app.os.replan.supervisor import propose
 from app.os.settings import OsSettings
 
 REPLAN_WORKFLOW = "os.replan"
+HANDOVER_PREFIX = "No automatic change: "  # no Supervisor configured (a system problem, Slice 8 S8-D12)
+BUDGET_REASON = "The planning assistant's monthly budget is used up."
+INVALID_REASON = "The planning assistant could not propose a valid change."
 log = logging.getLogger("app.os.replan")
 
 
@@ -112,9 +115,9 @@ def register_replan(engine: Engine, settings: OsSettings, replanner: Replanner, 
         if "ops" in answer:
             return decide_step(plan_id, event_id, "rules", answer["ops"])
         if supervisor is None:
-            return support_step(plan_id, event_id, f"No automatic change: {answer['handover']}.")
+            return support_step(plan_id, event_id, f"{HANDOVER_PREFIX}{answer['handover']}.")
         if budget_step(plan_id, event_id)["over_budget"]:
-            return support_step(plan_id, event_id, "The planning assistant's monthly budget is used up.")
+            return support_step(plan_id, event_id, BUDGET_REASON)
         agent, spec = supervisor
         state = replanner.state(plan_id, with_suggestions=True)
         result = propose(agent, spec, state, [ev.get(engine, tenant, event_id)], [], replanner.plans._pinned(plan_id))
@@ -124,7 +127,7 @@ def register_replan(engine: Engine, settings: OsSettings, replanner: Replanner, 
         record_step(plan_id, f"{DBOS.workflow_id}:supervisor", agent.model.model_name, usage,
                     cost(result.usage, settings, spec.tier), error)
         if result.output is None:
-            return support_step(plan_id, event_id, "The planning assistant could not propose a valid change.")
+            return support_step(plan_id, event_id, INVALID_REASON)
         return decide_step(plan_id, event_id, "supervisor", [op.model_dump(mode="json") for op in result.output.ops])
 
     DBOS.workflow(name=REPLAN_WORKFLOW)(replan)

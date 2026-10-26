@@ -49,6 +49,8 @@ class SupportCase:
     resolution: str | None
     created_at: datetime
     resolved_at: datetime | None
+    counsellor_status: str | None = None  # Slice 8: pending | sent | refused, for a route problem told the Counsellor
+    counsellor_reason: str | None = None
 
 
 def _proposal(r) -> Proposal:
@@ -58,7 +60,7 @@ def _proposal(r) -> Proposal:
 
 def _case(r) -> SupportCase:
     return SupportCase(r.id, r.plan_id, r.student_ref, r.reason, r.event_ids, r.proposal_id, r.status, r.resolution,
-                       r.created_at, r.resolved_at)
+                       r.created_at, r.resolved_at, r.counsellor_status, r.counsellor_reason)
 
 
 class ProposalStore:

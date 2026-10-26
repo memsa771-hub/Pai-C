@@ -9,6 +9,7 @@ from app.os import models
 from app.os.outbox.senders import Sender
 
 O = models.outbox
+GLUE_CHANNELS = ("counsellor",)  # delivered by the host's glue (Slice 8), never by a sender here
 
 
 @dataclass(frozen=True)
@@ -40,7 +41,8 @@ class Outbox:
         sent = 0
         for _ in range(limit):
             with self.engine.begin() as conn:
-                row = conn.execute(select(O).where(O.c.tenant_id == self.tenant_id, O.c.status == "pending")
+                row = conn.execute(select(O).where(O.c.tenant_id == self.tenant_id, O.c.status == "pending",
+                                                   O.c.channel.not_in(GLUE_CHANNELS))
                                    .order_by(O.c.id).limit(1).with_for_update(skip_locked=True)).first()
                 if row is None:
                     break
