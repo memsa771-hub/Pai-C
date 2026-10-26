@@ -2,10 +2,9 @@
 from datetime import datetime, timezone
 import os
 from sqlalchemy import select
-from app.models import EventRecord, FileRecord, StudentJourney, CounselorMirrorFeedback
+from app.models import EventRecord, FileRecord, StudentJourney, CounselorMirrorFeedback, RouteDecision
 from app.pai_c.memory import MemoryService
 from app.pai_c.possibilities import PossibilityService
-from app.pai_c.roadmaps.service import RoadmapService
 from app.pai_c.redaction import redact, _ENV_SECRET
 
 
@@ -26,13 +25,16 @@ def export_student_data(db, workspace_id):
         feedback = db.scalars(select(CounselorMirrorFeedback).where(CounselorMirrorFeedback.workspace_id == workspace_id)
             .order_by(CounselorMirrorFeedback.created_at)).all()
         service = PossibilityService(db)
-        roadmaps = RoadmapService(db)
+        decisions = db.scalars(select(RouteDecision).where(RouteDecision.workspace_id == workspace_id)
+            .order_by(RouteDecision.chosen_at, RouteDecision.id)).all()
         result = {'exported_at': datetime.now(timezone.utc), 'workspace_id': workspace_id,
-            'scope': 'Student-visible profile, conversation, paths, roadmaps, confirmed picture and ratings; document metadata. Download document bytes from Documents. Private model notes and credential data are excluded.',
+            'scope': 'Student-visible profile, conversation, paths, chosen routes, confirmed picture and ratings; document metadata. Download document bytes from Documents. Private model notes and credential data are excluded.',
             'profile': memory.profile_cards(workspace_id), 'personal': memory.personal_view(workspace_id),
             'sections': memory.profile_sections(workspace_id), 'capabilities': memory.capability_view(workspace_id), 'conversation': conversation,
             'paths': [service.serialize(row) for row in service.list(workspace_id)],
-            'roadmaps': [*roadmaps.list(workspace_id), *roadmaps.list(workspace_id, 'dismissed')],
+            'route_decisions': [{'id': row.id, 'field_key': row.field_key, 'possibility_id': row.possibility_id,
+                'title': row.title, 'chosen_at': row.chosen_at, 'withdrawn_at': row.withdrawn_at,
+                'steps': row.steps, 'steps_done': row.steps_done, 'route': row.route} for row in decisions],
             'mirrors': [{'journey_id': row.id, 'version': row.counselor_summary_draft.get('version'),
                 'mirror': row.counselor_summary_draft.get('mirror')}
                 for row in journeys if (row.counselor_summary_draft or {}).get('status') == 'confirmed'],

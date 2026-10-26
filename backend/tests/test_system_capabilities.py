@@ -7,9 +7,9 @@ from app.tools.builtin import capabilities
 
 JOB_TYPES = (
     "counselor.opening",
-    "counselor.analyze", "counselor.mirror", "counselor.mirror_research", "counselor.paths", "roadmaps.mark_stale",
+    "counselor.analyze", "counselor.mirror", "counselor.mirror_research", "counselor.paths",
     "memory.extract", "memory.reconcile", "memory.embed", "memory.unindex",
-    "memory.reindex", "memory.resume_research", "research.refresh_stale",
+    "memory.reindex", "memory.resume_research",
     "document.parse", "document.extract", "document.index", "document.unindex", "document.notify",
 )
 
@@ -46,7 +46,7 @@ async def test_task_runtime_dispatches_existing_handler_signature(job_type):
     handler = AsyncMock(return_value={"done": True})
     registry = CapabilityRegistry()
     registry.register(replace(original, handler=handler))
-    payload = {"workspace_id": "workspace", "reason": "Profile changed"} if job_type == "roadmaps.mark_stale" else {}
+    payload = {}
     job, db = SimpleNamespace(job_type=job_type, payload=payload), object()
     assert await run(job, db, registry=registry) == {"done": True}
     handler.assert_awaited_once_with(job, db)

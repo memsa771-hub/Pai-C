@@ -12,6 +12,7 @@ from datetime import datetime, timezone
 from sqlalchemy import select
 
 from app.models import RouteDecision, Workspace
+from app.pai_c.possibilities import PossibilityService
 from app.pai_c.roadmap.engine import RoadmapEngine
 
 CHOOSABLE = {"open", "step"}
@@ -100,8 +101,10 @@ class RouteDecisionService:
             raise RouteDecisionError(REFUSALS[card["status"]], 409)
         now = datetime.now(timezone.utc)
         previous = self.active(workspace_id)
+        paths = PossibilityService(self.db)
         if previous is not None:
             previous.withdrawn_at = now
+            paths.set_chosen(workspace_id, previous.possibility_id, False)
             self.db.flush()  # the old row leaves the partial unique index before the new one enters
         steps = route_steps(card)
         row = RouteDecision(workspace_id=workspace_id, field_key=field_key, possibility_id=card["possibility_id"],
@@ -110,6 +113,9 @@ class RouteDecisionService:
                             steps_done=[False] * len(steps), chosen_at=now)
         self.db.add(row)
         self.db.flush()
+        paths.set_chosen(workspace_id, row.possibility_id, True)
+        from app.pai_c.checkins import schedule
+        schedule(self.db, workspace_id, "chosen_path", row.id, at=now)
         return serialize(row, page["fields"])
 
     def set_step(self, workspace_id: str, index: int, done: bool) -> dict:
@@ -127,5 +133,6 @@ class RouteDecisionService:
         self._lock(workspace_id)
         row = self._active_or_404(workspace_id)
         row.withdrawn_at = datetime.now(timezone.utc)
+        PossibilityService(self.db).set_chosen(workspace_id, row.possibility_id, False)
         self.db.flush()
         return serialize(row, RoadmapEngine(self.db).build(workspace_id)["fields"])

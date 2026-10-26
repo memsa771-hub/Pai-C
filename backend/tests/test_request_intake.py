@@ -3,7 +3,6 @@ import importlib.util
 import json
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
-from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 from uuid import uuid4
 
@@ -18,7 +17,6 @@ from app.pai_c.deep.actions import dispatch_action
 from app.pai_c.deep.context import build_context, DeepContext
 from app.pai_c.deep.notebook_schema import CounselorNotebookData
 from app.pai_c.deep.noted_questions import NotedQuestionService
-from app.research.gateway import _research_brief
 from scripts.counselor_eval_support import StudentSession
 from tests.test_counselor_deep_lean import source_turn
 
@@ -127,18 +125,6 @@ async def test_context_open_only_newest_five_and_workspace_isolated():
         block = json.loads(text.split("<open_requests>")[1].split("</open_requests>")[0])
         assert block == [{"text": f"Request {index}", "kind": "decision_help"} for index in (6, 5, 4, 3, 2)]
         assert "Other private request" not in text
-
-
-def test_answered_now_never_selected_for_research_and_legacy_statuses_unchanged():
-    with StudentSession() as student, student.factory() as db:
-        rows = [seed_request(student, db, status, index, needs_research=status != "answered_now")
-                for index, status in enumerate(("open", "unanswered", "answered", "answered_now", "handed_off", "dropped"))]
-        # Defensive filter even for an inconsistent historical/manual row.
-        seed_request(student, db, "open", 10, needs_research=False)
-        brief = _research_brief(db, student.workspace_id, SimpleNamespace(counselor_summary_draft={}),
-            snapshot=SimpleNamespace(facts={}, records={}), understanding={"said": []})
-        assert {row["id"] for row in brief["questions"]} == {rows[0].id, rows[1].id}
-        assert [row.status for row in rows] == ["open", "unanswered", "answered", "answered_now", "handed_off", "dropped"]
 
 
 def test_108_defaults_preserves_research_statuses_and_downgrade_columns():

@@ -13,7 +13,6 @@ from app.plugins.gap_assessment import assess_rule
 from app.plugins.qualification_recognition import marks_percentage, recognize
 from app.plugins._shared.institution_registry import registry_identity
 from app.plugins.program_research import research as research_program
-from app.plugins.roadmap_builder import build, on_run_status
 from app.journey import JourneyService
 from app.research.jobs import resume_research
 from app.models import BackgroundJob, EventRecord, ExecutionRun, Institution, MemoryCandidate
@@ -31,11 +30,10 @@ from scripts.counselor_eval_support import StudentSession
 def test_six_research_capabilities_register_with_single_owners():
     registry = get_capability_registry()
     expected = {"program.discover", "program.research", "qualification.recognize",
-                "scholarship.discover", "gap.assess", "roadmap.build"}
+                "scholarship.discover", "gap.assess"}
     assert {item.id for item in registry.all()} == expected | {"path.explain", "program.search"}
     assert registry.owner_for_task_type("path_explain").id == "path.explain"
-    assert registry.owner_for_task_type("roadmap_research").id == "roadmap.build"
-    assert registry.get("roadmap.build").uses_capabilities == expected - {"roadmap.build"}
+    assert registry.owner_for_task_type("roadmap_research") is None
 
 
 def test_registry_identity_requires_a_unique_active_website_match():
@@ -85,17 +83,11 @@ def test_requirement_store_requires_source_and_verifies_only_correlated_official
         assert revision.version == 2
         assert revision.status == "verified"
         assert store.preferred(student.workspace_id, opportunity.id).id == revision.id
-        reported = store.report_wrong_info(student.workspace_id, revision.id)
-        assert reported.status == "unconfirmed"
-        assert reported.verification_checks["student_report"]["passed"] is False
-        assert db.execute(select(BackgroundJob).where(
-            BackgroundJob.job_type == "research.refresh_stale")).scalar_one()
-        assert db.execute(select(EventRecord).where(
-            EventRecord.type == "research.requirement.reported")).scalar_one()
+        assert not hasattr(store, "report_wrong_info")  # only the removed roadmaps API reported sources
         db.commit()
 
 
-def test_due_verification_sweep_invalidates_stale_fact_and_queues_refresh():
+def test_due_verification_sweep_invalidates_stale_fact_without_roadmap_refresh():
     from app.research.scheduler import enqueue_due_verification
 
     with StudentSession() as student, student.factory() as db:
@@ -110,7 +102,7 @@ def test_due_verification_sweep_invalidates_stale_fact_and_queues_refresh():
         assert enqueue_due_verification(db, now=datetime.now(timezone.utc)) == 1
         assert row.status == "unconfirmed"
         assert db.execute(select(BackgroundJob).where(
-            BackgroundJob.job_type == "research.refresh_stale")).scalar_one()
+            BackgroundJob.job_type == "research.refresh_stale")).scalar_one_or_none() is None
         assert enqueue_due_verification(db, now=datetime.now(timezone.utc)) == 0
 
 
@@ -169,64 +161,12 @@ def test_marks_conversion_uses_awarded_total_and_never_guesses_from_cgpa():
     assert marks_percentage({"cgpa": 3.4, "cgpa_scale": 4}) is None
 
 
-def test_research_run_stage_hook_follows_server_transition_graph():
-    with StudentSession() as student, student.factory() as db:
-        journeys = JourneyService(db)
-        journey = journeys.ensure_counselor(student.workspace_id)
-        for stage in ("FOUNDATION", "DIRECTION", "MIRROR", "RESEARCHING"):
-            journey = journeys.set_counselor_stage(student.workspace_id, journey.id, stage)
-        run = ExecutionRun(workspace_id=student.workspace_id, requested_by="openagents:pai",
-                           objective="Research", task_type="roadmap_research", status="verifying",
-                           constraints={"research_key": f"{journey.id}:goal"})
-        db.add(run)
-        db.flush()
-        on_run_status(db, run)
-        assert journeys.get(student.workspace_id, journey.id).current_stage == "ASSESSING"
-        run.status = "needs_user_action"
-        run.pending_action = {"type": "need_from_student", "kind": "fact", "items": [{"field": "test.score"}]}
-        on_run_status(db, run)
-        assert journeys.get(student.workspace_id, journey.id).current_stage == "NEEDS_INFO"
-        run.status = "executing"
-        on_run_status(db, run)
-        run.status = "completed"
-        run.result = {"capability_result": {"roadmaps": [{
-            "title": "CS", "origin": "stated_goal", "route": {"url": "https://example.edu/cs"},
-            "sources": [{"url": "https://example.edu/cs", "checked_at": "2026-10-06T00:00:00+00:00"}],
-            "gaps": []}]}}
-        on_run_status(db, run)
-        assert journeys.get(student.workspace_id, journey.id).current_stage == "PROPOSED"
-
-
-def test_failed_research_publishes_retryable_card_and_leaves_assessing():
-    with StudentSession() as student, student.factory() as db:
-        journeys = JourneyService(db)
-        journey = journeys.ensure_counselor(student.workspace_id)
-        for stage in ("FOUNDATION", "DIRECTION", "MIRROR", "RESEARCHING", "ASSESSING"):
-            journey = journeys.set_counselor_stage(student.workspace_id, journey.id, stage)
-        run = ExecutionRun(workspace_id=student.workspace_id,
-                           requested_by="openagents:pai", objective="Research",
-                           task_type="roadmap_research", status="failed",
-                           constraints={"research_key": f"{journey.id}:goal",
-                                        "capability_input": {"brief": {
-                                            "stated_preference": "CS in Germany",
-                                            "underlying_objective": "tech career", "country": "Germany"}}},
-                           result={"capability_result": {"roadmaps": [], "unconfirmed": [
-                               {"reason": "Search provider unavailable"}]}})
-        db.add(run)
-        db.flush()
-        on_run_status(db, run)
-        assert journeys.get(student.workspace_id, journey.id).current_stage == "PROPOSED"
-        from app.pai_c.roadmaps.service import RoadmapService
-        card = RoadmapService(db).for_run(student.workspace_id, run.id)[0]
-        assert card["generation_status"] == "failed"
-
-
 @pytest.mark.asyncio
 async def test_accepted_fact_event_resumes_same_paused_run_without_student_continue():
     with StudentSession() as student, student.factory() as db:
         now = datetime.now(timezone.utc)
         run = ExecutionRun(workspace_id=student.workspace_id, requested_by="openagents:pai",
-                           objective="Research", task_type="roadmap_research",
+                           objective="Research", task_type="program_search",
                            status="needs_user_action", created_at=now,
                            pending_action={"kind": "fact", "type": "need_from_student",
                                            "items": [{"field": "goal.details.target_countries"}]})

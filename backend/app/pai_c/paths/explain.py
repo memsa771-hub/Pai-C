@@ -72,7 +72,7 @@ async def explain(context, payload):
         failure = spend("model")
         if failure:
             raise ValueError(failure)
-        raw = await complete(role="roadmap", phase="path_explain",
+        raw = await complete(role="path_explain", phase="path_explain",
             system_prompt=Path(__file__).with_name("explain.md").read_text(encoding="utf-8"),
             messages=[{"role": "user", "content": json.dumps({"path": brief, "pages": pages,
                 "schema": PathExplanation.model_json_schema(), "workspace_language": workspace_language(), "language_policy": {

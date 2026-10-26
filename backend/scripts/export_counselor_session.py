@@ -20,7 +20,7 @@ from sqlalchemy import select, text
 from app.database import new_session
 from app.pai_c.memory import MemoryService
 from app.models import (CounselorNotedQuestion, CounselorTurnDecision, CounselorMirrorFeedback, StudentJourneyEvent,
-                        EventRecord, Roadmap, StudentJourney, Workspace)
+                        EventRecord, RouteDecision, StudentJourney, Workspace)
 from scripts.eval.cost import load_prices, token_record
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -95,15 +95,11 @@ def export_session(db, workspace_id, usage_logs=()):
                 decisions=[row_data(d) for d in decisions if d.source_event_id == event.id]))
         notebook_export = MemoryService(db).export_truth_map(workspace_id)
         journeys = rows(StudentJourney, "workspace_id", StudentJourney.created_at, StudentJourney.id)
-        roadmaps = rows(Roadmap, "workspace_id", Roadmap.created_at, Roadmap.id)
+        decisions = rows(RouteDecision, "workspace_id", RouteDecision.chosen_at, RouteDecision.id)
         mirrors = [dict(journey_id=j.id, draft=j.counselor_summary_draft)
                    for j in journeys if j.counselor_summary_draft]
         mirror_events = [dict(event_id=e.id, timestamp=e.timestamp, payload=e.payload)
                          for e in events if (e.payload or {}).get("message_type") == "counselor_mirror"]
-        facts = []
-        for roadmap in roadmaps:
-            for fact in (roadmap.fit_dimensions or {}).get("facts", []):
-                facts.append(dict(roadmap_id=roadmap.id, fact=fact))
         result = dict(workspace_id=workspace_id, exported_at=datetime.now(timezone.utc),
             conversation=conversation, actions=actions,
             notebook=notebook_export,
@@ -116,10 +112,7 @@ def export_session(db, workspace_id, usage_logs=()):
                 "workspace_id", StudentJourneyEvent.created_at, StudentJourneyEvent.id)
                 if row.event_type == "counselor.mirror.confirmed"],
             mirror_history_coverage="Posted payloads, current draft and explicit confirmation proofs; older confirmations without proof remain unknown",
-            research_facts_used=facts,
-            roadmaps=[{**row_data(r), "status": r.generation_status,
-                       "missing_facts": (r.fit_dimensions or {}).get("missing_facts", []),
-                       "research_sources": r.sources} for r in roadmaps],
+            route_decisions=[row_data(row) for row in decisions],
             usage=logged_usage(usage_logs, {e.id for e in events}))
         secrets = [v for k, v in os.environ.items() if _ENV_SECRET.search(k) and v]
         return redact(result, secrets)

@@ -204,15 +204,14 @@ async def confirmed_research_job(job, db) -> dict:
         request = journey.research_request or {}
         if request.get("handoff_status") == "done":
             return {"status": "duplicate"}
-        snapshot = MemoryService(db).profile(job.workspace_id)
         workspace = db.get(Workspace, job.workspace_id)
         ctx = ToolContext(workspace_id=job.workspace_id, agent_name="pai",
             api=WorkspaceApi(job.workspace_id, workspace.password_hash),
             conversation=draft["channel"].removeprefix("channel/"),
             allowed_tools=frozenset({"operator.delegate"}) & frozenset(PAI_ALLOWED_TOOLS),
             audience=AUDIENCE_COUNSELOR, granted_capabilities=MemoryService(db).agent_capabilities("pai"))
-        outcome = await request_research("roadmap_light", job.workspace_id, trigger="mirror_confirmed", db=db, journey=journey,
-            snapshot=snapshot, tool_context=ctx)
+        outcome = await request_research("from_mirror", job.workspace_id, trigger="mirror_confirmed", db=db,
+            journey=journey, tool_context=ctx)
         if outcome is not None and not outcome.get("ok"):
             raise RuntimeError("Confirmed research handoff failed")
         from app.models import StudentJourney

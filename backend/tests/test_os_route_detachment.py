@@ -22,7 +22,7 @@ def test_os_routes_are_not_exposed_by_counselor_app(path):
 def test_counselor_and_os_contract_routes_stay_mounted():
     paths = {route.path for route in main.app.routes if hasattr(route, "path")}
     for prefix in ("/v1/fetch", "/v1/escalations", "/v1/student-requests", "/v1/decision-records",
-                   "/v1/counselor", "/v1/roadmaps", "/v1/vault", "/v1/files"):
+                   "/v1/counselor", "/v1/roadmap", "/v1/vault", "/v1/files"):
         assert any(path.startswith(prefix) for path in paths), prefix
 
 

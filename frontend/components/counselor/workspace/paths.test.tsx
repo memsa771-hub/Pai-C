@@ -115,12 +115,21 @@ it("H requires explicit consent, preserves no-source state", async () => {
   ).toBeTruthy();
 });
 
-it('expired evidence requires fresh consent and cannot prepare a roadmap',async()=>{
+it('expired evidence requires fresh consent and offers no next step',async()=>{
  vi.mocked(workspaceApi.getPrograms).mockResolvedValue({status:'stale',programs:[],missing:['expired_sources']});
  render(<ProgramPage id='path-one' onBack={vi.fn()}/>);
  const button=await screen.findByRole('button',{name:'Look at programs'});
  expect((button as HTMLButtonElement).disabled).toBe(true);
- expect(screen.queryByRole('button',{name:'Prepare a reviewed roadmap'})).toBeNull();
+ expect(screen.queryByRole('button',{name:'Open Roadmap'})).toBeNull();
+ expect(workspaceApi.searchPrograms).not.toHaveBeenCalled();
+});
+
+it('a completed places search points to the Roadmap page without starting work',async()=>{
+ vi.mocked(workspaceApi.getPrograms).mockResolvedValue({...programs,status:'completed'});
+ const onRoadmap=vi.fn();
+ render(<ProgramPage id='path-one' onBack={vi.fn()} onRoadmap={onRoadmap}/>);
+ fireEvent.click(await screen.findByRole('button',{name:'Open Roadmap'}));
+ expect(onRoadmap).toHaveBeenCalledOnce();
  expect(workspaceApi.searchPrograms).not.toHaveBeenCalled();
 });
 

@@ -3,7 +3,7 @@ import json
 from unittest.mock import patch
 
 from app.models import (CounselorNotebook, CounselorNotebookHistory, CounselorNotedQuestion,
-                        CounselorTurnDecision, EventRecord, Workspace, StudentJourney, Roadmap)
+                        CounselorTurnDecision, EventRecord, Workspace, StudentJourney, RouteDecision)
 from scripts.counselor_eval_support import StudentSession
 from scripts.export_counselor_session import export_session
 
@@ -37,10 +37,8 @@ def test_export_order_redaction_isolation_and_no_writes(tmp_path):
                 "notebook_version": 2, "status": "awaiting_confirmation", "mirror": {"intro": "You"}})
         db.add(journey)
         db.flush()
-        db.add(Roadmap(id="roadmap-export", workspace_id=workspace, journey_id=journey.id,
-            origin="stated_goal", title="Explore", generation_status="needs_info",
-            fit_dimensions={"missing_facts": ["entry"], "facts": [{"fact_id": "f1",
-                "source_url": "https://example.test/entry", "label": "unconfirmed"}]}))
+        db.add(RouteDecision(workspace_id=workspace, field_key="computer_science", title="Computer Science",
+            verdict={"status": "open"}, route={"needs": []}, steps=[{"key": "step_apply"}], steps_done=[False]))
         db.add(CounselorNotedQuestion(workspace_id=workspace, source_event_id="earlier",
                                     question_to_research="What are the entry requirements?"))
         db.commit()
@@ -66,8 +64,8 @@ def test_export_order_redaction_isolation_and_no_writes(tmp_path):
         assert "private archival payload" not in json.dumps(result)
         assert result["noted_questions"][0]["status"] == "open"
         assert result["mirror_drafts"][0]["draft"]["version"] == 2
-        assert result["roadmaps"][0]["missing_facts"] == ["entry"]
-        assert result["research_facts_used"][0]["fact"]["label"] == "unconfirmed"
+        assert "roadmaps" not in result
+        assert result["route_decisions"][0]["field_key"] == "computer_science"
         assert len(result["usage"]["calls"]) == 1
         assert result["usage"]["calls"][0]["cost_usd"] > 0
         serialized = json.dumps(result)

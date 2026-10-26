@@ -7,7 +7,7 @@ import { I18nProvider } from '@/lib/i18n';
 import type { Possibility } from '@/lib/possibilities';
 vi.mock('@/lib/api', () => ({ workspaceApi: { changePossibility: vi.fn(), getPossibilities: vi.fn() } }));
 afterEach(() => { cleanup(); vi.resetAllMocks(); });
-const value: Possibility = { id: 'candidate', title: 'Practical work', why: 'Your own project', status: 'suggested', evidence: [], unknowns: [], roadmap_id: null };
+const value: Possibility = { id: 'candidate', title: 'Practical work', why: 'Your own project', status: 'suggested', evidence: [], unknowns: [] };
 it('offers translated student controls and calls the existing workspace API', async () => {
   const changed = vi.fn();
   vi.mocked(workspaceApi.changePossibility).mockResolvedValue({ ...value, status: 'exploring' });

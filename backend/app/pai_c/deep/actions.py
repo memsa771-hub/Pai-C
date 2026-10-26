@@ -4,11 +4,9 @@ import logging
 import time
 from uuid import uuid4
 
-from sqlalchemy import select
-
 from app.pai_c.deep.context import DeepContext
 from app.pai_c.deep.turn_input import CounselorTurnInput
-from app.models import EventRecord, Roadmap
+from app.models import EventRecord
 
 logger = logging.getLogger(__name__)
 _KNOWN = frozenset({"none", "mirror", "note_question", "wellbeing", "rethink", "collect_fact", "show_place"})
@@ -82,29 +80,20 @@ async def dispatch_action(db, turn: CounselorTurnInput, action: dict,
     if kind == "wellbeing":
         _record(db, turn, kind, "recorded")
         return kind, "recorded"
-    rows = db.execute(select(Roadmap).where(
-        Roadmap.workspace_id == turn.workspace_id,
-        Roadmap.journey_id == (context.journey.id if context.journey else ""),
-    ).order_by(Roadmap.created_at.desc()).limit(1)).scalars().all()
-    if not rows:
-        _record(db, turn, kind, "ignored", reason="no_roadmaps")
-        return kind, "ignored"
+    # "rethink" moves only the journey stage back to direction; it never
+    # touches the student's chosen route (that changes only on the Roadmap page).
     from app.journey import JourneyService
-    from app.pai_c.roadmaps.service import RoadmapError, RoadmapService
 
+    stage = context.journey.current_stage if context.journey else None
+    if stage not in {"PROPOSED", "CHOSEN"}:
+        _record(db, turn, kind, "ignored", reason="stage_not_replannable")
+        return kind, "ignored"
     try:
-        stage = context.journey.current_stage
-        if stage == "PROPOSED":
-            RoadmapService(db).rethink(turn.workspace_id, rows[0].id)
-        elif stage == "CHOSEN":
-            JourneyService(db).set_counselor_stage(
-                turn.workspace_id, context.journey.id, "DIRECTION",
-                actor="openagents:pai", replan_escalation=True,
-            )
-        else:
-            _record(db, turn, kind, "ignored", reason="stage_not_replannable")
-            return kind, "ignored"
-    except (RoadmapError, ValueError):
+        JourneyService(db).set_counselor_stage(
+            turn.workspace_id, context.journey.id, "DIRECTION",
+            actor="openagents:pai", replan_escalation=stage == "CHOSEN",
+        )
+    except ValueError:
         db.rollback()
         _record(db, turn, kind, "ignored", reason="replan_unavailable")
         return kind, "ignored"

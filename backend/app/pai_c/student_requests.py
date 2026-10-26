@@ -1,10 +1,11 @@
-"""Durable research questions across chat, voice, uploads and roadmap cards."""
+"""Durable research questions for the student (PAI OS contract). The old roadmap
+research runs no longer create new ones; existing rows stay readable."""
 
 from datetime import datetime, timezone
 
 from sqlalchemy import select
 
-from app.models import ExecutionRun, StudentRequest
+from app.models import StudentRequest
 
 
 class StudentRequestService:
@@ -34,47 +35,6 @@ class StudentRequestService:
             StudentRequest.workspace_id == workspace_id,
             StudentRequest.status == "open",
         ).order_by(StudentRequest.created_at, StudentRequest.id).limit(1)).scalar_one_or_none()
-
-    def sync_research_run(self, run: ExecutionRun) -> None:
-        if run.task_type != "roadmap_research":
-            return
-        if run.status in {"completed", "failed"}:
-            for row in self.db.execute(select(StudentRequest).where(
-                StudentRequest.execution_run_id == run.id,
-                StudentRequest.status == "open")).scalars():
-                row.status = "withdrawn"
-            self.db.flush()
-            return
-        pending = run.pending_action or {}
-        if run.status != "needs_user_action" or pending.get("type") != "need_from_student":
-            return
-        for item in pending.get("items") or []:
-            if not isinstance(item, dict) or not item.get("field"):
-                continue
-            key = str(item["field"])
-            existing = self.db.execute(select(StudentRequest).where(
-                StudentRequest.execution_run_id == run.id,
-                StudentRequest.item_key == key)).scalar_one_or_none()
-            if existing is None:
-                row = StudentRequest(
-                    workspace_id=run.workspace_id, source="research",
-                    execution_run_id=run.id, item_key=key,
-                    reason=str(item.get("reason") or "PAI needs this to compare the route"),
-                    accepts_upload=bool(item.get("accepts_upload")))
-                self.db.add(row)
-                self.db.flush()
-                from app.services.notify import notify_once
-                notify_once(self.db, run.workspace_id,
-                            dedupe_key=f"research-request:{row.id}",
-                            source="system:roadmaps", title="PAI needs one detail",
-                            message="A research question is ready in Counselor",
-                            link_url="/roadmaps")
-            elif existing.status != "open":
-                existing.status = "open"
-                existing.reason = str(item.get("reason") or existing.reason)
-                existing.accepts_upload = bool(item.get("accepts_upload"))
-                existing.answered_at = None
-        self.db.flush()
 
     def mark_answered(self, workspace_id: str, run_id: str, field: str) -> None:
         row = self.db.execute(select(StudentRequest).where(

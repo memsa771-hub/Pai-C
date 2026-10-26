@@ -22,7 +22,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from app.config import config
 from app.security.errors import EmailNotVerified, IdentityUnavailable
 from app.api.response import ResponseCode, json_response
-from app.routers import counselor_possibilities, account, app_version, auth, counselor_summary, counselor_voice, decision_records, escalations, events, feedback, fetch, files, network, notifications, operator, roadmaps, search, shares, student_requests, tasks, vault, workflows, workspaces
+from app.routers import counselor_possibilities, account, app_version, auth, counselor_summary, counselor_voice, decision_records, escalations, events, feedback, fetch, files, network, notifications, operator, search, shares, student_requests, tasks, vault, workflows, workspaces
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -396,7 +396,6 @@ app.include_router(files.router)
 app.include_router(network.router)
 app.include_router(notifications.router)
 app.include_router(operator.router)
-app.include_router(roadmaps.router)
 from app.routers import roadmap
 app.include_router(roadmap.router)
 app.include_router(search.router)

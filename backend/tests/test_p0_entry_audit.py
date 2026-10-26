@@ -10,7 +10,7 @@ from sqlalchemy import select
 
 from app.database import Base, get_db
 from app.main import app
-from app.models import AuthDevice, User, Workspace, FileRecord, Roadmap
+from app.models import AuthDevice, User, Workspace, FileRecord
 from scripts.counselor_eval_support import StudentSession
 from tests.auth_fakes import firebase_tokens, identity_for, link_owner
 
@@ -109,7 +109,7 @@ def sample(schema, schemas):
 
 
 SPEC = app.openapi()
-PREFIXES = ('/v1/events', '/v1/counselor/', '/v1/roadmaps', '/v1/vault',
+PREFIXES = ('/v1/events', '/v1/counselor/', '/v1/roadmap', '/v1/vault',
             '/v1/student-requests', '/v1/files')
 CASES = [(path, method, spec) for path, methods in SPEC['paths'].items()
          if path.startswith(PREFIXES) for method, spec in methods.items()
@@ -129,13 +129,10 @@ def test_all_pai_c_routes_reject_anonymous_and_other_workspace(path, method, spe
             db.commit()
             foreign_id = str(foreign.id)
             from app.journey import JourneyService
-            journey = JourneyService(db).ensure_counselor(foreign_id)
+            JourneyService(db).ensure_counselor(foreign_id)
             foreign_file = str(uuid4())
-            foreign_roadmap = str(uuid4())
             db.add(FileRecord(id=foreign_file, workspace_id=foreign_id, filename='private.txt',
                 content_type='text/plain', size=1, storage_key='synthetic-only', uploaded_by='human:'+str(other.id)))
-            db.add(Roadmap(id=foreign_roadmap, workspace_id=foreign_id, journey_id=journey.id,
-                origin='stated_goal', title='Private roadmap', generation_status='ready'))
             db.commit()
             token, identity = link_owner(db, db.get(User, student.user_id))
         schemas = SPEC['components']['schemas']
@@ -144,7 +141,7 @@ def test_all_pai_c_routes_reject_anonymous_and_other_workspace(path, method, spe
         for parameter in spec.get('parameters', []):
             name = parameter['name']
             if parameter['in'] == 'path':
-                resource = foreign_file if name == 'file_id' else foreign_roadmap if name == 'roadmap_id' else str(uuid4())
+                resource = foreign_file if name == 'file_id' else str(uuid4())
                 url = url.replace('{'+name+'}', resource)
             elif parameter['in'] == 'query' and parameter.get('required'):
                 params[name] = foreign_id if name == 'network' else sample(parameter['schema'], schemas)

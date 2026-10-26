@@ -43,12 +43,12 @@ async def main():
                                      "sdp": "v=0\r\ns=offline student offer\r\n"})
         assert voice.status == 200, await voice.text()
         assert (await voice.json())["data"]["session_id"] == "offline-voice-session"
-        roadmaps = await api.get(f"http://backend:8000/v1/roadmaps?network={workspace}", headers=auth)
-        assert roadmaps.status == 200, await roadmaps.text()
+        roadmap = await api.get(f"http://backend:8000/v1/roadmap?network={workspace}", headers=auth)
+        assert roadmap.status == 200, await roadmap.text()
         print(json.dumps({"login": "passed (fake Firebase token, real account and device record)",
                           "chat": "passed (fake model, real event pipeline)",
                           "voice_route": "passed (fake SDP handshake, not live audio)",
-                          "roadmaps_api": roadmaps.status}))
+                          "roadmap_api": roadmap.status}))
         await api.dispose()
 
 

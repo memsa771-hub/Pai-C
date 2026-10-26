@@ -170,6 +170,53 @@ def test_withdraw():
         assert data(client.get("/v1/decision-records/current", params=params, headers=TOKEN)) is None
 
 
+def _statuses(student):
+    from app.models import PaiPossibility
+    with student.factory() as db:
+        return {row.study_field["key"]: row.status for row in db.query(PaiPossibility).all() if row.study_field}
+
+
+def test_choose_marks_path_chosen_and_previous_back_to_saved():
+    with pre_eng() as (client, student, params):
+        data(choose(client, params, "electrical_engineering"))
+        assert _statuses(student)["electrical_engineering"] == "chosen"
+        data(choose(client, params, "computer_engineering"))
+        statuses = _statuses(student)
+    assert statuses["computer_engineering"] == "chosen"
+    assert statuses["electrical_engineering"] == "saved"
+    assert statuses["mbbs"] == "suggested"
+
+
+def test_withdraw_puts_path_back_to_saved():
+    with pre_eng() as (client, student, params):
+        data(choose(client, params, "electrical_engineering"))
+        data(client.post("/v1/roadmap/withdraw", params=params, headers=TOKEN))
+        assert _statuses(student)["electrical_engineering"] == "saved"
+        # The chosen path stays choosable after a withdraw.
+        assert data(choose(client, params, "electrical_engineering"))["field_key"] == "electrical_engineering"
+
+
+def test_chosen_status_is_not_a_student_transition():
+    from app.pai_c.policy.controller import load_data
+    transitions = load_data("possibilities.json")["transitions"]
+    assert "choose" not in transitions and "chosen" not in transitions
+
+
+@pytest.mark.asyncio
+async def test_chosen_path_checkin_follows_the_active_decision():
+    from app.models import BackgroundJob
+    from app.pai_c.checkins import checkin_job
+    with pre_eng() as (client, student, params):
+        decision = data(choose(client, params, "electrical_engineering"))
+        with student.factory() as db:
+            job = db.query(BackgroundJob).filter(BackgroundJob.job_type == "counselor.checkin").one()
+            assert job.payload == {"kind": "chosen_path", "reference_id": decision["id"]}
+        data(client.post("/v1/roadmap/withdraw", params=params, headers=TOKEN))
+        with student.factory() as db:
+            job = db.query(BackgroundJob).filter(BackgroundJob.job_type == "counselor.checkin").one()
+            assert (await checkin_job(job, db)) == {"status": "superseded"}
+
+
 def test_decision_keeps_snapshot():
     with pre_eng() as (client, student, params):
         decision = data(choose(client, params, "electrical_engineering"))

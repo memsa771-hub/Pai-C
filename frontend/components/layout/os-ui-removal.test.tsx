@@ -35,10 +35,10 @@ it.each(['applications', 'deadlines', 'tasks', 'workflows'])('ignores an old sav
   expect(state.setCurrentSessionId).toHaveBeenCalledWith('pai-counselor', { skipFocus: true });
 });
 
-it('still restores a Counselor roadmap view', () => {
-  localStorage.setItem(preferenceKey, JSON.stringify({ view: 'roadmaps' }));
+it.each(['roadmaps', 'roadmap', 'compare', 'plan'])('restores a saved %s view on the one Roadmap page', (view) => {
+  localStorage.setItem(preferenceKey, JSON.stringify({ view }));
   renderHook(useDesktopWorkspaceState);
-  expect(state.openView).toHaveBeenCalledWith('roadmaps');
+  expect(state.openView).toHaveBeenCalledWith('roadmap');
 });
 
 it.each([
@@ -53,7 +53,7 @@ it.each([
 it('keeps roadmap notifications and Counselor conversation navigation', async () => {
   const { result } = renderHook(useNotificationNavigation);
   await result.current(notification({ createdBy: 'system:roadmaps' }));
-  expect(state.openView).toHaveBeenLastCalledWith('roadmaps');
+  expect(state.openView).toHaveBeenLastCalledWith('roadmap');
   await result.current(notification({ channelName: 'pai-counselor', isRead: true }));
   expect(state.setCurrentSessionId).toHaveBeenCalledWith('pai-counselor');
   expect(state.openView).toHaveBeenLastCalledWith('threads');

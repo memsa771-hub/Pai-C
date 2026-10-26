@@ -22,8 +22,6 @@ import { useLayout } from '@/components/layout/layout-context';
 import { useWorkspace } from '@/lib/workspace-context';
 import { useFormatters, useT } from '@/lib/i18n';
 import { agentLabel } from '@/lib/helpers';
-import { RoadmapComparison } from './roadmap-comparison';
-import type { Roadmap } from '@/lib/roadmaps';
 
 interface Attachment {
   fileId: string;
@@ -275,8 +273,8 @@ export const ChatMessage = memo(function ChatMessage({ message, agents = [] }: C
 
   // ── Agent message ──
   // PAI speaks on the page, not in a bubble: its name above, then the reply at
-  // full reading width, like a letter. Rich cards (fact, rating, paths,
-  // roadmaps) follow the text.
+  // full reading width, like a letter. Rich cards (fact, rating, paths)
+  // follow the text.
   return (
     <div className="group mx-auto w-full max-w-[46rem] py-3">
       <div className="min-w-0">
@@ -290,7 +288,6 @@ export const ChatMessage = memo(function ChatMessage({ message, agents = [] }: C
             <Attachments items={attachments} />
           </div>
           {!!message.metadata?.fact_card && <FactCard card={message.metadata.fact_card as OfferedFact}/>}
-          {Array.isArray(message.metadata?.roadmaps) && <RoadmapComparison initial={message.metadata.roadmaps as unknown as Roadmap[]} />}
           {typeof message.metadata?.possibility_id === 'string' && <Possibilities id={message.metadata.possibility_id} />}
           {Array.isArray(message.metadata?.paths_found) && <PathsFound ids={message.metadata.paths_found as string[]} />}
           {typeof message.metadata?.workspace_place === 'string' && <PlaceLink place={message.metadata.workspace_place} />}

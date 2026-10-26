@@ -4,7 +4,6 @@ import { workspaceApi } from "@/lib/api";
 import type { LivingPicture } from "@/lib/counselor-workspace";
 import type { Possibility } from "@/lib/possibilities";
 import type { RoadmapPage } from "@/lib/roadmap";
-import type { Roadmap } from "@/lib/roadmaps";
 import { useResource } from "./resource";
 import copy from "./copy.json";
 
@@ -12,7 +11,8 @@ export type Stage = (typeof copy.stages)[number];
 export type JourneySignals = {
   picture: LivingPicture;
   possibilities: Possibility[];
-  roadmaps: Roadmap[];
+  /** A places (program) search finished on at least one path. */
+  placesSearched: boolean;
   roadmap: RoadmapPage | null;
 };
 
@@ -25,7 +25,7 @@ export function signalMet(signal: string, data: JourneySignals): boolean {
   const live = data.possibilities.filter((p) => p.status !== "dismissed");
   if (signal === "paths_found") return live.length > 0;
   if (signal === "path_explored") return live.some((p) => p.status === "exploring" || p.status === "chosen");
-  if (signal === "roadmap_prepared") return data.roadmaps.length > 0;
+  if (signal === "places_searched") return data.placesSearched;
   // The Roadmap page: a route the student chose, then a first step ticked.
   // Cards alone reach nothing: they exist as soon as paths do.
   if (signal === "route_chosen") return !!data.roadmap?.chosen;
@@ -53,14 +53,20 @@ export function journeyProgress(data: JourneySignals) {
 
 /** Optional signals: a failed read leaves that stage unreached, never broken. */
 const settle = <T,>(read: () => Promise<T>, fallback: T) => Promise.resolve().then(read).catch(() => fallback);
+/** Places can be searched only on a path the student explored, so only those
+ * are asked; GET never starts a search. */
+const anyPlacesSearched = async (possibilities: Possibility[]) => {
+  const explored = possibilities.filter((p) => p.status === "exploring" || p.status === "saved" || p.status === "chosen");
+  const results = await Promise.all(explored.map((p) => settle(() => workspaceApi.getPrograms(p.id), null)));
+  return results.some((result) => result?.status === "completed");
+};
 const loadJourney = async (): Promise<JourneySignals> => {
-  const [picture, possibilities, roadmaps, roadmap] = await Promise.all([
+  const [picture, possibilities, roadmap] = await Promise.all([
     workspaceApi.getCounselorWorkspace(),
     settle(() => workspaceApi.getPossibilities(), [] as Possibility[]),
-    settle(() => workspaceApi.getRoadmaps(), [] as Roadmap[]),
     settle(() => workspaceApi.getRoadmapPage(), null as RoadmapPage | null),
   ]);
-  return { picture, possibilities, roadmaps, roadmap };
+  return { picture, possibilities, placesSearched: await anyPlacesSearched(possibilities), roadmap };
 };
 
 export function useJourney() {

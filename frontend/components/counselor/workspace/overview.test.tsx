@@ -10,11 +10,11 @@ vi.mock("@/lib/api", () => ({ workspaceApi: { getVault: vi.fn() } }));
 afterEach(() => { cleanup(); vi.clearAllMocks(); });
 
 const path = (id: string, title: string, status: Possibility["status"]) =>
-  ({ id, title, why: `Why ${title}`, status, evidence: [], unknowns: [], roadmap_id: null }) as unknown as Possibility;
+  ({ id, title, why: `Why ${title}`, status, evidence: [], unknowns: [] }) as unknown as Possibility;
 const data: JourneySignals = {
   picture,
   possibilities: [path("p1", "Practical design", "suggested"), path("p2", "Applied computing", "saved"), path("p3", "Old idea", "dismissed")],
-  roadmaps: [],
+  placesSearched: false,
   roadmap: null,
 };
 const journey = { data, error: false, busy: false, refresh: vi.fn(), progress: journeyProgress(data) };

@@ -1,5 +1,3 @@
-import asyncio
-from dataclasses import replace
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, Mock, patch
 
@@ -143,34 +141,6 @@ async def test_operator_run_dispatch_calls_policy_selected_execution_and_checks_
         with pytest.raises(LookupError):
             await dispatch(job, db)
         assert get_capability_registry().get("operator.run").kind == "system"
-
-
-@pytest.mark.asyncio
-async def test_roadmap_research_installed_owner_uses_workflow_without_operator_phases():
-    from app.capabilities import get_capability_registry
-    from app.journey import JourneyService
-    installed = get_capability_registry()
-    contract = installed.owner_for_task_type("roadmap_research")
-    handler = AsyncMock(return_value={"roadmaps": [], "unconfirmed": ["Undecisive fact"],
-                                     "pending_action": None, "mirror_version": 1})
-    registry = workflow_registry()
-    registry.register(replace(contract, handler=handler))
-    with StudentSession() as student:
-        with student.factory() as db:
-            journeys = JourneyService(db)
-            journey = journeys.ensure_counselor(student.workspace_id)
-            for stage in ("FOUNDATION", "DIRECTION", "MIRROR", "RESEARCHING"):
-                journeys.set_counselor_stage(student.workspace_id, journey.id, stage, actor="test")
-            db.commit()
-        run_id = create_run(student, task_type="roadmap_research", capability_input={"brief": {"mirror_version": 1}})
-        with patch.object(capability_module, "_registry", registry), \
-             patch.object(operator, "_post_result", AsyncMock()), patch.object(operator, "_publish_run_updated"):
-            await operator._execute(run_id, student.workspace_id, object(), "Work", {}, [], None)
-        handler.assert_awaited_once()
-        assert handler.await_args.args[1] == {"brief": {"mirror_version": 1}}
-        with student.factory() as db:
-            assert db.get(ExecutionRun, run_id).status == "completed"
-            assert JourneyService(db).get(student.workspace_id, journey.id).current_stage == "ASSESSING"
 
 
 @pytest.mark.asyncio

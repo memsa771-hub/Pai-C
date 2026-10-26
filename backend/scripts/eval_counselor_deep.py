@@ -453,8 +453,7 @@ async def complete_mirror_pipeline(student):
     from sqlalchemy import select
     from app.pai_c.deep.mirror import mirror_job, enqueue_confirmed_research, confirmed_research_job, JOB_MIRROR
     from app.journey import JourneyService
-    from app.models import Roadmap
-    from app.services import operator
+    from app.models import PaiPossibility
     with student.factory() as db:
         job=db.scalar(select(BackgroundJob).where(BackgroundJob.workspace_id==student.workspace_id,
             BackgroundJob.job_type==JOB_MIRROR,BackgroundJob.status=='pending'))
@@ -470,22 +469,15 @@ async def complete_mirror_pipeline(student):
         journey=JourneyService(db).queue_counselor_research(student.workspace_id,journey.id,str(uuid.uuid4()),
             actor='human:evaluation_confirmation',expected_version=draft['version'])
         research_id=enqueue_confirmed_research(db,student.workspace_id,journey);db.commit()
-        with phase('light_research'):
+        # A confirmed Mirror creates paths; routes come from the roadmap engine
+        # on the Roadmap page, not from this pipeline.
+        with phase('paths_from_mirror'):
             await confirmed_research_job(db.get(BackgroundJob,research_id),db)
-            from app.runtime.task_runtime import run as dispatch_job
-            operator_jobs=db.scalars(select(BackgroundJob).where(
-                BackgroundJob.workspace_id==student.workspace_id,
-                BackgroundJob.job_type=='operator.run',BackgroundJob.status=='pending')).all()
-            for operator_job in operator_jobs:
-                await dispatch_job(operator_job,db)
-                operator_job.status='succeeded';db.commit()
         db.expire_all()
-        rows=db.scalars(select(Roadmap).where(Roadmap.workspace_id==student.workspace_id)).all()
-        result['roadmaps']=[{'lane':row.lane,'title':row.title,'status':row.generation_status,
-            'route':row.route,'sources':row.sources,'gaps':row.gaps,'steps':row.steps} for row in rows]
-        result['ready_ratio']=sum(row.generation_status=='ready' for row in rows)/len(rows) if rows else 0
-        result['status']='published' if rows else 'no_roadmaps'
-        result['transcript'].append({'role':'roadmaps','content':result['roadmaps']})
+        rows=db.scalars(select(PaiPossibility).where(PaiPossibility.workspace_id==student.workspace_id)).all()
+        result['paths']=[{'kind':row.kind,'title':row.title,'status':row.status,'why':row.why} for row in rows]
+        result['status']='paths_ready' if rows else 'no_paths'
+        result['transcript'].append({'role':'paths','content':result['paths']})
         return result
 
 
@@ -566,7 +558,7 @@ async def run_evaluation(*, live: bool = False, max_cost_usd: float | None = Non
     if live:
         for model in {config.PAI_COUNSELOR_MODEL, config.PAI_ANALYST_MODEL,
                       config.PAI_SENSITIVE_CHECK_MODEL,
-                      *({config.PAI_MIRROR_MODEL, config.PAI_ROADMAP_MODEL, config.PAI_OPERATOR_MODEL or config.PAI_MODEL} if end_to_end else set()),
+                      *({config.PAI_MIRROR_MODEL} if end_to_end else set()),
                       config.MEMORY_EXTRACTOR_MODEL or config.PAI_MODEL,
                       *({config.PAI_CLASSIFIER_MODEL} if policy_mode else set()),
                       simulator_model or config.PAI_MODEL,

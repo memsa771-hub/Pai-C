@@ -1,4 +1,5 @@
-"""One durable question survives channels and resumes only from accepted facts."""
+"""Student requests stay a PAI OS contract: existing questions are listed, asked
+once and answered; the removed roadmap research no longer creates new ones."""
 
 from datetime import datetime, timezone
 
@@ -7,29 +8,30 @@ from fastapi.testclient import TestClient
 from app.pai_c.student_requests import StudentRequestService
 from app.database import get_db
 from app.main import app
-from app.models import ExecutionRun, NotificationRecord
+from app.models import ExecutionRun, StudentRequest
 from scripts.counselor_eval_support import StudentSession
 
 
-def test_research_request_is_idempotent_and_asked_once():
+def _request(db, workspace_id, item_key, **fields):
+    run = ExecutionRun(workspace_id=workspace_id, requested_by="openagents:pai", objective="Research",
+                       task_type="program_search", status="needs_user_action",
+                       created_at=datetime.now(timezone.utc))
+    db.add(run)
+    db.flush()
+    row = StudentRequest(workspace_id=workspace_id, source="research", execution_run_id=run.id,
+                         item_key=item_key, reason=fields.get("reason", "Need this detail"),
+                         accepts_upload=fields.get("accepts_upload", False))
+    db.add(row)
+    db.flush()
+    return run, row
+
+
+def test_existing_request_is_asked_once_and_answered():
     with StudentSession() as student, student.factory() as db:
-        run = ExecutionRun(workspace_id=student.workspace_id,
-                           requested_by="openagents:pai", objective="Research",
-                           task_type="roadmap_research", status="needs_user_action",
-                           pending_action={"type": "need_from_student", "items": [{
-                               "field": "test_attempt[IELTS].overall_score",
-                               "reason": "An English score affects this route",
-                               "accepts_upload": True}]})
-        db.add(run)
-        db.flush()
+        run, _ = _request(db, student.workspace_id, "test_attempt[IELTS].overall_score", accepts_upload=True)
         service = StudentRequestService(db)
-        service.sync_research_run(run)
-        service.sync_research_run(run)
         requests = service.list(student.workspace_id)
         assert len(requests) == 1
-        assert db.query(NotificationRecord).filter_by(
-            workspace_id=student.workspace_id,
-            dedupe_key=f"research-request:{requests[0]['id']}").count() == 1
         assert requests[0]["accepts_upload"] is True
         assert requests[0]["item_key"] == "test_attempt[IELTS].overall_score"
         row = service.oldest_open(student.workspace_id)
@@ -42,18 +44,15 @@ def test_research_request_is_idempotent_and_asked_once():
         assert service.list(student.workspace_id, status="answered")[0]["answered_at"]
 
 
+def test_service_no_longer_syncs_research_runs():
+    assert not hasattr(StudentRequestService, "sync_research_run")
+
+
 def test_request_api_is_workspace_scoped():
     with StudentSession() as student, student.factory() as db:
-        run = ExecutionRun(workspace_id=student.workspace_id,
-                           requested_by="openagents:pai", objective="Research",
-                           task_type="roadmap_research", status="needs_user_action",
-                           created_at=datetime.now(timezone.utc),
-                           pending_action={"type": "need_from_student", "items": [{
-                               "field": "education.grade", "reason": "Need your result"}]})
-        db.add(run)
-        db.flush()
-        StudentRequestService(db).sync_research_run(run)
+        _request(db, student.workspace_id, "education.grade", reason="Need your result")
         db.commit()
+
         def scoped_db():
             with student.factory() as session:
                 yield session

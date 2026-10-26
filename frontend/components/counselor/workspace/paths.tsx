@@ -532,11 +532,11 @@ function ProgramCard({ program }: { program: Program }) {
 export function ProgramPage({
   id,
   onBack,
-  onCompare,
+  onRoadmap,
 }: {
   id: string;
   onBack: () => void;
-  onCompare?: () => void;
+  onRoadmap?: () => void;
 }) {
   const load = useCallback(() => workspaceApi.getPrograms(id), [id]);
   const resource = useResource(load);
@@ -552,18 +552,6 @@ export function ProgramPage({
     const timer = setInterval(resource.refresh, 5000);
     return () => clearInterval(timer);
   }, [resource.data?.status, resource.refresh]);
-  async function prepare() {
-    setBusy(true);
-    setError(false);
-    try {
-      await workspaceApi.preparePathRoadmap(id);
-      onCompare?.();
-    } catch {
-      setError(true);
-    } finally {
-      setBusy(false);
-    }
-  }
   async function search() {
     setBusy(true);
     setError(false);
@@ -627,16 +615,15 @@ export function ProgramPage({
               </div>
             </>
           )}
-          {resource.data.status === "completed" && (
+          {resource.data.status === "completed" && onRoadmap && (
             <section className="mt-6 flex flex-wrap items-center justify-between gap-4 rounded-[22px] bg-powder p-6 text-signal-ink sm:p-7">
               <div className="max-w-xl">
                 <h2 className="font-display text-xl leading-tight">{copy.nextStepTitle}</h2>
                 <p className="mt-1 text-sm">{copy.decisionPending}</p>
               </div>
-              <Button size="tap" disabled={busy} onClick={prepare}>
-                {copy.prepareRoadmap}<ArrowRight aria-hidden />
+              <Button size="tap" onClick={onRoadmap}>
+                {copy.openRoadmap}<ArrowRight aria-hidden />
               </Button>
-              {error && <p role="alert" className="w-full text-sm font-medium text-danger-ink">{copy.error}</p>}
             </section>
           )}
         </>

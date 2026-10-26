@@ -205,5 +205,5 @@ async def test_end_to_end_completion_runs_existing_mirror_job_and_confirmation_o
              patch('app.pai_c.deep.mirror.confirmed_research_job',AsyncMock(side_effect=confirmed)) as research:
             result=await complete_mirror_pipeline(student)
         research.assert_awaited_once()
-        assert result['mirror'] and result['status']=='no_roadmaps'
+        assert result['mirror'] and result['status']=='no_paths'
         assert db.scalar(select(BackgroundJob.id).where(BackgroundJob.job_type=='counselor.mirror_research'))

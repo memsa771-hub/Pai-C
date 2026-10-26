@@ -9,7 +9,6 @@ import { VoiceModeButton, VoiceStatus, useCounselorVoice } from './counselor-voi
 import { CounselorMirrorCard } from '@/components/counselor/counselor-mirror-card';
 import counselorCopy from '@/components/counselor/workspace/copy.json';
 import { CounselorRequestPanel } from './counselor-request-panel';
-import { CounselorResearchStatus } from './counselor-research-status';
 import { ThreadStatusBar } from './thread-status-bar';
 import { useWorkspace } from '@/lib/workspace-context';
 import { useMessagePolling } from '@/hooks/use-polling';
@@ -982,7 +981,6 @@ export function ChatView({counselorOnly=false,initialDraft=""}:{counselorOnly?:b
           <div className="mx-auto w-full max-w-[48rem] px-3 pt-1 pb-3 lg:px-4 lg:pb-5">
             {counselorOnly && initialDraft === counselorCopy.checkin && !checkinSent && <CheckInCard onPick={(text) => setCurrentDraft(counselorCopy.checkinCard.draftTemplate.replace('{option}', text))} />}
             {currentSessionId === 'pai-counselor' && <div className="mb-2">
-              <CounselorResearchStatus />
               <CounselorMirrorCard refreshKey={`${currentSessionId}:${displayMessages.length}`}
                 onUpdated={forceRefresh} />
               <CounselorRequestPanel refreshKey={displayMessages.length} />

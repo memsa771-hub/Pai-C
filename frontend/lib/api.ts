@@ -261,55 +261,6 @@ class WorkspaceApi {
     return this.request(`/v1/roadmap/withdraw?network=${this.requireWorkspace()}`, { method: 'POST' });
   }
 
-  async getRoadmaps(filter: 'all' | 'favorites' | 'exploring' | 'dismissed' = 'all'): Promise<import('./roadmaps').Roadmap[]> {
-    const response = await this.request<{ roadmaps: import('./roadmaps').Roadmap[] }>(
-      `/v1/roadmaps?network=${this.requireWorkspace()}&filter=${filter}`,
-    );
-    return response.roadmaps;
-  }
-
-  async getRoadmap(id: string): Promise<import('./roadmaps').RoadmapDetail> {
-    return this.request(`/v1/roadmaps/${encodeURIComponent(id)}?network=${this.requireWorkspace()}`);
-  }
-
-  async setRoadmapFlag(id: string, action: 'favorite' | 'exploring', value: boolean): Promise<import('./roadmaps').Roadmap> {
-    return this.request(`/v1/roadmaps/${encodeURIComponent(id)}/${action}?network=${this.requireWorkspace()}`,
-      { method: 'POST', body: JSON.stringify({ value }) });
-  }
-
-  async setRoadmapDismissed(id: string, dismissed: boolean): Promise<import('./roadmaps').Roadmap> {
-    const action = dismissed ? 'dismiss' : 'restore';
-    return this.request(`/v1/roadmaps/${encodeURIComponent(id)}/${action}?network=${this.requireWorkspace()}`,
-      { method: 'POST' });
-  }
-
-  async focusRoadmap(id: string): Promise<import('./roadmaps').Roadmap> {
-    return this.request(`/v1/roadmaps/${encodeURIComponent(id)}/focus?network=${this.requireWorkspace()}`,
-      { method: 'POST' });
-  }
-
-  async rethinkRoadmap(id: string): Promise<import('./roadmaps').Roadmap> {
-    return this.request(`/v1/roadmaps/${encodeURIComponent(id)}/rethink?network=${this.requireWorkspace()}`,
-      { method: 'POST' });
-  }
-
-  async getRoadmapChoiceToken(id: string): Promise<string> {
-    const response = await this.request<{ confirm_token: string }>(
-      `/v1/roadmaps/${encodeURIComponent(id)}/choice-token?network=${this.requireWorkspace()}`,
-      { method: 'POST' });
-    return response.confirm_token;
-  }
-
-  async chooseRoadmap(id: string, confirmToken: string,
-                      choiceChannel: 'chat' | 'voice' | 'roadmaps' = 'roadmaps'): Promise<import('./roadmaps').Roadmap> {
-    return this.request(`/v1/roadmaps/${encodeURIComponent(id)}/choose?network=${this.requireWorkspace()}`,
-      { method: 'POST', body: JSON.stringify({ confirm_token: confirmToken, choice_channel: choiceChannel }) });
-  }
-
-  async getCurrentDecision(): Promise<import('./roadmaps').DecisionRecord | null> {
-    return this.request(`/v1/decision-records/current?network=${this.requireWorkspace()}`);
-  }
-
   async getCounselorSummary(): Promise<import('./counselor-mirror').CounselorMirrorDraft> {
     return this.request(`/v1/counselor/summary?network=${this.requireWorkspace()}`);
   }
@@ -380,9 +331,6 @@ class WorkspaceApi {
   async searchPrograms(id:string):Promise<unknown> {
     return this.request(`/v1/counselor/paths/${encodeURIComponent(id)}/programs?network=${this.requireWorkspace()}`,{method:'POST',body:JSON.stringify({explore_places:true})});
   }
-  async preparePathRoadmap(id:string):Promise<unknown> {
-    return this.request(`/v1/counselor/paths/${encodeURIComponent(id)}/roadmap?network=${this.requireWorkspace()}`,{method:'POST',body:JSON.stringify({explore_places:true})});
-  }
   async acceptPathActivity(id:string):Promise<{status:string;available_at:string}> {
     return this.request(`/v1/counselor/paths/${encodeURIComponent(id)}/try-it?network=${this.requireWorkspace()}`,{method:'POST',body:JSON.stringify({accepted:true})});
   }
@@ -423,25 +371,10 @@ class WorkspaceApi {
       { method: 'POST', body: JSON.stringify({ version, understood, certainty_after }) });
   }
 
-  async getStudentRequests(): Promise<import('./roadmaps').StudentRequest[]> {
-    const response = await this.request<{ requests: import('./roadmaps').StudentRequest[] }>(
+  async getStudentRequests(): Promise<import('./student-requests').StudentRequest[]> {
+    const response = await this.request<{ requests: import('./student-requests').StudentRequest[] }>(
       `/v1/student-requests?network=${this.requireWorkspace()}`);
     return response.requests;
-  }
-
-  async reportWrongRequirement(id: string): Promise<void> {
-    await this.request(`/v1/roadmaps/requirements/${encodeURIComponent(id)}/report?network=${this.requireWorkspace()}`,
-      { method: 'POST' });
-  }
-
-  async retryRoadmap(id: string): Promise<import('./roadmaps').Roadmap> {
-    return this.request(`/v1/roadmaps/${encodeURIComponent(id)}/retry?network=${this.requireWorkspace()}`,
-      { method: 'POST' });
-  }
-
-  async addCustomRoadmapGoal(input: import('./roadmaps').CustomRoadmapGoal): Promise<import('./roadmaps').Roadmap> {
-    return this.request(`/v1/roadmaps/custom?network=${this.requireWorkspace()}`,
-      { method: 'POST', body: JSON.stringify(input) });
   }
 
   // ---------------------------------------------------------------------------

@@ -12,6 +12,8 @@ No live model, search, OCR, voice or other provider API calls were made. Provide
 
 Sources: [locked workflow](PAI_C_WORKFLOW_LOCK_V1.md), [SPINE](SPINE.md), [Counseling policy](COUNSELING_POLICY.md), and [locked FigJam](https://www.figma.com/board/NjVJfdxERWfRHPycy1wDkF). The autonomous instruction replaced the earlier stop/attempt-limit rules; concrete fixes continued without weakening assertions.
 
+**26 October: roadmap engine.** Routes now come from a deterministic engine on one Roadmap page (spec [ROADMAP_ENGINE_SPEC.md](ROADMAP_ENGINE_SPEC.md)): fields open / a step away / not open / cannot check from the student's education and reviewed admission rules, a compare table, and one chosen route (`pai_route_decisions`, also the PAI OS decision record) with steps the student ticks. The old chat-linked roadmap system was removed: `/v1/roadmaps`, roadmap research runs and their jobs, the path "Prepare a reviewed roadmap" route, roadmap blocks in chat context and handoff, the chat roadmap comparison and the old Roadmaps / Compare / Plan screens. Mirror lanes, student requests, path explain and program search stay. See [DECISIONS.md](DECISIONS.md) (26 October).
+
 ## Commits
 
 | Step | Commit | Main changes / data |

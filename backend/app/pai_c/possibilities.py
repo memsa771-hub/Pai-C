@@ -2,7 +2,7 @@
 from datetime import datetime, timezone
 import logging
 from sqlalchemy import select
-from app.models import PaiPossibility, Roadmap, Workspace, StudentJourney
+from app.models import PaiPossibility, Workspace, StudentJourney
 from app.pai_c.policy.controller import load_data
 from app.pai_c.possibility_titles import normalized_title
 
@@ -38,11 +38,13 @@ class PossibilityService:
 
     @staticmethod
     def serialize(row):
+        # roadmap_id belongs to the removed roadmap system (dropped by migration 119).
         return {column.name: (value.isoformat() if isinstance(value, datetime) else value)
-                for column in row.__table__.columns for value in [getattr(row, column.name)]}
+                for column in row.__table__.columns if column.name != "roadmap_id"
+                for value in [getattr(row, column.name)]}
 
     def add(self, workspace_id, journey_id, *, title, why, kind, source, status,
-            evidence=(), unknowns=(), roadmap_id=None):
+            evidence=(), unknowns=()):
         self.lock(workspace_id)
         existing = self.by_title(workspace_id, title)
         if existing:
@@ -50,19 +52,14 @@ class PossibilityService:
         row = PaiPossibility(workspace_id=workspace_id, journey_id=journey_id,
             title=title, normalized_title=normalized_title(title), why=why, kind=kind,
             source=source, status=status, evidence=list(evidence), unknowns=list(unknowns),
-            mirror_versions=[], roadmap_id=roadmap_id)
+            mirror_versions=[])
         self.db.add(row)
         self.db.flush()
         logger.info("possibility_stored possibility_id=%s title=%s", row.id, row.title)
         return row
 
     def lane_title(self, journey, lane):
-        if lane.get("title"):
-            return lane["title"]
-        published = self.db.scalar(select(Roadmap).where(
-            Roadmap.workspace_id == journey.workspace_id, Roadmap.journey_id == journey.id,
-            Roadmap.lane == lane["lane"]).order_by(Roadmap.updated_at.desc()).limit(1))
-        return ((published.title if published else None) or (lane.get("route") or {}).get("field")
+        return (lane.get("title") or (lane.get("route") or {}).get("field")
                 or load_data("lane_labels.json")[lane["lane"]])
 
     def from_mirror(self, journey):
@@ -97,23 +94,6 @@ class PossibilityService:
         self.db.flush()
         return result
 
-    def link_lane(self, journey, lane, roadmap):
-        row = next((row for current, row in self.from_mirror(journey)
-                    if current["lane"] == lane["lane"]), None)
-        if row is None:
-            return
-        row.roadmap_id = roadmap.id
-        if not lane.get("title"):
-            collision = self.by_title(journey.workspace_id, roadmap.title)
-            if collision and collision.id != row.id:
-                logger.warning("possibility_title_collision possibility_id=%s other_id=%s", row.id, collision.id)
-            else:
-                row.title = roadmap.title
-                row.normalized_title = normalized_title(roadmap.title)
-        if row.status == "dismissed":
-            from app.pai_c.roadmaps.service import RoadmapService
-            RoadmapService(self.db).dismiss(journey.workspace_id, roadmap.id, True)
-
     def transition(self, workspace_id, id, action):
         self.lock(workspace_id)
         row = self.get(workspace_id, id)
@@ -124,11 +104,24 @@ class PossibilityService:
             return row, False
         row.status = target
         row.updated_at = datetime.now(timezone.utc)
-        if row.roadmap_id and action in {"dismiss", "explore"}:
-            from app.pai_c.roadmaps.service import RoadmapService
-            RoadmapService(self.db).dismiss(workspace_id, row.roadmap_id, action == "dismiss")
         self.db.flush()
         return row, True
+
+    def set_chosen(self, workspace_id, id, chosen):
+        """The route decision owns 'chosen': choosing a route marks its path
+        chosen; withdrawing (or choosing another) puts it back to saved. Kept
+        out of the student transition table so the possibilities API cannot
+        set it directly."""
+        row = self.db.scalar(select(PaiPossibility).where(
+            PaiPossibility.workspace_id == workspace_id, PaiPossibility.id == id)) if id else None
+        if row is None or row.status == "dismissed":
+            return None
+        target = "chosen" if chosen else ("saved" if row.status == "chosen" else row.status)
+        if row.status != target:
+            row.status = target
+            row.updated_at = datetime.now(timezone.utc)
+            self.db.flush()
+        return row
 
     def mark_mentioned(self, workspace_id, id):
         row = self.get(workspace_id, id)

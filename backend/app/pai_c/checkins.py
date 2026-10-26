@@ -3,7 +3,7 @@ import json
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from sqlalchemy import select
-from app.models import EventRecord, Workspace, RoadmapStudentState, Roadmap, PaiPossibility, CounselorTurnDecision, ExecutionRun
+from app.models import EventRecord, Workspace, RouteDecision, PaiPossibility, CounselorTurnDecision, ExecutionRun
 
 JOB_CHECKIN = 'counselor.checkin'
 
@@ -42,8 +42,9 @@ async def checkin_job(job, db):
                 EventRecord.metadata_['checkin_key'].as_string() == job.idempotency_key).limit(1)):
             return {'status': 'already_posted'}
         if kind == 'chosen_path':
-            current = db.scalar(select(Roadmap.id).join(RoadmapStudentState).where(Roadmap.workspace_id == job.workspace_id,
-                Roadmap.id == reference, RoadmapStudentState.chosen_at.is_not(None)))
+            # Only the still-active route decision gets its follow-up.
+            current = db.scalar(select(RouteDecision.id).where(RouteDecision.workspace_id == job.workspace_id,
+                RouteDecision.id == reference, RouteDecision.withdrawn_at.is_(None)))
         else:
             run = db.scalar(select(ExecutionRun).where(ExecutionRun.id == reference,
                 ExecutionRun.workspace_id == job.workspace_id, ExecutionRun.task_type == 'path_explain', ExecutionRun.status == 'completed'))

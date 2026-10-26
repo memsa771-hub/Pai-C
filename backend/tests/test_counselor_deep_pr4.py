@@ -25,7 +25,6 @@ from app.pai_c.stages import advance_discovery_stage
 from app.jobs.service import BackgroundJobService
 from app.inference.client import chat_completion
 from app.journey import JourneyService
-from app.research.jobs import _research_delegate_allowed
 from app.models import BackgroundJob, EventRecord
 from scripts.counselor_eval_support import StudentSession
 
@@ -450,14 +449,6 @@ def test_mirror_ready_is_forced_false_until_configured_coverage_is_complete(mode
 
 
 def test_research_gate_never_auto_advances_before_confirmation():
-    before = SimpleNamespace(current_stage="DIRECTION", counselor_summary_draft={})
-    confirmed = SimpleNamespace(current_stage="RESEARCHING",
-                                counselor_summary_draft={"status": "confirmed"})
-    stale = SimpleNamespace(current_stage="PROPOSED", counselor_summary_draft={})
-    assert not _research_delegate_allowed(before, None)
-    assert _research_delegate_allowed(confirmed, None)
-    assert _research_delegate_allowed(stale, "refresh")
-
     class Journeys:
         def set_counselor_stage(self, workspace_id, journey_id, stage, **kwargs):
             return SimpleNamespace(id=journey_id, current_stage=stage)

@@ -62,7 +62,7 @@ async def test_delegation_returns_while_execution_is_still_waiting():
         ctx = ToolContext(student.workspace_id, "pai", None, conversation="pai-counselor")
         with patch.object(operator, "_execute", slow), patch.object(operator, "is_available", return_value=True):
             result = await asyncio.wait_for(operator.delegate(ctx, "Research programs", {"capability_input": {}}, None,
-                                                             "study_abroad_matching", "roadmap_research"), 0.5)
+                                                             "study_abroad_matching", "path_explain"), 0.5)
             assert not started.is_set()
             assert result["ok"] and not release.is_set()
             with student.factory() as db:

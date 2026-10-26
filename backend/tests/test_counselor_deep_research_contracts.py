@@ -10,7 +10,6 @@ from app.pai_c.deep.polish import polish_reply, question_count
 from app.pai_c.stages import require_counselor_transition
 from app.plugins._shared.verification import SourceVerifier, official_url
 from app.plugins.gap_assessment import assess, assess_rule
-from app.plugins.roadmap_builder import build
 
 
 def test_deep_research_keeps_reported_evidence_and_requires_cited_rules():

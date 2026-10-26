@@ -23,7 +23,6 @@ export const possibilities: Possibility[] = [
       { label: "Paying for a full degree", status: "unknown", note: "", evidence: [] },
     ],
     unknowns: [],
-    roadmap_id: null,
   },
   {
     id: "path-two",
@@ -32,7 +31,6 @@ export const possibilities: Possibility[] = [
     status: "saved",
     evidence: [{ text: "I kept changing it until it worked.", item_id: "e2" }],
     unknowns: [],
-    roadmap_id: null,
   },
 ];
 export const picture: LivingPicture = {

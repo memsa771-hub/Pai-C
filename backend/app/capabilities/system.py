@@ -6,7 +6,6 @@ def load_system_capabilities(registry):
     from app.pai_c.deep import analysis, mirror
     from app.pai_c.paths import analyzer as paths
     from app.pai_c import sessions, opening, myths, checkins, reliability
-    from app.pai_c.roadmaps import jobs as roadmaps
     from app.memory import handlers as memory
     from app.research import jobs as research
     from app.documents import handlers as documents
@@ -31,7 +30,6 @@ def load_system_capabilities(registry):
         (memory.JOB_UNINDEX, memory.unindex_memory, {"ids": array}),
         (memory.JOB_REINDEX, memory.reindex_workspace, {"purge_first": {"type": "boolean"}, "batch_size": {"type": "integer"}}),
         (research.JOB_RESUME_RESEARCH, research.resume_research, {"candidate_id": string}),
-        (research.JOB_REFRESH_RESEARCH, research.refresh_stale_research, {"requirement_id": string}),
         (documents.JOB_DOCUMENT_PARSE, documents.parse_document_job, {"file_id": string}),
         (documents.JOB_DOCUMENT_EXTRACT, documents.extract_document_job, {"file_id": string}),
         (documents.JOB_DOCUMENT_INDEX, documents.index_document_job, {"file_id": string}),
@@ -43,14 +41,6 @@ def load_system_capabilities(registry):
         description="Internal durable Operator workflow or agent run", kind="system",
         input_schema={"type": "object", "properties": {"run_id": string}, "required": ["run_id"]},
         output_schema={"type": "object"}, handler=run_operator_job,
-    ))
-    registry.register(CapabilityContract(
-        id=roadmaps.JOB_MARK_STALE, version="1.0.0", name=roadmaps.JOB_MARK_STALE,
-        description="Internal durable roadmap invalidation", kind="system",
-        input_schema={"type": "object", "properties": {"workspace_id": string, "reason": string},
-                      "required": ["workspace_id", "reason"]},
-        output_schema={"type": "object", "properties": {"marked_stale": {"type": "integer"}},
-                       "required": ["marked_stale"]}, handler=roadmaps.mark_stale_job,
     ))
     for job_type, handler, properties in entries:
         registry.register(CapabilityContract(

@@ -70,12 +70,11 @@ def _parse_response(raw: str, *, violations=None) -> tuple[str, dict, list[str]]
 
 
 async def run_deep_turn(db, turn: CounselorTurnInput, *,
-                        roadmap_id: str | None = None,
                         history: list[dict] | None = None,
                         instructions: str | None = None,
                         safety_level: str | None = None,
                         decision=None, signals=None) -> DeepTurnResult:
-    context = await build_context(db, turn.workspace_id, turn, roadmap_id=roadmap_id, wellbeing=instructions == "wellbeing", decision=decision, signals=signals)
+    context = await build_context(db, turn.workspace_id, turn, wellbeing=instructions == "wellbeing", decision=decision, signals=signals)
     if decision is not None and decision.action == "clear_myth" and instructions != "wellbeing":
         from app.pai_c.myths import reply
         return DeepTurnResult(reply(db, turn.workspace_id, decision.topic), {"type": "none"}, context, 0, 0)

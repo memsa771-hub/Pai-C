@@ -177,6 +177,7 @@ class Config:
         "I'm sorry you're going through this. Please reach out to someone you trust. "
         "If you are in immediate danger, contact local emergency services.")
     PAI_MIRROR_MODEL: str = os.environ.get("PAI_MIRROR_MODEL", "") or PAI_COUNSELOR_MODEL
+    PAI_PATH_EXPLAIN_MODEL: str = os.environ.get("PAI_PATH_EXPLAIN_MODEL", "")
     PAI_ROADMAP_MODEL: str = os.environ.get("PAI_ROADMAP_MODEL", "") or PAI_COUNSELOR_MODEL
     PAI_RESEARCH_MAX_CALLS_PER_STUDENT: int = int(os.environ.get("PAI_RESEARCH_MAX_CALLS_PER_STUDENT", "40"))
     PAI_RESEARCH_REFRESH_MAX_CALLS: int = int(os.environ.get("PAI_RESEARCH_REFRESH_MAX_CALLS", "8"))

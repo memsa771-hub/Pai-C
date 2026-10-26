@@ -196,12 +196,6 @@ class MemoryReconciler:
                 timestamp=int(time.time() * 1000), visibility="private",
             ))
             enqueue(self.db,
-                job_type="roadmaps.mark_stale", workspace_id=candidate.workspace_id,
-                payload={"workspace_id": candidate.workspace_id,
-                         "reason": f"Student profile changed: {candidate.key or 'profile'}"},
-                idempotency_key=f"roadmap-stale:{candidate.id}",
-            )
-            enqueue(self.db,
                 job_type="memory.resume_research", workspace_id=candidate.workspace_id,
                 payload={"candidate_id": candidate.id},
                 idempotency_key=f"research-resume:{candidate.id}",

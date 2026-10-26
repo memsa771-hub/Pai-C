@@ -19,7 +19,7 @@ export type Possibility = {
    * Matric student would need; outdated: a kept path from before fields;
    * out_of_group: a kept field the student's current group does not open. */
   study_field?: StudyField | null;
-  unknowns: string[]; roadmap_id: string | null;
+  unknowns: string[];
 };
 
 export type StudyField = {

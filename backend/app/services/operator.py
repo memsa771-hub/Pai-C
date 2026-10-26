@@ -3,7 +3,7 @@
 PAI Operator — runs PAI C's background research as capability workflows.
 
 PAI Counselor is the student's only voice. When a turn needs research (path
-explanation, program search, roadmap research), Counselor delegates through
+explanation, program search, myth check), Counselor delegates through
 ``operator.delegate``; that creates an ``ExecutionRun`` row, queues a durable
 ``operator.run`` job and returns immediately, so chat never waits on it.
 ``operator.status`` reads the row back in a later turn.
@@ -158,11 +158,7 @@ async def _post_result(
                     "status": status, "result": run.result,
                     "verification": run.verification, "missing": run.missing,
                     "approval_required_for": run.approval_required_for,
-                    "roadmap_research": run.task_type == "roadmap_research",
                 }
-                if run.task_type == "roadmap_research":
-                    from app.pai_c.roadmaps.service import RoadmapService
-                    handoff["roadmaps"] = RoadmapService(db).for_run(workspace_id, run_id)
                 history = _build_conversation_context(
                     db, workspace_id, channel_target, pai.PAI_AGENT_NAME,
                     exclude_event_id="", max_chars=12000,
@@ -182,12 +178,6 @@ async def _post_result(
                         "Ask me to review the findings and I'll pick up from the saved result."
                     )
         response_metadata = {"execution_run_id": run_id, "execution_status": status}
-        if context_current and run is not None and run.task_type == "roadmap_research":
-            from app.pai_c.roadmaps.service import RoadmapService
-            cards = RoadmapService(db).for_run(workspace_id, run_id, presented=True)
-            if cards:
-                response_metadata["roadmaps"] = cards
-                db.commit()
         await send_to_student(
             db, workspace_id, channel_target, pai.PAI_AGENT_NAME, message, depth=0,
             message_type="operator_result",
@@ -300,11 +290,7 @@ def _baseline_is_current(db, workspace_id: str) -> bool:
 
 
 def _result_context_current(db, run: ExecutionRun) -> bool:
-    from app.research.gateway import mirror_is_current
-    if run.task_type != "roadmap_research":
-        return _baseline_is_current(db, run.workspace_id)
-    version = (run.constraints or {}).get("mirror_version")
-    return version is not None and mirror_is_current(db, run.workspace_id, version)
+    return _baseline_is_current(db, run.workspace_id)
 
 
 async def resume(ctx, run_id: str, action: dict) -> dict:

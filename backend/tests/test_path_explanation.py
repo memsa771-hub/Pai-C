@@ -34,7 +34,7 @@ async def test_path_workflow_queued_once_and_confirmation_does_not_search_places
         ctx=ToolContext(student.workspace_id,'pai',None,conversation='pai-counselor',
             allowed_tools=frozenset({'operator.delegate'}),audience=AUDIENCE_COUNSELOR,
             granted_capabilities=frozenset({'web.read','operator.delegate'}))
-        confirmed=await request_research('roadmap_light',student.workspace_id,db=db,journey=journey,tool_context=ctx,trigger='mirror_confirmed')
+        confirmed=await request_research('from_mirror',student.workspace_id,db=db,journey=journey,tool_context=ctx,trigger='mirror_confirmed')
         assert confirmed['data']['status']=='paths_ready'
         assert not db.scalars(select(ExecutionRun)).all()
         row=PossibilityService(db).add(student.workspace_id,journey.id,title='Practical design',

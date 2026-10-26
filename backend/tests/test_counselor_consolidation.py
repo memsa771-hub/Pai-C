@@ -11,10 +11,8 @@ from sqlalchemy import select
 from app.config import config
 from app.pai_c import posting, runtime
 from app.pai_c.deep.polish import is_counselor_fallback
-from app.pai_c.deep.turn import run_deep_turn
-from app.pai_c.deep.turn_input import CounselorTurnInput
 from app.journey import JourneyService
-from app.models import BackgroundJob, EducationRecord, EventRecord, MemoryCandidate, Roadmap
+from app.models import BackgroundJob, EducationRecord, EventRecord, MemoryCandidate
 from scripts.counselor_eval_support import StudentSession
 
 
@@ -47,28 +45,6 @@ def test_historical_voice_fallback_behavior_is_identical(text, expected):
 
 
 @pytest.mark.asyncio
-async def test_selected_roadmap_uses_deep_prompt_and_is_workspace_scoped():
-    with StudentSession() as student, student.factory() as db:
-        journey = JourneyService(db).ensure_counselor(student.workspace_id)
-        row = Roadmap(workspace_id=student.workspace_id, journey_id=journey.id,
-                      origin="stated_goal", title="Selected route", route={"level": "degree"})
-        db.add(row)
-        db.commit()
-        turn = CounselorTurnInput("channel/pai", student.workspace_id, "I opened this route.",
-                                  (), None, "", None, f"human:{student.user_id}")
-        with patch("app.pai_c.deep.turn.chat_completion", new=AsyncMock(
-                return_value='{"reply":"Which part matters most?","action":{"type":"none"}}')) as model:
-            result = await run_deep_turn(db, turn, roadmap_id=row.id, history=[])
-            assert result.reply == "Which part matters most?"
-            assert "<research>" in model.call_args.kwargs["system_prompt"]
-            assert "Selected route" in model.call_args.kwargs["system_prompt"]
-            assert model.await_count == 1
-            with pytest.raises(ValueError, match="another workspace"):
-                await run_deep_turn(db, turn, roadmap_id="other-workspace-roadmap", history=[])
-            assert model.await_count == 1
-
-
-@pytest.mark.asyncio
 async def test_deep_output_cannot_write_profile_or_activate_goal():
     with StudentSession() as student:
         with patch.object(config, "PAI_API_KEY", "fake"), patch(
@@ -96,12 +72,12 @@ async def test_research_handoff_runs_through_the_deep_counselor_turn():
     history = [{"role": "user", "content": "earlier"}]
     with patch.object(counselor_handoff, "new_session", return_value=session), \
             patch.object(counselor_handoff, "run_deep_turn", deep_turn):
-        reply = await counselor_handoff.explain_result("workspace", history, {"roadmap_research": True})
+        reply = await counselor_handoff.explain_result("workspace", history, {"path_explain": True})
     assert reply == "What matters most?"
     deep_turn.assert_awaited_once()
     turn = deep_turn.await_args.args[1]
     assert turn.workspace_id == "workspace" and turn.source == "system:handoff"
-    assert "roadmap_research" in turn.student_text
+    assert "path_explain" in turn.student_text
     assert deep_turn.await_args.kwargs == {"history": history, "instructions": "handoff"}
     session.close.assert_called_once()
     assert "BACKGROUND RESULT HANDOFF" in load_prompt("handoff")

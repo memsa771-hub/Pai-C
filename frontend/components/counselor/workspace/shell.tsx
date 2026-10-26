@@ -142,7 +142,7 @@ export function CounselorShell() {
                 <ProgramPage
                   id={path}
                   onBack={() => setPlaces(false)}
-                  onCompare={() => navigate("roadmap")}
+                  onRoadmap={() => navigate("roadmap")}
                 />
               ) : (
                 <PathPage

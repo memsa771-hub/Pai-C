@@ -355,3 +355,12 @@ The Counselor shell accidentally omitted the shared UserMenu when replacing the 
   - Migration 114 drops `users.supabase_uid`.
   - The unused `PaiSession` and `AuthIdentity` models are gone from the code. Their tables stay, because tables are never dropped.
   - The offline startup check now drives the API with a stand-in Firebase token. Its browser step, which relied on the old session cookie, was removed until the offline stack gets an Auth emulator.
+
+## 26 October: the roadmap engine replaces the chat-linked roadmaps (founder)
+
+- **Routes are computed, not generated.** The deterministic engine (`app/pai_c/roadmap/`, spec [ROADMAP_ENGINE_SPEC.md](ROADMAP_ENGINE_SPEC.md)) reads the student's education and paths and says, per field, open / a step away / not open / cannot check yet, from reviewed admission rules. No model call, no research run.
+- **One page, one decision.** The Roadmap page (`/v1/roadmap`) shows the fields, a side-by-side compare and the chosen route with steps the student ticks. Choosing writes one `pai_route_decisions` row (choosing another withdraws the first); that row is the decision record PAI OS reads at `/v1/decision-records/current`. The chosen path's status is `chosen`; withdrawing puts it back to `saved`. The 7-day `chosen_path` check-in follows the active decision.
+- **Removed:** the `/v1/roadmaps` API, the "Prepare a reviewed roadmap" route on paths, roadmap research runs (`roadmap.build`, light research, the `roadmaps.mark_stale` and `research.refresh_stale` jobs), roadmap blocks in chat context and the handoff prompt, the chat roadmap comparison and the old Roadmaps / Compare / Plan screens. Chat, voice and the Mirror never create or change a route. Old view names in URLs and saved desktop state open the Roadmap page.
+- **Kept:** Mirror `roadmap_lanes` (they create paths), student requests (PAI OS contract; nothing new comes from roadmap runs), path explain, program search, myth checks. The model role used by path explanations is now `path_explain` (`PAI_PATH_EXPLAIN_MODEL`, with `PAI_ROADMAP_MODEL` still honoured as a fallback).
+- Stage H of the journey ("Where to study") is reached by a finished places search on any path.
+- The old tables (`pai_roadmaps`, `pai_roadmap_student_state`, `pai_decision_records`, `pai_possibilities.roadmap_id`) are no longer read or written; migration 119 drops them (founder approved).

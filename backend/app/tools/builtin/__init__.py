@@ -40,7 +40,7 @@ def register_builtin_tools(registry):
             "immediately with a run_id.",
             obj({
                 "objective": {"type": "string"},
-                "task_type": {"type": "string", "pattern": "^[a-z][a-z0-9_]{1,63}$", "description": "Task type owned by an installed capability, such as roadmap_research."},
+                "task_type": {"type": "string", "pattern": "^[a-z][a-z0-9_]{1,63}$", "description": "Task type owned by an installed capability, such as path_explain."},
                 "constraints": {"type": "object", "additionalProperties": True},
                 "context_refs": {"type": "array", "items": {"type": "string"}},
                 "intent": {"type": "string"},

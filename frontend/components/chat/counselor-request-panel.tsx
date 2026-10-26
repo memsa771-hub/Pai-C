@@ -2,8 +2,8 @@
 
 import { useEffect, useState } from 'react';
 import { workspaceApi } from '@/lib/api';
-import type { StudentRequest } from '@/lib/roadmaps';
-import { StudentRequestCard } from '@/components/roadmaps/student-request-card';
+import type { StudentRequest } from '@/lib/student-requests';
+import { StudentRequestCard } from './student-request-card';
 
 export function CounselorRequestPanel({ refreshKey }: { refreshKey: string | number }) {
   const [request, setRequest] = useState<StudentRequest | null>(null);

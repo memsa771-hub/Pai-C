@@ -191,22 +191,7 @@ def test_vault_extractor_stops_interpretation_but_preserves_objective_targets():
     assert "certainty rating" in SYSTEM_PROMPT and "is never a goal" in SYSTEM_PROMPT
 
 
-def test_research_brief_uses_public_truth_map_summary():
-    from types import SimpleNamespace
-    from app.research.gateway import _research_brief
-    from scripts.counselor_eval_support import StudentSession
-    with StudentSession() as student, student.factory() as db:
-        summary = {"said": [item("Student goal", key="stated_goal", status="active")], "source": [], "pressures": {"items": [], "people": []}, "self": [], "sure": {"score": None}}
-        snapshot = SimpleNamespace(facts={}, records={})
-        journey = SimpleNamespace(counselor_summary_draft={"mirror": {}, "version": 1})
-        with patch.object(MemoryService, "understanding_summary", return_value=summary) as reader:
-            brief = _research_brief(db, student.workspace_id, journey, snapshot)
-        reader.assert_called_once_with(student.workspace_id)
-        assert brief["notebook"] == summary and brief["stated_preference"] == "Student goal"
-        assert "private_notes" not in brief["notebook"]
-
-
-@pytest.mark.parametrize("number,name", [(2, "planner"), (3, "mirror"), (4, "roadmap_builder"), (6, "sensitive_check")])
+@pytest.mark.parametrize("number,name", [(2, "planner"), (3, "mirror"), (6, "sensitive_check")])
 def test_v2_documented_prompts_match_runtime(number, name):
     backend = Path(__file__).parents[1]
     docs = backend.parent / "docs/counselor/COUNSELOR_V3_PROMPTS.md"

@@ -1,39 +1,6 @@
-"""Offline student-facing workspace, retirement and explicit roadmap handoff."""
-from types import SimpleNamespace
-from unittest.mock import AsyncMock, patch
-import pytest
-from sqlalchemy import select
-from app.models import ExecutionRun, Roadmap
-from app.pai_c.possibilities import PossibilityService
-from app.routers.counselor_paths import prepare_roadmap
+"""Offline student-facing workspace, retirement and student data export."""
+from unittest.mock import patch
 from scripts.counselor_eval_support import StudentSession
-from tests.test_counselor_deep_lean import research_journey
-
-
-@pytest.mark.asyncio
-async def test_new_roadmap_requires_explicit_current_program_check():
-    from fastapi import HTTPException
-    from app.models import Workspace
-    from app.routers.counselor_paths import ProgramConsent
-    with StudentSession() as student, student.factory() as db:
-        journey = research_journey(student, db, confirmed=True)
-        row = PossibilityService(db).add(student.workspace_id, journey.id, title='Practical design',
-            why='My own evidence', kind='discovered', source='planner', status='exploring')
-        workspace = db.get(Workspace, student.workspace_id)
-        body = ProgramConsent(explore_places=True)
-        with patch('app.routers.counselor_paths._authorized', return_value=workspace), patch('app.research.gateway.request_research', new_callable=AsyncMock) as gateway:
-            with pytest.raises(HTTPException) as failure:
-                await prepare_roadmap(row.id, body, student.workspace_id, db, None, None)
-            assert failure.value.status_code == 409 and gateway.call_count == 0
-            db.add(ExecutionRun(workspace_id=student.workspace_id, requested_by='pai', task_type='program_search',
-                objective='Check', status='completed', constraints={'possibility_id':row.id,'mirror_version':1}))
-            db.commit()
-            gateway.return_value = {'ok':True,'data':{'run_id':'fake-run'}}
-            await prepare_roadmap(row.id, body, student.workspace_id, db, None, None)
-            await prepare_roadmap(row.id, body, student.workspace_id, db, None, None)
-            assert len(db.scalars(select(Roadmap)).all()) == 1
-            assert gateway.call_args.kwargs['trigger'] == 'student_route'
-            assert gateway.call_args.kwargs['roadmap_id'] == row.roadmap_id
 
 
 def test_workspace_projection_does_not_publish_private_map():
@@ -70,9 +37,14 @@ def test_student_export_is_scoped_readonly_and_excludes_private_data():
         for id, wid, stamp, text in [('late',student.workspace_id,20,'Second'),('early',student.workspace_id,10,'First password=secret-value'),('foreign','00000000-0000-0000-0000-000000000003',1,'Other student')]:
             db.add(EventRecord(id=id,network_id=wid,type='workspace.message.posted',source='human:student',target='channel/pai',timestamp=stamp,payload={'content':text}))
         db.add(FileRecord(workspace_id=student.workspace_id,filename='record.pdf',size=10,storage_key='private-storage-key',uploaded_by='human:student'))
+        from app.models import RouteDecision
+        db.add(RouteDecision(workspace_id=student.workspace_id,field_key='computer_science',title='Computer Science',
+            verdict={'status':'open'},route={'needs':[]},steps=[{'key':'step_apply'}],steps_done=[True]))
         db.commit()
         with patch.object(db,'commit',side_effect=AssertionError('read-only')):
             result=export_student_data(db,student.workspace_id)
+        assert 'roadmaps' not in result
+        assert [(row['field_key'],row['steps_done']) for row in result['route_decisions']]==[('computer_science',[True])]
         assert [row['id'] for row in result['conversation']]==['early','late']
         assert result['documents'][0]['filename']=='record.pdf'
         for forbidden in ['hidden interpretation','private_notes','secret-value','private-storage-key','Other student']:

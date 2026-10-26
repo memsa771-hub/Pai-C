@@ -1,7 +1,7 @@
 """Offline P1d memory checks."""
 import ast
 from pathlib import Path
-from unittest.mock import AsyncMock, patch
+from unittest.mock import patch
 
 import pytest
 
@@ -69,87 +69,7 @@ async def test_context_reads_profile_once_without_foreground():
 
 
 
-@pytest.mark.asyncio
-@pytest.mark.parametrize("candidate_type,key,value", [
-    ("vault_fact", "preferences.study_mode", "online"),
-    ("student_record", "education", {"qualification_name": "Completed qualification"}),
-])
-async def test_accepted_candidate_queues_one_stale_job_and_preserves_notification(
-        candidate_type, key, value):
-    from sqlalchemy import select
-    from app.memory.candidates import MemoryCandidateService
-    from app.memory.reconciler import MemoryReconciler
-    from app.models import BackgroundJob, NotificationRecord, Roadmap
-    from app.pai_c.roadmaps.service import RoadmapService
-    from app.runtime.task_runtime import run
-    from tests.test_roadmaps import _journey, _card
-
-    with StudentSession() as student, student.factory() as db:
-        journey = _journey(db, student.workspace_id)
-        card = _card(db, student.workspace_id, journey.id, "Existing route")
-        RoadmapService(db).set_flag(student.workspace_id, card.id, "favorite", True)
-        candidate = MemoryCandidateService(db).propose(
-            student.workspace_id, candidate_type, key=key, proposed_value=value,
-            confidence=0.95, source_type="conversation",
-            evidence={"quote": "My student statement"})
-        reconciler = MemoryReconciler(db)
-        assert reconciler.reconcile(candidate).accepted
-        assert not reconciler.reconcile(candidate).accepted
-        db.flush()
-        jobs = db.scalars(select(BackgroundJob).where(
-            BackgroundJob.job_type == "roadmaps.mark_stale")).all()
-        assert len(jobs) == 1
-        job = jobs[0]
-        reason = f"Student profile changed: {key}"
-        assert job.workspace_id == student.workspace_id
-        assert job.idempotency_key == f"roadmap-stale:{candidate.id}"
-        assert job.payload == {"workspace_id": student.workspace_id, "reason": reason}
-        assert db.get(Roadmap, card.id).generation_status == "ready"
-        assert not db.scalars(select(NotificationRecord)).all()
-        db.commit()
-        assert await run(job, db) == {"marked_stale": 1}
-        db.flush()
-        result = RoadmapService(db).get(student.workspace_id, card.id)
-        assert result["generation_status"] == "stale"
-        assert result["stale_reason"] == reason
-        assert result["favorite"] is True
-        notification = db.scalars(select(NotificationRecord)).one()
-        assert notification.workspace_id == student.workspace_id
-        assert notification.dedupe_key == f"roadmap-stale:{card.id}:{card.version}"
-        assert notification.created_by == "system:roadmaps"
-        assert notification.title == "Roadmap needs a fresh check"
-        assert notification.message == card.title
-        assert notification.link_url == "/roadmaps"
-        assert await run(job, db) == {"marked_stale": 0}
-        db.flush()
-        assert len(db.scalars(select(NotificationRecord)).all()) == 1
-
-
-@pytest.mark.asyncio
-async def test_stale_job_rejects_another_workspace():
-    from types import SimpleNamespace
-    from app.runtime.task_runtime import run
-    job = SimpleNamespace(job_type="roadmaps.mark_stale", workspace_id="first",
-                          payload={"workspace_id": "second", "reason": "Profile changed"})
-    with pytest.raises(ValueError, match="own workspace"):
-        await run(job, None)
-
-
-def test_stale_capability_is_internal_and_requires_typed_input():
-    from app.capabilities import CapabilityRouter, get_capability_registry
-    from app.capabilities.router import CapabilityNotFound
-    from app.runtime.task_runtime import enqueue
-    registry = get_capability_registry()
-    contract = registry.get("roadmaps.mark_stale")
-    assert contract.kind == "system"
-    assert contract.input_schema["required"] == ["workspace_id", "reason"]
-    with pytest.raises(CapabilityNotFound):
-        CapabilityRouter(registry).resolve("roadmaps.mark_stale")
-    with pytest.raises(ValueError):
-        enqueue(None, "roadmaps.mark_stale", {"workspace_id": "workspace"})
-
-
-def test_stale_job_enqueue_rolls_back_with_reconciliation():
+def test_resume_job_enqueue_rolls_back_with_reconciliation():
     from sqlalchemy import select
     from app.memory.candidates import MemoryCandidateService
     from app.memory.reconciler import MemoryReconciler
@@ -162,7 +82,7 @@ def test_stale_job_enqueue_rolls_back_with_reconciliation():
         assert MemoryReconciler(db).reconcile(candidate).accepted
         db.flush()
         assert db.scalar(select(BackgroundJob.id).where(
-            BackgroundJob.job_type == "roadmaps.mark_stale"))
+            BackgroundJob.job_type == "memory.resume_research"))
         db.rollback()
         assert not db.scalars(select(BackgroundJob)).all()
         assert not db.scalars(select(VaultFact)).all()

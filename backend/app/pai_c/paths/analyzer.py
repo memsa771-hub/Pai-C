@@ -207,7 +207,7 @@ def _prune(service: PossibilityService, rows, candidates: dict[str, Candidate], 
         if row.source in {"student", "mirror"} or row.status == "dismissed":
             continue
         key = (row.study_field or {}).get("key")
-        if row.status == "suggested" and row.roadmap_id is None:
+        if row.status == "suggested":
             if key not in candidates or key not in returned:
                 service.db.delete(row)
             continue

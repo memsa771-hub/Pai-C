@@ -12,7 +12,7 @@ from urllib.parse import urldefrag, urlsplit
 
 from sqlalchemy import select
 
-from app.models import EventRecord, Institution, InstitutionDomain, Opportunity, RequirementSet
+from app.models import Institution, InstitutionDomain, Opportunity, RequirementSet
 from app.plugins._shared.verification import SourceVerifier, _host, official_url
 
 logger = logging.getLogger(__name__)
@@ -163,13 +163,6 @@ class RequirementStore:
                 "public_cache": {"key": self.cache_key(source_url, country, level, intake,
                     route.get("program_id")), "passed": verdict.status == "verified"}}
         self.db.flush()
-        if previous and (previous.rules != rules or previous.fees != (fees or {})
-                         or previous.deadlines != (deadlines or {})
-                         or previous.status != verdict.status):
-            from app.pai_c.roadmaps.service import RoadmapService
-            RoadmapService(self.db).mark_stale(
-                workspace_id, "Research evidence changed; this route needs a fresh fit check",
-                source_url=source_url)
         return opportunity, requirement
 
     def official_domains(self, institution_name: str | None) -> set[str]:
@@ -288,35 +281,3 @@ class RequirementStore:
         # An older verified version cannot hide newer contradictory evidence.
         return rows[0] if rows else None
 
-    def report_wrong_info(self, workspace_id: str, requirement_id: str) -> RequirementSet:
-        row = self.db.execute(select(RequirementSet).join(Opportunity).where(
-            Opportunity.workspace_id == workspace_id,
-            RequirementSet.id == requirement_id,
-        ).with_for_update()).scalar_one_or_none()
-        if row is None:
-            raise ResearchEvidenceError("Requirement set not found")
-        if (row.verification_checks or {}).get("student_report"):
-            return row
-        row.status = "unconfirmed"
-        row.verified_at = None
-        checks = dict(row.verification_checks or {})
-        checks["student_report"] = {"passed": False, "reason": "Student reported this information may be wrong"}
-        row.verification_checks = checks
-        from app.pai_c.roadmaps.service import RoadmapService
-        RoadmapService(self.db).mark_stale(
-            workspace_id, "A student reported a source may be wrong; we are checking it",
-            source_url=row.source_url)
-        from app.runtime.task_runtime import enqueue
-        from app.research.jobs import JOB_REFRESH_RESEARCH
-        enqueue(self.db,
-            job_type=JOB_REFRESH_RESEARCH, workspace_id=workspace_id,
-            payload={"requirement_id": row.id},
-            idempotency_key=f"research-report:{row.id}:{datetime.now(timezone.utc).date()}")
-        self.db.add(EventRecord(
-            id=str(uuid4()), network_id=workspace_id,
-            type="research.requirement.reported", source="human:student",
-            target="research", payload={"requirement_id": row.id},
-            timestamp=int(datetime.now(timezone.utc).timestamp() * 1000),
-            visibility="private"))
-        self.db.flush()
-        return row

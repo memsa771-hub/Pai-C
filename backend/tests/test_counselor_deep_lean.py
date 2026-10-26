@@ -2,7 +2,6 @@
 
 import ast
 import json
-from datetime import datetime, timezone
 from dataclasses import replace
 from pathlib import Path
 from types import SimpleNamespace
@@ -22,7 +21,7 @@ from app.pai_c.deep.sensitive import check_notebook_before_mirror
 from app.pai_c.deep.turn_input import CounselorTurnInput
 from app.research.gateway import request_research
 from app.journey import JourneyService
-from app.models import CounselorNotedQuestion, EventRecord, ExecutionRun, Roadmap, StudentJourney
+from app.models import CounselorNotedQuestion, EventRecord, StudentJourney
 from scripts.counselor_eval_support import StudentSession
 from scripts.eval_counselor_deep import run_evaluation
 
@@ -90,20 +89,13 @@ def research_journey(student, db, stage="RESEARCHING", confirmed=False):
 
 
 @pytest.mark.asyncio
-async def test_deep_context_has_only_roadmaps_after_mirror_confirmation():
+async def test_deep_context_has_no_research_block_without_requested_facts():
     with StudentSession() as student, student.factory() as db:
         turn = source_turn(student, db)
-        journey = research_journey(student, db, confirmed=False)
-        db.add(Roadmap(workspace_id=student.workspace_id, journey_id=journey.id,
-                       origin="stated_goal", title="Existing route", sources=[]))
-        db.commit()
+        research_journey(student, db, confirmed=False)
         assert "<research>" not in (await build_context(db, student.workspace_id, turn)).text
         research_journey(student, db, confirmed=True)
-        text = (await build_context(db, student.workspace_id, turn)).text
-        research = json.loads(text.split("<research>")[1].split("</research>")[0])
-        assert set(research) == {"roadmaps", "facts"}
-        assert research["facts"] == []
-        assert research["roadmaps"][0]["title"] == "Existing route"
+        assert "<research>" not in (await build_context(db, student.workspace_id, turn)).text
 
 
 @pytest.mark.asyncio
@@ -111,79 +103,18 @@ async def test_research_gateway_always_enforces_confirmation():
     with StudentSession() as student, student.factory() as db:
         journey = research_journey(student, db)
         ctx = SimpleNamespace(workspace_id=student.workspace_id)
-        kwargs = dict(db=db, journey=journey, goals=[],  tool_context=ctx)
+        kwargs = dict(db=db, journey=journey, tool_context=ctx)
         with patch("app.tools.get_tool_executor", return_value=SimpleNamespace(execute=AsyncMock(return_value={"ok": True}))) as mocked:
             delegate = mocked.return_value.execute
-            assert await request_research("roadmap_light", student.workspace_id, **kwargs) is None
+            assert await request_research("from_mirror", student.workspace_id, **kwargs) is None
             delegate.assert_not_awaited()
             kwargs["journey"] = research_journey(student, db, confirmed=True)
-            assert (await request_research("roadmap_light", student.workspace_id, **kwargs))["data"]["status"] == "paths_ready"
+            assert (await request_research("from_mirror", student.workspace_id, **kwargs))["data"]["status"] == "paths_ready"
             delegate.assert_not_awaited()
             kwargs["tool_context"] = SimpleNamespace(workspace_id="another-workspace")
-            assert await request_research("roadmap_light", student.workspace_id, **kwargs) is None
+            assert await request_research("from_mirror", student.workspace_id, **kwargs) is None
             with pytest.raises(ValueError, match="unknown"):
                 await request_research("other", student.workspace_id, **kwargs)
-
-
-@pytest.mark.asyncio
-async def test_stale_refresh_routes_through_gateway_and_keeps_chosen_stage():
-    with StudentSession() as student, student.factory() as db:
-        journey = research_journey(student, db, "CHOSEN", confirmed=True)
-        db.add(Roadmap(workspace_id=student.workspace_id, journey_id=journey.id,
-                       origin="stated_goal", title="Stale route", generation_status="stale"))
-        db.commit()
-        kwargs = dict(refresh_key="source-change")
-        with patch("app.tools.get_tool_executor", return_value=SimpleNamespace(execute=AsyncMock(return_value={"ok": True}))) as mocked:
-            delegate = mocked.return_value.execute
-            result = await request_research(
-                "stale_refresh", student.workspace_id, db=db, journey=journey,
-                goals=[],
-                tool_context=SimpleNamespace(workspace_id=student.workspace_id), **kwargs)
-            assert result == {"ok": True}
-            assert ":refresh:source-change" in delegate.call_args.args[1]["constraints"]["research_key"]
-        assert JourneyService(db).get(student.workspace_id, journey.id).current_stage == "CHOSEN"
-
-
-@pytest.mark.asyncio
-async def test_gateway_reuses_existing_operator_payload_and_deduplicates_runs():
-    with StudentSession() as student, student.factory() as db:
-        journey = research_journey(student, db, confirmed=True)
-        ctx = SimpleNamespace(workspace_id=student.workspace_id)
-        executor = SimpleNamespace(execute=AsyncMock(return_value={"ok": True}))
-        goals = [{"id": "goal", "title": "Student route", "details": {
-            "underlying_objective": "An education goal", "constraints": []}}]
-        with patch("app.tools.get_tool_executor", return_value=executor):
-            assert await request_research("roadmap_light", student.workspace_id,
-                db=db, journey=journey, snapshot=SimpleNamespace(facts={}, records={"goal":goals}), tool_context=ctx, trigger="student_answer") == {"ok": True}
-            name, payload, used_ctx = executor.execute.call_args.args
-            assert name == "operator.delegate" and used_ctx is ctx
-            assert payload["task_type"] == "roadmap_research"
-            assert payload["constraints"]["capability_input"]["brief"]["goal_id"] == "goal"
-            db.add(ExecutionRun(workspace_id=student.workspace_id, requested_by="openagents:pai",
-                objective="Existing research", task_type="roadmap_research", status="running",
-                constraints=payload["constraints"]))
-            db.commit()
-            duplicate = await request_research("roadmap_light", student.workspace_id,
-                db=db, journey=journey, snapshot=SimpleNamespace(facts={}, records={"goal":goals}), tool_context=ctx, trigger="student_answer")
-            assert duplicate["ok"] and duplicate["data"]["resumed"]
-        executor.execute.assert_awaited_once()
-
-
-@pytest.mark.asyncio
-async def test_gateway_serializes_snapshot_timestamps_before_operator_run():
-    with StudentSession() as student, student.factory() as db:
-        journey = research_journey(student, db, confirmed=True)
-        ctx = SimpleNamespace(workspace_id=student.workspace_id)
-        executor = SimpleNamespace(execute=AsyncMock(return_value={"ok": True}))
-        observed_at = datetime(2026, 10, 19, 12, 30, tzinfo=timezone.utc)
-        snapshot = SimpleNamespace(facts={"education": [{"observed_at": observed_at}]}, records={"goal": []})
-        with patch("app.tools.get_tool_executor", return_value=executor):
-            assert await request_research("roadmap_light", student.workspace_id,
-                db=db, journey=journey, snapshot=snapshot, tool_context=ctx,
-                trigger="student_answer") == {"ok": True}
-        payload = executor.execute.call_args.args[1]
-        json.dumps(payload["constraints"])
-        assert payload["constraints"]["capability_input"]["brief"]["profile"]["facts"]["education"][0]["observed_at"] == observed_at.isoformat()
 
 
 def test_only_research_gateway_directly_calls_operator_delegate():
@@ -281,28 +212,6 @@ async def test_per_turn_extraction_fallback_does_not_skip_intervening_messages()
         assert len(jobs) == 6
 
 @pytest.mark.asyncio
-async def test_gateway_custom_route_uses_current_mirror_and_releases_transaction():
-    with StudentSession() as student, student.factory() as db:
-        journey = research_journey(student, db, confirmed=True)
-        card = Roadmap(workspace_id=student.workspace_id, journey_id=journey.id,
-                       origin='student_added', title='My added route', route={'level':'degree'})
-        db.add(card); db.commit()
-        async def execute(name, payload, context):
-            assert not db.in_transaction()
-            assert name == 'operator.delegate'
-            brief = payload['constraints']['capability_input']['brief']
-            assert brief['custom_roadmap']['id'] == card.id
-            assert payload['constraints']['mirror_version'] == 1
-            return {'ok':True, 'data': {'run_id':'fake-run'}}
-        executor = SimpleNamespace(execute=AsyncMock(side_effect=execute))
-        with patch('app.tools.get_tool_executor', return_value=executor):
-            result = await request_research('roadmap_light', student.workspace_id, db=db,
-                journey=journey, tool_context=SimpleNamespace(workspace_id=student.workspace_id), roadmap_id=card.id)
-        assert result['ok']
-        executor.execute.assert_awaited_once()
-
-
-@pytest.mark.asyncio
 async def test_gateway_busy_lock_returns_retryable_failure_without_delegation():
     from unittest.mock import Mock
     connection = Mock()
@@ -314,7 +223,7 @@ async def test_gateway_busy_lock_returns_retryable_failure_without_delegation():
     db.get_bind.return_value = engine
     executor = SimpleNamespace(execute=AsyncMock())
     with patch('app.tools.get_tool_executor', return_value=executor):
-        result = await request_research('roadmap_light', 'workspace', db=db,
+        result = await request_research('from_mirror', 'workspace', db=db,
             journey=SimpleNamespace(id='journey'), tool_context=SimpleNamespace(workspace_id='workspace'))
     assert result == {'ok':False, 'error': {'code':'research_busy'}}
     executor.execute.assert_not_awaited()

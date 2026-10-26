@@ -14,8 +14,7 @@ from app.config import config
 from app.pai_c.memory import MemoryService, estimated_tokens, select_context_entries  # noqa: F401  imported from here elsewhere
 from app.pai_c.deep.turn_input import CounselorTurnInput
 from app.journey import JourneyService
-from app.models import Roadmap, User, Workspace
-from app.plugins._shared.sources import public_https
+from app.models import User, Workspace
 
 logger = logging.getLogger(__name__)
 _NOTEBOOK_ORDER = (
@@ -114,26 +113,6 @@ def _profile(db, workspace_id: str, snapshot=None, *, student_text: str = "", tr
                                      exclude_types=set(identity))}
 
 
-def _research(db, workspace_id: str, journey) -> dict | None:
-    if journey is None or (journey.counselor_summary_draft or {}).get("status") != "confirmed":
-        return None
-    rows = db.execute(select(Roadmap).where(
-        Roadmap.workspace_id == workspace_id, Roadmap.journey_id == journey.id,
-    ).order_by(Roadmap.created_at.desc()).limit(5)).scalars().all()
-    from app.models import RequirementSet, Opportunity
-    requirements = db.scalars(select(RequirementSet).join(Opportunity).where(
-        Opportunity.workspace_id == workspace_id,
-        RequirementSet.id.in_([row.requirement_set_id for row in rows if row.requirement_set_id]))).all()
-    facts = [{**fact, "status": requirement.status} for requirement in requirements
-             for fact in (requirement.rules or []) if isinstance(fact, dict)]
-    return {"facts": facts[:20],
-            "roadmaps": [{"id": row.id, "title": row.title,
-                          "status": row.generation_status,
-                          "sources": [item for item in (row.sources or [])[:5]
-                                      if public_https(item.get("url") if isinstance(item, dict) else None)]}
-                         for row in rows]}
-
-
 @dataclass(frozen=True)
 class DeepContext:
     text: str
@@ -173,7 +152,7 @@ def guided_state(db, workspace_id, notebook, draft, decision, coverage, open_req
 
 
 async def build_context(db, workspace_id: str, turn: CounselorTurnInput, *,
-                        roadmap_id: str | None = None, wellbeing: bool = False,
+                        wellbeing: bool = False,
                         decision=None, signals=None, mirror: bool = False) -> DeepContext:
     """Build every section from workspace-scoped reads; make no model calls."""
     started = time.monotonic()
@@ -236,45 +215,11 @@ async def build_context(db, workspace_id: str, turn: CounselorTurnInput, *,
             from app.pai_c.possibilities import PossibilityService
             possibility = PossibilityService(db).get(workspace_id, decision.topic)
         sections["decision"] = _json(decision_context(decision, signals, plan, possibility))
-    research = _research(db, workspace_id, journey)
     from app.pai_c.myths import information_facts
     requested_facts = information_facts(db, workspace_id)
-    if requested_facts:
-        research = {**(research or {}), "facts": [*(research or {}).get("facts", []), *requested_facts]}
-    if roadmap_id is not None:
-        row = db.scalar(select(Roadmap).where(
-            Roadmap.id == roadmap_id, Roadmap.workspace_id == workspace_id))
-        if row is None:
-            raise ValueError("roadmap belongs to another workspace or does not exist")
-        research = {**(research or {}), "selected_roadmap": {
-            "id": row.id, "title": row.title, "status": row.generation_status,
-            "route": _short(row.route), "fit_dimensions": _short(row.fit_dimensions),
-            "gaps": _short(row.gaps), "steps": _short(row.steps),
-            "risks": _short(row.risks), "sources": _short(row.sources),
-        }}
+    research = {"facts": requested_facts} if requested_facts else None
     if research is not None:
         sections["research"] = _json(research)
-    if decision is not None and decision.action == "guide" and journey is not None:
-        from app.pai_c.roadmaps.service import RoadmapService
-        from app.pai_c.policy.controller import load_data
-        ready = [row for row in RoadmapService(db).list(workspace_id)
-                 if row["journey_id"] == journey.id and row["generation_status"] == "ready"]
-        compare = []
-        for row in ready[:load_data("guide.json")["compare_max_roadmaps"]]:
-            entry = {key: row.get(key) for key in ("title", "origin", "why_for_you", "strengths_used",
-                "family_fit", "constraints_fit", "risks")}
-            entry["gaps"] = [{key: gap.get(key) for key in ("need", "have", "gap")} for gap in row["gaps"]]
-            trial = row.get("try_it")
-            entry["try_it"] = {key: trial.get(key) for key in ("kind", "what", "time_needed")} if isinstance(trial, dict) else None
-            entry["favorite"] = row["favorite"]
-            entry["focused"] = bool(row["focused_at"])
-            entry["facts"] = row.get("facts") or []
-            entry["source_labels"] = [{"url": source.get("url"), "label": source.get("status")} for source in row["sources"]]
-            compare.append(entry)
-        if compare:
-            # The Guide prompt's existing <research> grounding rule also covers
-            # this nested view of already-published artifacts.
-            sections["research"] = sections.get("research", "") + "\n<compare>" + _json(compare) + "</compare>"
     draft = (journey.counselor_summary_draft or {}) if journey else {}
     if decision is not None and not wellbeing and not mirror:
         sections["state"] = _json(guided_state(db, workspace_id, notebook, draft, decision,

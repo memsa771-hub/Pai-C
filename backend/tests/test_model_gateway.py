@@ -14,7 +14,7 @@ from app.memory.embeddings import OpenAIEmbeddingProvider
 
 MODELS = {
     'counselor': 'PAI_COUNSELOR_MODEL', 'analyst': 'PAI_ANALYST_MODEL',
-    'mirror': 'PAI_MIRROR_MODEL', 'roadmap': 'PAI_ROADMAP_MODEL',
+    'mirror': 'PAI_MIRROR_MODEL', 'path_explain': 'PAI_PATH_EXPLAIN_MODEL',
     'sensitive': 'PAI_SENSITIVE_CHECK_MODEL', 'extractor': 'MEMORY_EXTRACTOR_MODEL',
     'document_extractor': 'DOCUMENT_EXTRACTOR_MODEL', 'ocr': 'DOCUMENT_OCR_MODEL',
     'research_extract': 'PAI_MODEL', 'operator': 'PAI_OPERATOR_MODEL',
@@ -30,13 +30,19 @@ def test_role_resolves_configured_model(role, setting):
 
 @pytest.mark.parametrize('role,fallback', [
     ('counselor', 'PAI_MODEL'), ('analyst', 'PAI_COUNSELOR_MODEL'),
-    ('mirror', 'PAI_COUNSELOR_MODEL'), ('roadmap', 'PAI_COUNSELOR_MODEL'),
+    ('mirror', 'PAI_COUNSELOR_MODEL'), ('path_explain', 'PAI_ROADMAP_MODEL'),
     ('sensitive', 'PAI_ANALYST_MODEL'), ('extractor', 'PAI_MODEL'),
     ('document_extractor', 'PAI_MODEL'), ('operator', 'PAI_MODEL'),
 ])
 def test_role_keeps_existing_empty_setting_fallback(role, fallback):
     with patch.object(config, MODELS[role], ''), patch.object(config, fallback, 'fallback-model'):
         assert gateway.resolve_model(role) == 'fallback-model'
+
+
+def test_path_explain_falls_back_to_counselor_when_both_settings_are_empty():
+    with patch.object(config, 'PAI_PATH_EXPLAIN_MODEL', ''), patch.object(config, 'PAI_ROADMAP_MODEL', ''), \
+            patch.object(config, 'PAI_COUNSELOR_MODEL', 'counselor-model'):
+        assert gateway.resolve_model('path_explain') == 'counselor-model'
 
 
 def test_ocr_keeps_existing_empty_setting_fallback():
@@ -47,7 +53,7 @@ def test_ocr_keeps_existing_empty_setting_fallback():
 @pytest.mark.parametrize('role,setting', [
     ('counselor', 'PAI_COUNSELOR_REASONING_EFFORT'),
     ('mirror', 'PAI_COUNSELOR_REASONING_EFFORT'),
-    ('roadmap', 'PAI_COUNSELOR_REASONING_EFFORT'),
+    ('path_explain', 'PAI_COUNSELOR_REASONING_EFFORT'),
     ('analyst', 'PAI_ANALYST_REASONING_EFFORT'),
     ('sensitive', 'PAI_SENSITIVE_CHECK_REASONING_EFFORT'),
     ('document_extractor', 'DOCUMENT_EXTRACTOR_REASONING_EFFORT'),
@@ -99,7 +105,7 @@ async def test_complete_resolves_role_and_preserves_request_and_usage_format(cap
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize('role', ['analyst', 'mirror', 'roadmap', 'sensitive', 'classifier'])
+@pytest.mark.parametrize('role', ['analyst', 'mirror', 'path_explain', 'sensitive', 'classifier'])
 async def test_json_mode_always_contains_provider_required_instruction(role):
     client = fake_client('{}')
     with patch.object(gateway.transport, 'create_client', return_value=client):
@@ -243,7 +249,7 @@ async def test_gateway_calls_caller_usage_callback_once(caplog):
     seen = []
     with patch.object(gateway.transport, 'create_client', return_value=client), \
          caplog.at_level(logging.INFO, logger='app.inference.gateway'):
-        await gateway.complete('roadmap', [], api_key='fake', usage_callback=seen.append, turn_id='turn')
+        await gateway.complete('path_explain', [], api_key='fake', usage_callback=seen.append, turn_id='turn')
     assert len(seen) == 1
     assert len([r for r in caplog.records if 'counselor_token_usage' in r.message]) == 1
 

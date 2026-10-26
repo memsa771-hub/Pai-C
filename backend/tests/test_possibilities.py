@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 from unittest.mock import patch
 import pytest
 from sqlalchemy import select
-from app.models import PaiPossibility, Roadmap, RoadmapStudentState, StudentJourney
+from app.models import PaiPossibility, StudentJourney
 from app.pai_c.possibilities import PossibilityService, PossibilityError
 from app.pai_c.possibility_titles import valid_title
 from app.pai_c.deep.mirror_schema import CounselorMirror, SavedCounselorMirror
@@ -71,18 +71,12 @@ def test_mirror_idempotency_dismissal_and_restore():
         service.transition(student.workspace_id, row.id, 'dismiss')
         journey.counselor_summary_draft = {'status':'confirmed','version':2,'mirror':mirror_data()}
         assert service.from_mirror(journey)[0][1].status == 'dismissed'
-        roadmap = Roadmap(workspace_id=student.workspace_id,journey_id=journey.id,title='Published direction',lane=lane['lane'],origin='stated_goal')
-        db.add(roadmap); db.flush()
-        db.add(RoadmapStudentState(roadmap_id=roadmap.id,journey_id=journey.id)); db.flush()
-        service.link_lane(journey,lane,roadmap)
-        assert db.scalar(select(RoadmapStudentState)).dismissed_at
-        from app.pai_c.roadmaps.service import RoadmapService
-        RoadmapService(db).dismiss(student.workspace_id,roadmap.id,False)
+        service.transition(student.workspace_id, row.id, 'explore')
         assert row.status == 'exploring' and row.mirror_versions == [1,2]
         assert len(service.list(student.workspace_id)) == len(pairs)
 
 
-def test_old_lane_title_fallback_and_collision(caplog):
+def test_lane_title_fallback():
     with StudentSession() as student, student.factory() as db:
         _, journey, _ = prepare(student, db)
         journey = db.get(StudentJourney, journey.id)
@@ -92,19 +86,9 @@ def test_old_lane_title_fallback_and_collision(caplog):
         lane['route'] = {}
         with patch('app.pai_c.possibilities.load_data',return_value={'stated_goal':'Edited label'}):
             assert service.lane_title(journey,lane) == 'Edited label'
+        assert service.lane_title(journey,{**lane,'title':'Own title'}) == 'Own title'
         journey.counselor_summary_draft = {'status':'confirmed','version':1,'mirror':{'roadmap_lanes':[lane]}}
-        row = service.from_mirror(journey)[0][1]
-        other = service.add(student.workspace_id,journey.id,title='Published direction',why='Evidence',kind='discovered',source='planner',status='saved')
-        roadmap=Roadmap(workspace_id=student.workspace_id,journey_id=journey.id,title=other.title,lane='stated_goal',origin='stated_goal')
-        db.add(roadmap); db.flush()
-        assert service.lane_title(journey,lane) == other.title
-        old = row.title
-        service.link_lane(journey,lane,roadmap)
-        assert row.title == old and 'possibility_title_collision' in caplog.text
-        assert row.id in caplog.text and other.id in caplog.text
-        roadmap.title = 'Another published direction'
-        service.link_lane(journey,lane,roadmap)
-        assert row.title == roadmap.title
+        assert service.from_mirror(journey)[0][1].title == service.lane_title(journey,lane)
 
 
 def test_planner_optional_validation_and_dismissed_title_not_readded():
@@ -220,7 +204,7 @@ def test_possibility_endpoints_auth_scope_and_explore_once():
             db.expire_all(); journey=db.get(StudentJourney,journey.id)
             service=PossibilityService(db)
             row=service.add(student.workspace_id,journey.id,title='New practical field',why='Student evidence',kind='discovered',source='planner',status='suggested')
-            run=ExecutionRun(workspace_id=student.workspace_id,requested_by='pai',task_type='roadmap_research',objective='Research',status='queued')
+            run=ExecutionRun(workspace_id=student.workspace_id,requested_by='pai',task_type='path_explain',objective='Research',status='queued')
             db.add(run); db.commit()
             url=f'/v1/counselor/possibilities/{row.id}/explore?network={student.workspace_id}'
             assert client.get(f'/v1/counselor/possibilities?network={student.workspace_id}').status_code==401
@@ -233,7 +217,8 @@ def test_possibility_endpoints_auth_scope_and_explore_once():
                 assert research.call_args.args[0] == "path_explain"
                 assert research.call_args.kwargs['trigger']=='student_route'
             db.expire_all(); row=service.get(student.workspace_id,row.id)
-            assert row.roadmap_id is None  # Places require a separate, explicit step.
+            # Places require a separate, explicit step.
+            assert not db.scalars(select(ExecutionRun).where(ExecutionRun.task_type=='program_search')).all()
             assert client.post(f'/v1/counselor/possibilities/{row.id}/save?network={student.workspace_id}',headers=headers).status_code==409
             assert client.post(f'/v1/counselor/possibilities/{row.id}/dismiss?network={student.workspace_id}',headers=headers).status_code==200
             assert client.post(f'/v1/counselor/possibilities/{row.id}/save?network={student.workspace_id}',headers=headers).status_code==200
@@ -271,20 +256,6 @@ def test_migration_111_upgrade_constraints_and_downgrade():
         with student.engine.begin() as connection:
             with patch.object(migration,'op',Operations(MigrationContext.configure(connection))): migration.downgrade()
             assert 'pai_possibilities' not in inspect(connection).get_table_names()
-
-
-def test_choose_sets_possibility_chosen_and_preserves_decision_record():
-    from tests.test_roadmaps import _journey, _card
-    from app.pai_c.roadmaps.service import RoadmapService
-    with StudentSession() as student, student.factory() as db:
-        journey=_journey(db,student.workspace_id)
-        roadmap=_card(db,student.workspace_id,journey.id,'Practical route')
-        row=PossibilityService(db).add(student.workspace_id,journey.id,title=roadmap.title,why='Evidence',kind='discovered',source='planner',status='exploring',roadmap_id=roadmap.id)
-        service=RoadmapService(db)
-        service.list(student.workspace_id,presented=True)
-        service.choose(student.workspace_id,roadmap.id,service.choice_token(roadmap,'test-secret'),'test-secret')
-        assert row.status=='chosen'
-        assert service.current_decision(student.workspace_id)['roadmap_id']==roadmap.id
 
 
 @pytest.mark.asyncio

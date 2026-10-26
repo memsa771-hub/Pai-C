@@ -6,12 +6,10 @@ from unittest.mock import AsyncMock, patch
 from uuid import uuid4
 
 import pytest
-from sqlalchemy import select
 
 from app.config import config
 from app.models import Institution, Opportunity, RequirementSet, Workspace
 from app.research.requirements import RequirementStore
-from app.research.gateway import _research_brief
 from app.plugins.program_research import research
 from app.plugins._shared.budget import bounded_research, spend
 from scripts.counselor_eval_support import StudentSession
@@ -76,16 +74,6 @@ def test_student_budget_is_persistent_and_stops_before_external_call():
             with bounded_research(queries=10, fetches=10, seconds=30, workspace_id=student.workspace_id):
                 assert spend("web.fetch") == "research_student_budget_exceeded"
 
-
-def test_brief_uses_confirmed_mirror_not_legacy_understanding():
-    with StudentSession() as student, student.factory() as db:
-        mirror = {"dimensions": [{"key": "stated_goal", "picture": "My original wish"}],
-                  "roadmap_lanes": [{"lane": "stated_goal", "why": "Test my wish"}]}
-        journey = SimpleNamespace(counselor_summary_draft={"mirror": mirror, "version": 4})
-        result = _research_brief(db, student.workspace_id, journey)
-        assert result["mirror"] == mirror and result["mirror_version"] == 4
-        assert result["stated_preference"] == "My original wish"
-        assert "notebook" in result and "profile" in result and "questions" in result
 
 @pytest.mark.asyncio
 async def test_stale_cache_refreshes_through_existing_plugin_and_store_with_fakes():
