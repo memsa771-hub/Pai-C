@@ -10,6 +10,7 @@ from pathlib import Path
 
 from fastapi import FastAPI
 
+from app.os import ports
 from app.os.api.deps import current_student_ref, current_student_ref_for_write
 from app.os.api.router import build_router
 from app.os.api.services import make_services
@@ -51,6 +52,7 @@ def mount_os(app: FastAPI, *, env: Mapping[str, str] | None = None,
     services = make_services(settings, playbooks=books, document_types=types, statement_configs=statement_configs,
                              pack_configs=pack_configs, visa_configs=visa_configs)
     app.include_router(build_router(lambda: services), prefix=PREFIX)
+    ports.configure(services)  # the host's Slice 8 calls go through the ports, never the services directly
     if student_dependency is not None:
         app.dependency_overrides[current_student_ref] = student_dependency
     if student_write_dependency is not None:

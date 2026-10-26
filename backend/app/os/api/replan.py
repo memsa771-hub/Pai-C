@@ -26,7 +26,8 @@ class ResolveIn(BaseModel):
 
 
 def replanner_for(svc: Services) -> Replanner:
-    return Replanner(svc.engine, svc.plans, load_replan_configs(), Outbox(svc.engine, svc.settings.tenant_id))
+    return Replanner(svc.engine, svc.plans, load_replan_configs(), Outbox(svc.engine, svc.settings.tenant_id),
+                     escalations=svc.escalations)
 
 
 def proposal_out(p: Proposal) -> dict:

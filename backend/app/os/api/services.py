@@ -7,12 +7,14 @@ from functools import cache
 
 from sqlalchemy import Engine
 
+from app.os.adapters.standalone.escalation import CompositeSink, StandaloneSink
 from app.os.db import make_engine
 from app.os.documents.checks import load_name_variants
 from app.os.documents.types import DocumentType, load_document_types
 from app.os.kernel import Kernel
 from app.os.knowledge import SqlKnowledge
 from app.os.playbooks import Playbook, load_playbook_dir
+from app.os.ports.escalation import EscalationSink
 from app.os.runner import APP_NAME, default_registry
 from app.os.service import PlanService
 from app.os.settings import OsSettings
@@ -34,6 +36,7 @@ class Services:
     statement_configs: Mapping[str, StatementConfig] = None  # Slice 5: per route, checked at mount
     pack_configs: Mapping[str, PackConfig] = None  # Slice 6a: per route, checked at mount
     visa_configs: Mapping[str, PackConfig] = None  # Slice 6b: the visa file per route, checked at mount
+    escalations: EscalationSink = None  # Slice 8: every support case goes through this port (S8-D12)
 
 
 def _client_factory(settings: OsSettings) -> Callable[[], object]:
@@ -68,4 +71,5 @@ def make_services(settings: OsSettings, *, engine: Engine | None = None,
                     types, load_name_variants(),
                     statement_configs if statement_configs is not None else load_statement_configs(),
                     pack_configs if pack_configs is not None else load_pack_configs(),
-                    visa_configs if visa_configs is not None else load_pack_configs(kind="visa"))
+                    visa_configs if visa_configs is not None else load_pack_configs(kind="visa"),
+                    CompositeSink([StandaloneSink(engine, settings.tenant_id)]))
