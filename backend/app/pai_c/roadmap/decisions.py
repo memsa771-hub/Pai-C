@@ -11,7 +11,7 @@ from datetime import datetime, timezone
 
 from sqlalchemy import select
 
-from app.models import RouteDecision, Workspace
+from app.models import RouteDecision, StudentJourney, Workspace
 from app.pai_c.possibilities import PossibilityService
 from app.pai_c.roadmap.engine import RoadmapEngine
 
@@ -65,9 +65,59 @@ def serialize(row: RouteDecision, cards: list[dict]) -> dict:
             "route": row.route, "snapshot_verdict": row.verdict, "live_status": live}
 
 
+# Stages before the route decision that a confirmed Mirror may leave for it:
+# RESEARCHING (before engine routes were computed on read) and the old roadmap
+# research wait (ASSESSING, NEEDS_INFO).
+WAITING = {"RESEARCHING", "ASSESSING", "NEEDS_INFO"}
+
+
 class RouteDecisionService:
     def __init__(self, db):
         self.db = db
+
+    def _journey(self, workspace_id: str) -> StudentJourney | None:
+        return self.db.scalar(select(StudentJourney).where(
+            StudentJourney.workspace_id == workspace_id, StudentJourney.journey_type == "counselor_decision",
+            StudentJourney.status == "active").order_by(StudentJourney.created_at).limit(1))
+
+    def _set_stage(self, journey: StudentJourney, stage: str, **flags) -> None:
+        from app.journey import JourneyService
+        JourneyService(self.db).set_counselor_stage(journey.workspace_id, journey.id, stage,
+                                                    actor="human:student", **flags)
+
+    def _record_choice(self, workspace_id: str, row: RouteDecision) -> None:
+        """The journey follows the decision: CHOSEN, with the route as the
+        active goal. A student who chooses before the Mirror is confirmed keeps
+        their stage; the decision itself is still saved."""
+        journey = self._journey(workspace_id)
+        if journey is None:
+            return
+        confirmed = (journey.counselor_summary_draft or {}).get("status") == "confirmed"
+        if journey.current_stage in WAITING and confirmed:
+            self._set_stage(journey, "PROPOSED")
+        if journey.current_stage == "PROPOSED":
+            self._set_stage(journey, "CHOSEN", validated_choice=True)
+        if journey.current_stage != "CHOSEN":
+            return
+        journey.current_objective = row.title
+        journey.active_goal = {"route_decision_id": row.id, "field_key": row.field_key,
+                               "title": row.title, "route": row.route}
+        journey.decisions = [*(journey.decisions or []), {
+            "kind": "route_choice", "route_decision_id": row.id, "field_key": row.field_key,
+            "chosen_at": row.chosen_at.isoformat()}]
+
+    def _record_withdraw(self, workspace_id: str, row: RouteDecision) -> None:
+        journey = self._journey(workspace_id)
+        if journey is None:
+            return
+        if journey.current_stage == "CHOSEN":
+            self._set_stage(journey, "PROPOSED")
+        if (journey.active_goal or {}).get("route_decision_id") == row.id:
+            journey.active_goal = None
+            journey.current_objective = None
+        journey.decisions = [*(journey.decisions or []), {
+            "kind": "route_withdrawn", "route_decision_id": row.id, "field_key": row.field_key,
+            "withdrawn_at": row.withdrawn_at.isoformat()}]
 
     def active(self, workspace_id: str) -> RouteDecision | None:
         return self.db.scalar(select(RouteDecision).where(
@@ -114,6 +164,8 @@ class RouteDecisionService:
         self.db.add(row)
         self.db.flush()
         paths.set_chosen(workspace_id, row.possibility_id, True)
+        self._record_choice(workspace_id, row)
+        self.db.flush()
         from app.pai_c.checkins import schedule
         schedule(self.db, workspace_id, "chosen_path", row.id, at=now)
         return serialize(row, page["fields"])
@@ -134,5 +186,6 @@ class RouteDecisionService:
         row = self._active_or_404(workspace_id)
         row.withdrawn_at = datetime.now(timezone.utc)
         PossibilityService(self.db).set_chosen(workspace_id, row.possibility_id, False)
+        self._record_withdraw(workspace_id, row)
         self.db.flush()
         return serialize(row, RoadmapEngine(self.db).build(workspace_id)["fields"])

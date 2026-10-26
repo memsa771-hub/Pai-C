@@ -14,16 +14,20 @@ NEEDS_INFO = "NEEDS_INFO"
 PROPOSED = "PROPOSED"
 CHOSEN = "CHOSEN"
 
+# The roadmap engine computes routes on read, so a confirmed Mirror goes
+# straight from RESEARCHING to PROPOSED. ASSESSING and NEEDS_INFO were the old
+# roadmap research wait; journeys left there may still move on to PROPOSED.
+# Withdrawing a chosen route goes back to PROPOSED.
 TRANSITIONS = {
     IDENTITY: frozenset({FOUNDATION}),
     FOUNDATION: frozenset({DIRECTION}),
     DIRECTION: frozenset({MIRROR}),
     MIRROR: frozenset({DIRECTION, RESEARCHING}),
-    RESEARCHING: frozenset({ASSESSING}),
+    RESEARCHING: frozenset({ASSESSING, PROPOSED}),
     ASSESSING: frozenset({NEEDS_INFO, PROPOSED}),
-    NEEDS_INFO: frozenset({ASSESSING}),
+    NEEDS_INFO: frozenset({ASSESSING, PROPOSED}),
     PROPOSED: frozenset({DIRECTION, RESEARCHING, CHOSEN}),
-    CHOSEN: frozenset({DIRECTION}),
+    CHOSEN: frozenset({DIRECTION, PROPOSED}),
 }
 
 

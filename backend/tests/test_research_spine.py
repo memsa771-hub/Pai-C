@@ -165,6 +165,22 @@ async def test_student_answer_gateway_cannot_resume_another_workspace():
         assert run.status == "needs_user_action" and run.constraints == {}
 
 
+@pytest.mark.asyncio
+async def test_resume_needs_the_student_answer_trigger():
+    from app.research.gateway import request_research
+    with StudentSession() as student, student.factory() as db:
+        run = ExecutionRun(workspace_id=student.workspace_id, requested_by="openagents:pai",
+                           objective="Research", status="needs_user_action", constraints={},
+                           pending_action={"kind": "text", "prompt": "Detail"})
+        db.add(run); db.commit()
+        result = await request_research("resume", student.workspace_id, db=db, journey=None,
+            tool_context=ToolContext(student.workspace_id, "pai-operator", None), trigger="mirror_confirmed",
+            resume_run_id=run.id, resume_action={"text": "Detail"})
+        assert result is None
+        db.refresh(run)
+        assert run.status == "needs_user_action" and run.constraints == {}
+
+
 def test_research_and_operator_architecture_boundaries():
     import ast
     from pathlib import Path

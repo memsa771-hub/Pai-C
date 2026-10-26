@@ -95,7 +95,7 @@ def export_session(db, workspace_id, usage_logs=()):
                 decisions=[row_data(d) for d in decisions if d.source_event_id == event.id]))
         notebook_export = MemoryService(db).export_truth_map(workspace_id)
         journeys = rows(StudentJourney, "workspace_id", StudentJourney.created_at, StudentJourney.id)
-        decisions = rows(RouteDecision, "workspace_id", RouteDecision.chosen_at, RouteDecision.id)
+        route_decisions = rows(RouteDecision, "workspace_id", RouteDecision.chosen_at, RouteDecision.id)
         mirrors = [dict(journey_id=j.id, draft=j.counselor_summary_draft)
                    for j in journeys if j.counselor_summary_draft]
         mirror_events = [dict(event_id=e.id, timestamp=e.timestamp, payload=e.payload)
@@ -112,7 +112,7 @@ def export_session(db, workspace_id, usage_logs=()):
                 "workspace_id", StudentJourneyEvent.created_at, StudentJourneyEvent.id)
                 if row.event_type == "counselor.mirror.confirmed"],
             mirror_history_coverage="Posted payloads, current draft and explicit confirmation proofs; older confirmations without proof remain unknown",
-            route_decisions=[row_data(row) for row in decisions],
+            route_decisions=[row_data(row) for row in route_decisions],
             usage=logged_usage(usage_logs, {e.id for e in events}))
         secrets = [v for k, v in os.environ.items() if _ENV_SECRET.search(k) and v]
         return redact(result, secrets)

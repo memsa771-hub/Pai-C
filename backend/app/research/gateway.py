@@ -58,15 +58,16 @@ async def _request_research(kind, workspace_id, *, db, journey, tool_context,
     if kind in {"path_explain", "program_search"}:
         return await _request_path(db, workspace_id, journey, tool_context, possibility_id, kind)
     if kind == "resume":
-        return await _resume(db, workspace_id, tool_context, resume_run_id, resume_action)
+        return await _resume(db, workspace_id, tool_context, resume_run_id, resume_action, trigger)
     if kind == "from_mirror":
         return _from_mirror(db, workspace_id, journey, tool_context)
     raise ValueError("unknown Counselor research kind")
 
 
-async def _resume(db, workspace_id, tool_context, run_id, action):
+async def _resume(db, workspace_id, tool_context, run_id, action, trigger):
     """Accepted student evidence resumes the same paused run."""
-    if run_id is None or tool_context is None or tool_context.workspace_id != workspace_id:
+    if (trigger != "student_answer" or run_id is None or tool_context is None
+            or tool_context.workspace_id != workspace_id):
         return None
     run = db.scalar(select(ExecutionRun).where(ExecutionRun.id == run_id,
         ExecutionRun.workspace_id == workspace_id, ExecutionRun.status == "needs_user_action"))
@@ -93,6 +94,10 @@ def _from_mirror(db, workspace_id, journey, tool_context):
         return None
     from app.pai_c.possibilities import PossibilityService
     PossibilityService(db).from_mirror(journey)
+    # Routes are computed on read: there is no research wait, so the student
+    # is at the route decision as soon as the paths exist.
+    journey = JourneyService(db).set_counselor_stage(workspace_id, journey.id, "PROPOSED",
+                                                     actor="system:mirror_confirmed")
     db.commit()
     return {"ok": True, "data": {"status": "paths_ready",
                                  "mirror_version": (journey.counselor_summary_draft or {}).get("version")}}

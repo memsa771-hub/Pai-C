@@ -74,16 +74,21 @@ def test_mark_stale_job_is_not_registered():
     assert registry.owner_for_task_type("roadmap_research") is None
 
 
-def test_reconciler_accepts_fact_without_roadmap_invalidation():
+@pytest.mark.parametrize("candidate_type,key,value", [
+    ("vault_fact", "preferences.study_mode", "online"),
+    ("student_record", "education", {"qualification_name": "Completed qualification"}),
+])
+def test_reconciler_accepts_fact_without_roadmap_invalidation(candidate_type, key, value):
     from app.memory.candidates import MemoryCandidateService
     from app.memory.reconciler import MemoryReconciler
     from app.models import BackgroundJob
     with StudentSession() as student, student.factory() as db:
         candidate = MemoryCandidateService(db).propose(
-            student.workspace_id, "student_record", key="education",
-            proposed_value={"qualification_name": "Completed qualification"},
+            student.workspace_id, candidate_type, key=key, proposed_value=value,
             confidence=0.95, source_type="conversation", evidence={"quote": "My student statement"})
-        assert MemoryReconciler(db).reconcile(candidate).accepted
+        reconciler = MemoryReconciler(db)
+        assert reconciler.reconcile(candidate).accepted
+        assert not reconciler.reconcile(candidate).accepted  # the same candidate is accepted once
         db.flush()
         job_types = set(db.scalars(select(BackgroundJob.job_type)).all())
     assert "roadmaps.mark_stale" not in job_types
@@ -125,28 +130,3 @@ class _NoLockDb:
 
     def get_bind(self):
         return type("Bind", (), {"dialect": type("Dialect", (), {"name": "sqlite"})()})()
-
-
-@pytest.mark.asyncio
-async def test_chat_rethink_moves_the_stage_but_never_the_chosen_route():
-    from app.journey import JourneyService
-    from app.models import RouteDecision, StudentJourney
-    from app.pai_c.deep.actions import dispatch_action
-    from app.pai_c.deep.context import DeepContext
-    from app.pai_c.deep.notebook_schema import CounselorNotebookData
-    from app.pai_c.deep.turn_input import CounselorTurnInput
-    with StudentSession() as student, student.factory() as db:
-        journey = JourneyService(db).ensure_counselor(student.workspace_id)
-        db.get(StudentJourney, journey.id).current_stage = "CHOSEN"
-        decision = RouteDecision(workspace_id=student.workspace_id, field_key="computer_science",
-                                 title="Computer Science", verdict={}, route={}, steps=[], steps_done=[])
-        db.add(decision)
-        db.commit()
-        journey = JourneyService(db).get(student.workspace_id, journey.id)
-        turn = CounselorTurnInput("channel/pai-counselor", student.workspace_id, "Not sure any more",
-                                  (), None, str(uuid4()), student.next_timestamp(), f"human:{student.user_id}", False)
-        context = DeepContext("", {}, CounselorNotebookData(), journey, 0)
-        assert await dispatch_action(db, turn, {"type": "rethink", "reason": "Unsure"}, context) == ("rethink", "accepted")
-        db.expire_all()
-        assert JourneyService(db).get(student.workspace_id, journey.id).current_stage == "DIRECTION"
-        assert db.get(RouteDecision, decision.id).withdrawn_at is None

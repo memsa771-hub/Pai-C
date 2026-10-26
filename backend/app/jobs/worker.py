@@ -179,7 +179,7 @@ async def run_worker_loop(
                     count = enqueue_due_verification(db)
                     db.commit()
                     if count:
-                        logger.info("queued %d due research verification refreshes", count)
+                        logger.info("marked %d expired research sources unconfirmed", count)
                 except Exception:
                     db.rollback()
                     logger.exception("research verification sweep failed")
