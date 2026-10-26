@@ -1,0 +1,675 @@
+{
+ "_note": "Eligibility source for the roadmap engine (app/pai_c/roadmap): which intermediate groups open a study field, the percent floor, the entry tests and the degree length. To update: edit the rule here, keep its https sources and confidence (official|secondary|uncertain), and set unknown values to null; never fill a number from memory. Rules apply per field key (applies_to.fields) or per family (applies_to.family); a field rule wins over its family rule. groups_open null means use open_to from study_fields.json. scope_fields limits a step to those fields. Draft research of Oct 2026; see as_of.",
+ "as_of": "2026-10",
+ "rules": [
+  {
+   "applies_to": {
+    "fields": [
+     "electrical_engineering",
+     "electronic_engineering",
+     "computer_engineering",
+     "telecommunication_engineering",
+     "mechanical_engineering",
+     "mechatronics_engineering",
+     "civil_engineering",
+     "chemical_engineering",
+     "biomedical_engineering",
+     "industrial_engineering",
+     "aerospace_engineering",
+     "petroleum_engineering",
+     "materials_engineering",
+     "textile_engineering",
+     "environmental_engineering",
+     "mining_engineering",
+     "geological_engineering",
+     "automotive_engineering"
+    ]
+   },
+   "groups_open": [
+    "pre_engineering"
+   ],
+   "groups_with_step": [
+    {
+     "group": "pre_medical",
+     "step": "Allowed only for BS civil/electrical/mechanical engineering at universities running PEC's July 2024 SOP: deficiency mathematics bridge (about 8 weeks). Not a general right; per-university.",
+     "source": "https://ucp.edu.pk/blog/pec-allows-fsc-pre-medical-students-opt-engineering-courses/",
+     "scope_fields": [
+      "civil_engineering",
+      "electrical_engineering",
+      "mechanical_engineering"
+     ]
+    },
+    {
+     "group": "ics",
+     "step": "PEC allows Physics+Maths+Computer Science combination for computer, electronics, telecommunications and avionics engineering programmes only. University may add deficiency courses.",
+     "source": "https://www.pec.org.pk/wp-content/uploads/2022/11/REGULATIONS-FOR-ENGG-EDU.pdf",
+     "scope_fields": [
+      "computer_engineering",
+      "electronic_engineering",
+      "electrical_engineering",
+      "telecommunication_engineering",
+      "mechatronics_engineering",
+      "aerospace_engineering"
+     ]
+    },
+    {
+     "group": "pre_medical",
+     "step": "Biology+Physics+Chemistry combination allowed for Bio-Medical / Bio-Engineering (PEC regulation text).",
+     "source": "https://www.pec.org.pk/wp-content/uploads/2022/11/REGULATIONS-FOR-ENGG-EDU.pdf",
+     "scope_fields": [
+      "biomedical_engineering"
+     ]
+    },
+    {
+     "group": "dae",
+     "step": "DAE with at least 60% aggregate, only in the relevant discipline, only against a small reserved quota (text shows 2% in brackets; uncertain); relevancy decided by PEC Accreditation Committee. Lateral/quota route, not normal entry.",
+     "source": "https://www.pec.org.pk/wp-content/uploads/2022/11/REGULATIONS-FOR-ENGG-EDU.pdf"
+    }
+   ],
+   "groups_open_note": "A-level Physics, Chemistry, Mathematics (min grade E for IBCC) maps to pre_engineering.",
+   "min_percent": 60,
+   "min_percent_note": "60% aggregate in HSSC pre-engineering per PEC regulations; many universities also quote 60% in matric/O-level (secondary only). Universities may set higher merit floors.",
+   "required_subjects": [
+    "Physics",
+    "Chemistry",
+    "Mathematics"
+   ],
+   "entry_tests": [
+    {
+     "name": "ECAT (UET) / NET (NUST) / university test",
+     "body": "UET/NUST/university; PEC requires an institution test",
+     "pass_percent": 33,
+     "pass_percent_note": "33% (132/400) quoted for UET ECAT by third-party guides; PEC text states no number. NUST NET and others differ.",
+     "source": "https://blog.maqsad.io/blog/uet-ecat-complete-guide"
+    }
+   ],
+   "years": 4,
+   "fee_band_pkr_per_year": null,
+   "sources": [
+    "https://www.pec.org.pk/wp-content/uploads/2022/11/REGULATIONS-FOR-ENGG-EDU.pdf",
+    "https://ucp.edu.pk/blog/pec-allows-fsc-pre-medical-students-opt-engineering-courses/"
+   ],
+   "confidence": "official"
+  },
+  {
+   "applies_to": {
+    "fields": [
+     "engineering_technology"
+    ]
+   },
+   "groups_open": [
+    "pre_engineering",
+    "dae"
+   ],
+   "groups_with_step": [
+    {
+     "group": "ics",
+     "step": "Varies by university; check. No official source found.",
+     "source": "https://www.ilmkidunya.com/btech/"
+    }
+   ],
+   "min_percent": null,
+   "min_percent_note": "DAE route commonly quoted 50-60% aggregate (secondary, varies); FSc route percent not confirmed. NTC accredits BSc Engineering Technology; graduates register with NTC, not PEC.",
+   "required_subjects": [
+    "Related DAE trade for DAE route; Physics/Chemistry/Maths for FSc route"
+   ],
+   "entry_tests": [],
+   "years": 4,
+   "fee_band_pkr_per_year": null,
+   "sources": [
+    "https://www.ilmkidunya.com/btech/",
+    "https://www.ntc-hec.org.pk/instructonlineapps.php"
+   ],
+   "confidence": "secondary"
+  },
+  {
+   "applies_to": {
+    "fields": [
+     "computer_science",
+     "software_engineering",
+     "artificial_intelligence",
+     "data_science",
+     "cyber_security",
+     "information_technology"
+    ]
+   },
+   "groups_open": [
+    "pre_engineering",
+    "ics"
+   ],
+   "groups_with_step": [
+    {
+     "group": "pre_medical",
+     "step": "Allowed (NCEAC/HEC): pass 6 credit hours deficiency mathematics in first year.",
+     "source": "https://www.hec.gov.pk/english/services/universities/RevisedCurricula/Documents/2025-2026/COMPUTER-SCIENCE.pdf"
+    },
+    {
+     "group": "general_science",
+     "step": "Open if Mathematics was studied; otherwise 6 credit hours deficiency mathematics. Check what general_science contains.",
+     "source": "https://www.hec.gov.pk/english/services/universities/RevisedCurricula/Documents/2025-2026/COMPUTER-SCIENCE.pdf"
+    },
+    {
+     "group": "icom",
+     "step": "Open only if Mathematics studied at intermediate; else 6 credit hours deficiency maths. University may refuse; confirm.",
+     "source": "https://www.hec.gov.pk/english/services/universities/RevisedCurricula/Documents/2025-2026/COMPUTER-SCIENCE.pdf"
+    },
+    {
+     "group": "fa_humanities",
+     "step": "Rule is 'studied Mathematics' or deficiency maths; FA rarely has maths; university discretion. Treat as check.",
+     "source": "https://www.hec.gov.pk/english/services/universities/RevisedCurricula/Documents/2025-2026/COMPUTER-SCIENCE.pdf"
+    },
+    {
+     "group": "dae",
+     "step": "14-year qualification holders in computing may enter semester 5 after 15-18 credit hours bridging; fresh DAE entry to semester 1 is university decision.",
+     "source": "https://www.hec.gov.pk/english/services/universities/RevisedCurricula/Documents/2025-2026/COMPUTER-SCIENCE.pdf"
+    }
+   ],
+   "min_percent": 50,
+   "min_percent_note": "50% in HSSC/A-level/IBCC equivalent with Mathematics (BS Computer Engineering needs 60%, see computer_engineering).",
+   "required_subjects": [
+    "Mathematics (else deficiency 6 credit hours)"
+   ],
+   "entry_tests": [
+    {
+     "name": "University test (NTS/NAT, FAST, NUST NET, GIKI etc.)",
+     "body": "each university",
+     "pass_percent": null,
+     "source": "https://www.hec.gov.pk/english/services/universities/RevisedCurricula/Documents/2025-2026/COMPUTER-SCIENCE.pdf"
+    }
+   ],
+   "years": 4,
+   "fee_band_pkr_per_year": null,
+   "sources": [
+    "https://www.hec.gov.pk/english/services/universities/RevisedCurricula/Documents/2025-2026/COMPUTER-SCIENCE.pdf",
+    "https://nceac.org.pk/Documents/Curriculums/BS%20Curriculm%20Computing%20Disciplines-2023.pdf"
+   ],
+   "confidence": "official"
+  },
+  {
+   "applies_to": {
+    "fields": [
+     "architecture",
+     "city_planning"
+    ]
+   },
+   "groups_open": [
+    "pre_engineering"
+   ],
+   "groups_with_step": [
+    {
+     "group": "ics",
+     "step": "Unconfirmed; PCATP source not reached. Treat as check.",
+     "source": "https://www.facebook.com/groups/147130299086/posts/10160347022389087/"
+    }
+   ],
+   "min_percent": 60,
+   "min_percent_note": "60% quoted at UET Lahore for architecture (search summary of prospectus). PCATP primary not read. Pre-medical reportedly excluded (forum post, uncertain).",
+   "required_subjects": [
+    "Mathematics",
+    "Physics"
+   ],
+   "entry_tests": [
+    {
+     "name": "University test (UET ECAT / architecture aptitude, NUST NET)",
+     "body": "university",
+     "pass_percent": null,
+     "source": "https://blog.maqsad.io/blog/uet-ecat-complete-guide"
+    }
+   ],
+   "years": 5,
+   "fee_band_pkr_per_year": null,
+   "sources": [
+    "https://pcatp.org.pk/document/Architect%20Licensing%20Examination%20-%20ALE.pdf"
+   ],
+   "confidence": "uncertain"
+  },
+  {
+   "applies_to": {
+    "fields": [
+     "interior_design",
+     "textile_design",
+     "fashion_design",
+     "graphic_design",
+     "film_animation"
+    ]
+   },
+   "groups_open": [
+    "pre_engineering",
+    "pre_medical",
+    "ics",
+    "icom",
+    "fa_humanities",
+    "general_science"
+   ],
+   "groups_with_step": [],
+   "min_percent": null,
+   "min_percent_note": "University-specific (HEC general BS: 12 years schooling). Portfolio/aptitude test common.",
+   "required_subjects": [],
+   "entry_tests": [],
+   "years": 4,
+   "fee_band_pkr_per_year": null,
+   "sources": [
+    "https://www.hec.gov.pk"
+   ],
+   "confidence": "uncertain"
+  },
+  {
+   "applies_to": {
+    "fields": [
+     "mbbs",
+     "bds"
+    ]
+   },
+   "groups_open": [
+    "pre_medical"
+   ],
+   "groups_with_step": [],
+   "groups_open_note": "A-level: Biology+Chemistry. Other groups not open: Biology and Chemistry are mandatory per PM&DC 2025.",
+   "min_percent": 60,
+   "min_percent_note": "60% in HSSC or equivalent (PM&DC Regulations 2025; PM&DC may notify higher).",
+   "required_subjects": [
+    "Biology",
+    "Chemistry"
+   ],
+   "entry_tests": [
+    {
+     "name": "MDCAT (MBBS)",
+     "body": "PM&DC",
+     "pass_percent": 55,
+     "pass_percent_note": "55% (99/180) commonly quoted; not confirmed in primary text read",
+     "source": "https://raahban.com/guides/mdcat-passing-marks"
+    },
+    {
+     "name": "MDCAT (BDS)",
+     "body": "PM&DC",
+     "pass_percent": 50,
+     "pass_percent_note": "50% (90/180), secondary",
+     "source": "https://raahban.com/guides/mdcat-passing-marks"
+    }
+   ],
+   "years": 5,
+   "fee_band_pkr_per_year": null,
+   "sources": [
+    "https://pmdc.pk/Documents/law/Admissions%20Regulations-2025.pdf"
+   ],
+   "confidence": "official"
+  },
+  {
+   "applies_to": {
+    "fields": [
+     "pharm_d"
+    ]
+   },
+   "groups_open": [
+    "pre_medical"
+   ],
+   "groups_with_step": [
+    {
+     "group": "pre_engineering",
+     "step": "Not established. Some universities may accept with Biology; unverified.",
+     "source": "https://studentpath.pk/guides/pharm-d-admission/"
+    }
+   ],
+   "min_percent": 60,
+   "min_percent_note": "HEC curriculum: 60% in pre-medical HSSC (as quoted by secondary sources).",
+   "required_subjects": [
+    "Biology",
+    "Chemistry",
+    "Physics"
+   ],
+   "entry_tests": [
+    {
+     "name": "MDCAT or university test",
+     "body": "university/PM&DC",
+     "pass_percent": null,
+     "source": "https://parhlai.com/blog/pharmacy-degree-pakistan"
+    }
+   ],
+   "years": 5,
+   "fee_band_pkr_per_year": null,
+   "sources": [
+    "https://studentpath.pk/guides/pharm-d-admission/",
+    "https://qau.edu.pk/regulations-relating-to-doctor-of-pharmacy-pharm-d/"
+   ],
+   "confidence": "secondary"
+  },
+  {
+   "applies_to": {
+    "fields": [
+     "nursing"
+    ]
+   },
+   "groups_open": [
+    "pre_medical"
+   ],
+   "groups_with_step": [],
+   "min_percent": 50,
+   "min_percent_note": "FSc pre-medical, 50% minimum, Biology studied; age 16-35 (council 2021 document).",
+   "required_subjects": [
+    "Biology",
+    "Physics",
+    "Chemistry"
+   ],
+   "entry_tests": [
+    {
+     "name": "Institution entry test",
+     "body": "institution",
+     "pass_percent": null,
+     "source": "https://pnmc.gov.pk/admission-criteria/"
+    }
+   ],
+   "years": 4,
+   "fee_band_pkr_per_year": null,
+   "sources": [
+    "https://pnmc.gov.pk/admission-criteria/",
+    "https://pnmc.gov.pk/wp-content/uploads/2023/09/ESTABLISHMENT-NURSING-EDUCATIONAL-INSTITUTIONS-DEGREE-PROGRAMS-2021.pdf"
+   ],
+   "confidence": "official"
+  },
+  {
+   "applies_to": {
+    "fields": [
+     "physical_therapy"
+    ]
+   },
+   "groups_open": [
+    "pre_medical"
+   ],
+   "groups_with_step": [],
+   "min_percent": 60,
+   "min_percent_note": "60% FSc pre-medical per HEC (university ads; HEC curriculum not read).",
+   "required_subjects": [
+    "Biology",
+    "Chemistry"
+   ],
+   "entry_tests": [
+    {
+     "name": "University test",
+     "body": "university",
+     "pass_percent": null,
+     "source": "https://www.facebook.com/HajveryUni/posts/hu-doctor-of-physical-therapy-dpt-is-a-professional-degree-program-designed-to-p/1424214523067454/"
+    }
+   ],
+   "years": 5,
+   "fee_band_pkr_per_year": null,
+   "sources": [
+    "https://www.facebook.com/HajveryUni/posts/hu-doctor-of-physical-therapy-dpt-is-a-professional-degree-program-designed-to-p/1424214523067454/"
+   ],
+   "confidence": "secondary"
+  },
+  {
+   "applies_to": {
+    "fields": [
+     "medical_lab_technology",
+     "radiology_imaging",
+     "optometry",
+     "anesthesia_ot_technology",
+     "human_nutrition",
+     "public_health"
+    ]
+   },
+   "groups_open": [
+    "pre_medical"
+   ],
+   "groups_with_step": [],
+   "min_percent": null,
+   "min_percent_note": "Not researched; university/provincial specific.",
+   "required_subjects": [
+    "Biology"
+   ],
+   "entry_tests": [],
+   "years": 4,
+   "fee_band_pkr_per_year": null,
+   "sources": [
+    "https://www.hec.gov.pk"
+   ],
+   "confidence": "uncertain"
+  },
+  {
+   "applies_to": {
+    "fields": [
+     "veterinary_medicine"
+    ]
+   },
+   "groups_open": [
+    "pre_medical"
+   ],
+   "groups_with_step": [],
+   "min_percent": 60,
+   "min_percent_note": "60% FSc pre-medical (UVAS/CUVAS); age limit 23 or 25 (UVAS pages conflict). PVMC primary not read.",
+   "required_subjects": [
+    "Biology",
+    "Chemistry"
+   ],
+   "entry_tests": [
+    {
+     "name": "University test",
+     "body": "university",
+     "pass_percent": null,
+     "source": "https://www.uvas.edu.pk/Admissions/undergraduate/eligibility/index.htm"
+    }
+   ],
+   "years": 5,
+   "fee_band_pkr_per_year": null,
+   "sources": [
+    "https://www.uvas.edu.pk/Admissions/undergraduate/eligibility/index.htm"
+   ],
+   "confidence": "secondary"
+  },
+  {
+   "applies_to": {
+    "family": "sciences"
+   },
+   "groups_open": null,
+   "groups_open_note": "Use study_fields.json open_to per field; no official eligibility document found.",
+   "groups_with_step": [],
+   "min_percent": null,
+   "min_percent_note": "University-specific.",
+   "required_subjects": [],
+   "entry_tests": [],
+   "years": 4,
+   "fee_band_pkr_per_year": null,
+   "sources": [
+    "https://www.hec.gov.pk"
+   ],
+   "confidence": "uncertain"
+  },
+  {
+   "applies_to": {
+    "family": "agriculture"
+   },
+   "groups_open": null,
+   "groups_with_step": [],
+   "min_percent": null,
+   "min_percent_note": "Not researched.",
+   "required_subjects": [],
+   "entry_tests": [],
+   "years": 4,
+   "fee_band_pkr_per_year": null,
+   "sources": [
+    "https://web.uaf.edu.pk/UploadFiles/Downloads/9306ddbb-7967-4f62-bd41-eac8e6487195.pdf"
+   ],
+   "confidence": "uncertain"
+  },
+  {
+   "applies_to": {
+    "family": "business"
+   },
+   "groups_open": null,
+   "groups_open_note": "Per study_fields.json open_to. No official stream restriction found for BBA.",
+   "groups_with_step": [],
+   "min_percent": null,
+   "min_percent_note": "University-specific. NBEAC primary not read.",
+   "required_subjects": [],
+   "entry_tests": [
+    {
+     "name": "University test",
+     "body": "university",
+     "pass_percent": null,
+     "source": "https://www.hec.gov.pk"
+    }
+   ],
+   "years": 4,
+   "fee_band_pkr_per_year": null,
+   "sources": [
+    "https://www.hec.gov.pk"
+   ],
+   "confidence": "uncertain"
+  },
+  {
+   "applies_to": {
+    "fields": [
+     "law_llb"
+    ]
+   },
+   "groups_open": [
+    "pre_engineering",
+    "pre_medical",
+    "ics",
+    "icom",
+    "fa_humanities",
+    "general_science"
+   ],
+   "groups_with_step": [],
+   "min_percent": 45,
+   "min_percent_note": "Intermediate/A-level any group, 45% (university pages citing HEC/PBC).",
+   "required_subjects": [],
+   "entry_tests": [
+    {
+     "name": "LAT (HEC Law Admission Test)",
+     "body": "HEC / Pakistan Bar Council",
+     "pass_percent": 50,
+     "source": "https://monarch.edu.pk/law-admission-test-lat/"
+    }
+   ],
+   "years": 5,
+   "fee_band_pkr_per_year": null,
+   "sources": [
+    "https://monarch.edu.pk/law-admission-test-lat/",
+    "https://www.scribd.com/document/375356409/Pakistan-Bar-Council-Rules-for-Universities"
+   ],
+   "confidence": "secondary"
+  },
+  {
+   "applies_to": {
+    "family": "social_sciences"
+   },
+   "groups_open": [
+    "pre_engineering",
+    "pre_medical",
+    "ics",
+    "icom",
+    "fa_humanities",
+    "general_science"
+   ],
+   "groups_with_step": [],
+   "min_percent": null,
+   "min_percent_note": "University sets percent/test.",
+   "required_subjects": [],
+   "entry_tests": [],
+   "years": 4,
+   "fee_band_pkr_per_year": null,
+   "sources": [
+    "https://www.hec.gov.pk"
+   ],
+   "confidence": "uncertain"
+  },
+  {
+   "applies_to": {
+    "family": "arts_humanities"
+   },
+   "groups_open": [
+    "pre_engineering",
+    "pre_medical",
+    "ics",
+    "icom",
+    "fa_humanities",
+    "general_science"
+   ],
+   "groups_with_step": [],
+   "min_percent": null,
+   "min_percent_note": "University sets percent/test.",
+   "required_subjects": [],
+   "entry_tests": [],
+   "years": 4,
+   "fee_band_pkr_per_year": null,
+   "sources": [
+    "https://www.hec.gov.pk"
+   ],
+   "confidence": "uncertain"
+  },
+  {
+   "applies_to": {
+    "family": "education"
+   },
+   "groups_open": [
+    "pre_engineering",
+    "pre_medical",
+    "ics",
+    "icom",
+    "fa_humanities",
+    "general_science"
+   ],
+   "groups_with_step": [],
+   "min_percent": null,
+   "min_percent_note": "University sets percent/test.",
+   "required_subjects": [],
+   "entry_tests": [],
+   "years": 4,
+   "fee_band_pkr_per_year": null,
+   "sources": [
+    "https://www.hec.gov.pk"
+   ],
+   "confidence": "uncertain"
+  },
+  {
+   "applies_to": {
+    "fields": [
+     "sports_sciences"
+    ]
+   },
+   "groups_open": null,
+   "groups_open_note": "Use study_fields.json open_to; no admission document found.",
+   "min_percent": null,
+   "min_percent_note": "University-specific; not researched.",
+   "required_subjects": [],
+   "years": 4,
+   "fee_band_pkr_per_year": null,
+   "confidence": "uncertain",
+   "sources": [
+    "https://www.hec.gov.pk"
+   ],
+   "entry_tests": []
+  }
+ ],
+ "equivalence": {
+  "o_level_a_level": {
+   "source": "https://ibcc.edu.pk/equivalence-intro/british-system/",
+   "grade_to_pak_marks_a_level_o_level": {
+    "A*": "above 90 (session 2021+)",
+    "A": 85,
+    "B": 75,
+    "C": 65,
+    "D": 55,
+    "E": 45
+   },
+   "igcse_9_to_1": {
+    "9": "above 90",
+    "8": 87,
+    "7": 82,
+    "6": 77,
+    "5": 70,
+    "4": 60,
+    "3": 50,
+    "2": 40
+   },
+   "grade_source": "https://ibcc.edu.pk/conversion-for-equivalence/",
+   "o_level_requirement": "8 subjects when taken in Pakistan: English, Maths, Urdu, Islamiyat, Pakistan Studies plus 3 electives; min grade E. Pre-2006: 7 subjects.",
+   "a_level_requirement": "3 subjects min grade E. Pre-medical equiv: Physics, Chemistry, Biology. Pre-engineering equiv: Physics, Chemistry, Maths. ICS equiv: Physics, Computer, Maths. General: any 3 academic subjects.",
+   "o_level_science_electives": "Pre-medical equivalence: English, Maths plus Physics, Chemistry, Biology at O-level; pre-engineering: Physics, Chemistry, Biology/Computer electives.",
+   "notes": "Subject-wise A* equivalent tables exist per session. A reported IBCC decision not to deduct 15% marks is unconfirmed here. NCEAC requires IBCC certificate for foreign systems.",
+   "a_star_percent": 90,
+   "ibcc_percent_method": "ibcc_percent(grades) maps each grade to the percentage in grade_to_pak_marks_a_level_o_level (A* uses a_star_percent=90, the floor of IBCC's 'above 90') and returns the average; None when no grades or any grade is unknown."
+  }
+ }
+}
