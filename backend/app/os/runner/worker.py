@@ -214,6 +214,10 @@ def build(settings: OsSettings) -> tuple[Registry, Kernel, DBOSClient, Engine]:
     from app.os.replan.run import run_replan_job
 
     register_job("replan", "*/5 * * * *", lambda: run_replan_job(replanner, client, datetime.now(timezone.utc)))
+    from app.os.adapters.counsellor.run import IntakeDeps, register_intake, run_intake_job
+
+    register_intake(IntakeDeps(engine, kernel, replanner.plans, replanner.escalations))  # Slice 8: off by default
+    register_job("counsellor_intake", "* * * * *", lambda: run_intake_job(engine, settings.tenant_id, client))
     return registry, kernel, client, engine
 
 
