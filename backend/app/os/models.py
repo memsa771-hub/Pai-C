@@ -68,7 +68,7 @@ plans = Table(
     Column("updated_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
     Column("changes_paused", Boolean, nullable=False, server_default=text("false")),  # Slice 7 (os_0012), S7-D9
     UniqueConstraint("tenant_id", "source", "external_ref", name="uq_os_plans_identity"),
-    _in("status", ("active", "at_risk", "paused", "done"), "ck_os_plans_status"),
+    _in("status", ("active", "at_risk", "paused", "done", "closed"), "ck_os_plans_status"),  # closed: S8-D8
 )
 
 tasks = Table(
@@ -537,6 +537,12 @@ visa_choices = Table(
 
 PROPOSAL_STATUSES = ("applied", "pending", "accepted", "declined", "expired", "refused")
 OVERRIDE_OPS = ("skip", "cancel", "cancel_programme", "add", "reprioritise")
+# Slice 8 (spec S8-D10, S8-D12)
+INTAKE_STATUSES = ("pending", "planned", "revised", "replaced", "refused")
+INTAKE_REFUSALS = ("not_authorized", "invalid_export", "route_not_supported", "unknown_programme",
+                   "self_serve_plan_open", "plan_closed")
+COUNSELLOR_DELIVERY = ("pending", "sent", "refused")
+ESCALATION_REASONS = ("not_eligible", "all_rejected", "deadline_passed", "blocking_gap", "other")
 
 
 def _plan_fk() -> Column:
@@ -587,5 +593,40 @@ support_cases = Table(
     Column("resolution", Text),
     _created(),
     Column("resolved_at", DateTime(timezone=True)),
+    Column("counsellor_status", Text),  # Slice 8 (os_0013): delivery of a route problem to the Counsellor, S8-D12
+    Column("counsellor_reason", Text),
     _in("status", ("open", "resolved"), "ck_os_support_cases_status"),
+    _in("counsellor_status", COUNSELLOR_DELIVERY, "ck_os_support_cases_delivery"),
+    _in("counsellor_reason", ESCALATION_REASONS, "ck_os_support_cases_counsellor_reason"),
+)
+
+# --- Slice 8: the Counsellor connection (os_0013) ------------------------------------------------------------------
+
+counsellor_intake = Table(
+    "os_counsellor_intake", md,
+    _id(), _tenant(),
+    Column("decision_id", Text, nullable=False),
+    Column("student_ref", Text, nullable=False),
+    Column("journey_id", Text, nullable=False),
+    Column("export", JSONB, nullable=False),  # the decision record export as submitted (S8-D5)
+    Column("export_sha256", Text, nullable=False),
+    Column("chosen_at", DateTime(timezone=True), nullable=False),
+    Column("status", Text, nullable=False, server_default="pending"),
+    Column("reason", Text),  # a refusal (S8-D10)
+    Column("plan_id", BigInteger, ForeignKey("os.os_plans.id", ondelete="SET NULL")),
+    Column("counsellor_status", Text),  # a refusal sent to the Counsellor by journey (spec §2.5)
+    _created(),
+    Column("processed_at", DateTime(timezone=True)),
+    UniqueConstraint("tenant_id", "decision_id", name="uq_os_counsellor_intake_decision"),
+    _in("status", INTAKE_STATUSES, "ck_os_counsellor_intake_status"),
+    _in("reason", INTAKE_REFUSALS, "ck_os_counsellor_intake_reason"),
+    _in("counsellor_status", COUNSELLOR_DELIVERY, "ck_os_counsellor_intake_delivery"),
+    Index("ix_os_counsellor_intake_pending", "tenant_id", "status", "student_ref", "chosen_at"),
+)
+
+counsellor_sweep = Table(
+    "os_counsellor_sweep", md,
+    Column("tenant_id", Text, primary_key=True),
+    Column("mark", JSONB, nullable=False),  # the glue's sweep position: the last chosen_at and decision ID seen
+    Column("updated_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
 )
