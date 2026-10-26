@@ -75,8 +75,8 @@ instead), and frontend `components/roadmaps/*`, `decisions.tsx`, chat roadmap co
 API methods, and their tests. Student requests stay (PAI OS contract) but nothing new comes from roadmap runs.
 Mirror `roadmap_lanes` stay: they feed Paths.
 
-Old tables (`pai_roadmaps`, `pai_roadmap_student_state`, `pai_decision_records`) stay in the database until the
-founder approves dropping them (CLAUDE.md rule). Code stops reading and writing them.
+Old tables (`pai_roadmaps`, `pai_roadmap_student_state`, `pai_decision_records`) and `pai_possibilities.roadmap_id`
+are dropped by migration 119 (founder approved, 26 Oct 2026) after the code stops using them.
 
 ## 5. Acceptance
 - FSc Pre-Engineering 78% with paths Electrical, Computer, MBBS → Electrical and Computer open (ECAT/NET,

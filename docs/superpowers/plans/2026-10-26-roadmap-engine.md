@@ -14,7 +14,7 @@
 - Branch `roadmap-engine` (from `pai-c`). Commits end with `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`.
 - No field, group, exam, number or country hardcoded in code: rules in `pai_c/policy/admission_rules.json`, copy in `copy.json` / data.
 - No model calls in the engine. No live calls in tests. Never edit `.env`.
-- DB changes only via Alembic (head is 117). Do NOT drop old roadmap tables; code just stops using them.
+- DB changes only via Alembic (head is 117). Old roadmap tables are dropped only in Task 6 (founder approved); Tasks 1-5 leave them.
 - Reuse `paths/fields.py` education readers and `PossibilityService`; follow the workspace UI kit (`components/pai`, `CARD`, `StatChip`, `toneClass`, `Heading`, `useResource`).
 - Tests from `backend/` with the shim (see `.superpowers/sdd/2026-10-25-education-focus/env-notes.md`); frontend `npm test`, `npm run build`.
 - Existing-feature map: `.superpowers/sdd/2026-10-26-roadmap-engine/roadmap-map.md`.
@@ -55,3 +55,9 @@
 **Files:** per spec §4 and `roadmap-map.md` (backend generation, routers, plugin, jobs, enqueues, chat coupling, check-ins repoint to `RouteDecision`, data export, operator handoff, frontend components, chat roadmap comparison, old types/api, preview fakes, i18n keys, and their tests). Keep old models/tables; keep student requests; keep Mirror lanes; keep model role "roadmap" only if `paths/explain.py` still needs it (rename to `path_explain` if simple).
 - [ ] Failing guard test `backend/tests/test_roadmap_removed.py`: `/v1/roadmaps` 404; `/v1/counselor/paths/{id}/roadmap` 404; no module imports `app.pai_c.roadmaps`, `plugins.roadmap_builder`, `pai_c.deep.roadmaps`; reconciler accepts a fact without enqueuing `roadmaps.mark_stale`; a chat turn context has no roadmap block. Frontend: no import of `components/roadmaps`.
 - [ ] Remove; sync `COUNSELOR_V3_PROMPTS.md` if prompts change; update `DECISIONS.md` and `BUILD_REPORT_V1.md`; full backend suite, `npm test`, `npm run build`; commit `refactor(roadmap): remove the chat-linked roadmap system`.
+
+### Task 6: Drop the old roadmap tables (founder approved, 26 Oct 2026)
+**Files:** Create `backend/alembic/versions/119_drop_old_roadmaps.py`; modify `backend/app/models.py` (remove `Roadmap`, `RoadmapStudentState`, `DecisionRecord`, `PaiPossibility.roadmap_id`), `tests/http_student.py`, `scripts/counselor_eval_support.py`, `scripts/export_counselor_session.py`, `scripts/eval_counselor_deep.py`, `scripts/eval/offline_startup_check.py`, and any remaining reference; Test `backend/tests/test_migration_119.py`.
+**Interfaces:** upgrade drops in FK-safe order: `pai_decision_records`, `pai_roadmap_student_state`, the `pai_possibilities.roadmap_id` FK and column, then `pai_roadmaps`. Downgrade recreates them empty with the 084/091/100 shapes. `pai_student_requests` stays.
+- [ ] Failing tests: after upgrade the three tables and the column are gone; downgrade restores them; no code references the removed models (grep test).
+- [ ] Implement; full backend suite; commit `chore(roadmap): drop the old roadmap tables`.
