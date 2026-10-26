@@ -15,7 +15,7 @@ Paths below are relative to `backend/app/`. Every listed call now enters
 | `pai_c/deep/turn.py` (normal + language retry) | counselor | `PAI_COUNSELOR_MODEL` -> `PAI_MODEL` | `PAI_COUNSELOR_REASONING_EFFORT` |
 | `pai_c/deep/analysis.py` | analyst | `PAI_ANALYST_MODEL` -> Counselor model | `PAI_ANALYST_REASONING_EFFORT` |
 | `pai_c/deep/mirror.py` | mirror | `PAI_MIRROR_MODEL` -> Counselor model | Counselor effort |
-| `pai_c/deep/roadmaps.py` | roadmap | `PAI_ROADMAP_MODEL` -> Counselor model | Counselor effort |
+| `pai_c/paths/explain.py` | path_explain | `PAI_PATH_EXPLAIN_MODEL` -> `PAI_ROADMAP_MODEL` (older name) -> Counselor model | Counselor effort |
 | `pai_c/deep/sensitive.py` | sensitive | `PAI_SENSITIVE_CHECK_MODEL` -> Analyst model | `PAI_SENSITIVE_CHECK_REASONING_EFFORT` |
 | `memory/extractor.py` | extractor | `MEMORY_EXTRACTOR_MODEL` -> `PAI_MODEL` | No explicit effort, as before |
 | `memory/embeddings.py` | embeddings | `MEMORY_EMBEDDING_MODEL` | Not applicable |
@@ -271,6 +271,10 @@ and the existing Task Runtime.
 
 ### Trigger -> gateway -> run
 
+Superseded 26 Oct 2026: the roadmap engine (ROADMAP_ENGINE_SPEC.md) computes routes on read. A confirmed
+Mirror now creates paths and moves the journey to PROPOSED with no research run; `routers/roadmaps`,
+`roadmap_research` runs, `roadmap_light` and `stale_refresh` are removed. The table records the old design.
+
 | Trigger | Producer | Gateway / run |
 | --- | --- | --- |
 | mirror_confirmed | deep.mirror.confirmed_research_job | request_research(roadmap_light) -> roadmap_research + operator.run |
@@ -393,7 +397,7 @@ asserts one profile read and the retained memory fields.
 | services/workflow | handle_student_message | same thread/coroutine runner |
 | services/integrations | handle_student_message | same asyncio.run |
 | services/operator result handoff | handle_research_result | same awaited result explanation |
-| routers/roadmaps focus | handle_roadmap_discussion | same awaited deep turn and post; router keeps exception handling |
+| routers/roadmaps focus (superseded 26 Oct 2026 by the roadmap engine, ROADMAP_ENGINE_SPEC.md) | handle_roadmap_discussion | same awaited deep turn and post; router keeps exception handling |
 | documents/handlers notify | handle_document_update | same queued document job and awaited post |
 
 ### Outbound path
@@ -428,6 +432,9 @@ per-turn memory extraction; sensitivity remains batched before Mirror.
 
 "Shared modules signal PAI C only by enqueueing a named job through the Task
 Runtime; they never import pai_c."
+
+Superseded 26 Oct 2026: `roadmaps.mark_stale` and `RoadmapService` are removed with the old roadmaps;
+the engine reads the Vault on every request, so nothing goes stale. The rest of this section records the old design.
 
 The reconciler queues roadmaps.mark_stale with {workspace_id, reason} and
 idempotency key roadmap-stale:<candidate.id>, in the same transaction as the
@@ -571,12 +578,12 @@ legacy reads are unchanged.
 | deep/sensitive | V2 batching; private archive excluded |
 | research/gateway | Public understanding_summary; stated goal from said |
 | research/jobs | Same facade gate and summary for refresh/resume |
-| deep/roadmaps + prompt | Existing brief now carries v2 public understanding |
+| deep/roadmaps + prompt (superseded 26 Oct 2026 by the roadmap engine, ROADMAP_ENGINE_SPEC.md) | Existing brief now carries v2 public understanding |
 | session exporter | Facade reads latest/history and emits v2 + archive flag |
 | evaluation harness | V2 replay fixtures and claim-level metrics |
 | workspace deletion | Facade lifecycle method, no direct NotebookService import |
 
-Grep found one intentional interpretive write retained: routers/roadmaps.py
+Grep found one intentional interpretive write retained (superseded 26 Oct 2026 by the roadmap engine, ROADMAP_ENGINE_SPEC.md): routers/roadmaps.py
 stores the student's manually added route why as details.underlying_objective.
 This is explicitly unchanged. Shared profile view/student context/snapshot,
 records, stewards, voice attribution and Vault intake retain existing-row reads,
