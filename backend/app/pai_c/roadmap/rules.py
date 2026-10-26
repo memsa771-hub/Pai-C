@@ -27,6 +27,7 @@ class EntryTest:
     body: str
     pass_percent: float | None
     source: str
+    scope_fields: tuple[str, ...] | None = None  # None: the test applies to every field of the rule
 
 
 @dataclass(frozen=True)
@@ -45,6 +46,12 @@ class Rule:
     def years_for(self, field_key: str) -> int | None:
         return (self.years_by_field or {}).get(field_key, self.years)
 
+    def tests_for(self, field_key: str) -> tuple[EntryTest, ...]:
+        """The entry tests of one field: a shared rule (MBBS and BDS) may scope
+        a test to its own field, as steps do, so a card never shows another
+        field's pass mark."""
+        return tuple(t for t in self.entry_tests if t.scope_fields is None or field_key in t.scope_fields)
+
 
 @lru_cache(maxsize=1)
 def _data() -> dict:
@@ -58,7 +65,8 @@ def _rule(row: dict) -> Rule:
                                     tuple(s["scope_fields"]) if s.get("scope_fields") else None)
                                for s in row.get("groups_with_step", [])),
         required_subjects=list(row["required_subjects"]),
-        entry_tests=tuple(EntryTest(t["name"], t["body"], t.get("pass_percent"), t["source"])
+        entry_tests=tuple(EntryTest(t["name"], t["body"], t.get("pass_percent"), t["source"],
+                                    tuple(t["scope_fields"]) if t.get("scope_fields") else None)
                           for t in row.get("entry_tests", [])),
         years=row["years"], fee_band_per_year=next((v for k, v in row.items() if k.startswith("fee_band")), None),
         sources=list(row["sources"]), confidence=row["confidence"], years_by_field=row.get("years_by_field"))
@@ -86,11 +94,16 @@ def rule_for(field_key: str) -> Rule | None:
 
 
 def grade_list(text: str) -> list[str]:
-    """Grades named in one result string ("A*AB", "A, B, C"), read with the
-    grade letters of the IBCC table so a new grade is a data change."""
+    """Grades in a result string made only of grades and separators ("A*AB",
+    "A, B / C"), read with the IBCC table's letters so a new grade is a data
+    change. Anything else ("BCC (predicted)") is not structured data: [] and
+    the student is asked for marks, never a partial guess."""
     table = _data()["equivalence"]["o_level_a_level"]["grade_to_pak_marks_a_level_o_level"]
     pattern = "|".join(re.escape(g) for g in sorted(table, key=len, reverse=True))
-    return re.findall(pattern, str(text or "").upper())
+    text = str(text or "").strip().upper()
+    if not text or not re.fullmatch(rf"(?:(?:{pattern})[\s,/]*)+", text):
+        return []
+    return re.findall(pattern, text)
 
 
 def ibcc_percent(grades: list[str]) -> float | None:

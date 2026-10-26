@@ -250,13 +250,19 @@ def test_a_downward_correction_reads_as_the_latest_answer():
         assert prefill["level"] == "intermediate" and prefill["group"] == "pre_engineering"
 
 
-def test_current_education_is_current_first_then_most_recent():
+def test_current_education_is_current_first_then_highest_completed():
     newest_completed = {"qualification_name": "matric", "academic_status": "completed"}
     older_completed = {"qualification_name": "bachelor", "academic_status": "completed"}
     current_low = {"qualification_name": "fsc", "academic_status": "current"}
     current_high = {"qualification_name": "bachelor", "academic_status": "current"}
     # Records arrive newest first, as StudentRecordService.list returns them.
-    assert current_education([newest_completed, older_completed]) is newest_completed
+    # No current record: the highest completed level wins (ruling, roadmap fix round 1),
+    # ties go to the most recent.
+    assert current_education([newest_completed, older_completed]) is older_completed
+    newer_bachelor = dict(older_completed)
+    assert current_education([newer_bachelor, older_completed]) is newer_bachelor
+    planned = {"qualification_name": "bachelor", "academic_status": "planned"}
+    assert current_education([planned]) is planned
     assert current_education([newest_completed, current_low, current_high]) is current_low
     assert current_education([]) is None
 

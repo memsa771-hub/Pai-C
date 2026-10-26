@@ -8,8 +8,9 @@ from app.journey import JourneyService
 from app.memory.student_records import StudentRecordService
 from app.pai_c.paths.fields import study_fields
 from app.pai_c.possibilities import PossibilityService
-from app.pai_c.roadmap.engine import RoadmapEngine, roadmap_policy, student_standing, verdict
-from app.pai_c.roadmap.rules import ibcc_percent, rule_for
+from app.pai_c.paths.fields import read_education
+from app.pai_c.roadmap.engine import RoadmapEngine, education_line, roadmap_policy, student_standing, verdict
+from app.pai_c.roadmap.rules import grade_list, ibcc_percent, rule_for
 from scripts.counselor_eval_support import StudentSession
 
 
@@ -89,8 +90,6 @@ def test_pre_eng_55_step():
     assert result.status == "step"
     assert {"key": "needs_percent", "min": 60, "have": 55} in result.reasons
     assert any(n.kind == "marks" for n in result.needs)
-    template = roadmap_policy()["copy"]["needs_percent"]
-    assert template.format(min=60, have=55) == "Needs 60%; you have 55%"
 
 
 def test_pre_med_engineering_step_and_mbbs_open():
@@ -189,3 +188,78 @@ def test_engine_makes_no_model_call():
     with patch("app.inference.gateway.complete", side_effect=AssertionError("model called")):
         result = build_for([fsc("pre_medical", 70)], ["mbbs", "electrical_engineering"])
     assert by_key(result)["mbbs"]["status"] == "open"
+
+
+# ---- fix round 1 -----------------------------------------------------------------
+
+def a_level(grade=None, grades=None):
+    details = {"subjects": ["physics", "chemistry", "mathematics"]}
+    if grades is not None:
+        details["grades"] = grades
+    record = {"qualification_name": "a_level", "academic_status": "completed", "details": details}
+    if grade is not None:
+        record["result"] = {"grade": grade}
+    return record
+
+
+def test_grades_only_from_structured_data():
+    assert grade_list("BCC (predicted)") == [] and grade_list("A grade") == [] and grade_list("Distinction") == []
+    assert grade_list("A*AB") == ["A*", "A", "B"] and grade_list("A, B / C") == ["A", "B", "C"]
+    assert standing_of(a_level("BCC (predicted)")).percent is None
+    noisy = verdict("electrical_engineering", standing_of(a_level("BCC (predicted)")))
+    assert noisy.status == "open" and noisy.reasons[0]["key"] == "add_marks"
+    assert standing_of(a_level(grades=["B", "C", "C"])).percent == round(ibcc_percent(["B", "C", "C"]), 1)
+    assert standing_of(a_level(grades=["B", "C", "predicted"])).percent is None
+
+
+def test_mdcat_scoped_to_its_own_field():
+    record = fsc("pre_medical", 80)
+    bds, mbbs = verdict("bds", standing_of(record)), verdict("mbbs", standing_of(record))
+    assert [(t["name"], t["pass_percent"]) for t in bds.tests] == [("MDCAT (BDS)", 50)]
+    assert [(t["name"], t["pass_percent"]) for t in mbbs.tests] == [("MDCAT (MBBS)", 55)]
+    assert rule_for("bds").tests_for("bds") == tuple(t for t in rule_for("bds").entry_tests
+                                                     if not t.scope_fields or "bds" in t.scope_fields)
+
+
+def test_standing_level_and_percent_from_one_record():
+    matric = {"qualification_name": "matric", "academic_status": "current", "result": {"percentage": 90}}
+    standing = standing_of(matric, fsc("pre_engineering", 72))
+    assert (standing.level, standing.percent) == ("matric", None)
+    assert standing_of(fsc("pre_engineering", None, result={"marks_obtained": 1200, "marks_total": 1100})
+                       ).percent is None
+
+
+def test_completed_records_read_the_highest_level():
+    from app.pai_c.paths.fields import candidate_fields, current_education
+    matric = {"qualification_name": "matric", "academic_status": "completed", "result": {"percentage": 90}}
+    records = [matric, fsc("pre_engineering", 72)]  # newest first: the Matric was edited later
+    assert read_education(current_education(records))[0] == "fsc"
+    assert candidate_fields(current_education(records))["electrical_engineering"].standing == "open"
+    assert (standing_of(*records).level, standing_of(*records).percent) == ("fsc", 72)
+    current_matric = {**matric, "academic_status": "current"}
+    assert read_education(current_education([fsc("pre_engineering", 72), current_matric]))[0] == "matric"
+    with StudentSession() as student, student.factory() as db:
+        add_education(student, db, fsc("pre_engineering", 72))
+        add_education(student, db, matric)
+        add_path(student, db, field_title("electrical_engineering"), "electrical_engineering")
+        result = RoadmapEngine(db).build(student.workspace_id)
+    assert result["standing"]["level"] == "fsc" and result["fields"][0]["status"] == "open"
+
+
+def test_matric_step_names_the_full_group():
+    result = verdict("electrical_engineering", standing_of({"qualification_name": "matric",
+                                                            "academic_status": "completed"}))
+    [group] = result.reasons[0]["groups"]
+    copy = roadmap_policy()["copy"]["choose_group"]
+    assert copy.format(groups=group["route_label"]) == "Choose FSc Pre-Engineering in intermediate"
+
+
+def test_reason_values_render_whole_numbers():
+    [reason] = verdict("electrical_engineering", standing_of(fsc("pre_engineering", 55))).reasons
+    assert roadmap_policy()["copy"][reason["key"]].format(**reason) == "Needs 60%; you have 55%"
+
+
+def test_o_level_line_names_no_group():
+    record = {"qualification_name": "o_level", "academic_status": "current",
+              "details": {"subjects": ["physics", "chemistry", "mathematics"]}}
+    assert education_line(standing_of(record))["groups"] == []

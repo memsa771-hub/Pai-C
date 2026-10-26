@@ -1,5 +1,5 @@
 {
- "_note": "Eligibility source for the roadmap engine (app/pai_c/roadmap): which intermediate groups open a study field, the percent floor, the entry tests and the degree length. To update: edit the rule here, keep its https sources and confidence (official|secondary|uncertain), and set unknown values to null; never fill a number from memory. Rules apply per field key (applies_to.fields) or per family (applies_to.family); a field rule wins over its family rule. groups_open null means use open_to from study_fields.json. scope_fields limits a step to those fields. Draft research of Oct 2026; see as_of.",
+ "_note": "Eligibility source for the roadmap engine (app/pai_c/roadmap): which intermediate groups open a study field, the percent floor, the entry tests and the degree length. To update: edit the rule here, keep its https sources and confidence (official|secondary|uncertain), and set unknown values to null; never fill a number from memory. Rules apply per field key (applies_to.fields) or per family (applies_to.family); a field rule wins over its family rule. groups_open null means use open_to from study_fields.json. scope_fields limits a step or an entry test to those fields. Draft research of Oct 2026; see as_of.",
  "as_of": "2026-10",
  "rules": [
   {
@@ -275,6 +275,9 @@
     {
      "name": "MDCAT (MBBS)",
      "body": "PM&DC",
+     "scope_fields": [
+      "mbbs"
+     ],
      "pass_percent": 55,
      "pass_percent_note": "55% (99/180) commonly quoted; not confirmed in primary text read",
      "source": "https://raahban.com/guides/mdcat-passing-marks"
@@ -282,6 +285,9 @@
     {
      "name": "MDCAT (BDS)",
      "body": "PM&DC",
+     "scope_fields": [
+      "bds"
+     ],
      "pass_percent": 50,
      "pass_percent_note": "50% (90/180), secondary",
      "source": "https://raahban.com/guides/mdcat-passing-marks"

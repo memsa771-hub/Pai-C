@@ -29,7 +29,7 @@ def roadmap_policy() -> dict:
 class Standing:
     level: str | None
     groups: tuple[str, ...]
-    percent: float | None
+    percent: float | int | None
     readable: bool
     field: str | None = None  # a degree student's own study field
 
@@ -64,28 +64,32 @@ def _intermediate_levels() -> set[str]:
             - set(rules["before_intermediate"]))
 
 
-def _marks_record(records: list[dict], current: dict | None) -> dict | None:
-    """The intermediate-level record, completed or current: the current
-    education when it is one, else the most recent such record."""
-    levels = _intermediate_levels()
-    usable = [row for row in records if read_education(row)[0] in levels
-              and row.get("academic_status") in (None, "current", "completed")]
-    return current if current in usable else (usable[0] if usable else None)
-
-
-def _percent(record: dict | None) -> float | None:
-    if not record:
+def _whole(value: float | None) -> float | int | None:
+    """One decimal, and 55 rather than 55.0, so "you have {have}%" reads right."""
+    if value is None:
         return None
+    value = round(float(value), 1)
+    return int(value) if value.is_integer() else value
+
+
+def _number(value) -> bool:
+    return isinstance(value, (int, float)) and not isinstance(value, bool)
+
+
+def _percent(record: dict) -> float | int | None:
+    """The record's own marks: percentage, else obtained/total (a total below
+    the obtained marks is a typo, not a mark), else IBCC grades for subject
+    levels (A-level) when they are structured grade codes. None otherwise."""
     result = {**record, **(record.get("result") or {})}
-    if isinstance(result.get("percentage"), (int, float)):
-        return round(float(result["percentage"]), 1)
+    if _number(result.get("percentage")) and 0 <= result["percentage"] <= 100:
+        return _whole(result["percentage"])
     obtained, total = result.get("marks_obtained"), result.get("marks_total")
-    if isinstance(obtained, (int, float)) and isinstance(total, (int, float)) and total > 0:
-        return round(obtained / total * 100, 1)
+    if _number(obtained) and _number(total) and 0 <= obtained <= total and total > 0:
+        return _whole(obtained / total * 100)
     if read_education(record)[0] in group_rules()["subject_rules"]:
-        grades = (record.get("details") or {}).get("grades") or grade_list(result.get("grade"))
-        value = ibcc_percent(list(grades)) if grades else None
-        return round(value, 1) if value is not None else None
+        grades = (record.get("details") or {}).get("grades")
+        grades = grades if isinstance(grades, list) else grade_list(result.get("grade"))
+        return _whole(ibcc_percent(grades)) if grades else None
     return None
 
 
@@ -95,8 +99,10 @@ def student_standing(education_records: list[dict]) -> Standing:
     if current is None:
         return Standing(level=None, groups=(), percent=None, readable=False)
     level, field_code = read_education(current)
+    # Level and marks come from the one record paths read: an intermediate
+    # mark never describes a Matric standing, nor a Matric mark an FSc one.
     return Standing(level=level, groups=tuple(sorted(student_groups(current))),
-                    percent=_percent(_marks_record(education_records, current)),
+                    percent=_percent(current) if level in _intermediate_levels() else None,
                     readable=education_readable(education_records),
                     field=field_code if level in group_rules()["degree_levels"] else None)
 
@@ -107,11 +113,24 @@ def _group(code: str) -> dict:
     return {"code": code, "label": vault_catalog().label("intermediate_groups", code)}
 
 
+def _route_group(code: str) -> dict:
+    """A group as a Matric student would choose it, with the qualification
+    that carries it: "FSc Pre-Engineering", or "ICS" where the level is the
+    group (group_rules from_level)."""
+    rules, catalog = group_rules(), vault_catalog()
+    own_level = next((level for level, group in rules["from_level"].items() if group == code), None)
+    if own_level:
+        route = catalog.label("levels", own_level)
+    else:
+        route = f"{catalog.label('levels', rules['from_field_of_study'][0])} {_group(code)['label']}"
+    return {**_group(code), "route_label": route}
+
+
 def _facts(rule: Rule | None, field_key: str | None, standing: Standing) -> dict:
     if rule is None:
         return {"tests": [], "years": None, "min_percent": None, "student_percent": standing.percent,
                 "confidence": None, "sources": [], "subjects": []}
-    return {"tests": [asdict(test) for test in rule.entry_tests], "years": rule.years_for(field_key),
+    return {"tests": [asdict(test) for test in rule.tests_for(field_key)], "years": rule.years_for(field_key),
             "min_percent": rule.min_percent, "student_percent": standing.percent,
             "confidence": rule.confidence, "sources": list(rule.sources),
             "subjects": list(rule.required_subjects)}
@@ -155,7 +174,7 @@ def _choose_group(field_key: str, level: str) -> tuple:
                              "group_label": vault_catalog().label("levels", level)}], []
     if not candidate.needs_group:
         return "step", [{"key": "choose_any_group"}], [Need("group", {"groups": []})]
-    groups = [_group(code) for code in candidate.needs_group]
+    groups = [_route_group(code) for code in candidate.needs_group]
     return "step", [{"key": "choose_group", "groups": groups}], [Need("group", {"groups": groups})]
 
 
@@ -190,8 +209,8 @@ def education_line(standing: Standing) -> dict | None:
     if standing.field:
         study = study_fields().get(standing.field)
         groups = [{"code": standing.field, "label": study.title if study else standing.field}]
-    elif standing.level in rules["from_level"]:
-        groups = []  # the level already names the group (ICS, I.Com, FA, DAE)
+    elif standing.level in rules["from_level"] or standing.level in rules["before_intermediate"]:
+        groups = []  # the level names the group (ICS, FA), or no group is chosen yet (Matric, O-level)
     else:
         groups = [_group(code) for code in standing.groups if code in known_groups()]
     return {"level": standing.level, "level_label": vault_catalog().label("levels", standing.level),

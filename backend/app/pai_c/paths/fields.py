@@ -152,13 +152,24 @@ def candidate_fields(education_record: dict | None) -> dict[str, Candidate]:
 
 
 def current_education(records: list[dict]) -> dict | None:
-    """The education record paths read: the most recent current one, else the
-    most recent. Records arrive newest first (StudentRecordService.list
-    orders by updated_at), so the student's latest answer wins even when it is
-    a lower level than an older record, as when a Bachelor's typed by mistake
-    is corrected to Intermediate."""
-    return next((row for row in records if row.get("academic_status") == "current"),
-                records[0] if records else None)
+    """The education record paths and the roadmap read: the most recent
+    current one, else the highest completed level (catalog level_ranks, ties to
+    the most recent), else the most recent. Records arrive newest first
+    (StudentRecordService.list orders by updated_at), so the student's latest
+    current answer wins even when it is a lower level than an older record, as
+    when a Bachelor's typed by mistake is corrected to Intermediate; but a
+    later edit to a completed Matric never hides a completed FSc."""
+    current = next((row for row in records if row.get("academic_status") == "current"), None)
+    if current is not None:
+        return current
+    from app.pai_c.memory import vault_catalog
+    spec = vault_catalog().type("education")
+    ranks = spec.level_ranks if spec else {}
+    completed = [row for row in records if row.get("academic_status") == "completed"]
+    if completed:
+        # max keeps the first of equal ranks: the most recently updated.
+        return max(completed, key=lambda row: ranks.get(read_education(row)[0], -1))
+    return records[0] if records else None
 
 
 def education_readable(records: list[dict]) -> bool:
