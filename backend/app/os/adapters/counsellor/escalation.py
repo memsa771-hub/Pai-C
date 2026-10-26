@@ -19,14 +19,16 @@ from app.os.outbox import Outbox
 from app.os.replan import events
 from app.os.replan.apply import BROKEN_REASON, LIMIT_REASON, REFUSED_REASON
 from app.os.replan.rules import REASONS
-from app.os.replan.run import BUDGET_REASON, HANDOVER_PREFIX, INVALID_REASON
+from app.os.replan.run import BUDGET_REASON, INVALID_REASON
 from app.os.replan.store import SupportStore
 
 NOTES_PATH = Path(__file__).with_name("notes.yaml")
 REASON_CODES = ("not_eligible", "all_rejected", "deadline_passed", "blocking_gap", "other")
 CHANNEL = "counsellor"
 _SYSTEM = (LIMIT_REASON, REFUSED_REASON, REASONS["failed"], BUDGET_REASON, INVALID_REASON)
-_SYSTEM_PREFIXES = (HANDOVER_PREFIX, "The plan kept changing")  # no Supervisor; a stale draft (ReplanFailed)
+# A stale draft (ReplanFailed). A rules hand-over with no Supervisor (HANDOVER_PREFIX) is *not* here: the route
+# problem is still real, so the triggering event decides (final review I1).
+_SYSTEM_PREFIXES = ("The plan kept changing",)
 _BY_EVENT = {"route_invalid": "not_eligible", "admission_rejected": "all_rejected",
              "deadline_at_risk": "deadline_passed", "escalate": "blocking_gap", "document_missing": "blocking_gap"}
 

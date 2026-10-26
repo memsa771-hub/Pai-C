@@ -33,6 +33,12 @@ def submit_counsellor_decision(export: dict) -> Literal["stored", "duplicate", "
     return "stored" if stored else "duplicate"
 
 
+def counsellor_enabled() -> bool:
+    """Whether the `counsellor` module is on: while it is off the glue's sweep submits nothing (S8-D2)."""
+    svc = ports.services()
+    return manifest.is_enabled(svc.engine, svc.settings.tenant_id)
+
+
 def sweep_mark() -> dict | None:
     """The glue's sweep position (the last chosen_at and decision ID it submitted)."""
     svc = ports.services()

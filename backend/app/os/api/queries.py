@@ -2,6 +2,7 @@
 
 from sqlalchemy import Engine, select
 
+from app.os.kernel.states import PLAN_OPEN
 from app.os import models
 
 T, P = models.tasks, models.plans
@@ -123,7 +124,7 @@ def student_programmes(engine: Engine, tenant_id: str, student_ref: str) -> list
     year: value, status, source link, quote, check date and conflict note. No evidence (it is for admins)."""
     with engine.connect() as conn:
         plans = conn.execute(select(P.c.id, P.c.contract).where(
-            P.c.tenant_id == tenant_id, P.c.student_ref == student_ref, P.c.status != "done").order_by(P.c.id)).all()
+            P.c.tenant_id == tenant_id, P.c.student_ref == student_ref, P.c.status.in_(PLAN_OPEN)).order_by(P.c.id)).all()
         out, seen = [], set()
         for plan_id, contract in plans:
             intake_year = contract["target_intake"]["year"]

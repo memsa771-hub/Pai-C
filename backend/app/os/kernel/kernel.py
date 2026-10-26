@@ -169,6 +169,9 @@ class Kernel:
                 diff={"cancelled": sorted(cancelled)}))
             conn.execute(update(P).where(P.c.id == plan_id).values(
                 status=PLAN_CLOSED, current_revision=number, updated_at=self.clock()))
+            PR = models.proposals  # a suggestion waiting for the student can no longer be accepted (final review I2)
+            conn.execute(update(PR).where(PR.c.plan_id == plan_id, PR.c.status == "pending").values(
+                status="expired", answered_at=self.clock()))
             self._event(conn, plan_id, None, "plan_closed", {"number": number, "cause": cause})
             return number
 
@@ -364,6 +367,8 @@ class Kernel:
 
     def _revise(self, conn: Connection, plan_id: int, cause: str, draft: PlanDraft, *,
                 contract_update: dict | None = None, pin_version: int | None = None) -> int | None:
+        if conn.execute(select(P.c.status).where(P.c.id == plan_id)).scalar_one() == PLAN_CLOSED:
+            raise IllegalTransition(f"plan {plan_id} is closed: it is never revised again (Slice 8 S8-D8)")
         stored = {r.instance_key: r._mapping for r in conn.execute(select(T).where(T.c.plan_id == plan_id))}
         ids = {k: r["id"] for k, r in stored.items()}
         new = {t.instance_key: t for t in draft.tasks}

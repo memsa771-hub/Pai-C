@@ -99,7 +99,6 @@ def test_intake_refusal_is_other(svc):
 @pytest.mark.parametrize("type_,reason", [
     ("admission_rejected", LIMIT_REASON),  # the daily-change limit
     ("task_failed", REASONS["failed"]),  # a step failing twice
-    ("admission_rejected", "No automatic change: a rejection left 0 programme(s) and there is no close match."),
     ("deadline_at_risk", BUDGET_REASON),  # the Supervisor over budget
     ("escalate", INVALID_REASON),  # or invalid
     ("deadline_at_risk", REFUSED_REASON),  # every operation refused

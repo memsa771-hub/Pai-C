@@ -6,6 +6,7 @@ from dataclasses import asdict, dataclass
 
 from sqlalchemy import exists, select
 
+from app.os.kernel.states import PLAN_OPEN
 from app.os import models
 from app.os.api.queries import plan_out
 from app.os.eligibility.evaluate import Card
@@ -128,7 +129,7 @@ def student_plan(plans, student_ref: str) -> StudentPlan | None:
     """The student's newest open plan and the route it follows (Slice 5: statements belong to a route)."""
     with plans.engine.connect() as conn:
         rows = conn.execute(select(P.c.id, P.c.contract).where(
-            P.c.tenant_id == plans.kernel.tenant_id, P.c.student_ref == student_ref, P.c.status != "done")
+            P.c.tenant_id == plans.kernel.tenant_id, P.c.student_ref == student_ref, P.c.status.in_(PLAN_OPEN))
             .order_by(P.c.id.desc())).all()
     books = newest_books(plans)
     for row in rows:

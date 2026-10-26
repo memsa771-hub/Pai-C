@@ -51,12 +51,15 @@ def decision_changed(workspace_id: str, db=None) -> str | None:
 
         with SessionLocal() as session:
             return decision_changed(workspace_id, session)
-    export = current_export(db, workspace_id)
-    if export is None:
-        return None
     try:
+        export = current_export(db, workspace_id)
+        if export is None:
+            return None
         return plan_source.submit_counsellor_decision(export)
     except ports.OsUnavailable:
+        return None
+    except Exception:  # noqa: BLE001  (a bad export is logged; the sweep tries again, never the Counsellor's request)
+        log.exception("PAI OS could not take the decision export of workspace %s", workspace_id)
         return None
 
 
@@ -64,22 +67,31 @@ def _aware(at: datetime) -> datetime:
     return at if at.tzinfo else at.replace(tzinfo=timezone.utc)
 
 
-def _submit_since_mark(db) -> int:
+def _submit_since_mark(db) -> tuple[int, int]:
+    """(submitted, failed). Only while the `counsellor` module is on (S8-D2): while it is off the mark stays, so
+    switching on submits from there. One export that fails is logged and never stops the others."""
+    if not plan_source.counsellor_enabled():
+        return 0, 0
     mark = plan_source.sweep_mark()
     after = (datetime.fromisoformat(mark["chosen_at"]), mark["decision_id"]) if mark else None
     rows = db.execute(select(DecisionRecord.id, DecisionRecord.workspace_id, DecisionRecord.chosen_at)
                       .order_by(DecisionRecord.chosen_at, DecisionRecord.id)).all()
     rows = [r for r in rows if after is None or (_aware(r.chosen_at), r.id) > after]
-    submitted = 0
+    submitted = failed = 0
     for workspace_id in dict.fromkeys(r.workspace_id for r in rows):  # each student once, oldest change first
-        export = current_export(db, workspace_id)
-        if export is not None:
-            plan_source.submit_counsellor_decision(export)
-            submitted += 1
+        try:
+            export = current_export(db, workspace_id)
+            if export is not None:
+                plan_source.submit_counsellor_decision(export)
+                submitted += 1
+        except Exception:  # noqa: BLE001  (logged; the Counsellor fixes the export and the next choice re-submits)
+            db.rollback()
+            log.exception("PAI OS could not take the decision export of workspace %s", workspace_id)
+            failed += 1
     if rows:
         last = max(rows, key=lambda r: (_aware(r.chosen_at), r.id))
         plan_source.set_sweep_mark({"chosen_at": _aware(last.chosen_at).isoformat(), "decision_id": last.id})
-    return submitted
+    return submitted, failed
 
 
 def _deliver(db) -> dict:
@@ -116,7 +128,13 @@ def sweep_once(db) -> dict:
         ports.services()
     except ports.OsUnavailable:
         return {"mounted": False}
-    return {"submitted": _submit_since_mark(db), **_deliver(db)}
+    try:
+        submitted, failed = _submit_since_mark(db)
+    except Exception:  # noqa: BLE001  (logged; delivery still runs, and the next sweep tries again from the mark)
+        db.rollback()
+        log.exception("PAI OS sweep could not submit decisions")
+        submitted, failed = 0, 1
+    return {"submitted": submitted, "failed": failed, **_deliver(db)}
 
 
 def _sweep_with_session() -> dict:
