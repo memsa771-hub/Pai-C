@@ -20,6 +20,7 @@ from app.os.contracts.route_contract import RouteContract
 from app.os.kernel.revisions import CANCELLED_MARK, DONE_MARK, NOTICE_PREFIX, diff
 from app.os.replan import events as replan_events
 from app.os.kernel.states import (
+    PLAN_CLOSED,
     SATISFIES_DEPENDENCY,
     TERMINAL,
     IllegalTransition,
@@ -147,6 +148,29 @@ class Kernel:
                     tenant_id=self.tenant_id, plan_id=plan_id, proposal_id=proposal_id, op=o.op, target=o.target,
                     payload=o.payload))
             return self._revise(conn, plan_id, f"{REPLAN_CAUSE}{proposal_id}", draft)
+
+    def close_plan(self, plan_id: int, cause: str) -> int:
+        """Closes a plan for good (Slice 8 S8-D8): status `closed`, every open task `cancelled`, one revision with
+        `cause` (e.g. `superseded:<new plan id>`). A closed plan is never reopened; closing it again changes nothing
+        and returns the revision that closed it."""
+        with self.engine.begin() as conn:
+            self._lock_plan(conn, plan_id)
+            status, current = conn.execute(select(P.c.status, P.c.current_revision).where(P.c.id == plan_id)).one()
+            if status == PLAN_CLOSED:
+                return current
+            number = current + 1
+            cancelled = []
+            for row in conn.execute(select(T).where(T.c.plan_id == plan_id, T.c.state.not_in(
+                    [s.value for s in TERMINAL])).order_by(T.c.id)).all():
+                self._transition(conn, row, S.CANCELLED, cause=cause)
+                cancelled.append(row.instance_key)
+            conn.execute(insert(models.plan_revisions).values(
+                tenant_id=self.tenant_id, plan_id=plan_id, number=number, cause=cause,
+                diff={"cancelled": sorted(cancelled)}))
+            conn.execute(update(P).where(P.c.id == plan_id).values(
+                status=PLAN_CLOSED, current_revision=number, updated_at=self.clock()))
+            self._event(conn, plan_id, None, "plan_closed", {"number": number, "cause": cause})
+            return number
 
     def set_changes_paused(self, plan_id: int, paused: bool) -> None:
         """Pauses or resumes replanning for a plan (S7-D9). Student-driven changes are not affected."""
@@ -414,4 +438,5 @@ class Kernel:
                     self._request(conn, r.id, attempt)
         states = conn.execute(select(T.c.state).where(T.c.plan_id == plan_id)).scalars().all()
         if states and all(S(s) in TERMINAL for s in states):
-            conn.execute(update(P).where(P.c.id == plan_id).values(status="done", updated_at=self.clock()))
+            conn.execute(update(P).where(P.c.id == plan_id, P.c.status != PLAN_CLOSED).values(
+                status="done", updated_at=self.clock()))
