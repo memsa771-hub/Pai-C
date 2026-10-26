@@ -14,8 +14,10 @@ from pydantic import TypeAdapter
 from sqlalchemy import Engine, func, select, text
 
 from app.os import models
+from app.os.adapters.standalone.escalation import StandaloneSink
 from app.os.compiler import CompileError
 from app.os.kernel import IllegalTransition, StaleDraft
+from app.os.ports.escalation import EscalationSink
 from app.os.replan.checks import check_operations, task_rows
 from app.os.replan.config import ReplanConfig
 from app.os.replan.events import Event
@@ -65,11 +67,13 @@ def _writes(op: Op) -> bool:
 
 class Replanner:
     def __init__(self, engine: Engine, plans, configs: Mapping[str, ReplanConfig], outbox,
-                 clock: Callable[[], datetime] = _utcnow) -> None:
+                 clock: Callable[[], datetime] = _utcnow, escalations: EscalationSink | None = None) -> None:
         self.engine, self.plans, self.configs, self.outbox, self.clock = engine, plans, configs, outbox, clock
         self.tenant = plans.kernel.tenant_id
         self.proposals, self.overrides = ProposalStore(engine, self.tenant), OverrideStore(engine, self.tenant)
         self.support_cases = SupportStore(engine, self.tenant)
+        # every support case goes through the port (Slice 8 S8-D12); standalone only unless the caller wires more
+        self.escalations = escalations or StandaloneSink(engine, self.tenant, self.student_of)
 
     @contextmanager
     def plan_lock(self, plan_id: int) -> Iterator[None]:
@@ -238,10 +242,7 @@ class Replanner:
         return self.proposals.create(plan_id, event_ids, "rules", [], [], big=False, expires_at=None, status="applied")
 
     def support(self, plan_id: int, event_ids: list[int], reason: str, proposal_id: int | None = None) -> int:
-        found = self.support_cases.for_event(event_ids[0]) if event_ids else None
-        if found is not None:
-            return found.id
-        return self.support_cases.open(plan_id, self.student_of(plan_id), reason, event_ids, proposal_id)
+        return self.escalations.escalate(plan_id, event_ids, reason, proposal_id)
 
     # ------------------------------------------------------------------ applying
 
