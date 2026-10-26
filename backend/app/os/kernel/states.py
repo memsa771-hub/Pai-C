@@ -33,6 +33,8 @@ ALLOWED: Mapping[TaskState, frozenset[TaskState]] = {
 TERMINAL = frozenset({S.DONE, S.SKIPPED, S.CANCELLED})
 SATISFIES_DEPENDENCY = frozenset({S.DONE, S.SKIPPED})
 UNSTARTED = frozenset({S.PENDING, S.READY, S.BLOCKED})
+PLAN_OPEN = ("active", "at_risk", "paused")  # plan statuses still being worked on; done and closed plans are over
+PLAN_CLOSED = "closed"  # superseded by a new route (Slice 8 S8-D8): never reopened
 
 
 def is_started(state: TaskState | str, kind: str) -> bool:
