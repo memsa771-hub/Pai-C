@@ -28,8 +28,8 @@ import {
 import copy from "./copy.json";
 
 const health = () => workspaceApi.getCounselorHealth();
-/** Section names in a URL land on the section's first view. */
-/** Old view names (the Compare and Plan tabs) land on the one Roadmap page. */
+/** Section names in a URL land on the section's first view; old view names
+ * (roadmaps, and the Compare and Plan tabs) land on the one Roadmap page. */
 const ALIASES: Record<string, string> = {
   roadmaps: "roadmap", compare: "roadmap", plan: "roadmap", vault: "files", pai: "threads", home: "overview",
 };
@@ -162,7 +162,7 @@ export function CounselorShell() {
             ) : (
               <Paths onOpen={openPath} onChat={chat} />
             ))}
-          {active === "roadmap" && <Roadmap onNavigate={navigate} onChat={chat} />}
+          {active === "roadmap" && <Roadmap onNavigate={navigate} onChat={chat} onChanged={() => void journey.refresh()} />}
           {active === "settings" && <CounselorSettings base={base} onNavigate={navigate} />}
         </div>
       </div>

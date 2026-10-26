@@ -1,7 +1,7 @@
 "use client";
 /** Pieces of the Roadmap page: a field card, the route sheet, the Compare
  * table and the student's chosen route. Words come from copy.json `roadmap`. */
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   BookOpen, Briefcase, CalendarClock, Check, CircleCheck, ClipboardCheck, ExternalLink, FlaskConical, Flag,
   GraduationCap, Info, Laptop, ListChecks, Loader2, MapPin, MessageCircle, Percent, Ruler, Scale,
@@ -16,6 +16,8 @@ import {
 import { StatChip, Timeline, toneClass, type Tone } from "@/components/pai";
 import { initials } from "@/components/counselor/path-card";
 import { cn } from "@/lib/utils";
+import { formatDate } from "@/lib/i18n/format";
+import { DEFAULT_LOCALE } from "@/lib/i18n/locales";
 import {
   educationText, fill, marksText, needItem, render, shortNeed, testsText, uncertain, yearsText,
 } from "./roadmap-text";
@@ -127,10 +129,18 @@ const host = (url: string) => {
   try { return new URL(url).hostname.replace(/^www\./, ""); } catch { return url; }
 };
 
-function Sources({ sources }: { sources: string[] }) {
+/** "October 2026" from the rules' "2026-10"; empty when unknown. */
+const monthYear = (asOf: string | null | undefined) =>
+  asOf ? formatDate(`${asOf}-01`.slice(0, 10), DEFAULT_LOCALE, { month: "long", year: "numeric", timeZone: "UTC" }) : "";
+
+function Sources({ sources, checkedAt }: { sources: string[]; checkedAt?: string | null }) {
+  const checked = monthYear(checkedAt);
   return (
     <section className="mt-5">
-      <h3 className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{t.sheet.sources}</h3>
+      <div className="flex flex-wrap items-baseline justify-between gap-x-3">
+        <h3 className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{t.sheet.sources}</h3>
+        {checked && <p className="text-xs text-muted-foreground">{fill(t.sheet.checked, { date: checked })}</p>}
+      </div>
       {sources.length ? (
         <ul className="mt-2 flex flex-wrap gap-2">
           {sources.map((url) => (
@@ -149,9 +159,10 @@ function Sources({ sources }: { sources: string[] }) {
 
 /** The route for one field: Now → What you need → Entry test → Degree, its
  * sources, and the student's own choice. Nothing is chosen for them. */
-export function RouteSheet({ card, line, chosen, onClose, onChoose }: {
+export function RouteSheet({ card, line, chosen, checkedAt, onClose, onChoose }: {
   card: FieldCard | null;
   line: EducationLine | null;
+  checkedAt?: string | null;
   chosen: ChosenRoute | null;
   onClose: () => void;
   onChoose: (card: FieldCard) => Promise<void>;
@@ -207,7 +218,7 @@ export function RouteSheet({ card, line, chosen, onClose, onChoose }: {
               children: <p className="text-sm text-muted-foreground">{card.title}</p> },
           ]} />
           {uncertain(card) && <div className="mt-4"><CheckNote /></div>}
-          <Sources sources={v.sources} />
+          <Sources sources={v.sources} checkedAt={checkedAt} />
         </DialogBody>
         <DialogFooter className="flex-col items-stretch gap-2 px-7 pb-7 pt-3 max-lg:px-5 sm:flex-col sm:items-stretch">
           {!choosable && reasons[0] && <p className="text-sm text-muted-foreground">{reasons[0]}</p>}
@@ -235,7 +246,7 @@ export function CompareDialog({ cards, open, onOpenChange }: {
     ["marks", (card) => card.verdict.min_percent == null ? t.notKnown : card.verdict.student_percent == null
       ? `${card.verdict.min_percent}%` : fill(t.facts.marksCompare, { min: card.verdict.min_percent, have: card.verdict.student_percent })],
     ["step", (card) => card.status === "not_open" ? render(card.verdict.reasons[0] || { key: "" }) || t.status.not_open
-      : card.status === "unknown" ? t.notKnown : shortNeed(card.verdict.needs[0])],
+      : card.status === "unknown" ? t.notKnown : (card.verdict.needs.length ? card.verdict.needs.map(shortNeed).join(", ") : shortNeed(undefined))],
     ["test", (card) => testsText(card) || t.facts.noTest],
     ["years", (card) => yearsText(card.verdict.years) || t.notKnown],
     ["confidence", (card) => card.verdict.confidence ? t.confidence[card.verdict.confidence] : t.notKnown],
@@ -281,24 +292,36 @@ export function CompareDialog({ cards, open, onOpenChange }: {
 
 /** The chosen route: its checklist the student ticks (saved at once, undone
  * if the save fails), and "Change route" behind one confirm. */
-export function YourRoute({ route, onWithdrawn, onChat }: {
+export function YourRoute({ route, onWithdrawn, onTicked, onChat }: {
   route: ChosenRoute;
   onWithdrawn: () => Promise<void> | void;
+  onTicked?: () => void;
   onChat?: (topic?: string) => void;
 }) {
   const [done, setDone] = useState(route.steps_done);
-  const [error, setError] = useState(false), [confirming, setConfirming] = useState(false), [busy, setBusy] = useState(false);
+  const [error, setError] = useState(false), [confirming, setConfirming] = useState(false), [busy, setBusy] = useState(false),
+    [savingView, setSavingView] = useState(false);
+  const saving = useRef(false);
   useEffect(() => { setDone(route.steps_done); }, [route]);
+  // One save at a time: the checklist is disabled while a tick is saving, so
+  // a double click cannot send (i, true) then (i, false) and replies never
+  // arrive out of order. A failure undoes only the step that failed.
   async function tick(index: number, value: boolean) {
-    const before = done;
-    setDone(done.map((d, i) => (i === index ? value : d)));
+    if (saving.current) return;
+    saving.current = true;
+    setSavingView(true);
+    setDone((list) => list.map((d, i) => (i === index ? value : d)));
     setError(false);
     try {
       const saved = await workspaceApi.setRouteStep(index, value);
       setDone(saved.steps_done);
+      onTicked?.();
     } catch {
-      setDone(before);
+      setDone((list) => list.map((d, i) => (i === index ? !value : d)));
       setError(true);
+    } finally {
+      saving.current = false;
+      setSavingView(false);
     }
   }
   async function withdraw() {
@@ -318,8 +341,9 @@ export function YourRoute({ route, onWithdrawn, onChat }: {
               <p className="font-display text-xl leading-snug">{route.title}</p>
             </div>
           </div>
-          <p className="text-sm font-semibold tabular-nums" aria-label={fill(t.route.progressLabel, { done: count, total })}>
-            {fill(t.route.progress, { done: count, total })}
+          <p className="text-sm font-semibold tabular-nums">
+            <span aria-hidden>{fill(t.route.progress, { done: count, total })}</span>
+            <span className="sr-only">{fill(t.route.progressLabel, { done: count, total })}</span>
           </p>
         </div>
         <span aria-hidden className="mt-3 block h-2 overflow-hidden rounded-full bg-card">
@@ -336,7 +360,7 @@ export function YourRoute({ route, onWithdrawn, onChat }: {
           {route.steps.map((step, i) => (
             <li key={i}>
               <label className="flex min-h-11 cursor-pointer items-center gap-3 py-1.5 text-sm">
-                <input type="checkbox" checked={!!done[i]} onChange={(e) => tick(i, e.target.checked)}
+                <input type="checkbox" checked={!!done[i]} disabled={savingView} onChange={(e) => tick(i, e.target.checked)}
                   className="size-[18px] shrink-0 accent-[var(--brand)]" />
                 <span className={cn(done[i] && "text-muted-foreground line-through decoration-muted-foreground/50")}>{render(step)}</span>
               </label>

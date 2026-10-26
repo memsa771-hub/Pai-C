@@ -22,18 +22,22 @@ const SHOWN: RoadmapStatus[] = ["open", "step", "unknown"];
 const ORDER: RoadmapStatus[] = ["open", "step", "not_open", "unknown"];
 const firstReason = (card: FieldCard) => card.verdict.reasons[0]?.key;
 
-function GroupTitle({ id, status, count }: { id?: string; status: RoadmapStatus; count: number }) {
+/** A group's title; inside the collapsed <summary> it is a span, since a
+ * heading there loses its role in some screen readers. */
+function GroupTitle({ id, status, count, as: Tag = "h2" }: { id?: string; status: RoadmapStatus; count: number; as?: "h2" | "span" }) {
   return (
-    <h2 id={id} className="flex items-center gap-2.5 font-display text-lg leading-tight">
+    <Tag id={id} className="flex items-center gap-2.5 font-display text-lg leading-tight">
       {t.groups[status]}
       <span className="rounded-full bg-muted px-2 py-0.5 font-sans text-xs font-semibold tabular-nums text-muted-foreground">{count}</span>
-    </h2>
+    </Tag>
   );
 }
 
-export function Roadmap({ onNavigate, onChat }: {
+export function Roadmap({ onNavigate, onChat, onChanged }: {
   onNavigate?: (view: string) => void;
   onChat?: (topic?: string) => void;
+  /** After a choose, tick or withdraw, so the shell's journey stage follows. */
+  onChanged?: () => void;
 }) {
   const resource = useResource(load);
   const [picked, setPicked] = useState<string[]>([]),
@@ -58,6 +62,7 @@ export function Roadmap({ onNavigate, onChat }: {
     await workspaceApi.chooseRoute(card.field_key!);
     setSheet(null);
     await resource.refresh();
+    onChanged?.();
   };
   const cardsOf = (status: RoadmapStatus) => fields.filter((c) => c.status === status);
   const grid = (cards: FieldCard[]) => (
@@ -74,7 +79,8 @@ export function Roadmap({ onNavigate, onChat }: {
   return (
     <>
       {header}
-      {data.chosen && <YourRoute route={data.chosen} onWithdrawn={resource.refresh} onChat={onChat} />}
+      {data.chosen && <YourRoute route={data.chosen} onWithdrawn={async () => { await resource.refresh(); onChanged?.(); }}
+        onTicked={onChanged} onChat={onChat} />}
       {noEducation ? (
         <EmptyState icon={PencilLine} tone="violet" title={t.empty.educationTitle} description={t.empty.educationBody}
           action={<Button size="tap" onClick={() => onNavigate?.("profile")}>{t.empty.educationAction}</Button>} />
@@ -109,7 +115,7 @@ export function Roadmap({ onNavigate, onChat }: {
           {notOpen.length > 0 && (
             <details className="group/details">
               <summary className="flex min-h-11 cursor-pointer list-none items-center gap-2 [&::-webkit-details-marker]:hidden">
-                <GroupTitle status="not_open" count={notOpen.length} />
+                <GroupTitle as="span" status="not_open" count={notOpen.length} />
                 <ChevronDown aria-hidden className="size-5 text-muted-foreground transition-transform group-open/details:rotate-180" />
               </summary>
               <div className="mt-3">{grid(notOpen)}</div>
@@ -132,7 +138,7 @@ export function Roadmap({ onNavigate, onChat }: {
         </div>
       )}
 
-      <RouteSheet card={sheet} line={data.education_line} chosen={data.chosen} onClose={() => setSheet(null)} onChoose={choose} />
+      <RouteSheet card={sheet} line={data.education_line} chosen={data.chosen} checkedAt={data.rules_as_of} onClose={() => setSheet(null)} onChoose={choose} />
       <CompareDialog open={comparing} onOpenChange={setComparing}
         cards={picked.map((id) => fields.find((c) => c.possibility_id === id)).filter((c): c is FieldCard => !!c)} />
     </>

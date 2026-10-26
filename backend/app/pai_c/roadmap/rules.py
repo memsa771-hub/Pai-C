@@ -85,6 +85,12 @@ def _index() -> tuple[dict[str, Rule], dict[str, Rule]]:
     return by_field, by_family
 
 
+def rules_as_of() -> str | None:
+    """When the rules were last checked (admission_rules.json as_of), shown
+    beside the sources so a stale rule is visible."""
+    return _data().get("as_of")
+
+
 def rule_for(field_key: str) -> Rule | None:
     by_field, by_family = _index()
     if field_key in by_field:

@@ -4,6 +4,7 @@ import { workspaceApi } from "@/lib/api";
 import type { LivingPicture } from "@/lib/counselor-workspace";
 import type { Possibility } from "@/lib/possibilities";
 import type { RoadmapPage } from "@/lib/roadmap";
+import type { Roadmap } from "@/lib/roadmaps";
 import { useResource } from "./resource";
 import copy from "./copy.json";
 
@@ -11,6 +12,7 @@ export type Stage = (typeof copy.stages)[number];
 export type JourneySignals = {
   picture: LivingPicture;
   possibilities: Possibility[];
+  roadmaps: Roadmap[];
   roadmap: RoadmapPage | null;
 };
 
@@ -23,8 +25,9 @@ export function signalMet(signal: string, data: JourneySignals): boolean {
   const live = data.possibilities.filter((p) => p.status !== "dismissed");
   if (signal === "paths_found") return live.length > 0;
   if (signal === "path_explored") return live.some((p) => p.status === "exploring" || p.status === "chosen");
-  // The Roadmap page: fields checked, a route chosen, a first step ticked.
-  if (signal === "route_checked") return (data.roadmap?.fields.length ?? 0) > 0;
+  if (signal === "roadmap_prepared") return data.roadmaps.length > 0;
+  // The Roadmap page: a route the student chose, then a first step ticked.
+  // Cards alone reach nothing: they exist as soon as paths do.
   if (signal === "route_chosen") return !!data.roadmap?.chosen;
   if (signal === "route_step_done") return !!data.roadmap?.chosen?.steps_done.some(Boolean);
   return false;
@@ -51,12 +54,13 @@ export function journeyProgress(data: JourneySignals) {
 /** Optional signals: a failed read leaves that stage unreached, never broken. */
 const settle = <T,>(read: () => Promise<T>, fallback: T) => Promise.resolve().then(read).catch(() => fallback);
 const loadJourney = async (): Promise<JourneySignals> => {
-  const [picture, possibilities, roadmap] = await Promise.all([
+  const [picture, possibilities, roadmaps, roadmap] = await Promise.all([
     workspaceApi.getCounselorWorkspace(),
     settle(() => workspaceApi.getPossibilities(), [] as Possibility[]),
+    settle(() => workspaceApi.getRoadmaps(), [] as Roadmap[]),
     settle(() => workspaceApi.getRoadmapPage(), null as RoadmapPage | null),
   ]);
-  return { picture, possibilities, roadmap };
+  return { picture, possibilities, roadmaps, roadmap };
 };
 
 export function useJourney() {

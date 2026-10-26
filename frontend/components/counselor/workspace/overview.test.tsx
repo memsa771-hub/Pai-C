@@ -14,6 +14,7 @@ const path = (id: string, title: string, status: Possibility["status"]) =>
 const data: JourneySignals = {
   picture,
   possibilities: [path("p1", "Practical design", "suggested"), path("p2", "Applied computing", "saved"), path("p3", "Old idea", "dismissed")],
+  roadmaps: [],
   roadmap: null,
 };
 const journey = { data, error: false, busy: false, refresh: vi.fn(), progress: journeyProgress(data) };

@@ -225,8 +225,8 @@
     {
       "id": "H",
       "title": "Where to study",
-      "view": "roadmap",
-      "signal": "route_checked",
+      "view": "paths",
+      "signal": "roadmap_prepared",
       "tone": "blue"
     },
     {
@@ -721,7 +721,8 @@
       "choose": "Choose this route",
       "chosen": "This is your route",
       "replaces": "Choosing this replaces your current route.",
-      "close": "Close"
+      "close": "Close",
+      "checked": "Checked {date}"
     },
     "route": {
       "title": "Your route",

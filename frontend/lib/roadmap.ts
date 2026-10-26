@@ -61,4 +61,6 @@ export type RoadmapPage = {
   counts: Record<RoadmapStatus, number>;
   fields: FieldCard[];
   chosen: ChosenRoute | null;
+  /** When the admission rules were last checked, "YYYY-MM". */
+  rules_as_of?: string | null;
 };

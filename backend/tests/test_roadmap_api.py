@@ -16,7 +16,7 @@ from app.database import get_db
 from app.main import app
 from app.models import DecisionRecord, Roadmap, RoadmapStudentState, RouteDecision
 from app.pai_c.roadmap.engine import roadmap_policy
-from app.pai_c.roadmap.rules import rule_for
+from app.pai_c.roadmap.rules import rule_for, rules_as_of
 from tests.test_roadmap_engine import add_education, add_path, field_title, fsc
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -60,7 +60,8 @@ def choose(client, params, field_key):
 def test_get_roadmap_shape():
     with pre_eng() as (client, _, params):
         page = data(client.get("/v1/roadmap", params=params, headers=TOKEN))
-    assert set(page) >= {"education_line", "counts", "fields", "chosen"}
+    assert set(page) >= {"education_line", "counts", "fields", "chosen", "rules_as_of"}
+    assert page["rules_as_of"] == rules_as_of() == "2026-10"  # the date the rules were checked
     assert page["counts"] == {"open": 2, "step": 0, "not_open": 1, "unknown": 0}
     card = page["fields"][0]
     assert set(card) >= {"possibility_id", "field_key", "title", "family", "why", "status", "verdict"}

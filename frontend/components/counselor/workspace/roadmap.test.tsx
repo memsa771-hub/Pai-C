@@ -70,6 +70,7 @@ it("opens a route sheet with the timeline in order and its sources", async () =>
   expect(source.getAttribute("href")).toBe("https://www.pec.org.pk/regulations.pdf");
   expect(source.getAttribute("target")).toBe("_blank");
   expect(source.getAttribute("rel")).toContain("noopener");
+  expect(within(dialog).getByText("Checked October 2026")).toBeTruthy();
   expect((within(dialog).getByRole("button", { name: "Choose this route" }) as HTMLButtonElement).disabled).toBe(false);
 });
 
@@ -102,6 +103,35 @@ it("compares two or three fields with the same rows for each", async () => {
   expect(within(table).getAllByText("60% · you 78%")).toHaveLength(2);
 });
 
+it("joins every need in the compare Extra step cell", async () => {
+  const two = { ...roadmapCards[2], verdict: { ...roadmapCards[2].verdict, needs: [
+    { kind: "bridge" as const, detail: { text: "Biology bridge" } }, { kind: "marks" as const, detail: { min: 60, have: 55 } }] } };
+  vi.mocked(workspaceApi.getRoadmapPage).mockResolvedValue({ ...roadmapPage, fields: [roadmapCards[0], two] });
+  render(<Roadmap onNavigate={vi.fn()} />);
+  fireEvent.click(await screen.findByRole("checkbox", { name: "Compare Electrical Engineering" }));
+  fireEvent.click(screen.getByRole("checkbox", { name: "Compare Pharmacy" }));
+  fireEvent.click(screen.getByRole("button", { name: "Compare (2)" }));
+  const table = within(await screen.findByRole("dialog")).getByRole("table");
+  expect(within(table).getByText("Bridge or extra courses, Marks up to 60%")).toBeTruthy();
+});
+
+it("tells the shell after choose, tick and withdraw so the journey stage refreshes", async () => {
+  const changed = vi.fn();
+  vi.mocked(workspaceApi.chooseRoute).mockResolvedValue(chosenRoute);
+  render(<Roadmap onNavigate={vi.fn()} onChanged={changed} />);
+  fireEvent.click(await screen.findByRole("button", { name: "See route for Pharmacy" }));
+  vi.mocked(workspaceApi.getRoadmapPage).mockResolvedValue({ ...roadmapPage, chosen: chosenRoute });
+  fireEvent.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Choose this route" }));
+  await waitFor(() => expect(changed).toHaveBeenCalledTimes(1));
+  vi.mocked(workspaceApi.setRouteStep).mockResolvedValueOnce({ ...chosenRoute, steps_done: [true, true, false] });
+  fireEvent.click(await screen.findByRole("checkbox", { name: "Take University test" }));
+  await waitFor(() => expect(changed).toHaveBeenCalledTimes(2));
+  vi.mocked(workspaceApi.withdrawRoute).mockResolvedValue(chosenRoute);
+  fireEvent.click(screen.getByRole("button", { name: "Change route" }));
+  fireEvent.click(screen.getByRole("button", { name: "Yes, change route" }));
+  await waitFor(() => expect(changed).toHaveBeenCalledTimes(3));
+});
+
 it("chooses a route and shows it at the top with progress", async () => {
   vi.mocked(workspaceApi.chooseRoute).mockResolvedValue(chosenRoute);
   render(<Roadmap onNavigate={vi.fn()} />);
@@ -128,6 +158,24 @@ it("ticks a step through the API and reverts when it fails", async () => {
   const apply = screen.getByRole("checkbox", { name: "Apply for Pharmacy" }) as HTMLInputElement;
   fireEvent.click(apply);
   await waitFor(() => expect(apply.checked).toBe(false));
+  expect(screen.getByRole("alert").textContent).toBe(copy.roadmap.error);
+});
+
+it("blocks a second tick while a save is in flight, and a failure reverts only its own step", async () => {
+  vi.mocked(workspaceApi.getRoadmapPage).mockResolvedValue({ ...roadmapPage, chosen: chosenRoute });
+  let fail!: (error: Error) => void;
+  vi.mocked(workspaceApi.setRouteStep).mockReturnValueOnce(new Promise((_, reject) => { fail = reject; }));
+  render(<Roadmap onNavigate={vi.fn()} />);
+  const first = (await screen.findByRole("checkbox", { name: "Biology bridge course at some universities" })) as HTMLInputElement;
+  const test = screen.getByRole("checkbox", { name: "Take University test" }) as HTMLInputElement;
+  fireEvent.click(test);
+  expect(test.checked).toBe(true);
+  fireEvent.click(test); // a double click while saving
+  fireEvent.click(screen.getByRole("checkbox", { name: "Apply for Pharmacy" }));
+  expect(workspaceApi.setRouteStep).toHaveBeenCalledTimes(1);
+  fail(new Error("offline"));
+  await waitFor(() => expect(test.checked).toBe(false));
+  expect(first.checked).toBe(true); // the other ticks stay as they were
   expect(screen.getByRole("alert").textContent).toBe(copy.roadmap.error);
 });
 

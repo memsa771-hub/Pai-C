@@ -17,7 +17,7 @@ from app.pai_c.paths.fields import (candidate_fields, current_education, educati
                                     known_groups, read_education, student_groups, study_fields)
 from app.pai_c.policy.controller import load_data
 from app.pai_c.possibilities import PossibilityService
-from app.pai_c.roadmap.rules import Rule, grade_list, ibcc_percent, rule_for
+from app.pai_c.roadmap.rules import Rule, grade_list, ibcc_percent, rule_for, rules_as_of
 
 
 @lru_cache(maxsize=1)
@@ -244,7 +244,8 @@ class RoadmapEngine:
         cards.sort(key=lambda card: order.index(card["status"]))  # stable: path order within a status
         counts = {status: sum(card["status"] == status for card in cards) for status in order}
         return {"education_line": education_line(standing), "standing": asdict(standing),
-                "counts": counts, "fields": cards, "chosen": self._chosen(workspace_id, cards)}
+                "counts": counts, "fields": cards, "rules_as_of": rules_as_of(),
+                "chosen": self._chosen(workspace_id, cards)}
 
     def _chosen(self, workspace_id: str, cards: list[dict]) -> dict | None:
         """The active route decision, with its live status from these cards."""

@@ -6,8 +6,7 @@
     "journey": "The steps of their journey with PAI and which step they are on.",
     "profile": "What PAI knows about them, which they can check and correct, including details still missing.",
     "files": "Their documents, where they can upload a marksheet, certificate or result to confirm it.",
-    "compare": "Prepared roadmaps side by side, where they compare and choose one.",
-    "plan": "The plan for their chosen roadmap and their check-ins.",
+    "roadmap": "Which fields they can get into from their education, the route to each, a side-by-side compare, and the route they chose with its steps.",
     "settings": "Language, notifications, privacy and their account."
   }
 }

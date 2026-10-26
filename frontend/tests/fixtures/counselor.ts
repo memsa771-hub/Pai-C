@@ -298,4 +298,5 @@ export const roadmapPage: RoadmapPage = {
   counts: { open: 2, step: 1, not_open: 1, unknown: 1 },
   fields: roadmapCards,
   chosen: null,
+  rules_as_of: "2026-10",
 };

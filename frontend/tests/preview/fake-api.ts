@@ -1,5 +1,6 @@
 import {picture,vault,vaultCatalog,possibilities,pathResult,programs,roadmapPage,chosenRoute} from '../fixtures/counselor';
 import type {ChosenRoute} from '@/lib/roadmap';
+import {needItem} from '@/components/counselor/workspace/roadmap-text';
 export const calls:{method:string;args:unknown[]}[]=[];
 export const mirror={type:'mirror',version:1,status:'awaiting_confirmation',mirror:{
   intro:'Here is the picture I have so far.',confidence:'focused',
@@ -28,7 +29,7 @@ const roadmap={id:'roadmap-one',journey_id:'journey-one',goal_id:null,title:'Pra
 // The Roadmap page (GET /v1/roadmap): ?chosen=1 starts with a chosen route.
 let route:ChosenRoute|null=new URLSearchParams(location.search).has('chosen')?structuredClone(chosenRoute):null;
 const choose=(fieldKey:string)=>{const card=roadmapPage.fields.find(c=>c.field_key===fieldKey)!;
-  const steps=[...card.verdict.needs.map(n=>n.kind==='bridge'?{key:'step_bridge',text:n.detail.text}:{key:'step_marks',...n.detail}),
+  const steps=[...card.verdict.needs.map(needItem),
     ...card.verdict.tests.map(t=>({key:'step_test',name:t.name})),{key:'step_apply',degree:card.title}];
   route={id:'route-offline',field_key:fieldKey,possibility_id:card.possibility_id,title:card.title,chosen_at:'2026-10-26T09:00:00Z',
     steps,steps_done:steps.map(()=>false),snapshot_verdict:card.verdict,live_status:card.status};return route;};
