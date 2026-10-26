@@ -292,7 +292,10 @@
    "sources": [
     "https://pmdc.pk/Documents/law/Admissions%20Regulations-2025.pdf"
    ],
-   "confidence": "official"
+   "confidence": "official",
+   "years_by_field": {
+    "bds": 4
+   }
   },
   {
    "applies_to": {

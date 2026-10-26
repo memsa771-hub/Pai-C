@@ -15,7 +15,8 @@ def test_rule_targets_exist():
     for rule in _rules():
         target = rule["applies_to"]
         assert set(target.get("fields", [])) <= set(fields)
-        assert target.get("family", next(iter(families))) in families
+        if "family" in target:
+            assert target["family"] in families
         for group in (rule["groups_open"] or []) + [s["group"] for s in rule.get("groups_with_step", [])]:
             assert group in known_groups()
         for step in rule.get("groups_with_step", []):
@@ -49,3 +50,14 @@ def test_ibcc_percent_averages_table():
     assert ibcc_percent(["A", "A", "B"]) == (table["A"] * 2 + table["B"]) / 3
     assert ibcc_percent(["A*"]) == 90
     assert ibcc_percent([]) is None and ibcc_percent(["Z"]) is None
+
+
+def test_years_per_field_override():
+    assert rule_for("mbbs").years_for("mbbs") == 5
+    assert rule_for("bds").years_for("bds") == 4
+
+
+def test_null_groups_open_means_use_study_field_open_to():
+    """None is the contract: the roadmap engine falls back to open_to in study_fields.json."""
+    for key in ("zoology", "food_science", "hospitality_tourism", "sports_sciences"):
+        assert rule_for(key).groups_open is None

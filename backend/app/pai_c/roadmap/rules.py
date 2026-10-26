@@ -39,6 +39,10 @@ class Rule:
     fee_band_per_year: object  # the JSON key carries the currency; code files keep currency tokens out
     sources: list[str]
     confidence: str
+    years_by_field: dict[str, int] | None = None  # per-field override of years in a shared rule
+
+    def years_for(self, field_key: str) -> int | None:
+        return (self.years_by_field or {}).get(field_key, self.years)
 
 
 @lru_cache(maxsize=1)
@@ -56,7 +60,7 @@ def _rule(row: dict) -> Rule:
         entry_tests=tuple(EntryTest(t["name"], t["body"], t.get("pass_percent"), t["source"])
                           for t in row.get("entry_tests", [])),
         years=row["years"], fee_band_per_year=next((v for k, v in row.items() if k.startswith("fee_band")), None),
-        sources=list(row["sources"]), confidence=row["confidence"])
+        sources=list(row["sources"]), confidence=row["confidence"], years_by_field=row.get("years_by_field"))
 
 
 @lru_cache(maxsize=1)
