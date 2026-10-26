@@ -1,10 +1,13 @@
 import os
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 import pytest
+from psycopg.errors import DeadlockDetected
 from sqlalchemy import create_engine, text
+from sqlalchemy.exc import OperationalError
 
 BACKEND = Path(__file__).resolve().parents[2]
 
@@ -55,15 +58,32 @@ def engine(os_db: str):
     eng.dispose()
 
 
+def os_table_names(conn) -> list[str]:
+    return conn.execute(text(
+        "SELECT tablename FROM pg_tables WHERE schemaname = 'os' AND tablename LIKE 'os\\_%' ORDER BY tablename"
+    )).scalars().all()
+
+
+def truncate_os_tables(engine, attempts: int = 5) -> None:
+    """A worker thread a previous test's DBOS left running can still hold a table: the TRUNCATE then loses a deadlock,
+    Postgres cancels it and the other side finishes, so it is tried again."""
+    for attempt in range(attempts):
+        try:
+            with engine.begin() as conn:
+                names = os_table_names(conn)
+                if names:
+                    conn.execute(text("TRUNCATE " + ", ".join(f"os.{n}" for n in names) + " RESTART IDENTITY CASCADE"))
+            return
+        except OperationalError as e:
+            if not isinstance(e.orig, DeadlockDetected) or attempt == attempts - 1:
+                raise
+            time.sleep(0.5)
+
+
 @pytest.fixture
 def clean(engine) -> None:
     """Empty every os_* table before the test."""
-    with engine.begin() as conn:
-        names = conn.execute(text(
-            "SELECT tablename FROM pg_tables WHERE schemaname = 'os' AND tablename LIKE 'os\\_%'"
-        )).scalars().all()
-        if names:
-            conn.execute(text("TRUNCATE " + ", ".join(f"os.{n}" for n in names) + " RESTART IDENTITY CASCADE"))
+    truncate_os_tables(engine)
 
 
 TEST_DBOS_SCHEMA = "dbos_os_test"
