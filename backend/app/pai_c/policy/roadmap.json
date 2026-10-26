@@ -1,0 +1,25 @@
+{
+ "_note": "Roadmap engine (app/pai_c/roadmap/engine.py) policy. status_order sorts the field cards and the summary chips. The engine returns reasons as {key, values}; copy holds the English template per key ({name} placeholders are the reason's values; groups render as their labels joined by group_joiner). education_line renders the header from the Vault. official_confidence: a rule with any other confidence shows the check_with_university note. compare: how many cards the Compare table takes.",
+ "status_order": ["open", "step", "not_open", "unknown"],
+ "official_confidence": "official",
+ "group_joiner": " or ",
+ "copy": {
+  "needs_percent": "Needs {min}%; you have {have}%",
+  "add_marks": "Add your marks to check the {min}% rule",
+  "rule_step": "{text}",
+  "check": "{note}",
+  "choose_group": "Choose {groups} in intermediate",
+  "choose_any_group": "Choose any group in intermediate",
+  "not_open_group": "Not open from {group_label}",
+  "cannot_check": "PAI cannot check this field yet",
+  "undergrad_only": "Undergraduate entry rules only for now",
+  "needs_education": "Tell PAI your education first",
+  "check_with_university": "Check with the university"
+ },
+ "education_line": {
+  "with_percent": "From {level} {groups}, {percent}%",
+  "without_percent": "From {level} {groups}",
+  "groups_joiner": " / "
+ },
+ "compare": {"min": 2, "max": 3}
+}

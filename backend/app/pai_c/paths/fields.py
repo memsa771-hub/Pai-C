@@ -31,6 +31,11 @@ def _data() -> dict:
     return load_data("study_fields.json")
 
 
+def group_rules() -> dict:
+    """How an education record names its group (study_fields.json group_rules)."""
+    return _data()["group_rules"]
+
+
 def known_groups() -> set[str]:
     return set(_data()["groups"])
 

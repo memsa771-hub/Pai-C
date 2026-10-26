@@ -5,6 +5,7 @@ an edit to the JSON. A field's own rule wins over its family's rule, and a
 rule with null values means "not researched", never "no requirement".
 """
 
+import re
 from dataclasses import dataclass
 from functools import lru_cache
 
@@ -82,6 +83,14 @@ def rule_for(field_key: str) -> Rule | None:
         return by_field[field_key]
     field = study_fields().get(field_key)
     return by_family.get(field.family) if field else None
+
+
+def grade_list(text: str) -> list[str]:
+    """Grades named in one result string ("A*AB", "A, B, C"), read with the
+    grade letters of the IBCC table so a new grade is a data change."""
+    table = _data()["equivalence"]["o_level_a_level"]["grade_to_pak_marks_a_level_o_level"]
+    pattern = "|".join(re.escape(g) for g in sorted(table, key=len, reverse=True))
+    return re.findall(pattern, str(text or "").upper())
 
 
 def ibcc_percent(grades: list[str]) -> float | None:
