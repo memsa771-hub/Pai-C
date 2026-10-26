@@ -17,7 +17,7 @@
 - DB changes only via Alembic (head is 117). Do NOT drop old roadmap tables; code just stops using them.
 - Reuse `paths/fields.py` education readers and `PossibilityService`; follow the workspace UI kit (`components/pai`, `CARD`, `StatChip`, `toneClass`, `Heading`, `useResource`).
 - Tests from `backend/` with the shim (see `.superpowers/sdd/2026-10-25-education-focus/env-notes.md`); frontend `npm test`, `npm run build`.
-- Existing-feature map: `.superpowers/sdd/roadmap-engine/roadmap-map.md`.
+- Existing-feature map: `.superpowers/sdd/2026-10-26-roadmap-engine/roadmap-map.md`.
 
 ## Review Focus
 - Student path with no study field (own path "Mobile repair") → card status `unknown`, never a crash → Task 2 `test_own_path_without_field_is_unknown`.
@@ -29,7 +29,7 @@
 ---
 
 ### Task 1: Admission rules data
-**Files:** Create `backend/app/pai_c/policy/admission_rules.json` (from `.superpowers/sdd/roadmap-engine/admission_rules_draft.json` + `admission_rules_summary.md`), loader `backend/app/pai_c/roadmap/rules.py`; Test `backend/tests/test_admission_rules.py`.
+**Files:** Create `backend/app/pai_c/policy/admission_rules.json` (from `.superpowers/sdd/2026-10-26-roadmap-engine/admission_rules_draft.json` + `admission_rules_summary.md`), loader `backend/app/pai_c/roadmap/rules.py`; Test `backend/tests/test_admission_rules.py`.
 **Interfaces:** `rule_for(field_key: str) -> Rule | None` (field-specific rule wins over family rule); `Rule` fields: `groups_open`, `groups_with_step` (group, step, source, scope_fields), `min_percent`, `required_subjects`, `entry_tests` (name, body, pass_percent, source), `years`, `fee_band_pkr_per_year`, `sources`, `confidence`; `ibcc_percent(grades: list[str]) -> float | None`.
 - [ ] Failing tests: every `fields` key exists in `study_fields.json`; every family exists; every group code is a known group; every rule has ≥1 https source and a valid confidence; every study field resolves to a rule (field or family); `rule_for("mbbs").groups_open == ["pre_medical"]`; a pre_medical step on engineering is scoped to civil/electrical/mechanical; `ibcc_percent(["A","A","B"])` matches the IBCC table in the file.
 - [ ] Fill `years` per rule where the draft has it (engineering 4, MBBS 5, BDS 4, Pharm-D 5, LLB 5, nursing 4, BS 4); keep nulls as null. Commit `feat(roadmap): admission rules data`.
