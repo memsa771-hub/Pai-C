@@ -25,14 +25,10 @@ import { useJourney } from "./use-journey";
 import {
   CommandMenu, MAIN_SECTIONS, NavItem, SECTIONS, SubTabs, sectionOf, shortcutLabel,
 } from "./shell-parts";
+import { VIEW_ALIASES as ALIASES } from "../workspace-link";
 import copy from "./copy.json";
 
 const health = () => workspaceApi.getCounselorHealth();
-/** Section names in a URL land on the section's first view; old view names
- * (roadmaps, and the Compare and Plan tabs) land on the one Roadmap page. */
-const ALIASES: Record<string, string> = {
-  roadmaps: "roadmap", compare: "roadmap", plan: "roadmap", vault: "files", pai: "threads", home: "overview",
-};
 const COLLAPSE_KEY = "pai.sidebar.collapsed";
 
 export function CounselorShell() {

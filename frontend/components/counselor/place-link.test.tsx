@@ -17,3 +17,12 @@ it('renders nothing for a place the workspace does not have', () => {
   const { container } = render(<PlaceLink place="operator-console" />);
   expect(container.innerHTML).toBe('');
 });
+it('resolves old place names the way the shell does', () => {
+  window.history.replaceState({}, '', '/my-space?view=threads');
+  for (const old of ['compare', 'plan']) {
+    render(<PlaceLink place={old} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Roadmap' }));
+    expect(window.location.search).toBe('?view=roadmap');
+    cleanup();
+  }
+});
