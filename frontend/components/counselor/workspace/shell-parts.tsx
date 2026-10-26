@@ -19,7 +19,7 @@ export type SubView = keyof typeof copy.subTabs;
 export const SECTIONS: { key: SectionKey; icon: LucideIcon; views: string[] }[] = [
   { key: "overview", icon: LayoutDashboard, views: ["overview"] },
   { key: "threads", icon: MessageCircle, views: ["threads", "notifications"] },
-  { key: "roadmaps", icon: Map, views: ["paths", "compare", "plan"] },
+  { key: "roadmaps", icon: Map, views: ["paths", "roadmap"] },
   { key: "journey", icon: Route, views: ["journey"] },
   { key: "vault", icon: FolderLock, views: ["files", "profile"] },
   { key: "settings", icon: Settings, views: ["settings"] },
@@ -119,7 +119,7 @@ export function CommandMenu({ open, onOpenChange, onGo, onAsk }: {
     section.views.filter((view) => view !== "notifications").map((view) => ({
       view,
       section,
-      label: section.views.length > 2 || section.key === "vault"
+      label: section.views.filter((v) => v !== "notifications").length > 1
         ? `${copy.sections[section.key].label} · ${copy.subTabs[view as SubView]}`
         : copy.sections[section.key].label,
     })));

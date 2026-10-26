@@ -242,6 +242,25 @@ class WorkspaceApi {
     return this.request<NetworkDiscovery>(`/v1/discover?network=${this.workspaceId}`);
   }
 
+  /** The Roadmap page: which fields the student can get into, computed on read. */
+  async getRoadmapPage(): Promise<import('./roadmap').RoadmapPage> {
+    return this.request(`/v1/roadmap?network=${this.requireWorkspace()}`);
+  }
+
+  async chooseRoute(fieldKey: string): Promise<import('./roadmap').ChosenRoute> {
+    return this.request(`/v1/roadmap/choose?network=${this.requireWorkspace()}`,
+      { method: 'POST', body: JSON.stringify({ field_key: fieldKey }) });
+  }
+
+  async setRouteStep(index: number, done: boolean): Promise<import('./roadmap').ChosenRoute> {
+    return this.request(`/v1/roadmap/steps?network=${this.requireWorkspace()}`,
+      { method: 'POST', body: JSON.stringify({ index, done }) });
+  }
+
+  async withdrawRoute(): Promise<import('./roadmap').ChosenRoute> {
+    return this.request(`/v1/roadmap/withdraw?network=${this.requireWorkspace()}`, { method: 'POST' });
+  }
+
   async getRoadmaps(filter: 'all' | 'favorites' | 'exploring' | 'dismissed' = 'all'): Promise<import('./roadmaps').Roadmap[]> {
     const response = await this.request<{ roadmaps: import('./roadmaps').Roadmap[] }>(
       `/v1/roadmaps?network=${this.requireWorkspace()}&filter=${filter}`,

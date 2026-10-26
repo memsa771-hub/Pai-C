@@ -150,7 +150,7 @@ export const messages = {
 
   /** View names. Shared by the sidebar, the nav rail and the app header. */
   views: {
-    overview: "Overview", journey: "Your journey", paths: "Paths", compare: "Compare & choose", plan: "Plan & check-ins", settings: "Settings",
+    overview: "Overview", journey: "Your journey", paths: "Paths", roadmap: "Roadmap", compare: "Compare & choose", plan: "Plan & check-ins", settings: "Settings",
     paiCounselor: 'PAI Counselor',
     roadmaps: 'Roadmaps',
     profile: 'Profile',

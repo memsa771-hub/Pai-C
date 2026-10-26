@@ -103,8 +103,8 @@ module.exports = [
   { id: 'chat-mirror-rate', path: '/student?view=threads&mirror=1', ready: 'main textarea', crawl: false, setup: async (page) => {
     await page.getByRole('button', { name: 'Yes, that is right' }).click(); await page.getByRole('radiogroup').waitFor();
   } },
-  { id: 'chat-check-in', path: '/student?view=plan', ready: 'main h1', crawl: false, setup: async (page) => {
-    await page.getByRole('button', { name: 'Open conversation' }).first().click();
+  { id: 'chat-check-in', path: '/student?view=roadmap&chosen=1', ready: 'main h1', crawl: false, setup: async (page) => {
+    await page.getByRole('button', { name: 'How is it going?' }).first().click();
     await page.getByRole('region', { name: 'Check-in' }).waitFor();
   } },
 
@@ -120,23 +120,18 @@ module.exports = [
     await page.getByText('No verified program information', { exact: false }).waitFor();
   } },
 
-  { id: 'compare', path: '/student?view=compare&roadmap=1', ready: 'main h1', full: true },
-  { id: 'compare-family', path: '/student?view=compare&roadmap=1', ready: 'main h1', full: true, crawl: false, setup: async (page) => {
-    await page.getByRole('button', { name: 'Help me talk this through with my family', exact: true }).click();
-    await page.locator('label', { hasText: 'Parent' }).first().click();
-    if (!(await page.getByRole('radio', { name: 'Parent', exact: true }).isChecked())) throw new Error('compare-family: the label must select the person');
-    await page.getByRole('checkbox').first().check();
+  { id: 'roadmap', path: '/student?view=roadmap', ready: 'main h1', full: true },
+  { id: 'roadmap-sheet', path: '/student?view=roadmap', ready: 'main h1', crawl: false, setup: async (page) => {
+    await page.getByRole('button', { name: 'See route for Electrical Engineering' }).click(); await page.getByRole('dialog').waitFor();
   } },
-  { id: 'decision', path: '/student?view=compare&roadmap=1', ready: 'main h1', crawl: false, setup: async (page) => {
-    await page.getByRole('button', { name: 'Choose route', exact: true }).click();
-    await page.getByRole('dialog').getByRole('button', { name: 'Choose route', exact: true }).click();
-    await page.getByRole('dialog').getByRole('status').waitFor();
+  { id: 'roadmap-compare', path: '/student?view=roadmap', ready: 'main h1', crawl: false, setup: async (page) => {
+    for (const title of ['Electrical Engineering', 'Computer Science', 'Pharmacy']) await page.getByRole('checkbox', { name: `Compare ${title}` }).check();
+    await page.getByRole('button', { name: 'Compare (3)' }).click(); await page.getByRole('dialog').getByRole('table').waitFor();
   } },
-  { id: 'compare-chosen', path: '/student?view=compare&roadmap=1&family=1', ready: 'main h1', full: true },
-  { id: 'plan-empty', path: '/student?view=plan', ready: 'main h1', full: true },
-  { id: 'plan', path: '/student?view=plan&roadmap=1&family=1', ready: 'main h1', full: true },
-  { id: 'roadmap-details', path: '/student?view=compare&roadmap=1', ready: 'main h1', crawl: false, setup: async (page) => {
-    await page.getByRole('button', { name: 'View details' }).click(); await page.getByRole('dialog').waitFor();
+  { id: 'roadmap-chosen', path: '/student?view=roadmap&chosen=1', ready: 'main h1', full: true },
+  { id: 'roadmap-bar', path: '/student?view=roadmap', ready: 'main h1', crawl: false, setup: async (page) => {
+    await page.getByRole('checkbox', { name: 'Compare Electrical Engineering' }).check();
+    await page.getByRole('checkbox', { name: 'Compare Computer Science' }).check();
   } },
 
   { id: 'documents', path: '/student?view=files', ready: 'main h1' },
@@ -162,12 +157,9 @@ module.exports = [
   { id: 'states-paths-loading', path: '/student?view=paths&state=loading', ready: 'main [role=status], main [role=alert], main h1', crawl: false },
   { id: 'states-paths-error', path: '/student?view=paths&state=error', ready: 'main [role=status], main [role=alert], main h1', crawl: true },
   { id: 'states-paths-empty', path: '/student?view=paths&state=empty', ready: 'main [role=status], main [role=alert], main h1', crawl: true },
-  { id: 'states-compare-loading', path: '/student?view=compare&state=loading', ready: 'main [role=status], main [role=alert], main h1', crawl: false },
-  { id: 'states-compare-error', path: '/student?view=compare&state=error', ready: 'main [role=status], main [role=alert], main h1', crawl: true },
-  { id: 'states-compare-empty', path: '/student?view=compare&state=empty', ready: 'main [role=status], main [role=alert], main h1', crawl: true },
-  { id: 'states-plan-loading', path: '/student?view=plan&state=loading', ready: 'main [role=status], main [role=alert], main h1', crawl: false },
-  { id: 'states-plan-error', path: '/student?view=plan&state=error', ready: 'main [role=status], main [role=alert], main h1', crawl: true },
-  { id: 'states-plan-empty', path: '/student?view=plan&state=empty', ready: 'main [role=status], main [role=alert], main h1', crawl: true },
+  { id: 'states-roadmap-loading', path: '/student?view=roadmap&state=loading', ready: 'main [role=status], main [role=alert], main h1', crawl: false },
+  { id: 'states-roadmap-error', path: '/student?view=roadmap&state=error', ready: 'main [role=status], main [role=alert], main h1', crawl: true },
+  { id: 'states-roadmap-empty', path: '/student?view=roadmap&state=empty', ready: 'main [role=status], main [role=alert], main h1', crawl: true },
   { id: 'states-path-error', path: '/student?view=paths&path=path-one&state=error', ready: 'main [role=alert]', crawl: true },
   { id: 'states-programs-loading', path: '/student?view=paths&path=path-one&stage=H&state=loading', ready: 'main [role=status]', crawl: false },
 ];

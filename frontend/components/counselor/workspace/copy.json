@@ -7,8 +7,7 @@
     "journey": "Your journey",
     "paths": "Paths",
     "profile": "Your profile",
-    "compare": "Compare & choose",
-    "plan": "Plan & check-ins",
+    "roadmap": "Roadmap",
     "files": "Documents",
     "settings": "Settings",
     "notifications": "Notifications"
@@ -226,28 +225,28 @@
     {
       "id": "H",
       "title": "Where to study",
-      "view": "paths",
-      "signal": "roadmap_prepared",
+      "view": "roadmap",
+      "signal": "route_checked",
       "tone": "blue"
     },
     {
       "id": "I",
-      "title": "Compare & choose",
-      "view": "compare",
-      "signal": "roadmap_chosen",
+      "title": "Choose your route",
+      "view": "roadmap",
+      "signal": "route_chosen",
       "tone": "violet"
     },
     {
       "id": "J",
       "title": "Make a plan",
-      "view": "plan",
-      "signal": "decision_recorded",
+      "view": "roadmap",
+      "signal": "route_step_done",
       "tone": "amber"
     },
     {
       "id": "K",
       "title": "Stay in touch",
-      "view": "plan",
+      "view": "roadmap",
       "signal": "never",
       "tone": "rose"
     }
@@ -516,7 +515,7 @@
     },
     "roadmaps": {
       "label": "Roadmaps",
-      "hint": "Paths, compare and your plan"
+      "hint": "Paths and where you can go"
     },
     "journey": {
       "label": "Journey",
@@ -533,8 +532,7 @@
   },
   "subTabs": {
     "paths": "Paths",
-    "compare": "Compare",
-    "plan": "Plan",
+    "roadmap": "Roadmap",
     "files": "Documents",
     "profile": "About you"
   },
@@ -621,5 +619,143 @@
     "FOUNDATION": 1,
     "DIRECTION": 3,
     "MIRROR": 4
+  },
+  "roadmap": {
+    "title": "Where you can go",
+    "intro": "Fields from your paths, checked against your education.",
+    "updateVault": "Update in Vault",
+    "groupJoiner": " or ",
+    "officialConfidence": "official",
+    "templates": {
+      "needs_percent": "Needs {min}%; you have {have}%",
+      "add_marks": "Add your marks to check the {min}% rule",
+      "rule_step": "{text}",
+      "check": "{note}",
+      "choose_group": "Choose {groups} in intermediate",
+      "choose_any_group": "Choose any group in intermediate",
+      "not_open_group": "Not open from {group_label}",
+      "cannot_check": "PAI cannot check this field yet",
+      "undergrad_only": "Undergraduate entry rules only for now",
+      "needs_education": "Tell PAI your education first",
+      "check_with_university": "Check with the university",
+      "step_marks": "Meet the {min}% marks rule (you have {have}%)",
+      "step_bridge": "{text}",
+      "step_check": "{note}",
+      "step_group": "Choose {groups} in intermediate",
+      "step_any_group": "Choose any group in intermediate",
+      "step_test": "Take {name}",
+      "step_apply": "Apply for {degree}"
+    },
+    "educationLine": {
+      "with_percent": "From {level} {groups}, {percent}%",
+      "without_percent": "From {level} {groups}",
+      "groups_joiner": " / "
+    },
+    "status": {
+      "open": "Open",
+      "step": "Needs a step",
+      "not_open": "Not open",
+      "unknown": "Cannot check yet"
+    },
+    "counts": {
+      "open": "{n} open",
+      "step": "{n} need a step",
+      "not_open": "{n} not open",
+      "unknown": "{n} cannot check"
+    },
+    "groups": {
+      "open": "You can go",
+      "step": "Possible with a step",
+      "not_open": "Not open from your group",
+      "unknown": "PAI cannot check these yet"
+    },
+    "facts": {
+      "years": "{n} years",
+      "needsYou": "Needs {min}% · you {have}%",
+      "needs": "Needs {min}%",
+      "noTest": "No entry test listed",
+      "marksCompare": "{min}% · you {have}%"
+    },
+    "checkUniversity": "Check with the university",
+    "compareToggle": "Compare {title}",
+    "compareBar": "Compare ({n})",
+    "comparePickMore": "Pick {n} more to compare",
+    "compareMax": "You can compare up to {n} fields",
+    "compareClear": "Clear",
+    "compareTitle": "Compare fields",
+    "compareIntro": "The same facts for each field, side by side.",
+    "compareRows": {
+      "status": "Status",
+      "marks": "Marks needed vs yours",
+      "step": "Extra step",
+      "test": "Entry test",
+      "years": "Years",
+      "confidence": "Rule confidence"
+    },
+    "compareStep": {
+      "none": "None",
+      "marks": "Marks up to {min}%",
+      "bridge": "Bridge or extra courses",
+      "check": "Check with the university",
+      "group": "Choose {groups}",
+      "any_group": "Choose an intermediate group"
+    },
+    "confidence": {
+      "official": "Official",
+      "secondary": "Secondary source",
+      "uncertain": "Uncertain"
+    },
+    "notKnown": "Not known",
+    "open": "See route for {title}",
+    "sheet": {
+      "now": "Now",
+      "needs": "What you need",
+      "test": "Entry test",
+      "degree": "Degree ({n} years)",
+      "degreeNoYears": "Degree",
+      "nothingExtra": "Nothing extra from your education.",
+      "noTest": "No entry test listed for this field.",
+      "pass": "pass mark {n}%",
+      "sources": "Sources",
+      "noSources": "No sources listed yet.",
+      "choose": "Choose this route",
+      "chosen": "This is your route",
+      "replaces": "Choosing this replaces your current route.",
+      "close": "Close"
+    },
+    "route": {
+      "title": "Your route",
+      "progress": "{done} of {total}",
+      "progressLabel": "{done} of {total} steps done",
+      "change": "Change route",
+      "changeConfirm": "Stop following {title}? Your ticks are kept in your history.",
+      "changeYes": "Yes, change route",
+      "changeNo": "Keep it",
+      "changed": "Your situation changed: now {status}.",
+      "checkin": "How is it going?"
+    },
+    "empty": {
+      "educationTitle": "Tell PAI your education first",
+      "educationBody": "PAI checks each field against your current education and marks.",
+      "educationAction": "Go to Vault",
+      "pathsTitle": "PAI is working out your fields",
+      "pathsBody": "Your paths are found on their own as PAI learns about you. They show here once ready.",
+      "pathsAction": "See your paths",
+      "undergrad": "Undergraduate entry rules only for now."
+    },
+    "error": "This did not save. Try again.",
+    "statusNow": {
+      "open": "open to you",
+      "step": "a step away",
+      "not_open": "not open from your group",
+      "unknown": "not checkable right now"
+    },
+    "compareCorner": "Field",
+    "compareLimits": {
+      "min": 2,
+      "max": 3
+    },
+    "compareHint": "Tick 2 or 3 fields to compare them side by side.",
+    "yourRouteChip": "Your route"
   }
 }

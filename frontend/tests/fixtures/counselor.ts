@@ -5,6 +5,7 @@ import type {
 } from "@/lib/counselor-workspace";
 import type { Possibility } from "@/lib/possibilities";
 import type { VaultCatalog, VaultEntry, VaultView } from "@/lib/vault";
+import type { ChosenRoute, FieldCard, RoadmapPage, Verdict } from "@/lib/roadmap";
 export const possibilities: Possibility[] = [
   {
     id: "path-one",
@@ -255,4 +256,46 @@ export const programs: Programs = {
   status: "completed",
   programs: [],
   missing: ["verified_program_sources"],
+};
+
+// The Roadmap page for an FSc Pre-Engineering student with 78%: the shape of
+// backend RoadmapEngine.build (app/pai_c/roadmap/engine.py).
+const verdict = (v: Partial<Verdict>): Verdict => ({
+  status: "open", reasons: [], needs: [], tests: [], years: null, min_percent: null, student_percent: 78,
+  confidence: "official", sources: [], subjects: [], ...v,
+});
+export const roadmapCards: FieldCard[] = [
+  { possibility_id: "path-ee", field_key: "electrical_engineering", title: "Electrical Engineering", family: "engineering",
+    why: "You like finding out how circuits and machines work.", status: "open",
+    verdict: verdict({ tests: [{ name: "ECAT / NET", pass_percent: 33 }], years: 4, min_percent: 60,
+      sources: ["https://www.pec.org.pk/regulations.pdf"] }) },
+  { possibility_id: "path-cs", field_key: "computer_science", title: "Computer Science", family: "computing",
+    why: "You kept changing your project until it worked.", status: "open",
+    verdict: verdict({ tests: [{ name: "University test", pass_percent: null }], years: 4, min_percent: 50,
+      confidence: "secondary", sources: ["https://www.hec.gov.pk/criteria"] }) },
+  { possibility_id: "path-pharm", field_key: "pharmacy", title: "Pharmacy", family: "health",
+    why: "You are curious about how medicines help people.", status: "step",
+    verdict: verdict({ status: "step", reasons: [{ key: "rule_step", text: "Biology bridge course at some universities" }],
+      needs: [{ kind: "bridge", detail: { text: "Biology bridge course at some universities", source: "https://example.org/pharm" } }],
+      tests: [{ name: "University test", pass_percent: null }], years: 5, min_percent: 60, confidence: "uncertain",
+      sources: ["https://example.org/pharm"] }) },
+  { possibility_id: "path-mbbs", field_key: "mbbs", title: "MBBS", family: "health",
+    why: "You said you want to help people directly.", status: "not_open",
+    verdict: verdict({ status: "not_open", reasons: [{ key: "not_open_group", group_code: "pre_engineering", group_label: "Pre-Engineering" }],
+      tests: [{ name: "MDCAT", pass_percent: 55 }], years: 5, min_percent: 60, sources: ["https://pmdc.pk/regulations"] }) },
+  { possibility_id: "path-game", field_key: null, title: "Game design", family: null,
+    why: "You enjoy making small games.", status: "unknown",
+    verdict: verdict({ status: "unknown", reasons: [{ key: "cannot_check" }], confidence: null }) },
+];
+export const chosenRoute: ChosenRoute = {
+  id: "route-one", field_key: "pharmacy", possibility_id: "path-pharm", title: "Pharmacy", chosen_at: "2026-10-20T10:00:00Z",
+  steps: [{ key: "step_bridge", text: "Biology bridge course at some universities" }, { key: "step_test", name: "University test" },
+    { key: "step_apply", degree: "Pharmacy" }],
+  steps_done: [true, false, false], snapshot_verdict: roadmapCards[2].verdict, live_status: "step",
+};
+export const roadmapPage: RoadmapPage = {
+  education_line: { level: "fsc", level_label: "FSc", groups: [{ code: "pre_engineering", label: "Pre-Engineering" }], percent: 78 },
+  counts: { open: 2, step: 1, not_open: 1, unknown: 1 },
+  fields: roadmapCards,
+  chosen: null,
 };

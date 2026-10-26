@@ -15,7 +15,7 @@ import { cn } from "@/lib/utils";
 import { LivingProfile } from "./profile";
 import { Journey } from "./journey";
 import { Paths, PathPage, ProgramPage } from "./paths";
-import { Compare, Plan } from "./decisions";
+import { Roadmap } from "./roadmap";
 import { CounselorSettings } from "./settings";
 import { DocumentsView } from "./documents";
 import { Overview } from "./overview";
@@ -29,7 +29,10 @@ import copy from "./copy.json";
 
 const health = () => workspaceApi.getCounselorHealth();
 /** Section names in a URL land on the section's first view. */
-const ALIASES: Record<string, string> = { roadmaps: "paths", vault: "files", pai: "threads", home: "overview" };
+/** Old view names (the Compare and Plan tabs) land on the one Roadmap page. */
+const ALIASES: Record<string, string> = {
+  roadmaps: "roadmap", compare: "roadmap", plan: "roadmap", vault: "files", pai: "threads", home: "overview",
+};
 const COLLAPSE_KEY = "pai.sidebar.collapsed";
 
 export function CounselorShell() {
@@ -107,12 +110,8 @@ export function CounselorShell() {
     navigate("threads");
     setDraft(topic || "");
   };
-  const active =
-    viewMode === "roadmaps"
-      ? "compare"
-      : Object.hasOwn(copy.nav, viewMode)
-        ? viewMode
-        : "threads";
+  const requested = ALIASES[viewMode] || viewMode;
+  const active = Object.hasOwn(copy.nav, requested) ? requested : "threads";
   const section = sectionOf(active);
   const subViews = section.views.filter((view) => view in copy.subTabs);
   const content =
@@ -143,7 +142,7 @@ export function CounselorShell() {
                 <ProgramPage
                   id={path}
                   onBack={() => setPlaces(false)}
-                  onCompare={() => navigate("compare")}
+                  onCompare={() => navigate("roadmap")}
                 />
               ) : (
                 <PathPage
@@ -163,10 +162,7 @@ export function CounselorShell() {
             ) : (
               <Paths onOpen={openPath} onChat={chat} />
             ))}
-          {active === "compare" && (
-            <Compare onChat={chat} onOpen={openPath} />
-          )}
-          {active === "plan" && <Plan onChat={chat} onNavigate={navigate} />}
+          {active === "roadmap" && <Roadmap onNavigate={navigate} onChat={chat} />}
           {active === "settings" && <CounselorSettings base={base} onNavigate={navigate} />}
         </div>
       </div>

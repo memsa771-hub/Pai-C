@@ -75,33 +75,28 @@ module.exports = async function flow(browser, open, ORIGIN) {
     await page.getByText('No verified program information is available yet.', { exact: false }).waitFor();
     assert.equal((await called(page, 'searchPrograms')).length, 1, 'one search after consent');
 
-    // I: a reviewed roadmap is prepared; no choice is made for the student.
-    await page.getByRole('button', { name: 'Prepare a reviewed roadmap' }).click();
-    await page.getByRole('heading', { name: 'Compare paths', exact: true }).waitFor();
-    assert.equal((await called(page, 'chooseRoadmap')).length, 0, 'no automatic choice');
-    // The certainty slider sends nothing until the student presses Share.
-    await page.locator('#decision-certainty').fill('8');
-    assert.equal((await called(page, 'sendMessage')).length, 0, 'moving the slider sends nothing');
-    await page.getByRole('button', { name: 'Share with PAI' }).click();
-    await page.getByText('Shared with PAI.', { exact: false }).waitFor();
-    const shared = await called(page, 'sendMessage');
-    assert.equal(shared.length, 1);
-    assert.match(String(shared[0].args[1]), /8 out of 10/);
-    await page.getByRole('button', { name: 'Choose route', exact: true }).click();
-    const dialog = page.getByRole('dialog');
-    await dialog.getByRole('button', { name: 'Choose route', exact: true }).click();
-    await dialog.getByRole('status').waitFor();
-    assert.equal((await called(page, 'getRoadmapChoiceToken')).length, 1, 'one confirmation token');
-    assert.equal((await called(page, 'chooseRoadmap')).length, 1, 'one explicit choice');
-    await dialog.getByRole('button', { name: 'Close' }).first().click();
+    // I: the Roadmap page shows where the student can go; nothing is chosen
+    // for them, and a choice is one explicit press in the route sheet.
+    await page.getByRole('group', { name: 'Sections' }).getByRole('button', { name: 'Roadmap', exact: true }).click();
+    await page.getByRole('heading', { name: 'Where you can go', exact: true }).waitFor();
+    assert.equal((await called(page, 'chooseRoute')).length, 0, 'no automatic choice');
+    assert(!(await page.getByRole('button', { name: 'See route for MBBS' }).isVisible()), 'not open is collapsed');
+    await page.getByText('Not open from your group').click();
+    await page.getByRole('button', { name: 'See route for MBBS' }).click();
+    assert(await page.getByRole('dialog').getByRole('button', { name: 'Choose this route' }).isDisabled(), 'a field that is not open cannot be chosen');
+    await page.keyboard.press('Escape');
+    await page.getByRole('button', { name: 'See route for Pharmacy' }).click();
+    await page.getByRole('dialog').getByRole('button', { name: 'Choose this route' }).click();
+    await page.getByRole('region', { name: 'Your route' }).waitFor();
+    assert.deepEqual((await called(page, 'chooseRoute')).map((call) => call.args), [['pharmacy']], 'one explicit choice');
 
-    // J-K: the plan, and a check-in that opens the same conversation as a
-    // draft. Quick starts fill the draft; nothing is sent automatically.
-    await page.getByRole('navigation').getByRole('button', { name: 'Roadmaps', exact: true }).click();
-    await page.getByRole('group', { name: 'Sections' }).getByRole('button', { name: 'Plan', exact: true }).click();
-    await page.getByRole('heading', { name: 'Small next steps' }).waitFor();
+    // J-K: the route's steps are ticked by the student, and a check-in opens
+    // the conversation as a draft. Nothing is sent automatically.
+    await page.getByRole('region', { name: 'Your route' }).getByRole('checkbox').first().check();
+    await page.getByText('1 of 3').waitFor();
+    assert.deepEqual((await called(page, 'setRouteStep')).at(-1).args, [0, true], 'the tick is saved');
     const sentBefore = (await called(page, 'sendMessage')).length;
-    await page.getByRole('button', { name: 'Open conversation' }).click();
+    await page.getByRole('button', { name: 'How is it going?' }).click();
     await page.getByRole('region', { name: 'Check-in' }).getByRole('button', { name: 'I tried something' }).click();
     // Wait for the draft to render (the click updates React state), then check it.
     await page.waitForFunction(() => /^I tried something\. /.test(document.querySelector('textarea[data-chat-input]')?.value || ''), null, { timeout: 5000 });

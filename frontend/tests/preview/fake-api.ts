@@ -1,4 +1,5 @@
-import {picture,vault,vaultCatalog,possibilities,pathResult,programs} from '../fixtures/counselor';
+import {picture,vault,vaultCatalog,possibilities,pathResult,programs,roadmapPage,chosenRoute} from '../fixtures/counselor';
+import type {ChosenRoute} from '@/lib/roadmap';
 export const calls:{method:string;args:unknown[]}[]=[];
 export const mirror={type:'mirror',version:1,status:'awaiting_confirmation',mirror:{
   intro:'Here is the picture I have so far.',confidence:'focused',
@@ -24,12 +25,23 @@ const richPrograms={status:'completed',missing:[],programs:[
 let searched=new URLSearchParams(location.search).has('programs'), prepared=new URLSearchParams(location.search).has('roadmap'), chosen=new URLSearchParams(location.search).has('family');
 const roadmap={id:'roadmap-one',journey_id:'journey-one',goal_id:null,title:'Practical design',origin:'stated_goal',route:{},
   fit_level:'partial',fit_dimensions:{},gaps:[],steps:[{action:'Try a small project'},{action:'Talk with a student on this route'},{action:'Read one course outline together with family'}],total_cost:null,time_to_start:null,risks:['Test the daily study before deciding.','Check the cost of materials.'],try_it:{kind:'taste_the_work',what:'Build a paper prototype of an everyday object and change it once.',time_needed:'About two hours',questions:['Which part did you enjoy most?']},scholarships:[],sources:[],generation_status:'ready',stale_reason:null,execution_run_id:'offline',version:1,favorite:false,exploring:true,dismissed_at:null,chosen_at:null,focused_at:null,created_at:'2026-10-18T12:00:00Z',updated_at:'2026-10-18T12:00:00Z'};
+// The Roadmap page (GET /v1/roadmap): ?chosen=1 starts with a chosen route.
+let route:ChosenRoute|null=new URLSearchParams(location.search).has('chosen')?structuredClone(chosenRoute):null;
+const choose=(fieldKey:string)=>{const card=roadmapPage.fields.find(c=>c.field_key===fieldKey)!;
+  const steps=[...card.verdict.needs.map(n=>n.kind==='bridge'?{key:'step_bridge',text:n.detail.text}:{key:'step_marks',...n.detail}),
+    ...card.verdict.tests.map(t=>({key:'step_test',name:t.name})),{key:'step_apply',degree:card.title}];
+  route={id:'route-offline',field_key:fieldKey,possibility_id:card.possibility_id,title:card.title,chosen_at:'2026-10-26T09:00:00Z',
+    steps,steps_done:steps.map(()=>false),snapshot_verdict:card.verdict,live_status:card.status};return route;};
 const api={getCounselorWorkspace:async()=>picture,getVault:async()=>vault,getVaultCatalog:async()=>vaultCatalog,getPossibilities:async()=>prepared?possibilities.map(p=>p.id==='path-one'?{...p,roadmap_id:'roadmap-one'}:p):possibilities,
   getFamilyTalk:async()=>({ready:true,path_id:'path-one',path:'Practical design',message:'Prepare around what you know, without assuming that a concern has been resolved.',family:[{id:'person-one',role:'Parent',wish:'A dependable career',worry:'Whether the work will be stable',evidence:'My parent wants me to have dependable work.'}],evidence:[{id:'quote-one',quote:'I fixed a broken lamp with my friend.'}]}),
   prepareFamilyTalk:async()=>({event_id:'offline-family',script:'I understand that dependable work matters to you. I want to explore practical design. I fixed a broken lamp with my friend. I would like us to look at the evidence together before deciding.'}),
   acceptPathActivity:async()=>({scheduled:true}),
   addOwnPath:async()=>({...possibilities[1],id:'own-path',title:'Nursing',why:'Nursing',source:'student',status:'saved',fit:[]}),
   
+  getRoadmapPage:async()=>({...roadmapPage,chosen:route&&structuredClone(route)}),
+  chooseRoute:async(fieldKey:string)=>choose(fieldKey),
+  setRouteStep:async(index:number,done:boolean)=>{route!.steps_done[index]=done;return structuredClone(route);},
+  withdrawRoute:async()=>{const old=route;route=null;return old;},
   getCounselorHealth:async()=>({planner_lag_alert:false}),getPath:async()=>pathResult,
   getPrograms:async()=>searched?(new URLSearchParams(location.search).has('programs')?richPrograms:programs):{status:'not_started',programs:[],missing:[]},
   searchPrograms:async()=>{searched=true;return{};},preparePathRoadmap:async()=>{prepared=true;return {run_id:'offline'};},
@@ -50,7 +62,7 @@ const emptyReads:Record<string,unknown>={
   getCounselorWorkspace:{coverage:Object.fromEntries(Object.keys(picture.coverage).map(k=>[k,{covered:false,item_count:0,evidence:null}])),
     personal:{world:{},self:[],source:[],pressures:{items:[]},sure:{score:null,history:[]}},capabilities:[],academic:{records:{}},sections:{},
     picture:null,mirror_status:null,moments:{},ratings:[]},
-  getVault:{details:{},story:[],conflicts:[],stale:[]},getPossibilities:[],getRoadmaps:[],getCurrentDecision:null,getCounselorSummary:{type:null,status:null,version:null},
+  getVault:{details:{},story:[],conflicts:[],stale:[]},getPossibilities:[],getRoadmaps:[],getCurrentDecision:null,getRoadmapPage:{education_line:null,counts:{open:0,step:0,not_open:0,unknown:0},fields:[],chosen:null},getCounselorSummary:{type:null,status:null,version:null},
 };
 const read=(method:string)=>method.startsWith('get')&&method!=='getCounselorHealth'&&method!=='getFileUrl';
 export const workspaceApi=new Proxy(api,{get:(target,key)=>{const method=String(key);return (...args:unknown[])=>{calls.push({method,args});
@@ -59,5 +71,5 @@ export const workspaceApi=new Proxy(api,{get:(target,key)=>{const method=String(
     if(forced==='error') return Promise.reject(new Error('Offline review: forced error'));
     if(forced==='empty'&&method in emptyReads) return Promise.resolve(structuredClone(emptyReads[method]));
   }
-  const fn=target[key as keyof typeof target];return fn?fn():Promise.resolve([]);};}}) as any;
+  const fn=target[key as keyof typeof target] as ((...a:unknown[])=>Promise<unknown>)|undefined;return fn?fn(...args):Promise.resolve([]);};}}) as any;
 (window as any).__offlineCalls=calls;
