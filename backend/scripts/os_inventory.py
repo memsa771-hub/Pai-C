@@ -174,7 +174,7 @@ FATES: dict[str, Fate] = {
     # --- retire: old-OS only, with notes on what to salvage first ---
     "app.plugins._shared.costs": Fate("retire", "—", "A test-only fee helper that nothing in the running app calls."),
     "app.plugins.scholarship_discovery": Fate("retire", "—", "No v1 slice builds scholarship listing and nothing calls it."),
-    "app.routers.escalations": Fate("retire", "Slice 8 EscalationSink (outside slices 0–7)", "Nothing calls it today; it is a tested intake the Slice 8 adapter may reuse from git history, and it is retired only after the pilot."),
+    "app.routers.escalations": Fate("keep", "Slice 8 glue (app.pai_os_bridge)", "The Counsellor's escalation intake: since Slice 8 the glue hands PAI OS route problems to it. Counsellor-owned; it takes the five shared reasons once the Counsellor team adopts them (hand-over doc)."),
     "app.plugins.qualification_recognition": Fate("retire", "Slice 1 playbook (data only)", "Registered but never called; its sourced packs (DAAD, uni-assist, HEC attestation, APS, with official URLs) must be copied into the Slice 1 Germany playbook/Knowledge before deletion."),
     "app.plugins.gap_assessment": Fate("retire", "—", "Registered but never called; its meets / does-not-meet / unknown logic is a reference for the Slice 1 eligibility checks."),
     # --- read-only: workflow and task features driven by the live application workspace ---
@@ -420,7 +420,7 @@ PRESERVE_NOTES = (
     "`plugins/roadmap_builder/__init__.py:5-8` `DEPENDENCIES` names `qualification.recognize`, `scholarship.discover` and `gap.assess`: remove those names before deleting the three plugins.",
     "`app.plugins.qualification_recognition` packs (`packs/de.json`, `pk.json`, `uk.json`: DAAD, uni-assist, HEC attestation, APS, with official URLs) must be copied into the Slice 1 Germany playbook/Knowledge before the plugin is deleted.",
     "`app.plugins.gap_assessment` meets / does-not-meet / unknown logic is a reference for the Slice 1 eligibility checks: read it before deleting.",
-    "`routers/escalations.py:109-116` needs `PAI_OS_SERVICE_TOKEN`: the Slice 8 EscalationSink adapter may reuse this tested intake (`tests/test_counselor_escalations.py`) from git history.",
+    "`routers/escalations.py` needs `PAI_OS_SERVICE_TOKEN`: the Slice 8 glue (`app/pai_os_bridge.py`) calls it, so it is kept (`tests/test_counselor_escalations.py`, `tests/test_pai_os_bridge.py`).",
 )
 
 HEADER = (
