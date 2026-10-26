@@ -244,8 +244,10 @@ class RoadmapEngine:
         cards.sort(key=lambda card: order.index(card["status"]))  # stable: path order within a status
         counts = {status: sum(card["status"] == status for card in cards) for status in order}
         return {"education_line": education_line(standing), "standing": asdict(standing),
-                "counts": counts, "fields": cards, "chosen": self._chosen(workspace_id)}
+                "counts": counts, "fields": cards, "chosen": self._chosen(workspace_id, cards)}
 
-    def _chosen(self, workspace_id: str):
-        """The active route decision; Task 3 (pai_route_decisions) fills this seam."""
-        return None
+    def _chosen(self, workspace_id: str, cards: list[dict]) -> dict | None:
+        """The active route decision, with its live status from these cards."""
+        from app.pai_c.roadmap.decisions import RouteDecisionService, serialize  # decisions builds on the engine
+        row = RouteDecisionService(self.db).active(workspace_id)
+        return serialize(row, cards) if row is not None else None

@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from app.api.response import success_response
 from app.memory.errors import MemoryDataError
 from app.database import get_db
-from app.routers.roadmaps import _authorized
+from app.routers._workspace_auth import _authorized
 from app.security.access import is_workspace_owner
 from app.pai_c.memory import MemoryService
 from app.pai_c.fact_cards import CardAnswer, available_cards, submit_answer

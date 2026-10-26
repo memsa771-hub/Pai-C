@@ -254,7 +254,8 @@ def test_roadmap_api_is_workspace_scoped_and_choice_requires_presentation():
             assert chosen.json()["data"]["chosen_at"]
             decision = client.get("/v1/decision-records/current", params=params, headers=headers)
             assert decision.status_code == 200
-            assert decision.json()["data"]["roadmap_id"] == card.id
+            # The hand-off now reads pai_route_decisions; a legacy choice is not a route decision.
+            assert decision.json()["data"] is None
         finally:
             app.dependency_overrides.pop(get_db, None)
 

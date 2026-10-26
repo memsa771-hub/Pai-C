@@ -13,7 +13,7 @@ from app.memory.errors import MemoryDataError
 from app.models import Roadmap
 from app.pai_c.roadmaps.service import RoadmapError, RoadmapService
 from app.research.requirements import RequirementStore, ResearchEvidenceError
-from app.routers.network import _resolve_workspace, _verify_workspace_access
+from app.routers._workspace_auth import _authorized
 
 router = APIRouter(prefix="/v1/roadmaps", tags=["Roadmaps"])
 logger = logging.getLogger(__name__)
@@ -34,15 +34,6 @@ class CustomGoal(BaseModel):
     level: str | None = Field(default=None, max_length=100)
     field: str | None = Field(default=None, max_length=120)
     why: str | None = Field(default=None, max_length=500)
-
-
-def _authorized(db, network, token, authorization):
-    workspace = _resolve_workspace(db, network)
-    if workspace is None:
-        raise HTTPException(status_code=404, detail="Workspace not found")
-    if not _verify_workspace_access(workspace, token, authorization):
-        raise HTTPException(status_code=401, detail="Invalid credentials")
-    return workspace
 
 
 def _result(action, db):

@@ -10,7 +10,7 @@ from app.api.response import success_response
 from app.database import get_db
 from app.models import StudentJourney, StudentJourneyEvent, CounselorMirrorFeedback, Workspace
 from app.journey import JourneyService, JourneyError
-from app.routers.roadmaps import _authorized
+from app.routers._workspace_auth import _authorized
 from app.pai_c.summary_access import _journey
 
 router = APIRouter(prefix="/v1/counselor", tags=["Counselor"])

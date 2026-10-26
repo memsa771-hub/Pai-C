@@ -859,6 +859,38 @@ class DecisionRecord(Base):
     )
 
 
+class RouteDecision(Base):
+    """The student's chosen route: the decision record PAI OS reads.
+
+    Rows are never rewritten except to tick steps or withdraw: the verdict and
+    route stay the snapshot the student chose, so a later Vault change shows as
+    a live status beside it, not as a silently different choice. One active row
+    (withdrawn_at null) per workspace.
+    """
+    __tablename__ = "pai_route_decisions"
+
+    id = Column(UUID(as_uuid=False), primary_key=True, default=_uuid)
+    workspace_id = Column(UUID(as_uuid=False), ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False)
+    field_key = Column(Text, nullable=False)
+    possibility_id = Column(UUID(as_uuid=False), ForeignKey("pai_possibilities.id", ondelete="SET NULL"),
+                            nullable=True)
+    title = Column(Text, nullable=False)
+    verdict = Column(JSONB, nullable=False)
+    route = Column(JSONB, nullable=False)
+    # Steps are copy keys with values (policy/roadmap.json copy); steps_done is parallel.
+    steps = Column(JSONB, nullable=False, default=list)
+    steps_done = Column(JSONB, nullable=False, default=list)
+    chosen_at = Column(DateTime(timezone=True), nullable=False, default=_now, server_default=text("NOW()"))
+    withdrawn_at = Column(DateTime(timezone=True), nullable=True)
+
+    __table_args__ = (
+        Index("uq_route_decision_active", "workspace_id", unique=True,
+              postgresql_where=text("withdrawn_at IS NULL"),
+              sqlite_where=text("withdrawn_at IS NULL")),
+        Index("idx_route_decisions_workspace", "workspace_id", "chosen_at"),
+    )
+
+
 class StudentRequest(Base):
     """One durable student question, shared by Counselor and later OS surfaces."""
     __tablename__ = "pai_student_requests"

@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, Header, Query
 from app.api.response import success_response
 from app.pai_c.student_requests import StudentRequestService
 from app.database import get_db
-from app.routers.roadmaps import _authorized
+from app.routers._workspace_auth import _authorized
 
 router = APIRouter(prefix="/v1/student-requests", tags=["Student requests"])
 

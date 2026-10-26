@@ -397,6 +397,8 @@ app.include_router(network.router)
 app.include_router(notifications.router)
 app.include_router(operator.router)
 app.include_router(roadmaps.router)
+from app.routers import roadmap
+app.include_router(roadmap.router)
 app.include_router(search.router)
 app.include_router(shares.router)
 app.include_router(student_requests.router)

@@ -1,5 +1,5 @@
 {
- "_note": "Roadmap engine (app/pai_c/roadmap/engine.py) policy. status_order sorts the field cards and the summary chips. The engine returns reasons as {key, values}; copy holds the English template per key ({name} placeholders are the reason's values; choose_group groups render as their route_label (e.g. FSc Pre-Engineering) joined by group_joiner). education_line renders the header from the Vault. official_confidence: a rule with any other confidence shows the check_with_university note. compare: how many cards the Compare table takes.",
+ "_note": "Roadmap engine (app/pai_c/roadmap/engine.py) policy. status_order sorts the field cards and the summary chips. The engine returns reasons as {key, values}; copy holds the English template per key ({name} placeholders are the reason's values; choose_group groups render as their route_label (e.g. FSc Pre-Engineering) joined by group_joiner). education_line renders the header from the Vault. official_confidence: a rule with any other confidence shows the check_with_university note. compare: how many cards the Compare table takes. step_* keys render the chosen route checklist (app/pai_c/roadmap/decisions.py): each need, each entry test, then applying for the degree.",
  "status_order": ["open", "step", "not_open", "unknown"],
  "official_confidence": "official",
  "group_joiner": " or ",
@@ -14,7 +14,14 @@
   "cannot_check": "PAI cannot check this field yet",
   "undergrad_only": "Undergraduate entry rules only for now",
   "needs_education": "Tell PAI your education first",
-  "check_with_university": "Check with the university"
+  "check_with_university": "Check with the university",
+  "step_marks": "Meet the {min}% marks rule (you have {have}%)",
+  "step_bridge": "{text}",
+  "step_check": "{note}",
+  "step_group": "Choose {groups} in intermediate",
+  "step_any_group": "Choose any group in intermediate",
+  "step_test": "Take {name}",
+  "step_apply": "Apply for {degree}"
  },
  "education_line": {
   "with_percent": "From {level} {groups}, {percent}%",

@@ -7,7 +7,7 @@ from app.journey import JourneyService
 from app.models import ExecutionRun
 from app.pai_c.memory import MemoryService
 from app.pai_c.possibilities import PossibilityService, PossibilityError
-from app.routers.roadmaps import _authorized
+from app.routers._workspace_auth import _authorized
 from pydantic import BaseModel, ConfigDict
 from typing import Literal
 

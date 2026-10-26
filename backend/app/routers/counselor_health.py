@@ -2,7 +2,7 @@
 from fastapi import APIRouter, Depends, Header, Query
 from app.database import get_db
 from app.api.response import success_response
-from app.routers.roadmaps import _authorized
+from app.routers._workspace_auth import _authorized
 from app.pai_c.reliability import health
 
 router=APIRouter(prefix='/v1/counselor',tags=['Counselor'])
