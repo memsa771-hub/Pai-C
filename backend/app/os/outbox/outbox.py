@@ -1,13 +1,15 @@
 """The outbox: every external send carries an idempotency key and is recorded first (invariant 8)."""
 
+import logging
 from dataclasses import dataclass
 
 from sqlalchemy import Engine, func, select, update
 from sqlalchemy.dialects.postgresql import insert
 
 from app.os import models
-from app.os.outbox.senders import Sender
+from app.os.outbox.senders import NotAllowed, Refused, Sender, address_hash
 
+log = logging.getLogger("app.os.outbox")
 O = models.outbox
 GLUE_CHANNELS = ("counsellor",)  # delivered by the host's glue (Slice 8), never by a sender here
 
@@ -46,8 +48,16 @@ class Outbox:
                                    .order_by(O.c.id).limit(1).with_for_update(skip_locked=True)).first()
                 if row is None:
                     break
-                sender.send(OutboxMessage(row.id, row.idempotency_key, row.channel, row.recipient, row.template,
-                                          row.payload))
+                try:
+                    sender.send(OutboxMessage(row.id, row.idempotency_key, row.channel, row.recipient, row.template,
+                                              row.payload))
+                except (NotAllowed, Refused) as e:  # terminal: the row leaves pending; go on to the next row
+                    status = "blocked" if isinstance(e, NotAllowed) else "failed"
+                    detail = "not on the allow-list" if status == "blocked" else f"HTTP {e.status}"
+                    log.warning("email %s (%s) to_sha256=%s key=%s", status, detail, address_hash(row.recipient),
+                                row.idempotency_key)
+                    conn.execute(update(O).where(O.c.id == row.id).values(status=status, attempts=O.c.attempts + 1))
+                    continue
                 conn.execute(update(O).where(O.c.id == row.id).values(
                     status="sent", sent_at=func.now(), attempts=O.c.attempts + 1))
                 sent += 1

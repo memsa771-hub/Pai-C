@@ -16,6 +16,9 @@ class OsSettings:
     tenant_id: str = "pai"
     admin_token: str | None = None
     email_sender: str = "log"
+    resend_api_key: str | None = None  # Slice 9a: never logged, never in a message (OS_RESEND_API_KEY)
+    email_from: str | None = None  # Slice 9a: the From address for Resend (OS_EMAIL_FROM)
+    email_allowlist: frozenset[str] = frozenset()  # Slice 9a: exact addresses, lower-cased; empty = nobody
     worker_id: str | None = None
     fetch_host_interval_s: float = 2.0  # research: minimum seconds between requests to one host
     page_ttl_h: float = 24.0  # research: how long a fetched page is reused
@@ -68,6 +71,12 @@ def load_settings(env: Mapping[str, str] | None = None) -> OsSettings:
         raise ModelModeError("OS_MODEL_MODE=offline needs rehearsal mode: set OS_REHEARSAL=on, or use OS_MODEL_MODE=openai")
     if model_mode == "offline" and answers_dir is None:
         raise ModelModeError("OS_MODEL_MODE=offline needs OS_OFFLINE_ANSWERS_DIR (the folder of canned answers)")
+    email_sender = env.get("OS_EMAIL_SENDER") or "log"
+    resend_api_key = env.get("OS_RESEND_API_KEY") or None
+    email_from = (env.get("OS_EMAIL_FROM") or "").strip() or None
+    if email_sender == "resend" and (resend_api_key is None or email_from is None):
+        raise ValueError("OS_EMAIL_SENDER=resend needs OS_RESEND_API_KEY and OS_EMAIL_FROM")
+    allowlist = frozenset(a.strip().lower() for a in (env.get("OS_EMAIL_ALLOWLIST") or "").split(",") if a.strip())
     return OsSettings(
         database_url=database_url,
         dbos_system_schema=env.get("OS_DBOS_SYSTEM_SCHEMA", "dbos"),
@@ -77,7 +86,10 @@ def load_settings(env: Mapping[str, str] | None = None) -> OsSettings:
         os_enabled=flag(env, "OS_ENABLED"),
         tenant_id=env.get("OS_TENANT_ID") or "pai",
         admin_token=env.get("OS_ADMIN_TOKEN") or None,
-        email_sender=env.get("OS_EMAIL_SENDER") or "log",
+        email_sender=email_sender,
+        resend_api_key=resend_api_key,
+        email_from=email_from,
+        email_allowlist=allowlist,
         worker_id=env.get("OS_WORKER_ID") or None,
         fetch_host_interval_s=float(env.get("OS_FETCH_HOST_INTERVAL_S") or 2.0),
         page_ttl_h=float(env.get("OS_PAGE_TTL_H") or 24.0),

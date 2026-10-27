@@ -59,7 +59,7 @@ def test_make_sender():
     s = load_settings({"DATABASE_URL": "x"})
     assert isinstance(make_sender(s, engine=None), LogSender)
     with pytest.raises(ValueError, match="email sender"):
-        make_sender(load_settings({"DATABASE_URL": "x", "OS_EMAIL_SENDER": "resend"}), engine=None)
+        make_sender(load_settings({"DATABASE_URL": "x", "OS_EMAIL_SENDER": "smtp"}), engine=None)
 
 
 @pytest.mark.parametrize("due_in,slack,expected", [
