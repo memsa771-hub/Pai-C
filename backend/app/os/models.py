@@ -193,7 +193,7 @@ outbox = Table(
     _created(),
     Column("sent_at", DateTime(timezone=True)),
     UniqueConstraint("tenant_id", "idempotency_key", name="uq_os_outbox_key"),
-    _in("status", ("pending", "sent", "skipped"), "ck_os_outbox_status"),
+    _in("status", ("pending", "sent", "skipped", "blocked", "failed"), "ck_os_outbox_status"),
 )
 
 knowledge_facts = Table(
