@@ -21,7 +21,7 @@ from app.os.packs.config import PACK_DIR, load_checked_pack_configs
 from app.os.statements.config import check_config, load_statement_configs
 from app.os.knowledge.profile import PROFILE_DIR, load_profile_dir
 from app.os.playbooks import PLAYBOOK_DIR, load_playbook_dir
-from app.os.settings import ModelModeError, _flag, load_settings
+from app.os.settings import ModelModeError, flag, load_settings
 
 PREFIX = "/v1/os"
 
@@ -34,7 +34,7 @@ def mount_os(app: FastAPI, *, env: Mapping[str, str] | None = None,
     try:
         settings = load_settings(env)
     except ModelModeError:
-        if _flag(os.environ if env is None else env, "OS_ENABLED"):
+        if flag(os.environ if env is None else env, "OS_ENABLED"):
             raise  # Slice 9a: e.g. offline AI without rehearsal mode refuses to start, with the reason
         return False
     except ValueError:

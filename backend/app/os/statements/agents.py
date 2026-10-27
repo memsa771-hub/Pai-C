@@ -54,7 +54,7 @@ class AgentResult:
     usage: RunUsage = field(default_factory=RunUsage)
 
 
-_KIND = {"sop": "a statement of purpose (motivation letter)", "cv": "a CV"}
+KIND = {"sop": "a statement of purpose (motivation letter)", "cv": "a CV"}
 
 WRITER_RULES = """
 Rules:
@@ -121,7 +121,7 @@ def _run(agent: Agent, spec: AgentSpec, prompt: str) -> AgentResult:
 
 def write(agent: Agent, spec: AgentSpec, inputs: Inputs, previous: str | None = None, fixes: list[str] = (),
           flags: list[str] = ()) -> AgentResult:
-    lines = [f"Write {_KIND[inputs.kind]}, {_limit(inputs.rules)}."]
+    lines = [f"Write {KIND[inputs.kind]}, {_limit(inputs.rules)}."]
     if inputs.rules.prompt:
         lines.append(f"The programme asks: <<<PROMPT>>>\n{_clean(inputs.rules.prompt)}\n<<<END>>>")
     lines.append(_data(inputs))
@@ -135,7 +135,7 @@ def write(agent: Agent, spec: AgentSpec, inputs: Inputs, previous: str | None = 
 
 
 def review(agent: Agent, spec: AgentSpec, inputs: Inputs, draft: str, flags: list[str] = ()) -> AgentResult:
-    lines = [f"Review this {_KIND[inputs.kind]} ({_limit(inputs.rules)}).",
+    lines = [f"Review this {KIND[inputs.kind]} ({_limit(inputs.rules)}).",
              "Rubric:\n" + "\n".join(f"- {c}" for c in inputs.rubric),
              _data(inputs), f"<<<DRAFT>>>\n{_clean(draft)}\n<<<END>>>"]
     if flags:

@@ -46,7 +46,7 @@ class ModelModeError(ValueError):
     """OS_MODEL_MODE is unknown, or offline without rehearsal mode or an answers folder: the OS must not start."""
 
 
-def _flag(env: Mapping[str, str], name: str) -> bool:
+def flag(env: Mapping[str, str], name: str) -> bool:
     return env.get(name, "").strip().lower() in TRUTHY
 
 
@@ -64,7 +64,7 @@ def load_settings(env: Mapping[str, str] | None = None) -> OsSettings:
     answers_dir = (env.get("OS_OFFLINE_ANSWERS_DIR") or "").strip() or None
     if model_mode not in MODEL_MODES:
         raise ModelModeError(f"OS_MODEL_MODE must be one of {', '.join(MODEL_MODES)}, got {model_mode!r}")
-    if model_mode == "offline" and not _flag(env, "OS_REHEARSAL"):  # canned answers never reach a real student
+    if model_mode == "offline" and not flag(env, "OS_REHEARSAL"):  # canned answers never reach a real student
         raise ModelModeError("OS_MODEL_MODE=offline needs rehearsal mode: set OS_REHEARSAL=on, or use OS_MODEL_MODE=openai")
     if model_mode == "offline" and answers_dir is None:
         raise ModelModeError("OS_MODEL_MODE=offline needs OS_OFFLINE_ANSWERS_DIR (the folder of canned answers)")
@@ -74,7 +74,7 @@ def load_settings(env: Mapping[str, str] | None = None) -> OsSettings:
         model_cheap=env.get("OS_MODEL_CHEAP", "gpt-5.4-mini"),
         model_strong=env.get("OS_MODEL_STRONG", "gpt-5.4"),
         openai_api_key=env.get("OS_OPENAI_API_KEY") or None,
-        os_enabled=_flag(env, "OS_ENABLED"),
+        os_enabled=flag(env, "OS_ENABLED"),
         tenant_id=env.get("OS_TENANT_ID") or "pai",
         admin_token=env.get("OS_ADMIN_TOKEN") or None,
         email_sender=env.get("OS_EMAIL_SENDER") or "log",
@@ -93,7 +93,7 @@ def load_settings(env: Mapping[str, str] | None = None) -> OsSettings:
         statements_monthly_usd=float(env.get("OS_STATEMENTS_MONTHLY_USD") or 10.0),
         replan_monthly_usd=float(env.get("OS_REPLAN_MONTHLY_USD") or 5.0),
         fact_ttl_days=int(env.get("OS_FACT_TTL_DAYS") or 30),
-        rehearsal=_flag(env, "OS_REHEARSAL"),
+        rehearsal=flag(env, "OS_REHEARSAL"),
         model_mode=model_mode,
         offline_answers_dir=answers_dir,
     )

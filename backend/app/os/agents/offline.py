@@ -102,13 +102,11 @@ def _cut(text: str, words: int | None, chars: int | None) -> str:
 
 def _writer(answers: dict) -> Callable:
     def fn(messages: list[ModelMessage], info: AgentInfo) -> ModelResponse:
-        from app.os.statements.agents import (
-            _KIND,  # imported late: statements imports the model router
-        )
+        from app.os.statements.agents import KIND  # imported late: statements imports the model router
 
         prompt = _user_text(messages)
         first = prompt.split("\n", 1)[0]
-        kind = next((k for k, phrase in _KIND.items() if first.startswith(f"Write {phrase},")), None)
+        kind = next((k for k, phrase in KIND.items() if first.startswith(f"Write {phrase},")), None)
         if kind is None or kind not in answers:
             return _missing(info, "writer", str(kind))
         words, chars = _LIMIT_WORDS.search(first), _LIMIT_CHARS.search(first)

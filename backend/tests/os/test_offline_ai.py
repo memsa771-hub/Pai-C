@@ -63,6 +63,19 @@ def _sample_key() -> dict:
     return yaml.safe_load((SAMPLES / "samples_key.yaml").read_text(encoding="utf-8"))["documents"]
 
 
+def test_documents_answers_current():
+    """The committed documents.yaml matches what make_answers computes on this machine's Pillow."""
+    from tests.os.rehearsal.make_answers import answers
+
+    committed = yaml.safe_load((ANSWERS / "documents.yaml").read_text(encoding="utf-8"))
+    fresh = answers()
+    stale = sorted({e["file"] for e in committed.values()} ^ {e["file"] for e in fresh.values()}
+                   | {e["file"] for k, e in fresh.items() if committed.get(k) != e})
+    assert committed == fresh, (
+        f"documents.yaml is stale for this Pillow (differs for {stale}); "
+        "run `python -m tests.os.rehearsal.make_answers` from backend/ and commit the result")
+
+
 def test_document_answer_by_hash():
     model = offline_model("documents", ANSWERS)
     assert model.model_name == "offline"
