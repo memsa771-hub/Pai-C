@@ -6,7 +6,10 @@ from collections.abc import Callable
 
 from fastapi import APIRouter, Depends, File, Form, Header, HTTPException, Query, Response, UploadFile
 
+from datetime import date
+
 from app.os import clock
+from app.os.costs import cost_report
 from app.os.api.deps import check_admin, current_student_ref, current_student_ref_for_write
 from app.os.api.queries import (
     document_out,
@@ -22,6 +25,7 @@ from app.os.api.queries import (
 )
 from app.os.api.schemas import (
     CompleteIn,
+    CostReportOut,
     ConsentIn,
     ConsentOut,
     CompleteOut,
@@ -525,6 +529,14 @@ def build_router(get_services: Callable[[], Services]) -> APIRouter:
                                         plan.year)
         return {"version": approval.version, "sha256": approval.sha256, "approved_at": approval.approved_at,
                 "completed_tasks": done}
+
+    @router.get("/admin/costs", response_model=CostReportOut, dependencies=[Depends(require_admin)])
+    def costs(start: date = Query(alias="from"), end: date = Query(alias="to"),
+              svc: Services = Depends(services)) -> dict:
+        """Slice 9 Task 8 (spec §3.4): AI cost per student between two calendar dates (UTC), both included."""
+        if end < start:
+            raise HTTPException(status_code=422, detail="to is before from")
+        return asdict(cost_report(svc.engine, svc.settings.tenant_id, start, end))
 
     add_pack_routes(router, services)  # Slice 6a (spec §4)
     add_visa_routes(router, services)  # Slice 6b (spec §4)

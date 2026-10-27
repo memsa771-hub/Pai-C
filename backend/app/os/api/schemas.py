@@ -1,6 +1,7 @@
 """API response and request bodies."""
 
-from datetime import datetime
+from datetime import date, datetime
+from decimal import Decimal
 from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -463,3 +464,22 @@ class ConsentOut(BaseModel):
 class ConsentIn(BaseModel):
     model_config = ConfigDict(extra="forbid")
     version: int = Field(ge=1)
+
+
+class StudentCostOut(BaseModel):
+    """Slice 9 Task 8: money is Decimal (sent as a string, so no float rounding)."""
+    student_ref: str
+    documents_usd: Decimal
+    statements_usd: Decimal
+    replan_usd: Decimal
+    total_usd: Decimal
+    flag: Literal["ok", "alert", "over"]
+
+
+class CostReportOut(BaseModel):
+    start: date
+    end: date
+    students: list[StudentCostOut]
+    research_usd: Decimal
+    unlinked_rows: int
+    unlinked_usd: Decimal
