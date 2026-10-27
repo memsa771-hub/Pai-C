@@ -46,6 +46,10 @@ Finding (Task 1, 2026-10-27): **the real sign-in needs a real Supabase project. 
 an existing test entry point that swaps the Supabase check for a fake one.** The owners must say whether that is
 acceptable for the walkthroughs (spec 2.6). Nothing was built for this; 9a adds no sign-in code.
 
+This path gives only **one fixed student**. The entry point accepts one token and always returns the same account
+(`offline-student@example.invalid`), so S1, S3 and S9 cannot each have their own test account without new code. The owners
+should judge it with that limit in view.
+
 | item | where | on/off | how to remove |
 |---|---|---|---|
 | Real sign-in (email or username and password) | Browser form calls `${NEXT_PUBLIC_SUPABASE_URL}/auth/v1/token` (`frontend/lib/supabase-auth.ts`). The API then checks the Supabase token (`backend/app/security/human_auth.py`) at `POST /v1/auth/session` (`backend/app/routers/auth.py`) | Needs `SUPABASE_URL` and `SUPABASE_ANON_KEY` on the API, and the same two as `NEXT_PUBLIC_SUPABASE_*` in the frontend build. We have no Supabase project, so this does not work locally | Not ours. Nothing to remove |
