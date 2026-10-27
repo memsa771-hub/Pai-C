@@ -104,6 +104,11 @@ def refusal(code: str, message: str) -> HTTPException:
     return HTTPException(status_code=409, detail={"code": code, "message": message})
 
 
+def _accepts(svc: Services, terms) -> bool:
+    """Placeholder terms can be agreed to, and count, only in rehearsal mode (Slice 9a spec §3.2)."""
+    return not terms.placeholder or svc.settings.rehearsal
+
+
 def build_router(get_services: Callable[[], Services]) -> APIRouter:
     router = APIRouter(tags=["os"])
 
@@ -119,7 +124,10 @@ def build_router(get_services: Callable[[], Services]) -> APIRouter:
                           svc: Services = Depends(services)) -> str:
         """A dependency, so it runs before the body is validated and before any write or enqueue. Only a new start
         and an upload are refused: the inbox and changes to a running plan keep working (Review Focus 3)."""
-        if not ConsentStore(svc.engine, svc.settings.tenant_id).has(student, current_terms(svc.terms_dir).version):
+        terms = current_terms(svc.terms_dir)
+        if not _accepts(svc, terms):  # a placeholder row made in a rehearsal never counts outside it
+            raise refusal("terms_not_set", "the pilot terms are not written yet")
+        if not ConsentStore(svc.engine, svc.settings.tenant_id).has(student, terms.version):
             raise refusal("consent_needed", "Please agree to the pilot terms first.")
         return student
 
@@ -127,7 +135,8 @@ def build_router(get_services: Callable[[], Services]) -> APIRouter:
     def consent(student: str = Depends(current_student_ref), svc: Services = Depends(services)) -> dict:
         terms = current_terms(svc.terms_dir)
         return {"version": terms.version, "text": terms.text, "placeholder": terms.placeholder,
-                "agreed": ConsentStore(svc.engine, svc.settings.tenant_id).has(student, terms.version)}
+                "agreed": _accepts(svc, terms)
+                and ConsentStore(svc.engine, svc.settings.tenant_id).has(student, terms.version)}
 
     @router.post("/consent", status_code=204)
     def agree(body: ConsentIn, student: str = Depends(current_student_ref_for_write),
@@ -135,7 +144,7 @@ def build_router(get_services: Callable[[], Services]) -> APIRouter:
         terms = current_terms(svc.terms_dir)
         if body.version != terms.version:
             raise refusal("consent_version", f"these are not the current terms (version {terms.version})")
-        if terms.placeholder and not svc.settings.rehearsal:  # no real student starts before the owners' text
+        if not _accepts(svc, terms):  # no real student starts before the owners' text
             raise refusal("terms_not_set", "the pilot terms are not written yet")
         ConsentStore(svc.engine, svc.settings.tenant_id).agree(student, terms.version)
         return Response(status_code=204)

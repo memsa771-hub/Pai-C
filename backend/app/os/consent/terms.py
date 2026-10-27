@@ -34,7 +34,7 @@ def current_terms(terms_dir: Path | str | None = None) -> Terms:
     meta = (yaml.safe_load(m.group(1)) if m else None) or {}
     if type(meta) is not dict or type(meta.get("placeholder")) is not bool:
         raise ValueError(f"{path.name}: front matter needs version and placeholder (true or false)")
-    if meta.get("version") != number:
+    if type(meta.get("version")) is not int or meta["version"] != number:  # `version: true` is not 1
         raise ValueError(f"{path.name}: front matter version {meta.get('version')!r} does not match the file name")
     text = m.group(2).strip()
     if not text:

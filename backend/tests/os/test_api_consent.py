@@ -210,3 +210,25 @@ def test_migration_up_down_up(os_db):
     finally:
         eng.dispose()
     run_alembic(["upgrade", "os@head"], os_db)
+
+
+def test_placeholder_consent_from_rehearsal_does_not_pass_outside_it(engine, clean, os_db):
+    """A rehearsal database reused with rehearsal off: a consent row for the placeholder must not let anyone in."""
+    rehearsal = build_api(engine, os_db, terms_dir=None, rehearsal=True)
+    version = rehearsal.get(f"{P}/consent", headers=me()).json()["version"]
+    assert rehearsal.post(f"{P}/consent", json={"version": version}, headers=me()).status_code == 204
+    clock.configure(None)
+    pilot = build_api(engine, os_db, terms_dir=None)
+    assert pilot.get(f"{P}/consent", headers=me()).json()["agreed"] is False
+    r = raw_start(pilot)
+    assert r.status_code == 409 and code(r) == "terms_not_set"
+    up = raw_upload(pilot)
+    assert up.status_code == 409 and code(up) == "terms_not_set"
+    assert count(engine, models.plans) == 0 and count(engine, models.documents) == 0
+
+
+@pytest.mark.parametrize("value", ["true", "'1'", "1.0"])
+def test_terms_version_must_be_an_integer(tmp_path, value):
+    (tmp_path / "pilot.v1.md").write_text(f"---\nversion: {value}\nplaceholder: false\n---\nx\n", encoding="utf-8")
+    with pytest.raises(ValueError, match="version"):
+        current_terms(tmp_path)
