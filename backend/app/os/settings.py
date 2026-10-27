@@ -33,6 +33,14 @@ class OsSettings:
     statements_monthly_usd: float = 10.0  # Writer + Critic spend cap per tenant and month (S5-D10)
     replan_monthly_usd: float = 5.0  # Supervisor spend cap per tenant and month (Slice 7 S7-D8)
     fact_ttl_days: int = 30  # a confirmed fact older than this goes stale (spec §4.7)
+    rehearsal: bool = False  # Slice 9a rehearsal mode: stored clock offset, no cron, admin advance/tick (spec §2.2)
+
+
+TRUTHY = {"1", "true", "yes", "on"}
+
+
+def _flag(env: Mapping[str, str], name: str) -> bool:
+    return env.get(name, "").strip().lower() in TRUTHY
 
 
 def _price(env: Mapping[str, str], name: str, default: float | None) -> float | None:
@@ -51,7 +59,7 @@ def load_settings(env: Mapping[str, str] | None = None) -> OsSettings:
         model_cheap=env.get("OS_MODEL_CHEAP", "gpt-5.4-mini"),
         model_strong=env.get("OS_MODEL_STRONG", "gpt-5.4"),
         openai_api_key=env.get("OS_OPENAI_API_KEY") or None,
-        os_enabled=env.get("OS_ENABLED", "").strip().lower() in {"1", "true", "yes", "on"},
+        os_enabled=_flag(env, "OS_ENABLED"),
         tenant_id=env.get("OS_TENANT_ID") or "pai",
         admin_token=env.get("OS_ADMIN_TOKEN") or None,
         email_sender=env.get("OS_EMAIL_SENDER") or "log",
@@ -70,4 +78,5 @@ def load_settings(env: Mapping[str, str] | None = None) -> OsSettings:
         statements_monthly_usd=float(env.get("OS_STATEMENTS_MONTHLY_USD") or 10.0),
         replan_monthly_usd=float(env.get("OS_REPLAN_MONTHLY_USD") or 5.0),
         fact_ttl_days=int(env.get("OS_FACT_TTL_DAYS") or 30),
+        rehearsal=_flag(env, "OS_REHEARSAL"),
     )

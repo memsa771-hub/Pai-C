@@ -28,6 +28,8 @@ from app.os.db import make_engine
 from app.os.kernel import Kernel
 from app.os.knowledge.profile import PROFILE_DIR, load_profile_dir
 from app.os.playbooks import PLAYBOOK_DIR, load_playbook_dir
+from app.os.rehearsal.store import install_clock
+from app.os.rehearsal.tick import register_tick
 from app.os.runner.enqueue import enqueue_pending
 from app.os.runner.modules import default_registry
 from app.os.runner.reconcile import reconcile
@@ -195,32 +197,39 @@ def build(settings: OsSettings) -> tuple[Registry, Kernel, DBOSClient, Engine]:
     pack_configs = load_checked_pack_configs(PACK_SOURCE, types, books, profiles)  # and an invalid pack config (S6a-D12)
     visa_configs = load_checked_pack_configs(PACK_SOURCE, types, books, profiles, kind="visa")  # or visa file (S6b-D3)
     engine = make_engine(settings)
+    install_clock(settings, engine)  # Slice 9a: rehearsal mode reads the stored offset (loud warning); else real time
     kernel = Kernel(engine, settings.tenant_id)
     DBOS(config=dbos_config(settings, settings.worker_id))
     register_workflow(engine, settings, registry, kernel)
     client = DBOSClient(system_database_url=settings.database_url, dbos_system_schema=settings.dbos_system_schema,
                         application_name=APP_NAME, lazy=True)
-    register_job("reconcile", "*/5 * * * *", lambda: reconcile(engine, client, kernel))
+    jobs: dict[str, tuple[str, Callable[[], object]]] = {}  # name -> (cron, job); scheduled, or ticked in rehearsal
+    jobs["reconcile"] = ("*/5 * * * *", lambda: reconcile(engine, client, kernel))
     from app.os.workers.jobs import JOB_FACTORIES as worker_jobs  # imported late: workers depend on the runner
 
     for name, cron, factory in [*worker_jobs, *JOB_FACTORIES]:
-        register_job(name, cron, factory(settings, engine, kernel, client))
+        jobs[name] = (cron, factory(settings, engine, kernel, client))
     RESEARCH["on"] = register_research_if_configured(settings, engine, kernel)
     if register_documents_if_configured(settings, engine):
         from app.os.documents.run import retry_waiting
 
-        register_job("documents_retry", "10 0 * * *",  # uploads that waited for the budget, daily at 00:10 UTC
-                     lambda: retry_waiting(engine, client, settings.tenant_id, clock.today()))
+        jobs["documents_retry"] = ("10 0 * * *",  # uploads that waited for the budget, daily at 00:10 UTC
+                                   lambda: retry_waiting(engine, client, settings.tenant_id, clock.today()))
     register_statements_if_configured(settings, engine)
     register_packs_always(settings, engine, books, pack_configs, visa_configs)
     replanner = register_replan_always(settings, engine, kernel, books)
     from app.os.replan.run import run_replan_job
 
-    register_job("replan", "*/5 * * * *", lambda: run_replan_job(replanner, client, clock.now()))
+    jobs["replan"] = ("*/5 * * * *", lambda: run_replan_job(replanner, client, clock.now()))
     from app.os.adapters.counsellor.run import IntakeDeps, register_intake, run_intake_job
 
     register_intake(IntakeDeps(engine, kernel, replanner.plans, replanner.escalations))  # Slice 8: off by default
-    register_job("counsellor_intake", "* * * * *", lambda: run_intake_job(engine, settings.tenant_id, client))
+    jobs["counsellor_intake"] = ("* * * * *", lambda: run_intake_job(engine, settings.tenant_id, client))
+    if settings.rehearsal:  # Slice 9a: no cron, so real time never mixes with rehearsal time; only admin tick runs jobs
+        register_tick({name: fn for name, (_, fn) in jobs.items()})
+    else:
+        for name, (cron, fn) in jobs.items():
+            register_job(name, cron, fn)
     return registry, kernel, client, engine
 
 

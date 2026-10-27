@@ -16,22 +16,29 @@ Plain audit stamps written by the database (for example `sent_at`, `read_at`, `a
 
 | item | where | on/off | how to remove |
 |---|---|---|---|
+| Rehearsal mode (`OS_REHEARSAL`) | `OsSettings.rehearsal` in `backend/app/os/settings.py` (same true words as `OS_ENABLED`: 1, true, yes, on). Set it on both the API and the worker. It is separate from `scripts/offline_startup_app.py`: with that entry point, set `OS_REHEARSAL` in the same environment as `OS_ENABLED` | Off by default. On: the shared clock reads the stored offset, the worker registers no cron schedules, the three admin calls below exist, and the API and worker log a WARNING containing "REHEARSAL MODE" at start. Off: real time even if an offset row is left, and the calls answer 404 | Delete the field and `_flag(env, "OS_REHEARSAL")` in `settings.py`, the `install_clock` calls in `app/os/api/services.py` and `app/os/runner/worker.py` `build`, the `if settings.rehearsal` branch in `build` (keep the `register_job` loop), and the `if get_services().settings.rehearsal` block in `app/os/api/router.py` |
 
 ## Tables
 
 | item | where | on/off | how to remove |
 |---|---|---|---|
+| `os_rehearsal_clock` (`tenant_id` PK, `offset_seconds` bigint >= 0, `updated_at`) | Migration `backend/alembic/versions_os/os_0014_slice9_rehearsal_clock.py`; model `rehearsal_clock` in `backend/app/os/models.py`. One row per tenant, moved only by `advance` (one atomic `INSERT ... ON CONFLICT DO UPDATE SET offset_seconds = os_rehearsal_clock.offset_seconds + :s`) | Always created. Read only when rehearsal mode is on; a leftover row is ignored when it is off | A new migration that drops the table (the `os_0014` downgrade does exactly that), then delete the model and `"os_rehearsal_clock"` in `tests/os/test_models.py` |
 
 ## Endpoints
 
 | item | where | on/off | how to remove |
 |---|---|---|---|
+| `POST /v1/os/admin/rehearsal/advance` `{days}` (1 to 60, else 422) -> `{offset_days, now}` | `backend/app/os/rehearsal/api.py`, added by `build_router` | Admin token (`X-OS-Admin-Token`). Exists only in rehearsal mode (404 otherwise). Time only moves forward | Delete with `app/os/rehearsal/` (see Files) |
+| `POST /v1/os/admin/rehearsal/tick` -> `{tick_id}` | Same file. Enqueues one `os.rehearsal_tick` workflow on the `os` queue through the API's DBOS client; the ID is `rehearsal-tick:<tenant>:<random>` | Same as above | Same as above |
+| `GET /v1/os/admin/rehearsal/tick/{tick_id}` -> `{status: running/done/error, ran}` | Same file. Reads the workflow from DBOS: `SUCCESS` is done (with the job names it ran), `ERROR`/`CANCELLED`/`MAX_RECOVERY_ATTEMPTS_EXCEEDED` is error, anything else is running. Another tenant's or a non-tick workflow ID is 404 | Same as above | Same as above |
 
 ## Files
 
 | item | where | on/off | how to remove |
 |---|---|---|---|
 | The shared clock | `backend/app/os/clock.py`. Every OS module reads time through `clock.now()` and `clock.today()` | Always on. It gives real time unless rehearsal mode installs an offset (Task 3) | Not removable on its own. Delete the file and change each `clock.now`/`clock.today` back to a direct date call (the check below then goes too) |
+| Rehearsal package | `backend/app/os/rehearsal/`: `store.py` (`ClockStore`, `install_clock`, the warning text), `tick.py` (`JOB_ORDER`, `run_tick`, `register_tick`, `enqueue_tick`, `tick_status`), `api.py` (the three calls). Tests: `backend/tests/os/test_rehearsal_mode.py` | Imported always; does nothing unless rehearsal mode is on | Delete the folder and the test file, after removing the setting's uses (see Settings) |
+| Workflow `os.rehearsal_tick` | `register_tick` in `app/os/rehearsal/tick.py`, called by `build` in `app/os/runner/worker.py` instead of the `register_job` loop. It runs the worker's jobs once, each as a DBOS step (`os.tick.<job>`, the normal step retries), in this order: deadline_engine, reminders, replan, deliver_outbox, freshness, documents_retry (only on a worker with a model key), reconcile. A job that still fails ends the tick as error and the jobs after it do not run. **`counsellor_intake` is not ticked** and, with no cron, does not run at all in rehearsal mode: the Counsellor module is off for the pilot (Slice 8 S8-D2) | Registered only in rehearsal mode; with it off the worker registers today's schedules and no tick workflow | Delete with the package; in `build` keep only the `register_job` loop |
 
 ## Checks
 

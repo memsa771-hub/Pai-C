@@ -630,3 +630,13 @@ counsellor_sweep = Table(
     Column("mark", JSONB, nullable=False),  # the glue's sweep position: the last chosen_at and decision ID seen
     Column("updated_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
 )
+
+# --- Slice 9a: rehearsal mode (os_0014) ----------------------------------------------------------------------------
+
+rehearsal_clock = Table(
+    "os_rehearsal_clock", md,
+    Column("tenant_id", Text, primary_key=True),
+    Column("offset_seconds", BigInteger, nullable=False, server_default="0"),  # how far the rehearsal clock is moved
+    Column("updated_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
+    CheckConstraint("offset_seconds >= 0", name="ck_os_rehearsal_clock_offset"),
+)
