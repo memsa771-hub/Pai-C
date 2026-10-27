@@ -2,7 +2,7 @@
 
 import os
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 
 @dataclass(frozen=True)
@@ -16,7 +16,7 @@ class OsSettings:
     tenant_id: str = "pai"
     admin_token: str | None = None
     email_sender: str = "log"
-    resend_api_key: str | None = None  # Slice 9a: never logged, never in a message (OS_RESEND_API_KEY)
+    resend_api_key: str | None = field(default=None, repr=False)  # Slice 9a: never logged, never in a message (OS_RESEND_API_KEY)
     email_from: str | None = None  # Slice 9a: the From address for Resend (OS_EMAIL_FROM)
     email_allowlist: frozenset[str] = frozenset()  # Slice 9a: exact addresses, lower-cased; empty = nobody
     worker_id: str | None = None
@@ -72,7 +72,7 @@ def load_settings(env: Mapping[str, str] | None = None) -> OsSettings:
     if model_mode == "offline" and answers_dir is None:
         raise ModelModeError("OS_MODEL_MODE=offline needs OS_OFFLINE_ANSWERS_DIR (the folder of canned answers)")
     email_sender = env.get("OS_EMAIL_SENDER") or "log"
-    resend_api_key = env.get("OS_RESEND_API_KEY") or None
+    resend_api_key = (env.get("OS_RESEND_API_KEY") or "").strip() or None
     email_from = (env.get("OS_EMAIL_FROM") or "").strip() or None
     if email_sender == "resend" and (resend_api_key is None or email_from is None):
         raise ValueError("OS_EMAIL_SENDER=resend needs OS_RESEND_API_KEY and OS_EMAIL_FROM")

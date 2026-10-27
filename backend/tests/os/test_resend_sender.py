@@ -3,6 +3,7 @@
 import hashlib
 import json
 import logging
+import pickle
 
 import httpx
 import pytest
@@ -11,7 +12,13 @@ from sqlalchemy import select
 from app.os import models
 from app.os.outbox import Outbox
 from app.os.outbox.outbox import OutboxMessage
-from app.os.outbox.senders import NotAllowed, Refused, ResendSender, make_sender
+from app.os.outbox.senders import (
+    NotAllowed,
+    ProviderUnavailable,
+    Refused,
+    ResendSender,
+    make_sender,
+)
 from app.os.settings import load_settings
 
 KEY = "re_test_dummy"
@@ -111,7 +118,7 @@ def test_5xx_raises_for_step_retry(engine, clean):
     box = Outbox(engine, "pai")
     for k in ("k1", "k2", "k3"):
         box.add(k, "email", "ali@example.com", "inbox_reminder", {})
-    with pytest.raises(httpx.HTTPStatusError):
+    with pytest.raises(ProviderUnavailable):
         box.deliver(ResendSender(settings(), http))
     with engine.connect() as conn:
         statuses = [r.status for r in conn.execute(select(models.outbox).order_by(models.outbox.c.id))]
@@ -123,7 +130,7 @@ def test_network_error_raises():
         raise httpx.ConnectError("down")
 
     http, _ = client(boom)
-    with pytest.raises(httpx.ConnectError):
+    with pytest.raises(ProviderUnavailable):
         ResendSender(settings(), http).send(msg())
 
 
@@ -177,3 +184,39 @@ def test_migration_down_turns_new_statuses_into_skipped(os_db, engine, clean):
     finally:
         engine.dispose()
         run_alembic(["upgrade", "os@head"], os_db)
+
+
+def _boom(request):
+    raise httpx.ConnectError("down", request=request)
+
+
+@pytest.mark.parametrize("handler", [lambda r: httpx.Response(503), _boom, lambda r: httpx.Response(429),
+                                     lambda r: httpx.Response(408)])
+def test_retryable_errors_do_not_carry_the_key(handler, engine, clean):
+    http, _ = client(handler)
+    with pytest.raises(ProviderUnavailable) as exc:
+        ResendSender(settings(), http).send(msg())
+    e = exc.value
+    assert e.__cause__ is None and e.__context__ is None
+    assert KEY not in repr(e) and KEY not in str(e) and KEY.encode() not in pickle.dumps(e)
+    # through the outbox: it propagates and the row stays pending
+    box = Outbox(engine, "pai")
+    box.add("k1", "email", "ali@example.com", "inbox_reminder", {})
+    with pytest.raises(ProviderUnavailable):
+        box.deliver(ResendSender(settings(), http))
+    with engine.connect() as conn:
+        assert conn.execute(select(models.outbox.c.status)).scalar_one() == "pending"
+
+
+def test_other_4xx_is_still_refused():
+    for code in (400, 401, 403, 404, 422):
+        http, _ = client(lambda r, c=code: httpx.Response(c))
+        with pytest.raises(Refused):
+            ResendSender(settings(), http).send(msg())
+
+
+def test_blank_key_is_missing_and_not_in_repr():
+    with pytest.raises(ValueError):
+        load_settings({"DATABASE_URL": "x", "OS_EMAIL_SENDER": "resend", "OS_RESEND_API_KEY": "   ",
+                       "OS_EMAIL_FROM": "a@example.com"})
+    assert KEY not in repr(settings())

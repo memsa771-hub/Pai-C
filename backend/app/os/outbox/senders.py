@@ -32,6 +32,17 @@ class Refused(Exception):
         self.status = status
 
 
+class ProviderUnavailable(Exception):
+    """Resend is unreachable, slow (408), rate-limiting (429) or failing (5xx): the DBOS step retries.
+
+    Carries only a status code or an exception class name. httpx errors hold the request, whose headers hold the API
+    key, and DBOS stores the errors of a step that ran out of retries; so no httpx exception may escape `send`.
+    """
+
+
+RETRYABLE_4XX = (408, 429)
+
+
 def address_hash(recipient: str) -> str:
     """What logs show instead of an address."""
     return hashlib.sha256(recipient.strip().lower().encode()).hexdigest()
@@ -81,12 +92,21 @@ class ResendSender:
             raise NotAllowed(digest)
         subject, text = _render(msg)
         log.info("email (resend) to_sha256=%s template=%s key=%s", digest, msg.template, msg.idempotency_key)
-        resp = self._http.post(
-            RESEND_URL, headers={"Authorization": f"Bearer {self._key}", "Idempotency-Key": msg.idempotency_key},
-            json={"from": self._from, "to": [to], "subject": subject, "text": text})
-        if 400 <= resp.status_code < 500:
-            raise Refused(resp.status_code)
-        resp.raise_for_status()  # 5xx (and anything else not 2xx) raises: the DBOS step retries
+        failure = None
+        try:
+            resp = self._http.post(
+                RESEND_URL, headers={"Authorization": f"Bearer {self._key}", "Idempotency-Key": msg.idempotency_key},
+                json={"from": self._from, "to": [to], "subject": subject, "text": text})
+        except httpx.HTTPError as e:
+            failure = type(e).__name__
+        if failure is not None:  # raised outside the except block, so there is no __context__ holding the request
+            raise ProviderUnavailable(f"email provider unreachable ({failure})")
+        code = resp.status_code
+        if 200 <= code < 300:
+            return
+        if 400 <= code < 500 and code not in RETRYABLE_4XX:
+            raise Refused(code)
+        raise ProviderUnavailable(f"email provider answered HTTP {code}")
 
 
 def make_sender(settings: OsSettings, engine: Engine | None) -> Sender:
