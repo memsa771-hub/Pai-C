@@ -10,6 +10,8 @@ to remove it.
 
 Only fictional, non-secret values belong here. Never put a key, token or real student data in this file.
 
+Plain audit stamps written by the database (for example `sent_at`, `read_at`, `approved_at`, and a `created_at` that is not used in a rule) stay real time under a rehearsal offset. Anything the OS decides with time (daily limits, spend by month, freshness, the 24 hour swap window) uses the shared clock.
+
 ## Settings
 
 | item | where | on/off | how to remove |
@@ -29,11 +31,13 @@ Only fictional, non-secret values belong here. Never put a key, token or real st
 
 | item | where | on/off | how to remove |
 |---|---|---|---|
+| The shared clock | `backend/app/os/clock.py`. Every OS module reads time through `clock.now()` and `clock.today()` | Always on. It gives real time unless rehearsal mode installs an offset (Task 3) | Not removable on its own. Delete the file and change each `clock.now`/`clock.today` back to a direct date call (the check below then goes too) |
 
 ## Checks
 
 | item | where | on/off | how to remove |
 |---|---|---|---|
+| No direct clock calls | `test_no_direct_clock_calls` in `backend/tests/os/test_invariants.py`. It fails if any file in `app/os` (except `clock.py`) reads the real date or time itself | Runs with the tests; cannot be switched off | Delete the two clock tests in that file (`test_no_direct_clock_calls` and `test_clock_check_catches_a_violation`) |
 
 ## Senders
 

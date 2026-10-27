@@ -1,10 +1,10 @@
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 import pytest
 import yaml
 from sqlalchemy import func, select
 
-from app.os import models
+from app.os import clock, models
 from app.os.knowledge import Fact, SqlKnowledge, load_seed
 
 NOW = datetime(2026, 10, 17, tzinfo=timezone.utc)
@@ -94,3 +94,17 @@ def test_confirm_updates_status(engine, clean):
 def test_confirm_unknown_fact_raises(engine, clean):
     with pytest.raises(KeyError):
         SqlKnowledge(engine, "pai").confirm(999, value=1, quote="q", url="https://u", status="confirmed")
+
+
+def test_confirm_stamps_from_the_shared_clock(engine, clean):
+    """Slice 9a: an admin-confirmed fact is checked 'now' on the shared clock, so it is not stale at once."""
+    clock.configure(lambda: timedelta(days=60))
+    try:
+        kb = SqlKnowledge(engine, "pai")
+        fid = kb.upsert("programme", "p1", "deadline_close", _fact({"date": "2027-07-15"}, status="unconfirmed", quote=""))
+        kb.confirm(fid, value={"date": "2027-07-15"}, quote="Deadline 15 July", url="https://uni.example/apply",
+                   status="confirmed")
+        checked = kb.programme_facts(["p1"], ["deadline_close"], 2027)[("p1", "deadline_close")].checked_at
+        assert abs(checked - clock.now()) < timedelta(minutes=5)
+    finally:
+        clock.configure(None)

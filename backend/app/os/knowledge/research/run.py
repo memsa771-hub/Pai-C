@@ -11,12 +11,13 @@ at workflow level, so each model request is its own step (DBOSDurability). Step 
 
 from collections.abc import Callable, Mapping
 from dataclasses import asdict
-from datetime import date, datetime, timezone
+from datetime import date, datetime
 
 from dbos import DBOS, DBOSClient, EnqueueOptions
 from sqlalchemy import Engine, insert, select, update
 
 from app.os import models
+from app.os import clock as shared_clock
 from app.os.agents.spec import AgentSpec
 from app.os.compiler import CONFIRM_TYPE, CompileError
 from app.os.knowledge.changes import after_fact_change
@@ -40,10 +41,6 @@ E = models.events
 def research_workflow_id(tenant_id: str, programme_ref: str, intake_year: int, day: date | str) -> str:
     day = day.isoformat() if isinstance(day, date) else day
     return f"research:{tenant_id}:{programme_ref}:{intake_year}:{day}"
-
-
-def _utcnow() -> datetime:
-    return datetime.now(timezone.utc)
 
 
 # --- kernel side: start the day's runs -----------------------------------------------------------------------
@@ -166,7 +163,7 @@ def _needs_third(verdicts: Mapping[str, dict]) -> bool:
 
 def register_research(engine: Engine, settings: OsSettings, kernel, service, gateway: PageGateway,
                       readers: Mapping[str, Mapping[str, object]], spec: AgentSpec,
-                      profiles: Mapping[str, ResearchProfile], clock: Callable[[], datetime] = _utcnow) -> None:
+                      profiles: Mapping[str, ResearchProfile], clock: Callable[[], datetime] = shared_clock.now) -> None:
     """Registers os.research and its steps. Must run before DBOS.launch(), with readers built once per process.
 
     `readers` maps a route key to its readers A, B and C (readings.build_readers)."""

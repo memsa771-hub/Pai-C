@@ -30,7 +30,7 @@ from pydantic_ai.usage import RunUsage, UsageLimits
 from sqlalchemy import Engine, func, select
 from sqlalchemy.dialects.postgresql import insert
 
-from app.os import models
+from app.os import clock, models
 from app.os.agents.spec import AgentSpec
 from app.os.knowledge.profile import ResearchProfile, reading_model
 from app.os.settings import OsSettings
@@ -222,8 +222,7 @@ class AgentRuns:
                   "reading": reading, "agent": spec.id, "agent_version": spec.version, "model": model,
                   "input_tokens": u.input_tokens or 0, "cached_tokens": u.cache_read_tokens or 0,
                   "output_tokens": u.output_tokens or 0, "cost_usd": cost_usd, "error": error}
-        if at is not None:
-            values["at"] = at
+        values["at"] = at if at is not None else clock.now()  # the shared clock, so spend follows rehearsal time
         constraint = ("uq_os_agent_runs_plan" if plan_id is not None else  # a Supervisor reading (Slice 7)
                       "uq_os_agent_runs_artifact" if artifact_id is not None else
                       "uq_os_agent_runs_document" if document_id is not None else "uq_os_agent_runs_reading")

@@ -18,12 +18,12 @@ import signal
 import sys
 import threading
 from collections.abc import Callable
-from datetime import datetime, timezone
 from pathlib import Path
 
 from dbos import DBOS, DBOSClient
 from sqlalchemy import Engine
 
+from app.os import clock
 from app.os.db import make_engine
 from app.os.kernel import Kernel
 from app.os.knowledge.profile import PROFILE_DIR, load_profile_dir
@@ -156,7 +156,7 @@ def register_replan_always(settings: OsSettings, engine: Engine, kernel: Kernel,
     from app.os.service import PlanService
 
     plans = PlanService(engine, settings, kernel, SqlKnowledge(engine, settings.tenant_id), books,
-                        today=lambda: datetime.now(timezone.utc).date())
+                        today=clock.today)
     from app.os.adapters.counsellor.escalation import escalation_sink
 
     replanner = Replanner(engine, plans, load_replan_configs(), Outbox(engine, settings.tenant_id),
@@ -210,13 +210,13 @@ def build(settings: OsSettings) -> tuple[Registry, Kernel, DBOSClient, Engine]:
         from app.os.documents.run import retry_waiting
 
         register_job("documents_retry", "10 0 * * *",  # uploads that waited for the budget, daily at 00:10 UTC
-                     lambda: retry_waiting(engine, client, settings.tenant_id, datetime.now(timezone.utc).date()))
+                     lambda: retry_waiting(engine, client, settings.tenant_id, clock.today()))
     register_statements_if_configured(settings, engine)
     register_packs_always(settings, engine, books, pack_configs, visa_configs)
     replanner = register_replan_always(settings, engine, kernel, books)
     from app.os.replan.run import run_replan_job
 
-    register_job("replan", "*/5 * * * *", lambda: run_replan_job(replanner, client, datetime.now(timezone.utc)))
+    register_job("replan", "*/5 * * * *", lambda: run_replan_job(replanner, client, clock.now()))
     from app.os.adapters.counsellor.run import IntakeDeps, register_intake, run_intake_job
 
     register_intake(IntakeDeps(engine, kernel, replanner.plans, replanner.escalations))  # Slice 8: off by default
@@ -247,7 +247,7 @@ def main(argv: list[str] | None = None) -> int:
                 if RESEARCH["on"]:
                     from app.os.knowledge.research.run import enqueue_research
 
-                    enqueue_research(engine, client, settings.tenant_id, datetime.now(timezone.utc).date())
+                    enqueue_research(engine, client, settings.tenant_id, clock.today())
             except Exception:  # noqa: BLE001  (a database blip must not kill the worker; next tick retries)
                 log.exception("enqueue failed")
     finally:

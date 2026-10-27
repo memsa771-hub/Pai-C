@@ -11,7 +11,7 @@ used up the workflow calls `record_failure`.
 
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 from urllib.parse import urlsplit
 from urllib.robotparser import RobotFileParser
 
@@ -20,6 +20,7 @@ from sqlalchemy import Engine, func, select
 from sqlalchemy.dialects.postgresql import insert
 
 from app.os import models
+from app.os import clock as shared_clock
 from app.os.knowledge.research.links import domain_of, rank_links
 from app.os.knowledge.research.text import html_to_text, pdf_to_text
 from app.os.settings import OsSettings
@@ -49,10 +50,6 @@ class Page:
         return self.blocked is None and bool(self.text)
 
 
-def _utcnow() -> datetime:
-    return datetime.now(timezone.utc)
-
-
 def _sleep(seconds: float) -> None:
     import time
 
@@ -61,7 +58,7 @@ def _sleep(seconds: float) -> None:
 
 class PageGateway:
     def __init__(self, engine: Engine, tenant_id: str, settings: OsSettings, client: httpx.Client | None = None,
-                 clock: Callable[[], datetime] = _utcnow, sleep: Callable[[float], None] = _sleep) -> None:
+                 clock: Callable[[], datetime] = shared_clock.now, sleep: Callable[[float], None] = _sleep) -> None:
         self.engine, self.tenant_id, self.settings = engine, tenant_id, settings
         self.client = client or httpx.Client(headers={"User-Agent": USER_AGENT}, follow_redirects=True,
                                              timeout=20.0)

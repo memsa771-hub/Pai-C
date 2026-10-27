@@ -3,14 +3,13 @@ on a Counsellor plan is also written to the outbox (channel `counsellor`, key `e
 payload) for the host's glue to deliver. Only while the module is on; system problems stay in the support inbox.
 The note is a fixed sentence per reason from notes.yaml, never student, document or Supervisor text."""
 
-from datetime import datetime, timezone
 from functools import cache
 from pathlib import Path
 
 import yaml
 from sqlalchemy import Engine, select, update
 
-from app.os import models
+from app.os import clock, models
 from app.os.adapters.counsellor import manifest
 from app.os.adapters.counsellor.store import Intake, IntakeStore
 from app.os.adapters.standalone.escalation import CompositeSink, StandaloneSink
@@ -63,7 +62,7 @@ def journey_of(external_ref: str) -> str:
 def _payload(key: str, case_id: int | None, journey_id: str, student_ref: str, reason: str,
              notes: dict[str, str]) -> dict:
     return EscalationV1(key=key, case_id=case_id, journey_id=journey_id, student_ref=student_ref, reason=reason,
-                        note=notes[reason], raised_at=datetime.now(timezone.utc)).model_dump(mode="json", by_alias=True)
+                        note=notes[reason], raised_at=clock.now()).model_dump(mode="json", by_alias=True)
 
 
 class CounsellorSink:

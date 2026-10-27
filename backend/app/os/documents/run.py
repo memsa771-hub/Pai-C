@@ -17,12 +17,13 @@ deterministically, at workflow level just before the reading.
 
 import re
 from collections.abc import Callable, Mapping
-from datetime import date, datetime, timezone
+from datetime import date, datetime
 
 from dbos import DBOS, DBOSClient, EnqueueOptions
 from sqlalchemy import Engine, func, insert, select, update
 
 from app.os import models
+from app.os import clock as shared_clock
 from app.os.agents.spec import AgentSpec
 from app.os.documents.checks import Finding, cross_check
 from app.os.documents.intake import UploadError, check_upload, prepare
@@ -131,10 +132,6 @@ def compare_documents(engine: Engine, tenant_id: str, student_ref: str, types: M
         return found
 
 
-def _utcnow() -> datetime:
-    return datetime.now(timezone.utc)
-
-
 def _norm(s: str) -> str:
     return " ".join(re.sub(r"[\W_]+", " ", s.casefold()).split())
 
@@ -150,7 +147,7 @@ def type_matches(t: DocumentType, detected: str | None) -> bool:
 
 def register_documents(engine: Engine, settings: OsSettings, readers: Mapping[str, object], spec: AgentSpec,
                        types: Mapping[str, DocumentType], variants: list[set[str]],
-                       clock: Callable[[], datetime] = _utcnow) -> None:
+                       clock: Callable[[], datetime] = shared_clock.now) -> None:
     """Registers os.document and its steps. Must run before DBOS.launch(), with the readers built once per process
     (reader.build_readers)."""
     from app.os.runner.workflow import STEP_CONFIG  # imported here: the runner imports documents

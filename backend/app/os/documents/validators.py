@@ -9,6 +9,7 @@ import re
 from datetime import date
 from typing import Any, Literal
 
+from app.os import clock
 from app.os.documents.types import DocumentType, FieldSpec, Rule
 
 Check = Literal["ok", "check_failed", "missing"]
@@ -99,7 +100,7 @@ def _yymmdd(s: str, *, birth: bool) -> date | None:
     try:
         yy, mm, dd = int(s[0:2]), int(s[2:4]), int(s[4:6])
         year = 2000 + yy
-        if birth and year > date.today().year:  # a birth date is never in the future
+        if birth and year > clock.today().year:  # a birth date is never in the future
             year -= 100
         return date(year, mm, dd)
     except ValueError:

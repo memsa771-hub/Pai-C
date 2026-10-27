@@ -3,10 +3,10 @@ inbox, the student's programme facts, research (admin), and the student's docume
 
 import logging
 from collections.abc import Callable
-from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, File, Form, Header, HTTPException, Query, Response, UploadFile
 
+from app.os import clock
 from app.os.api.deps import check_admin, current_student_ref, current_student_ref_for_write
 from app.os.api.queries import (
     document_out,
@@ -263,7 +263,7 @@ def build_router(get_services: Callable[[], Services]) -> APIRouter:
         try:
             ref, created = request_programme(
                 svc.engine, tenant, student, body.route, body.university, body.name, body.url,
-                now=datetime.now(timezone.utc), intake_year=body.intake_year,
+                now=clock.now(), intake_year=body.intake_year,
                 enqueue=lambda r: enqueue_one(svc.engine, svc.dbos_client(), tenant, r, body.intake_year, svc.today()))
         except RequestLimit as e:
             raise HTTPException(status_code=429, detail=str(e)) from None

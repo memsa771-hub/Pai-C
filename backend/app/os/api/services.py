@@ -2,11 +2,12 @@
 
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
-from datetime import date, datetime, timezone
+from datetime import date
 from functools import cache
 
 from sqlalchemy import Engine
 
+from app.os import clock
 from app.os.adapters.counsellor.escalation import escalation_sink
 from app.os.db import make_engine
 from app.os.documents.checks import load_name_variants
@@ -64,7 +65,7 @@ def make_services(settings: OsSettings, *, engine: Engine | None = None,
     registry.validate(books.values())
     kernel = Kernel(engine, settings.tenant_id)
     knowledge = SqlKnowledge(engine, settings.tenant_id)
-    today = today or (lambda: datetime.now(timezone.utc).date())
+    today = today or clock.today
     plans = PlanService(engine, settings, kernel, knowledge, books, today=today, registry=registry)
     types = document_types if document_types is not None else load_document_types()
     return Services(settings, engine, kernel, knowledge, plans, dbos_client or _client_factory(settings), today,

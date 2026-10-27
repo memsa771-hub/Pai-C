@@ -6,11 +6,12 @@ route's origin, destination and level come from its playbook, and the task the b
 """
 
 import logging
+from datetime import timedelta
 
 from pydantic import ValidationError
-from sqlalchemy import func, select, text
+from sqlalchemy import func, select
 
-from app.os import models
+from app.os import clock, models
 from app.os.contracts.route_contract import IntakeRef, ProgrammeChoice, RouteContract
 from app.os.eligibility.notes import on_profile_change
 from app.os.kernel import PlanRef, contract_sha256
@@ -109,10 +110,10 @@ def _not_started(plans, plan_id: int, ref: str) -> None:
 
 
 def _within_limit(plans, plan_id: int) -> None:
-    """Counted on the database's clock, the one that stamps each revision."""
+    """Counted on the shared clock, which also stamps each revision, so a rehearsal day moves both together."""
     with plans.engine.connect() as conn:
         n = conn.execute(select(func.count()).select_from(R).where(
-            R.c.plan_id == plan_id, R.c.created_at > func.now() - text("interval '24 hours'"),
+            R.c.plan_id == plan_id, R.c.created_at > clock.now() - timedelta(hours=24),
             R.c.cause.like("programmes:%"))).scalar()
     if n >= CHANGES_PER_DAY:
         raise SwapLimit(f"at most {CHANGES_PER_DAY} programme changes a day; try again tomorrow")

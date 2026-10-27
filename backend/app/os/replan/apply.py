@@ -14,6 +14,7 @@ from pydantic import TypeAdapter
 from sqlalchemy import Engine, func, select, text
 
 from app.os import models
+from app.os import clock as shared_clock
 from app.os.adapters.standalone.escalation import StandaloneSink
 from app.os.compiler import CompileError
 from app.os.kernel import IllegalTransition, StaleDraft
@@ -52,10 +53,6 @@ class Decision:
     proposal_id: int | None = None
 
 
-def _utcnow() -> datetime:
-    return datetime.now(timezone.utc)
-
-
 def ops_of(raw: list[dict]) -> list[Op]:
     return list(_OPS.validate_python(raw))
 
@@ -67,7 +64,7 @@ def _writes(op: Op) -> bool:
 
 class Replanner:
     def __init__(self, engine: Engine, plans, configs: Mapping[str, ReplanConfig], outbox,
-                 clock: Callable[[], datetime] = _utcnow, escalations: EscalationSink | None = None) -> None:
+                 clock: Callable[[], datetime] = shared_clock.now, escalations: EscalationSink | None = None) -> None:
         self.engine, self.plans, self.configs, self.outbox, self.clock = engine, plans, configs, outbox, clock
         self.tenant = plans.kernel.tenant_id
         self.proposals, self.overrides = ProposalStore(engine, self.tenant), OverrideStore(engine, self.tenant)

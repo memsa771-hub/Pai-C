@@ -1,6 +1,6 @@
 """Slice 2 Task 5: the research agent spec, readings A/B/C, cost and spend (spec §4.5, S2-D5, S2-D10)."""
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import pytest
@@ -9,7 +9,7 @@ from pydantic_ai.models.function import AgentInfo, FunctionModel
 from pydantic_ai.usage import RunUsage
 from sqlalchemy import func, insert, select
 
-from app.os import models
+from app.os import clock, models
 from app.os.agents.spec import AGENT_DIR, AgentSpec, AgentSpecError, load_agent_spec
 from app.os.knowledge.profile import load_profile_dir
 from app.os.knowledge.programmes import Programme
@@ -222,3 +222,14 @@ def test_readings_from_several_threads_share_one_loop():
         t.start()
         t.join()
     assert errors == [None, None, None]
+
+
+def test_month_spend_follows_the_shared_clock(engine, clean):
+    """Slice 9a: a reading is stamped from the shared clock, so its spend counts in the clock's month."""
+    clock.configure(lambda: timedelta(days=60))
+    try:
+        runs = AgentRuns(engine, "pai")
+        runs.record(_research_run(engine), "A", spec=SPEC, model="m", usage=None, cost_usd=0.25)
+        assert runs.month_spend(clock.now(), "research") == pytest.approx(0.25)
+    finally:
+        clock.configure(None)
