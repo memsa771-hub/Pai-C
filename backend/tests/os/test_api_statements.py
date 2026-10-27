@@ -21,6 +21,7 @@ from app.os.settings import load_settings
 from app.os.statements.approval import delete_statements
 from app.os.statements.config import load_statement_configs
 from tests.os.test_api_documents import FakeClient
+from tests.os.test_api import TEST_TERMS, agree
 
 FAKE = Path(__file__).parent / "playbooks"
 CONFIGS = load_statement_configs(Path(__file__).parent / "statements")
@@ -39,7 +40,7 @@ def api(engine, clean, os_db):
     settings = load_settings({"OS_DATABASE_URL": os_db, "OS_ENABLED": "true"})
     fake = FakeClient()
     svc = make_services(settings, engine=engine, playbooks=load_playbook_dir(FAKE), today=lambda: date(2027, 3, 1),
-                        dbos_client=lambda: fake, statement_configs=CONFIGS)
+                        dbos_client=lambda: fake, statement_configs=CONFIGS, terms_dir=TEST_TERMS)
     store, kb = ProgrammeStore(engine, TENANT), SqlKnowledge(engine, TENANT)
     for ref in ("p1", "p2"):
         store.upsert(Programme(ref=ref, route_key="ireland_master", university="Uni X", name=f"Programme {ref}",
@@ -71,6 +72,7 @@ def api(engine, clean, os_db):
 
 
 def start(api, student="stu-1", refs=("p1", "p2")):
+    agree(api, student)
     r = api.post(f"{P}/plans/self", headers=me(student), json={
         "route": "ireland_master", "intake": {"term": "winter", "year": 2027},
         "choices": [{"programme_ref": r, "rank": i + 1} for i, r in enumerate(refs)]})

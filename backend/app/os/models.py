@@ -640,3 +640,14 @@ rehearsal_clock = Table(
     Column("updated_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
     CheckConstraint("offset_seconds >= 0", name="ck_os_rehearsal_clock_offset"),
 )
+
+# --- Slice 9a: pilot consent (os_0015) -----------------------------------------------------------------------------
+
+consents = Table(
+    "os_consents", md,
+    _id(), _tenant(),
+    Column("student_ref", Text, nullable=False),
+    Column("terms_version", Integer, nullable=False),  # the pilot.vN.md the student agreed to
+    Column("agreed_at", DateTime(timezone=True), nullable=False),  # from the shared clock
+    UniqueConstraint("tenant_id", "student_ref", "terms_version", name="uq_os_consents_student_version"),
+)

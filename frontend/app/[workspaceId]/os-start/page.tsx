@@ -2,9 +2,11 @@
 
 import { use, useCallback, useEffect, useState } from 'react';
 import { notFound, useRouter } from 'next/navigation';
+import { ConsentCard } from '@/components/os/consent-card';
 import { RouteBuilder } from '@/components/os/route-builder';
 import { workspaceApi } from '@/lib/api';
 import { OS_UI_ENABLED } from '@/lib/config';
+import { consentCode, type OsConsent } from '@/lib/os-consent';
 import {
   moveChoice,
   requestErrorText,
@@ -34,6 +36,14 @@ export default function OsStartPage({ params }: { params: Promise<{ workspaceId:
   const [requestError, setRequestError] = useState<string | null>(null);
   const [requestSent, setRequestSent] = useState<string | null>(null);
   const [starting, setStarting] = useState(false);
+  const [consent, setConsent] = useState<OsConsent | null>(null);
+  const [refused, setRefused] = useState(false);
+
+  // Slice 9a: the pilot terms come first; nothing else shows until the student agrees to the current version.
+  const loadConsent = useCallback(() => workspaceApi.getOsConsent().then(
+    (c) => { setConsent(c); if (c.agreed) setRefused(false); },
+    () => setError('Could not load the pilot terms. Please try again.'),
+  ), []);
 
   useEffect(() => {
     if (!OS_UI_ENABLED || loading) return;
@@ -43,11 +53,12 @@ export default function OsStartPage({ params }: { params: Promise<{ workspaceId:
     }
     // Placement AI: the bearer alone authorizes the call (no workspace token in the browser).
     workspaceApi.configure(workspaceId, '', idToken || undefined);
+    void loadConsent();
     workspaceApi.getOsRoutes().then(
       (r) => { setRoutes(r); setRoute((cur) => cur || r[0]?.key || ''); },
       () => setError('Could not load the routes. Please try again.'),
     );
-  }, [loading, user, idToken, workspaceId]);
+  }, [loading, user, idToken, workspaceId, loadConsent]);
 
   const loadProgrammes = useCallback(async () => {
     if (!route) return;
@@ -79,7 +90,12 @@ export default function OsStartPage({ params }: { params: Promise<{ workspaceId:
       await workspaceApi.startOsPlan(route, { term: TERM, year },
                                      choices.map((programme_ref, i) => ({ programme_ref, rank: i + 1 })));
       router.push(`/${workspaceId}/os-inbox`);
-    } catch {
+    } catch (e) {
+      if (consentCode(e) === 'consent_needed') {  // the terms changed since this page loaded
+        setRefused(true);
+        await loadConsent();
+        return;
+      }
       setError('Your plan could not be started. Please check your choices and try again.');
     } finally {
       setStarting(false);
@@ -106,7 +122,11 @@ export default function OsStartPage({ params }: { params: Promise<{ workspaceId:
     <main className="mx-auto w-full max-w-md px-4 py-6">
       <h1 className="mb-4 text-lg font-semibold">Start your plan</h1>
       {error && <p role="alert" className="mb-3 break-words text-sm text-destructive">{error}</p>}
-      {programmes === null ? (
+      {consent === null ? (
+        !error && <p className="text-sm text-muted-foreground">Loading…</p>
+      ) : !consent.agreed ? (
+        <ConsentCard consent={consent} refused={refused} onAgreed={loadConsent} onChanged={loadConsent} />
+      ) : programmes === null ? (
         <p className="text-sm text-muted-foreground">Loading…</p>
       ) : (
         <RouteBuilder routes={routes} route={route} onRoute={(k) => { setRoute(k); setChoices([]); }}

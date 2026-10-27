@@ -23,6 +23,7 @@ from app.os.statements.config import load_statement_configs
 from app.os.statements.run import register_statements
 from tests.os.conftest import TEST_DBOS_SCHEMA, reset_dbos_schema
 from tests.os.quality.run_statement_quality import _test_model
+from tests.os.test_api import TEST_TERMS, agree
 
 HERE = Path(__file__).parent
 CONFIGS = load_statement_configs() | load_statement_configs(HERE / "statements")
@@ -50,7 +51,7 @@ def api(engine, clean, os_db):
     client = DBOSClient(system_database_url=os_db, dbos_system_schema=TEST_DBOS_SCHEMA, application_name=APP_NAME)
     books = load_playbook_dir(HERE / "playbooks") | load_playbook_dir(PLAYBOOK_DIR)
     svc = make_services(settings, engine=engine, playbooks=books, today=lambda: date(2027, 3, 1),
-                        dbos_client=lambda: client, statement_configs=CONFIGS)
+                        dbos_client=lambda: client, statement_configs=CONFIGS, terms_dir=TEST_TERMS)
     store, kb = ProgrammeStore(engine, TENANT), SqlKnowledge(engine, TENANT)
     for ref, route in (("g1", "germany_master"), ("i1", "ireland_master")):
         store.upsert(Programme(ref=ref, route_key=route, university="Uni X", name=f"Programme {ref}", aliases=(),
@@ -89,6 +90,7 @@ def drafted(api, kind: str, timeout: float = 30) -> dict:
 @pytest.mark.parametrize("route,programme,task", [("germany_master", "g1", "application_documents"),
                                                   ("ireland_master", "i1", "apply")])
 def test_slice5_gate(api, route, programme, task):
+    agree(api)
     r = api.post(f"{P}/plans/self", headers=ME, json={"route": route, "intake": {"term": "winter", "year": 2027},
                                                       "choices": [{"programme_ref": programme, "rank": 1}]})
     assert r.status_code == 201, r.text

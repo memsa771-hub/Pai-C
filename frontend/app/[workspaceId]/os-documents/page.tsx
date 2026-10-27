@@ -2,11 +2,13 @@
 
 import { use, useCallback, useEffect, useState } from 'react';
 import { notFound } from 'next/navigation';
+import { ConsentCard } from '@/components/os/consent-card';
 import { DocumentConfirm } from '@/components/os/document-confirm';
 import { DocumentList } from '@/components/os/documents';
 import { Button } from '@/components/ui/button';
 import { workspaceApi } from '@/lib/api';
 import { OS_UI_ENABLED } from '@/lib/config';
+import type { OsConsent } from '@/lib/os-consent';
 import { typeLabel, type OsDocuments, type OsDocument } from '@/lib/os-documents';
 import { usePaiAuth } from '@/lib/pai-auth-context';
 import { goToSignIn } from '@/lib/auth-redirects';
@@ -33,6 +35,14 @@ export default function OsDocumentsPage({ params }: { params: Promise<{ workspac
   const [openId, setOpenId] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [consent, setConsent] = useState<OsConsent | null>(null);
+  const [refused, setRefused] = useState(false);
+
+  // Slice 9a: uploading needs consent to the current pilot terms; the card shows until the student agrees.
+  const loadConsent = useCallback(() => workspaceApi.getOsConsent().then(
+    (c) => { setConsent(c); if (c.agreed) setRefused(false); return c; },
+    () => null,
+  ), []);
 
   const load = useCallback(() => workspaceApi.getOsDocuments().then(
     (d) => { setData(d); setError(null); },
@@ -48,7 +58,8 @@ export default function OsDocumentsPage({ params }: { params: Promise<{ workspac
     // Placement AI: the bearer alone authorizes the call (no workspace token in the browser).
     workspaceApi.configure(workspaceId, '', idToken || undefined);
     load();
-  }, [loading, user, idToken, workspaceId, load]);
+    void loadConsent();
+  }, [loading, user, idToken, workspaceId, load, loadConsent]);
 
   const waiting = data?.documents.some((d) => d.status === 'uploaded' || d.status === 'reading') ?? false;
   useEffect(() => {
@@ -71,6 +82,24 @@ export default function OsDocumentsPage({ params }: { params: Promise<{ workspac
     }
   }
 
+  async function upload(file: File, docType: string) {
+    setBusy(true);
+    try {
+      await workspaceApi.uploadOsDocument(file, docType);
+      await load();
+    } catch (e) {
+      const now = await loadConsent();
+      if (now && !now.agreed) {  // refused for missing consent (the terms may have changed): the card asks
+        setRefused(true);
+        setError(null);
+      } else {
+        setError(reason(e, 'Could not upload. Please try again.'));
+      }
+    } finally {
+      setBusy(false);
+    }
+  }
+
   const open: OsDocument | undefined = data?.documents.find((d) => d.id === openId);
 
   return (
@@ -79,6 +108,11 @@ export default function OsDocumentsPage({ params }: { params: Promise<{ workspac
         {open && data ? `Check what we read: ${typeLabel(open.doc_type, data.doc_types)}` : 'Your documents'}
       </h1>
       {error && <p role="alert" className="mb-3 break-words text-sm text-destructive">{error}</p>}
+      {consent && !consent.agreed && !open && (
+        <div className="mb-4">
+          <ConsentCard consent={consent} refused={refused} onAgreed={loadConsent} onChanged={loadConsent} />
+        </div>
+      )}
       {data === null ? (
         <p className="text-sm text-muted-foreground">Loading…</p>
       ) : open ? (
@@ -99,8 +133,7 @@ export default function OsDocumentsPage({ params }: { params: Promise<{ workspac
       ) : (
         <DocumentList documents={data.documents} findings={data.findings} docTypes={data.doc_types} busy={busy}
                       onOpen={(d) => setOpenId(d.id)}
-                      onUpload={(file, docType) => act(() => workspaceApi.uploadOsDocument(file, docType),
-                                                       'Could not upload. Please try again.')}
+                      onUpload={upload}
                       onResolve={(f, value) => act(() => workspaceApi.resolveOsFinding(f.id, value),
                                                    'Could not save your choice. Please try again.')}
                       onDelete={(d) => act(() => workspaceApi.deleteOsDocument(d.id),

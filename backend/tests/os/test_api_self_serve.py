@@ -13,6 +13,7 @@ from app.os.knowledge import Fact, SqlKnowledge
 from app.os.knowledge.programmes import Programme, ProgrammeStore
 from app.os.playbooks import PLAYBOOK_DIR, load_playbook_dir
 from app.os.settings import load_settings
+from tests.os.test_api import TEST_TERMS, agree
 from tests.os.test_api_knowledge import FakeClient
 
 FAKE = Path(__file__).parent / "playbooks"
@@ -27,11 +28,17 @@ def me(student="stu-1") -> dict:
 
 @pytest.fixture
 def api(engine, clean, os_db):
-    settings = load_settings({"OS_DATABASE_URL": os_db, "OS_ADMIN_TOKEN": TOKEN, "OS_ENABLED": "true"})
+    return build_api(engine, os_db)
+
+
+def build_api(engine, os_db, terms_dir=TEST_TERMS, rehearsal=False) -> TestClient:
+    """The self-serve test app (Slice 9a Task 5: the pilot terms folder and rehearsal mode can be chosen)."""
+    settings = load_settings({"OS_DATABASE_URL": os_db, "OS_ADMIN_TOKEN": TOKEN, "OS_ENABLED": "true",
+                              "OS_REHEARSAL": "on" if rehearsal else ""})
     fake = FakeClient()
     books = load_playbook_dir(FAKE) | load_playbook_dir(PLAYBOOK_DIR)
     svc = make_services(settings, engine=engine, playbooks=books, today=lambda: date(2027, 3, 1),
-                        dbos_client=lambda: fake)
+                        dbos_client=lambda: fake, terms_dir=terms_dir)
     store, kb = ProgrammeStore(engine, "pai"), SqlKnowledge(engine, "pai")
     for ref, ielts, status in (("p1", 6.5, "confirmed"), ("p2", 6.0, "confirmed"), ("p3", 7.5, "unconfirmed")):
         store.upsert(Programme(ref=ref, route_key="ireland_master", university="Uni X", name=f"Programme {ref}",
@@ -56,11 +63,12 @@ def api(engine, clean, os_db):
     app.dependency_overrides[current_student_ref] = student
     app.dependency_overrides[current_student_ref_for_write] = student
     c = TestClient(app)
-    c.fake = fake
+    c.fake, c.engine = fake, engine
     return c
 
 
 def start(api, student="stu-1", refs=("p1",)):
+    agree(api, student)
     return api.post(f"{P}/plans/self", headers=me(student), json={
         "route": "ireland_master", "intake": {"term": "winter", "year": 2027},
         "choices": [{"programme_ref": r, "rank": i + 1} for i, r in enumerate(refs)]})
@@ -116,6 +124,7 @@ def test_start_201_then_200(api):
 
 
 def test_start_refusals_422(api):
+    agree(api)
     bad = api.post(f"{P}/plans/self", headers=me(), json={
         "route": "mars", "intake": {"term": "winter", "year": 2027}, "choices": [{"programme_ref": "p1", "rank": 1}]})
     assert bad.status_code == 422 and "route" in bad.json()["detail"]

@@ -24,6 +24,7 @@ from app.os.playbooks import PLAYBOOK_DIR, load_playbook_dir
 from app.os.settings import load_settings
 from tests.os.conftest import TEST_DBOS_SCHEMA, reset_dbos_schema
 from tests.os.test_slice6a_gate import CHECKED, CONFIGS, HERE, ROUTES, STATEMENTS, jpeg
+from tests.os.test_api import TEST_TERMS, agree
 
 VISAS = load_pack_configs(kind="visa")
 P = "/v1/os"
@@ -48,7 +49,7 @@ def api(engine, clean, os_db):
     client = DBOSClient(system_database_url=os_db, dbos_system_schema=TEST_DBOS_SCHEMA, application_name=APP_NAME)
     svc = make_services(settings, engine=engine, playbooks=books, today=lambda: date(2027, 3, 1),
                         dbos_client=lambda: client, statement_configs=STATEMENTS, pack_configs=CONFIGS,
-                        visa_configs=VISAS)
+                        visa_configs=VISAS, terms_dir=TEST_TERMS)
     kb, store = SqlKnowledge(engine, "pai"), ProgrammeStore(engine, "pai")
     load_seed(SEED_DIR / "germany_ws2027.yaml", kb)  # the route's funds fact
     for route, refs in {**{r: [ref] for r, (ref, _) in ROUTES.items()}, "germany_master": GERMANY}.items():
@@ -93,6 +94,7 @@ def test_slice6b_gate(api):
     programmes = GERMANY
 
     # 1. the student's Germany plan, with the visa step waiting for them (the kernel's promotion, simulated)
+    agree(api)
     r = api.post(f"{P}/plans/self", headers=ME, json={
         "route": "germany_master", "intake": {"term": "winter", "year": 2027},
         "choices": [{"programme_ref": ref, "rank": n} for n, ref in enumerate(programmes, 1)]})
@@ -160,6 +162,7 @@ def test_slice6b_gate(api):
 @pytest.mark.parametrize("route", ["ireland_master", "pakistan_bs"])
 def test_fake_routes_have_no_visa_page(api, route):
     programme, _ = ROUTES[route]
+    agree(api)
     r = api.post(f"{P}/plans/self", headers=ME, json={"route": route, "intake": {"term": "winter", "year": 2027},
                                                       "choices": [{"programme_ref": programme, "rank": 1}]})
     assert r.status_code == 201, r.text

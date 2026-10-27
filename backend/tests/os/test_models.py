@@ -44,6 +44,8 @@ def test_os_tables_present():
         "os_counsellor_intake", "os_counsellor_sweep",
         # Slice 9a (os_0014)
         "os_rehearsal_clock",
+        # Slice 9a (os_0015)
+        "os_consents",
     }
 
 
