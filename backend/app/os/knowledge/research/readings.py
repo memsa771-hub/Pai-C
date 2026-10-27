@@ -20,6 +20,7 @@ import threading
 from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import datetime, timezone
+from pathlib import Path
 
 from pydantic_ai import Agent
 from pydantic_ai.durable_exec.dbos import DBOSDurability
@@ -31,6 +32,8 @@ from sqlalchemy import Engine, func, select
 from sqlalchemy.dialects.postgresql import insert
 
 from app.os import clock, models
+from app.os.agents.offline import MODEL_NAME as OFFLINE_MODEL
+from app.os.agents.offline import offline_model
 from app.os.agents.spec import AgentSpec
 from app.os.knowledge.profile import ResearchProfile, reading_model
 from app.os.settings import OsSettings
@@ -92,6 +95,14 @@ def model_for(settings: OsSettings, tier: str) -> OpenAIChatModel:
     name = settings.model_cheap if tier == "cheap" else settings.model_strong
     client = OpenAIProvider(api_key=settings.openai_api_key).client.with_options(max_retries=0)
     return OpenAIChatModel(name, provider=OpenAIProvider(openai_client=client))
+
+
+def model_for_spec(settings: OsSettings, spec: AgentSpec) -> Model:
+    """The model for one agent: its offline model in offline mode (rehearsals only, Slice 9a spec §2.3), else the
+    OpenAI model for its tier."""
+    if settings.model_mode == "offline":
+        return offline_model(spec.id, Path(settings.offline_answers_dir))
+    return model_for(settings, spec.tier)
 
 
 def build_readers(model: Model, profile: ResearchProfile, spec: AgentSpec) -> dict[str, Agent]:
@@ -191,9 +202,10 @@ def run_reading(agent: Agent, spec: AgentSpec, prompt: str) -> ReadingResult:
     return ReadingResult(r.output, None, r.usage)
 
 
-def cost(usage: RunUsage | None, settings: OsSettings, tier: str) -> float:
-    """USD at list prices: new input, cached input at the cached price, and output (per 1M tokens)."""
-    if usage is None:
+def cost(usage: RunUsage | None, settings: OsSettings, tier: str, model: str | None = None) -> float:
+    """USD at list prices: new input, cached input at the cached price, and output (per 1M tokens). A run on the
+    offline model (rehearsals) costs nothing."""
+    if usage is None or model == OFFLINE_MODEL:
         return 0.0
     p_in, p_cached, p_out = ((settings.price_cheap_in, settings.price_cheap_cached, settings.price_cheap_out)
                              if tier == "cheap" else

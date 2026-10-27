@@ -7,8 +7,9 @@ OS_PARENT_PID (optional: exit when that parent is gone). Stops on SIGTERM/SIGINT
 Besides running DBOS workflows, the main loop is the enqueuer: about once a second it sends the
 kernel's unsent enqueue requests to the queue (the reconciler, every 5 minutes, is only the backstop),
 and starts the day's research runs for programmes whose facts are waiting (Slice 2, R2-P1). Research and
-document reading (Slice 3; the API enqueues each upload) run only when OS_OPENAI_API_KEY is set; without it,
-confirm_fact tasks wait for an admin and uploads stay unread.
+document reading (Slice 3; the API enqueues each upload) run only when OS_OPENAI_API_KEY is set, or in offline mode
+(OS_MODEL_MODE=offline, rehearsals only: canned answers, Slice 9a); without either, confirm_fact tasks wait for an
+admin and uploads stay unread.
 """
 
 import importlib
@@ -55,17 +56,22 @@ def _extra_modules(spec: str) -> list[Module]:
     return found
 
 
+def _models_on(settings: OsSettings, test_model: str) -> bool:
+    """Whether this worker has models: a test hook, an OpenAI key, or offline mode (no key needed)."""
+    return bool(test_model or settings.openai_api_key or settings.model_mode == "offline")
+
+
 def register_research_if_configured(settings: OsSettings, engine: Engine, kernel: Kernel) -> bool:
     """Registers os.research (readers built once, before launch). False when no model key is set.
 
     OS_TEST_RESEARCH_MODEL (tests only, `pkg.mod:factory`) gives a fake model instead, like OS_EXTRA_MODULES."""
     test_model = os.environ.get("OS_TEST_RESEARCH_MODEL", "").strip()
-    if not settings.openai_api_key and not test_model:
+    if not _models_on(settings, test_model):
         log.warning("OS_OPENAI_API_KEY is not set: research is off and confirm_fact tasks wait for an admin")
         return False
     from app.os.agents.spec import AGENT_DIR, load_agent_spec  # imported late: only a researching worker needs them
     from app.os.knowledge.research.pages import PageGateway
-    from app.os.knowledge.research.readings import build_readers, model_for
+    from app.os.knowledge.research.readings import build_readers, model_for_spec
     from app.os.knowledge.research.run import register_research
     from app.os.workers.jobs import _service
 
@@ -75,10 +81,15 @@ def register_research_if_configured(settings: OsSettings, engine: Engine, kernel
         module_path, _, name = test_model.partition(":")
         model = getattr(importlib.import_module(module_path), name)()
     else:
-        model = model_for(settings, spec.tier)
+        model = model_for_spec(settings, spec)
     readers = {key: build_readers(model, profile, spec) for key, profile in profiles.items()}
-    register_research(engine, settings, kernel, _service(settings, engine, kernel),
-                      PageGateway(engine, settings.tenant_id, settings), readers, spec, profiles)
+    if settings.model_mode == "offline":  # rehearsals: no page is fetched, so every fact stays as it is
+        from app.os.agents.offline import OfflinePages
+
+        gateway = OfflinePages()
+    else:
+        gateway = PageGateway(engine, settings.tenant_id, settings)
+    register_research(engine, settings, kernel, _service(settings, engine, kernel), gateway, readers, spec, profiles)
     return True
 
 
@@ -88,7 +99,7 @@ def register_documents_if_configured(settings: OsSettings, engine: Engine) -> bo
 
     OS_TEST_DOCUMENT_MODEL (tests only, `pkg.mod:factory`) gives a fake model instead, like OS_TEST_RESEARCH_MODEL."""
     test_model = os.environ.get("OS_TEST_DOCUMENT_MODEL", "").strip()
-    if not settings.openai_api_key and not test_model:
+    if not _models_on(settings, test_model):
         log.warning("OS_OPENAI_API_KEY is not set: documents are not read")
         return False
     from app.os.agents.spec import AGENT_DIR, load_agent_spec  # imported late: only a reading worker needs them
@@ -96,7 +107,7 @@ def register_documents_if_configured(settings: OsSettings, engine: Engine) -> bo
     from app.os.documents.reader import build_readers
     from app.os.documents.run import register_documents
     from app.os.documents.types import load_document_types
-    from app.os.knowledge.research.readings import model_for
+    from app.os.knowledge.research.readings import model_for_spec
 
     spec = load_agent_spec(AGENT_DIR / "documents.v1.yaml")
     types = load_document_types()
@@ -104,7 +115,7 @@ def register_documents_if_configured(settings: OsSettings, engine: Engine) -> bo
         module_path, _, name = test_model.partition(":")
         model = getattr(importlib.import_module(module_path), name)()
     else:
-        model = model_for(settings, spec.tier)
+        model = model_for_spec(settings, spec)
     register_documents(engine, settings, build_readers(model, types, spec), spec, types, load_name_variants())
     return True
 
@@ -113,11 +124,11 @@ def register_statements_if_configured(settings: OsSettings, engine: Engine) -> b
     """Registers os.statement (Writer and Critic built once, before launch). False when no model key is set.
     OS_TEST_STATEMENT_MODEL (tests only, `pkg.mod:factory`) gives a fake model, like the documents worker."""
     test_model = os.environ.get("OS_TEST_STATEMENT_MODEL", "").strip()
-    if not settings.openai_api_key and not test_model:
+    if not _models_on(settings, test_model):
         log.warning("OS_OPENAI_API_KEY is not set: statements are not drafted")
         return False
     from app.os.agents.spec import AGENT_DIR, load_agent_spec  # imported late: only a drafting worker needs them
-    from app.os.knowledge.research.readings import model_for
+    from app.os.knowledge.research.readings import model_for_spec
     from app.os.knowledge.store import SqlKnowledge
     from app.os.statements.agents import build_agents
     from app.os.statements.config import load_statement_configs
@@ -126,10 +137,10 @@ def register_statements_if_configured(settings: OsSettings, engine: Engine) -> b
     wspec, cspec = load_agent_spec(AGENT_DIR / "writer.v1.yaml"), load_agent_spec(AGENT_DIR / "critic.v1.yaml")
     if test_model:
         module_path, _, name = test_model.partition(":")
-        model = getattr(importlib.import_module(module_path), name)()
+        writer, critic = build_agents(getattr(importlib.import_module(module_path), name)(), wspec, cspec)
     else:
-        model = model_for(settings, wspec.tier)
-    writer, critic = build_agents(model, wspec, cspec)
+        writer, critic = build_agents(model_for_spec(settings, wspec), wspec, cspec,
+                                      critic_model=model_for_spec(settings, cspec))
     register_statements(engine, settings, writer, critic, wspec, cspec, load_statement_configs(),
                         SqlKnowledge(engine, settings.tenant_id))
     return True
@@ -165,9 +176,9 @@ def register_replan_always(settings: OsSettings, engine: Engine, kernel: Kernel,
                           escalations=escalation_sink(engine, settings.tenant_id))  # Slice 8: also tells the Counsellor
     supervisor = None
     test_model = os.environ.get("OS_TEST_REPLAN_MODEL", "").strip()
-    if settings.openai_api_key or test_model:
+    if _models_on(settings, test_model):
         from app.os.agents.spec import AGENT_DIR, load_agent_spec
-        from app.os.knowledge.research.readings import model_for
+        from app.os.knowledge.research.readings import model_for_spec
         from app.os.replan.supervisor import build_supervisor
 
         spec = load_agent_spec(AGENT_DIR / "supervisor.v1.yaml")
@@ -175,7 +186,7 @@ def register_replan_always(settings: OsSettings, engine: Engine, kernel: Kernel,
             module_path, _, name = test_model.partition(":")
             model = getattr(importlib.import_module(module_path), name)()
         else:
-            model = model_for(settings, spec.tier)
+            model = model_for_spec(settings, spec)
         supervisor = (build_supervisor(model, spec), spec)
     else:
         log.warning("OS_OPENAI_API_KEY is not set: replan hand-overs go to the support inbox")

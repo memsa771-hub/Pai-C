@@ -54,7 +54,7 @@ class AgentResult:
     usage: RunUsage = field(default_factory=RunUsage)
 
 
-_KIND = {"sop": "a statement of purpose (motivation letter)", "cv": "a CV"}
+KIND = {"sop": "a statement of purpose (motivation letter)", "cv": "a CV"}
 
 WRITER_RULES = """
 Rules:
@@ -91,17 +91,22 @@ def _limit(rules: Rules) -> str:
     return f"at most {rules.limit_words} words" if rules.limit_words else "no stated limit"
 
 
-def build_agents(model: Model, writer_spec: AgentSpec, critic_spec: AgentSpec) -> tuple[Agent, Agent]:
+def build_agents(model: Model, writer_spec: AgentSpec, critic_spec: AgentSpec,
+                 critic_model: Model | None = None) -> tuple[Agent, Agent]:
+    """The Writer and the Critic, on one model unless `critic_model` is given (offline mode: each agent has its own
+    answers)."""
     from app.os.runner.workflow import STEP_CONFIG  # imported here: the runner imports statements
 
-    def agent(spec: AgentSpec, output, prompt: str) -> Agent:
+    def agent(spec: AgentSpec, output, prompt: str, model: Model) -> Agent:
         return Agent(model, output_type=output, system_prompt=prompt, name=f"{spec.id}_v{spec.version}",
                      retries={"tools": spec.retries.tools, "output": spec.retries.output},
                      model_settings={"timeout": spec.limits.timeout_s},
                      capabilities=[DBOSDurability(model_step_config=dict(STEP_CONFIG))])
 
-    return (agent(writer_spec, Draft, "You co-write a student's application text from their own material." + WRITER_RULES),
-            agent(critic_spec, Review, "You review a draft of a student's application text." + CRITIC_RULES))
+    return (agent(writer_spec, Draft, "You co-write a student's application text from their own material." + WRITER_RULES,
+                  model),
+            agent(critic_spec, Review, "You review a draft of a student's application text." + CRITIC_RULES,
+                  critic_model or model))
 
 
 def _run(agent: Agent, spec: AgentSpec, prompt: str) -> AgentResult:
@@ -116,7 +121,7 @@ def _run(agent: Agent, spec: AgentSpec, prompt: str) -> AgentResult:
 
 def write(agent: Agent, spec: AgentSpec, inputs: Inputs, previous: str | None = None, fixes: list[str] = (),
           flags: list[str] = ()) -> AgentResult:
-    lines = [f"Write {_KIND[inputs.kind]}, {_limit(inputs.rules)}."]
+    lines = [f"Write {KIND[inputs.kind]}, {_limit(inputs.rules)}."]
     if inputs.rules.prompt:
         lines.append(f"The programme asks: <<<PROMPT>>>\n{_clean(inputs.rules.prompt)}\n<<<END>>>")
     lines.append(_data(inputs))
@@ -130,7 +135,7 @@ def write(agent: Agent, spec: AgentSpec, inputs: Inputs, previous: str | None = 
 
 
 def review(agent: Agent, spec: AgentSpec, inputs: Inputs, draft: str, flags: list[str] = ()) -> AgentResult:
-    lines = [f"Review this {_KIND[inputs.kind]} ({_limit(inputs.rules)}).",
+    lines = [f"Review this {KIND[inputs.kind]} ({_limit(inputs.rules)}).",
              "Rubric:\n" + "\n".join(f"- {c}" for c in inputs.rubric),
              _data(inputs), f"<<<DRAFT>>>\n{_clean(draft)}\n<<<END>>>"]
     if flags:

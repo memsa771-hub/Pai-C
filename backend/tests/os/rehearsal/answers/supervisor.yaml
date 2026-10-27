@@ -1,0 +1,37 @@
+# Offline Supervisor (Slice 9a spec §2.3): the operations per replan event type. `{field}` is filled from the event's
+# structured fields (instance_key, programme_ref, template_key, attempt, version, slack_days). The kernel still checks
+# every operation, as for a real answer. A type missing here fails output validation (logged with the type).
+admission_rejected:
+  ops:
+    - {op: escalate, reason: "A rejection needs a person to look at the plan."}
+  summary: "Offline answer: escalated the rejection to support."
+approved_changed:
+  ops:
+    - {op: escalate, reason: "An approved file changed; a person will check it."}
+  summary: "Offline answer: escalated the changed approved file to support."
+deadline_at_risk:
+  ops:
+    - {op: request_from_student, instance_key: "{instance_key}", reason: "This step is close to its deadline.",
+       message: "Please finish this step soon: its deadline is close."}
+  summary: "Offline answer: asked the student to finish the step at risk."
+document_missing:
+  ops:
+    - {op: request_from_student, instance_key: "{instance_key}", reason: "A document is still missing.",
+       message: "Please upload the missing document for this step."}
+  summary: "Offline answer: asked the student for the missing document."
+escalate:
+  ops:
+    - {op: escalate, reason: "A person will look at the plan."}
+  summary: "Offline answer: escalated to support."
+playbook_newer:
+  ops:
+    - {op: escalate, reason: "A newer guide is available; a person will check the plan."}
+  summary: "Offline answer: escalated the newer guide to support."
+route_invalid:
+  ops:
+    - {op: escalate, reason: "The plan's route no longer fits; a person will check it."}
+  summary: "Offline answer: escalated the route change to support."
+task_failed:
+  ops:
+    - {op: escalate, reason: "A step failed; a person will look at it."}
+  summary: "Offline answer: escalated the failed step to support."
