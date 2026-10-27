@@ -156,11 +156,16 @@ def test_tick_route_enqueues_and_reports(engine, clean, os_db):
     assert [(o["workflow_name"], o["workflow_id"], o["queue_name"]) for o in fake.enqueued] == [
         (TICK_WORKFLOW, tick_id, "os")]
     assert api.get(f"{BASE}/tick/{tick_id}", headers=ADMIN).status_code == 404  # not in DBOS yet
-    for status, want, ran in (("ENQUEUED", "running", []), ("PENDING", "running", []),
-                              ("SUCCESS", "done", ["reminders"]), ("ERROR", "error", [])):
-        fake.statuses[tick_id] = SimpleNamespace(status=status, name=TICK_WORKFLOW,
-                                                 output=["reminders"] if status == "SUCCESS" else None)
-        assert api.get(f"{BASE}/tick/{tick_id}", headers=ADMIN).json() == {"status": want, "ran": ran}
+    finished = {"ran": ["reminders"], "failed": []}
+    some_failed = {"ran": ["reminders"], "failed": ["replan"]}
+    for status, output, want in (("ENQUEUED", None, {"status": "running", "ran": [], "failed": []}),
+                                 ("PENDING", None, {"status": "running", "ran": [], "failed": []}),
+                                 ("SUCCESS", finished, {"status": "done", **finished}),
+                                 ("SUCCESS", some_failed, {"status": "error", **some_failed}),
+                                 ("ERROR", None, {"status": "error", "ran": [], "failed": []}),
+                                 ("CANCELLED", None, {"status": "error", "ran": [], "failed": []})):
+        fake.statuses[tick_id] = SimpleNamespace(status=status, name=TICK_WORKFLOW, output=output)
+        assert api.get(f"{BASE}/tick/{tick_id}", headers=ADMIN).json() == want
     fake.statuses["other"] = SimpleNamespace(status="SUCCESS", name="os.research", output="secret")
     assert api.get(f"{BASE}/tick/other", headers=ADMIN).status_code == 404  # only tick workflows are shown
 
@@ -176,10 +181,40 @@ def test_tick_runs_jobs_in_order():
     jobs = {name: (lambda n=name: seen.append(n)) for name in reversed(JOB_ORDER)}
     jobs["counsellor_intake"] = lambda: seen.append("counsellor_intake")  # not in JOB_ORDER: never ticked
     del jobs["documents_retry"]  # a job this worker does not have is skipped
-    ran = run_tick(jobs)
+    result = run_tick(jobs)
     want = [n for n in JOB_ORDER if n != "documents_retry"]
     assert seen == want
-    assert ran == want
+    assert result == {"ran": want, "failed": []}
+
+
+def test_tick_runs_every_job_when_one_fails(caplog):
+    from app.os.rehearsal.tick import JOB_ORDER, run_tick
+
+    seen: list[str] = []
+
+    def broken():
+        raise RuntimeError("replan is broken")
+
+    jobs = {name: (lambda n=name: seen.append(n)) for name in JOB_ORDER}
+    jobs["replan"] = broken  # an early job fails: the later ones (deliver_outbox, reconcile, ...) still run
+    caplog.set_level(logging.ERROR)
+    result = run_tick(jobs)
+    rest = [n for n in JOB_ORDER if n != "replan"]
+    assert seen == rest
+    assert result == {"ran": rest, "failed": ["replan"]}
+    assert any("replan" in r.getMessage() for r in caplog.records if r.levelno >= logging.ERROR)
+
+
+def test_tick_of_another_tenant_is_404(engine, clean, os_db):
+    from app.os.rehearsal.tick import TICK_WORKFLOW
+
+    fake = FakeClient()
+    pai_tick = "rehearsal-tick:pai:0123abcd"
+    fake.statuses[pai_tick] = SimpleNamespace(status="SUCCESS", name=TICK_WORKFLOW, output={"ran": [], "failed": []})
+    other = _app(engine, _settings(os_db, True, OS_TENANT_ID="other"), fake)
+    assert other.get(f"{BASE}/tick/{pai_tick}", headers=ADMIN).status_code == 404
+    pai = _app(engine, _settings(os_db, True), fake)
+    assert pai.get(f"{BASE}/tick/{pai_tick}", headers=ADMIN).status_code == 200
 
 
 def test_tick_workflow_runs_on_dbos(engine, clean, os_db):
@@ -201,17 +236,22 @@ def test_tick_workflow_runs_on_dbos(engine, clean, os_db):
     seen: list[str] = []
     DBOS(config=dbos_config(settings, "tick-w0"))
     register_workflow(engine, settings, default_registry(), Kernel(engine, "pai"))
-    register_tick({"reconcile": lambda: seen.append("reconcile"), "reminders": lambda: seen.append("reminders")})
+
+    def broken():
+        raise RuntimeError("replan is broken")
+
+    register_tick({"reconcile": lambda: seen.append("reconcile"), "reminders": lambda: seen.append("reminders"),
+                   "replan": broken})
     launch()
     client = DBOSClient(system_database_url=os_db, dbos_system_schema=TEST_DBOS_SCHEMA, application_name=APP_NAME)
     try:
         api = _app(engine, settings, client)
         tick_id = api.post(f"{BASE}/tick", headers=ADMIN).json()["tick_id"]
-        deadline = time.monotonic() + 30
+        deadline = time.monotonic() + 60  # the broken step is retried (STEP_CONFIG) before it counts as failed
         while (got := api.get(f"{BASE}/tick/{tick_id}", headers=ADMIN).json())["status"] == "running":
             assert time.monotonic() < deadline, "the tick never finished"
             time.sleep(0.2)
-        assert got == {"status": "done", "ran": ["reminders", "reconcile"]}
+        assert got == {"status": "error", "ran": ["reminders", "reconcile"], "failed": ["replan"]}
         assert seen == ["reminders", "reconcile"]
     finally:
         client.destroy()
@@ -273,3 +313,11 @@ def test_settings_reads_rehearsal():
     for word in ("1", "true", "yes", "on", " ON "):
         assert load_settings({**base, "OS_REHEARSAL": word}).rehearsal is True
     assert load_settings({**base, "OS_REHEARSAL": "off"}).rehearsal is False
+
+
+def test_worker_refuses_two_jobs_with_one_name(monkeypatch, os_db):
+    from app.os.runner import worker
+
+    monkeypatch.setattr(worker, "JOB_FACTORIES", [("reminders", "0 * * * *", lambda *a: (lambda: None))])
+    with pytest.raises(ValueError, match="reminders"):
+        _build(monkeypatch, _settings(os_db, True, OS_WORKER_ID="w1"))

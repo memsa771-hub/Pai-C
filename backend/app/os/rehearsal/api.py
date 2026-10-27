@@ -33,6 +33,7 @@ class TickOut(BaseModel):
 class TickStatusOut(BaseModel):
     status: Literal["running", "done", "error"]
     ran: list[str]
+    failed: list[str]
 
 
 def add_rehearsal_routes(router: APIRouter, services: Callable, require_admin) -> None:

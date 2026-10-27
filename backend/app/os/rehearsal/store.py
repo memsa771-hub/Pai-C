@@ -42,7 +42,8 @@ class ClockStore:
 
 def install_clock(settings: OsSettings, engine: Engine) -> None:
     """Rehearsal on: the shared clock reads the stored offset (and a loud warning is logged). Off: real time, whatever
-    row is left in the table."""
+    row is left in the table. It overwrites the module-global clock, so a test that sets its own offset does so after
+    building services or the worker."""
     if settings.rehearsal:
         log.warning(WARNING)
         clock.configure(ClockStore(engine, settings.tenant_id).offset)

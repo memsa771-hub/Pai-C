@@ -12,6 +12,8 @@ Only fictional, non-secret values belong here. Never put a key, token or real st
 
 Plain audit stamps written by the database (for example `sent_at`, `read_at`, `approved_at`, and a `created_at` that is not used in a rule) stay real time under a rehearsal offset. Anything the OS decides with time (daily limits, spend by month, freshness, the 24 hour swap window) uses the shared clock.
 
+In rehearsal mode every `clock.now()` reads the offset with its own short database connection. A tick runs on whichever worker takes it from the queue, with that worker's tenant (one tenant per deployment).
+
 ## Settings
 
 | item | where | on/off | how to remove |
@@ -30,7 +32,7 @@ Plain audit stamps written by the database (for example `sent_at`, `read_at`, `a
 |---|---|---|---|
 | `POST /v1/os/admin/rehearsal/advance` `{days}` (1 to 60, else 422) -> `{offset_days, now}` | `backend/app/os/rehearsal/api.py`, added by `build_router` | Admin token (`X-OS-Admin-Token`). Exists only in rehearsal mode (404 otherwise). Time only moves forward | Delete with `app/os/rehearsal/` (see Files) |
 | `POST /v1/os/admin/rehearsal/tick` -> `{tick_id}` | Same file. Enqueues one `os.rehearsal_tick` workflow on the `os` queue through the API's DBOS client; the ID is `rehearsal-tick:<tenant>:<random>` | Same as above | Same as above |
-| `GET /v1/os/admin/rehearsal/tick/{tick_id}` -> `{status: running/done/error, ran}` | Same file. Reads the workflow from DBOS: `SUCCESS` is done (with the job names it ran), `ERROR`/`CANCELLED`/`MAX_RECOVERY_ATTEMPTS_EXCEEDED` is error, anything else is running. Another tenant's or a non-tick workflow ID is 404 | Same as above | Same as above |
+| `GET /v1/os/admin/rehearsal/tick/{tick_id}` -> `{status: running/done/error, ran, failed}` | Same file. Reads the workflow from DBOS: finished with no failed job is done, finished with a failed job is error (`ran` lists the jobs that completed, `failed` those that did not), a workflow that itself ended `ERROR`/`CANCELLED`/`MAX_RECOVERY_ATTEMPTS_EXCEEDED` is error with both lists empty, anything else is running. Another tenant's or a non-tick workflow ID is 404 | Same as above | Same as above |
 
 ## Files
 
@@ -38,7 +40,7 @@ Plain audit stamps written by the database (for example `sent_at`, `read_at`, `a
 |---|---|---|---|
 | The shared clock | `backend/app/os/clock.py`. Every OS module reads time through `clock.now()` and `clock.today()` | Always on. It gives real time unless rehearsal mode installs an offset (Task 3) | Not removable on its own. Delete the file and change each `clock.now`/`clock.today` back to a direct date call (the check below then goes too) |
 | Rehearsal package | `backend/app/os/rehearsal/`: `store.py` (`ClockStore`, `install_clock`, the warning text), `tick.py` (`JOB_ORDER`, `run_tick`, `register_tick`, `enqueue_tick`, `tick_status`), `api.py` (the three calls). Tests: `backend/tests/os/test_rehearsal_mode.py` | Imported always; does nothing unless rehearsal mode is on | Delete the folder and the test file, after removing the setting's uses (see Settings) |
-| Workflow `os.rehearsal_tick` | `register_tick` in `app/os/rehearsal/tick.py`, called by `build` in `app/os/runner/worker.py` instead of the `register_job` loop. It runs the worker's jobs once, each as a DBOS step (`os.tick.<job>`, the normal step retries), in this order: deadline_engine, reminders, replan, deliver_outbox, freshness, documents_retry (only on a worker with a model key), reconcile. A job that still fails ends the tick as error and the jobs after it do not run. **`counsellor_intake` is not ticked** and, with no cron, does not run at all in rehearsal mode: the Counsellor module is off for the pilot (Slice 8 S8-D2) | Registered only in rehearsal mode; with it off the worker registers today's schedules and no tick workflow | Delete with the package; in `build` keep only the `register_job` loop |
+| Workflow `os.rehearsal_tick` | `register_tick` in `app/os/rehearsal/tick.py`, called by `build` in `app/os/runner/worker.py` instead of the `register_job` loop. It runs the worker's jobs once, each as a DBOS step (`os.tick.<job>`, the normal step retries), in this order: deadline_engine, reminders, replan, deliver_outbox, freshness, documents_retry (only on a worker with a model key), reconcile. A job that still fails after its step retries is logged and listed in `failed`, and the tick goes on with the next job (so one broken job does not stall the rehearsal); the tick then reports error. **`counsellor_intake` is not ticked** and, with no cron, does not run at all in rehearsal mode: the Counsellor module is off for the pilot (Slice 8 S8-D2) | Registered only in rehearsal mode; with it off the worker registers today's schedules and no tick workflow | Delete with the package; in `build` keep only the `register_job` loop |
 
 ## Checks
 
