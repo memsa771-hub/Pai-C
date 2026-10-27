@@ -11,13 +11,13 @@ import hashlib
 import json
 from collections.abc import Callable, Mapping
 from dataclasses import asdict
-from datetime import datetime, timezone
+from datetime import datetime
 
 from dbos import DBOS, DBOSClient, EnqueueOptions
 from sqlalchemy import Engine, insert, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
-from app.os import models
+from app.os import clock, models
 from app.os.agents.spec import AgentSpec
 from app.os.artifacts.store import ArtifactStore
 from app.os.documents.store import ProfileStore
@@ -32,10 +32,6 @@ from app.os.statements.rules import Rules, resolve_rules
 STATEMENT_WORKFLOW = "os.statement"
 MAX_REVISIONS = 2
 ANS = models.statement_answers
-
-
-def _utcnow() -> datetime:
-    return datetime.now(timezone.utc)
 
 
 def statement_workflow_id(tenant_id: str, artifact_id: int, inputs_sha: str, attempt: int = 1) -> str:
@@ -96,7 +92,7 @@ def _inputs_from(d: dict) -> Inputs:
 
 def register_statements(engine: Engine, settings: OsSettings, writer, critic, writer_spec: AgentSpec,
                         critic_spec: AgentSpec, configs: Mapping[str, StatementConfig], knowledge,
-                        clock: Callable[[], datetime] = _utcnow) -> None:
+                        clock: Callable[[], datetime] = clock.now) -> None:
     """Registers os.statement and its steps. Must run before DBOS.launch(), with the agents built once per process."""
     from app.os.runner.workflow import STEP_CONFIG  # imported here: the runner imports statements
 

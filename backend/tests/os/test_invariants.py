@@ -73,3 +73,30 @@ def test_no_country_terms_in_python():
             if COUNTRY_TERMS.search(line):
                 hits.append(f"{path.relative_to(APP_OS).as_posix()}:{n}: {line.strip()}")
     assert hits == []
+
+
+_CLOCK_CALL = re.compile(r"\b(datetime\.now|datetime\.utcnow|date\.today)\b")
+
+
+def direct_clock_calls(root: Path) -> list[str]:
+    """Reads of the wall clock outside app/os/clock.py, with or without brackets (rehearsal mode moves one shared
+    clock, so a module that reads real time itself would not move with it)."""
+    found = []
+    for path in root.rglob("*.py"):
+        if path.relative_to(root).as_posix() == "clock.py":
+            continue
+        for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+            if _CLOCK_CALL.search(line):
+                found.append(f"{path.relative_to(root).as_posix()}:{number}")
+    return found
+
+
+def test_no_direct_clock_calls():
+    assert direct_clock_calls(APP_OS) == []
+
+
+def test_clock_check_catches_a_violation(tmp_path):
+    (tmp_path / "workers").mkdir()
+    (tmp_path / "workers" / "bad.py").write_text("x = datetime.now(timezone.utc)\ny = date.today()\nz = datetime.now\n")
+    (tmp_path / "clock.py").write_text("x = datetime.now(timezone.utc)\n")
+    assert direct_clock_calls(tmp_path) == ["workers/bad.py:1", "workers/bad.py:2", "workers/bad.py:3"]

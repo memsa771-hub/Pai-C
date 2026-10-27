@@ -1,11 +1,10 @@
 """The admin fallback: an admin confirms, corrects or supplies a fact (Slice 1). From Slice 2 the
 `knowledge.research` module owns `confirm_fact`; this API completes whatever research leaves unconfirmed."""
 
-from datetime import datetime, timezone
 
 from sqlalchemy import select
 
-from app.os import models
+from app.os import clock, models
 from app.os.compiler import CONFIRM_TYPE
 from app.os.kernel import TERMINAL, Kernel
 from app.os.knowledge import Fact, SqlKnowledge
@@ -30,7 +29,7 @@ def supply_fact(service, knowledge: SqlKnowledge, kernel: Kernel, *, scope: str,
                 conflict_note: str | None = None) -> list[int]:
     """Adds or replaces a fact by its key, e.g. one that was never seeded (review I2)."""
     service.check_fact_value(field, value)
-    fact = Fact(value=value, quote=quote, url=url, checked_at=datetime.now(timezone.utc),
+    fact = Fact(value=value, quote=quote, url=url, checked_at=clock.now(),
                 intake_year=intake_year, status=status, conflict_note=conflict_note)  # validates trust rules
     fact_id = knowledge.upsert(scope, ref, field, fact)
     return _after_fact_change(service, kernel, scope, ref, field, fact_id, status, intake_year)

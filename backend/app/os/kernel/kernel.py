@@ -15,6 +15,7 @@ from sqlalchemy import Connection, Engine, and_, delete, func, insert, select, u
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from app.os import models
+from app.os import clock as shared_clock
 from app.os.compiler import CONFIRM_TYPE, DraftTask, PlanDraft
 from app.os.contracts.route_contract import RouteContract
 from app.os.kernel.revisions import CANCELLED_MARK, DONE_MARK, NOTICE_PREFIX, diff
@@ -67,7 +68,7 @@ class Kernel:
     def __init__(self, engine: Engine, tenant_id: str, clock: Callable[[], datetime] | None = None) -> None:
         self.engine = engine
         self.tenant_id = tenant_id
-        self.clock = clock or (lambda: datetime.now(timezone.utc))
+        self.clock = clock or shared_clock.now
 
     # ---------------------------------------------------------------- plans
 
