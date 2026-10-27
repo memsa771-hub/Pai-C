@@ -5,6 +5,7 @@ instead of failing every request (spec §4.1, review I7). Research profiles are 
 (Slice 2 spec §4.2). Building them does not connect to the database.
 """
 
+import os
 from collections.abc import Callable, Mapping
 from pathlib import Path
 
@@ -20,7 +21,7 @@ from app.os.packs.config import PACK_DIR, load_checked_pack_configs
 from app.os.statements.config import check_config, load_statement_configs
 from app.os.knowledge.profile import PROFILE_DIR, load_profile_dir
 from app.os.playbooks import PLAYBOOK_DIR, load_playbook_dir
-from app.os.settings import load_settings
+from app.os.settings import ModelModeError, _flag, load_settings
 
 PREFIX = "/v1/os"
 
@@ -32,6 +33,10 @@ def mount_os(app: FastAPI, *, env: Mapping[str, str] | None = None,
              document_types_dir: Path = TYPES_DIR, pack_dir: Path = PACK_DIR) -> bool:
     try:
         settings = load_settings(env)
+    except ModelModeError:
+        if _flag(os.environ if env is None else env, "OS_ENABLED"):
+            raise  # Slice 9a: e.g. offline AI without rehearsal mode refuses to start, with the reason
+        return False
     except ValueError:
         return False  # no database configured: the OS stays off
     if not settings.os_enabled:

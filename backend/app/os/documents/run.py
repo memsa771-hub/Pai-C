@@ -243,8 +243,8 @@ def register_documents(engine: Engine, settings: OsSettings, readers: Mapping[st
                  "cache_read_tokens": reading.usage.cache_read_tokens or 0,
                  "output_tokens": reading.usage.output_tokens or 0, "requests": reading.usage.requests or 0}
         error = None if reading.error is None else reading.error.split(":", 1)[0]  # the kind only: no values
-        record_step(document_id, readers[doc_type].model.model_name, usage, cost(reading.usage, settings, spec.tier),
-                    error)
+        model = readers[doc_type].model.model_name
+        record_step(document_id, model, usage, cost(reading.usage, settings, spec.tier, model), error)
         if reading.values is None:
             finish_step(document_id, "failed", READ_FAILED, None, checked["pages"])
             return {"status": "failed"}

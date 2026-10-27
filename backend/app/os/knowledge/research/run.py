@@ -237,7 +237,7 @@ def register_research(engine: Engine, settings: OsSettings, kernel, service, gat
         result = run_reading(agents[name], spec, prompt)
         usage = {"input_tokens": result.usage.input_tokens or 0, "cache_read_tokens": result.usage.cache_read_tokens or 0,
                  "output_tokens": result.usage.output_tokens or 0, "requests": result.usage.requests or 0}
-        c = cost(result.usage, settings, spec.tier)
+        c = cost(result.usage, settings, spec.tier, agents[name].model.model_name)
         record_step(run_id, name, agents[name].model.model_name, usage, c, result.error)
         return (None if result.reading is None else result.reading.model_dump()), c
 

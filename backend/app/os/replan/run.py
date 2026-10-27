@@ -125,7 +125,7 @@ def register_replan(engine: Engine, settings: OsSettings, replanner: Replanner, 
                  "output_tokens": result.usage.output_tokens or 0, "requests": result.usage.requests or 0}
         error = None if result.error is None else result.error.split(":", 1)[0]  # the kind only
         record_step(plan_id, f"{DBOS.workflow_id}:supervisor", agent.model.model_name, usage,
-                    cost(result.usage, settings, spec.tier), error)
+                    cost(result.usage, settings, spec.tier, agent.model.model_name), error)
         if result.output is None:
             return support_step(plan_id, event_id, INVALID_REASON)
         return decide_step(plan_id, event_id, "supervisor", [op.model_dump(mode="json") for op in result.output.ops])

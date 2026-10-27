@@ -91,17 +91,22 @@ def _limit(rules: Rules) -> str:
     return f"at most {rules.limit_words} words" if rules.limit_words else "no stated limit"
 
 
-def build_agents(model: Model, writer_spec: AgentSpec, critic_spec: AgentSpec) -> tuple[Agent, Agent]:
+def build_agents(model: Model, writer_spec: AgentSpec, critic_spec: AgentSpec,
+                 critic_model: Model | None = None) -> tuple[Agent, Agent]:
+    """The Writer and the Critic, on one model unless `critic_model` is given (offline mode: each agent has its own
+    answers)."""
     from app.os.runner.workflow import STEP_CONFIG  # imported here: the runner imports statements
 
-    def agent(spec: AgentSpec, output, prompt: str) -> Agent:
+    def agent(spec: AgentSpec, output, prompt: str, model: Model) -> Agent:
         return Agent(model, output_type=output, system_prompt=prompt, name=f"{spec.id}_v{spec.version}",
                      retries={"tools": spec.retries.tools, "output": spec.retries.output},
                      model_settings={"timeout": spec.limits.timeout_s},
                      capabilities=[DBOSDurability(model_step_config=dict(STEP_CONFIG))])
 
-    return (agent(writer_spec, Draft, "You co-write a student's application text from their own material." + WRITER_RULES),
-            agent(critic_spec, Review, "You review a draft of a student's application text." + CRITIC_RULES))
+    return (agent(writer_spec, Draft, "You co-write a student's application text from their own material." + WRITER_RULES,
+                  model),
+            agent(critic_spec, Review, "You review a draft of a student's application text." + CRITIC_RULES,
+                  critic_model or model))
 
 
 def _run(agent: Agent, spec: AgentSpec, prompt: str) -> AgentResult:

@@ -154,7 +154,7 @@ def register_statements(engine: Engine, settings: OsSettings, writer, critic, wr
                  "output_tokens": result.usage.output_tokens or 0, "requests": result.usage.requests or 0}
         error = None if result.error is None else result.error.split(":", 1)[0]  # the kind only: no student text
         record_step(artifact_id, f"{DBOS.workflow_id}:{label}", spec.id, agent.model.model_name, usage,
-                    cost(result.usage, settings, spec.tier), error)
+                    cost(result.usage, settings, spec.tier, agent.model.model_name), error)
         return result.output
 
     def statement(artifact_id: int, route_key: str, year: int) -> dict:

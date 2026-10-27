@@ -34,9 +34,16 @@ class OsSettings:
     replan_monthly_usd: float = 5.0  # Supervisor spend cap per tenant and month (Slice 7 S7-D8)
     fact_ttl_days: int = 30  # a confirmed fact older than this goes stale (spec §4.7)
     rehearsal: bool = False  # Slice 9a rehearsal mode: stored clock offset, no cron, admin advance/tick (spec §2.2)
+    model_mode: str = "openai"  # Slice 9a: "openai", or "offline" (canned answers, rehearsal only; spec §2.3)
+    offline_answers_dir: str | None = None  # the canned answers' folder (offline mode only)
 
 
 TRUTHY = {"1", "true", "yes", "on"}
+MODEL_MODES = ("openai", "offline")
+
+
+class ModelModeError(ValueError):
+    """OS_MODEL_MODE is unknown, or offline without rehearsal mode or an answers folder: the OS must not start."""
 
 
 def _flag(env: Mapping[str, str], name: str) -> bool:
@@ -53,6 +60,14 @@ def load_settings(env: Mapping[str, str] | None = None) -> OsSettings:
     database_url = env.get("OS_DATABASE_URL") or env.get("DATABASE_URL")
     if not database_url:
         raise ValueError("OS_DATABASE_URL or DATABASE_URL must be set")
+    model_mode = (env.get("OS_MODEL_MODE") or "openai").strip().lower()
+    answers_dir = (env.get("OS_OFFLINE_ANSWERS_DIR") or "").strip() or None
+    if model_mode not in MODEL_MODES:
+        raise ModelModeError(f"OS_MODEL_MODE must be one of {', '.join(MODEL_MODES)}, got {model_mode!r}")
+    if model_mode == "offline" and not _flag(env, "OS_REHEARSAL"):  # canned answers never reach a real student
+        raise ModelModeError("OS_MODEL_MODE=offline needs rehearsal mode: set OS_REHEARSAL=on, or use OS_MODEL_MODE=openai")
+    if model_mode == "offline" and answers_dir is None:
+        raise ModelModeError("OS_MODEL_MODE=offline needs OS_OFFLINE_ANSWERS_DIR (the folder of canned answers)")
     return OsSettings(
         database_url=database_url,
         dbos_system_schema=env.get("OS_DBOS_SYSTEM_SCHEMA", "dbos"),
@@ -79,4 +94,6 @@ def load_settings(env: Mapping[str, str] | None = None) -> OsSettings:
         replan_monthly_usd=float(env.get("OS_REPLAN_MONTHLY_USD") or 5.0),
         fact_ttl_days=int(env.get("OS_FACT_TTL_DAYS") or 30),
         rehearsal=_flag(env, "OS_REHEARSAL"),
+        model_mode=model_mode,
+        offline_answers_dir=answers_dir,
     )
