@@ -10,6 +10,8 @@ to remove it.
 
 Only fictional, non-secret values belong here. Never put a key, token or real student data in this file.
 
+Plain audit stamps written by the database (for example `sent_at`, `read_at`, `approved_at`, and a `created_at` that is not used in a rule) stay real time under a rehearsal offset. Anything the OS decides with time (daily limits, spend by month, freshness, the 24 hour swap window) uses the shared clock.
+
 ## Settings
 
 | item | where | on/off | how to remove |

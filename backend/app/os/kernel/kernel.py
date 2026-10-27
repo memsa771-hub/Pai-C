@@ -99,7 +99,8 @@ class Kernel:
             self._rebuild_edges(conn, plan_id, draft.tasks, ids)
             keys = sorted(ids)
             conn.execute(insert(models.plan_revisions).values(
-                tenant_id=self.tenant_id, plan_id=plan_id, number=1, cause="created", diff={"added": keys}))
+                tenant_id=self.tenant_id, plan_id=plan_id, number=1, cause="created", diff={"added": keys},
+                created_at=self.clock()))
             self._event(conn, plan_id, None, "plan_created",
                         {"playbook": draft.playbook_key, "version": draft.playbook_version, "tasks": len(keys)})
             self._set_risk(conn, plan_id, draft.at_risk)
@@ -167,7 +168,7 @@ class Kernel:
                 cancelled.append(row.instance_key)
             conn.execute(insert(models.plan_revisions).values(
                 tenant_id=self.tenant_id, plan_id=plan_id, number=number, cause=cause,
-                diff={"cancelled": sorted(cancelled)}))
+                diff={"cancelled": sorted(cancelled)}, created_at=self.clock()))
             conn.execute(update(P).where(P.c.id == plan_id).values(
                 status=PLAN_CLOSED, current_revision=number, updated_at=self.clock()))
             PR = models.proposals  # a suggestion waiting for the student can no longer be accepted (final review I2)
@@ -296,7 +297,8 @@ class Kernel:
 
     def _event(self, conn: Connection, plan_id: int | None, task_id: int | None, type_: str, payload: dict) -> None:
         conn.execute(insert(models.events).values(
-            tenant_id=self.tenant_id, plan_id=plan_id, task_id=task_id, type=type_, payload=payload))
+            tenant_id=self.tenant_id, plan_id=plan_id, task_id=task_id, type=type_, payload=payload,
+            at=self.clock()))
 
     def _lock_plan(self, conn: Connection, plan_id: int) -> None:
         found = conn.execute(select(P.c.id).where(P.c.id == plan_id, P.c.tenant_id == self.tenant_id)
@@ -407,7 +409,8 @@ class Kernel:
         live = {k: v for k, v in ids.items() if k in new}
         self._rebuild_edges(conn, plan_id, draft.tasks, live)
         conn.execute(insert(models.plan_revisions).values(
-            tenant_id=self.tenant_id, plan_id=plan_id, number=number, cause=cause, diff=d.as_json()))
+            tenant_id=self.tenant_id, plan_id=plan_id, number=number, cause=cause, diff=d.as_json(),
+            created_at=self.clock()))
         conn.execute(update(P).where(P.c.id == plan_id).values(current_revision=number, updated_at=self.clock()))
         if pin_version is not None:
             conn.execute(update(models.playbook_pins).where(models.playbook_pins.c.plan_id == plan_id)

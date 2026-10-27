@@ -16,7 +16,8 @@ from datetime import date, datetime
 from dbos import DBOS, DBOSClient, EnqueueOptions
 from sqlalchemy import Engine, insert, select, update
 
-from app.os import clock, models
+from app.os import models
+from app.os import clock as shared_clock
 from app.os.agents.spec import AgentSpec
 from app.os.compiler import CONFIRM_TYPE, CompileError
 from app.os.knowledge.changes import after_fact_change
@@ -162,7 +163,7 @@ def _needs_third(verdicts: Mapping[str, dict]) -> bool:
 
 def register_research(engine: Engine, settings: OsSettings, kernel, service, gateway: PageGateway,
                       readers: Mapping[str, Mapping[str, object]], spec: AgentSpec,
-                      profiles: Mapping[str, ResearchProfile], clock: Callable[[], datetime] = clock.now) -> None:
+                      profiles: Mapping[str, ResearchProfile], clock: Callable[[], datetime] = shared_clock.now) -> None:
     """Registers os.research and its steps. Must run before DBOS.launch(), with readers built once per process.
 
     `readers` maps a route key to its readers A, B and C (readings.build_readers)."""

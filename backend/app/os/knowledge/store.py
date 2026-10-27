@@ -6,7 +6,7 @@ from typing import Literal
 from sqlalchemy import Engine, func, select, update
 from sqlalchemy.dialects.postgresql import insert
 
-from app.os import models
+from app.os import clock, models
 from app.os.knowledge.port import Fact
 
 T = models.knowledge_facts
@@ -108,9 +108,10 @@ class SqlKnowledge:
         _, _, _, old = self.get(fact_id)
         new = Fact(value=value, quote=quote, url=url, checked_at=old.checked_at, intake_year=old.intake_year,
                    status=status, conflict_note=conflict_note, id=fact_id)  # validates the trust rule
+        stamp = clock.now()  # the shared clock: freshness compares checked_at with it
         with self.engine.begin() as conn:
             conn.execute(update(T).where(T.c.id == fact_id).values(
                 value=value, quote=quote, url=url, status=status, conflict_note=conflict_note,
-                checked_at=func.now(), updated_at=func.now(), source="manual",
+                checked_at=stamp, updated_at=stamp, source="manual",
             ))
         return new

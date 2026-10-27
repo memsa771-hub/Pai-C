@@ -17,7 +17,8 @@ from dbos import DBOS, DBOSClient, EnqueueOptions
 from sqlalchemy import Engine, insert, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
-from app.os import clock, models
+from app.os import models
+from app.os import clock as shared_clock
 from app.os.agents.spec import AgentSpec
 from app.os.artifacts.store import ArtifactStore
 from app.os.documents.store import ProfileStore
@@ -92,7 +93,7 @@ def _inputs_from(d: dict) -> Inputs:
 
 def register_statements(engine: Engine, settings: OsSettings, writer, critic, writer_spec: AgentSpec,
                         critic_spec: AgentSpec, configs: Mapping[str, StatementConfig], knowledge,
-                        clock: Callable[[], datetime] = clock.now) -> None:
+                        clock: Callable[[], datetime] = shared_clock.now) -> None:
     """Registers os.statement and its steps. Must run before DBOS.launch(), with the agents built once per process."""
     from app.os.runner.workflow import STEP_CONFIG  # imported here: the runner imports statements
 

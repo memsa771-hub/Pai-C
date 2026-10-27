@@ -7,7 +7,7 @@ from datetime import date, timedelta
 import pytest
 from sqlalchemy import select, update
 
-from app.os import models
+from app.os import clock, models
 from app.os.compiler import compile_plan
 from app.os.kernel import Kernel, StaleDraft
 from app.os.knowledge import SEED_DIR, SqlKnowledge, load_seed
@@ -193,3 +193,21 @@ def test_replan_count_restarts_after_resume(svc, engine):
     svc.kernel.set_changes_paused(plan_id, True)
     svc.kernel.set_changes_paused(plan_id, False)
     assert svc.kernel.replan_revisions_today(plan_id) == 0
+
+
+def test_daily_count_follows_the_shared_clock(svc, engine):
+    """Slice 9a: a revision is stamped from the shared clock, so the day count works under a rehearsal offset, and a
+    resume event is stamped from it too."""
+    clock.configure(lambda: timedelta(days=60))
+    try:
+        plan_id = svc.start_plan(TEST_STUDENT).plan_id
+        contract, sha = svc._contract(plan_id)
+        draft = compile_plan(contract, svc._pinned(plan_id), {}, {}, TODAY,
+                             overrides=to_overrides(CancelProgramme(programme_ref=P1, reason=R)))
+        svc.kernel.apply_replan(plan_id, 7, draft, based_on=sha)
+        assert svc.kernel.replan_revisions_today(plan_id) == 1
+        svc.kernel.set_changes_paused(plan_id, True)
+        svc.kernel.set_changes_paused(plan_id, False)
+        assert svc.kernel.replan_revisions_today(plan_id) == 0
+    finally:
+        clock.configure(None)

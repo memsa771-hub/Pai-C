@@ -1,12 +1,12 @@
 """Slice 4 Task 8: the self-serve builder, swap and remove, through PlanService and the kernel (S4-D9, S4-D10, Q3)."""
 
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
 import pytest
 from sqlalchemy import select
 
-from app.os import models
+from app.os import clock, models
 from app.os.api import make_services
 from app.os.contracts.route_contract import IntakeRef, ProgrammeChoice, RouteContract
 from app.os.kernel import StaleDraft
@@ -199,3 +199,18 @@ def test_start_and_swap_record_starting_verdicts(svc):
     with svc.engine.connect() as conn:
         assert {r.programme_ref for r in conn.execute(select(S.c.programme_ref))} == {"p1", "p2"}
 
+
+def test_swap_window_follows_the_shared_clock(svc):
+    """Slice 9a: the 24 hour programme-change window runs on the shared clock, so advancing a rehearsal day clears it."""
+    shift = [timedelta(days=60)]
+    clock.configure(lambda: shift[0])
+    try:
+        plan = start(svc.plans, "stu-1", "ireland_master", WINTER, choices("p1", "p2")).plan_id
+        for out, new in (("p1", "p3"), ("p3", "p4"), ("p4", "p1")):
+            swap(svc.plans, "stu-1", plan, out, new)
+        with pytest.raises(SwapLimit):
+            swap(svc.plans, "stu-1", plan, "p1", "p3")
+        shift[0] += timedelta(hours=25)
+        swap(svc.plans, "stu-1", plan, "p1", "p3")
+    finally:
+        clock.configure(None)

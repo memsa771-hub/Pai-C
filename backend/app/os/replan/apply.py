@@ -13,7 +13,8 @@ from datetime import datetime, timedelta, timezone
 from pydantic import TypeAdapter
 from sqlalchemy import Engine, func, select, text
 
-from app.os import clock, models
+from app.os import models
+from app.os import clock as shared_clock
 from app.os.adapters.standalone.escalation import StandaloneSink
 from app.os.compiler import CompileError
 from app.os.kernel import IllegalTransition, StaleDraft
@@ -63,7 +64,7 @@ def _writes(op: Op) -> bool:
 
 class Replanner:
     def __init__(self, engine: Engine, plans, configs: Mapping[str, ReplanConfig], outbox,
-                 clock: Callable[[], datetime] = clock.now, escalations: EscalationSink | None = None) -> None:
+                 clock: Callable[[], datetime] = shared_clock.now, escalations: EscalationSink | None = None) -> None:
         self.engine, self.plans, self.configs, self.outbox, self.clock = engine, plans, configs, outbox, clock
         self.tenant = plans.kernel.tenant_id
         self.proposals, self.overrides = ProposalStore(engine, self.tenant), OverrideStore(engine, self.tenant)

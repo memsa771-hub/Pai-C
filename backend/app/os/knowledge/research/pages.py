@@ -19,7 +19,8 @@ import httpx
 from sqlalchemy import Engine, func, select
 from sqlalchemy.dialects.postgresql import insert
 
-from app.os import clock, models
+from app.os import models
+from app.os import clock as shared_clock
 from app.os.knowledge.research.links import domain_of, rank_links
 from app.os.knowledge.research.text import html_to_text, pdf_to_text
 from app.os.settings import OsSettings
@@ -57,7 +58,7 @@ def _sleep(seconds: float) -> None:
 
 class PageGateway:
     def __init__(self, engine: Engine, tenant_id: str, settings: OsSettings, client: httpx.Client | None = None,
-                 clock: Callable[[], datetime] = clock.now, sleep: Callable[[float], None] = _sleep) -> None:
+                 clock: Callable[[], datetime] = shared_clock.now, sleep: Callable[[float], None] = _sleep) -> None:
         self.engine, self.tenant_id, self.settings = engine, tenant_id, settings
         self.client = client or httpx.Client(headers={"User-Agent": USER_AGENT}, follow_redirects=True,
                                              timeout=20.0)

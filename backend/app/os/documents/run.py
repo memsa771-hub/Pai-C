@@ -22,7 +22,8 @@ from datetime import date, datetime
 from dbos import DBOS, DBOSClient, EnqueueOptions
 from sqlalchemy import Engine, func, insert, select, update
 
-from app.os import clock, models
+from app.os import models
+from app.os import clock as shared_clock
 from app.os.agents.spec import AgentSpec
 from app.os.documents.checks import Finding, cross_check
 from app.os.documents.intake import UploadError, check_upload, prepare
@@ -146,7 +147,7 @@ def type_matches(t: DocumentType, detected: str | None) -> bool:
 
 def register_documents(engine: Engine, settings: OsSettings, readers: Mapping[str, object], spec: AgentSpec,
                        types: Mapping[str, DocumentType], variants: list[set[str]],
-                       clock: Callable[[], datetime] = clock.now) -> None:
+                       clock: Callable[[], datetime] = shared_clock.now) -> None:
     """Registers os.document and its steps. Must run before DBOS.launch(), with the readers built once per process
     (reader.build_readers)."""
     from app.os.runner.workflow import STEP_CONFIG  # imported here: the runner imports documents
