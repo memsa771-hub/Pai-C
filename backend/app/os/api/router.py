@@ -485,4 +485,8 @@ def build_router(get_services: Callable[[], Services]) -> APIRouter:
     add_pack_routes(router, services)  # Slice 6a (spec §4)
     add_visa_routes(router, services)  # Slice 6b (spec §4)
     add_replan_routes(router, services, require_admin)  # Slice 7 (spec §4)
+    if get_services().settings.rehearsal:  # Slice 9a (spec §2.2): absent on a pilot server, so 404
+        from app.os.rehearsal.api import add_rehearsal_routes
+
+        add_rehearsal_routes(router, services, require_admin)
     return router
