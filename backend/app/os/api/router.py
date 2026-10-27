@@ -22,6 +22,8 @@ from app.os.api.queries import (
 )
 from app.os.api.schemas import (
     CompleteIn,
+    ConsentIn,
+    ConsentOut,
     CompleteOut,
     ConfirmDocumentIn,
     ConfirmIn,
@@ -69,6 +71,7 @@ from dataclasses import asdict
 from app.os.knowledge.programmes import ProgrammeStore
 from app.os.knowledge.research.run import enqueue_one
 from app.os.api.services import Services
+from app.os.consent import ConsentStore, current_terms
 from app.os.compiler import CompileError
 from app.os.contracts.route_contract import RouteContract
 from app.os.documents.confirm import NotConfirmable, confirm_document, delete_document, resolve_finding
@@ -96,6 +99,11 @@ def _notify(plans, student: str) -> None:
         log.exception("eligibility notes failed for a student")
 
 
+def refusal(code: str, message: str) -> HTTPException:
+    """A 409 the screens tell apart by `code` (Slice 9a: consent_needed, consent_version, terms_not_set)."""
+    return HTTPException(status_code=409, detail={"code": code, "message": message})
+
+
 def build_router(get_services: Callable[[], Services]) -> APIRouter:
     router = APIRouter(tags=["os"])
 
@@ -104,6 +112,33 @@ def build_router(get_services: Callable[[], Services]) -> APIRouter:
 
     def require_admin(x_os_admin_token: str | None = Header(None), svc: Services = Depends(services)) -> None:
         check_admin(svc.settings, x_os_admin_token)
+
+    # --- Slice 9a: pilot consent (spec §3.2). Starting a plan and uploading need consent to the current terms. ---
+
+    def consented_student(student: str = Depends(current_student_ref_for_write),
+                          svc: Services = Depends(services)) -> str:
+        """A dependency, so it runs before the body is validated and before any write or enqueue. Only a new start
+        and an upload are refused: the inbox and changes to a running plan keep working (Review Focus 3)."""
+        if not ConsentStore(svc.engine, svc.settings.tenant_id).has(student, current_terms(svc.terms_dir).version):
+            raise refusal("consent_needed", "Please agree to the pilot terms first.")
+        return student
+
+    @router.get("/consent", response_model=ConsentOut)
+    def consent(student: str = Depends(current_student_ref), svc: Services = Depends(services)) -> dict:
+        terms = current_terms(svc.terms_dir)
+        return {"version": terms.version, "text": terms.text, "placeholder": terms.placeholder,
+                "agreed": ConsentStore(svc.engine, svc.settings.tenant_id).has(student, terms.version)}
+
+    @router.post("/consent", status_code=204)
+    def agree(body: ConsentIn, student: str = Depends(current_student_ref_for_write),
+              svc: Services = Depends(services)) -> Response:
+        terms = current_terms(svc.terms_dir)
+        if body.version != terms.version:
+            raise refusal("consent_version", f"these are not the current terms (version {terms.version})")
+        if terms.placeholder and not svc.settings.rehearsal:  # no real student starts before the owners' text
+            raise refusal("terms_not_set", "the pilot terms are not written yet")
+        ConsentStore(svc.engine, svc.settings.tenant_id).agree(student, terms.version)
+        return Response(status_code=204)
 
     @router.post("/plans", status_code=201, response_model=PlanOut, dependencies=[Depends(require_admin)])
     def post_plan(contract: RouteContract, response: Response, svc: Services = Depends(services)) -> dict:
@@ -223,7 +258,7 @@ def build_router(get_services: Callable[[], Services]) -> APIRouter:
         return found
 
     @router.post("/plans/self", status_code=201, response_model=SelfPlanOut)
-    def start_self(body: SelfStartIn, response: Response, student: str = Depends(current_student_ref_for_write),
+    def start_self(body: SelfStartIn, response: Response, student: str = Depends(consented_student),
                    svc: Services = Depends(services)) -> dict:
         try:
             ref = builder.start(svc.plans, student, body.route, body.intake, body.choices)
@@ -286,7 +321,7 @@ def build_router(get_services: Callable[[], Services]) -> APIRouter:
 
     @router.post("/documents", status_code=201, response_model=DocumentOut)
     def upload_document(file: UploadFile = File(...), doc_type: str = Form(...),
-                        student: str = Depends(current_student_ref_for_write),
+                        student: str = Depends(consented_student),
                         svc: Services = Depends(services)) -> dict:
         t = svc.document_types.get(doc_type)
         if t is None:

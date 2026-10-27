@@ -21,6 +21,7 @@ from app.os.knowledge.programmes import Programme, ProgrammeStore
 from app.os.playbooks import PLAYBOOK_DIR, load_playbook_dir
 from app.os.settings import load_settings
 from tests.os.test_api_documents import FakeClient, confirm_body, jpeg, simulate_read, upload
+from tests.os.test_api import TEST_TERMS, agree
 
 FAKE = Path(__file__).parent / "playbooks"
 CHECKED = datetime(2026, 10, 17, tzinfo=timezone.utc)
@@ -60,7 +61,7 @@ def api(engine, clean, os_db):
     fake = FakeClient()
     books = load_playbook_dir(FAKE) | load_playbook_dir(PLAYBOOK_DIR)
     svc = make_services(settings, engine=engine, playbooks=books, today=lambda: date(2027, 3, 1),
-                        dbos_client=lambda: fake)
+                        dbos_client=lambda: fake, terms_dir=TEST_TERMS)
     store, kb = ProgrammeStore(engine, "pai"), SqlKnowledge(engine, "pai")
     for route, spec in ROUTES.items():
         for ref, facts in spec["programmes"].items():
@@ -117,6 +118,7 @@ def test_slice4_gate(api, route):
     first, second = sorted(spec["programmes"])
 
     # 1. the student starts a plan alone: no admin call, no Counsellor
+    agree(api)
     started = api.post(f"{P}/plans/self", headers=me(), json={
         "route": route, "intake": {"term": "winter", "year": 2027},
         "choices": [{"programme_ref": first, "rank": 1}]})

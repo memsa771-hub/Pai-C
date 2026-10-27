@@ -18,7 +18,7 @@ from app.os.documents.types import load_document_types
 from app.os.documents.validators import validate
 from app.os.playbooks import load_playbook_dir
 from app.os.settings import load_settings
-from tests.os.test_api import ADMIN, TOKEN, as_student
+from tests.os.test_api import ADMIN, TEST_TERMS, TOKEN, agree, as_student
 from tests.os.test_api_knowledge import FakeClient as _FakeClient
 
 FAKE = Path(__file__).parent / "playbooks"
@@ -60,7 +60,8 @@ def jpeg(seed: int = 1) -> bytes:
 def api(engine, clean, os_db):
     settings = load_settings({"OS_DATABASE_URL": os_db, "OS_ADMIN_TOKEN": TOKEN, "OS_ENABLED": "true"})
     fake = FakeClient()
-    services = make_services(settings, engine=engine, playbooks=load_playbook_dir(FAKE), dbos_client=lambda: fake)
+    services = make_services(settings, engine=engine, playbooks=load_playbook_dir(FAKE), dbos_client=lambda: fake,
+                             terms_dir=TEST_TERMS)
     app = FastAPI()
     app.include_router(build_router(lambda: services), prefix="/v1/os")
 
@@ -77,6 +78,7 @@ def api(engine, clean, os_db):
 
 
 def upload(api, doc_type="transcript", data=None, name="transcript.jpg", student="stu-1"):
+    agree(api, student)
     return api.post("/v1/os/documents", data={"doc_type": doc_type},
                     files={"file": (name, data if data is not None else jpeg(), "image/jpeg")},
                     headers=as_student(student))

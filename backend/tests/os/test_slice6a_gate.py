@@ -26,6 +26,7 @@ from app.os.playbooks import PLAYBOOK_DIR, load_playbook_dir
 from app.os.settings import load_settings
 from app.os.statements.config import load_statement_configs
 from tests.os.conftest import TEST_DBOS_SCHEMA, reset_dbos_schema
+from tests.os.test_api import TEST_TERMS, agree
 
 HERE = Path(__file__).parent
 CONFIGS = load_pack_configs() | load_pack_configs(HERE / "fixtures" / "packs")
@@ -62,7 +63,8 @@ def api(engine, clean, os_db):
     launch()
     client = DBOSClient(system_database_url=os_db, dbos_system_schema=TEST_DBOS_SCHEMA, application_name=APP_NAME)
     svc = make_services(settings, engine=engine, playbooks=books, today=lambda: date(2027, 3, 1),
-                        dbos_client=lambda: client, statement_configs=STATEMENTS, pack_configs=CONFIGS)
+                        dbos_client=lambda: client, statement_configs=STATEMENTS, pack_configs=CONFIGS,
+                        terms_dir=TEST_TERMS)
     store, kb = ProgrammeStore(engine, "pai"), SqlKnowledge(engine, "pai")
     for route, (ref, facts) in ROUTES.items():
         store.upsert(Programme(ref=ref, route_key=route, university="Uni X", name=f"Programme {ref}", aliases=(),
@@ -106,6 +108,7 @@ def test_slice6a_gate(api, route):
     cfg = CONFIGS[route]
 
     # 1. the student's plan, with the pack step waiting for them (the kernel's promotion, simulated)
+    agree(api)
     r = api.post(f"{P}/plans/self", headers=ME, json={"route": route, "intake": {"term": "winter", "year": 2027},
                                                       "choices": [{"programme_ref": programme, "rank": 1}]})
     assert r.status_code == 201, r.text

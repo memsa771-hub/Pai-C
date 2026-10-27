@@ -450,3 +450,16 @@ class PastedRulesIn(BaseModel):
     prompt: str | None = Field(None, max_length=4000)
     limit_words: int | None = Field(None, gt=0, le=100000)
     limit_chars: int | None = Field(None, gt=0, le=100000)
+
+
+class ConsentOut(BaseModel):
+    """The current pilot terms and whether this student agreed to them (Slice 9a spec §3.2)."""
+    version: int
+    text: str
+    placeholder: bool
+    agreed: bool
+
+
+class ConsentIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    version: int = Field(ge=1)

@@ -11,6 +11,8 @@ from app.os.playbooks import load_playbook_dir
 from app.os.settings import load_settings
 
 FAKE = Path(__file__).parent / "playbooks"
+# Slice 9a Task 5: test-only pilot terms that are not a placeholder, so `agree` works with rehearsal mode off.
+TEST_TERMS = Path(__file__).parent / "fixtures" / "terms"
 TOKEN = "test-admin-token"
 CHECKED = datetime(2026, 10, 17, tzinfo=timezone.utc)
 
@@ -27,7 +29,8 @@ def contract(student="stu-1", refs=("p1",), external_ref="ext-1", destination="I
 @pytest.fixture
 def client(engine, clean, os_db):
     settings = load_settings({"OS_DATABASE_URL": os_db, "OS_ADMIN_TOKEN": TOKEN, "OS_ENABLED": "true"})
-    services = make_services(settings, engine=engine, playbooks=load_playbook_dir(FAKE), today=lambda: date(2027, 3, 1))
+    services = make_services(settings, engine=engine, playbooks=load_playbook_dir(FAKE), today=lambda: date(2027, 3, 1),
+                             terms_dir=TEST_TERMS)
     SqlKnowledge(engine, "pai").upsert("programme", "p1", "deadline_close", Fact(
         {"date": "2027-07-15"}, "Apply by 15 July", "https://uni.example/apply", CHECKED, 2027, "confirmed"))
     app = FastAPI()
@@ -49,6 +52,15 @@ ADMIN = {"X-OS-Admin-Token": TOKEN}
 
 def as_student(name="stu-1") -> dict:
     return {"X-Test-Student": name}
+
+
+def agree(client, student="stu-1") -> None:
+    """The student agrees to the current pilot terms through the API (Slice 9a Task 5). Starting a self-serve plan
+    and uploading a document are refused without it. The client's services must use TEST_TERMS (not a placeholder),
+    since a placeholder cannot be accepted with rehearsal mode off."""
+    version = client.get("/v1/os/consent", headers=as_student(student)).json()["version"]
+    r = client.post("/v1/os/consent", json={"version": version}, headers=as_student(student))
+    assert r.status_code == 204, r.text
 
 
 def test_post_plan_requires_admin_token(client):

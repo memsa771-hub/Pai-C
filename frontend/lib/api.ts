@@ -323,6 +323,27 @@ class WorkspaceApi {
     return this.requestJson(`/v1/os/eligibility/${encodeURIComponent(programmeRef)}?${params}`);
   }
 
+  /** PAI OS: the current pilot terms and whether the student agreed to them (Slice 9a spec §3.2). */
+  async getOsConsent(): Promise<import('./os-consent').OsConsent> {
+    const params = new URLSearchParams({ network: this.requireWorkspace() });
+    return this.requestJson(`/v1/os/consent?${params}`);
+  }
+
+  /** PAI OS: agree to this version of the pilot terms (204, no body; 409 with a code if refused). */
+  async agreeOsConsent(version: number): Promise<void> {
+    const params = new URLSearchParams({ network: this.requireWorkspace() });
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (this.token) headers['X-Workspace-Token'] = this.token;
+    if (this.bearerToken) headers['Authorization'] = `Bearer ${this.bearerToken}`;
+    const res = await fetch(`${API_URL}/v1/os/consent?${params}`, {
+      method: 'POST', body: JSON.stringify({ version }), headers, credentials: 'include', cache: 'no-store',
+    });
+    if (!res.ok) {
+      if (res.status === 401 && typeof window !== 'undefined') window.dispatchEvent(new Event(AUTH_INVALID_EVENT));
+      throw new Error(`API ${res.status}: ${await res.text()}`);
+    }
+  }
+
   /** PAI OS: start the student's own plan (or get the one they already have). */
   async startOsPlan(route: string, intake: { term: string; year: number },
                     choices: { programme_ref: string; rank: number }[]): Promise<import('./os-self-serve').OsSelfPlan> {
