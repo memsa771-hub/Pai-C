@@ -1,11 +1,16 @@
 'use client';
 
+import { useState } from 'react';
 import { ExternalLink } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   GROUP_TITLES,
   KIND_LABELS,
+  actionHint,
+  changeLine,
   completeActions,
+  programmeName,
+  type CompleteAction,
   dateLabels,
   formatDue,
   groupItems,
@@ -63,6 +68,8 @@ function NoteCard({ note, names, onSwap, onReadNote }: { note: OsNote; names: Re
 /** The PAI OS student inbox (Slice 1 spec §4.11): mobile-first, one action per item. */
 export function InboxList({ items, now, onComplete, busyId = null, factStatus = {}, programmesHref, notes = [],
                             names = {}, onSwap, onReadNote }: InboxListProps) {
+  // an answer that asks first (Slice 9 Task 11): "Not admitted" names the programme and waits for a second tap
+  const [asking, setAsking] = useState<{ id: number; action: CompleteAction } | null>(null);
   if (items.length === 0 && notes.length === 0) {
     return <p className="px-4 py-10 text-center text-sm text-muted-foreground">Nothing to do right now.</p>;
   }
@@ -89,6 +96,8 @@ export function InboxList({ items, now, onComplete, busyId = null, factStatus = 
               const fact = item.programme_ref ? factStatus[item.programme_ref] : null;
               const labels = [...dateLabels(item), ...(due && fact ? [statusLabel(fact)] : [])];
               const source = item.citations[0];
+              const prog = programmeName(item, names);
+              const hint = actionHint(item);
               return (
                 <li key={item.id} className="rounded-lg border bg-card p-3">
                   <div className="flex items-start justify-between gap-3">
@@ -99,6 +108,15 @@ export function InboxList({ items, now, onComplete, busyId = null, factStatus = 
                         )}
                         {item.title}
                       </p>
+                      {prog && <p className="mt-0.5 break-words text-sm font-semibold">{prog}</p>}
+                      {(item.changes ?? []).length > 0 && (
+                        <ul className="mt-1 flex flex-col gap-0.5 text-xs">
+                          {(item.changes ?? []).map((c) => (
+                            <li key={`${c.change}:${c.instance_key}`} className="break-words">{changeLine(c, names)}</li>
+                          ))}
+                        </ul>
+                      )}
+                      {hint && <p className="mt-1 break-words text-xs text-muted-foreground">{hint}</p>}
                       {(due || labels.length > 0) && (
                         <p className="mt-1 text-xs text-muted-foreground">
                           {due}
@@ -129,15 +147,32 @@ export function InboxList({ items, now, onComplete, busyId = null, factStatus = 
                         </a>
                       )}
                     </div>
-                    <div className="flex shrink-0 flex-col gap-1">
-                      {completeActions(item).map((a) => (
-                        <Button key={a.label} size="sm" variant="outline" disabled={busyId === item.id}
-                                onClick={() => onComplete(item, a.payload)}>
-                          {a.label}
-                        </Button>
-                      ))}
-                    </div>
+                    {asking?.id !== item.id && (
+                      <div className="flex shrink-0 flex-col gap-1">
+                        {completeActions(item, names).map((a) => (
+                          <Button key={a.label} size="sm" variant="outline" disabled={busyId === item.id}
+                                  onClick={() => (a.confirm ? setAsking({ id: item.id, action: a })
+                                    : onComplete(item, a.payload))}>
+                            {a.label}
+                          </Button>
+                        ))}
+                      </div>
+                    )}
                   </div>
+                  {asking?.id === item.id && asking.action.confirm && (
+                    <div role="alertdialog" aria-label={asking.action.label}
+                         className="mt-2 rounded-md border border-amber-300 bg-amber-50 p-2 text-sm text-amber-950">
+                      <p className="break-words">{asking.action.confirm.question}</p>
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        <Button size="sm" variant="destructive" disabled={busyId === item.id}
+                                className="h-auto max-w-full whitespace-normal break-words py-1.5 text-left"
+                                onClick={() => { const a = asking.action; setAsking(null); onComplete(item, a.payload); }}>
+                          {asking.action.confirm.yes}
+                        </Button>
+                        <Button size="sm" variant="outline" onClick={() => setAsking(null)}>Cancel</Button>
+                      </div>
+                    </div>
+                  )}
                 </li>
               );
             })}

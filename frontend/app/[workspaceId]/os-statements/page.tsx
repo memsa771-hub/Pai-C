@@ -2,6 +2,7 @@
 
 import { use, useCallback, useEffect, useState } from 'react';
 import { notFound } from 'next/navigation';
+import { OsHeader } from '@/components/os/os-header';
 import { StatementEditor } from '@/components/os/statement-editor';
 import { StatementInterview } from '@/components/os/statement-interview';
 import { StatementProgrammes } from '@/components/os/statement-programmes';
@@ -9,7 +10,7 @@ import { Button } from '@/components/ui/button';
 import { workspaceApi } from '@/lib/api';
 import { OS_UI_ENABLED } from '@/lib/config';
 import {
-  kindLabel, statusLabel, type OsInterview, type OsProgrammeRules, type OsStatement, type OsStatementKind,
+  kindLabel, programmeNames, statusLabel, type OsInterview, type OsProgrammeRules, type OsStatement, type OsStatementKind,
 } from '@/lib/os-statements';
 import { usePaiAuth } from '@/lib/pai-auth-context';
 import { goToSignIn } from '@/lib/auth-redirects';
@@ -84,13 +85,14 @@ export default function OsStatementsPage({ params }: { params: Promise<{ workspa
 
   return (
     <main className="mx-auto w-full max-w-md px-4 py-6">
-      <h1 className="mb-4 text-lg font-semibold">{open ? 'Your draft' : 'Your statement and CV'}</h1>
+      <OsHeader workspaceId={workspaceId} current="os-statements" title={open ? 'Your draft' : 'Your statement and CV'} />
       {error && <p role="alert" className="mb-3 break-words text-sm text-destructive">{error}</p>}
       {interview === null || statements === null ? (
         <p className="text-sm text-muted-foreground">{error ? '' : 'Loading…'}</p>
       ) : open ? (
         <>
           <StatementEditor key={`${open.id}:${open.version?.number}`} statement={open} busy={busy}
+                           names={programmeNames(programmes)}
                            onSave={(text) => act(() => workspaceApi.saveOsStatementText(open.id, text),
                                                  'Could not save. Please try again.')}
                            onRewrite={() => draft(open.kind, open.programme_ref)}
@@ -104,7 +106,7 @@ export default function OsStatementsPage({ params }: { params: Promise<{ workspa
             {statements.map((s) => (
               <button key={s.id} type="button" disabled={!s.version}
                       className="flex flex-wrap justify-between gap-2 text-left text-sm" onClick={() => setOpenId(s.id)}>
-                <span className="break-words font-medium">{kindLabel(s.kind, s.programme_ref)}</span>
+                <span className="break-words font-medium">{kindLabel(s.kind, s.programme_ref, programmeNames(programmes))}</span>
                 <span className="text-muted-foreground">{statusLabel(s)}</span>
               </button>
             ))}

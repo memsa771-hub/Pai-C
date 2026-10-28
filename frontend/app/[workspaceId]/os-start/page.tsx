@@ -2,6 +2,7 @@
 
 import { use, useCallback, useEffect, useState } from 'react';
 import { notFound, useRouter } from 'next/navigation';
+import { OsHeader } from '@/components/os/os-header';
 import { ConsentCard } from '@/components/os/consent-card';
 import { RouteBuilder } from '@/components/os/route-builder';
 import { workspaceApi } from '@/lib/api';
@@ -120,7 +121,7 @@ export default function OsStartPage({ params }: { params: Promise<{ workspaceId:
 
   return (
     <main className="mx-auto w-full max-w-md px-4 py-6">
-      <h1 className="mb-4 text-lg font-semibold">Start your plan</h1>
+      <OsHeader workspaceId={workspaceId} current="os-start" title="Start your plan" />
       {error && <p role="alert" className="mb-3 break-words text-sm text-destructive">{error}</p>}
       {consent === null ? (
         !error && <p className="text-sm text-muted-foreground">Loading…</p>

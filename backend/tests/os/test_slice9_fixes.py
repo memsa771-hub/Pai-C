@@ -26,6 +26,7 @@ from tests.os.test_api_replan import (  # noqa: F401  (api and real_clock are fi
     api,
     propose,
 )
+from tests.os.test_golden import TEST_STUDENT
 from tests.os.test_rehearsal_mode import (  # noqa: F401
     ADMIN,
     BASE,
@@ -350,3 +351,167 @@ def test_complete_review_if_waiting_skips_a_finished_check(engine, clean):
     assert kernel.complete_review(row.id, {}, only_if_waiting=True) is False
     with pytest.raises(IllegalTransition):  # the default stays strict for the admin API
         kernel.complete_review(row.id, {})
+
+
+# ==== batch B: the student's screens ================================================================================
+# The API half of the screen fixes: what the pages need to name programmes, to leave a removed programme out, to ask
+# which admission the visa file is for, and to say what a plan update changed. Fictional data only.
+
+NOTICE = "plan_updated@"
+TEST_REF = TEST_STUDENT.student_ref
+
+
+def _waiting(api, ref: str) -> int:
+    """A student step of this programme put in the inbox (the kernel's write, simulated)."""
+    with api.engine.begin() as conn:
+        row = conn.execute(select(T.c.id).where(T.c.plan_id == api.plan_id, T.c.kind == "student",
+                                                T.c.programme_ref == ref).order_by(T.c.id).limit(1)).first()
+        conn.execute(T.update().where(T.c.id == row.id).values(state="waiting_student"))
+    return row.id
+
+
+def test_inbox_items_carry_programme_name(api):
+    """`walk:S3:admission_card_unnamed`, `walk:S1:inbox_programme_unnamed`: every per-programme inbox item carries the
+    programme's name and university from the programme store, so two cards of two programmes can be told apart."""
+    from app.os.knowledge.programmes import Programme, ProgrammeStore
+
+    ProgrammeStore(api.engine, "pai").upsert(Programme(
+        ref=P1, route_key="germany_master", university="Uni Sample", name="MSc Example", aliases=(),
+        start_urls=("https://uni.example/p1",), official_domains=("uni.example",)))
+    tid = _waiting(api, P1)
+    other = _waiting(api, "ovgu-eeit")  # not in the programme store: no name, the page words the step without one
+    items = {i["id"]: i for i in api.get("/v1/os/inbox", headers=ME).json()["items"]}
+    assert (items[tid]["programme_name"], items[tid]["university"]) == ("MSc Example", "Uni Sample")
+    assert items[other]["programme_name"] is None
+    assert all(i["programme_name"] is None for i in items.values() if i["programme_ref"] is None)
+
+
+def test_removed_programme_left_out_of_the_students_pages(api):
+    """`walk:S3:removed_programme_still_shown`: once the removal is accepted, the programme is no longer one of the
+    plan's programmes for the pages (programme facts; and packs, visa choices and statements, which all read
+    `student_plan`)."""
+    from app.os.api import self_serve
+
+    assert P1 in self_serve.student_plan(api.svc.plans, TEST_REF).programmes
+    pid = propose(api)
+    assert api.post(f"/v1/os/proposals/{pid}/accept", headers=ME).status_code == 200
+    plan = self_serve.student_plan(api.svc.plans, TEST_REF)
+    assert P1 not in plan.programmes and plan.programmes
+    refs = [p["ref"] for p in api.get("/v1/os/programmes", headers=ME).json()["programmes"]]
+    assert P1 not in refs and refs
+
+
+def test_changes_still_name_a_removed_programme(api):
+    """With the removed programme gone from the programmes page, "What changed" and the plan update still name it:
+    the changes carry the names of every programme the plan had, and each notice change its programme's name."""
+    from app.os.knowledge.programmes import Programme, ProgrammeStore
+
+    ProgrammeStore(api.engine, "pai").upsert(Programme(
+        ref=P1, route_key="germany_master", university="Uni Sample", name="MSc Example", aliases=(),
+        start_urls=("https://uni.example/p1",), official_domains=("uni.example",)))
+    pid = propose(api)
+    assert api.post(f"/v1/os/proposals/{pid}/accept", headers=ME).status_code == 200
+    assert api.get("/v1/os/changes", headers=ME).json()["names"][P1] == "MSc Example"
+    [notice] = [i for i in api.get("/v1/os/inbox", headers=ME).json()["items"] if i["instance_key"].startswith(NOTICE)]
+    assert {c["programme_name"] for c in notice["changes"] if c["programme_ref"] == P1} == {"MSc Example"}
+
+
+def test_plan_update_notice_says_what_changed(api):
+    """`walk:S1:plan_updated_notice_empty`: the "Your plan was updated" item says which of the student's steps were
+    added, removed or changed; one whose revision changed none of the student's steps leaves the inbox."""
+    pid = propose(api)
+    assert api.post(f"/v1/os/proposals/{pid}/accept", headers=ME).status_code == 200
+    items = api.get("/v1/os/inbox", headers=ME).json()["items"]
+    [notice] = [i for i in items if i["instance_key"].startswith(NOTICE)]
+    assert notice["changes"], "the removal removed some of the student's steps"
+    removed = [c for c in notice["changes"] if c["change"] == "removed"]
+    assert removed and all(c["title"] and c["programme_ref"] == P1 for c in removed)
+    assert {c["change"] for c in notice["changes"]} <= {"added", "removed", "changed", "kept"}
+    assert all(c["title"] for c in notice["changes"])
+    assert all(i["changes"] == [] for i in items if not i["instance_key"].startswith(NOTICE))
+    # a revision that changed only work steps (the kernel's write, simulated): nothing to tell the student
+    with api.engine.begin() as conn:
+        work = conn.execute(select(T.c.instance_key).where(T.c.plan_id == api.plan_id, T.c.kind == "work")
+                            .limit(1)).scalar_one()
+        conn.execute(insert(models.plan_revisions).values(tenant_id="pai", plan_id=api.plan_id, number=90,
+                                                          cause="fact:x", diff={"added": [], "removed": [],
+                                                                                "changed": [work]}))
+        nid = conn.execute(insert(T).values(
+            tenant_id="pai", plan_id=api.plan_id, instance_key=f"{NOTICE}r90", template_key="plan_updated",
+            task_type="student.act", kind="student", inbox_kind="act", title="Your plan was updated",
+            state="waiting_student", due_tz="UTC", playbook_version=1, result={"revision": 90, "cause": "fact:x"})
+        ).inserted_primary_key[0]
+    assert nid not in {i["id"] for i in api.get("/v1/os/inbox", headers=ME).json()["items"]}
+    with api.engine.connect() as conn:
+        assert conn.execute(select(T.c.state).where(T.c.id == nid)).scalar_one() == "done"
+
+
+def test_statement_programmes_named(engine, clean, os_db):
+    """`walk:S1:statement_programmes_raw_refs`: the statements page's programmes carry name and university."""
+    from tests.os import test_api_statements as st
+
+    web = st.api.__wrapped__(engine, clean, os_db)
+    st.start(web)
+    progs = web.get(f"{st.P}/statements", headers=st.me()).json()["programmes"]
+    assert [(p["programme_ref"], p["name"], p["university"]) for p in progs] == [
+        ("p1", "Programme p1", "Uni X"), ("p2", "Programme p2", "Uni X")]
+
+
+def test_how_to_apply_names_the_programme():
+    """`walk:S1:visa_how_to_apply_programme_text`: without a confirmed application route the one step names the
+    programme and its university, and on the visa file it says the visa steps wait for that route."""
+    from dataclasses import replace as dc_replace
+
+    from app.os.packs.instructions import instructions
+    from tests.os.test_pack_rules import inputs
+
+    named = {"name": "MSc Example", "university": "Uni Sample"}
+    [step] = instructions(inputs(facts={}), "p1", **named)[1]
+    assert "MSc Example" in step.text and "Uni Sample" in step.text
+    assert "this programme" not in step.text and "the university" not in step.text
+    [visa] = instructions(dc_replace(inputs(facts={}), kind="visa"), "p1", **named)[1]
+    assert "visa" in visa.text and "MSc Example" in visa.text and "Uni Sample" in visa.text
+    assert "not confirmed yet" in instructions(inputs(facts={}), "p1")[1][0].text  # no name: still says so
+
+
+def test_document_fields_have_plain_labels():
+    """`walk:S1:documents_read_needs_tap`: a technical field name ("Mrz line1") has a plain label in its document
+    type, and the documents API sends each field's label (None: the page words the name)."""
+    from app.os.api.queries import document_out
+    from app.os.documents.types import load_document_types
+
+    types = load_document_types()
+    labels = {f.name: f.label for t in types.values() for f in t.fields}
+    for name in ("mrz_line1", "mrz_line2", "trf_number", "cefr", "min_pass", "scale_best"):
+        assert labels[name], name
+    assert "mrz" not in labels["mrz_line1"].lower()
+    store = SimpleNamespace(fields=lambda _id: [
+        {"field": f, "value_read": "x", "check": "ok", "reasons": [], "value_confirmed": None}
+        for f in ("mrz_line1", "surname")])
+    d = SimpleNamespace(id=1, doc_type="passport", filename="p.pdf", status="read", detected_type=None, pages=1,
+                        error=None, created_at=None, read_at=None, confirmed_at=None)
+    out = {f["field"]: f["label"] for f in document_out(store, d, [], types)["fields"]}
+    assert out == {"mrz_line1": labels["mrz_line1"], "surname": labels["surname"]}
+
+
+def test_visa_with_two_admissions_asks_first(engine, clean, os_db):
+    """`walk:S1:visa_admitted_label_one_only`: with two admissions every admitted programme is listed, nothing is
+    chosen for the student and nothing is built until they choose; with one admission it is still pre-selected."""
+    from tests.os import test_api_visa as va
+
+    gen = va.api.__wrapped__(engine, clean, os_db)
+    web = next(gen)
+    try:
+        va.admitted(web, va.PROG)
+        va.admitted(web, va.OTHER_PROG)
+        body = web.get(va.V, headers=va.ME).json()
+        assert body["status"] == "no_choice" and body["programme_ref"] is None
+        assert body["choice"]["preselected"] is None
+        assert set(body["choice"]["admitted"]) == {va.PROG, va.OTHER_PROG}
+        assert web.post(f"{va.V}/build", headers=va.ME).status_code == 409
+        assert not web.ctx.client.list_workflows(workflow_id_prefix="visa:", load_input=False, load_output=False)
+        assert web.put(f"{va.V}/choice", headers=va.ME, json={"programme_ref": va.PROG}).status_code == 200
+        body = va.settled(web)
+        assert body["programme_ref"] == va.PROG and body["status"] != "no_choice"
+    finally:
+        next(gen, None)

@@ -77,7 +77,7 @@ describe('ChangesList', () => {
     const html = renderToStaticMarkup(<ChangesList changes={[older, newer]} names={NAMES} />);
     expect(html.indexOf('Ask a person')).toBeLessThan(html.indexOf('Remove the steps'));
     expect(html).toContain('A step failed twice');
-    expect(renderToStaticMarkup(<ChangesList changes={[]} names={NAMES} />)).toContain('No changes yet');
+    expect(renderToStaticMarkup(<ChangesList changes={[]} names={NAMES} />)).toContain('No suggested changes yet');
   });
 });
 

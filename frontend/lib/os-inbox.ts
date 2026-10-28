@@ -26,6 +26,19 @@ export interface OsInboxItem {
   slack_days: number | null;
   critical: boolean;
   citations: OsCitation[];
+  /** The programme's name and university (Slice 9 Task 11); null when the programme store has no name. */
+  programme_name?: string | null;
+  university?: string | null;
+  /** A "Your plan was updated" item: the student's steps it added, removed, changed or kept. */
+  changes?: OsPlanChange[];
+}
+
+export interface OsPlanChange {
+  change: 'added' | 'removed' | 'changed' | 'kept';
+  instance_key: string;
+  title: string;
+  programme_ref: string | null;
+  programme_name?: string | null;
 }
 
 export type InboxGroup = 'overdue' | 'this_week' | 'later';
@@ -100,13 +113,59 @@ export function sourceHost(url: string): string {
 }
 
 const ADMISSION_PREFIX = 'admission_result@'; // the plan's per-programme admission step (Slice 6b S6b-D8)
+const NOTICE_PREFIX = 'plan_updated@'; // "Your plan was updated" (the kernel's notice of a revision)
+
+/** The programme an item is for, by name: "MSc Example (Uni Sample)". Never the internal ref: null when no name is
+ * known (Slice 9 Task 11). `names` is the page's ref -> name map, used when the item has no name of its own. */
+export function programmeName(item: OsInboxItem, names: Record<string, string> = {}): string | null {
+  if (!item.programme_ref) return null;
+  const name = item.programme_name ?? names[item.programme_ref] ?? null;
+  if (!name) return null;
+  return item.university && item.programme_name ? `${name} (${item.university})` : name;
+}
+
+export function isNotice(item: OsInboxItem): boolean {
+  return item.instance_key.startsWith(NOTICE_PREFIX);
+}
+
+const CHANGE_WORDS: Record<OsPlanChange['change'], string> = {
+  added: 'New step',
+  removed: 'Removed',
+  changed: 'Updated',
+  kept: 'Kept (already started)',
+};
+
+/** One line of a plan update: 'Removed: Apply (MSc Example)'. */
+export function changeLine(c: OsPlanChange, names: Record<string, string> = {}): string {
+  const prog = c.programme_name ?? (c.programme_ref ? names[c.programme_ref] : undefined);
+  return `${CHANGE_WORDS[c.change] ?? c.change}: ${c.title}${prog ? ` (${prog})` : ''}`;
+}
+
+export interface CompleteAction {
+  label: string;
+  payload: Record<string, unknown>;
+  /** Asked before the answer is sent: the button only opens this question (Slice 9 Task 11). */
+  confirm?: { question: string; yes: string };
+}
 
 /** The buttons an item offers and what each sends: an admission result says admitted or not (the visa page
- * pre-selects the admitted programme); other choices confirm; the rest are done. */
-export function completeActions(item: OsInboxItem): { label: string; payload: Record<string, unknown> }[] {
+ * pre-selects the admitted programme); "Not admitted" names the programme and asks first, since it starts removing
+ * that programme. Other choices confirm; a plan update is acknowledged; the rest are marked done. */
+export function completeActions(item: OsInboxItem, names: Record<string, string> = {}): CompleteAction[] {
   if (item.instance_key.startsWith(ADMISSION_PREFIX)) {
+    const name = programmeName(item, names) ?? 'this programme';
     return [{ label: 'Admitted', payload: { choice: 'admitted' } },
-            { label: 'Not admitted', payload: { choice: 'rejected' } }];
+            { label: 'Not admitted', payload: { choice: 'rejected' },
+              confirm: { question: `Did ${name} say no? We will then suggest removing ${name} from your plan.`,
+                         yes: `Yes, ${name} did not admit me` } }];
   }
-  return [{ label: item.inbox_kind === 'choose' ? 'Confirm' : 'Done', payload: {} }];
+  if (isNotice(item)) return [{ label: 'OK', payload: {} }];
+  if (item.inbox_kind === 'choose') return [{ label: 'Confirm', payload: {} }];
+  return [{ label: 'Mark as done', payload: {} }];
+}
+
+/** What a step's button means, when it is not plain: a "provide" step is not closed by an upload alone. */
+export function actionHint(item: OsInboxItem): string | null {
+  if (item.inbox_kind === 'provide') return 'Uploading alone does not close this step: tap Mark as done when it is all done.';
+  return null;
 }

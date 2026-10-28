@@ -27,7 +27,7 @@ export function DocumentConfirm({ document, onConfirm, onBack, busy = false }: D
         const failed = f.check === 'check_failed';
         return (
           <div key={f.field} className="min-w-0">
-            <label htmlFor={id} className="text-xs font-medium text-muted-foreground">{fieldLabel(f.field)}</label>
+            <label htmlFor={id} className="text-xs font-medium text-muted-foreground">{f.label ?? fieldLabel(f.field)}</label>
             <input id={id} value={text[f.field] ?? ''} aria-invalid={failed}
                    aria-describedby={failed ? `${id}-why` : undefined}
                    onChange={(e) => setText((t) => ({ ...t, [f.field]: e.target.value }))}

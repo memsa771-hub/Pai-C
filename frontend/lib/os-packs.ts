@@ -90,6 +90,13 @@ export function packStatusLabel(p: OsPack): string {
   }
 }
 
+/** What is left before the pack (or visa file) can be approved, in the student's words (Slice 9 Task 11): an item
+ * the student ticks says so. The server's rule: every item is ready, and every manual item is ticked. */
+export function approveBlockers(p: OsPack): string[] {
+  return p.checklist.filter((i) => (i.state === 'manual' ? !i.ticked : i.state !== 'ready'))
+    .map((i) => (i.tickable ? `${i.label} (tick it once you have done it)` : i.label));
+}
+
 export function canApprove(p: OsPack): boolean {
   return p.status === 'ready' && !p.approved && p.manifest_sha256 !== null;
 }

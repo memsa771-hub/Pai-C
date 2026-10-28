@@ -7,18 +7,18 @@ fields:
   - {name: surname, type: name, hint: "Surname exactly as printed on the data page"}
   - {name: given_names, type: name, hint: "Given names exactly as printed"}
   - {name: nationality, type: text, hint: "Nationality as printed, e.g. PAKISTANI"}
-  - {name: country_code, type: code, pattern: "^[A-Z]{3}$", hint: "Three-letter country code next to 'Type', e.g. PAK"}
+  - {name: country_code, label: "Country code", type: code, pattern: "^[A-Z]{3}$", hint: "Three-letter country code next to 'Type', e.g. PAK"}
   - {name: date_of_birth, type: date, cross_check: date_of_birth, hint: "Date of birth as YYYY-MM-DD"}
   - {name: sex, type: enum, values: [M, F, X], hint: "Sex: M, F or X"}
   - {name: place_of_birth, type: text, hint: "Place of birth as printed"}
-  - {name: father_or_husband_name, type: name, hint: "The father's or husband's name if printed, as printed (the label says which)"}
+  - {name: father_or_husband_name, label: "Father's or husband's name", type: name, hint: "The father's or husband's name if printed, as printed (the label says which)"}
   - {name: national_id, type: code, hint: "Citizenship or national identity number as printed, with its dashes"}
   - {name: passport_number, type: code, pattern: "^[A-Z0-9]{6,9}$", hint: "Passport number"}
   - {name: issue_date, type: date, hint: "Date of issue as YYYY-MM-DD"}
   - {name: expiry_date, type: date, hint: "Date of expiry as YYYY-MM-DD"}
   - {name: tracking_number, type: code, hint: "The tracking number if printed, digits only; leave empty if you cannot read every digit"}
   - {name: booklet_number, type: code, hint: "Booklet number if printed"}
-  - {name: mrz_line1, type: mrz_line, hint: "First machine-readable line at the bottom (44 characters, starting P<), copied character by character including every '<'"}
-  - {name: mrz_line2, type: mrz_line, hint: "Second machine-readable line (44 characters), copied character by character including every '<'"}
+  - {name: mrz_line1, label: "Code line 1 (bottom of the page)", type: mrz_line, hint: "First machine-readable line at the bottom (44 characters, starting P<), copied character by character including every '<'"}
+  - {name: mrz_line2, label: "Code line 2 (bottom of the page)", type: mrz_line, hint: "Second machine-readable line (44 characters), copied character by character including every '<'"}
 rules:
   - {kind: mrz, fields: [mrz_line1, mrz_line2, passport_number, date_of_birth, expiry_date]}

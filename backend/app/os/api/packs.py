@@ -21,7 +21,7 @@ from app.os.packs.inputs import inputs_sha, load_inputs
 from app.os.packs.funds import required_funds
 from app.os.packs.run import PACK_KIND, VISA_KIND, enqueue_pack, latest_attempt
 from app.os.packs.store import PackFileStore, PackItemStore
-from app.os.packs.visa import VISA_ITEMS, VisaChoiceStore, preselect
+from app.os.packs.visa import VISA_ITEMS, VisaChoiceStore, admitted, preselect
 
 log = logging.getLogger(__name__)
 
@@ -78,7 +78,7 @@ class VisaOut(PackOut):
     programme_ref: str | None  # the chosen programme, else the pre-selected one; None: choose one first
     status: str  # no_choice, building, ready, incomplete, approved, failed
     funds: dict | None
-    choice: dict  # programme_ref (stored), reduction, preselected
+    choice: dict  # programme_ref (stored), reduction, preselected, admitted (every admitted programme)
     programmes: list[dict]  # the plan's programmes to choose from
 
 
@@ -96,11 +96,11 @@ def complete_ready_packs(svc: Services, student: str) -> None:
 
 
 def visa_choice(svc: Services, plan, student: str) -> tuple[str | None, str | None, float, str | None]:
-    """(the programme the visa file is for, the stored choice, the reduction, the pre-selected programme)."""
+    """(the programme the visa file is for, the stored choice, the reduction, the pre-selected programme). Only one
+    admission is pre-selected; with two the student chooses first, and nothing is built until they do."""
     stored = VisaChoiceStore(svc.engine, svc.settings.tenant_id).get(student)
     ref = stored.programme_ref if stored and stored.programme_ref in plan.programmes else None
-    pre = preselect(svc.engine, svc.settings.tenant_id, plan.plan_id)
-    pre = pre if pre in plan.programmes else None
+    pre = preselect(svc.engine, svc.settings.tenant_id, plan.plan_id, plan.programmes)
     return ref or pre, ref, stored.reduction if stored else 0.0, pre
 
 
@@ -305,7 +305,9 @@ def add_visa_routes(router: APIRouter, services: Callable[[], Services]) -> None
                "status": "no_choice" if ref is None else "building", "version": None, "approved": False,
                "manifest_sha256": None, "route_value": None, "instructions": [], "fees": [], "checklist": [],
                "data_sheet": [], "files": [], "funds": None, "programmes": listed,
-               "choice": {"programme_ref": stored, "reduction": reduction, "preselected": pre}}
+               "choice": {"programme_ref": stored, "reduction": reduction, "preselected": pre,
+                          "admitted": [r for r in admitted(svc.engine, svc.settings.tenant_id, plan.plan_id)
+                                       if r in plan.programmes]}}
         if ref is None:  # nothing to build yet: the funds still show what the student will need
             if cfg.funds is not None:
                 fact = svc.knowledge.route_facts(cfg.route_key, [cfg.funds.fact], plan.year).get(cfg.funds.fact)

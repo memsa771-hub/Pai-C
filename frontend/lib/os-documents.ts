@@ -22,6 +22,8 @@ export interface OsDocField {
   check: FieldCheck;
   reasons: string[];
   value_confirmed: unknown;
+  /** The plain label from the document type (Slice 9 Task 11); null: the field name is worded. */
+  label?: string | null;
 }
 
 export interface OsFindingItem {
@@ -72,7 +74,7 @@ export const ACCEPT = 'application/pdf,image/jpeg,image/png,image/webp,.jfif';
 const STATUS_LABELS: Record<DocStatus, string> = {
   uploaded: 'waiting to be read',
   reading: 'reading…',
-  read: 'read',
+  read: 'read: tap to check the values',
   needs_student: 'check the type',
   confirmed: 'confirmed ✓',
   failed: 'could not read',

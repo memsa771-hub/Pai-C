@@ -21,7 +21,7 @@ fields:
   - {name: writing, type: band, hint: "The Writing band score from the row of four band scores (Listening, Reading, Writing, Speaking); not the overall score"}
   - {name: speaking, type: band, hint: "Speaking band score"}
   - {name: overall, type: band, hint: "Overall band score"}
-  - {name: cefr, type: enum, values: [A1, A2, B1, B2, C1, C2], hint: "CEFR level if printed"}
-  - {name: trf_number, type: code, hint: "The Test Report Form number: capital letters and digits with no spaces; leave empty if you cannot read every character"}
+  - {name: cefr, label: "CEFR level", type: enum, values: [A1, A2, B1, B2, C1, C2], hint: "CEFR level if printed"}
+  - {name: trf_number, label: "Test Report Form (TRF) number", type: code, hint: "The Test Report Form number: capital letters and digits with no spaces; leave empty if you cannot read every character"}
 rules:
   - {kind: band_mean, fields: [listening, reading, writing, speaking, overall]}

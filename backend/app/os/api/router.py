@@ -89,6 +89,7 @@ from app.os.api.replan import add_replan_routes, changes_paused, student_proposa
 from app.os.knowledge.requests import RequestLimit, request_programme
 from app.os.routes import builder
 from app.os.kernel import IllegalTransition
+from app.os.kernel.revisions import NOTICE_PREFIX
 from app.os.playbooks import PlaybookError
 from app.os.workers import confirm_fact, open_confirm_tasks, supply_fact
 
@@ -177,12 +178,27 @@ def build_router(get_services: Callable[[], Services]) -> APIRouter:
         except KeyError:
             raise HTTPException(status_code=404, detail="plan not found") from None
 
+    def drop_empty_notices(svc: Services, student: str, items: list[dict]) -> list[dict]:
+        """A "Your plan was updated" item whose revision changed none of the student's steps has nothing to tell
+        them: it is done (Slice 9 Task 11, `walk:S1:plan_updated_notice_empty`). Extra work on a read: a failure
+        leaves the item listed."""
+        kept = []
+        for item in items:
+            if item["instance_key"].startswith(NOTICE_PREFIX) and not item["changes"]:
+                try:
+                    svc.kernel.complete_student_task(item["id"], student, {})
+                    continue
+                except Exception:
+                    log.exception("closing an empty plan update notice failed")
+            kept.append(item)
+        return kept
+
     @router.get("/inbox", response_model=InboxOut)
     def inbox(student: str = Depends(current_student_ref), svc: Services = Depends(services)) -> dict:
         complete_ready(svc, student)  # Slice 5: a documents task whose statements are already approved
         complete_ready_packs(svc, student)  # Slice 6a/6b: a review task whose pack or visa file is approved
         tenant = svc.settings.tenant_id
-        return {"items": inbox_items(svc.engine, tenant, student),
+        return {"items": drop_empty_notices(svc, student, inbox_items(svc.engine, tenant, student)),
                 "notes": eligibility_notes(svc.engine, tenant, student),
                 "proposals": student_proposals(svc, student), "changes_paused": changes_paused(svc, student)}
 
@@ -354,7 +370,7 @@ def build_router(get_services: Callable[[], Services]) -> APIRouter:
             raise HTTPException(status_code=409, detail=str(e)) from None
         doc = store.get(doc_id)
         enqueue_document(svc.dbos_client(), tenant, doc)  # if this is lost, the daily documents_retry sends it
-        return document_out(store, doc, [])
+        return document_out(store, doc, [], svc.document_types)
 
     @router.get("/documents", response_model=DocumentsOut)
     def documents(student: str = Depends(current_student_ref), svc: Services = Depends(services)) -> dict:
@@ -374,7 +390,7 @@ def build_router(get_services: Callable[[], Services]) -> APIRouter:
         _notify(svc.plans, student)  # Slice 4: a note if a programme's eligibility changed
         store = DocumentStore(svc.engine, tenant)
         findings = [finding_out(f) for f in FindingStore(svc.engine, tenant).list_open(student)]
-        return document_out(store, store.get(doc_id), findings)
+        return document_out(store, store.get(doc_id), findings, svc.document_types)
 
     @router.post("/documents/findings/{finding_id}/resolve", response_model=FindingOut)
     def resolve(finding_id: int, body: ResolveIn, student: str = Depends(current_student_ref_for_write),
@@ -479,9 +495,11 @@ def build_router(get_services: Callable[[], Services]) -> APIRouter:
         store = ArtifactStore(svc.engine, tenant)
         plan = self_serve.student_plan(svc.plans, student)
         cfg = plan and svc.statement_configs.get(plan.route_key)
+        store_p = ProgrammeStore(svc.engine, tenant)
         programmes = [] if cfg is None else [  # each plan programme's rules: does it ask for its own statement?
-            {"programme_ref": ref, **asdict(resolve_rules(svc.engine, tenant, svc.knowledge, student, ref, plan.year,
-                                                          cfg, "sop"))} for ref in plan.programmes]
+            {"programme_ref": ref, "name": p.name if p else None, "university": p.university if p else None,
+             **asdict(resolve_rules(svc.engine, tenant, svc.knowledge, student, ref, plan.year, cfg, "sop"))}
+            for ref in plan.programmes for p in [store_p.get(ref)]]
         return {"statements": [statement_out(store, a) for a in store.list_for(student, STATEMENT_KINDS)],
                 "programmes": programmes}
 

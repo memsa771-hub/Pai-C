@@ -2,6 +2,7 @@
 
 import { use, useEffect, useState } from 'react';
 import { notFound } from 'next/navigation';
+import { OsHeader } from '@/components/os/os-header';
 import { ProgrammeFacts } from '@/components/os/programme-facts';
 import { workspaceApi } from '@/lib/api';
 import { OS_UI_ENABLED } from '@/lib/config';
@@ -34,7 +35,7 @@ export default function OsProgrammesPage({ params }: { params: Promise<{ workspa
 
   return (
     <main className="mx-auto w-full max-w-md px-4 py-6">
-      <h1 className="mb-4 text-lg font-semibold">Your programmes</h1>
+      <OsHeader workspaceId={workspaceId} current="os-programmes" title="Your programmes" />
       {error && <p role="alert" className="mb-3 text-sm text-destructive">{error}</p>}
       {programmes === null ? (
         <p className="text-sm text-muted-foreground">Loading…</p>

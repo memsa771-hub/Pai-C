@@ -48,7 +48,7 @@ describe('document helpers', () => {
   it('labels every status', () => {
     expect(docStatusLabel(doc({ status: 'uploaded' }))).toBe('waiting to be read');
     expect(docStatusLabel(doc({ status: 'reading' }))).toBe('reading…');
-    expect(docStatusLabel(doc({ status: 'read' }))).toBe('read');
+    expect(docStatusLabel(doc({ status: 'read' }))).toBe('read: tap to check the values');
     expect(docStatusLabel(doc({ status: 'needs_student' }))).toBe('check the type');
     expect(docStatusLabel(doc({ status: 'confirmed' }))).toBe('confirmed ✓');
     expect(docStatusLabel(doc({ status: 'failed' }))).toBe('could not read');
@@ -192,5 +192,26 @@ describe('uploadOsDocument', () => {
     workspaceApi.configure('ws-1', '', 'bearer-x');
     const file = new File([new Uint8Array([1])], 'a.jpg');
     await expect(workspaceApi.uploadOsDocument(file, 'passport')).rejects.toThrow('this file is already uploaded');
+  });
+});
+
+// Slice 9 Task 11 (`walk:S1:documents_read_needs_tap`): a read document says to tap it and check the values; a
+// technical field name has a plain label from its document type.
+describe('a read document asks to be checked', () => {
+  it('says to tap a read document to check its values', () => {
+    expect(docStatusLabel(doc({ status: 'read' }))).toBe('read: tap to check the values');
+    expect(list({ documents: [doc({ status: 'read' })] })).toContain('read: tap to check the values');
+    expect(list({ documents: [doc({ status: 'confirmed' })] })).not.toContain('tap to check');
+  });
+
+  it('shows the plain label from the API, else a worded field name', () => {
+    const html = renderToStaticMarkup(
+      <DocumentConfirm document={doc({ fields: [
+        field({ field: 'mrz_line1', label: 'Code line 1 (bottom of the page)', value_read: 'P<XXX' }),
+        field({ field: 'given_names', label: null }),
+      ] })} onConfirm={() => {}} />);
+    expect(html).toContain('Code line 1 (bottom of the page)');
+    expect(html).not.toContain('Mrz line1');
+    expect(html).toContain('Given names');
   });
 });

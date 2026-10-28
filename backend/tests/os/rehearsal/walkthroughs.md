@@ -50,10 +50,10 @@ what happened, and a severity (`blocks` | `workaround` | `wording`). One screens
 | 5 | Check what was read, document by document; "Confirm all" | `os-documents` | |
 | 6 | Answer the interview (`students.yaml` `interview`) | `os-statements` | |
 | 7 | "Write my statement", "Write my CV"; open each draft, read it, "Approve this version" | `os-statements` | tick |
-| 8 | Upload the blocked account and insurance pages; confirm them. In the inbox tap "Done" on the steps the student has done (tests, attestation, certificates, blocked account, insurance) | `os-documents`, `os-inbox` | |
+| 8 | Upload the blocked account and insurance pages; confirm them. In the inbox tap "Mark as done" on the steps the student has done (tests, attestation, certificates, blocked account, insurance) | `os-documents`, `os-inbox` | |
 | 9 | Each pack: "A few more details" (contact details from `students.yaml`), tick the checklist items, "Approve pack" | `os-pack` | tick |
-| 10 | Ready to submit: each programme's submit step waits. Tap "Done" ("I submitted it") | `os-inbox` | tick 2 days |
-| 11 | Admission results as `students.yaml` says | `os-inbox` | tick |
+| 10 | Ready to submit: each programme's submit step waits. Tap "Mark as done" ("I submitted it") | `os-inbox` | tick 2 days |
+| 11 | Admission results as `students.yaml` says ("Not admitted" asks again, naming the programme: confirm it) | `os-inbox` | tick |
 | 12 | Read a suggestion and accept it; read "What changed" | `os-inbox` | tick |
 | 13 | Upload and confirm the admission letter; the visa file: choose the programme, details, ticks, "Approve visa file" | `os-documents`, `os-visa` | tick |
 | 14 | Visa file ready: `visa_apply` waits in the inbox. If it does not, and the plan waits on `visa_target_date`, supply it as the admin (`POST /v1/os/facts`, as the driver does) and log it | `os-inbox` | tick |

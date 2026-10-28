@@ -2,6 +2,7 @@
 
 import { use, useCallback, useEffect, useState } from 'react';
 import { notFound } from 'next/navigation';
+import { OsHeader } from '@/components/os/os-header';
 import { ChangesList } from '@/components/os/changes-list';
 import { InboxList } from '@/components/os/inbox-list';
 import { PausedBanner, ProposalCard } from '@/components/os/proposal-card';
@@ -34,7 +35,9 @@ export default function OsInboxPage({ params }: { params: Promise<{ workspaceId:
       setError('Could not load your next steps. Please try again.');
     }
     try {  // Slice 7: suggested changes and what changed (extra: the inbox works without them)
-      setChanges(await workspaceApi.getOsChanges());
+      const got = await workspaceApi.getOsChanges();
+      setChanges(got);
+      setNames((n) => ({ ...(got.names ?? {}), ...n }));  // a removed programme keeps its name in "What changed"
     } catch {
       setChanges(null);
     }
@@ -127,7 +130,7 @@ export default function OsInboxPage({ params }: { params: Promise<{ workspaceId:
 
   return (
     <main className="mx-auto w-full max-w-md px-4 py-6">
-      <h1 className="mb-4 text-lg font-semibold">Your next steps</h1>
+      <OsHeader workspaceId={workspaceId} current="os-inbox" title="Your next steps" />
       {error && <p role="alert" className="mb-3 break-words text-sm text-destructive">{error}</p>}
       {changes?.changes_paused && <PausedBanner />}
       {changes && changes.pending.length > 0 && (

@@ -40,6 +40,8 @@ export interface OsChanges {
   changes: OsChange[];
   pending: OsProposal[];
   changes_paused: boolean;
+  /** Programme ref -> name for every programme the plan had, removed ones too (Slice 9 Task 11). */
+  names?: Record<string, string>;
 }
 
 export interface OsSupportCase {

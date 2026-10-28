@@ -2,6 +2,7 @@
 
 import { use, useCallback, useEffect, useState } from 'react';
 import { notFound } from 'next/navigation';
+import { OsHeader } from '@/components/os/os-header';
 import { ConsentCard } from '@/components/os/consent-card';
 import { DocumentConfirm } from '@/components/os/document-confirm';
 import { DocumentList } from '@/components/os/documents';
@@ -104,9 +105,8 @@ export default function OsDocumentsPage({ params }: { params: Promise<{ workspac
 
   return (
     <main className="mx-auto w-full max-w-md px-4 py-6">
-      <h1 className="mb-4 text-lg font-semibold">
-        {open && data ? `Check what we read: ${typeLabel(open.doc_type, data.doc_types)}` : 'Your documents'}
-      </h1>
+      <OsHeader workspaceId={workspaceId} current="os-documents"
+                title={open && data ? `Check what we read: ${typeLabel(open.doc_type, data.doc_types)}` : 'Your documents'} />
       {error && <p role="alert" className="mb-3 break-words text-sm text-destructive">{error}</p>}
       {consent && !consent.agreed && !open && (
         <div className="mb-4">

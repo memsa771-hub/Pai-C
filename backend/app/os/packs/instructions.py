@@ -43,12 +43,24 @@ def _url(inp: PackInputs, source: str) -> str | None:
     return str(c.citations[0].url) if c is not None and c.citations else None
 
 
-def instructions(inp: PackInputs, programme_ref: str) -> tuple[str | None, list[InstructionStep]]:
-    """(the application route used, its steps). Without a confirmed route there is one step saying so."""
+def _not_confirmed_text(kind: str, name: str | None, university: str | None) -> str:
+    """The one step shown while the programme's application route is not confirmed, naming the programme and its
+    university when they are known (Slice 9 Task 11, `walk:S1:visa_how_to_apply_programme_text`)."""
+    programme = f"{name} at {university}" if name and university else name or university or "this programme"
+    ask = university or "the university"
+    if kind == "visa":
+        return (f"Your visa steps depend on how you apply to {programme}, and that is {NOT_CONFIRMED}: check the "
+                f"programme's page, or ask {ask}.")
+    return f"How to apply to {programme} is {NOT_CONFIRMED}: check the programme's page, or ask {ask}."
+
+
+def instructions(inp: PackInputs, programme_ref: str, name: str | None = None,
+                 university: str | None = None) -> tuple[str | None, list[InstructionStep]]:
+    """(the application route used, its steps). Without a confirmed route there is one step saying so, naming the
+    programme (`name`) and its university when given."""
     route = _confirmed(inp, "application_route")
     if route is None or route.value not in inp.cfg.instructions:
-        text = (f"How to apply to this programme is {NOT_CONFIRMED}: check the programme's page, "
-                "or ask the university.")
+        text = _not_confirmed_text(inp.kind, name, university)
         return None, [InstructionStep(1, text, _url(inp, "fact:application_route"), ["application_route"])]
     steps = []
     for n, step in enumerate(inp.cfg.instructions[route.value], 1):
