@@ -1,0 +1,152 @@
+# The 12 fictional rehearsal students (Slice 9a spec §2.4). Test data only (invariant 12 covers app/os, not tests).
+#
+# programmes: 2-3 of the seeded Germany programmes that have the facts an application step needs (deadline and route).
+# bundle: a Spike 2 sample bundle (tests/os/fixtures/documents/samples, b1..b5): the student's passport, degree,
+#   transcript, SSC, HSSC and English test. Bundles 3 and 4 carry planted mistakes (a different father's name on the
+#   transcript; a swapped date of birth on the HSSC certificate): S2 and S4 use them and `resolve` gives the right value.
+#   The other students use the consistent bundles 1 and 5. The driver makes the four documents the samples lack
+#   (minimum passing grade letter, admission letter, blocked account, insurance) from the bundle's own name.
+# answers: the interview, the admission result per programme, the programme the visa file is for, the contact details
+#   the student types into the pack and visa file, and how they resolve a mismatch.
+# event: S3 rejected, S5 missing_document, S7 late, S9 approved_changed, S11 ignore_big, the others none.
+#   S3 and S11 are both "Not admitted" by one programme: S3 accepts the suggestion that follows, S11 ignores it.
+#   S5 holds back its minimum passing grade letter (`withhold`) until a support case is opened for its plan.
+#   S7 does nothing on its inbox until a deadline is at risk and the plan asks for the step.
+#   S9 changes its approved SOP once every pack is approved, so the packs change after approval.
+
+common:
+  interview: &interview
+    field_why: "Building a small weather station in school started my interest in how software meets hardware."
+    key_project: "In my final project I wrote the firmware for a low-power sensor board and cut its power use by half."
+    skills: "C and Python from my courses, used in the sensor project; teamwork from leading a lab group of four."
+    achievement: "My final-year project was graded among the best of my class."
+    why_now: "I finished my bachelor's degree and want to deepen it before I start full-time work."
+    why_country: "The programmes combine strong teaching with close links to industry and applied research."
+    goal: "I want to work as an engineer on embedded or intelligent systems."
+    challenge: "When our project board failed a week before the deadline, I rebuilt the test plan and we finished on time."
+
+students:
+  S1:
+    programmes: [ovgu-eeit, tu-chemnitz-embedded-systems]
+    bundle: 1
+    event: none
+    answers:
+      interview: {<<: *interview, goal: "I want to design control software for energy systems."}
+      admission: {ovgu-eeit: admitted, tu-chemnitz-embedded-systems: admitted}
+      visa_programme: ovgu-eeit
+      details: {email: s1@example.invalid, phone: "+00 100 0000001", address_line: "1 Sample Street", city: Exampleton,
+                postcode: "10001", country_of_residence: Sampleland}
+  S2:
+    programmes: [tu-chemnitz-embedded-systems, btu-artificial-intelligence]
+    bundle: 3
+    event: none
+    answers:
+      interview: {<<: *interview, key_project: "I built a small robot arm controller and documented every test."}
+      admission: {tu-chemnitz-embedded-systems: admitted, btu-artificial-intelligence: admitted}
+      visa_programme: tu-chemnitz-embedded-systems
+      resolve: {father_name: Javed Iqbal}
+      details: {email: s2@example.invalid, phone: "+00 100 0000002", address_line: "2 Sample Street", city: Exampleton,
+                postcode: "10002", country_of_residence: Sampleland}
+  S3:
+    programmes: [ovgu-eeit, btu-artificial-intelligence]
+    bundle: 5
+    event: rejected
+    answers:
+      interview: {<<: *interview, field_why: "A course on machine learning showed me how data can guide decisions."}
+      admission: {ovgu-eeit: admitted, btu-artificial-intelligence: rejected}
+      visa_programme: ovgu-eeit
+      details: {email: s3@example.invalid, phone: "+00 100 0000003", address_line: "3 Sample Street", city: Exampleton,
+                postcode: "10003", country_of_residence: Sampleland}
+  S4:
+    programmes: [btu-artificial-intelligence, ovgu-eeit]
+    bundle: 4
+    event: none
+    answers:
+      interview: {<<: *interview, challenge: "I retook a difficult course and passed it with a better grade."}
+      admission: {btu-artificial-intelligence: admitted, ovgu-eeit: admitted}
+      visa_programme: btu-artificial-intelligence
+      resolve: {date_of_birth: "1999-07-03"}
+      details: {email: s4@example.invalid, phone: "+00 100 0000004", address_line: "4 Sample Street", city: Exampleton,
+                postcode: "10004", country_of_residence: Sampleland}
+  S5:
+    programmes: [ovgu-eeit, tu-chemnitz-embedded-systems]
+    bundle: 1
+    event: missing_document
+    answers:
+      interview: {<<: *interview, why_now: "Two years of work showed me which skills I still need."}
+      admission: {ovgu-eeit: admitted, tu-chemnitz-embedded-systems: admitted}
+      visa_programme: tu-chemnitz-embedded-systems
+      withhold: min_passing_grade_letter
+      details: {email: s5@example.invalid, phone: "+00 100 0000005", address_line: "5 Sample Street", city: Exampleton,
+                postcode: "10005", country_of_residence: Sampleland}
+  S6:
+    programmes: [tu-chemnitz-embedded-systems, ovgu-eeit, btu-artificial-intelligence]
+    bundle: 5
+    event: none
+    answers:
+      interview: {<<: *interview, skills: "Signal processing in MATLAB, used in a course project on audio filters."}
+      admission: {tu-chemnitz-embedded-systems: admitted, ovgu-eeit: admitted, btu-artificial-intelligence: admitted}
+      visa_programme: ovgu-eeit
+      details: {email: s6@example.invalid, phone: "+00 100 0000006", address_line: "6 Sample Street", city: Exampleton,
+                postcode: "10006", country_of_residence: Sampleland}
+  S7:
+    programmes: [btu-artificial-intelligence, tu-chemnitz-embedded-systems]
+    bundle: 1
+    event: late
+    answers:
+      interview: {<<: *interview, achievement: "I won the department's prize for the best project poster."}
+      admission: {btu-artificial-intelligence: admitted, tu-chemnitz-embedded-systems: admitted}
+      visa_programme: btu-artificial-intelligence
+      details: {email: s7@example.invalid, phone: "+00 100 0000007", address_line: "7 Sample Street", city: Exampleton,
+                postcode: "10007", country_of_residence: Sampleland}
+  S8:
+    programmes: [ovgu-eeit, btu-artificial-intelligence]
+    bundle: 5
+    event: none
+    answers:
+      interview: {<<: *interview, goal: "I want to build reliable software for medical devices."}
+      admission: {ovgu-eeit: admitted, btu-artificial-intelligence: admitted}
+      visa_programme: btu-artificial-intelligence
+      details: {email: s8@example.invalid, phone: "+00 100 0000008", address_line: "8 Sample Street", city: Exampleton,
+                postcode: "10008", country_of_residence: Sampleland}
+  S9:
+    programmes: [tu-chemnitz-embedded-systems, ovgu-eeit]
+    bundle: 1
+    event: approved_changed
+    answers:
+      interview: {<<: *interview, key_project: "I wrote a scheduler for a small real-time operating system."}
+      admission: {tu-chemnitz-embedded-systems: admitted, ovgu-eeit: admitted}
+      visa_programme: tu-chemnitz-embedded-systems
+      sop_addition: "I have since finished a short course on real-time systems."
+      details: {email: s9@example.invalid, phone: "+00 100 0000009", address_line: "9 Sample Street", city: Exampleton,
+                postcode: "10009", country_of_residence: Sampleland}
+  S10:
+    programmes: [btu-artificial-intelligence, ovgu-eeit, tu-chemnitz-embedded-systems]
+    bundle: 5
+    event: none
+    answers:
+      interview: {<<: *interview, why_country: "Teaching in English with research groups I can join as a student."}
+      admission: {btu-artificial-intelligence: admitted, ovgu-eeit: admitted, tu-chemnitz-embedded-systems: admitted}
+      visa_programme: btu-artificial-intelligence
+      details: {email: s10@example.invalid, phone: "+00 100 0000010", address_line: "10 Sample Street", city: Exampleton,
+                postcode: "10010", country_of_residence: Sampleland}
+  S11:
+    programmes: [ovgu-eeit, tu-chemnitz-embedded-systems]
+    bundle: 1
+    event: ignore_big
+    answers:
+      interview: {<<: *interview, challenge: "I balanced a part-time job with my final year and kept my grades up."}
+      admission: {ovgu-eeit: rejected, tu-chemnitz-embedded-systems: admitted}
+      visa_programme: tu-chemnitz-embedded-systems
+      details: {email: s11@example.invalid, phone: "+00 100 0000011", address_line: "11 Sample Street", city: Exampleton,
+                postcode: "10011", country_of_residence: Sampleland}
+  S12:
+    programmes: [tu-chemnitz-embedded-systems, btu-artificial-intelligence]
+    bundle: 5
+    event: none
+    answers:
+      interview: {<<: *interview, field_why: "Repairing phones as a teenager made me curious about embedded design."}
+      admission: {tu-chemnitz-embedded-systems: admitted, btu-artificial-intelligence: admitted}
+      visa_programme: btu-artificial-intelligence
+      details: {email: s12@example.invalid, phone: "+00 100 0000012", address_line: "12 Sample Street", city: Exampleton,
+                postcode: "10012", country_of_residence: Sampleland}
