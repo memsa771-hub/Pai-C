@@ -8,6 +8,8 @@ export type InboxKind = 'provide' | 'approve' | 'act' | 'choose';
 export interface OsCitation {
   source: string;
   url: string;
+  /** A derived date's plain explanation, e.g. "6 weeks before your semester starts on 1 October 2027" (Task 11). */
+  note?: string;
 }
 
 export interface OsInboxItem {
@@ -31,6 +33,8 @@ export interface OsInboxItem {
   university?: string | null;
   /** A "Your plan was updated" item: the student's steps it added, removed, changed or kept. */
   changes?: OsPlanChange[];
+  /** A step blocked on a fact nobody has given yet (state "blocked"): what it waits for, in the playbook's words. */
+  waiting_for?: string | null;
 }
 
 export interface OsPlanChange {
@@ -132,7 +136,7 @@ const CHANGE_WORDS: Record<OsPlanChange['change'], string> = {
   added: 'New step',
   removed: 'Removed',
   changed: 'Updated',
-  kept: 'Kept (already started)',
+  kept: 'Kept',
 };
 
 /** One line of a plan update: 'Removed: Apply (MSc Example)'. */
@@ -168,4 +172,21 @@ export function completeActions(item: OsInboxItem, names: Record<string, string>
 export function actionHint(item: OsInboxItem): string | null {
   if (item.inbox_kind === 'provide') return 'Uploading alone does not close this step: tap Mark as done when it is all done.';
   return null;
+}
+
+/** A step listed only to say what the plan waits for (Slice 9 Task 11, walk:S1:nothing_to_do_while_blocked): nothing
+ * can be done on it. */
+export function isWaiting(item: OsInboxItem): boolean {
+  return item.state === 'blocked';
+}
+
+/** What a waiting step waits for: the playbook's words, else a plain general line. */
+export function waitingText(item: OsInboxItem): string {
+  return item.waiting_for ?? 'Waiting for a date we are still checking';
+}
+
+/** How a derived date follows from its source (the first citation with a note), e.g. "6 weeks before your semester
+ * starts on 1 October 2027"; null when the date is not derived. */
+export function dueNote(item: OsInboxItem): string | null {
+  return item.citations.find((c) => c.note)?.note ?? null;
 }

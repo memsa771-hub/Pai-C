@@ -15,7 +15,7 @@ use a real document. Screenshots and the failure log go outside the repo (`~/s9-
    `NEXT_PUBLIC_OS_ENABLED=true`. Add on the API and on the worker: `OS_REHEARSAL=on`, `OS_MODEL_MODE=offline`,
    `OS_OFFLINE_ANSWERS_DIR` (a temporary folder made the way the driver makes it: `build_answers` with the student's
    extra pages), `OS_ADMIN_TOKEN` (any fictional value), `OS_EMAIL_SENDER=log`, `OS_DATABASE_URL`.
-2. Load the programme registry and the seeded facts into the database (as the driver's `_clean` does).
+2. Load the programme registry, the seeded facts and the fictional semester starts (`semester_starts.yaml`) into the database (as the driver's `_clean` does).
 3. Start the worker: `python -m app.os.runner.worker` from `backend/`, same environment.
 4. Set the clock to 1 Dec 2026, once, on the clean database: `POST /v1/os/admin/rehearsal/start {"date": "2026-12-01"}` (works before or after the real 1 Dec; 409 if the clock was already set or moved).
 5. Sign in with the fake token (step 5 of "Walkthrough sign-in"). The entry point gives one fixed student, so the
@@ -56,7 +56,7 @@ what happened, and a severity (`blocks` | `workaround` | `wording`). One screens
 | 11 | Admission results as `students.yaml` says ("Not admitted" asks again, naming the programme: confirm it) | `os-inbox` | tick |
 | 12 | Read a suggestion and accept it; read "What changed" | `os-inbox` | tick |
 | 13 | Upload and confirm the admission letter; the visa file: choose the programme, details, ticks, "Approve visa file" | `os-documents`, `os-visa` | tick |
-| 14 | Visa file ready: `visa_apply` waits in the inbox. If it does not, and the plan waits on `visa_target_date`, supply it as the admin (`POST /v1/os/facts`, as the driver does) and log it | `os-inbox` | tick |
+| 14 | Visa file ready: `visa_apply` waits in the inbox, its date "6 weeks before your semester starts on ..." (the visa programme's `semester_start`; load `semester_starts.yaml` with the seed, as the driver does). If it is still under "Waiting", log it | `os-inbox` | tick |
 
 ## Per student
 

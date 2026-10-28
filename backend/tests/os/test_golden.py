@@ -76,8 +76,11 @@ def test_golden_dates_follow_the_rules(engine, clean):
     assert apply["provisional"] and apply["estimated"] and apply["due_tz"] == "Europe/Berlin"
     # The seeded route is uni_assist (unconfirmed): direct_apply is dropped, and the route fact gets checked.
     assert "direct_apply@ovgu-eeit" not in tasks and "confirm_fact@ovgu-eeit:application_route" in tasks
-    assert tasks["visa_apply"]["state"] == "blocked" and tasks["visa_apply"]["blocked_reason"] == "fact_missing:visa_target_date"
-    assert "confirm_fact@germany_master:visa_target_date" in tasks
+    # Slice 9 Task 11 (F1): the visa date is derived from a semester start; none is seeded, so every programme's is
+    # looked for and the visa step waits for it. There is no route-level visa_target_date check any more.
+    assert tasks["visa_apply"]["state"] == "blocked" and tasks["visa_apply"]["blocked_reason"] == "fact_missing:semester_start"
+    assert {f"confirm_fact@{p.programme_ref}:semester_start" for p in TEST_STUDENT.programmes} <= set(tasks)
+    assert not any("visa_target_date" in k for k in tasks)
     assert tasks["choose_programmes"]["state"] == "waiting_student"
     from_facts = {"admission_test", "application_documents", "review_pack", "admission_result"}  # cite the programme's fact
     assert all(t["citations"] for k, t in tasks.items()

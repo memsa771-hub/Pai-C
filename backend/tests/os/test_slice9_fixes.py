@@ -515,3 +515,98 @@ def test_visa_with_two_admissions_asks_first(engine, clean, os_db):
         assert body["programme_ref"] == va.PROG and body["status"] != "no_choice"
     finally:
         next(gen, None)
+
+
+# ---- batch C: F1, the visa date from the semester start ------------------------------------------------------------
+
+VISA_NOTE = "6 weeks before your semester starts on {}"
+WAITING = "Waiting for your programme's semester start date"
+
+
+def _semester_start(svc, ref: str, day: str) -> None:
+    """A fictional semester start, as research or an admin would store it (confirmed, with its page and quote)."""
+    from app.os.knowledge import SqlKnowledge
+    from app.os.workers.manual import supply_fact
+
+    supply_fact(svc.plans, SqlKnowledge(svc.engine, "pai"), svc.kernel, scope="programme", ref=ref,
+                field="semester_start", intake_year=2027, value={"date": day},
+                quote=f"Lectures start on {day}", url=f"https://uni.example/{ref}/dates", status="confirmed")
+
+
+def _visa_step(engine, plan_id: int):
+    with engine.connect() as conn:
+        return conn.execute(select(T).where(T.c.plan_id == plan_id, T.c.instance_key == "visa_apply")).one()
+
+
+def _visa_due(day: str) -> datetime:
+    from app.os.compiler import end_of_day
+
+    return end_of_day(date.fromisoformat(day), "Europe/Berlin") - timedelta(days=42)
+
+
+def test_visa_date_follows_the_visa_programme(engine, clean, os_db):
+    """F1 (`fact_missing:visa_target_date`): the visa step's date is 6 weeks before the semester start of the
+    programme the visa file is for, cites that programme's page with a plain note, and moves when that programme
+    changes: before any admission the earliest start (provisional), then the one admitted programme, then, with two
+    admissions, the one the student chooses."""
+    from tests.os import test_api_visa as va
+
+    gen = va.api.__wrapped__(engine, clean, os_db)
+    web = next(gen)
+    try:
+        uni_one, uni_two, uni_three = va.OTHER_PROG, va.PROG, "btu-artificial-intelligence"
+        for ref, day in ((uni_one, "2027-10-01"), (uni_two, "2027-10-15"), (uni_three, "2027-09-15")):
+            _semester_start(web.svc, ref, day)
+        step = _visa_step(engine, web.plan_id)
+        assert step.blocked_reason is None and step.provisional
+        assert step.due_at == _visa_due("2027-09-15")
+        with engine.begin() as conn:  # the admission step waits for the student (the kernel's write, simulated)
+            tid = conn.execute(select(T.c.id).where(T.c.plan_id == web.plan_id,
+                                                    T.c.instance_key == f"admission_result@{uni_one}")).scalar_one()
+            conn.execute(T.update().where(T.c.id == tid).values(state="waiting_student"))
+        r = web.post(f"/v1/os/inbox/{tid}/complete", headers=va.ME, json={"payload": {"choice": "admitted"}})
+        assert r.status_code == 200, r.text
+        step = _visa_step(engine, web.plan_id)
+        assert step.due_at == _visa_due("2027-10-01") and not step.provisional
+        assert step.citations[0] == {"source": "fact:semester_start", "url": f"https://uni.example/{uni_one}/dates",
+                                     "note": VISA_NOTE.format("1 October 2027")}
+        assert ["programme", uni_one, "semester_start"] in step.fact_refs
+        va.admitted(web, uni_two)  # a second admission: the student chooses which one the visa is for
+        assert web.put(f"{va.V}/choice", headers=va.ME, json={"programme_ref": uni_two}).status_code == 200
+        step = _visa_step(engine, web.plan_id)
+        assert step.due_at == _visa_due("2027-10-15")
+        assert step.citations[0]["note"] == VISA_NOTE.format("15 October 2027")
+    finally:
+        next(gen, None)
+
+
+def test_inbox_says_what_a_blocked_step_waits_for(api):
+    """`walk:S1:nothing_to_do_while_blocked`: the visa step blocked on its semester start is listed (state
+    `blocked`, nothing to tap) with what it waits for, in the playbook's words, instead of an empty inbox."""
+    step = _visa_step(api.engine, api.plan_id)
+    assert (step.state, step.blocked_reason) == ("blocked", "fact_missing:semester_start")
+    items = api.get("/v1/os/inbox", headers=ME).json()["items"]
+    [visa] = [i for i in items if i["instance_key"] == "visa_apply"]
+    assert visa["state"] == "blocked" and visa["waiting_for"] == WAITING
+    assert all(i["state"] in ("waiting_student", "blocked") for i in items)
+    assert all(i["waiting_for"] is None for i in items if i["state"] == "waiting_student")
+    assert api.post(f"/v1/os/inbox/{visa['id']}/complete", headers=ME, json={"payload": {}}).status_code == 409
+
+
+def test_closed_notice_keeps_its_revision(api):
+    """Review follow-up (batch B): an empty plan-update notice is closed with a result that keeps its revision and
+    cause, so the link to the revision is not lost."""
+    with api.engine.begin() as conn:
+        conn.execute(insert(models.plan_revisions).values(tenant_id="pai", plan_id=api.plan_id, number=91,
+                                                          cause="fact:y", diff={"added": [], "removed": [],
+                                                                                "changed": []}))
+        nid = conn.execute(insert(T).values(
+            tenant_id="pai", plan_id=api.plan_id, instance_key=f"{NOTICE}r91", template_key="plan_updated",
+            task_type="student.act", kind="student", inbox_kind="act", title="Your plan was updated",
+            state="waiting_student", due_tz="UTC", playbook_version=1, result={"revision": 91, "cause": "fact:y"})
+        ).inserted_primary_key[0]
+    api.get("/v1/os/inbox", headers=ME)
+    with api.engine.connect() as conn:
+        row = conn.execute(select(T.c.state, T.c.result).where(T.c.id == nid)).one()
+    assert row.state == "done"
+    assert row.result == {"closed": "no_student_changes", "revision": 91, "cause": "fact:y"}

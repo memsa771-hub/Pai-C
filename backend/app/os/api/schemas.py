@@ -28,6 +28,7 @@ class TaskOut(BaseModel):
     programme_name: str | None = None  # the inbox: the programme's name and university (Slice 9 Task 11)
     university: str | None = None
     changes: list[dict] = []  # a "Your plan was updated" item: the student's steps it added, removed or changed
+    waiting_for: str | None = None  # a blocked step listed in the inbox: what it waits for (Slice 9 Task 11)
 
 
 class PlanOut(BaseModel):

@@ -27,8 +27,10 @@ route:
     url: "https://www.uni-assist.de/en/how-to-apply/apply-online/pay-submit/"
     checked_at: 2026-10-17
     status: unconfirmed
-  # visa_target_date is deliberately absent: no official source gives it, so the compiler blocks
-  # visa_apply and creates a confirm_fact task (Spike 5 C5, the biggest open risk).
+  # There is no visa_target_date fact (Slice 9 Task 11, F1): no official source gives one. The playbook derives the
+  # visa step's date from the visa programme's semester_start (a programme fact research looks up, with its page),
+  # 6 weeks before it (the visa_before_semester_days constant). No semester_start is seeded here: until research
+  # finds it for a programme, visa_apply waits for it and the student is told so (Spike 5 C5).
 
 programmes:
   tu-chemnitz-embedded-systems:

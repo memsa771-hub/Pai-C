@@ -5,27 +5,16 @@ one document until a support case is opened. Each must reach both end points (re
 scripted event must give its change, and the failure log must be empty. The full 12 and the kill run are run by hand
 (`python -m tests.os.rehearsal.run`). Fictional data only.
 
-Strict xfail (plan ruling 4): the run finds a product failure, named in KNOWN and in the reason. Only exactly that set
-raises KnownProductFailures, the one exception the mark expects: a failed end point or event, or a new failure fails
-the suite as usual, and so does a pass (XPASS, strict) once it is fixed or accepted, so the mark is then removed and
-KNOWN emptied. Task 11 batch A fixed `left_open:S3:removed_programme`; `fact_missing:visa_target_date` (F1) is with the
-owners."""
-
-import pytest
+No xfail (Task 11): batch A fixed `left_open:S3:removed_programme`, and batch C fixed `fact_missing:visa_target_date`
+(F1: the visa date is derived from the visa programme's semester start; the rehearsal loads fictional semester starts as
+test data). Any failure in the log fails the test."""
 
 from tests.os.rehearsal.driver import Rehearsal
 from tests.os.rehearsal.failures import FailureLog
 
 STUDENTS = ["S1", "S3", "S5"]
-KNOWN = {"fact_missing:visa_target_date"}  # F1: with the owners (Task 11)
 
 
-class KnownProductFailures(AssertionError):
-    pass
-
-
-@pytest.mark.xfail(strict=True, raises=KnownProductFailures,
-                   reason="product failure fact_missing:visa_target_date (F1, with the owners)")
 def test_rehearsal_short(os_db, tmp_path):
     report = Rehearsal(STUDENTS, tmp_path / "run").run()
     failures = FailureLog(tmp_path / "run" / "failures.yaml").entries()
@@ -38,8 +27,5 @@ def test_rehearsal_short(os_db, tmp_path):
     assert "missing_document:ok" in report.students["S5"].events  # reminders, an ask, then a support case
     assert (tmp_path / "run" / "report.json").is_file() and (tmp_path / "run" / "report.md").is_file()
 
-    ids = {f.id for f in failures}
-    assert ids in (set(), KNOWN), sorted(ids)  # a new failure fails the suite
-    if ids:
-        raise KnownProductFailures([f"{f.id}: {f.got}" for f in failures])
+    assert [f"{f.id}: {f.got}" for f in failures] == []
     assert report.failures == {}

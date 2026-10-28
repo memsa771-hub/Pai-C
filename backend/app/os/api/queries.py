@@ -1,6 +1,7 @@
 """PlanQuery and Knowledge reads (reads are allowed outside the kernel; only writes are kernel-only)."""
 
 import re
+from collections.abc import Mapping
 
 from sqlalchemy import Engine, select
 
@@ -117,6 +118,33 @@ def inbox_items(engine: Engine, tenant_id: str, student_ref: str) -> list[dict]:
         return [{**task_out(r), "programme_name": r.programme_name, "university": r.university,
                  "changes": notice_changes(conn, tenant_id, r.plan_id, r.result) if r.instance_key.startswith(NOTICE_PREFIX)
                  else []} for r in rows]
+
+
+def waiting_items(engine: Engine, tenant_id: str, student_ref: str, books: Mapping) -> list[dict]:
+    """The student's steps that wait for a fact nobody has given yet (blocked `fact_missing:<field>`), each with what
+    it waits for in its pinned playbook's words (`anchor.waiting`; None if the playbook has none). Listed after the
+    inbox items so the student is told what the plan is waiting for, never "nothing to do" (Slice 9 Task 11,
+    `walk:S1:nothing_to_do_while_blocked`). Nothing can be done on them: completing one is refused."""
+    pins = models.playbook_pins
+    with engine.connect() as conn:
+        rows = conn.execute(select(T, G.c.name.label("programme_name"), G.c.university.label("university"),
+                                   pins.c.playbook_key, pins.c.version.label("pinned_version"))
+                            .join(P, P.c.id == T.c.plan_id)
+                            .join(pins, pins.c.plan_id == T.c.plan_id)
+                            .outerjoin(G, (G.c.tenant_id == T.c.tenant_id) & (G.c.ref == T.c.programme_ref))
+                            .where(T.c.tenant_id == tenant_id, P.c.student_ref == student_ref, T.c.kind == "student",
+                                   P.c.status.in_(PLAN_OPEN), T.c.state == "blocked",
+                                   T.c.blocked_reason.like("fact_missing:%"))
+                            .order_by(T.c.id)).all()
+    out = []
+    for r in rows:
+        book = books.get((r.playbook_key, r.pinned_version))
+        tmpl = next((t for t in book.tasks if t.template_key == r.template_key), None) if book else None
+        anchor = tmpl.anchor if tmpl else None
+        said = anchor.waiting if anchor and r.blocked_reason == f"fact_missing:{anchor.fact}" else None
+        out.append({**task_out(r), "programme_name": r.programme_name, "university": r.university, "changes": [],
+                    "waiting_for": said})
+    return out
 
 
 # --- Knowledge (Slice 2 spec §4.8) ---------------------------------------------------------------------------

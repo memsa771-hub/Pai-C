@@ -95,6 +95,17 @@ def complete_ready_packs(svc: Services, student: str) -> None:
         log.exception("pack task completion failed for a student")
 
 
+def refresh_visa_date(svc: Services, plan_id: int) -> None:
+    """Recompiles the plan after the visa programme may have changed (a choice, or an admission answer): the visa
+    step's date follows that programme's semester start (Slice 9 Task 11, F1). Through the service and the kernel
+    (invariant 1); a revision only if something changed. Extra work after a saved answer: a failure is logged, and
+    the next recompile catches up."""
+    try:
+        svc.plans.recompile(plan_id, "visa_programme")
+    except Exception:
+        log.exception("recompiling after a visa programme change failed (plan %s)", plan_id)
+
+
 def visa_choice(svc: Services, plan, student: str) -> tuple[str | None, str | None, float, str | None]:
     """(the programme the visa file is for, the stored choice, the reduction, the pre-selected programme). Only one
     admission is pre-selected; with two the student chooses first, and nothing is built until they do."""
@@ -332,6 +343,7 @@ def add_visa_routes(router: APIRouter, services: Callable[[], Services]) -> None
             raise HTTPException(status_code=422, detail="this programme is not in your plan")
         if body.programme_ref is not None:
             store.set_programme(student, body.programme_ref)
+            refresh_visa_date(svc, plan.plan_id)
         if body.reduction is not None:
             try:
                 store.set_reduction(student, body.reduction)

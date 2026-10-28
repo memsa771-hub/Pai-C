@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { InboxList } from './inbox-list';
-import { completeActions, type OsInboxItem } from '@/lib/os-inbox';
+import { changeLine, completeActions, type OsInboxItem } from '@/lib/os-inbox';
 
 const NOW = new Date('2027-03-10T09:00:00Z');
 
@@ -127,5 +127,61 @@ describe('plan updates and provide steps (walk:S1:plan_updated_notice_empty, wal
     expect(html).toContain('Uploading alone does not close this step');
     expect(html).toContain('>Mark as done<');
     expect(html).not.toContain('>Done<');
+  });
+});
+
+// Slice 9 Task 11 batch C. Fictional programmes and dates only.
+describe('a step waiting for a fact (walk:S1:nothing_to_do_while_blocked, F1)', () => {
+  afterEach(() => cleanup());
+  const visa = item({ id: 20, instance_key: 'visa_apply', title: 'Apply for the student visa', state: 'blocked',
+                      blocked_reason: 'fact_missing:semester_start',
+                      waiting_for: "Waiting for your programme's semester start date" });
+
+  it('says what the plan waits for instead of "Nothing to do", with nothing to tap', () => {
+    const html = renderToStaticMarkup(<InboxList items={[visa]} now={NOW} onComplete={() => {}} />);
+    expect(html).not.toContain('Nothing to do');
+    expect(html).toContain('Apply for the student visa');
+    expect(html).toContain("Waiting for your programme&#x27;s semester start date");
+    expect(html).not.toContain('>Mark as done<');
+  });
+
+  it('lists waiting steps after the ones to do, and words a reason the playbook does not', () => {
+    const todo = item({ id: 21, title: 'Open a blocked account', due_at: '2027-03-13T22:59:59Z' });
+    const other = item({ id: 22, instance_key: 'apply@p1', title: 'Apply', state: 'blocked',
+                         blocked_reason: 'fact_missing:deadline_close' });
+    const html = renderToStaticMarkup(<InboxList items={[visa, todo, other]} now={NOW} onComplete={() => {}} />);
+    expect(html.indexOf('Open a blocked account')).toBeLessThan(html.indexOf('>Waiting<'));
+    expect(html.indexOf('>Waiting<')).toBeLessThan(html.indexOf('Apply for the student visa'));
+    expect(html).toContain('Waiting for a date we are still checking');
+    expect(html.match(/>Mark as done</g)?.length).toBe(1);
+  });
+
+  it('shows how a derived date follows from its source', () => {
+    const ready = item({ id: 23, title: 'Apply for the student visa', due_at: '2027-08-20T21:59:59Z',
+                         citations: [{ source: 'fact:semester_start', url: 'https://uni.example/dates',
+                                       note: '6 weeks before your semester starts on 1 October 2027' }] });
+    const html = renderToStaticMarkup(<InboxList items={[ready]} now={NOW} onComplete={() => {}} />);
+    expect(html).toContain('6 weeks before your semester starts on 1 October 2027');
+    expect(html).toContain('source: uni.example');
+  });
+});
+
+describe('"Not admitted" question focus (batch B review)', () => {
+  afterEach(() => cleanup());
+  const a = item({ id: 30, instance_key: 'admission_result@p1', inbox_kind: 'choose', programme_ref: 'p1',
+                   title: "Tell us this programme's admission result", programme_name: 'MSc Example' });
+
+  it('moves focus into the question, and back to "Not admitted" on Cancel', () => {
+    render(<InboxList items={[a]} now={NOW} onComplete={() => {}} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Not admitted' }));
+    expect(screen.getByRole('alertdialog').contains(document.activeElement)).toBe(true);
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Not admitted' }));
+  });
+});
+
+describe('plan change words (batch B review)', () => {
+  it('a kept step says only "Kept" (it may be started or kept on purpose)', () => {
+    expect(changeLine({ change: 'kept', instance_key: 'k', title: 'Apply', programme_ref: null })).toBe('Kept: Apply');
   });
 });

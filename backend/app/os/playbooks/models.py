@@ -1,5 +1,6 @@
 """Playbook schema: a versioned route template, validated at load time (spec §4.1)."""
 
+from string import Formatter
 from typing import Literal
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
@@ -34,8 +35,28 @@ class Condition(_Model):
         return self
 
 
+NOTE_FIELDS = frozenset({"date", "days", "weeks"})
+
+
 class Anchor(_Model):
+    """The fact a step's date comes from. `programme: visa` (Slice 9 Task 11, F1): a step that is not fanned out takes
+    the fact of the programme the student's visa file is for (before they choose: the earliest of the plan's
+    programmes). `note`: the plain explanation shown with the date, e.g. "{weeks} weeks before your semester starts
+    on {date}" ({days} and {weeks} are the lead time). `waiting`: what the student is told while the fact is
+    missing."""
     fact: str
+    programme: Literal["visa"] | None = None
+    note: str | None = None
+    waiting: str | None = None
+
+    @field_validator("note")
+    @classmethod
+    def _known_placeholders(cls, note: str | None) -> str | None:
+        if note is not None:
+            unknown = {name for _, name, _, _ in Formatter().parse(note) if name is not None} - NOTE_FIELDS
+            if unknown:
+                raise ValueError(f"unknown note placeholder {sorted(unknown)} (known: {sorted(NOTE_FIELDS)})")
+        return note
 
 
 class LeadTime(_Model):
@@ -73,6 +94,9 @@ class TaskTemplate(_Model):
             raise ValueError(f"student task needs inbox_kind ({self.template_key})")
         if self.kind == "work" and self.inbox_kind is not None:
             raise ValueError(f"work task cannot have inbox_kind ({self.template_key})")
+        if self.anchor and self.anchor.programme and self.fan_out == "programme":
+            raise ValueError(f"a fanned-out step anchors on its own programme, not anchor.programme "
+                             f"({self.template_key})")
         return self
 
 

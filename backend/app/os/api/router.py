@@ -8,7 +8,9 @@ from fastapi import APIRouter, Depends, File, Form, Header, HTTPException, Query
 
 from datetime import date
 
-from app.os import clock
+from sqlalchemy import select
+
+from app.os import clock, models
 from app.os.costs import cost_report
 from app.os.api.deps import check_admin, current_student_ref, current_student_ref_for_write
 from app.os.api.queries import (
@@ -22,6 +24,7 @@ from app.os.api.queries import (
     plan_out,
     research_runs,
     student_programmes,
+    waiting_items,
 )
 from app.os.api.schemas import (
     CompleteIn,
@@ -84,12 +87,13 @@ from app.os.documents.run import enqueue_document
 from app.os.documents.store import DocumentStore, DuplicateDocument, FindingStore, ProfileStore
 from app.os.eligibility.notes import on_profile_change
 from app.os.api import self_serve
-from app.os.api.packs import add_pack_routes, add_visa_routes, complete_ready_packs
+from app.os.api.packs import add_pack_routes, add_visa_routes, complete_ready_packs, refresh_visa_date
 from app.os.api.replan import add_replan_routes, changes_paused, student_proposals
 from app.os.knowledge.requests import RequestLimit, request_programme
 from app.os.routes import builder
 from app.os.kernel import IllegalTransition
 from app.os.kernel.revisions import NOTICE_PREFIX
+from app.os.packs.visa import ADMISSION_TASK
 from app.os.playbooks import PlaybookError
 from app.os.workers import confirm_fact, open_confirm_tasks, supply_fact
 
@@ -185,8 +189,13 @@ def build_router(get_services: Callable[[], Services]) -> APIRouter:
         kept = []
         for item in items:
             if item["instance_key"].startswith(NOTICE_PREFIX) and not item["changes"]:
-                try:
-                    svc.kernel.complete_student_task(item["id"], student, {})
+                try:  # the result keeps the notice's link to its revision and cause
+                    with svc.engine.connect() as conn:
+                        link = conn.execute(select(models.tasks.c.result).where(
+                            models.tasks.c.id == item["id"])).scalar() or {}
+                    svc.kernel.complete_student_task(item["id"], student, {
+                        "closed": "no_student_changes",
+                        **{k: link[k] for k in ("revision", "cause") if k in link}})
                     continue
                 except Exception:
                     log.exception("closing an empty plan update notice failed")
@@ -198,7 +207,8 @@ def build_router(get_services: Callable[[], Services]) -> APIRouter:
         complete_ready(svc, student)  # Slice 5: a documents task whose statements are already approved
         complete_ready_packs(svc, student)  # Slice 6a/6b: a review task whose pack or visa file is approved
         tenant = svc.settings.tenant_id
-        return {"items": drop_empty_notices(svc, student, inbox_items(svc.engine, tenant, student)),
+        items = drop_empty_notices(svc, student, inbox_items(svc.engine, tenant, student))
+        return {"items": items + waiting_items(svc.engine, tenant, student, svc.plans.playbooks),
                 "notes": eligibility_notes(svc.engine, tenant, student),
                 "proposals": student_proposals(svc, student), "changes_paused": changes_paused(svc, student)}
 
@@ -219,6 +229,12 @@ def build_router(get_services: Callable[[], Services]) -> APIRouter:
             raise HTTPException(status_code=404, detail="inbox item not found") from None
         except IllegalTransition as e:
             raise HTTPException(status_code=409, detail=str(e)) from None
+        if done:  # an admission answer can change the visa programme, and so the visa step's date (F1)
+            with svc.engine.connect() as conn:
+                row = conn.execute(select(models.tasks.c.plan_id, models.tasks.c.template_key).where(
+                    models.tasks.c.id == task_id)).first()
+            if row is not None and row.template_key == ADMISSION_TASK:
+                refresh_visa_date(svc, row.plan_id)
         return {"completed": done}
 
     @router.post("/facts/{fact_id}/confirm", response_model=ConfirmOut, dependencies=[Depends(require_admin)])

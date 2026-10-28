@@ -95,9 +95,15 @@ DOC_STEP = {"degree_certificate": "hec_attestation", "transcript": "hec_attestat
             "admission_letter": "admission_result"}
 # What the visa file needs that is not ready on day one: these documents come when their step does.
 STEP_DOCS = {"blocked_account": "blocked_account_confirmation", "travel_insurance": "insurance_certificate"}
-# visa_target_date has no official source (seed comment; Spike 5 C5): the rehearsal's admin supplies one when a plan
-# waits for it, as an admin would through the open-facts screen, and logs that it had to (a workaround).
-VISA_TARGET = {"date": "2027-09-01", "tz": "Europe/Berlin"}
+# The visa step's date comes from the visa programme's semester_start (Task 11, F1). Offline research finds nothing,
+# so the rehearsal loads fictional semester starts with the seed: test data, not a workaround.
+SEMESTER_STARTS = HERE / "semester_starts.yaml"
+
+
+def _actionable(items: list[dict]) -> list[dict]:
+    """The inbox items the student can act on. The inbox also lists steps blocked on a missing fact, with what they
+    wait for (Task 11, `walk:S1:nothing_to_do_while_blocked`): nothing can be done on those."""
+    return [t for t in items if t["state"] == "waiting_student"]
 
 
 # --------------------------------------------------------------------------------------------------- students file
@@ -454,6 +460,7 @@ class Rehearsal:
         kb, store = SqlKnowledge(self.engine, TENANT), ProgrammeStore(self.engine, TENANT)
         load_programme_seed(PROGRAMME_SEED, store)
         load_seed(SEED_DIR / "germany_ws2027.yaml", kb)
+        load_seed(SEMESTER_STARTS, kb)
 
     def _answers(self) -> None:
         store = ProgrammeStore(self.engine, TENANT)
@@ -712,7 +719,7 @@ class Rehearsal:
                 acted = True
         plan = self._plan(run)
         tasks = {t["instance_key"]: t for t in plan["tasks"] if _live(t)}
-        waiting = {t["instance_key"]: t for t in inbox["items"]}
+        waiting = {t["instance_key"]: t for t in _actionable(inbox["items"])}
         by_template: dict[str, list[dict]] = {}
         for t in waiting.values():
             by_template.setdefault(_template(t["instance_key"]), []).append(t)
@@ -999,7 +1006,10 @@ class Rehearsal:
             return False
         if step["state"] == "blocked" and (step["blocked_reason"] or "").startswith("fact_missing:") \
                 and any(_template(k) == "review_visa_file" and t["state"] == "done" for k, t in tasks.items()):
-            return self._supply_fact(run, step["blocked_reason"].split(":", 1)[1])
+            name = step["blocked_reason"].split(":", 1)[1]  # no admin step any more: a missing fact is a failure
+            self.fail(f"fact_missing:{name}", run.s.sid, "visa_apply", f"{name} is known",
+                      "no value; the visa step waits for it")
+            return False
         if step["state"] != "waiting_student":
             return False
         if "visa_ready" not in run.reached:
@@ -1023,21 +1033,6 @@ class Rehearsal:
             return True
         return any(p.status == "pending" for p in self._proposals_of(run))
 
-    def _supply_fact(self, run: Run, name: str) -> bool:
-        """The admin step for a fact no source gives (today only visa_target_date): logged as a workaround."""
-        if name != "visa_target_date" or name in self.admin_actions:
-            if name != "visa_target_date":
-                self.fail(f"fact_missing:{name}", "all", "visa_apply", f"{name} is known", "no value; no admin step")
-            return False
-        self.admin_actions.append(name)
-        self.fail(f"fact_missing:{name}", "all", "visa_apply", "visa_apply waits for the student once the visa file "
-                  "is approved", f"blocked on fact_missing:{name} (no source; the admin supplied a rehearsal value)",
-                  "workaround")
-        return self.call(None, "POST", "/facts", json={
-            "scope": "route", "ref": ROUTE, "field": name, "intake_year": INTAKE["year"], "value": VISA_TARGET,
-            "quote": "Rehearsal value supplied by the admin", "url": "https://rehearsal.example.invalid/visa",
-            "status": "confirmed"}) is not None
-
     # ------------------------------------------------------------------ per loop: stuck
 
     def _observe(self, run: Run, today: date) -> None:
@@ -1045,7 +1040,7 @@ class Rehearsal:
         inbox = self.get(run, "/inbox") or {"items": [], "proposals": []}
         fingerprint = (plan["revision"], plan["status"], tuple(sorted((t["instance_key"], t["state"])
                                                                       for t in plan["tasks"])))
-        stuck = self.watch.see(run.s.sid, today, fingerprint, bool(inbox["items"] or inbox["proposals"]))
+        stuck = self.watch.see(run.s.sid, today, fingerprint, bool(_actionable(inbox["items"]) or inbox["proposals"]))
         if stuck is not None:
             self.failures.add(stuck)
             run.state = "stuck"

@@ -1,5 +1,6 @@
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
+from types import SimpleNamespace
 from zoneinfo import ZoneInfo
 
 import pytest
@@ -167,3 +168,94 @@ def test_needed_fields():
     data = IE.model_dump(mode="json", by_alias=True, exclude_none=True)
     data["tasks"][1]["anchor"] = {"fact": "visa_target_date"}
     assert needed_fields(Playbook.model_validate(data)) == ({"visa_target_date"}, {"deadline_close"})
+
+
+# ---- Slice 9 Task 11 (F1): a route step's date from the chosen programme's fact ------------------------------------
+
+NOTE = "{weeks} weeks before your semester starts on {date}"
+
+
+def visa_book(**anchor) -> Playbook:
+    data = IE.model_dump(mode="json", by_alias=True, exclude_none=True)
+    data["tasks"][1]["anchor"] = {"fact": "semester_start", "programme": "visa", "note": NOTE, **anchor}
+    data["tasks"][1]["lead_time"] = {"days": 42}
+    return Playbook.model_validate(data)
+
+
+def starts(status="confirmed", **by_ref) -> dict:
+    return {(ref, "semester_start"): fact({"date": d}, status) for ref, d in by_ref.items()}
+
+
+def test_anchor_on_the_chosen_programme():
+    """The visa date is 6 weeks (the playbook's lead time) before the semester start of the programme the visa file
+    is for, and the step cites that programme's page with a plain note saying so."""
+    facts = {**deadlines(p1="2027-07-15", p2="2027-07-15"), **starts(p1="2027-10-01", p2="2027-09-15")}
+    d = compile_plan(contract(["p1", "p2"]), visa_book(), {}, facts, TODAY, chosen={"visa": "p1"})
+    visa = task(d, "visa")
+    assert visa.latest_finish == end_of_day(date(2027, 10, 1), "Europe/Dublin") - timedelta(days=42)
+    assert visa.blocked_reason is None and not visa.provisional
+    assert visa.citations[0] == {"source": "fact:semester_start", "url": "https://uni.example/p",
+                                 "note": "6 weeks before your semester starts on 1 October 2027"}
+    assert ("programme", "p1", "semester_start") in visa.fact_refs
+    assert ("programme", "p2", "semester_start") not in visa.fact_refs
+    assert not any(t.instance_key.startswith("confirm_fact@p2:semester") for t in d.tasks)
+
+
+def test_anchor_before_a_choice_uses_the_earliest_start():
+    """No programme chosen yet: the earliest semester start of the plan's programmes, provisional (it may move once
+    the student's visa programme is known), and every programme's start is looked for."""
+    facts = {**deadlines(p1="2027-07-15", p2="2027-07-15"), **starts(p1="2027-10-01", p2="2027-09-15")}
+    visa = task(compile_plan(contract(["p1", "p2"]), visa_book(), {}, facts, TODAY), "visa")
+    assert visa.latest_finish == end_of_day(date(2027, 9, 15), "Europe/Dublin") - timedelta(days=42)
+    assert visa.provisional and visa.blocked_reason is None
+    assert {("programme", r, "semester_start") for r in ("p1", "p2")} <= set(visa.fact_refs)
+    one = task(compile_plan(contract(["p1"]), visa_book(), {}, facts, TODAY), "visa")
+    assert not one.provisional  # one programme: it is the one
+
+
+def test_anchor_waits_for_the_chosen_programmes_start():
+    """The chosen programme has no semester start yet: the step stays blocked on it (another programme's date is
+    never used for it), and the start is looked for."""
+    facts = {**deadlines(p1="2027-07-15", p2="2027-07-15"), **starts(p2="2027-09-15")}
+    d = compile_plan(contract(["p1", "p2"]), visa_book(), {}, facts, TODAY, chosen={"visa": "p1"})
+    assert task(d, "visa").blocked_reason == "fact_missing:semester_start"
+    assert task(d, "visa").latest_finish is None
+    assert task(d, "confirm_fact@p1:semester_start")
+    none = compile_plan(contract(["p1", "p2"]), visa_book(), {}, deadlines(p1="2027-07-15", p2="2027-07-15"), TODAY)
+    assert task(none, "visa").blocked_reason == "fact_missing:semester_start"
+    assert task(none, "confirm_fact@p1:semester_start") and task(none, "confirm_fact@p2:semester_start")
+
+
+def test_anchor_ignores_a_removed_programme():
+    """A programme the student removed (an accepted cancel_programme) is never the visa date's programme."""
+    facts = {**deadlines(p1="2027-07-15", p2="2027-07-15"), **starts(p1="2027-10-01", p2="2027-09-15")}
+    gone = [SimpleNamespace(op="cancel_programme", target="p2", payload={})]
+    visa = task(compile_plan(contract(["p1", "p2"]), visa_book(), {}, facts, TODAY, overrides=gone), "visa")
+    assert visa.latest_finish == end_of_day(date(2027, 10, 1), "Europe/Dublin") - timedelta(days=42)
+    chosen_gone = compile_plan(contract(["p1", "p2"]), visa_book(), {}, facts, TODAY, overrides=gone,
+                               chosen={"visa": "p2"})
+    assert task(chosen_gone, "visa").latest_finish == visa.latest_finish
+
+
+def test_needed_fields_with_a_programme_anchor():
+    assert needed_fields(visa_book()) == (set(), {"deadline_close", "semester_start"})
+
+
+def test_programme_anchor_rules():
+    data = IE.model_dump(mode="json", by_alias=True, exclude_none=True)
+    data["tasks"][0]["anchor"] = {"fact": "semester_start", "programme": "visa"}  # a fanned-out step has its own
+    with pytest.raises(ValueError, match="programme"):
+        Playbook.model_validate(data)
+    with pytest.raises(ValueError, match="placeholder"):
+        visa_book(note="{month} before")
+
+
+def test_germany_visa_date_from_the_semester_start():
+    """F1: the Germany playbook derives the visa date from the visa programme's semester start, 6 weeks before it,
+    with the number in the playbook (invariant 12); nothing anchors on visa_target_date any more."""
+    gm = load_playbook(Path(__file__).parents[2] / "app/os/playbooks/germany_master.v1.yaml")
+    visa = gm.task("visa_apply")
+    assert (visa.anchor.fact, visa.anchor.programme) == ("semester_start", "visa")
+    assert gm.constants[visa.lead_time.constant].value == 42
+    assert visa.anchor.note and visa.anchor.waiting
+    assert all(t.anchor is None or t.anchor.fact != "visa_target_date" for t in gm.tasks)
