@@ -10,9 +10,12 @@ import yaml
 from sqlalchemy import select
 
 from app.os import models
+from app.os.documents.run import READ_FAILED
 from app.os.knowledge.programmes import PROGRAMME_SEED
 from app.os.knowledge.seed import SEED_DIR
-from tests.os.rehearsal.driver import END, SAMPLES, StuckWatch, load_students, should_stop, student_ref, Rehearsal
+from tests.os.rehearsal.driver import (
+    DUPLICATE_CHECKS, END, SAMPLES, Rehearsal, StuckWatch, duplicates, load_students, should_stop, student_ref,
+)
 from tests.os.rehearsal.failures import Failure, FailureLog
 
 EVENTS = {"S3": "rejected", "S5": "missing_document", "S7": "late", "S9": "approved_changed", "S11": "ignore_big"}
@@ -115,9 +118,62 @@ def test_missing_offline_answer_logged_run_continues(os_db, tmp_path):
         with engine.connect() as conn:
             D = models.documents
             rows = conn.execute(select(D.c.student_ref, D.c.doc_type, D.c.status)).all()
+            A = models.agent_runs  # the failed reading went the normal invalid-output way (2 repairs, then given up)
+            [(error, doc_error)] = conn.execute(select(A.c.error, D.c.error).join(D, D.c.id == A.c.document_id).where(
+                D.c.student_ref == student_ref("S1"), D.c.doc_type == "transcript")).all()
     finally:
         engine.dispose()
     s1 = {r.doc_type: r.status for r in rows if r.student_ref == student_ref("S1")}
     s6 = {r.doc_type: r.status for r in rows if r.student_ref == student_ref("S6")}
     assert s1.pop("transcript") == "failed" and set(s1.values()) == {"confirmed"}
+    assert error == "UnexpectedModelBehavior" and doc_error == READ_FAILED
     assert s6 and set(s6.values()) == {"confirmed"}
+
+
+def _seed(engine, twice: bool) -> None:
+    """One plan's replan, task and artifact rows; `twice` repeats each piece of work a crash could repeat."""
+    from sqlalchemy import insert
+
+    n = 2 if twice else 1
+    with engine.begin() as conn:
+        plan = conn.execute(insert(models.plans).values(
+            tenant_id="pai", source="self_serve", external_ref="dup", student_ref="rehearsal-dup", contract={},
+            contract_sha256="x").returning(models.plans.c.id)).scalar_one()
+        for _ in range(n):
+            pid = conn.execute(insert(models.proposals).values(
+                tenant_id="pai", plan_id=plan, event_ids=[7], source="rules", status="applied")
+                .returning(models.proposals.c.id)).scalar_one()
+        first = pid - n + 1
+        for number in range(2, 2 + n):
+            conn.execute(insert(models.plan_revisions).values(tenant_id="pai", plan_id=plan, number=number,
+                                                              cause=f"replan:{first}"))
+        for _ in range(n):
+            conn.execute(insert(models.support_cases).values(tenant_id="pai", plan_id=plan, student_ref="rehearsal-dup",
+                                                             reason="x", proposal_id=first))
+        task = conn.execute(insert(models.tasks).values(
+            tenant_id="pai", plan_id=plan, instance_key="m", template_key="m", task_type="system.milestone",
+            kind="work", title="m", due_tz="UTC", playbook_version=1).returning(models.tasks.c.id)).scalar_one()
+        for attempt in range(1, n + 1):
+            conn.execute(insert(models.task_attempts).values(tenant_id="pai", task_id=task, attempt=attempt,
+                                                             workflow_id=f"{task}:{attempt}", status="done"))
+        for kind, author, text_ in (("pack", "system", '{"inputs_sha256": "same"}'), ("sop", "writer", "A draft.")):
+            art = conn.execute(insert(models.artifacts).values(
+                tenant_id="pai", student_ref="rehearsal-dup", kind=kind, programme_ref="p" if kind == "pack" else "")
+                .returning(models.artifacts.c.id)).scalar_one()
+            for number in range(1, n + 1):
+                conn.execute(insert(models.artifact_versions).values(
+                    tenant_id="pai", artifact_id=art, number=number, text=text_, sha256=str(number), author=author,
+                    words=1))
+
+
+def test_duplicates_detected(engine, clean):
+    """The kill run's "0 duplicated" (9a gate 3) counts work the schema does not already forbid: each check sees a
+    seeded repeat, and none fires on the same rows done once."""
+    drafts = {"rehearsal-dup": {("sop", None): 1}}
+    _seed(engine, twice=False)
+    assert duplicates(engine, drafts) == {}
+    from tests.os.conftest import truncate_os_tables
+
+    truncate_os_tables(engine)
+    _seed(engine, twice=True)
+    assert set(duplicates(engine, drafts)) == set(DUPLICATE_CHECKS)

@@ -27,6 +27,7 @@ End points (spec 9a gate 1): **ready to submit** = for every live programme an a
 Test code: country words and fictional names are allowed here (invariant 12 covers app/os only)."""
 
 import io
+import json
 import logging
 import os
 import random
@@ -257,6 +258,65 @@ def missing_answer(sid: str, doc_type: str, name: str, data: bytes, answers_dir:
                    f"missing offline answer documents:{sha} ({name})", "blocks")
 
 
+# --------------------------------------------------------------------------------------------------- duplicates
+
+# What would be done twice if a step ran again after a kill and its work were not idempotent. Each is something the
+# schema does NOT already forbid: a document has one agent-run row by a unique key (`document:<id>`), and the outbox one
+# row per idempotency key, so those cannot be counted. Name -> what a clean run shows.
+DUPLICATE_CHECKS = {
+    "proposal_per_event": "one replan proposal per event",
+    "revision_per_proposal": "at most one plan revision per replan proposal",
+    "support_case_per_proposal": "at most one support case per replan proposal",
+    "attempt_without_failure": "a work task runs as a new attempt only after it failed",
+    "manifest_built_twice": "a pack or visa file version differs from the version before it",
+    "draft_per_request": "one Writer version per draft request",
+}
+
+
+def duplicates(engine: Engine, drafts: dict[str, dict[tuple[str, str | None], int]]) -> dict[str, list[str]]:
+    """Duplicated work in the database: check name (DUPLICATE_CHECKS) -> what was found twice. `drafts` gives, per
+    student reference, how many draft requests the driver sent per (kind, programme), for `draft_per_request`."""
+    PR, R, C, T, TA, E = (models.proposals, models.plan_revisions, models.support_cases, models.tasks,
+                          models.task_attempts, models.events)
+    A, V = models.artifacts, models.artifact_versions
+    found: dict[str, list[str]] = {}
+    with engine.connect() as conn:
+        per_event: dict[int, int] = {}
+        for ids in conn.execute(select(PR.c.event_ids)).scalars():
+            for i in ids or []:
+                per_event[i] = per_event.get(i, 0) + 1
+        found["proposal_per_event"] = [f"event {i}" for i, n in sorted(per_event.items()) if n > 1]
+        found["revision_per_proposal"] = [f"{cause} on plan {plan}" for plan, cause, n in conn.execute(
+            select(R.c.plan_id, R.c.cause, func.count()).where(R.c.cause.like("replan:%"))
+            .group_by(R.c.plan_id, R.c.cause).having(func.count() > 1)).all()]
+        found["support_case_per_proposal"] = [f"proposal {p}" for p, n in conn.execute(
+            select(C.c.proposal_id, func.count()).where(C.c.proposal_id.is_not(None))
+            .group_by(C.c.proposal_id).having(func.count() > 1)).all()]
+        failed = set(conn.execute(select(E.c.task_id).where(E.c.type == "task_failed")).scalars().all())
+        found["attempt_without_failure"] = [f"task {task}" for task, n in conn.execute(
+            select(TA.c.task_id, func.count()).join(T, T.c.id == TA.c.task_id).where(T.c.kind == "work")
+            .group_by(TA.c.task_id).having(func.count() > 1)).all() if task not in failed]
+        rows = conn.execute(select(A.c.id, A.c.kind, V.c.number, V.c.text).join(V, V.c.artifact_id == A.c.id)
+                            .where(A.c.kind.in_(("pack", "visa"))).order_by(A.c.id, V.c.number)).all()
+        last: dict[int, str | None] = {}
+        twice = []
+        for art, kind, number, text_ in rows:
+            try:
+                inputs = json.loads(text_).get("inputs_sha256")  # a manifest version's text is its JSON
+            except (ValueError, AttributeError):
+                inputs = None
+            if inputs is not None and last.get(art) == inputs:
+                twice.append(f"{kind} {art} version {number}")
+            last[art] = inputs
+        found["manifest_built_twice"] = twice
+        writer = conn.execute(select(A.c.student_ref, A.c.kind, A.c.programme_ref, func.count())
+                              .join(V, V.c.artifact_id == A.c.id).where(V.c.author == "writer")
+                              .group_by(A.c.student_ref, A.c.kind, A.c.programme_ref)).all()
+        found["draft_per_request"] = [f"{kind} of {student}" for student, kind, ref, n in writer
+                                      if student in drafts and n > drafts[student].get((kind, ref or None), 0)]
+    return {k: v for k, v in found.items() if v}
+
+
 # --------------------------------------------------------------------------------------------------- the worker
 
 
@@ -319,6 +379,7 @@ class Run:
     accepted: list[int] = field(default_factory=list)
     sop_changed: bool = False
     sop_id: int | None = None  # the base SOP's id, as the statements page showed it
+    drafts: dict[tuple[str, str | None], int] = field(default_factory=dict)  # draft requests per (kind, programme)
     released: bool = False  # S7: the plan asked for the late step; S5: a support case was opened
     incomplete_since: dict[str, date] = field(default_factory=dict)
 
@@ -436,7 +497,9 @@ class Rehearsal:
         today = clock.today()
         if today > START:
             log.warning("real today %s is past the rehearsal start %s: starting from today", today, START)
-            self.admin_actions.append("start_after_1_dec_2026")
+            self.fail(f"start_late:{today.isoformat()}", "all", None, f"the rehearsal starts on {START.isoformat()}",
+                      f"real today is {today.isoformat()}: the clock only moves forward, so it started from today",
+                      "workaround")
         days = (START - today).days
         while days > 0:
             step = min(60, days)
@@ -647,7 +710,7 @@ class Rehearsal:
             if not run.released:  # S7 answers nothing but plan notices until the plan asks for the late step
                 return self._notices(run, inbox["items"]) or acted
         if run.s.withhold and not run.released:
-            run.released = self._support_case(run) is not None
+            run.released = self._missing_case(run) is not None
             if run.released:
                 self._upload_extra(run, run.s.withhold)
                 acted = True
@@ -657,8 +720,8 @@ class Rehearsal:
         by_template: dict[str, list[dict]] = {}
         for t in waiting.values():
             by_template.setdefault(_template(t["instance_key"]), []).append(t)
-        if "application_documents" in by_template or any(
-                _template(k) == "application_documents" and t["state"] == "waiting_student" for k, t in tasks.items()):
+        self._inbox_matches_plan(run, tasks, waiting)
+        if "application_documents" in by_template:
             acted |= self._statements(run)
         if "review_pack" in by_template:
             acted |= self._packs(run, [t["programme_ref"] for t in by_template["review_pack"]])
@@ -688,6 +751,19 @@ class Rehearsal:
             for t in items:
                 acted |= self._complete(run, t)
         return acted
+
+    def _inbox_matches_plan(self, run: Run, tasks: dict, waiting: dict) -> None:
+        """Every student step the plan (admin view) says waits for the student must be in their inbox. The inbox is
+        read once more first, since a step can start waiting between the two reads."""
+        missing = [k for k, t in tasks.items() if t["kind"] == "student" and t["state"] == "waiting_student"
+                   and k not in waiting]
+        if not missing:
+            return
+        again = {t["instance_key"] for t in (self.get(run, "/inbox") or {"items": []})["items"]}
+        for key in missing:
+            if key not in again and tasks[key]["state"] == "waiting_student":
+                self.fail(f"inbox_missing:{run.s.sid}:{_template(key)}", run.s.sid, _template(key),
+                          "a step waiting for the student is in their inbox", f"{key} waits but is not in the inbox")
 
     def _complete(self, run: Run, t: dict, payload: dict | None = None) -> bool:
         return self.call(run, "POST", f"/inbox/{t['id']}/complete", step=_template(t["instance_key"]),
@@ -764,6 +840,19 @@ class Rehearsal:
         cases = (self.get(None, "/admin/support") or {"cases": []})["cases"]
         return next((c for c in cases if c["plan_id"] == run.plan_id), None)
 
+    def _missing_case(self, run: Run) -> dict | None:
+        """S5: the support case opened for the withheld step: one that names an `escalate` event of that step (its
+        date passed with the document still missing), not any case on the plan."""
+        cases = [c for c in (self.get(None, "/admin/support") or {"cases": []})["cases"] if c["plan_id"] == run.plan_id]
+        if not cases:
+            return None
+        E = models.events
+        with self.engine.connect() as conn:
+            escalations = set(conn.execute(select(E.c.id).where(
+                E.c.plan_id == run.plan_id, E.c.type == "escalate",
+                E.c.payload["instance_key"].astext == run.s.withhold)).scalars().all())
+        return next((c for c in cases if set(c["event_ids"]) & escalations), None)
+
     # statements: answer the interview, draft and approve the SOP and the CV (and a programme's own SOP if asked)
     def _statements(self, run: Run) -> bool:
         acted = False
@@ -785,8 +874,11 @@ class Rehearsal:
             st = have.get((kind, ref))
             if st is None or st["status"] == "empty" or st["version"] is None:
                 if st is None or st["status"] != "drafting":
-                    acted |= self.call(run, "POST", f"/statements/{kind}/draft", step="application_documents",
-                                       json={"programme_ref": ref}) is not None
+                    sent = self.call(run, "POST", f"/statements/{kind}/draft", step="application_documents",
+                                     json={"programme_ref": ref}) is not None
+                    if sent:
+                        run.drafts[(kind, ref)] = run.drafts.get((kind, ref), 0) + 1
+                    acted |= sent
                 continue
             if st["status"] == "drafting":
                 continue
@@ -969,12 +1061,12 @@ class Rehearsal:
             if run.plan_id is None:
                 continue
             self._safe(run, self._check_events)
-            if self.check_finish and run.state != "visa_ready":
+            missing = [r for r in ("ready_to_submit", "visa_ready") if r not in run.reached]
+            if self.check_finish and (missing or run.state != "visa_ready"):
                 plan = self._plan(run)
                 open_ = sorted(f"{_template(t['instance_key'])}:{t['state']}" for t in plan["tasks"]
                                if _live(t) and t["state"] not in ("done", "cancelled", "skipped")
                                and t["kind"] == "student")
-                missing = [r for r in ("ready_to_submit", "visa_ready") if r not in run.reached]
                 self.fail(f"not_finished:{run.s.sid}", run.s.sid, None, "ready to submit and visa file ready",
                           f"state {run.state}; not reached {missing}; open student steps {open_[:12]}")
                 if run.state == "running":
@@ -1035,15 +1127,24 @@ class Rehearsal:
             task_ids = [t["id"] for t in tasks if _template(t["instance_key"]) == key]
             with self.engine.connect() as conn:
                 O = models.outbox
-                rows = conn.execute(select(O.c.idempotency_key, O.c.template)).all()
-            reminders = [k for k, tpl in rows if tpl == "inbox_reminder"
-                         and any(k.startswith(f"reminder:{i}:") and ":esc:" not in k for i in task_ids)]
-            asked = any(o["op"] == "request_from_student" and _template(o.get("instance_key", "")) == key
-                        for p in proposals if p.status == "applied" for o in p.ops)
-            case = self._support_case(run)
-            self._event(run, "missing_document", bool(reminders) and asked and case is not None, key,
-                        "reminders by slack, then an ask, then a support case",
-                        f"reminders {len(reminders)}; asked {asked}; support case {case is not None}")
+                rows = conn.execute(select(O.c.idempotency_key, O.c.template, O.c.created_at)).all()
+            reminders = sorted(at for k, tpl, at in rows if tpl == "inbox_reminder"
+                               and any(k.startswith(f"reminder:{i}:") and ":esc:" not in k for i in task_ids))
+            asks = [p for p in proposals if p.status == "applied" and any(
+                o["op"] == "request_from_student" and _template(o.get("instance_key", "")) == key for o in p.ops)]
+            case = self._missing_case(run)
+            with self.engine.connect() as conn:  # when the OS recorded each event (database time, in order)
+                E = models.events
+                event_at = dict(conn.execute(select(E.c.id, E.c.at).where(E.c.plan_id == run.plan_id)).all())
+            ask = asks[0] if asks else None
+            ask_at = min((event_at[i] for i in ask.event_ids if i in event_at), default=None) if ask else None
+            case_at = min((event_at[i] for i in case["event_ids"] if i in event_at), default=None) if case else None
+            in_order = bool(reminders and ask and case and ask_at and case_at
+                            and reminders[0] < ask.created_at and ask_at < case_at)
+            self._event(run, "missing_document", in_order, key,
+                        "reminders by slack, then an ask, then a support case for the missing document",
+                        f"reminders {len(reminders)}; asked {ask is not None}; missing-document case "
+                        f"{case is not None}; in order {in_order}")
         if s.event == "late":
             E = models.events
             with self.engine.connect() as conn:
@@ -1063,18 +1164,16 @@ class Rehearsal:
                         f"SOP changed {run.sop_changed}; review steps added {len(again)}")
 
     def _integrity(self, runs: list[Run]) -> None:
-        """Nothing lost or duplicated (9a gate 3): no work task left waiting for a worker, one reading per document."""
-        T, A = models.tasks, models.agent_runs
+        """Nothing lost or duplicated (9a gate 3): no work task left waiting for a worker; and `duplicates`."""
+        T = models.tasks
         with self.engine.connect() as conn:
             lost = conn.execute(select(T.c.instance_key, T.c.state).where(
                 T.c.kind == "work", T.c.state.in_(("ready", "running")))).all()
-            dup = conn.execute(select(A.c.document_id, A.c.reading, func.count()).where(
-                A.c.document_id.is_not(None)).group_by(A.c.document_id, A.c.reading).having(func.count() > 1)).all()
         if lost:
             self.fail("lost_tasks", "all", None, "no work task left ready or running",
                       f"{len(lost)}: {sorted({_template(k) + ':' + s for k, s in lost})[:8]}")
-        if dup:
-            self.fail("duplicate_readings", "all", None, "one reading per document", f"{len(dup)} documents read twice")
+        for kind, found in duplicates(self.engine, {r.ref: r.drafts for r in runs}).items():
+            self.fail(f"duplicate:{kind}", "all", None, DUPLICATE_CHECKS[kind], f"{len(found)}: {found[:6]}")
 
     # ------------------------------------------------------------------ step 5: the report
 

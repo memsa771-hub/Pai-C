@@ -5,9 +5,10 @@ one document until a support case is opened. Each must reach both end points (re
 scripted event must give its change, and the failure log must be empty. The full 12 and the kill run are run by hand
 (`python -m tests.os.rehearsal.run`). Fictional data only.
 
-Strict xfail (plan ruling 4): the run finds two product failures, named in KNOWN and in the reason. Only they raise
-KnownProductFailures, the one exception the mark expects: a failed end point or event, or any new failure, fails the
-suite as usual, and so does a pass (XPASS, strict) once Task 11 has fixed both, so the mark is then removed."""
+Strict xfail (plan ruling 4): the run finds two product failures, named in KNOWN and in the reason. Only exactly
+that set raises KnownProductFailures, the one exception the mark expects: a failed end point or event, a new failure,
+or one of the two fixed without the other fails the suite as usual, and so does a pass (XPASS, strict) once Task 11 has
+fixed both, so the mark is then removed and KNOWN emptied."""
 
 import pytest
 
@@ -36,8 +37,8 @@ def test_rehearsal_short(os_db, tmp_path):
     assert "missing_document:ok" in report.students["S5"].events  # reminders, an ask, then a support case
     assert (tmp_path / "run" / "report.json").is_file() and (tmp_path / "run" / "report.md").is_file()
 
-    new = [f"{f.id}: {f.got}" for f in failures if f.id not in KNOWN]
-    assert not new, new  # anything not already known fails the suite
-    if failures:
+    ids = {f.id for f in failures}
+    assert ids in (set(), KNOWN), sorted(ids)  # a new failure, or a partial fix in Task 11, fails the suite
+    if ids:
         raise KnownProductFailures([f"{f.id}: {f.got}" for f in failures])
     assert report.failures == {}
