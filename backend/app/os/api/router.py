@@ -65,7 +65,7 @@ from app.os.api.schemas import (
     TextIn,
 )
 from app.os.api.queries import statement_out
-from app.os.artifacts.store import ArtifactStore
+from app.os.artifacts.store import STATEMENT_KINDS, ArtifactStore
 from app.os.statements import interview as stmt
 from app.os.statements.approval import complete_documents_tasks
 from app.os.statements.facts_check import unsupported
@@ -431,7 +431,7 @@ def build_router(get_services: Callable[[], Services]) -> APIRouter:
 
     def own_artifact(svc: Services, artifact_id: int, student: str):
         art = ArtifactStore(svc.engine, svc.settings.tenant_id).get(artifact_id)
-        if art is None or art.student_ref != student:
+        if art is None or art.student_ref != student or art.kind not in STATEMENT_KINDS:  # never a pack or visa file
             raise HTTPException(status_code=404, detail="statement not found")
         return art
 
@@ -482,7 +482,8 @@ def build_router(get_services: Callable[[], Services]) -> APIRouter:
         programmes = [] if cfg is None else [  # each plan programme's rules: does it ask for its own statement?
             {"programme_ref": ref, **asdict(resolve_rules(svc.engine, tenant, svc.knowledge, student, ref, plan.year,
                                                           cfg, "sop"))} for ref in plan.programmes]
-        return {"statements": [statement_out(store, a) for a in store.list_for(student)], "programmes": programmes}
+        return {"statements": [statement_out(store, a) for a in store.list_for(student, STATEMENT_KINDS)],
+                "programmes": programmes}
 
     @router.post("/statements/{kind}/draft", status_code=202, response_model=StatementOut)
     def statement_draft(kind: str, body: DraftIn | None = None, student: str = Depends(current_student_ref_for_write),

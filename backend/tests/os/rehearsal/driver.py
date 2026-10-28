@@ -494,17 +494,13 @@ class Rehearsal:
         self.client = TestClient(app, raise_server_exceptions=False)  # a 500 is a logged failure, not a crash
 
     def _set_clock(self) -> None:
-        today = clock.today()
-        if today > START:
-            log.warning("real today %s is past the rehearsal start %s: starting from today", today, START)
+        """The rehearsal starts on START whatever the real date: the admin `start` call sets the clean clock once
+        (a day in the past too). If it is refused, the run goes on from the clock's today and logs start_late."""
+        if self.call(None, "POST", "/admin/rehearsal/start", json={"date": START.isoformat()}) is None:
+            today = clock.today()
+            log.warning("the rehearsal clock could not be set to %s: starting from %s", START, today)
             self.fail(f"start_late:{today.isoformat()}", "all", None, f"the rehearsal starts on {START.isoformat()}",
-                      f"real today is {today.isoformat()}: the clock only moves forward, so it started from today",
-                      "workaround")
-        days = (START - today).days
-        while days > 0:
-            step = min(60, days)
-            self.call(None, "POST", "/admin/rehearsal/advance", json={"days": step})
-            days -= step
+                      f"the start call was refused; the clock's today is {today.isoformat()}", "workaround")
         self.start = clock.today()
 
     def _worker(self) -> None:

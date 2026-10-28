@@ -1,9 +1,9 @@
 """The stored rehearsal offset, one row per tenant, and the switch that makes the shared clock read it."""
 
 import logging
-from datetime import timedelta
+from datetime import date, timedelta
 
-from sqlalchemy import Engine, func, select
+from sqlalchemy import Date, Engine, cast, func, literal, select
 from sqlalchemy.dialects.postgresql import insert
 
 from app.os import clock, models
@@ -38,6 +38,20 @@ class ClockStore:
         ).returning(R.c.offset_seconds)
         with self.engine.begin() as conn:
             return timedelta(seconds=conn.execute(stmt).scalar_one())
+
+    def start(self, day: date) -> timedelta | None:
+        """Sets the clock once, on a clean rehearsal clock (no row yet), so that today is `day`: whole days from the
+        real UTC date, which may be negative (a day already past). Returns the new offset, or None when the clock was
+        already set or moved (time never goes back once set). One atomic insert: two starts at once set it once.
+
+        The real date is the database's (`now()` in UTC), so this module reads no time itself (clock rule)."""
+        real_today = cast(func.timezone("UTC", func.now()), Date)
+        seconds = (cast(literal(day.isoformat()), Date) - real_today) * 86400
+        stmt = insert(R).values(tenant_id=self.tenant_id, offset_seconds=seconds)
+        stmt = stmt.on_conflict_do_nothing(index_elements=[R.c.tenant_id]).returning(R.c.offset_seconds)
+        with self.engine.begin() as conn:
+            got = conn.execute(stmt).scalar()
+        return None if got is None else timedelta(seconds=got)
 
 
 def install_clock(settings: OsSettings, engine: Engine) -> None:

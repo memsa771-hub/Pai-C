@@ -35,6 +35,7 @@ DAILY_REVISIONS = 3  # replan revisions per plan per UTC day; the 4th pauses cha
 LIMIT_REASON = "Changes are paused: this plan reached today's limit of 3 automatic changes."
 REFUSED_REASON = "Every proposed change was refused by the plan's checks."
 BROKEN_REASON = "This plan no longer compiles: a person needs to check it."
+PAUSED_REASON = "Changes are paused while a person checks your plan: try again once they are done."
 LOCK_CLASS = 7007  # pg_advisory_lock(LOCK_CLASS, plan id): one replan or answer per plan at a time
 _OPS = TypeAdapter(Ops)
 
@@ -251,12 +252,13 @@ class Replanner:
         stored = bool(self.overrides.for_proposal(proposal_id))
         new = [] if stored else [o for op in ops for o in to_overrides(op)]
         cause = f"replan:{proposal_id}"
+        made = False  # whether this proposal changed the plan (a revision of its own)
         if any(to_overrides(op) for op in ops):
             for _ in range(3):
                 contract, sha = self.plans._contract(plan_id)
                 try:
                     draft = self.plans.compile(contract, self.plans._pinned(plan_id), plan_id, new)
-                    self.plans.kernel.apply_replan(plan_id, proposal_id, draft, sha, overrides=new)
+                    made = self.plans.kernel.apply_replan(plan_id, proposal_id, draft, sha, overrides=new) is not None
                     break
                 except StaleDraft:
                     continue
@@ -266,9 +268,9 @@ class Replanner:
                 raise ReplanFailed("The plan kept changing while this change was being made.")
         for op in ops:
             if isinstance(op, SwapProgramme):
-                self._swap(plan_id, op, cause)
+                made = self._swap(plan_id, op, cause) or made
             elif isinstance(op, UpgradePlaybook) and self.plans._pinned(plan_id).version < op.version:
-                self.plans.upgrade(plan_id, op.version)
+                made = self.plans.upgrade(plan_id, op.version) is not None or made
             elif isinstance(op, RequestFromStudent):  # one nudge per step per day (final review I2)
                 day = self.clock().astimezone(timezone.utc).date().isoformat()
                 self.outbox.add(f"replan:{plan_id}:{op.instance_key}:{day}", "email", self.student_of(plan_id),
@@ -276,11 +278,21 @@ class Replanner:
                                                    "reason": op.reason})
             elif isinstance(op, Escalate):
                 self.support(plan_id, p.event_ids, op.reason, proposal_id)
-        revision = self._base(plan_id)[1]
+        # A proposal that changed nothing (its overrides compiled to the same plan) records no revision, so "What
+        # changed" shows no empty entry (Slice 7 minor #7). One that only acts elsewhere (a nudge, a support case)
+        # still records the plan's revision: it is shown, and a repeated step does not apply it again.
+        made = made or self._revised_by(plan_id, cause) or not all(_writes(op) for op in ops)
+        revision = self._base(plan_id)[1] if made else None
         self.proposals.set_status(proposal_id, status, revision=revision)
         return revision
 
-    def _swap(self, plan_id: int, op: SwapProgramme, cause: str) -> None:
+    def _revised_by(self, plan_id: int, cause: str) -> bool:
+        """Whether a revision with this cause exists (a repeated step finds the first run's revision)."""
+        R = models.plan_revisions
+        with self.engine.connect() as conn:
+            return conn.execute(select(R.c.id).where(R.c.plan_id == plan_id, R.c.cause == cause)).first() is not None
+
+    def _swap(self, plan_id: int, op: SwapProgramme, cause: str) -> bool:
         from app.os.contracts.route_contract import ProgrammeChoice
 
         def edit(current):
@@ -291,9 +303,9 @@ class Replanner:
                                     rank=x.rank) for x in current.programmes]
 
         try:
-            self.plans.change_programmes(plan_id, edit, cause)
+            return self.plans.change_programmes(plan_id, edit, cause) is not None
         except _AlreadyDone:
-            pass
+            return False
 
     # ------------------------------------------------------------------ the student's answer
 
@@ -316,6 +328,8 @@ class Replanner:
             raise PermissionError("not this student's proposal")
         with self.plan_lock(p.plan_id):
             p = self._own_pending(student_ref, proposal_id)
+            if self.plans.kernel.changes_paused(p.plan_id):  # a person is checking the plan (Slice 7 minor #1)
+                raise ProposalStale(PAUSED_REASON)
             if p.based_on is not None and self._base(p.plan_id)[0] != p.based_on:
                 raise ProposalStale("your plan changed since this was suggested")
             ops = ops_of(p.ops)

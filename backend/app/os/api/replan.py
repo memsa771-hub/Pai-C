@@ -69,7 +69,8 @@ def add_replan_routes(router: APIRouter, services: Callable[[], Services], requi
         with svc.engine.connect() as conn:
             paused = conn.execute(select(P.c.changes_paused).where(P.c.id == plan_id)).scalar_one()
         return {"changes": [{**proposal_out(p), "proposal_id": p.id, "at": p.answered_at or p.created_at}
-                            for p in found if p.status in ("applied", "accepted") and p.ops],
+                            for p in found if p.status in ("applied", "accepted") and p.ops
+                            and p.revision is not None],  # a proposal that changed nothing is no entry (minor #7)
                 "pending": [proposal_out(p) for p in found if p.status == "pending"],
                 "changes_paused": paused, "plan_id": plan_id}
 

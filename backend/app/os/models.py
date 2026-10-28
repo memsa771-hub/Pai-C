@@ -636,9 +636,9 @@ counsellor_sweep = Table(
 rehearsal_clock = Table(
     "os_rehearsal_clock", md,
     Column("tenant_id", Text, primary_key=True),
-    Column("offset_seconds", BigInteger, nullable=False, server_default="0"),  # how far the rehearsal clock is moved
+    # how far the rehearsal clock is moved; negative only when `start` set a day before the real date (os_0017)
+    Column("offset_seconds", BigInteger, nullable=False, server_default="0"),
     Column("updated_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
-    CheckConstraint("offset_seconds >= 0", name="ck_os_rehearsal_clock_offset"),
 )
 
 # --- Slice 9a: pilot consent (os_0015) -----------------------------------------------------------------------------

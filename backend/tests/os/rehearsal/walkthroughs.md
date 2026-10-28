@@ -17,7 +17,7 @@ use a real document. Screenshots and the failure log go outside the repo (`~/s9-
    extra pages), `OS_ADMIN_TOKEN` (any fictional value), `OS_EMAIL_SENDER=log`, `OS_DATABASE_URL`.
 2. Load the programme registry and the seeded facts into the database (as the driver's `_clean` does).
 3. Start the worker: `python -m app.os.runner.worker` from `backend/`, same environment.
-4. Move the clock to 1 Dec 2026: `POST /v1/os/admin/rehearsal/advance {"days": N}` (at most 60 per call).
+4. Set the clock to 1 Dec 2026, once, on the clean database: `POST /v1/os/admin/rehearsal/start {"date": "2026-12-01"}` (works before or after the real 1 Dec; 409 if the clock was already set or moved).
 5. Sign in with the fake token (step 5 of "Walkthrough sign-in"). The entry point gives one fixed student, so the
    three walkthroughs run one after the other, each on a fresh database.
 6. Browser: 375 px wide, touch. Move between pages with the menu if there is one; note it if there is not.
