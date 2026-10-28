@@ -10,9 +10,11 @@ folders (`~/s9-rehearsal/full-1`, `kill-1`, `walkthroughs`) stay outside the rep
 |---|---|---|---|---|
 | Full | `python -m tests.os.rehearsal.run --students all --out ~/s9-rehearsal/full-1` | 447 s | 12 of 12 `visa_ready`; 12 ready to submit, 12 visa file ready | 4 (blocks 1, workaround 3) |
 | Kill | `python -m tests.os.rehearsal.run --students all --kill --out ~/s9-rehearsal/kill-1` | 604 s, 54 worker SIGKILLs | the same as the full run | the same 4 ids |
-| Walkthroughs | S1, S3, S9 by hand, headless Chromium at 375 px (`walkthroughs.md`) | about 10 min each once the stack ran | S1 and S3 reached both end points; S9 reached both, but its scripted event could not be played | 16 (blocks 3, workaround 4, wording 9) |
+| Walkthroughs | S1, S3, S9 by hand, headless Chromium at 375 px (`walkthroughs.md`) | about 10 min each once the stack ran | S1 and S3 reached both end points; S9 reached both, but its scripted event could not be played | 16 (blocks 3, workaround 5, wording 8) |
 
-**All failures (distinct ids): 20. blocks 4, workaround 7, wording 9.** Both driver runs exit 1 because the failure
+**All failures (distinct ids): 20. blocks 4, workaround 8, wording 8.** The 4 `blocks` entries come from **2 root
+causes**: F3 (`http:S9:GET /statements:500`, also behind `walk:S3:statements_page_500` and
+`walk:S9:cannot_change_approved_sop`) and the unnamed admission-result cards (`walk:S3:admission_card_unnamed`). Both driver runs exit 1 because the failure
 log is not empty (expected while F1 to F4 are open).
 
 ## End states (full run; the kill run matched)
@@ -60,18 +62,18 @@ the two failure logs' ids:
 
 | id | severity | one line |
 |---|---|---|
-| `walk:S3:admission_card_unnamed` | blocks | Two identical "Tell us this programme's admission result" cards with no programme name; "Not admitted" removes the programme with no confirmation, so a wrong tap removes the admitted one |
-| `walk:S3:statements_page_500` | blocks | The statements page shows "Could not load your statements" once a pack exists (same cause as F3); seen for S3 and S9, not only S9 |
-| `walk:S9:cannot_change_approved_sop` | blocks | S9's scripted event (change an approved SOP) cannot be done in the browser, because of F3 |
-| `walk:S1:no_menu_on_os_pages` | workaround | The OS pages have no menu or header at 375 px; the "Study abroad plan" links are only in the host drawer, whose home page first shows the host onboarding form; pages were reached by URL |
+| `walk:S3:admission_card_unnamed` | blocks | Two identical "Tell us this programme's admission result" cards with no programme name. Blocks because a wrong tap on "Not admitted" is recorded at once, with no confirmation, the card then leaves the inbox so the result cannot be changed there, and the plan goes on to suggest removing the programme that admitted the student |
+| `walk:S3:statements_page_500` | blocks | Same cause as F3. The statements page shows "Could not load your statements" once a pack exists (same cause as F3); seen for S3 and S9, not only S9 |
+| `walk:S9:cannot_change_approved_sop` | blocks | Same cause as F3. S9's scripted event (change an approved SOP) cannot be done in the browser, because of F3 |
+| `walk:S1:no_menu_on_os_pages` | workaround | The OS pages have no menu or header at 375 px; the "Study abroad plan" links are only in the host drawer, whose home page first shows the host onboarding form; pages were reached by URL. `workaround` because the host drawer has the links, but the OS pages themselves offer no way back to it; it would be `blocks` if that drawer cannot be reached from the OS pages on a phone |
 | `walk:S1:inbox_programme_unnamed` | workaround | Per-programme inbox steps show as identical cards with no programme name; only the "programme facts" link hints which |
 | `walk:S1:nothing_to_do_while_blocked` | workaround | After the visa file is approved the inbox says "Nothing to do right now" while the plan waits on F1 |
+| `walk:S1:visa_admitted_label_one_only` | workaround | With two admissions, only one programme is marked "(admitted)" and the visa file is built for it without asking (behaviour, not only wording) |
 | `walk:S3:removed_programme_still_shown` | workaround | After the removal is accepted, the removed programme's pack still shows "approved" and the programmes page and visa "For" list still offer it (with F2) |
 | `walk:S1:chip_unknown_says_being_researched` | wording | All programmes on the start page say "being researched", including the 3 that have facts (verdict unknown before documents) |
 | `walk:S1:statement_programmes_raw_refs` | wording | The statements page lists programmes by internal ref, not by name |
 | `walk:S1:datasheet_label_overlap` | wording | In the data sheet at 375 px the "IELTS TRF number" label and value run together |
 | `walk:S1:visa_how_to_apply_programme_text` | wording | The visa file's "How to apply" speaks of "this programme" and "the university" |
-| `walk:S1:visa_admitted_label_one_only` | wording | With two admissions, only one programme is marked "(admitted)" and the visa file is built for it without asking |
 | `walk:S1:plan_updated_notice_empty` | wording | "Your plan was updated" appears while "What changed" says "No changes yet." |
 | `walk:S1:documents_read_needs_tap` | wording | A read document says only "read"; nothing says to tap it to check the values; some labels are technical ("Mrz line1") |
 | `walk:S1:done_after_upload` | wording | Provide steps keep a "Done" button after their documents are uploaded and confirmed |
@@ -92,6 +94,12 @@ the two failure logs' ids:
   tap; it was hidden for the rest of the run (dev server only, not a product finding).
 - Time moved with the admin `advance` and `tick` calls between steps; `visa_target_date` was supplied as the admin, as
   the driver does (F1).
+- **Deviations from spec.** (a) The walkthroughs used Playwright's headless Chromium, driven from scratch scripts
+  outside the project, while spec §2.6 / S9-D5 says no Playwright and a built-in browser (the controller's brief asked
+  for Playwright here; Playwright was not added to the project). (b) S9's visa file was built for its preselected
+  programme (ovgu-eeit), not tu-chemnitz-embedded-systems as `walkthroughs.md` asks: the page preselects the first
+  programme answered "Admitted" and builds the file for it at once; the walkthrough did not change the "For" list
+  before approving. This is what `walk:S1:visa_admitted_label_one_only` describes.
 - Not findings (rehearsal only): approval dates and "What changed" dates show the real date (plain audit stamps stay
   real time, `rehearsal.md`); the offline drafts are template text.
 
