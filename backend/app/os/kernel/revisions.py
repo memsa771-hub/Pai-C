@@ -5,7 +5,7 @@ import json
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 
-from app.os.compiler import DraftTask
+from app.os.compiler import CONFIRM_TYPE, DraftTask
 from app.os.kernel.states import TERMINAL, TaskState, is_started
 
 NOTICE_PREFIX = "plan_updated@"
@@ -60,12 +60,13 @@ def draft_token(t: DraftTask) -> str:
 
 
 def _left_with_programme(row: Mapping, state: TaskState, live_programmes: set[str]) -> bool:
-    """A work task only waiting for a review (a fact check waiting for research or an admin) whose programme has
+    """A fact check (`CONFIRM_TYPE`; another module's step waiting for a review is kept) only waiting for research or
+    an admin whose programme has
     left the plan goes with it (Slice 9a Task 11, F2; Slice 7 §2 "cancel the programme's remaining tasks"): it holds
     no work of the student's, and its research would serve nothing. Only then: a check dropped because its fact was
     just confirmed stays, so the research run completes it (`after_fact_change`)."""
-    return (row["kind"] == "work" and state == TaskState.WAITING_REVIEW and row.get("programme_ref") is not None
-            and row["programme_ref"] not in live_programmes)
+    return (row["task_type"] == CONFIRM_TYPE and row["kind"] == "work" and state == TaskState.WAITING_REVIEW
+            and row.get("programme_ref") is not None and row["programme_ref"] not in live_programmes)
 
 
 def diff(stored: Mapping[str, Mapping], draft_tasks: Mapping[str, DraftTask],

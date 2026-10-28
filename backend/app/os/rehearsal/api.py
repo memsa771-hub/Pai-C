@@ -53,10 +53,11 @@ def add_rehearsal_routes(router: APIRouter, services: Callable, require_admin) -
     @router.post(f"{PREFIX}/start", response_model=AdvanceOut, dependencies=admin)
     def start(body: StartIn, svc=Depends(services)) -> dict:
         """Sets the day the rehearsal starts on, once, on a clean clock (a day in the past too). 409 once the clock
-        has been set or moved: time never goes back once set."""
+        has been set or moved, or once a plan exists: time never goes back once set."""
         moved = ClockStore(svc.engine, svc.settings.tenant_id).start(body.date)
         if moved is None:
-            raise HTTPException(status_code=409, detail="the rehearsal clock is already set; clean the database first")
+            raise HTTPException(status_code=409, detail="the rehearsal clock is already set or plans exist; clean the "
+                                                        "database first")
         return {"offset_days": moved.total_seconds() / DAY_SECONDS, "now": clock.now()}
 
     @router.post(f"{PREFIX}/tick", response_model=TickOut, dependencies=admin)

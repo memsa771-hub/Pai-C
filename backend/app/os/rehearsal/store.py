@@ -3,7 +3,7 @@
 import logging
 from datetime import date, timedelta
 
-from sqlalchemy import Date, Engine, cast, func, literal, select
+from sqlalchemy import Date, Engine, cast, exists, func, literal, select
 from sqlalchemy.dialects.postgresql import insert
 
 from app.os import clock, models
@@ -40,14 +40,18 @@ class ClockStore:
             return timedelta(seconds=conn.execute(stmt).scalar_one())
 
     def start(self, day: date) -> timedelta | None:
-        """Sets the clock once, on a clean rehearsal clock (no row yet), so that today is `day`: whole days from the
-        real UTC date, which may be negative (a day already past). Returns the new offset, or None when the clock was
-        already set or moved (time never goes back once set). One atomic insert: two starts at once set it once.
+        """Sets the clock once, on a clean rehearsal clock, so that today is `day`: whole days from the real UTC date,
+        which may be negative (a day already past). Clean means no clock row yet and no plan of this tenant (plans that
+        ran at real time would have timestamps after a past start). Returns the new offset, or None when refused (time
+        never goes back once set). One atomic statement: two starts at once set it once. Seeded facts do not count:
+        they are loaded before the start.
 
         The real date is the database's (`now()` in UTC), so this module reads no time itself (clock rule)."""
         real_today = cast(func.timezone("UTC", func.now()), Date)
         seconds = (cast(literal(day.isoformat()), Date) - real_today) * 86400
-        stmt = insert(R).values(tenant_id=self.tenant_id, offset_seconds=seconds)
+        no_plans = ~exists().where(models.plans.c.tenant_id == self.tenant_id)  # nothing has run at real time yet
+        rows = select(literal(self.tenant_id), seconds).where(no_plans)
+        stmt = insert(R).from_select([R.c.tenant_id, R.c.offset_seconds], rows)
         stmt = stmt.on_conflict_do_nothing(index_elements=[R.c.tenant_id]).returning(R.c.offset_seconds)
         with self.engine.begin() as conn:
             got = conn.execute(stmt).scalar()

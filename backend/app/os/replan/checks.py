@@ -36,7 +36,7 @@ def task_rows(engine: Engine, tenant_id: str, plan_id: int) -> dict[str, TaskRow
         deps.setdefault(e.to_task, []).append((key_of[e.from_task], e.hard))
     return {t.instance_key: TaskRow(t.instance_key, t.template_key, t.programme_ref, t.state, t.kind, t.critical,
                                     t.protected, t.latest_finish, t.slack_days, t.duration_days,
-                                    tuple(sorted(deps.get(t.id, []))))
+                                    tuple(sorted(deps.get(t.id, []))), t.task_type)
             for t in tasks if CANCELLED_MARK not in t.instance_key and DONE_MARK not in t.instance_key}
 
 

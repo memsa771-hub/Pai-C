@@ -10,7 +10,7 @@ from sqlalchemy import insert, select
 
 from app.os import clock, models
 from app.os.compiler import CONFIRM_TYPE
-from app.os.kernel import Outcome
+from app.os.kernel import IllegalTransition, Outcome
 from app.os.knowledge.research.run import enqueue_research
 from app.os.replan import events
 from app.os.replan.checks import task_rows
@@ -103,6 +103,37 @@ def test_clock_reads_a_negative_offset(engine, clean, os_db):
     assert _near(clock.now(), datetime.now(timezone.utc) - 30 * DAY)
 
 
+def test_rehearsal_start_refused_once_plans_exist(engine, clean, os_db):
+    """A rehearsal clock that never moved, on a database where plans already ran at real time: a start on a past day
+    would send time back behind their stored timestamps, so it is refused (409) and nothing is written."""
+    with engine.begin() as conn:
+        conn.execute(insert(models.plans).values(tenant_id="pai", source="self_serve", external_ref="x", student_ref="stu-x", contract={},
+                                                 contract_sha256="0" * 64, status="active"))
+    web = _app(engine, _settings(os_db, True), FakeClient())
+    r = _start(web, date(2026, 12, 1))
+    assert r.status_code == 409
+    with engine.connect() as conn:
+        assert conn.execute(select(models.rehearsal_clock)).all() == []
+    with engine.begin() as conn:  # another tenant's plans do not count
+        conn.execute(models.plans.update().values(tenant_id="other"))
+    assert _start(web, date(2026, 12, 1)).status_code == 200
+
+
+def test_leftover_negative_offset_ignored_when_off(engine, clean, os_db):
+    """Review Focus 1: rehearsal off, a leftover negative offset row: real time, and every rehearsal call is 404."""
+    from app.os.rehearsal.store import install_clock
+
+    with engine.begin() as conn:
+        conn.execute(insert(models.rehearsal_clock).values(tenant_id="pai", offset_seconds=-90 * 86400))
+    install_clock(_settings(os_db, False), engine)
+    assert _near(clock.now(), datetime.now(timezone.utc))
+    web = _app(engine, _settings(os_db, False), FakeClient())
+    assert _near(clock.now(), datetime.now(timezone.utc))
+    assert _start(web, date(2026, 12, 1)).status_code == 404
+    assert web.post(f"{BASE}/advance", json={"days": 1}, headers=ADMIN).status_code == 404
+    assert web.post(f"{BASE}/tick", headers=ADMIN).status_code == 404
+
+
 def test_migration_down_clamps_a_negative_offset(os_db, engine, clean):
     from sqlalchemy import text
 
@@ -165,16 +196,18 @@ def test_only_review_waits_are_removed_with_their_programme():
     a check of a programme that stays (dropped because its fact was just confirmed) waits to be completed."""
     from app.os.kernel import diff
 
-    def row(state, ref="gone", kind="work", protected=False):
-        return {"state": state, "kind": kind, "protected": protected, "skipped_draft": None, "task_type": "x",
+    def row(state, ref="gone", kind="work", protected=False, task_type=CONFIRM_TYPE):
+        return {"state": state, "kind": kind, "protected": protected, "skipped_draft": None, "task_type": task_type,
                 "programme_ref": ref}
 
     stored = {"review": row("waiting_review"), "running": row("running"), "input": row("waiting_student"),
               "kept": row("pending", protected=True), "inbox": row("waiting_student", kind="student"),
-              "route_check": row("waiting_review", ref=None), "stays_check": row("waiting_review", ref="stays")}
+              "route_check": row("waiting_review", ref=None), "stays_check": row("waiting_review", ref="stays"),
+              "other_review": row("waiting_review", task_type="some.module_review")}
     d = diff(stored, {"live@stays": SimpleNamespace(programme_ref="stays")}, {})
     assert sorted(d.removed) == ["inbox", "review"]
-    assert sorted(d.skipped_started) == ["input", "route_check", "running", "stays_check"]
+    # a work step of another module waiting for a review is not a fact check: it is kept and reported, not cancelled
+    assert sorted(d.skipped_started) == ["input", "other_review", "route_check", "running", "stays_check"]
     assert d.kept_protected == ["kept"]
 
 
@@ -219,8 +252,8 @@ def test_empty_supervisor_answer_escalates(os_db, engine, clean, monkeypatch):
         DBOS.destroy(destroy_registry=True)
 
 
-def _row(key: str, state: str, kind: str = "student", protected: bool = False) -> TaskRow:
-    return TaskRow(key, key.split("@")[0], P1, state, kind, False, protected, None, None, 1, ())
+def _row(key: str, state: str, kind: str = "student", protected: bool = False, task_type: str = "x") -> TaskRow:
+    return TaskRow(key, key.split("@")[0], P1, state, kind, False, protected, None, None, 1, (), task_type)
 
 
 def _rejected(*rows: TaskRow):
@@ -242,8 +275,11 @@ def test_cancel_programme_wording_when_steps_kept():
         assert "kept" in reason
     finished = _rejected(_row(f"a@{P1}", "pending"), _row(f"d@{P1}", "done", kind="work"))
     assert finished == R  # a finished step is history, not "kept"
-    checking = _rejected(_row(f"a@{P1}", "pending"), _row(f"confirm_fact@{P1}:x", "waiting_review", kind="work"))
+    checking = _rejected(_row(f"a@{P1}", "pending"),
+                         _row(f"confirm_fact@{P1}:x", "waiting_review", kind="work", task_type=CONFIRM_TYPE))
     assert checking == R  # a fact check waiting for research goes with the programme (F2)
+    other = _rejected(_row(f"a@{P1}", "pending"), _row(f"m@{P1}", "waiting_review", kind="work"))
+    assert "kept" in other  # another module's step waiting for a review stays, and the text says so
 
 
 def test_no_empty_what_changed_entry(api):
@@ -264,3 +300,53 @@ def test_no_empty_what_changed_entry(api):
     assert ProposalStore(api.engine, "pai").get(d.proposal_id).revision is None
     body = api.get(f"/v1/os/plans/{api.plan_id}/changes", headers=ME).json()
     assert body["changes"] == []
+
+
+# ---- polish: a fact check cancelled meanwhile is not completed ----------------------------------------------------
+
+def test_fact_change_skips_a_check_cancelled_meanwhile(engine, clean, monkeypatch):
+    """The research run lists the checks waiting for a fact, then completes them. A check the kernel cancelled in
+    between (its programme left the plan, F2) is skipped, not an IllegalTransition that fails the step."""
+    from app.os.knowledge import Fact
+    from app.os.knowledge.changes import after_fact_change
+    from tests.os.kernel_helpers import contract
+    from tests.os.test_freshness import to_review
+    from tests.os.test_workers import seed_deadline, service, task
+
+    svc, kb, kernel = service(engine)
+    fid = seed_deadline(kb, status="unconfirmed")
+    ref = svc.start_plan(contract())
+    key = "confirm_fact@p1:deadline_close"
+    to_review(kernel, task(engine, ref.plan_id, key))
+    real = kernel.complete_review
+
+    def cancelled_first(task_id, result, **kw):  # the kernel's cancel lands between the listing and the completion
+        with engine.begin() as conn:
+            conn.execute(T.update().where(T.c.id == task_id).values(state="cancelled"))
+        return real(task_id, result, **kw)
+
+    monkeypatch.setattr(kernel, "complete_review", cancelled_first)
+    kb.upsert("programme", "p1", "deadline_close", Fact({"date": "2027-07-15"}, "Deadline", "https://uni.example/apply",
+                                                       datetime(2026, 10, 17, tzinfo=timezone.utc), 2027, "confirmed"))
+    after_fact_change(svc, kernel, "programme", "p1", "deadline_close", fid, "confirmed", 2027)
+    with engine.connect() as conn:
+        assert conn.execute(select(T.c.state).where(T.c.plan_id == ref.plan_id, T.c.instance_key.like(f"{key}%"))
+                            ).scalars().all() == ["cancelled"]
+
+
+def test_complete_review_if_waiting_skips_a_finished_check(engine, clean):
+    """The kernel's own state check: a check no longer waiting for review is left as it is."""
+    from tests.os.kernel_helpers import contract
+    from tests.os.test_freshness import to_review
+    from tests.os.test_workers import seed_deadline, service, task
+
+    svc, kb, kernel = service(engine)
+    seed_deadline(kb, status="unconfirmed")
+    ref = svc.start_plan(contract())
+    row = task(engine, ref.plan_id, "confirm_fact@p1:deadline_close")
+    to_review(kernel, row)
+    with engine.begin() as conn:
+        conn.execute(T.update().where(T.c.id == row.id).values(state="cancelled"))
+    assert kernel.complete_review(row.id, {}, only_if_waiting=True) is False
+    with pytest.raises(IllegalTransition):  # the default stays strict for the admin API
+        kernel.complete_review(row.id, {})

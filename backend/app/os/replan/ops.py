@@ -90,6 +90,7 @@ class TaskRow:
     slack_days: int | None
     duration_days: int
     depends_on: tuple[tuple[str, bool], ...]
+    task_type: str = ""  # e.g. the fact check's type (Slice 9a Task 11: a removed programme's checks go with it)
 
 
 def is_big(op: Op, tasks: Mapping[str, TaskRow], playbook) -> bool:

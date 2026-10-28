@@ -5,6 +5,7 @@ the plan, the playbook and the route's replan config (invariant 12)."""
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 
+from app.os.compiler import CONFIRM_TYPE
 from app.os.kernel.states import is_started
 from app.os.replan.config import ReplanConfig
 from app.os.replan.events import Event
@@ -69,8 +70,9 @@ def _rejected(event: Event, state: PlanState, cfg: ReplanConfig) -> list[Op] | H
 
 def _stays(t: TaskRow) -> bool:
     """Whether the kernel keeps this started step when its programme is removed. A fact check only waiting for a
-    review goes with its programme (kernel `revisions._left_with_programme`)."""
-    return is_started(t.state, t.kind) and not (t.kind == "work" and t.state == "waiting_review")
+    review goes with its programme (kernel `revisions._left_with_programme`); another module's step does not."""
+    return is_started(t.state, t.kind) and not (t.task_type == CONFIRM_TYPE and t.kind == "work"
+                                                and t.state == "waiting_review")
 
 
 def _unstarted_student(t: TaskRow | None) -> bool:
