@@ -90,7 +90,7 @@ cite them like facts and records.
 - Removed: `POST /summary/confirm`, `POST /summary/edit`, `POST /summary/feedback`, the Mirror lanes, the
   old `counselor.mirror` LLM job and schema (`mirror_schema.py` lanes/dimensions/blockers/question), the
   `counselor.mirror_research` job, `PossibilityService.from_mirror`, `mirror_is_current`, and the
-  `pai_counselor_mirror_feedback` table (migration 120; founder may object before merge).
+  `pai_counselor_mirror_feedback` table (migration 121; founder may object before merge).
 - `GET /summary` returns the state card; `GET /v1/counselor/workspace.picture` becomes the card's header,
   unknowns and text (the Overview reads the same shape).
 - Corrections: every entry on the Mirror has "This is wrong", which opens the Vault entry (Details) or, for
@@ -106,7 +106,7 @@ cite them like facts and records.
 - Stages keep their names. New transitions: DIRECTION → MIRROR when `MirrorEngine.ready` first becomes true
   (set by the reconciler after the write that made it ready); MIRROR → PROPOSED when the first path exists
   (set by the Path engine job after it saves paths). RESEARCHING, ASSESSING and NEEDS_INFO are no longer
-  entered by any code; migration 120 moves any journey still in them to PROPOSED (with events).
+  entered by any code; migration 121 moves any journey still in them to PROPOSED (with events).
 - Frontend signal `mirror_confirmed` becomes `mirror_ready` (card `ready`). Stage E title "Your Mirror".
 - `guided_state` `options_ready` becomes "any path exists"; `mirror_ready` is the card's `ready`.
 
