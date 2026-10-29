@@ -610,3 +610,29 @@ def test_closed_notice_keeps_its_revision(api):
         row = conn.execute(select(T.c.state, T.c.result).where(T.c.id == nid)).one()
     assert row.state == "done"
     assert row.result == {"closed": "no_student_changes", "revision": 91, "cause": "fact:y"}
+
+
+# ---- batch C fix round 1 -------------------------------------------------------------------------------------------
+
+def test_provisional_visa_date_leaves_out_rejections(engine, clean, os_db):
+    """With no visa programme yet, a programme that said "not admitted" (still in the plan until its removal is
+    accepted) is never the date's source; once one admitted, only admitted programmes are."""
+    from tests.os import test_api_visa as va
+
+    gen = va.api.__wrapped__(engine, clean, os_db)
+    web = next(gen)
+    try:
+        first, second, third = va.OTHER_PROG, va.PROG, "btu-artificial-intelligence"
+        for ref, day in ((first, "2027-10-01"), (second, "2027-10-15"), (third, "2027-09-15")):
+            _semester_start(web.svc, ref, day)
+        assert _visa_step(engine, web.plan_id).due_at == _visa_due("2027-09-15")
+        with engine.begin() as conn:  # the student's answer, as the kernel stores it (simulated)
+            conn.execute(T.update().where(T.c.plan_id == web.plan_id,
+                                          T.c.instance_key == f"admission_result@{third}")
+                         .values(state="done", result={"choice": "rejected"}))
+        web.svc.plans.recompile(web.plan_id, "test")
+        step = _visa_step(engine, web.plan_id)
+        assert step.due_at == _visa_due("2027-10-01") and step.provisional
+        assert "earliest semester start of your programmes (1 October 2027)" in step.citations[0]["note"]
+    finally:
+        next(gen, None)

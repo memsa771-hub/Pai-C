@@ -120,6 +120,19 @@ def inbox_items(engine: Engine, tenant_id: str, student_ref: str) -> list[dict]:
                  else []} for r in rows]
 
 
+def notice_link(engine: Engine, task_id: int) -> dict:
+    """A plan-update notice's link to its revision: {"revision", "cause"} from its stored result (what is there)."""
+    with engine.connect() as conn:
+        result = conn.execute(select(T.c.result).where(T.c.id == task_id)).scalar() or {}
+    return {k: result[k] for k in ("revision", "cause") if k in result}
+
+
+def task_plan_and_template(engine: Engine, task_id: int) -> tuple[int, str] | None:
+    with engine.connect() as conn:
+        row = conn.execute(select(T.c.plan_id, T.c.template_key).where(T.c.id == task_id)).first()
+    return None if row is None else (row.plan_id, row.template_key)
+
+
 def waiting_items(engine: Engine, tenant_id: str, student_ref: str, books: Mapping) -> list[dict]:
     """The student's steps that wait for a fact nobody has given yet (blocked `fact_missing:<field>`), each with what
     it waits for in its pinned playbook's words (`anchor.waiting`; None if the playbook has none). Listed after the

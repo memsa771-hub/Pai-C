@@ -8,9 +8,7 @@ from fastapi import APIRouter, Depends, File, Form, Header, HTTPException, Query
 
 from datetime import date
 
-from sqlalchemy import select
-
-from app.os import clock, models
+from app.os import clock
 from app.os.costs import cost_report
 from app.os.api.deps import check_admin, current_student_ref, current_student_ref_for_write
 from app.os.api.queries import (
@@ -20,10 +18,12 @@ from app.os.api.queries import (
     finding_out,
     inbox_items,
     mark_note_read,
+    notice_link,
     open_facts,
     plan_out,
     research_runs,
     student_programmes,
+    task_plan_and_template,
     waiting_items,
 )
 from app.os.api.schemas import (
@@ -190,12 +190,8 @@ def build_router(get_services: Callable[[], Services]) -> APIRouter:
         for item in items:
             if item["instance_key"].startswith(NOTICE_PREFIX) and not item["changes"]:
                 try:  # the result keeps the notice's link to its revision and cause
-                    with svc.engine.connect() as conn:
-                        link = conn.execute(select(models.tasks.c.result).where(
-                            models.tasks.c.id == item["id"])).scalar() or {}
                     svc.kernel.complete_student_task(item["id"], student, {
-                        "closed": "no_student_changes",
-                        **{k: link[k] for k in ("revision", "cause") if k in link}})
+                        "closed": "no_student_changes", **notice_link(svc.engine, item["id"])})
                     continue
                 except Exception:
                     log.exception("closing an empty plan update notice failed")
@@ -230,11 +226,9 @@ def build_router(get_services: Callable[[], Services]) -> APIRouter:
         except IllegalTransition as e:
             raise HTTPException(status_code=409, detail=str(e)) from None
         if done:  # an admission answer can change the visa programme, and so the visa step's date (F1)
-            with svc.engine.connect() as conn:
-                row = conn.execute(select(models.tasks.c.plan_id, models.tasks.c.template_key).where(
-                    models.tasks.c.id == task_id)).first()
-            if row is not None and row.template_key == ADMISSION_TASK:
-                refresh_visa_date(svc, row.plan_id)
+            found = task_plan_and_template(svc.engine, task_id)
+            if found is not None and found[1] == ADMISSION_TASK:
+                refresh_visa_date(svc, found[0])
         return {"completed": done}
 
     @router.post("/facts/{fact_id}/confirm", response_model=ConfirmOut, dependencies=[Depends(require_admin)])

@@ -10,7 +10,7 @@ from app.os.compiler import PlanDraft, compile_plan, date_of, needed_fields
 from app.os.contracts.route_contract import RouteContract
 from app.os.kernel import Kernel, PlanRef, StaleDraft
 from app.os.knowledge import KnowledgePort
-from app.os.packs.visa import VisaChoiceStore, preselect
+from app.os.packs.visa import ADMITTED, REJECTED, VisaChoiceStore, answers, preselect
 from app.os.playbooks import Playbook, PlaybookError, select_playbook
 from app.os.runner import Registry, default_registry
 from app.os.settings import OsSettings
@@ -70,7 +70,19 @@ class PlanService:
             self.knowledge.programme_facts(refs, sorted(programme_fields), year),
             self.today(), self.disabled_types(),
             overrides=overrides, chosen={"visa": self.visa_programme(contract, plan_id, overrides)},
+            excluded={"visa": self.not_visa_programmes(contract, plan_id)},
         )
+
+    def not_visa_programmes(self, contract: RouteContract, plan_id: int | None) -> set[str]:
+        """Programmes the provisional visa date (no visa programme yet) must not come from: once any programme
+        admitted the student, every other one; before that, those that said "not admitted" (still in the plan until
+        the removal is accepted). Slice 9 Task 11 fix round 1."""
+        if plan_id is None:
+            return set()
+        said = answers(self.engine, self.kernel.tenant_id, plan_id)
+        refs = {p.programme_ref for p in contract.programmes}
+        yes = {r for r, a in said.items() if a == ADMITTED and r in refs}
+        return refs - yes if yes else {r for r, a in said.items() if a == REJECTED}
 
     def visa_programme(self, contract: RouteContract, plan_id: int | None, overrides: Sequence = ()) -> str | None:
         """The programme the student's visa file is for: their stored choice, else the one programme that admitted

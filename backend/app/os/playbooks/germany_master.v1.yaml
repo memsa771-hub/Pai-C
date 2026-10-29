@@ -272,6 +272,7 @@ tasks:
       fact: semester_start
       programme: visa
       note: "{weeks} weeks before your semester starts on {date}"
+      note_earliest: "{weeks} weeks before the earliest semester start of your programmes ({date})"
       waiting: "Waiting for your programme's semester start date"
     lead_time: {constant: visa_before_semester_days}
     duration_constant: visa_processing_days

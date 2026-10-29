@@ -41,15 +41,16 @@ NOTE_FIELDS = frozenset({"date", "days", "weeks"})
 class Anchor(_Model):
     """The fact a step's date comes from. `programme: visa` (Slice 9 Task 11, F1): a step that is not fanned out takes
     the fact of the programme the student's visa file is for (before they choose: the earliest of the plan's
-    programmes). `note`: the plain explanation shown with the date, e.g. "{weeks} weeks before your semester starts
-    on {date}" ({days} and {weeks} are the lead time). `waiting`: what the student is told while the fact is
-    missing."""
+    candidate programmes). `note`: the plain explanation shown with the date, e.g. "{weeks} weeks before your
+    semester starts on {date}" ({days} and {weeks} are the lead time); `note_earliest`: the same when the date is
+    the earliest of several programmes'. `waiting`: what the student is told while the fact is missing."""
     fact: str
     programme: Literal["visa"] | None = None
     note: str | None = None
+    note_earliest: str | None = None  # the note when the date is the earliest of several programmes' (provisional)
     waiting: str | None = None
 
-    @field_validator("note")
+    @field_validator("note", "note_earliest")
     @classmethod
     def _known_placeholders(cls, note: str | None) -> str | None:
         if note is not None:

@@ -259,3 +259,77 @@ def test_germany_visa_date_from_the_semester_start():
     assert gm.constants[visa.lead_time.constant].value == 42
     assert visa.anchor.note and visa.anchor.waiting
     assert all(t.anchor is None or t.anchor.fact != "visa_target_date" for t in gm.tasks)
+
+
+# ---- Task 11 fix round 1 -------------------------------------------------------------------------------------------
+
+EARLIEST = "{weeks} weeks before the earliest semester start of your programmes ({date})"
+
+
+def test_provisional_date_skips_excluded_programmes():
+    """No visa choice yet: a programme the caller excludes (it said "not admitted", or others admitted the student)
+    is never the date's source, even while it is still in the plan."""
+    facts = {**deadlines(p1="2027-07-15", p2="2027-07-15", p3="2027-07-15"),
+             **starts(p1="2027-10-01", p2="2027-09-15", p3="2027-10-15")}
+    d = compile_plan(contract(["p1", "p2", "p3"]), visa_book(), {}, facts, TODAY, excluded={"visa": {"p2"}})
+    visa = task(d, "visa")
+    assert visa.latest_finish == end_of_day(date(2027, 10, 1), "Europe/Dublin") - timedelta(days=42)
+    assert ("programme", "p2", "semester_start") not in visa.fact_refs
+    assert not any(t.instance_key == "confirm_fact@p2:semester_start" for t in d.tasks)
+    every = compile_plan(contract(["p1", "p2"]), visa_book(), {}, facts, TODAY, excluded={"visa": {"p1", "p2"}})
+    assert task(every, "visa").blocked_reason == "fact_missing:semester_start"  # nothing left to plan from
+
+
+def test_provisional_date_says_it_is_the_earliest():
+    """A date taken from several programmes says so, in the playbook's words; one programme's date keeps its note."""
+    facts = {**deadlines(p1="2027-07-15", p2="2027-07-15"), **starts(p1="2027-10-01", p2="2027-09-15")}
+    book = visa_book(note_earliest=EARLIEST)
+    several = task(compile_plan(contract(["p1", "p2"]), book, {}, facts, TODAY), "visa")
+    assert several.citations[0]["note"] == \
+        "6 weeks before the earliest semester start of your programmes (15 September 2027)"
+    one = task(compile_plan(contract(["p1", "p2"]), book, {}, facts, TODAY, chosen={"visa": "p1"}), "visa")
+    assert one.citations[0]["note"] == "6 weeks before your semester starts on 1 October 2027"
+    gm = load_playbook(Path(__file__).parents[2] / "app/os/playbooks/germany_master.v1.yaml")
+    assert gm.task("visa_apply").anchor.note_earliest
+
+
+def test_note_month_does_not_follow_the_locale(monkeypatch):
+    """The note's month name is fixed English, whatever the process locale."""
+    import locale
+
+    try:
+        locale.setlocale(locale.LC_TIME, "de_DE.UTF-8")
+    except locale.Error:
+        pytest.skip("no German locale installed")
+    try:
+        facts = {**deadlines(p1="2027-07-15"), **starts(p1="2027-10-01")}
+        visa = task(compile_plan(contract(["p1"]), visa_book(), {}, facts, TODAY), "visa")
+        assert visa.citations[0]["note"].endswith("1 October 2027")
+    finally:
+        locale.setlocale(locale.LC_TIME, "C")
+
+
+@pytest.mark.xfail(strict=True, raises=AssertionError, reason="visa date semantics pending user decision")
+def test_visa_date_does_not_pull_applications_before_their_deadlines():
+    """Regression (Task 11 review, critical): on the real Germany playbook with realistic dates (semester start 1 Oct,
+    application deadline 15 Jul, visa programme chosen), no apply step may be due before its cited deadline minus its
+    own lead time, and no admission result before the application deadline."""
+    gm = load_playbook(Path(__file__).parents[2] / "app/os/playbooks/germany_master.v1.yaml")
+    refs = ["p1", "p2"]
+    berlin = "Europe/Berlin"
+    prog = {}
+    for r in refs:
+        prog[(r, "deadline_close")] = fact({"date": "2027-07-15", "tz": berlin})
+        prog[(r, "semester_start")] = fact({"date": "2027-10-01", "tz": berlin})
+        prog[(r, "application_route")] = fact("uni_assist")
+        prog[(r, "admission_test")] = fact([])
+    d = compile_plan(contract(refs, destination="DE"), gm, {}, prog, date(2026, 12, 1), chosen={"visa": "p1"})
+    deadline = end_of_day(date(2027, 7, 15), berlin)
+    lead = timedelta(days=int(gm.constants["uni_assist_lead_days"].value))
+    for t in d.tasks:
+        if t.template_key == "uni_assist_apply":
+            assert t.latest_finish >= deadline - lead, (t.instance_key, t.latest_finish)
+        if t.template_key == "direct_apply":
+            assert t.latest_finish >= deadline, (t.instance_key, t.latest_finish)
+        if t.template_key == "admission_result":
+            assert t.latest_finish is None or t.latest_finish >= deadline, (t.instance_key, t.latest_finish)

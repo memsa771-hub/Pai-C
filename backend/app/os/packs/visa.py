@@ -15,6 +15,7 @@ V, T = models.visa_choices, models.tasks
 VISA_ITEMS = ":visa"  # the os_pack_items key of the visa file's ticks and added items (no programme ref has a colon)
 ADMISSION_TASK = "admission_result"
 ADMITTED = "admitted"  # the admission_result payload: {"choice": "admitted" | "rejected"}
+REJECTED = "rejected"
 
 
 @dataclass(frozen=True)
@@ -47,6 +48,17 @@ class VisaChoiceStore:
         if not amount.is_finite() or amount < 0:
             raise ValueError("the amount must be 0 or more")
         self._upsert(student_ref, reduction=amount)
+
+
+def answers(engine: Engine, tenant_id: str, plan_id: int) -> dict[str, str]:
+    """Programme -> the student's admission answer ("admitted" or "rejected"), from the done `admission_result`
+    tasks; the latest answer of a programme wins."""
+    with engine.connect() as conn:
+        rows = conn.execute(select(T.c.programme_ref, T.c.result).where(
+            T.c.tenant_id == tenant_id, T.c.plan_id == plan_id, T.c.template_key == ADMISSION_TASK,
+            T.c.state == TaskState.DONE).order_by(T.c.id)).all()
+    return {r.programme_ref: r.result["choice"] for r in rows
+            if r.programme_ref and isinstance(r.result, dict) and r.result.get("choice") in (ADMITTED, REJECTED)}
 
 
 def admitted(engine: Engine, tenant_id: str, plan_id: int) -> list[str]:

@@ -3,7 +3,7 @@
 Pure: no database, no clock, no randomness. The same input always gives the same draft.
 """
 
-from collections.abc import Mapping, Sequence
+from collections.abc import Collection, Mapping, Sequence
 from dataclasses import dataclass, field, replace
 from datetime import date, datetime, timedelta
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
@@ -15,6 +15,9 @@ from app.os.knowledge import Fact
 from app.os.playbooks import Playbook, TaskTemplate
 
 CONFIRM_TYPE = "knowledge.confirm_fact"
+# A derived date's note names its month in English whatever the process locale (strftime's %B follows it).
+MONTHS = ("January", "February", "March", "April", "May", "June", "July", "August", "September", "October",
+          "November", "December")
 
 
 class CompileError(ValueError):
@@ -200,12 +203,16 @@ def compile_plan(
     today: date,
     disabled_types: frozenset[str] = frozenset(),
     overrides: Sequence = (),
-    chosen: Mapping[str, str | None] = {},
+    chosen: Mapping[str, str | None] | None = None,
+    excluded: Mapping[str, Collection[str]] | None = None,
 ) -> PlanDraft:
     """`overrides`: a replan's plan overrides (Slice 7 S7-D5), each with `op`, `target` and `payload`, applied after
     the playbook is expanded, so every recompile keeps them. An override whose target is gone is ignored.
     `chosen`: the programme the student chose for a purpose, by the name an `anchor.programme` uses ("visa": the
-    programme the visa file is for), or None while there is none (Slice 9 Task 11, F1)."""
+    programme the visa file is for), or None while there is none (Slice 9 Task 11, F1). `excluded`: by the same name,
+    programmes that are never the source while nothing is chosen (e.g. one that said "not admitted" while others
+    did not, or one that did not admit the student while others did)."""
+    chosen, excluded = chosen or {}, excluded or {}
     refs = [p.programme_ref for p in sorted(contract.programmes, key=lambda p: p.rank)]
     removed = {o.target for o in overrides if o.op == "cancel_programme"}
     route_key = playbook.key
@@ -256,7 +263,8 @@ def compile_plan(
                 if t.anchor.programme and ref is None:  # the chosen programme's fact, else the earliest (F1)
                     live = [r for r in refs if r not in removed]
                     pick = chosen.get(t.anchor.programme)
-                    sources = [pick] if pick in live else live
+                    out = set(excluded.get(t.anchor.programme, ()))
+                    sources = [pick] if pick in live else [r for r in live if r not in out]
                 else:
                     sources = [ref]
                 usable = []
@@ -276,9 +284,11 @@ def compile_plan(
                     inst.tz = tz or playbook.default_timezone
                     if fact.url:  # the date comes from this page: cite it first (invariant 3, review I5)
                         cite = {"source": f"fact:{t.anchor.fact}", "url": fact.url}
-                        if t.anchor.note:  # and say plainly how the date follows from it (F1)
-                            cite["note"] = t.anchor.note.format(date=f"{d.day} {d:%B} {d.year}", days=lead_days,
-                                                                weeks=lead_days // 7)
+                        note = t.anchor.note_earliest if len(sources) > 1 and t.anchor.note_earliest \
+                            else t.anchor.note
+                        if note:  # and say plainly how the date follows from it (F1)
+                            cite["note"] = note.format(date=f"{d.day} {MONTHS[d.month - 1]} {d.year}",
+                                                       days=lead_days, weeks=lead_days // 7)
                         inst.citations.insert(0, cite)
                     inst.deadline = end_of_day(d, inst.tz) - timedelta(days=lead_days)
                     if not fact.confirmed or len(sources) > 1:  # several: it may move once one is chosen
