@@ -198,3 +198,81 @@ def test_settings_repr_hides_the_openai_key():
 
     s = load_settings({"OS_DATABASE_URL": "postgresql://a@b/c", "OS_OPENAI_API_KEY": FAKE_KEY})
     assert s.openai_api_key == FAKE_KEY and FAKE_KEY not in repr(s)
+
+
+# ---- the connection preflight (final review fix pass). The HTTP call is faked: no test reaches the network.
+
+class _Resp:
+    def __init__(self, status_code: int):
+        self.status_code = status_code
+
+
+def _fake_get(answer):
+    calls = []
+
+    def get(url, **kw):
+        calls.append((url, kw))
+        if isinstance(answer, Exception):
+            raise answer
+        return answer
+
+    return get, calls
+
+
+def test_preflight_passes_on_2xx():
+    from tests.os.rehearsal.run import preflight
+
+    get, calls = _fake_get(_Resp(200))
+    preflight(GOOD, get=get)
+    [(url, kw)] = calls
+    assert url == "https://api.openai.com/v1/models"
+    assert kw["timeout"] == 10
+    assert kw["headers"]["Authorization"] == f"Bearer {FAKE_KEY}"
+
+
+@pytest.mark.parametrize("answer,said", [
+    (_Resp(401), "HTTP 401"),
+    (_Resp(503), "HTTP 503"),
+])
+def test_preflight_refuses_a_non_2xx_answer(answer, said):
+    from tests.os.rehearsal.run import preflight
+
+    get, _ = _fake_get(answer)
+    with pytest.raises(BilledRefused, match=said) as err:
+        preflight(GOOD, get=get)
+    assert "api.openai.com" in str(err.value) and FAKE_KEY not in str(err.value)
+
+
+def test_preflight_refuses_when_it_cannot_connect():
+    """What the proxy did in the 2-hour run: CONNECT to api.openai.com refused (403). The reason names the host and
+    the error type only, never the key (not even when the error's own text carries it)."""
+    import httpx
+
+    from tests.os.rehearsal.run import preflight
+
+    get, _ = _fake_get(httpx.ProxyError(f"403 Forbidden for {FAKE_KEY}"))
+    with pytest.raises(BilledRefused, match="ProxyError") as err:
+        preflight(GOOD, get=get)
+    assert "api.openai.com" in str(err.value) and FAKE_KEY not in str(err.value)
+    assert err.value.__cause__ is None and err.value.__suppress_context__  # no traceback shows the error's text
+
+
+def test_cli_refuses_when_the_preflight_fails(monkeypatch, capsys, tmp_path):
+    """main() with --billed, a complete env and no route to OpenAI exits 2 before any rehearsal starts."""
+    import httpx
+
+    for k, v in GOOD.items():
+        monkeypatch.setenv(k, v)
+
+    def no_route(url, **kw):
+        raise httpx.ConnectError("refused")
+
+    def boom(*a, **kw):
+        raise AssertionError("a billed rehearsal must not start")
+
+    monkeypatch.setattr("tests.os.rehearsal.run.httpx.get", no_route)
+    monkeypatch.setattr("tests.os.rehearsal.run.Rehearsal", boom)
+    assert main(["--students", "S1", "--billed", "--out", str(tmp_path / "billed")]) == 2
+    out = capsys.readouterr()
+    assert "--billed refused: " in out.err and "api.openai.com" in out.err and "ConnectError" in out.err
+    assert FAKE_KEY not in out.err + out.out

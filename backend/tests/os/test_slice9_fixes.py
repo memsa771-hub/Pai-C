@@ -120,14 +120,17 @@ def test_rehearsal_start_refused_once_plans_exist(engine, clean, os_db):
     assert _start(web, date(2026, 12, 1)).status_code == 200
 
 
-def test_leftover_negative_offset_ignored_when_off(engine, clean, os_db):
-    """Review Focus 1: rehearsal off, a leftover negative offset row: real time, and every rehearsal call is 404."""
-    from app.os.rehearsal.store import install_clock
+def test_leftover_negative_offset_refused_when_off(engine, clean, os_db):
+    """Review Focus 1, changed by the final review fix pass: rehearsal off with a leftover offset row (here negative)
+    refuses to start; with no row, real time and every rehearsal call is 404."""
+    from app.os.rehearsal.store import RehearsalDataLeft, install_clock
 
     with engine.begin() as conn:
         conn.execute(insert(models.rehearsal_clock).values(tenant_id="pai", offset_seconds=-90 * 86400))
-    install_clock(_settings(os_db, False), engine)
-    assert _near(clock.now(), datetime.now(timezone.utc))
+    with pytest.raises(RehearsalDataLeft):
+        install_clock(_settings(os_db, False), engine)
+    with engine.begin() as conn:
+        conn.execute(models.rehearsal_clock.delete())
     web = _app(engine, _settings(os_db, False), FakeClient())
     assert _near(clock.now(), datetime.now(timezone.utc))
     assert _start(web, date(2026, 12, 1)).status_code == 404

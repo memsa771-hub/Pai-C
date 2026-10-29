@@ -71,7 +71,7 @@ def load_settings(env: Mapping[str, str] | None = None) -> OsSettings:
         raise ModelModeError("OS_MODEL_MODE=offline needs rehearsal mode: set OS_REHEARSAL=on, or use OS_MODEL_MODE=openai")
     if model_mode == "offline" and answers_dir is None:
         raise ModelModeError("OS_MODEL_MODE=offline needs OS_OFFLINE_ANSWERS_DIR (the folder of canned answers)")
-    email_sender = env.get("OS_EMAIL_SENDER") or "log"
+    email_sender = (env.get("OS_EMAIL_SENDER") or "").strip().lower() or "log"
     resend_api_key = (env.get("OS_RESEND_API_KEY") or "").strip() or None
     email_from = (env.get("OS_EMAIL_FROM") or "").strip() or None
     if email_sender == "resend" and (resend_api_key is None or email_from is None):

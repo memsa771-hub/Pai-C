@@ -185,13 +185,16 @@ def build_router(get_services: Callable[[], Services]) -> APIRouter:
     def drop_empty_notices(svc: Services, student: str, items: list[dict]) -> list[dict]:
         """A "Your plan was updated" item whose revision changed none of the student's steps has nothing to tell
         them: it is done (Slice 9 Task 11, `walk:S1:plan_updated_notice_empty`). Extra work on a read: a failure
-        leaves the item listed."""
+        leaves the item listed; one another request moved on meanwhile (IllegalTransition, e.g. two loads at once) is
+        left out, quietly."""
         kept = []
         for item in items:
             if item["instance_key"].startswith(NOTICE_PREFIX) and not item["changes"]:
                 try:  # the result keeps the notice's link to its revision and cause
                     svc.kernel.complete_student_task(item["id"], student, {
                         "closed": "no_student_changes", **notice_link(svc.engine, item["id"])})
+                    continue
+                except IllegalTransition:  # another request moved it on meanwhile: no longer the student's to see
                     continue
                 except Exception:
                     log.exception("closing an empty plan update notice failed")
@@ -226,7 +229,7 @@ def build_router(get_services: Callable[[], Services]) -> APIRouter:
         except IllegalTransition as e:
             raise HTTPException(status_code=409, detail=str(e)) from None
         if done:  # an admission answer can change the visa programme, and so the visa step's date (F1)
-            found = task_plan_and_template(svc.engine, task_id)
+            found = task_plan_and_template(svc.engine, svc.settings.tenant_id, task_id)
             if found is not None and found[1] == ADMISSION_TASK:
                 refresh_visa_date(svc, found[0])
         return {"completed": done}

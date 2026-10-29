@@ -62,14 +62,9 @@ def answers(engine: Engine, tenant_id: str, plan_id: int) -> dict[str, str]:
 
 
 def admitted(engine: Engine, tenant_id: str, plan_id: int) -> list[str]:
-    """Every programme of a done `admission_result` task whose result is {"choice": "admitted"} (what the inbox sends
-    for that task), in task order, each once."""
-    with engine.connect() as conn:
-        rows = conn.execute(select(T.c.programme_ref, T.c.result).where(
-            T.c.tenant_id == tenant_id, T.c.plan_id == plan_id, T.c.template_key == ADMISSION_TASK,
-            T.c.state == TaskState.DONE).order_by(T.c.id)).all()
-    return list(dict.fromkeys(r.programme_ref for r in rows
-                              if r.programme_ref and isinstance(r.result, dict) and r.result.get("choice") == ADMITTED))
+    """Every programme whose latest admission answer (`answers`) is "admitted", in task order, each once: one that
+    later said "rejected" is not admitted any more."""
+    return [ref for ref, choice in answers(engine, tenant_id, plan_id).items() if choice == ADMITTED]
 
 
 def preselect(engine: Engine, tenant_id: str, plan_id: int, among: tuple[str, ...] | None = None) -> str | None:

@@ -95,15 +95,17 @@ def test_concurrent_advance_adds_both(engine, clean):
     assert ClockStore(engine, "pai").offset() == 10 * DAY
 
 
-def test_offset_ignored_when_rehearsal_off(engine, clean, os_db):
-    from app.os.rehearsal.store import install_clock
+def test_offset_row_refused_when_rehearsal_off(engine, clean, os_db):
+    """Final review fix pass: a leftover offset row with rehearsal off no longer means "real time": startup is refused
+    (rehearsal data must not become a pilot database), on the worker's path and the API path (make_services)."""
+    from app.os.rehearsal.store import RehearsalDataLeft, install_clock
 
     with engine.begin() as conn:
         conn.execute(insert(models.rehearsal_clock).values(tenant_id="pai", offset_seconds=30 * 86400))
-    install_clock(_settings(os_db, False), engine)
-    assert _near(clock.now(), datetime.now(timezone.utc))
-    _app(engine, _settings(os_db, False))  # the API path (make_services) too
-    assert _near(clock.now(), datetime.now(timezone.utc))
+    with pytest.raises(RehearsalDataLeft):
+        install_clock(_settings(os_db, False), engine)
+    with pytest.raises(RehearsalDataLeft):
+        _app(engine, _settings(os_db, False))
 
 
 def test_offset_is_per_tenant(engine, clean):
