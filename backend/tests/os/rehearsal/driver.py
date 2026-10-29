@@ -430,9 +430,12 @@ class Rehearsal:
         self.billed = dict(billed) if billed else None
         self.tenant = self.billed["OS_TENANT_ID"] if self.billed else TENANT
         # The caps are monthly and follow rehearsal time, so a run over several rehearsal months could spend them
-        # again each month: a billed run also stops once the tenant's spend so far reaches the caps' sum (<= $15).
+        # again each month: a billed run also stops (`_billed_stop`) once the tenant's whole spend reaches the caps'
+        # sum minus a margin, after every wait for the worker (controller ruling, Task 12 fix round 1).
         self.billed_total = sum(float(v) for k, v in self.billed.items() if k.endswith("_MONTHLY_USD")) \
             if self.billed else None
+        self.billed_stopped: str | None = None  # why the guard stopped the billed run (latched)
+        self.settle_timed_out = False  # the last settle() ended on its timeout (work still in flight)
 
     # ------------------------------------------------------------------ helpers
 
@@ -572,6 +575,7 @@ class Rehearsal:
         """Waits until the worker has nothing left to do (twice in a row, 0.15 s apart). In a kill run it first
         SIGKILLs the worker now and then while it is busy, and starts it again with the same executor ID."""
         end, quiet = time.monotonic() + SETTLE_S, 0
+        self.settle_timed_out = False
         if self.kill and self.rng.random() < 0.2 and self._busy() is not None:  # a kill while work is in flight
             time.sleep(self.rng.uniform(0.0, 0.5))
             self.worker.kill()
@@ -586,6 +590,7 @@ class Rehearsal:
                 return
             if time.monotonic() > end:
                 self.fail("worker_busy", "all", None, f"the worker finishes within {SETTLE_S:.0f} s", busy)
+                self.settle_timed_out = True
                 return
             time.sleep(0.15)
 
@@ -634,7 +639,8 @@ class Rehearsal:
             for run in runs:
                 self._safe(run, self._begin)
             self.settle()
-            self._loop(runs)
+            if not self._billed_stop():
+                self._loop(runs)
             self._final(runs)
             report = self._report(runs)
         finally:
@@ -672,15 +678,19 @@ class Rehearsal:
                 if not acted:
                     break  # nothing new for the worker: the last wait still holds
                 self.settle()
+                if self._billed_stop():
+                    return
             for run in runs:
                 if run.state == "running":
                     self._safe(run, lambda r: self._observe(r, today))
                     run.days = (today - self.start).days
-            if should_stop(today, {r.s.sid: r.state for r in runs}, self.end) or self._budget_spent():
+            if should_stop(today, {r.s.sid: r.state for r in runs}, self.end) or self._billed_stop():
                 return
             self.advance(self.rng.randint(1, 3))
             self.tick()
             self.settle()
+            if self._billed_stop():
+                return
 
     def _spent(self) -> float:
         t = models.agent_runs
@@ -688,16 +698,38 @@ class Rehearsal:
             return float(conn.execute(select(func.coalesce(func.sum(t.c.cost_usd), 0))
                                       .where(t.c.tenant_id == self.tenant)).scalar())
 
-    def _budget_spent(self) -> bool:
-        """A billed run's total guard: True (and one logged result) once this tenant's AI spend over the whole run
-        reaches the sum of the four caps. The overshoot is at most what the last 1 to 3 rehearsal days spent."""
+    def billed_stop_at(self) -> float:
+        """The spend at which a billed run stops: the caps' sum minus a margin (the larger of $1 and 20 %), so work
+        still in flight when the guard looks cannot take the run past the hard cap ($12 for $15)."""
+        return self.billed_total - max(1.0, 0.2 * self.billed_total)
+
+    def _billed_stop(self) -> bool:
+        """A billed run's whole-run budget guard, called after every wait for the worker. True (latched) when the
+        run must stop: the tenant's spend reached `billed_stop_at()`; or the last wait timed out (`worker_busy`: the
+        spend still in flight is unknown); or the spend could not be read. The stop is a safety stop, not a product
+        failure: it is recorded as an admin step in the report (`billed_stop: ...`), not in the failure log; only a
+        spend query error is also a failure (`billed_guard_error`). Offline runs never stop here."""
         if not self.billed:
             return False
-        spent = self._spent()
-        if spent < self.billed_total:
-            return False
-        self.fail("billed_total_reached", "all", None, f"the billed run stays under ${self.billed_total:.2f}",
-                  f"spent ${spent:.2f}; the run stopped here", "workaround")
+        if self.billed_stopped is not None:
+            return True
+        if self.settle_timed_out:
+            reason = "the worker was still busy after a wait; spend in flight unknown"
+        else:
+            try:
+                spent = self._spent()
+            except Exception as e:  # any error: stop rather than spend blind
+                log.exception("billed guard: the spend query failed")
+                self.fail("billed_guard_error", "all", None, "the billed run's spend can be read",
+                          f"{type(e).__name__}: {e}")
+                reason = "the spend could not be read"
+            else:
+                if spent < self.billed_stop_at():
+                    return False
+                reason = f"spent ${spent:.2f}, at or over the stop point ${self.billed_stop_at():.2f}"
+        self.billed_stopped = reason
+        self.admin_actions.append(f"billed_stop: {reason}")
+        log.warning("billed run stopped by the budget guard: %s", reason)
         return True
 
     # ------------------------------------------------------------------ step 2: begin
@@ -1112,9 +1144,12 @@ class Rehearsal:
         for run in runs:
             if run.plan_id is None:
                 continue
-            self._safe(run, self._check_events)
+            if self.billed_stopped is not None and run.state == "running":
+                run.state = "billed_stop"  # stopped by the budget guard: its events cannot be judged, no not_finished
+            if run.state != "billed_stop":
+                self._safe(run, self._check_events)
             missing = [r for r in ("ready_to_submit", "visa_ready") if r not in run.reached]
-            if self.check_finish and (missing or run.state != "visa_ready"):
+            if self.check_finish and run.state != "billed_stop" and (missing or run.state != "visa_ready"):
                 plan = self._plan(run)
                 open_ = sorted(f"{_template(t['instance_key'])}:{t['state']}" for t in plan["tasks"]
                                if _live(t) and t["state"] not in ("done", "cancelled", "skipped")

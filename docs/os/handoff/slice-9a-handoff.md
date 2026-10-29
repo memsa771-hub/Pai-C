@@ -41,7 +41,7 @@ One PR per task, each into `pai-os`:
 - The alembic `os` head is `os_0017`.
 
 **Checks on `os/s9-t12-gate`** (`41587cb` plus this branch's change, 2026-10-29, Linux):
-- `pytest tests/os`: **1359 passed, 1 skipped** (the German-locale test; pytest exit 0, 22 min);
+- `pytest tests/os`: **1366 passed, 1 skipped** (the German-locale test; pytest exit 0, 22 min; after Task 12 fix round 1);
 - legacy, as CI runs it (`cd backend && env -u OS_TEST_DATABASE_URL python -m pytest -q`): **1809 passed, 577 skipped** (exit 0; the OS database tests skip without the URL, as on CI);
 - the standalone suite with the Counsellor off (`tests/os/test_slice8_gate.py::test_standalone_suite_module_off`;
   the whole `tests/os` also runs with the module off, its default): **1 passed** (exit 0);
@@ -97,10 +97,12 @@ outside the repo, in `~/s9-rehearsal/`.
 
 **Found while building `--billed` (Task 12):** the four caps are **monthly on rehearsal time** (`month_spend` counts
 from the start of the clock's month), and a billed rehearsal crosses several rehearsal months (S5 takes about 170
-rehearsal days). So the caps alone would allow $15 again in each rehearsal month. The driver therefore also stops a
-billed run once the tenant's whole spend reaches the caps' sum (an entry `billed_total_reached`); the overshoot is at
-most what the last 1 to 3 rehearsal days spent. The owners should know that the spec's "hard cap enforced by the
-monthly caps" holds per month only.
+rehearsal days). So the caps alone would allow $15 again in each rehearsal month. The driver therefore has a
+whole-run guard, checked after every wait for the worker: it stops the run at **$12** spent (the caps' sum minus the
+larger of $1 and 20 %), after a wait that timed out (spend in flight unknown), or if the spend cannot be read. **Worst
+case:** $12 plus the work in flight during one wait, so under $15 unless one wait's work costs more than $3. The stop
+is recorded as an admin step (`billed_stop: ...`), not a failure. The owners should know that the spec's "hard cap
+enforced by the monthly caps" holds per month only.
 
 ## 4. Rulings (binding unless the owners change them; each is in its PR)
 
@@ -152,8 +154,10 @@ four caps are set and sum to at most $15.
     estimate in the text (the user's option A, #166).
 29. The billed run is approved: S1, S3, S5, cap $15 (5/4/4/2), the owners set a budgeted key; the key is never
     printed, logged or committed (the user on the owners' behalf, 2026-10-29; this branch).
-30. (Task 12) A billed run also stops at the caps' sum over the whole run, because the caps are monthly on rehearsal
-    time (this branch).
+30. (Task 12, final design confirmed by the controller in fix round 1) A billed run also has a whole-run budget
+    guard, because the caps are monthly on rehearsal time: checked after every wait for the worker, it stops at $12
+    of $15 (margin: the larger of $1 and 20 %), after a timed-out wait, or on a spend query error; the stop is an
+    admin step in the report, not a product failure, and stopped students get no `not_finished` (this branch).
 
 **Other PR rulings:**
 - #156: no sign-in workaround was built; the existing test entry point is only documented.
@@ -254,7 +258,10 @@ Raised during 9a:
 ## 7. Next steps
 
 **To close 9a:** the owners set the budgeted key; run the billed rehearsal and the cost report (`rehearsal.md`,
-"Billed run"); fill in mark 6 and the D7 figure here; the owners confirm D7 (Q5). Optionally replay the three
+"Billed run", which also says how to read a budget stop); fill in mark 6 and the D7 figure here; the owners confirm
+D7 (Q5). Two things are untested before that run: real research page fetches through this container's proxy, and the
+`--billed` path end to end with a real key. The budget guard's worst case is the $12 stop point plus the work in
+flight during one wait for the worker (the guard looks after every wait, and stops if a wait times out). Optionally replay the three
 walkthroughs in a browser on the fixed code.
 
 **9b, the real pilot (spec §11, its own full spec once 9a passes):**
