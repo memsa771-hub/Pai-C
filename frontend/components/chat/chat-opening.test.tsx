@@ -24,7 +24,6 @@ vi.mock('./chat-input', () => ({ ChatInput: () => null }));
 vi.mock('./thread-status-bar', () => ({ ThreadStatusBar: () => null }));
 vi.mock('./counselor-voice-control', () => ({ useCounselorVoice: () => ({}), VoiceModeButton: () => null, VoiceStatus: () => null }));
 vi.mock('./counselor-request-panel', () => ({ CounselorRequestPanel: () => null }));
-vi.mock('@/components/counselor/counselor-mirror-card', () => ({ CounselorMirrorCard: () => null }));
 vi.mock('./share-dialog', () => ({ ShareDialog: () => null }));
 vi.mock('./chat-messages', () => ({ ChatMessages: ({ messages }: any) => <div>{messages.map((m: any) => <p key={m.messageId}>{m.content}</p>)}</div> }));
 

@@ -6,7 +6,7 @@ import { chosenRoute, picture, roadmapPage } from '@/tests/fixtures/counselor';
 import copy from './copy.json';
 
 const at = (stage: string | null, moments: Record<string, string>, extra: Partial<JourneySignals> = {}) => journeyProgress({
-  picture: { ...picture, stage, moments, mirror_status: null },
+  picture: { ...picture, stage, moments, picture: notReady },
   possibilities: [], placesSearched: false, roadmap: null, ...extra,
 } as JourneySignals);
 
@@ -14,6 +14,8 @@ const at = (stage: string | null, moments: Record<string, string>, extra: Partia
 // picture and a follow-up, and the view jumped from B to E with no first
 // picture shown and no Mirror ready.
 const planned = { explore_area: 'e1', first_picture: 'e2', follow_thread: 'e3' };
+const notReady = { ...picture.picture!, ready: false };
+const ready = (stage: string | null) => ({ picture: { ...picture, stage, moments: planned } }) as Partial<JourneySignals>;
 
 it('never shows a stage the server has not reached', () => {
   expect(at('FOUNDATION', planned).stage.id).toBe('B');
@@ -27,8 +29,20 @@ it('lets early paths exist without skipping the conversation stages', () => {
 });
 
 it('does not cap later stages, and an unknown stage keeps the signal view', () => {
-  expect(at('RESEARCHING', { ...planned, mirror: 'e4' }, { picture: { ...picture, stage: 'RESEARCHING', moments: planned, mirror_status: 'confirmed' } } as Partial<JourneySignals>).stage.id).toBe('F');
+  expect(at('PROPOSED', planned, ready('PROPOSED')).stage.id).toBe('F');
   expect(at(null, planned).stage.id).toBe('E');
+});
+
+it('stage E is Your Mirror, reached when the Mirror is ready; at MIRROR the view may show F', () => {
+  const stageE = copy.stages.find((s) => s.id === 'E')!;
+  expect([stageE.title, stageE.view, stageE.signal]).toEqual(['Your Mirror', 'mirror', 'mirror_ready']);
+  const data = (ready: boolean) => ({ picture: { ...picture, picture: { ...picture.picture!, ready } }, possibilities: [], placesSearched: false, roadmap: null }) as JourneySignals;
+  expect(signalMet('mirror_ready', data(true))).toBe(true);
+  expect(signalMet('mirror_ready', data(false))).toBe(false);
+  expect(signalMet('mirror_ready', { ...data(true), picture: { ...picture, picture: null } })).toBe(false);
+  expect(signalMet('mirror_confirmed', data(true))).toBe(false); // the old signal is gone
+  expect(at('MIRROR', planned).stage.id).toBe('E');
+  expect(at('MIRROR', planned, ready('MIRROR')).stage.id).toBe('F');
 });
 
 it('reads the Roadmap page: chosen when a route is chosen, J when a step is ticked', () => {
@@ -36,8 +50,8 @@ it('reads the Roadmap page: chosen when a route is chosen, J when a step is tick
   expect(signalMet('route_checked', data(roadmapPage))).toBe(false); // no such signal: cards alone reach nothing
   expect(signalMet('route_chosen', data(roadmapPage))).toBe(false);
   expect(signalMet('route_chosen', data({ ...roadmapPage, chosen: chosenRoute }))).toBe(true);
-  expect(signalMet('route_step_done', data({ ...roadmapPage, chosen: { ...chosenRoute, steps_done: [false, false, false] } }))).toBe(false);
-  expect(signalMet('route_step_done', data({ ...roadmapPage, chosen: chosenRoute }))).toBe(true);
+  expect(signalMet('route_step_done', data({ ...roadmapPage, chosen: chosenRoute }))).toBe(false);
+  expect(signalMet('route_step_done', data({ ...roadmapPage, chosen: { ...chosenRoute, steps_done: ['apply'] } }))).toBe(true);
 });
 
 it('stays on G when paths are found and none is explored, even with roadmap cards', () => {
@@ -49,7 +63,7 @@ it('stays on G when paths are found and none is explored, even with roadmap card
 
 it('H is reached by a finished places search on any path, with no old roadmap API', () => {
   const explored = { possibilities: [{ id: 'p', title: 'Electronics', why: '', status: 'exploring' }] } as unknown as Partial<JourneySignals>;
-  const confirmed = { picture: { ...picture, stage: 'RESEARCHING', moments: planned, mirror_status: 'confirmed' } } as Partial<JourneySignals>;
+  const confirmed = ready('PROPOSED');
   expect(at(null, planned, { ...confirmed, ...explored }).stage.id).toBe('H');
   expect(at(null, planned, { ...confirmed, ...explored, placesSearched: true }).stage.id).toBe('I');
   expect(signalMet('places_searched', { picture, possibilities: [], placesSearched: true, roadmap: null })).toBe(true);

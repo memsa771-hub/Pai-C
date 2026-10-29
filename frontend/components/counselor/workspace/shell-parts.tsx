@@ -17,7 +17,7 @@ export type SubView = keyof typeof copy.subTabs;
 /** Four places plus Settings. A section owns one or more views; the first is
  * where its nav item lands. */
 export const SECTIONS: { key: SectionKey; icon: LucideIcon; views: string[] }[] = [
-  { key: "overview", icon: LayoutDashboard, views: ["overview"] },
+  { key: "overview", icon: LayoutDashboard, views: ["overview", "mirror"] },
   { key: "threads", icon: MessageCircle, views: ["threads", "notifications"] },
   { key: "roadmaps", icon: Map, views: ["paths", "roadmap"] },
   { key: "journey", icon: Route, views: ["journey"] },
@@ -119,7 +119,9 @@ export function CommandMenu({ open, onOpenChange, onGo, onAsk }: {
     section.views.filter((view) => view !== "notifications").map((view) => ({
       view,
       section,
+      // "Overview · Mirror", but never "Overview · Overview".
       label: section.views.filter((v) => v !== "notifications").length > 1
+        && copy.subTabs[view as SubView] !== copy.sections[section.key].label
         ? `${copy.sections[section.key].label} · ${copy.subTabs[view as SubView]}`
         : copy.sections[section.key].label,
     })));

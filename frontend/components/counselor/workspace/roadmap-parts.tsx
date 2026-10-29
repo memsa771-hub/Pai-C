@@ -3,24 +3,26 @@
  * table and the student's chosen route. Words come from copy.json `roadmap`. */
 import { useEffect, useRef, useState } from "react";
 import {
-  BookOpen, Briefcase, CalendarClock, Check, CircleCheck, ClipboardCheck, ExternalLink, FlaskConical, Flag,
-  GraduationCap, Info, Laptop, ListChecks, Loader2, MapPin, MessageCircle, Percent, Ruler, Scale,
+  BookOpen, Briefcase, CalendarClock, Check, ClipboardCheck, Clock, ExternalLink, FlaskConical, Flag,
+  GraduationCap, Info, Laptop, Loader2, MessageCircle, Percent, Ruler, Scale,
   Sprout, Stethoscope, Users, Wrench, type LucideIcon,
 } from "lucide-react";
 import { workspaceApi } from "@/lib/api";
-import type { ChosenRoute, EducationLine, FieldCard, RoadmapStatus } from "@/lib/roadmap";
+import type { ChosenRoute, EducationLine, FieldCard, RoadmapStatus, RouteStep } from "@/lib/roadmap";
 import { Button } from "@/components/ui/button";
 import {
   Dialog, DialogBody, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from "@/components/ui/responsive-dialog";
-import { StatChip, Timeline, toneClass, type Tone } from "@/components/pai";
+import { StatChip, toneClass, type Tone } from "@/components/pai";
 import { initials } from "@/components/counselor/path-card";
 import { cn } from "@/lib/utils";
 import { formatDate } from "@/lib/i18n/format";
 import { DEFAULT_LOCALE } from "@/lib/i18n/locales";
 import {
-  educationText, fill, marksText, needItem, render, shortNeed, testsText, uncertain, yearsText,
+  cardTime, compareTime, doneCount, educationText, fill, intakeText, marksText, render, shortNeed, stepLabel, stepsDoneText,
+  testsText, tickable, uncertain, yearsText,
 } from "./roadmap-text";
+import { RouteSteps, StepBar, StepDot, StepMeta, TimeLine } from "./roadmap-steps";
 import { FamilyTalk } from "./family-talk";
 import familyCopy from "./family-talk.json";
 import copy from "./copy.json";
@@ -90,7 +92,7 @@ export function FieldCardView({ card, picked, pickDisabled, onPick, onOpen, mine
   onOpen: () => void;
 }) {
   const reason = reasonLine(card);
-  const tests = testsText(card), years = yearsText(card.verdict.years), marks = marksText(card);
+  const tests = testsText(card), years = yearsText(card.verdict.years), marks = marksText(card), time = cardTime(card.time);
   return (
     <article className={cn(CARD, "group relative flex gap-3.5 p-4 transition-shadow hover:shadow-lift sm:p-5",
       picked && "ring-2 ring-primary/60")}>
@@ -111,6 +113,12 @@ export function FieldCardView({ card, picked, pickDisabled, onPick, onOpen, mine
             {years && <Fact icon={CalendarClock}>{years}</Fact>}
             {marks && <Fact icon={Percent}>{marks}</Fact>}
           </p>
+        )}
+        {(time || !!card.steps?.length) && (
+          <div className="mt-2 flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1.5 text-[13px] font-medium">
+            {!!card.steps?.length && <StepBar steps={card.steps} className="w-24 shrink-0" />}
+            {time && <Fact icon={Clock}>{time}</Fact>}
+          </div>
         )}
         {card.why && <p className="mt-2 line-clamp-2 text-sm text-muted-foreground sm:line-clamp-1">{card.why}</p>}
         {uncertain(card) && <div className="mt-2.5"><CheckNote /></div>}
@@ -173,7 +181,6 @@ export function RouteSheet({ card, line, chosen, checkedAt, onClose, onChoose }:
   useEffect(() => { setBusy(false); setError(false); }, [card]);
   if (!card) return <Dialog open={false} onOpenChange={onClose} />;
   const v = card.verdict;
-  const needs = v.needs.map((need) => render(needItem(need))).filter(Boolean);
   const reasons = v.reasons.map(render).filter(Boolean);
   const choosable = CHOOSABLE.includes(card.status);
   const mine = chosen?.field_key != null && chosen.field_key === card.field_key;
@@ -181,7 +188,6 @@ export function RouteSheet({ card, line, chosen, checkedAt, onClose, onChoose }:
     setBusy(true); setError(false);
     try { await onChoose(card!); } catch { setError(true); } finally { setBusy(false); }
   }
-  const h = (text: string) => <h3 className="text-sm">{text}</h3>;
   return (
     <Dialog open onOpenChange={(open) => { if (!open) onClose(); }}>
       <DialogContent className="sm:max-w-xl">
@@ -194,31 +200,22 @@ export function RouteSheet({ card, line, chosen, checkedAt, onClose, onChoose }:
             </div>
           </div>
           <DialogDescription className={cn(!reasons.length && "sr-only")}>{reasons.join(" · ") || t.status[card.status]}</DialogDescription>
+          {line && <p className="text-sm text-muted-foreground">{educationText(line)}</p>}
         </DialogHeader>
         <DialogBody className="px-7 py-3 max-lg:px-5">
-          <Timeline label={card.title} items={[
-            { id: "now", icon: MapPin, state: "now", title: h(t.sheet.now),
-              children: <p className="text-sm text-muted-foreground">{educationText(line) || t.notKnown}</p> },
-            { id: "needs", icon: ListChecks, title: h(t.sheet.needs),
-              children: needs.length ? (
-                <ul className="space-y-1.5">
-                  {needs.map((need, i) => (
-                    <li key={i} className="flex gap-2 text-sm"><CircleCheck aria-hidden className="mt-0.5 size-4 shrink-0 text-warning-ink" />{need}</li>
-                  ))}
-                </ul>
-              ) : <p className="text-sm text-muted-foreground">{t.sheet.nothingExtra}</p> },
-            { id: "test", icon: ClipboardCheck, title: h(t.sheet.test),
-              children: v.tests.length ? (
-                <ul className="space-y-1 text-sm">
-                  {v.tests.map((test) => (
-                    <li key={test.name}>{test.name}{test.pass_percent != null && <span className="text-muted-foreground"> · {fill(t.sheet.pass, { n: test.pass_percent })}</span>}</li>
-                  ))}
-                </ul>
-              ) : <p className="text-sm text-muted-foreground">{t.sheet.noTest}</p> },
-            { id: "degree", icon: GraduationCap,
-              title: h(v.years == null ? t.sheet.degreeNoYears : fill(t.sheet.degree, { n: v.years })),
-              children: <p className="text-sm text-muted-foreground">{card.title}</p> },
-          ]} />
+          {card.time && (
+            <div className="mb-4 rounded-2xl bg-brand-soft/60 px-4 py-3">
+              <TimeLine time={card.time} />
+            </div>
+          )}
+          <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{t.steps.title}</h3>
+          <RouteSteps steps={card.steps || []} time={card.time} label={card.title} />
+          {intakeText(card.time) && (
+            <p className="mt-3 flex items-center gap-2 text-sm font-semibold">
+              <GraduationCap aria-hidden className="size-4 shrink-0 text-primary" />{intakeText(card.time)}
+            </p>
+          )}
+          {!!card.steps?.length && <p className="mt-2 text-xs text-muted-foreground">{t.steps.legend}</p>}
           {uncertain(card) && <div className="mt-4"><CheckNote /></div>}
           <Sources sources={v.sources} checkedAt={checkedAt} />
         </DialogBody>
@@ -249,8 +246,10 @@ export function CompareDialog({ cards, open, onOpenChange }: {
       ? `${card.verdict.min_percent}%` : fill(t.facts.marksCompare, { min: card.verdict.min_percent, have: card.verdict.student_percent })],
     ["step", (card) => card.status === "not_open" ? render(card.verdict.reasons[0] || { key: "" }) || t.status.not_open
       : card.status === "unknown" ? t.notKnown : (card.verdict.needs.length ? card.verdict.needs.map(shortNeed).join(", ") : shortNeed(undefined))],
+    ["stepsDone", (card) => stepsDoneText(card.steps) || t.notKnown],
     ["test", (card) => testsText(card) || t.facts.noTest],
     ["years", (card) => yearsText(card.verdict.years) || t.notKnown],
+    ["time", (card) => compareTime(card.time)],
     ["confidence", (card) => card.verdict.confidence ? t.confidence[card.verdict.confidence] : t.notKnown],
   ];
   const label = "sticky left-0 z-10 w-28 min-w-28 bg-card py-3 pe-3 text-left align-top text-xs font-semibold text-muted-foreground sm:w-40 sm:min-w-40";
@@ -292,35 +291,38 @@ export function CompareDialog({ cards, open, onOpenChange }: {
   );
 }
 
-/** The chosen route: its checklist the student ticks (saved at once, undone
- * if the save fails), "Change route" behind one confirm, and family-talk
- * preparation (the backend reads the chosen path, which this route is). */
+/** The chosen route: its coloured steps (green from the Vault, or ticked by
+ * the student where a tick is allowed: applying, and a step not yet done),
+ * progress by status, the time to entry, "Change route" behind one confirm,
+ * and family-talk preparation (the backend reads the chosen path). A tick is
+ * saved at once and undone if the save fails. */
 export function YourRoute({ route, onWithdrawn, onTicked, onChat }: {
   route: ChosenRoute;
   onWithdrawn: () => Promise<void> | void;
   onTicked?: () => void;
   onChat?: (topic?: string) => void;
 }) {
-  const [done, setDone] = useState(route.steps_done);
+  const [steps, setSteps] = useState<RouteStep[]>(route.steps);
   const [error, setError] = useState(false), [confirming, setConfirming] = useState(false), [busy, setBusy] = useState(false),
     [savingView, setSavingView] = useState(false), [familyOpen, setFamilyOpen] = useState(false);
   const saving = useRef(false);
-  useEffect(() => { setDone(route.steps_done); }, [route]);
-  // One save at a time: the checklist is disabled while a tick is saving, so
-  // a double click cannot send (i, true) then (i, false) and replies never
+  useEffect(() => { setSteps(route.steps); }, [route]);
+  // One save at a time: the ticks are disabled while one is saving, so a
+  // double click cannot send (key, true) then (key, false) and replies never
   // arrive out of order. A failure undoes only the step that failed.
-  async function tick(index: number, value: boolean) {
+  async function tick(step: RouteStep, value: boolean) {
     if (saving.current) return;
     saving.current = true;
     setSavingView(true);
-    setDone((list) => list.map((d, i) => (i === index ? value : d)));
+    const put = (next: RouteStep) => setSteps((list) => list.map((s) => (s.key === step.key ? next : s)));
+    put({ ...step, status: value ? "done" : "not", manual_done: value });
     setError(false);
     try {
-      const saved = await workspaceApi.setRouteStep(index, value);
-      setDone(saved.steps_done);
+      const saved = await workspaceApi.setRouteStep(step.key, value);
+      setSteps(saved.steps);
       onTicked?.();
     } catch {
-      setDone((list) => list.map((d, i) => (i === index ? !value : d)));
+      put(step);
       setError(true);
     } finally {
       saving.current = false;
@@ -331,7 +333,7 @@ export function YourRoute({ route, onWithdrawn, onTicked, onChat }: {
     setBusy(true); setError(false);
     try { await workspaceApi.withdrawRoute(); await onWithdrawn(); } catch { setError(true); } finally { setBusy(false); setConfirming(false); }
   }
-  const count = done.filter(Boolean).length, total = route.steps.length;
+  const count = doneCount(steps), total = steps.length;
   const snapshot = route.snapshot_verdict?.status;
   return (
     <section aria-labelledby="your-route-title" className={cn(CARD, "mb-8 overflow-hidden")}>
@@ -349,9 +351,8 @@ export function YourRoute({ route, onWithdrawn, onTicked, onChat }: {
             <span className="sr-only">{fill(t.route.progressLabel, { done: count, total })}</span>
           </p>
         </div>
-        <span aria-hidden className="mt-3 block h-2 overflow-hidden rounded-full bg-card">
-          <span className="block h-full rounded-full bg-primary transition-[width] duration-500" style={{ width: `${total ? (count / total) * 100 : 0}%` }} />
-        </span>
+        <StepBar steps={steps} className="mt-3" />
+        <TimeLine time={route.time} className="mt-3" />
       </div>
       <div className="px-5 py-4 sm:px-6">
         {snapshot && snapshot !== route.live_status && (
@@ -359,16 +360,25 @@ export function YourRoute({ route, onWithdrawn, onTicked, onChat }: {
             <Info aria-hidden className="mt-0.5 size-4 shrink-0" />{fill(t.route.changed, { status: t.statusNow[route.live_status] })}
           </p>
         )}
-        <ul className="divide-y divide-border/70">
-          {route.steps.map((step, i) => (
-            <li key={i}>
-              <label className="flex min-h-11 cursor-pointer items-center gap-3 py-1.5 text-sm">
-                <input type="checkbox" checked={!!done[i]} disabled={savingView} onChange={(e) => tick(i, e.target.checked)}
-                  className="size-[18px] shrink-0 accent-[var(--brand)]" />
-                <span className={cn(done[i] && "text-muted-foreground line-through decoration-muted-foreground/50")}>{render(step)}</span>
-              </label>
-            </li>
-          ))}
+        <ul aria-label={t.steps.title} className="divide-y divide-border/70">
+          {steps.map((step) => {
+            const label = stepLabel(step);
+            return (
+              <li key={step.key} data-status={step.status} className="flex min-w-0 items-start gap-3 py-2.5">
+                <span className="pt-0.5"><StepDot status={step.status} size="sm" /></span>
+                <div className="min-w-0 flex-1">
+                  <p className="break-words text-sm font-medium leading-snug">{label}</p>
+                  <StepMeta step={step} time={route.time} />
+                </div>
+                {tickable(step) && (
+                  <label title={t.steps.tick} className="-my-1.5 -me-2 flex size-11 shrink-0 cursor-pointer items-center justify-center rounded-full hover:bg-accent">
+                    <input type="checkbox" aria-label={label} checked={step.status === "done"} disabled={savingView}
+                      onChange={(e) => tick(step, e.target.checked)} className="size-[18px] cursor-[inherit] accent-[var(--brand)]" />
+                  </label>
+                )}
+              </li>
+            );
+          })}
         </ul>
         {error && <p role="alert" className="mt-2 text-sm font-medium text-danger-ink">{t.error}</p>}
         {confirming ? (
@@ -398,5 +408,3 @@ export function YourRoute({ route, onWithdrawn, onTicked, onChat }: {
     </section>
   );
 }
-
-

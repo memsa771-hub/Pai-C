@@ -252,17 +252,20 @@ class WorkspaceApi {
       { method: 'POST', body: JSON.stringify({ field_key: fieldKey }) });
   }
 
-  async setRouteStep(index: number, done: boolean): Promise<import('./roadmap').ChosenRoute> {
+  /** Tick or untick one step of the chosen route, named by its key. */
+  async setRouteStep(key: string, done: boolean): Promise<import('./roadmap').ChosenRoute> {
     return this.request(`/v1/roadmap/steps?network=${this.requireWorkspace()}`,
-      { method: 'POST', body: JSON.stringify({ index, done }) });
+      { method: 'POST', body: JSON.stringify({ key, done }) });
   }
 
   async withdrawRoute(): Promise<import('./roadmap').ChosenRoute> {
     return this.request(`/v1/roadmap/withdraw?network=${this.requireWorkspace()}`, { method: 'POST' });
   }
 
-  async getCounselorSummary(): Promise<import('./counselor-mirror').CounselorMirrorDraft> {
-    return this.request(`/v1/counselor/summary?network=${this.requireWorkspace()}`);
+  /** The Mirror state card, computed from the Vault on this read. */
+  async getMirror(): Promise<import('./mirror').MirrorCard> {
+    const state = await this.request<import('./mirror').MirrorState>(`/v1/counselor/summary?network=${this.requireWorkspace()}`);
+    return state.card;
   }
 
   async getCounselorWorkspace(): Promise<import('./counselor-workspace').LivingPicture> {

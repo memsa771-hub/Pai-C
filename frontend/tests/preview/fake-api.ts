@@ -1,12 +1,8 @@
-import {picture,vault,vaultCatalog,possibilities,pathResult,programs,roadmapPage,chosenRoute} from '../fixtures/counselor';
+import {picture,vault,vaultCatalog,possibilities,pathResult,programs,roadmapPage,chosenRoute,mirrorCard,mirrorEmpty} from '../fixtures/counselor';
 import type {ChosenRoute} from '@/lib/roadmap';
-import {needItem} from '@/components/counselor/workspace/roadmap-text';
 export const calls:{method:string;args:unknown[]}[]=[];
-export const mirror={type:'mirror',version:1,status:'awaiting_confirmation',mirror:{
-  intro:'Here is the picture I have so far.',confidence:'focused',
-  core_picture:Object.fromEntries(Object.entries(picture.picture!).map(([key,line])=>[key,{text:line.text,evidence:'Your own words in this conversation.',unknown:false}])),
-  dimensions:[{key:'strengths',name:'Practical curiosity',picture:'You try things, notice what happens and try again.',evidence:'I fixed a broken lamp with my friend.',unknown:false}],
-  blockers:['We still need to test how the study itself feels to you.'],opinion:'Practical design is worth exploring alongside computing.',question:'What feels right, and what should I change?',roadmap_lanes:[]}};
+// ?mirror=empty: the Mirror before it is ready (onboarding only).
+const mirrorState=new URLSearchParams(location.search).get('mirror')==='empty'?mirrorEmpty:mirrorCard;
 const sampleSource=(path:string)=>({source_url:`https://example.org/${path}`,checked_at:'2026-10-10T09:00:00Z',status:'verified'});
 // Same shape as the backend payload: fees and rules are sourced facts;
 // eligibility follows eligibility(): unconfirmed means unknown, a band needs
@@ -27,10 +23,14 @@ let searched=new URLSearchParams(location.search).has('programs');
 // The Roadmap page (GET /v1/roadmap): ?chosen=1 starts with a chosen route.
 let route:ChosenRoute|null=new URLSearchParams(location.search).has('chosen')?structuredClone(chosenRoute):null;
 const choose=(fieldKey:string)=>{const card=roadmapPage.fields.find(c=>c.field_key===fieldKey)!;
-  const steps=[...card.verdict.needs.map(needItem),
-    ...card.verdict.tests.map(t=>({key:'step_test',name:t.name})),{key:'step_apply',degree:card.title}];
+  const steps=structuredClone(card.steps||[]);
   route={id:'route-offline',field_key:fieldKey,possibility_id:card.possibility_id,title:card.title,chosen_at:'2026-10-26T09:00:00Z',
-    steps,steps_done:steps.map(()=>false),snapshot_verdict:card.verdict,live_status:card.status};return route;};
+    steps,time:card.time,snapshot_steps:steps.map(({key,label_key,values,status})=>({key,label_key,values,status})),
+    steps_done:[],snapshot_verdict:card.verdict,live_status:card.status};return route;};
+// A tick makes a step done with "You marked it" when no Vault entry is behind it, as the backend does.
+const tick=(key:string,done:boolean)=>{const r=route!;r.steps_done=done?[...r.steps_done.filter(k=>k!==key),key]:r.steps_done.filter(k=>k!==key);
+  r.steps=r.steps.map(s=>s.key!==key?s:{...s,manual_done:done,status:done?'done':'not',
+    evidence:done?(s.evidence||{id:null,level:'stated',source_label:'You marked it'}):(s.evidence?.id?s.evidence:null)});return structuredClone(r);};
 const api={getCounselorWorkspace:async()=>picture,getVault:async()=>vault,getVaultCatalog:async()=>vaultCatalog,getPossibilities:async()=>possibilities,
   getFamilyTalk:async()=>({ready:true,path_id:'path-one',path:'Practical design',message:'Prepare around what you know, without assuming that a concern has been resolved.',family:[{id:'person-one',role:'Parent',wish:'A dependable career',worry:'Whether the work will be stable',evidence:'My parent wants me to have dependable work.'}],evidence:[{id:'quote-one',quote:'I fixed a broken lamp with my friend.'}]}),
   prepareFamilyTalk:async()=>({event_id:'offline-family',script:'I understand that dependable work matters to you. I want to explore practical design. I fixed a broken lamp with my friend. I would like us to look at the evidence together before deciding.'}),
@@ -39,12 +39,12 @@ const api={getCounselorWorkspace:async()=>picture,getVault:async()=>vault,getVau
   
   getRoadmapPage:async()=>({...roadmapPage,chosen:route&&structuredClone(route)}),
   chooseRoute:async(fieldKey:string)=>choose(fieldKey),
-  setRouteStep:async(index:number,done:boolean)=>{route!.steps_done[index]=done;return structuredClone(route);},
+  setRouteStep:async(key:string,done:boolean)=>tick(key,done),
   withdrawRoute:async()=>{const old=route;route=null;return old;},
   getCounselorHealth:async()=>({planner_lag_alert:false}),getPath:async()=>pathResult,
   getPrograms:async()=>searched?(new URLSearchParams(location.search).has('programs')?richPrograms:programs):{status:'not_started',programs:[],missing:[]},
   searchPrograms:async()=>{searched=true;return{};},
-  getCounselorSummary:async()=>new URLSearchParams(location.search).has('mirror')?mirror:{type:null,status:null,version:null},
+  getMirror:async()=>structuredClone(mirrorState),
   getStudentRequests:async()=>[],
   getCounselorRequests:async()=>[],getOperatorRun:async()=>null,
   loadMessageHistory:async()=>({events:[]}),pollMessages:async()=>({messages:[]}),
@@ -58,8 +58,9 @@ const forced=new URLSearchParams(location.search).get('state');
 const emptyReads:Record<string,unknown>={
   getCounselorWorkspace:{coverage:Object.fromEntries(Object.keys(picture.coverage).map(k=>[k,{covered:false,item_count:0,evidence:null}])),
     personal:{world:{},self:[],source:[],pressures:{items:[]},sure:{score:null,history:[]}},capabilities:[],academic:{records:{}},sections:{},
-    picture:null,mirror_status:null,moments:{},ratings:[]},
-  getVault:{details:{},story:[],conflicts:[],stale:[]},getPossibilities:[],getRoadmapPage:{education_line:null,counts:{open:0,step:0,not_open:0,unknown:0},fields:[],chosen:null},getCounselorSummary:{type:null,status:null,version:null},
+    picture:{header:{name:null,education_line:null},unknowns:[],text:null,ready:false,version:'v0'},moments:{},ratings:[]},
+  getVault:{details:{},story:[],conflicts:[],stale:[]},getPossibilities:[],getRoadmapPage:{education_line:null,counts:{open:0,step:0,not_open:0,unknown:0},fields:[],chosen:null},getMirror:{...mirrorEmpty,header:{name:null,education_line:null},areas:mirrorEmpty.areas.map(a=>({...a,level:0,entries:[]})),
+    unknowns:mirrorCard.areas.map((a,i)=>({area:a.key,label:a.label,question_key:`topic_text.${a.key}`,priority:i+1}))},
 };
 const read=(method:string)=>method.startsWith('get')&&method!=='getCounselorHealth'&&method!=='getFileUrl';
 export const workspaceApi=new Proxy(api,{get:(target,key)=>{const method=String(key);return (...args:unknown[])=>{calls.push({method,args});

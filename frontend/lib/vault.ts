@@ -137,6 +137,13 @@ export function vaultEntries(view: VaultView): VaultEntry[] {
   ];
 }
 
+/** An entry named as the Mirror, coverage and paths name it (backend
+ * memory/vault_view.py entry_ref): `fact:<type>`, `<record type>:<id>`, `item:<id>`. */
+export function entryRef(entry: Pick<VaultEntry, 'kind' | 'type' | 'id'>): string {
+  if (entry.kind === 'fact') return `fact:${entry.type}`;
+  return entry.kind === 'item' ? `item:${entry.id}` : `${entry.type}:${entry.id}`;
+}
+
 /** The badge an entry shows: an open question overrides its evidence level. */
 export function badgeLevel(entry: Pick<VaultEntry, 'level' | 'in_question'>): VaultLevel | 'question' {
   return entry.in_question ? 'question' : entry.level;

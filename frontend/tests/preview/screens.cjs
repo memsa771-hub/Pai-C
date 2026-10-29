@@ -83,9 +83,11 @@ module.exports = [
   } },
   { id: 'journey', path: '/student?view=journey', ready: 'main h1', full: true },
 
+  { id: 'mirror', path: '/student?view=mirror', ready: 'main h1', full: true },
+  { id: 'mirror-empty', path: '/student?view=mirror&mirror=empty', ready: 'main h1', full: true },
+
   { id: 'profile', path: '/student?view=profile', ready: 'main h1', full: true },
   { id: 'profile-background', path: '/student?view=profile&tab=background', ready: 'main h1', full: true },
-  { id: 'profile-mirror-check', path: '/student?view=profile&tab=background&mirror=1', ready: 'main h1', full: true, crawl: false },
   { id: 'profile-row-open', path: '/student?view=profile', ready: 'main h1', full: true, crawl: false, setup: async (page) => {
     await page.getByRole('button', { name: 'Show source and actions for Education' }).first().click();
   } },
@@ -99,10 +101,7 @@ module.exports = [
   { id: 'chat-path-card', path: '/student?view=threads&card=paths', ready: 'main textarea' },
   { id: 'chat-paths-found', path: '/student?view=threads&card=paths-found', ready: 'main textarea' },
   { id: 'chat-place', path: '/student?view=threads&card=place', ready: 'main textarea' },
-  { id: 'chat-mirror', path: '/student?view=threads&mirror=1', ready: 'main textarea' },
-  { id: 'chat-mirror-rate', path: '/student?view=threads&mirror=1', ready: 'main textarea', crawl: false, setup: async (page) => {
-    await page.getByRole('button', { name: 'Yes, that is right' }).click(); await page.getByRole('radiogroup').waitFor();
-  } },
+  { id: 'chat-mirror', path: '/student?view=threads&card=mirror', ready: 'main textarea' },
   { id: 'chat-check-in', path: '/student?view=roadmap&chosen=1', ready: 'main h1', crawl: false, setup: async (page) => {
     await page.getByRole('button', { name: 'How is it going?' }).first().click();
     await page.getByRole('region', { name: 'Check-in' }).waitFor();
@@ -129,6 +128,9 @@ module.exports = [
     await page.getByRole('button', { name: 'Compare (3)' }).click(); await page.getByRole('dialog').getByRole('table').waitFor();
   } },
   { id: 'roadmap-chosen', path: '/student?view=roadmap&chosen=1', ready: 'main h1', full: true },
+  { id: 'roadmap-sheet-uncertain', path: '/student?view=roadmap', ready: 'main h1', crawl: false, setup: async (page) => {
+    await page.getByRole('button', { name: 'See route for Pharmacy' }).click(); await page.getByRole('dialog').waitFor();
+  } },
   { id: 'roadmap-bar', path: '/student?view=roadmap', ready: 'main h1', crawl: false, setup: async (page) => {
     await page.getByRole('checkbox', { name: 'Compare Electrical Engineering' }).check();
     await page.getByRole('checkbox', { name: 'Compare Computer Science' }).check();
@@ -151,6 +153,8 @@ module.exports = [
   { id: 'states-profile-empty', path: '/student?view=profile&state=empty', ready: 'main [role=status], main [role=alert], main h1', crawl: true },
   { id: 'states-overview-error', path: '/student?view=overview&state=error', ready: 'main [role=status], main [role=alert], main h1', crawl: true },
   { id: 'states-overview-empty', path: '/student?view=overview&state=empty', ready: 'main [role=status], main [role=alert], main h1', crawl: true },
+  { id: 'states-mirror-error', path: '/student?view=mirror&state=error', ready: 'main [role=status], main [role=alert], main h1', crawl: true },
+  { id: 'states-mirror-empty', path: '/student?view=mirror&state=empty', ready: 'main [role=status], main [role=alert], main h1', crawl: true },
   { id: 'states-journey-loading', path: '/student?view=journey&state=loading', ready: 'main [role=status], main [role=alert], main h1', crawl: false },
   { id: 'states-journey-error', path: '/student?view=journey&state=error', ready: 'main [role=status], main [role=alert], main h1', crawl: true },
   { id: 'states-journey-empty', path: '/student?view=journey&state=empty', ready: 'main [role=status], main [role=alert], main h1', crawl: true },

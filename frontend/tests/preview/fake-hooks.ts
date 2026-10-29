@@ -1,3 +1,4 @@
+import {mirrorCard} from '../fixtures/counselor';
 import type {WorkspaceMessage} from '@/lib/types';
 export const messages:WorkspaceMessage[]=[
   {messageId:'m1',sessionId:'pai-counselor',senderType:'human',senderName:'Sam',content:'I enjoy making things work. I repaired a lamp with a friend, but I am not sure where that could lead.',mentions:[],targetAgents:null,messageType:'chat',metadata:{},createdAt:'2026-10-18T12:00:00Z'},
@@ -9,6 +10,7 @@ if(card==='rating') {messages[1].metadata={counselor_card:{kind:'rating',min:0,m
 if(card==='fact') {messages[1].metadata={fact_card:{key:'board',label:'Awarding board',kind:'choice',choices:[{value:'Reviewed catalog entry',label:'Reviewed catalog entry'}],upload_invite:'Upload a result card',record_id:'education-one'}};messages[1].content='You can choose the awarding board or use the wording on your result card.';}
 if(card==='paths') {messages[1].metadata={possibility_id:'path-one'};messages[1].content='Here is one direction worth exploring, based on what you told me.';}
 if(card==='paths-found') {messages[1].metadata={paths_found:['path-one','path-two']};messages[1].content='I have put together a few paths from what you shared. They are possibilities to look at, not decisions.';}
+if(card==='mirror') {messages[1].messageType='counselor_mirror';messages[1].metadata={header:mirrorCard.header,unknowns:mirrorCard.unknowns,text:mirrorCard.text,version:mirrorCard.version};messages[1].content=mirrorCard.text!.sentences.join(' ');}
 if(card==='place') {messages[1].metadata={workspace_place:'files'};messages[1].content='You can upload your result card in Documents, and I will use it to confirm your marks.';}
 if(card==='typing') messages.push({messageId:'m3',sessionId:'pai-counselor',senderType:'agent',senderName:'pai',content:'',mentions:[],targetAgents:null,messageType:'loading',metadata:{},createdAt:'2026-10-18T12:02:00Z'});
 if(card==='empty') messages.splice(0,messages.length);

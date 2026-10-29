@@ -60,20 +60,43 @@ it("notes an uncertain or secondary rule with Check with the university", async 
   expect(within(await card("Pharmacy")).getByText("Biology bridge course at some universities")).toBeTruthy();
 });
 
-it("opens a route sheet with the timeline in order and its sources", async () => {
+it("opens a route sheet: every step with its colour, evidence, rule and time", async () => {
   render(<Roadmap onNavigate={vi.fn()} />);
   fireEvent.click(await screen.findByRole("button", { name: "See route for Electrical Engineering" }));
   const dialog = await screen.findByRole("dialog");
-  const steps = within(dialog).getByRole("list", { name: "Electrical Engineering" }).querySelectorAll(":scope > li");
-  expect([...steps].map((li) => li.querySelector("h3")?.textContent)).toEqual(
-    ["Now", "What you need", "Entry test", "Degree (4 years)"]);
-  expect(within(dialog).getByText("From FSc Pre-Engineering, 78%")).toBeTruthy();
-  const source = within(dialog).getByRole("link", { name: /pec\.org\.pk/ });
-  expect(source.getAttribute("href")).toBe("https://www.pec.org.pk/regulations.pdf");
-  expect(source.getAttribute("target")).toBe("_blank");
-  expect(source.getAttribute("rel")).toContain("noopener");
+  const steps = [...within(dialog).getByRole("list", { name: "Electrical Engineering" }).querySelectorAll<HTMLElement>(":scope > li")];
+  expect(steps.map((li) => li.querySelector("h3")?.textContent)).toEqual([
+    "Choose FSc Pre-Engineering in intermediate", "Finish FSc (exam May 2027)", "Meet the 60% marks rule (you have 78%)",
+    "Take ECAT / NET (pass 33%)", "Apply for Electrical Engineering", "Study Electrical Engineering (4 years)"]);
+  // Colour is never alone: each step says its status in words.
+  expect(steps.map((li) => li.getAttribute("data-status"))).toEqual(["done", "half", "done", "not", "not", "not"]);
+  expect(steps.map((li) => li.querySelector("[data-status-word]")?.textContent)).toEqual(
+    ["Done", "Partly done", "Done", "Not yet", "Not yet", "Not yet"]);
+  // Evidence: the badge and where it came from; the rule behind the step links out.
+  expect(within(steps[0]).getByText("From document")).toBeTruthy();
+  expect(within(steps[0]).getByText("Result card.jpg")).toBeTruthy();
+  const rule = within(steps[0]).getByRole("link", { name: /pec\.org\.pk/ });
+  expect(rule.getAttribute("href")).toBe("https://www.pec.org.pk/regulations.pdf");
+  expect(rule.getAttribute("rel")).toContain("noopener");
+  // When: the step's own month, then the entry and the total.
+  expect(within(steps[1]).getByText("May 2027")).toBeTruthy();
+  expect(within(steps[3]).getByText("June 2027")).toBeTruthy();
+  expect(within(dialog).getByText("Entry: September intake, September 2027")).toBeTruthy();
+  expect(within(dialog).getByText("About 11 months to entry · about 4.9 years to finish")).toBeTruthy();
+  expect(within(dialog).getByText("Dates: Secondary source")).toBeTruthy();
   expect(within(dialog).getByText("Checked October 2026")).toBeTruthy();
   expect((within(dialog).getByRole("button", { name: "Choose this route" }) as HTMLButtonElement).disabled).toBe(false);
+});
+
+it("says the date is not confirmed when the calendar cannot place a step", async () => {
+  render(<Roadmap onNavigate={vi.fn()} />);
+  expect(within(await card("Pharmacy")).getByText("Date not confirmed")).toBeTruthy();
+  expect(within(await card("Electrical Engineering")).getByText("About 11 months to entry")).toBeTruthy();
+  fireEvent.click(screen.getByRole("button", { name: "See route for Pharmacy" }));
+  const dialog = await screen.findByRole("dialog");
+  const test = within(dialog).getByRole("heading", { level: 3, name: "Take University test" }).closest("li")!;
+  expect(within(test).getByText("Date not confirmed")).toBeTruthy();
+  expect(within(dialog).getByText("Dates not confirmed; check the official schedule")).toBeTruthy();
 });
 
 it("will not choose a field that is not open, and says why", async () => {
@@ -103,6 +126,9 @@ it("compares two or three fields with the same rows for each", async () => {
   expect(within(table).getByText("Bridge or extra courses")).toBeTruthy();
   expect(within(table).getByText("Uncertain")).toBeTruthy();
   expect(within(table).getAllByText("60% · you 78%")).toHaveLength(2);
+  const cells = (name: string) => [...within(table).getByRole("rowheader", { name }).parentElement!.querySelectorAll("td")].map((td) => td.textContent);
+  expect(cells("Steps done")).toEqual(["2 of 6", "2 of 6", "2 of 7"]);
+  expect(cells("Time to entry")).toEqual(["About 11 months", "About 10 months · Not confirmed", "Not confirmed"]);
 });
 
 it("joins every need in the compare Extra step cell", async () => {
@@ -117,16 +143,19 @@ it("joins every need in the compare Extra step cell", async () => {
   expect(within(table).getByText("Bridge or extra courses, Marks up to 60%")).toBeTruthy();
 });
 
+const ticked = (key: string, done: boolean) => ({ ...chosenRoute, steps_done: done ? [key] : [],
+  steps: chosenRoute.steps.map((s) => (s.key === key ? { ...s, status: done ? "done" as const : "not" as const, manual_done: done } : s)) });
+
 it("tells the shell after choose, tick and withdraw so the journey stage refreshes", async () => {
   const changed = vi.fn();
   vi.mocked(workspaceApi.chooseRoute).mockResolvedValue(chosenRoute);
   render(<Roadmap onNavigate={vi.fn()} onChanged={changed} />);
-  fireEvent.click(await screen.findByRole("button", { name: "See route for Pharmacy" }));
+  fireEvent.click(await screen.findByRole("button", { name: "See route for Electrical Engineering" }));
   vi.mocked(workspaceApi.getRoadmapPage).mockResolvedValue({ ...roadmapPage, chosen: chosenRoute });
   fireEvent.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Choose this route" }));
   await waitFor(() => expect(changed).toHaveBeenCalledTimes(1));
-  vi.mocked(workspaceApi.setRouteStep).mockResolvedValueOnce({ ...chosenRoute, steps_done: [true, true, false] });
-  fireEvent.click(await screen.findByRole("checkbox", { name: "Take University test" }));
+  vi.mocked(workspaceApi.setRouteStep).mockResolvedValueOnce(ticked("apply", true));
+  fireEvent.click(await screen.findByRole("checkbox", { name: "Apply for Electrical Engineering" }));
   await waitFor(() => expect(changed).toHaveBeenCalledTimes(2));
   vi.mocked(workspaceApi.withdrawRoute).mockResolvedValue(chosenRoute);
   fireEvent.click(screen.getByRole("button", { name: "Change route" }));
@@ -134,58 +163,68 @@ it("tells the shell after choose, tick and withdraw so the journey stage refresh
   await waitFor(() => expect(changed).toHaveBeenCalledTimes(3));
 });
 
-it("chooses a route and shows it at the top with progress", async () => {
+it("chooses a route and shows it at the top: coloured steps, progress by status and the time", async () => {
   vi.mocked(workspaceApi.chooseRoute).mockResolvedValue(chosenRoute);
   render(<Roadmap onNavigate={vi.fn()} />);
-  fireEvent.click(await screen.findByRole("button", { name: "See route for Pharmacy" }));
+  fireEvent.click(await screen.findByRole("button", { name: "See route for Electrical Engineering" }));
   vi.mocked(workspaceApi.getRoadmapPage).mockResolvedValue({ ...roadmapPage, chosen: chosenRoute });
   fireEvent.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Choose this route" }));
-  await waitFor(() => expect(workspaceApi.chooseRoute).toHaveBeenCalledWith("pharmacy"));
+  await waitFor(() => expect(workspaceApi.chooseRoute).toHaveBeenCalledWith("electrical_engineering"));
   const route = await screen.findByRole("region", { name: "Your route" });
-  expect(within(route).getByText("Pharmacy")).toBeTruthy();
-  expect(within(route).getByText("1 of 3")).toBeTruthy();
-  expect(within(route).getByRole("checkbox", { name: "Take University test" })).toBeTruthy();
+  expect(within(route).getByText("Electrical Engineering")).toBeTruthy();
+  // Done steps are the green ones, whatever made them green.
+  expect(within(route).getByText("2 of 6")).toBeTruthy();
+  expect(within(route).getByText("About 11 months to entry · about 4.9 years to finish")).toBeTruthy();
+  const items = [...within(route).getByRole("list", { name: "Your steps" }).querySelectorAll(":scope > li")];
+  expect(items.map((li) => li.getAttribute("data-status"))).toEqual(["done", "half", "done", "not", "not", "not"]);
+  // A manual tick only where the student can claim it: the test (not yet) and applying.
+  expect(within(route).getAllByRole("checkbox").map((box) => box.getAttribute("aria-label") || (box.closest("label")?.textContent ?? "")))
+    .toEqual(["Take ECAT / NET (pass 33%)", "Apply for Electrical Engineering"]);
 });
 
-it("ticks a step through the API and reverts when it fails", async () => {
+it("ticks a step by its key through the API and reverts when it fails", async () => {
   vi.mocked(workspaceApi.getRoadmapPage).mockResolvedValue({ ...roadmapPage, chosen: chosenRoute });
-  vi.mocked(workspaceApi.setRouteStep).mockResolvedValueOnce({ ...chosenRoute, steps_done: [true, true, false] });
+  vi.mocked(workspaceApi.setRouteStep).mockResolvedValueOnce(ticked("test:ECAT / NET", true));
   render(<Roadmap onNavigate={vi.fn()} />);
-  const box = (await screen.findByRole("checkbox", { name: "Take University test" })) as HTMLInputElement;
+  const box = (await screen.findByRole("checkbox", { name: "Take ECAT / NET (pass 33%)" })) as HTMLInputElement;
   fireEvent.click(box);
   expect(box.checked).toBe(true); // optimistic
-  await waitFor(() => expect(workspaceApi.setRouteStep).toHaveBeenCalledWith(1, true));
-  expect(await screen.findByText("2 of 3")).toBeTruthy();
+  await waitFor(() => expect(workspaceApi.setRouteStep).toHaveBeenCalledWith("test:ECAT / NET", true));
+  expect(await screen.findByText("3 of 6")).toBeTruthy();
+  // A ticked step without Vault proof reads "You marked it", at the stated level.
+  const test = screen.getByRole("checkbox", { name: "Take ECAT / NET (pass 33%)" }).closest("li")!;
+  expect(test.getAttribute("data-status")).toBe("done");
   vi.mocked(workspaceApi.setRouteStep).mockRejectedValueOnce(new Error("offline"));
-  const apply = screen.getByRole("checkbox", { name: "Apply for Pharmacy" }) as HTMLInputElement;
+  const apply = screen.getByRole("checkbox", { name: "Apply for Electrical Engineering" }) as HTMLInputElement;
   fireEvent.click(apply);
   await waitFor(() => expect(apply.checked).toBe(false));
   expect(screen.getByRole("alert").textContent).toBe(copy.roadmap.error);
 });
 
 it("blocks a second tick while a save is in flight, and a failure reverts only its own step", async () => {
-  vi.mocked(workspaceApi.getRoadmapPage).mockResolvedValue({ ...roadmapPage, chosen: chosenRoute });
+  vi.mocked(workspaceApi.getRoadmapPage).mockResolvedValue({ ...roadmapPage, chosen: ticked("apply", true) });
   let fail!: (error: Error) => void;
   vi.mocked(workspaceApi.setRouteStep).mockReturnValueOnce(new Promise((_, reject) => { fail = reject; }));
   render(<Roadmap onNavigate={vi.fn()} />);
-  const first = (await screen.findByRole("checkbox", { name: "Biology bridge course at some universities" })) as HTMLInputElement;
-  const test = screen.getByRole("checkbox", { name: "Take University test" }) as HTMLInputElement;
+  const apply = (await screen.findByRole("checkbox", { name: "Apply for Electrical Engineering" })) as HTMLInputElement;
+  const test = screen.getByRole("checkbox", { name: "Take ECAT / NET (pass 33%)" }) as HTMLInputElement;
+  expect(apply.checked).toBe(true);
   fireEvent.click(test);
   expect(test.checked).toBe(true);
   fireEvent.click(test); // a double click while saving
-  fireEvent.click(screen.getByRole("checkbox", { name: "Apply for Pharmacy" }));
+  fireEvent.click(apply);
   expect(workspaceApi.setRouteStep).toHaveBeenCalledTimes(1);
   fail(new Error("offline"));
   await waitFor(() => expect(test.checked).toBe(false));
-  expect(first.checked).toBe(true); // the other ticks stay as they were
+  expect(apply.checked).toBe(true); // the other ticks stay as they were
   expect(screen.getByRole("alert").textContent).toBe(copy.roadmap.error);
 });
 
 it("changes route only after a confirm, and notes a changed situation", async () => {
-  vi.mocked(workspaceApi.getRoadmapPage).mockResolvedValue({ ...roadmapPage, chosen: { ...chosenRoute, live_status: "open" } });
+  vi.mocked(workspaceApi.getRoadmapPage).mockResolvedValue({ ...roadmapPage, chosen: { ...chosenRoute, live_status: "step" } });
   vi.mocked(workspaceApi.withdrawRoute).mockResolvedValue(chosenRoute);
   render(<Roadmap onNavigate={vi.fn()} />);
-  expect(await screen.findByText("Your situation changed: now open to you.")).toBeTruthy();
+  expect(await screen.findByText("Your situation changed: now a step away.")).toBeTruthy();
   fireEvent.click(screen.getByRole("button", { name: "Change route" }));
   expect(workspaceApi.withdrawRoute).not.toHaveBeenCalled();
   vi.mocked(workspaceApi.getRoadmapPage).mockResolvedValue(roadmapPage);
@@ -249,9 +288,23 @@ it("has a template for every backend roadmap copy key, and renders groups as a r
   expect(copy.roadmap.groupJoiner).toBe(policy.group_joiner);
   expect(copy.roadmap.officialConfidence).toBe(policy.official_confidence);
   expect(copy.roadmap.compareLimits).toEqual(policy.compare);
+  // Every step status the engine colours has its word.
+  for (const status of Object.keys(policy.steps.colours)) expect(copy.roadmap.templates).toHaveProperty([`status_${status}`]);
   expect(renderItem({ key: "step_group", groups: [{ code: "pre_engineering", label: "Pre-Engineering", route_label: "FSc Pre-Engineering" }] }))
     .toBe("Choose FSc Pre-Engineering in intermediate");
   expect(renderItem({ key: "choose_group", groups: [
     { code: "pre_engineering", label: "Pre-Engineering", route_label: "FSc Pre-Engineering" },
     { code: "ics", label: "ICS", route_label: "ICS" }] })).toBe("Choose FSc Pre-Engineering or ICS in intermediate");
+});
+
+it("fits a 375px phone: the route list and the sheet wrap instead of overflowing", async () => {
+  vi.mocked(workspaceApi.getRoadmapPage).mockResolvedValue({ ...roadmapPage, chosen: chosenRoute });
+  const { baseElement } = render(<Roadmap onNavigate={vi.fn()} />);
+  await screen.findByRole("region", { name: "Your route" });
+  fireEvent.click(screen.getByRole("button", { name: "See route for Electrical Engineering" }));
+  await screen.findByRole("dialog");
+  for (const li of baseElement.querySelectorAll("li[data-status]")) expect(li.className).toMatch(/\bmin-w-0\b/);
+  const widths = [...baseElement.querySelectorAll("[class]")].flatMap((el) =>
+    [...String(el.getAttribute("class")).matchAll(/\b(?:min-)?w-\[(\d+)px\]/g)].map((m) => +m[1]));
+  expect(widths.every((w) => w <= 343)).toBe(true);
 });

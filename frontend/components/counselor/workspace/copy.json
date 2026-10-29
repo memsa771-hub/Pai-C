@@ -3,6 +3,7 @@
   "tagline": "Your direction. Your decision.",
   "nav": {
     "overview": "Overview",
+    "mirror": "Your Mirror",
     "threads": "PAI Counselor",
     "journey": "Your journey",
     "paths": "Paths",
@@ -24,7 +25,6 @@
   "coverage": "What PAI knows so far",
   "coverageHelp": "Shading means there is evidence. This is not a score.",
   "certainty": "Your certainty over time",
-  "understood": "Last felt understood",
   "picture": "Who I am",
   "people": "People around me",
   "education": "Education timeline",
@@ -135,12 +135,6 @@
     "goals": "Goals & whose wish",
     "options": "Options & myths"
   },
-  "pictureLabels": {
-    "you_say": "You say",
-    "life_shows": "Your life shows",
-    "pressure": "The pressure",
-    "you_want": "You want"
-  },
   "pathSections": {
     "what_it_is": "What it is",
     "what_you_study": "What you study",
@@ -195,10 +189,9 @@
     },
     {
       "id": "E",
-      "title": "Check your Mirror",
-      "view": "threads",
-      "action": "mirror",
-      "signal": "mirror_confirmed",
+      "title": "Your Mirror",
+      "view": "mirror",
+      "signal": "mirror_ready",
       "tone": "rose"
     },
     {
@@ -290,7 +283,7 @@
     "B": "PAI asks about your life, interests and the people around you.",
     "C": "PAI shares a first picture of you, and you correct it.",
     "D": "You go deeper on what matters most.",
-    "E": "You check the Mirror: what you say, what your life shows, the pressure and what you want.",
+    "E": "PAI draws what it knows about you from your Vault. Anything wrong, you fix in the Vault.",
     "F": "Directions worth exploring, each with a reason from your own words.",
     "G": "What a path involves, a day at work, and a small way to try it.",
     "H": "Places to study this path, with sources and dates.",
@@ -458,7 +451,7 @@
   "sections": {
     "overview": {
       "label": "Overview",
-      "hint": "Your signals and next best step"
+      "hint": "Your signals, your Mirror and the next best step"
     },
     "threads": {
       "label": "PAI",
@@ -482,6 +475,8 @@
     }
   },
   "subTabs": {
+    "overview": "Overview",
+    "mirror": "Mirror",
     "paths": "Paths",
     "roadmap": "Roadmap",
     "files": "Documents",
@@ -543,10 +538,6 @@
       "dismissed": "Not for me"
     },
     "statusLabel": "Status",
-    "understandTitle": "What PAI understands so far",
-    "understandNote": "Things you have shared, by area.",
-    "understandEmpty": "Nothing shared yet.",
-    "understandOpen": "See the full picture",
     "fitDots": "{have} you have, {partial} partly, {blocker} in the way, {unknown} not known yet",
     "nextLabel": "Your next step",
     "nextOpen": "Open {view}",
@@ -562,14 +553,23 @@
     "recAlso": "Also: {items}",
     "recPrev": "Previous recommendation",
     "recNext": "Next recommendation",
-    "trackLabel": "{done} of {total} stages"
+    "trackLabel": "{done} of {total} stages",
+    "mirrorTitle": "Your Mirror",
+    "mirrorNote": "What PAI knows about you, from your Vault.",
+    "mirrorNotReady": "PAI needs a little more to draw your picture.",
+    "mirrorUnknowns": {
+      "one": "1 thing still unknown",
+      "other": "{count} things still unknown"
+    },
+    "mirrorAllKnown": "Every area has something",
+    "mirrorOpen": "Open your Mirror"
   },
   "stageCaps": {
-    "_note": "Furthest A-K index the view may show as current for each server stage. Moments are planned moves, not proof; stages not listed here do not cap.",
+    "_note": "Furthest A-K index the view may show as current for each server stage. Moments are planned moves, not proof; stages not listed here do not cap. MIRROR (the Mirror is ready) may show F, since paths follow on their own.",
     "IDENTITY": 1,
     "FOUNDATION": 1,
     "DIRECTION": 3,
-    "MIRROR": 4
+    "MIRROR": 5
   },
   "roadmap": {
     "title": "Where you can go",
@@ -595,7 +595,23 @@
       "step_group": "Choose {groups} in intermediate",
       "step_any_group": "Choose any group in intermediate",
       "step_test": "Take {name}",
-      "step_apply": "Apply for {degree}"
+      "step_apply": "Apply for {degree}",
+      "step_finish": "Finish {level}",
+      "step_finish_exam": "Finish {level} (exam {month} {year})",
+      "step_finish_intermediate": "Finish intermediate",
+      "step_marks_unknown": "Meet the {min}% marks rule (add your marks)",
+      "step_test_pass": "Take {name} (pass {pass}%)",
+      "step_degree": "Study {degree} ({years} years)",
+      "step_degree_years_unknown": "Study {degree}",
+      "step_tell_education": "Tell PAI your education",
+      "status_done": "Done",
+      "status_half": "Partly done",
+      "status_not": "Not yet",
+      "marked_by_you": "You marked it",
+      "date_not_confirmed": "Date not confirmed",
+      "time_to_entry": "About {months} months to entry",
+      "time_to_finish": "About {years} years to finish",
+      "time_uncertain": "Dates not confirmed; check the official schedule"
     },
     "educationLine": {
       "with_percent": "From {level} {groups}, {percent}%",
@@ -639,8 +655,10 @@
       "status": "Status",
       "marks": "Marks needed vs yours",
       "step": "Extra step",
+      "stepsDone": "Steps done",
       "test": "Entry test",
       "years": "Years",
+      "time": "Time to entry",
       "confidence": "Rule confidence"
     },
     "compareStep": {
@@ -710,6 +728,97 @@
       "max": 3
     },
     "compareHint": "Tick 2 or 3 fields to compare them side by side.",
-    "yourRouteChip": "Your route"
+    "yourRouteChip": "Your route",
+    "time": {
+      "entryShort": "About {months} months",
+      "notConfirmed": "Not confirmed",
+      "intake": "Entry: {label}, {month} {year}",
+      "when": "{month} {year}",
+      "confidence": "Dates: {confidence}"
+    },
+    "steps": {
+      "title": "Your steps",
+      "rule": "Rule",
+      "ruleLabel": "Rule source for this step: {host}",
+      "legend": "Green is done, yellow is partly done, red is not yet.",
+      "none": "PAI has no steps for this field yet.",
+      "tick": "Mark as done"
+    }
+  },
+  "pathMayBeOld": "Your Vault changed since PAI wrote this, so parts of it may be out of date.",
+  "mirror": {
+    "title": "Your Mirror",
+    "intro": "What PAI knows about you, drawn from your Vault.",
+    "updated": "Updated {date}",
+    "known": "{known} of {total} areas known",
+    "inWords": "In a few words",
+    "textPending": "PAI is writing a few lines about you. Your picture below is already up to date.",
+    "areasTitle": "What PAI knows",
+    "levels": [
+      "Not known yet",
+      "Said, not shown",
+      "Shown",
+      "Well shown"
+    ],
+    "levelLabel": "How well PAI knows this: {level}",
+    "wrong": "This is wrong",
+    "wrongLabel": "This is wrong: {text}",
+    "marks": "Marks by subject",
+    "unknownTitle": "Still unknown",
+    "unknownIntro": "Each answer makes your picture clearer.",
+    "tellPai": "Tell PAI",
+    "tellPaiLabel": "Tell PAI about {label}",
+    "topicFallback": "I want to tell you about {label}.",
+    "allKnown": "Every area has something. Tell PAI when things change.",
+    "emptyTitle": "PAI needs a little more to draw your picture",
+    "emptyBody": "Start with this one:",
+    "tension": "Two views differ",
+    "chatOpen": "Open your Mirror",
+    "templates": {
+      "tension.family_vs_goal": "Your family's wish and the field you lean toward point to different fields.",
+      "chat_card": "Your Mirror: what PAI knows about you so far."
+    },
+    "questions": {
+      "topic_text.history": {
+        "question": "What have you studied so far, and what marks did you get?",
+        "topic": "I want to tell you about my education and my marks."
+      },
+      "topic_text.goals": {
+        "question": "Which field of study do you lean toward, and why?",
+        "topic": "I want to tell you which field of study I lean toward."
+      },
+      "topic_text.options": {
+        "question": "Which fields and entrance tests are you considering?",
+        "topic": "I want to tell you which fields and tests I am considering."
+      },
+      "topic_text.pressures": {
+        "question": "What is your budget for study, and can you move to another city?",
+        "topic": "I want to tell you about my budget and whether I can move."
+      },
+      "topic_text.interests": {
+        "question": "Which subjects do you like?",
+        "topic": "I want to tell you which subjects I like."
+      },
+      "topic_text.status": {
+        "question": "What are you studying now: class, group or year?",
+        "topic": "I want to tell you what I am studying now."
+      },
+      "topic_text.family_social": {
+        "question": "What does your family want you to study?",
+        "topic": "I want to tell you what my family wants me to study."
+      },
+      "topic_text.sure": {
+        "question": "How sure do you feel about the field you lean toward?",
+        "topic": "I want to tell you how sure I feel about my direction."
+      },
+      "topic_text.values": {
+        "question": "What matters most to you when you choose a field?",
+        "topic": "I want to tell you what matters most to me in a field."
+      },
+      "topic_text.strengths": {
+        "question": "Which subjects or study tasks do you do well in?",
+        "topic": "I want to tell you what I do well."
+      }
+    }
   }
 }

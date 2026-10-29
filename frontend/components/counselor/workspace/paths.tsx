@@ -350,6 +350,12 @@ export function PathPage({
           {error && <p role="alert" className="w-full text-sm font-medium text-danger-ink">{copy.error}</p>}
         </section>
       )}
+      {/* The Vault changed since this was written: a calm note, nothing hidden. */}
+      {result.stale && result.status !== "stale" && (
+        <p role="status" className="mb-5 flex items-start gap-2 rounded-[14px] bg-info-soft px-4 py-3 text-sm text-info-ink">
+          <Info aria-hidden className="mt-0.5 size-4 shrink-0" />{copy.pathMayBeOld}
+        </p>
+      )}
       <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_20rem] xl:grid-cols-[minmax(0,1fr)_23rem]">
         {!result.path ? (
           <section className={cn(CARD, "p-6 sm:p-8")}>

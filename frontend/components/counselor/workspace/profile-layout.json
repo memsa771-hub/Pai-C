@@ -51,16 +51,6 @@
     "scholarship_name"
   ],
   "copy": {
-    "mirrorTitle": "How PAI sees you",
-    "mirrorIntro": "Four short lines PAI built from your words. You decide if they are right.",
-    "mirrorConfirmed": "You agreed with this picture",
-    "mirrorWaiting": "Waiting for you to check",
-    "mirrorChanged": "You asked PAI to change this picture",
-    "mirrorAgree": "Yes, that is me",
-    "mirrorEdit": "Change something",
-    "mirrorEditHint": "What should PAI change?",
-    "mirrorSend": "Send to PAI",
-    "mirrorTalk": "Something changed? Tell PAI",
     "feltUnderstood": "Did you feel understood?",
     "feltUnderstoodValue": "You felt understood: {value} of 5",
     "feltScale": [
@@ -70,13 +60,8 @@
       "Mostly",
       "Completely"
     ],
-    "certaintyAfter": "How sure do you feel about your direction now? (optional)",
     "sendRating": "Send",
     "ratingSaved": "Thank you. PAI will use this to do better.",
-    "gettingToKnow": "PAI is still getting to know you",
-    "gettingToKnowBody": "Keep talking. When PAI has enough of your own words, it will show you a first picture to check.",
-    "firstPicture": "PAI's first picture of you",
-    "openChat": "Talk with PAI",
     "heatmapTitle": "What PAI understands so far",
     "certaintyTitle": "Your certainty over time",
     "certaintyEmpty": "When you rate how sure you feel, it will show up here.",

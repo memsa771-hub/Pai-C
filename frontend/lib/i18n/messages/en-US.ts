@@ -131,7 +131,7 @@ export const messages = {
 
   /** View names. Shared by the sidebar, the nav rail and the app header. */
   views: {
-    overview: "Overview", journey: "Your journey", paths: "Paths", roadmap: "Roadmap", settings: "Settings",
+    overview: "Overview", mirror: "Your Mirror", journey: "Your journey", paths: "Paths", roadmap: "Roadmap", settings: "Settings",
     paiCounselor: 'PAI Counselor',
     profile: 'Profile',
     applications: 'Applications',
@@ -886,31 +886,6 @@ export const messages = {
     hint: 'Your answer goes to the same Counselor conversation.',
     sending: 'Sending…',
     sent: 'Sent to PAI. I’ll continue checking when this is added to your profile.',
-  },
-
-  counselorMirror: {
-    you_say: 'You say',
-    life_shows: 'Your life shows',
-    pressure: 'The pressure',
-    you_want: 'You seem to want',
-    details: 'Details',
-    understood: 'Did PAI understand you?',
-    certaintyAfter: 'How sure do you feel about your direction now?',
-    optional: 'Optional',
-    sendFeedback: 'Send',
-    skipFeedback: 'Skip',
-    title: 'Your 360-degree picture',
-    confirm: 'Yes, that is right',
-    edit: 'Edit',
-    saveEdits: 'Send corrections to PAI',
-    confirmed: 'You confirmed this picture. Your research request has been queued.',
-    sent: 'Your correction was sent to PAI. We will revisit this picture together.',
-    editHint: 'What should PAI change?',
-    unknown: 'We have not explored this yet.',
-    evidence: 'What this is based on',
-    blockers: 'What needs attention',
-    opinion: 'PAI’s perspective',
-    error: 'We could not complete that action. Please try again.',
   },
 
   // In-app feedback dialog

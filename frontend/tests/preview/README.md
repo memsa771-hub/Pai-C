@@ -14,8 +14,8 @@ unknown routes) and runs `flow.cjs`, which checks the A-K boundaries. Screenshot
 `docs/counselor/screenshots/v2/`, which is git-ignored. Options: `--only=<prefix>`,
 `--skip-crawl`, `--skip-flow`, `--flow-only`.
 
-Useful URLs: `?kit=1` (design system), `?onboarding=1`, `?view=profile|threads|journey|paths|roadmap|files|settings`,
-`&theme=dark`, `&state=loading|error|empty`, `&mirror=1`, `&card=picture|rating|fact|paths|typing|empty`.
+Useful URLs: `?kit=1` (design system), `?onboarding=1`, `?view=overview|mirror|profile|threads|journey|paths|roadmap|files|settings`,
+`&theme=dark`, `&state=loading|error|empty`, `&mirror=empty` (Mirror not ready), `&card=picture|rating|fact|paths|typing|empty|mirror`.
 
 | File | Role |
 |---|---|

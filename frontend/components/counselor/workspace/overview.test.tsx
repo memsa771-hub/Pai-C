@@ -46,3 +46,22 @@ it("counts Vault entries and the ones the student confirmed", async () => {
   await waitFor(() => expect(metric.textContent).toContain("9"));
   expect(metric.textContent).toContain("1 confirmed by you");
 });
+it("shows the Mirror picture from the card: who, a few lines, what is unknown, and a link", async () => {
+  vi.mocked(workspaceApi.getVault).mockResolvedValue(vault);
+  const navigate = vi.fn();
+  render(<Overview journey={journey} navigate={navigate} openPath={vi.fn()} onChat={vi.fn()} />);
+  const card = screen.getByRole("region", { name: "Your Mirror" });
+  expect(within(card).getByText("Sam Taylor")).toBeTruthy();
+  expect(within(card).getByText("FSc Pre-Engineering, 78%")).toBeTruthy();
+  expect(card.textContent).toContain("You like finding out how machines work.");
+  expect(within(card).getByText("2 things still unknown")).toBeTruthy();
+  fireEvent.click(within(card).getByRole("button", { name: "Open your Mirror" }));
+  expect(navigate).toHaveBeenCalledWith("mirror");
+});
+it("says PAI needs a little more before the Mirror is ready", async () => {
+  vi.mocked(workspaceApi.getVault).mockResolvedValue(vault);
+  const early = { ...data, picture: { ...picture, picture: { ...picture.picture!, ready: false, text: null } } };
+  render(<Overview journey={{ ...journey, data: early, progress: journeyProgress(early) }} navigate={vi.fn()} openPath={vi.fn()} onChat={vi.fn()} />);
+  const card = screen.getByRole("region", { name: "Your Mirror" });
+  expect(within(card).getByText("PAI needs a little more to draw your picture.")).toBeTruthy();
+});

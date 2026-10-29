@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { AlertCircle, MessageCircle, PencilLine } from "lucide-react";
 import { workspaceApi } from "@/lib/api";
 import type { LivingPicture } from "@/lib/counselor-workspace";
-import { badgeLevel, conflictFor, vaultEntries, type VaultCatalog, type VaultCatalogType, type VaultEntry } from "@/lib/vault";
+import { badgeLevel, conflictFor, entryRef, vaultEntries, type VaultCatalog, type VaultCatalogType, type VaultEntry } from "@/lib/vault";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AreaHeatmap, evidenceLevel, vaultBadgeLabel, type HeatmapArea } from "@/components/pai";
@@ -13,7 +13,7 @@ import layout from "./profile-layout.json";
 import { missingBasics, resultsToProve } from "./profile-basics";
 import labels from "@/lib/evidence-labels.json";
 import { LoadState, useResource, human } from "./resource";
-import { MirrorPanel, areaIcon, fill, text } from "./profile-parts";
+import { areaIcon, fill, text } from "./profile-parts";
 import {
   DocumentLink, EntryBadge, FactReview, ReadableValue, StaleMarker, ValueEditor, readable, useOpenDocument,
 } from "./profile-details";
@@ -22,15 +22,12 @@ import { ConflictBanner, ConflictReview, ConflictSummary } from "./vault-conflic
 export { CertaintyChart } from "./profile-parts";
 
 const load = async () => {
-  const [picture, vault, catalog] = await Promise.all([
-    // The Mirror still comes from the counselor picture; a failed read only
-    // hides it, never the Vault.
-    workspaceApi.getCounselorWorkspace().catch(() => null),
+  const [vault, catalog] = await Promise.all([
     workspaceApi.getVault(),
     // Without the catalog the page still reads; only Add and Edit step back.
     workspaceApi.getVaultCatalog().catch((): VaultCatalog => ({ types: [] })),
   ]);
-  return { picture, vault, catalog };
+  return { vault, catalog };
 };
 type Tab = "details" | "background";
 
@@ -135,9 +132,28 @@ export function LivingProfile({
     if (next === "background") q.set("tab", "background"); else q.delete("tab");
     window.history.replaceState({}, "", `${window.location.pathname}?${q}`);
   };
+  // "This is wrong" on the Mirror links here with ?entry=<ref> (the Mirror's
+  // entry names): open that entry once the Vault is read, then drop the param.
+  const focus = useRef<string | null>(null);
+  useEffect(() => {
+    focus.current = new URLSearchParams(window.location.search).get("entry");
+  }, []);
+  useEffect(() => {
+    const ref = focus.current;
+    if (!ref || !resource.data) return;
+    focus.current = null;
+    const q = new URLSearchParams(window.location.search);
+    q.delete("entry");
+    window.history.replaceState({}, "", `${window.location.pathname}?${q}`);
+    const target = vaultEntries(resource.data.vault).find((e) => entryRef(e) === ref);
+    if (!target) return;
+    if (target.kind === "item") setTab("background");
+    const conflict = conflictFor(resource.data.vault.conflicts, target);
+    if (conflict) setReview({ start: conflict.id }); else setOpenId(target.id);
+  }, [resource.data]);
   if (!resource.data || resource.error)
     return <LoadState error={resource.error} busy={resource.busy} retry={resource.refresh} skeleton="profile" />;
-  const { picture, vault, catalog } = resource.data;
+  const { vault, catalog } = resource.data;
   const typeOf = (key: string) => catalog.types.find((t) => t.key === key) || null;
   // A preferred name is no longer asked for; older saved ones stay out of view.
   const visible = (entry: VaultEntry) => !layout.hiddenKeys.includes(entry.type);
@@ -265,7 +281,6 @@ export function LivingProfile({
           </div>
         ) : (
           <div className="space-y-8">
-            {picture && <MirrorPanel picture={picture} onChat={onChat} onChanged={resource.refresh} />}
             <section aria-labelledby="story-title">
               <h2 id="story-title" className="text-xl font-bold tracking-tight">{text.storyTitle}</h2>
               <p className="mt-1 max-w-2xl text-sm text-muted-foreground">{text.storyIntro}</p>

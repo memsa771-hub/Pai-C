@@ -5,6 +5,8 @@ import { FactCard, type OfferedFact } from '@/components/counselor/workspace/fac
 import { cn } from '@/lib/utils';
 import { Possibilities, PathsFound } from '@/components/counselor/possibilities';
 import { PlaceLink } from '@/components/counselor/place-link';
+import { MirrorLink } from '@/components/counselor/mirror-link';
+import type { MirrorHeader } from '@/lib/mirror';
 import { Button } from '@/components/ui/button';
 import { Copy, Check, FileIcon, Download, Eye, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -291,6 +293,7 @@ export const ChatMessage = memo(function ChatMessage({ message, agents = [] }: C
           {typeof message.metadata?.possibility_id === 'string' && <Possibilities id={message.metadata.possibility_id} />}
           {Array.isArray(message.metadata?.paths_found) && <PathsFound ids={message.metadata.paths_found as string[]} />}
           {typeof message.metadata?.workspace_place === 'string' && <PlaceLink place={message.metadata.workspace_place} />}
+          {message.messageType === 'counselor_mirror' && <MirrorLink header={message.metadata?.header as MirrorHeader | undefined} />}
 
           <div className="mt-1 flex min-h-8 items-center gap-2 px-1">
             {timestamp && <span className="text-[11px] text-muted-foreground">{timestamp}</span>}

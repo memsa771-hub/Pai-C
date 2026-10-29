@@ -1,4 +1,5 @@
 import type { Possibility } from "./possibilities";
+import type { MirrorPicture, MirrorUnknown } from "./mirror";
 export type EvidenceItem = {
   id?: string;
   key?: string;
@@ -35,12 +36,15 @@ export type LivingPicture = {
   };
   capabilities: EvidenceItem[] | Record<string, EvidenceItem[]>;
   academic: { records: Record<string, Record<string, unknown>[]> };
-  picture: Record<string, { text: string; evidence: string[] }> | null;
-  mirror_status: string | null;
+  /** The Mirror state card's header, unknowns, text and readiness. */
+  picture: MirrorPicture | null;
+  /** How complete the Vault is: areas known of the total, and what is still unknown. */
+  completeness?: { known: number; total: number; unknowns: MirrorUnknown[] };
   moments: Record<string, string>;
   /** Server-owned Counselor stage (IDENTITY … CHOSEN); null before a journey exists. */
   stage?: string | null;
-  ratings: {
+  /** Old certainty ratings; the backend now sends an empty list. */
+  ratings?: {
     version: number;
     understood: number;
     before: number | null;
@@ -61,6 +65,8 @@ export type FactCard = {
 export type PathResult = {
   possibility: Possibility;
   status: string;
+  /** The Vault changed since this explanation was written. */
+  stale?: boolean;
   path: Record<string, unknown> | null;
   facts: Record<string, unknown>[];
   missing: unknown[];

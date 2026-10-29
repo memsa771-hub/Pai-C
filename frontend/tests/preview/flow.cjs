@@ -47,17 +47,20 @@ module.exports = async function flow(browser, open, ORIGIN) {
     assert.equal(await page.locator('main ol > li').count(), 11, 'all eleven stages');
     assert.equal(await page.locator('main ol > li[aria-current="step"]').count(), 1, 'exactly one current stage');
 
-    // E: the Mirror needs agreement before feedback; the rating is the exact version.
-    await go('/student?view=threads&mirror=1');
-    assert.equal(await page.getByRole('radiogroup').count(), 0, 'no rating before agreement');
-    await page.getByRole('button', { name: 'Yes, that is right' }).click();
-    await page.locator('label').filter({ hasText: 'Completely' }).click();
-    assert(await page.getByRole('radio', { name: '5: Completely' }).isChecked(), 'the label selects the rating');
-    await page.getByRole('slider').fill('7');
-    await page.getByRole('button', { name: 'Send', exact: true }).click();
-    await page.getByText('Thank you. PAI will use this to do better.').waitFor();
-    const feedback = await called(page, 'submitCounselorMirrorFeedback');
-    assert.deepEqual(feedback.at(-1).args, [1, 5, 7], 'Mirror feedback is version 1, understood 5, certainty 7');
+    // E: the Mirror is drawn from the Vault; nothing to confirm. "Tell PAI"
+    // on what is still unknown only fills a chat draft, and "This is wrong"
+    // opens the Vault entry.
+    await go('/student?view=mirror');
+    await page.getByRole('heading', { level: 1, name: 'Sam Taylor' }).waitFor();
+    assert.equal(await page.getByRole('button', { name: /confirm|that is right/i }).count(), 0, 'no confirm on the Mirror');
+    const sentBeforeTell = (await called(page, 'sendMessage')).length;
+    await page.getByRole('region', { name: 'Still unknown' }).getByRole('button', { name: 'Tell PAI about Pressures & limits' }).click();
+    await page.waitForFunction(() => /budget/.test(document.querySelector('textarea[data-chat-input]')?.value || ''), null, { timeout: 5000 });
+    assert.equal((await called(page, 'sendMessage')).length, sentBeforeTell, 'Tell PAI is a draft, not a send');
+    await go('/student?view=mirror');
+    await page.getByRole('button', { name: 'This is wrong: Matric Science, 81%' }).click();
+    await page.getByRole('dialog').waitFor();
+    assert.match(page.url(), /view=profile/, 'This is wrong opens the Vault');
 
     // F-G: paths first. Merely viewing a path must not search programs.
     await page.getByRole('navigation').getByRole('button', { name: 'Roadmaps', exact: true }).click();
@@ -93,8 +96,8 @@ module.exports = async function flow(browser, open, ORIGIN) {
     // J-K: the route's steps are ticked by the student, and a check-in opens
     // the conversation as a draft. Nothing is sent automatically.
     await page.getByRole('region', { name: 'Your route' }).getByRole('checkbox').first().check();
-    await page.getByText('1 of 3').waitFor();
-    assert.deepEqual((await called(page, 'setRouteStep')).at(-1).args, [0, true], 'the tick is saved');
+    await page.getByText('3 of 7').waitFor();
+    assert.deepEqual((await called(page, 'setRouteStep')).at(-1).args, ['bridge', true], 'the tick is saved by step key');
     const sentBefore = (await called(page, 'sendMessage')).length;
     await page.getByRole('button', { name: 'How is it going?' }).click();
     await page.getByRole('region', { name: 'Check-in' }).getByRole('button', { name: 'I tried something' }).click();
@@ -176,5 +179,5 @@ module.exports = async function flow(browser, open, ORIGIN) {
     assert.equal(phone.errors.length, 0, 'phone flow: ' + phone.errors.join(' | '));
     await phone.context.close();
   }
-  console.log('Flow: A-K boundaries, Mirror version, consent, no auto-choice/auto-send, digest confirm, phone account and tabs.');
+  console.log('Flow: A-K boundaries, Mirror drafts only, consent, no auto-choice/auto-send, digest confirm, phone account and tabs.');
 };

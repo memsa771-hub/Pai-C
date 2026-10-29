@@ -6,7 +6,6 @@ import { TypingBubble } from './working-indicator';
 import { PaiDmIntro } from './pai-dm-intro';
 import { ChatInput, type PendingFile } from './chat-input';
 import { VoiceModeButton, VoiceStatus, useCounselorVoice } from './counselor-voice-control';
-import { CounselorMirrorCard } from '@/components/counselor/counselor-mirror-card';
 import counselorCopy from '@/components/counselor/workspace/copy.json';
 import { CounselorRequestPanel } from './counselor-request-panel';
 import { ThreadStatusBar } from './thread-status-bar';
@@ -981,8 +980,6 @@ export function ChatView({counselorOnly=false,initialDraft=""}:{counselorOnly?:b
           <div className="mx-auto w-full max-w-[48rem] px-3 pt-1 pb-3 lg:px-4 lg:pb-5">
             {counselorOnly && initialDraft === counselorCopy.checkin && !checkinSent && <CheckInCard onPick={(text) => setCurrentDraft(counselorCopy.checkinCard.draftTemplate.replace('{option}', text))} />}
             {currentSessionId === 'pai-counselor' && <div className="mb-2">
-              <CounselorMirrorCard refreshKey={`${currentSessionId}:${displayMessages.length}`}
-                onUpdated={forceRefresh} />
               <CounselorRequestPanel refreshKey={displayMessages.length} />
             </div>}
             {voiceEnabled && <VoiceStatus voice={voice} />}

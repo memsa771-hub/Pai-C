@@ -1,15 +1,11 @@
 "use client";
-import { useEffect, useId, useState } from "react";
+import { useId } from "react";
 import {
-  Eye, FileText, Gauge, Gem, GraduationCap, Heart, Home, Lightbulb, MessageCircle,
+  FileText, Gauge, Gem, GraduationCap, Heart, Home, Lightbulb, MessageCircle,
   Scale, Signpost, Sparkles, Target, Users, type LucideIcon,
 } from "lucide-react";
-import { workspaceApi } from "@/lib/api";
 import type { LivingPicture } from "@/lib/counselor-workspace";
-import type { CounselorMirrorDraft } from "@/lib/counselor-mirror";
-import { Button } from "@/components/ui/button";
-import { EmptyState, SectionCard, StatChip, type Quadrant, type Tone } from "@/components/pai";
-import copy from "./copy.json";
+import type { Tone } from "@/components/pai";
 import layout from "./profile-layout.json";
 
 export const text = layout.copy;
@@ -24,7 +20,7 @@ const fill = (template: string, values: Record<string, string | number>) =>
 export { fill };
 
 /** A smooth line of real certainty ratings only. Never invents a point. */
-export function CertaintyChart({ ratings }: { ratings: LivingPicture["ratings"] }) {
+export function CertaintyChart({ ratings }: { ratings: NonNullable<LivingPicture["ratings"]> }) {
   const gradient = useId();
   const points = ratings.flatMap((row) => [
     row.before === null ? null : { label: fill(text.before, { version: row.version }), value: row.before },
@@ -68,64 +64,3 @@ export function CertaintyChart({ ratings }: { ratings: LivingPicture["ratings"] 
     </div>
   );
 }
-
-const QUADRANTS: { key: "you_say" | "life_shows" | "pressure" | "you_want"; icon: LucideIcon; tone: Tone }[] = [
-  { key: "you_say", icon: MessageCircle, tone: "blue" },
-  { key: "life_shows", icon: Eye, tone: "teal" },
-  { key: "pressure", icon: Scale, tone: "amber" },
-  { key: "you_want", icon: Target, tone: "violet" },
-];
-const loadSummary = async (): Promise<CounselorMirrorDraft | null> => {
-  try { return await workspaceApi.getCounselorSummary(); } catch { return null; }
-};
-
-/** The Mirror at the top of the profile, read-only: the confirm, edit and
- * rating routes are gone (FOUR_FEATURES_SPEC 2.3); corrections go through the
- * Vault, and the Mirror page replaces this panel. */
-export function MirrorPanel({ picture, onChat, onChanged }: { picture: LivingPicture; onChat: (topic?: string) => void; onChanged: () => void }) {
-  const [draft, setDraft] = useState<CounselorMirrorDraft | null>(null);
-  void onChanged;
-  useEffect(() => { let alive = true; void loadSummary().then((d) => { if (alive) setDraft(d); }); return () => { alive = false; }; }, []);
-  const core = draft?.mirror?.core_picture;
-  // Only an old 4-line picture fills this panel; the new state card (a header, not lines) is the Mirror page's.
-  const oldPicture = picture.picture?.you_say ? picture.picture : null;
-  const status = draft?.status ?? (oldPicture ? "confirmed" : null);
-  const lines: Record<string, string> | null = core
-    ? Object.fromEntries(QUADRANTS.map(({ key }) => [key, core[key]?.text || ""]))
-    : oldPicture ? Object.fromEntries(QUADRANTS.map(({ key }) => [key, oldPicture[key]?.text || ""])) : null;
-  if (!lines) {
-    return (
-      <SectionCard id="mirror" className="scroll-mt-6" title={text.mirrorTitle}>
-        {draft?.mirror?.intro ? (
-          <div>
-            <p className="text-xs font-semibold text-primary">{text.firstPicture}</p>
-            <p className="mt-2 text-pretty text-lg leading-relaxed">{draft.mirror.intro}</p>
-            <Button size="tap" variant="soft" className="mt-4" onClick={() => onChat()}><MessageCircle aria-hidden />{text.openChat}</Button>
-          </div>
-        ) : (
-          <EmptyState icon={MessageCircle} tone="blue" title={text.gettingToKnow} description={text.gettingToKnowBody}
-            action={<Button size="tap" onClick={() => onChat()}><MessageCircle aria-hidden />{text.openChat}</Button>} />
-        )}
-      </SectionCard>
-    );
-  }
-  const quadrants: Quadrant[] = QUADRANTS.filter(({ key }) => lines[key]).map(({ key, icon, tone }) => ({
-    key, icon, tone, text: lines[key], label: copy.pictureLabels[key],
-  }));
-  return (
-    <SectionCard id="mirror" className="scroll-mt-6" title={text.mirrorTitle} description={text.mirrorIntro}
-      action={<StatChip size="sm" tone={status === "confirmed" ? "success" : status === "needs_changes" ? "warning" : "blue"}>
-        {status === "confirmed" ? text.mirrorConfirmed : status === "needs_changes" ? text.mirrorChanged : text.mirrorWaiting}
-      </StatChip>}>
-      <dl className="divide-y rounded-2xl border">
-        {quadrants.map((q) => (
-          <div key={q.key} className="grid gap-1 px-4 py-3.5 sm:grid-cols-[10rem_1fr] sm:gap-4">
-            <dt className="text-sm text-muted-foreground">{q.label}</dt>
-            <dd className="text-pretty text-[15px] font-semibold leading-relaxed">{q.text}</dd>
-          </div>
-        ))}
-      </dl>
-    </SectionCard>
-  );
-}
-

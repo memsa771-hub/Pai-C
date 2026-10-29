@@ -16,7 +16,6 @@ const setSelectedFileId = vi.fn();
 vi.mock("@/lib/workspace-context", () => ({ useWorkspace: () => ({ setSelectedFileId }) }));
 vi.mock("@/lib/api", () => ({
   workspaceApi: {
-    getCounselorWorkspace: vi.fn(),
     getVault: vi.fn(),
     getVaultCatalog: vi.fn(),
     addVaultEntry: vi.fn(),
@@ -33,7 +32,6 @@ afterEach(() => {
 });
 const RAW_KEY = /\b(?:identity|location|preferences)\.[a-z_]+\b|\b[a-z]{2,}_[a-z_]{2,}\b/;
 function setup(view = vault) {
-  vi.mocked(workspaceApi.getCounselorWorkspace).mockResolvedValue(picture);
   vi.mocked(workspaceApi.getVault).mockResolvedValue(view);
   vi.mocked(workspaceApi.getVaultCatalog).mockResolvedValue(vaultCatalog);
   for (const write of ["addVaultEntry", "editVaultEntry", "confirmVaultEntry", "removeVaultEntry"] as const)
@@ -364,10 +362,12 @@ it("explains where a value came from, what disagrees, and links the documents", 
   expect(navigate).toHaveBeenCalledWith("files");
 });
 
-it("builds Background from the Mirror and the Vault story, and adds a story item", async () => {
+it("builds Background from the Vault story, and adds a story item", async () => {
   window.history.replaceState({}, "", "/?tab=background");
   const { chat } = setup();
-  expect(await screen.findByRole("heading", { name: "How PAI sees you" })).toBeTruthy();
+  expect(await screen.findByRole("heading", { name: "Your story" })).toBeTruthy();
+  // The Mirror has its own page now; Background holds no Mirror panel.
+  expect(screen.queryByRole("heading", { name: "How PAI sees you" })).toBeNull();
   // The seven story areas, never one card per Vault type.
   const areas = within(screen.getByRole("region", { name: "Your story" })).getAllByRole("heading", { level: 3 });
   expect(areas.map((h) => h.textContent)).toEqual(
@@ -456,7 +456,7 @@ it.each(["light", "dark"])("labels evidence in words, not colour alone, in %s", 
   const { container } = render(
     <div className={theme}>
       <CoverageHeatmap coverage={picture.coverage} />
-      <CertaintyChart ratings={picture.ratings} />
+      <CertaintyChart ratings={picture.ratings!} />
     </div>,
   );
   const areas = within(screen.getByRole("list", { name: "What PAI understands so far" })).getAllByRole("button");
@@ -465,4 +465,25 @@ it.each(["light", "dark"])("labels evidence in words, not colour alone, in %s", 
   expect(areas[9].getAttribute("aria-label")).toMatch(/^Options & myths: Not yet, 0 pieces of evidence/);
   expect(screen.getByRole("img", { name: /Your certainty over time/ })).toBeTruthy();
   expect(container).toMatchSnapshot();
+});
+
+it("opens the entry the Mirror's This is wrong points at (?entry=<ref>)", async () => {
+  window.history.replaceState({}, "", "/student?view=profile&entry=education%3Aeducation-earlier");
+  setup();
+  const dialog = await screen.findByRole("dialog");
+  expect(within(dialog).getByRole("heading", { name: "Education" })).toBeTruthy();
+  expect(new URLSearchParams(window.location.search).get("entry")).toBeNull();
+});
+
+it("opens a story item from the Mirror on the Background tab", async () => {
+  window.history.replaceState({}, "", "/student?view=profile&entry=item%3Afixing&tab=background");
+  setup();
+  const dialog = await screen.findByRole("dialog");
+  expect(within(dialog).getByRole("heading", { name: "Interest" })).toBeTruthy();
+});
+
+it("opens the conflict review when the Mirror points at an entry in question", async () => {
+  window.history.replaceState({}, "", "/student?view=profile&entry=fact%3Alocation.current_country");
+  setup();
+  expect(await screen.findByText("Which current country is right?")).toBeTruthy();
 });

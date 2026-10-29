@@ -2,6 +2,8 @@
  * roadmap engine (backend/app/pai_c/roadmap). Reasons, needs and steps are
  * copy keys with values; the page renders them from copy.json `roadmap`. */
 
+import type { VaultLevel } from "./vault";
+
 export type RoadmapStatus = "open" | "step" | "not_open" | "unknown";
 
 export type RouteGroup = { code: string; label: string; route_label?: string };
@@ -26,6 +28,43 @@ export type Verdict = {
   subjects?: string[];
 };
 
+export type StepStatus = "done" | "half" | "not";
+
+/** One step of a field's route, coloured from the Vault (backend roadmap/steps.py):
+ * done green, half yellow, not red. The evidence badge shows the level apart
+ * from the colour, so a step done on a stated fact reads "done · stated". */
+export type RouteStep = {
+  key: string;
+  kind?: string;
+  label_key: string;
+  values: Record<string, unknown>;
+  status: StepStatus;
+  colour?: "green" | "yellow" | "red";
+  evidence?: { id: string | null; level: VaultLevel; source_label: string } | null;
+  rule?: { source: string; confidence: "official" | "secondary" | "uncertain" | null } | null;
+  manual_done?: boolean;
+};
+
+/** A dated calendar event behind the estimate; month null is "date not confirmed". */
+export type TimeBasis = {
+  step: string | null;
+  event_key: string | null;
+  month: number | null;
+  year: number | null;
+  source: string | null;
+  confidence: string | null;
+};
+
+/** How long, from the academic calendar (backend roadmap/timeline.py). */
+export type RouteTime = {
+  to_entry_months: number | null;
+  to_finish_years: number | null;
+  next_intake: { label: string; start_month: number; year: number } | null;
+  degree_years?: number | null;
+  basis: TimeBasis[];
+  confidence: "official" | "secondary" | "uncertain";
+};
+
 export type FieldCard = {
   possibility_id: string;
   field_key: string | null;
@@ -34,6 +73,8 @@ export type FieldCard = {
   why: string;
   status: RoadmapStatus;
   verdict: Verdict;
+  steps?: RouteStep[];
+  time?: RouteTime | null;
 };
 
 export type EducationLine = {
@@ -49,8 +90,13 @@ export type ChosenRoute = {
   possibility_id?: string | null;
   title: string;
   chosen_at: string | null;
-  steps: CopyItem[];
-  steps_done: boolean[];
+  /** The live route with the student's ticks applied. */
+  steps: RouteStep[];
+  time?: RouteTime | null;
+  /** The route as it was at choose time. */
+  snapshot_steps?: Pick<RouteStep, "key" | "label_key" | "values" | "status">[];
+  /** Keys of the steps the student ticked. */
+  steps_done: string[];
   snapshot_verdict: Verdict | null;
   live_status: RoadmapStatus;
 };

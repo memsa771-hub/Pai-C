@@ -19,6 +19,7 @@ import { Roadmap } from "./roadmap";
 import { CounselorSettings } from "./settings";
 import { DocumentsView } from "./documents";
 import { Overview } from "./overview";
+import { Mirror } from "./mirror";
 import { workspaceApi } from "@/lib/api";
 import { useResource } from "./resource";
 import { useJourney } from "./use-journey";
@@ -132,6 +133,7 @@ export function CounselorShell() {
         <div className="mx-auto max-w-6xl px-4 pb-16 pt-6 sm:px-8 sm:pt-8">
           {active === "profile" && <LivingProfile onChat={chat} onNavigate={navigate} stage={journey.progress?.stage} />}
           {active === "journey" && <Journey navigate={navigate} journey={journey} onChat={chat} />}
+          {active === "mirror" && <Mirror onChat={chat} />}
           {active === "paths" &&
             (path ? (
               places ? (

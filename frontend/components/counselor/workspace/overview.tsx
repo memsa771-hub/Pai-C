@@ -8,6 +8,7 @@ import { AnimatePresence, motion } from "motion/react";
 import { ArrowRight, ChevronLeft, ChevronRight } from "lucide-react";
 import { workspaceApi } from "@/lib/api";
 import { vaultEntries, type VaultEntry } from "@/lib/vault";
+import type { LivingPicture } from "@/lib/counselor-workspace";
 import { cn } from "@/lib/utils";
 import { LoadState, useResource } from "./resource";
 import type { useJourney } from "./use-journey";
@@ -27,6 +28,35 @@ function Metric({ label, value, sub, tone = "white" }: { label: string; value: R
       <p className="mt-0.5 text-[32px] font-bold leading-[44px] tabular-nums">{value}</p>
       <p className={cn("text-xs font-medium", tone === "white" ? "text-primary" : "text-[#1249c4]")}>{sub}</p>
     </div>
+  );
+}
+
+/** The Mirror in brief: who PAI is drawing, the first lines it wrote, how
+ * much is still unknown, and the way to the Mirror page. */
+function MirrorSummary({ picture, onOpen }: { picture: LivingPicture["picture"]; onOpen: () => void }) {
+  const unknowns = picture?.unknowns.length ?? 0;
+  const sentences = picture?.ready ? picture.text?.sentences.slice(0, 2) ?? [] : [];
+  const who = [picture?.header.name, picture?.header.education_line?.text].filter(Boolean);
+  return (
+    <section aria-labelledby="ov-mirror" className="flex min-w-0 flex-col">
+      <h2 id="ov-mirror" className="font-display text-lg leading-tight">{text.mirrorTitle}</h2>
+      <p className="mt-0.5 text-[11px] text-muted-foreground">{text.mirrorNote}</p>
+      {who.length > 0 && (
+        <p className="mt-3 flex min-w-0 flex-wrap items-baseline gap-x-2 text-sm">
+          {picture?.header.name && <span className="font-semibold">{picture.header.name}</span>}
+          {picture?.header.education_line && <span className="text-muted-foreground">{picture.header.education_line.text}</span>}
+        </p>
+      )}
+      {sentences.length ? (
+        <p className="mt-2 line-clamp-3 text-pretty text-sm leading-relaxed">{sentences.join(" ")}</p>
+      ) : <p className="mt-2 text-sm text-muted-foreground">{text.mirrorNotReady}</p>}
+      <p className="mt-2 text-xs font-semibold text-primary">
+        {unknowns ? fill(unknowns === 1 ? text.mirrorUnknowns.one : text.mirrorUnknowns.other, { count: unknowns }) : text.mirrorAllKnown}
+      </p>
+      <button onClick={onOpen} className="mt-auto inline-flex min-h-8 items-center gap-1 pt-2 text-xs font-semibold text-primary hover:underline">
+        {text.mirrorOpen}<ArrowRight aria-hidden className="size-3.5" />
+      </button>
+    </section>
   );
 }
 
@@ -54,12 +84,6 @@ export function Overview({ journey, navigate, openPath, onChat }: {
   const missing = missingBasics(facts);
   const stage = progress.stage;
   const moment = "action" in stage ? picture.moments?.[stage.action!] : undefined;
-  const areas = Object.entries(copy.areas)
-    .map(([key, label]) => ({ key, label, count: picture.coverage[key]?.item_count || 0 }))
-    .filter((a) => a.count > 0)
-    .sort((a, b) => b.count - a.count)
-    .slice(0, 4);
-  const maxCount = Math.max(1, ...areas.map((a) => a.count));
 
   const recs: Rec[] = [
     {
@@ -144,28 +168,7 @@ export function Overview({ journey, navigate, openPath, onChat }: {
           </section>
 
           <section className="grid content-start gap-6 rounded-[22px] bg-card p-5 shadow-card ring-1 ring-border/70 fit:min-h-44 fit:flex-1 fit:overflow-y-auto md:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
-            <div aria-labelledby="ov-understand">
-              <h2 id="ov-understand" className="font-display text-lg leading-tight">{text.understandTitle}</h2>
-              <p className="mt-0.5 text-[11px] text-muted-foreground">{text.understandNote}</p>
-              {areas.length ? (
-                <ul className="mt-3 space-y-2">
-                  {areas.map((area) => (
-                    <li key={area.key} className="flex items-center gap-2.5">
-                      <span className="w-32 shrink-0 truncate text-[11px] text-muted-foreground">{area.label}</span>
-                      <span className="h-[7px] flex-1 overflow-hidden rounded-full bg-background">
-                        <span className="block h-full rounded-full bg-primary" style={{ width: `${(area.count / maxCount) * 100}%` }} />
-                      </span>
-                      <span className="w-5 shrink-0 text-right text-[11px] font-semibold tabular-nums">{area.count}</span>
-                    </li>
-                  ))}
-                </ul>
-              ) : <p className="mt-3 text-sm text-muted-foreground">{text.understandEmpty}</p>}
-              {areas.length > 0 && (
-                <button onClick={() => navigate("profile")} className="mt-3 inline-flex min-h-8 items-center gap-1 text-xs font-semibold text-primary hover:underline">
-                  {text.understandOpen}<ArrowRight aria-hidden className="size-3.5" />
-                </button>
-              )}
-            </div>
+            <MirrorSummary picture={picture.picture} onOpen={() => navigate("mirror")} />
             <div className="flex flex-col rounded-[14px] bg-brand-soft p-3.5 lg:max-xl:hidden">
               <p className="text-[10px] font-semibold uppercase tracking-wide text-primary">{text.nextLabel}</p>
               <p className="mt-1 text-[15px] font-semibold leading-snug">{stage.title}</p>

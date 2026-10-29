@@ -193,3 +193,14 @@ it("asks for the education when the last run needed it, and shows PAI's own run 
     expect(screen.queryByText(/PAI is looking at everything/)).toBeNull();
   } finally { vi.useRealTimers(); }
 });
+it("notes calmly when the Vault changed since the explanation was written", async () => {
+  vi.mocked(workspaceApi.getPath).mockResolvedValue({ ...pathResult, stale: true });
+  render(<PathPage id="path-one" onBack={vi.fn()} onPlaces={vi.fn()} onChat={vi.fn()} />);
+  expect(await screen.findByText("Your Vault changed since PAI wrote this, so parts of it may be out of date.")).toBeTruthy();
+});
+it("says nothing about age when the explanation is current", async () => {
+  vi.mocked(workspaceApi.getPath).mockResolvedValue({ ...pathResult, stale: false });
+  render(<PathPage id="path-one" onBack={vi.fn()} onPlaces={vi.fn()} onChat={vi.fn()} />);
+  await screen.findByRole("heading", { level: 1 });
+  expect(screen.queryByText(/may be out of date/)).toBeNull();
+});

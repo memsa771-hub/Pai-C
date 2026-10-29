@@ -21,7 +21,8 @@ export type JourneySignals = {
 export function signalMet(signal: string, data: JourneySignals): boolean {
   if (signal === "onboarded") return true;
   if (signal.startsWith("moment:")) return !!data.picture.moments?.[signal.slice(7)];
-  if (signal === "mirror_confirmed") return data.picture.mirror_status === "confirmed";
+  // The Mirror is drawn from the Vault with no confirm step; E is reached once it is ready.
+  if (signal === "mirror_ready") return !!data.picture.picture?.ready;
   const live = data.possibilities.filter((p) => p.status !== "dismissed");
   if (signal === "paths_found") return live.length > 0;
   if (signal === "path_explored") return live.some((p) => p.status === "exploring" || p.status === "chosen");
@@ -29,7 +30,7 @@ export function signalMet(signal: string, data: JourneySignals): boolean {
   // The Roadmap page: a route the student chose, then a first step ticked.
   // Cards alone reach nothing: they exist as soon as paths do.
   if (signal === "route_chosen") return !!data.roadmap?.chosen;
-  if (signal === "route_step_done") return !!data.roadmap?.chosen?.steps_done.some(Boolean);
+  if (signal === "route_step_done") return !!data.roadmap?.chosen?.steps_done?.length;
   return false;
 }
 
