@@ -250,11 +250,16 @@ def enqueue_path_analysis(db, workspace_id: str, *, source_event_id: str | None,
     not yet started is reused, since it reads all of them when it runs. The
     caller commits, as with the other Counselor enqueues."""
     snapshot = MemoryService(db).truth_map(workspace_id)
-    pending = db.scalar(select(BackgroundJob.id).where(
+    pending = db.scalar(select(BackgroundJob).where(
         BackgroundJob.workspace_id == workspace_id, BackgroundJob.job_type == JOB_ANALYZE_PATHS,
-        BackgroundJob.status == "pending"))
+        BackgroundJob.status == "pending").limit(1))
     if pending:
-        return pending
+        if reason == "asked" and channel:
+            # A chat request outranks a quiet (Vault or planner) run: the
+            # pending run answers the student in their channel.
+            pending.payload = {**(pending.payload or {}), "reason": "asked", "channel": channel,
+                               **({"source_event_id": source_event_id} if source_event_id else {})}
+        return pending.id
     own = sorted(row.normalized_title for row in PossibilityService(db).list(workspace_id)
                  if row.source == "student" and row.status != "dismissed")
     # Every relevant write changes the key (each entry's id and updated_at),
@@ -268,6 +273,46 @@ def enqueue_path_analysis(db, workspace_id: str, *, source_event_id: str | None,
         workspace_id=workspace_id,
         idempotency_key=f"counselor:paths:{workspace_id}:{snapshot.version}:{digest}")
     return job.id if job else None
+
+
+async def ask_path_analysis(db, workspace_id: str, *, source_event_id: str | None,
+                            channel: str) -> str | None:
+    """The student asked in chat which paths they have. A pending run takes
+    over the channel (enqueue_path_analysis). A finished run for the same
+    input is not run again: its result is posted now, as the run would have
+    posted it, once per asking turn. The caller commits."""
+    job_id = enqueue_path_analysis(db, workspace_id, source_event_id=source_event_id,
+                                   channel=channel, reason="asked")
+    job = db.get(BackgroundJob, job_id) if job_id else None
+    if job is None or job.status != "succeeded":
+        return job_id
+    replied = db.scalar(select(EventRecord.id).where(
+        EventRecord.network_id == workspace_id,
+        EventRecord.metadata_["paths_reply_to"].as_string() == (source_event_id or job.id)))
+    if not replied:
+        await _post_finished(db, job, channel, source_event_id or job.id)
+    return job_id
+
+
+async def _post_finished(db, job, channel: str, reply_to: str) -> None:
+    result = job.result or {}
+    if result.get("status") == "needs_education":
+        education = [card["value"] for card in _records(db, job.workspace_id) if card["kind"] == "education"]
+        await _needs_education(db, job, {"channel": channel, "reason": "asked"}, education,
+                               extra={"paths_reply_to": reply_to})
+        return
+    paths = result.get("paths") or []
+    if not paths:
+        return
+    message = result.get("message")
+    if not message and result.get("message_id"):
+        event = db.get(EventRecord, result["message_id"])
+        message = ((event.payload or {}).get("content") if event else None)
+    message = message or policy()["paths_found_message"]
+    posted = await send_to_student(db, job.workspace_id, channel, "pai", message, 0,
+        metadata={"paths_job_id": job.id, "paths_found": paths, "paths_reply_to": reply_to})
+    if not posted:
+        raise RuntimeError("path analysis message was not persisted")
 
 
 def after_accept(db, candidate) -> None:
@@ -311,7 +356,7 @@ def propose_after_paths(db, workspace_id: str, *, actor: str = "system:paths") -
     RouteDecisionService(db).follow_active(workspace_id, actor=actor)
 
 
-async def _needs_education(db, job, payload: dict, education: list[dict]) -> dict:
+async def _needs_education(db, job, payload: dict, education: list[dict], extra: dict | None = None) -> dict:
     """A student who asked in chat hears, in one short line, what PAI still
     needs (their group, subjects, field or education); the copy is data."""
     rules = policy()
@@ -322,7 +367,7 @@ async def _needs_education(db, job, payload: dict, education: list[dict]) -> dic
     level = read_education(current)[0] if current else None
     message = rules["needs_education_messages"][rules["needs_education_by_level"].get(level, "education")]
     posted = await send_to_student(db, job.workspace_id, channel, "pai", message, 0,
-                                   metadata={"paths_job_id": job.id, "paths_found": []})
+                                   metadata={"paths_job_id": job.id, "paths_found": [], **(extra or {})})
     if not posted:
         raise RuntimeError("path analysis message was not persisted")
     return {"status": "needs_education", "message_id": posted}
@@ -434,7 +479,8 @@ async def path_analysis_job(job, db) -> dict:
                              job.workspace_id, type(exc).__name__)
         channel = payload.get("channel")
         if not channel or not ids:
-            return {"status": "stored", "paths": ids}
+            # The message is kept so a later chat request can post it unchanged.
+            return {"status": "stored", "paths": ids, "message": analysis.message}
         message = await send_to_student(db, job.workspace_id, channel, "pai", analysis.message, 0,
             metadata={"paths_job_id": job.id, "paths_found": ids})
         if not message:

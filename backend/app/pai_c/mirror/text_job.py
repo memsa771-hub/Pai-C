@@ -95,8 +95,14 @@ def after_accept(db, candidate) -> None:
             if stage == "MIRROR":
                 # Paths saved before the Mirror was ready (or kept through a
                 # rethink) move the journey on without waiting for a new run.
-                from app.pai_c.paths.analyzer import propose_after_paths
-                propose_after_paths(db, candidate.workspace_id, actor="system:mirror_ready")
+                from app.pai_c.paths import analyzer
+                try:
+                    # Its own savepoint: a failed stage move keeps MIRROR and the text job.
+                    with db.begin_nested():
+                        analyzer.propose_after_paths(db, candidate.workspace_id, actor="system:mirror_ready")
+                except Exception as exc:  # noqa: BLE001  the stage move is best effort here
+                    logger.error("mirror_propose_failed workspace_id=%s error_type=%s",
+                                 candidate.workspace_id, type(exc).__name__)
             enqueue_mirror_text(db, candidate.workspace_id, card)
     except Exception as exc:  # noqa: BLE001  the Vault write outranks its read model
         logger.error("mirror_text_enqueue_failed workspace_id=%s error_type=%s",

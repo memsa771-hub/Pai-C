@@ -249,12 +249,12 @@ async def _run_deep_turn(db, workspace_id: str, event_data: dict, depth: int):
             logger.warning("information_enqueue_failed error_type=%s", type(exc).__name__)
     # A student asking which paths they have gets them worked out in the
     # background by the path analyzer; the reply above never waits for it.
-    from app.pai_c.paths.analyzer import enqueue_path_analysis, policy as path_policy
+    from app.pai_c.paths.analyzer import ask_path_analysis, policy as path_policy
     if (signals is not None and signals.request is not None and not flagged
             and signals.request.kind in path_policy()["triggers"]["request_kinds"]):
         try:
-            enqueue_path_analysis(db, workspace_id, source_event_id=turn.source_event_id,
-                                  channel=turn.channel, reason="asked")
+            await ask_path_analysis(db, workspace_id, source_event_id=turn.source_event_id,
+                                    channel=turn.channel)
             db.commit()
         except Exception as exc:
             db.rollback()

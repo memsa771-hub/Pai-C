@@ -11,6 +11,8 @@ import time
 # workspace settings never grow (the allowance itself is one UTC day).
 KEEP_DAYS = 7
 _DATED = re.compile(r":(\d{4}-\d{2}-\d{2})$")
+# Whole-Vault-version keys written briefly before the daily key (44bd9e4).
+_LEGACY_DIGEST = re.compile(r"^[0-9a-f]{16}$")
 
 
 def daily_key(scope: str, now: datetime | None = None) -> str:
@@ -20,9 +22,9 @@ def daily_key(scope: str, now: datetime | None = None) -> str:
 
 def _pruned(counters: dict, today: date) -> dict:
     """Drop dated keys older than KEEP_DAYS and the bare numbers the old
-    per-Mirror-version budget left; other keys (belief-check periods) stay."""
+    per-Mirror-version budget left (and the 16-hex Vault-version keys); other keys (belief-check periods) stay."""
     def keep(key: str) -> bool:
-        if key.isdigit():
+        if key.isdigit() or _LEGACY_DIGEST.match(key):
             return False
         match = _DATED.search(key)
         return not match or date.fromisoformat(match.group(1)) >= today - timedelta(days=KEEP_DAYS)

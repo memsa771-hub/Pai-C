@@ -19,7 +19,6 @@ from app.database import get_db
 from app.journey import JourneyService
 from app.main import app
 from app.memory.candidates import MemoryCandidateService
-from app.memory.completeness import vault_version
 from app.memory.reconciler import MemoryReconciler
 from app.models import BackgroundJob, ExecutionRun, StudentJourney, StudentJourneyEvent
 from app.pai_c.mirror import MirrorEngine
@@ -94,9 +93,8 @@ async def test_programs_run_keyed_by_relevance_version():
         constraints = sent.await_args.args[0]["constraints"]
         assert constraints["relevance_version"] == version and "vault_version" not in constraints
         assert f":relevance:{version}" in constraints["research_key"]
-        before = vault_version(db, ws)
         add_education(student, db, fsc("pre_engineering", 78))  # education is path-relevant
-        assert vault_version(db, ws) != before and current_relevance(db, ws) != version
+        assert current_relevance(db, ws) != version
 
 
 REMOVED = re.compile(r"mirror_is_current|from_mirror|summary/confirm|summary/edit|summary/feedback|"
