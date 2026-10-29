@@ -235,8 +235,9 @@ async def _run_deep_turn(db, workspace_id: str, event_data: dict, depth: int):
         logged_decision = decision_log(decision, signals) if decision is not None else None
         if logged_decision is not None and "statement_fallback" in violations:
             logged_decision["statement_fallback"] = True
-        if logged_decision is not None and FELL_BACK & set(violations):
-            # A fixed reply never asked the bank question: it stays unasked.
+        if logged_decision is not None and FELL_BACK & set(violations) and not step:
+            # A fixed reply never asked the bank question: it stays unasked. When the
+            # drive rule appended the step to it (after a language fallback), it was asked.
             logged_decision["bank_intent"] = logged_decision["step_bank_intent"] = None
         db.add(CounselorTurnDecision(
             workspace_id=workspace_id, source_event_id=turn.source_event_id,

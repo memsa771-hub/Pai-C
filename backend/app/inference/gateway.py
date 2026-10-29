@@ -216,8 +216,13 @@ def _settings(role, api_key, model, base_url, effort):
 async def complete(role: str, messages: list[dict], system_prompt=None, response_format=None,
                    tools=None, *, api_key=None, model=None, base_url=_DEFAULT,
                    reasoning_effort=_DEFAULT, max_tokens=None, temperature=None,
-                   phase=None, turn_id='', usage_callback=None, tool_response=False):
+                   phase=None, turn_id='', usage_callback=None, tool_response=False, system_blocks=None):
+    """`system_blocks` is the system prompt split for prompt caching (static
+    part first, per-turn context after): Anthropic gets them as separate
+    blocks; OpenAI gets `system_prompt`, else the blocks joined."""
     provider = _provider(role)
+    if system_blocks and system_prompt is None:
+        system_prompt = '\n\n'.join(block for block in system_blocks if block)
     if provider != model_roles()['fallback_provider']:
         if tools is not None or tool_response:
             raise UnsupportedForProvider(f'{role} runs on {provider}, which has no tool calls here')
@@ -229,8 +234,10 @@ async def complete(role: str, messages: list[dict], system_prompt=None, response
                     **{key: value for key, value in _defaults(role).items()
                        if key in ('max_tokens', 'timeout_seconds', 'max_retries')}}
         effort = resolved.reasoning_effort if reasoning_effort is _DEFAULT else reasoning_effort
+        blocks = list(system_blocks) if system_blocks else [system_prompt or '']
         if response_format and response_format.get('type') == 'json_object':
-            system_prompt = (system_prompt or '') + '\n' + settings['json_instruction']
+            # The JSON instruction is static: it joins the first (cached) block.
+            blocks[0] = (blocks[0] or '') + '\n' + settings['json_instruction']
         record = _usage_callback(phase or role, model, turn_id, role=role)
 
         def on_provider_usage(usage):
@@ -238,7 +245,7 @@ async def complete(role: str, messages: list[dict], system_prompt=None, response
             if usage_callback is not None:
                 usage_callback(usage)
         return await anthropic_client.chat_completion(
-            resolved.api_key, model, messages, system_prompt=system_prompt, max_tokens=max_tokens,
+            resolved.api_key, model, messages, system_blocks=blocks, max_tokens=max_tokens,
             temperature=temperature, base_url=resolved.base_url, settings=settings,
             reasoning_effort=effort, usage_callback=on_provider_usage)
     api_key, model, base_url, effort = _settings(role, api_key, model, base_url, reasoning_effort)

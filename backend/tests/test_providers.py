@@ -253,3 +253,47 @@ async def test_refused_turn_gets_the_fixed_fallback_reply():
         result = await run_deep_turn(db, _turn(student), history=[])
     assert result.reply == config.PAI_COUNSELOR_FALLBACK_REPLY
     assert "provider_fallback" in result.guard_violations
+
+
+@pytest.mark.asyncio
+async def test_counselor_turns_send_a_cacheable_static_block_then_the_context():
+    """Two system blocks: the static voice prompt (with the JSON instruction)
+    carries cache_control and is identical across turns; the per-turn context
+    follows without it, so Anthropic can reuse the cached prefix."""
+    client = _anthropic_sequence(('{"reply": "One."}', "end_turn"), ('{"reply": "Two."}', "end_turn"))
+    first, second, third, fourth = _counselor_on_anthropic(client)
+    with StudentSession() as student, first, second, third, fourth:
+        with student.factory() as db:
+            await run_deep_turn(db, _turn(student, "I like robotics."), history=[])
+        with student.factory() as db:
+            await run_deep_turn(db, _turn(student, "My father wants me to study medicine."), history=[])
+    one, two = (call.kwargs["system"] for call in client.messages.create.await_args_list)
+    for system in (one, two):
+        assert len(system) == 2
+        assert system[0]["cache_control"] == {"type": "ephemeral"} and "cache_control" not in system[1]
+        assert system[0]["text"].endswith(gateway.model_roles()["providers"]["anthropic"]["json_instruction"])
+    assert one[0]["text"] == two[0]["text"]
+    assert one[1]["text"] != two[1]["text"]
+
+
+@pytest.mark.asyncio
+async def test_openai_callers_get_the_blocks_joined():
+    openai_client = _openai_client("reply")
+    with patch.object(gateway.transport, "create_client", return_value=openai_client):
+        await gateway.complete("analyst", [], api_key="fake", system_blocks=["static", "context"])
+    assert openai_client.chat.completions.create.await_args.kwargs["messages"][0] == {
+        "role": "system", "content": "static\n\ncontext"}
+
+
+@pytest.mark.asyncio
+async def test_an_sdk_parameter_error_falls_back_like_a_provider_failure():
+    """An older SDK rejects an unknown parameter with TypeError: the turn falls back, it does not error."""
+    client = SimpleNamespace(messages=SimpleNamespace(create=AsyncMock(
+        side_effect=TypeError("create() got an unexpected keyword argument 'thinking'"))), close=AsyncMock())
+    first, second, third, fourth = _counselor_on_anthropic(client)
+    with first, second, third, fourth:
+        with pytest.raises(gateway.ProviderUnavailable):
+            await gateway.complete("counselor", [])
+    with StudentSession() as student, student.factory() as db, first, second, third, fourth:
+        result = await run_deep_turn(db, _turn(student), history=[])
+    assert result.reply == config.PAI_COUNSELOR_FALLBACK_REPLY and "provider_fallback" in result.guard_violations

@@ -368,3 +368,26 @@ async def test_a_care_reply_posts_no_next_step(monkeypatch):
     content, metadata = await _posted_turn(monkeypatch, sig, _reply("Main yahan hoon. Tum akelay nahi ho.",
                                                                     {"type": "wellbeing"}))
     assert "next_step" not in metadata
+
+
+@pytest.mark.asyncio
+async def test_a_language_fallback_with_an_appended_bank_step_records_the_step_as_asked(monkeypatch):
+    """The fixed language-fallback reply still ends with the appended bank
+    question, so the decision keeps its bank fields (the question was asked)."""
+    from sqlalchemy import select
+    from app.config import config
+    from app.models import CounselorTurnDecision
+    monkeypatch.setattr(config, "PAI_LANGUAGE_BLOCKED_SCRIPTS", "Devanagari")
+    # A configured fallback without a question, so the drive rule appends the step.
+    monkeypatch.setattr(config, "PAI_COUNSELOR_FALLBACK_REPLY", "I want to understand you properly.")
+    blocked = _reply("\u0920\u0940\u0915 \u0939\u0948\u0964")
+    content, metadata = await _posted_turn(monkeypatch, signals(intent="sharing"), blocked)
+    assert content.startswith(config.PAI_COUNSELOR_FALLBACK_REPLY) and metadata["next_step"]
+    with StudentSession() as student:
+        with patch("app.pai_c.policy.classifier.complete", AsyncMock(return_value=signals(intent="sharing").model_dump_json())), \
+             patch("app.pai_c.deep.turn.chat_completion", AsyncMock(return_value=blocked)):
+            await student.turn("Theek hai")
+        with student.factory() as db:
+            row = db.scalar(select(CounselorTurnDecision))
+    assert "language_fallback" in row.guard_violations and "drive_appended" in row.guard_violations
+    assert row.decision["step_bank_intent"]

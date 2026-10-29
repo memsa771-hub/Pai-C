@@ -42,21 +42,27 @@ def create_client(api_key: str, base_url: Optional[str] = None, timeout: float =
     return AsyncAnthropic(**kwargs)
 
 
-def _messages(messages: list[dict], system_prompt: Optional[str], empty_turn: str) -> tuple[str, list[dict]]:
-    """System turns join the system prompt; the conversation must open with a user turn."""
-    system = [system_prompt] if system_prompt else []
+def _messages(messages: list[dict], system_blocks: list[str], empty_turn: str) -> tuple[list[str], list[dict]]:
+    """System turns join the last system block; the conversation must open with a user turn."""
+    blocks = [block for block in system_blocks if block]
+    extra: list[str] = []
     turns: list[dict] = []
     for message in messages:
         role, content = message.get("role"), message.get("content") or ""
         if role == "system":
-            system.append(str(content))
+            extra.append(str(content))
         elif turns and turns[-1]["role"] == role and isinstance(content, str) and isinstance(turns[-1]["content"], str):
             turns[-1]["content"] += "\n\n" + content
         else:
             turns.append({"role": "assistant" if role == "assistant" else "user", "content": content})
     if not turns or turns[0]["role"] != "user":
         turns.insert(0, {"role": "user", "content": empty_turn})
-    return "\n\n".join(part for part in system if part), turns
+    if extra:
+        if blocks:
+            blocks[-1] = "\n\n".join([blocks[-1], *extra])
+        else:
+            blocks = ["\n\n".join(extra)]
+    return blocks, turns
 
 
 def openai_shaped_usage(usage: Any) -> SimpleNamespace | None:
@@ -83,17 +89,23 @@ def _thinking(effort: Optional[str], settings: dict) -> tuple[dict, int]:
 
 
 async def chat_completion(api_key: str, model: str, messages: list[dict], *, system_prompt: Optional[str] = None,
+                          system_blocks: Optional[list[str]] = None,
                           max_tokens: Optional[int] = None, temperature: Optional[float] = None,
                           base_url: Optional[str] = None, settings: dict, reasoning_effort: Optional[str] = None,
                           usage_callback: Optional[Callable[[Any], None]] = None) -> str:
     """`settings` is the provider block of model_roles.json with the role's own
     overrides on top (max_tokens, timeout_seconds, max_retries).
 
-    The system prompt is sent as one cached block (prompt caching): the voice
-    and context prefix repeats on every turn. A reply cut off at max_tokens is
-    asked once more for fewer words; a second cut-off or a refusal raises
-    ProviderUnavailable, so the caller's fixed fallback is used."""
-    system, turns = _messages(messages, system_prompt, settings["empty_conversation"])
+    Prompt caching: `system_blocks` (else the one `system_prompt`) are sent as
+    separate system blocks and only the first carries the cache breakpoint.
+    Anthropic matches a cached prefix only at block boundaries, so the caller
+    puts the static prompt first and the per-turn context after it. A reply
+    cut off at max_tokens is asked once more for fewer words (on the last,
+    uncached block); a second cut-off or a refusal raises ProviderUnavailable,
+    so the caller's fixed fallback is used. Any other SDK failure (a bad
+    parameter on an older SDK raises TypeError) is also ProviderUnavailable."""
+    blocks, turns = _messages(messages, system_blocks if system_blocks else [system_prompt or ""],
+                              settings["empty_conversation"])
     thinking, budget = _thinking(reasoning_effort, settings)
     kwargs: dict = {"model": model, "messages": turns, "thinking": thinking,
                     "max_tokens": (max_tokens or settings.get("max_tokens") or settings["default_max_tokens"]) + budget}
@@ -103,12 +115,19 @@ async def chat_completion(api_key: str, model: str, messages: list[dict], *, sys
                            max_retries=settings.get("max_retries"))
     try:
         for attempt in range(2):
-            text = system + ("\n\n" + settings["shorter_instruction"] if attempt else "")
-            if text:
-                kwargs["system"] = [{"type": "text", "text": text, "cache_control": {"type": "ephemeral"}}]
+            texts = list(blocks)
+            if attempt:
+                texts = texts[:-1] + ["\n\n".join(texts[-1:] + [settings["shorter_instruction"]])]
+            if texts:
+                kwargs["system"] = [{"type": "text", "text": text, **({"cache_control": {"type": "ephemeral"}}
+                                                                    if not index else {})}
+                                    for index, text in enumerate(texts)]
             try:
                 response = await client.messages.create(**kwargs)
             except AnthropicError as exc:
+                raise ProviderUnavailable(type(exc).__name__) from exc
+            except (TypeError, ValueError) as exc:  # a parameter this SDK does not take
+                logger.warning("anthropic_sdk_error model=%s error_type=%s", model, type(exc).__name__)
                 raise ProviderUnavailable(type(exc).__name__) from exc
             usage = openai_shaped_usage(getattr(response, "usage", None))
             from app.plugins._shared.budget import record_model_usage

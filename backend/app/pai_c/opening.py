@@ -89,8 +89,9 @@ async def opening_job(job, db):
         try:
             if not usage.role_allowed("counselor"):
                 raise _Paused()
-            raw = await complete("counselor", messages=[],
-                system_prompt=load_prompt("voice") + "\n\n" + context.text + "\n\n" + sections + "\n\n" + instruction,
+            # The static voice prompt is its own (cached) system block; the student's context follows.
+            blocks = [load_prompt("voice"), context.text + "\n\n" + sections + "\n\n" + instruction]
+            raw = await complete("counselor", messages=[], system_prompt="\n\n".join(blocks), system_blocks=blocks,
                 response_format={"type": "json_object"}, phase="opening", turn_id=job_id)
             from app.pai_c.deep.turn import unfence
             data = json.loads(unfence(raw))

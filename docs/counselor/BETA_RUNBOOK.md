@@ -67,7 +67,7 @@ The job in Docker writes `./proposals/<date>.json` on the host (docker-compose m
 python -m scripts.apply_refresh ../proposals/<date>.json [--only PATH ...]
 ~~~
 
-With `PAI_PROPOSALS_DIR` set, a bare file name is read from that folder and no name applies the newest proposal there.
+A bare file name is looked up in `PAI_PROPOSALS_DIR` (or the policy folder) and in the repository's `./proposals`; with no name, `python -m scripts.apply_refresh` applies the newest proposal in either, so a host run finds the Docker worker's proposals without any setting.
 
 A diff whose file value has changed since is reported stale and skipped. The admission-rule and calendar tests run after applying; if they fail, every file is restored. Commit the changed policy files yourself.
 
@@ -85,7 +85,7 @@ A diff whose file value has changed since is reported stale and skipped. The adm
 - The first applied proposal reformats `admission_rules.json`.
 - The institution filter is a word list plus catalog names.
 - The Settings spend card hides itself after a failed first load in a browser session.
-- Cost estimate after the final fixes (Sonnet at $2/$10 with prompt caching, thinking off at effort low, planner on gpt-5-mini, path analysis and Mirror text at 6 runs per workspace and day, web calls counted): about $1.5–2 per student over 30 turns, so the $100 cap covers roughly 50–65 such students. The 80 % stage (path analysis, planner, Mirror text and research stop for everyone) comes earlier. For a larger cohort the founder may raise `PAI_MONTHLY_CAP_USD`. Task 7 must measure the real figure.
+- Cost estimate after the final fixes (Sonnet at $2/$10 with the static voice prompt cached as its own system block (the per-turn context is not cached), thinking off at effort low, planner on gpt-5-mini, path analysis and Mirror text at 6 runs per workspace and day, web calls counted): about $1.5–2 per student over 30 turns, so the $100 cap covers roughly 50–65 such students. The 80 % stage (path analysis, planner, Mirror text and research stop for everyone) comes earlier. For a larger cohort the founder may raise `PAI_MONTHLY_CAP_USD`. Task 7 must measure the real figure.
 - The monthly cap is not a hard ceiling: the classifier, safety, summarizer and sensitive check still run at 100 %.
 - A chat-asked path analysis is not held by the daily cap (only by the 80 % stage).
 - Live end-to-end verification with real models (Task 7) is pending; run it before inviting students.

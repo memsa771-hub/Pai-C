@@ -361,3 +361,16 @@ async def test_job_writes_to_the_configured_proposals_dir(tmp_path):
         assert apply_refresh.resolve_proposal(Path(result["file"])) == folder / result["file"]
     with patch.object(config, "PAI_PROPOSALS_DIR", ""):
         assert rules_refresh.proposals_dir() == POLICY_DIR / rules_refresh.policy()["proposals_dir"]
+
+
+def test_apply_with_no_argument_also_finds_the_repository_proposals(tmp_path):
+    """On the host PAI_PROPOSALS_DIR is usually unset: the repository's
+    ./proposals (the Docker worker's mounted folder) is searched too."""
+    from app.config import config
+    repo = tmp_path / "proposals"
+    repo.mkdir()
+    (repo / "2026-11-01.json").write_text("{}", encoding="utf-8")
+    with patch.object(config, "PAI_PROPOSALS_DIR", str(tmp_path / "empty")):
+        assert apply_refresh.resolve_proposal(None, repo) == repo / "2026-11-01.json"
+        assert apply_refresh.resolve_proposal(Path("2026-11-01.json"), repo) == repo / "2026-11-01.json"
+    assert apply_refresh.REPO_PROPOSALS == Path(apply_refresh.BACKEND).parent / "proposals"

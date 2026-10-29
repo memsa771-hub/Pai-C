@@ -127,13 +127,17 @@ async def run_deep_turn(db, turn: CounselorTurnInput, *,
     # Read transactions must not remain open over the network call.
     db.rollback()
     voice_prompt = "voice_guided" if decision is not None else "voice"
-    prompt = load_prompt(voice_prompt) + "\n\n" + context.text
+    # Two system blocks for prompt caching: the static voice prompt (cached),
+    # then this turn's context, instructions and any retry line.
+    static = load_prompt(voice_prompt)
+    dynamic = context.text
     if instructions:
-        prompt += "\n\n" + load_prompt(instructions)
+        dynamic += "\n\n" + load_prompt(instructions)
         if instructions == "wellbeing":
-            prompt += "\n<safety_level>" + str(safety_level or "concern") + "</safety_level>"
+            dynamic += "\n<safety_level>" + str(safety_level or "concern") + "</safety_level>"
             if safety_level == "urgent":
-                prompt += "\n<wellbeing_resources>" + config.PAI_WELLBEING_RESOURCES + "</wellbeing_resources>"
+                dynamic += "\n<wellbeing_resources>" + config.PAI_WELLBEING_RESOURCES + "</wellbeing_resources>"
+    prompt = static + "\n\n" + dynamic
     model_ms = 0
     polish_ms = 0
     violations = []
@@ -154,6 +158,7 @@ async def run_deep_turn(db, turn: CounselorTurnInput, *,
             raw = await chat_completion(role="counselor",
                 api_key=config.PAI_API_KEY, model=resolve_model("counselor"), messages=messages,
                 system_prompt=prompt + ("\n\n" + retry_line if retry_line else ""),
+                system_blocks=[static, dynamic + ("\n\n" + retry_line if retry_line else "")],
                 response_format={"type": "json_object"},
                 reasoning_effort=config.PAI_COUNSELOR_REASONING_EFFORT,
                 base_url=config.PAI_BASE_URL,

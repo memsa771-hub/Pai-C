@@ -15,6 +15,7 @@ from pathlib import Path
 
 BACKEND = Path(__file__).resolve().parents[1]
 POLICY_DIR = BACKEND / "app" / "pai_c" / "policy"
+REPO_PROPOSALS = BACKEND.parent / "proposals"
 
 
 def _settings(policy_dir: Path) -> dict:
@@ -95,15 +96,21 @@ def apply_proposal(proposal_path: Path, only: list[str] | None = None, *,
     return {"applied": applied, "stale": stale, "valid": True}
 
 
-def resolve_proposal(given: Path | None) -> Path | None:
-    """The given file; a name not found as given, from the proposals folder;
-    no name, the newest proposal there."""
+def resolve_proposal(given: Path | None, repo_proposals: Path | None = None) -> Path | None:
+    """The given file; a name not found as given, from the proposals folders;
+    no name, the newest proposal there. The folders are the configured one
+    (PAI_PROPOSALS_DIR, else the policy folder) and the repository's
+    ./proposals, which docker-compose mounts for the worker, so a host run
+    finds the container's proposals without any setting."""
     sys.path.insert(0, str(BACKEND))
     from app.research.rules_refresh import proposals_dir
-    folder = proposals_dir()
+    folders = list(dict.fromkeys([proposals_dir(), repo_proposals or REPO_PROPOSALS]))
     if given is not None:
-        return given if given.exists() or given.is_absolute() else folder / given
-    found = sorted(folder.glob("*.json"), key=lambda path: path.stat().st_mtime)
+        if given.exists() or given.is_absolute():
+            return given
+        return next((folder / given for folder in folders if (folder / given).exists()), folders[0] / given)
+    found = sorted((path for folder in folders if folder.is_dir() for path in folder.glob("*.json")),
+                   key=lambda path: path.stat().st_mtime)
     return found[-1] if found else None
 
 
