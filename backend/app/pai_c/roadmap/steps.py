@@ -211,20 +211,24 @@ def _manual(steps: list[dict], steps_done) -> list[dict]:
         if step["key"] not in done:
             continue
         step["manual_done"] = True
-        if step["status"] != "done":
-            step["status"] = "done"
+        step["status"] = "done"
+        if step["evidence"] is None:  # a Vault entry behind a half step stays its evidence
             step["evidence"] = {"id": None, "level": policy["steps"]["manual_level"],
                                 "source_label": policy["copy"]["marked_by_you"]}
     return steps
 
 
 def route_steps(card: dict, standing: Standing, snapshot: list, items: list = (), today: date | None = None,
-                steps_done=()) -> list[dict]:
+                steps_done=(), record: dict | None = None, record_id: str | None = None) -> list[dict]:
     """Every step of the card's route in order (group, complete_intermediate,
     marks, bridge/check, each entry test, apply, degree). `snapshot` is the
     Vault view rows (MemoryService.vault_rows); `items` are extra Vault rows
     to cite; `steps_done` the student's manual ticks by step key. A degree
-    student's undergraduate route is not read here (the verdict says so)."""
+    student's undergraduate route is not read here (the verdict says so).
+    `record`/`record_id` are the education record the standing was read
+    from (current_education over profile_cards); its view row is picked by
+    id so steps and standing never describe different records. Without
+    them the record is chosen from the view rows the same way."""
     today = today or date.today()
     if standing.level in group_rules()["degree_levels"]:
         return []
@@ -232,8 +236,11 @@ def route_steps(card: dict, standing: Standing, snapshot: list, items: list = ()
     field_key, verdict = card.get("field_key"), card["verdict"]
     rule = rule_for(field_key) if field_key in study_fields() else None
     education = _records(rows, "education")
-    record = current_education([row.entry["value"] for row in education])
-    row = next((row for row in education if row.entry["value"] is record), None)
+    if record_id is not None:
+        row = next((row for row in education if str(row.entry["id"]) == str(record_id)), None)
+    else:
+        record = current_education([row.entry["value"] for row in education])
+        row = next((row for row in education if row.entry["value"] is record), None)
 
     steps = [_group(field_key, rule, standing, row), _complete_intermediate(standing, record, row, today)]
     if rule is not None and rule.min_percent is not None:

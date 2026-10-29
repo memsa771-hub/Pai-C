@@ -154,3 +154,34 @@ def test_degree_student_has_no_undergraduate_route():
     bachelor = {"qualification_name": "bachelor", "field_of_study": "computer_science",
                 "academic_status": "current"}
     assert route("electrical_engineering", bachelor) == []
+
+
+def test_tick_on_half_step_keeps_vault_evidence():
+    registered = row("test_attempt", {"test_type": "mdcat", "details": {"status": "registered"}}, id="t1",
+                     level="shown", source="document", document={"filename": "mdcat-slip.pdf"})
+    name = rule_for("mbbs").tests_for("mbbs")[0].name
+    ticked = step(route("mbbs", fsc("pre_medical", 80), registered, steps_done=[f"test:{name}"]), "test")
+    assert ticked["status"] == "done" and ticked["manual_done"] is True
+    assert ticked["evidence"] == {"id": "test_attempt:t1", "level": "shown", "source_label": "mdcat-slip.pdf"}
+
+
+def test_steps_follow_the_standings_record():
+    """Two education records: an older current FSc and a completed Matric edited
+    later. The standing reads the current FSc; the steps cite that same record."""
+    from app.pai_c.memory import MemoryService
+    from app.pai_c.roadmap.engine import RoadmapEngine
+    from scripts.counselor_eval_support import StudentSession
+    from tests.test_roadmap_engine import add_education, add_path, field_title
+    with StudentSession() as student, student.factory() as db:
+        add_education(student, db, fsc("pre_engineering", 72, status="current"))
+        add_education(student, db, {"qualification_name": "matric", "academic_status": "completed",
+                                    "result": {"percentage": 90}})
+        add_path(student, db, field_title("electrical_engineering"), "electrical_engineering")
+        page = RoadmapEngine(db).build(student.workspace_id, today=TODAY)
+        cards = [c for c in MemoryService(db).profile_cards(student.workspace_id) if c["kind"] == "education"]
+    fsc_id = next(c["id"] for c in cards if c["value"]["qualification_name"] == "fsc")
+    assert page["standing"]["level"] == "fsc"
+    steps = page["fields"][0]["steps"]
+    for key in ("group", "complete_intermediate", "marks"):
+        assert step(steps, key)["evidence"]["id"] == f"education:{fsc_id}", key
+    assert step(steps, "complete_intermediate")["status"] == "half"

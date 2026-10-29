@@ -231,8 +231,7 @@ class RoadmapEngine:
 
     def _education(self, workspace_id: str) -> list[dict]:
         # Read exactly as the path analyzer does, so paths and roadmap agree.
-        return [card["value"] for card in MemoryService(self.db).profile_cards(workspace_id)
-                if card["kind"] == "education"]
+        return [card for card in MemoryService(self.db).profile_cards(workspace_id) if card["kind"] == "education"]
 
     def build(self, workspace_id: str, today: date | None = None) -> dict:
         """The page. `today` is the request day (routers pass date.today());
@@ -241,8 +240,12 @@ class RoadmapEngine:
         from app.pai_c.roadmap.steps import route_steps
         from app.pai_c.roadmap.timeline import estimate
         today = today or date.today()
-        records = self._education(workspace_id)
+        education = self._education(workspace_id)
+        records = [card["value"] for card in education]
         standing = student_standing(records)
+        # The steps read the very record the standing was read from.
+        current = current_education(records)
+        current_id = next((card["id"] for card in education if card["value"] is current), None)
         rows = MemoryService(self.db).vault_rows(workspace_id)
         decision = RouteDecisionService(self.db).active(workspace_id)
         order = roadmap_policy()["status_order"]
@@ -258,7 +261,8 @@ class RoadmapEngine:
                     "family": study.family if study else None, "why": row.why,
                     "status": result.status, "verdict": asdict(result)}
             ticks = done_keys(decision) if decision is not None and decision.field_key == field_key else ()
-            card["steps"] = route_steps(card, standing, rows, today=today, steps_done=ticks)
+            card["steps"] = route_steps(card, standing, rows, today=today, steps_done=ticks,
+                                        record=current, record_id=current_id)
             # Only a field the student can enter has a time to entry.
             card["time"] = (estimate(card["steps"], field_key, today)
                             if result.status in TIMED and card["steps"] else None)

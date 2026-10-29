@@ -41,7 +41,8 @@ def next_occurrence(months, after: Month | None, today: date, *, same_month: boo
 def _basis(step_key: str | None, key: str | None, when: Month | None, row: dict | None) -> dict:
     return {"step": step_key, "event_key": key, "month": when[1] if when else None,
             "year": when[0] if when else None,
-            "source": (row or {}).get("sources", [None])[0], "confidence": (row or {}).get("confidence")}
+            "source": next((url for url in (row or {}).get("sources", ()) if url.startswith("https://")), None),
+            "confidence": (row or {}).get("confidence")}
 
 
 def _years(field_key: str | None) -> int | None:
