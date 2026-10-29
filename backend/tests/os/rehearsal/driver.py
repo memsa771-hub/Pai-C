@@ -954,10 +954,33 @@ class Rehearsal:
         if run.s.event == "approved_changed" and run.sop_changed:
             if any(_template(k) == "review_pack" and t["state"] != "done" for k, t in tasks.items()):
                 return False  # the changed pack is reviewed again before the student submits
-        acted = False
+        acted, packs = False, None
         for t in waiting:  # "I submitted it": PAI OS never submits (invariant 5, 6)
+            ref = t["programme_ref"]
+            if f"after:pack:{ref}" not in run.ticked:  # first the student pays and ticks it (after approving)
+                packs = packs or {p["programme_ref"]: p for p in
+                                  (self.get(run, "/packs") or {"programmes": []})["programmes"]}
+                if packs.get(ref, {}).get("approved"):
+                    acted |= self._after_approval(
+                        run, f"pack:{ref}", f"/packs/{ref}/items", _template(t["instance_key"]), packs[ref],
+                        lambda ref=ref: next((p for p in (self.get(run, "/packs") or {"programmes": []})[
+                            "programmes"] if p["programme_ref"] == ref), None))
             acted |= self._complete(run, t, {"submitted": True})
         return acted
+
+    def _after_approval(self, run: Run, key: str, items_path: str, step: str, view: dict, again) -> bool:
+        """Once approved, the student pays (and applies) and ticks those steps, through the API. The ticks are not part
+        of what was approved (Slice 9 Task 11 ruling, invariant 5): the approval must stand, on the same version."""
+        todo = [i["key"] for i in view.get("after_approval", []) if not i["ticked"]]
+        run.ticked.add(f"after:{key}")
+        if not todo or self.call(run, "PUT", items_path, json={"tick": todo}) is None:
+            return False
+        now = again()
+        if now is None or not now["approved"] or now["manifest_sha256"] != view["manifest_sha256"]:
+            self.fail(f"after_approval_tick:{run.s.sid}:{key.split(':')[0]}", run.s.sid, step,
+                      "ticking a step after approving keeps the approval and its version",
+                      "dropped" if now is None or not now["approved"] else "a new version")
+        return True
 
     def _change_sop(self, run: Run) -> bool:
         """S9: a new version of the approved SOP, approved again, after every pack was approved."""
@@ -1016,6 +1039,8 @@ class Rehearsal:
             visa = self.get(run, "/visa")
             if visa is None or not visa["approved"]:
                 return False
+            # the student applies on the portal and pays, then ticks those steps (after approving: Slice 9 Task 11)
+            self._after_approval(run, "visa:file", "/visa/items", "visa_apply", visa, lambda: self.get(run, "/visa"))
             run.reached.append("visa_ready")
             run.days = (clock.today() - self.start).days
         if self._events_open(run):

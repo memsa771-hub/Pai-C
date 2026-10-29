@@ -2,7 +2,8 @@
 # Data-sheet sources are confirmed profile keys ("<doc_type>.<field>") or "entered" (the student types them).
 # Instruction sources are a programme fact's page or a playbook citation (S4-S6: uni-assist, see the playbook).
 route_key: germany_master
-version: 1
+# 2: payment comes after approval (Slice 9 Task 11): every pack is rebuilt once without it in the approved part
+version: 2
 
 data_sheet:
   - title: Personal details
@@ -56,7 +57,12 @@ checklist:
   - {key: min_passing_grade, label: Minimum passing grade letter, kind: document, ref: min_passing_grade_letter}
   - {key: sop, label: Statement of purpose, kind: statement, ref: sop}
   - {key: cv, label: CV, kind: statement, ref: cv}
-  - {key: fee_paid, label: Paid the application fee, kind: manual, note: Tick this after you pay in the portal}
+  # after_approval: a step after approving ("these documents are right"); it never blocks approval (Slice 9 Task 11)
+  - key: fee_paid
+    label: Paid the application fee
+    kind: manual
+    after_approval: true
+    note: Pay the application fee in the portal, then tick this.
 
 formats:
   default: {types: [pdf], max_mb: 5}

@@ -636,3 +636,140 @@ def test_provisional_visa_date_leaves_out_rejections(engine, clean, os_db):
         assert "earliest semester start of your programmes (1 October 2027)" in step.citations[0]["note"]
     finally:
         next(gen, None)
+
+
+# ---- batch D: payment ticks come after approval --------------------------------------------------------------------
+
+AFTER_PACK = {"fee_paid"}
+AFTER_VISA = {"portal_applied", "visa_fee_paid"}
+
+
+def test_payment_items_are_after_approval_in_the_config():
+    """Ruling (batch D): approving says "these documents are right"; paying and applying come after. The flag is
+    route data (invariant 12), on manual items only."""
+    from app.os.packs.config import Item, load_pack_configs
+
+    pack, visa = load_pack_configs()["germany_master"], load_pack_configs(kind="visa")["germany_master"]
+    assert {i.key for i in pack.checklist if i.after_approval} == AFTER_PACK
+    assert {i.key for i in visa.checklist if i.after_approval} == AFTER_VISA
+    with pytest.raises(ValueError, match="after_approval"):
+        Item(key="passport", label="Passport", kind="document", ref="passport", after_approval=True)
+
+
+def test_after_approval_items_do_not_block_approval():
+    from dataclasses import replace
+
+    from app.os.packs.checklist import checklist, complete
+    from tests.os.test_pack_rules import inputs
+
+    ready = inputs(ticked={"degree", "transcript", "hssc", "ssc"})  # fee_paid not ticked
+    results = {r.key: r for r in checklist(ready, "p1")}
+    assert results["fee_paid"].after_approval and not results["fee_paid"].ticked
+    assert complete(list(results.values()))
+    assert not complete(checklist(replace(ready, added=[("added:1", "Module descriptions")]), "p1"))  # still counts
+
+
+def test_after_approval_ticks_are_not_in_what_is_approved():
+    """Invariant 5: the approval binds the manifest's SHA-256. A tick the student makes after approving (they paid)
+    is not part of the inputs' SHA-256 nor of the manifest, so it never makes a new version."""
+    from dataclasses import replace
+
+    from app.os.packs.checklist import checklist
+    from app.os.packs.inputs import inputs_sha
+    from app.os.packs.manifest import build_manifest
+    from tests.os.test_pack_rules import inputs
+
+    before = inputs(ticked={"degree", "transcript", "hssc", "ssc"})
+    after = replace(before, ticked=before.ticked | {"fee_paid"})
+    assert inputs_sha(before) == inputs_sha(after)
+    texts = [build_manifest(i, "p1", None, checklist(i, "p1"), [], [], [], {}) for i in (before, after)]
+    assert texts[0] == texts[1]
+    assert "fee_paid" not in texts[0][0]
+    assert inputs_sha(replace(before, ticked=before.ticked - {"ssc"})) != inputs_sha(before)  # other ticks still count
+
+
+def _pack_workflows(web, ref: str) -> list[str]:
+    return sorted(w.workflow_id for w in web.ctx.client.list_workflows(
+        workflow_id_prefix=f"pack:pai:{TEST_STUDENT.student_ref}:{ref}:", load_input=False, load_output=False))
+
+
+def test_ticking_payment_after_approval_keeps_the_approval(engine, clean, os_db):
+    """Approve a pack, then tick "Paid the application fee": the approval stands, there is no new version and no new
+    build. The tick is kept and shown under `after_approval`."""
+    from tests.os import test_api_packs as pa
+    from tests.os.test_pack_run import TICKS, ready_inputs
+
+    gen = pa.api.__wrapped__(engine, clean, os_db)
+    web = next(gen)
+    try:
+        ready_inputs(web.ctx, TICKS - AFTER_PACK)
+        pack = pa.settled(web)
+        assert pack["status"] == "ready", pack["checklist"]
+        assert "fee_paid" not in {i["key"] for i in pack["checklist"]}
+        assert pack["after_approval"] == [{"key": "fee_paid", "label": "Paid the application fee",
+                                           "note": "Pay the application fee in the portal, then tick this.",
+                                           "ticked": False}]
+        r = web.post(f"{pa.P}/{pa.PROG}/approve", headers=pa.ME, json={"sha256": pack["manifest_sha256"]})
+        assert r.status_code == 200, r.text
+        built = _pack_workflows(web, pa.PROG)
+        assert web.put(f"{pa.P}/{pa.PROG}/items", headers=pa.ME, json={"tick": ["fee_paid"]}).status_code == 200
+        after = pa.settled(web)
+        assert after["approved"] is True and after["status"] == "approved"
+        assert (after["version"], after["manifest_sha256"]) == (pack["version"], pack["manifest_sha256"])
+        assert after["after_approval"][0]["ticked"] is True
+        assert _pack_workflows(web, pa.PROG) == built  # nothing new to build
+    finally:
+        next(gen, None)
+
+
+def test_visa_payment_ticks_after_approval_keep_the_approval(engine, clean, os_db):
+    from app.os.packs.store import PackItemStore
+    from app.os.packs.visa import VISA_ITEMS
+    from tests.os import test_api_visa as va
+    from tests.os.test_visa_run import ready_visa
+
+    gen = va.api.__wrapped__(engine, clean, os_db)
+    web = next(gen)
+    try:
+        ready_visa(web.ctx)
+        for key in AFTER_VISA:  # not ticked before approving
+            PackItemStore(engine, "pai").untick(TEST_STUDENT.student_ref, VISA_ITEMS, key)
+        body = va.settled(web)
+        assert body["status"] == "ready", body["checklist"]
+        assert {i["key"] for i in body["after_approval"]} == AFTER_VISA
+        assert not AFTER_VISA & {i["key"] for i in body["checklist"]}
+        assert web.post(f"{va.V}/approve", headers=va.ME, json={"sha256": body["manifest_sha256"]}).status_code == 200
+        assert web.put(f"{va.V}/items", headers=va.ME, json={"tick": sorted(AFTER_VISA)}).status_code == 200
+        after = va.settled(web)
+        assert after["approved"] is True and after["manifest_sha256"] == body["manifest_sha256"]
+        assert all(i["ticked"] for i in after["after_approval"])
+    finally:
+        next(gen, None)
+
+
+NO_ADMISSION = "Waiting until a programme admits you"
+
+
+def test_visa_step_waits_for_an_admission_when_every_programme_is_out(engine, clean, os_db):
+    """Batch C review: when every programme said "not admitted", the visa step has no programme to take its date
+    from. It says so in its own words, not "Waiting for your programme's semester start date"."""
+    from tests.os import test_api_visa as va
+
+    gen = va.api.__wrapped__(engine, clean, os_db)
+    web = next(gen)
+    try:
+        refs = (va.OTHER_PROG, va.PROG, "btu-artificial-intelligence")
+        for ref, day in zip(refs, ("2027-10-01", "2027-10-15", "2027-09-15")):
+            _semester_start(web.svc, ref, day)
+        with engine.begin() as conn:  # the student's answers, as the kernel stores them (simulated)
+            conn.execute(T.update().where(T.c.plan_id == web.plan_id,
+                                          T.c.instance_key.in_([f"admission_result@{r}" for r in refs]))
+                         .values(state="done", result={"choice": "rejected"}))
+        web.svc.plans.recompile(web.plan_id, "test")
+        step = _visa_step(engine, web.plan_id)
+        assert (step.state, step.blocked_reason) == ("blocked", "no_candidate:visa")
+        items = web.get("/v1/os/inbox", headers=va.ME).json()["items"]
+        [visa] = [i for i in items if i["instance_key"] == "visa_apply"]
+        assert visa["state"] == "blocked" and visa["waiting_for"] == NO_ADMISSION
+    finally:
+        next(gen, None)

@@ -3,7 +3,8 @@
 # against it. Sources: the German mission in Pakistan (S9 blocked account, S11 study visa, S13 digital visa,
 # S15 the study visa leaflet; see the playbook).
 route_key: germany_master
-version: 1
+# 2: applying and paying come after approval (Slice 9 Task 11): every visa file is rebuilt once
+version: 2
 
 data_sheet:
   - title: Personal details
@@ -47,8 +48,17 @@ checklist:
     kind: statement
     ref: sop
     note: "The embassy may want a letter about your study plan in Germany; check your SOP covers it."
-  - {key: portal_applied, label: Applied on the Consular Services Portal, kind: manual}
-  - {key: visa_fee_paid, label: Paid the visa fee, kind: manual}
+  # after_approval: steps after approving the file; they never block approval (Slice 9 Task 11)
+  - key: portal_applied
+    label: Applied on the Consular Services Portal
+    kind: manual
+    after_approval: true
+    note: Apply on the Consular Services Portal with these files, then tick this.
+  - key: visa_fee_paid
+    label: Paid the visa fee
+    kind: manual
+    after_approval: true
+    note: Pay the visa fee when the portal asks, then tick this.
 
 formats:
   default: {types: [pdf], max_mb: 5}

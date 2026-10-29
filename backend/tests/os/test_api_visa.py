@@ -115,8 +115,11 @@ def test_visa_items(api):
     api.put(f"{V}/choice", headers=ME, json={"programme_ref": PROG})
     r = api.put(f"{V}/items", headers=ME, json={"tick": ["visa_fee_paid"], "add": [{"label": "Bank statement"}]})
     assert r.status_code == 200
-    items = {i["key"]: i for i in settled(api)["checklist"]}
-    assert items["visa_fee_paid"]["ticked"] and items["added:1"]["label"] == "Bank statement"
+    body = settled(api)
+    items = {i["key"]: i for i in body["checklist"]}
+    assert items["added:1"]["label"] == "Bank statement"
+    after = {i["key"]: i for i in body["after_approval"]}  # paying comes after approval (Slice 9 Task 11)
+    assert after["visa_fee_paid"]["ticked"] and not after["portal_applied"]["ticked"]
     assert api.put(f"{V}/items", headers=ME, json={"tick": ["fee_paid"]}).status_code == 422  # a pack item
 
 

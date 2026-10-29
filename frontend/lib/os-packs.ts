@@ -16,6 +16,16 @@ export interface OsPackItem {
   source: 'research' | 'default' | 'student';
   document_id: number | null;
   tickable: boolean;
+  after_approval?: boolean; // a step after approving (Slice 9 Task 11): it never blocks approval
+}
+
+/** A step the student takes after approving, e.g. paying the fee (Slice 9 Task 11). Its tick is not part of what is
+ * approved: ticking it never changes the approved version. */
+export interface OsAfterItem {
+  key: string;
+  label: string;
+  note: string | null;
+  ticked: boolean;
 }
 
 export interface OsSheetRow {
@@ -66,6 +76,7 @@ export interface OsPack {
   checklist: OsPackItem[];
   data_sheet: OsSheetRow[];
   files: OsPackFile[];
+  after_approval?: OsAfterItem[]; // older APIs send none
 }
 
 export interface OsPacks {
@@ -77,7 +88,12 @@ export const DATA_SHEET_KEY = 'data_sheet';
 
 /** Items still to do: not ready, or a tick-settled item not ticked yet. */
 export function todoCount(p: OsPack): number {
-  return p.checklist.filter((i) => (i.state === 'manual' ? !i.ticked : i.state !== 'ready')).length;
+  return beforeApproval(p).filter((i) => (i.state === 'manual' ? !i.ticked : i.state !== 'ready')).length;
+}
+
+/** The checklist items the approval covers: never the steps after approving (Slice 9 Task 11). */
+function beforeApproval(p: OsPack): OsPackItem[] {
+  return p.checklist.filter((i) => !i.after_approval);
 }
 
 export function packStatusLabel(p: OsPack): string {
@@ -91,9 +107,10 @@ export function packStatusLabel(p: OsPack): string {
 }
 
 /** What is left before the pack (or visa file) can be approved, in the student's words (Slice 9 Task 11): an item
- * the student ticks says so. The server's rule: every item is ready, and every manual item is ticked. */
+ * the student ticks says so. The server's rule: every item is ready, and every manual item is ticked; a step after
+ * approving (paying the fee) never counts. */
 export function approveBlockers(p: OsPack): string[] {
-  return p.checklist.filter((i) => (i.state === 'manual' ? !i.ticked : i.state !== 'ready'))
+  return beforeApproval(p).filter((i) => (i.state === 'manual' ? !i.ticked : i.state !== 'ready'))
     .map((i) => (i.tickable ? `${i.label} (tick it once you have done it)` : i.label));
 }
 

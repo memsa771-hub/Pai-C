@@ -277,7 +277,7 @@ def test_provisional_date_skips_excluded_programmes():
     assert ("programme", "p2", "semester_start") not in visa.fact_refs
     assert not any(t.instance_key == "confirm_fact@p2:semester_start" for t in d.tasks)
     every = compile_plan(contract(["p1", "p2"]), visa_book(), {}, facts, TODAY, excluded={"visa": {"p1", "p2"}})
-    assert task(every, "visa").blocked_reason == "fact_missing:semester_start"  # nothing left to plan from
+    assert task(every, "visa").blocked_reason == "no_candidate:visa"  # nothing left to plan from: its own reason
 
 
 def test_provisional_date_says_it_is_the_earliest():

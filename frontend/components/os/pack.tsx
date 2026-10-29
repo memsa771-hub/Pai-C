@@ -46,7 +46,8 @@ interface PackViewProps {
   notice?: string;
 }
 
-/** One programme's pack: how to apply, fees, the checklist with downloads, the data sheet, and Approve. */
+/** One programme's pack: how to apply, fees, the checklist with downloads, the data sheet, Approve, and then the steps
+ * after approving (paying, applying: Slice 9 Task 11), tickable once approved. */
 export function PackView({ pack, busy, onTick, onAdd, onApprove, onDownload, onRebuild, onDetails, noun = 'pack',
                            notice = 'You submit and pay yourself. We never send anything for you.' }: PackViewProps) {
   const [extra, setExtra] = useState('');
@@ -176,6 +177,29 @@ export function PackView({ pack, busy, onTick, onAdd, onApprove, onDownload, onR
             </div>
           )}
         </>
+      )}
+
+      {(pack.after_approval ?? []).length > 0 && (
+        <section aria-label="After you approve" className="rounded-lg border bg-card p-3">
+          <h2 className="mb-1 font-semibold">After you approve</h2>
+          <p className="mb-2 break-words text-xs text-muted-foreground">
+            {pack.approved
+              ? 'Do these yourself, then tick each one. Ticking them does not change what you approved.'
+              : `Do these once your ${noun} is approved. You can tick them after you approve.`}
+          </p>
+          <ul className="flex flex-col gap-3">
+            {(pack.after_approval ?? []).map((i) => (
+              <li key={i.key} className="min-w-0">
+                <label className="flex min-w-0 items-center gap-2 break-words">
+                  <input type="checkbox" checked={i.ticked} disabled={busy || !pack.approved}
+                         onChange={(e) => onTick(i.key, e.target.checked)} />
+                  {i.label}
+                </label>
+                {i.note && <p className="mt-0.5 break-words text-xs text-muted-foreground">{i.note}</p>}
+              </li>
+            ))}
+          </ul>
+        </section>
       )}
     </div>
   );

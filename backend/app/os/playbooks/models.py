@@ -49,12 +49,13 @@ class Anchor(_Model):
     before your semester starts on {date}" ({date} is the fact's date, {due} the step's own due date, {days} and
     {weeks} the lead time; any playbook constant by its name, e.g. {visa_processing_days}); `note_earliest`: the same
     when the date is the earliest of several programmes'. `waiting`: what the student is told while the fact is
-    missing."""
+    missing; `waiting_none`: while no programme is left to take it from (every one said "not admitted")."""
     fact: str
     programme: Literal["visa"] | None = None
     note: str | None = None
     note_earliest: str | None = None  # the note when the date is the earliest of several programmes' (provisional)
     waiting: str | None = None
+    waiting_none: str | None = None  # blocked `no_candidate:<programme>` (Slice 9 Task 11)
 
     @field_validator("note", "note_earliest")
     @classmethod

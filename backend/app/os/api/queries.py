@@ -134,7 +134,8 @@ def task_plan_and_template(engine: Engine, task_id: int) -> tuple[int, str] | No
 
 
 def waiting_items(engine: Engine, tenant_id: str, student_ref: str, books: Mapping) -> list[dict]:
-    """The student's steps that wait for a fact nobody has given yet (blocked `fact_missing:<field>`), each with what
+    """The student's steps that wait for a fact nobody has given yet (blocked `fact_missing:<field>`), or for a
+    programme to take it from (blocked `no_candidate:<name>`: every programme said "not admitted"), each with what
     it waits for in its pinned playbook's words (`anchor.waiting`; None if the playbook has none). Listed after the
     inbox items so the student is told what the plan is waiting for, never "nothing to do" (Slice 9 Task 11,
     `walk:S1:nothing_to_do_while_blocked`). Nothing can be done on them: completing one is refused."""
@@ -147,14 +148,19 @@ def waiting_items(engine: Engine, tenant_id: str, student_ref: str, books: Mappi
                             .outerjoin(G, (G.c.tenant_id == T.c.tenant_id) & (G.c.ref == T.c.programme_ref))
                             .where(T.c.tenant_id == tenant_id, P.c.student_ref == student_ref, T.c.kind == "student",
                                    P.c.status.in_(PLAN_OPEN), T.c.state == "blocked",
-                                   T.c.blocked_reason.like("fact_missing:%"))
+                                   T.c.blocked_reason.like("fact_missing:%")
+                                   | T.c.blocked_reason.like("no_candidate:%"))
                             .order_by(T.c.id)).all()
     out = []
     for r in rows:
         book = books.get((r.playbook_key, r.pinned_version))
         tmpl = next((t for t in book.tasks if t.template_key == r.template_key), None) if book else None
         anchor = tmpl.anchor if tmpl else None
-        said = anchor.waiting if anchor and r.blocked_reason == f"fact_missing:{anchor.fact}" else None
+        said = None
+        if anchor and r.blocked_reason == f"fact_missing:{anchor.fact}":
+            said = anchor.waiting
+        elif anchor and r.blocked_reason == f"no_candidate:{anchor.programme}":
+            said = anchor.waiting_none
         out.append({**task_out(r), "programme_name": r.programme_name, "university": r.university, "changes": [],
                     "waiting_for": said})
     return out

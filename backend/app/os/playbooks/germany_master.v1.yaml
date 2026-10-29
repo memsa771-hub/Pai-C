@@ -280,6 +280,7 @@ tasks:
       note_earliest: "Apply by {due}: {weeks} weeks before the earliest semester start of your programmes ({date}).
         A visa usually takes about {visa_processing_days} days."
       waiting: "Waiting for your programme's semester start date"
+      waiting_none: "Waiting until a programme admits you"
     lead_time: {constant: visa_before_semester_days}
     duration_days: 2
     depends_on:

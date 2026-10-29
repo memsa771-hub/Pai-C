@@ -25,9 +25,9 @@ function visa(over: Partial<OsVisa> = {}): OsVisa {
       { key: 'blocked_account', label: 'Blocked account confirmation', kind: 'document', state: 'needs_action',
         ticked: false, reasons: ['the amount is below what you need: 11904 XYZ'], source: 'default', document_id: 2,
         tickable: false },
-      { key: 'visa_fee_paid', label: 'Paid the visa fee', kind: 'manual', state: 'manual', ticked: false, reasons: [],
-        source: 'default', document_id: null, tickable: true },
     ],
+    after_approval: [{ key: 'visa_fee_paid', label: 'Paid the visa fee', note: 'Pay the visa fee when the portal asks, then tick this.',
+                       ticked: false }],
     data_sheet: [],
     files: [{ key: 'admission', sha256: 'b'.repeat(64), filename: 'admission.pdf', size: 1000, pages: 1 }],
     funds: funds(),
@@ -159,5 +159,17 @@ describe('visa API calls', () => {
     const [url] = fetchMock.mock.calls[1] as unknown as [string, RequestInit];
     expect(url).toContain(`/v1/os/visa/files/${'b'.repeat(64)}?network=ws-1`);
     expect(url).not.toContain('bearer-x');
+  });
+});
+
+// Slice 9 Task 11 (batch D): applying and paying come after the visa file is approved. Fictional values only.
+describe('visa file: after you approve', () => {
+  it('lists paying the fee after approving, not as something blocking approval', () => {
+    const html = file(visa());
+    expect(html).toContain('After you approve');
+    expect(html).toContain('Do these once your visa file is approved.');
+    expect(html).toContain('Pay the visa fee when the portal asks, then tick this.');
+    expect(html).not.toContain('Paid the visa fee (tick');
+    expect(file(visa({ status: 'approved', approved: true }))).toContain('Ticking them does not change what you approved.');
   });
 });

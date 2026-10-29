@@ -22,8 +22,9 @@ function pack(over: Partial<OsPack> = {}): OsPack {
         reasons: ['Upload a colour scan of the attested copy'], source: 'default', document_id: 2, tickable: true },
       { key: 'sop', label: 'Statement of purpose', kind: 'statement', state: 'missing', ticked: false,
         reasons: ['approve your SOP first'], source: 'default', document_id: null, tickable: false },
-      { key: 'fee_paid', label: 'Paid the fee', kind: 'manual', state: 'manual', ticked: false, reasons: [], source: 'default', document_id: null, tickable: true },
+      { key: 'added:1', label: 'Module descriptions', kind: 'manual', state: 'manual', ticked: false, reasons: [], source: 'student', document_id: null, tickable: true },
     ],
+    after_approval: [{ key: 'fee_paid', label: 'Paid the application fee', note: 'Pay the application fee in the portal, then tick this.', ticked: false }],
     data_sheet: [
       { section: 'Personal details', key: 'surname', label: 'Surname', value: 'KHAN', source: 'document', document_id: 1, gap: false, hint: '', entered: false },
       { section: 'Contact', key: 'phone', label: 'Phone', value: null, source: null, document_id: null, gap: true, hint: '', entered: true },
@@ -160,7 +161,7 @@ describe('ticks before approval (walk:S1:ticks_before_approve)', () => {
     const html = view(pack({ status: 'incomplete' }));
     expect(html).toContain('You can approve only when every item has a ✓ or a tick');
     expect(html).toContain('Before you can approve:');
-    expect(html).toContain('Paid the fee (tick it once you have done it)');
+    expect(html).toContain('Module descriptions (tick it once you have done it)');
     expect(html).toContain('Statement of purpose');
     expect(html).not.toContain('Passport (tick');  // a ready item is not listed
   });
@@ -184,5 +185,32 @@ describe('data sheet at 375 px (walk:S1:datasheet_label_overlap)', () => {
     expect(row![1]).toContain('flex-col');
     expect(html).toMatch(/<span class="[^"]*\[overflow-wrap:anywhere\][^"]*">24ZZ00111SAMP101A<\/span>/);
     expect(html).not.toContain('justify-end');
+  });
+});
+
+// Slice 9 Task 11 (batch D, ruling): paying and applying come after approval. Fictional values only.
+describe('after you approve', () => {
+  it('never lists an after-approval item as blocking approval', () => {
+    const p = pack({ checklist: [{ key: 'fee_paid', label: 'Paid the application fee', kind: 'manual', state: 'manual',
+                                   ticked: false, reasons: [], source: 'default', document_id: null, tickable: true,
+                                   after_approval: true }] });
+    expect(approveBlockers(p)).toEqual([]);
+    expect(todoCount(p)).toBe(0);
+  });
+
+  it('shows the steps after approving in their own group, tickable only once approved', () => {
+    const before = view(pack());
+    expect(before).toContain('After you approve');
+    expect(before).toContain('Pay the application fee in the portal, then tick this.');
+    expect(before).toMatch(/<input type="checkbox" disabled=""[^>]*\/>Paid the application fee/);
+    expect(before).not.toContain('Paid the application fee (tick');  // not a blocker
+    const after = view(pack({ status: 'approved', approved: true }));
+    expect(after).toContain('After you approve');
+    expect(after).not.toMatch(/<input type="checkbox" disabled=""[^>]*\/>Paid the application fee/);
+  });
+
+  it('shows no such group when there is nothing after approving', () => {
+    expect(view(pack({ after_approval: [] }))).not.toContain('After you approve');
+    expect(view(pack({ after_approval: undefined }))).not.toContain('After you approve');
   });
 });

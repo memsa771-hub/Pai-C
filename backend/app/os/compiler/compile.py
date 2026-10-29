@@ -281,7 +281,9 @@ def compile_plan(
                     if not fact.confirmed:
                         need_confirm(fref)
                     usable.append((date_of(fact.value, f"{fref[1]}:{fref[2]}"), fact))
-                if not usable:
+                if not sources:  # every programme is out (none admitted the student): nothing to date it from
+                    inst.blocked_reason = f"no_candidate:{t.anchor.programme}"
+                elif not usable:
                     inst.blocked_reason = f"fact_missing:{t.anchor.fact}"
                 else:
                     (d, tz), fact = min(usable, key=lambda u: u[0][0])

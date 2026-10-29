@@ -2,7 +2,11 @@
 
 The items are the research list if confirmed (it replaces the route default's document and statement items), else the
 route default, plus the items the student added. Manual and entered items always stay. Each item comes out `ready`,
-`missing`, `needs_action` (with reasons) or `manual` (ticked by the student, or not)."""
+`missing`, `needs_action` (with reasons) or `manual` (ticked by the student, or not).
+
+An `after_approval` item (paying the fee, applying: Slice 9 Task 11 ruling) is a step the student takes after
+approving. It never blocks approval and is left out of the manifest (`approved_part`): its tick is a record of what
+the student did after, not part of what they approved (invariant 5)."""
 
 from dataclasses import dataclass, field, replace
 from typing import Literal
@@ -24,6 +28,7 @@ class ItemResult:
     source: Literal["research", "default", "student"] = "default"
     document_id: int | None = None
     tickable: bool = False  # the student settles it with a tick (a manual item, or a note no converter can check)
+    after_approval: bool = False  # a step after approving: not in the manifest, never blocks approval
 
 
 def _effective(inp: PackInputs):
@@ -45,7 +50,8 @@ def checklist(inp: PackInputs, programme_ref: str, unfixable: dict[str, str] | N
         base = {"key": item.key, "label": item.label, "kind": item.kind, "source": source}
         ticked = item.key in inp.ticked
         if item.kind == "manual":
-            out.append(ItemResult(**base, state="manual", ticked=ticked, tickable=True))
+            out.append(ItemResult(**base, state="manual", ticked=ticked, tickable=True,
+                                  after_approval=item.after_approval))
         elif item.kind == "entered":
             v = inp.profile.get(ENTERED_PREFIX + item.ref)
             filled = v is not None and v.value not in (None, "")
@@ -107,5 +113,18 @@ def _proof(inp: PackInputs, item, base: dict, ticked: bool, unfixable: str | Non
 
 
 def complete(results: list[ItemResult]) -> bool:
-    """Every non-manual item is ready and every manual item is ticked: the pack can be approved."""
-    return all(r.ticked if r.state == "manual" else r.state == "ready" for r in results)
+    """Every non-manual item is ready and every manual item is ticked: the pack can be approved. Items the student
+    ticks after approving do not count."""
+    return all(r.ticked if r.state == "manual" else r.state == "ready" for r in approved_part(results))
+
+
+def approved_part(results: list[ItemResult]) -> list[ItemResult]:
+    """The items the approval covers: all but the after-approval ones."""
+    return [r for r in results if not r.after_approval]
+
+
+def after_approval(cfg, ticked: set[str]) -> list[dict]:
+    """The steps after approving, with the student's ticks, read live (not from a manifest): key, label, note,
+    ticked."""
+    return [{"key": i.key, "label": i.label, "note": i.note, "ticked": i.key in ticked}
+            for i in cfg.checklist if i.after_approval]

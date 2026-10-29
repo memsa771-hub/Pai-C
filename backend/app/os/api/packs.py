@@ -16,6 +16,7 @@ from app.os.api.services import Services
 from app.os.artifacts.store import ArtifactStore
 from app.os.knowledge.programmes import ProgrammeStore
 from app.os.packs.approval import PackIncomplete, PackNotCurrent, approve_pack, complete_review_tasks
+from app.os.packs.checklist import after_approval
 from app.os.packs.details import save_details
 from app.os.packs.inputs import inputs_sha, load_inputs
 from app.os.packs.funds import required_funds
@@ -62,6 +63,9 @@ class PackOut(BaseModel):
     checklist: list[dict]
     data_sheet: list[dict]
     files: list[dict]
+    # steps after approving (paid the fee, applied): key, label, note, ticked. Read live, never part of what is
+    # approved (Slice 9 Task 11 ruling; invariant 5)
+    after_approval: list[dict] = []
 
 
 class PacksOut(BaseModel):
@@ -187,13 +191,14 @@ def add_pack_routes(router: APIRouter, services: Callable[[], Services]) -> None
         return enqueue_pack(client, tenant, student, programme_ref, plan.route_key, plan.year, sha, version,
                             attempt), sha
 
-    def pack_out(svc: Services, student: str, programme_ref: str, art, current_inputs: str) -> dict:
+    def pack_out(svc: Services, cfg, student: str, programme_ref: str, art, current_inputs: str) -> dict:
         store = ArtifactStore(svc.engine, svc.settings.tenant_id)
         programme = ProgrammeStore(svc.engine, svc.settings.tenant_id).get(programme_ref)
+        ticked = PackItemStore(svc.engine, svc.settings.tenant_id).ticked(student, programme_ref)
         out = {"programme_ref": programme_ref, "name": programme.name if programme else None,
                "university": programme.university if programme else None, "status": "building", "version": None,
                "approved": False, "manifest_sha256": None, "route_value": None, "instructions": [], "fees": [],
-               "checklist": [], "data_sheet": [], "files": []}
+               "checklist": [], "data_sheet": [], "files": [], "after_approval": after_approval(cfg, ticked)}
         if art is not None and art.status == "failed":
             out["status"] = "failed"  # shown as such, with Rebuild; never "being prepared" for ever (final review C1)
         return fill_from_manifest(out, store, art, current_inputs)
@@ -207,7 +212,7 @@ def add_pack_routes(router: APIRouter, services: Callable[[], Services]) -> None
         out = []
         for ref in plan.programmes:
             _, current = build(svc, plan, cfg, student, ref, arts.get(ref))  # the same inputs: built once
-            item = pack_out(svc, student, ref, arts.get(ref), current)
+            item = pack_out(svc, cfg, student, ref, arts.get(ref), current)
             out.append(item)
         return {"route": plan.route_key, "programmes": out}
 
@@ -316,6 +321,8 @@ def add_visa_routes(router: APIRouter, services: Callable[[], Services]) -> None
                "status": "no_choice" if ref is None else "building", "version": None, "approved": False,
                "manifest_sha256": None, "route_value": None, "instructions": [], "fees": [], "checklist": [],
                "data_sheet": [], "files": [], "funds": None, "programmes": listed,
+               "after_approval": after_approval(cfg, PackItemStore(svc.engine, svc.settings.tenant_id).ticked(
+                   student, VISA_ITEMS)),
                "choice": {"programme_ref": stored, "reduction": reduction, "preselected": pre,
                           "admitted": [r for r in admitted(svc.engine, svc.settings.tenant_id, plan.plan_id)
                                        if r in plan.programmes]}}
