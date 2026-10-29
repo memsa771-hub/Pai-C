@@ -87,11 +87,16 @@ def after_accept(db, candidate) -> None:
         return
     try:
         with db.begin_nested():
-            card = None
-            if _stage(db, candidate.workspace_id) == "DIRECTION":
+            card, stage = None, _stage(db, candidate.workspace_id)
+            if stage == "DIRECTION":
                 card = MirrorEngine(db).build(candidate.workspace_id)
                 if card["ready"]:
-                    JourneyService(db).mark_mirror_ready(candidate.workspace_id)
+                    stage = JourneyService(db).mark_mirror_ready(candidate.workspace_id).current_stage
+            if stage == "MIRROR":
+                # Paths saved before the Mirror was ready (or kept through a
+                # rethink) move the journey on without waiting for a new run.
+                from app.pai_c.paths.analyzer import propose_after_paths
+                propose_after_paths(db, candidate.workspace_id, actor="system:mirror_ready")
             enqueue_mirror_text(db, candidate.workspace_id, card)
     except Exception as exc:  # noqa: BLE001  the Vault write outranks its read model
         logger.error("mirror_text_enqueue_failed workspace_id=%s error_type=%s",

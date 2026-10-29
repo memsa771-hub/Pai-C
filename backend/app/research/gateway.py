@@ -1,10 +1,10 @@
-"""One research gateway. Path research is keyed by the Vault version it read
-(FOUR_FEATURES_SPEC 2.3): a stored run is current while the Vault is unchanged,
-and a path can be explored as soon as it exists."""
+"""One research gateway. Path research is stamped with the relevance version it
+read (pai_c/paths/currency.py): a finished run is current while the
+path-relevant Vault is unchanged and is re-run only when it is stale. A path
+can be explored as soon as it exists (FOUR_FEATURES_SPEC 2.3)."""
 
 from sqlalchemy import select
 
-from app.memory.completeness import vault_version
 from app.models import ExecutionRun
 
 
@@ -80,39 +80,43 @@ async def _request_path(db, workspace_id, journey, tool_context, possibility_id,
     row = PossibilityService(db).get(workspace_id, possibility_id)
     if row.journey_id != journey.id or row.status == "dismissed":
         return None
-    version = vault_version(db, workspace_id)
-    key = f"{kind}:{row.id}:vault:{version}"
-    if kind == "program_search":
-        explanations = db.scalars(select(ExecutionRun).where(ExecutionRun.workspace_id == workspace_id,
-            ExecutionRun.task_type == "path_explain", ExecutionRun.status == "completed")).all()
-        if not any((run.constraints or {}).get("possibility_id") == row.id and
-                   (run.constraints or {}).get("vault_version") == version for run in explanations):
-            return None
-    runs = db.scalars(select(ExecutionRun).where(ExecutionRun.workspace_id == workspace_id,
-        ExecutionRun.task_type == kind).order_by(ExecutionRun.created_at.desc())).all()
-    previous = next((run for run in runs if (run.constraints or {}).get("possibility_id") == row.id
-        and (run.constraints or {}).get("vault_version") == version and run.status != "failed"), None)
+    from app.pai_c.paths.currency import current_relevance, is_stale
+    version = current_relevance(db, workspace_id)
+    key = f"{kind}:{row.id}:relevance:{version}"
+
+    def runs_of(task_type):
+        return [run for run in db.scalars(select(ExecutionRun).where(ExecutionRun.workspace_id == workspace_id,
+            ExecutionRun.task_type == task_type).order_by(ExecutionRun.created_at.desc())).all()
+            if (run.constraints or {}).get("possibility_id") == row.id]
+    if kind == "program_search" and not any(run.status == "completed" for run in runs_of("path_explain")):
+        # Places follow an explanation of the path; a stale one is enough.
+        return None
+    previous = next((run for run in runs_of(kind) if run.status != "failed"), None)
     if previous:
-        reusable = True
-        if kind == "program_search" and previous.status == "completed":
+        # A run still in flight is reused whatever it read; a finished one is
+        # re-run only when the path-relevant Vault changed or its evidence expired.
+        reusable = previous.status != "completed" or not is_stale(previous, version)
+        if reusable and kind == "program_search" and previous.status == "completed":
             from app.pai_c.paths.programs import reusable_program_run
             reusable = reusable_program_run(db, previous, PossibilityService(db).research_route(row))
-        if kind == "path_explain" and previous.status == "completed":
+        if reusable and kind == "path_explain" and previous.status == "completed":
             from app.pai_c.paths.explain import current_path_result
             _, expired = current_path_result((previous.result or {}).get('capability_result') or {})
             reusable = not expired
         if reusable:
             return {"ok": True, "data": {"run_id": previous.id, "status": previous.status, "resumed": True}}
-        # A new explicit request may refresh expired evidence; GET never queues work.
+        # A new explicit request refreshes a stale or expired run (a new key,
+        # even if the Vault went back to what an older run read); GET never
+        # queues work.
         key += f":refresh:{previous.id}"
     brief = {"possibility_id": row.id, "title": row.title, "why": row.why,
-        "evidence": row.evidence or [], "vault_version": version}
+        "evidence": row.evidence or [], "relevance_version": version}
     if kind == "program_search":
         from app.pai_c.memory import MemoryService
         brief["route"] = PossibilityService(db).research_route(row)
         brief["facts"] = MemoryService(db).comparable_facts(workspace_id)
     payload = {"objective": policy()["program_objective" if kind == "program_search" else "objective"], "task_type": kind,
-        "constraints": {"trigger": "student_route", "research_key": key, "vault_version": version,
+        "constraints": {"trigger": "student_route", "research_key": key, "relevance_version": version,
             "possibility_id": row.id, "capability_input": {"brief": brief}}, "context_refs": []}
     db.commit()
     return await _delegate(payload, tool_context)

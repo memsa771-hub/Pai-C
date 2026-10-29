@@ -67,36 +67,36 @@ def test_explore_works_without_mirror():
             app.dependency_overrides.pop(get_db, None)
         assert response.status_code == 200, response.text
         constraints = sent.await_args.args[0]["constraints"]
-        assert constraints["vault_version"] == vault_version(db, ws)
+        from app.pai_c.paths.currency import current_relevance
+        assert constraints["relevance_version"] == current_relevance(db, ws)
         assert "mirror_version" not in constraints
         assert "mirror_version" not in constraints["capability_input"]["brief"]
 
 
 @pytest.mark.asyncio
-async def test_programs_run_keyed_by_vault_version():
+async def test_programs_run_keyed_by_relevance_version():
+    """Fix round 1: runs are keyed by the path-relevant Vault
+    (`relevance_version`), not the whole Vault version."""
+    from app.pai_c.paths.currency import current_relevance
     with StudentSession() as student, student.factory() as db:
         ws = student.workspace_id
         journey = JourneyService(db).ensure_counselor(ws)
         row = add_path(student, db, field_title("electrical_engineering"), "electrical_engineering",
                        status="exploring")
-        version = vault_version(db, ws)
+        version = current_relevance(db, ws)
         db.add(ExecutionRun(workspace_id=ws, requested_by="pai", task_type="path_explain", objective="Explain",
-                            status="completed", constraints={"possibility_id": row.id, "vault_version": version}))
+                            status="completed", constraints={"possibility_id": row.id, "relevance_version": version}))
         db.commit()
         kwargs = dict(db=db, journey=JourneyService(db).get(ws, journey.id),
                       tool_context=SimpleNamespace(workspace_id=ws), possibility_id=row.id)
         with patch(DELEGATE, AsyncMock(side_effect=lambda payload, context: queued(payload))) as sent:
             assert (await request_research("program_search", ws, **kwargs))["ok"]
         constraints = sent.await_args.args[0]["constraints"]
-        assert constraints["vault_version"] == version
-        assert f":vault:{version}" in constraints["research_key"]
-        # The Vault changed: the stored explanation is for an older Vault, so
-        # programs wait until the path is explained again for this one.
-        add_education(student, db, fsc("pre_engineering", 78))
-        assert vault_version(db, ws) != version
-        with patch(DELEGATE, AsyncMock(side_effect=lambda payload, context: queued(payload))) as sent:
-            assert await request_research("program_search", ws, **kwargs) is None
-        sent.assert_not_awaited()
+        assert constraints["relevance_version"] == version and "vault_version" not in constraints
+        assert f":relevance:{version}" in constraints["research_key"]
+        before = vault_version(db, ws)
+        add_education(student, db, fsc("pre_engineering", 78))  # education is path-relevant
+        assert vault_version(db, ws) != before and current_relevance(db, ws) != version
 
 
 REMOVED = re.compile(r"mirror_is_current|from_mirror|summary/confirm|summary/edit|summary/feedback|"

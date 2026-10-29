@@ -1,14 +1,14 @@
 """Path-scoped exploration; shared research gateway owns durable work.
 
-A stored explanation or program search is current while the Vault is the one it
-read (`vault_version`); otherwise the student asks again and it is re-run. No
-Mirror confirmation is needed (FOUR_FEATURES_SPEC 2.3)."""
+A finished explanation or program search is never hidden: reads return the
+latest finished run with `stale: true` when the path-relevant Vault changed
+since it ran (pai_c/paths/currency.py), and a new request re-runs it. No Mirror
+confirmation is needed (FOUR_FEATURES_SPEC 2.3)."""
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from sqlalchemy import select
 from app.api.response import success_response
 from app.database import get_db
 from app.journey import JourneyService
-from app.memory.completeness import vault_version
 from app.models import ExecutionRun
 from app.pai_c.memory import MemoryService
 from app.pai_c.possibilities import PossibilityService, PossibilityError
@@ -36,17 +36,26 @@ def accept_try_it(path_id: str, body: TryItConsent, network: str=Query(...), db=
     workspace = _authorized(db, network, x_workspace_token, authorization)
     wid = str(workspace.id)
     path = path_row(db, wid, path_id)
-    runs = db.scalars(select(ExecutionRun).where(ExecutionRun.workspace_id == wid,
-        ExecutionRun.task_type == 'path_explain', ExecutionRun.status == 'completed')
-        .order_by(ExecutionRun.created_at.desc())).all()
-    version = vault_version(db, wid)
-    run = next((run for run in runs if (run.constraints or {}).get('possibility_id') == path.id
-        and (run.constraints or {}).get('vault_version') == version), None)
+    # The latest finished explanation, stale or not: its activity still stands.
+    _, run = path_runs(db, wid, path.id, 'path_explain')
     if path.status == 'dismissed' or not run or not (((run.result or {}).get('capability_result') or {}).get('path') or {}).get('try_it'):
-        raise HTTPException(409, 'A current path activity is required')
+        raise HTTPException(409, 'An explained path activity is required')
     job = schedule(db, wid, 'try_it', run.id)
     db.commit()
     return success_response({'status': 'scheduled', 'available_at': job.available_at.isoformat()})
+
+
+def path_runs(db, workspace_id, possibility_id, task_type):
+    """(latest run, latest completed run) of one kind for one path."""
+    runs = [run for run in db.scalars(select(ExecutionRun).where(ExecutionRun.workspace_id == workspace_id,
+        ExecutionRun.task_type == task_type).order_by(ExecutionRun.created_at.desc())).all()
+        if (run.constraints or {}).get('possibility_id') == possibility_id]
+    return (runs[0] if runs else None), next((run for run in runs if run.status == 'completed'), None)
+
+
+def stale(db, workspace_id, run) -> bool:
+    from app.pai_c.paths.currency import current_relevance, is_stale
+    return bool(run) and is_stale(run, current_relevance(db, workspace_id))
 
 
 def path_row(db, workspace_id, path_id):
@@ -69,15 +78,14 @@ def tool_context(workspace, db):
 def get_path(path_id: str, network: str = Query(...), db=Depends(get_db), x_workspace_token: str | None = Header(None), authorization: str | None = Header(None)):
     workspace = _authorized(db, network, x_workspace_token, authorization)
     row = path_row(db, str(workspace.id), path_id)
-    version = vault_version(db, str(workspace.id))
-    runs = db.scalars(select(ExecutionRun).where(ExecutionRun.workspace_id == str(workspace.id),
-        ExecutionRun.task_type == "path_explain").order_by(ExecutionRun.created_at.desc())).all()
-    run = next((item for item in runs if (item.constraints or {}).get("possibility_id") == row.id
-                and (item.constraints or {}).get("vault_version") == version), None)
-    result = ((run.result or {}).get("capability_result") or {}) if run and run.status == "completed" else {}
+    run, done = path_runs(db, str(workspace.id), row.id, "path_explain")
+    result = ((done.result or {}).get("capability_result") or {}) if done else {}
     from app.pai_c.paths.explain import current_path_result
     result, expired = current_path_result(result)
-    return success_response({"possibility": PossibilityService.serialize(row), "status": "stale" if expired else run.status if run else "not_started",
+    # `status: stale` is expired world facts; `stale: true` is a Vault change since the run.
+    return success_response({"possibility": PossibilityService.serialize(row),
+        "status": "stale" if expired and run is done else run.status if run else "not_started",
+        "stale": stale(db, str(workspace.id), done),
         "path": result.get("path"), "facts": result.get("facts", []), "missing": result.get("missing", []),
         "run_id": run.id if run else None})
 
@@ -123,19 +131,16 @@ def get_programs(path_id: str, network: str = Query(...), db=Depends(get_db),
     x_workspace_token: str | None = Header(None), authorization: str | None = Header(None)):
     workspace = _authorized(db, network, x_workspace_token, authorization)
     row = path_row(db, str(workspace.id), path_id)
-    version = vault_version(db, str(workspace.id))
-    runs = db.scalars(select(ExecutionRun).where(ExecutionRun.workspace_id == str(workspace.id),
-        ExecutionRun.task_type == 'program_search').order_by(ExecutionRun.created_at.desc())).all()
-    run = next((run for run in runs if (run.constraints or {}).get('possibility_id') == row.id
-        and (run.constraints or {}).get('vault_version') == version), None)
-    result = ((run.result or {}).get('capability_result') or {}) if run and run.status == 'completed' else {}
+    run, done = path_runs(db, str(workspace.id), row.id, 'program_search')
+    result = ((done.result or {}).get('capability_result') or {}) if done else {}
     from app.pai_c.paths.programs import current_programs, reusable_program_run
     result, _ = current_programs(db, str(workspace.id), result,
         MemoryService(db).comparable_facts(str(workspace.id)))
     status = run.status if run else 'not_started'
-    if run and run.status == 'completed' and not reusable_program_run(db, run, PossibilityService(db).research_route(row)):
-        status = 'stale'
+    if done and not reusable_program_run(db, done, PossibilityService(db).research_route(row)):
+        if run is done:
+            status = 'stale'
         # A changed destination/level must not display the previous route's programs.
         result['programs'] = []
-    return success_response({'status': status,
+    return success_response({'status': status, 'stale': stale(db, str(workspace.id), done),
         'programs': result.get('programs', []), 'missing': result.get('missing', [])})

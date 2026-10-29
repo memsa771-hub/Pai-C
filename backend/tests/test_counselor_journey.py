@@ -87,7 +87,7 @@ async def test_result_is_interpreted_by_counselor_and_does_not_create_student_fa
                 result={"final_message": "Detailed evidence and program constraints", "observations": []})
             db.add(run)
             db.commit()
-            with patch.object(operator, "_result_context_current", return_value=True), \
+            with patch.object(operator, "_result_stale", return_value=False), \
                  patch("app.pai_c.orchestrator.handle_research_result", AsyncMock(
                     return_value="Given your budget, verify the academic credits before paying an application fee.")) as explain:
                 await operator._post_result(db, student.workspace_id, "channel/pai-counselor", run.id,
@@ -95,34 +95,3 @@ async def test_result_is_interpreted_by_counselor_and_does_not_create_student_fa
             assert explain.call_args.args[2]["result"]["final_message"] == "Detailed evidence and program constraints"
             assert db.execute(select(BackgroundJob)).scalars().all() == []
             assert student.transcript[-1]["content"].startswith("Given your budget")
-
-
-
-@pytest.mark.asyncio
-async def test_operator_result_for_an_older_vault_is_not_explained():
-    with StudentSession() as student:
-        with student.factory() as db:
-            db.add(ProfileRequirement(
-                key="education.history", tier="critical", source_type="record_presence",
-                source_key="education", selector="any",
-                question="What is your current or highest qualification?",
-                priority=100, version=1, enabled=True,
-            ))
-            run = ExecutionRun(
-                workspace_id=student.workspace_id, requested_by="openagents:pai",
-                objective="Rank universities for this student", status="completed",
-                # Read on a Vault that has changed since (FOUR_FEATURES_SPEC 2.3).
-                constraints={"vault_version": "an-older-vault"},
-                result={"final_message": "Secret personalized ranking", "observations": []},
-            )
-            db.add(run)
-            db.commit()
-            with patch.object(config, "PAI_PROFILE_COMPLETION_ROLLOUT_MODE", "all"), \
-                    patch("app.pai_c.orchestrator.handle_research_result", AsyncMock()) as explain:
-                await operator._post_result(
-                    db, student.workspace_id, "channel/pai-counselor", run.id,
-                    "completed", "Secret personalized ranking",
-                )
-        explain.assert_not_awaited()
-        assert "Secret personalized ranking" not in student.transcript[-1]["content"]
-        assert "has changed since it started" in student.transcript[-1]["content"]

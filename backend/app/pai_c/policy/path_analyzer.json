@@ -17,6 +17,8 @@
   "triggers": {
     "request_kinds": ["decision_help"]
   },
+  "_vault_trigger_types_note": "Catalog types a path reads. A write to one queues the Path engine (reason vault), and path research (explanations, program searches) is current while none of them changed: relevance_version in memory/completeness.py.",
+  "vault_trigger_types": ["education", "test_attempt", "goal", "interest", "strength", "pressure", "option", "certainty", "family_member"],
   "message_type": "counselor_paths",
   "_needs_education_note": "When a chat-requested analysis cannot place the student, PAI posts one short message saying what it needs. needs_education_by_level picks the message from the level the education record names; a level not listed (or none) asks for the education itself. Only runs the student asked for in chat (needs_education_post_reasons) post it; the Paths page says it on its own.",
   "needs_education_post_reasons": ["asked"],

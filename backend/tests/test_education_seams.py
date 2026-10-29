@@ -68,7 +68,8 @@ def test_onboarding_education_write_queues_path_analysis():
                                           "status": "current", "year": "year_1"})
         db.commit()
         [job] = _jobs(db, student.workspace_id)
-        assert job.payload["reason"] == "education"
+        # The reconciler's Vault trigger queues it first; the education trigger reuses that pending run.
+        assert job.payload["reason"] in {"vault", "education"}
 
 
 def test_vault_education_edit_queues_path_analysis():

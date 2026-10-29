@@ -44,6 +44,8 @@ def test_student_export_is_scoped_readonly_and_excludes_private_data():
         with patch.object(db,'commit',side_effect=AssertionError('read-only')):
             result=export_student_data(db,student.workspace_id)
         assert 'roadmaps' not in result
+        assert 'mirrors' not in result and 'ratings' not in result
+        assert set(result['mirror'])=={'header','unknowns','text','ready','version'}
         assert [(row['field_key'],row['steps_done']) for row in result['route_decisions']]==[('computer_science',[True])]
         assert [row['id'] for row in result['conversation']]==['early','late']
         assert result['documents'][0]['filename']=='record.pdf'

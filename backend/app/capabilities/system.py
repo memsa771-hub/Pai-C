@@ -16,6 +16,8 @@ def load_system_capabilities(registry):
     # After Mirror-relevant Vault writes the reconciler moves the journey to
     # MIRROR when the card is ready and queues the Mirror text.
     register_accept_hook(mirror_text.after_accept)
+    # A path-relevant Vault write queues the Path engine (reason vault).
+    register_accept_hook(paths.after_accept)
 
     string = {"type": "string"}
     array = {"type": "array"}

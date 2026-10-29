@@ -38,7 +38,7 @@ async def test_program_search_requires_completed_current_path():
         assert await request_research('program_search',student.workspace_id,db=db,journey=journey,
             tool_context=SimpleNamespace(workspace_id=student.workspace_id),possibility_id=row.id) is None
         db.add(ExecutionRun(workspace_id=student.workspace_id,requested_by='pai',task_type='path_explain',
-            objective='Explore',status='completed',constraints={'possibility_id':row.id,'vault_version':'an-older-vault'}))
+            objective='Explore',status='failed',constraints={'possibility_id':row.id,'relevance_version':'an-older-vault'}))
         db.commit()
         assert await request_research('program_search',student.workspace_id,db=db,journey=journey,
             tool_context=SimpleNamespace(workspace_id=student.workspace_id),possibility_id=row.id) is None
@@ -76,10 +76,10 @@ async def test_expired_program_run_refreshes_once_and_pending_run_is_reused():
         journey=research_journey(student,db)
         row=PossibilityService(db).add(student.workspace_id,journey.id,title='Practical design',why='Evidence',kind='discovered',source='planner',status='exploring')
         route=PossibilityService(db).research_route(row)
-        from app.memory.completeness import vault_version
-        version=vault_version(db,student.workspace_id)
-        db.add(ExecutionRun(workspace_id=student.workspace_id,requested_by='pai',task_type='path_explain',objective='Explain',status='completed',constraints={'possibility_id':row.id,'vault_version':version}))
-        old=ExecutionRun(workspace_id=student.workspace_id,requested_by='pai',task_type='program_search',objective='Search',status='completed',created_at=datetime.now(timezone.utc)-timedelta(days=1000),constraints={'possibility_id':row.id,'vault_version':version,'capability_input':{'brief':{'route':route}}},result={'capability_result':{'programs':[]}})
+        from app.pai_c.paths.currency import current_relevance
+        version=current_relevance(db,student.workspace_id)
+        db.add(ExecutionRun(workspace_id=student.workspace_id,requested_by='pai',task_type='path_explain',objective='Explain',status='completed',constraints={'possibility_id':row.id,'relevance_version':version}))
+        old=ExecutionRun(workspace_id=student.workspace_id,requested_by='pai',task_type='program_search',objective='Search',status='completed',created_at=datetime.now(timezone.utc)-timedelta(days=1000),constraints={'possibility_id':row.id,'relevance_version':version,'capability_input':{'brief':{'route':route}}},result={'capability_result':{'programs':[]}})
         db.add(old);db.commit()
         async def queue(payload, context):
             run=ExecutionRun(workspace_id=student.workspace_id,requested_by='pai',task_type='program_search',objective='Search',status='pending',constraints=payload['constraints'])

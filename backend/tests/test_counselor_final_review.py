@@ -11,7 +11,7 @@ def test_budget_resets_per_budget_key():
             with bounded_research(queries=5,fetches=5,seconds=30,workspace_id=student.workspace_id,
                  budget_key=version):
                 return spend('web.search')
-        assert attempt(1) is None
-        assert attempt(1)=='research_student_budget_exceeded'
-        assert attempt(2) is None
-        assert attempt(1)=='research_student_budget_exceeded'
+        assert attempt('first') is None
+        assert attempt('first')=='research_student_budget_exceeded'
+        assert attempt('second') is None
+        assert attempt('first')=='research_student_budget_exceeded'

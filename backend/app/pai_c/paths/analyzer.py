@@ -244,10 +244,11 @@ def _education_candidates(education: list[dict]) -> dict[str, Candidate]:
 def enqueue_path_analysis(db, workspace_id: str, *, source_event_id: str | None,
                           channel: str | None, reason: str) -> str | None:
     """Queue one analysis per input: the Truth Map version, the paths the
-    student typed in and their education records as last written, so any
-    education change is a new run even when nothing else changed. A job not
-    yet started is reused, since it reads all three when it runs. The caller
-    commits, as with the other Counselor enqueues."""
+    student typed in and the path-relevant Vault (`relevance_version` over
+    `vault_trigger_types`, which includes education records as last written),
+    so any education change is a new run even when nothing else changed. A job
+    not yet started is reused, since it reads all of them when it runs. The
+    caller commits, as with the other Counselor enqueues."""
     snapshot = MemoryService(db).truth_map(workspace_id)
     pending = db.scalar(select(BackgroundJob.id).where(
         BackgroundJob.workspace_id == workspace_id, BackgroundJob.job_type == JOB_ANALYZE_PATHS,
@@ -256,18 +257,34 @@ def enqueue_path_analysis(db, workspace_id: str, *, source_event_id: str | None,
         return pending
     own = sorted(row.normalized_title for row in PossibilityService(db).list(workspace_id)
                  if row.source == "student" and row.status != "dismissed")
-    # Every education write changes the key (each record's id and
-    # updated_at), so going back to an earlier group is a fresh run too, not
-    # the finished job from the first time the student was in it.
-    education = sorted(f"{row['id']}@{row.get('updated_at')}" for row in
-                       MemoryService(db).profile(workspace_id).records.get("education", []))
-    digest = hashlib.sha256(("|".join(own) + "#" + "|".join(education)).encode()).hexdigest()[:16]
+    # Every relevant write changes the key (each entry's id and updated_at),
+    # so going back to an earlier group is a fresh run too, not the finished
+    # job from the first time the student was in it.
+    from app.pai_c.paths.currency import current_relevance
+    digest = hashlib.sha256(("|".join(own) + "#" + current_relevance(db, workspace_id)).encode()).hexdigest()[:16]
     payload = {"notebook_version": snapshot.version, "reason": reason,
                "source_event_id": source_event_id, "channel": channel}
     job = enqueue(db, JOB_ANALYZE_PATHS, {key: value for key, value in payload.items() if value is not None},
         workspace_id=workspace_id,
         idempotency_key=f"counselor:paths:{workspace_id}:{snapshot.version}:{digest}")
     return job.id if job else None
+
+
+def after_accept(db, candidate) -> None:
+    """Reconciler hook: a write to a path-relevant Vault type
+    (`vault_trigger_types`) queues the Path engine (reason "vault"). The
+    enqueue is idempotent on the relevance version and the student's own
+    paths, and a pending run is reused. Like the Mirror hook, it runs in a
+    savepoint and never undoes the Vault write."""
+    from app.pai_c.paths.currency import trigger_types
+    if candidate.key not in trigger_types():
+        return
+    try:
+        with db.begin_nested():
+            enqueue_path_analysis(db, candidate.workspace_id, source_event_id=None, channel=None, reason="vault")
+    except Exception as exc:  # noqa: BLE001  the Vault write outranks its read model
+        logger.error("path_analysis_enqueue_failed workspace_id=%s error_type=%s",
+                     candidate.workspace_id, type(exc).__name__)
 
 
 # Stages of the confirm-gated research wait, kept for old data (stages.py).
@@ -405,9 +422,16 @@ async def path_analysis_job(job, db) -> dict:
             if path["study_field"] is not None:
                 row.study_field = path["study_field"]
             ids.append(row.id)
-        if ids:
-            propose_after_paths(db, job.workspace_id)
         db.commit()
+        if ids:
+            # The paths are saved; a stage problem must not undo them.
+            try:
+                propose_after_paths(db, job.workspace_id)
+                db.commit()
+            except Exception as exc:  # noqa: BLE001  the saved paths outrank the stage move
+                db.rollback()
+                logger.error("paths_stage_move_failed workspace_id=%s error_type=%s",
+                             job.workspace_id, type(exc).__name__)
         channel = payload.get("channel")
         if not channel or not ids:
             return {"status": "stored", "paths": ids}

@@ -147,37 +147,37 @@ async def _post_result(
         from app.pai_c.posting import _build_conversation_context, send_to_student
         db.rollback()
         run = db.get(ExecutionRun, run_id)
-        context_current = bool(run and _result_context_current(db, run))
+        stale = bool(run and _result_stale(db, run))
         if run is not None and str(run.workspace_id) == workspace_id and run.result:
-            if not context_current:
-                message = ("The background work is complete, but what you have told me has changed "
-                           "since it started. Ask me again and I will look with what I know now.")
-            else:
-                handoff = {
-                    "objective": run.objective, "constraints": run.constraints,
-                    "status": status, "result": run.result,
-                    "verification": run.verification, "missing": run.missing,
-                    "approval_required_for": run.approval_required_for,
-                }
-                history = _build_conversation_context(
-                    db, workspace_id, channel_target, pai.PAI_AGENT_NAME,
-                    exclude_event_id="", max_chars=12000,
+            handoff = {
+                "objective": run.objective, "constraints": run.constraints,
+                "status": status, "result": run.result,
+                "verification": run.verification, "missing": run.missing,
+                "approval_required_for": run.approval_required_for,
+            }
+            history = _build_conversation_context(
+                db, workspace_id, channel_target, pai.PAI_AGENT_NAME,
+                exclude_event_id="", max_chars=12000,
+            )
+            db.rollback()
+            try:
+                from app.pai_c.orchestrator import handle_research_result
+                explained = await handle_research_result(workspace_id, history, handoff)
+                if explained:
+                    message = explained
+            except Exception:
+                # Persisted evidence remains available through operator.status.
+                # Do not send raw internal output as if Counselor interpreted it.
+                logger.exception("operator: counselor handoff failed for %s", run_id)
+                message = (
+                    "The background work has returned, but I couldn't prepare its explanation. "
+                    "Ask me to review the findings and I'll pick up from the saved result."
                 )
-                db.rollback()
-                try:
-                    from app.pai_c.orchestrator import handle_research_result
-                    explained = await handle_research_result(workspace_id, history, handoff)
-                    if explained:
-                        message = explained
-                except Exception:
-                    # Persisted evidence remains available through operator.status.
-                    # Do not send raw internal output as if Counselor interpreted it.
-                    logger.exception("operator: counselor handoff failed for %s", run_id)
-                    message = (
-                        "The background work has returned, but I couldn't prepare its explanation. "
-                        "Ask me to review the findings and I'll pick up from the saved result."
-                    )
         response_metadata = {"execution_run_id": run_id, "execution_status": status}
+        if stale:
+            # The result is posted either way; the flag tells the student the
+            # path-relevant Vault changed since the run started.
+            response_metadata["stale"] = True
         await send_to_student(
             db, workspace_id, channel_target, pai.PAI_AGENT_NAME, message, depth=0,
             message_type="operator_result",
@@ -284,13 +284,17 @@ async def delegate(ctx, objective: str, constraints: Optional[dict], context_ref
     return {"ok": True, "data": data}
 
 
-def _result_context_current(db, run: ExecutionRun) -> bool:
-    """A result is explained to the student only while the Vault is the one
-    the run read (FOUR_FEATURES_SPEC 2.3). A run that recorded no Vault
-    version did not read the student, so it never goes out of date."""
-    from app.memory.completeness import vault_version
-    version = (run.constraints or {}).get("vault_version")
-    return version is None or version == vault_version(db, run.workspace_id)
+def _result_stale(db, run: ExecutionRun) -> bool:
+    """A path run whose path-relevant Vault changed since it started
+    (pai_c/paths/currency.py). It is still explained and posted, only
+    flagged. A run that read no student (no relevance or old Mirror key) is
+    not path research and is never stale; a path run from before relevance
+    keys (a `possibility_id` and no relevance version) is."""
+    constraints = run.constraints or {}
+    if "relevance_version" not in constraints:
+        return "possibility_id" in constraints
+    from app.pai_c.paths.currency import current_relevance, is_stale
+    return is_stale(run, current_relevance(db, run.workspace_id))
 
 
 async def resume(ctx, run_id: str, action: dict) -> dict:

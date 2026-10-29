@@ -3,7 +3,30 @@
 from contextlib import contextmanager
 from contextvars import ContextVar
 from dataclasses import dataclass
+from datetime import date, datetime, timedelta, timezone
+import re
 import time
+
+# Budget keys older than this are dropped when a counter is written, so the
+# workspace settings never grow (the allowance itself is one UTC day).
+KEEP_DAYS = 7
+_DATED = re.compile(r":(\d{4}-\d{2}-\d{2})$")
+
+
+def daily_key(scope: str, now: datetime | None = None) -> str:
+    """One allowance per workspace, scope and UTC calendar day."""
+    return f"{scope}:{(now or datetime.now(timezone.utc)).astimezone(timezone.utc).date().isoformat()}"
+
+
+def _pruned(counters: dict, today: date) -> dict:
+    """Drop dated keys older than KEEP_DAYS and the bare numbers the old
+    per-Mirror-version budget left; other keys (belief-check periods) stay."""
+    def keep(key: str) -> bool:
+        if key.isdigit():
+            return False
+        match = _DATED.search(key)
+        return not match or date.fromisoformat(match.group(1)) >= today - timedelta(days=KEEP_DAYS)
+    return {key: value for key, value in counters.items() if keep(key)}
 
 
 @dataclass
@@ -41,10 +64,11 @@ class ResearchBudget:
                     self.exhausted = True
                     return "research_student_budget_exceeded"
                 settings = dict(workspace.settings or {})
-                # Counters belong to a key (the Vault version path research
-                # read, or a belief-check period), not a lifetime. Keeping the
-                # keys prevents an old job from resetting a new job's allowance.
-                counters = dict(settings.get("counselor_research_budgets") or {})
+                # Counters belong to a key (a UTC day for path research, a
+                # period for belief checks), not a lifetime. Keeping the keys
+                # prevents an old job from resetting a new job's allowance.
+                counters = _pruned(dict(settings.get("counselor_research_budgets") or {}),
+                                   datetime.now(timezone.utc).date())
                 key = str(self.budget_key)
                 used = int(counters.get(key, 0))
                 limit = config.PAI_RESEARCH_MAX_CALLS_PER_STUDENT

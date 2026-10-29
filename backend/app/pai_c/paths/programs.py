@@ -1,6 +1,6 @@
 """Stage H: existing research capabilities, evidence-only eligibility."""
 from app.config import config
-from app.plugins._shared.budget import bounded_research
+from app.plugins._shared.budget import bounded_research, daily_key
 from app.plugins.gap_assessment import assess_rule
 from app.research.seasons import verified_rules
 from app.pai_c.paths.explain import policy
@@ -34,7 +34,7 @@ async def search(context, payload):
         return {'programs': [], 'missing': ['place_preference']}
     with bounded_research(queries=config.PAI_RESEARCH_MAX_QUERIES, fetches=config.PAI_RESEARCH_MAX_FETCHES,
         seconds=config.PAI_RESEARCH_MAX_SECONDS, workspace_id=context.workspace_id,
-        budget_key=brief['vault_version']) as budget:
+        budget_key=daily_key("path_research")) as budget:
         found = await context.capabilities('program.discover', {'objective': route['field'],
             'country': route['place_preference'], 'level': route.get('level', '')})
         programs = []

@@ -201,7 +201,9 @@ class JourneyService:
     def note_mirror_posted(self, workspace_id: str, card_version: str,
                            *, actor: str = "openagents:pai") -> JourneyView | None:
         """Remember that the ready card was posted in chat, so the guided
-        table's `mirror` rule fires once."""
+        table's `mirror` rule fires once per journey (spec 2.5: when the card
+        first becomes ready). The version is kept as a record of what was
+        posted; it is not compared, so a later card is not re-posted."""
         row = self._counselor_row(workspace_id)
         if row is None:
             return None
