@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { useConfirm } from "@/components/ui/dialogs-provider";
 import { FeedbackDialog } from "@/components/feedback/feedback-dialog";
-import { workspaceApi } from "@/lib/api";
+import { workspaceApi, type AdminUsage } from "@/lib/api";
 import { RecentSignInRequired, requestPasswordReset } from "@/lib/auth/service";
 import { signOutAndGoToLanding, signOutAndReturnToSignIn } from "@/lib/auth-redirects";
 import { publicAppUrl } from "@/lib/desktop-host";
@@ -18,7 +18,7 @@ import { usePaiAuth } from "@/lib/pai-auth-context";
 import { useWorkspace } from "@/lib/workspace-context";
 import type { ShareSummary } from "@/lib/types";
 import { cn } from "@/lib/utils";
-import { Heading, shortDate } from "./resource";
+import { Heading, LoadState, shortDate, useResource } from "./resource";
 import copy from "./copy.json";
 
 const text = copy.settings;
@@ -52,6 +52,59 @@ function Row({ label, help, children, tone }: { label: string; help?: string; ch
 
 function Panel({ children }: { children: React.ReactNode }) {
   return <div className="divide-y divide-border/70 overflow-hidden rounded-[22px] bg-card shadow-card ring-1 ring-border/70">{children}</div>;
+}
+
+const usd = new Intl.NumberFormat(undefined, { style: "currency", currency: "USD", minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const STAGE_TONE: Record<string, string> = {
+  ok: "bg-success-soft text-success-ink",
+  research_paused: "bg-warning-soft text-warning-ink",
+  paused: "bg-danger-soft text-danger-ink",
+};
+const loadUsage = () => workspaceApi.getAdminUsage();
+
+/** This month's model spend against the cap (GET /v1/admin/usage). Founder
+ * accounts only: for anyone else the API answers 403 and nothing renders. */
+export function UsageCard() {
+  const usage = useResource<AdminUsage | null>(loadUsage);
+  if (usage.error) return <LoadState error busy={false} retry={usage.refresh} skeleton="list" />;
+  if (usage.busy || !usage.data) return null;
+  const { month, cap, spent, stage, by_role } = usage.data;
+  const u = text.usage;
+  const share = spent === null || cap <= 0 ? 1 : Math.min(spent / cap, 1);
+  return (
+    <Panel>
+      <Row label={u.title} help={fill(u.help, { month })}>
+        <span className={cn("rounded-full px-3 py-1 text-xs font-semibold", STAGE_TONE[stage] || "bg-muted text-foreground")}>
+          {u.stages[stage as keyof typeof u.stages] || stage}
+        </span>
+      </Row>
+      <div className="px-5 py-4 sm:px-6">
+        <p className="text-sm font-semibold">{spent === null ? u.unread : fill(u.spentOf, { spent: usd.format(spent), cap: usd.format(cap) })}</p>
+        <div role="progressbar" aria-label={u.title} aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(share * 100)}
+          className="mt-2 h-2 overflow-hidden rounded-full bg-muted">
+          <div className={cn("h-full rounded-full", stage === "paused" ? "bg-danger" : stage === "ok" ? "bg-primary" : "bg-warning")} style={{ width: `${share * 100}%` }} />
+        </div>
+      </div>
+      <div className="px-5 py-4 sm:px-6">
+        {by_role.length === 0 ? <p className="text-sm text-muted-foreground">{u.none}</p> : (
+          <table className="w-full text-sm">
+            <thead className="text-left text-xs text-muted-foreground">
+              <tr><th className="pb-2 font-semibold">{u.role}</th><th className="pb-2 text-right font-semibold">{u.calls}</th><th className="pb-2 text-right font-semibold">{u.cost}</th></tr>
+            </thead>
+            <tbody>
+              {by_role.map((row) => (
+                <tr key={row.role} className="border-t border-border/70">
+                  <td className="break-all py-2 pr-3">{row.role}</td>
+                  <td className="py-2 pr-3 text-right tabular-nums">{row.calls}</td>
+                  <td className="py-2 text-right tabular-nums">{usd.format(row.est_usd)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+    </Panel>
+  );
 }
 
 /** The one Settings place for the student: account, appearance, the
@@ -173,6 +226,7 @@ export function CounselorSettings({ onNavigate }: { base?: string; onNavigate?: 
           )}
 
           {section === "account" && (
+            <div className="space-y-5">
             <Panel>
               <Row label={text.name} help={text.nameHelp}>
                 <span className="text-sm font-semibold">{user?.displayName || "—"}</span>
@@ -191,6 +245,8 @@ export function CounselorSettings({ onNavigate }: { base?: string; onNavigate?: 
                 <Button size="tap" variant="outline" onClick={leave}><LogOut aria-hidden />{text.signOut}</Button>
               </Row>
             </Panel>
+            <UsageCard />
+            </div>
           )}
 
           {section === "appearance" && (

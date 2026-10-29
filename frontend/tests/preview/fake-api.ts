@@ -1,4 +1,4 @@
-import {picture,vault,vaultCatalog,possibilities,pathResult,programs,roadmapPage,chosenRoute,mirrorCard,mirrorEmpty} from '../fixtures/counselor';
+import {picture,vault,vaultCatalog,possibilities,pathResult,programs,roadmapPage,chosenRoute,mirrorCard,mirrorEmpty,adminUsage} from '../fixtures/counselor';
 import type {ChosenRoute} from '@/lib/roadmap';
 export const calls:{method:string;args:unknown[]}[]=[];
 // ?mirror=empty: the Mirror before it is ready (onboarding only).
@@ -42,6 +42,8 @@ const api={getCounselorWorkspace:async()=>picture,getVault:async()=>vault,getVau
   setRouteStep:async(key:string,done:boolean)=>tick(key,done),
   withdrawRoute:async()=>{const old=route;route=null;return old;},
   getCounselorHealth:async()=>({planner_lag_alert:false}),getPath:async()=>pathResult,
+  // The preview signs in as a founder, so Settings shows the spend card.
+  getAdminUsage:async()=>structuredClone(adminUsage),
   getPrograms:async()=>searched?(new URLSearchParams(location.search).has('programs')?richPrograms:programs):{status:'not_started',programs:[],missing:[]},
   searchPrograms:async()=>{searched=true;return{};},
   getMirror:async()=>structuredClone(mirrorState),

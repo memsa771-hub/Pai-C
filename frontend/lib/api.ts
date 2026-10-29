@@ -26,6 +26,16 @@ import { eventToMessage } from './types';
 import { API_URL } from './config';
 import { AUTH_INVALID_EVENT, AUTH_UNVERIFIED_EVENT, currentIdToken, RecentSignInRequired } from './auth/service';
 
+/** GET /v1/admin/usage (backend app/routers/admin_usage.py). `spent` is null
+ * when the usage counter could not be read. */
+export interface AdminUsage {
+  month: string;
+  cap: number;
+  spent: number | null;
+  stage: string;
+  by_role: { role: string; calls: number; est_usd: number }[];
+}
+
 /** Map a snake_case custom-skill entry from the backend to camelCase. */
 /** Map snake_case file response from backend to camelCase WorkspaceFile. */
 function mapFileResponse(raw: Record<string, unknown>): WorkspaceFile {
@@ -285,6 +295,17 @@ class WorkspaceApi {
       await this.request('/v1/account', {method:'DELETE'});
     } catch (error) {
       if (error instanceof Error && error.message.includes('AUTH_RECENT_SIGN_IN_REQUIRED')) throw new RecentSignInRequired();
+      throw error;
+    }
+  }
+
+  /** This month's model spend (GET /v1/admin/usage). Founder accounts only:
+   * any other account gets 403, returned here as null. */
+  async getAdminUsage(): Promise<AdminUsage | null> {
+    try {
+      return await this.request<AdminUsage>('/v1/admin/usage');
+    } catch (error) {
+      if (error instanceof Error && error.message.startsWith('API 403')) return null;
       throw error;
     }
   }

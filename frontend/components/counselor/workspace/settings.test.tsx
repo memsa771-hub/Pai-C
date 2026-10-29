@@ -1,13 +1,14 @@
 // @vitest-environment jsdom
 import {it,expect,vi,afterEach} from 'vitest';
 import {render,screen,fireEvent,cleanup,waitFor,within} from '@testing-library/react';
-import {CounselorSettings} from './settings';
+import {CounselorSettings,UsageCard} from './settings';
+import {adminUsage} from '@/tests/fixtures/counselor';
 import {workspaceApi} from '@/lib/api';
 import {RecentSignInRequired,requestPasswordReset} from '@/lib/auth/service';
 import {signOutAndGoToLanding} from '@/lib/auth-redirects';
 const theme=vi.hoisted(()=>({setTheme:vi.fn(),theme:'light'}));
 vi.mock('next-themes',()=>({useTheme:()=>theme}));
-vi.mock('@/lib/api',()=>({workspaceApi:{deleteMyAccount:vi.fn(),getVault:vi.fn(),exportCounselorData:vi.fn(),listShares:vi.fn(),deleteShare:vi.fn()}}));
+vi.mock('@/lib/api',()=>({workspaceApi:{deleteMyAccount:vi.fn(),getVault:vi.fn(),exportCounselorData:vi.fn(),listShares:vi.fn(),deleteShare:vi.fn(),getAdminUsage:vi.fn(()=>Promise.resolve(null))}}));
 vi.mock('@/lib/auth/service',()=>({requestPasswordReset:vi.fn(),RecentSignInRequired:class extends Error{}}));
 vi.mock('@/lib/auth-redirects',()=>({signOutAndReturnToSignIn:vi.fn(),signOutAndGoToLanding:vi.fn()}));
 vi.mock('@/components/ui/dialogs-provider',()=>({useConfirm:()=>vi.fn().mockResolvedValue(false)}));
@@ -92,4 +93,35 @@ it('opens feedback from Help',()=>{
   render(<CounselorSettings/>);
   open('Help');fireEvent.click(screen.getByRole('button',{name:'Write feedback'}));
   expect(screen.getByRole('dialog')).toBeTruthy();
+});
+
+it("shows the founder this month's model spend, by role, with the cap stage",async()=>{
+  vi.mocked(workspaceApi.getAdminUsage).mockResolvedValueOnce(structuredClone(adminUsage));
+  render(<CounselorSettings/>);
+  expect(await screen.findByText("This month's model spend")).toBeTruthy();
+  expect(screen.getByText('$83.50 of $100.00')).toBeTruthy();
+  expect(screen.getByRole('progressbar').getAttribute('aria-valuenow')).toBe('84');
+  expect(screen.getByText('Research paused')).toBeTruthy();
+  const rows=screen.getAllByRole('row');
+  expect(rows.map(r=>r.textContent)).toEqual(['RoleCallsEstimated cost','counselor412$51.20','analyst38$22.75','extractor590$9.55']);
+});
+it('shows each cap stage as its own chip',async()=>{
+  for (const [stage,label] of [['ok','Running'],['paused','Paused']]) {
+    vi.mocked(workspaceApi.getAdminUsage).mockResolvedValueOnce({...structuredClone(adminUsage),stage});
+    const view=render(<UsageCard/>);
+    expect(await screen.findByText(label)).toBeTruthy();
+    view.unmount();
+  }
+});
+it('renders nothing for an account that is not a founder (403)',async()=>{
+  render(<CounselorSettings/>);
+  await waitFor(()=>expect(workspaceApi.getAdminUsage).toHaveBeenCalled());
+  await Promise.resolve();
+  expect(screen.queryByText("This month's model spend")).toBeNull();
+  expect(screen.queryByRole('button',{name:'Try again'})).toBeNull();
+});
+it('offers a retry when the spend cannot load',async()=>{
+  vi.mocked(workspaceApi.getAdminUsage).mockRejectedValueOnce(new Error('API 500: down'));
+  render(<UsageCard/>);
+  expect(await screen.findByRole('button',{name:'Try again'})).toBeTruthy();
 });

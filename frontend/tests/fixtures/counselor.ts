@@ -7,6 +7,7 @@ import type { Possibility } from "@/lib/possibilities";
 import type { VaultCatalog, VaultEntry, VaultView } from "@/lib/vault";
 import type { ChosenRoute, FieldCard, RoadmapPage, RouteStep, RouteTime, Verdict } from "@/lib/roadmap";
 import type { MirrorCard } from "@/lib/mirror";
+import type { AdminUsage } from "@/lib/api";
 export const possibilities: Possibility[] = [
   {
     id: "path-one",
@@ -384,4 +385,16 @@ export const mirrorEmpty: MirrorCard = {
     area: key, label: mirrorCard.areas.find((a) => a.key === key)!.label, question_key: `topic_text.${key}`, priority: i + 2 })),
   text: null,
   ready: false,
+};
+/** GET /v1/admin/usage for a founder account (backend app/routers/admin_usage.py). */
+export const adminUsage: AdminUsage = {
+  month: "2026-10",
+  cap: 100,
+  spent: 83.5,
+  stage: "research_paused",
+  by_role: [
+    { role: "counselor", calls: 412, est_usd: 51.2 },
+    { role: "analyst", calls: 38, est_usd: 22.75 },
+    { role: "extractor", calls: 590, est_usd: 9.55 },
+  ],
 };

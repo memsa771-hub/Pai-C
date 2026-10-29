@@ -444,7 +444,22 @@
     "deleteHelp": "Permanently delete your Placement AI account and all your data. This cannot be undone.",
     "feedbackLabel": "Send feedback",
     "feedbackHelp": "Report a problem or suggest something. It goes straight to the team.",
-    "feedbackAction": "Write feedback"
+    "feedbackAction": "Write feedback",
+    "usage": {
+      "title": "This month's model spend",
+      "help": "Estimated cost of every model call in {month}, against the monthly cap. Only founder accounts see this.",
+      "spentOf": "{spent} of {cap}",
+      "unread": "The usage counter could not be read; the cap is not applied.",
+      "stages": {
+        "ok": "Running",
+        "research_paused": "Research paused",
+        "paused": "Paused"
+      },
+      "role": "Role",
+      "calls": "Calls",
+      "cost": "Estimated cost",
+      "none": "No model calls yet this month."
+    }
   },
   "placesOpen": "Look at places",
   "notSet": "Not set",

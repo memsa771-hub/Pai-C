@@ -8,7 +8,7 @@ import { PlaceLink } from '@/components/counselor/place-link';
 import { MirrorLink } from '@/components/counselor/mirror-link';
 import type { MirrorHeader } from '@/lib/mirror';
 import { Button } from '@/components/ui/button';
-import { Copy, Check, FileIcon, Download, Eye, Loader2 } from 'lucide-react';
+import { ArrowRight, Copy, Check, FileIcon, Download, Eye, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { memo, useCallback, useEffect, useMemo, useState } from 'react';
 import {
@@ -186,6 +186,20 @@ function Attachments({ items }: { items: Attachment[] }) {
   );
 }
 
+/** PAI's reply ends with the next step as its own last line, after a blank
+ * line (backend pai_c/deep/turn.py, the drive rule). Split it off so it can
+ * be set apart; a last block that is a list, heading, quote, table or code
+ * stays in the body. */
+const BLOCK_START = /^(?:[-*+>#|`]|\d+[.)]\s)/;
+export function splitNextStep(content: string): [string, string | null] {
+  const text = content.trimEnd();
+  const at = text.lastIndexOf('\n\n');
+  if (at <= 0) return [content, null];
+  const body = text.slice(0, at).trimEnd(), step = text.slice(at + 2).trim();
+  if (!body || !step || step.includes('\n') || BLOCK_START.test(step) || body.split('```').length % 2 === 0) return [content, null];
+  return [body, step];
+}
+
 interface ChatMessageProps {
   message: WorkspaceMessage;
   agents?: WorkspaceAgent[];
@@ -218,6 +232,11 @@ export const ChatMessage = memo(function ChatMessage({ message, agents = [] }: C
   }));
 
   const timestamp = message.createdAt ? formatTime(message.createdAt) : null;
+  const [body, nextStep] = useMemo(
+    () => (isHuman || message.metadata?.counselor_card || message.messageType === 'counselor_mirror'
+      ? [message.content, null] : splitNextStep(message.content || '')),
+    [isHuman, message.content, message.metadata?.counselor_card, message.messageType],
+  );
 
   const handleCopy = async () => {
     try {
@@ -286,7 +305,13 @@ export const ChatMessage = memo(function ChatMessage({ message, agents = [] }: C
         </div>
         <div className="min-w-0">
           <div className="max-w-full text-[15.5px] leading-7 text-foreground [&_p+p]:mt-3">
-            <ConversationCard card={message.metadata?.counselor_card as InlineCard | undefined} channel={message.sessionId}><MarkdownContent content={message.content} agentNames={agentNames} agentLabels={agentLabels} /></ConversationCard>
+            <ConversationCard card={message.metadata?.counselor_card as InlineCard | undefined} channel={message.sessionId}><MarkdownContent content={body} agentNames={agentNames} agentLabels={agentLabels} /></ConversationCard>
+            {nextStep && (
+              <div data-testid="next-step" className="mt-3 flex items-start gap-2 text-muted-foreground">
+                <ArrowRight aria-hidden className="mt-1.5 size-4 shrink-0 text-primary" />
+                <div className="min-w-0 flex-1"><MarkdownContent content={nextStep} agentNames={agentNames} agentLabels={agentLabels} /></div>
+              </div>
+            )}
             <Attachments items={attachments} />
           </div>
           {!!message.metadata?.fact_card && <FactCard card={message.metadata.fact_card as OfferedFact}/>}
