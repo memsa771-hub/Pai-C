@@ -85,22 +85,30 @@ def _parse(raw) -> list[dict]:
     return [row for row in values if isinstance(row, dict)] if isinstance(values, list) else []
 
 
-def states_value(value, quote: str, rules: dict, months: bool = False) -> bool:
-    """The quote states the proposed value: a number as a number, a month
-    (a field naming a month) by its name or short name, text as itself;
-    a list needs every element. Anything else is never stated."""
+def states_value(value, quote: str, rules: dict, kind: str | None = None) -> bool:
+    """The quote states the proposed value in its own context: a month (kind
+    "month") by its name next to a day or a year ("May 2027", "27 March"),
+    so the verb "may" never counts; a percent (kind "percent") as a number
+    next to "%" or "percent"; any other number as a number; text as itself.
+    A list needs every element. Anything else is never stated."""
     if isinstance(value, bool) or value is None:
         return False
     if isinstance(value, list):
-        return bool(value) and all(states_value(element, quote, rules, months) for element in value)
-    words = " " + re.sub(r"[^a-z0-9]+", " ", quote.lower()) + " "
+        return bool(value) and all(states_value(element, quote, rules, kind) for element in value)
     if isinstance(value, (int, float)):
-        if months and isinstance(value, int) and 1 <= value <= 12:
-            names = rules["month_names"][value - 1]
-            if any(f" {name} " in words for name in names):
-                return True
+        if kind == "month":
+            if not (isinstance(value, int) and 1 <= value <= 12):
+                return False
+            names = "|".join(re.escape(name) for name in rules["month_names"][value - 1])
+            return bool(re.search(rf"\b\d{{1,4}}(?:st|nd|rd|th)?\s+(?:{names})\b|\b(?:{names})\.?\s+\d{{1,4}}\b",
+                                  quote, re.IGNORECASE))
         text = str(int(value)) if float(value).is_integer() else str(value)
+        if kind == "percent":
+            found = {raw.replace(",", "") for raw in re.findall(r"(\d+(?:[.,]\d+)?)\s*(?:%|percent\b|per cent\b)",
+                                                                  quote, re.IGNORECASE)}
+            return text in {number[:-2] if number.endswith(".0") else number for number in found}
         return text in numbers(quote)
+    words = " " + re.sub(r"[^a-z0-9]+", " ", quote.lower()) + " "
     return isinstance(value, str) and f" {' '.join(re.findall(r'[a-z0-9]+', value.lower()))} " in words
 
 
@@ -109,7 +117,8 @@ def _verified(row: dict, item: dict, page: dict, rules: dict) -> bool:
     quote = row.get("quote")
     if not isinstance(quote, str) or not quote_on_page(quote, page["text"]) or not real_quote(quote, rules["quote_rules"]):
         return False
-    return states_value(row.get("value"), quote, rules, months="month" in item["field"])
+    kind = "month" if "month" in item["field"] else "percent" if "percent" in item["field"] else None
+    return states_value(row.get("value"), quote, rules, kind)
 
 
 async def run_refresh(*, max_calls: int | None = None, out_dir: Path | None = None,

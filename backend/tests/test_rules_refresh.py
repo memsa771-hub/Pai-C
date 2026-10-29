@@ -306,3 +306,38 @@ def test_apply_reverts_when_validation_raises_and_marks_the_proposal(tmp_path):
     apply_refresh.apply_proposal(proposal, policy_dir=folder, validate=lambda: True)
     marked = json.loads(proposal.read_text(encoding="utf-8"))
     assert marked["applied"] == ["admission_rules.json:rules/0/min_percent", "academic_calendar.json:events/0/months"]
+
+
+# ---- fix round 2: months beside a date, percents beside a percent sign; PDF off the loop -------
+
+@pytest.mark.parametrize("field,value,quote,stated", [
+    ("apply_months", [5], "Candidates may apply online through the portal after the results are announced this year.", False),
+    ("months", [5], "The annual examination will be held in May 2027 across the province.", True),
+    ("months", [3], "Papers begin on 27 March and continue for three weeks across the province.", True),
+    ("min_percent", 60, "Registration remains open for 60 days and the minimum marks required are 65 percent overall.", False),
+    ("min_percent", 65, "Registration remains open for 60 days and the minimum marks required are 65 percent overall.", True),
+    ("min_percent", 65, "Candidates need at least 65% marks in HSSC Pre-Engineering to apply.", True),
+    ("years", 4, "The degree lasts 4 years of full-time study at an accredited university.", True),
+])
+def test_the_quote_states_the_value_in_its_own_context(field, value, quote, stated):
+    page = {"text": quote}
+    assert rules_refresh._verified({"quote": quote, "value": value}, {"field": field}, page,
+                                   rules_refresh.policy()) is stated
+
+
+@pytest.mark.asyncio
+async def test_pdf_text_is_extracted_off_the_event_loop():
+    from app.plugins._shared import sources
+    from app.security.network import SafeFetchResult
+    url = "https://www.pec.org.pk/rules.pdf"
+    fetched = SafeFetchResult(text_pdf("Candidates need at least 60 percent marks in HSSC."), 200,
+                              {"content-type": "application/pdf"}, url, False)
+    calls = []
+
+    async def to_thread(function, *args):
+        calls.append(function.__name__)
+        return function(*args)
+    with patch("app.security.network.safe_fetch", AsyncMock(return_value=fetched)), \
+            patch.object(sources.asyncio, "to_thread", to_thread):
+        page = await sources.read_page(url, 5000)
+    assert calls == ["parse_pdf"] and page["text"].startswith("Candidates need")

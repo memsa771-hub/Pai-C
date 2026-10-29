@@ -371,3 +371,50 @@ def test_note_confidence_counts_only_trusted_facts():
     rules = field_research.policy()
     facts = {"work_day": [{"text": "t", "quote": "q", "source_url": BLOG, "confidence": "uncertain"}] * 9}
     assert field_research._confidence(facts, rules) == "uncertain"
+
+
+# ---- fix round 2: the quote must support the claim; negations --------------------------------
+
+def test_an_on_topic_fabrication_is_dropped():
+    assert check("Electrical engineers are guaranteed jobs at power companies abroad.", LONG_QUOTE) == []
+    assert check("Every graduate is guaranteed a government job abroad after graduation.", LONG_QUOTE) == []
+
+
+def test_a_true_clause_of_a_long_quote_passes():
+    quote = ("Most electrical engineers start in design or maintenance roles at power and telecom companies, "
+             "while others move into teaching, research, sales or project management after several years of work.")
+    assert check("Most electrical engineers start in design or maintenance roles.", quote, page=quote)
+
+
+@pytest.mark.parametrize("fact,page", [
+    ("Electrical engineering programs require 60% marks in FSc for admission.",
+     "Electrical engineering programs do not require 60% marks in FSc for admission to the degree."),
+    ("Electrical engineers work night shifts in testing labs.",
+     "Electrical engineers rarely work night shifts; most work in offices and testing labs."),
+    ("Most electrical engineers start in design or maintenance roles at power and telecom companies.",
+     "Most electrical engineers never start in design or maintenance roles at power and telecom companies."),
+])
+def test_a_negation_in_only_one_of_fact_and_quote_drops_the_fact(fact, page):
+    assert check(fact, page, page=page) == []
+
+
+def test_the_same_negation_on_both_sides_passes():
+    page = "Electrical engineers rarely work night shifts; most work in offices and testing labs."
+    assert check("Electrical engineers rarely work night shifts.", page, page=page)
+
+
+def test_negation_words_are_data_and_not_stopwords():
+    rules = field_research.policy()["quote_rules"]
+    assert {"not", "no", "never", "rarely", "nahi"} <= set(rules["negations"])
+    assert not set(rules["negations"]) & set(rules["stopwords"])
+    assert rules["min_support"] == 0.75
+
+
+@pytest.mark.parametrize("sentence,blocked", [
+    ("Many students at Nust study this field.", True),
+    ("Lums graduates often join consulting firms.", True),
+    ("FAST graduates often work abroad.", True),
+    ("Engineers work fast when a deadline is close.", False),
+])
+def test_known_short_names_match_in_any_case_but_english_words_only_in_capitals(sentence, blocked):
+    assert names_institution(sentence, institution_blocklist(None), field_research.policy()) is blocked

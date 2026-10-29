@@ -145,14 +145,15 @@ def institution_blocklist(db) -> set[str]:
 
 
 def names_institution(text: str, blocked: set[str], rules: dict) -> bool:
-    """A whole-word match of a blocked name, or an institution pattern. Short
-    names (acronym_max_letters or fewer) match only in capitals, so "FAST" and
-    "UCP" are blocked but "work fast" is not."""
+    """A whole-word match of a blocked name in any case ("Nust", "NUST"), or
+    an institution pattern. A name that is also an English word
+    (english_collisions) matches only in capitals, so "FAST" is blocked but
+    "work fast" is not."""
     lower = " " + re.sub(r"[^a-z0-9-]+", " ", text.lower()) + " "
     upper = " " + re.sub(r"[^A-Za-z0-9-]+", " ", text) + " "
+    collisions = set(rules["english_collisions"])
     for name in blocked:
-        short = len(name.replace(" ", "")) <= rules["acronym_max_letters"] and " " not in name
-        if (f" {name.upper()} " in upper) if short else (f" {name} " in lower):
+        if (f" {name.upper()} " in upper) if name in collisions else (f" {name} " in lower):
             return True
     return any(re.search(pattern, text, re.IGNORECASE) for pattern in rules["institution_patterns"])
 
@@ -172,8 +173,8 @@ def trusted_domains() -> set[str]:
 def verified_facts(raw: dict, pages: list[dict], rules: dict, checked: datetime, *,
                    blocked: set[str], trusted: set[str]) -> dict[str, list[dict]]:
     """Keep a fact only when its quote is on the page it cites (line breaks
-    ignored) and supports it (quote_rules: a real passage that states the
-    fact's numbers and shares its words), and when neither its text nor its
+    ignored) and supports it (quote_rules: a real passage with the fact's
+    numbers, negations and most of its content words), and when neither its text nor its
     quote names an institution or uses a blocked script. A fact from a
     trusted domain is "trusted", any other "uncertain"."""
     by_url = {page["url"]: page["text"] for page in pages}

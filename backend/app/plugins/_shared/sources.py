@@ -1,5 +1,6 @@
 """Source handling for proposed research results."""
 
+import asyncio
 from datetime import datetime, timezone
 import re
 from urllib.parse import urlparse
@@ -74,7 +75,8 @@ async def read_page(url: str, max_chars: int) -> dict | None:
             return None
         from app.documents.parsers import parse_pdf
         try:
-            parsed = parse_pdf(fetched.content)
+            # Parsing a 2 MiB PDF is CPU work; keep it off the event loop.
+            parsed = await asyncio.to_thread(parse_pdf, fetched.content)
         except Exception:  # noqa: BLE001  a broken or protected PDF is unread
             return None
         text = "\n".join(segment.text for segment in parsed.segments if segment.text).strip()
@@ -132,13 +134,22 @@ def content_words(text, stopwords) -> set[str]:
     return words
 
 
+def negations(text, words) -> set[str]:
+    return set(re.findall(r"[a-z]+", str(text or "").lower())) & set(words)
+
+
 def quote_supports(text: str, quote: str, rules: dict) -> bool:
     """The quote backs the fact: it is a real passage, every number the fact
-    states is in it, and the fact's content words overlap it (Jaccard of at
-    least min_overlap). A model's paraphrase passes; an invention with a
-    stray one-word quote does not."""
+    states is in it, the same negation words (rules["negations"]) appear in
+    both or in neither, and at least min_support of the fact's content words
+    are in the quote. Measured on the fact, so a long quote never penalises a
+    true fact, and three invented words ("guaranteed jobs abroad") sink it.
+    Known limit: a number the quote uses in another sense ("fee 500,000" read
+    as "earn 500,000") still passes; word checks cannot see meaning."""
     if not real_quote(quote, rules) or not numbers(text) <= numbers(quote):
+        return False
+    if negations(text, rules.get("negations", ())) != negations(quote, rules.get("negations", ())):
         return False
     stop = set(rules.get("stopwords", ()))
     mine, theirs = content_words(text, stop), content_words(quote, stop)
-    return bool(mine) and len(mine & theirs) / len(mine | theirs) >= rules["min_overlap"]
+    return bool(mine) and len(mine & theirs) / len(mine) >= rules["min_support"]
