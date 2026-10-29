@@ -14,6 +14,7 @@ from sqlalchemy import select
 from app.models import RouteDecision, StudentJourney, Workspace
 from app.pai_c.possibilities import PossibilityService
 from app.pai_c.roadmap.engine import RoadmapEngine
+from app.pai_c.roadmap.steps import step_key_of_legacy
 
 CHOOSABLE = {"open", "step"}
 REFUSALS = {"not_open": "This field is not open from your education, so it cannot be chosen",
@@ -26,26 +27,22 @@ class RouteDecisionError(Exception):
         self.status_code = status_code
 
 
-def _need_step(need: dict) -> dict:
-    kind, detail = need["kind"], need.get("detail") or {}
-    if kind == "marks":
-        return {"key": "step_marks", "min": detail["min"], "have": detail["have"]}
-    if kind == "bridge":
-        return {"key": "step_bridge", "text": detail["text"], "source": detail.get("source")}
-    if kind == "check":
-        return {"key": "step_check", "note": detail.get("note")}
-    if detail.get("groups"):
-        return {"key": "step_group", "groups": detail["groups"]}
-    return {"key": "step_any_group"}
+def done_keys(row: RouteDecision) -> list[str]:
+    """The student's manual ticks as step keys. Decisions saved before steps
+    had keys hold one bool per old checklist entry; those map once, by
+    position, to the key each entry stands for (the next write stores keys)."""
+    done = list(row.steps_done or [])
+    if not any(isinstance(item, bool) for item in done):
+        return [item for item in done if isinstance(item, str)]
+    steps = list(row.steps or [])
+    return [key for index, item in enumerate(done) if item is True and index < len(steps)
+            and (key := step_key_of_legacy(steps[index]))]
 
 
-def route_steps(card: dict) -> list[dict]:
-    """The route checklist: each need, each entry test, then applying for the
-    degree. Copy keys with values, rendered by policy/roadmap.json like reasons."""
-    verdict = card["verdict"]
-    return ([_need_step(need) for need in verdict["needs"]]
-            + [{"key": "step_test", "name": test["name"]} for test in verdict["tests"]]
-            + [{"key": "step_apply", "degree": card["title"]}])
+def _snapshot(steps: list[dict]) -> list[dict]:
+    """What a step was at choose time: key, copy and colour, not the live
+    evidence or calendar wiring."""
+    return [{name: step[name] for name in ("key", "label_key", "values", "status")} for step in steps]
 
 
 def route_of(card: dict, education_line: dict | None) -> dict:
@@ -55,14 +52,18 @@ def route_of(card: dict, education_line: dict | None) -> dict:
 
 
 def serialize(row: RouteDecision, cards: list[dict]) -> dict:
-    """The decision with the field's status in this same build ("unknown" when
-    the path is gone), so the page can say the route changed since choosing."""
-    live = next((card["status"] for card in cards if card["field_key"] == row.field_key), "unknown")
+    """The decision with the field's status, steps and time in this same build
+    ("unknown" and the choose-time steps when the path is gone), beside the
+    snapshot taken at choose time, so the page can say what changed."""
+    card = next((card for card in cards if card["field_key"] == row.field_key), None)
     return {"id": row.id, "field_key": row.field_key, "possibility_id": row.possibility_id, "title": row.title,
             "chosen_at": row.chosen_at.isoformat() if row.chosen_at else None,
             "withdrawn_at": row.withdrawn_at.isoformat() if row.withdrawn_at else None,
-            "steps": list(row.steps or []), "steps_done": list(row.steps_done or []),
-            "route": row.route, "snapshot_verdict": row.verdict, "live_status": live}
+            "steps": card["steps"] if card else list(row.steps or []),
+            "time": card["time"] if card else None,
+            "snapshot_steps": list(row.steps or []), "steps_done": done_keys(row),
+            "route": row.route, "snapshot_verdict": row.verdict,
+            "live_status": card["status"] if card else "unknown"}
 
 
 # The old confirm-gated research wait (RESEARCHING, ASSESSING, NEEDS_INFO). No
@@ -177,11 +178,10 @@ class RouteDecisionService:
             previous.withdrawn_at = now
             paths.set_chosen(workspace_id, previous.possibility_id, False)
             self.db.flush()  # the old row leaves the partial unique index before the new one enters
-        steps = route_steps(card)
         row = RouteDecision(workspace_id=workspace_id, field_key=field_key, possibility_id=card["possibility_id"],
                             title=card["title"], verdict=card["verdict"],
-                            route=route_of(card, page["education_line"]), steps=steps,
-                            steps_done=[False] * len(steps), chosen_at=now)
+                            route=route_of(card, page["education_line"]), steps=_snapshot(card["steps"]),
+                            steps_done=[], chosen_at=now)
         self.db.add(row)
         self.db.flush()
         paths.set_chosen(workspace_id, row.possibility_id, True)
@@ -191,14 +191,20 @@ class RouteDecisionService:
         schedule(self.db, workspace_id, "chosen_path", row.id, at=now)
         return serialize(row, page["fields"])
 
-    def set_step(self, workspace_id: str, index: int, done: bool) -> dict:
+    def set_step(self, workspace_id: str, done: bool, *, key: str | None = None, index: int | None = None) -> dict:
+        """Tick or untick one step of the live route, named by its key (or,
+        for older clients, its position in the live steps)."""
         self._lock(workspace_id)
         row = self._active_or_404(workspace_id)
-        if not 0 <= index < len(row.steps or []):
+        page = RoadmapEngine(self.db).build(workspace_id)
+        card = next((card for card in page["fields"] if card["field_key"] == row.field_key), None)
+        keys = [step["key"] for step in (card["steps"] if card else row.steps or [])]
+        if key is None and index is not None and 0 <= index < len(keys):
+            key = keys[index]
+        if key not in keys:
             raise RouteDecisionError("No such step on this route", 422)
-        steps_done = list(row.steps_done or [])
-        steps_done[index] = done
-        row.steps_done = steps_done  # a new list, so the JSON column is marked changed
+        ticks = [item for item in done_keys(row) if item != key] + ([key] if done else [])
+        row.steps_done = ticks  # a new list of keys, so the JSON column is marked changed
         self.db.flush()
         return serialize(row, RoadmapEngine(self.db).build(workspace_id)["fields"])
 

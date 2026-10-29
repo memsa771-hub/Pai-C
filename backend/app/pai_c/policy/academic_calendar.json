@@ -1,0 +1,531 @@
+{
+ "_note": "Dated academic calendar for the roadmap time estimate (FOUR_FEATURES_SPEC 4.2; app/pai_c/roadmap/calendar.py loads and validates it, timeline.py reads it). Built from the research of 2026-10-28 (2026 cycle observed; month numbers derived from 2026 dates). Every event, intake and test keeps its https sources and confidence (official|secondary|uncertain). An empty months list or a null month means not found: the estimate then says 'date not confirmed' and is uncertain; never fill one from memory. BISE Lahore is the proxy for the boards; other boards, DAE, supplementary results, UET class start and most result dates are gaps. Dates move year to year (2025 papers postponed; MDCAT 2026 moved Aug->Sep; MDCAT may move near FSc from 2027, unconfirmed). applies_to.levels are catalog level codes. intakes carry a label shown to the student (no university names) and name study-field families and/or fields (study_fields.json). tests.codes are catalog test codes (choices.tests) a test_attempt record carries and admission_rules entry tests name. degree_years: years by study field key, the fallback when admission_rules.json has no years for the field; the draft's degree-type keys (bs, be, dae) are not study fields and were dropped. Research draft note: DRAFT from research on 2026-10-28. 2026 cycle observed (dates are actual 2026 dates; month numbers derived). Months marked uncertain came from aggregator/social posts, not board PDFs (not opened). Dates shift year to year (2025 BISE papers were postponed in May; MDCAT 2026 was moved Aug 16 -> Sep 20). PM&DC reportedly moves MDCAT close to FSc exams from 2027 (unofficial, unconfirmed). BISE Lahore used as proxy; other boards not verified.",
+ "as_of": "2026-10",
+ "events": [
+  {
+   "key": "ssc_annual_exam",
+   "label": "Matric/SSC First Annual exam (BISE Lahore)",
+   "applies_to": {
+    "levels": [
+     "matric",
+     "ssc"
+    ]
+   },
+   "months": [
+    3,
+    4
+   ],
+   "month_note": "Matric reported starting 27 March 2026 (Punjab boards share timeline); end month not verified. Datesheet PDF listed on biselahore.com but not opened.",
+   "sources": [
+    "https://biselahore.com/notifications",
+    "https://www.facebook.com/groups/373967295052913/posts/1040981565018146/"
+   ],
+   "confidence": "uncertain"
+  },
+  {
+   "key": "ssc_annual_result",
+   "label": "Matric/SSC First Annual result",
+   "applies_to": {
+    "levels": [
+     "matric",
+     "ssc"
+    ]
+   },
+   "months": [
+    8
+   ],
+   "month_note": "BISE Lahore announced 10th class result 6 Aug 2026 (ilmkidunya). Other boards not checked.",
+   "sources": [
+    "https://www.ilmkidunya.com/results/bise-lahore-10th-class-result.aspx"
+   ],
+   "confidence": "secondary"
+  },
+  {
+   "key": "hssc_part1_exam",
+   "label": "FSc/FA/ICS/ICom Part-1 annual exam",
+   "applies_to": {
+    "levels": [
+     "fsc",
+     "ics",
+     "icom",
+     "fa",
+     "intermediate"
+    ]
+   },
+   "months": [
+    4,
+    5
+   ],
+   "month_note": "BISE Lahore inter exams reported 17 Apr - 4 May 2026 (one Instagram snippet; unclear if Part-1 only).",
+   "sources": [
+    "https://biselahore.com/notifications",
+    "https://www.instagram.com/popular/bise-lahore-date-sheet-2026/?hl=en"
+   ],
+   "confidence": "uncertain"
+  },
+  {
+   "key": "hssc_part1_result",
+   "label": "HSSC Part-1 annual result",
+   "applies_to": {
+    "levels": [
+     "fsc",
+     "ics",
+     "icom",
+     "fa",
+     "intermediate"
+    ]
+   },
+   "months": [
+    10
+   ],
+   "month_note": "BISE Lahore Part-1 result announced 22 Oct 2026 (homepage confirms result announced; date from ProPakistani post).",
+   "sources": [
+    "https://www.biselahore.com/",
+    "https://www.facebook.com/ProPakistani/posts/the-bise-lahore-board-11th-class-result-2026-has-been-announced-on-thursday-octo/1592935499537102/"
+   ],
+   "confidence": "official"
+  },
+  {
+   "key": "hssc_part2_exam",
+   "label": "FSc/FA/ICS/ICom Part-2 annual exam",
+   "applies_to": {
+    "levels": [
+     "fsc",
+     "ics",
+     "icom",
+     "fa",
+     "intermediate"
+    ]
+   },
+   "months": [
+    5,
+    6
+   ],
+   "month_note": "12th class written exams began 20 May 2026 (ilmkidunya, BISE Lahore); end date not verified. Varies by board.",
+   "sources": [
+    "https://www.ilmkidunya.com/date_sheets/bise-lahore-12th-class-date-sheet.aspx",
+    "https://biselahore.com/notifications"
+   ],
+   "confidence": "secondary"
+  },
+  {
+   "key": "hssc_part2_result",
+   "label": "HSSC Part-2 annual result",
+   "applies_to": {
+    "levels": [
+     "fsc",
+     "ics",
+     "icom",
+     "fa",
+     "intermediate"
+    ]
+   },
+   "months": [
+    9
+   ],
+   "month_note": "BISE Lahore announced Part-2 result 23 Sep 2026 10am. Other boards not verified.",
+   "sources": [
+    "https://www.ilmkidunya.com/results/bise-lahore-board-fsc-part-1-2-result.aspx",
+    "https://result.biselahore.com/"
+   ],
+   "confidence": "secondary"
+  },
+  {
+   "key": "ssc_supplementary_exam",
+   "label": "Matric Second Annual (supplementary/improvement)",
+   "applies_to": {
+    "levels": [
+     "matric",
+     "ssc"
+    ]
+   },
+   "months": [],
+   "month_note": "BISE Lahore published a Date Sheet for Matric Second Annual 2026; months not read.",
+   "sources": [
+    "https://biselahore.com/notifications"
+   ],
+   "confidence": "uncertain"
+  },
+  {
+   "key": "hssc_supplementary_exam",
+   "label": "Intermediate Second Annual (supplementary/improvement)",
+   "applies_to": {
+    "levels": [
+     "fsc",
+     "ics",
+     "icom",
+     "fa",
+     "intermediate"
+    ]
+   },
+   "months": [
+    10,
+    11
+   ],
+   "month_note": "Roll number slips for HSSC 2nd Annual 2026 uploaded ~24 Oct 2026, so exams are imminent; exact window not read.",
+   "sources": [
+    "https://www.facebook.com/biselahorepunjab/videos/roll-number-slips-of-hssc-2nd-annual-examination-2026-has-been-uploaded-on-bise-/1131056456346526/",
+    "https://biselahore.com/notifications"
+   ],
+   "confidence": "uncertain"
+  },
+  {
+   "key": "hssc_supplementary_result",
+   "label": "Intermediate Second Annual result",
+   "applies_to": {
+    "levels": [
+     "fsc",
+     "ics",
+     "icom",
+     "fa",
+     "intermediate"
+    ]
+   },
+   "months": [],
+   "month_note": "Not found.",
+   "sources": [
+    "https://result.biselahore.com/"
+   ],
+   "confidence": "uncertain"
+  },
+  {
+   "key": "alevel_june_series",
+   "label": "Cambridge A/AS and O Level June series",
+   "applies_to": {
+    "levels": [
+     "a_level",
+     "o_level"
+    ]
+   },
+   "months": [
+    5,
+    6
+   ],
+   "month_note": "Inferred from series name; exam window not fetched.",
+   "sources": [
+    "https://www.cambridgeinternational.org/exam-administration/results/"
+   ],
+   "confidence": "uncertain"
+  },
+  {
+   "key": "alevel_june_result",
+   "label": "Cambridge June series results",
+   "applies_to": {
+    "levels": [
+     "a_level",
+     "o_level"
+    ]
+   },
+   "months": [
+    8
+   ],
+   "month_note": "A/AS Level 11 Aug 2026; O Level/IGCSE 18 Aug 2026.",
+   "sources": [
+    "https://www.cambridgeinternational.org/exam-administration/results/",
+    "https://www.facebook.com/groups/4618950024802215/posts/28517702811166935/"
+   ],
+   "confidence": "secondary"
+  },
+  {
+   "key": "alevel_nov_series",
+   "label": "Cambridge November series",
+   "applies_to": {
+    "levels": [
+     "a_level",
+     "o_level"
+    ]
+   },
+   "months": [
+    10,
+    11
+   ],
+   "month_note": "Inferred from series name; window not fetched.",
+   "sources": [
+    "https://www.cambridgeinternational.org/exam-administration/results/"
+   ],
+   "confidence": "uncertain"
+  },
+  {
+   "key": "alevel_nov_result",
+   "label": "Cambridge November series results",
+   "applies_to": {
+    "levels": [
+     "a_level",
+     "o_level"
+    ]
+   },
+   "months": [
+    1
+   ],
+   "month_note": "A/AS Level 7 Jan 2027; O Level/IGCSE 14 Jan 2027.",
+   "sources": [
+    "https://www.cambridgeinternational.org/exam-administration/results/"
+   ],
+   "confidence": "official"
+  },
+  {
+   "key": "dae_annual_result",
+   "label": "DAE (PBTE) first annual results",
+   "applies_to": {
+    "levels": [
+     "dae"
+    ]
+   },
+   "months": [],
+   "month_note": "PBTE says 3rd-year DAE First Annual 2026 results declared; month not extracted. Exam month not found. SBTE not checked.",
+   "sources": [
+    "https://www.pbte.edu.pk/",
+    "https://www.pbte.edu.pk/result.aspx"
+   ],
+   "confidence": "uncertain"
+  }
+ ],
+ "result_lag_months": {
+  "ssc_annual": {
+   "value_months": [
+    4,
+    5
+   ],
+   "note": "Exam starts late Mar -> result 6 Aug 2026 (BISE Lahore, derived).",
+   "sources": [
+    "https://www.ilmkidunya.com/results/bise-lahore-10th-class-result.aspx"
+   ],
+   "confidence": "secondary"
+  },
+  "hssc_part2": {
+   "value_months": [
+    3,
+    4
+   ],
+   "note": "Exam starts 20 May -> result 23 Sep 2026 (derived).",
+   "sources": [
+    "https://www.ilmkidunya.com/results/bise-lahore-board-fsc-part-1-2-result.aspx"
+   ],
+   "confidence": "secondary"
+  },
+  "hssc_part1": {
+   "value_months": [
+    5,
+    6
+   ],
+   "note": "Exam Apr/May -> result 22 Oct 2026 (derived).",
+   "sources": [
+    "https://www.biselahore.com/"
+   ],
+   "confidence": "secondary"
+  },
+  "cambridge_june_to_result": {
+   "value_months": [
+    2
+   ],
+   "note": "June series -> Aug results.",
+   "sources": [
+    "https://www.cambridgeinternational.org/exam-administration/results/"
+   ],
+   "confidence": "secondary"
+  },
+  "ibcc_equivalence_working_days": {
+   "value_days": [
+    15,
+    20
+   ],
+   "note": "IBCC FAQ: 15-20 working days for equivalence certificate; Express Service is faster.",
+   "sources": [
+    "https://ibcc.edu.pk/faqs/equivalence-faqs/",
+    "https://ibcc.edu.pk/faqs/express-service-faqs/"
+   ],
+   "confidence": "official"
+  }
+ },
+ "intakes": [
+  {
+   "key": "engineering_fall_uet",
+   "label": "Engineering fall intake",
+   "families": [
+    "engineering",
+    "computing"
+   ],
+   "apply_months": [
+    5,
+    6,
+    7
+   ],
+   "classes_start_month": null,
+   "merit_list_months": [
+    7,
+    8,
+    9
+   ],
+   "note": "UET UG Fall 2026: ECAT phase-2 reg from ~14 May, ECAT 16-21 Jun, 1st merit list 24 Jul 2026, 3rd list 14 Aug, further list 8 Sep. Classes start month NOT verified (likely Sep/Oct; do not rely). UET portal also shows a later cycle (apply by 24 Nov 2026, merit 27 Nov, classes 7 Dec 2026), purpose unclear.",
+   "sources": [
+    "https://admission.uet.edu.pk/UG-2026-1",
+    "https://admission.uet.edu.pk/",
+    "https://www.uet.edu.pk/newsannouncement/Event/ECAT-Phase-Two-Registration-Open-for-Fall-2026-Admissions-2026.05.14/?instancedate=1778742457000",
+    "https://www.instagram.com/p/DbM-CWAiPGz/"
+   ],
+   "confidence": "secondary",
+   "fields": []
+  },
+  {
+   "key": "nust_ug",
+   "label": "September intake",
+   "families": [
+    "engineering",
+    "computing",
+    "business",
+    "architecture_design",
+    "sciences",
+    "social_sciences"
+   ],
+   "apply_months": [
+    10,
+    11,
+    12,
+    1,
+    2,
+    3,
+    4,
+    5
+   ],
+   "classes_start_month": 9,
+   "note": "NUST dates page: programme commencement Sept (MCS Oct, CAE Nov). NET-2027: Series-1 reg 4 Oct-14 Nov 2026, CBT from 17 Nov; Series-2 reg Dec 2026-Jan 2027, test Jan-Feb 2027; Series-3 reg Feb-Mar, test Apr 2027; Series-4 reg Apr-May, test Jun-Jul 2027. Commencement table may refer to the 2026 cohort page; confirm.",
+   "sources": [
+    "https://nust.edu.pk/admissions/undergraduates/dates-to-remember/",
+    "https://ugadmissions.nust.edu.pk/"
+   ],
+   "confidence": "official",
+   "fields": []
+  },
+  {
+   "key": "mbbs_punjab_public",
+   "label": "MBBS intake (Punjab public colleges)",
+   "families": [],
+   "apply_months": [
+    10
+   ],
+   "classes_start_month": 2,
+   "note": "UHS 2026-27 via Punjab Education Desk blog (UHS PDF not opened): MBBS public apply 16-30 Oct 2026, provisional merit 13 Nov, final 16 Nov, classes 1 Feb 2027. BDS public apply 15-30 Dec, merit 6/9 Jan 2027, classes 1 Mar 2027. Private MBBS apply 23 Oct-6 Nov; private BDS 18 Dec-1 Jan. Other provinces not checked.",
+   "sources": [
+    "http://punjab.ac.pk/blog/uhs-announces-mbbs-and-bds-admission-schedules-for-punjab",
+    "https://www.uhs.edu.pk/mdcatadmissionnews.php"
+   ],
+   "confidence": "secondary",
+   "fields": [
+    "mbbs"
+   ]
+  },
+  {
+   "key": "bds_punjab_public",
+   "label": "BDS intake (Punjab public colleges)",
+   "families": [],
+   "apply_months": [
+    12
+   ],
+   "classes_start_month": 3,
+   "note": "UHS 2026-27 via Punjab Education Desk blog (UHS PDF not opened): MBBS public apply 16-30 Oct 2026, provisional merit 13 Nov, final 16 Nov, classes 1 Feb 2027. BDS public apply 15-30 Dec, merit 6/9 Jan 2027, classes 1 Mar 2027. Private MBBS apply 23 Oct-6 Nov; private BDS 18 Dec-1 Jan. Other provinces not checked.",
+   "sources": [
+    "http://punjab.ac.pk/blog/uhs-announces-mbbs-and-bds-admission-schedules-for-punjab",
+    "https://www.uhs.edu.pk/mdcatadmissionnews.php"
+   ],
+   "confidence": "secondary",
+   "fields": [
+    "bds"
+   ]
+  }
+ ],
+ "tests": [
+  {
+   "key": "mdcat",
+   "register_months": [
+    6,
+    7
+   ],
+   "test_months": [
+    9
+   ],
+   "result_months": [
+    10
+   ],
+   "cycle_notes": "2026: reg 22 Jun-13 Jul (late to 18 Jul); test planned 16 Aug, rescheduled 6 Aug to Sun 20 Sep 2026. 2025: reg 8-25 Aug (late 1 Sep), test 5 Oct (official PM&DC notice). 2026 result announced (pass ~66%) but date not captured; Oct is an assumption. Score validity 3 years per Maqsad (secondary; verify PM&DC Act 2022). PM&DC reportedly moves MDCAT near FSc exams from 2027 (unconfirmed).",
+   "sources": [
+    "https://pmdc.pk/Documents/Others/Public%20Notice%20Regarding%20MDCAT-2025.pdf",
+    "https://pmdc.pk/home/PublicAnnouncement",
+    "https://maqsad.io/mdcat-2027-date",
+    "https://pmdc.pk/result/MDCATResult"
+   ],
+   "confidence": "official",
+   "codes": [
+    "mdcat"
+   ]
+  },
+  {
+   "key": "ecat",
+   "register_months": [
+    4,
+    5,
+    6
+   ],
+   "test_months": [
+    6
+   ],
+   "result_months": [
+    6
+   ],
+   "cycle_notes": "Fall 2026 phase-2: reg ~14 May to 9/13 Jun (sources differ), test 16/17-21 Jun, result 23 Jun (UET news) vs 30 Jun (ecat.uet.edu.pk). Phase-1 timing not captured; sittings may extend to Jul/Aug.",
+   "sources": [
+    "https://ecat.uet.edu.pk/",
+    "https://www.uet.edu.pk/newsannouncement/Event/ECAT-Phase-Two-Registration-Open-for-Fall-2026-Admissions-2026.05.14/?instancedate=1778742457000"
+   ],
+   "confidence": "official",
+   "codes": [
+    "ecat"
+   ]
+  },
+  {
+   "key": "nust_net",
+   "register_months": [
+    10,
+    11,
+    12,
+    1,
+    2,
+    3,
+    4,
+    5
+   ],
+   "test_months": [
+    11,
+    1,
+    2,
+    4,
+    6,
+    7
+   ],
+   "result_months": [],
+   "cycle_notes": "Four series for 2027 entry; see nust_ug. Result months not captured.",
+   "sources": [
+    "https://nust.edu.pk/admissions/undergraduates/dates-to-remember/",
+    "https://ugadmissions.nust.edu.pk/"
+   ],
+   "confidence": "official",
+   "codes": [
+    "net"
+   ]
+  }
+ ],
+ "degree_years": {
+  "mbbs": 5,
+  "bds": 4,
+  "pharm_d": 5,
+  "physical_therapy": 5,
+  "law_llb": 5,
+  "nursing": 4,
+  "architecture": 5,
+  "veterinary_medicine": 5,
+  "_note": "Lengths as given in the task brief; NOT independently verified against HEC/PEC/PM&DC/PNC in this pass. Keys mapped to study fields: mbbs, bds, pharmd->pharm_d, dpt->physical_therapy, llb->law_llb, bsn->nursing, barch->architecture, dvm->veterinary_medicine.",
+  "sources": [
+   "https://www.hec.gov.pk/"
+  ],
+  "confidence": "uncertain"
+ }
+}

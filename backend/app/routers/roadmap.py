@@ -1,6 +1,9 @@
 """The Roadmap page API: the engine's fields for the student and their chosen
 route (spec ROADMAP_ENGINE_SPEC.md §3). Reads compute on request; writes only
-touch pai_route_decisions."""
+touch pai_route_decisions. Step colours and the time estimate are read
+against the request day."""
+
+from datetime import date
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from pydantic import BaseModel, Field
@@ -20,7 +23,10 @@ class ChooseAction(BaseModel):
 
 
 class StepAction(BaseModel):
-    index: int = Field(ge=0)
+    """A step is named by its key; index (its position in the live steps) is
+    kept for clients written before steps had keys."""
+    key: str | None = Field(default=None, min_length=1, max_length=300)
+    index: int | None = Field(default=None, ge=0)
     done: bool
 
 
@@ -41,7 +47,7 @@ def _write(action, db):
 def get_roadmap(network: str = Query(...), db=Depends(get_db), x_workspace_token: str | None = Header(None),
                 authorization: str | None = Header(None)):
     workspace = _authorized(db, network, x_workspace_token, authorization)
-    return success_response(RoadmapEngine(db).build(str(workspace.id)))
+    return success_response(RoadmapEngine(db).build(str(workspace.id), today=date.today()))
 
 
 @router.post("/choose")
@@ -55,7 +61,8 @@ def choose_route(body: ChooseAction, network: str = Query(...), db=Depends(get_d
 def tick_step(body: StepAction, network: str = Query(...), db=Depends(get_db),
               x_workspace_token: str | None = Header(None), authorization: str | None = Header(None)):
     workspace = _authorized(db, network, x_workspace_token, authorization)
-    return _write(lambda: RouteDecisionService(db).set_step(str(workspace.id), body.index, body.done), db)
+    return _write(lambda: RouteDecisionService(db).set_step(
+        str(workspace.id), body.done, key=body.key, index=body.index), db)
 
 
 @router.post("/withdraw")

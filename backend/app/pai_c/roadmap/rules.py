@@ -28,6 +28,7 @@ class EntryTest:
     pass_percent: float | None
     source: str
     scope_fields: tuple[str, ...] | None = None  # None: the test applies to every field of the rule
+    codes: tuple[str, ...] = ()  # catalog test codes: how a test_attempt record and the calendar name it
 
 
 @dataclass(frozen=True)
@@ -66,7 +67,8 @@ def _rule(row: dict) -> Rule:
                                for s in row.get("groups_with_step", [])),
         required_subjects=list(row["required_subjects"]),
         entry_tests=tuple(EntryTest(t["name"], t["body"], t.get("pass_percent"), t["source"],
-                                    tuple(t["scope_fields"]) if t.get("scope_fields") else None)
+                                    tuple(t["scope_fields"]) if t.get("scope_fields") else None,
+                                    tuple(t.get("codes", ())))
                           for t in row.get("entry_tests", [])),
         years=row["years"], fee_band_per_year=next((v for k, v in row.items() if k.startswith("fee_band")), None),
         sources=list(row["sources"]), confidence=row["confidence"], years_by_field=row.get("years_by_field"))

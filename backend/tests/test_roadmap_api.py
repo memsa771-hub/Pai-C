@@ -88,12 +88,17 @@ def test_choose_open_field_writes_decision_with_route_steps():
     assert decision["title"] == field_title("electrical_engineering")
     assert decision["live_status"] == "open" and decision["snapshot_verdict"]["status"] == "open"
     tests = [t.name for t in rule.tests_for("electrical_engineering")]
-    assert decision["steps"] == [{"key": "step_test", "name": name} for name in tests] + [
-        {"key": "step_apply", "degree": field_title("electrical_engineering")}]
-    assert decision["steps_done"] == [False] * len(decision["steps"])
+    # The full coloured route (FOUR_FEATURES_SPEC 4.1): an open field's group and marks are done.
+    assert [step["key"] for step in decision["steps"]] == (
+        ["group", "complete_intermediate", "marks"] + [f"test:{name}" for name in tests] + ["apply", "degree"])
+    assert [step["status"] for step in decision["steps"][:3]] == ["done", "done", "done"]
+    assert decision["steps"][-2]["values"] == {"degree": field_title("electrical_engineering")}
+    assert decision["snapshot_steps"] == [{k: step[k] for k in ("key", "label_key", "values", "status")}
+                                          for step in decision["steps"]]
+    assert decision["steps_done"] == [] and decision["time"]["to_entry_months"] is not None
     assert decision["chosen_at"] and decision["possibility_id"]
     for step in decision["steps"]:
-        assert step["key"] in roadmap_policy()["copy"]
+        assert step["label_key"] in roadmap_policy()["copy"]
     assert page["chosen"]["id"] == decision["id"] and page["chosen"]["live_status"] == "open"
     assert current["id"] == decision["id"] and current["workspace_id"] == student.workspace_id
 
@@ -102,8 +107,9 @@ def test_choose_step_field_lists_needs_first():
     with pre_eng(55) as (client, _, params):
         decision = data(choose(client, params, "electrical_engineering"))
     assert decision["snapshot_verdict"]["status"] == "step"
-    assert decision["steps"][0] == {"key": "step_marks", "min": 60, "have": 55}
-    assert decision["steps"][-1]["key"] == "step_apply"
+    marks = next(step for step in decision["steps"] if step["key"] == "marks")
+    assert marks["status"] == "not" and marks["values"] == {"min": 60, "have": 55}
+    assert [step["key"] for step in decision["steps"]][-2:] == ["apply", "degree"]
 
 
 def test_choose_not_open_or_unknown_refused():
@@ -148,16 +154,23 @@ def test_steps_toggle_persists_and_validates_index():
                            json={"index": 0, "done": True}).status_code == 404
         decision = data(choose(client, params, "electrical_engineering"))
         ticked = data(client.post("/v1/roadmap/steps", params=params, headers=TOKEN,
-                                  json={"index": 0, "done": True}))
-        assert ticked["steps_done"][0] is True
+                                  json={"key": "apply", "done": True}))
+        assert ticked["steps_done"] == ["apply"]
+        apply = next(step for step in ticked["steps"] if step["key"] == "apply")
+        assert apply["status"] == "done" and apply["manual_done"] is True
+        assert apply["evidence"]["source_label"] == roadmap_policy()["copy"]["marked_by_you"]
+        # Older clients name the step by its position in the live steps.
+        by_index = data(client.post("/v1/roadmap/steps", params=params, headers=TOKEN,
+                                    json={"index": 0, "done": True}))
+        assert by_index["steps_done"] == ["apply", decision["steps"][0]["key"]]
         page = data(client.get("/v1/roadmap", params=params, headers=TOKEN))
-        assert page["chosen"]["steps_done"] == [True] + [False] * (len(decision["steps"]) - 1)
-        for index in (len(decision["steps"]), -1):
-            bad = client.post("/v1/roadmap/steps", params=params, headers=TOKEN, json={"index": index, "done": True})
+        assert page["chosen"]["steps_done"] == by_index["steps_done"]
+        for body in ({"index": len(decision["steps"])}, {"index": -1}, {"key": "nope"}):
+            bad = client.post("/v1/roadmap/steps", params=params, headers=TOKEN, json={**body, "done": True})
             assert bad.status_code == 422
         untick = data(client.post("/v1/roadmap/steps", params=params, headers=TOKEN,
-                                  json={"index": 0, "done": False}))
-        assert untick["steps_done"][0] is False
+                                  json={"key": "apply", "done": False}))
+        assert untick["steps_done"] == [decision["steps"][0]["key"]]
 
 
 def test_withdraw():
@@ -228,7 +241,8 @@ def test_decision_keeps_snapshot():
     chosen = page["chosen"]
     assert chosen["id"] == decision["id"]
     assert chosen["snapshot_verdict"]["status"] == "open" and chosen["live_status"] == "step"
-    assert chosen["steps"] == decision["steps"]
+    assert chosen["snapshot_steps"] == decision["snapshot_steps"]
+    assert next(step for step in chosen["steps"] if step["key"] == "marks")["status"] == "not"
 
 
 def test_live_status_unknown_when_path_gone():

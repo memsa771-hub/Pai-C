@@ -772,7 +772,8 @@ class RouteDecision(Base):
     title = Column(Text, nullable=False)
     verdict = Column(JSONB, nullable=False)
     route = Column(JSONB, nullable=False)
-    # Steps are copy keys with values (policy/roadmap.json copy); steps_done is parallel.
+    # Steps: the route as it was at choose time (key, label_key, values, status); steps_done: the
+    # step keys the student ticked (older rows: one bool per step, mapped once by position).
     steps = Column(JSONB, nullable=False, default=list)
     steps_done = Column(JSONB, nullable=False, default=list)
     chosen_at = Column(DateTime(timezone=True), nullable=False, default=_now, server_default=text("NOW()"))

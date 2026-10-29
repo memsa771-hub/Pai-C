@@ -10,6 +10,7 @@ the API and the page render the same words.
 """
 
 from dataclasses import asdict, dataclass, field
+from datetime import date
 from functools import lru_cache
 
 from app.pai_c.memory import MemoryService, vault_catalog
@@ -18,6 +19,13 @@ from app.pai_c.paths.fields import (candidate_fields, current_education, educati
 from app.pai_c.policy.controller import load_data
 from app.pai_c.possibilities import PossibilityService
 from app.pai_c.roadmap.rules import Rule, grade_list, ibcc_percent, rule_for, rules_as_of
+
+TIMED = {"open", "step"}
+
+
+def calendar_as_of() -> str | None:
+    from app.pai_c.roadmap.calendar import calendar
+    return calendar().get("as_of")
 
 
 @lru_cache(maxsize=1)
@@ -226,9 +234,17 @@ class RoadmapEngine:
         return [card["value"] for card in MemoryService(self.db).profile_cards(workspace_id)
                 if card["kind"] == "education"]
 
-    def build(self, workspace_id: str) -> dict:
+    def build(self, workspace_id: str, today: date | None = None) -> dict:
+        """The page. `today` is the request day (routers pass date.today());
+        every card's steps and time estimate are read against it."""
+        from app.pai_c.roadmap.decisions import RouteDecisionService, done_keys, serialize
+        from app.pai_c.roadmap.steps import route_steps
+        from app.pai_c.roadmap.timeline import estimate
+        today = today or date.today()
         records = self._education(workspace_id)
         standing = student_standing(records)
+        rows = MemoryService(self.db).vault_rows(workspace_id)
+        decision = RouteDecisionService(self.db).active(workspace_id)
         order = roadmap_policy()["status_order"]
         cards = []
         for row in PossibilityService(self.db).list(workspace_id):
@@ -237,18 +253,19 @@ class RoadmapEngine:
             field_key = (row.study_field or {}).get("key")
             study = study_fields().get(field_key) if field_key else None
             result = verdict(field_key, standing)
-            cards.append({"possibility_id": row.id, "field_key": field_key,
-                          "title": study.title if study else row.title,
-                          "family": study.family if study else None, "why": row.why,
-                          "status": result.status, "verdict": asdict(result)})
+            card = {"possibility_id": row.id, "field_key": field_key,
+                    "title": study.title if study else row.title,
+                    "family": study.family if study else None, "why": row.why,
+                    "status": result.status, "verdict": asdict(result)}
+            ticks = done_keys(decision) if decision is not None and decision.field_key == field_key else ()
+            card["steps"] = route_steps(card, standing, rows, today=today, steps_done=ticks)
+            # Only a field the student can enter has a time to entry.
+            card["time"] = (estimate(card["steps"], field_key, today)
+                            if result.status in TIMED and card["steps"] else None)
+            cards.append(card)
         cards.sort(key=lambda card: order.index(card["status"]))  # stable: path order within a status
         counts = {status: sum(card["status"] == status for card in cards) for status in order}
         return {"education_line": education_line(standing), "standing": asdict(standing),
                 "counts": counts, "fields": cards, "rules_as_of": rules_as_of(),
-                "chosen": self._chosen(workspace_id, cards)}
-
-    def _chosen(self, workspace_id: str, cards: list[dict]) -> dict | None:
-        """The active route decision, with its live status from these cards."""
-        from app.pai_c.roadmap.decisions import RouteDecisionService, serialize  # decisions builds on the engine
-        row = RouteDecisionService(self.db).active(workspace_id)
-        return serialize(row, cards) if row is not None else None
+                "calendar_as_of": calendar_as_of(),
+                "chosen": serialize(decision, cards) if decision is not None else None}

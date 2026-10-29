@@ -1,5 +1,5 @@
 {
- "_note": "Eligibility source for the roadmap engine (app/pai_c/roadmap): which intermediate groups open a study field, the percent floor, the entry tests and the degree length. To update: edit the rule here, keep its https sources and confidence (official|secondary|uncertain), and set unknown values to null; never fill a number from memory. Rules apply per field key (applies_to.fields) or per family (applies_to.family); a field rule wins over its family rule. groups_open null means use open_to from study_fields.json. scope_fields limits a step or an entry test to those fields. Draft research of Oct 2026; see as_of.",
+ "_note": "Eligibility source for the roadmap engine (app/pai_c/roadmap): which intermediate groups open a study field, the percent floor, the entry tests and the degree length. To update: edit the rule here, keep its https sources and confidence (official|secondary|uncertain), and set unknown values to null; never fill a number from memory. Rules apply per field key (applies_to.fields) or per family (applies_to.family); a field rule wins over its family rule. groups_open null means use open_to from study_fields.json. scope_fields limits a step or an entry test to those fields. codes: the catalog test codes (choices.tests) an entry test names, so a test_attempt record and the academic calendar find it; a test with no catalog code has none. Draft research of Oct 2026; see as_of.",
  "as_of": "2026-10",
  "rules": [
   {
@@ -77,6 +77,7 @@
    "entry_tests": [
     {
      "name": "ECAT (UET) / NET (NUST) / university test",
+     "codes": ["ecat", "net"],
      "body": "UET/NUST/university; PEC requires an institution test",
      "pass_percent": 33,
      "pass_percent_note": "33% (132/400) quoted for UET ECAT by third-party guides; PEC text states no number. NUST NET and others differ.",
@@ -172,6 +173,7 @@
    "entry_tests": [
     {
      "name": "University test (NTS/NAT, FAST, NUST NET, GIKI etc.)",
+     "codes": ["nat", "net"],
      "body": "each university",
      "pass_percent": null,
      "source": "https://www.hec.gov.pk/english/services/universities/RevisedCurricula/Documents/2025-2026/COMPUTER-SCIENCE.pdf"
@@ -211,6 +213,7 @@
    "entry_tests": [
     {
      "name": "University test (UET ECAT / architecture aptitude, NUST NET)",
+     "codes": ["ecat", "net"],
      "body": "university",
      "pass_percent": null,
      "source": "https://blog.maqsad.io/blog/uet-ecat-complete-guide"
@@ -274,6 +277,7 @@
    "entry_tests": [
     {
      "name": "MDCAT (MBBS)",
+     "codes": ["mdcat"],
      "body": "PM&DC",
      "scope_fields": [
       "mbbs"
@@ -284,6 +288,7 @@
     },
     {
      "name": "MDCAT (BDS)",
+     "codes": ["mdcat"],
      "body": "PM&DC",
      "scope_fields": [
       "bds"
@@ -329,6 +334,7 @@
    "entry_tests": [
     {
      "name": "MDCAT or university test",
+     "codes": ["mdcat"],
      "body": "university/PM&DC",
      "pass_percent": null,
      "source": "https://parhlai.com/blog/pharmacy-degree-pakistan"

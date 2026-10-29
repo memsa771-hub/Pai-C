@@ -21,7 +21,49 @@
   "step_group": "Choose {groups} in intermediate",
   "step_any_group": "Choose any group in intermediate",
   "step_test": "Take {name}",
-  "step_apply": "Apply for {degree}"
+  "step_apply": "Apply for {degree}",
+  "step_finish": "Finish {level}",
+  "step_finish_exam": "Finish {level} (exam {month} {year})",
+  "step_finish_intermediate": "Finish intermediate",
+  "step_marks_unknown": "Meet the {min}% marks rule (add your marks)",
+  "step_test_pass": "Take {name} (pass {pass}%)",
+  "step_degree": "Study {degree} ({years} years)",
+  "step_degree_years_unknown": "Study {degree}",
+  "step_tell_education": "Tell PAI your education",
+  "status_done": "Done",
+  "status_half": "Partly done",
+  "status_not": "Not yet",
+  "marked_by_you": "You marked it",
+  "date_not_confirmed": "Date not confirmed",
+  "time_to_entry": "About {months} months to entry",
+  "time_to_finish": "About {years} years to finish",
+  "time_uncertain": "Dates not confirmed; check the official schedule"
+ },
+ "steps": {
+  "_note": "Coloured route steps (app/pai_c/roadmap/steps.py; FOUR_FEATURES_SPEC 4.1). order: the step kinds in route order. colours: status to colour. month_labels: month number 1-12 as shown. test_pending_statuses: test_attempt details.status values that mean planned or registered (half). bridge_course_terms: a bridge or check step is done when a course record's name and the step's text share one of these words. manual_level: the evidence level a manual tick shows.",
+  "order": ["group", "complete_intermediate", "marks", "bridge", "check", "test", "apply", "degree"],
+  "colours": {"done": "green", "half": "yellow", "not": "red"},
+  "month_labels": ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"],
+  "test_pending_statuses": ["planned", "registered", "booked", "scheduled", "applied"],
+  "bridge_course_terms": ["mathematics", "maths", "math", "biology", "physics", "chemistry", "computer science"],
+  "manual_level": "stated"
+ },
+ "timeline": {
+  "_note": "Time estimate (app/pai_c/roadmap/timeline.py; FOUR_FEATURES_SPEC 4.2). Event keys are academic_calendar.json events or tests. tracks: an education level to its calendar track. finish: what a track still sits to finish intermediate; chain events happen in order, each after the one before (a later step's test can follow the exam), and result is the gate the intake waits for but nothing chains after. A current student in details.current_year 1 uses <track>_year_1; a student before intermediate uses <track> while current and <track>_done once it is completed. improve: the exam and result a student below the marks floor sits again; a track with none leaves the step 'date not confirmed'. Steps of other kinds wait for no calendar event (apply goes with the intake).",
+  "tracks": {"fsc": "hssc", "intermediate": "hssc", "ics": "hssc", "icom": "hssc", "fa": "hssc", "a_level": "a_level", "dae": "dae", "matric": "ssc", "o_level": "o_level"},
+  "finish": {
+   "hssc": {"chain": ["hssc_part2_exam"], "result": "hssc_part2_result"},
+   "hssc_year_1": {"chain": ["hssc_part1_exam", "hssc_part1_result", "hssc_part2_exam"], "result": "hssc_part2_result"},
+   "a_level": {"chain": ["alevel_june_series"], "result": "alevel_june_result"},
+   "dae": {"chain": [], "result": "dae_annual_result"},
+   "ssc": {"chain": ["ssc_annual_result", "hssc_part1_exam", "hssc_part1_result", "hssc_part2_exam"], "result": "hssc_part2_result"},
+   "ssc_done": {"chain": ["hssc_part1_exam", "hssc_part1_result", "hssc_part2_exam"], "result": "hssc_part2_result"},
+   "o_level": {"chain": ["alevel_june_result", "alevel_june_result", "alevel_june_series"], "result": "alevel_june_result"},
+   "o_level_done": {"chain": ["alevel_june_series", "alevel_june_result", "alevel_june_series"], "result": "alevel_june_result"}
+  },
+  "improve": {
+   "hssc": {"chain": ["hssc_supplementary_exam"], "result": "hssc_supplementary_result"}
+  }
  },
  "education_line": {
   "with_percent": "From {level} {groups}, {percent}%",
