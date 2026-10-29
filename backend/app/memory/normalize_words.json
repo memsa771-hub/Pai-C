@@ -76,7 +76,7 @@
   "روپیہ",
   "روپے"
  ],
- "_rules_note": "Audit #5/#7 rules, data not code. third_person: item fields written about the student or the person they belong to; first-person phrases (longest first) become third person. phrase_choice_types: an emitted value said as a phrase (\"can't leave Lahore\") reads as its catalog code. mobility: a quote says the student cannot move only when it holds a move cue, a place cue (these, the catalog provinces, or a city the turn names) and a negation. wish_cues: a family wish the extractor marks as the student's own statement (attribution.stated_field wish) is Stated only when the quote says a wish.",
+ "_rules_note": "Audit #5/#7 rules, data not code. third_person: item fields written about the student or the person they belong to; first-person phrases (longest first) become third person. phrase_choice_types: a value the extractor emitted as a phrase (\"can't leave Lahore\") reads as its catalog code; mobility comes only from the extractor. wish_cues: a family wish the extractor marks as the student's own statement (attribution.stated_field wish) is Stated only when the quote says a wish.",
  "third_person": {
   "types": {
    "family_member": [
@@ -153,51 +153,6 @@
  "phrase_choice_types": [
   "mobility.relocation_willingness"
  ],
- "mobility": {
-  "move": [
-   "move",
-   "relocate",
-   "leave",
-   "shift",
-   "jana",
-   "ja",
-   "jaa",
-   "bahar",
-   "chor",
-   "chhor"
-  ],
-  "place": [
-   "city",
-   "shehar",
-   "shahar",
-   "province",
-   "lahore",
-   "karachi",
-   "islamabad",
-   "rawalpindi",
-   "peshawar",
-   "quetta",
-   "multan",
-   "faisalabad",
-   "hyderabad",
-   "sialkot",
-   "gujranwala",
-   "abroad",
-   "ghar",
-   "home"
-  ],
-  "negation": [
-   "not",
-   "no",
-   "never",
-   "can't",
-   "cant",
-   "cannot",
-   "nahi",
-   "nahin",
-   "na"
-  ]
- },
  "wish_cues": [
   "chahte",
   "chahti",

@@ -141,34 +141,25 @@ def test_7_cant_leave_reads_as_the_catalog_no():
 
 
 @pytest.mark.asyncio
-async def test_7_cant_leave_lahore_sets_relocation_willingness_even_when_the_model_only_saves_the_city():
-    text = "Main Lahore se bahar nahi ja sakta, ammi akeli hain."
-    state = await _run(text, [_proposal("vault_fact", "location.current_city", "Lahore",
-                                        "Main Lahore se bahar nahi ja sakta")])
-    assert state.mobility == "no"
-
-
-@pytest.mark.asyncio
-@pytest.mark.parametrize("text", ["I'm not sure about engineering", "I can move on from medicine",
-                                  "Abbu nahi chahte"])
-async def test_7_quotes_not_about_moving_set_nothing(text):
-    state = await _run(text, [_proposal("vault_item", "option", {"text": "Engineering", "status": "considering"},
-                                        text)])
+@pytest.mark.parametrize("text", [
+    "I can leave Lahore, no problem", "No, I will leave Lahore", "I am not sure I can leave home early",
+    "Abbu nahi chahte ke main Lahore se bahar jaun", "I'm not sure about engineering",
+    "I can move on from medicine", "Main Lahore se bahar nahi ja sakta"])
+async def test_7_mobility_is_never_derived_from_a_quote(text):
+    """Fix round 2: only a mobility fact the extractor proposes is saved; a
+    city or a pressure from the same quote never adds one."""
+    state = await _run(text, [
+        _proposal("vault_fact", "location.current_city", "Lahore", text),
+        _proposal("vault_item", "pressure", {"text": "Has to stay near family", "kind": "family"}, text)])
     assert state.mobility is None
 
 
 @pytest.mark.asyncio
-async def test_7_cant_leave_lahore_on_any_candidate_sets_no():
-    state = await _run("I can't leave Lahore.", [_proposal("vault_item", "pressure",
-                                                           {"text": "Has to stay in Lahore", "kind": "family"},
-                                                           "I can't leave Lahore")])
-    assert state.mobility == "no"
-
-
-@pytest.mark.asyncio
-async def test_7_model_phrase_value_becomes_the_code():
-    state = await _run("I can't leave Lahore.", [_proposal(
-        "vault_fact", "mobility.relocation_willingness", "can't leave Lahore", "I can't leave Lahore")])
+@pytest.mark.parametrize("text, value", [("I can't leave Lahore.", "can't leave Lahore"),
+                                         ("Main Lahore se bahar nahi ja sakta.", "Lahore se bahar nahi ja sakta"),
+                                         ("Main Lahore se bahar nahi ja sakta.", "no")])
+async def test_7_extractor_emitted_value_maps_to_no(text, value):
+    state = await _run(text, [_proposal("vault_fact", "mobility.relocation_willingness", value, text.rstrip("."))])
     assert state.mobility == "no"
 
 
@@ -178,6 +169,7 @@ def test_5_7_extractor_prompt_states_the_rules_and_is_documented_verbatim():
                  '"I built a line-following robot" or "maine app banaya" is completed',
                  '"I finished matric, next year FSc" makes FSc planned',
                  "always mobility.relocation_willingness with the code no",
+                 "is that family_member's wish, never the student's mobility",
                  "so it never carries \"inferred\""):
         assert line in prompt
     if not DOCS.exists():

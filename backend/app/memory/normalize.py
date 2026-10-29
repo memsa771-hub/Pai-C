@@ -114,19 +114,6 @@ def _says(text: str, words) -> bool:
     return any(f" {norm(word)} " in padded for word in words if norm(word))
 
 
-def says_cannot_move(quote: str, places=()) -> bool:
-    """"I can't leave Lahore" / "Lahore se bahar nahi ja sakta": a move cue, a
-    place cue and a negation together (audit #7). Anything less ("not sure
-    about engineering", "move on from medicine") says nothing about moving.
-    Cues live in normalize_words.json; places add the catalog provinces and
-    any city the turn names."""
-    rule = _WORDS["mobility"]
-    catalog = vault_catalog()
-    provinces = [w for c in catalog.choices("provinces") for w in (c.label, *c.synonyms)]
-    return (_says(quote, rule["move"]) and _says(quote, [*rule["place"], *provinces, *places])
-            and _says(quote, rule["negation"]))
-
-
 def says_a_wish(quote: str) -> bool:
     return _says(quote, _WORDS["wish_cues"])
 

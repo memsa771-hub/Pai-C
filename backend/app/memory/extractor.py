@@ -795,28 +795,4 @@ async def extract_candidates(
             _validate(p, turn, allowed_vault_keys, drops) for p in proposals
         ) if candidate is not None
     ]
-    return ExtractionOutput(_with_mobility(validated, allowed_vault_keys), drops)
-
-
-_MOBILITY = "mobility.relocation_willingness"
-
-
-def _with_mobility(validated: list, allowed_vault_keys) -> list:
-    """"Lahore se bahar nahi ja sakta" is a mobility limit even when the model
-    saved only the city (audit #7). Added only where a quote is explicit: a
-    move cue, a place cue and a negation together (normalize.says_cannot_move),
-    and never when the extractor already proposed relocation willingness."""
-    from app.memory.normalize import says_cannot_move
-
-    if _MOBILITY not in allowed_vault_keys or any(c.key == _MOBILITY for c in validated):
-        return validated
-    cities = [c.proposed_value for c in validated
-              if c.key == "location.current_city" and isinstance(c.proposed_value, str)]
-    for candidate in validated:
-        quote = (candidate.evidence or {}).get("quote") or ""
-        if quote and says_cannot_move(quote, cities):
-            return [*validated, ExtractedCandidate(
-                candidate_type="vault_fact", operation="upsert", key=_MOBILITY, proposed_value="no",
-                content=None, entities={}, confidence=candidate.confidence,
-                evidence={k: v for k, v in candidate.evidence.items() if k in ("quote", "user_event_id")})]
-    return validated
+    return ExtractionOutput(validated, drops)
