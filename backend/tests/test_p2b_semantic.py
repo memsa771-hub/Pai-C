@@ -107,7 +107,9 @@ def test_recall_only_called_by_analyst():
         tree = ast.parse(path.read_text(encoding="utf-8"))
         if any(isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute) and node.func.attr == "recall" for node in ast.walk(tree)):
             callers.append(path.relative_to(app).as_posix())
-    assert callers == ["deep/analysis.py"]
+    # Background analyst jobs only, never the live turn: the planner and the
+    # Path engine (FOUR_FEATURES_SPEC 3).
+    assert sorted(callers) == ["deep/analysis.py", "paths/analyzer.py"]
 
 
 def test_summarizer_role_fallback_and_reasoning():

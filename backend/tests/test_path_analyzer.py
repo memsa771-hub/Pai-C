@@ -10,7 +10,7 @@ import pytest
 from sqlalchemy import select
 
 from app.config import config
-from app.models import BackgroundJob, EventRecord, PaiPossibility
+from app.models import BackgroundJob, EventRecord, PaiPossibility, VaultItem
 from app.pai_c.deep.notebook import NotebookService
 from app.pai_c.deep.prompts import load_prompt
 from app.pai_c.paths.analyzer import (JOB_ANALYZE_PATHS, PathAnalysis, enqueue_path_analysis,
@@ -27,6 +27,11 @@ ROOT = Path(__file__).parents[1]
 HEADERS = {"X-Workspace-Token": "synthetic-test-only"}
 EVIDENCE = {"c1": "I fix phones for neighbours.", "c2": "Money at home is tight.",
             "c3": "My father wants me to be an engineer."}
+# One Vault item every seeded student has, so a path's why can cite the Vault
+# (FOUR_FEATURES_SPEC 3); unit tests treat it as a stated chat entry.
+VAULT_ITEM = "item:v-repair"
+CITED = {**EVIDENCE, VAULT_ITEM: "Repairing phones"}
+VAULT = {VAULT_ITEM: {"evidence_level": "stated", "source_label": "Chat"}}
 
 
 def fit(label, status, ids=(), note=""):
@@ -38,7 +43,7 @@ CANDIDATES = candidate_fields(FSC_ENGINEERING)
 STRONG = (fit("Hands-on skill", "have", ["c1"]), fit("Interest", "partial", ["c3"]))
 
 
-def path(field_key, *, why="It follows what you said.", ids=("c1",), fits=STRONG, title=""):
+def path(field_key, *, why="It follows what you said.", ids=("c1", VAULT_ITEM), fits=STRONG, title=""):
     return {"field_key": field_key, "title": title, "why": why, "evidence_item_ids": list(ids), "fit": list(fits)}
 
 
@@ -64,6 +69,10 @@ def seed(student, db):
     data["said"] = [item(text, key=f"claim_{key}", id=key, evidence=text) for key, text in EVIDENCE.items()]
     snapshot, _ = NotebookService(db).apply(student.workspace_id, data, turn.source_event_id,
                                            expected_version=snapshot.version)
+    if db.get(VaultItem, VAULT_ITEM.removeprefix("item:")) is None:
+        db.add(VaultItem(id=VAULT_ITEM.removeprefix("item:"), workspace_id=student.workspace_id,
+                         item_type="interest", value={"text": "Repairing phones"}, level="stated",
+                         source_type="conversation", evidence={"quote": EVIDENCE["c1"]}))
     db.commit()
     return turn, journey, snapshot
 
@@ -86,7 +95,7 @@ def test_sanitize_makes_uncited_verdicts_unknown_and_keeps_student_words():
         fit("Afford fees", "blocker", ["made-up"]),
         fit("Maths level", "partial"),
         fit("Family support", "unknown", ["c3"]),
-    ]))), EVIDENCE, set(), CANDIDATES)
+    ]))), CITED, set(), CANDIDATES, vault=VAULT)
     assert [(row["label"], row["status"], row["evidence"]) for row in result[0]["fit"]] == [
         ("Hands-on skill", "have", [EVIDENCE["c1"]]),
         ("Interest", "partial", [EVIDENCE["c3"]]),
@@ -94,7 +103,9 @@ def test_sanitize_makes_uncited_verdicts_unknown_and_keeps_student_words():
         ("Maths level", "unknown", []),
         ("Family support", "unknown", []),
     ]
-    assert result[0]["evidence"] == [{"text": EVIDENCE["c1"], "item_id": "c1"}]
+    assert result[0]["evidence"] == [
+        {"text": EVIDENCE["c1"], "item_id": "c1", "evidence_level": None, "source_label": None},
+        {"text": CITED[VAULT_ITEM], "item_id": VAULT_ITEM, "evidence_level": "stated", "source_label": "Chat"}]
 
 
 def test_sanitize_drops_world_numbers_dismissed_duplicates_and_caps():
@@ -107,7 +118,7 @@ def test_sanitize_drops_world_numbers_dismissed_duplicates_and_caps():
         path("education"),
         path("mechanical_engineering", fits=[*STRONG, *[fit(f"Need {n}", "unknown") for n in range(10)]]),
         *many)
-    result = sanitize(PathAnalysis.model_validate(raw), EVIDENCE, {normalized_title(title("education"))}, CANDIDATES)
+    result = sanitize(PathAnalysis.model_validate(raw), CITED, {normalized_title(title("education"))}, CANDIDATES, vault=VAULT)
     titles = [row["title"] for row in result]
     assert title("electrical_engineering") not in titles and title("education") not in titles
     assert len(result) == rules["max_paths"]
@@ -117,7 +128,7 @@ def test_sanitize_drops_world_numbers_dismissed_duplicates_and_caps():
 def test_sanitize_keeps_only_fields_of_study():
     raw = analysis(path("electrical_engineering"), path("", title="Phone Repair Shop"),
                    path("9999", title="Online Resale"))
-    assert [row["title"] for row in sanitize(PathAnalysis.model_validate(raw), EVIDENCE, set(), CANDIDATES)] == [
+    assert [row["title"] for row in sanitize(PathAnalysis.model_validate(raw), CITED, set(), CANDIDATES, vault=VAULT)] == [
         title("electrical_engineering")]
 
 
@@ -130,7 +141,7 @@ def test_profile_evidence_is_the_stored_value_not_the_raw_quote():
 def test_sanitize_clears_a_note_that_carries_a_world_number():
     result = sanitize(PathAnalysis.model_validate(analysis(path("electronic_engineering", fits=[
         fit("Fees", "unknown", note="Usually $500 per semester."), *STRONG,
-    ]))), EVIDENCE, set(), CANDIDATES)
+    ]))), CITED, set(), CANDIDATES, vault=VAULT)
     assert result[0]["fit"][0]["note"] == ""
 
 
@@ -149,7 +160,7 @@ async def test_job_stores_paths_updates_fit_posts_once_and_never_revives_dismiss
         db.commit()
         reply_json = json.dumps(analysis(
             path("", title="Mobile repair", fits=[fit("Hands-on skill", "have", ["c1"])]),
-            path("electrical_engineering", ids=["c3"], fits=[*STRONG, fit("Afford fees", "blocker", ["c2"])]),
+            path("electrical_engineering", ids=["c3", VAULT_ITEM], fits=[*STRONG, fit("Afford fees", "blocker", ["c2"])]),
             path("civil_engineering")))
 
         async def model(**kwargs):

@@ -1,3 +1,4 @@
+import type { VaultLevel } from './vault';
 /** One requirement of a path checked against the student: have (green),
  * partial (amber), blocker (red) or unknown (grey). Known verdicts carry the
  * student's own words; the server turns anything uncited into unknown. */
@@ -8,11 +9,21 @@ export type FitItem = {
   evidence: string[];
 };
 
+export type PathEvidence = {
+  text: string;
+  item_id: string | null;
+  evidence_level?: VaultLevel | null;
+  source_label?: string | null;
+};
+
 export type Possibility = {
   id: string; title: string; why: string;
   status: 'suggested' | 'exploring' | 'saved' | 'dismissed' | 'chosen';
   source?: 'mirror' | 'planner' | 'student' | 'analyzer';
-  evidence: { text: string; item_id: string | null }[];
+  /** What the reason rests on. A Vault entry carries its evidence level and
+   * where it came from (onboarding, chat, details or a document's name);
+   * a notebook note carries neither. */
+  evidence: PathEvidence[];
   fit?: FitItem[];
   /** The study field an analyzer path names. needs_check: the student's group
    * may qualify only with conditions; needs_group: the intermediate group a

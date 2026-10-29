@@ -130,6 +130,57 @@ def _records(db, workspace_id: str) -> list[dict]:
             for card in MemoryService(db).profile_cards(workspace_id)]
 
 
+def _vault_sources(db, workspace_id: str, records: list[dict]) -> dict[str, dict]:
+    """Every citable Vault entry (a profile card: fact, record or item) with
+    the badge a path shows next to its reason: the card's evidence level and
+    where it came from, labelled as the Mirror labels its entries (document
+    name, onboarding, details or chat)."""
+    from app.pai_c.mirror.engine import source_label
+    labels = {}
+    for row in MemoryService(db).vault_rows(workspace_id):
+        entry = row.entry
+        labels[("item:" if entry["kind"] == "item" else "") + str(entry["id"])] = source_label(row)
+    return {card["id"]: {"evidence_level": card["evidence_level"], "source_label": labels.get(card["id"])}
+            for card in records}
+
+
+# Recall kinds that name a Vault entry; their hit id is the entry's own id.
+_VAULT_RECALL_KINDS = ("vault_fact", "vault_item", "student_record:")
+
+
+def _recall_query(fields: list[dict], records: list[dict]) -> str:
+    """What the student could study and what they want: the candidate field
+    titles and the Vault entries of the types `recall_query_types` names."""
+    types = set(policy().get("recall_query_types", ()))
+    wanted = [_card_text(card["value"], card["kind"]) for card in records if card["key"] in types]
+    return "; ".join(part for part in [*(field["title"] for field in fields), *wanted] if part)
+
+
+async def _semantic_recall(db, workspace_id: str, query: str, citable: set[str]) -> list[dict]:
+    """Embeddings recall as extra evidence (FOUR_FEATURES_SPEC 3). A hit on a
+    Vault entry carries its profile-card id, so the model can cite it and
+    sanitize accepts it. A Vault hit that is not a card (sensitive, or only
+    PAI's guess) is left out, since the cards exclude it on purpose. Any other
+    hit (a session summary, a document passage) has no Vault entry behind it:
+    it is shown with id null, as context the model cannot cite. Recall off or
+    empty gives no block."""
+    if not query:
+        return []
+    hits = await MemoryService(db).recall(workspace_id, query, top_k=policy().get("recall_top_k", 8))
+    shown, seen = [], set()
+    for hit in hits:
+        kind = str(hit.get("kind") or "")
+        if kind.startswith(_VAULT_RECALL_KINDS):
+            ref = ("item:" if kind == "vault_item" else "") + str(hit["id"])
+            if ref not in citable or ref in seen:
+                continue
+            seen.add(ref)
+            shown.append({"id": ref, "kind": kind, "text": str(hit.get("text") or "")[:300]})
+        elif hit.get("text"):
+            shown.append({"id": None, "kind": kind, "text": str(hit["text"])[:300]})
+    return shown
+
+
 def _study_field(candidate: Candidate) -> dict:
     """What the workspace shows and PAI OS reads; the ISCED code is never shown."""
     return {"key": candidate.field.key, "isced": candidate.field.isced,
@@ -139,13 +190,16 @@ def _study_field(candidate: Candidate) -> dict:
 
 
 def sanitize(analysis: PathAnalysis, evidence: dict[str, str], dismissed: set[str],
-             candidates: dict[str, Candidate], own: set[str] = frozenset()) -> list[dict]:
+             candidates: dict[str, Candidate], own: set[str] = frozenset(), *,
+             vault: dict[str, dict]) -> list[dict]:
     """Code-level honesty: keep only candidate fields (titled by the field,
     never by the model) or the student's own paths, drop world numbers,
-    dismissed paths and fields without enough evidenced fit, cap the count,
-    and turn any uncited verdict into "unknown". Zero paths is a valid result.
-    A field outside the candidates is one the student's group rules out. The
-    student's own paths are re-assessed first; fields fill the rest of the cap."""
+    dismissed paths, paths whose why cites no Vault entry (`vault`: card id ->
+    evidence level and source label) and fields without enough evidenced fit,
+    cap the count, and turn any uncited verdict into "unknown". Zero paths is
+    a valid result. A field outside the candidates is one the student's group
+    rules out. The student's own paths are re-assessed first; fields fill the
+    rest of the cap."""
     rules = policy()
     world_number = re.compile(load_data("grounding.json")["numeric_world_pattern"])
     evidenced = set(rules["evidenced_statuses"])
@@ -170,6 +224,12 @@ def sanitize(analysis: PathAnalysis, evidence: dict[str, str], dismissed: set[st
         if world_number.search(path.why):
             logger.warning("path_analyzer_dropped_world_number")
             continue
+        cited = [i for i in dict.fromkeys(path.evidence_item_ids) if i in evidence]
+        if not any(i in vault for i in cited):
+            # The why must rest on the Vault (FOUR_FEATURES_SPEC 3), not
+            # only on the notebook or nothing.
+            logger.warning("path_analyzer_dropped_uncited_why")
+            continue
         fit = []
         for item in path.fit[:rules["max_fit_items"]]:
             ids = [i for i in dict.fromkeys(item.evidence_item_ids) if i in evidence]
@@ -181,9 +241,10 @@ def sanitize(analysis: PathAnalysis, evidence: dict[str, str], dismissed: set[st
             logger.warning("path_analyzer_dropped_weak_fit field=%s", candidate.field.key)
             continue
         seen.add(key)
-        ids = [i for i in dict.fromkeys(path.evidence_item_ids) if i in evidence]
         kept.append({"title": title, "why": path.why.strip(), "fit": fit,
-                     "evidence": [{"text": evidence[i], "item_id": i} for i in ids],
+                     "evidence": [{"text": evidence[i], "item_id": i,
+                                   "evidence_level": vault.get(i, {}).get("evidence_level"),
+                                   "source_label": vault.get(i, {}).get("source_label")} for i in cited],
                      "study_field": _study_field(candidate) if candidate is not None else None})
         if len(kept) == rules["max_paths"]:
             break
@@ -440,6 +501,9 @@ async def path_analysis_job(job, db) -> dict:
         fields = [{"key": c.field.key, "title": c.field.title, "family": c.field.family, "standing": c.standing}
                   | ({"needs_group": [vault_catalog().label("intermediate_groups", g) for g in c.needs_group]}
                      if c.needs_group else {}) for c in candidates.values()]
+        vault = _vault_sources(db, job.workspace_id, records)
+        recall = await _semantic_recall(db, job.workspace_id, _recall_query(fields, records),
+                                        set(vault) & set(evidence))
         reassess = []
         for row in existing:
             if row.status == "dismissed":
@@ -455,7 +519,8 @@ async def path_analysis_job(job, db) -> dict:
             + "<fields>" + _json(fields) + "</fields>\n"
             + workspace_language_block() + "\n"
             + "<existing_paths>" + _json(reassess) + "</existing_paths>\n"
-            + "<dismissed_paths>" + _json([row.title for row in existing if row.status == "dismissed"]) + "</dismissed_paths>")
+            + "<dismissed_paths>" + _json([row.title for row in existing if row.status == "dismissed"]) + "</dismissed_paths>"
+            + ("\n<semantic_recall>" + _json(recall) + "</semantic_recall>" if recall else ""))
         db.rollback()
         prompt = load_prompt("path_analyzer")
         analysis = None
@@ -474,7 +539,7 @@ async def path_analysis_job(job, db) -> dict:
                 prompt += "\nReturn one complete JSON object that follows every output rule."
         if analysis is None:
             return {"status": "invalid", "model_calls": 2}
-        paths = sanitize(analysis, evidence, dismissed, candidates, own)
+        paths = sanitize(analysis, evidence, dismissed, candidates, own, vault=vault)
         workspace = db.scalar(select(Workspace).where(
             Workspace.id == job.workspace_id, Workspace.status == "active").with_for_update())
         if workspace is None:

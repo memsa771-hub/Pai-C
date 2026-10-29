@@ -212,25 +212,3 @@ async def test_a_stale_operator_result_is_still_explained_and_flagged():
     explain.assert_awaited_once()
     assert post.await_args.args[4] == "Here is what the field involves."
     assert post.await_args.kwargs["metadata"]["stale"] is True
-
-
-# ---- the Path engine runs from the Vault --------------------------------------------
-
-def test_a_relevant_vault_write_queues_path_analysis_once():
-    from app.pai_c.paths.analyzer import JOB_ANALYZE_PATHS
-
-    def jobs(db, ws):
-        return db.scalars(select(BackgroundJob).where(BackgroundJob.workspace_id == ws,
-                                                      BackgroundJob.job_type == JOB_ANALYZE_PATHS)).all()
-
-    with StudentSession() as student, student.factory() as db:
-        ws = student.workspace_id
-        JourneyService(db).ensure_counselor(ws)
-        db.commit()
-        city(db, ws)
-        assert jobs(db, ws) == []  # not path-relevant
-        hobby(db, ws)
-        queued = jobs(db, ws)
-        assert len(queued) == 1 and queued[0].payload["reason"] == "vault"
-        hobby(db, ws, "Circuits")
-        assert len(jobs(db, ws)) == 1  # a pending run reads everything when it starts

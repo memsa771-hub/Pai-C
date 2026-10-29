@@ -1,7 +1,7 @@
 'use client';
 import { CircleCheck, CircleDashed, CircleHelp, CircleX, Compass, Quote, type LucideIcon } from 'lucide-react';
-import { StatChip, toneClass, toneFor, type Tone } from '@/components/pai';
-import type { FitItem, StudyField } from '@/lib/possibilities';
+import { EvidenceBadge, StatChip, toneClass, toneFor, vaultBadgeLabel, type Tone } from '@/components/pai';
+import type { FitItem, PathEvidence, StudyField } from '@/lib/possibilities';
 import { cn } from '@/lib/utils';
 import copy from './workspace/copy.json';
 
@@ -21,6 +21,29 @@ export function FieldNotes({ field, className }: { field?: StudyField | null; cl
   return (
     <span className={cn('inline-flex flex-wrap gap-1.5', className)}>
       {notes.map((note) => <StatChip key={note} size="sm" tone="warning">{note}</StatChip>)}
+    </span>
+  );
+}
+
+/** The Vault badge behind a path's reason: each distinct evidence level and
+ * source the reason cites, worded as the Vault words it ("Stated · Chat"). */
+export function WhyEvidence({ evidence, className }: { evidence?: PathEvidence[]; className?: string }) {
+  const seen = new Set<string>();
+  const badges = (evidence || []).filter((item) => {
+    if (!item.evidence_level) return false;
+    const key = `${item.evidence_level}|${item.source_label || ''}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+  if (!badges.length) return null;
+  return (
+    <span className={cn('inline-flex flex-wrap items-center gap-x-3 gap-y-1', className)}>
+      {badges.map((item) => {
+        const label = vaultBadgeLabel(item.evidence_level!);
+        return <EvidenceBadge key={`${item.evidence_level}|${item.source_label}`} level={item.evidence_level!}
+          label={item.source_label ? `${label} · ${item.source_label}` : label} />;
+      })}
     </span>
   );
 }
@@ -84,13 +107,15 @@ export function FitDots({ items, summary }: { items: FitItem[]; summary: string 
 
 /** The one path card: a colour accent per path (stable by id), the reason it
  * fits in the student's own words, and the actions the caller provides. */
-export function PathCardView({ id, tone: given, title, whyLabel, why, quote, fit = [], studyField, status, statusTone = 'neutral', actions, error, compact = false, headingLevel = 2 }: {
+export function PathCardView({ id, tone: given, title, whyLabel, why, evidence, quote, fit = [], studyField, status, statusTone = 'neutral', actions, error, compact = false, headingLevel = 2 }: {
   id: string;
   /** From tonesByOrder; falls back to a hash of the id. */
   tone?: Tone;
   title: string;
   whyLabel: string;
   why: string;
+  /** What the reason cites; Vault entries show their badge next to it. */
+  evidence?: PathEvidence[];
   quote?: string;
   /** The analyzer's check of this path against the student, when there is one. */
   fit?: FitItem[];
@@ -116,7 +141,10 @@ export function PathCardView({ id, tone: given, title, whyLabel, why, quote, fit
         </div>
         <Heading className={cn('mt-3 break-words font-bold tracking-tight', compact ? 'text-lg' : 'text-xl')}>{title}</Heading>
         <FieldNotes field={studyField} className="mt-2" />
-        <p className={'mt-3 text-xs font-semibold text-muted-foreground'}>{whyLabel}</p>
+        <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1">
+          <p className="text-xs font-semibold text-muted-foreground">{whyLabel}</p>
+          <WhyEvidence evidence={evidence} />
+        </div>
         <p className="mt-1 text-pretty text-sm leading-relaxed text-muted-foreground">{why}</p>
         {quote && (
           <blockquote className={cn('mt-4 flex gap-2 rounded-2xl px-4 py-3 text-sm', toneClass[tone].soft)}>

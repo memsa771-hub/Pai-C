@@ -14,7 +14,7 @@ from app.pai_c.paths.fields import candidate_fields, student_groups, study_field
 from app.pai_c.possibilities import PossibilityService
 from scripts.counselor_eval_support import StudentSession
 from tests.counselor_fixtures import fake_post
-from tests.test_path_analyzer import EVIDENCE, seed
+from tests.test_path_analyzer import CITED, EVIDENCE, VAULT, VAULT_ITEM, seed
 
 FSC_MEDICAL = {"qualification_name": "fsc", "field_of_study": "pre_medical", "academic_status": "current"}
 ICS = {"qualification_name": "ics", "academic_status": "current"}
@@ -31,7 +31,7 @@ def fit(label, status, ids=("c1",)):
 STRONG = [fit("Hands-on skill", "have"), fit("Maths", "partial", ["c3"])]
 
 
-def path(field_key, *, title="Some wording the model chose", fits=STRONG, ids=("c1",)):
+def path(field_key, *, title="Some wording the model chose", fits=STRONG, ids=("c1", VAULT_ITEM)):
     return {"field_key": field_key, "title": title, "why": "It builds on what you said.",
             "evidence_item_ids": list(ids), "fit": list(fits)}
 
@@ -74,7 +74,7 @@ def test_group_filters_fields():
     assert candidates["electrical_engineering"].standing == "check"
     assert "computer_science" in candidates and candidates["computer_science"].standing == "check"
     assert "aerospace_engineering" not in candidates  # open to pre-engineering, check only for DAE
-    result = sanitize(analysis(path("mbbs"), path("aerospace_engineering")), EVIDENCE, set(), candidates)
+    result = sanitize(analysis(path("mbbs"), path("aerospace_engineering")), CITED, set(), candidates, vault=VAULT)
     assert [row["title"] for row in result] == [title("mbbs")]
     assert result[0]["study_field"]["key"] == "mbbs"
     assert result[0]["study_field"]["isced"] == study_fields()["mbbs"].isced
@@ -86,7 +86,7 @@ def test_check_field_is_flagged():
     assert candidates["software_engineering"].standing == "open"
     assert candidates["electrical_engineering"].standing == "check"
     result = sanitize(analysis(path("electrical_engineering"), path("software_engineering")),
-                      EVIDENCE, set(), candidates)
+                      CITED, set(), candidates, vault=VAULT)
     flags = {row["title"]: row["study_field"]["needs_check"] for row in result}
     assert flags == {title("electrical_engineering"): True, title("software_engineering"): False}
 
@@ -94,7 +94,7 @@ def test_check_field_is_flagged():
 def test_unknown_field_dropped():
     candidates = candidate_fields(FSC_MEDICAL)
     raw = analysis(path("astrology"), path(""), path("mbbs", title="Medicine and surgery"))
-    result = sanitize(raw, EVIDENCE, set(), candidates)
+    result = sanitize(raw, CITED, set(), candidates, vault=VAULT)
     # The saved title is the study field's, never the model's wording.
     assert [row["title"] for row in result] == [title("mbbs")]
 
@@ -108,14 +108,14 @@ def test_weak_fit_is_dropped_never_padded():
     blocked = [fit("Interest", "have"), fit("Fees", "blocker", ["c2"])]
     raw = analysis(path("mbbs", fits=weak), path("bds", fits=uncited), path("nursing", fits=blocked),
                    path("pharm_d"))
-    assert [row["title"] for row in sanitize(raw, EVIDENCE, set(), candidates)] == [title("pharm_d")]
+    assert [row["title"] for row in sanitize(raw, CITED, set(), candidates, vault=VAULT)] == [title("pharm_d")]
 
 
 def test_count_is_capped_and_dismissed_fields_stay_gone():
     from app.pai_c.possibility_titles import normalized_title
     candidates = candidate_fields(FSC_MEDICAL)
     keys = ["mbbs", "bds", "pharm_d", "nursing", "zoology", "botany", "biotechnology"]
-    result = sanitize(analysis(*[path(k) for k in keys]), EVIDENCE, {normalized_title(title("bds"))}, candidates)
+    result = sanitize(analysis(*[path(k) for k in keys]), CITED, {normalized_title(title("bds"))}, candidates, vault=VAULT)
     assert len(result) == 5 and title("bds") not in [row["title"] for row in result]
 
 
@@ -126,7 +126,7 @@ def test_matric_sees_every_field_with_the_group_it_needs():
     assert mbbs.standing == "needs_group" and mbbs.needs_group == ("pre_medical",)
     # Open to every intermediate group: no group to name.
     assert candidates["bba"].standing == "open" and candidates["bba"].needs_group == ()
-    result = sanitize(analysis(path("mbbs")), EVIDENCE, set(), candidates)
+    result = sanitize(analysis(path("mbbs")), CITED, set(), candidates, vault=VAULT)
     assert result[0]["study_field"]["needs_group"] == [{"code": "pre_medical", "label": "Pre-Medical"}]
     assert candidate_fields({"qualification_name": "o_level", "details": {"subjects": ["biology"]}})["mbbs"].standing == "needs_group"
 
@@ -238,7 +238,8 @@ async def test_old_generic_paths_replaced():
                                        channel=turn.channel, reason="asked")
         db.commit()
         reply = {"message": "Here are some fields.", "paths": [
-            path("mbbs"), {"title": "Mobile repair", "why": "Yours.", "fit": [fit("Hands-on skill", "have")]}]}
+            path("mbbs"), {"title": "Mobile repair", "why": "Yours.", "evidence_item_ids": [VAULT_ITEM],
+                          "fit": [fit("Hands-on skill", "have")]}]}
         with patch("app.pai_c.paths.analyzer.chat_completion", AsyncMock(return_value=json.dumps(reply))), \
              patch("app.pai_c.paths.analyzer.send_to_student", AsyncMock(side_effect=fake_post(student))):
             await path_analysis_job(db.get(BackgroundJob, job_id), db)
@@ -411,8 +412,8 @@ def test_own_paths_are_reassessed_first_then_fields_fill_the_cap():
     from app.pai_c.possibility_titles import normalized_title
     candidates = candidate_fields(FSC_MEDICAL)
     raw = analysis(*[path(k) for k in ("mbbs", "bds", "pharm_d", "nursing", "zoology")],
-                   {"title": "Mobile repair", "why": "Yours.", "fit": []})
-    titles = [row["title"] for row in sanitize(raw, EVIDENCE, set(), candidates, {normalized_title("Mobile repair")})]
+                   {"title": "Mobile repair", "why": "Yours.", "evidence_item_ids": [VAULT_ITEM], "fit": []})
+    titles = [row["title"] for row in sanitize(raw, CITED, set(), candidates, {normalized_title("Mobile repair")}, vault=VAULT)]
     assert titles[0] == "Mobile repair" and len(titles) == 5
 
 

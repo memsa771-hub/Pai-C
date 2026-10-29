@@ -109,6 +109,19 @@ def ready_from(coverage: dict) -> bool:
                for area in areas)
 
 
+def source_label(row) -> str:
+    """Where a Vault entry came from, in the student's words for it: a
+    document's filename, else the capture (onboarding, details), else the
+    source type. The Path engine labels its evidence the same way."""
+    labels = mirror_policy()["source_labels"]
+    document = row.entry.get("document")
+    if document and document.get("filename"):
+        return document["filename"]
+    if row.capture in labels["captures"]:
+        return labels["captures"][row.capture]
+    return labels["source_types"].get(row.entry.get("source"), labels["default"])
+
+
 # ---- the card -----------------------------------------------------------------------
 
 class MirrorEngine:
@@ -161,16 +174,6 @@ class MirrorEngine:
             return 3
         return 2 if strong else 1
 
-    @staticmethod
-    def _source_label(row) -> str:
-        labels = mirror_policy()["source_labels"]
-        document = row.entry.get("document")
-        if document and document.get("filename"):
-            return document["filename"]
-        if row.capture in labels["captures"]:
-            return labels["captures"][row.capture]
-        return labels["source_types"].get(row.entry.get("source"), labels["default"])
-
     def _entry(self, ref: str, row, line: dict | None) -> dict:
         entry = row.entry
         if line is not None:
@@ -179,7 +182,7 @@ class MirrorEngine:
             text = f"{entry['label']}: {entry['display']}"
         else:
             text = entry["display"] or entry["label"]
-        return {"id": ref, "text": text, "evidence": entry["level"], "source_label": self._source_label(row),
+        return {"id": ref, "text": text, "evidence": entry["level"], "source_label": source_label(row),
                 "observed_at": entry["observed_at"]}
 
     @staticmethod

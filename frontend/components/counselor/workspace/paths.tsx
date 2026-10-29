@@ -16,7 +16,7 @@ import {
   Dialog, DialogBody, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from "@/components/ui/responsive-dialog";
 import { EmptyState, Skeletons, StatChip, toneClass, toneFor, tonesByOrder, type Tone } from "@/components/pai";
-import { FieldNotes, FitDots, FitList, initials } from "@/components/counselor/path-card";
+import { FieldNotes, FitDots, FitList, WhyEvidence, initials } from "@/components/counselor/path-card";
 import { cn } from "@/lib/utils";
 import { Heading, LoadState, useResource, human, evidenceLabel, shortDate } from "./resource";
 import { DEFAULT_LOCALE } from "@/lib/i18n/locales";
@@ -340,6 +340,7 @@ export function PathPage({
         <p className="mt-4 max-w-3xl text-pretty text-[15px] leading-relaxed">
           <span className="font-semibold text-muted-foreground">{copy.why}: </span>{result.possibility.why}
         </p>
+        <WhyEvidence evidence={result.possibility.evidence} className="mt-2" />
         <p className="mt-1 text-[13px] text-muted-foreground">{copy.pathIntro}</p>
       </header>
       {result.status === "stale" && (
