@@ -368,3 +368,19 @@ The Counselor shell accidentally omitted the shared UserMenu when replacing the 
 - **Family talk moves to Your route.** Its only mount was the old Compare tab. It is now a secondary button, "Prepare to talk with family", on the Your route card, opening the same `FamilyTalk` flow against `/v1/counselor/family-talk` (which reads the chosen path, the route decision's path).
 - **The Plan certainty slider is removed** with the Compare/Plan tabs (`decisionCertainty*` copy). Your route replaces the Plan tab and has no certainty question.
 - **Migration 119 reconciles choices from the old system** before it drops the tables: paths still `chosen` without an active route decision go back to `saved`; counselor journeys in CHOSEN without one go back to PROPOSED (DIRECTION if the Mirror is unconfirmed) and lose their goal, as a withdraw does; waiting journeys moved to CHOSEN get the route as their goal; each move writes a `journey.stage_changed` event; unfinished `roadmap_research` runs are marked failed with a reason, so their queued jobs end without a chat message.
+
+## 29 October: four features (founder, ledger rulings)
+
+- Scope A: each feature's target state plus the pieces it cannot work without. Ship beta after.
+- Embeddings on by default with a $5 monthly cap; the founder sets `MEMORY_EMBEDDING_API_KEY`, never Claude.
+- Completeness lives in `app/pai_c/completeness.py` (memory must not import pai_c); `vault_version` and `relevance_version` live in `app/memory/` and read Vault tables only.
+- The next question keeps mentioned-first among unknowns; stale entries never count toward `min_items`; notebook sources inherit the freshness of their Vault type.
+- Migration 120 is the usage counter; 121 removes the Mirror gate and drops `pai_counselor_mirror_feedback` (table drop approved for this cleanup).
+- Mirror `ready` maps the light keys: said to history and goals, self to interests; card `version` is a content digest string.
+- The research budget is keyed per workspace and UTC day (keys older than 7 days pruned), not per Vault version.
+- Results stay current by `relevance_version` over `vault_trigger_types`; a finished run is never discarded, only flagged stale, and re-runs only when asked.
+- A path's `why` must cite a Vault entry; evidence badge levels come from the Vault ladder, not the profile card.
+- Roadmap: the Matric marks step is "not"; an intake may start in the month of the result; a test may precede its result; a Part-1 student is assumed Part-2 only when the current year is missing.
+- Manual ticks only where the Vault is silent; the degree step is not tickable; the API refuses a tick on an observable step (409).
+- Beta polish: duplicates need a polarity guard; mobility needs move and place cues or the extractor; "stated" only from an explicit wish claim; no tense heuristic; non-PKR budgets get no band.
+- Audit item 12 (stray navigation) is on watch; the one non-click trigger found (desktop view restore) is fixed.

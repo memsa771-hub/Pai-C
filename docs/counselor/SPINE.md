@@ -271,9 +271,22 @@ and the existing Task Runtime.
 
 ### Trigger -> gateway -> run
 
-Superseded 26 Oct 2026: the roadmap engine (ROADMAP_ENGINE_SPEC.md) computes routes on read. A confirmed
-Mirror now creates paths and moves the journey to PROPOSED with no research run; `routers/roadmaps`,
-`roadmap_research` runs, `roadmap_light` and `stale_refresh` are removed. The table records the old design.
+Superseded 26 Oct 2026 and again 29 Oct 2026 (FOUR_FEATURES_SPEC.md). The old flow (confirmed Mirror, `counselor.mirror`
+and `counselor.mirror_research` jobs, `roadmap_research` runs) is gone. The current flow:
+
+- The reconciler's accept hook (`mirror/text_job.after_accept`) runs after an accepted Vault write. It moves
+  DIRECTION to MIRROR when the card is ready and enqueues `counselor.mirror_text` (one pending job per
+  workspace, skipped when the card `version` is unchanged). Path analysis is enqueued with reason `vault` when the
+  write was a `vault_trigger_types` type.
+- The Mirror state card (`MirrorEngine`) and routes (roadmap engine steps and time) are computed on read: no model
+  call, no stored copy. Only the Mirror text is stored (`counselor_summary_draft`, type `mirror_state`).
+- Path analysis saves paths and calls `propose_after_paths` (MIRROR to PROPOSED; an earlier route choice follows).
+  Currency of paths, explanations and program searches is `relevance_version` over `vault_trigger_types`
+  (`path_analyzer.json`); `vault_version` keys Operator result currency. Finished runs are flagged stale, never discarded.
+- Research gateway budgets are per workspace and UTC day, not per Mirror or Vault version.
+- Explore, try-it and program search need only an existing path (programs also need the path explained for the current Vault).
+
+The table below records the pre-26 Oct design and is kept for history.
 
 | Trigger | Producer | Gateway / run |
 | --- | --- | --- |

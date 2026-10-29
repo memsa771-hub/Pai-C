@@ -252,6 +252,46 @@ The import graph still reaches services.workflow from Counselor dependencies; it
 - New feature depth/quality testing is deferred as instructed. Delayed delivery and live source coverage have not been exercised on a real configured deployment.
 - No live Supabase, microphone, OCR, search-provider or conversation-quality validation was authorized.
 
+## 29 October: four features (beta)
+
+Spec [FOUR_FEATURES_SPEC.md](FOUR_FEATURES_SPEC.md). Placement AI is four features (Vault, Mirror, Path engine, Roadmap engine); everything else helps them. Branch `four-features`.
+
+- **Vault.**
+  - Completeness meter (`app/pai_c/completeness.py`): `known/total` areas, an area counts only when covered and not stale, plus an ordered `unknowns` list. It is in `GET /v1/vault` and the workspace payload, and the counselor's next question reads the same list.
+  - Vault items (interest, strength, value, pressure, option, certainty, family member, domicile, daily life) are cards (`item:<id>`) with evidence levels, so the Mirror and the Path engine cite them like facts and records.
+  - Embeddings are on by default; items are embedded. Monthly spend cap `PAI_EMBEDDING_MONTHLY_CAP_USD` (default 5), counted in `pai_usage_months`; at the cap recall falls back to lexical.
+- **Mirror.**
+  - State card engine (`app/pai_c/mirror/engine.py`), no model call, computed on every read: ten areas with levels, entries with evidence badges, tension marks, still-unknown list, `ready`.
+  - Background text: the reconciler's accept hook enqueues `counselor.mirror_text` (one pending job per workspace, skipped when the card version is unchanged). A failed job leaves the last text.
+  - No confirm gate: confirm, edit and feedback routes, the lanes, the old Mirror job and the "understood" rating are removed. "This is wrong" opens the Vault entry; the write goes through propose and reconcile.
+  - Mirror page in the Overview pill nav; the chat card is a small link card.
+- **Path engine.**
+  - Triggered by an accepted write of a path-relevant Vault type (reason `vault`); currency is a relevance version over `vault_trigger_types`, so unrelated writes do not re-run it.
+  - Semantic recall adds Vault entries to the input.
+  - A path's `why` must cite a Vault entry; paths that cite nothing are dropped.
+  - Paths show evidence badges from the Vault ladder.
+  - The asked-run (student presses Explore) posts its result to chat; explore, try-it and programs need no Mirror.
+- **Roadmap engine.**
+  - Every step is coloured (done / half / not) with the Vault fact behind it; a time estimate comes from `academic_calendar.json` (months to entry, years to finish, next intake, basis, confidence).
+  - Tickable rule: a manual tick only where the Vault is silent (for example apply); a step the Vault can observe is refused (409). The degree step is not tickable.
+- **Journey stages.** DIRECTION to MIRROR when the card is ready; MIRROR to PROPOSED when the first path is saved. RESEARCHING, ASSESSING and NEEDS_INFO are no longer entered by any code (names kept for old data).
+- **Migrations.**
+  - 120 adds `pai_usage_months` (embedding spend counter).
+  - 121 moves journeys in the old wait stages and unconfirmed Mirror states to PROPOSED (or MIRROR with no live path), with stage events; clears old-shape Mirror drafts; deletes queued `counselor.mirror` and `counselor.mirror_research` jobs; drops `pai_counselor_mirror_feedback` (founder approved table drops for this cleanup; may object before merge).
+- **Research budget per day.** Path research and program search are capped per workspace per UTC day (keys older than 7 days pruned), not per Vault version, so chatting and pressing Explore cannot reset the cap.
+- **Results stay current by relevance.** A stored explanation or program search stays shown until the path-relevant part of the Vault changes; a finished run is never discarded, it is flagged stale and re-run only when asked.
+- **Beta polish (audit).** Vault display through catalog labels, third-person extraction rules, duplicate items merged, relocation willingness list, planner rejection logging, password hint matches the check, `?view=` kept on load, chat "New messages" pill only after a real reply.
+
+### Known gaps for beta
+
+- The academic calendar is thin: dates are BISE Lahore only (other boards use it as a stand-in), engineering entry rests on the NUST September start, and several families have no intake (arts and humanities, law, education, agriculture, and every health field except MBBS and BDS), so they show an uncertain time.
+- Master's rules and fees are missing, so no Master's route is computed.
+- Some rule families are uncertain; they say so rather than guess.
+- The founder must set `MEMORY_EMBEDDING_API_KEY` in `.env`. Without it recall is lexical only and nothing breaks. Live embedding quality is untested.
+- Parked proposals: what-if marks, change over time, near-twin compare, rule coverage meter, Tavily refresh of rules.
+- Conversation redesign is parked.
+- Postgres round trip of migrations 120 and 121 is not yet run (Docker Desktop was not running); do it before merge.
+
 ## Founder local test
 
 From the existing **workspace** folder, using the founder's existing ignored configuration:

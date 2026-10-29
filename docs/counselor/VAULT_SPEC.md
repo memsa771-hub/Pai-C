@@ -95,3 +95,6 @@ Deferred:
   context without a topic match; only people and pressures are gated.
 - Live eval baseline: recordings need live extractor calls, which wait for the founder's approval and a
   cost cap; until then recall against the golden set is unmeasured.
+
+## Status (29 Oct 2026, branch four-features)
+Added by [FOUR_FEATURES_SPEC.md](FOUR_FEATURES_SPEC.md): a completeness meter (`GET /v1/vault` returns `completeness`: known areas with stale ones excluded, and an ordered unknowns list that also drives the counselor's next question), and Vault items as evidence everywhere (items are cards `item:<id>` that the Mirror and Path engine cite). Items are embedded for semantic recall under a monthly cost cap.

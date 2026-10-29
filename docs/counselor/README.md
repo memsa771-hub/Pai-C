@@ -10,6 +10,7 @@ Work in `workspace` on branch `pai-c`. `pai-os` is the PAI OS developer's branch
 5. `SPINE.md` - how the code is built (services, jobs, policy modes)
 
 ## Working files
+- `FOUR_FEATURES_SPEC.md` - the four core features (Vault, Mirror, Path engine, Roadmap engine) and what helps them; no Mirror confirm gate, embeddings on, coloured route steps with a time estimate
 - `BUILD_REPORT_V1.md` - locked-workflow implementation, card checklist, tests and founder start command
 - `UI_REPORT_V2.md` - the v2 UI redesign: screens, design system, verification
 - `DECISIONS.md`, `BLOCKERS.md` - implementation choices and safely unavailable/deferred items
