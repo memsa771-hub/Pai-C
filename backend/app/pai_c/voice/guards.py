@@ -49,3 +49,12 @@ def repeats_previous_reply(reply, history):
     """True when the draft restates the previous counselor reply (token Jaccard)."""
     previous = next((row.get("content", "") for row in reversed(history) if row.get("role") == "assistant"), "")
     return bool(previous.strip()) and similarity(reply, previous) >= config.PAI_REPEAT_REPLY_SIMILARITY
+
+
+def drives(reply, next_step):
+    """True when the reply ends the turn with a next step: a question, or a
+    line naming the phase's next step (next_steps.json markers)."""
+    if any(question_sentences(reply)):
+        return True
+    text = reply.casefold()
+    return any(marker.casefold() in text for marker in (next_step or {}).get("markers", ()))

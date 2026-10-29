@@ -23,8 +23,10 @@ async def test_multi_turn_history_and_profile_jobs_survive_a_background_result()
 
         async def model(**kwargs):
             received.append(kwargs)
-            replies = ["I hear what matters to you about this route.", "Germany gives your plan a clear place to start.",
-                       "That finding gives us a concrete next check."]
+            # Each reply ends with a different question, as the drive rule asks.
+            replies = ["I hear what matters to you about this route. Which country is on your mind?",
+                       "Germany gives your plan a clear place to start. What did you study for your bachelor's?",
+                       "That finding gives us a concrete next check. Can you upload your transcript?"]
             return json.dumps({"reply": replies[len(received) - 1], "moves": ["reflect"], "action": {"type": "none"}})
 
         with patch("app.pai_c.deep.turn.chat_completion", model), \

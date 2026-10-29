@@ -8,6 +8,7 @@ from app.memory.vault_view import entry_ref  # noqa: F401  re-exported for PAI C
 from app.memory.vault_view import _result_text as result_text, display_text  # noqa: F401  re-exported for PAI C
 from app.memory.student_schema import RECORD_SPECS  # noqa: F401  re-exported for PAI C
 from app.memory.completeness import relevance_version  # noqa: F401  re-exported for PAI C
+from app.memory.normalize import detect_language  # noqa: F401  re-exported for PAI C
 from app.memory.vault_context import (  # noqa: F401  re-exported for PAI C
     context_policy, estimated_tokens, select_context_entries, sensitive_types_for)
 from app.pai_c.deep.notebook import NotebookService

@@ -120,7 +120,7 @@ async def test_runtime_stores_moves_and_repetition_violations_and_logs_no_questi
         with patch.object(config,'PAI_API_KEY','fake'),patch('app.pai_c.memory.MemoryService.recent_turns',return_value=history),patch('app.pai_c.policy.classifier.classify',AsyncMock(return_value=Signals.model_validate({**fallback_signals().model_dump(), 'question_needed': True}))),patch('app.pai_c.deep.turn.chat_completion',model),caplog.at_level('INFO',logger='app.pai_c.runtime'):
             await runtime._run_deep_turn(db,student.workspace_id,data,0)
         row=db.scalar(sa.select(CounselorTurnDecision))
-        assert row.moves==['reflect','ask'] and row.guard_violations==['repeated_question','repeat_removed']
+        assert row.moves==['reflect','ask'] and row.guard_violations==['repeated_question','repeat_removed','drive_appended']
         logs=[record.message for record in caplog.records if 'counselor_deep_turn' in record.message]
         assert logs and "moves=['reflect', 'ask']" in logs[0]
         assert 'What did you enjoy' not in logs[0]

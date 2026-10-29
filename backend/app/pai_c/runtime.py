@@ -131,7 +131,14 @@ async def _run_deep_turn(db, workspace_id: str, event_data: dict, depth: int):
             signals = await classify(turn.student_text, recent)
         classifier_ms = int((time.monotonic() - classified_at) * 1000)
         safety = signals.safety
-        if signals.request:
+        if signals.language is not None:
+            # Every message to the student follows the latest turn's language (pai_c/language.py).
+            from app.pai_c.language import set_chat_language
+            if set_chat_language(db, workspace_id, signals.language.model_dump()):
+                db.commit()
+        # A question about PAI itself is answered from data (about_pai.json):
+        # nothing to note or research.
+        if signals.request and signals.request.kind != "about_pai":
             request = signals.request
             NotedQuestionService(db).record(workspace_id, turn.source_event_id, request.text,
                 kind=request.kind, needs_research=request.needs_research, pending=True)

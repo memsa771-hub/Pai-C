@@ -217,8 +217,10 @@ class Config:
         "PAI_MIRROR_COVERAGE_REQUIREMENTS_JSON", ""
     )
     PAI_LANGUAGE_BLOCKED_SCRIPTS: str = os.environ.get("PAI_LANGUAGE_BLOCKED_SCRIPTS", "Devanagari")
+    # Empty (default): a reply in a blocked script is rewritten in the
+    # student's own language and script; a value names one replacement.
     PAI_LANGUAGE_BLOCKED_SCRIPT_REPLACEMENT: str = os.environ.get(
-        "PAI_LANGUAGE_BLOCKED_SCRIPT_REPLACEMENT", "Roman Urdu"
+        "PAI_LANGUAGE_BLOCKED_SCRIPT_REPLACEMENT", ""
     )
     PAI_COUNSELOR_FALLBACK_REPLY: str = os.environ.get(
         "PAI_COUNSELOR_FALLBACK_REPLY",
@@ -382,8 +384,6 @@ class Config:
 
     def validate_startup(self) -> None:
         """Reject incomplete production configuration before serving traffic."""
-        if not self.PAI_LANGUAGE_BLOCKED_SCRIPT_REPLACEMENT.strip():
-            raise RuntimeError("PAI_LANGUAGE_BLOCKED_SCRIPT_REPLACEMENT must not be empty")
         if not self.PAI_COUNSELOR_FALLBACK_REPLY.strip():
             raise RuntimeError("PAI_COUNSELOR_FALLBACK_REPLY must not be empty")
         import re

@@ -15,6 +15,7 @@ from app.pai_c.memory import MemoryService, estimated_tokens, select_context_ent
 from app.pai_c.deep.turn_input import CounselorTurnInput
 from app.journey import JourneyService
 from app.models import User, Workspace
+from app.pai_c.language import chat_language
 
 logger = logging.getLogger(__name__)
 _NOTEBOOK_ORDER = (
@@ -182,9 +183,13 @@ async def build_context(db, workspace_id: str, turn: CounselorTurnInput, *,
         "language_policy": _json({
             "blocked_scripts": [name.strip() for name in config.PAI_LANGUAGE_BLOCKED_SCRIPTS.split(",")
                                 if name.strip()],
-            "replacement": config.PAI_LANGUAGE_BLOCKED_SCRIPT_REPLACEMENT,
+            # Empty: the student's own language and script (<language>).
+            **({"replacement": config.PAI_LANGUAGE_BLOCKED_SCRIPT_REPLACEMENT.strip()}
+               if config.PAI_LANGUAGE_BLOCKED_SCRIPT_REPLACEMENT.strip() else {}),
             "fallback_reply": config.PAI_COUNSELOR_FALLBACK_REPLY,
         }),
+        # The latest student message's language (classifier, stored on the workspace).
+        "language": _json(chat_language(db, workspace_id)),
         "profile": _json(_profile(db, workspace_id, snapshot, student_text=turn.student_text,
                                   trigger_text=trigger_text, topics=topics)),
     }
@@ -215,6 +220,10 @@ async def build_context(db, workspace_id: str, turn: CounselorTurnInput, *,
             from app.pai_c.possibilities import PossibilityService
             possibility = PossibilityService(db).get(workspace_id, decision.topic)
         sections["decision"] = _json(decision_context(decision, signals, plan, possibility))
+        if decision.action == "about_pai":
+            from app.pai_c.policy.controller import load_data
+            sections["about_pai"] = _json({key: value for key, value in load_data("about_pai.json").items()
+                                           if not key.startswith("_")})
     from app.pai_c.myths import information_facts
     requested_facts = information_facts(db, workspace_id)
     research = {"facts": requested_facts} if requested_facts else None

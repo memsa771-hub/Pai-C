@@ -27,7 +27,8 @@ def test_guided_prompt_puts_education_first_without_praise_or_echo():
         "No praise and no affirmations.",
         "Never repeat the student's words back as a summary unless they ask for one.",
         "end with ONE short question about the most relevant missing basic",
-        "Never probe hobbies or side activities that do not help decide between fields.",
+        "Every reply ends with the next step: one question, or one concrete action",
+        "acknowledge it in one clause, then move on; never praise and never lecture.",
         "Answer a direct request first.",
     ):
         assert line in prompt
@@ -97,12 +98,13 @@ def test_extractor_prompt_third_person_done_vs_planned_and_hobbies_as_evidence()
         assert line in prompt
 
 
-def test_shared_voice_tail_has_no_affirm_move_and_hobbies_only_as_evidence():
+def test_shared_voice_tail_has_no_affirm_move_and_hobbies_through_the_bank():
     from app.pai_c.deep.turn import _parse_response
     for name in ("voice", "voice_guided"):
         prompt = load_prompt(name)
         assert '"affirm"' not in prompt and "Engage with these naturally" not in prompt
-        assert "count only as supporting evidence when they help decide between fields" in prompt
+        # The bank explores hobbies and life on purpose (BETA_CONVERSATION_SPEC 2.2), never as small talk.
+        assert "count only as supporting evidence" not in prompt and "never as small talk" in prompt
     reply = '{"reply": "Theek hai.", "moves": ["affirm", "give"], "action": {"type": "none"}}'
     assert _parse_response(reply)[2] == ["give"]
 
@@ -150,7 +152,7 @@ def test_prompt_basics_match_the_data_and_voice_heads_agree():
                      "Never repeat the student's words back as a summary unless they ask for one."):
             assert line in prompt
         assert "Affirm only with a concrete fact" not in prompt and "Reflect the meaning or the feeling" not in prompt
-        assert "may follow each other, unless an education basic is missing and question_allowed is true." in prompt
+        assert "question_allowed is permission, not an instruction to ask" in prompt
     if DOCS.exists():
         assert documented("## 1.") == load_prompt("voice").rstrip()
 

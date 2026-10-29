@@ -39,6 +39,15 @@
       }
     ]
   },
+  "drive": {
+    "_note": "Every reply ends with the next step (next_steps.json), except these actions and a student who asked to stop (BETA_CONVERSATION_SPEC 2.3).",
+    "exempt_actions": [
+      "care"
+    ],
+    "exempt_intents": [
+      "stop"
+    ]
+  },
   "rows": [
     {
       "id": "care",
@@ -61,6 +70,25 @@
       }
     },
     {
+      "id": "about_pai",
+      "when": {
+        "eq": [
+          {
+            "ref": "request.kind"
+          },
+          "about_pai"
+        ]
+      },
+      "set": {
+        "action": "about_pai",
+        "question_allowed": {
+          "ref": "question_due"
+        },
+        "topic": "request",
+        "invite": false
+      }
+    },
+    {
       "id": "answer",
       "when": {
         "ne": [
@@ -77,6 +105,45 @@
         },
         "topic": "request",
         "invite": false
+      }
+    },
+    {
+      "id": "intro",
+      "when": {
+        "ref": "intro_due"
+      },
+      "set": {
+        "action": "intro",
+        "question_allowed": true,
+        "topic": null,
+        "invite": false,
+        "bank_intent": "about_you",
+        "bank_followup": false
+      }
+    },
+    {
+      "id": "bank_question",
+      "when": {
+        "ne": [
+          {
+            "ref": "next_bank_item"
+          },
+          null
+        ]
+      },
+      "set": {
+        "action": "bank_question",
+        "question_allowed": true,
+        "topic": {
+          "ref": "next_bank_item.area"
+        },
+        "invite": false,
+        "bank_intent": {
+          "ref": "next_bank_item.intent_key"
+        },
+        "bank_followup": {
+          "ref": "next_bank_item.followup"
+        }
       }
     },
     {
@@ -267,6 +334,22 @@
                 "ref": "chosen.action"
               },
               "care"
+            ]
+          },
+          {
+            "ne": [
+              {
+                "ref": "chosen.action"
+              },
+              "intro"
+            ]
+          },
+          {
+            "ne": [
+              {
+                "ref": "chosen.action"
+              },
+              "bank_question"
             ]
           }
         ]

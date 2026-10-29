@@ -50,6 +50,14 @@ class Decision:
     question_allowed: bool
     invite: bool
     summary_due: bool
+    # The drive rule: the reply must end with `next_step` (a question or a
+    # concrete action). Set by `decide`; a hand-built decision does not drive.
+    must_drive: bool = False
+    next_step: dict | None = None
+    # The question-bank ledger: the bank item this reply asks, and whether it
+    # is that item's one follow-up.
+    bank_intent: str | None = None
+    bank_followup: bool = False
 
     def as_dict(self):
         return asdict(self)
@@ -83,6 +91,33 @@ def askable_areas(state, policy=None, excluded=()):
         policy["priority"].index(area)))
 
 
+def bank_item(intent_key):
+    return next((item for item in load_data("question_bank.json")["items"]
+                 if item["intent_key"] == intent_key), None)
+
+
+def next_step(state, chosen):
+    """What this reply ends with (next_steps.json): in a phase that asks and a
+    reply allowed a question, the bank question (this move's, else the next
+    one), else the next missing education basic; otherwise the phase's line,
+    a concrete action that names a workspace place."""
+    data = load_data("next_steps.json")
+    phase = data["stage_phase"].get(state.get("journey_stage") or "", data["default_phase"])
+    rules = data["phases"][phase]
+    step = {"phase": phase, "markers": rules["markers"], "place": None}
+    if rules["ask"] and chosen.get("question_allowed"):
+        item = bank_item(chosen.get("bank_intent")) or state.get("next_bank_item")
+        if item:
+            followup = chosen.get("bank_followup") if chosen.get("bank_intent") else item.get("followup")
+            return {**step, "key": "bank:" + item["intent_key"] + (":followup" if followup else ""),
+                    "text": item["followup_prompt"] if followup else item["prompt"]}
+        basic = state.get("askable_basic") or state.get("askable_area")
+        if basic:
+            topic_text = load_data("areas_policy.json")["topic_text"].get(basic, "")
+            return {**step, "key": "basic:" + basic, "text": data["basic_question"].format(topic_text=topic_text)}
+    return {**step, "key": "phase:" + phase, "text": rules["line"], "place": rules["place"]}
+
+
 def decide(state):
     table = load_data("guided_table.json")
     state = {"question_needed": False, **state}
@@ -107,7 +142,11 @@ def decide(state):
                 if replacement != chosen:
                     chosen = replacement
                     rule_id += "+" + check["id"]
-    return Decision(rule_id=rule_id, summary_due=state["summary_due"], **chosen)
+    drive = table.get("drive", {})
+    must_drive = (chosen["action"] not in drive.get("exempt_actions", ())
+                  and state.get("intent") not in drive.get("exempt_intents", ()))
+    return Decision(rule_id=rule_id, summary_due=state["summary_due"], must_drive=must_drive,
+                    next_step=next_step(state, chosen) if must_drive else None, **chosen)
 
 
 def decision_context(decision, signals, plan, possibility=None):
@@ -117,11 +156,16 @@ def decision_context(decision, signals, plan, possibility=None):
     instruction = (POLICY_DIR / "actions" / (decision.action + ".md")).read_text(encoding="utf-8")
     instruction = instruction.replace("{topic_text}", topic_text)
     instruction = instruction.replace("{topic_clause}", " (about " + topic_text + ")" if topic_text else "")
+    item = bank_item(decision.bank_intent)
+    if item:
+        instruction = instruction.replace("{bank_prompt}", item["followup_prompt"] if decision.bank_followup else item["prompt"])
     if possibility is not None:
         instruction = instruction.replace("{possibility_title}", possibility.title).replace("{possibility_why}", possibility.why)
     if decision.invite:
         instruction += "\n" + (POLICY_DIR / "actions/invite.md").read_text(encoding="utf-8")
     return {"action": decision.action, "topic_text": topic_text,
             "question_allowed": decision.question_allowed, "instruction": instruction,
+            "student_emotion": signals.emotion if signals is not None else None,
+            "next_step": decision.next_step["text"] if decision.must_drive and decision.next_step else None,
             "avoid_questions": plan.avoid_questions if plan else [],
             "insight_candidate": plan.give if plan else ""}

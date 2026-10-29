@@ -27,24 +27,31 @@ class SafetyResult(StrictModel):
 
 class Request(StrictModel):
     text: str
-    kind: Literal["information", "task", "decision_help", "other"]
+    kind: Literal["information", "task", "decision_help", "about_pai", "other"]
     needs_research: bool
     needs_context: bool
 
 
-from pydantic import PrivateAttr
+from pydantic import PrivateAttr, Field
+
+
+class Language(StrictModel):
+    """The latest message's language: an ISO 639 code and its script (romanized text is latin)."""
+    code: str = Field(pattern=r"^[A-Za-z]{2,3}$")
+    script: Literal["latin", "arabic", "other"]
 
 
 class Signals(StrictModel):
     _fallback: bool = PrivateAttr(default=False)
     safety: SafetyResult
-    intent: Literal["sharing", "asking_info", "asking_task", "deciding", "pushback", "short_reply", "greeting", "other"]
+    intent: Literal["sharing", "asking_info", "asking_task", "deciding", "pushback", "short_reply", "greeting", "stop", "other"]
     emotion: Literal["neutral", "positive", "stressed", "frustrated", "distressed"]
     request: Request | None
     mentioned_areas: list[Area]
     declined_area: Area | None
     opened_thread: Area | None = None
     question_needed: bool = False
+    language: Language | None = None
 
 
 def fallback_signals():

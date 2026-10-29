@@ -1,5 +1,7 @@
 {
   "checking_reply": "I'll check a reliable source before giving you that detail.",
+  "_allowed_sections_note": "Context sections a reply may restate without a world source: what the student said (profile, notebook, memory) and PAI's own description of itself (about_pai).",
+  "allowed_sections": ["profile", "notebook", "memory", "about_pai"],
   "source_statuses": ["verified", "confirmed"],
   "source_date_fields": ["checked_at", "verified_at"],
   "numeric_world_pattern": "(?:[$€£¥]\\s*\\d[\\d,.]*|\\d[\\d,.]*\\s*[%％])"

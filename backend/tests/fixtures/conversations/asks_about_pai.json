@@ -1,0 +1,65 @@
+{
+ "description": "The student opens by asking how PAI works: answered from about_pai.json, then the bank continues.",
+ "turns": [
+  {
+   "student": "Salam, pehle yeh batao PAI kaam kaise karta hai?",
+   "signals": {
+    "intent": "asking_info",
+    "language": {
+     "code": "ur",
+     "script": "latin"
+    },
+    "request": {
+     "text": "PAI kaam kaise karta hai?",
+     "kind": "about_pai",
+     "needs_research": false,
+     "needs_context": false
+    }
+   },
+   "writer": [
+    "PAI tumhara education counselor hai: pehle tumhe jaanta hai, phir field chunne mein madad karta hai. Jo tum batate ho woh tumhare Vault mein evidence ke saath rehta hai aur bina ijazat kisi ko nahi jata. Apne baare mein batao, aaj kal kya karte ho?"
+   ],
+   "extract": [],
+   "expect": {
+    "action": "about_pai",
+    "about_pai": true
+   }
+  },
+  {
+   "student": "Main ICS kar raha hoon aur gaming bohat pasand hai.",
+   "signals": {
+    "intent": "sharing",
+    "mentioned_areas": [
+     "status",
+     "interests"
+    ],
+    "language": {
+     "code": "ur",
+     "script": "latin"
+    }
+   },
+   "writer": [
+    "ICS aur gaming saath ho to games banane ka khayal bhi aata hai. Koi aisi cheez hai jo tumne achieve ki ho aur tumhare liye matter karti ho?"
+   ],
+   "extract": [
+    {
+     "candidate_type": "vault_item",
+     "operation": "upsert",
+     "key": "interest",
+     "proposed_value": {
+      "text": "Gaming"
+     },
+     "quote": "gaming bohat pasand hai",
+     "confidence": 0.9
+    }
+   ],
+   "expect": {
+    "action": "bank_question",
+    "bank_intent": "accomplishments"
+   }
+  }
+ ],
+ "expect_vault_types": [
+  "interest"
+ ]
+}

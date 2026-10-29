@@ -65,7 +65,8 @@ async def test_answered_now_uses_actual_posted_reply_and_is_idempotent():
         assert row.status == "answered_now" and not row.needs_research and row.kind == "task"
         assert row.answered_event_id == posted[0]
         reply = db.get(EventRecord, row.answered_event_id)
-        assert reply.source == "openagents:pai" and reply.payload["content"] == "Here is the help you asked for."
+        # The posted reply (with the drive rule's next step after the answer).
+        assert reply.source == "openagents:pai" and reply.payload["content"].startswith("Here is the help you asked for.")
         assert NotedQuestionService(db).record(student.workspace_id, turn.source_event_id,
             "Help with this task", kind="task", needs_research=False,
             answered_event_id=row.answered_event_id) == "duplicate"

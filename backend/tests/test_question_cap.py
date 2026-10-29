@@ -80,11 +80,15 @@ async def test_reproductions_reach_voice_without_a_third_question(monkeypatch, a
     assert decision.action == action
     if action == "first_picture":
         assert decision.question_allowed and result.reply == text + " Which matters most?"
+        assert model.await_count == 1
     else:
-        assert not decision.question_allowed
-        assert result.reply == text and "question_removed" in result.guard_violations
-    assert model.await_count == 1
-    prompt = model.await_args.kwargs["system_prompt"]
+        # No question; the drive rule ends the reply with the phase's next step (a concrete action).
+        assert not decision.question_allowed and decision.must_drive
+        assert result.reply.startswith(text) and "?" not in result.reply
+        assert result.reply.endswith(decision.next_step["text"])
+        assert {"question_removed", "drive_retry", "drive_appended"} <= set(result.guard_violations)
+        assert model.await_count == 2
+    prompt = model.await_args_list[0].kwargs["system_prompt"]
     block = json.loads(prompt.rsplit("<context>", 1)[1].split("<decision>", 1)[1].split("</decision>")[0])
     assert block["action"] == action and block["question_allowed"] is decision.question_allowed
 

@@ -65,11 +65,16 @@ async def test_statement_fallback_posted_and_logged():
     signals=fallback_signals().model_dump();signals["emotion"]="stressed"
     # Pretend every education basic is known so this turn allows no question and the fallback fires.
     load=controller.load_data
-    known=lambda name:{**load(name),"education_basics":[]} if name=="areas_policy.json" else load(name)
-    with StudentSession() as student, patch.object(controller,"load_data",known):
+    # No question-bank move either (the bank waits on this intent here).
+    known=lambda name:({**load(name),"education_basics":[]} if name=="areas_policy.json"
+        else {**load(name),"skip_intents":["sharing"]} if name=="question_bank.json" else load(name))
+    from app.pai_c.policy import state as policy_state
+    with StudentSession() as student, patch.object(controller,"load_data",known), patch.object(policy_state,"load_data",known):
         with patch("app.pai_c.policy.classifier.complete",AsyncMock(return_value=json.dumps(signals))),patch("app.pai_c.deep.turn.chat_completion",AsyncMock(side_effect=[output("First?"),output("Second?")])):
             await student.turn("A difficult day")
-        assert student.transcript[-1]["content"]==config.PAI_STATEMENT_FALLBACK_REPLY
+        # The fallback statement, then the drive rule's concrete next step (no question).
+        posted=student.transcript[-1]["content"]
+        assert posted.startswith(config.PAI_STATEMENT_FALLBACK_REPLY) and "?" not in posted
         with student.factory() as db:
             row=db.scalar(select(CounselorTurnDecision))
             assert "statement_fallback" in row.guard_violations and row.decision["statement_fallback"] is True

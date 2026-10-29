@@ -43,10 +43,11 @@ async def test_deep_eval_policy_mode_uses_production_runtime(tmp_path):
         result = await run_evaluation(persona_ids={"danish"}, result_dir=tmp_path, policy_mode="guided")
     assert result["policy_mode"] == "guided"
     turns = result["personas"][0]["turns"]
-    # A new student is missing education basics, so the replay may ask about one; nothing else earns a question.
-    assert turns and all(turn["decision"]["action"] in ("counsel", "explore_area") for turn in turns)
-    assert all(turn["decision"]["question_allowed"] == (turn["decision"]["action"] == "explore_area") for turn in turns)
-    assert any(turn["decision"]["action"] == "explore_area" for turn in turns)
+    # A new student gets the intro, then the question bank, or a missing education basic; nothing else earns a question.
+    asking = ("intro", "bank_question", "explore_area")
+    assert turns and all(turn["decision"]["action"] in ("counsel", *asking) for turn in turns)
+    assert all(turn["decision"]["question_allowed"] == (turn["decision"]["action"] in asking) for turn in turns)
+    assert turns[0]["decision"]["action"] == "intro"
     assert all(turn["reply"] for turn in turns)
 
 

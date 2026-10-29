@@ -19,8 +19,8 @@ def state(**changes):
 
 
 def test_data_edits_change_decisions(tmp_path,monkeypatch):
-    for name in ("guided_table.json","areas_policy.json"):
-        shutil.copyfile(controller.POLICY_DIR/name,tmp_path/name)
+    for source in controller.POLICY_DIR.glob("*.json"):
+        shutil.copyfile(source,tmp_path/source.name)
     monkeypatch.setattr(controller,"POLICY_DIR",tmp_path)
     assert controller.decide(state(coverage={})).topic == "history"
     path=tmp_path/"areas_policy.json"; data=json.loads(path.read_text());data["priority"].reverse();path.write_text(json.dumps(data))

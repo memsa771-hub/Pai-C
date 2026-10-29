@@ -25,6 +25,31 @@ class _Paused(Exception):
     pass
 
 
+def student_core(db, workspace_id: str, name: str) -> dict:
+    """What onboarding already told PAI (BETA_CONVERSATION_SPEC 2.1): the name,
+    the education line as the Mirror header builds it, and the other Vault
+    facts (status, city, ...) as catalog labels and display text. Restricted
+    facts never."""
+    from app.pai_c.memory import MemoryService
+    from app.pai_c.mirror.engine import MirrorEngine
+    header = MirrorEngine(db).build(workspace_id)["header"]
+    facts = {row.entry["label"]: row.entry["display"] for row in MemoryService(db).vault_rows(workspace_id)
+             if row.entry["kind"] == "fact" and row.sensitivity != "restricted" and row.entry["display"]}
+    line = header.get("education_line")
+    return {"name": header.get("name") or name, "education_line": line["text"] if line else None,
+            "facts": facts}
+
+
+def opening_language(db, workspace_id: str, core: dict) -> dict | None:
+    """The chat language when known, else the language of the onboarding
+    answers, else None (English)."""
+    from app.pai_c.language import chat_language, detected_language
+    known = chat_language(db, workspace_id)
+    if known is not None:
+        return known
+    return detected_language(" ".join(str(value) for value in core["facts"].values()))
+
+
 def _already_posted(db, workspace_id, channel):
     return db.scalar(select(EventRecord.id).where(
         EventRecord.network_id == workspace_id,
@@ -49,13 +74,20 @@ async def opening_job(job, db):
         turn = CounselorTurnInput(channel, workspace_id, "", (), None,
                                   job_id, None, "system:opening")
         context = await build_context(db, workspace_id, turn)
-        instruction = (Path(__file__).parent / "policy/actions/opening.md").read_text(encoding="utf-8")
+        core = student_core(db, workspace_id, name)
+        language = opening_language(db, workspace_id, core)
+        from app.pai_c.policy.controller import bank_item, load_data
+        about_you = bank_item(load_data("question_bank.json")["first_item"])["prompt"]
+        instruction = (Path(__file__).parent / "policy/actions/opening.md").read_text(
+            encoding="utf-8").replace("{about_you}", about_you)
+        sections = ("<student_core>" + json.dumps(core, ensure_ascii=False) + "</student_core>\n"
+                    + "<opening_language>" + json.dumps(language) + "</opening_language>")
         db.rollback()
         try:
             if not usage.role_allowed("counselor"):
                 raise _Paused()
             raw = await complete("counselor", messages=[],
-                system_prompt=load_prompt("voice") + "\n\n" + context.text + "\n\n" + instruction,
+                system_prompt=load_prompt("voice") + "\n\n" + context.text + "\n\n" + sections + "\n\n" + instruction,
                 response_format={"type": "json_object"}, phase="opening", turn_id=job_id)
             from app.pai_c.deep.turn import unfence
             data = json.loads(unfence(raw))

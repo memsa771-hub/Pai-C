@@ -24,9 +24,51 @@ def first_picture_due(*, coverage, student_count, prior_decisions, mirror_ready)
             and all(_known(coverage.get(area, {})) for area in rules["first_picture_required_areas"]))
 
 
+def bank_asked(prior_decisions, asking) -> list[str]:
+    """Bank intents already asked (the ledger in the turn decisions). Once any
+    PAI reply has asked a question the conversation is past its open first
+    question (the opening or the intro), so that item counts as asked."""
+    bank = load_data("question_bank.json")
+    asked = [row["decision"].get("bank_intent") for row in prior_decisions if row["decision"].get("bank_intent")]
+    if any(asking):
+        asked.append(bank["first_item"])
+    return list(dict.fromkeys(asked))
+
+
+def next_bank_item(*, vault_types, asked, previous, intent, mentioned, declined_at, student_count):
+    """The bank question for this reply (BETA_CONVERSATION_SPEC 2.2/2.3), or None.
+    A short answer to the previous bank question gets its follow-up once;
+    otherwise the first item not asked whose Vault types are still empty,
+    whose area the student did not just cover, and which passes the area's
+    decline cooldown and sensitivity rules."""
+    bank = load_data("question_bank.json")
+    if intent in bank["skip_intents"]:
+        return None
+    items = {item["intent_key"]: item for item in bank["items"]}
+    areas = load_data("areas_policy.json")
+    previous_item = items.get(previous.get("bank_intent"))
+    if (previous_item and intent == load_data("guided_table.json")["derived"]["short_reply_intent"]
+            and not previous.get("bank_followup") and not set(previous_item["vault_types"]) & vault_types):
+        return {**previous_item, "followup": True}
+    for item in bank["items"]:
+        area = item["area"]
+        if item["intent_key"] in asked or set(item["vault_types"]) & vault_types or area in mentioned:
+            continue
+        declined = declined_at.get(area)
+        if declined is not None and student_count - declined < areas["declined_cooldown_student_messages"]:
+            continue
+        rule = areas["sensitive"].get(area)
+        if rule and student_count < rule["min_student_messages"]:
+            continue
+        return {**item, "followup": False}
+    return None
+
+
 def derive_state(signals, *, coverage, mirror_ready, plan, student_count,
                  prior_decisions, replies, student_ordinals, current_event_id,
-                 reply_requested_input=None):
+                 reply_requested_input=None, vault_types=None):
+    """`vault_types` (the catalog types the Vault holds) turns on the question
+    bank; a caller without a Vault read gets no intro or bank move."""
     policy = load_data("guided_table.json")["derived"]
     data = signals.model_dump()
     previous = prior_decisions[-1]["decision"] if prior_decisions else {}
@@ -52,7 +94,19 @@ def derive_state(signals, *, coverage, mirror_ready, plan, student_count,
     window = policy["question_window"]
     requested = reply_requested_input or [False] * len(replies)
     asking = [requested[i] or any(question_sentences(reply)) for i, reply in enumerate(replies)]
-    return {**data, "coverage": coverage, "mirror_ready": mirror_ready,
+    bank = {"intro_due": False, "next_bank_item": None, "bank_asked": []}
+    if vault_types is not None:
+        asked = bank_asked(prior_decisions, asking)
+        skip = load_data("question_bank.json")["skip_intents"]
+        bank = {"bank_asked": asked,
+                "intro_due": not any(asking) and data["intent"] not in skip
+                    and load_data("question_bank.json")["first_item"] not in asked,
+                "next_bank_item": next_bank_item(vault_types=set(vault_types), asked=asked, previous=previous,
+                    intent=data["intent"], mentioned=data["mentioned_areas"], declined_at=declines,
+                    student_count=student_count)}
+    return {**data, **bank, "coverage": coverage, "mirror_ready": mirror_ready,
+            "short_answer": data["intent"] == policy["short_reply_intent"],
+            "chat_language": data.get("language"),
             "student_count": student_count, "previous": previous,
             "previous_mentioned_areas": previous.get("signals", {}).get("mentioned_areas", []),
             "declined_at": declines, "short_reply_streak": streak,
@@ -85,7 +139,8 @@ def build_state(db, turn, signals, history):
     from app.pai_c.mirror import ready_from
     # The Mirror state card's `ready`, read once per turn from this coverage.
     mirror_ready = ready_from(coverage)
-    state = derive_state(signals, coverage=coverage, mirror_ready=mirror_ready,
+    vault_types = {row.entry["type"] for row in memory.vault_rows(turn.workspace_id) if not row.entry["stale"]}
+    state = derive_state(signals, coverage=coverage, mirror_ready=mirror_ready, vault_types=vault_types,
         plan=plan, student_count=len(ordinals), prior_decisions=prior,
         replies=[row["content"] for row in history if row["role"] == "assistant"],
         reply_requested_input=[bool(row.get("requested_input")) for row in history if row["role"] == "assistant"],
@@ -96,6 +151,7 @@ def build_state(db, turn, signals, history):
         StudentJourney.workspace_id == turn.workspace_id,
         StudentJourney.journey_type == "counselor_decision", StudentJourney.status == "active"))
     draft = (journey.counselor_summary_draft or {}) if journey else {}
+    state["journey_stage"] = journey.current_stage if journey else None
     # The card is posted in chat once, the first time it is ready (spec 2.5).
     posted = draft.get("mirror_posted_version") if draft.get("type") == "mirror_state" else None
     state["mirror_due"] = bool(mirror_ready and journey is not None and not posted)
@@ -121,4 +177,5 @@ def decision_log(decision, signals):
         "request_kind": request.kind if request else None,
         "needs_research": request.needs_research if request else None,
         "needs_context": request.needs_context if request else None,
-        "mentioned_areas": signals.mentioned_areas, "declined_area": signals.declined_area}}
+        "mentioned_areas": signals.mentioned_areas, "declined_area": signals.declined_area,
+        "language": signals.language.model_dump() if signals.language else None}}

@@ -1,0 +1,10 @@
+{
+  "_note": "Language codes for the chat language (workspaces.chat_language, BETA_CONVERSATION_SPEC 2.5). detected maps memory/normalize.detect_language's labels to {code, script}; English (and no label) means the default, English. english_codes are the codes the product treats as English: no copy rendering, and the English text checks apply.",
+  "english_codes": ["en"],
+  "scripts": ["latin", "arabic", "other"],
+  "detected": {
+    "ur": {"code": "ur", "script": "arabic"},
+    "roman_ur": {"code": "ur", "script": "latin"},
+    "mixed": {"code": "ur", "script": "latin"}
+  }
+}

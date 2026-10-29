@@ -1,0 +1,113 @@
+{
+ "description": "A student who answers in one word: one gentle follow-up per bank item, then PAI moves on.",
+ "turns": [
+  {
+   "student": "hi",
+   "signals": {
+    "intent": "greeting",
+    "language": {
+     "code": "ur",
+     "script": "latin"
+    }
+   },
+   "writer": [
+    "Salam! Main PAI hoon. Apne baare mein batao: aaj kal kya karte ho aur kya cheez tumhare liye important hai?"
+   ],
+   "extract": [],
+   "expect": {
+    "action": "intro",
+    "bank_intent": "about_you"
+   }
+  },
+  {
+   "student": "theek",
+   "signals": {
+    "intent": "short_reply",
+    "language": {
+     "code": "ur",
+     "script": "latin"
+    }
+   },
+   "writer": [
+    "Koi baat nahi, aaram se. Thora aur batao: tumhara aam din kaisa guzarta hai?"
+   ],
+   "extract": [],
+   "expect": {
+    "action": "bank_question",
+    "bank_intent": "about_you",
+    "bank_followup": true
+   }
+  },
+  {
+   "student": "bas",
+   "signals": {
+    "intent": "short_reply",
+    "language": {
+     "code": "ur",
+     "script": "latin"
+    }
+   },
+   "writer": [
+    "Theek hai. Free time mein tumhe kya karna acha lagta hai, khaas taur par koi alag si cheez?"
+   ],
+   "extract": [],
+   "expect": {
+    "action": "bank_question",
+    "bank_intent": "hobbies",
+    "bank_followup": false
+   }
+  },
+  {
+   "student": "cricket",
+   "signals": {
+    "intent": "short_reply",
+    "language": {
+     "code": "ur",
+     "script": "latin"
+    }
+   },
+   "writer": [
+    "Cricket mein tumhe sab se zyada kya acha lagta hai?"
+   ],
+   "extract": [
+    {
+     "candidate_type": "vault_item",
+     "operation": "upsert",
+     "key": "interest",
+     "proposed_value": {
+      "text": "Cricket"
+     },
+     "quote": "cricket",
+     "confidence": 0.9
+    }
+   ],
+   "expect": {
+    "action": "bank_question",
+    "bank_intent": "hobbies",
+    "bank_followup": true
+   }
+  },
+  {
+   "student": "pata nahi",
+   "signals": {
+    "intent": "short_reply",
+    "language": {
+     "code": "ur",
+     "script": "latin"
+    }
+   },
+   "writer": [
+    "Koi masla nahi. Koi aisi cheez hai jo tumne achieve ki ho, koi result ya inaam, jo tumhare liye matter karti ho?"
+   ],
+   "extract": [],
+   "expect": {
+    "action": "bank_question",
+    "bank_intent": "accomplishments",
+    "bank_followup": false
+   }
+  }
+ ],
+ "expect_vault_types": [
+  "interest"
+ ]
+}

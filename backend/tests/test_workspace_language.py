@@ -27,8 +27,8 @@ def test_prompts_that_write_for_the_workspace_name_the_workspace_language():
     assert "<workspace_language>" in SYSTEM_PROMPT
     for name in ("planner", "path_analyzer"):
         assert "<workspace_language>" in load_prompt(name), name
-    # The analyzer's chat message still follows the student.
-    assert "in the language and script the student writes in" in load_prompt("path_analyzer")
+    # The analyzer's chat message still follows the student (the stored chat language).
+    assert "in the language and script given in <chat_language>" in load_prompt("path_analyzer")
 
 
 @pytest.mark.asyncio

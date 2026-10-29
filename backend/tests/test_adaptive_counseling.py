@@ -19,6 +19,7 @@ from app.pai_c.deep.turn import run_deep_turn
 from app.pai_c.planner.patch import apply_patch, PatchRejected
 from app.pai_c.planner.view import build_planner_view
 from app.pai_c.policy.classifier import Signals, fallback_signals
+from app.pai_c.policy import controller
 from app.pai_c.policy.controller import decide
 from app.pai_c.policy.state import first_picture_due
 from app.pai_c.understanding.views import coverage_areas
@@ -51,7 +52,10 @@ async def test_direct_information_empty_profile_queues_research_not_an_interview
         with patch("app.pai_c.policy.classifier.complete", AsyncMock(return_value=sig.model_dump_json())), \
              patch("app.pai_c.deep.turn.chat_completion", voice):
             await student.turn(sig.request.text)
-        assert student.transcript[-1]["content"] == "I'll check current sources for that information."
+        # The answer comes first; the drive rule ends the reply with the next step.
+        posted = student.transcript[-1]["content"]
+        assert posted.startswith("I'll check current sources for that information.")
+        assert posted.endswith(controller.load_data("next_steps.json")["phases"]["getting_to_know"]["line"])
         with student.factory() as db:
             job = db.scalar(select(BackgroundJob).where(BackgroundJob.job_type == "research.claim"))
             assert job and job.payload["request_id"]
@@ -102,9 +106,11 @@ async def test_personal_sharing_stays_in_domain_without_forced_questions(monkeyp
         model = AsyncMock(return_value=reply(response + " What else do you enjoy?"))
         with patch("app.pai_c.deep.turn.chat_completion", model):
             result = await run_deep_turn(db, _turn(student, text), history=[], decision=decision, signals=sig)
-        assert result.reply == response
-        assert "question_removed" in result.guard_violations
-        assert "count only as supporting evidence" in model.await_args.kwargs["system_prompt"]
+        # The question is removed; the drive rule then ends the reply with a concrete next step.
+        assert result.reply.startswith(response) and "?" not in result.reply
+        assert result.reply.endswith(decision.next_step["text"])
+        assert "question_removed" in result.guard_violations and "drive_appended" in result.guard_violations
+        assert "never as small talk" in model.await_args.kwargs["system_prompt"]
 
 
 def test_useful_clarification_not_a_fixed_ratio_and_safety_precedes_request():

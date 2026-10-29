@@ -109,6 +109,11 @@ class Workspace(Base):
     # daemons always authenticate with the workspace token regardless.
     require_login = Column(Boolean, nullable=False, default=True, server_default=text("TRUE"))
     settings = Column(JSONB, default={})
+    # The student's chat language from the latest turn ({code, script}; NULL =
+    # not known yet) and fixed copy rendered in it (pai_c/language.py). Kept
+    # out of `settings`, which clients can replace wholesale.
+    chat_language = Column(JSONB, nullable=True)
+    rendered_copy = Column(JSONB, nullable=True)
     status = Column(Text, default="active")
     created_at = Column(DateTime(timezone=True), default=_now, server_default=text("NOW()"))
     last_activity_at = Column(DateTime(timezone=True), default=_now, server_default=text("NOW()"))

@@ -40,6 +40,7 @@ from app.pai_c.posting import send_to_student
 from app.pai_c.understanding.data import at_path, load_policy as understanding_policy
 from app.plugins._shared.budget import take_daily
 from app.workspace_language import workspace_language_block
+from app.pai_c.language import chat_language
 from app.runtime.task_runtime import enqueue
 
 logger = logging.getLogger(__name__)
@@ -439,7 +440,9 @@ async def _post_finished(db, job, channel: str, reply_to: str) -> None:
     if not message and result.get("message_id"):
         event = db.get(EventRecord, result["message_id"])
         message = ((event.payload or {}).get("content") if event else None)
-    message = message or policy()["paths_found_message"]
+    if not message:
+        from app.pai_c.language import render_copy
+        message = await render_copy(db, job.workspace_id, "paths_found_message", policy()["paths_found_message"])
     posted = await send_to_student(db, job.workspace_id, channel, "pai", message, 0,
         metadata={"paths_job_id": job.id, "paths_found": paths, "paths_reply_to": reply_to})
     if not posted:
@@ -477,7 +480,10 @@ async def _needs_education(db, job, payload: dict, education: list[dict], extra:
         return {"status": "needs_education"}
     current = current_education(education)
     level = read_education(current)[0] if current else None
-    message = rules["needs_education_messages"][rules["needs_education_by_level"].get(level, "education")]
+    key = rules["needs_education_by_level"].get(level, "education")
+    # The copy is English data; the student reads it in their chat language.
+    from app.pai_c.language import render_copy
+    message = await render_copy(db, job.workspace_id, "needs_education:" + key, rules["needs_education_messages"][key])
     posted = await send_to_student(db, job.workspace_id, channel, "pai", message, 0,
                                    metadata={"paths_job_id": job.id, "paths_found": [], **(extra or {})})
     if not posted:
@@ -539,6 +545,7 @@ async def path_analysis_job(job, db) -> dict:
             + "<records>" + _json(records) + "</records>\n"
             + "<fields>" + _json(fields) + "</fields>\n"
             + workspace_language_block() + "\n"
+            + "<chat_language>" + _json(chat_language(db, job.workspace_id)) + "</chat_language>\n"
             + "<existing_paths>" + _json(reassess) + "</existing_paths>\n"
             + "<dismissed_paths>" + _json([row.title for row in existing if row.status == "dismissed"]) + "</dismissed_paths>")
         # Daily cap on model runs (cost): a quiet run over it is skipped, one

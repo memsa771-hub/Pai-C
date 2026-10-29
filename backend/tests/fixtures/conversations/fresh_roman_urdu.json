@@ -1,0 +1,135 @@
+{
+ "description": "A new student writes in Roman Urdu with no opening posted: intro, then the bank skips what the student already covered or the Vault already holds.",
+ "turns": [
+  {
+   "student": "Assalam o alaikum",
+   "signals": {
+    "intent": "greeting",
+    "language": {
+     "code": "ur",
+     "script": "latin"
+    }
+   },
+   "writer": [
+    "Walaikum assalam! Main PAI hoon, tumhara counselor. Apne baare mein batao: aaj kal kya karte ho aur tumhare liye kya important hai?"
+   ],
+   "extract": [],
+   "expect": {
+    "action": "intro",
+    "bank_intent": "about_you"
+   }
+  },
+  {
+   "student": "Main FSc kar raha hoon, free time mein cricket khelta hoon aur thori coding bhi karta hoon.",
+   "signals": {
+    "intent": "sharing",
+    "mentioned_areas": [
+     "status",
+     "interests"
+    ],
+    "language": {
+     "code": "ur",
+     "script": "latin"
+    }
+   },
+   "writer": [
+    "Cricket aur coding dono mein kuch banane aur jeetne wali soch dikhti hai. Koi aisi cheez hai jo tumne achieve ki ho aur tumhare liye sach mein matter karti ho?"
+   ],
+   "extract": [
+    {
+     "candidate_type": "vault_item",
+     "operation": "upsert",
+     "key": "interest",
+     "proposed_value": {
+      "text": "Cricket"
+     },
+     "quote": "free time mein cricket khelta hoon",
+     "confidence": 0.9
+    },
+    {
+     "candidate_type": "vault_item",
+     "operation": "upsert",
+     "key": "interest",
+     "proposed_value": {
+      "text": "Coding"
+     },
+     "quote": "thori coding bhi karta hoon",
+     "confidence": 0.9
+    }
+   ],
+   "expect": {
+    "action": "bank_question",
+    "bank_intent": "accomplishments"
+   }
+  },
+  {
+   "student": "Haan, school ke science fair mein robot bana kar first aaya tha.",
+   "signals": {
+    "intent": "sharing",
+    "mentioned_areas": [
+     "history"
+    ],
+    "language": {
+     "code": "ur",
+     "script": "latin"
+    }
+   },
+   "writer": [
+    "Robot khud banana aur us par jeetna engineering ki taraf ek asli ishara hai. Tumhare background, family ya sheher ne tumhare liye kaunse darwaze khole ya mushkil banaye?"
+   ],
+   "extract": [
+    {
+     "candidate_type": "student_record",
+     "operation": "upsert",
+     "key": "achievement",
+     "proposed_value": {
+      "title": "First place at the school science fair with a robot"
+     },
+     "quote": "school ke science fair mein robot bana kar first aaya tha",
+     "confidence": 0.9
+    }
+   ],
+   "expect": {
+    "action": "bank_question",
+    "bank_intent": "identity"
+   }
+  },
+  {
+   "student": "Hamari family mein koi engineer nahi, abbu dukaan chalate hain aur main shaam ko unki madad karta hoon.",
+   "signals": {
+    "intent": "sharing",
+    "mentioned_areas": [
+     "family_social"
+    ],
+    "language": {
+     "code": "ur",
+     "script": "latin"
+    }
+   },
+   "writer": [
+    "Shaam ko dukaan sambhalna bhi zimmedari aur hisaab ki samajh deta hai. Class ke bahar kaunsi activities mein tum shamil ho, aur un mein tumhara role kya tha?"
+   ],
+   "extract": [
+    {
+     "candidate_type": "vault_item",
+     "operation": "upsert",
+     "key": "daily_life",
+     "proposed_value": {
+      "text": "Helps his father at the family shop in the evenings"
+     },
+     "quote": "main shaam ko unki madad karta hoon",
+     "confidence": 0.9
+    }
+   ],
+   "expect": {
+    "action": "bank_question",
+    "bank_intent": "extracurriculars"
+   }
+  }
+ ],
+ "expect_vault_types": [
+  "interest",
+  "achievement",
+  "daily_life"
+ ]
+}

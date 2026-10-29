@@ -74,6 +74,19 @@ def _parse_response(raw: str, *, violations=None) -> tuple[str, dict, list[str]]
     return re.sub(r'\\"\s*,?\s*$', "", stripped), {"type": "none"}, []
 
 
+async def _append_next_step(db, turn, decision, reply, action):
+    """The phase's next step (next_steps.json), in the student's language, after the reply."""
+    from app.pai_c.language import render_copy
+    step = decision.next_step or {}
+    if not step.get("text"):
+        return reply, action
+    line = await render_copy(db, turn.workspace_id, step["key"], step["text"])
+    reply = polish_reply((reply.rstrip() + " " + line).strip())
+    if step.get("place") and action.get("type", "none") == "none":
+        action = {"type": "show_place", "place": step["place"]}
+    return reply, action
+
+
 async def run_deep_turn(db, turn: CounselorTurnInput, *,
                         history: list[dict] | None = None,
                         instructions: str | None = None,
@@ -108,7 +121,7 @@ async def run_deep_turn(db, turn: CounselorTurnInput, *,
         # Monthly cap reached: a fixed reply that says PAI is paused, no model call.
         return DeepTurnResult(config.PAI_COUNSELOR_FALLBACK_REPLY + "\n\n" + usage.paused_line(),
                               {"type": "none"}, context, 0, 0, [], ["cap_paused"])
-    from app.pai_c.voice.guards import repeated_questions, remove_repeated, question_sentences, repeats_previous_reply
+    from app.pai_c.voice.guards import drives, repeated_questions, remove_repeated, question_sentences, repeats_previous_reply
     for attempt in range(2):
         started = time.monotonic()
         try:
@@ -159,9 +172,9 @@ async def run_deep_turn(db, turn: CounselorTurnInput, *,
         if card is not None and list(question_sentences(reply)):
             reply = remove_repeated(reply, list(question_sentences(reply))) or config.PAI_STATEMENT_FALLBACK_REPLY
             violations.append("card_question_removed")
-        from app.pai_c.deep.grounding import guard_reply
-        student_sections = " ".join(re.findall(r"<(?:profile|notebook|memory)>(.*?)</(?:profile|notebook|memory)>", context.text, flags=re.DOTALL))
-        reply, grounding_violations = guard_reply(reply, raw, context.world_facts, student_sections + turn.student_text)
+        from app.pai_c.deep.grounding import allowed_context, guard_reply
+        reply, grounding_violations = guard_reply(reply, raw, context.world_facts,
+                                                  allowed_context(context.text) + turn.student_text)
         violations.extend(grounding_violations)
         reply = polish_reply(reply)
         avoid = context.plan.avoid_questions if context.plan is not None else []
@@ -185,6 +198,17 @@ async def run_deep_turn(db, turn: CounselorTurnInput, *,
                 retry_line = (Path(__file__).parent.parent / "policy/prompts/reply_retry.md").read_text(encoding="utf-8").strip()
                 polish_ms += int((time.monotonic() - started) * 1000)
                 continue
+        # The drive rule: the reply ends with the next step (a question or a
+        # concrete action); one rewrite, then the step is appended (data copy).
+        if decision is not None and decision.must_drive and card is None and not drives(reply, decision.next_step):
+            if attempt == 0:
+                violations.append("drive_retry")
+                retry_line = (Path(__file__).parent.parent / "policy/prompts/drive_retry.md").read_text(
+                    encoding="utf-8").strip().replace("{next_step}", (decision.next_step or {}).get("text", ""))
+                polish_ms += int((time.monotonic() - started) * 1000)
+                continue
+            reply, action = await _append_next_step(db, turn, decision, reply, action)
+            violations.append("drive_appended")
         polish_ms += int((time.monotonic() - started) * 1000)
         break
     return DeepTurnResult(reply, action, context, model_ms, polish_ms, moves, violations)

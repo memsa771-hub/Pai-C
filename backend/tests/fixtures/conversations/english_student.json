@@ -1,0 +1,138 @@
+{
+ "description": "An English-speaking student who switches to Roman Urdu for one message and back: chat_language follows each turn.",
+ "turns": [
+  {
+   "student": "Hi there.",
+   "signals": {
+    "intent": "greeting",
+    "language": {
+     "code": "en",
+     "script": "latin"
+    }
+   },
+   "writer": [
+    "Hi, I am PAI, your counselor. Tell me about yourself: what do you do these days, and what matters to you?"
+   ],
+   "extract": [],
+   "expect": {
+    "action": "intro",
+    "bank_intent": "about_you"
+   }
+  },
+  {
+   "student": "I am doing A-levels, I love painting and I volunteer at an animal shelter.",
+   "signals": {
+    "intent": "sharing",
+    "mentioned_areas": [
+     "status",
+     "interests",
+     "history"
+    ],
+    "language": {
+     "code": "en",
+     "script": "latin"
+    }
+   },
+   "writer": [
+    "Painting and caring for animals both take patience and attention to detail. How would your friends describe you?"
+   ],
+   "extract": [
+    {
+     "candidate_type": "vault_item",
+     "operation": "upsert",
+     "key": "interest",
+     "proposed_value": {
+      "text": "Painting"
+     },
+     "quote": "I love painting",
+     "confidence": 0.9
+    },
+    {
+     "candidate_type": "student_record",
+     "operation": "upsert",
+     "key": "activity",
+     "proposed_value": {
+      "title": "Animal shelter volunteering",
+      "activity_type": "volunteering"
+     },
+     "quote": "I volunteer at an animal shelter",
+     "confidence": 0.9
+    }
+   ],
+   "expect": {
+    "action": "bank_question",
+    "bank_intent": "character"
+   }
+  },
+  {
+   "student": "Mere dost kehte hain main bohat patient hoon.",
+   "signals": {
+    "intent": "sharing",
+    "mentioned_areas": [
+     "strengths"
+    ],
+    "language": {
+     "code": "ur",
+     "script": "latin"
+    }
+   },
+   "writer": [
+    "Sabr un kaamon mein kaam aata hai jahan cheezein dheere dheere banti hain. Koi aisi cheez hai jo tumne achieve ki ho aur tumhare liye matter karti ho?"
+   ],
+   "extract": [
+    {
+     "candidate_type": "vault_item",
+     "operation": "upsert",
+     "key": "strength",
+     "proposed_value": {
+      "text": "Patience"
+     },
+     "quote": "main bohat patient hoon",
+     "confidence": 0.9
+    }
+   ],
+   "expect": {
+    "action": "bank_question",
+    "bank_intent": "accomplishments"
+   }
+  },
+  {
+   "student": "Back to English: I won a district art prize last year.",
+   "signals": {
+    "intent": "sharing",
+    "mentioned_areas": [
+     "history"
+    ],
+    "language": {
+     "code": "en",
+     "script": "latin"
+    }
+   },
+   "writer": [
+    "A district prize means your work held up next to many others. What is a challenge you have faced that shaped how you work?"
+   ],
+   "extract": [
+    {
+     "candidate_type": "student_record",
+     "operation": "upsert",
+     "key": "achievement",
+     "proposed_value": {
+      "title": "District art prize"
+     },
+     "quote": "I won a district art prize last year",
+     "confidence": 0.9
+    }
+   ],
+   "expect": {
+    "action": "bank_question",
+    "bank_intent": "obstacles"
+   }
+  }
+ ],
+ "expect_vault_types": [
+  "interest",
+  "activity",
+  "strength",
+  "achievement"
+ ]
+}

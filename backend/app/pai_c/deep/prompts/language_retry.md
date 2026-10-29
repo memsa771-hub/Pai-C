@@ -1,1 +1,1 @@
-Rewrite your previous reply while following <language_policy> exactly. Avoid every blocked script and use the configured replacement. Return the same JSON structure and no other text.
+Rewrite your previous reply in the student's language and script (<language>, the language of their latest message) while following <language_policy> exactly: avoid every blocked script, and when <language_policy> names a replacement, write in that instead. Return the same JSON structure and no other text.

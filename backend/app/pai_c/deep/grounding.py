@@ -26,6 +26,14 @@ def current_fact(fact):
         return False
 
 
+def allowed_context(context_text: str) -> str:
+    """The text of the context sections a reply may restate without a world
+    source (grounding.json allowed_sections): the student's own facts and
+    PAI's description of itself (<about_pai>)."""
+    names = "|".join(re.escape(name) for name in load_data("grounding.json")["allowed_sections"])
+    return " ".join(body for _, body in re.findall(rf"<({names})>(.*?)</\1>", context_text, flags=re.DOTALL))
+
+
 def guard_reply(reply, raw, facts, student_context):
     rules = load_data("grounding.json")
     index = {str(row["fact_id"]): row for row in facts if row.get("fact_id") and current_fact(row)}

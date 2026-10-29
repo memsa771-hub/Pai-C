@@ -123,7 +123,11 @@ def _has(words: list[str], text: str) -> list[str]:
     return [word for word in words if f" {word} " in padded]
 
 
-def valid_sentences(sentences, brief: str) -> bool:
+def valid_sentences(sentences, brief: str, english: bool = True) -> bool:
+    """The English word checks (second person, praise) apply to English text;
+    text in another chat language keeps the count, question, university and
+    number checks."""
+    from app.pai_c.deep.polish import question_count
     rules = mirror_policy()["text"]
     if not isinstance(sentences, list) or not all(isinstance(s, str) and s.strip() for s in sentences):
         return False
@@ -132,11 +136,11 @@ def valid_sentences(sentences, brief: str) -> bool:
     sentences = split_sentences(text)
     if not rules["min_sentences"] <= len(sentences) <= rules["max_sentences"]:
         return False
-    if "?" in text or _has(rules["praise_words"], text):
+    if question_count(text) or _has(rules["praise_words"], text):
         return False
     if [word for word in _has(rules["university_words"], text) if word not in _has(rules["university_words"], brief)]:
         return False
-    if not all(_has(rules["second_person"], sentence) for sentence in sentences):
+    if english and not all(_has(rules["second_person"], sentence) for sentence in sentences):
         return False
     return set(_NUMBER.findall(text)) <= set(_NUMBER.findall(_LEVEL_MARK.sub("", brief)))
 
@@ -158,7 +162,10 @@ async def mirror_text_job(job, db) -> dict:
     brief = card_brief(card)
     # The file's second section is the retry instruction (prompts live in .md).
     prompt, retry = (part.strip() for part in load_prompt("mirror_text").split(RETRY_SECTION, 1))
-    messages = [{"role": "user", "content": f"<card>\n{brief}\n</card>"}]
+    # The text is shown to the student in their chat language; card labels stay English.
+    from app.pai_c.language import chat_language, is_english
+    language = chat_language(db, workspace_id)
+    messages = [{"role": "user", "content": f"<card>\n{brief}\n</card>\n<language>{json.dumps(language)}</language>"}]
     db.rollback()  # no transaction held open across the model call
     attempts = mirror_policy()["text"]["attempts"]
     for attempt in range(attempts):
@@ -171,7 +178,7 @@ async def mirror_text_job(job, db) -> dict:
             sentences = [s.strip() for s in json.loads(raw).get("sentences")]
         except (TypeError, ValueError, AttributeError):
             sentences = None
-        if valid_sentences(sentences, brief):
+        if valid_sentences(sentences, brief, english=is_english(language)):
             break
         logger.warning("mirror_text_invalid workspace_id=%s attempt=%d", workspace_id, attempt + 1)
         prompt += "\n" + retry
