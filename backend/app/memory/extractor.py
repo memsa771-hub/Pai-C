@@ -762,6 +762,10 @@ async def extract_candidates(
     """
     if turn.is_empty():
         return ExtractionOutput([], [])
+    from app.inference import usage
+    if not usage.role_allowed("extractor"):
+        # Monthly model cap reached: extraction stops until next month.
+        return ExtractionOutput([], [])
 
     api_key, model, base_url = _model_config()
     if not api_key:

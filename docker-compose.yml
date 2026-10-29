@@ -26,6 +26,8 @@ x-backend: &backend
     # Semantic recall: Qdrant plus MEMORY_EMBEDDING_API_KEY from .env. Without a
     # key recall stays lexical; spend stops at PAI_EMBEDDING_MONTHLY_CAP_USD.
     PAI_SEMANTIC_RECALL_ENABLED: ${PAI_SEMANTIC_RECALL_ENABLED:-true}
+    # Chat (counselor role) runs on Anthropic when this key is set; otherwise on OpenAI.
+    ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
     # Uploads live on a volume shared with the worker, which parses them.
     FILE_STORAGE_BACKEND: local
     FILE_STORAGE_PATH: /data/files

@@ -24,6 +24,8 @@ def hermetic_providers_and_database(monkeypatch):
     def forbidden_provider(*args, **kwargs):
         pytest.fail("Offline test attempted an unpatched model provider; install a fake transport", pytrace=False)
 
+    from app.inference import anthropic_client
+    monkeypatch.setattr(anthropic_client, "AsyncAnthropic", forbidden_provider)
     monkeypatch.setattr(client, "create_client", forbidden_provider)
     monkeypatch.setattr(client, "create_sync_client", forbidden_provider)
     monkeypatch.setattr(client, "AsyncOpenAI", forbidden_provider)
@@ -58,3 +60,16 @@ def offline_classifier_model(monkeypatch):
     from unittest.mock import AsyncMock
     from app.pai_c.policy import classifier as gate
     monkeypatch.setattr(gate, "complete", AsyncMock(return_value='{"safety":{"level":"none","category":null},"intent":"sharing","emotion":"neutral","request":null,"mentioned_areas":[],"declined_area":null}'))
+
+
+@pytest.fixture(autouse=True)
+def offline_model_usage(request, monkeypatch):
+    """The monthly model counter is a database row: tests marked `model_usage`
+    exercise it against their own database; every other test neither writes it
+    nor is stopped by it. No test runs on the Anthropic key from .env."""
+    from app.config import config
+    from app.inference import usage
+    monkeypatch.setattr(config, "ANTHROPIC_API_KEY", "")
+    if request.node.get_closest_marker("model_usage") is None:
+        monkeypatch.setattr(usage, "record_model_call", lambda *args, **kwargs: None)
+        monkeypatch.setattr(usage, "cap_state", lambda: {"month": "", "spent": 0.0, "cap": 0.0, "stage": "ok"})

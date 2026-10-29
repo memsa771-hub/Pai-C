@@ -17,7 +17,8 @@ MODELS = {
     'mirror': 'PAI_MIRROR_MODEL', 'path_explain': 'PAI_PATH_EXPLAIN_MODEL',
     'sensitive': 'PAI_SENSITIVE_CHECK_MODEL', 'extractor': 'MEMORY_EXTRACTOR_MODEL',
     'document_extractor': 'DOCUMENT_EXTRACTOR_MODEL', 'ocr': 'DOCUMENT_OCR_MODEL',
-    'research_extract': 'PAI_MODEL', 'operator': 'PAI_OPERATOR_MODEL',
+    'research_extract': 'PAI_RESEARCHER_MODEL', 'researcher': 'PAI_RESEARCHER_MODEL',
+    'operator': 'PAI_OPERATOR_MODEL',
     'router': 'PAI_MODEL', 'embeddings': 'MEMORY_EMBEDDING_MODEL',
 }
 
@@ -35,12 +36,14 @@ def test_role_resolves_configured_model(role, setting):
     ('document_extractor', 'PAI_MODEL'), ('operator', 'PAI_MODEL'),
 ])
 def test_role_keeps_existing_empty_setting_fallback(role, fallback):
-    with patch.object(config, MODELS[role], ''), patch.object(config, fallback, 'fallback-model'):
+    with patch.object(config, MODELS[role], ''), patch.object(config, fallback, 'fallback-model'), \
+            patch.object(config, 'PAI_RESEARCHER_MODEL', ''):
         assert gateway.resolve_model(role) == 'fallback-model'
 
 
 def test_path_explain_falls_back_to_counselor_when_both_settings_are_empty():
     with patch.object(config, 'PAI_PATH_EXPLAIN_MODEL', ''), patch.object(config, 'PAI_ROADMAP_MODEL', ''), \
+            patch.object(config, 'PAI_RESEARCHER_MODEL', ''), \
             patch.object(config, 'PAI_COUNSELOR_MODEL', 'counselor-model'):
         assert gateway.resolve_model('path_explain') == 'counselor-model'
 

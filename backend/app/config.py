@@ -152,6 +152,18 @@ class Config:
     PAI_ENABLED: bool = os.environ.get("PAI_ENABLED", "false").lower() in ("true", "1", "yes")
     PAI_API_KEY: str = os.environ.get("PAI_API_KEY", "")
     PAI_BASE_URL: str = os.environ.get("PAI_BASE_URL", "https://api.openai.com/v1")
+    # Provider per role (app/inference/gateway.py resolve_role): defaults in
+    # pai_c/policy/model_roles.json; PAI_<ROLE>_PROVIDER / PAI_<ROLE>_MODEL
+    # override them. Without ANTHROPIC_API_KEY an anthropic role runs on openai.
+    ANTHROPIC_API_KEY: str = os.environ.get("ANTHROPIC_API_KEY", "")
+    ANTHROPIC_BASE_URL: str = os.environ.get("ANTHROPIC_BASE_URL", "")
+    PAI_COUNSELOR_PROVIDER: str = os.environ.get("PAI_COUNSELOR_PROVIDER", "")
+    PAI_RESEARCHER_MODEL: str = os.environ.get("PAI_RESEARCHER_MODEL", "")
+    # One estimated spend cap for every model call in a UTC month (stages and
+    # the roles each stage stops: model_roles.json; rates: model_costs.json).
+    PAI_MONTHLY_CAP_USD: float = float(os.environ.get("PAI_MONTHLY_CAP_USD", "100") or "100")
+    # Signed-in accounts allowed to read GET /v1/admin/usage (comma separated).
+    PAI_FOUNDER_EMAILS: str = os.environ.get("PAI_FOUNDER_EMAILS", "")
     # minimax-m2.5: fastest reliable tool-looper on the gateway (2026-08-27
     # screen of all 23 models: ~7s/2-turn loop, 4/4 valid reps, all quality
     # probes passed; deepseek-4-flash had degraded to >40s continuation turns).

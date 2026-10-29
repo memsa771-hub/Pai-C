@@ -6,6 +6,7 @@ from pathlib import Path
 from sqlalchemy import select
 
 from app.config import config
+from app.inference import usage
 from app.inference.gateway import complete
 from app.models import EventRecord, User, Workspace
 from app.pai_c.deep.analysis import _workspace_lock
@@ -18,6 +19,10 @@ from app.services.pai import PAI_AGENT_NAME, PAI_PRIMARY_CHANNEL
 
 JOB_OPENING = "counselor.opening"
 logger = logging.getLogger(__name__)
+
+
+class _Paused(Exception):
+    pass
 
 
 def _already_posted(db, workspace_id, channel):
@@ -47,6 +52,8 @@ async def opening_job(job, db):
         instruction = (Path(__file__).parent / "policy/actions/opening.md").read_text(encoding="utf-8")
         db.rollback()
         try:
+            if not usage.role_allowed("counselor"):
+                raise _Paused()
             raw = await complete("counselor", messages=[],
                 system_prompt=load_prompt("voice") + "\n\n" + context.text + "\n\n" + instruction,
                 response_format={"type": "json_object"}, phase="opening", turn_id=job_id)
@@ -55,6 +62,9 @@ async def opening_job(job, db):
             if not isinstance(reply, str) or not reply.strip() or contains_blocked_script(
                     reply, config.PAI_LANGUAGE_BLOCKED_SCRIPTS):
                 raise ValueError("Invalid opening reply")
+        except _Paused:
+            # Monthly cap reached: the fixed opening, saying PAI is paused, no model call.
+            reply = config.PAI_OPENING_FALLBACK_REPLY.replace("{name}", name) + "\n\n" + usage.paused_line()
         except Exception as exc:
             logger.warning("counselor_opening_error job_id=%s error_type=%s", job_id, type(exc).__name__)
             if not final_attempt:

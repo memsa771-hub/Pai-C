@@ -145,6 +145,10 @@ async def mirror_text_job(job, db) -> dict:
     workspace_id = job.workspace_id or (job.payload or {}).get("workspace_id")
     if not workspace_id:
         raise ValueError("Mirror text job requires a workspace")
+    from app.inference import usage
+    if not usage.role_allowed("mirror"):
+        # Monthly model cap (research_paused stage): a quiet skip, logged once a day.
+        return {"status": "cap_paused"}
     card = MirrorEngine(db).build(workspace_id)
     draft = _draft(db, workspace_id)
     if draft.get("type") == "mirror_state" and draft.get("card_version") == card["version"]:

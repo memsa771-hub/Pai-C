@@ -37,6 +37,11 @@ async def request_research(kind, workspace_id, *, db, journey, tool_context,
 async def _request_research(kind, workspace_id, *, db, journey, tool_context,
                             refresh_key=None, trigger=None, resume_run_id=None, resume_action=None,
                             possibility_id=None):
+    from app.inference import usage
+    if not usage.role_allowed("researcher"):
+        # Monthly model cap (research_paused stage): no new or resumed research,
+        # logged once a day; callers already treat ok=False as "not now".
+        return {"ok": False, "error": {"code": "research_paused"}}
     if kind == "information":
         from app.pai_c.myths import enqueue_information
         if tool_context is None or tool_context.workspace_id != workspace_id:

@@ -488,6 +488,10 @@ async def _needs_education(db, job, payload: dict, education: list[dict], extra:
 async def path_analysis_job(job, db) -> dict:
     if not job.workspace_id:
         raise ValueError("path analysis requires a workspace")
+    from app.inference import usage
+    if not usage.role_allowed("analyst"):
+        # Monthly model cap (research_paused stage): a quiet skip, logged once a day.
+        return {"status": "cap_paused"}
     payload = dict(job.payload or {})
     rules = policy()
     async with _workspace_lock(db, job.workspace_id):

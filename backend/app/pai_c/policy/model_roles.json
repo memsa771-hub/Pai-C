@@ -1,0 +1,34 @@
+{
+  "providers": {
+    "openai": {"api_key": "PAI_API_KEY", "base_url": "PAI_BASE_URL", "default_model": "gpt-5-mini"},
+    "anthropic": {"api_key": "ANTHROPIC_API_KEY", "base_url": "ANTHROPIC_BASE_URL",
+                  "model_prefixes": ["claude"], "default_model": "claude-sonnet-5-5", "default_max_tokens": 2048,
+                  "empty_conversation": "Begin.",
+                  "json_instruction": "Return only a valid JSON object, with no text before or after it."}
+  },
+  "fallback_provider": "openai",
+  "roles": {
+    "counselor": {"provider": "anthropic", "model": "claude-sonnet-5-5"},
+    "classifier": {"provider": "openai", "model": "gpt-5-mini"},
+    "extractor": {"provider": "openai", "model": "gpt-5-mini"},
+    "document_extractor": {"provider": "openai", "model": "gpt-5-mini"},
+    "safety": {"provider": "openai", "model": "gpt-5-mini"},
+    "sensitive": {"provider": "openai", "model": "gpt-5-mini"},
+    "summarizer": {"provider": "openai", "model": "gpt-5-mini"},
+    "ocr": {"provider": "openai", "model": "gpt-5-mini"},
+    "analyst": {"provider": "openai", "model": "gpt-5"},
+    "mirror": {"provider": "openai", "model": "gpt-5"},
+    "researcher": {"provider": "openai", "model": "gpt-5"},
+    "path_explain": {"same_as": "researcher"},
+    "research_extract": {"same_as": "researcher"},
+    "operator": {"provider": "openai", "model": null},
+    "router": {"provider": "openai", "model": null},
+    "embeddings": {"provider": "openai", "model": "text-embedding-3-small"}
+  },
+  "cap_stages": {"research_paused": 0.8, "paused": 1.0},
+  "cap_gates": {
+    "research_paused": ["researcher", "path_explain", "research_extract", "analyst", "mirror", "rules_refresh"],
+    "paused": ["counselor", "extractor", "document_extractor"]
+  },
+  "copy": {"paused_line": "PAI is paused for this month."}
+}

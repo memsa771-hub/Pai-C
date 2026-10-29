@@ -550,6 +550,10 @@ async def understand_document(
 
     if not segments:
         return DocumentUnderstanding("unknown", 0.0, None, [])
+    from app.inference import usage
+    if not usage.role_allowed("document_extractor"):
+        # Monthly model cap reached: extraction stops until next month.
+        return DocumentUnderstanding("unknown", 0.0, None, [])
 
     api_key, model, base_url = _model_config()
     if not api_key:

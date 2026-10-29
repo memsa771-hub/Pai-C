@@ -13,7 +13,8 @@ from app.pai_c.deep.polish import contains_blocked_script, polish_reply
 from app.pai_c.deep.prompts import load_prompt
 from app.pai_c.deep.turn_input import CounselorTurnInput
 from app.pai_c.memory import MemoryService
-from app.inference.gateway import complete as chat_completion, resolve_model
+from app.inference import usage
+from app.inference.gateway import ProviderUnavailable, complete as chat_completion, resolve_model
 
 logger = logging.getLogger(__name__)
 
@@ -99,16 +100,29 @@ async def run_deep_turn(db, turn: CounselorTurnInput, *,
     polish_ms = 0
     violations = []
     retry_line = ""
+    if instructions != "wellbeing" and not usage.role_allowed("counselor"):
+        # Monthly cap reached: a fixed reply that says PAI is paused, no model call.
+        return DeepTurnResult(config.PAI_COUNSELOR_FALLBACK_REPLY + "\n\n" + usage.paused_line(),
+                              {"type": "none"}, context, 0, 0, [], ["cap_paused"])
     from app.pai_c.voice.guards import repeated_questions, remove_repeated, question_sentences, repeats_previous_reply
     for attempt in range(2):
         started = time.monotonic()
-        raw = await chat_completion(role="counselor",
-            api_key=config.PAI_API_KEY, model=resolve_model("counselor"), messages=messages,
-            system_prompt=prompt + ("\n\n" + retry_line if retry_line else ""),
-            response_format={"type": "json_object"},
-            reasoning_effort=config.PAI_COUNSELOR_REASONING_EFFORT,
-            base_url=config.PAI_BASE_URL,
-            phase="counselor_retry" if attempt else "counselor", turn_id=turn.source_event_id)
+        try:
+            raw = await chat_completion(role="counselor",
+                api_key=config.PAI_API_KEY, model=resolve_model("counselor"), messages=messages,
+                system_prompt=prompt + ("\n\n" + retry_line if retry_line else ""),
+                response_format={"type": "json_object"},
+                reasoning_effort=config.PAI_COUNSELOR_REASONING_EFFORT,
+                base_url=config.PAI_BASE_URL,
+                phase="counselor_retry" if attempt else "counselor", turn_id=turn.source_event_id)
+        except ProviderUnavailable as exc:
+            # Wellbeing keeps its own fallback (runtime); any other turn gets the fixed reply.
+            if instructions == "wellbeing":
+                raise
+            logger.warning("counselor_provider_unavailable turn_id=%s error=%s", turn.source_event_id, exc)
+            violations.append("provider_fallback")
+            return DeepTurnResult(config.PAI_COUNSELOR_FALLBACK_REPLY, {"type": "none"}, context,
+                                  model_ms, polish_ms, [], violations)
         model_ms += int((time.monotonic() - started) * 1000)
         started = time.monotonic()
         reply, action, moves = _parse_response(raw, violations=violations)
