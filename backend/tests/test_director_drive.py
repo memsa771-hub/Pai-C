@@ -273,3 +273,48 @@ def test_chosen_next_step_is_the_routes_first_open_step():
     assert "Take ECAT" in chosen.next_step["text"]
     generic = controller.decide({**inputs(replies=["Hi?"]), "journey_stage": "CHOSEN"})
     assert generic.next_step["text"] == controller.load_data("next_steps.json")["phases"]["chosen"]["line"]
+
+
+
+# ---- fix round 2 ------------------------------------------------------------------
+
+def test_a_bank_step_appended_to_an_answer_is_recorded_as_asked():
+    from app.pai_c.policy.state import decision_log
+    ask = {"text": "What is software engineering?", "kind": "information", "needs_research": False,
+           "needs_context": False}
+    sig = signals(intent="asking_info", request=ask)
+    answered = controller.decide(inputs(sig, replies=["Hi?"]))
+    assert answered.next_step["key"] == "bank:hobbies"
+    logged = decision_log(answered, sig)
+    assert logged["step_bank_intent"] == "hobbies"
+    following = controller.decide(inputs(prior=[logged], replies=["Hi?", "What do you enjoy?"]))
+    assert following.action == "bank_question" and following.bank_intent != "hobbies"
+
+
+@pytest.mark.asyncio
+async def test_a_step_line_in_a_blocked_script_is_never_posted(monkeypatch):
+    from app.config import config
+    monkeypatch.setattr(config, "PAI_LANGUAGE_BLOCKED_SCRIPTS", "Devanagari")
+    decision = controller.decide({**inputs(replies=["Hi?"]), "journey_stage": "PROPOSED"})
+    output = json.dumps({"reply": "Those two fields both use maths.",
+                         "next_step": "\u0930\u094b\u0921\u092e\u0948\u092a page kholo.",
+                         "moves": ["give"], "action": {"type": "none"}})
+    model = AsyncMock(return_value=output)
+    with StudentSession() as student, student.factory() as db:
+        with patch("app.pai_c.deep.turn.chat_completion", model):
+            result = await run_deep_turn(db, _turn(student, "ok"), history=[], decision=decision, signals=signals())
+    assert "\u0930" not in result.reply and result.reply.endswith(decision.next_step["text"])
+    assert "drive_appended" in result.guard_violations
+
+
+@pytest.mark.asyncio
+async def test_a_step_line_with_an_unsourced_world_number_is_never_posted():
+    decision = controller.decide({**inputs(replies=["Hi?"]), "journey_stage": "PROPOSED"})
+    output = json.dumps({"reply": "Those two fields both use maths.",
+                         "next_step": "Apply now; 90% of students get in.",
+                         "moves": ["give"], "action": {"type": "none"}})
+    model = AsyncMock(return_value=output)
+    with StudentSession() as student, student.factory() as db:
+        with patch("app.pai_c.deep.turn.chat_completion", model):
+            result = await run_deep_turn(db, _turn(student, "ok"), history=[], decision=decision, signals=signals())
+    assert "90%" not in result.reply and result.reply.endswith(decision.next_step["text"])

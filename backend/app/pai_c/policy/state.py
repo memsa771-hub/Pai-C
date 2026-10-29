@@ -29,7 +29,8 @@ def bank_asked(prior_decisions, asking) -> list[str]:
     PAI reply has asked a question the conversation is past its open first
     question (the opening or the intro), so that item counts as asked."""
     bank = load_data("question_bank.json")
-    asked = [row["decision"].get("bank_intent") for row in prior_decisions if row["decision"].get("bank_intent")]
+    asked = [intent for row in prior_decisions
+             for intent in (row["decision"].get("bank_intent"), row["decision"].get("step_bank_intent")) if intent]
     if any(asking):
         asked.append(bank["first_item"])
     return list(dict.fromkeys(asked))
@@ -196,9 +197,16 @@ def build_state(db, turn, signals, history):
     return state
 
 
+def step_bank_intent(decision) -> str | None:
+    """The bank item a reply's next step asks ("bank:<intent>[:followup]"),
+    e.g. the question an answer ends with, so the ledger never asks it again."""
+    key = (decision.next_step or {}).get("key") or ""
+    return key.split(":")[1] if key.startswith("bank:") else None
+
+
 def decision_log(decision, signals):
     request = signals.request
-    return {**decision.as_dict(), "signals": {
+    return {**decision.as_dict(), "step_bank_intent": step_bank_intent(decision), "signals": {
         "intent": signals.intent, "emotion": signals.emotion,
         "request_kind": request.kind if request else None,
         "needs_research": request.needs_research if request else None,

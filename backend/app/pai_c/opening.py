@@ -95,8 +95,14 @@ async def opening_job(job, db):
             data = json.loads(unfence(raw))
             reply = data.get("reply") if isinstance(data, dict) else None
             step = data.get("next_step") if isinstance(data, dict) else None
-            if isinstance(reply, str) and isinstance(step, str) and step.strip():
+            # One question: the opening ends with its own question; a step is
+            # added only to a body that asks none, and at most one question stays.
+            from app.pai_c.deep.polish import polish_reply, question_count
+            if (isinstance(reply, str) and isinstance(step, str) and step.strip()
+                    and not question_count(reply)):
                 reply = reply.rstrip() + "\n\n" + step.strip()
+            if isinstance(reply, str):
+                reply = polish_reply(reply)
             if not isinstance(reply, str) or not reply.strip() or contains_blocked_script(
                     reply, config.PAI_LANGUAGE_BLOCKED_SCRIPTS):
                 raise ValueError("Invalid opening reply")

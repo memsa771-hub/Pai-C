@@ -73,3 +73,18 @@ async def test_opening_language_is_the_chat_language_else_the_script_of_the_stud
         db.commit()
         prompt = await _open(student, db)
         assert _section(prompt, "opening_language") == {"code": "ps", "script": "arabic"}
+
+
+
+@pytest.mark.asyncio
+async def test_the_opening_posts_exactly_one_question():
+    with StudentSession() as student, student.factory() as db:
+        model = AsyncMock(return_value=json.dumps({
+            "reply": "Salam Ali. Main PAI hoon. Apne baare mein batao, aaj kal kya karte ho?",
+            "next_step": "Aur tumhe kya pasand hai?", "moves": ["ask"], "action": {"type": "none"}}))
+        job = SimpleNamespace(id="opening", workspace_id=student.workspace_id, attempts=1, max_attempts=3)
+        with patch.object(opening, "complete", model):
+            assert (await opening.opening_job(job, db))["status"] == "posted"
+        posted = student.transcript[-1]["content"]
+        assert posted.count("?") == 1 and posted.endswith("aaj kal kya karte ho?")
+        assert "no separate next step" in model.await_args.kwargs["system_prompt"]

@@ -227,6 +227,16 @@ async def run_deep_turn(db, turn: CounselorTurnInput, *,
                     not (decision.next_step or {}).get("question")
                     or repeated_questions(step_line, history, avoid)):
                 step_line = ""
+            # The step line passes the same checks as the reply: no blocked
+            # script, no unsourced world number; otherwise the data step is used.
+            if step_line and contains_blocked_script(step_line, config.PAI_LANGUAGE_BLOCKED_SCRIPTS):
+                step_line = ""
+            if step_line:
+                _, step_violations = guard_reply(step_line, "{}", context.world_facts,
+                                                       allowed_context(context.text) + turn.student_text)
+                if step_violations:
+                    violations.extend(item for item in step_violations if item not in violations)
+                    step_line = ""
             if step_line:
                 reply = polish_reply(reply.rstrip() + "\n\n" + step_line)
         if decision is not None and decision.must_drive and card is None and not ends_with_step(reply, step_line):
