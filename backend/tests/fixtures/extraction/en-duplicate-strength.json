@@ -1,0 +1,56 @@
+{
+  "id": "en-duplicate-strength",
+  "language": "en",
+  "description": "The same strength said twice in slightly different words is one entry.",
+  "student_messages": [
+    "I'm very good at solving maths problems.",
+    "Yes, like I said, I'm good at solving math problems, that's my strongest thing."
+  ],
+  "extractor_output": [
+    {
+      "candidates": [
+        {
+          "candidate_type": "vault_item",
+          "operation": "upsert",
+          "key": "strength",
+          "proposed_value": {
+            "text": "Very good at solving maths problems"
+          },
+          "quote": "I'm very good at solving maths problems",
+          "confidence": 0.9
+        }
+      ]
+    },
+    {
+      "candidates": [
+        {
+          "candidate_type": "vault_item",
+          "operation": "upsert",
+          "key": "strength",
+          "proposed_value": {
+            "text": "Good at solving math problems"
+          },
+          "quote": "I'm good at solving math problems",
+          "confidence": 0.9
+        }
+      ]
+    }
+  ],
+  "expected_vault": [
+    {
+      "kind": "item",
+      "type": "strength",
+      "display": [
+        "solving",
+        "problems"
+      ],
+      "evidence_level": "stated",
+      "core": true
+    }
+  ],
+  "expected_counts": {
+    "strength": 1
+  },
+  "must_not": [],
+  "synthetic": true
+}

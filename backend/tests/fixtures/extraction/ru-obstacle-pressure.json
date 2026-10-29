@@ -1,0 +1,67 @@
+{
+  "id": "ru-obstacle-pressure",
+  "language": "roman_ur",
+  "description": "Money and time pressures, with no budget figure invented.",
+  "student_messages": [
+    "Ghar ke halaat theek nahi, fees ka bara masla hai. Aur shaam ko mujhe abbu ki dukaan pe baithna parta hai, parhai ka time nahi milta."
+  ],
+  "extractor_output": {
+    "candidates": [
+      {
+        "candidate_type": "vault_item",
+        "operation": "upsert",
+        "key": "pressure",
+        "proposed_value": {
+          "text": "Fees are a big problem because the family's situation is difficult",
+          "kind": "money"
+        },
+        "quote": "Ghar ke halaat theek nahi, fees ka bara masla hai",
+        "confidence": 0.9
+      },
+      {
+        "candidate_type": "vault_item",
+        "operation": "upsert",
+        "key": "pressure",
+        "proposed_value": {
+          "text": "Sits at the father's shop in the evenings and gets little study time",
+          "kind": "time"
+        },
+        "quote": "shaam ko mujhe abbu ki dukaan pe baithna parta hai, parhai ka time nahi milta",
+        "confidence": 0.9
+      }
+    ]
+  },
+  "expected_vault": [
+    {
+      "kind": "item",
+      "type": "pressure",
+      "display": [
+        "Fees",
+        "Money"
+      ],
+      "evidence_level": "stated",
+      "core": true
+    },
+    {
+      "kind": "item",
+      "type": "pressure",
+      "display": [
+        "shop",
+        "Time"
+      ],
+      "evidence_level": "stated",
+      "core": true
+    }
+  ],
+  "must_not": [
+    {
+      "type": "finance.budget",
+      "why": "a money worry has no figure"
+    },
+    {
+      "type": "goal",
+      "why": "an obstacle is not a goal"
+    }
+  ],
+  "synthetic": true
+}

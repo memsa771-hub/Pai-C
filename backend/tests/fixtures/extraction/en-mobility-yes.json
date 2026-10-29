@@ -1,0 +1,84 @@
+{
+  "id": "en-mobility-yes",
+  "language": "en",
+  "description": "A positive move to a named city.",
+  "student_messages": [
+    "I live in Hyderabad but I can move to Karachi for university."
+  ],
+  "extractor_output": {
+    "candidates": [
+      {
+        "candidate_type": "vault_fact",
+        "operation": "upsert",
+        "key": "location.current_city",
+        "proposed_value": "Hyderabad",
+        "quote": "I live in Hyderabad",
+        "confidence": 0.9
+      },
+      {
+        "candidate_type": "vault_fact",
+        "operation": "upsert",
+        "key": "mobility.relocation_willingness",
+        "proposed_value": "yes",
+        "quote": "I can move to Karachi for university",
+        "confidence": 0.9
+      },
+      {
+        "candidate_type": "vault_fact",
+        "operation": "upsert",
+        "key": "preferences.location_limits",
+        "proposed_value": [
+          "Can move to Karachi"
+        ],
+        "quote": "I can move to Karachi for university",
+        "confidence": 0.9
+      }
+    ]
+  },
+  "expected_vault": [
+    {
+      "kind": "fact",
+      "type": "location.current_city",
+      "display": [
+        "Hyderabad"
+      ],
+      "evidence_level": "stated",
+      "core": true
+    },
+    {
+      "kind": "fact",
+      "type": "mobility.relocation_willingness",
+      "display_any": [
+        "Willing to move",
+        "Only within the province"
+      ],
+      "evidence_level": "stated",
+      "core": true
+    },
+    {
+      "kind": "fact",
+      "type": "preferences.location_limits",
+      "display": [
+        "Karachi"
+      ],
+      "evidence_level": "stated"
+    }
+  ],
+  "must_not": [
+    {
+      "type": "mobility.relocation_willingness",
+      "display": [
+        "Not willing"
+      ],
+      "why": "they can move"
+    },
+    {
+      "type": "location.current_city",
+      "display": [
+        "Karachi"
+      ],
+      "why": "Karachi is where they could go, not where they live"
+    }
+  ],
+  "synthetic": true
+}

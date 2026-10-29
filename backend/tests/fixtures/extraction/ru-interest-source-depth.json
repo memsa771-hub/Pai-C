@@ -1,0 +1,89 @@
+{
+  "id": "ru-interest-source-depth",
+  "language": "roman_ur",
+  "description": "Two interests: one from reels with no hands-on depth, one from a school class.",
+  "student_messages": [
+    "Mujhe robotics bohat pasand hai, Instagram reels pe robots dekhta rehta hoon.",
+    "Nahi, khud kabhi kuch banaya nahi. Haan physics class mein circuits wala chapter bohat acha laga tha, wo samajh aata hai."
+  ],
+  "extractor_output": [
+    {
+      "candidates": [
+        {
+          "candidate_type": "vault_item",
+          "operation": "upsert",
+          "key": "interest",
+          "proposed_value": {
+            "text": "Robotics",
+            "example": "Watches robot videos on Instagram reels"
+          },
+          "quote": "Mujhe robotics bohat pasand hai, Instagram reels pe robots dekhta rehta hoon",
+          "confidence": 0.9
+        }
+      ]
+    },
+    {
+      "candidates": [
+        {
+          "candidate_type": "vault_item",
+          "operation": "upsert",
+          "key": "interest",
+          "proposed_value": {
+            "text": "Robotics",
+            "example": "Watches robot videos on Instagram reels; has not built anything yet"
+          },
+          "quote": "khud kabhi kuch banaya nahi",
+          "confidence": 0.8
+        },
+        {
+          "candidate_type": "vault_item",
+          "operation": "upsert",
+          "key": "interest",
+          "proposed_value": {
+            "text": "Electric circuits",
+            "example": "Liked the circuits chapter in physics class at school and understands it"
+          },
+          "quote": "physics class mein circuits wala chapter bohat acha laga tha",
+          "confidence": 0.9
+        }
+      ]
+    }
+  ],
+  "expected_vault": [
+    {
+      "kind": "item",
+      "type": "interest",
+      "display": [
+        "Robotics",
+        "reels",
+        "not built"
+      ],
+      "evidence_level": "stated",
+      "core": true
+    },
+    {
+      "kind": "item",
+      "type": "interest",
+      "display": [
+        "circuits",
+        "physics class"
+      ],
+      "evidence_level": "stated",
+      "core": true
+    }
+  ],
+  "expected_counts": {
+    "interest": 2
+  },
+  "must_not": [
+    {
+      "type": "goal",
+      "why": "liking a field is an interest, not a goal"
+    },
+    {
+      "type": "exploration_experience",
+      "why": "watching reels is not a project they did"
+    }
+  ],
+  "synthetic": true
+}

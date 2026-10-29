@@ -1,0 +1,51 @@
+{
+  "id": "en-a-level-grades",
+  "language": "en",
+  "description": "A-levels with subjects and grades, in English.",
+  "student_messages": [
+    "I did my A levels at Beaconhouse in Maths, Physics and Chemistry and got A*AB."
+  ],
+  "extractor_output": {
+    "candidates": [
+      {
+        "candidate_type": "student_record",
+        "operation": "upsert",
+        "key": "education",
+        "proposed_value": {
+          "qualification_name": "a_level",
+          "institution_name": "Beaconhouse",
+          "academic_status": "completed",
+          "details": {
+            "subjects": [
+              "mathematics",
+              "physics",
+              "chemistry"
+            ],
+            "awarding_body": "Cambridge"
+          },
+          "result": {
+            "grade": "A*AB"
+          }
+        },
+        "quote": "I did my A levels at Beaconhouse in Maths, Physics and Chemistry and got A*AB",
+        "confidence": 0.9
+      }
+    ]
+  },
+  "expected_vault": [
+    {
+      "kind": "record",
+      "type": "education",
+      "display": [
+        "A Level",
+        "Beaconhouse",
+        "A*AB",
+        "Physics"
+      ],
+      "evidence_level": "stated",
+      "core": true
+    }
+  ],
+  "must_not": [],
+  "synthetic": true
+}

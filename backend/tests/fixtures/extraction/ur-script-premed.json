@@ -1,0 +1,78 @@
+{
+  "id": "ur-script-premed",
+  "language": "ur",
+  "description": "Urdu script: values stored in English, the name transliterated.",
+  "student_messages": [
+    "میرا نام عائشہ ہے۔ میں نے ایف ایس سی پری میڈیکل راولپنڈی بورڈ سے کی ہے اور مجھے بچوں کو پڑھانا بہت اچھا لگتا ہے۔"
+  ],
+  "extractor_output": {
+    "candidates": [
+      {
+        "candidate_type": "vault_fact",
+        "operation": "upsert",
+        "key": "identity.preferred_name",
+        "proposed_value": "Ayesha",
+        "quote": "میرا نام عائشہ ہے",
+        "confidence": 0.9
+      },
+      {
+        "candidate_type": "student_record",
+        "operation": "upsert",
+        "key": "education",
+        "proposed_value": {
+          "qualification_name": "fsc",
+          "field_of_study": "pre_medical",
+          "academic_status": "completed",
+          "details": {
+            "awarding_body": "BISE Rawalpindi"
+          }
+        },
+        "quote": "میں نے ایف ایس سی پری میڈیکل راولپنڈی بورڈ سے کی ہے",
+        "confidence": 0.9
+      },
+      {
+        "candidate_type": "vault_item",
+        "operation": "upsert",
+        "key": "interest",
+        "proposed_value": {
+          "text": "Teaching children"
+        },
+        "quote": "مجھے بچوں کو پڑھانا بہت اچھا لگتا ہے",
+        "confidence": 0.9
+      }
+    ]
+  },
+  "expected_vault": [
+    {
+      "kind": "fact",
+      "type": "identity.preferred_name",
+      "display": [
+        "Ayesha"
+      ],
+      "evidence_level": "stated",
+      "core": true
+    },
+    {
+      "kind": "record",
+      "type": "education",
+      "display": [
+        "FSc",
+        "Pre-Medical",
+        "Rawalpindi"
+      ],
+      "evidence_level": "stated",
+      "core": true
+    },
+    {
+      "kind": "item",
+      "type": "interest",
+      "display": [
+        "Teaching"
+      ],
+      "evidence_level": "stated",
+      "core": true
+    }
+  ],
+  "must_not": [],
+  "synthetic": true
+}

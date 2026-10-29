@@ -1,0 +1,53 @@
+{
+  "id": "ru-matric-board",
+  "language": "roman_ur",
+  "description": "Matric with its group, year, board and raw marks.",
+  "student_messages": [
+    "Matric computer science group mein 2023 mein Multan board se ki thi, 1020 marks aaye 1100 mein se."
+  ],
+  "extractor_output": {
+    "candidates": [
+      {
+        "candidate_type": "student_record",
+        "operation": "upsert",
+        "key": "education",
+        "proposed_value": {
+          "qualification_name": "matric",
+          "field_of_study": "science_computer",
+          "academic_status": "completed",
+          "graduation_year": 2023,
+          "details": {
+            "awarding_body": "Multan board"
+          },
+          "result": {
+            "marks_obtained": 1020,
+            "marks_total": 1100
+          }
+        },
+        "quote": "Matric computer science group mein 2023 mein Multan board se ki thi, 1020 marks aaye 1100 mein se",
+        "confidence": 0.9
+      }
+    ]
+  },
+  "expected_vault": [
+    {
+      "kind": "record",
+      "type": "education",
+      "display": [
+        "Matric",
+        "1020/1100 (93%)",
+        "Multan",
+        "2023"
+      ],
+      "evidence_level": "stated",
+      "core": true
+    }
+  ],
+  "must_not": [
+    {
+      "type": "location.current_city",
+      "why": "Multan is the board, not where they live"
+    }
+  ],
+  "synthetic": true
+}

@@ -1,0 +1,45 @@
+{
+  "id": "ru-goal-engineering",
+  "language": "roman_ur",
+  "description": "A planned degree goal in the student's own words.",
+  "student_messages": [
+    "FSc ke baad main electrical engineering mein BS karna chahta hoon."
+  ],
+  "extractor_output": {
+    "candidates": [
+      {
+        "candidate_type": "student_record",
+        "operation": "upsert",
+        "key": "goal",
+        "proposed_value": {
+          "goal_type": "education",
+          "title": "BS in Electrical Engineering",
+          "commitment": "considering",
+          "details": {
+            "stated_preference": "BS in electrical engineering after FSc",
+            "degree_level": "bachelor",
+            "field_of_study": "electrical_engineering"
+          }
+        },
+        "quote": "FSc ke baad main electrical engineering mein BS karna chahta hoon",
+        "confidence": 0.9,
+        "attribution": {
+          "claim_owner": "student"
+        }
+      }
+    ]
+  },
+  "expected_vault": [
+    {
+      "kind": "record",
+      "type": "goal",
+      "display": [
+        "Electrical Engineering"
+      ],
+      "evidence_level": "stated",
+      "core": true
+    }
+  ],
+  "must_not": [],
+  "synthetic": true
+}

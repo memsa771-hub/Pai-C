@@ -1,0 +1,58 @@
+{
+  "id": "en-strength-evidence",
+  "language": "en",
+  "description": "A stated strength with its evidence, plus PAI's own guess kept as a guess.",
+  "student_messages": [
+    "I'm good at explaining things. Every evening I teach maths to two kids in my street."
+  ],
+  "extractor_output": {
+    "candidates": [
+      {
+        "candidate_type": "vault_item",
+        "operation": "upsert",
+        "key": "strength",
+        "proposed_value": {
+          "text": "Good at explaining things",
+          "basis": "Teaches maths to two children in the street every evening"
+        },
+        "quote": "I'm good at explaining things. Every evening I teach maths to two kids in my street",
+        "confidence": 0.9
+      },
+      {
+        "candidate_type": "vault_item",
+        "operation": "upsert",
+        "key": "strength",
+        "proposed_value": {
+          "text": "Patient and consistent",
+          "basis": "Tutors every evening"
+        },
+        "quote": "Every evening I teach maths to two kids in my street",
+        "confidence": 0.6,
+        "inferred": true
+      }
+    ]
+  },
+  "expected_vault": [
+    {
+      "kind": "item",
+      "type": "strength",
+      "display": [
+        "explaining",
+        "maths",
+        "every evening"
+      ],
+      "evidence_level": "stated",
+      "core": true
+    },
+    {
+      "kind": "item",
+      "type": "strength",
+      "display": [
+        "Patient"
+      ],
+      "evidence_level": "inferred"
+    }
+  ],
+  "must_not": [],
+  "synthetic": true
+}

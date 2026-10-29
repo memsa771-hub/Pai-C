@@ -1,0 +1,74 @@
+{
+  "id": "ru-family-wish-stated",
+  "language": "roman_ur",
+  "description": "A father's wish the student states: Stated, third person, the father's and not the student's goal.",
+  "student_messages": [
+    "Abbu chahte hain main doctor banun, lekin mujhe engineering zyada pasand hai."
+  ],
+  "extractor_output": {
+    "candidates": [
+      {
+        "candidate_type": "vault_item",
+        "operation": "upsert",
+        "key": "family_member",
+        "proposed_value": {
+          "relation": "father",
+          "wish": "Wants me to become a doctor",
+          "influence": "high"
+        },
+        "quote": "Abbu chahte hain main doctor banun",
+        "confidence": 0.9,
+        "inferred": true,
+        "attribution": {
+          "claim_owner": "student",
+          "stated_field": "wish"
+        }
+      },
+      {
+        "candidate_type": "vault_item",
+        "operation": "upsert",
+        "key": "interest",
+        "proposed_value": {
+          "text": "Engineering"
+        },
+        "quote": "mujhe engineering zyada pasand hai",
+        "confidence": 0.9
+      }
+    ]
+  },
+  "expected_vault": [
+    {
+      "kind": "item",
+      "type": "family_member",
+      "display": [
+        "Father",
+        "Wants the student to become a doctor"
+      ],
+      "evidence_level": "stated",
+      "core": true
+    },
+    {
+      "kind": "item",
+      "type": "interest",
+      "display": [
+        "Engineering"
+      ],
+      "evidence_level": "stated",
+      "core": true
+    }
+  ],
+  "must_not": [
+    {
+      "type": "goal",
+      "why": "a parent's wish is never the student's goal"
+    },
+    {
+      "type": "family_member",
+      "display": [
+        "wants me"
+      ],
+      "why": "values are third person"
+    }
+  ],
+  "synthetic": true
+}

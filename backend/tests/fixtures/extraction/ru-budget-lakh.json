@@ -1,0 +1,47 @@
+{
+  "id": "ru-budget-lakh",
+  "language": "roman_ur",
+  "description": "A yearly budget range in lakh, shown as lakh and never as raw figures.",
+  "student_messages": [
+    "Saal ka 3 se 5 lakh tak kharcha ho sakta hai, hostel mila kar."
+  ],
+  "extractor_output": {
+    "candidates": [
+      {
+        "candidate_type": "vault_fact",
+        "operation": "upsert",
+        "key": "finance.budget",
+        "proposed_value": {
+          "min": 300000,
+          "max": 500000,
+          "currency": "rupees",
+          "period": "per_year",
+          "covers": "fees_and_living"
+        },
+        "quote": "Saal ka 3 se 5 lakh tak kharcha ho sakta hai, hostel mila kar",
+        "confidence": 0.9
+      }
+    ]
+  },
+  "expected_vault": [
+    {
+      "kind": "fact",
+      "type": "finance.budget",
+      "display": [
+        "lakh"
+      ],
+      "evidence_level": "stated",
+      "core": true
+    }
+  ],
+  "must_not": [
+    {
+      "type": "finance.budget",
+      "display": [
+        "300000"
+      ],
+      "why": "figures read in lakh"
+    }
+  ],
+  "synthetic": true
+}

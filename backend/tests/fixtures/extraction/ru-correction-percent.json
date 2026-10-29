@@ -1,0 +1,79 @@
+{
+  "id": "ru-correction-percent",
+  "language": "roman_ur",
+  "description": "The student corrects their own Matric percentage; the corrected figure replaces the first.",
+  "student_messages": [
+    "Matric mein mere 78% aaye the.",
+    "Sorry galti ho gayi, actually 82% aaye the, 78 nahi."
+  ],
+  "extractor_output": [
+    {
+      "candidates": [
+        {
+          "candidate_type": "student_record",
+          "operation": "upsert",
+          "key": "education",
+          "proposed_value": {
+            "qualification_name": "matric",
+            "academic_status": "completed",
+            "result": {
+              "percentage": 78
+            }
+          },
+          "quote": "Matric mein mere 78% aaye the",
+          "confidence": 0.9
+        }
+      ]
+    },
+    {
+      "candidates": [
+        {
+          "candidate_type": "student_record",
+          "operation": "upsert",
+          "key": "education",
+          "proposed_value": {
+            "result": {
+              "percentage": 82
+            }
+          },
+          "quote": "actually 82% aaye the, 78 nahi",
+          "confidence": 0.9,
+          "entities": {
+            "record_id": "@education[0]"
+          },
+          "attribution": {
+            "claim_owner": "student",
+            "correction": true,
+            "correction_quote": "actually 82% aaye the, 78 nahi"
+          }
+        }
+      ]
+    }
+  ],
+  "expected_vault": [
+    {
+      "kind": "record",
+      "type": "education",
+      "display": [
+        "Matric",
+        "82%"
+      ],
+      "evidence_level": "stated",
+      "core": true
+    }
+  ],
+  "expected_counts": {
+    "education": 1
+  },
+  "expected_conflicts": 0,
+  "must_not": [
+    {
+      "type": "education",
+      "display": [
+        "78%"
+      ],
+      "why": "the corrected figure replaces the old one"
+    }
+  ],
+  "synthetic": true
+}

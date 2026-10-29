@@ -1,0 +1,68 @@
+{
+  "id": "ru-mobility-no",
+  "language": "roman_ur",
+  "description": "The student cannot leave their city: mobility no, a location limit and the city.",
+  "student_messages": [
+    "Main Lahore mein rehta hoon aur Lahore se bahar nahi ja sakta."
+  ],
+  "extractor_output": {
+    "candidates": [
+      {
+        "candidate_type": "vault_fact",
+        "operation": "upsert",
+        "key": "location.current_city",
+        "proposed_value": "Lahore",
+        "quote": "Main Lahore mein rehta hoon",
+        "confidence": 0.9
+      },
+      {
+        "candidate_type": "vault_fact",
+        "operation": "upsert",
+        "key": "mobility.relocation_willingness",
+        "proposed_value": "no",
+        "quote": "Lahore se bahar nahi ja sakta",
+        "confidence": 0.9
+      },
+      {
+        "candidate_type": "vault_fact",
+        "operation": "upsert",
+        "key": "preferences.location_limits",
+        "proposed_value": [
+          "Can only study in Lahore"
+        ],
+        "quote": "Lahore se bahar nahi ja sakta",
+        "confidence": 0.9
+      }
+    ]
+  },
+  "expected_vault": [
+    {
+      "kind": "fact",
+      "type": "location.current_city",
+      "display": [
+        "Lahore"
+      ],
+      "evidence_level": "stated",
+      "core": true
+    },
+    {
+      "kind": "fact",
+      "type": "mobility.relocation_willingness",
+      "display": [
+        "Not willing to move"
+      ],
+      "evidence_level": "stated",
+      "core": true
+    },
+    {
+      "kind": "fact",
+      "type": "preferences.location_limits",
+      "display": [
+        "Lahore"
+      ],
+      "evidence_level": "stated"
+    }
+  ],
+  "must_not": [],
+  "synthetic": true
+}

@@ -1,0 +1,104 @@
+{
+  "id": "en-ics-student",
+  "language": "en",
+  "description": "An English-writing student: name, city, a current intermediate and a goal.",
+  "student_messages": [
+    "Hi, I'm Hamza from Islamabad. I'm in my first year of ICS at FAST and I want to do software engineering."
+  ],
+  "extractor_output": {
+    "candidates": [
+      {
+        "candidate_type": "vault_fact",
+        "operation": "upsert",
+        "key": "identity.preferred_name",
+        "proposed_value": "Hamza",
+        "quote": "I'm Hamza",
+        "confidence": 0.9
+      },
+      {
+        "candidate_type": "vault_fact",
+        "operation": "upsert",
+        "key": "location.current_city",
+        "proposed_value": "Islamabad",
+        "quote": "I'm Hamza from Islamabad",
+        "confidence": 0.9
+      },
+      {
+        "candidate_type": "student_record",
+        "operation": "upsert",
+        "key": "education",
+        "proposed_value": {
+          "qualification_name": "ics",
+          "field_of_study": "ics",
+          "institution_name": "FAST",
+          "academic_status": "current",
+          "details": {
+            "current_year": 1
+          }
+        },
+        "quote": "I'm in my first year of ICS at FAST",
+        "confidence": 0.9
+      },
+      {
+        "candidate_type": "student_record",
+        "operation": "upsert",
+        "key": "goal",
+        "proposed_value": {
+          "goal_type": "education",
+          "title": "Software engineering",
+          "commitment": "considering",
+          "details": {
+            "stated_preference": "Software engineering",
+            "field_of_study": "software_engineering"
+          }
+        },
+        "quote": "I want to do software engineering",
+        "confidence": 0.9,
+        "attribution": {
+          "claim_owner": "student"
+        }
+      }
+    ]
+  },
+  "expected_vault": [
+    {
+      "kind": "fact",
+      "type": "identity.preferred_name",
+      "display": [
+        "Hamza"
+      ],
+      "evidence_level": "stated",
+      "core": true
+    },
+    {
+      "kind": "fact",
+      "type": "location.current_city",
+      "display": [
+        "Islamabad"
+      ],
+      "evidence_level": "stated",
+      "core": true
+    },
+    {
+      "kind": "record",
+      "type": "education",
+      "display": [
+        "ICS",
+        "FAST"
+      ],
+      "evidence_level": "stated",
+      "core": true
+    },
+    {
+      "kind": "record",
+      "type": "goal",
+      "display": [
+        "Software"
+      ],
+      "evidence_level": "stated",
+      "core": true
+    }
+  ],
+  "must_not": [],
+  "synthetic": true
+}

@@ -1,0 +1,50 @@
+{
+  "id": "ru-parent-moving-wish",
+  "language": "roman_ur",
+  "description": "A parent's wish about moving is that parent's wish, never the student's mobility.",
+  "student_messages": [
+    "Abbu nahi chahte ke main Lahore se bahar jaun."
+  ],
+  "extractor_output": {
+    "candidates": [
+      {
+        "candidate_type": "vault_item",
+        "operation": "upsert",
+        "key": "family_member",
+        "proposed_value": {
+          "relation": "father",
+          "wish": "Does not want the student to study outside Lahore"
+        },
+        "quote": "Abbu nahi chahte ke main Lahore se bahar jaun",
+        "confidence": 0.9,
+        "attribution": {
+          "claim_owner": "student",
+          "stated_field": "wish"
+        }
+      }
+    ]
+  },
+  "expected_vault": [
+    {
+      "kind": "item",
+      "type": "family_member",
+      "display": [
+        "Father",
+        "outside Lahore"
+      ],
+      "evidence_level": "stated",
+      "core": true
+    }
+  ],
+  "must_not": [
+    {
+      "type": "mobility.relocation_willingness",
+      "why": "the father's wish is not the student's mobility"
+    },
+    {
+      "type": "preferences.location_limits",
+      "why": "the limit is the father's, not the student's"
+    }
+  ],
+  "synthetic": true
+}
