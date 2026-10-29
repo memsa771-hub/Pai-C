@@ -214,7 +214,8 @@ async def run_case(case: dict, model) -> dict:
             return await model(case, index["value"], kwargs, student)
 
         with patch.object(extractor, "chat_completion", call), \
-                patch.object(extractor, "_model_config", return_value=_model_config()),                 patch.object(handlers, "get_memory_index", NullMemoryIndex):
+                patch.object(extractor, "_model_config", return_value=_model_config()), \
+                patch.object(handlers, "get_memory_index", NullMemoryIndex):
             # The Vault is what is scored; recall indexing (and a vector
             # server) has no part in it.
             for position, text in enumerate(case["student_messages"]):
@@ -244,7 +245,8 @@ def prompt_fingerprint() -> str:
 
 
 def recorded_model(fingerprint: str):
-    """Replays saved outputs; a missing or stale recording is reported, never faked."""
+    """Replays saved outputs; a missing, stale or incomplete recording is
+    reported as skipped, never faked."""
     async def call(case, index, kwargs, student):
         path = RECORDINGS / f"{case['id']}.json"
         if not path.exists():
@@ -252,6 +254,8 @@ def recorded_model(fingerprint: str):
         data = json.loads(path.read_text(encoding="utf-8"))
         if data.get("prompt_fingerprint") != fingerprint:
             raise LookupError("stale_recording")
+        if index >= len(data.get("outputs", [])):
+            raise LookupError("incomplete_recording")
         return data["outputs"][index]
     return call
 
@@ -281,6 +285,7 @@ class LiveModel:
         self.model = extractor._model_config()[1]
         self.rate_in, self.rate_out = model_rates(self.model, usd_per_million)
         self.outputs: dict[str, list[str]] = {}
+        self.messages: dict[str, int] = {}
 
     def _usd(self, chars: int, rate: float) -> float:
         return chars / CHARS_PER_TOKEN * rate / 1e6
@@ -291,14 +296,22 @@ class LiveModel:
         projected = self.spent + self._usd(sent, self.rate_in) + OUTPUT_RESERVE_TOKENS * self.rate_out / 1e6
         if projected > self.cap:
             raise LookupError("budget_reached")
-        raw = await self.real(**kwargs)
+        try:
+            raw = await self.real(**kwargs)
+        except Exception as exc:  # one failing case must not end the run
+            raise LookupError(f"model_error: {type(exc).__name__}") from None
         self.spent += self._usd(sent, self.rate_in) + self._usd(len(raw or ""), self.rate_out)
-        self.outputs.setdefault(case["id"], []).append(raw)
+        if index == 0:
+            self.outputs[case["id"]] = []
+        self.messages[case["id"]] = len(case["student_messages"])
+        self.outputs[case["id"]].append(raw)
         return raw
 
     def save(self) -> None:
         RECORDINGS.mkdir(parents=True, exist_ok=True)
         for case_id, raws in self.outputs.items():
+            if len(raws) != self.messages[case_id]:
+                continue  # a case cut short (cap or error) would replay out of step
             (RECORDINGS / f"{case_id}.json").write_text(json.dumps(
                 {"prompt_fingerprint": self.fingerprint, "model": self.model,
                  "recorded_at": datetime.now(timezone.utc).isoformat(), "outputs": raws},
