@@ -82,11 +82,12 @@ def notice_changes(conn, tenant_id: str, plan_id: int, result: dict | None) -> l
     if number is None:
         return []
     diff = conn.execute(select(models.plan_revisions.c.diff).where(
-        models.plan_revisions.c.plan_id == plan_id, models.plan_revisions.c.number == number)).scalar()
+        models.plan_revisions.c.tenant_id == tenant_id, models.plan_revisions.c.plan_id == plan_id,
+        models.plan_revisions.c.number == number)).scalar()
     if not diff:
         return []
     rows = conn.execute(select(T.c.instance_key, T.c.title, T.c.programme_ref, T.c.kind).where(
-        T.c.plan_id == plan_id).order_by(T.c.id)).all()
+        T.c.tenant_id == tenant_id, T.c.plan_id == plan_id).order_by(T.c.id)).all()
     exact = {r.instance_key: r for r in rows}
     by_base = {_MARKS.sub("", r.instance_key): r for r in rows}  # the newest row of each key
     out = []
@@ -127,9 +128,10 @@ def notice_link(engine: Engine, task_id: int) -> dict:
     return {k: result[k] for k in ("revision", "cause") if k in result}
 
 
-def task_plan_and_template(engine: Engine, task_id: int) -> tuple[int, str] | None:
+def task_plan_and_template(engine: Engine, tenant_id: str, task_id: int) -> tuple[int, str] | None:
     with engine.connect() as conn:
-        row = conn.execute(select(T.c.plan_id, T.c.template_key).where(T.c.id == task_id)).first()
+        row = conn.execute(select(T.c.plan_id, T.c.template_key).where(T.c.tenant_id == tenant_id,
+                                                                       T.c.id == task_id)).first()
     return None if row is None else (row.plan_id, row.template_key)
 
 

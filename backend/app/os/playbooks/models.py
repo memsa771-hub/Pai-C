@@ -160,6 +160,12 @@ class Playbook(_Model):
                 if unknown:
                     raise ValueError(f"unknown note placeholder {sorted(unknown)} in {t.template_key} (known: "
                                      f"{sorted(NOTE_FIELDS)} and the playbook's constants)")
+                if "weeks" in placeholders(note or ""):  # {weeks} is the lead time / 7: anything else shows wrong
+                    lead = 0 if not t.lead_time else t.lead_time.days if t.lead_time.days is not None \
+                        else self.constants[t.lead_time.constant].value
+                    if not str(lead).isdigit() or int(lead) % 7:
+                        raise ValueError(f"note of {t.template_key} says {{weeks}}: its lead time ({lead} days) must "
+                                         f"be in whole weeks (a multiple of 7), or the note must say {{days}}")
             if self.require_citations and not t.citations and not t.citation_from_fact:
                 raise ValueError(f"task {t.template_key} needs a citation (require_citations is on)")
         return self

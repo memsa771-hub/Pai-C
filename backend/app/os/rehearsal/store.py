@@ -5,6 +5,7 @@ from datetime import date, timedelta
 
 from sqlalchemy import Date, Engine, cast, exists, func, literal, select
 from sqlalchemy.dialects.postgresql import insert
+from sqlalchemy.exc import OperationalError
 
 from app.os import clock, models
 from app.os.settings import OsSettings
@@ -14,6 +15,11 @@ log = logging.getLogger("app.os.rehearsal")
 R = models.rehearsal_clock
 WARNING = ("REHEARSAL MODE is on (OS_REHEARSAL): the OS clock is moved by the stored offset, the worker runs no "
            "scheduled jobs (only admin tick), and the admin advance/tick calls are open. Never run a pilot like this.")
+
+
+class RehearsalDataLeft(RuntimeError):
+    """Rehearsal is off but the tenant has a rehearsal clock row: the database holds rehearsal data (dated by the moved
+    clock, often in the future), which must never become a pilot database. The OS must not start."""
 
 
 class ClockStore:
@@ -59,11 +65,23 @@ class ClockStore:
 
 
 def install_clock(settings: OsSettings, engine: Engine) -> None:
-    """Rehearsal on: the shared clock reads the stored offset (and a loud warning is logged). Off: real time, whatever
-    row is left in the table. It overwrites the module-global clock, so a test that sets its own offset does so after
-    building services or the worker."""
+    """Rehearsal on: the shared clock reads the stored offset (and a loud warning is logged). Off: real time, and
+    startup is refused (RehearsalDataLeft) while the tenant still has a clock row, so rehearsal data never becomes a
+    pilot database (an unreachable database is logged, not refused: the worker cannot start without it). It
+    overwrites the module-global clock, so a test that sets its own offset does so after building services or the
+    worker."""
     if settings.rehearsal:
         log.warning(WARNING)
         clock.configure(ClockStore(engine, settings.tenant_id).offset)
-    else:
-        clock.configure(None)
+        return
+    try:
+        with engine.connect() as conn:
+            left = conn.execute(select(exists().where(R.c.tenant_id == settings.tenant_id))).scalar()
+    except OperationalError:  # no database yet (mounting the API does not need one): nothing to check against
+        log.warning("could not check os_rehearsal_clock for leftover rehearsal data: the database is not reachable")
+        left = False
+    if left:
+        raise RehearsalDataLeft(
+            f"OS_REHEARSAL is off but os_rehearsal_clock has a row for tenant '{settings.tenant_id}': this database "
+            "holds rehearsal data and must not run as a pilot. Use a clean database, or turn rehearsal mode on.")
+    clock.configure(None)

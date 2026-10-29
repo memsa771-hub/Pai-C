@@ -13,22 +13,29 @@ failure log is empty, 1 otherwise, 2 when it refused to start.
 OS_MODEL_MODE=openai, OS_TENANT_ID=rehearsal-billed, OS_REHEARSAL=on and the four monthly caps. It refuses to start
 unless OS_OPENAI_API_KEY is set and OS_RESEARCH_MONTHLY_USD, OS_DOCUMENTS_MONTHLY_USD, OS_STATEMENTS_MONTHLY_USD and
 OS_REPLAN_MONTHLY_USD are all set and sum to at most $15 (unset caps would fall back to the much larger defaults). The
-key is read from the environment only; it is never printed, logged or written to --out."""
+key is read from the environment only; it is never printed, logged or written to --out. Before anything starts, one
+cheap request (GET /v1/models, 10 s) checks that OpenAI can be reached with the key: a run whose network refuses
+api.openai.com would otherwise fail every model call for hours."""
 
 import argparse
 import logging
 import math
 import os
 import sys
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from datetime import datetime, timezone
 from pathlib import Path
+
+import httpx
 
 from tests.os.rehearsal.driver import BACKEND, Rehearsal, load_students
 
 REPO = BACKEND.parent
 BILLED_TENANT = "rehearsal-billed"
 BILLED_CAP_USD = 15.0
+OPENAI_HOST = "api.openai.com"
+PREFLIGHT_URL = f"https://{OPENAI_HOST}/v1/models"
+PREFLIGHT_TIMEOUT_S = 10
 CAPS = ("OS_RESEARCH_MONTHLY_USD", "OS_DOCUMENTS_MONTHLY_USD", "OS_STATEMENTS_MONTHLY_USD", "OS_REPLAN_MONTHLY_USD")
 
 
@@ -60,6 +67,21 @@ def billed_env(env: Mapping[str, str]) -> dict[str, str]:
     return {"OS_MODEL_MODE": "openai", "OS_TENANT_ID": BILLED_TENANT, "OS_REHEARSAL": "on", **caps}
 
 
+def preflight(env: Mapping[str, str], get: Callable[..., object] | None = None) -> None:
+    """One cheap request to OpenAI with the key, or BilledRefused. The reason names the host and the HTTP status or
+    the error's type only: never the key, nor the error's own text (it may echo request details)."""
+    key = (env.get("OS_OPENAI_API_KEY") or "").strip()
+    try:
+        answer = (get or httpx.get)(PREFLIGHT_URL, headers={"Authorization": f"Bearer {key}"},
+                                    timeout=PREFLIGHT_TIMEOUT_S)
+    except Exception as err:  # noqa: BLE001  any failure to connect refuses the run
+        raise BilledRefused(f"cannot reach {OPENAI_HOST} ({type(err).__name__}): check the network policy allows "
+                            f"it") from None
+    if not 200 <= answer.status_code < 300:
+        raise BilledRefused(f"{OPENAI_HOST} answered HTTP {answer.status_code} to GET /v1/models (check the key and "
+                            f"its project)")
+
+
 def parse(argv: list[str] | None = None) -> argparse.Namespace:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--students", default="all", help="all, or a comma list such as S1,S3,S5")
@@ -77,6 +99,7 @@ def main(argv: list[str] | None = None) -> int:
     if args.billed:
         try:
             billed = billed_env(os.environ)
+            preflight(os.environ)
         except BilledRefused as err:
             print(f"--billed refused: {err}", file=sys.stderr)
             return 2
