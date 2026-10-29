@@ -119,3 +119,65 @@ def test_a_failing_stage_move_keeps_the_mirror_ready_and_the_text_job():
         assert db.get(StudentJourney, journey.id).current_stage == "MIRROR"
         assert db.scalar(select(BackgroundJob.id).where(BackgroundJob.workspace_id == ws,
                                                         BackgroundJob.job_type == JOB_MIRROR_TEXT))
+
+
+@pytest.mark.asyncio
+async def test_an_ask_while_the_run_is_running_is_posted_when_it_finishes():
+    with StudentSession() as student, student.factory() as db:
+        turn, _, _ = seed(student, db)
+        add_education(student, db)
+        quiet = enqueue_path_analysis(db, student.workspace_id, source_event_id=None, channel=None, reason="vault")
+        job = db.get(BackgroundJob, quiet)
+        job.status = "running"
+        db.commit()
+        reply = json.dumps(analysis(path("electrical_engineering")))
+
+        async def model(**kwargs):
+            # The student asks while the run is already past reading its payload.
+            assert await ask_path_analysis(db, student.workspace_id, source_event_id=turn.source_event_id,
+                                           channel=turn.channel) == quiet
+            db.commit()
+            return reply
+
+        with patch(MODEL, AsyncMock(side_effect=model)), patch(POST, AsyncMock(side_effect=fake_post(student))):
+            assert (await finish(db, job))["status"] == "posted"
+        assert len(jobs(db, student.workspace_id)) == 1
+        sent = posts(db, student.workspace_id)
+    assert len(sent) == 1 and sent[0].target == turn.channel
+    assert sent[0].metadata_["paths_reply_to"] == turn.source_event_id
+
+
+@pytest.mark.asyncio
+async def test_a_retried_turn_after_the_run_posted_does_not_post_again():
+    with StudentSession() as student, student.factory() as db:
+        turn, _, _ = seed(student, db)
+        add_education(student, db)
+        quiet = enqueue_path_analysis(db, student.workspace_id, source_event_id=None, channel=None, reason="vault")
+        await ask_path_analysis(db, student.workspace_id, source_event_id=turn.source_event_id, channel=turn.channel)
+        db.commit()
+        reply = json.dumps(analysis(path("electrical_engineering")))
+        with patch(MODEL, AsyncMock(return_value=reply)), patch(POST, AsyncMock(side_effect=fake_post(student))):
+            assert (await finish(db, db.get(BackgroundJob, quiet)))["status"] == "posted"
+            await ask_path_analysis(db, student.workspace_id, source_event_id=turn.source_event_id,
+                                    channel=turn.channel)
+        assert len(posts(db, student.workspace_id)) == 1
+
+
+@pytest.mark.asyncio
+async def test_an_ask_after_a_failed_run_retries_once_per_turn():
+    with StudentSession() as student, student.factory() as db:
+        turn, _, _ = seed(student, db)
+        add_education(student, db)
+        quiet = enqueue_path_analysis(db, student.workspace_id, source_event_id=None, channel=None, reason="vault")
+        db.get(BackgroundJob, quiet).status = "failed"
+        db.commit()
+        retry = await ask_path_analysis(db, student.workspace_id, source_event_id=turn.source_event_id,
+                                        channel=turn.channel)
+        db.commit()
+        again = await ask_path_analysis(db, student.workspace_id, source_event_id=turn.source_event_id,
+                                        channel=turn.channel)
+        db.commit()
+        job = db.get(BackgroundJob, retry)
+        assert retry != quiet and again == retry and len(jobs(db, student.workspace_id)) == 2
+        assert job.status == "pending" and job.payload["reason"] == "asked" and job.payload["channel"] == turn.channel
+        assert job.idempotency_key.endswith(f":retry:{turn.source_event_id}")
