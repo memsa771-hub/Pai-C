@@ -142,6 +142,13 @@ def confirm_tasks(engine, plan_id=None) -> dict[str, dict]:
         return {r.instance_key: {"state": r.state, "result": r.result} for r in conn.execute(q)}
 
 
+def confirm_states(tasks: dict[str, dict], key: str) -> list[str]:
+    """The states of `key`'s rows that are not cancelled, under any revision mark: when concurrent research runs
+    recompile the plan in a different order, a done check can be re-asked once (its row kept as `<key>#d<n>`) and the
+    fresh one cancelled (`<key>#c<n>`) when the next revision sees the fact confirmed."""
+    return [t["state"] for k, t in tasks.items() if re.sub(r"(#[cd]\d+)+$", "", k) == key and t["state"] != "cancelled"]
+
+
 def start_and_wait(ctx: Ctx, contract=TEST_STUDENT) -> int:
     """Seeds, starts the plan and runs its confirm tasks until they all wait for review."""
     if not count(ctx.engine, models.knowledge_facts):
@@ -248,7 +255,7 @@ def test_confirmed_fact_completes_task_and_redates_plan(research):
     assert len(steps) == 6 and len({s.workflow_uuid for s in steps}) == 3  # A and B in each of the 3 runs
     tasks = confirm_tasks(research.engine, plan_id)
     assert tasks["confirm_fact@ovgu-eeit:deadline_close"]["state"] == "done"
-    assert tasks["confirm_fact@ovgu-eeit:application_route"]["state"] == "done"
+    assert confirm_states(tasks, "confirm_fact@ovgu-eeit:application_route") == ["done"]
     assert tasks["confirm_fact@ovgu-eeit:semester_start"]["state"] == "waiting_review"  # the pages do not say it
     assert revision(research.engine, plan_id) > before_rev
     assert due(research.engine, plan_id, "uni_assist_apply@ovgu-eeit") < before_due  # 1 July, not 15 July
