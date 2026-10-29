@@ -6,7 +6,8 @@ import { SidebarGroup, SidebarGroupContent, SidebarGroupLabel, SidebarMenu, Side
 import { OS_UI_ENABLED } from '@/lib/config';
 import { useT } from '@/lib/i18n';
 
-const PAGES = [
+/** The PAI OS student pages, in menu order (the host sidebar's group and the OS pages' own header). */
+export const OS_PAGES = [
   ['os-start', 'nav.osStart'],
   ['os-inbox', 'nav.osInbox'],
   ['os-documents', 'nav.osDocuments'],
@@ -24,7 +25,7 @@ export function OsNavGroup({ onNavigate }: { onNavigate?: () => void }) {
   return <SidebarGroup>
     <SidebarGroupLabel>{t('nav.studyAbroadPlan')}</SidebarGroupLabel>
     <SidebarGroupContent><SidebarMenu className="gap-0.5">
-      {PAGES.map(([page, key]) => <SidebarMenuItem key={page}>
+      {OS_PAGES.map(([page, key]) => <SidebarMenuItem key={page}>
         <SidebarMenuButton asChild tooltip={t(key)}>
           <Link href={`/${workspaceId}/${page}`} onClick={() => onNavigate?.()}><span>{t(key)}</span></Link>
         </SidebarMenuButton>

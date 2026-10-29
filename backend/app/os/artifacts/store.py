@@ -16,6 +16,7 @@ from app.os import models
 
 A, V, AP = models.artifacts, models.artifact_versions, models.approvals
 BASE = ""  # programme_ref of a student's base artifact (not tied to a programme)
+STATEMENT_KINDS = ("sop", "cv")  # the student's statements; the pack and the visa file share the table (Slices 6a, 6b)
 
 
 @dataclass(frozen=True)
@@ -85,10 +86,13 @@ class ArtifactStore:
             row = conn.execute(select(A).where(A.c.id == artifact_id, A.c.tenant_id == self.tenant_id)).first()
         return None if row is None else _artifact(row)
 
-    def list_for(self, student_ref: str) -> list[Artifact]:
+    def list_for(self, student_ref: str, kinds: tuple[str, ...] | None = None) -> list[Artifact]:
+        """The student's artifacts, or only those of `kinds` (e.g. STATEMENT_KINDS)."""
+        q = select(A).where(A.c.tenant_id == self.tenant_id, A.c.student_ref == student_ref)
+        if kinds is not None:
+            q = q.where(A.c.kind.in_(kinds))
         with self.engine.connect() as conn:
-            rows = conn.execute(select(A).where(A.c.tenant_id == self.tenant_id, A.c.student_ref == student_ref)
-                                .order_by(A.c.kind, A.c.programme_ref)).all()
+            rows = conn.execute(q.order_by(A.c.kind, A.c.programme_ref)).all()
         return [_artifact(r) for r in rows]
 
     def add_version(self, artifact_id: int, text: str, author: str, *, critic: dict | None = None,

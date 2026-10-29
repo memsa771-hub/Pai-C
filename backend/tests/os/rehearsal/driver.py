@@ -95,9 +95,15 @@ DOC_STEP = {"degree_certificate": "hec_attestation", "transcript": "hec_attestat
             "admission_letter": "admission_result"}
 # What the visa file needs that is not ready on day one: these documents come when their step does.
 STEP_DOCS = {"blocked_account": "blocked_account_confirmation", "travel_insurance": "insurance_certificate"}
-# visa_target_date has no official source (seed comment; Spike 5 C5): the rehearsal's admin supplies one when a plan
-# waits for it, as an admin would through the open-facts screen, and logs that it had to (a workaround).
-VISA_TARGET = {"date": "2027-09-01", "tz": "Europe/Berlin"}
+# The visa step's date comes from the visa programme's semester_start (Task 11, F1). Offline research finds nothing,
+# so the rehearsal loads fictional semester starts with the seed: test data, not a workaround.
+SEMESTER_STARTS = HERE / "semester_starts.yaml"
+
+
+def _actionable(items: list[dict]) -> list[dict]:
+    """The inbox items the student can act on. The inbox also lists steps blocked on a missing fact, with what they
+    wait for (Task 11, `walk:S1:nothing_to_do_while_blocked`): nothing can be done on those."""
+    return [t for t in items if t["state"] == "waiting_student"]
 
 
 # --------------------------------------------------------------------------------------------------- students file
@@ -454,6 +460,7 @@ class Rehearsal:
         kb, store = SqlKnowledge(self.engine, TENANT), ProgrammeStore(self.engine, TENANT)
         load_programme_seed(PROGRAMME_SEED, store)
         load_seed(SEED_DIR / "germany_ws2027.yaml", kb)
+        load_seed(SEMESTER_STARTS, kb)
 
     def _answers(self) -> None:
         store = ProgrammeStore(self.engine, TENANT)
@@ -494,17 +501,13 @@ class Rehearsal:
         self.client = TestClient(app, raise_server_exceptions=False)  # a 500 is a logged failure, not a crash
 
     def _set_clock(self) -> None:
-        today = clock.today()
-        if today > START:
-            log.warning("real today %s is past the rehearsal start %s: starting from today", today, START)
+        """The rehearsal starts on START whatever the real date: the admin `start` call sets the clean clock once
+        (a day in the past too). If it is refused, the run goes on from the clock's today and logs start_late."""
+        if self.call(None, "POST", "/admin/rehearsal/start", json={"date": START.isoformat()}) is None:
+            today = clock.today()
+            log.warning("the rehearsal clock could not be set to %s: starting from %s", START, today)
             self.fail(f"start_late:{today.isoformat()}", "all", None, f"the rehearsal starts on {START.isoformat()}",
-                      f"real today is {today.isoformat()}: the clock only moves forward, so it started from today",
-                      "workaround")
-        days = (START - today).days
-        while days > 0:
-            step = min(60, days)
-            self.call(None, "POST", "/admin/rehearsal/advance", json={"days": step})
-            days -= step
+                      f"the start call was refused; the clock's today is {today.isoformat()}", "workaround")
         self.start = clock.today()
 
     def _worker(self) -> None:
@@ -716,7 +719,7 @@ class Rehearsal:
                 acted = True
         plan = self._plan(run)
         tasks = {t["instance_key"]: t for t in plan["tasks"] if _live(t)}
-        waiting = {t["instance_key"]: t for t in inbox["items"]}
+        waiting = {t["instance_key"]: t for t in _actionable(inbox["items"])}
         by_template: dict[str, list[dict]] = {}
         for t in waiting.values():
             by_template.setdefault(_template(t["instance_key"]), []).append(t)
@@ -951,10 +954,33 @@ class Rehearsal:
         if run.s.event == "approved_changed" and run.sop_changed:
             if any(_template(k) == "review_pack" and t["state"] != "done" for k, t in tasks.items()):
                 return False  # the changed pack is reviewed again before the student submits
-        acted = False
+        acted, packs = False, None
         for t in waiting:  # "I submitted it": PAI OS never submits (invariant 5, 6)
+            ref = t["programme_ref"]
+            if f"after:pack:{ref}" not in run.ticked:  # first the student pays and ticks it (after approving)
+                packs = packs or {p["programme_ref"]: p for p in
+                                  (self.get(run, "/packs") or {"programmes": []})["programmes"]}
+                if packs.get(ref, {}).get("approved"):
+                    acted |= self._after_approval(
+                        run, f"pack:{ref}", f"/packs/{ref}/items", _template(t["instance_key"]), packs[ref],
+                        lambda ref=ref: next((p for p in (self.get(run, "/packs") or {"programmes": []})[
+                            "programmes"] if p["programme_ref"] == ref), None))
             acted |= self._complete(run, t, {"submitted": True})
         return acted
+
+    def _after_approval(self, run: Run, key: str, items_path: str, step: str, view: dict, again) -> bool:
+        """Once approved, the student pays (and applies) and ticks those steps, through the API. The ticks are not part
+        of what was approved (Slice 9 Task 11 ruling, invariant 5): the approval must stand, on the same version."""
+        todo = [i["key"] for i in view.get("after_approval", []) if not i["ticked"]]
+        run.ticked.add(f"after:{key}")
+        if not todo or self.call(run, "PUT", items_path, json={"tick": todo}) is None:
+            return False
+        now = again()
+        if now is None or not now["approved"] or now["manifest_sha256"] != view["manifest_sha256"]:
+            self.fail(f"after_approval_tick:{run.s.sid}:{key.split(':')[0]}", run.s.sid, step,
+                      "ticking a step after approving keeps the approval and its version",
+                      "dropped" if now is None or not now["approved"] else "a new version")
+        return True
 
     def _change_sop(self, run: Run) -> bool:
         """S9: a new version of the approved SOP, approved again, after every pack was approved."""
@@ -1003,13 +1029,18 @@ class Rehearsal:
             return False
         if step["state"] == "blocked" and (step["blocked_reason"] or "").startswith("fact_missing:") \
                 and any(_template(k) == "review_visa_file" and t["state"] == "done" for k, t in tasks.items()):
-            return self._supply_fact(run, step["blocked_reason"].split(":", 1)[1])
+            name = step["blocked_reason"].split(":", 1)[1]  # no admin step any more: a missing fact is a failure
+            self.fail(f"fact_missing:{name}", run.s.sid, "visa_apply", f"{name} is known",
+                      "no value; the visa step waits for it")
+            return False
         if step["state"] != "waiting_student":
             return False
         if "visa_ready" not in run.reached:
             visa = self.get(run, "/visa")
             if visa is None or not visa["approved"]:
                 return False
+            # the student applies on the portal and pays, then ticks those steps (after approving: Slice 9 Task 11)
+            self._after_approval(run, "visa:file", "/visa/items", "visa_apply", visa, lambda: self.get(run, "/visa"))
             run.reached.append("visa_ready")
             run.days = (clock.today() - self.start).days
         if self._events_open(run):
@@ -1027,21 +1058,6 @@ class Rehearsal:
             return True
         return any(p.status == "pending" for p in self._proposals_of(run))
 
-    def _supply_fact(self, run: Run, name: str) -> bool:
-        """The admin step for a fact no source gives (today only visa_target_date): logged as a workaround."""
-        if name != "visa_target_date" or name in self.admin_actions:
-            if name != "visa_target_date":
-                self.fail(f"fact_missing:{name}", "all", "visa_apply", f"{name} is known", "no value; no admin step")
-            return False
-        self.admin_actions.append(name)
-        self.fail(f"fact_missing:{name}", "all", "visa_apply", "visa_apply waits for the student once the visa file "
-                  "is approved", f"blocked on fact_missing:{name} (no source; the admin supplied a rehearsal value)",
-                  "workaround")
-        return self.call(None, "POST", "/facts", json={
-            "scope": "route", "ref": ROUTE, "field": name, "intake_year": INTAKE["year"], "value": VISA_TARGET,
-            "quote": "Rehearsal value supplied by the admin", "url": "https://rehearsal.example.invalid/visa",
-            "status": "confirmed"}) is not None
-
     # ------------------------------------------------------------------ per loop: stuck
 
     def _observe(self, run: Run, today: date) -> None:
@@ -1049,7 +1065,7 @@ class Rehearsal:
         inbox = self.get(run, "/inbox") or {"items": [], "proposals": []}
         fingerprint = (plan["revision"], plan["status"], tuple(sorted((t["instance_key"], t["state"])
                                                                       for t in plan["tasks"])))
-        stuck = self.watch.see(run.s.sid, today, fingerprint, bool(inbox["items"] or inbox["proposals"]))
+        stuck = self.watch.see(run.s.sid, today, fingerprint, bool(_actionable(inbox["items"]) or inbox["proposals"]))
         if stuck is not None:
             self.failures.add(stuck)
             run.state = "stuck"

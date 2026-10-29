@@ -178,7 +178,7 @@ def test_student_sees_only_own(api):
     assert [d["id"] for d in docs] == [mine]
     by_field = {f["field"]: f for f in docs[0]["fields"]}
     assert by_field["cgpa"] == {"field": "cgpa", "value_read": 3.7, "check": "ok", "reasons": [],
-                                "value_confirmed": None}
+                                "value_confirmed": None, "label": None}  # no plain label: the page words the name
     # another student's document cannot be confirmed, deleted or seen through any write
     body = confirm_body("transcript", TRANSCRIPT)
     assert api.post(f"/v1/os/documents/{theirs}/confirm", json=body, headers=as_student("stu-1")).status_code == 404

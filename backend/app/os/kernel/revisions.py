@@ -5,7 +5,7 @@ import json
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 
-from app.os.compiler import DraftTask
+from app.os.compiler import CONFIRM_TYPE, DraftTask
 from app.os.kernel.states import TERMINAL, TaskState, is_started
 
 NOTICE_PREFIX = "plan_updated@"
@@ -59,6 +59,16 @@ def draft_token(t: DraftTask) -> str:
     return hashlib.sha256(json.dumps(payload, sort_keys=True).encode()).hexdigest()[:32]
 
 
+def _left_with_programme(row: Mapping, state: TaskState, live_programmes: set[str]) -> bool:
+    """A fact check (`CONFIRM_TYPE`; another module's step waiting for a review is kept) only waiting for research or
+    an admin whose programme has
+    left the plan goes with it (Slice 9a Task 11, F2; Slice 7 §2 "cancel the programme's remaining tasks"): it holds
+    no work of the student's, and its research would serve nothing. Only then: a check dropped because its fact was
+    just confirmed stays, so the research run completes it (`after_fact_change`)."""
+    return (row["task_type"] == CONFIRM_TYPE and row["kind"] == "work" and state == TaskState.WAITING_REVIEW
+            and row.get("programme_ref") is not None and row["programme_ref"] not in live_programmes)
+
+
 def diff(stored: Mapping[str, Mapping], draft_tasks: Mapping[str, DraftTask],
          stored_deps: Mapping[str, set], recheck_types: frozenset[str] = frozenset()) -> RevisionDiff:
     """A task that has started (or is protected) keeps its version; the difference is reported once,
@@ -66,8 +76,12 @@ def diff(stored: Mapping[str, Mapping], draft_tasks: Mapping[str, DraftTask],
 
     One exception: a done task of a `recheck_types` type whose key is in the draft again (the compiler asks
     for a fact check only while the fact is not confirmed, so a stale fact asks again, spec §4.7) is
-    `rechecked`: its row keeps its history under a new key and a fresh task is added."""
+    `rechecked`: its row keeps its history under a new key and a fresh task is added.
+
+    And one more: a work task waiting for a review whose programme is no longer in the draft is removed with it
+    (`_left_with_programme`)."""
     d = RevisionDiff()
+    live_programmes = {t.programme_ref for t in draft_tasks.values() if t.programme_ref}
 
     def report_once(target: list[str], key: str, token: str, row: Mapping) -> None:
         if row["skipped_draft"] != token:
@@ -87,7 +101,7 @@ def diff(stored: Mapping[str, Mapping], draft_tasks: Mapping[str, DraftTask],
                 continue
             if row["protected"]:
                 report_once(d.kept_protected, key, REMOVED_TOKEN, row)
-            elif started:
+            elif started and not _left_with_programme(row, state, live_programmes):
                 report_once(d.skipped_started, key, REMOVED_TOKEN, row)
             else:
                 d.removed.append(key)

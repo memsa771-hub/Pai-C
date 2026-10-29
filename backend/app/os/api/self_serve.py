@@ -8,7 +8,7 @@ from sqlalchemy import exists, select
 
 from app.os.kernel.states import PLAN_OPEN
 from app.os import models
-from app.os.api.queries import plan_out
+from app.os.api.queries import plan_out, removed_programmes
 from app.os.eligibility.evaluate import Card
 from app.os.eligibility.notes import profile_of, programme_cards
 from app.os.eligibility.swaps import suggest
@@ -126,11 +126,14 @@ class StudentPlan:
 
 
 def student_plan(plans, student_ref: str) -> StudentPlan | None:
-    """The student's newest open plan and the route it follows (Slice 5: statements belong to a route)."""
+    """The student's newest open plan and the route it follows (Slice 5: statements belong to a route). Its
+    programmes leave out those an accepted change removed (Slice 9 Task 11): packs, the visa file's choices and the
+    statements page show only programmes still in the plan."""
     with plans.engine.connect() as conn:
         rows = conn.execute(select(P.c.id, P.c.contract).where(
             P.c.tenant_id == plans.kernel.tenant_id, P.c.student_ref == student_ref, P.c.status.in_(PLAN_OPEN))
             .order_by(P.c.id.desc())).all()
+        removed = removed_programmes(conn, plans.kernel.tenant_id, [r.id for r in rows])
     books = newest_books(plans)
     for row in rows:
         c = row.contract
@@ -138,5 +141,6 @@ def student_plan(plans, student_ref: str) -> StudentPlan | None:
             if (b.route.origin, b.route.destination, b.route.level) == (
                     c["origin_country"], c["destination_country"], c["level"]):
                 return StudentPlan(row.id, key, c["target_intake"]["year"],
-                                   tuple(p["programme_ref"] for p in sorted(c["programmes"], key=lambda p: p["rank"])))
+                                   tuple(p["programme_ref"] for p in sorted(c["programmes"], key=lambda p: p["rank"])
+                                         if p["programme_ref"] not in removed[row.id]))
     return None

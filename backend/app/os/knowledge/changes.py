@@ -35,9 +35,9 @@ def after_fact_change(service, kernel, scope: str, ref: str, field: str, fact_id
             T.c.tenant_id == kernel.tenant_id, T.c.fact_refs.contains([[scope, ref, field]]),
             T.c.plan_id.in_(in_year),
         ).order_by(T.c.plan_id)).scalars().all()
-    if complete:
+    if complete:  # a check cancelled since it was listed (its programme left the plan) is not completed
         for task_id in waiting:
-            kernel.complete_review(task_id, {"fact_id": fact_id, "status": status})
+            kernel.complete_review(task_id, {"fact_id": fact_id, "status": status}, only_if_waiting=True)
     revised = [p for p in plan_ids if service.recompile(p, "fact_changed") is not None]
     if scope == "programme":
         from app.os.eligibility import notes  # imported here: notes imports knowledge

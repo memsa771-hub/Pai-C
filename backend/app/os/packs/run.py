@@ -18,6 +18,7 @@ from sqlalchemy import Engine
 from app.os.artifacts.store import ArtifactStore
 from app.os.documents.intake import check_upload
 from app.os.documents.store import DocumentStore
+from app.os.knowledge.programmes import ProgrammeStore
 from app.os.packs import render
 from app.os.packs.checklist import checklist, complete
 from app.os.packs.config import PackConfig
@@ -136,7 +137,9 @@ def register_packs(engine: Engine, settings: OsSettings, knowledge, books, confi
               unfixable: dict, kind: str = PACK_KIND) -> dict:
         inp = inputs(student, programme, route_key, year, kind)
         results = checklist(inp, programme, unfixable, funds=inp.funds)
-        route_value, steps = instructions(inp, programme)
+        named = ProgrammeStore(engine, tenant).get(programme)  # the step names the programme (Slice 9 Task 11)
+        route_value, steps = instructions(inp, programme, named.name if named else None,
+                                          named.university if named else None)
         text, sha = build_manifest(inp, programme, route_value, results, data_sheet(inp), steps, fees(inp),
                                    {k: FileRef(**v) for k, v in refs.items()})
         art = arts.get(artifact_id)

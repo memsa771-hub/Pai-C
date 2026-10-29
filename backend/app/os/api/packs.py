@@ -16,12 +16,13 @@ from app.os.api.services import Services
 from app.os.artifacts.store import ArtifactStore
 from app.os.knowledge.programmes import ProgrammeStore
 from app.os.packs.approval import PackIncomplete, PackNotCurrent, approve_pack, complete_review_tasks
+from app.os.packs.checklist import after_approval
 from app.os.packs.details import save_details
 from app.os.packs.inputs import inputs_sha, load_inputs
 from app.os.packs.funds import required_funds
 from app.os.packs.run import PACK_KIND, VISA_KIND, enqueue_pack, latest_attempt
 from app.os.packs.store import PackFileStore, PackItemStore
-from app.os.packs.visa import VISA_ITEMS, VisaChoiceStore, preselect
+from app.os.packs.visa import VISA_ITEMS, VisaChoiceStore, admitted, preselect
 
 log = logging.getLogger(__name__)
 
@@ -62,6 +63,9 @@ class PackOut(BaseModel):
     checklist: list[dict]
     data_sheet: list[dict]
     files: list[dict]
+    # steps after approving (paid the fee, applied): key, label, note, ticked. Read live, never part of what is
+    # approved (Slice 9 Task 11 ruling; invariant 5)
+    after_approval: list[dict] = []
 
 
 class PacksOut(BaseModel):
@@ -78,7 +82,7 @@ class VisaOut(PackOut):
     programme_ref: str | None  # the chosen programme, else the pre-selected one; None: choose one first
     status: str  # no_choice, building, ready, incomplete, approved, failed
     funds: dict | None
-    choice: dict  # programme_ref (stored), reduction, preselected
+    choice: dict  # programme_ref (stored), reduction, preselected, admitted (every admitted programme)
     programmes: list[dict]  # the plan's programmes to choose from
 
 
@@ -95,12 +99,23 @@ def complete_ready_packs(svc: Services, student: str) -> None:
         log.exception("pack task completion failed for a student")
 
 
+def refresh_visa_date(svc: Services, plan_id: int) -> None:
+    """Recompiles the plan after the visa programme may have changed (a choice, or an admission answer): the visa
+    step's date follows that programme's semester start (Slice 9 Task 11, F1). Through the service and the kernel
+    (invariant 1); a revision only if something changed. Extra work after a saved answer: a failure is logged, and
+    the next recompile catches up."""
+    try:
+        svc.plans.recompile(plan_id, "visa_programme")
+    except Exception:
+        log.exception("recompiling after a visa programme change failed (plan %s)", plan_id)
+
+
 def visa_choice(svc: Services, plan, student: str) -> tuple[str | None, str | None, float, str | None]:
-    """(the programme the visa file is for, the stored choice, the reduction, the pre-selected programme)."""
+    """(the programme the visa file is for, the stored choice, the reduction, the pre-selected programme). Only one
+    admission is pre-selected; with two the student chooses first, and nothing is built until they do."""
     stored = VisaChoiceStore(svc.engine, svc.settings.tenant_id).get(student)
     ref = stored.programme_ref if stored and stored.programme_ref in plan.programmes else None
-    pre = preselect(svc.engine, svc.settings.tenant_id, plan.plan_id)
-    pre = pre if pre in plan.programmes else None
+    pre = preselect(svc.engine, svc.settings.tenant_id, plan.plan_id, plan.programmes)
     return ref or pre, ref, stored.reduction if stored else 0.0, pre
 
 
@@ -176,13 +191,14 @@ def add_pack_routes(router: APIRouter, services: Callable[[], Services]) -> None
         return enqueue_pack(client, tenant, student, programme_ref, plan.route_key, plan.year, sha, version,
                             attempt), sha
 
-    def pack_out(svc: Services, student: str, programme_ref: str, art, current_inputs: str) -> dict:
+    def pack_out(svc: Services, cfg, student: str, programme_ref: str, art, current_inputs: str) -> dict:
         store = ArtifactStore(svc.engine, svc.settings.tenant_id)
         programme = ProgrammeStore(svc.engine, svc.settings.tenant_id).get(programme_ref)
+        ticked = PackItemStore(svc.engine, svc.settings.tenant_id).ticked(student, programme_ref)
         out = {"programme_ref": programme_ref, "name": programme.name if programme else None,
                "university": programme.university if programme else None, "status": "building", "version": None,
                "approved": False, "manifest_sha256": None, "route_value": None, "instructions": [], "fees": [],
-               "checklist": [], "data_sheet": [], "files": []}
+               "checklist": [], "data_sheet": [], "files": [], "after_approval": after_approval(cfg, ticked)}
         if art is not None and art.status == "failed":
             out["status"] = "failed"  # shown as such, with Rebuild; never "being prepared" for ever (final review C1)
         return fill_from_manifest(out, store, art, current_inputs)
@@ -196,7 +212,7 @@ def add_pack_routes(router: APIRouter, services: Callable[[], Services]) -> None
         out = []
         for ref in plan.programmes:
             _, current = build(svc, plan, cfg, student, ref, arts.get(ref))  # the same inputs: built once
-            item = pack_out(svc, student, ref, arts.get(ref), current)
+            item = pack_out(svc, cfg, student, ref, arts.get(ref), current)
             out.append(item)
         return {"route": plan.route_key, "programmes": out}
 
@@ -305,7 +321,11 @@ def add_visa_routes(router: APIRouter, services: Callable[[], Services]) -> None
                "status": "no_choice" if ref is None else "building", "version": None, "approved": False,
                "manifest_sha256": None, "route_value": None, "instructions": [], "fees": [], "checklist": [],
                "data_sheet": [], "files": [], "funds": None, "programmes": listed,
-               "choice": {"programme_ref": stored, "reduction": reduction, "preselected": pre}}
+               "after_approval": after_approval(cfg, PackItemStore(svc.engine, svc.settings.tenant_id).ticked(
+                   student, VISA_ITEMS)),
+               "choice": {"programme_ref": stored, "reduction": reduction, "preselected": pre,
+                          "admitted": [r for r in admitted(svc.engine, svc.settings.tenant_id, plan.plan_id)
+                                       if r in plan.programmes]}}
         if ref is None:  # nothing to build yet: the funds still show what the student will need
             if cfg.funds is not None:
                 fact = svc.knowledge.route_facts(cfg.route_key, [cfg.funds.fact], plan.year).get(cfg.funds.fact)
@@ -330,6 +350,7 @@ def add_visa_routes(router: APIRouter, services: Callable[[], Services]) -> None
             raise HTTPException(status_code=422, detail="this programme is not in your plan")
         if body.programme_ref is not None:
             store.set_programme(student, body.programme_ref)
+            refresh_visa_date(svc, plan.plan_id)
         if body.reduction is not None:
             try:
                 store.set_reduction(student, body.reduction)

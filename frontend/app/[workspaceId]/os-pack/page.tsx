@@ -2,6 +2,7 @@
 
 import { use, useCallback, useEffect, useState } from 'react';
 import { notFound } from 'next/navigation';
+import { OsHeader } from '@/components/os/os-header';
 import { PackList, PackView } from '@/components/os/pack';
 import { PackDetails } from '@/components/os/pack-details';
 import { Button } from '@/components/ui/button';
@@ -85,9 +86,7 @@ export default function OsPackPage({ params }: { params: Promise<{ workspaceId: 
 
   return (
     <main className="mx-auto w-full max-w-md px-4 py-6">
-      <h1 className="mb-4 break-words text-lg font-semibold">
-        {open ? programmeTitle(open) : 'Your application packs'}
-      </h1>
+      <OsHeader workspaceId={workspaceId} current="os-pack" title={open ? programmeTitle(open) : 'Your application packs'} />
       {error && <p role="alert" className="mb-3 break-words text-sm text-destructive">{error}</p>}
       {packs === null ? (
         <p className="text-sm text-muted-foreground">Loading…</p>

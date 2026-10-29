@@ -7,7 +7,7 @@ import json
 from dataclasses import asdict, dataclass
 
 from app.os.artifacts.store import sha256
-from app.os.packs.checklist import ItemResult, complete
+from app.os.packs.checklist import ItemResult, approved_part, complete
 from app.os.packs.datasheet import SheetRow
 from app.os.packs.inputs import PackInputs, inputs_sha
 from app.os.packs.instructions import FeeRow, InstructionStep
@@ -31,7 +31,7 @@ def build_manifest(inp: PackInputs, programme_ref: str, route_value: str | None,
         "config": {"route": inp.cfg.route_key, "version": inp.cfg.version},
         "route_value": route_value,
         "complete": complete(results),
-        "checklist": [asdict(r) for r in results],
+        "checklist": [asdict(r) for r in approved_part(results)],  # after-approval ticks are not approved
         "data_sheet": [asdict(r) for r in sheet],
         "instructions": [asdict(s) for s in steps],
         "fees": [asdict(f) for f in fee_rows],

@@ -2,6 +2,7 @@
 
 import { use, useCallback, useEffect, useState } from 'react';
 import { notFound } from 'next/navigation';
+import { OsHeader } from '@/components/os/os-header';
 import { PackView } from '@/components/os/pack';
 import { PackDetails } from '@/components/os/pack-details';
 import { VisaChoice, VisaFunds } from '@/components/os/visa-funds';
@@ -83,7 +84,7 @@ export default function OsVisaPage({ params }: { params: Promise<{ workspaceId: 
 
   return (
     <main className="mx-auto flex w-full max-w-md flex-col gap-4 px-4 py-6">
-      <h1 className="break-words text-lg font-semibold">Your visa file</h1>
+      <OsHeader workspaceId={workspaceId} current="os-visa" title="Your visa file" />
       {error && <p role="alert" className="break-words text-sm text-destructive">{error}</p>}
       {visa === null ? (
         <p className="text-sm text-muted-foreground">Loading…</p>

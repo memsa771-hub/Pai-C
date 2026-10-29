@@ -5,5 +5,5 @@ label: Insurance certificate
 fields:
   - {name: holder_name, type: name, cross_check: full_name, hint: "The insured person's name exactly as printed"}
   - {name: insurer, type: text, hint: "The insurance company"}
-  - {name: cover_start, type: date, hint: "The first day of cover, YYYY-MM-DD"}
-  - {name: cover_end, type: date, hint: "The last day of cover, YYYY-MM-DD"}
+  - {name: cover_start, label: "Cover starts on", type: date, hint: "The first day of cover, YYYY-MM-DD"}
+  - {name: cover_end, label: "Cover ends on", type: date, hint: "The last day of cover, YYYY-MM-DD"}

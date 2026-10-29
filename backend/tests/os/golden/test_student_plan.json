@@ -297,13 +297,13 @@
    "due_tz": "Europe/Berlin",
    "estimated": false,
    "inbox_kind": null,
-   "instance_key": "confirm_fact@germany_master:visa_target_date",
+   "instance_key": "confirm_fact@btu-artificial-intelligence:semester_start",
    "kind": "work",
-   "programme_ref": null,
+   "programme_ref": "btu-artificial-intelligence",
    "provisional": false,
    "slack_days": null,
    "state": "ready",
-   "title": "Confirm visa_target_date for germany_master"
+   "title": "Confirm semester_start for btu-artificial-intelligence"
   },
   {
    "blocked_reason": null,
@@ -393,6 +393,22 @@
    "due_tz": "Europe/Berlin",
    "estimated": false,
    "inbox_kind": null,
+   "instance_key": "confirm_fact@ovgu-eeit:semester_start",
+   "kind": "work",
+   "programme_ref": "ovgu-eeit",
+   "provisional": false,
+   "slack_days": null,
+   "state": "ready",
+   "title": "Confirm semester_start for ovgu-eeit"
+  },
+  {
+   "blocked_reason": null,
+   "citations": [],
+   "critical": false,
+   "due_at": null,
+   "due_tz": "Europe/Berlin",
+   "estimated": false,
+   "inbox_kind": null,
    "instance_key": "confirm_fact@tu-chemnitz-embedded-systems:admission_test",
    "kind": "work",
    "programme_ref": "tu-chemnitz-embedded-systems",
@@ -464,6 +480,22 @@
    "slack_days": null,
    "state": "ready",
    "title": "Confirm required_documents for tu-chemnitz-embedded-systems"
+  },
+  {
+   "blocked_reason": null,
+   "citations": [],
+   "critical": false,
+   "due_at": null,
+   "due_tz": "Europe/Berlin",
+   "estimated": false,
+   "inbox_kind": null,
+   "instance_key": "confirm_fact@tu-chemnitz-embedded-systems:semester_start",
+   "kind": "work",
+   "programme_ref": "tu-chemnitz-embedded-systems",
+   "provisional": false,
+   "slack_days": null,
+   "state": "ready",
+   "title": "Confirm semester_start for tu-chemnitz-embedded-systems"
   },
   {
    "blocked_reason": null,
@@ -848,7 +880,7 @@
    "title": "Submit the uni-assist application and pay the handling fee"
   },
   {
-   "blocked_reason": "fact_missing:visa_target_date",
+   "blocked_reason": "fact_missing:semester_start",
    "citations": [
     {
      "source": "S11",

@@ -2,12 +2,21 @@
 
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { fundsLine, programmeLabel, type OsFunds, type OsVisa } from '@/lib/os-visa';
+import { admittedRefs, fundsLine, programmeLabel, type OsFunds, type OsVisa } from '@/lib/os-visa';
 
-/** Which programme the visa file is for (Slice 6b spec S6b-D8): one from the plan, pre-selected if admitted. */
+/** Which programme the visa file is for (Slice 6b spec S6b-D8): one from the plan, pre-selected if only one admitted
+ * the student. With two admissions both are marked and the student chooses first: nothing is built before (Slice 9
+ * Task 11). */
 export function VisaChoice({ visa, busy, onChoose }: { visa: OsVisa; busy: boolean; onChoose: (ref: string) => void }) {
+  const admitted = admittedRefs(visa);
   return (
     <section aria-label="Programme" className="rounded-lg border bg-card p-3 text-sm">
+      {visa.programme_ref === null && admitted.length > 1 && (
+        <p className="mb-2 break-words font-medium">
+          You were admitted to more than one programme. Choose the one your visa is for: we prepare the visa file
+          once you choose.
+        </p>
+      )}
       <label className="flex flex-col gap-1 break-words">
         <span className="font-semibold">
           {visa.programme_ref ? 'For' : 'Choose the programme your visa is for'}
@@ -17,7 +26,7 @@ export function VisaChoice({ visa, busy, onChoose }: { visa: OsVisa; busy: boole
           {visa.programme_ref === null && <option value="">Choose…</option>}
           {visa.programmes.map((p) => (
             <option key={p.programme_ref} value={p.programme_ref}>
-              {programmeLabel(p)}{p.programme_ref === visa.choice.preselected ? ' (admitted)' : ''}
+              {programmeLabel(p)}{admitted.includes(p.programme_ref) ? ' (admitted)' : ''}
             </option>
           ))}
         </select>

@@ -100,10 +100,12 @@ def test_details_put_and_422(api):
 def test_items_tick_untick_add(api):
     r = api.put(f"{P}/{PROG}/items", headers=ME, json={"tick": ["fee_paid"], "add": [{"label": "Module descriptions"}]})
     assert r.status_code == 200
-    items = {i["key"]: i for i in settled(api)["checklist"]}
-    assert items["fee_paid"]["ticked"] and items["added:1"]["label"] == "Module descriptions"
+    pack = settled(api)
+    items = {i["key"]: i for i in pack["checklist"]}
+    assert items["added:1"]["label"] == "Module descriptions"
+    assert pack["after_approval"][0]["key"] == "fee_paid" and pack["after_approval"][0]["ticked"]  # Slice 9 Task 11
     api.put(f"{P}/{PROG}/items", headers=ME, json={"untick": ["fee_paid"]})
-    assert not {i["key"]: i for i in settled(api)["checklist"]}["fee_paid"]["ticked"]
+    assert not settled(api)["after_approval"][0]["ticked"]
     assert api.put(f"{P}/{PROG}/items", headers=ME, json={"tick": ["no_such_item"]}).status_code == 422
 
 
@@ -180,11 +182,12 @@ def test_failed_build_shows_failed_and_rebuild_retries(api, monkeypatch):
 def test_return_to_earlier_inputs_rebuilds(api):
     """Review C2: inputs that change and change back (A -> B -> A) still settle; the pack is never stuck."""
     assert settled(api)["status"] == "incomplete"
-    api.put(f"{P}/{PROG}/items", headers=ME, json={"tick": ["fee_paid"]})
-    assert {i["key"]: i for i in settled(api)["checklist"]}["fee_paid"]["ticked"]
-    api.put(f"{P}/{PROG}/items", headers=ME, json={"untick": ["fee_paid"]})
+    api.put(f"{P}/{PROG}/items", headers=ME, json={"add": [{"label": "Module descriptions"}]})
+    api.put(f"{P}/{PROG}/items", headers=ME, json={"tick": ["added:1"]})
+    assert {i["key"]: i for i in settled(api)["checklist"]}["added:1"]["ticked"]
+    api.put(f"{P}/{PROG}/items", headers=ME, json={"untick": ["added:1"]})
     back = settled(api)
-    assert back["status"] == "incomplete" and not {i["key"]: i for i in back["checklist"]}["fee_paid"]["ticked"]
+    assert back["status"] == "incomplete" and not {i["key"]: i for i in back["checklist"]}["added:1"]["ticked"]
 
 
 def test_approve_refuses_when_inputs_changed(api):
@@ -192,6 +195,6 @@ def test_approve_refuses_when_inputs_changed(api):
     ready_inputs(api.ctx)
     pack = settled(api)
     assert pack["status"] == "ready"
-    api.put(f"{P}/{PROG}/items", headers=ME, json={"untick": ["fee_paid"]})  # before any rebuild runs
+    api.put(f"{P}/{PROG}/items", headers=ME, json={"untick": ["ssc"]})  # before any rebuild runs
     r = api.post(f"{P}/{PROG}/approve", headers=ME, json={"sha256": pack["manifest_sha256"]})
     assert r.status_code == 409 and "changed" in r.json()["detail"]

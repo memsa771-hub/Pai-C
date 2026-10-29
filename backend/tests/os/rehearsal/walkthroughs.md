@@ -15,9 +15,9 @@ use a real document. Screenshots and the failure log go outside the repo (`~/s9-
    `NEXT_PUBLIC_OS_ENABLED=true`. Add on the API and on the worker: `OS_REHEARSAL=on`, `OS_MODEL_MODE=offline`,
    `OS_OFFLINE_ANSWERS_DIR` (a temporary folder made the way the driver makes it: `build_answers` with the student's
    extra pages), `OS_ADMIN_TOKEN` (any fictional value), `OS_EMAIL_SENDER=log`, `OS_DATABASE_URL`.
-2. Load the programme registry and the seeded facts into the database (as the driver's `_clean` does).
+2. Load the programme registry, the seeded facts and the fictional semester starts (`semester_starts.yaml`) into the database (as the driver's `_clean` does).
 3. Start the worker: `python -m app.os.runner.worker` from `backend/`, same environment.
-4. Move the clock to 1 Dec 2026: `POST /v1/os/admin/rehearsal/advance {"days": N}` (at most 60 per call).
+4. Set the clock to 1 Dec 2026, once, on the clean database: `POST /v1/os/admin/rehearsal/start {"date": "2026-12-01"}` (works before or after the real 1 Dec; 409 if the clock was already set or moved).
 5. Sign in with the fake token (step 5 of "Walkthrough sign-in"). The entry point gives one fixed student, so the
    three walkthroughs run one after the other, each on a fresh database.
 6. Browser: 375 px wide, touch. Move between pages with the menu if there is one; note it if there is not.
@@ -50,13 +50,13 @@ what happened, and a severity (`blocks` | `workaround` | `wording`). One screens
 | 5 | Check what was read, document by document; "Confirm all" | `os-documents` | |
 | 6 | Answer the interview (`students.yaml` `interview`) | `os-statements` | |
 | 7 | "Write my statement", "Write my CV"; open each draft, read it, "Approve this version" | `os-statements` | tick |
-| 8 | Upload the blocked account and insurance pages; confirm them. In the inbox tap "Done" on the steps the student has done (tests, attestation, certificates, blocked account, insurance) | `os-documents`, `os-inbox` | |
-| 9 | Each pack: "A few more details" (contact details from `students.yaml`), tick the checklist items, "Approve pack" | `os-pack` | tick |
-| 10 | Ready to submit: each programme's submit step waits. Tap "Done" ("I submitted it") | `os-inbox` | tick 2 days |
-| 11 | Admission results as `students.yaml` says | `os-inbox` | tick |
+| 8 | Upload the blocked account and insurance pages; confirm them. In the inbox tap "Mark as done" on the steps the student has done (tests, attestation, certificates, blocked account, insurance) | `os-documents`, `os-inbox` | |
+| 9 | Each pack: "A few more details" (contact details from `students.yaml`), tick the checklist items, "Approve pack". "Paid the application fee" is not in the checklist: it is under "After you approve", greyed out until the pack is approved (log it if it blocks Approve) | `os-pack` | tick |
+| 10 | Ready to submit: each programme's submit step waits. On each pack, under "After you approve", tick "Paid the application fee": the pack must stay "Approved ✓" (log it if it goes back to "ready to approve"). Then tap "Mark as done" ("I submitted it") | `os-pack`, `os-inbox` | tick 2 days |
+| 11 | Admission results as `students.yaml` says ("Not admitted" asks again, naming the programme: confirm it) | `os-inbox` | tick |
 | 12 | Read a suggestion and accept it; read "What changed" | `os-inbox` | tick |
-| 13 | Upload and confirm the admission letter; the visa file: choose the programme, details, ticks, "Approve visa file" | `os-documents`, `os-visa` | tick |
-| 14 | Visa file ready: `visa_apply` waits in the inbox. If it does not, and the plan waits on `visa_target_date`, supply it as the admin (`POST /v1/os/facts`, as the driver does) and log it | `os-inbox` | tick |
+| 13 | Upload and confirm the admission letter; the visa file: choose the programme, details, ticks, "Approve visa file" ("Applied on the Consular Services Portal" and "Paid the visa fee" are under "After you approve", not needed to approve) | `os-documents`, `os-visa` | tick |
+| 14 | Visa file ready: `visa_apply` waits in the inbox, its date "6 weeks before your semester starts on ..." (the visa programme's `semester_start`; load `semester_starts.yaml` with the seed, as the driver does). If it is still under "Waiting", log it. On the visa file, tick both steps under "After you approve": it must stay "Approved ✓" | `os-inbox`, `os-visa` | tick |
 
 ## Per student
 

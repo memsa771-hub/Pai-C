@@ -37,7 +37,8 @@ function ProgrammeRow({ rules, started, disabled, onDraft, onPaste }: {
   const [limit, setLimit] = useState(rules.source === 'student' && rules.limit_words ? String(rules.limit_words) : '');
   return (
     <section data-programme={rules.programme_ref} className="flex flex-col gap-1 border-t pt-2 first:border-t-0 first:pt-0">
-      <p className="break-words text-sm font-medium">{rules.programme_ref}</p>
+      <p className="break-words text-sm font-medium">{rules.name ?? 'A programme in your plan'}</p>
+      {rules.university && <p className="break-words text-xs text-muted-foreground">{rules.university}</p>}
       <p className="break-words text-xs text-muted-foreground">{rulesLabel(rules)}</p>
       {rules.prompt && rules.needed && <p className="break-words text-xs">Its question: {rules.prompt}</p>}
       {rules.needed && !started && (

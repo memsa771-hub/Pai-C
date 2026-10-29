@@ -118,7 +118,9 @@ def inputs_sha(inp: PackInputs) -> str:
         "profile": {k: [v.value, v.source, v.document_id] for k, v in inp.profile.items()},
         "facts": {k: [f.value, f.status, f.url] for k, f in inp.facts.items()},
         "constants": {k: c.value for k, c in inp.constants.items()},
-        "ticked": sorted(inp.ticked), "added": inp.added, "override": inp.required_override,
+        # a tick after approving (paid the fee) is not part of what is approved: it never makes a new version
+        "ticked": sorted(inp.ticked - inp.cfg.after_approval_keys()),
+        "added": inp.added, "override": inp.required_override,
     }
     if inp.kind != "pack":  # only when set, so a pack's fingerprint is unchanged from Slice 6a
         body["kind"], body["programme"] = inp.kind, inp.programme_ref

@@ -62,7 +62,22 @@ describe('self-serve helpers', () => {
     expect(lineText(line({ status: 'needs_input', have: null, needs: ['transcript'] }))).toBe('Needs your transcript');
     expect(lineText(line({ status: 'needs_input', have: null, reason: 'open_finding' }))).toContain('mismatch');
     expect(lineText(line({ status: 'likely_meets', have: null, need: 'none' }))).toBe('Not required');
-    expect(lineText(line({ status: 'unknown', have: null }))).toContain('being researched');
+    expect(lineText(line({ status: 'unknown', have: null }))).toBe("Not found on the programme's pages yet");
+  });
+
+  // Slice 9 Task 11 (`walk:S1:chip_unknown_says_being_researched`): a researched programme whose entry requirements
+  // were not found is not "being researched"; the chip says what is missing.
+  it('tells a researched programme with no requirements found from one still being researched', () => {
+    const unknown = { programme_ref: 'p1', verdict: 'unknown' as const,
+                      lines: [line({ status: 'unknown', have: null, check: 'grade' })] };
+    expect(chipLabel(prog({ card: unknown }))).toBe('entry requirements not found yet');
+    expect(chipLabel(prog({ card: { ...unknown, lines: [] } }))).toBe('entry requirements not found yet');
+    expect(chipLabel(prog({ research_state: 'being_researched', card: null }))).toBe('being researched');
+    expect(chipLabel(prog({ card: null }))).toBe('being researched');
+    expect(chipLabel('unknown')).toBe('not found yet');
+    const html = builder({ programmes: [prog({ card: unknown })] });
+    expect(html).toContain('>entry requirements not found yet<');
+    expect(html).not.toContain('being researched');
   });
 
   it('caps the choices at 10 and reorders them', () => {

@@ -18,10 +18,13 @@ from app.os.api.queries import (
     finding_out,
     inbox_items,
     mark_note_read,
+    notice_link,
     open_facts,
     plan_out,
     research_runs,
     student_programmes,
+    task_plan_and_template,
+    waiting_items,
 )
 from app.os.api.schemas import (
     CompleteIn,
@@ -65,7 +68,7 @@ from app.os.api.schemas import (
     TextIn,
 )
 from app.os.api.queries import statement_out
-from app.os.artifacts.store import ArtifactStore
+from app.os.artifacts.store import STATEMENT_KINDS, ArtifactStore
 from app.os.statements import interview as stmt
 from app.os.statements.approval import complete_documents_tasks
 from app.os.statements.facts_check import unsupported
@@ -84,11 +87,13 @@ from app.os.documents.run import enqueue_document
 from app.os.documents.store import DocumentStore, DuplicateDocument, FindingStore, ProfileStore
 from app.os.eligibility.notes import on_profile_change
 from app.os.api import self_serve
-from app.os.api.packs import add_pack_routes, add_visa_routes, complete_ready_packs
+from app.os.api.packs import add_pack_routes, add_visa_routes, complete_ready_packs, refresh_visa_date
 from app.os.api.replan import add_replan_routes, changes_paused, student_proposals
 from app.os.knowledge.requests import RequestLimit, request_programme
 from app.os.routes import builder
 from app.os.kernel import IllegalTransition
+from app.os.kernel.revisions import NOTICE_PREFIX
+from app.os.packs.visa import ADMISSION_TASK
 from app.os.playbooks import PlaybookError
 from app.os.workers import confirm_fact, open_confirm_tasks, supply_fact
 
@@ -177,12 +182,29 @@ def build_router(get_services: Callable[[], Services]) -> APIRouter:
         except KeyError:
             raise HTTPException(status_code=404, detail="plan not found") from None
 
+    def drop_empty_notices(svc: Services, student: str, items: list[dict]) -> list[dict]:
+        """A "Your plan was updated" item whose revision changed none of the student's steps has nothing to tell
+        them: it is done (Slice 9 Task 11, `walk:S1:plan_updated_notice_empty`). Extra work on a read: a failure
+        leaves the item listed."""
+        kept = []
+        for item in items:
+            if item["instance_key"].startswith(NOTICE_PREFIX) and not item["changes"]:
+                try:  # the result keeps the notice's link to its revision and cause
+                    svc.kernel.complete_student_task(item["id"], student, {
+                        "closed": "no_student_changes", **notice_link(svc.engine, item["id"])})
+                    continue
+                except Exception:
+                    log.exception("closing an empty plan update notice failed")
+            kept.append(item)
+        return kept
+
     @router.get("/inbox", response_model=InboxOut)
     def inbox(student: str = Depends(current_student_ref), svc: Services = Depends(services)) -> dict:
         complete_ready(svc, student)  # Slice 5: a documents task whose statements are already approved
         complete_ready_packs(svc, student)  # Slice 6a/6b: a review task whose pack or visa file is approved
         tenant = svc.settings.tenant_id
-        return {"items": inbox_items(svc.engine, tenant, student),
+        items = drop_empty_notices(svc, student, inbox_items(svc.engine, tenant, student))
+        return {"items": items + waiting_items(svc.engine, tenant, student, svc.plans.playbooks),
                 "notes": eligibility_notes(svc.engine, tenant, student),
                 "proposals": student_proposals(svc, student), "changes_paused": changes_paused(svc, student)}
 
@@ -203,6 +225,10 @@ def build_router(get_services: Callable[[], Services]) -> APIRouter:
             raise HTTPException(status_code=404, detail="inbox item not found") from None
         except IllegalTransition as e:
             raise HTTPException(status_code=409, detail=str(e)) from None
+        if done:  # an admission answer can change the visa programme, and so the visa step's date (F1)
+            found = task_plan_and_template(svc.engine, task_id)
+            if found is not None and found[1] == ADMISSION_TASK:
+                refresh_visa_date(svc, found[0])
         return {"completed": done}
 
     @router.post("/facts/{fact_id}/confirm", response_model=ConfirmOut, dependencies=[Depends(require_admin)])
@@ -354,7 +380,7 @@ def build_router(get_services: Callable[[], Services]) -> APIRouter:
             raise HTTPException(status_code=409, detail=str(e)) from None
         doc = store.get(doc_id)
         enqueue_document(svc.dbos_client(), tenant, doc)  # if this is lost, the daily documents_retry sends it
-        return document_out(store, doc, [])
+        return document_out(store, doc, [], svc.document_types)
 
     @router.get("/documents", response_model=DocumentsOut)
     def documents(student: str = Depends(current_student_ref), svc: Services = Depends(services)) -> dict:
@@ -374,7 +400,7 @@ def build_router(get_services: Callable[[], Services]) -> APIRouter:
         _notify(svc.plans, student)  # Slice 4: a note if a programme's eligibility changed
         store = DocumentStore(svc.engine, tenant)
         findings = [finding_out(f) for f in FindingStore(svc.engine, tenant).list_open(student)]
-        return document_out(store, store.get(doc_id), findings)
+        return document_out(store, store.get(doc_id), findings, svc.document_types)
 
     @router.post("/documents/findings/{finding_id}/resolve", response_model=FindingOut)
     def resolve(finding_id: int, body: ResolveIn, student: str = Depends(current_student_ref_for_write),
@@ -431,7 +457,7 @@ def build_router(get_services: Callable[[], Services]) -> APIRouter:
 
     def own_artifact(svc: Services, artifact_id: int, student: str):
         art = ArtifactStore(svc.engine, svc.settings.tenant_id).get(artifact_id)
-        if art is None or art.student_ref != student:
+        if art is None or art.student_ref != student or art.kind not in STATEMENT_KINDS:  # never a pack or visa file
             raise HTTPException(status_code=404, detail="statement not found")
         return art
 
@@ -479,10 +505,13 @@ def build_router(get_services: Callable[[], Services]) -> APIRouter:
         store = ArtifactStore(svc.engine, tenant)
         plan = self_serve.student_plan(svc.plans, student)
         cfg = plan and svc.statement_configs.get(plan.route_key)
+        store_p = ProgrammeStore(svc.engine, tenant)
         programmes = [] if cfg is None else [  # each plan programme's rules: does it ask for its own statement?
-            {"programme_ref": ref, **asdict(resolve_rules(svc.engine, tenant, svc.knowledge, student, ref, plan.year,
-                                                          cfg, "sop"))} for ref in plan.programmes]
-        return {"statements": [statement_out(store, a) for a in store.list_for(student)], "programmes": programmes}
+            {"programme_ref": ref, "name": p.name if p else None, "university": p.university if p else None,
+             **asdict(resolve_rules(svc.engine, tenant, svc.knowledge, student, ref, plan.year, cfg, "sop"))}
+            for ref in plan.programmes for p in [store_p.get(ref)]]
+        return {"statements": [statement_out(store, a) for a in store.list_for(student, STATEMENT_KINDS)],
+                "programmes": programmes}
 
     @router.post("/statements/{kind}/draft", status_code=202, response_model=StatementOut)
     def statement_draft(kind: str, body: DraftIn | None = None, student: str = Depends(current_student_ref_for_write),

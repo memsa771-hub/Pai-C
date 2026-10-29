@@ -9,7 +9,7 @@ from sqlalchemy import Engine, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from app.os import models
-from app.os.artifacts.store import ArtifactStore
+from app.os.artifacts.store import STATEMENT_KINDS, ArtifactStore
 from app.os.statements.config import StatementConfig
 from app.os.statements.run import enqueue_statement, inputs_for, inputs_sha, statement_workflow_id
 
@@ -88,7 +88,7 @@ def answer_follow_up(engine: Engine, client, tenant: str, student: str, cfg: Sta
         return []
     store = ArtifactStore(engine, tenant)
     started = [start_draft(engine, client, tenant, cfg, a.id, year, knowledge)
-               for a in store.list_for(student) if a.status == "needs_answers"]
+               for a in store.list_for(student, STATEMENT_KINDS) if a.status == "needs_answers"]
     return [w for w in started if w]
 
 

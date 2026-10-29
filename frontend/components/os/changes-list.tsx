@@ -5,7 +5,7 @@ import { newestFirst, opText, type OsChange } from '@/lib/os-replan';
 /** "What changed" (Slice 7 spec §5): the plan's changes, newest first, each with why and when. */
 export function ChangesList({ changes, names }: { changes: OsChange[]; names: Record<string, string> }) {
   if (changes.length === 0) {
-    return <p className="text-sm text-muted-foreground">No changes yet.</p>;
+    return <p className="text-sm text-muted-foreground">No suggested changes yet.</p>;
   }
   return (
     <ul className="flex flex-col gap-2 text-sm">

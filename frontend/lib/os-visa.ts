@@ -20,7 +20,13 @@ export interface OsFunds {
 export interface OsVisaChoice {
   programme_ref: string | null; // what the student chose
   reduction: number;
-  preselected: string | null; // the programme the student said admitted them
+  preselected: string | null; // the one programme the student said admitted them (null with two: they choose)
+  admitted?: string[]; // every programme the student said admitted them (Slice 9 Task 11)
+}
+
+/** Every admitted programme of the plan (older APIs send only the pre-selected one). */
+export function admittedRefs(v: OsVisa): string[] {
+  return v.choice.admitted ?? (v.choice.preselected ? [v.choice.preselected] : []);
 }
 
 export interface OsVisaProgramme {

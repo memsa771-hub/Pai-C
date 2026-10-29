@@ -6,7 +6,9 @@ import { StatementProgrammes } from './statement-programmes';
 import { workspaceApi } from '@/lib/api';
 import {
   countLabel,
+  kindLabel,
   overBy,
+  programmeNames,
   progressLabel,
   rulesLabel,
   segments,
@@ -186,6 +188,29 @@ describe('StatementProgrammes', () => {
     expect(rulesLabel(rules({ status: 'unconfirmed' }))).toContain('not yet confirmed');
     expect(rulesLabel(rules({ source: 'student', limit_words: null, limit_chars: 4000 })))
       .toBe('Asks for its own statement: 4,000 characters (from what you pasted)');
+  });
+
+  // Slice 9 Task 11 (`walk:S1:statement_programmes_raw_refs`): programmes by name, never by internal ref.
+  it('names each programme, with its university, and never shows the ref', () => {
+    const html = render([rules({ programme_ref: 'ovgu-x', name: 'MSc Example', university: 'Uni Sample' }),
+                         rules({ programme_ref: 'p-unnamed', needed: false, source: 'default', prompt: null })]);
+    expect(html).toContain('>MSc Example<');
+    expect(html).toContain('Uni Sample');
+    expect(html).not.toContain('>ovgu-x<');
+    expect(html).not.toContain('>p-unnamed<');
+    expect(html).toContain('A programme in your plan');
+  });
+
+  it('names a programme statement by its programme', () => {
+    const names = programmeNames([rules({ programme_ref: 'ovgu-x', name: 'MSc Example' })]);
+    expect(kindLabel('sop', 'ovgu-x', names)).toBe('Statement of purpose for MSc Example');
+    expect(kindLabel('sop', 'gone', names)).toBe('Statement of purpose for one of your programmes');
+    expect(kindLabel('sop', null, names)).toBe('Statement of purpose');
+    const editor = renderToStaticMarkup(
+      <StatementEditor statement={stmt({ programme_ref: 'ovgu-x' })} names={names} onSave={() => {}}
+                       onRewrite={() => {}} onApprove={() => {}} />);
+    expect(editor).toContain('Statement of purpose for MSc Example');
+    expect(editor).not.toContain('ovgu-x');
   });
 
   it('labels a budget pause', () => {

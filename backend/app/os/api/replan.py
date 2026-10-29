@@ -67,11 +67,20 @@ def add_replan_routes(router: APIRouter, services: Callable[[], Services], requi
     def plan_changes(svc: Services, plan_id: int) -> dict:
         found = ProposalStore(svc.engine, svc.settings.tenant_id).for_plan(plan_id)
         with svc.engine.connect() as conn:
-            paused = conn.execute(select(P.c.changes_paused).where(P.c.id == plan_id)).scalar_one()
+            paused, contract = conn.execute(select(P.c.changes_paused, P.c.contract).where(P.c.id == plan_id)).one()
+            # the names of every programme the plan had or a change names, removed ones too (Slice 9 Task 11): the
+            # programmes page lists only those still in the plan, so the page cannot name a removed one by itself
+            refs = {c["programme_ref"] for c in (contract or {}).get("programmes", [])}
+            refs |= {op.get(k) for p in found for op in p.ops for k in ("programme_ref", "out_ref", "in_ref")}
+            refs.discard(None)
+            G = models.programmes
+            names = dict(conn.execute(select(G.c.ref, G.c.name).where(
+                G.c.tenant_id == svc.settings.tenant_id, G.c.ref.in_(refs))).all()) if refs else {}
         return {"changes": [{**proposal_out(p), "proposal_id": p.id, "at": p.answered_at or p.created_at}
-                            for p in found if p.status in ("applied", "accepted") and p.ops],
+                            for p in found if p.status in ("applied", "accepted") and p.ops
+                            and p.revision is not None],  # a proposal that changed nothing is no entry (minor #7)
                 "pending": [proposal_out(p) for p in found if p.status == "pending"],
-                "changes_paused": paused, "plan_id": plan_id}
+                "changes_paused": paused, "plan_id": plan_id, "names": names}
 
     @router.get("/plans/{plan_id}/changes")
     def changes(plan_id: int, student: str = Depends(current_student_ref), svc: Services = Depends(services)) -> dict:

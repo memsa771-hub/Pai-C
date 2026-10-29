@@ -103,6 +103,14 @@ fields:
     cycle_bound: true
     hint: Last day of the winter application window for applicants with a foreign (non-EU) degree, as MM-DD.
 
+  # Slice 9 Task 11 (F1): the visa step's date is derived from this (the playbook's visa_apply anchor).
+  - name: semester_start
+    type: month_day
+    cycle_bound: true
+    hint: >-
+      First day of the winter semester's lectures (Vorlesungsbeginn) for this programme, as MM-DD; the semester's
+      official start if the pages give no lecture start.
+
   - name: application_route
     type: enum
     hint: >-

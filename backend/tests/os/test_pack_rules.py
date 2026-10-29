@@ -99,9 +99,10 @@ def test_student_added_item_is_manual():
 
 
 def test_manual_needs_tick_and_complete():
-    ready = inputs(ticked={"degree", "transcript", "hssc", "ssc"})
-    assert not complete(checklist(ready, "p1"))  # fee_paid not ticked
-    assert complete(checklist(replace(ready, ticked=ready.ticked | {"fee_paid"}), "p1"))
+    ready = inputs(ticked={"degree", "transcript", "hssc", "ssc"}, added=[("added:1", "Module descriptions")])
+    assert not complete(checklist(ready, "p1"))  # the student's own item not ticked
+    assert complete(checklist(replace(ready, ticked=ready.ticked | {"added:1"}), "p1"))
+    # fee_paid is ticked after approving (Slice 9 Task 11): it never blocks approval
 
 
 def test_sheet_values_and_gaps():

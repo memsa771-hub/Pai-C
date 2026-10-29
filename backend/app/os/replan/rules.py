@@ -5,6 +5,7 @@ the plan, the playbook and the route's replan config (invariant 12)."""
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 
+from app.os.compiler import CONFIRM_TYPE
 from app.os.kernel.states import is_started
 from app.os.replan.config import ReplanConfig
 from app.os.replan.events import Event
@@ -14,6 +15,8 @@ from app.os.replan.ops import (
 
 REASONS = {
     "rejected": "The programme did not admit you: its remaining steps are removed.",
+    "rejected_kept": "The programme did not admit you: its steps that have not started are removed; steps already "
+                     "started or kept on purpose stay.",
     "swap": "You have fewer programmes than planned: this one is a close match.",
     "critical": "This step is on the critical path for a deadline.",
     "request": "This is needed to keep your plan on time.",
@@ -56,12 +59,20 @@ def _rejected(event: Event, state: PlanState, cfg: ReplanConfig) -> list[Op] | H
     if ref not in state.programmes:
         return []
     left = [p for p in state.programmes if p != ref]
-    if len(left) >= cfg.min_programmes:
-        return [CancelProgramme(programme_ref=ref, reason=REASONS["rejected"])]
+    if len(left) >= cfg.min_programmes:  # the kernel keeps started and protected steps: say so (Slice 7 minor #6)
+        kept = any(_open(t) and t.programme_ref == ref and (t.protected or _stays(t)) for t in state.tasks.values())
+        return [CancelProgramme(programme_ref=ref, reason=REASONS["rejected_kept" if kept else "rejected"])]
     match = next((s for s in state.suggestions.get(ref, []) if s not in state.programmes), None)
     if match is None:
         return Handover(f"a rejection left {len(left)} programme(s) and there is no close match")
     return [SwapProgramme(out_ref=ref, in_ref=match, reason=REASONS["swap"])]
+
+
+def _stays(t: TaskRow) -> bool:
+    """Whether the kernel keeps this started step when its programme is removed. A fact check only waiting for a
+    review goes with its programme (kernel `revisions._left_with_programme`); another module's step does not."""
+    return is_started(t.state, t.kind) and not (t.task_type == CONFIRM_TYPE and t.kind == "work"
+                                                and t.state == "waiting_review")
 
 
 def _unstarted_student(t: TaskRow | None) -> bool:

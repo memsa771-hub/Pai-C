@@ -25,9 +25,9 @@ function visa(over: Partial<OsVisa> = {}): OsVisa {
       { key: 'blocked_account', label: 'Blocked account confirmation', kind: 'document', state: 'needs_action',
         ticked: false, reasons: ['the amount is below what you need: 11904 XYZ'], source: 'default', document_id: 2,
         tickable: false },
-      { key: 'visa_fee_paid', label: 'Paid the visa fee', kind: 'manual', state: 'manual', ticked: false, reasons: [],
-        source: 'default', document_id: null, tickable: true },
     ],
+    after_approval: [{ key: 'visa_fee_paid', label: 'Paid the visa fee', note: 'Pay the visa fee when the portal asks, then tick this.',
+                       ticked: false }],
     data_sheet: [],
     files: [{ key: 'admission', sha256: 'b'.repeat(64), filename: 'admission.pdf', size: 1000, pages: 1 }],
     funds: funds(),
@@ -91,6 +91,33 @@ describe('VisaChoice', () => {
   });
 });
 
+// Slice 9 Task 11: `walk:S1:visa_admitted_label_one_only`. Fictional programmes only.
+describe('VisaChoice with two admissions', () => {
+  const two = visa({ programme_ref: null, status: 'no_choice',
+                     choice: { programme_ref: null, reduction: 0, preselected: null, admitted: ['p1', 'p2'] } });
+
+  it('marks every admitted programme', () => {
+    const html = renderToStaticMarkup(<VisaChoice visa={two} busy={false} onChoose={noop} />);
+    expect(html).toContain('Uni Sample · MSc Example (admitted)');
+    expect(html).toContain('Uni Two · MSc Other (admitted)');
+  });
+
+  it('asks which one before anything is built, with nothing chosen', () => {
+    const html = renderToStaticMarkup(<VisaChoice visa={two} busy={false} onChoose={noop} />);
+    expect(html).toContain('You were admitted to more than one programme');
+    expect(html).toMatch(/<option[^>]*value=""[^>]*selected=""/);
+  });
+
+  it('once chosen, says which one it is for and still marks both', () => {
+    const chosen = visa({ choice: { programme_ref: 'p2', reduction: 0, preselected: null, admitted: ['p1', 'p2'] },
+                          programme_ref: 'p2' });
+    const html = renderToStaticMarkup(<VisaChoice visa={chosen} busy={false} onChoose={noop} />);
+    expect(html).toMatch(/<option[^>]*value="p2"[^>]*selected=""/);
+    expect(html).not.toContain('You were admitted to more than one programme');
+    expect((html.match(/\(admitted\)/g) ?? []).length).toBe(2);
+  });
+});
+
 describe('the visa file', () => {
   it('says to check the list against the embassy portal', () => {
     const html = renderToStaticMarkup(<VisaChoice visa={visa()} busy={false} onChoose={noop} />);
@@ -132,5 +159,17 @@ describe('visa API calls', () => {
     const [url] = fetchMock.mock.calls[1] as unknown as [string, RequestInit];
     expect(url).toContain(`/v1/os/visa/files/${'b'.repeat(64)}?network=ws-1`);
     expect(url).not.toContain('bearer-x');
+  });
+});
+
+// Slice 9 Task 11 (batch D): applying and paying come after the visa file is approved. Fictional values only.
+describe('visa file: after you approve', () => {
+  it('lists paying the fee after approving, not as something blocking approval', () => {
+    const html = file(visa());
+    expect(html).toContain('After you approve');
+    expect(html).toContain('Do these once your visa file is approved.');
+    expect(html).toContain('Pay the visa fee when the portal asks, then tick this.');
+    expect(html).not.toContain('Paid the visa fee (tick');
+    expect(file(visa({ status: 'approved', approved: true }))).toContain('Ticking them does not change what you approved.');
   });
 });

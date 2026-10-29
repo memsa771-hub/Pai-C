@@ -1,7 +1,11 @@
 """PlanQuery and Knowledge reads (reads are allowed outside the kernel; only writes are kernel-only)."""
 
+import re
+from collections.abc import Mapping
+
 from sqlalchemy import Engine, select
 
+from app.os.kernel.revisions import CANCELLED_MARK, DONE_MARK, NOTICE_PREFIX
 from app.os.kernel.states import PLAN_OPEN
 from app.os import models
 
@@ -17,6 +21,21 @@ def task_out(row) -> dict:
         "provisional": row.provisional, "estimated": row.estimated, "slack_days": row.slack_days,
         "critical": row.critical, "citations": row.citations or [],
     }
+
+
+def removed_programmes(conn, tenant_id: str, plan_ids) -> dict[int, set[str]]:
+    """Plan id -> the programmes an accepted change removed (an active `cancel_programme` override, Slice 7). They
+    stay in the plan's contract, but they are no longer the student's programmes on any page (Slice 9 Task 11,
+    `walk:S3:removed_programme_still_shown`)."""
+    O = models.plan_overrides
+    ids = list(plan_ids)
+    out: dict[int, set[str]] = {i: set() for i in ids}
+    if ids:
+        for plan_id, ref in conn.execute(select(O.c.plan_id, O.c.target).where(
+                O.c.tenant_id == tenant_id, O.c.plan_id.in_(ids), O.c.op == "cancel_programme",
+                O.c.active.is_(True))).all():
+            out[plan_id].add(ref)
+    return out
 
 
 def plan_out(engine: Engine, tenant_id: str, plan_id: int) -> dict | None:
@@ -52,13 +71,99 @@ def mark_note_read(engine: Engine, tenant_id: str, student_ref: str, note_id: in
     return found is not None
 
 
+_MARKS = re.compile(rf"(?:(?:{re.escape(CANCELLED_MARK)}|{re.escape(DONE_MARK)})\d+)+$")
+
+
+def notice_changes(conn, tenant_id: str, plan_id: int, result: dict | None) -> list[dict]:
+    """What a "Your plan was updated" item changed for the student: each of their steps the revision added, removed,
+    changed or kept (started or kept on purpose), with its title and programme (Slice 9 Task 11). Work steps
+    (research, checks) are left out."""
+    number = (result or {}).get("revision")
+    if number is None:
+        return []
+    diff = conn.execute(select(models.plan_revisions.c.diff).where(
+        models.plan_revisions.c.plan_id == plan_id, models.plan_revisions.c.number == number)).scalar()
+    if not diff:
+        return []
+    rows = conn.execute(select(T.c.instance_key, T.c.title, T.c.programme_ref, T.c.kind).where(
+        T.c.plan_id == plan_id).order_by(T.c.id)).all()
+    exact = {r.instance_key: r for r in rows}
+    by_base = {_MARKS.sub("", r.instance_key): r for r in rows}  # the newest row of each key
+    out = []
+    lists = [("added", "added"), ("removed", "removed"), ("changed", "changed"), ("skipped_started", "kept"),
+             ("kept_protected", "kept")]
+    for name, change in lists:
+        for key in diff.get(name) or []:
+            row = exact.get(f"{key}{CANCELLED_MARK}{number}") if change == "removed" else None
+            row = row or exact.get(key) or by_base.get(key)
+            if row is not None and row.kind == "student" and not key.startswith(NOTICE_PREFIX):
+                out.append({"change": change, "instance_key": key, "title": row.title,
+                            "programme_ref": row.programme_ref})
+    refs = {c["programme_ref"] for c in out if c["programme_ref"]}
+    names = dict(conn.execute(select(G.c.ref, G.c.name).where(G.c.tenant_id == tenant_id, G.c.ref.in_(refs))).all()) \
+        if refs else {}
+    return [{**c, "programme_name": names.get(c["programme_ref"])} for c in out]
+
+
 def inbox_items(engine: Engine, tenant_id: str, student_ref: str) -> list[dict]:
+    """The student's open inbox items, each with its programme's name (Slice 9 Task 11: two cards of two programmes
+    must be told apart) and, for a "Your plan was updated" item, what it changed for them."""
     with engine.connect() as conn:
-        rows = conn.execute(select(T).join(P, P.c.id == T.c.plan_id).where(
-            T.c.tenant_id == tenant_id, P.c.student_ref == student_ref, T.c.kind == "student",
-            T.c.state == "waiting_student",
-        ).order_by(T.c.due_at.asc().nulls_last(), T.c.id)).all()
-    return [task_out(r) for r in rows]
+        rows = conn.execute(select(T, G.c.name.label("programme_name"), G.c.university.label("university"))
+                            .join(P, P.c.id == T.c.plan_id)
+                            .outerjoin(G, (G.c.tenant_id == T.c.tenant_id) & (G.c.ref == T.c.programme_ref))
+                            .where(T.c.tenant_id == tenant_id, P.c.student_ref == student_ref, T.c.kind == "student",
+                                   T.c.state == "waiting_student")
+                            .order_by(T.c.due_at.asc().nulls_last(), T.c.id)).all()
+        return [{**task_out(r), "programme_name": r.programme_name, "university": r.university,
+                 "changes": notice_changes(conn, tenant_id, r.plan_id, r.result) if r.instance_key.startswith(NOTICE_PREFIX)
+                 else []} for r in rows]
+
+
+def notice_link(engine: Engine, task_id: int) -> dict:
+    """A plan-update notice's link to its revision: {"revision", "cause"} from its stored result (what is there)."""
+    with engine.connect() as conn:
+        result = conn.execute(select(T.c.result).where(T.c.id == task_id)).scalar() or {}
+    return {k: result[k] for k in ("revision", "cause") if k in result}
+
+
+def task_plan_and_template(engine: Engine, task_id: int) -> tuple[int, str] | None:
+    with engine.connect() as conn:
+        row = conn.execute(select(T.c.plan_id, T.c.template_key).where(T.c.id == task_id)).first()
+    return None if row is None else (row.plan_id, row.template_key)
+
+
+def waiting_items(engine: Engine, tenant_id: str, student_ref: str, books: Mapping) -> list[dict]:
+    """The student's steps that wait for a fact nobody has given yet (blocked `fact_missing:<field>`), or for a
+    programme to take it from (blocked `no_candidate:<name>`: every programme said "not admitted"), each with what
+    it waits for in its pinned playbook's words (`anchor.waiting`; None if the playbook has none). Listed after the
+    inbox items so the student is told what the plan is waiting for, never "nothing to do" (Slice 9 Task 11,
+    `walk:S1:nothing_to_do_while_blocked`). Nothing can be done on them: completing one is refused."""
+    pins = models.playbook_pins
+    with engine.connect() as conn:
+        rows = conn.execute(select(T, G.c.name.label("programme_name"), G.c.university.label("university"),
+                                   pins.c.playbook_key, pins.c.version.label("pinned_version"))
+                            .join(P, P.c.id == T.c.plan_id)
+                            .join(pins, pins.c.plan_id == T.c.plan_id)
+                            .outerjoin(G, (G.c.tenant_id == T.c.tenant_id) & (G.c.ref == T.c.programme_ref))
+                            .where(T.c.tenant_id == tenant_id, P.c.student_ref == student_ref, T.c.kind == "student",
+                                   P.c.status.in_(PLAN_OPEN), T.c.state == "blocked",
+                                   T.c.blocked_reason.like("fact_missing:%")
+                                   | T.c.blocked_reason.like("no_candidate:%"))
+                            .order_by(T.c.id)).all()
+    out = []
+    for r in rows:
+        book = books.get((r.playbook_key, r.pinned_version))
+        tmpl = next((t for t in book.tasks if t.template_key == r.template_key), None) if book else None
+        anchor = tmpl.anchor if tmpl else None
+        said = None
+        if anchor and r.blocked_reason == f"fact_missing:{anchor.fact}":
+            said = anchor.waiting
+        elif anchor and r.blocked_reason == f"no_candidate:{anchor.programme}":
+            said = anchor.waiting_none
+        out.append({**task_out(r), "programme_name": r.programme_name, "university": r.university, "changes": [],
+                    "waiting_for": said})
+    return out
 
 
 # --- Knowledge (Slice 2 spec §4.8) ---------------------------------------------------------------------------
@@ -120,17 +225,18 @@ def open_facts(engine: Engine, tenant_id: str, items: list[dict]) -> list[dict]:
 
 
 def student_programmes(engine: Engine, tenant_id: str, student_ref: str) -> list[dict]:
-    """The programmes in the student's plans, in plan then rank order, with their facts for the plan's intake
+    """The programmes in the student's plans (not those a change removed), in plan then rank order, with their facts for the plan's intake
     year: value, status, source link, quote, check date and conflict note. No evidence (it is for admins)."""
     with engine.connect() as conn:
         plans = conn.execute(select(P.c.id, P.c.contract).where(
             P.c.tenant_id == tenant_id, P.c.student_ref == student_ref, P.c.status.in_(PLAN_OPEN)).order_by(P.c.id)).all()
         out, seen = [], set()
+        removed = removed_programmes(conn, tenant_id, [p for p, _ in plans])
         for plan_id, contract in plans:
             intake_year = contract["target_intake"]["year"]
             for choice in sorted(contract["programmes"], key=lambda c: c["rank"]):
                 ref = choice["programme_ref"]
-                if (ref, intake_year) in seen:
+                if ref in removed[plan_id] or (ref, intake_year) in seen:
                     continue
                 seen.add((ref, intake_year))
                 prog = conn.execute(select(G).where(G.c.tenant_id == tenant_id, G.c.ref == ref)).first()
@@ -157,14 +263,17 @@ def documents_out(engine: Engine, tenant_id: str, student_ref: str, types: dict)
 
     store = DocumentStore(engine, tenant_id)
     findings = [finding_out(f) for f in FindingStore(engine, tenant_id).list_open(student_ref)]
-    return {"documents": [document_out(store, d, findings) for d in store.list_for(student_ref)],
+    return {"documents": [document_out(store, d, findings, types) for d in store.list_for(student_ref)],
             "findings": findings,
             "doc_types": sorted(({"key": t.key, "label": t.label} for t in types.values()), key=lambda t: t["label"])}
 
 
-def document_out(store, d, findings: list[dict]) -> dict:
-    fields = [{k: f[k] for k in ("field", "value_read", "check", "reasons", "value_confirmed")}
-              for f in store.fields(d.id)]
+def document_out(store, d, findings: list[dict], types: dict | None = None) -> dict:
+    """A document with its fields; each field carries its type's plain label (None: the page words the name)."""
+    spec = (types or {}).get(d.doc_type)
+    labels = {f.name: f.label for f in spec.fields} if spec is not None else {}
+    fields = [{**{k: f[k] for k in ("field", "value_read", "check", "reasons", "value_confirmed")},
+               "label": labels.get(f["field"])} for f in store.fields(d.id)]
     return {"id": d.id, "doc_type": d.doc_type, "filename": d.filename, "status": d.status,
             "detected_type": d.detected_type, "pages": d.pages, "error": d.error, "created_at": d.created_at,
             "read_at": d.read_at, "confirmed_at": d.confirmed_at, "fields": fields,

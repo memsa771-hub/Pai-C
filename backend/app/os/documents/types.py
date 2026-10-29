@@ -30,6 +30,7 @@ class FieldSpec(_Model):
     name: str
     type: GenericType
     hint: str
+    label: str | None = None  # the student's plain label, when the name alone is technical (Slice 9 Task 11)
     required: bool = False
     pattern: str | None = None  # `code`: the value must match
     values: list[str] = []  # `enum`: the allowed values

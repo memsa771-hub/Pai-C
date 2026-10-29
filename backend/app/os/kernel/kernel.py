@@ -273,15 +273,21 @@ class Kernel:
             self._promote(conn, row.plan_id)
             return True
 
-    def complete_review(self, task_id: int, result: dict) -> None:
+    def complete_review(self, task_id: int, result: dict, *, only_if_waiting: bool = False) -> bool:
+        """Completes a task waiting for review; True if this call completed it. A task already done is left as it is.
+        With `only_if_waiting`, a task no longer waiting (e.g. cancelled with its programme meanwhile, Slice 9a F2) is
+        left as it is too; otherwise that is an IllegalTransition. Checked under the task lock."""
         with self.engine.begin() as conn:
             row = self._lock_task(conn, task_id)
             if row.state == S.DONE:
-                return
+                return False
             if row.state != S.WAITING_REVIEW:
+                if only_if_waiting:
+                    return False
                 raise IllegalTransition(f"task is {row.state}, not waiting for review")
             self._transition(conn, row, S.DONE, cause="review_completed", result=result)
             self._promote(conn, row.plan_id)
+            return True
 
     def retry(self, task_id: int) -> int:
         with self.engine.begin() as conn:

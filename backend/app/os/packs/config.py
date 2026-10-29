@@ -47,11 +47,16 @@ class Item(_Model):
     ref: str | None = None  # document: a document type; statement: sop | cv; entered: a data-sheet field key
     format: str | None = None  # a named format; the route default otherwise
     note: str | None = None
+    # a step the student takes after approving (e.g. paying the fee): it never blocks approval and is not part of
+    # what is approved (Slice 9 Task 11 ruling; invariant 5). Manual items only.
+    after_approval: bool = False
 
     @model_validator(mode="after")
     def _ref(self) -> "Item":
         if (self.kind == "manual") != (self.ref is None):
             raise ValueError(f"item '{self.key}': a {self.kind} item {'has no' if self.kind == 'manual' else 'needs a'} ref")
+        if self.after_approval and self.kind != "manual":
+            raise ValueError(f"item '{self.key}': only a manual item can be after_approval")
         return self
 
 
@@ -113,6 +118,9 @@ class PackConfig(_Model):
             if dupes:
                 raise ValueError(f"duplicate {name} keys {dupes}")
         return self
+
+    def after_approval_keys(self) -> set[str]:
+        return {i.key for i in self.checklist if i.after_approval}
 
     def fields(self) -> list[SheetField]:
         return [f for s in self.data_sheet for f in s.fields]

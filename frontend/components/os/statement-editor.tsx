@@ -16,6 +16,8 @@ import {
 
 interface StatementEditorProps {
   statement: OsStatement;
+  /** Programme ref -> name: a programme statement is named by its programme. */
+  names?: Record<string, string>;
   onSave: (text: string) => void;
   onRewrite: () => void;
   onApprove: (version: number) => void;
@@ -24,7 +26,7 @@ interface StatementEditorProps {
 
 /** One draft (Slice 5 spec §5): the text in an editor with its count and limit, the phrases we could not find in
  * the student's material highlighted, the reviewer's notes, and Save / Write again / Approve this version. */
-export function StatementEditor({ statement, onSave, onRewrite, onApprove, busy = false }: StatementEditorProps) {
+export function StatementEditor({ statement, names = {}, onSave, onRewrite, onApprove, busy = false }: StatementEditorProps) {
   const v = statement.version;
   const [text, setText] = useState(v?.text ?? '');
   if (!v) return <p className="text-sm text-muted-foreground">No draft yet.</p>;
@@ -35,7 +37,7 @@ export function StatementEditor({ statement, onSave, onRewrite, onApprove, busy 
   const fixes = v.critic?.fixes ?? [];
   return (
     <div className="mx-auto flex w-full max-w-md flex-col gap-3">
-      <h2 className="break-words text-base font-semibold">{kindLabel(statement.kind, statement.programme_ref)}</h2>
+      <h2 className="break-words text-base font-semibold">{kindLabel(statement.kind, statement.programme_ref, names)}</h2>
       <textarea aria-label="Your text" rows={14} value={text} disabled={busy}
                 className="w-full rounded-md border bg-background p-2 text-sm" onChange={(e) => setText(e.target.value)} />
       <p className={`text-xs ${over ? 'text-destructive' : 'text-muted-foreground'}`}>

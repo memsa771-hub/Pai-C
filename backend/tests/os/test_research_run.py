@@ -224,8 +224,9 @@ def test_confirm_task_waits_for_research(research):
     tasks = confirm_tasks(research.engine, plan_id)
     assert tasks["confirm_fact@ovgu-eeit:application_route"]["result"]["waiting_for"] == "research"
     assert tasks["confirm_fact@ovgu-eeit:deadline_close"]["result"]["waiting_for"] == "research"
-    # a route fact is not researched (S2-D1): an admin supplies it
-    assert tasks["confirm_fact@germany_master:visa_target_date"]["result"]["waiting_for"] == "admin_fact_confirmation"
+    # Slice 9 Task 11 (F1): the visa date comes from the programme's semester start, which research looks for
+    assert tasks["confirm_fact@ovgu-eeit:semester_start"]["result"]["waiting_for"] == "research"
+    assert not any(k.startswith("confirm_fact@germany_master:") for k in tasks)  # no route fact left to supply
 
 
 def test_confirmed_fact_completes_task_and_redates_plan(research):
@@ -248,7 +249,7 @@ def test_confirmed_fact_completes_task_and_redates_plan(research):
     tasks = confirm_tasks(research.engine, plan_id)
     assert tasks["confirm_fact@ovgu-eeit:deadline_close"]["state"] == "done"
     assert tasks["confirm_fact@ovgu-eeit:application_route"]["state"] == "done"
-    assert tasks["confirm_fact@germany_master:visa_target_date"]["state"] == "waiting_review"
+    assert tasks["confirm_fact@ovgu-eeit:semester_start"]["state"] == "waiting_review"  # the pages do not say it
     assert revision(research.engine, plan_id) > before_rev
     assert due(research.engine, plan_id, "uni_assist_apply@ovgu-eeit") < before_due  # 1 July, not 15 July
     changed = [e for e in events(research.engine, "fact_changed") if e["ref"] == "ovgu-eeit"]

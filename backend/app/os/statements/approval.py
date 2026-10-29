@@ -8,7 +8,7 @@ with the approved texts' SHA-256 as the result, so the pack (Slice 6) knows exac
 from sqlalchemy import Engine, delete, select
 
 from app.os import models
-from app.os.artifacts.store import ArtifactStore
+from app.os.artifacts.store import STATEMENT_KINDS, ArtifactStore
 from app.os.kernel import IllegalTransition
 from app.os.kernel.states import TaskState
 from app.os.statements.config import StatementConfig
@@ -29,7 +29,7 @@ def needed_artifacts(engine: Engine, tenant: str, knowledge, student: str, progr
 def approved_shas(engine: Engine, tenant: str, student: str) -> dict[tuple[str, str | None], str]:
     store = ArtifactStore(engine, tenant)
     out = {}
-    for a in store.list_for(student):
+    for a in store.list_for(student, STATEMENT_KINDS):
         if a.status == "approved" and (ap := store.approval(a.id)) is not None:
             out[(a.kind, a.programme_ref)] = ap.sha256
     return out

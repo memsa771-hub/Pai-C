@@ -3,7 +3,7 @@
 Pure: no database, no clock, no randomness. The same input always gives the same draft.
 """
 
-from collections.abc import Mapping, Sequence
+from collections.abc import Collection, Mapping, Sequence
 from dataclasses import dataclass, field, replace
 from datetime import date, datetime, timedelta
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
@@ -15,6 +15,13 @@ from app.os.knowledge import Fact
 from app.os.playbooks import Playbook, TaskTemplate
 
 CONFIRM_TYPE = "knowledge.confirm_fact"
+# A derived date's note names its month in English whatever the process locale (strftime's %B follows it).
+MONTHS = ("January", "February", "March", "April", "May", "June", "July", "August", "September", "October",
+          "November", "December")
+
+
+def _day(d: date) -> str:
+    return f"{d.day} {MONTHS[d.month - 1]} {d.year}"
 
 
 class CompileError(ValueError):
@@ -77,10 +84,11 @@ def needed_fields(playbook: Playbook) -> tuple[set[str], set[str]]:
     route, programme = set(), set()
     for t in playbook.tasks:
         target = programme if t.fan_out == "programme" else route
-        for name in (t.condition.fact if t.condition else None, t.anchor.fact if t.anchor else None,
-                     t.citation_from_fact):
+        for name in (t.condition.fact if t.condition else None, t.citation_from_fact):
             if name:
                 target.add(name)
+        if t.anchor:  # an anchor on a chosen programme reads that programme's fact (Slice 9 Task 11, F1)
+            (programme if t.anchor.programme else target).add(t.anchor.fact)
     return route, programme
 
 
@@ -199,10 +207,18 @@ def compile_plan(
     today: date,
     disabled_types: frozenset[str] = frozenset(),
     overrides: Sequence = (),
+    chosen: Mapping[str, str | None] | None = None,
+    excluded: Mapping[str, Collection[str]] | None = None,
 ) -> PlanDraft:
     """`overrides`: a replan's plan overrides (Slice 7 S7-D5), each with `op`, `target` and `payload`, applied after
-    the playbook is expanded, so every recompile keeps them. An override whose target is gone is ignored."""
+    the playbook is expanded, so every recompile keeps them. An override whose target is gone is ignored.
+    `chosen`: the programme the student chose for a purpose, by the name an `anchor.programme` uses ("visa": the
+    programme the visa file is for), or None while there is none (Slice 9 Task 11, F1). `excluded`: by the same name,
+    programmes that are never the source while nothing is chosen (e.g. one that said "not admitted" while others
+    did not, or one that did not admit the student while others did)."""
+    chosen, excluded = chosen or {}, excluded or {}
     refs = [p.programme_ref for p in sorted(contract.programmes, key=lambda p: p.rank)]
+    removed = {o.target for o in overrides if o.op == "cancel_programme"}
     route_key = playbook.key
     insts: dict[str, _Inst] = {}
     by_template: dict[str, list[_Inst]] = {}
@@ -248,20 +264,43 @@ def compile_plan(
                     lead_days = int(const.value)
                     inst.estimated |= const.estimate
             if t.anchor:
-                fact, fref = lookup(ref, t.anchor.fact)
-                inst.fact_refs.append(fref)
-                if fact is None or fact.value is None:
-                    inst.blocked_reason = f"fact_missing:{t.anchor.fact}"
-                    need_confirm(fref)
+                if t.anchor.programme and ref is None:  # the chosen programme's fact, else the earliest (F1)
+                    live = [r for r in refs if r not in removed]
+                    pick = chosen.get(t.anchor.programme)
+                    out = set(excluded.get(t.anchor.programme, ()))
+                    sources = [pick] if pick in live else [r for r in live if r not in out]
                 else:
-                    d, tz = date_of(fact.value, f"{fref[1]}:{fref[2]}")
+                    sources = [ref]
+                usable = []
+                for src in sources:
+                    fact, fref = lookup(src, t.anchor.fact)
+                    inst.fact_refs.append(fref)
+                    if fact is None or fact.value is None:
+                        need_confirm(fref)
+                        continue
+                    if not fact.confirmed:
+                        need_confirm(fref)
+                    usable.append((date_of(fact.value, f"{fref[1]}:{fref[2]}"), fact))
+                if not sources:  # every programme is out (none admitted the student): nothing to date it from
+                    inst.blocked_reason = f"no_candidate:{t.anchor.programme}"
+                elif not usable:
+                    inst.blocked_reason = f"fact_missing:{t.anchor.fact}"
+                else:
+                    (d, tz), fact = min(usable, key=lambda u: u[0][0])
                     inst.tz = tz or playbook.default_timezone
                     if fact.url:  # the date comes from this page: cite it first (invariant 3, review I5)
-                        inst.citations.insert(0, {"source": f"fact:{t.anchor.fact}", "url": fact.url})
+                        cite = {"source": f"fact:{t.anchor.fact}", "url": fact.url}
+                        note = t.anchor.note_earliest if len(sources) > 1 and t.anchor.note_earliest \
+                            else t.anchor.note
+                        if note:  # and say plainly how the date follows from it (F1)
+                            cite["note"] = note.format(
+                                **{k: c.value for k, c in playbook.constants.items()},
+                                date=_day(d), due=_day(d - timedelta(days=lead_days)), days=lead_days,
+                                weeks=lead_days // 7)
+                        inst.citations.insert(0, cite)
                     inst.deadline = end_of_day(d, inst.tz) - timedelta(days=lead_days)
-                    if not fact.confirmed:
+                    if not fact.confirmed or len(sources) > 1:  # several: it may move once one is chosen
                         inst.provisional = True
-                        need_confirm(fref)
             if t.citation_from_fact:
                 fact, fref = lookup(ref, t.citation_from_fact)
                 inst.fact_refs.append(fref)

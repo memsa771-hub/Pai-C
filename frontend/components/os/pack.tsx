@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import {
   DATA_SHEET_KEY,
+  approveBlockers,
   canApprove,
   feeValue,
   fileFor,
@@ -45,7 +46,8 @@ interface PackViewProps {
   notice?: string;
 }
 
-/** One programme's pack: how to apply, fees, the checklist with downloads, the data sheet, and Approve. */
+/** One programme's pack: how to apply, fees, the checklist with downloads, the data sheet, Approve, and then the steps
+ * after approving (paying, applying: Slice 9 Task 11), tickable once approved. */
 export function PackView({ pack, busy, onTick, onAdd, onApprove, onDownload, onRebuild, onDetails, noun = 'pack',
                            notice = 'You submit and pay yourself. We never send anything for you.' }: PackViewProps) {
   const [extra, setExtra] = useState('');
@@ -94,7 +96,10 @@ export function PackView({ pack, busy, onTick, onAdd, onApprove, onDownload, onR
       </section>
 
       <section aria-label="Checklist" className="rounded-lg border bg-card p-3">
-        <h2 className="mb-2 font-semibold">Checklist</h2>
+        <h2 className="mb-1 font-semibold">Checklist</h2>
+        <p className="mb-2 break-words text-xs text-muted-foreground">
+          Tick a box yourself once you have done that step. You can approve only when every item has a ✓ or a tick.
+        </p>
         <ul className="flex flex-col gap-3">
           {pack.checklist.map((i) => {
             const file = fileFor(pack, i.key);
@@ -137,12 +142,12 @@ export function PackView({ pack, busy, onTick, onAdd, onApprove, onDownload, onR
             <h3 className="mb-1 text-xs font-semibold uppercase text-muted-foreground">{section}</h3>
             <dl className="flex flex-col gap-1">
               {pack.data_sheet.filter((r) => r.section === section).map((r) => (
-                <div key={r.key} className="flex flex-wrap items-center gap-x-2">
-                  <dt className="text-muted-foreground">{r.label}</dt>
-                  <dd className="flex min-w-0 flex-1 items-center justify-end gap-2 break-words">
+                <div key={r.key} className="flex flex-col border-b pb-1 last:border-b-0">
+                  <dt className="break-words text-xs text-muted-foreground">{r.label}</dt>
+                  <dd className="flex min-w-0 items-center justify-between gap-2">
                     {r.value !== null ? (
                       <>
-                        <span className="break-words">{r.value}</span>
+                        <span className="min-w-0 [overflow-wrap:anywhere]">{r.value}</span>
                         <Button size="sm" variant="ghost" type="button"
                                 onClick={() => void navigator.clipboard?.writeText(r.value ?? '')}>Copy</Button>
                       </>
@@ -161,7 +166,40 @@ export function PackView({ pack, busy, onTick, onAdd, onApprove, onDownload, onR
       {pack.approved ? (
         <p className="font-medium">Approved ✓</p>
       ) : (
-        <Button disabled={busy || !canApprove(pack)} onClick={onApprove}>Approve {noun}</Button>
+        <>
+          <Button disabled={busy || !canApprove(pack)} onClick={onApprove}>Approve {noun}</Button>
+          {pack.status !== 'building' && approveBlockers(pack).length > 0 && (
+            <div className="break-words text-xs text-muted-foreground">
+              <p className="font-medium">Before you can approve:</p>
+              <ul className="mt-0.5 list-disc pl-4">
+                {approveBlockers(pack).map((b) => <li key={b}>{b}</li>)}
+              </ul>
+            </div>
+          )}
+        </>
+      )}
+
+      {(pack.after_approval ?? []).length > 0 && (
+        <section aria-label="After you approve" className="rounded-lg border bg-card p-3">
+          <h2 className="mb-1 font-semibold">After you approve</h2>
+          <p className="mb-2 break-words text-xs text-muted-foreground">
+            {pack.approved
+              ? 'Do these yourself, then tick each one. Ticking them does not change what you approved.'
+              : `Do these once your ${noun} is approved. You can tick them after you approve.`}
+          </p>
+          <ul className="flex flex-col gap-3">
+            {(pack.after_approval ?? []).map((i) => (
+              <li key={i.key} className="min-w-0">
+                <label className="flex min-w-0 items-center gap-2 break-words">
+                  <input type="checkbox" checked={i.ticked} disabled={busy || !pack.approved}
+                         onChange={(e) => onTick(i.key, e.target.checked)} />
+                  {i.label}
+                </label>
+                {i.note && <p className="mt-0.5 break-words text-xs text-muted-foreground">{i.note}</p>}
+              </li>
+            ))}
+          </ul>
+        </section>
       )}
     </div>
   );

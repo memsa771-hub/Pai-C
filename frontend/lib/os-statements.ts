@@ -47,9 +47,17 @@ export interface OsStatement {
 export const NOT_FOUND_COPY = 'We could not find this in your answers or profile';
 export const APPROVED_COPY = 'This is the text that goes in your application';
 
-export function kindLabel(kind: OsStatementKind, programmeRef: string | null = null): string {
+/** "Statement of purpose for MSc Example": a programme by its name, never its internal ref (Slice 9 Task 11). */
+export function kindLabel(kind: OsStatementKind, programmeRef: string | null = null,
+                          names: Record<string, string> = {}): string {
   if (kind === 'cv') return 'CV';
-  return programmeRef ? `Statement of purpose for ${programmeRef}` : 'Statement of purpose';
+  if (!programmeRef) return 'Statement of purpose';
+  return `Statement of purpose for ${names[programmeRef] ?? 'one of your programmes'}`;
+}
+
+/** Programme ref -> name, from the statements page's programmes. */
+export function programmeNames(programmes: OsProgrammeRules[]): Record<string, string> {
+  return Object.fromEntries(programmes.filter((p) => p.name).map((p) => [p.programme_ref, p.name as string]));
 }
 
 export function wordCount(text: string): number {
@@ -117,6 +125,8 @@ export function statusLabel(s: OsStatement): string {
 /** One plan programme's statement rules: does it ask for its own statement, and with what limit and prompt. */
 export interface OsProgrammeRules {
   programme_ref: string;
+  name?: string | null; // from the programme store (Slice 9 Task 11)
+  university?: string | null;
   needed: boolean;
   limit_words: number | null;
   limit_chars: number | null;

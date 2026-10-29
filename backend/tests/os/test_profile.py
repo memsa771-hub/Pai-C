@@ -26,8 +26,12 @@ def test_germany_profile_loads_with_the_answer_key_fields():
     key_fields = set(next(iter(yaml.safe_load(KEY.read_text(encoding="utf-8"))["programmes"].values()))["facts"])
     assert profile.route_key == "germany_master" and profile.version == 1
     # plan ruling R2-P3: the Spike 1 key's fields, plus fields later slices added that the key does not score
-    # (Slice 5: statement_requirement; the scorer skips a field the key has no value for)
-    assert {f.name for f in profile.fields} == key_fields | {"statement_requirement", "required_documents"}
+    # (Slice 5: statement_requirement; the scorer skips a field the key has no value for; Slice 9 Task 11:
+    # semester_start, which the visa step's date is derived from)
+    assert {f.name for f in profile.fields} == key_fields | {"statement_requirement", "required_documents",
+                                                            "semester_start"}
+    start = next(f for f in profile.fields if f.name == "semester_start")
+    assert (start.type, start.cycle_bound) == ("month_day", True)
     assert set(profile.month_names) == set(range(1, 13))
 
 

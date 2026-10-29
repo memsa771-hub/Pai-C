@@ -7,5 +7,5 @@ fields:
   - {name: holder_name, type: name, cross_check: full_name, hint: "The account holder's name exactly as printed"}
   - {name: provider, type: text, hint: "The bank or provider that issued the confirmation"}
   - {name: amount, type: number, hint: "The total amount paid in and blocked, as a number without currency"}
-  - {name: monthly_payout, type: number, hint: "The amount paid out each month, as a number without currency, if printed"}
+  - {name: monthly_payout, label: "Paid out each month", type: number, hint: "The amount paid out each month, as a number without currency, if printed"}
   - {name: issue_date, type: date, hint: "Date of the confirmation, YYYY-MM-DD"}

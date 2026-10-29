@@ -109,13 +109,21 @@ const CHIPS: Record<Verdict, string> = {
   likely_meets: 'likely meets',
   likely_below: 'check this',
   needs_input: 'needs your documents',
-  unknown: 'being researched',
+  unknown: 'not found yet',
 };
 
-/** The chip for a verdict, or for a programme still being researched. */
+export const BEING_RESEARCHED = 'being researched';
+/** A researched programme whose pages did not give its entry requirements (Slice 9 Task 11): not "being
+ * researched", and not about the student's documents either. */
+export const REQUIREMENTS_NOT_FOUND = 'entry requirements not found yet';
+
+/** The chip for a verdict (a line), or for a programme: still being researched, or researched with its verdict. */
 export function chipLabel(p: { research_state?: string; card: OsCard | null } | Verdict): string {
   if (typeof p === 'string') return CHIPS[p] ?? p;
-  if (p.research_state === 'being_researched' || p.card === null) return CHIPS.unknown;
+  if (p.research_state === 'being_researched' || p.card === null) return BEING_RESEARCHED;
+  if (p.card.verdict === 'unknown') {
+    return p.card.lines.some((l) => l.status === 'needs_input') ? CHIPS.needs_input : REQUIREMENTS_NOT_FOUND;
+  }
   return CHIPS[p.card.verdict] ?? p.card.verdict;
 }
 
@@ -156,7 +164,7 @@ export function valueText(v: unknown): string {
 
 /** One line of a card in plain words, with its numbers. */
 export function lineText(line: OsLine): string {
-  if (line.status === 'unknown') return 'Not stated yet: being researched';
+  if (line.status === 'unknown') return "Not found on the programme's pages yet";
   if (line.status === 'needs_input') {
     if (line.reason === 'open_finding') return 'Resolve the mismatch in your documents first';
     if (line.reason === 'no_proof_type') return `Needs proof of ${valueText(line.need)}`;

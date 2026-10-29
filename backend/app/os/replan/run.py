@@ -22,6 +22,7 @@ REPLAN_WORKFLOW = "os.replan"
 HANDOVER_PREFIX = "No automatic change: "  # no Supervisor configured (a system problem, Slice 8 S8-D12)
 BUDGET_REASON = "The planning assistant's monthly budget is used up."
 INVALID_REASON = "The planning assistant could not propose a valid change."
+EMPTY_REASON = "The planning assistant proposed no change: a person needs to look at this."
 log = logging.getLogger("app.os.replan")
 
 
@@ -128,6 +129,8 @@ def register_replan(engine: Engine, settings: OsSettings, replanner: Replanner, 
                     cost(result.usage, settings, spec.tier, agent.model.model_name), error)
         if result.output is None:
             return support_step(plan_id, event_id, INVALID_REASON)
+        if not result.output.ops:  # an empty answer is not "nothing to do": a person looks (Slice 7 minor #5)
+            return support_step(plan_id, event_id, EMPTY_REASON)
         return decide_step(plan_id, event_id, "supervisor", [op.model_dump(mode="json") for op in result.output.ops])
 
     DBOS.workflow(name=REPLAN_WORKFLOW)(replan)

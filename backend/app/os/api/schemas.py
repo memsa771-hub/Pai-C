@@ -25,6 +25,10 @@ class TaskOut(BaseModel):
     slack_days: int | None
     critical: bool
     citations: list[dict]
+    programme_name: str | None = None  # the inbox: the programme's name and university (Slice 9 Task 11)
+    university: str | None = None
+    changes: list[dict] = []  # a "Your plan was updated" item: the student's steps it added, removed or changed
+    waiting_for: str | None = None  # a blocked step listed in the inbox: what it waits for (Slice 9 Task 11)
 
 
 class PlanOut(BaseModel):
@@ -179,6 +183,7 @@ class DocumentFieldOut(BaseModel):
     check: Literal["ok", "check_failed", "missing"]
     reasons: list[str]
     value_confirmed: Any
+    label: str | None = None  # the plain label from the document type (Slice 9 Task 11)
 
 
 class FindingItemOut(BaseModel):
@@ -414,6 +419,8 @@ class ProgrammeRulesOut(BaseModel):
     """One plan programme's statement rules: whether it asks for its own SOP, its limit and prompt, and where they
     come from (research with its status, the student's paste, or the route default)."""
     programme_ref: str
+    name: str | None = None  # from the programme store (Slice 9 Task 11): the page shows names, not refs
+    university: str | None = None
     needed: bool
     limit_words: int | None
     limit_chars: int | None

@@ -282,3 +282,20 @@ def test_programmes_rules_listed(api):
     api.put(f"{P}/statements/rules/p2", headers=me(), json={"prompt": "Why p2?", "limit_words": 600})
     p2 = next(p for p in api.get(f"{P}/statements", headers=me()).json()["programmes"] if p["programme_ref"] == "p2")
     assert (p2["needed"], p2["limit_words"], p2["prompt"], p2["source"]) == (True, 600, "Why p2?", "student")
+
+
+def test_statements_list_leaves_out_pack_and_visa(api):
+    """Slice 9a Task 11, F3 (`http:S9:GET /statements:500`, `walk:S3:statements_page_500`): the pack and the visa file
+    share the artifacts table; once one exists the statements list still answers, with statements only."""
+    start(api)
+    sop = written(api)
+    store = ArtifactStore(api.engine, TENANT)
+    pack, visa = store.get_or_create("stu-1", "pack", "p1"), store.get_or_create("stu-1", "visa", None)
+    for art in (pack, visa):
+        store.add_version(art.id, "built", "system")
+    r = api.get(f"{P}/statements", headers=me())
+    assert r.status_code == 200, r.text
+    assert [(s["id"], s["kind"]) for s in r.json()["statements"]] == [(sop, "sop")]
+    for art in (pack, visa):  # a statement call never reaches a pack or a visa file either
+        assert api.put(f"{P}/statements/{art.id}/text", headers=me(), json={"text": "x"}).status_code == 404
+        assert api.post(f"{P}/statements/{art.id}/approve", headers=me(), json={"version": 1}).status_code == 404
