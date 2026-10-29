@@ -404,10 +404,12 @@ def _live(t: dict) -> bool:
 class Rehearsal:
     def __init__(self, students: list[str], out_dir: Path, *, kill: bool = False, end: date = END,
                  seed: int = 9, answers_edit: Callable[[Path], None] | None = None,
-                 check_finish: bool | None = None, database_url: str | None = None) -> None:
+                 check_finish: bool | None = None, database_url: str | None = None,
+                 billed: dict[str, str] | None = None) -> None:
         """`end`, `answers_edit` and `check_finish` are for tests: a shorter run, a changed answers folder (Review
         Focus 5), and whether a student who has not finished by the end is a failure (default: only with the real
-        end date)."""
+        end date). `billed` is run.billed_env()'s result (spec §2.7): real OpenAI on its own tenant with the four
+        caps, for the API and the worker; the key comes from the process environment and is never copied here."""
         every = load_students()
         unknown = [s for s in students if s not in every]
         if unknown:
@@ -425,6 +427,15 @@ class Rehearsal:
         self.watch = StuckWatch()
         self.start: date = START
         self.admin_actions: list[str] = []
+        self.billed = dict(billed) if billed else None
+        self.tenant = self.billed["OS_TENANT_ID"] if self.billed else TENANT
+        # The caps are monthly and follow rehearsal time, so a run over several rehearsal months could spend them
+        # again each month: a billed run also stops (`_billed_stop`) once the tenant's whole spend reaches the caps'
+        # sum minus a margin, after every wait for the worker (controller ruling, Task 12 fix round 1).
+        self.billed_total = sum(float(v) for k, v in self.billed.items() if k.endswith("_MONTHLY_USD")) \
+            if self.billed else None
+        self.billed_stopped: str | None = None  # why the guard stopped the billed run (latched)
+        self.settle_timed_out = False  # the last settle() ended on its timeout (work still in flight)
 
     # ------------------------------------------------------------------ helpers
 
@@ -457,13 +468,13 @@ class Rehearsal:
         run_alembic(["upgrade", "os@head"], self.url)
         truncate_os_tables(self.engine)
         reset_dbos_schema(self.url)
-        kb, store = SqlKnowledge(self.engine, TENANT), ProgrammeStore(self.engine, TENANT)
+        kb, store = SqlKnowledge(self.engine, self.tenant), ProgrammeStore(self.engine, self.tenant)
         load_programme_seed(PROGRAMME_SEED, store)
         load_seed(SEED_DIR / "germany_ws2027.yaml", kb)
         load_seed(SEMESTER_STARTS, kb)
 
     def _answers(self) -> None:
-        store = ProgrammeStore(self.engine, TENANT)
+        store = ProgrammeStore(self.engine, self.tenant)
         programmes = {}
         for s in self.students:
             for ref in s.programmes:
@@ -486,6 +497,9 @@ class Rehearsal:
         env = {"OS_DATABASE_URL": self.url, "OS_DBOS_SYSTEM_SCHEMA": TEST_DBOS_SCHEMA, "OS_ADMIN_TOKEN": TOKEN,
                "OS_ENABLED": "true", "OS_REHEARSAL": "on", "OS_MODEL_MODE": "offline",
                "OS_OFFLINE_ANSWERS_DIR": str(self.answers_dir)}
+        if self.billed:  # real OpenAI on its own tenant, with the caps; the key only from the process env
+            env.update(self.billed)
+            env["OS_OPENAI_API_KEY"] = os.environ.get("OS_OPENAI_API_KEY", "")
         self.settings = load_settings(env)
         self.svc = make_services(self.settings, engine=self.engine)  # installs the rehearsal clock
         app = FastAPI()
@@ -515,8 +529,14 @@ class Rehearsal:
                "OS_DBOS_SYSTEM_SCHEMA": TEST_DBOS_SCHEMA, "OS_WORKER_ID": WORKER_ID, "OS_REHEARSAL": "on",
                "OS_MODEL_MODE": "offline", "OS_OFFLINE_ANSWERS_DIR": str(self.answers_dir),
                "OS_EMAIL_SENDER": "log", "OS_PARENT_PID": str(os.getpid())}
-        for k in ("OS_OPENAI_API_KEY", "OS_TEST_RESEARCH_MODEL", "OS_TEST_DOCUMENT_MODEL", "OS_TEST_STATEMENT_MODEL",
-                  "OS_TEST_REPLAN_MODEL", "OS_EXTRA_MODULES"):
+        drop = ["OS_TEST_RESEARCH_MODEL", "OS_TEST_DOCUMENT_MODEL", "OS_TEST_STATEMENT_MODEL", "OS_TEST_REPLAN_MODEL",
+                "OS_EXTRA_MODULES", "OS_TENANT_ID"]
+        if self.billed:  # real OpenAI: keep the key the owners set in the process env, add tenant, mode and caps
+            env.update(self.billed)
+            drop.remove("OS_TENANT_ID")
+        else:
+            drop.append("OS_OPENAI_API_KEY")
+        for k in drop:
             env.pop(k, None)
         self.worker = Worker(env, self.out_dir / "logs")
         self.worker.start()
@@ -555,6 +575,7 @@ class Rehearsal:
         """Waits until the worker has nothing left to do (twice in a row, 0.15 s apart). In a kill run it first
         SIGKILLs the worker now and then while it is busy, and starts it again with the same executor ID."""
         end, quiet = time.monotonic() + SETTLE_S, 0
+        self.settle_timed_out = False
         if self.kill and self.rng.random() < 0.2 and self._busy() is not None:  # a kill while work is in flight
             time.sleep(self.rng.uniform(0.0, 0.5))
             self.worker.kill()
@@ -569,6 +590,7 @@ class Rehearsal:
                 return
             if time.monotonic() > end:
                 self.fail("worker_busy", "all", None, f"the worker finishes within {SETTLE_S:.0f} s", busy)
+                self.settle_timed_out = True
                 return
             time.sleep(0.15)
 
@@ -617,7 +639,8 @@ class Rehearsal:
             for run in runs:
                 self._safe(run, self._begin)
             self.settle()
-            self._loop(runs)
+            if not self._billed_stop():
+                self._loop(runs)
             self._final(runs)
             report = self._report(runs)
         finally:
@@ -655,15 +678,59 @@ class Rehearsal:
                 if not acted:
                     break  # nothing new for the worker: the last wait still holds
                 self.settle()
+                if self._billed_stop():
+                    return
             for run in runs:
                 if run.state == "running":
                     self._safe(run, lambda r: self._observe(r, today))
                     run.days = (today - self.start).days
-            if should_stop(today, {r.s.sid: r.state for r in runs}, self.end):
+            if should_stop(today, {r.s.sid: r.state for r in runs}, self.end) or self._billed_stop():
                 return
             self.advance(self.rng.randint(1, 3))
             self.tick()
             self.settle()
+            if self._billed_stop():
+                return
+
+    def _spent(self) -> float:
+        t = models.agent_runs
+        with self.engine.connect() as conn:
+            return float(conn.execute(select(func.coalesce(func.sum(t.c.cost_usd), 0))
+                                      .where(t.c.tenant_id == self.tenant)).scalar())
+
+    def billed_stop_at(self) -> float:
+        """The spend at which a billed run stops: the caps' sum minus a margin (the larger of $1 and 20 %), so work
+        still in flight when the guard looks cannot take the run past the hard cap ($12 for $15)."""
+        return self.billed_total - max(1.0, 0.2 * self.billed_total)
+
+    def _billed_stop(self) -> bool:
+        """A billed run's whole-run budget guard, called after every wait for the worker. True (latched) when the
+        run must stop: the tenant's spend reached `billed_stop_at()`; or the last wait timed out (`worker_busy`: the
+        spend still in flight is unknown); or the spend could not be read. The stop is a safety stop, not a product
+        failure: it is recorded as an admin step in the report (`billed_stop: ...`), not in the failure log; only a
+        spend query error is also a failure (`billed_guard_error`). Offline runs never stop here."""
+        if not self.billed:
+            return False
+        if self.billed_stopped is not None:
+            return True
+        if self.settle_timed_out:
+            reason = "the worker was still busy after a wait; spend in flight unknown"
+        else:
+            try:
+                spent = self._spent()
+            except Exception as e:  # any error: stop rather than spend blind
+                log.exception("billed guard: the spend query failed")
+                self.fail("billed_guard_error", "all", None, "the billed run's spend can be read",
+                          f"{type(e).__name__}: {e}")
+                reason = "the spend could not be read"
+            else:
+                if spent < self.billed_stop_at():
+                    return False
+                reason = f"spent ${spent:.2f}, at or over the stop point ${self.billed_stop_at():.2f}"
+        self.billed_stopped = reason
+        self.admin_actions.append(f"billed_stop: {reason}")
+        log.warning("billed run stopped by the budget guard: %s", reason)
+        return True
 
     # ------------------------------------------------------------------ step 2: begin
 
@@ -789,7 +856,8 @@ class Rehearsal:
             elif doc["status"] in ("failed", "needs_student") and doc["id"] not in run.docs_logged:
                 run.docs_logged.add(doc["id"])
                 name, data = run.uploads.get(doc["doc_type"], (doc["filename"], b""))
-                missing = missing_answer(run.s.sid, doc["doc_type"], name, data, self.answers_dir) if data else None
+                offline = data and not self.billed  # a billed run reads with real AI: no canned answer to miss
+                missing = missing_answer(run.s.sid, doc["doc_type"], name, data, self.answers_dir) if offline else None
                 if missing is not None:
                     self.failures.add(missing)
                 else:
@@ -1054,7 +1122,7 @@ class Rehearsal:
         a person by design (S7-D9): they do not hold the student (the final check logs the pause)."""
         if self.svc.kernel.changes_paused(run.plan_id):
             return False
-        if replan_events.pending(self.engine, TENANT, run.plan_id):
+        if replan_events.pending(self.engine, self.tenant, run.plan_id):
             return True
         return any(p.status == "pending" for p in self._proposals_of(run))
 
@@ -1076,9 +1144,12 @@ class Rehearsal:
         for run in runs:
             if run.plan_id is None:
                 continue
-            self._safe(run, self._check_events)
+            if self.billed_stopped is not None and run.state == "running":
+                run.state = "billed_stop"  # stopped by the budget guard: its events cannot be judged, no not_finished
+            if run.state != "billed_stop":
+                self._safe(run, self._check_events)
             missing = [r for r in ("ready_to_submit", "visa_ready") if r not in run.reached]
-            if self.check_finish and (missing or run.state != "visa_ready"):
+            if self.check_finish and run.state != "billed_stop" and (missing or run.state != "visa_ready"):
                 plan = self._plan(run)
                 open_ = sorted(f"{_template(t['instance_key'])}:{t['state']}" for t in plan["tasks"]
                                if _live(t) and t["state"] not in ("done", "cancelled", "skipped")
@@ -1091,7 +1162,7 @@ class Rehearsal:
                 case = self._support_case(run)
                 self.fail(f"paused:{run.s.sid}", run.s.sid, None, "the plan's automatic changes keep running",
                           f"changes paused at the end ({case['reason'] if case else 'no support case'}); "
-                          f"{len(replan_events.pending(self.engine, TENANT, run.plan_id))} events wait for a person",
+                          f"{len(replan_events.pending(self.engine, self.tenant, run.plan_id))} events wait for a person",
                           "workaround")
         self._integrity(runs)
 

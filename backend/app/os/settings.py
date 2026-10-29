@@ -11,7 +11,7 @@ class OsSettings:
     dbos_system_schema: str = "dbos"
     model_cheap: str = "gpt-5.4-mini"
     model_strong: str = "gpt-5.4"
-    openai_api_key: str | None = None
+    openai_api_key: str | None = field(default=None, repr=False)  # never logged, never in a message
     os_enabled: bool = False
     tenant_id: str = "pai"
     admin_token: str | None = None

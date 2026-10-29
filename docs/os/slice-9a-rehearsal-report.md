@@ -176,3 +176,10 @@ The `fixed_by` and `owner_accepted` fields are recorded in `~/s9-rehearsal/full-
 
 The walkthroughs were not played again in a browser after the fix pass. The screen fixes are covered by component
 tests and by the batch B screenshots at 375 px (`~/s9-rehearsal/walkthroughs-2`).
+
+## Gate (Task 12)
+
+**Gate:** marks 1 to 5 and 7 pass on the final code (`full-5`, and `kill-5` with 50 kills: 12 of 12 both end points,
+7 of 7 events, 0 lost or duplicated, only `paused:S7`, owner-accepted; `kill-compare-5.txt` matches). Mark 6, the
+billed run, is approved but not yet run: it waits for `OS_OPENAI_API_KEY`. The walkthroughs were not replayed in a
+browser after the fix pass. See `docs/os/handoff/slice-9a-handoff.md` §3.
