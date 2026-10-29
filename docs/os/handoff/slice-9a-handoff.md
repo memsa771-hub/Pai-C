@@ -13,7 +13,8 @@ Authority order: parent spec > Slice 9 spec > Slice 9 plan > the rulings in the 
 ## 1. Where things stand
 
 9a is built and rehearsed. **Six of the seven gate marks pass; the billed run (mark 6) is approved but not yet run**:
-it waits for the owners' budgeted `OS_OPENAI_API_KEY` in the environment. So **9a's gate is not yet passed**, and no
+the key is now set, but the first attempt (2026-10-29) could not reach OpenAI: this environment's network policy
+refuses `api.openai.com` and the universities' sites. It spent $0. So **9a's gate is not yet passed**, and no
 real student may start (spec §10 Q4 and the gate).
 
 One PR per task, each into `pai-os`:
@@ -32,7 +33,8 @@ One PR per task, each into `pai-os`:
 | 9 | `os/s9-t9-driver` | #164 | The rehearsal driver, 12 students, failure log, report, the short CI rehearsal |
 | 10 | `os/s9-t10-rehearsals` | #165 | Full run, kill run, three walkthroughs, the findings report |
 | 11 | `os/s9-t11-fixes` | #166 | The fix pass, batches A to D (`os_0017` rehearsal start; F1, F2, F3; screens; visa apply-by date; ticks after approval) |
-| 12 | `os/s9-t12-gate` | (this branch, not yet opened) | `--billed` with its cap check, the gate, this handoff |
+| 12 | `os/s9-t12-gate` | #167 | `--billed` with its cap check, the gate, this handoff |
+| — | `os/s9-fix-review` | #168 | The final review's fix pass, and the billed preflight |
 
 - **Never open or prepare a `pai-os` → `dev` PR.** The owners merge once, at the very end.
 - Merge policy since #162 (the user's choice A, 2026-10-27): the controller merges its own PRs into `pai-os` once the
@@ -89,7 +91,7 @@ outside the repo, in `~/s9-rehearsal/`.
 | 3 | No task lost or duplicated, also with the worker killed | **Pass** | `kill-5`: 50 SIGKILLs, 0 lost, 0 duplicated, same end states as `full-5` (`kill-compare-5.txt`) |
 | 4 | The failure log is clear: fixed with a test, or accepted by the owners | **Pass** | 20 distinct ids from Task 10: 19 fixed with a test (`fixed_by` in the logs), 1 accepted (`paused:S7`, by the user on the owners' behalf). The final runs log only that one |
 | 5 | The three phone walkthroughs find nothing that blocks a student | **Pass, with a limit** | Task 10's walkthroughs found 3 `blocks` (2 root causes); all are fixed (`78ce040`, `6fe27b6`). **The walkthroughs were not played again in a browser after the fix pass.** The screen fixes have Vitest tests, and batch B took 375 px screenshots against a mocked API (`~/s9-rehearsal/walkthroughs-2`). The owners' OK for the fake sign-in path was not seen |
-| 6 | The billed run finishes within its cap and gives a cost per student below D7 | **Not run** | Approved by the user on the owners' behalf (2026-10-29): S1, S3, S5, tenant `rehearsal-billed`, caps 5/4/4/2 = $15. **Waiting for `OS_OPENAI_API_KEY`.** `--billed` and its check are built and tested |
+| 6 | The billed run finishes within its cap and gives a cost per student below D7 | **Not run** | Approved by the user on the owners' behalf (2026-10-29), then reduced at the user's request ("as low as possible"): **S1 only, caps 1.5/1/1/0.5 = $4** (guard stop at $3). The key is set; **waiting for the network policy to allow `api.openai.com` and the universities' sites** (first attempt: $0 spent). `--billed`, its check and its preflight are built and tested |
 | 7 | The usual checks pass | **Pass** | See §1: `tests/os`, legacy, standalone (module off), Tach, the single head, Vitest, `tsc`, the OS-enabled build |
 
 **Cost figure for D7: not yet measured — billed run pending key.** When it has run, `python -m scripts.os_costs`
@@ -157,7 +159,15 @@ four caps are set and sum to at most $15.
 30. (Task 12, final design confirmed by the controller in fix round 1) A billed run also has a whole-run budget
     guard, because the caps are monthly on rehearsal time: checked after every wait for the worker, it stops at $12
     of $15 (margin: the larger of $1 and 20 %), after a timed-out wait, or on a spend query error; the stop is an
-    admin step in the report, not a product failure, and stopped students get no `not_finished` (this branch).
+    admin step in the report, not a product failure, and stopped students get no `not_finished` (#167).
+31. The billed run is reduced to **S1 only, caps 1.5/1/1/0.5 = $4** (the user: "as low as possible"). One full
+    student journey gives the per-student figure D7 needs. It keeps the fictional `semester_start` seed: real
+    research of it would add cost and could leave `visa_apply` waiting, which would stall the run. Real
+    `semester_start` research is a 9b entry condition (§7).
+32. `--billed` checks first that OpenAI can be reached (one `GET /v1/models`) and refuses with exit 2 if not. The
+    first attempt ran 2 h against a blocked network (#168).
+33. With rehearsal off, startup is refused while the tenant has a rehearsal clock row, so rehearsal data never
+    becomes a pilot database. An unreachable database when the API is mounted is logged, not refused (#168).
 
 **Other PR rulings:**
 - #156: no sign-in workaround was built; the existing test entry point is only documented.
@@ -208,9 +218,10 @@ The `fixed_by` and `owner_accepted` fields are in `~/s9-rehearsal/full-1`, `kill
 ## 6. Open items for the owners
 
 From spec §10, updated:
-1. **Q1 the billed run:** approved by the user on the owners' behalf on 2026-10-29, with the $15 cap (5/4/4/2). Still
-   needed: a budgeted PAI OS `OS_OPENAI_API_KEY` set in the environment (never in chat, logs or the repo). Note the
-   monthly-cap finding in §3.
+1. **Q1 the billed run:** approved by the user on the owners' behalf on 2026-10-29, reduced to S1 and $4 (ruling
+   31). The key is set. Still needed: the environment's network policy must allow `api.openai.com` and the
+   universities' sites. Also set a hard spend limit on the OpenAI project that owns the key: the driver's guard is a
+   soft backstop (§3).
 2. **Q2 the pilot terms text** (data location, how long files are kept): still open. Until then the placeholder
    cannot be accepted outside rehearsal mode. A qualified review is a 9b item.
 3. **Q3 where the pilot server lives** (its own server from `pai-os`, or the real merge first): open. The rule "never
@@ -257,12 +268,21 @@ Raised during 9a:
 
 ## 7. Next steps
 
-**To close 9a:** the owners set the budgeted key; run the billed rehearsal and the cost report (`rehearsal.md`,
+**To close 9a:** allow `api.openai.com` and the universities' sites in the environment's network policy; in a new
+session, run the billed rehearsal with S1 and the $4 caps and the cost report (`rehearsal.md`,
 "Billed run", which also says how to read a budget stop); fill in mark 6 and the D7 figure here; the owners confirm
 D7 (Q5). Two things are untested before that run: real research page fetches through this container's proxy, and the
 `--billed` path end to end with a real key. The budget guard's worst case is the $12 stop point plus the work in
 flight during one wait for the worker (the guard looks after every wait, and stops if a wait times out). Optionally replay the three
 walkthroughs in a browser on the fixed code.
+
+**The final whole-slice review (2026-10-29)** found the work ready for 9b planning, with 0 Critical. Its cheap
+findings were fixed in #168. Three findings are **9b entry conditions**, to be settled before any real student:
+1. **The visa apply-by figure.** Applying 6 weeks before the semester contradicts the ~90-day processing time shown
+   in the same note. The owners choose `visa_before_semester_days`.
+2. **Real research of `semester_start`,** plus an admin runbook for supplying it when research can't find it.
+3. **Usable email:** a recipient lookup port; real templates (today the body is the raw payload); and 401/403/422
+   from Resend treated as configuration errors that stop and alert, not as rows marked `failed`.
 
 **9b, the real pilot (spec §11, its own full spec once 9a passes):**
 - **Before students:** the pilot server (Q3) with `OS_ENABLED`, its own `OS_WORKER_ID` per replica, `OS_ADMIN_TOKEN`,

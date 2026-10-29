@@ -116,8 +116,9 @@ Before it runs:
 cd backend
 export OS_TEST_DATABASE_URL=postgresql://os_test:os_test@localhost:5432/os_test
 # OS_OPENAI_API_KEY is set by the owners in the environment; never type it into chat, a file or a log
-export OS_RESEARCH_MONTHLY_USD=5 OS_DOCUMENTS_MONTHLY_USD=4 OS_STATEMENTS_MONTHLY_USD=4 OS_REPLAN_MONTHLY_USD=2
-python -m tests.os.rehearsal.run --students S1,S3,S5 --billed --out ~/s9-rehearsal/billed
+# reduced at the user's request (handoff ruling 31): S1 only, $4 in caps, the guard stops at $3
+export OS_RESEARCH_MONTHLY_USD=1.5 OS_DOCUMENTS_MONTHLY_USD=1 OS_STATEMENTS_MONTHLY_USD=1 OS_REPLAN_MONTHLY_USD=0.5
+python -m tests.os.rehearsal.run --students S1 --billed --out ~/s9-rehearsal/billed
 ```
 
 Then the cost report. `os_agent_runs.at` is stamped with the shared clock, so the dates are **rehearsal** dates: the
