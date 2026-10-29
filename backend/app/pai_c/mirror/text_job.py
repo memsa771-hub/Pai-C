@@ -27,13 +27,16 @@ from app.inference.gateway import complete as chat_completion, resolve_model
 from app.journey import JourneyService
 from app.models import BackgroundJob, StudentJourney
 from app.pai_c.deep.prompts import load_prompt
-from app.pai_c.mirror.engine import MirrorEngine, mirror_policy
+from app.pai_c.mirror.engine import MirrorEngine, mirror_policy, split_sentences
 from app.pai_c.understanding.data import load_areas
 from app.runtime.task_runtime import enqueue
 
 logger = logging.getLogger(__name__)
 JOB_MIRROR_TEXT = "counselor.mirror_text"
 _NUMBER = re.compile(r"\d+(?:\.\d+)?")
+_LEVEL = "(level {level} of 3)"
+# The level marks are the brief's scaffolding, not numbers the card states.
+_LEVEL_MARK = re.compile(r"\(level \d+ of 3\)")
 
 
 @lru_cache(maxsize=1)
@@ -67,16 +70,18 @@ def enqueue_mirror_text(db, workspace_id: str) -> str | None:
 
 
 def after_accept(db, candidate) -> None:
-    """Reconciler hook. The Vault write has happened; a failure to queue the
-    text must not undo it, so the enqueue runs in a savepoint and a database
-    error is logged, not raised."""
+    """Reconciler hook. The Vault write has happened and must stand whatever
+    the Mirror does: the enqueue runs in a savepoint and any failure (a
+    database error, a bug or bad policy data in the card) is logged by type
+    and swallowed. The text is only a derived read model."""
     if candidate.key not in mirror_types():
         return
     try:
         with db.begin_nested():
             enqueue_mirror_text(db, candidate.workspace_id)
-    except SQLAlchemyError:
-        logger.exception("mirror_text_enqueue_failed workspace_id=%s", candidate.workspace_id)
+    except Exception as exc:  # noqa: BLE001  the Vault write outranks its read model
+        logger.error("mirror_text_enqueue_failed workspace_id=%s error_type=%s",
+                     candidate.workspace_id, type(exc).__name__)
 
 
 # ---- the model input and its checks -------------------------------------------------
@@ -92,7 +97,7 @@ def card_brief(card: dict) -> str:
         if area["level"]:
             entries = "; ".join(entry["text"] for entry in area["entries"])
             bars = "; ".join(f"{bar['label']} {bar['percent']}%" for bar in area.get("bars", ()))
-            lines.append(f"{area['label']} (level {area['level']} of 3): {entries}" + (f"; marks: {bars}" if bars else ""))
+            lines.append(f"{area['label']} {_LEVEL.format(level=area['level'])}: {entries}" + (f"; marks: {bars}" if bars else ""))
     notes = {mark["note_key"] for area in card["areas"] for mark in area["tension"]}
     lines += [f"Tension: {copy.get(key, key)}" for key in sorted(notes)]
     unknown = [row["label"] for row in card["unknowns"]]
@@ -108,17 +113,20 @@ def _has(words: list[str], text: str) -> list[str]:
 
 def valid_sentences(sentences, brief: str) -> bool:
     rules = mirror_policy()["text"]
-    if (not isinstance(sentences, list) or not rules["min_sentences"] <= len(sentences) <= rules["max_sentences"]
-            or not all(isinstance(s, str) and s.strip() for s in sentences)):
+    if not isinstance(sentences, list) or not all(isinstance(s, str) and s.strip() for s in sentences):
         return False
     text = " ".join(sentences)
+    # Count what the card will show: the stored text split into sentences.
+    sentences = split_sentences(text)
+    if not rules["min_sentences"] <= len(sentences) <= rules["max_sentences"]:
+        return False
     if "?" in text or _has(rules["praise_words"], text):
         return False
     if [word for word in _has(rules["university_words"], text) if word not in _has(rules["university_words"], brief)]:
         return False
     if not all(_has(rules["second_person"], sentence) for sentence in sentences):
         return False
-    return set(_NUMBER.findall(text)) <= set(_NUMBER.findall(brief))
+    return set(_NUMBER.findall(text)) <= set(_NUMBER.findall(_LEVEL_MARK.sub("", brief)))
 
 
 async def mirror_text_job(job, db) -> dict:

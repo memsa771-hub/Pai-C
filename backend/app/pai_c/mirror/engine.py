@@ -23,7 +23,7 @@ from app.pai_c.completeness import completeness_from
 from app.pai_c.memory import MemoryService, entry_ref, vault_catalog
 from app.pai_c.paths.fields import current_education, study_fields
 from app.pai_c.policy.controller import at_path, load_data
-from app.pai_c.roadmap.engine import _percent, education_line, student_standing
+from app.pai_c.roadmap.engine import education_line, marks_percent, student_standing
 
 _SENTENCE_END = re.compile(r"(?<=[.!])\s+(?=\S)")
 
@@ -36,8 +36,11 @@ def mirror_policy() -> dict:
 def card_version(card: dict) -> str:
     """Digest of everything on the card that comes from the Vault (header,
     areas with their entries, unknowns, ready), never the stored text, so the
-    text job can tell whether the card changed since it last wrote."""
-    content = {key: card[key] for key in ("header", "areas", "unknowns", "ready")}
+    text job can tell whether the card changed since it last wrote. An entry's
+    `observed_at` is left out: seeing the same thing again is not a change."""
+    content = {key: card[key] for key in ("header", "unknowns", "ready")}
+    content["areas"] = [{**area, "entries": [{k: v for k, v in entry.items() if k != "observed_at"}
+                                             for entry in area["entries"]]} for area in card["areas"]]
     return hashlib.sha256(json.dumps(content, sort_keys=True, default=str).encode("utf-8")).hexdigest()[:16]
 
 
@@ -190,7 +193,7 @@ class MirrorEngine:
             value = row.entry["value"] if row.entry["type"] == "course" else None
             if not isinstance(value, dict) or value.get("education_id") != education_id:
                 continue
-            percent = _percent({"result": value.get("score") or {}})
+            percent = marks_percent({"result": value.get("score") or {}})
             if percent is not None and value.get("name"):
                 bars.append({"label": value["name"], "percent": percent})
         return bars

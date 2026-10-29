@@ -76,7 +76,7 @@ def _number(value) -> bool:
     return isinstance(value, (int, float)) and not isinstance(value, bool)
 
 
-def _percent(record: dict) -> float | int | None:
+def marks_percent(record: dict) -> float | int | None:
     """The record's own marks: percentage, else obtained/total (a total below
     the obtained marks is a typo, not a mark), else IBCC grades for subject
     levels (A-level) when they are structured grade codes. None otherwise."""
@@ -102,7 +102,7 @@ def student_standing(education_records: list[dict]) -> Standing:
     # Level and marks come from the one record paths read: an intermediate
     # mark never describes a Matric standing, nor a Matric mark an FSc one.
     return Standing(level=level, groups=tuple(sorted(student_groups(current))),
-                    percent=_percent(current) if level in _intermediate_levels() else None,
+                    percent=marks_percent(current) if level in _intermediate_levels() else None,
                     readable=education_readable(education_records),
                     field=field_code if level in group_rules()["degree_levels"] else None)
 

@@ -140,6 +140,13 @@ def test_tension_family_vs_goal():
                                  "details": {"field_of_study": "mbbs"}})
         card = MirrorEngine(db).build(ws)
     assert _area(card, "family_social")["tension"] == [] and _area(card, "goals")["tension"] == []
+    with StudentSession() as student, student.factory() as db:
+        ws = student.workspace_id
+        _item(db, ws, "family_member", {"relation": "father", "wish": "Wants me to be happy"})
+        _item(db, ws, "family_member", {"relation": "mother", "occupation": "Teacher"})
+        _record(db, ws, "goal", {"goal_type": "study", "title": "Computer Science"})
+        card = MirrorEngine(db).build(ws)
+    assert _area(card, "family_social")["tension"] == []  # a wish no field matches is no tension
 
 
 def test_version_changes_only_when_entries_change():
@@ -166,6 +173,12 @@ def test_version_changes_only_when_entries_change():
         changed = MirrorEngine(db).build(ws)
         assert journey is not None
     assert changed["version"] != first["version"]
+    # A re-sighting moves observed_at only: the card is the same.
+    seen_again = json.loads(json.dumps(changed))
+    for area in seen_again["areas"]:
+        for entry in area["entries"]:
+            entry["observed_at"] = "2030-01-01T00:00:00+00:00"
+    assert card_version(seen_again) == changed["version"]
 
 
 def test_engine_makes_no_model_call():
@@ -178,6 +191,10 @@ def test_engine_makes_no_model_call():
         _item(db, ws, "interest", {"text": "Robotics"})
         card = MirrorEngine(db).build(ws)
     assert card["areas"] and boom.await_count == 0
+    # A `from app.inference.gateway import complete` would dodge the patch above.
+    from pathlib import Path
+    from app.pai_c.mirror import engine
+    assert "app.inference" not in Path(engine.__file__).read_text(encoding="utf-8")
 
 
 def test_summary_and_workspace_picture_read_the_card():

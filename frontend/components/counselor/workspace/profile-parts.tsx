@@ -89,10 +89,12 @@ export function MirrorPanel({ picture, onChat, onChanged }: { picture: LivingPic
   const [busy, setBusy] = useState(false), [error, setError] = useState(false);
   useEffect(() => { let alive = true; void loadSummary().then((d) => { if (alive) setDraft(d); }); return () => { alive = false; }; }, []);
   const core = draft?.mirror?.core_picture;
-  const status = draft?.status ?? (picture.picture ? "confirmed" : null);
+  // Only an old 4-line picture fills this panel; the new state card (a header, not lines) is the Mirror page's.
+  const oldPicture = picture.picture?.you_say ? picture.picture : null;
+  const status = draft?.status ?? (oldPicture ? "confirmed" : null);
   const lines: Record<string, string> | null = core
     ? Object.fromEntries(QUADRANTS.map(({ key }) => [key, core[key]?.text || ""]))
-    : picture.picture ? Object.fromEntries(QUADRANTS.map(({ key }) => [key, picture.picture?.[key]?.text || ""])) : null;
+    : oldPicture ? Object.fromEntries(QUADRANTS.map(({ key }) => [key, oldPicture[key]?.text || ""])) : null;
   const version = draft?.version ?? picture.ratings.at(-1)?.version ?? null;
   const rated = picture.ratings.find((r) => r.version === version);
   async function act(edit: boolean) {

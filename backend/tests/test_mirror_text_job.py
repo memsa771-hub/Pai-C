@@ -171,3 +171,52 @@ def test_mirror_text_prompt_is_documented_verbatim():
         pytest.skip("docs are not mounted")
     section = docs.read_text(encoding="utf-8").split("## Mirror text (background)", 1)[1].split("\n## ", 1)[0]
     assert section.split("```text\n", 1)[1].split("\n```", 1)[0].rstrip() == load_prompt("mirror_text").rstrip()
+
+
+def test_hook_failure_never_undoes_the_vault_write():
+    from app.memory.vault_items import VaultItemService
+
+    def accept(student, db):
+        candidate = MemoryCandidateService(db).propose(workspace_id=student.workspace_id,
+            candidate_type="vault_item", key="interest", proposed_value={"text": "Robotics"}, confidence=0.9,
+            source_type="user_explicit", evidence={"quote": QUOTE}, allow_user_explicit=True)
+        result = MemoryReconciler(db).reconcile(candidate)
+        db.commit()
+        return result
+
+    with StudentSession() as student, student.factory() as db:
+        expected = accept(student, db)
+    with StudentSession() as student, student.factory() as db:
+        with patch("app.pai_c.mirror.text_job.MirrorEngine.build", side_effect=KeyError("light")):
+            result = accept(student, db)
+        db.expire_all()
+        items = VaultItemService(db).active(student.workspace_id)
+    assert (result.accepted, result.outcome, result.reason) == (expected.accepted, expected.outcome, expected.reason)
+    assert result.accepted and [item.value for item in items] == [{"text": "Robotics"}]
+
+
+def test_sentence_count_reads_the_sentences_not_the_list():
+    from app.pai_c.mirror.text_job import valid_sentences
+    brief = "Education: FSc Pre-Engineering, 82%"
+    two_in_one = "You study FSc with 82% marks. You like robotics."
+    assert valid_sentences([two_in_one, "You weigh your options."], brief)  # 3 sentences
+    assert not valid_sentences([two_in_one, "You lean toward fields.", "Your family agrees.",
+                                "You weigh your options."], brief)  # 5 sentences
+    # Scaffolding numbers on the brief (level N of 3) are not card numbers.
+    card_brief = brief + "\nInterests (level 3 of 3): Robotics; Circuits"
+    assert not valid_sentences(["You have 3 options.", "You like robotics.", "You study FSc."], card_brief)
+
+
+@pytest.mark.asyncio
+async def test_failed_text_keeps_the_last_text():
+    with StudentSession() as student, student.factory() as db:
+        ws = student.workspace_id
+        _seed(db, ws)
+        with patch(MODEL, AsyncMock(return_value=_reply(GOOD))):
+            assert (await mirror_text_job(_job(db, ws), db))["status"] == "written"
+        before = _draft(db, ws)
+        _item(db, ws, "value", {"text": "Helping people"})
+        job = _job(db, ws)
+        with patch(MODEL, AsyncMock(return_value=_reply(GOOD[:1]))):
+            assert (await mirror_text_job(job, db))["status"] == "invalid"
+        assert _draft(db, ws) == before
