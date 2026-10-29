@@ -9,7 +9,9 @@ result, then the Part-2 exam, then the entry test); a step's result is a gate
 the intake waits for that nothing chains after, because students sit entry
 tests between their exams and their results. Entry is the first intake start
 in or after the month of the last event: the 2026 cycle announced results in
-the month its intakes opened. A month nobody found leaves that step "date not
+the month its intakes opened. With a region (calendar.region_for) its dates replace the national ones by
+event key and the basis names the region; the overall confidence is the weakest
+date used. A month nobody found leaves that step "date not
 confirmed" and the whole estimate uncertain; nothing is guessed.
 """
 
@@ -39,7 +41,7 @@ def next_occurrence(months, after: Month | None, today: date, *, same_month: boo
 
 
 def _basis(step_key: str | None, key: str | None, when: Month | None, row: dict | None) -> dict:
-    return {"step": step_key, "event_key": key, "month": when[1] if when else None,
+    return {"step": step_key, "region": (row or {}).get("region"), "event_key": key, "month": when[1] if when else None,
             "year": when[0] if when else None,
             "source": next((url for url in (row or {}).get("sources", ()) if url.startswith("https://")), None),
             "confidence": (row or {}).get("confidence")}
@@ -51,7 +53,7 @@ def _years(field_key: str | None) -> int | None:
     return years if years is not None else (cal.degree_years(field_key) if field_key else None)
 
 
-def estimate(steps: list[dict], field_key: str | None, today: date) -> dict:
+def estimate(steps: list[dict], field_key: str | None, today: date, region: str | None = None) -> dict:
     previous: Month | None = None
     latest: Month = (today.year, today.month)
     basis, uncertain = [], False
@@ -64,7 +66,7 @@ def estimate(steps: list[dict], field_key: str | None, today: date) -> dict:
             uncertain = True
             continue
         for key in timing.get("chain", ()):
-            row = cal.event(key)
+            row = cal.event(key, region)
             when = next_occurrence(row["months"] if row else (), previous, today)
             basis.append(_basis(step["key"], key, when, row))
             if when is None:
@@ -72,7 +74,7 @@ def estimate(steps: list[dict], field_key: str | None, today: date) -> dict:
                 continue
             previous, latest = when, max(latest, when)
         if timing.get("result"):
-            row = cal.event(timing["result"])
+            row = cal.event(timing["result"], region)
             when = next_occurrence(row["months"] if row else (), previous, today, same_month=True)
             basis.append(_basis(step["key"], timing["result"], when, row))
             if when is None:

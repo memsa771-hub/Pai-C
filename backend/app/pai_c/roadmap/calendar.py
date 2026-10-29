@@ -8,13 +8,22 @@ rules, so a bad edit fails at load (and in the data test), never as a wrong
 date on a student's card.
 """
 
+import json
 from functools import lru_cache
+from pathlib import Path
 
+from app.pai_c.memory import vault_catalog
 from app.pai_c.paths.fields import study_fields
 from app.pai_c.policy.controller import load_data
 
 CONFIDENCE = ("official", "secondary", "uncertain")
 _DEGREE_META = {"_note", "sources", "confidence"}
+FALLBACK_REGION = "federal_fbise"
+CAMBRIDGE_REGION = "cambridge"
+CAMBRIDGE_LEVELS = ("o_level", "a_level")
+_REGION_META = {"boards", "overrides", "gaps", "_note", "national_fallback_confidence", "ibcc_lag_months",
+                "ibcc_sources", "ibcc_confidence"}
+_BOARDS_CATALOG = Path(__file__).resolve().parents[2] / "memory" / "catalog" / "vault_catalog.json"
 
 
 class CalendarError(ValueError):
@@ -33,6 +42,33 @@ def _sourced(where: str, row: dict) -> None:
         raise CalendarError(f"{where}: needs at least one https source")
     if row.get("confidence") not in CONFIDENCE:
         raise CalendarError(f"{where}: confidence must be one of {CONFIDENCE}")
+
+
+def region_events(region: dict) -> dict:
+    """A region's dated rows by event key (everything that is not region metadata)."""
+    return {key: row for key, row in region.items() if key not in _REGION_META and isinstance(row, dict)}
+
+
+def _validate_regions(data: dict) -> None:
+    """Region rows follow the same rules as national ones (a region may carry
+    an event no national row has, such as a supplementary result), and the
+    cities map only to known regions."""
+    regions = data.get("regions", {})
+    for name, region in regions.items():
+        for key, row in region_events(region).items():
+            where = f"region {name} event {key}"
+            _sourced(where, row)
+            _months(where, row.get("months"))
+        if region.get("national_fallback_confidence", "uncertain") not in CONFIDENCE:
+            raise CalendarError(f"region {name}: national_fallback_confidence must be one of {CONFIDENCE}")
+        if region.get("ibcc_lag_months") is not None:
+            _sourced(f"region {name} ibcc", {"sources": region.get("ibcc_sources"),
+                                              "confidence": region.get("ibcc_confidence")})
+    if FALLBACK_REGION not in regions:
+        raise CalendarError(f"region {FALLBACK_REGION} is required")
+    for city, name in data.get("city_regions", {}).items():
+        if city != "_note" and name not in regions:
+            raise CalendarError(f"city_regions: {city} names unknown region {name}")
 
 
 def validate(data: dict) -> dict:
@@ -56,6 +92,7 @@ def validate(data: dict) -> dict:
         _sourced(where, test)
         for name in ("register_months", "test_months", "result_months"):
             _months(where, test.get(name))
+    _validate_regions(data)
     keys = [row["key"] for row in data["events"] + data["tests"] + data["intakes"]]
     if len(keys) != len(set(keys)):
         raise CalendarError("event, test and intake keys must be unique")
@@ -75,23 +112,82 @@ def calendar() -> dict:
     return validate(load_data("academic_calendar.json"))
 
 
-def event(key: str) -> dict | None:
-    """An event or a test as one shape {key, months, sources, confidence}: a
-    test's months are its test months, and `<test>:result` names its result
-    months, so a step can wait for a test result like a board result."""
+def _weaker(*names: str) -> str:
+    return max(names, key=lambda name: CONFIDENCE.index(name) if name in CONFIDENCE else len(CONFIDENCE))
+
+
+def event(key: str, region: str | None = None) -> dict | None:
+    """An event or a test as one shape {key, months, sources, confidence,
+    region}: a test's months are its test months, and `<test>:result` names its
+    result months, so a step can wait for a test result like a board result.
+
+    With a region, that region's row replaces the national one by key. A key
+    the region lists as a gap stays empty (date not confirmed) rather than
+    borrowing the BISE Lahore proxy; any other key falls back to the national
+    row, downgraded where the region says its proxy is weaker. Cambridge
+    results wait for the IBCC certificate."""
     data = calendar()
     if key.endswith(":result"):
-        test = event(key.removesuffix(":result"))
+        test = event(key.removesuffix(":result"), region)
         return {**test, "key": key, "months": test["result_months"]} if test and "result_months" in test else None
+    area = data.get("regions", {}).get(region) if region else None
     for row in data["events"]:
-        if row["key"] == key:
-            return {"key": key, "months": list(row.get("months") or []), "sources": row["sources"],
-                    "confidence": row["confidence"]}
+        if row["key"] != key:
+            continue
+        if area is not None:
+            own = region_events(area).get(key)
+            if own is not None:
+                found = {"key": key, "months": list(own.get("months") or []), "sources": own["sources"],
+                         "confidence": own["confidence"], "region": region}
+                return _with_lag(found, area)
+            if key in area.get("gaps", ()):
+                return {"key": key, "months": [], "sources": [], "confidence": "uncertain", "region": region}
+        found = {"key": key, "months": list(row.get("months") or []), "sources": row["sources"],
+                 "confidence": row["confidence"], "region": "national"}
+        if area is not None and "national_fallback_confidence" in area:
+            found["confidence"] = _weaker(found["confidence"], area["national_fallback_confidence"])
+        return _with_lag(found, area or {})
     for row in data["tests"]:
         if row["key"] == key:
             return {"key": key, "months": list(row.get("test_months") or []), "sources": row["sources"],
-                    "confidence": row["confidence"], "result_months": list(row.get("result_months") or [])}
+                    "confidence": row["confidence"], "result_months": list(row.get("result_months") or []),
+                    "region": "national"}
     return None
+
+
+def _with_lag(found: dict, area: dict) -> dict:
+    """Cambridge results (`alevel_*_result`) are usable only after the IBCC
+    equivalence certificate, so their months move by the IBCC lag."""
+    lag = area.get("ibcc_lag_months")
+    if not lag or not (found["key"].startswith("alevel_") and found["key"].endswith("_result")):
+        return found
+    months = [(month - 1 + lag) % 12 + 1 for month in found["months"]]
+    return {**found, "months": months, "lag_months": lag,
+            "confidence": _weaker(found["confidence"], area.get("ibcc_confidence", "uncertain"))}
+
+
+@lru_cache(maxsize=1)
+def _board_regions() -> dict:
+    """Board choice code -> region, from the catalog's `boards` choices."""
+    boards = json.loads(_BOARDS_CATALOG.read_text(encoding="utf-8"))["choices"]["boards"]
+    return {board["code"]: board["region"] for board in boards if board.get("region")}
+
+
+def region_for(education_record: dict | None, city: str | None = None) -> str:
+    """The calendar region of a student: Cambridge for O/A level, else the
+    education record's board (catalog `boards`), else the province of the
+    city, else federal. Unknown input never raises; it falls to federal."""
+    record = education_record or {}
+    catalog = vault_catalog()
+    level = catalog.read_education(record.get("qualification_name"), record.get("field_of_study"))[0]
+    if level in CAMBRIDGE_LEVELS:
+        return CAMBRIDGE_REGION
+    board = record.get("board") or (record.get("details") or {}).get("awarding_body")
+    code = catalog.choice_code("boards", str(board)) if board else None
+    if code in _board_regions():
+        return _board_regions()[code]
+    region = calendar().get("city_regions", {}).get(" ".join(str(city or "").casefold().split()))
+    return region if region and region != "_note" else FALLBACK_REGION
 
 
 def calendar_test(codes) -> dict | None:

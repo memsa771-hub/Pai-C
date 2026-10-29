@@ -571,6 +571,7 @@
   "boards": [
    {
     "code": "bise_lahore",
+    "region": "punjab",
     "label": "BISE Lahore",
     "synonyms": [
      "Lahore board",
@@ -580,6 +581,7 @@
    },
    {
     "code": "bise_rawalpindi",
+    "region": "punjab",
     "label": "BISE Rawalpindi",
     "synonyms": [
      "Rawalpindi board",
@@ -589,6 +591,7 @@
    },
    {
     "code": "bise_faisalabad",
+    "region": "punjab",
     "label": "BISE Faisalabad",
     "synonyms": [
      "Faisalabad board",
@@ -598,6 +601,7 @@
    },
    {
     "code": "bise_gujranwala",
+    "region": "punjab",
     "label": "BISE Gujranwala",
     "synonyms": [
      "Gujranwala board",
@@ -607,6 +611,7 @@
    },
    {
     "code": "bise_multan",
+    "region": "punjab",
     "label": "BISE Multan",
     "synonyms": [
      "Multan board",
@@ -616,6 +621,7 @@
    },
    {
     "code": "bise_sargodha",
+    "region": "punjab",
     "label": "BISE Sargodha",
     "synonyms": [
      "Sargodha board",
@@ -625,6 +631,7 @@
    },
    {
     "code": "bise_bahawalpur",
+    "region": "punjab",
     "label": "BISE Bahawalpur",
     "synonyms": [
      "Bahawalpur board",
@@ -634,6 +641,7 @@
    },
    {
     "code": "bise_dg_khan",
+    "region": "punjab",
     "label": "BISE DG Khan",
     "synonyms": [
      "DG Khan board",
@@ -643,6 +651,7 @@
    },
    {
     "code": "bise_sahiwal",
+    "region": "punjab",
     "label": "BISE Sahiwal",
     "synonyms": [
      "Sahiwal board",
@@ -652,6 +661,7 @@
    },
    {
     "code": "bise_karachi",
+    "region": "sindh",
     "label": "BISE Karachi",
     "synonyms": [
      "Karachi board",
@@ -661,6 +671,7 @@
    },
    {
     "code": "bise_hyderabad",
+    "region": "sindh",
     "label": "BISE Hyderabad",
     "synonyms": [
      "Hyderabad board",
@@ -670,6 +681,7 @@
    },
    {
     "code": "bise_sukkur",
+    "region": "sindh",
     "label": "BISE Sukkur",
     "synonyms": [
      "Sukkur board",
@@ -679,6 +691,7 @@
    },
    {
     "code": "bise_larkana",
+    "region": "sindh",
     "label": "BISE Larkana",
     "synonyms": [
      "Larkana board",
@@ -688,6 +701,7 @@
    },
    {
     "code": "bise_mirpurkhas",
+    "region": "sindh",
     "label": "BISE Mirpurkhas",
     "synonyms": [
      "Mirpurkhas board",
@@ -697,6 +711,7 @@
    },
    {
     "code": "bise_peshawar",
+    "region": "kp",
     "label": "BISE Peshawar",
     "synonyms": [
      "Peshawar board",
@@ -706,6 +721,7 @@
    },
    {
     "code": "bise_mardan",
+    "region": "kp",
     "label": "BISE Mardan",
     "synonyms": [
      "Mardan board",
@@ -715,6 +731,7 @@
    },
    {
     "code": "bise_abbottabad",
+    "region": "kp",
     "label": "BISE Abbottabad",
     "synonyms": [
      "Abbottabad board",
@@ -724,6 +741,7 @@
    },
    {
     "code": "bise_swat",
+    "region": "kp",
     "label": "BISE Swat",
     "synonyms": [
      "Swat board",
@@ -733,6 +751,7 @@
    },
    {
     "code": "bise_kohat",
+    "region": "kp",
     "label": "BISE Kohat",
     "synonyms": [
      "Kohat board",
@@ -742,6 +761,7 @@
    },
    {
     "code": "bise_bannu",
+    "region": "kp",
     "label": "BISE Bannu",
     "synonyms": [
      "Bannu board",
@@ -751,6 +771,7 @@
    },
    {
     "code": "bise_malakand",
+    "region": "kp",
     "label": "BISE Malakand",
     "synonyms": [
      "Malakand board",
@@ -760,6 +781,7 @@
    },
    {
     "code": "bise_quetta",
+    "region": "balochistan",
     "label": "BISE Quetta",
     "synonyms": [
      "Quetta board",
@@ -769,6 +791,7 @@
    },
    {
     "code": "bise_ajk",
+    "region": "ajk",
     "label": "BISE AJK",
     "synonyms": [
      "AJK board",
@@ -778,6 +801,7 @@
    },
    {
     "code": "bise_gilgit_baltistan",
+    "region": "gilgit_baltistan",
     "label": "BISE Gilgit-Baltistan",
     "synonyms": [
      "Gilgit-Baltistan board",
@@ -787,6 +811,7 @@
    },
    {
     "code": "fbise",
+    "region": "federal_fbise",
     "label": "Federal Board (FBISE)",
     "synonyms": [
      "federal board",
@@ -796,6 +821,7 @@
    },
    {
     "code": "aga_khan",
+    "region": "aku_eb",
     "label": "Aga Khan Examination Board",
     "synonyms": [
      "AKU-EB",
@@ -805,6 +831,7 @@
    },
    {
     "code": "cambridge",
+    "region": "cambridge",
     "label": "Cambridge International",
     "synonyms": [
      "cambridge",

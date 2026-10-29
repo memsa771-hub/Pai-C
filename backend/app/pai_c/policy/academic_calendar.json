@@ -1,5 +1,5 @@
 {
- "_note": "Dated academic calendar for the roadmap time estimate (FOUR_FEATURES_SPEC 4.2; app/pai_c/roadmap/calendar.py loads and validates it, timeline.py reads it). Built from the research of 2026-10-28 (2026 cycle observed; month numbers derived from 2026 dates). Every event, intake and test keeps its https sources and confidence (official|secondary|uncertain). An empty months list or a null month means not found: the estimate then says 'date not confirmed' and is uncertain; never fill one from memory. BISE Lahore is the proxy for the boards; other boards, DAE, supplementary results, UET class start and most result dates are gaps. Dates move year to year (2025 papers postponed; MDCAT 2026 moved Aug->Sep; MDCAT may move near FSc from 2027, unconfirmed). applies_to.levels are catalog level codes. intakes carry a label shown to the student (no university names) and name study-field families and/or fields (study_fields.json). tests.codes are catalog test codes (choices.tests) a test_attempt record carries and admission_rules entry tests name. degree_years: years by study field key, the fallback when admission_rules.json has no years for the field; the draft's degree-type keys (bs, be, dae) are not study fields and were dropped. Research draft note: DRAFT from research on 2026-10-28. 2026 cycle observed (dates are actual 2026 dates; month numbers derived). Months marked uncertain came from aggregator/social posts, not board PDFs (not opened). Dates shift year to year (2025 BISE papers were postponed in May; MDCAT 2026 was moved Aug 16 -> Sep 20). PM&DC reportedly moves MDCAT close to FSc exams from 2027 (unofficial, unconfirmed). BISE Lahore used as proxy; other boards not verified.",
+ "_note": "Pakistan-wide regions merged 2026-10-29 from the research draft (web search only, no board PDF opened; almost all rows secondary or uncertain; official only for Cambridge key dates, NED schedule, PM&DC, IBCC, NUST, UET). regions: per-region events override the national ones by key; a key listed in a region's gaps (or with empty months) is not found and stays \"date not confirmed\", never filled from the national proxy; other keys fall back to the national rows (downgraded to uncertain where national_fallback_confidence says so). Known gaps: Gilgit-Baltistan board entirely; AKU-EB HSSC and result dates; AJK exam/result; Sindh and KP HSSC exam months; KP HSSC results; Balochistan inter result; supplementary results for Sindh/KP/Balochistan/AKU-EB; MBBS/BDS application and class start for Sindh, KP, Balochistan (UHS figures from a blog); DAE exam/result months for SBTE/KPBTE and KPBTE admissions; B.Tech; Mehran/Sindh engineering test; pharmacy entry; LUMS/FAST class start; Cambridge June exam window; 2027 cycle dates for LCAT, IBA, FAST, GIKI, ETEA, NAT. Known conflicts: Punjab HSSC Part-1 result 22 Oct (Eduvision, GoTest, ProPakistani; kept) vs 22 Aug (Daily Pakistan); BSEK start 7 vs 11 Apr; Sindh result dates are government targets (10/31 Jul) vs earlier plan (1/15 Jun), actual release unconfirmed; Quetta matric result 7 May looks too early and Quetta inter result 20 Jul vs 9 Sep; Cambridge IGCSE results 18 vs 19 Aug; LAT 2026 6 Sep vs 15 Nov; GIKI 6-10 vs 9-13 Jul; FAST 7-15 Jul vs 2 Aug; USAT 5 Jul vs Sep estimate; ETEA Test-I dates differ; AJK matric result 18 Aug from a low-quality page. Next step: open the board notification PDFs (biselahore.com, bisep.com.pk, bseik.org, fbise.edu.pk, examinationboard.aku.edu, etea.edu.pk, uhs.edu.pk, kmu.edu.pk) to upgrade secondary rows to official. Top-level events, intakes and tests are unchanged by this merge: the draft's extra rows (DAE/B.Tech events; NED, FAST, LUMS, DAE and Sindh/KP/Balochistan MBBS intakes; ETEA, NAT, USAT, HAT, LAT, GIKI, FAST, LCAT, IBA, NED, Mehran and pharmacy tests) need catalog test codes and intake families first and stay in .superpowers/sdd/2026-10-29-beta-conversation/academic_calendar_pk.json. --- Earlier note: Dated academic calendar for the roadmap time estimate (FOUR_FEATURES_SPEC 4.2; app/pai_c/roadmap/calendar.py loads and validates it, timeline.py reads it). Built from the research of 2026-10-28 (2026 cycle observed; month numbers derived from 2026 dates). Every event, intake and test keeps its https sources and confidence (official|secondary|uncertain). An empty months list or a null month means not found: the estimate then says 'date not confirmed' and is uncertain; never fill one from memory. BISE Lahore is the proxy for the boards; other boards, DAE, supplementary results, UET class start and most result dates are gaps. Dates move year to year (2025 papers postponed; MDCAT 2026 moved Aug->Sep; MDCAT may move near FSc from 2027, unconfirmed). applies_to.levels are catalog level codes. intakes carry a label shown to the student (no university names) and name study-field families and/or fields (study_fields.json). tests.codes are catalog test codes (choices.tests) a test_attempt record carries and admission_rules entry tests name. degree_years: years by study field key, the fallback when admission_rules.json has no years for the field; the draft's degree-type keys (bs, be, dae) are not study fields and were dropped. Research draft note: DRAFT from research on 2026-10-28. 2026 cycle observed (dates are actual 2026 dates; month numbers derived). Months marked uncertain came from aggregator/social posts, not board PDFs (not opened). Dates shift year to year (2025 BISE papers were postponed in May; MDCAT 2026 was moved Aug 16 -> Sep 20). PM&DC reportedly moves MDCAT close to FSc exams from 2027 (unofficial, unconfirmed). BISE Lahore used as proxy; other boards not verified.",
  "as_of": "2026-10",
  "events": [
   {
@@ -527,5 +527,526 @@
    "https://www.hec.gov.pk/"
   ],
   "confidence": "uncertain"
+ },
+ "regions": {
+  "punjab": {
+   "boards": [
+    "BISE Lahore",
+    "Rawalpindi",
+    "Gujranwala",
+    "Multan",
+    "Faisalabad",
+    "Sargodha",
+    "Bahawalpur",
+    "DG Khan",
+    "Sahiwal",
+    "AJK Mirpur (followed Punjab Boards Committee timing in 2025; 2026 unconfirmed)"
+   ],
+   "ssc_annual_exam": {
+    "months": [
+     3,
+     4
+    ],
+    "month_note": "Matric starts ~27 Mar 2026 (shared Punjab timeline).",
+    "sources": [
+     "https://biselahore.com/notifications"
+    ],
+    "confidence": "uncertain"
+   },
+   "ssc_annual_result": {
+    "months": [
+     8
+    ],
+    "month_note": "Class 10 result 6 Aug 2026; class 9 result 2 Sep 2026 per Punjab Boards Committee schedule (reported official by ilmkidunya, called tentative by eduvision).",
+    "sources": [
+     "https://www.ilmkidunya.com/edunews/punjab-boards-release-official-exam--result-schedule-for-2026-matric--inter-dates-announced",
+     "https://www.eduvision.edu.pk/edu_news/punjab-boards-announces-matric-result-2026-dates-news-4440"
+    ],
+    "confidence": "secondary"
+   },
+   "hssc_part1_exam": {
+    "months": [
+     4,
+     5
+    ],
+    "month_note": "Lahore 17 Apr-4 May reported; unclear if Part-1 only.",
+    "sources": [
+     "https://biselahore.com/notifications"
+    ],
+    "confidence": "uncertain"
+   },
+   "hssc_part1_result": {
+    "months": [
+     10
+    ],
+    "month_note": "22 Oct 2026 (Eduvision, GoTest, ProPakistani); Daily Pakistan lists 22 Aug, conflict.",
+    "sources": [
+     "https://www.ilmkidunya.com/edunews/punjab-boards-release-official-exam--result-schedule-for-2026-matric--inter-dates-announced",
+     "https://en.dailypakistan.com.pk/?p=310062"
+    ],
+    "confidence": "secondary"
+   },
+   "hssc_part2_exam": {
+    "months": [
+     5,
+     6
+    ],
+    "month_note": "12th class from 20 May 2026 (Lahore).",
+    "sources": [
+     "https://www.ilmkidunya.com/date_sheets/bise-lahore-12th-class-date-sheet.aspx"
+    ],
+    "confidence": "secondary"
+   },
+   "hssc_part2_result": {
+    "months": [
+     9
+    ],
+    "month_note": "23 Sep 2026.",
+    "sources": [
+     "https://www.ilmkidunya.com/edunews/punjab-boards-release-official-exam--result-schedule-for-2026-matric--inter-dates-announced",
+     "https://en.dailypakistan.com.pk/?p=310062"
+    ],
+    "confidence": "secondary"
+   },
+   "ssc_supplementary_exam": {
+    "months": [
+     10
+    ],
+    "month_note": "Matric supplementary starts 6 Oct 2026 (Daily Pakistan).",
+    "sources": [
+     "https://en.dailypakistan.com.pk/?p=310062"
+    ],
+    "confidence": "secondary"
+   },
+   "ssc_supplementary_result": {
+    "months": [
+     12
+    ],
+    "month_note": "8 Dec 2026 (Daily Pakistan, projected).",
+    "sources": [
+     "https://en.dailypakistan.com.pk/?p=310062"
+    ],
+    "confidence": "uncertain"
+   },
+   "hssc_supplementary_exam": {
+    "months": [
+     10,
+     11
+    ],
+    "month_note": "Lahore roll slips ~24 Oct 2026.",
+    "sources": [
+     "https://biselahore.com/notifications"
+    ],
+    "confidence": "uncertain"
+   },
+   "hssc_supplementary_result": {
+    "months": [
+     1
+    ],
+    "month_note": "12 Jan 2027 (Daily Pakistan, projected).",
+    "sources": [
+     "https://en.dailypakistan.com.pk/?p=310062"
+    ],
+    "confidence": "uncertain"
+   },
+   "gaps": [],
+   "overrides": {},
+   "_note": "National rows are the BISE Lahore proxy; Punjab rows repeat them with their own sources."
+  },
+  "sindh": {
+   "boards": [
+    "BSEK Karachi",
+    "BIEK Karachi (inter)",
+    "Hyderabad",
+    "Sukkur",
+    "Larkana",
+    "Mirpurkhas",
+    "Shaheed Benazirabad"
+   ],
+   "ssc_annual_exam": {
+    "months": [
+     4,
+     5
+    ],
+    "month_note": "BSEK: class 10 from 7 Apr 2026, class 9 from 8 Apr (one source: general group 11 Apr-6 May). Conflict.",
+    "sources": [
+     "https://www.result.pk/educom/bsek-karachi-matric-1st-annual-exams-2026-date-sheet-57002.htm",
+     "https://www.result.pk/educom/karachi-board-ssc-part-1-and-2-annual-exam-schedule-2026-57013.htm"
+    ],
+    "confidence": "secondary"
+   },
+   "ssc_annual_result": {
+    "months": [
+     7
+    ],
+    "month_note": "Sindh govt target: matric by 10 Jul 2026 (earlier plan 1 Jun); class 9 by 31 Aug. Actual release not confirmed.",
+    "sources": [
+     "https://www.thenews.pk/story/1418855-matric-inter-result-schedule-announced-in-sindh",
+     "https://www.result.pk/educom/sindh-boards-confirm-matric-inter-results-2026-59276.htm"
+    ],
+    "confidence": "uncertain"
+   },
+   "hssc_part1_exam": {
+    "months": [],
+    "month_note": "Not found.",
+    "sources": [
+     "https://www.ilmkidunya.com/date_sheets/bise_mirpurkhas_board_datesheets.aspx"
+    ],
+    "confidence": "uncertain"
+   },
+   "hssc_part1_result": {
+    "months": [
+     8
+    ],
+    "month_note": "Class 11 results scheduled by 31 Aug 2026; BIEK exact date not announced in source.",
+    "sources": [
+     "https://www.result.pk/educom/sindh-boards-1st-year-results-2026-expected-this-month-61899.htm",
+     "https://propakistani.pk/?p=1064496"
+    ],
+    "confidence": "uncertain"
+   },
+   "hssc_part2_result": {
+    "months": [
+     7
+    ],
+    "month_note": "Inter by 31 Jul 2026 per Sindh govt; BIEK started announcing HSC-II.",
+    "sources": [
+     "https://www.thenews.pk/story/1418855-matric-inter-result-schedule-announced-in-sindh"
+    ],
+    "confidence": "uncertain"
+   },
+   "gaps": [
+    "hssc_part2_exam",
+    "ssc_supplementary_exam",
+    "hssc_supplementary_exam"
+   ],
+   "overrides": {},
+   "national_fallback_confidence": "uncertain"
+  },
+  "kp": {
+   "boards": [
+    "Peshawar",
+    "Mardan",
+    "Abbottabad",
+    "Swat",
+    "Kohat",
+    "Bannu",
+    "DI Khan",
+    "Malakand"
+   ],
+   "ssc_annual_exam": {
+    "months": [
+     3,
+     4
+    ],
+    "month_note": "BISE Peshawar matric from 31 Mar 2026.",
+    "sources": [
+     "https://www.techjuice.pk/bise-peshawar-announces-date-for-matric-annual-exams-2026/"
+    ],
+    "confidence": "secondary"
+   },
+   "ssc_annual_result": {
+    "months": [
+     8
+    ],
+    "month_note": "Peshawar and Abbottabad ~4 Aug 2026; Kohat ~5 Aug, Bannu ~6 Aug (expected only).",
+    "sources": [
+     "https://regionalstudies.com.pk/?p=93",
+     "https://regionalstudies.com.pk/bise-kohat-10th-class-result-2026/"
+    ],
+    "confidence": "uncertain"
+   },
+   "hssc_part1_exam": {
+    "months": [
+     5
+    ],
+    "month_note": "HSSC annual first year from 6 May 2026; practicals after Eid-ul-Adha.",
+    "sources": [
+     "https://www.app.com.pk/kp/hssc-annual-exams-2026-to-begin-from-may-6/"
+    ],
+    "confidence": "secondary"
+   },
+   "hssc_part1_result": {
+    "months": [],
+    "month_note": "No confirmed date (aggregator claims joint release ~Sep 2026).",
+    "sources": [
+     "https://www.pakadmissions.com/kp-all-boards-hsscintermediate-annual-i-result-2026-check-online"
+    ],
+    "confidence": "uncertain"
+   },
+   "hssc_supplementary_exam": {
+    "months": [
+     11
+    ],
+    "month_note": "HSSC Annual-II 2026 provisional timetable shows mid-Nov 2026 (one university-hosted PDF).",
+    "sources": [
+     "https://zueb.edu.pk/wp-content/uploads/2026/07/Time-Table-HSSC-Annual-II-2026.pdf"
+    ],
+    "confidence": "uncertain"
+   },
+   "gaps": [
+    "hssc_part2_exam",
+    "hssc_part2_result",
+    "ssc_supplementary_exam"
+   ],
+   "overrides": {},
+   "national_fallback_confidence": "uncertain"
+  },
+  "balochistan": {
+   "boards": [
+    "BISE Quetta"
+   ],
+   "ssc_annual_exam": {
+    "months": [
+     3,
+     4
+    ],
+    "month_note": "Date sheet exists; window not read.",
+    "sources": [
+     "https://www.result.pk/educom/bise-quetta-matric-annual-exams-2026-date-sheet-54891.htm"
+    ],
+    "confidence": "uncertain"
+   },
+   "ssc_annual_result": {
+    "months": [
+     5
+    ],
+    "month_note": "Reported 7 May 2026 (several aggregator pages; suspiciously early).",
+    "sources": [
+     "https://www.ilmkidunya.com/results/bise-quetta-matric-result.aspx"
+    ],
+    "confidence": "uncertain"
+   },
+   "hssc_part1_exam": {
+    "months": [
+     3,
+     5
+    ],
+    "month_note": "Sources say March or May 2026.",
+    "sources": [
+     "https://www.result.pk/educom/bbise-quetta-inter-annual-exams-2026-date-sheet-announced-56752.htm"
+    ],
+    "confidence": "uncertain"
+   },
+   "hssc_part1_result": {
+    "months": [],
+    "month_note": "Declared per result.pk, no date; 20 Jul and 9 Sep both appear.",
+    "sources": [
+     "https://www.result.pk/educom/bbise-quetta-hssc-result-2026-fa-fsc-ics-icom-students-60836.htm"
+    ],
+    "confidence": "uncertain"
+   },
+   "ssc_supplementary_exam": {
+    "months": [
+     10
+    ],
+    "month_note": "Projected only.",
+    "sources": [
+     "https://www.ilmkidunya.com/results/bise-quetta-matric-result.aspx"
+    ],
+    "confidence": "uncertain"
+   },
+   "gaps": [],
+   "overrides": {},
+   "national_fallback_confidence": "uncertain"
+  },
+  "federal_fbise": {
+   "boards": [
+    "FBISE Islamabad"
+   ],
+   "ssc_annual_exam": {
+    "months": [
+     3,
+     4
+    ],
+    "month_note": "Date sheet issued 27 Feb 2026 (class 9/10).",
+    "sources": [
+     "https://propakistani.pk/2026/02/27/fbise-announces-class-9-and-10-annual-exams-2026-date-sheet/amp/",
+     "https://mail.fbise.edu.pk/datesheet/datesheets26/ssc_1A26_new.pdf"
+    ],
+    "confidence": "secondary"
+   },
+   "ssc_annual_result": {
+    "months": [
+     7
+    ],
+    "month_note": "29 Jul 2026 11:15 (FBISE Facebook via aggregator).",
+    "sources": [
+     "https://en.dailypakistan.com.pk/05-Jul-2026/fbise-matric-inter-result-2026-udpate"
+    ],
+    "confidence": "secondary"
+   },
+   "hssc_part1_exam": {
+    "months": [
+     4,
+     5
+    ],
+    "month_note": "Date sheet PDF hssc_1A26 on fbise.edu.pk; months not read.",
+    "sources": [
+     "https://mail.fbise.edu.pk/datesheet/datesheets26/hssc_1A26_updated.pdf"
+    ],
+    "confidence": "uncertain"
+   },
+   "hssc_part1_result": {
+    "months": [
+     9
+    ],
+    "month_note": "HSSC Part 1 and 2 reported 9 Sep 2026.",
+    "sources": [
+     "https://regionalstudies.com.pk/?p=503"
+    ],
+    "confidence": "uncertain"
+   },
+   "hssc_part2_result": {
+    "months": [
+     9
+    ],
+    "month_note": "Same announcement as Part 1.",
+    "sources": [
+     "https://regionalstudies.com.pk/?p=503"
+    ],
+    "confidence": "uncertain"
+   },
+   "ssc_supplementary_exam": {
+    "months": [
+     9,
+     10
+    ],
+    "month_note": "Matric second annual from 24 Sep 2026.",
+    "sources": [
+     "https://www.eduvision.edu.pk/edu_news/fbise-announces-matric-second-annual-exams-date-sheet-2026-news-4513"
+    ],
+    "confidence": "secondary"
+   },
+   "hssc_supplementary_exam": {
+    "months": [
+     11,
+     12
+    ],
+    "month_note": "HSSC second annual written 12 Nov-17 Dec 2026; practicals from 21 Dec.",
+    "sources": [
+     "https://propakistani.pk/2026/10/14/federal-board-announces-hssc-second-annual-exam-date-sheet-for-2026/"
+    ],
+    "confidence": "secondary"
+   },
+   "gaps": [],
+   "national_fallback_confidence": "uncertain"
+  },
+  "aku_eb": {
+   "boards": [
+    "AKU-EB (private; schools in Karachi, Sindh, Punjab, GB, others)"
+   ],
+   "ssc_annual_exam": {
+    "months": [
+     4,
+     5
+    ],
+    "month_note": "28 Apr-25 May 2026 (classes 9-12, aggregator).",
+    "sources": [
+     "https://www.result.pk/educom/akueb-ssc-hssc-annual-exams-2026-final-date-sheet-55416.htm"
+    ],
+    "confidence": "secondary"
+   },
+   "ssc_annual_result": {
+    "months": [
+     7,
+     8
+    ],
+    "month_note": "2025 result 28 Jul; 2026 date not found (31 Aug listed for class 9, unreliable).",
+    "sources": [
+     "https://www.result.pk/educom/aga-khan-board-annual-examination-results-2025-date-announced-50684.htm"
+    ],
+    "confidence": "uncertain"
+   },
+   "gaps": [],
+   "national_fallback_confidence": "uncertain"
+  },
+  "ajk": {
+   "boards": [
+    "BISE AJK Mirpur"
+   ],
+   "ssc_annual_result": {
+    "months": [
+     7,
+     8
+    ],
+    "month_note": "One page says 18 Aug 2026; others expected Jul/Aug. Unverified.",
+    "sources": [
+     "https://www.ilmkidunya.com/results/bise_ajk_result.aspx"
+    ],
+    "confidence": "uncertain"
+   },
+   "hssc_part2_exam": {
+    "months": [
+     4,
+     5
+    ],
+    "month_note": "12th from 29 Apr, 11th from 20 May 2026 (aggregator).",
+    "sources": [
+     "https://www.result.pk/educom/ajkbise-inter-date-sheet-2026-official-release-update-58405.htm"
+    ],
+    "confidence": "uncertain"
+   },
+   "gaps": [],
+   "national_fallback_confidence": "uncertain"
+  },
+  "gilgit_baltistan": {
+   "boards": [
+    "Gilgit-Baltistan board / KIU-affiliated / AKU-EB schools"
+   ],
+   "gaps": [],
+   "_note": "Nothing found for the GB board (BISE Gilgit / KIU). Left empty by design. Its students use the national rows downgraded to uncertain.",
+   "national_fallback_confidence": "uncertain"
+  },
+  "cambridge": {
+   "boards": [
+    "Cambridge International (O Level, A Level, IGCSE)"
+   ],
+   "_note": "Cambridge sessions are the alevel_* events; results then wait for the IBCC equivalence certificate (15-20 working days, rounded up to one month).",
+   "ibcc_lag_months": 1,
+   "ibcc_sources": [
+    "https://ibcc.edu.pk/faqs/equivalence-faqs/",
+    "https://ibcc.edu.pk/faqs/express-service-faqs/"
+   ],
+   "ibcc_confidence": "official",
+   "gaps": []
+  }
+ },
+ "city_regions": {
+  "_note": "City to province region for a student whose board is unknown or unlisted; major cities only, anything else falls to federal_fbise. Geography, not a dated fact.",
+  "lahore": "punjab",
+  "rawalpindi": "punjab",
+  "faisalabad": "punjab",
+  "multan": "punjab",
+  "gujranwala": "punjab",
+  "sialkot": "punjab",
+  "sargodha": "punjab",
+  "bahawalpur": "punjab",
+  "sahiwal": "punjab",
+  "dg khan": "punjab",
+  "sheikhupura": "punjab",
+  "karachi": "sindh",
+  "hyderabad": "sindh",
+  "sukkur": "sindh",
+  "larkana": "sindh",
+  "mirpurkhas": "sindh",
+  "nawabshah": "sindh",
+  "peshawar": "kp",
+  "mardan": "kp",
+  "abbottabad": "kp",
+  "swat": "kp",
+  "mingora": "kp",
+  "kohat": "kp",
+  "bannu": "kp",
+  "dera ismail khan": "kp",
+  "quetta": "balochistan",
+  "gwadar": "balochistan",
+  "turbat": "balochistan",
+  "islamabad": "federal_fbise",
+  "muzaffarabad": "ajk",
+  "mirpur": "ajk",
+  "gilgit": "gilgit_baltistan",
+  "skardu": "gilgit_baltistan",
+  "hunza": "gilgit_baltistan"
  }
 }
