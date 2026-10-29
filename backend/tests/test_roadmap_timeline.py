@@ -38,7 +38,9 @@ def test_estimate_rolls_to_next_year():
     time = estimate(steps, "electrical_engineering", TODAY)
     assert [(row["event_key"], row["year"]) for row in time["basis"] if row["step"]] == [
         ("ecat", 2027), ("ecat:result", 2027)]
-    assert time["to_entry_months"] == 11
+    # 10, not 11: the calendar now carries the NED fall intake (official NED schedule, classes in
+    # August), which is earlier than the September intakes this test used to end on.
+    assert time["to_entry_months"] == 10 and time["next_intake"]["start_month"] == 8
 
 
 def test_unknown_event_marks_uncertain():

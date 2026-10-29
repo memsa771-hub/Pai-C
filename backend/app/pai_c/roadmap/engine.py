@@ -237,6 +237,7 @@ class RoadmapEngine:
         """The page. `today` is the request day (routers pass date.today());
         every card's steps and time estimate are read against it."""
         from app.pai_c.roadmap.decisions import RouteDecisionService, done_keys, serialize
+        from app.pai_c.roadmap.calendar import region_for
         from app.pai_c.roadmap.steps import route_steps
         from app.pai_c.roadmap.timeline import estimate
         today = today or date.today()
@@ -247,6 +248,10 @@ class RoadmapEngine:
         current = current_education(records)
         current_id = next((card["id"] for card in education if card["value"] is current), None)
         rows = MemoryService(self.db).vault_rows(workspace_id)
+        # Board first, then the city the student lives in (the Vault fact), else federal.
+        city = next((row.entry.get("value") for row in rows if row.entry.get("kind") == "fact"
+                     and row.entry.get("type") == "location.current_city"), None)
+        region = region_for(current, city if isinstance(city, str) else None)
         decision = RouteDecisionService(self.db).active(workspace_id)
         order = roadmap_policy()["status_order"]
         cards = []
@@ -264,7 +269,7 @@ class RoadmapEngine:
             card["steps"] = route_steps(card, standing, rows, today=today, steps_done=ticks,
                                         record=current, record_id=current_id)
             # Only a field the student can enter has a time to entry.
-            card["time"] = (estimate(card["steps"], field_key, today)
+            card["time"] = (estimate(card["steps"], field_key, today, region)
                             if result.status in TIMED and card["steps"] else None)
             cards.append(card)
         cards.sort(key=lambda card: order.index(card["status"]))  # stable: path order within a status

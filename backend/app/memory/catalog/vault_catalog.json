@@ -870,6 +870,81 @@
     ]
    },
    {
+    "code": "etea",
+    "label": "ETEA",
+    "synonyms": []
+   },
+   {
+    "code": "usat",
+    "label": "HEC USAT",
+    "synonyms": [
+     "USAT"
+    ]
+   },
+   {
+    "code": "hat",
+    "label": "HEC HAT",
+    "synonyms": [
+     "HAT"
+    ]
+   },
+   {
+    "code": "lat",
+    "label": "HEC LAT",
+    "synonyms": [
+     "LAT",
+     "law admission test"
+    ]
+   },
+   {
+    "code": "giki",
+    "label": "GIKI test",
+    "synonyms": [
+     "GIKI admission test"
+    ]
+   },
+   {
+    "code": "fast",
+    "label": "FAST NU test",
+    "synonyms": [
+     "NU test",
+     "FAST test"
+    ]
+   },
+   {
+    "code": "lcat",
+    "label": "LCAT",
+    "synonyms": [
+     "LUMS LCAT"
+    ]
+   },
+   {
+    "code": "iba",
+    "label": "IBA test",
+    "synonyms": [
+     "IBA aptitude test"
+    ]
+   },
+   {
+    "code": "ned",
+    "label": "NED test",
+    "synonyms": [
+     "NED admission test"
+    ]
+   },
+   {
+    "code": "muet",
+    "label": "Mehran UET test",
+    "synonyms": [
+     "MUET"
+    ]
+   },
+   {
+    "code": "pharmd_entry",
+    "label": "Pharm-D entry test",
+    "synonyms": []
+   },
+   {
     "code": "sat",
     "label": "SAT",
     "synonyms": []

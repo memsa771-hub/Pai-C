@@ -1,5 +1,5 @@
 {
- "_note": "Pakistan-wide regions merged 2026-10-29 from the research draft (web search only, no board PDF opened; almost all rows secondary or uncertain; official only for Cambridge key dates, NED schedule, PM&DC, IBCC, NUST, UET). regions: per-region events override the national ones by key; a key listed in a region's gaps (or with empty months) is not found and stays \"date not confirmed\", never filled from the national proxy; other keys fall back to the national rows (downgraded to uncertain where national_fallback_confidence says so). Known gaps: Gilgit-Baltistan board entirely; AKU-EB HSSC and result dates; AJK exam/result; Sindh and KP HSSC exam months; KP HSSC results; Balochistan inter result; supplementary results for Sindh/KP/Balochistan/AKU-EB; MBBS/BDS application and class start for Sindh, KP, Balochistan (UHS figures from a blog); DAE exam/result months for SBTE/KPBTE and KPBTE admissions; B.Tech; Mehran/Sindh engineering test; pharmacy entry; LUMS/FAST class start; Cambridge June exam window; 2027 cycle dates for LCAT, IBA, FAST, GIKI, ETEA, NAT. Known conflicts: Punjab HSSC Part-1 result 22 Oct (Eduvision, GoTest, ProPakistani; kept) vs 22 Aug (Daily Pakistan); BSEK start 7 vs 11 Apr; Sindh result dates are government targets (10/31 Jul) vs earlier plan (1/15 Jun), actual release unconfirmed; Quetta matric result 7 May looks too early and Quetta inter result 20 Jul vs 9 Sep; Cambridge IGCSE results 18 vs 19 Aug; LAT 2026 6 Sep vs 15 Nov; GIKI 6-10 vs 9-13 Jul; FAST 7-15 Jul vs 2 Aug; USAT 5 Jul vs Sep estimate; ETEA Test-I dates differ; AJK matric result 18 Aug from a low-quality page. Next step: open the board notification PDFs (biselahore.com, bisep.com.pk, bseik.org, fbise.edu.pk, examinationboard.aku.edu, etea.edu.pk, uhs.edu.pk, kmu.edu.pk) to upgrade secondary rows to official. Top-level events, intakes and tests are unchanged by this merge: the draft's extra rows (DAE/B.Tech events; NED, FAST, LUMS, DAE and Sindh/KP/Balochistan MBBS intakes; ETEA, NAT, USAT, HAT, LAT, GIKI, FAST, LCAT, IBA, NED, Mehran and pharmacy tests) need catalog test codes and intake families first and stay in .superpowers/sdd/2026-10-29-beta-conversation/academic_calendar_pk.json. --- Earlier note: Dated academic calendar for the roadmap time estimate (FOUR_FEATURES_SPEC 4.2; app/pai_c/roadmap/calendar.py loads and validates it, timeline.py reads it). Built from the research of 2026-10-28 (2026 cycle observed; month numbers derived from 2026 dates). Every event, intake and test keeps its https sources and confidence (official|secondary|uncertain). An empty months list or a null month means not found: the estimate then says 'date not confirmed' and is uncertain; never fill one from memory. BISE Lahore is the proxy for the boards; other boards, DAE, supplementary results, UET class start and most result dates are gaps. Dates move year to year (2025 papers postponed; MDCAT 2026 moved Aug->Sep; MDCAT may move near FSc from 2027, unconfirmed). applies_to.levels are catalog level codes. intakes carry a label shown to the student (no university names) and name study-field families and/or fields (study_fields.json). tests.codes are catalog test codes (choices.tests) a test_attempt record carries and admission_rules entry tests name. degree_years: years by study field key, the fallback when admission_rules.json has no years for the field; the draft's degree-type keys (bs, be, dae) are not study fields and were dropped. Research draft note: DRAFT from research on 2026-10-28. 2026 cycle observed (dates are actual 2026 dates; month numbers derived). Months marked uncertain came from aggregator/social posts, not board PDFs (not opened). Dates shift year to year (2025 BISE papers were postponed in May; MDCAT 2026 was moved Aug 16 -> Sep 20). PM&DC reportedly moves MDCAT close to FSc exams from 2027 (unofficial, unconfirmed). BISE Lahore used as proxy; other boards not verified.",
+ "_note": "Pakistan-wide regions merged 2026-10-29 from the research draft (web search only, no board PDF opened; almost all rows secondary or uncertain; official only for Cambridge key dates, NED schedule, PM&DC, IBCC, NUST, UET). regions: per-region events override the national ones by key; a key listed in a region's gaps (or with empty months) is not found and stays \"date not confirmed\", never filled from the national proxy; other keys fall back to the national rows (downgraded to uncertain where national_fallback_confidence says so). Known gaps: Gilgit-Baltistan board entirely; AKU-EB HSSC and result dates; AJK exam/result; Sindh and KP HSSC exam months; KP HSSC results; Balochistan inter result; supplementary results for Sindh/KP/Balochistan/AKU-EB; MBBS/BDS application and class start for Sindh, KP, Balochistan (UHS figures from a blog); DAE exam/result months for SBTE/KPBTE and KPBTE admissions; B.Tech; Mehran/Sindh engineering test; pharmacy entry; LUMS/FAST class start; Cambridge June exam window; 2027 cycle dates for LCAT, IBA, FAST, GIKI, ETEA, NAT. Known conflicts: Punjab HSSC Part-1 result 22 Oct (Eduvision, GoTest, ProPakistani; kept) vs 22 Aug (Daily Pakistan); BSEK start 7 vs 11 Apr; Sindh result dates are government targets (10/31 Jul) vs earlier plan (1/15 Jun), actual release unconfirmed; Quetta matric result 7 May looks too early and Quetta inter result 20 Jul vs 9 Sep; Cambridge IGCSE results 18 vs 19 Aug; LAT 2026 6 Sep vs 15 Nov; GIKI 6-10 vs 9-13 Jul; FAST 7-15 Jul vs 2 Aug; USAT 5 Jul vs Sep estimate; ETEA Test-I dates differ; AJK matric result 18 Aug from a low-quality page. Next step: open the board notification PDFs (biselahore.com, bisep.com.pk, bseik.org, fbise.edu.pk, examinationboard.aku.edu, etea.edu.pk, uhs.edu.pk, kmu.edu.pk) to upgrade secondary rows to official. The draft's extra tests (ETEA, NAT, USAT, HAT, LAT, GIKI, FAST, LCAT, IBA, NED, Mehran, pharmacy) and intakes (NED, FAST, LUMS, DAE PBTE, Sindh/KP/Balochistan MBBS) are merged with their sources and confidence; the draft's extra top-level events (DAE, B.Tech) and its changed A-level and MDCAT rows are not, and stay in the research draft. pharmacy_entry has no known test, so its code pharmd_entry is a placeholder catalog code. --- Earlier note: Dated academic calendar for the roadmap time estimate (FOUR_FEATURES_SPEC 4.2; app/pai_c/roadmap/calendar.py loads and validates it, timeline.py reads it). Built from the research of 2026-10-28 (2026 cycle observed; month numbers derived from 2026 dates). Every event, intake and test keeps its https sources and confidence (official|secondary|uncertain). An empty months list or a null month means not found: the estimate then says 'date not confirmed' and is uncertain; never fill one from memory. BISE Lahore is the proxy for the boards; other boards, DAE, supplementary results, UET class start and most result dates are gaps. Dates move year to year (2025 papers postponed; MDCAT 2026 moved Aug->Sep; MDCAT may move near FSc from 2027, unconfirmed). applies_to.levels are catalog level codes. intakes carry a label shown to the student (no university names) and name study-field families and/or fields (study_fields.json). tests.codes are catalog test codes (choices.tests) a test_attempt record carries and admission_rules entry tests name. degree_years: years by study field key, the fallback when admission_rules.json has no years for the field; the draft's degree-type keys (bs, be, dae) are not study fields and were dropped. Research draft note: DRAFT from research on 2026-10-28. 2026 cycle observed (dates are actual 2026 dates; month numbers derived). Months marked uncertain came from aggregator/social posts, not board PDFs (not opened). Dates shift year to year (2025 BISE papers were postponed in May; MDCAT 2026 was moved Aug 16 -> Sep 20). PM&DC reportedly moves MDCAT close to FSc exams from 2027 (unofficial, unconfirmed). BISE Lahore used as proxy; other boards not verified.",
  "as_of": "2026-10",
  "events": [
   {
@@ -431,6 +431,142 @@
    "fields": [
     "bds"
    ]
+  },
+  {
+   "key": "ned_fall",
+   "label": "Engineering fall intake (Karachi)",
+   "families": [
+    "engineering",
+    "computing"
+   ],
+   "apply_months": [
+    5
+   ],
+   "classes_start_month": 8,
+   "merit_list_months": [
+    7
+   ],
+   "note": "NED 2026: merit list 16 Jul, classes 17 Aug (official schedule).",
+   "sources": [
+    "https://www.neduet.edu.pk/sites/default/files/Admissions-2026/ADMISSIONS_SCHEDULE_2026.pdf"
+   ],
+   "confidence": "official",
+   "fields": []
+  },
+  {
+   "key": "fast_fall",
+   "label": "Computing/business fall intake",
+   "families": [
+    "computing",
+    "business",
+    "engineering"
+   ],
+   "apply_months": [
+    5,
+    6
+   ],
+   "classes_start_month": 8,
+   "merit_list_months": [
+    8
+   ],
+   "note": "FAST-NU classes 19 Aug 2026 reported as forecast.",
+   "sources": [
+    "https://gotest.com.pk/?p=6683"
+   ],
+   "confidence": "uncertain",
+   "fields": []
+  },
+  {
+   "key": "lums_fall",
+   "label": "Fall intake (LUMS)",
+   "families": [
+    "business",
+    "sciences",
+    "social_sciences",
+    "engineering",
+    "computing"
+   ],
+   "apply_months": [
+    11,
+    12,
+    1
+   ],
+   "classes_start_month": null,
+   "merit_list_months": [
+    4,
+    5,
+    6,
+    7
+   ],
+   "note": "Classes start month not found.",
+   "sources": [
+    "https://lums.edu.pk/node/12655"
+   ],
+   "confidence": "uncertain",
+   "fields": []
+  },
+  {
+   "key": "mbbs_sindh",
+   "label": "MBBS intake (Sindh)",
+   "families": [],
+   "apply_months": [],
+   "classes_start_month": null,
+   "note": "Not found (DUHS/JSMU searches returned nothing).",
+   "sources": [
+    "https://tribune.com.pk/story/2628346/mdcat-2026-to-be-held-across-sindh-on-sept-20"
+   ],
+   "confidence": "uncertain",
+   "fields": [
+    "mbbs"
+   ]
+  },
+  {
+   "key": "mbbs_kp",
+   "label": "MBBS intake (KP)",
+   "families": [],
+   "apply_months": [],
+   "classes_start_month": null,
+   "note": "KMU conducts MDCAT; admission schedule not found.",
+   "sources": [
+    "https://pmdc.pk/home/PublicAnnouncement"
+   ],
+   "confidence": "uncertain",
+   "fields": [
+    "mbbs"
+   ]
+  },
+  {
+   "key": "mbbs_balochistan",
+   "label": "MBBS intake (Balochistan)",
+   "families": [],
+   "apply_months": [],
+   "classes_start_month": null,
+   "note": "Bolan University conducts MDCAT; admission schedule not found.",
+   "sources": [
+    "https://pmdc.pk/home/PublicAnnouncement"
+   ],
+   "confidence": "uncertain",
+   "fields": [
+    "mbbs"
+   ]
+  },
+  {
+   "key": "dae_pbte",
+   "label": "DAE first year (Punjab)",
+   "families": [],
+   "apply_months": [
+    8,
+    9,
+    10,
+    11
+   ],
+   "classes_start_month": null,
+   "note": "PBTE 2026-27 registration notice 18 Aug 2026; deadlines not read.",
+   "sources": [
+    "https://www.result.pk/educom/pbte-1st-year-dae-admission-schedule-2026-62057.htm"
+   ],
+   "confidence": "secondary",
+   "fields": []
   }
  ],
  "tests": [
@@ -510,6 +646,245 @@
    "confidence": "official",
    "codes": [
     "net"
+   ]
+  },
+  {
+   "key": "etea_uet",
+   "label": "ETEA UET Peshawar engineering CBT",
+   "register_months": [
+    7
+   ],
+   "test_months": [
+    7
+   ],
+   "result_months": [],
+   "cycle_notes": "2026: reg 6-19 Jul, CBT Test-I 4-5 Jul (one source) and Test-II 25-26 Jul. Sources inconsistent.",
+   "sources": [
+    "https://www.result.pk/educom/etea-computer-based-entrance-test-2026-for-engineering-admissions-59928.htm",
+    "https://etea.edu.pk/"
+   ],
+   "confidence": "secondary",
+   "codes": [
+    "etea"
+   ]
+  },
+  {
+   "key": "nts_nat",
+   "label": "NTS NAT (multiple series per year)",
+   "register_months": [],
+   "test_months": [
+    1,
+    7
+   ],
+   "result_months": [],
+   "cycle_notes": "NAT-I Jan 2026 (10 or 18 Jan, conflict); NAT-VII 12 Jul 2026 (reg to 29 Jun, result 21 Jul). Series run through the year.",
+   "sources": [
+    "https://www.ilmkidunya.com/nat/test-schedule",
+    "https://gotest.com.pk/nts/nts-national-aptitude-test-nat-vii-online-registration/"
+   ],
+   "confidence": "secondary",
+   "codes": [
+    "nat"
+   ]
+  },
+  {
+   "key": "hec_usat",
+   "label": "HEC USAT",
+   "register_months": [
+    6,
+    9
+   ],
+   "test_months": [
+    7,
+    9
+   ],
+   "result_months": [],
+   "cycle_notes": "2026: apply by 7 Jun, test 5 Jul (one report); another page estimates Sep test. Unconfirmed for Sep.",
+   "sources": [
+    "https://www.result.pk/educom/hec-announces-undergraduate-studies-admission-test-usat-2026-57524.htm",
+    "https://gotest.com.pk/?p=124394"
+   ],
+   "confidence": "uncertain",
+   "codes": [
+    "usat"
+   ]
+  },
+  {
+   "key": "hec_hat",
+   "label": "HEC HAT (graduate)",
+   "register_months": [
+    8
+   ],
+   "test_months": [
+    8
+   ],
+   "result_months": [],
+   "cycle_notes": "Special HAT for Commonwealth/Chinese scholarships: reg to 3 Aug, test 30 Aug 2026. Regular HAT calendar not found.",
+   "sources": [
+    "https://www.eduvision.edu.pk/edu_news/hec-announces-special-hat-2026-for-commonwealth-and-chinese-scholarships-news-4469"
+   ],
+   "confidence": "uncertain",
+   "codes": [
+    "hat"
+   ]
+  },
+  {
+   "key": "hec_lat",
+   "label": "HEC Law Admission Test (LAT)",
+   "register_months": [
+    8,
+    9,
+    10
+   ],
+   "test_months": [
+    11
+   ],
+   "result_months": [],
+   "cycle_notes": "2026: test 15 Nov (reg deadline 20 Oct); older notices said 6 Sep (reg 12 Aug). Conflict; recent source favours 15 Nov.",
+   "sources": [
+    "https://www.ilmkidunya.com/edunews/hec-opens-registration-for-law-admission-test-2026-lat-mandatory-for-llb",
+    "https://www.techjuice.pk/hec-opens-registration-for-law-admission-test-2026/"
+   ],
+   "confidence": "secondary",
+   "codes": [
+    "lat"
+   ]
+  },
+  {
+   "key": "giki",
+   "label": "GIKI own CBT (ECAT not accepted)",
+   "register_months": [
+    3,
+    4,
+    5
+   ],
+   "test_months": [
+    7
+   ],
+   "result_months": [],
+   "cycle_notes": "2026: reg closes ~15 May; test 6-10 or 9-13 Jul (conflict).",
+   "sources": [
+    "https://parhlai.com/blog/giki-admission-2026",
+    "https://www.ilmkidunya.com/colleges/ghulam-ishaq-khan-institute-of-engineering-science-and-technology-admission.aspx"
+   ],
+   "confidence": "uncertain",
+   "codes": [
+    "giki"
+   ]
+  },
+  {
+   "key": "fast_nu",
+   "label": "FAST-NU NU Test",
+   "register_months": [
+    5,
+    6
+   ],
+   "test_months": [
+    7,
+    8
+   ],
+   "result_months": [],
+   "cycle_notes": "2026: window 7-15 Jul (forecast) or 2 Aug; apply by 26 Jun or 4 Jul. Classes 19 Aug (forecast).",
+   "sources": [
+    "https://gotest.com.pk/?p=6683",
+    "https://www.nu.edu.pk/Admissions/FAQ"
+   ],
+   "confidence": "uncertain",
+   "codes": [
+    "fast"
+   ]
+  },
+  {
+   "key": "lcat",
+   "label": "LUMS LCAT",
+   "register_months": [
+    12,
+    1
+   ],
+   "test_months": [
+    2
+   ],
+   "result_months": [],
+   "cycle_notes": "Fall 2026 cycle: LCAT 15 Feb 2026 (tentative), apply by 27 Jan, decisions 15 Apr-31 Jul. Fall 2027 not found.",
+   "sources": [
+    "https://lums.edu.pk/node/12655",
+    "https://www.result.pk/educom/lums-ug-programs-admission-schedule-2026-published-55994.htm"
+   ],
+   "confidence": "secondary",
+   "codes": [
+    "lcat"
+   ]
+  },
+  {
+   "key": "iba_karachi",
+   "label": "IBA Karachi aptitude test",
+   "register_months": [],
+   "test_months": [
+    2,
+    6
+   ],
+   "result_months": [
+    2
+   ],
+   "cycle_notes": "Fall 2026 Round 1 test 1 Feb, result 26 Feb 2026; Round 2 ~10 Jun (unconfirmed).",
+   "sources": [
+    "https://admissions.iba.edu.pk/acpiba/uploads/0e981dbae024f53017e642110e757c26.pdf",
+    "https://maqsad.io/bcat/iba-syllabus"
+   ],
+   "confidence": "secondary",
+   "codes": [
+    "iba"
+   ]
+  },
+  {
+   "key": "ned",
+   "label": "NED University admission test",
+   "register_months": [
+    5
+   ],
+   "test_months": [
+    6
+   ],
+   "result_months": [
+    7
+   ],
+   "cycle_notes": "2026: reg deadline 20 May, test 11 Jun (commercial site); official schedule: merit 16 Jul, classes 17 Aug 2026.",
+   "sources": [
+    "https://www.neduet.edu.pk/sites/default/files/Admissions-2026/ADMISSIONS_SCHEDULE_2026.pdf"
+   ],
+   "confidence": "official",
+   "codes": [
+    "ned"
+   ]
+  },
+  {
+   "key": "mehran_muet",
+   "label": "Mehran UET Jamshoro entry test",
+   "register_months": [],
+   "test_months": [],
+   "result_months": [],
+   "cycle_notes": "Held twice a year per PEC notification; no 2026 date found.",
+   "sources": [
+    "https://eduvision.edu.pk/entry-test/muet-entry-test-pattern-deadline-weightage-aggregate-merit"
+   ],
+   "confidence": "uncertain",
+   "codes": [
+    "muet"
+   ]
+  },
+  {
+   "key": "pharmacy_entry",
+   "label": "Pharm-D / PMC pharmacy entry",
+   "register_months": [],
+   "test_months": [],
+   "result_months": [],
+   "cycle_notes": "Not found; Pharm-D generally uses MDCAT or university tests (unverified).",
+   "sources": [
+    "https://pmdc.pk/home/PublicAnnouncement"
+   ],
+   "confidence": "uncertain",
+   "codes": [
+    "pharmd_entry"
    ]
   }
  ],

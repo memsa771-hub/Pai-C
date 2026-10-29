@@ -278,3 +278,27 @@ def test_o_level_line_names_no_group():
     record = {"qualification_name": "o_level", "academic_status": "current",
               "details": {"subjects": ["physics", "chemistry", "mathematics"]}}
     assert education_line(standing_of(record))["groups"] == []
+
+
+def region_of(education, city=None, **record_extra):
+    from datetime import date
+    from app.memory.vault import VaultService
+    with StudentSession() as student, student.factory() as db:
+        add_education(student, db, {**education, **record_extra})
+        if city:
+            VaultService(db).apply_fact(student.workspace_id, "location.current_city", city, "user_explicit")
+            db.commit()
+        add_path(student, db, field_title("electrical_engineering"), "electrical_engineering")
+        card = by_key(RoadmapEngine(db).build(student.workspace_id, date(2026, 10, 29)))["electrical_engineering"]
+        return {row["region"] for row in card["time"]["basis"] if row["step"]}
+
+
+def test_karachi_board_student_card_names_sindh():
+    regions = region_of(fsc("pre_engineering", 78, academic_status="current"),
+                        details={"awarding_body": "bise_karachi"})
+    assert "sindh" in regions
+
+
+def test_city_decides_the_region_without_a_board():
+    regions = region_of(fsc("pre_engineering", 78, academic_status="current"), city="Peshawar")
+    assert "kp" in regions
