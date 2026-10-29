@@ -5,7 +5,7 @@ each successful call with `record_embedding()`. Spend is an estimate (characters
 / chars_per_token, times the per-model rate in pai_c/policy/embedding_costs.json)
 kept in one `pai_usage_months` row per scope and UTC month. At
 PAI_EMBEDDING_MONTHLY_CAP_USD the gateway returns no vectors and recall falls
-back to lexical search; the cap is logged once per process, not per call.
+back to lexical search; the cap is logged once per process and month, not per call.
 
 The counter uses its own short session (the gateway has none) and fails closed:
 if the month's spend cannot be read, no embedding call is made.
@@ -25,7 +25,7 @@ from app.config import config
 logger = logging.getLogger(__name__)
 SCOPE = "embeddings"
 _COSTS = Path(__file__).resolve().parents[1] / "pai_c" / "policy" / "embedding_costs.json"
-_cap_logged = False
+_cap_logged = ""  # the month the cap was last logged for
 
 
 @lru_cache(maxsize=1)
@@ -38,8 +38,10 @@ def rate_per_million(model: str) -> float:
     return float(rates.get(model, rates["default"]))
 
 
-def estimate_usd(model: str, texts: list[str]) -> float:
-    tokens = sum(len(text or "") for text in texts) / embedding_costs()["chars_per_token"]
+def estimate_usd(model: str, texts: list[str], tokens: int | None = None) -> float:
+    """The provider's token count when it reports one, else chars / chars_per_token."""
+    if not isinstance(tokens, int) or isinstance(tokens, bool):
+        tokens = sum(len(text or "") for text in texts) / embedding_costs()["chars_per_token"]
     return tokens * rate_per_million(model) / 1_000_000
 
 
@@ -60,17 +62,17 @@ def embedding_allowed() -> bool:
         return False
     if float(spent) < config.PAI_EMBEDDING_MONTHLY_CAP_USD:
         return True
-    if not _cap_logged:
-        _cap_logged = True
+    if _cap_logged != _month():
+        _cap_logged = _month()
         logger.warning("embeddings: monthly cap reached (est $%.4f of $%.2f); recall is lexical until next month",
                        float(spent), config.PAI_EMBEDDING_MONTHLY_CAP_USD)
     return False
 
 
-def record_embedding(model: str, texts: list[str]) -> None:
+def record_embedding(model: str, texts: list[str], tokens: int | None = None) -> None:
     from app.database import new_session
     from app.models import PaiUsageMonth
-    usd, month = estimate_usd(model, texts), _month()
+    usd, month = estimate_usd(model, texts, tokens), _month()
     bump = (update(PaiUsageMonth).where(PaiUsageMonth.scope == SCOPE, PaiUsageMonth.month == month)
             .values(calls=PaiUsageMonth.calls + 1, est_usd=PaiUsageMonth.est_usd + usd,
                     updated_at=datetime.now(timezone.utc)))

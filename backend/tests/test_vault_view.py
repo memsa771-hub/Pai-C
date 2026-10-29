@@ -108,7 +108,7 @@ def test_document_entry_has_file_link():
         assert domicile["document"] == {"file_id": f.id, "page": 2, "filename": "domicile_certificate.pdf"}
         assert domicile["kind"] == "item" and domicile["source"] == "document"
         assert domicile["source_language"] == "roman_ur"
-        assert domicile["display"] == "Sindh, urban"  # codes shown as English labels
+        assert domicile["display"] == "Sindh, Urban"  # codes shown as English labels
         education = _entry(view, "education")
         assert education["document"] == {"file_id": f.id, "page": 3, "filename": "domicile_certificate.pdf"}
         assert education["badge"] == "From document" and education["kind"] == "record"

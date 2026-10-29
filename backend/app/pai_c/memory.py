@@ -13,6 +13,8 @@ from app.pai_c.deep.turn_input import shared_history
 # Sensitive Vault fields shown back to their own subject (planning context:
 # where they are a citizen of, what they can fund). Anything not listed stays
 # withheld, so adding a sensitive field to the Vault does not publish it here.
+# Vault items follow the same rule through path_analyzer.json
+# `evidence_item_types`.
 PROFILE_SAFE_SENSITIVE_FIELDS = frozenset({
     "identity.full_name", "identity.nationality", "identity.gender",
     "finance.funding_status", "finance.scholarship_interest", "finance.budget",
@@ -26,6 +28,16 @@ PROFILE_RECORD_KINDS = (
     "skill", "certification", "research", "achievement", "goal", "financial_sponsor",
     "scholarship_application", "application", "visa", "document",
 )
+
+
+def labelled_value(type_key, value):
+    """A Vault value with each choice code replaced by its catalog label."""
+    catalog = vault_catalog()
+    if not isinstance(value, dict):
+        return value
+    lists = catalog.record_choice_fields(catalog.type(type_key), value)
+    return {key: catalog.label(lists[key], node) if key in lists and isinstance(node, str) else node
+            for key, node in value.items()}
 
 
 class MemoryService:
@@ -83,16 +95,18 @@ class MemoryService:
             metadata = {row["id"]: row for row in snapshot.records.get(kind, [])}
             for row in records.list(workspace_id, kind):
                 append(kind, kind, metadata[row.id], records._values(kind, row))
-        # Vault items cite as `item:<id>` (FOUR_FEATURES_SPEC 1.2). A guess
-        # (inferred) is not evidence, and a restricted type never leaves the Vault.
-        from app.memory.catalog import vault_catalog
+        # Vault items cite as `item:<id>` (FOUR_FEATURES_SPEC 1.2): only the
+        # listed types, never a guess (inferred), and choice codes read as their
+        # catalog labels, so path evidence never shows "ruled_out".
         from app.memory.vault_items import VaultItemService
-        for item in VaultItemService(self.db).active(workspace_id):
-            spec = vault_catalog().type(item.item_type)
-            if item.level == "inferred" or spec is None or spec.sensitivity == "restricted":
+        from app.pai_c.policy.controller import load_data
+        types = load_data("path_analyzer.json")["evidence_item_types"]
+        for item in VaultItemService(self.db).active(workspace_id, types):
+            if item.level == "inferred":
                 continue
             evidence = item.evidence or {}
-            cards.append({"kind": "item", "key": item.item_type, "id": "item:" + item.id, "value": item.value,
+            value = labelled_value(item.item_type, item.value)
+            cards.append({"kind": "item", "key": item.item_type, "id": "item:" + item.id, "value": value,
                 "digest": value_digest(item.value), "evidence_level": item.level,
                 "source": {name: evidence[name] for name in evidence_policy()["source_fields"] if name in evidence},
                 "source_type": item.source_type, "updated_at": item.updated_at or item.observed_at})

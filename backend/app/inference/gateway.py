@@ -188,7 +188,7 @@ async def embed(role: str, texts: list[str], *, api_key=None, model=None, base_u
     try:
         response = await client.embeddings.create(model=model, input=texts)
         _usage_callback(phase or role, model, turn_id)(getattr(response, 'usage', None))
-        usage.record_embedding(model, texts)
+        usage.record_embedding(model, texts, getattr(getattr(response, 'usage', None), 'prompt_tokens', None))
         return [item.embedding for item in response.data]
     finally:
         await client.close()

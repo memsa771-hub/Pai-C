@@ -1,6 +1,8 @@
 {
   "_note": "360-degree path analyzer. Limits and statuses are data; the prompt is path_analyzer.md.",
   "max_paths": 5,
+  "_evidence_item_note": "Vault item types the analyzer may cite as item:<id> (FOUR_FEATURES_SPEC 1.2). Any other type (myth, quota, a new one) stays out until listed here.",
+  "evidence_item_types": ["interest", "strength", "value", "pressure", "option", "certainty", "family_member", "domicile", "daily_life"],
   "_min_fit_note": "A suggested field is kept only with at least min_fit_evidence fit items in fit_evidence_statuses, each citing the student. Fewer or zero paths is the correct answer when the fit is weak; never pad to max_paths.",
   "min_fit_evidence": 2,
   "planner_cooldown_minutes": 30,

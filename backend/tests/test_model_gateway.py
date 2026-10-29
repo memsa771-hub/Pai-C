@@ -144,7 +144,8 @@ async def test_embedding_provider_uses_gateway_and_preserves_vectors_metadata():
 def embedding_budget():
     """The monthly cap's counter is a database row (test_embeddings_cap covers it)."""
     from app.inference import usage
-    with patch.object(usage, 'embedding_allowed', return_value=True),          patch.object(usage, 'record_embedding') as record:
+    with patch.object(usage, 'embedding_allowed', return_value=True), \
+            patch.object(usage, 'record_embedding') as record:
         yield record
 
 
@@ -162,7 +163,7 @@ async def test_embed_resolves_model_logs_usage_and_closes_client(caplog, embeddi
     client.embeddings.create.assert_awaited_once_with(model='configured-embedding', input=['text'])
     assert 'phase=embeddings turn_id=embedding-turn model=configured-embedding input=2' in caplog.text
     client.close.assert_awaited_once()
-    embedding_budget.assert_called_once_with('configured-embedding', ['text'])
+    embedding_budget.assert_called_once_with('configured-embedding', ['text'], 2)
 
 
 @pytest.mark.asyncio

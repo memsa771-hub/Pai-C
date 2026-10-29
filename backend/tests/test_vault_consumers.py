@@ -24,7 +24,7 @@ from app.memory.vault_view import VaultView
 from app.models import ProfileIssue, VaultItem
 from app.pai_c.deep.context import _profile, build_context
 from app.pai_c.memory import MemoryService
-from app.pai_c.understanding.data import DATA_DIR
+from app.pai_c.understanding.data import load_areas
 from scripts.eval_vault import VaultSession
 from tests.test_counselor_deep_pr3 import _turn
 
@@ -162,7 +162,7 @@ def test_item_counts_toward_coverage():
 
 
 def test_coverage_item_types_come_from_the_catalog():
-    areas = json.loads((DATA_DIR / "areas.json").read_text(encoding="utf-8"))
+    areas = load_areas()
     item_types = {t.key for t in vault_catalog().types(storage="item")}
     used = {t for spec in areas.values() for source in spec["sources"] for t in source.get("vault_items", [])}
     assert used and used <= item_types
@@ -294,7 +294,7 @@ def test_a_bare_certainty_rating_in_the_notebook_covers_sure():
 
 
 def test_every_area_groups_each_notebook_source_with_its_vault_equivalent():
-    areas = json.loads((DATA_DIR / "areas.json").read_text(encoding="utf-8"))
+    areas = load_areas()
     for area, spec in areas.items():
         for source in spec["sources"]:
             group = source.get("group")

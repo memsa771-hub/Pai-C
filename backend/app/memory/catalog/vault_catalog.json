@@ -1476,6 +1476,70 @@
     "code": "education",
     "label": "Education (B.Ed)"
    }
+  ],
+  "option_statuses": [
+   {
+    "code": "considering",
+    "label": "Considering"
+   },
+   {
+    "code": "ruled_out",
+    "label": "Ruled out"
+   }
+  ],
+  "pressure_kinds": [
+   {
+    "code": "money",
+    "label": "Money"
+   },
+   {
+    "code": "time",
+    "label": "Time"
+   },
+   {
+    "code": "expectation",
+    "label": "Expectations"
+   },
+   {
+    "code": "family",
+    "label": "Family"
+   },
+   {
+    "code": "health",
+    "label": "Health"
+   },
+   {
+    "code": "other",
+    "label": "Other"
+   }
+  ],
+  "influence_levels": [
+   {
+    "code": "low",
+    "label": "Low"
+   },
+   {
+    "code": "medium",
+    "label": "Medium"
+   },
+   {
+    "code": "high",
+    "label": "High"
+   },
+   {
+    "code": "unknown",
+    "label": "Not known"
+   }
+  ],
+  "area_types": [
+   {
+    "code": "urban",
+    "label": "Urban"
+   },
+   {
+    "code": "rural",
+    "label": "Rural"
+   }
   ]
  },
  "types": [
@@ -3115,7 +3179,10 @@
    },
    "identity": [
     "text"
-   ]
+   ],
+   "choice_fields": {
+    "kind": "pressure_kinds"
+   }
   },
   {
    "key": "option",
@@ -3153,7 +3220,10 @@
    },
    "identity": [
     "text"
-   ]
+   ],
+   "choice_fields": {
+    "status": "option_statuses"
+   }
   },
   {
    "key": "myth",
@@ -3292,7 +3362,8 @@
     "name"
    ],
    "choice_fields": {
-    "relation": "relations"
+    "relation": "relations",
+    "influence": "influence_levels"
    }
   },
   {
@@ -3333,7 +3404,8 @@
    },
    "identity": [],
    "choice_fields": {
-    "province": "provinces"
+    "province": "provinces",
+    "area": "area_types"
    }
   },
   {

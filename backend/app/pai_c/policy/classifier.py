@@ -9,11 +9,11 @@ import time
 from pydantic import BaseModel, ConfigDict
 from app.config import config
 from app.inference.gateway import complete
-from app.pai_c.understanding.data import DATA_DIR
+from app.pai_c.understanding.data import load_areas
 
 logger = logging.getLogger(__name__)
 
-Area = Literal[tuple(json.loads((DATA_DIR / "areas.json").read_text(encoding="utf-8")))]
+Area = Literal[tuple(load_areas())]
 
 
 class StrictModel(BaseModel):

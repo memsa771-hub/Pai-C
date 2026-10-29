@@ -151,3 +151,64 @@ def test_items_in_profile_cards():
         "kind": "item", "key": "interest", "value": {"text": "Robotics"}, "evidence_level": "stated"}
     assert "item:" + guess.id not in {card["id"] for card in cards}  # a guess is not evidence
     assert "Robotics" in index["item:" + interest.id]
+
+
+def test_item_evidence_renders_labels_not_codes():
+    from app.pai_c.deep.notebook_schema import CounselorNotebookData
+    from app.pai_c.paths.analyzer import _evidence_index
+    with StudentSession() as student, student.factory() as db:
+        ws = student.workspace_id
+        option = _item(db, ws, "option", {"text": "Medicine", "status": "ruled_out"})
+        pressure = _item(db, ws, "pressure", {"text": "Fees are high", "kind": "money"})
+        cards = {card["id"]: card for card in MemoryService(db).profile_cards(ws)}
+        index = _evidence_index(db, ws, CounselorNotebookData())
+    assert cards["item:" + option.id]["value"] == {"text": "Medicine", "status": "Ruled out"}
+    assert index["item:" + option.id] == "Medicine, Ruled out"
+    assert index["item:" + pressure.id] == "Fees are high, Money"
+    text = str(cards) + str(index)
+    assert "ruled_out" not in text and "'money'" not in text
+
+
+def test_only_spec_item_types_are_cited():
+    from app.pai_c.paths.analyzer import policy as analyzer_policy
+    allowed = analyzer_policy()["evidence_item_types"]
+    assert set(allowed) == {"interest", "strength", "value", "pressure", "option", "certainty",
+                            "family_member", "domicile", "daily_life"}
+    with StudentSession() as student, student.factory() as db:
+        ws = student.workspace_id
+        quota = _item(db, ws, "quota", {"kind": "hafiz_e_quran"}).id
+        myth = _item(db, ws, "myth", {"text": "Only doctors earn well"}).id
+        kept = _item(db, ws, "interest", {"text": "Robotics"}).id
+        ids = {card["id"] for card in MemoryService(db).profile_cards(ws)}
+    assert "item:" + kept in ids
+    assert not {"item:" + quota, "item:" + myth} & ids
+
+
+def test_fresh_and_stale_mix_below_min_is_unknown():
+    """Ruling (a): stale entries do not count toward min_items."""
+    with StudentSession() as student, student.factory() as db:
+        ws = student.workspace_id
+        _item(db, ws, "interest", {"text": "Robotics"})
+        _item(db, ws, "interest", {"text": "Physics"}, age_days=400)
+        result = VaultCompleteness(db).build(ws)
+    row = next(row for row in result["areas"] if row["key"] == "interests")
+    assert row["covered"] and row["stale"] and row["min_items"] == 2
+    assert "interests" in [u["area"] for u in result["unknowns"]]
+
+
+def test_notebook_source_follows_its_vault_type_freshness():
+    """Ruling (b): a notebook row in a group with a Vault type ages like that type;
+    a notebook source with no Vault counterpart never goes stale."""
+    from types import SimpleNamespace
+    from app.pai_c.deep.notebook_schema import CounselorNotebookData
+    from app.pai_c.understanding.views import coverage_areas
+    from tests.truth_map_fixtures import item
+    old = (datetime.now(timezone.utc) - timedelta(days=400)).isoformat()
+    notebook = CounselorNotebookData.model_validate({
+        "self": [item(id="i1", key="interest.a", evidence="I like A", last_confirmed=old),
+                 item(id="i2", key="interest.b", evidence="I like B", last_confirmed=old)],
+        "world": {"social": [item(id="s1", key="social.a", evidence="My friends", last_confirmed=old),
+                             item(id="s2", key="social.b", evidence="My cousins", last_confirmed=old)]}})
+    result = coverage_areas(notebook, SimpleNamespace(facts={}, records={}))
+    assert result["interests"]["covered"] and result["interests"]["stale"]
+    assert result["family_social"]["covered"] and not result["family_social"]["stale"]

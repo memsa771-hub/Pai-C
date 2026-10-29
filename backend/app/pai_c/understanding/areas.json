@@ -1,4 +1,5 @@
 {
+  "_note": "Freshness (FOUR_FEATURES_SPEC 1.1): an area is known when covered and not stale. (a) Stale entries do not count toward min_items: an area needing 2 with one fresh and one stale entry is unknown. (b) A notebook source ages like the Vault types in its `group` (the most lenient of them; never, if any of them never ages); a notebook source with no group, or a group with no Vault type, never goes stale. Vault entries use their catalog freshness_days.",
   "status": {
     "min_items": 1,
     "sources": [
@@ -33,7 +34,9 @@
   },
   "history": {
     "min_items": 2,
-    "requires": ["readable_education"],
+    "requires": [
+      "readable_education"
+    ],
     "sources": [
       {
         "path": "world.education_story",

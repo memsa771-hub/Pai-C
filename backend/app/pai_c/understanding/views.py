@@ -1,9 +1,9 @@
 """Computed evidence coverage and public projections; no persistence or model calls."""
 from copy import deepcopy
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 import json
 
-from app.pai_c.understanding.data import DATA_DIR, at_path, load_policy
+from app.pai_c.understanding.data import DATA_DIR, at_path, load_areas, load_policy
 
 
 def _active(rows):
@@ -47,21 +47,37 @@ def _readable_education(snapshot) -> bool:
 _REQUIREMENTS = {"readable_education": _readable_education}
 
 
-def coverage_areas(notebook, snapshot, items=(), stale_ids=frozenset()):
+def _group_freshness(sources, group):
+    """Freshness days a notebook source borrows from the Vault types in its
+    `group` (areas.json `_note`): the most lenient of them, None (never stale)
+    when any never ages or the group has no Vault type."""
+    from app.pai_c.memory import vault_catalog
+    catalog = vault_catalog()
+    keys = [key for source in sources if source.get("group") == group
+            for key in (*source.get("vault_items", ()), *source.get("vault_records", ()),
+                        *source.get("vault_fields", ()))]
+    days = [getattr(catalog.type(key), "freshness_days", None) for key in keys]
+    return max(days) if days and None not in days else None
+
+
+def coverage_areas(notebook, snapshot, items=(), stale_ids=frozenset(), now=None):
     """`items` are the active Vault items; areas.json names their types.
     `stale_ids` are the Vault entries past their catalog freshness window
     (VaultView.stale_ids): an area that only they cover is `stale`, so the
     completeness meter counts it unknown and the counselor asks again."""
+    now = now or datetime.now(timezone.utc)
     data = notebook.model_dump(mode="json")
-    areas = json.loads((DATA_DIR / "areas.json").read_text(encoding="utf-8"))
+    areas = load_areas(DATA_DIR)
     result = {}
     for area, spec in areas.items():
         locations, min_items = (spec["sources"], spec.get("min_items", 1)) if isinstance(spec, dict) else (spec, 1)
-        evidence, strength, sides = {}, {}, {}
+        evidence, strength, sides, stale = {}, {}, {}, set(stale_ids)
         for index, location in enumerate(locations):
             # Equivalent notebook and Vault sources share a `group` (areas.json);
             # a source without one is its own group.
             group = location.get("group", f"#{index}")
+            days = (_group_freshness(locations, location["group"])
+                    if "path" in location and "group" in location else None)
             if "vault_fields" in location or "vault_field_prefixes" in location:
                 rows = [("fact:" + key, row) for key, row in snapshot.facts.items()
                         if key in location.get("vault_fields", []) or
@@ -91,6 +107,8 @@ def coverage_areas(notebook, snapshot, items=(), stale_ids=frozenset()):
                     continue
                 stamp = row.get(location.get("timestamp", "last_confirmed")) or row.get("updated_at") or row.get("valid_from") or row.get("created_at")
                 evidence[identity] = _date(stamp)
+                if days and evidence[identity] and now > evidence[identity] + timedelta(days=days):
+                    stale.add(identity)
                 strength[identity] = _strength(row)
                 sides.setdefault((group, "path" in location), set()).add(identity)
         dates = [stamp for stamp in evidence.values() if stamp is not None]
@@ -111,7 +129,7 @@ def coverage_areas(notebook, snapshot, items=(), stale_ids=frozenset()):
         required = spec.get("requires", ()) if isinstance(spec, dict) else ()
         met = all(_REQUIREMENTS[name](snapshot) for name in required)
         covered = count >= min_items and met
-        result[area] = {"covered": covered, "stale": covered and counted(stale_ids) < min_items,
+        result[area] = {"covered": covered, "stale": covered and counted(stale) < min_items,
                         "item_count": count,
                         "min_items": min_items, "last_confirmed": max(dates) if dates else None,
                         "evidence": max(levels, key=EVIDENCE_ORDER.index) if levels else None}

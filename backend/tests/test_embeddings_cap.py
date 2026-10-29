@@ -73,7 +73,7 @@ def test_embed_cap_stops_calls(caplog):
             patch.object(config, "PAI_SEMANTIC_RECALL_ENABLED", True), \
             patch.object(config, "MEMORY_EMBEDDING_MODEL", "text-embedding-3-small"), \
             patch.object(config, "PAI_EMBEDDING_MONTHLY_CAP_USD", 0.00001), \
-            patch.object(usage, "_cap_logged", False), \
+            patch.object(usage, "_cap_logged", ""), \
             patch.object(gateway.transport, "create_embedding_client", return_value=client), \
             caplog.at_level(logging.WARNING, logger="app.inference.usage"):
         first = asyncio.run(gateway.embed("embeddings", [text], api_key="fake", base_url=None))
@@ -103,3 +103,8 @@ def test_usage_months_migration_and_rates():
     assert {"id", "scope", "month", "calls", "est_usd", "updated_at"} <= set(table.columns.keys())
     assert usage.rate_per_million("text-embedding-3-small") == 0.02
     assert usage.rate_per_million("some-new-model") == usage.embedding_costs()["usd_per_million_tokens"]["default"]
+
+
+def test_estimate_prefers_provider_tokens():
+    assert usage.estimate_usd("text-embedding-3-small", ["x" * 4000], 500) == 500 * 0.02 / 1_000_000
+    assert usage.estimate_usd("text-embedding-3-small", ["x" * 4000]) == 1000 * 0.02 / 1_000_000
