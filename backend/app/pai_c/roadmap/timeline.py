@@ -47,6 +47,23 @@ def _basis(step_key: str | None, key: str | None, when: Month | None, row: dict 
             "confidence": (row or {}).get("confidence")}
 
 
+def _add_months(when: Month, months: int) -> Month:
+    index = when[0] * 12 + when[1] - 1 + months
+    return (index // 12, index % 12 + 1)
+
+
+def _equivalence(basis: list, step_key: str, key: str, when: Month, region: str | None) -> Month:
+    """A Cambridge result is usable only after the IBCC equivalence certificate:
+    the wait is its own basis entry (with the IBCC source) and moves the date."""
+    lag = cal.ibcc_lag(region)
+    if not lag or not (key.startswith("alevel_") and key.endswith("_result")):
+        return when
+    after = _add_months(when, lag["months"])
+    basis.append(_basis(step_key, "ibcc_equivalence", after,
+                        {"region": region, "sources": lag["sources"], "confidence": lag["confidence"]}))
+    return after
+
+
 def _years(field_key: str | None) -> int | None:
     rule = rule_for(field_key) if field_key else None
     years = rule.years_for(field_key) if rule else None
@@ -72,6 +89,7 @@ def estimate(steps: list[dict], field_key: str | None, today: date, region: str 
             if when is None:
                 uncertain = True
                 continue
+            when = _equivalence(basis, step["key"], key, when, region)
             previous, latest = when, max(latest, when)
         if timing.get("result"):
             row = cal.event(timing["result"], region)
@@ -80,10 +98,11 @@ def estimate(steps: list[dict], field_key: str | None, today: date, region: str 
             if when is None:
                 uncertain = True
             else:
+                when = _equivalence(basis, step["key"], timing["result"], when, region)
                 latest = max(latest, when)
 
     starts = []
-    for intake in cal.intakes_for(field_key) if field_key else []:
+    for intake in cal.intakes_for(field_key, region) if field_key else []:
         if intake.get("classes_start_month") is not None:
             when = next_occurrence([intake["classes_start_month"]], latest, today, same_month=True)
             starts.append((when, intake))

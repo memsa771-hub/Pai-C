@@ -249,7 +249,8 @@ class RoadmapEngine:
         current_id = next((card["id"] for card in education if card["value"] is current), None)
         rows = MemoryService(self.db).vault_rows(workspace_id)
         # Board first, then the city the student lives in (the Vault fact), else federal.
-        city = next((row.entry.get("value") for row in rows if row.entry.get("kind") == "fact"
+        # Read the city as the Mirror header reads a fact: its display text.
+        city = next((row.entry.get("display") for row in rows if row.entry.get("kind") == "fact"
                      and row.entry.get("type") == "location.current_city"), None)
         region = region_for(current, city if isinstance(city, str) else None)
         decision = RouteDecisionService(self.db).active(workspace_id)

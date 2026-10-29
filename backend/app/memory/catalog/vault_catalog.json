@@ -940,11 +940,6 @@
     ]
    },
    {
-    "code": "pharmd_entry",
-    "label": "Pharm-D entry test",
-    "synonyms": []
-   },
-   {
     "code": "sat",
     "label": "SAT",
     "synonyms": []

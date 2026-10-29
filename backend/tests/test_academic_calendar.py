@@ -147,9 +147,31 @@ def test_every_catalog_board_names_a_calendar_region():
     assert set(cal._board_regions()) == {b.code for b in vault_catalog().choices("boards")}
 
 
-def test_region_cambridge_lag_moves_results():
-    assert cal.event("alevel_june_result")["months"] == [8]
-    lagged = cal.event("alevel_june_result", "cambridge")
-    assert lagged["months"] == [9] and lagged["lag_months"] == 1 and lagged["confidence"] == "secondary"
-    assert cal.event("alevel_nov_result", "cambridge")["months"] == [2]
-    assert cal.event("alevel_june_series", "cambridge")["months"] == cal.event("alevel_june_series")["months"]
+def test_region_cambridge_has_its_own_rows_and_an_explicit_ibcc_lag():
+    cambridge = cal.calendar()["regions"]["cambridge"]
+    assert {"alevel_june_series", "alevel_june_result", "alevel_nov_series",
+            "alevel_nov_result"} <= set(cal.region_events(cambridge))
+    result = cal.event("alevel_june_result", "cambridge")
+    assert result["region"] == "cambridge" and result["months"] == [8]  # unshifted
+    lag = cal.ibcc_lag("cambridge")
+    assert lag["months"] == 1 and lag["sources"][0].startswith("https://") and lag["confidence"] == "official"
+    assert cal.ibcc_lag("sindh") is None
+
+
+def test_borrowed_national_rows_are_uncertain_in_every_non_punjab_region():
+    """A region without national_fallback_confidence is treated as uncertain, as
+    the validator does; Punjab is the proxy itself and keeps the national grade."""
+    national = cal.event("hssc_part1_result")
+    assert national["confidence"] == "official"
+    for region in ("sindh", "kp", "balochistan", "federal_fbise", "aku_eb", "ajk", "gilgit_baltistan", "cambridge"):
+        row = cal.event("dae_annual_result", region)
+        assert row["region"] == "national" and row["confidence"] == "uncertain", region
+    assert cal.event("hssc_supplementary_result", "sindh")["confidence"] == "uncertain"
+    assert cal.fallback_confidence({}) == "uncertain"
+    assert cal.event("hssc_part1_result", "cambridge")["confidence"] == "uncertain"
+    assert cal.event("ssc_annual_exam", "punjab")["region"] == "punjab"
+
+
+def test_regional_intake_applies_only_to_its_region():
+    keys = lambda region: {row["key"] for row in cal.intakes_for("electrical_engineering", region)}
+    assert "ned_fall" in keys("sindh") and "ned_fall" not in keys("punjab") and "ned_fall" not in keys(None)

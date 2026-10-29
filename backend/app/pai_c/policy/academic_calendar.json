@@ -1,5 +1,5 @@
 {
- "_note": "Pakistan-wide regions merged 2026-10-29 from the research draft (web search only, no board PDF opened; almost all rows secondary or uncertain; official only for Cambridge key dates, NED schedule, PM&DC, IBCC, NUST, UET). regions: per-region events override the national ones by key; a key listed in a region's gaps (or with empty months) is not found and stays \"date not confirmed\", never filled from the national proxy; other keys fall back to the national rows (downgraded to uncertain where national_fallback_confidence says so). Known gaps: Gilgit-Baltistan board entirely; AKU-EB HSSC and result dates; AJK exam/result; Sindh and KP HSSC exam months; KP HSSC results; Balochistan inter result; supplementary results for Sindh/KP/Balochistan/AKU-EB; MBBS/BDS application and class start for Sindh, KP, Balochistan (UHS figures from a blog); DAE exam/result months for SBTE/KPBTE and KPBTE admissions; B.Tech; Mehran/Sindh engineering test; pharmacy entry; LUMS/FAST class start; Cambridge June exam window; 2027 cycle dates for LCAT, IBA, FAST, GIKI, ETEA, NAT. Known conflicts: Punjab HSSC Part-1 result 22 Oct (Eduvision, GoTest, ProPakistani; kept) vs 22 Aug (Daily Pakistan); BSEK start 7 vs 11 Apr; Sindh result dates are government targets (10/31 Jul) vs earlier plan (1/15 Jun), actual release unconfirmed; Quetta matric result 7 May looks too early and Quetta inter result 20 Jul vs 9 Sep; Cambridge IGCSE results 18 vs 19 Aug; LAT 2026 6 Sep vs 15 Nov; GIKI 6-10 vs 9-13 Jul; FAST 7-15 Jul vs 2 Aug; USAT 5 Jul vs Sep estimate; ETEA Test-I dates differ; AJK matric result 18 Aug from a low-quality page. Next step: open the board notification PDFs (biselahore.com, bisep.com.pk, bseik.org, fbise.edu.pk, examinationboard.aku.edu, etea.edu.pk, uhs.edu.pk, kmu.edu.pk) to upgrade secondary rows to official. The draft's extra tests (ETEA, NAT, USAT, HAT, LAT, GIKI, FAST, LCAT, IBA, NED, Mehran, pharmacy) and intakes (NED, FAST, LUMS, DAE PBTE, Sindh/KP/Balochistan MBBS) are merged with their sources and confidence; the draft's extra top-level events (DAE, B.Tech) and its changed A-level and MDCAT rows are not, and stay in the research draft. pharmacy_entry has no known test, so its code pharmd_entry is a placeholder catalog code. --- Earlier note: Dated academic calendar for the roadmap time estimate (FOUR_FEATURES_SPEC 4.2; app/pai_c/roadmap/calendar.py loads and validates it, timeline.py reads it). Built from the research of 2026-10-28 (2026 cycle observed; month numbers derived from 2026 dates). Every event, intake and test keeps its https sources and confidence (official|secondary|uncertain). An empty months list or a null month means not found: the estimate then says 'date not confirmed' and is uncertain; never fill one from memory. BISE Lahore is the proxy for the boards; other boards, DAE, supplementary results, UET class start and most result dates are gaps. Dates move year to year (2025 papers postponed; MDCAT 2026 moved Aug->Sep; MDCAT may move near FSc from 2027, unconfirmed). applies_to.levels are catalog level codes. intakes carry a label shown to the student (no university names) and name study-field families and/or fields (study_fields.json). tests.codes are catalog test codes (choices.tests) a test_attempt record carries and admission_rules entry tests name. degree_years: years by study field key, the fallback when admission_rules.json has no years for the field; the draft's degree-type keys (bs, be, dae) are not study fields and were dropped. Research draft note: DRAFT from research on 2026-10-28. 2026 cycle observed (dates are actual 2026 dates; month numbers derived). Months marked uncertain came from aggregator/social posts, not board PDFs (not opened). Dates shift year to year (2025 BISE papers were postponed in May; MDCAT 2026 was moved Aug 16 -> Sep 20). PM&DC reportedly moves MDCAT close to FSc exams from 2027 (unofficial, unconfirmed). BISE Lahore used as proxy; other boards not verified.",
+ "_note": "Pakistan-wide regions merged 2026-10-29 from the research draft (web search only, no board PDF opened; almost all rows secondary or uncertain; official only for Cambridge key dates, NED schedule, PM&DC, IBCC, NUST, UET). regions: per-region events override the national ones by key; a key listed in a region's gaps (or with empty months) is not found and stays \"date not confirmed\", never filled from the national proxy; other keys fall back to the national rows (downgraded to uncertain where national_fallback_confidence says so). Known gaps: Gilgit-Baltistan board entirely; AKU-EB HSSC and result dates; AJK exam/result; Sindh and KP HSSC exam months; KP HSSC results; Balochistan inter result; supplementary results for Sindh/KP/Balochistan/AKU-EB; MBBS/BDS application and class start for Sindh, KP, Balochistan (UHS figures from a blog); DAE exam/result months for SBTE/KPBTE and KPBTE admissions; B.Tech; Mehran/Sindh engineering test; pharmacy entry; LUMS/FAST class start; Cambridge June exam window; 2027 cycle dates for LCAT, IBA, FAST, GIKI, ETEA, NAT. Known conflicts: Punjab HSSC Part-1 result 22 Oct (Eduvision, GoTest, ProPakistani; kept) vs 22 Aug (Daily Pakistan); BSEK start 7 vs 11 Apr; Sindh result dates are government targets (10/31 Jul) vs earlier plan (1/15 Jun), actual release unconfirmed; Quetta matric result 7 May looks too early and Quetta inter result 20 Jul vs 9 Sep; Cambridge IGCSE results 18 vs 19 Aug; LAT 2026 6 Sep vs 15 Nov; GIKI 6-10 vs 9-13 Jul; FAST 7-15 Jul vs 2 Aug; USAT 5 Jul vs Sep estimate; ETEA Test-I dates differ; AJK matric result 18 Aug from a low-quality page. Next step: open the board notification PDFs (biselahore.com, bisep.com.pk, bseik.org, fbise.edu.pk, examinationboard.aku.edu, etea.edu.pk, uhs.edu.pk, kmu.edu.pk) to upgrade secondary rows to official. The draft's extra tests (ETEA, NAT, USAT, HAT, LAT, GIKI, FAST, LCAT, IBA, NED, Mehran) and intakes (NED, FAST, LUMS, DAE PBTE, Sindh/KP/Balochistan MBBS) are merged with their sources and confidence; the draft's extra top-level events (DAE, B.Tech) and its changed A-level and MDCAT rows are not, and stay in the research draft. The draft's pharmacy_entry row (no test found) is dropped. ned_fall applies to Sindh only (regions: [sindh]). --- Earlier note: Dated academic calendar for the roadmap time estimate (FOUR_FEATURES_SPEC 4.2; app/pai_c/roadmap/calendar.py loads and validates it, timeline.py reads it). Built from the research of 2026-10-28 (2026 cycle observed; month numbers derived from 2026 dates). Every event, intake and test keeps its https sources and confidence (official|secondary|uncertain). An empty months list or a null month means not found: the estimate then says 'date not confirmed' and is uncertain; never fill one from memory. BISE Lahore is the proxy for the boards; other boards, DAE, supplementary results, UET class start and most result dates are gaps. Dates move year to year (2025 papers postponed; MDCAT 2026 moved Aug->Sep; MDCAT may move near FSc from 2027, unconfirmed). applies_to.levels are catalog level codes. intakes carry a label shown to the student (no university names) and name study-field families and/or fields (study_fields.json). tests.codes are catalog test codes (choices.tests) a test_attempt record carries and admission_rules entry tests name. degree_years: years by study field key, the fallback when admission_rules.json has no years for the field; the draft's degree-type keys (bs, be, dae) are not study fields and were dropped. Research draft note: DRAFT from research on 2026-10-28. 2026 cycle observed (dates are actual 2026 dates; month numbers derived). Months marked uncertain came from aggregator/social posts, not board PDFs (not opened). Dates shift year to year (2025 BISE papers were postponed in May; MDCAT 2026 was moved Aug 16 -> Sep 20). PM&DC reportedly moves MDCAT close to FSc exams from 2027 (unofficial, unconfirmed). BISE Lahore used as proxy; other boards not verified.",
  "as_of": "2026-10",
  "events": [
   {
@@ -451,7 +451,10 @@
     "https://www.neduet.edu.pk/sites/default/files/Admissions-2026/ADMISSIONS_SCHEDULE_2026.pdf"
    ],
    "confidence": "official",
-   "fields": []
+   "fields": [],
+   "regions": [
+    "sindh"
+   ]
   },
   {
    "key": "fast_fall",
@@ -871,21 +874,6 @@
    "codes": [
     "muet"
    ]
-  },
-  {
-   "key": "pharmacy_entry",
-   "label": "Pharm-D / PMC pharmacy entry",
-   "register_months": [],
-   "test_months": [],
-   "result_months": [],
-   "cycle_notes": "Not found; Pharm-D generally uses MDCAT or university tests (unverified).",
-   "sources": [
-    "https://pmdc.pk/home/PublicAnnouncement"
-   ],
-   "confidence": "uncertain",
-   "codes": [
-    "pharmd_entry"
-   ]
   }
  ],
  "degree_years": {
@@ -1026,7 +1014,8 @@
    },
    "gaps": [],
    "overrides": {},
-   "_note": "National rows are the BISE Lahore proxy; Punjab rows repeat them with their own sources."
+   "_note": "Punjab is the national proxy (BISE Lahore): borrowed national rows keep their own grade (national_fallback_confidence official means no downgrade). A region without the key is treated as uncertain.",
+   "national_fallback_confidence": "official"
   },
   "sindh": {
    "boards": [
@@ -1377,14 +1366,57 @@
    "boards": [
     "Cambridge International (O Level, A Level, IGCSE)"
    ],
-   "_note": "Cambridge sessions are the alevel_* events; results then wait for the IBCC equivalence certificate (15-20 working days, rounded up to one month).",
+   "_note": "Cambridge sessions and results are the rows below (copied from the national Cambridge rows, same sources); results then wait for the IBCC equivalence certificate (15-20 working days, rounded up to one month), which the estimate shows as its own ibcc_equivalence entry.",
    "ibcc_lag_months": 1,
    "ibcc_sources": [
     "https://ibcc.edu.pk/faqs/equivalence-faqs/",
     "https://ibcc.edu.pk/faqs/express-service-faqs/"
    ],
    "ibcc_confidence": "official",
-   "gaps": []
+   "gaps": [],
+   "alevel_june_series": {
+    "months": [
+     5,
+     6
+    ],
+    "month_note": "Inferred from series name; exam window not fetched.",
+    "sources": [
+     "https://www.cambridgeinternational.org/exam-administration/results/"
+    ],
+    "confidence": "uncertain"
+   },
+   "alevel_june_result": {
+    "months": [
+     8
+    ],
+    "month_note": "A/AS Level 11 Aug 2026; O Level/IGCSE 18 Aug 2026.",
+    "sources": [
+     "https://www.cambridgeinternational.org/exam-administration/results/",
+     "https://www.facebook.com/groups/4618950024802215/posts/28517702811166935/"
+    ],
+    "confidence": "secondary"
+   },
+   "alevel_nov_series": {
+    "months": [
+     10,
+     11
+    ],
+    "month_note": "Inferred from series name; window not fetched.",
+    "sources": [
+     "https://www.cambridgeinternational.org/exam-administration/results/"
+    ],
+    "confidence": "uncertain"
+   },
+   "alevel_nov_result": {
+    "months": [
+     1
+    ],
+    "month_note": "A/AS Level 7 Jan 2027; O Level/IGCSE 14 Jan 2027.",
+    "sources": [
+     "https://www.cambridgeinternational.org/exam-administration/results/"
+    ],
+    "confidence": "official"
+   }
   }
  },
  "city_regions": {

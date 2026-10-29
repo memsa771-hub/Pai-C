@@ -59,13 +59,17 @@ def _validate_regions(data: dict) -> None:
             where = f"region {name} event {key}"
             _sourced(where, row)
             _months(where, row.get("months"))
-        if region.get("national_fallback_confidence", "uncertain") not in CONFIDENCE:
+        if fallback_confidence(region) not in CONFIDENCE:
             raise CalendarError(f"region {name}: national_fallback_confidence must be one of {CONFIDENCE}")
         if region.get("ibcc_lag_months") is not None:
             _sourced(f"region {name} ibcc", {"sources": region.get("ibcc_sources"),
                                               "confidence": region.get("ibcc_confidence")})
     if FALLBACK_REGION not in regions:
         raise CalendarError(f"region {FALLBACK_REGION} is required")
+    for intake in data["intakes"]:
+        for name in intake.get("regions", ()):
+            if name not in regions:
+                raise CalendarError(f"intake {intake['key']}: unknown region {name}")
     for city, name in data.get("city_regions", {}).items():
         if city != "_note" and name not in regions:
             raise CalendarError(f"city_regions: {city} names unknown region {name}")
@@ -139,14 +143,14 @@ def event(key: str, region: str | None = None) -> dict | None:
             if own is not None:
                 found = {"key": key, "months": list(own.get("months") or []), "sources": own["sources"],
                          "confidence": own["confidence"], "region": region}
-                return _with_lag(found, area)
+                return found
             if key in area.get("gaps", ()):
                 return {"key": key, "months": [], "sources": [], "confidence": "uncertain", "region": region}
         found = {"key": key, "months": list(row.get("months") or []), "sources": row["sources"],
                  "confidence": row["confidence"], "region": "national"}
-        if area is not None and "national_fallback_confidence" in area:
-            found["confidence"] = _weaker(found["confidence"], area["national_fallback_confidence"])
-        return _with_lag(found, area or {})
+        if area is not None:
+            found["confidence"] = _weaker(found["confidence"], fallback_confidence(area))
+        return found
     for row in data["tests"]:
         if row["key"] == key:
             return {"key": key, "months": list(row.get("test_months") or []), "sources": row["sources"],
@@ -155,15 +159,21 @@ def event(key: str, region: str | None = None) -> dict | None:
     return None
 
 
-def _with_lag(found: dict, area: dict) -> dict:
-    """Cambridge results (`alevel_*_result`) are usable only after the IBCC
-    equivalence certificate, so their months move by the IBCC lag."""
-    lag = area.get("ibcc_lag_months")
-    if not lag or not (found["key"].startswith("alevel_") and found["key"].endswith("_result")):
-        return found
-    months = [(month - 1 + lag) % 12 + 1 for month in found["months"]]
-    return {**found, "months": months, "lag_months": lag,
-            "confidence": _weaker(found["confidence"], area.get("ibcc_confidence", "uncertain"))}
+def fallback_confidence(area: dict) -> str:
+    """The grade a national row gets when a region borrows it: the region's own
+    national_fallback_confidence, else uncertain (the proxy is BISE Lahore).
+    The validator and event() both read it here."""
+    return area.get("national_fallback_confidence", "uncertain")
+
+
+def ibcc_lag(region: str | None) -> dict | None:
+    """The IBCC equivalence wait a region's results carry (Cambridge), as
+    {months, sources, confidence}, or None."""
+    area = calendar().get("regions", {}).get(region) if region else None
+    if not area or not area.get("ibcc_lag_months"):
+        return None
+    return {"months": area["ibcc_lag_months"], "sources": area["ibcc_sources"],
+            "confidence": area.get("ibcc_confidence", "uncertain")}
 
 
 @lru_cache(maxsize=1)
@@ -199,11 +209,13 @@ def calendar_test(codes) -> dict | None:
     return None
 
 
-def intakes_for(field_key: str) -> list[dict]:
+def intakes_for(field_key: str, region: str | None = None) -> list[dict]:
+    """Intakes open to a field; one that names `regions` applies only there."""
     study = study_fields().get(field_key)
     family = study.family if study else None
     return [row for row in calendar()["intakes"]
-            if field_key in row.get("fields", ()) or (family and family in row.get("families", ()))]
+            if (field_key in row.get("fields", ()) or (family and family in row.get("families", ())))
+            and (not row.get("regions") or region in row["regions"])]
 
 
 def degree_years(field_key: str) -> int | None:

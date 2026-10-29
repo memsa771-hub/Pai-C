@@ -38,14 +38,16 @@ def test_estimate_rolls_to_next_year():
     time = estimate(steps, "electrical_engineering", TODAY)
     assert [(row["event_key"], row["year"]) for row in time["basis"] if row["step"]] == [
         ("ecat", 2027), ("ecat:result", 2027)]
-    # 10, not 11: the calendar now carries the NED fall intake (official NED schedule, classes in
-    # August), which is earlier than the September intakes this test used to end on.
-    assert time["to_entry_months"] == 10 and time["next_intake"]["start_month"] == 8
+    # 10, not 11: the calendar carries the FAST-NU fall intake (sourced, uncertain, classes in
+    # August), earlier than the September intakes this test used to end on. The NED intake is
+    # Sindh-only and does not apply here.
+    assert time["to_entry_months"] == 10 and time["next_intake"]["label"] == "Computing/business fall intake"
+    assert time["next_intake"]["start_month"] == 8
 
 
 def test_unknown_event_marks_uncertain():
-    """LAT has no calendar entry: that step's date is not confirmed and the
-    whole estimate is uncertain."""
+    """The law route's test step names no calendar test code: that step's date is
+    not confirmed and the whole estimate is uncertain."""
     steps = route("law_llb", fsc("pre_engineering", 70))
     time = estimate(steps, "law_llb", TODAY)
     lat = [row for row in time["basis"] if row["step"] and row["step"].startswith("test:")]
@@ -94,18 +96,21 @@ def test_karachi_board_student_uses_sindh_dates():
     assert {r["event_key"]: r["month"] for r in national["basis"]}["ssc_annual_result"] == 8
 
 
-def test_a_level_student_uses_cambridge_sessions_and_ibcc_lag():
+def test_a_level_student_gets_cambridge_rows_and_an_ibcc_entry():
     alevel = {"qualification_name": "a_level", "academic_status": "current", "field_of_study": "pre_engineering"}
     region = cal.region_for(alevel, "Lahore")
     assert region == "cambridge"
     steps = route("electrical_engineering", alevel)
     time = estimate(steps, "electrical_engineering", TODAY, region)
     rows = {row["event_key"]: row for row in time["basis"] if row["step"] == "complete_intermediate"}
-    assert (rows["alevel_june_series"]["year"], rows["alevel_june_series"]["month"]) == (2027, 5)
-    assert (rows["alevel_june_result"]["year"], rows["alevel_june_result"]["month"]) == (2027, 9)  # Aug + 1 IBCC
-    assert all(row["region"] for row in time["basis"] if row["step"] and row["event_key"])
+    for key, month in (("alevel_june_series", 5), ("alevel_june_result", 8), ("ibcc_equivalence", 9)):
+        assert (rows[key]["year"], rows[key]["month"], rows[key]["region"]) == (2027, month, "cambridge"), key
+    assert rows["ibcc_equivalence"]["source"].startswith("https://ibcc.edu.pk")
+    assert rows["ibcc_equivalence"]["confidence"] == "official"
+    assert {row["region"] for row in time["basis"] if (row["event_key"] or "").startswith(("alevel_", "ibcc"))} == {
+        "cambridge"}
     plain = estimate(steps, "electrical_engineering", TODAY)
-    assert {r["event_key"]: r["month"] for r in plain["basis"]}["alevel_june_result"] == 8
+    assert "ibcc_equivalence" not in {r["event_key"] for r in plain["basis"]}
 
 
 def test_region_fallback_federal():
@@ -116,13 +121,26 @@ def test_region_fallback_federal():
     assert region == "federal_fbise"
     time = estimate(route("electrical_engineering", record), "electrical_engineering", TODAY, region)
     assert time["confidence"] == "uncertain"
-    assert any(row["region"] == "federal_fbise" or row["region"] == "national" for row in time["basis"])
+    by_event = {row["event_key"]: row for row in time["basis"] if row["step"] == "complete_intermediate"}
+    assert by_event["hssc_part2_exam"]["region"] == "national"  # no federal row: borrowed, not federal
+    assert by_event["hssc_part2_exam"]["confidence"] == "uncertain"
+    assert by_event["hssc_part2_result"]["region"] == "federal_fbise"
 
 
-def test_weakest_confidence_across_regions():
+def test_student_borrowing_a_national_row_is_uncertain():
+    """AKU-EB has few rows of its own: the rest is the national proxy, uncertain."""
+    matric = {"qualification_name": "matric", "academic_status": "current", "board": "aga_khan"}
+    time = estimate(route("electrical_engineering", matric), "electrical_engineering", TODAY, "aku_eb")
+    rows = {row["event_key"]: row for row in time["basis"] if row["step"] == "complete_intermediate"}
+    assert rows["ssc_annual_result"]["region"] == "aku_eb"
+    assert rows["hssc_part1_result"]["region"] == "national" and rows["hssc_part1_result"]["confidence"] == "uncertain"
+    sindh = estimate(route("electrical_engineering", matric), "electrical_engineering", TODAY, "sindh")
+    gap = {r["event_key"]: r for r in sindh["basis"] if r["step"] == "complete_intermediate"}["hssc_part2_exam"]
+    assert gap["region"] == "sindh" and gap["month"] is None
+
+
+def test_confidence_is_the_weakest_used_in_a_region():
     record = fsc("pre_engineering", status="current")
     time = estimate(route("electrical_engineering", record), "electrical_engineering", TODAY, "punjab")
-    order = {name: i for i, name in enumerate(cal.CONFIDENCE)}
-    used = [row["confidence"] for row in time["basis"] if row["confidence"]]
-    assert time["confidence"] == max(used, key=order.get)
+    assert time["confidence"] == "secondary"
     assert any(row["region"] == "punjab" for row in time["basis"])
