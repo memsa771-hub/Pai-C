@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import {it,expect,vi,afterEach} from 'vitest';
 import {render,screen,fireEvent,cleanup,waitFor,within} from '@testing-library/react';
-import {CounselorSettings,UsageCard} from './settings';
+import {CounselorSettings,UsageCard,usageSession} from './settings';
 import {adminUsage} from '@/tests/fixtures/counselor';
 import {workspaceApi} from '@/lib/api';
 import {RecentSignInRequired,requestPasswordReset} from '@/lib/auth/service';
@@ -120,7 +120,21 @@ it('renders nothing for an account that is not a founder (403)',async()=>{
   expect(screen.queryByText("This month's model spend")).toBeNull();
   expect(screen.queryByRole('button',{name:'Try again'})).toBeNull();
 });
-it('offers a retry when the spend cannot load',async()=>{
+it('hides a failed read from an account that has never loaded the spend',async()=>{
+  usageSession.seen=false;
+  vi.mocked(workspaceApi.getAdminUsage).mockRejectedValueOnce(new Error('API 500: down'));
+  render(<UsageCard/>);
+  await waitFor(()=>expect(workspaceApi.getAdminUsage).toHaveBeenCalled());
+  await new Promise(r=>setTimeout(r,0));
+  expect(screen.queryByRole('button',{name:'Try again'})).toBeNull();
+  expect(screen.queryByText("This month's model spend")).toBeNull();
+});
+it('offers the founder a retry when the spend cannot load after it loaded once',async()=>{
+  usageSession.seen=false;
+  vi.mocked(workspaceApi.getAdminUsage).mockResolvedValueOnce(structuredClone(adminUsage));
+  const view=render(<UsageCard/>);
+  expect(await screen.findByText("This month's model spend")).toBeTruthy();
+  view.unmount();
   vi.mocked(workspaceApi.getAdminUsage).mockRejectedValueOnce(new Error('API 500: down'));
   render(<UsageCard/>);
   expect(await screen.findByRole('button',{name:'Try again'})).toBeTruthy();

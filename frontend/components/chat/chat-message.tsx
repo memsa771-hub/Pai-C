@@ -186,17 +186,17 @@ function Attachments({ items }: { items: Attachment[] }) {
   );
 }
 
-/** PAI's reply ends with the next step as its own last line, after a blank
- * line (backend pai_c/deep/turn.py, the drive rule). Split it off so it can
- * be set apart; a last block that is a list, heading, quote, table or code
- * stays in the body. */
-const BLOCK_START = /^(?:[-*+>#|`]|\d+[.)]\s)/;
-export function splitNextStep(content: string): [string, string | null] {
+/** PAI's reply ends with the next step as its own last line (backend
+ * pai_c/deep/turn.py, the drive rule), and the backend names that line in
+ * `metadata.next_step`. Only that exact last line is set apart. */
+export function splitNextStep(content: string, nextStep: unknown): [string, string | null] {
+  const step = typeof nextStep === 'string' ? nextStep.trim() : '';
   const text = content.trimEnd();
-  const at = text.lastIndexOf('\n\n');
-  if (at <= 0) return [content, null];
-  const body = text.slice(0, at).trimEnd(), step = text.slice(at + 2).trim();
-  if (!body || !step || step.includes('\n') || BLOCK_START.test(step) || body.split('```').length % 2 === 0) return [content, null];
+  if (!step || !text.endsWith(step)) return [content, null];
+  const before = text.slice(0, text.length - step.length);
+  // The step is a whole line: it starts after a line break, and a body precedes it.
+  if (!before.trim() || !before.endsWith('\n')) return [content, null];
+  const body = before.trimEnd();
   return [body, step];
 }
 
@@ -234,8 +234,8 @@ export const ChatMessage = memo(function ChatMessage({ message, agents = [] }: C
   const timestamp = message.createdAt ? formatTime(message.createdAt) : null;
   const [body, nextStep] = useMemo(
     () => (isHuman || message.metadata?.counselor_card || message.messageType === 'counselor_mirror'
-      ? [message.content, null] : splitNextStep(message.content || '')),
-    [isHuman, message.content, message.metadata?.counselor_card, message.messageType],
+      ? [message.content, null] : splitNextStep(message.content || '', message.metadata?.next_step)),
+    [isHuman, message.content, message.metadata?.counselor_card, message.metadata?.next_step, message.messageType],
   );
 
   const handleCopy = async () => {

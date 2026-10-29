@@ -60,13 +60,21 @@ const STAGE_TONE: Record<string, string> = {
   research_paused: "bg-warning-soft text-warning-ink",
   paused: "bg-danger-soft text-danger-ink",
 };
-const loadUsage = () => workspaceApi.getAdminUsage();
+/** Set once the spend has loaded in this session, i.e. the account is a founder's. */
+export const usageSession = { seen: false };
+const loadUsage = async () => {
+  const data = await workspaceApi.getAdminUsage();
+  if (data) usageSession.seen = true;
+  return data;
+};
 
 /** This month's model spend against the cap (GET /v1/admin/usage). Founder
- * accounts only: for anyone else the API answers 403 and nothing renders. */
+ * accounts only: for anyone else the API answers 403 and nothing renders. A
+ * failed read shows the error only to an account that has loaded it before,
+ * so a student never sees a retry for a card that is not theirs. */
 export function UsageCard() {
   const usage = useResource<AdminUsage | null>(loadUsage);
-  if (usage.error) return <LoadState error busy={false} retry={usage.refresh} skeleton="list" />;
+  if (usage.error) return usageSession.seen ? <LoadState error busy={false} retry={usage.refresh} skeleton="list" /> : null;
   if (usage.busy || !usage.data) return null;
   const { month, cap, spent, stage, by_role } = usage.data;
   const u = text.usage;
