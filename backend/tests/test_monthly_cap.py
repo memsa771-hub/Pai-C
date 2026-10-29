@@ -138,3 +138,62 @@ def test_admin_usage_auth_and_shape():
                                {"role": "embeddings", "calls": 1, "est_usd": 0.25}]
     from app.main import app
     assert any(getattr(route, "path", "") == "/v1/admin/usage" for route in app.routes)
+
+
+@pytest.mark.asyncio
+async def test_planner_skips_quietly_at_research_paused(caplog):
+    from app.pai_c.deep.analysis import analyze_job
+    with StudentSession() as student, patch.object(config, "PAI_MONTHLY_CAP_USD", 100.0), \
+            patch.object(usage, "_gate_logged", {}), \
+            patch("app.pai_c.deep.analysis.chat_completion", AsyncMock()) as planner_model, \
+            caplog.at_level(logging.WARNING, logger="app.inference.usage"):
+        _spend(student, models__analyst=81.0)
+        job = SimpleNamespace(id="job", workspace_id=student.workspace_id,
+                              payload={"user_event_id": "u", "assistant_event_id": "a"})
+        assert (await analyze_job(job, Mock()))["status"] == "cap_paused"
+        assert (await analyze_job(job, Mock()))["status"] == "cap_paused"
+    planner_model.assert_not_awaited()
+    assert len([r for r in caplog.records if r.getMessage().startswith("models: analyst stopped")]) == 1
+
+
+@pytest.mark.asyncio
+async def test_paused_turn_queues_no_learning_jobs():
+    from app.pai_c import runtime
+    event = {"id": "user-event", "source": "human:someone"}
+    with StudentSession() as student, patch.object(config, "PAI_MONTHLY_CAP_USD", 100.0), \
+            patch.object(usage, "_gate_logged", {}), \
+            patch.object(runtime, "_run_deep_turn", AsyncMock(return_value=("pai-event", "channel/x"))), \
+            patch("app.pai_c.memory.MemoryService.enqueue_turn_extraction") as extraction, \
+            patch("app.pai_c.deep.analysis.enqueue_turn_analysis") as analysis:
+        await runtime._run_turn(Mock(), student.workspace_id, event, 0)
+        assert extraction.call_count == 1 and analysis.call_count == 1
+        _spend(student, models__counselor=100.0)
+        await runtime._run_turn(Mock(), student.workspace_id, event, 0)
+        assert extraction.call_count == 1 and analysis.call_count == 1
+
+
+@pytest.mark.asyncio
+async def test_wellbeing_turn_still_calls_the_model_when_paused():
+    from tests.test_voice_guided import output
+    with StudentSession() as student, patch.object(config, "PAI_MONTHLY_CAP_USD", 100.0), \
+            patch.object(usage, "_gate_logged", {}), \
+            patch("app.pai_c.deep.turn.chat_completion", AsyncMock(return_value=output("I hear you."))) as model:
+        _spend(student, models__counselor=100.0)
+        with student.factory() as db:
+            result = await run_deep_turn(db, _turn(student), history=[], instructions="wellbeing",
+                                         safety_level="concern")
+    model.assert_awaited_once()
+    assert result.reply == "I hear you."
+
+
+def test_cap_state_fails_open_when_the_counter_is_unreadable():
+    with patch.object(usage, "month_rows", side_effect=RuntimeError("db down")):
+        state = usage.cap_state()
+    assert state["stage"] == "ok" and state["spent"] is None
+
+
+def test_cache_writes_use_their_own_rate():
+    from app.inference.anthropic_client import openai_shaped_usage
+    shaped = openai_shaped_usage(SimpleNamespace(input_tokens=100, output_tokens=0, cache_read_input_tokens=0,
+                                                 cache_creation_input_tokens=1000))
+    assert usage.estimate_model_usd("claude-sonnet-5-5", shaped) == pytest.approx((100 * 3 + 1000 * 3.75) / 1e6)

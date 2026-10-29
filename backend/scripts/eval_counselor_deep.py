@@ -21,6 +21,7 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 from app.config import config
+from app.inference.gateway import resolve_model
 from app.pai_c.deep.analysis import analyze_job, enqueue_turn_analysis
 from app.pai_c.deep.actions import dispatch_action
 from app.pai_c.memory import MemoryService
@@ -540,13 +541,13 @@ async def run_evaluation(*, live: bool = False, max_cost_usd: float | None = Non
     if live:
         ledger.checkpoint_path = result_dir / "live_usage_ledger.json"
     if live:
-        for model in {config.PAI_COUNSELOR_MODEL, config.PAI_ANALYST_MODEL,
-                      config.PAI_SENSITIVE_CHECK_MODEL,
-                      *({config.PAI_MIRROR_MODEL} if end_to_end else set()),
-                      config.MEMORY_EXTRACTOR_MODEL or config.PAI_MODEL,
-                      *({config.PAI_CLASSIFIER_MODEL} if policy_mode else set()),
+        for model in {resolve_model("counselor"), resolve_model("analyst"),
+                      resolve_model("sensitive"),
+                      *({resolve_model("mirror")} if end_to_end else set()),
+                      resolve_model("extractor"),
+                      *({resolve_model("classifier")} if policy_mode else set()),
                       simulator_model or config.PAI_MODEL,
-                      grader_model or config.PAI_COUNSELOR_MODEL}:
+                      grader_model or resolve_model("counselor")}:
             ledger.before_call(model)
             if ledger.prices[model].get("verify_before_live"):
                 raise ValueError(f"price verification required before live: {model}")
@@ -567,7 +568,7 @@ async def _evaluate_all(result, personas, ledger, *, live, max_turns, simulator_
         item = await evaluate_persona(
             persona, ledger, live=live, max_turns=max_turns,
             simulator_model=simulator_model or config.PAI_MODEL,
-            grader_model=grader_model or config.PAI_COUNSELOR_MODEL, end_to_end=end_to_end,
+            grader_model=grader_model or resolve_model("counselor"), end_to_end=end_to_end,
             progress_dir=result_dir if live else None, policy_mode=policy_mode)
         persona_calls = ledger.calls[persona_start:]
         item["total_cost_usd"] = round(sum(call["cost_usd"] for call in persona_calls), 8)

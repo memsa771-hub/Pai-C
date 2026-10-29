@@ -62,7 +62,7 @@ def openai_shaped_usage(usage: Any) -> SimpleNamespace | None:
     return SimpleNamespace(
         prompt_tokens=int(getattr(usage, "input_tokens", 0) or 0) + cached + written,
         completion_tokens=int(getattr(usage, "output_tokens", 0) or 0),
-        prompt_tokens_details=SimpleNamespace(cached_tokens=cached),
+        prompt_tokens_details=SimpleNamespace(cached_tokens=cached, cache_write_tokens=written),
         completion_tokens_details=SimpleNamespace(reasoning_tokens=0),
     )
 

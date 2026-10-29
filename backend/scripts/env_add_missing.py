@@ -23,6 +23,7 @@ BETA_NAMES = [
     "MEMORY_EMBEDDING_API_KEY",
     "PAI_SEMANTIC_RECALL_ENABLED=true",
     "PAI_MONTHLY_CAP_USD=100",
+    "PAI_FOUNDER_EMAILS",
 ]
 _NAME = re.compile(r"^\s*(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=")
 

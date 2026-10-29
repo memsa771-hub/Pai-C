@@ -28,24 +28,24 @@ from app.inference.anthropic_client import ProviderUnavailable, UnsupportedForPr
 logger = logging.getLogger(__name__)
 _turn_id: ContextVar[str] = ContextVar('counselor_token_turn_id', default='')
 _DEFAULT = object()
+# Each role's own model settings besides PAI_<ROLE>_MODEL (older names still
+# work). No role borrows another role's setting; an alias (`same_as` in
+# model_roles.json) also reads its target's names.
 _MODELS = {
-    'classifier': ('PAI_CLASSIFIER_MODEL', 'PAI_SAFETY_MODEL', 'PAI_ANALYST_MODEL', 'PAI_MODEL'),
-    'safety': ('PAI_SAFETY_MODEL', 'PAI_ANALYST_MODEL', 'PAI_MODEL'),
-    'counselor': ('PAI_COUNSELOR_MODEL', 'PAI_MODEL'),
-    'summarizer': ('PAI_SUMMARIZER_MODEL', 'PAI_ANALYST_MODEL', 'PAI_COUNSELOR_MODEL', 'PAI_MODEL'),
-    'analyst': ('PAI_ANALYST_MODEL', 'PAI_COUNSELOR_MODEL', 'PAI_MODEL'),
-    'mirror': ('PAI_MIRROR_MODEL', 'PAI_COUNSELOR_MODEL', 'PAI_MODEL'),
+    'classifier': ('PAI_CLASSIFIER_MODEL',),
+    'safety': ('PAI_SAFETY_MODEL',),
+    'counselor': ('PAI_COUNSELOR_MODEL',),
+    'summarizer': ('PAI_SUMMARIZER_MODEL',),
+    'analyst': ('PAI_ANALYST_MODEL',),
+    'mirror': ('PAI_MIRROR_MODEL',),
     # PAI_ROADMAP_MODEL is the older name for this setting; it still works.
-    'path_explain': ('PAI_PATH_EXPLAIN_MODEL', 'PAI_RESEARCHER_MODEL', 'PAI_ROADMAP_MODEL',
-                     'PAI_COUNSELOR_MODEL', 'PAI_MODEL'),
-    'sensitive': ('PAI_SENSITIVE_CHECK_MODEL', 'PAI_ANALYST_MODEL', 'PAI_COUNSELOR_MODEL', 'PAI_MODEL'),
-    'extractor': ('MEMORY_EXTRACTOR_MODEL', 'PAI_MODEL'),
-    'document_extractor': ('DOCUMENT_EXTRACTOR_MODEL', 'PAI_MODEL'),
+    'path_explain': ('PAI_PATH_EXPLAIN_MODEL', 'PAI_ROADMAP_MODEL'),
+    'sensitive': ('PAI_SENSITIVE_CHECK_MODEL',),
+    'extractor': ('MEMORY_EXTRACTOR_MODEL',),
+    'document_extractor': ('DOCUMENT_EXTRACTOR_MODEL',),
     'ocr': ('DOCUMENT_OCR_MODEL',),
-    'research_extract': ('PAI_RESEARCHER_MODEL', 'PAI_MODEL'),
     'researcher': ('PAI_RESEARCHER_MODEL',),
-    'operator': ('PAI_OPERATOR_MODEL', 'PAI_MODEL'),
-    'router': ('PAI_MODEL',),
+    'operator': ('PAI_OPERATOR_MODEL',),
     'embeddings': ('MEMORY_EMBEDDING_MODEL',),
 }
 _EFFORTS = {
@@ -125,7 +125,11 @@ def _provider(role: str) -> str:
 
 
 def _model(role: str, provider: str) -> str:
-    names = dict.fromkeys((f'PAI_{role.upper()}_MODEL', *_MODELS.get(role, ())))
+    """The role's own setting, else its data default; PAI_MODEL only for a role
+    the data gives no model (operator, router)."""
+    alias = model_roles()['roles'].get(role, {}).get('same_as')
+    names = dict.fromkeys((f'PAI_{role.upper()}_MODEL', *_MODELS.get(role, ()),
+                           *((f'PAI_{alias.upper()}_MODEL', *_MODELS.get(alias, ())) if alias else ())))
     for name in names:
         value = _setting(name).strip()
         if value and _fits(provider, value):
@@ -136,6 +140,8 @@ def _model(role: str, provider: str) -> str:
     default = _defaults(role).get('model') or ''
     if default and _fits(provider, default):
         return default
+    if not default and config.PAI_MODEL and _fits(provider, config.PAI_MODEL):
+        return config.PAI_MODEL
     # The role's default belongs to another provider (the provider was switched by env).
     return model_roles()['providers'][provider].get('default_model') or ''
 

@@ -60,6 +60,10 @@ async def _run_turn(db, workspace_id: str, event_data: dict, depth: int) -> None
     """Dispatch a turn, then queue learning only after a successful post."""
     posted = await _run_deep_turn(db, workspace_id, event_data, depth)
     if posted and str(event_data.get("source") or "").startswith("human:"):
+        from app.inference import usage
+        if not usage.role_allowed("counselor"):
+            # Monthly cap reached (paused): the fixed reply is all; no extraction or planner job.
+            return
         from app.pai_c.memory import MemoryService
         from app.services.pai import PAI_AGENT_NAME
 

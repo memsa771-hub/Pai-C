@@ -9,6 +9,7 @@ from sqlalchemy import select
 
 from app.pai_c.policy.classifier import fallback_signals
 from app.config import config
+from app.inference.gateway import resolve_model
 from app.pai_c import runtime
 from app.pai_c.deep.actions import dispatch_action
 from app.pai_c.deep.context import DeepContext, build_context
@@ -40,7 +41,7 @@ async def test_normal_deep_turn_uses_one_json_model_call():
         assert result.reply == "Tell me about your day?"
         assert model.await_count == 1
         assert model.call_args.kwargs["response_format"] == {"type": "json_object"}
-        assert model.call_args.kwargs["model"] == config.PAI_COUNSELOR_MODEL
+        assert model.call_args.kwargs["model"] == resolve_model("counselor")
         assert model.call_args.kwargs["reasoning_effort"] == "low"
         system_prompt = model.call_args.kwargs["system_prompt"]
         assert "<context>" in system_prompt

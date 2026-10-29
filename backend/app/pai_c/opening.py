@@ -57,7 +57,8 @@ async def opening_job(job, db):
             raw = await complete("counselor", messages=[],
                 system_prompt=load_prompt("voice") + "\n\n" + context.text + "\n\n" + instruction,
                 response_format={"type": "json_object"}, phase="opening", turn_id=job_id)
-            data = json.loads(raw)
+            from app.pai_c.deep.turn import unfence
+            data = json.loads(unfence(raw))
             reply = data.get("reply") if isinstance(data, dict) else None
             if not isinstance(reply, str) or not reply.strip() or contains_blocked_script(
                     reply, config.PAI_LANGUAGE_BLOCKED_SCRIPTS):

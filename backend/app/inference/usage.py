@@ -116,16 +116,19 @@ def model_rates(model: str) -> dict:
 
 
 def estimate_model_usd(model: str, usage) -> float:
-    """OpenAI-shaped usage (the Anthropic transport reshapes its own): cached
-    input is billed at its own rate, the rest of the input at the input rate."""
+    """OpenAI-shaped usage (the Anthropic transport reshapes its own): cache
+    reads and cache writes are billed at their own rates (a model without a
+    cache_write rate pays the input rate), the rest of the input at the input rate."""
     if usage is None:
         return 0.0
+    details = getattr(usage, "prompt_tokens_details", None)
     prompt = int(getattr(usage, "prompt_tokens", 0) or 0)
-    cached = int(getattr(getattr(usage, "prompt_tokens_details", None), "cached_tokens", 0) or 0)
+    cached = int(getattr(details, "cached_tokens", 0) or 0)
+    written = int(getattr(details, "cache_write_tokens", 0) or 0)
     output = int(getattr(usage, "completion_tokens", 0) or 0)
     rates = model_rates(model)
-    return (max(0, prompt - cached) * rates["input"] + cached * rates["cached_input"]
-            + output * rates["output"]) / 1_000_000
+    return (max(0, prompt - cached - written) * rates["input"] + cached * rates["cached_input"]
+            + written * rates.get("cache_write", rates["input"]) + output * rates["output"]) / 1_000_000
 
 
 def record_model_call(role: str, model: str, usage) -> None:

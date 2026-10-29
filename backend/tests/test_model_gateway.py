@@ -29,23 +29,41 @@ def test_role_resolves_configured_model(role, setting):
         assert gateway.resolve_model(role) == 'configured-model'
 
 
-@pytest.mark.parametrize('role,fallback', [
-    ('counselor', 'PAI_MODEL'), ('analyst', 'PAI_COUNSELOR_MODEL'),
-    ('mirror', 'PAI_COUNSELOR_MODEL'), ('path_explain', 'PAI_ROADMAP_MODEL'),
-    ('sensitive', 'PAI_ANALYST_MODEL'), ('extractor', 'PAI_MODEL'),
-    ('document_extractor', 'PAI_MODEL'), ('operator', 'PAI_MODEL'),
+@pytest.mark.parametrize('role,default', [
+    ('classifier', 'gpt-5-mini'), ('safety', 'gpt-5-mini'), ('summarizer', 'gpt-5-mini'),
+    ('sensitive', 'gpt-5-mini'), ('extractor', 'gpt-5-mini'), ('document_extractor', 'gpt-5-mini'),
+    ('analyst', 'gpt-5'), ('mirror', 'gpt-5'), ('path_explain', 'gpt-5'), ('research_extract', 'gpt-5'),
 ])
-def test_role_keeps_existing_empty_setting_fallback(role, fallback):
-    with patch.object(config, MODELS[role], ''), patch.object(config, fallback, 'fallback-model'), \
-            patch.object(config, 'PAI_RESEARCHER_MODEL', ''):
+def test_empty_role_setting_takes_the_data_default_never_another_role(role, default):
+    # Other roles' settings and PAI_MODEL are set; none of them is borrowed.
+    own = gateway._MODELS.get(role, ('PAI_RESEARCHER_MODEL',))[0]
+    others = {'PAI_ANALYST_MODEL': 'gpt-x', 'PAI_COUNSELOR_MODEL': 'gpt-y', 'PAI_MODEL': 'gpt-z'}
+    with patch.multiple(config, **{name: value for name, value in others.items() if name != own}), \
+            patch.object(config, own, ''), patch.object(config, 'PAI_RESEARCHER_MODEL', ''), \
+            patch.object(config, 'PAI_ROADMAP_MODEL', ''):
+        assert gateway.resolve_model(role) == default
+
+
+def test_path_explain_keeps_its_older_setting_name():
+    with patch.object(config, 'PAI_PATH_EXPLAIN_MODEL', ''), patch.object(config, 'PAI_ROADMAP_MODEL', 'roadmap-model'):
+        assert gateway.resolve_model('path_explain') == 'roadmap-model'
+
+
+@pytest.mark.parametrize('role', ['operator', 'router'])
+def test_pai_model_is_the_fallback_only_for_roles_without_a_data_model(role):
+    with patch.object(config, 'PAI_OPERATOR_MODEL', ''), patch.object(config, 'PAI_MODEL', 'fallback-model'):
         assert gateway.resolve_model(role) == 'fallback-model'
 
 
-def test_path_explain_falls_back_to_counselor_when_both_settings_are_empty():
-    with patch.object(config, 'PAI_PATH_EXPLAIN_MODEL', ''), patch.object(config, 'PAI_ROADMAP_MODEL', ''), \
-            patch.object(config, 'PAI_RESEARCHER_MODEL', ''), \
-            patch.object(config, 'PAI_COUNSELOR_MODEL', 'counselor-model'):
-        assert gateway.resolve_model('path_explain') == 'counselor-model'
+def test_analyst_override_never_changes_per_turn_roles():
+    with patch.object(config, 'PAI_ANALYST_MODEL', 'gpt-5'), patch.object(config, 'PAI_COUNSELOR_MODEL', 'gpt-6-sol'), \
+            patch.object(config, 'PAI_SAFETY_MODEL', ''), patch.object(config, 'PAI_CLASSIFIER_MODEL', ''), \
+            patch.object(config, 'PAI_SUMMARIZER_MODEL', ''), patch.object(config, 'PAI_SENSITIVE_CHECK_MODEL', ''):
+        assert gateway.resolve_model('analyst') == 'gpt-5'
+        for role in ('safety', 'classifier', 'summarizer', 'sensitive'):
+            assert gateway.resolve_model(role) == 'gpt-5-mini', role
+    with patch.object(config, 'PAI_SAFETY_MODEL', 'safety-model'):
+        assert gateway.resolve_model('safety') == 'safety-model'
 
 
 def test_ocr_keeps_existing_empty_setting_fallback():

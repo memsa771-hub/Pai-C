@@ -136,7 +136,7 @@ async def test_safety_input_is_text_only_and_last_four_messages():
     assert data=={"recent_turns":[{"role":"user","text":str(i)} for i in range(6,10)],"student_message":"current"}
 
 
-@pytest.mark.parametrize("safety,analyst,expected", [("s","a","s"),("","a","a"),("","","p")])
+@pytest.mark.parametrize("safety,analyst,expected", [("s","a","s"),("","a","gpt-5-mini"),("","","gpt-5-mini")])
 def test_safety_model_chain(safety,analyst,expected):
     with patch.object(config,"PAI_SAFETY_MODEL",safety), patch.object(config,"PAI_ANALYST_MODEL",analyst), \
             patch.object(config,"PAI_MODEL","p"):

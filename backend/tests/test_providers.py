@@ -50,9 +50,9 @@ def test_role_resolution_from_data_and_env():
             assert gateway.resolve_role("researcher").model == "gpt-6"
             assert gateway.resolve_role("research_extract").model == "gpt-6"
             assert gateway.resolve_role("path_explain").model == "gpt-6"
-        # An OpenAI role never runs a Claude model inherited from another setting.
+        # An OpenAI role never runs a Claude model; it takes its data default.
         analyst = gateway.resolve_role("analyst")
-        assert (analyst.provider, analyst.model) == ("openai", "gpt-5.4-mini")
+        assert (analyst.provider, analyst.model) == ("openai", "gpt-5")
         # PAI_<ROLE>_PROVIDER from the environment switches any role.
         with patch.dict(os.environ, {"PAI_MIRROR_PROVIDER": "anthropic"}), \
                 patch.object(config, "PAI_MIRROR_MODEL", "gpt-5"):
@@ -114,6 +114,8 @@ async def test_tools_are_unsupported_for_anthropic():
             await gateway.complete("counselor", [], tools=[{"type": "function"}])
         with pytest.raises(gateway.UnsupportedForProvider):
             gateway.get_client("counselor")
+        with pytest.raises(gateway.UnsupportedForProvider):
+            gateway.complete_sync("counselor", [])
     constructor.assert_not_called()
 
 
@@ -158,9 +160,9 @@ async def test_anthropic_failure_falls_back(caplog):
 def test_env_script_adds_only_missing_names(tmp_path, capsys):
     env = tmp_path / ".env"
     env.write_bytes(b"PAI_API_KEY=very-secret-value\r\nexport PAI_COUNSELOR_MODEL=gpt-x\r\n# ANTHROPIC_API_KEY=old")
-    added = env_add_missing.main(["--env", str(env), "ANTHROPIC_API_KEY", "PAI_COUNSELOR_MODEL=claude-sonnet-5-5",
+    exit_code = env_add_missing.main(["--env", str(env), "ANTHROPIC_API_KEY", "PAI_COUNSELOR_MODEL=claude-sonnet-5-5",
                                   "PAI_COUNSELOR_PROVIDER=anthropic", "PAI_API_KEY"])
-    assert added == 0
+    assert exit_code == 0
     text = env.read_bytes().decode("utf-8")
     assert text.startswith("PAI_API_KEY=very-secret-value\r\nexport PAI_COUNSELOR_MODEL=gpt-x\r\n# ANTHROPIC_API_KEY=old\n")
     assert text.endswith("ANTHROPIC_API_KEY=\nPAI_COUNSELOR_PROVIDER=anthropic\n")

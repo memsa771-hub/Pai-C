@@ -168,12 +168,14 @@ class Config:
     # screen of all 23 models: ~7s/2-turn loop, 4/4 valid reps, all quality
     # probes passed; deepseek-4-flash had degraded to >40s continuation turns).
     PAI_MODEL: str = os.environ.get("PAI_MODEL", "gpt-5.4-mini")
-    PAI_COUNSELOR_MODEL: str = os.environ.get("PAI_COUNSELOR_MODEL", "") or PAI_MODEL
-    PAI_ANALYST_MODEL: str = os.environ.get("PAI_ANALYST_MODEL", "") or PAI_COUNSELOR_MODEL
-    PAI_SAFETY_MODEL: str = os.environ.get("PAI_SAFETY_MODEL", "") or PAI_ANALYST_MODEL or PAI_MODEL
+    # Role model settings hold only what the environment says (no cascade from
+    # one role to another): the gateway falls back to model_roles.json.
+    PAI_COUNSELOR_MODEL: str = os.environ.get("PAI_COUNSELOR_MODEL", "")
+    PAI_ANALYST_MODEL: str = os.environ.get("PAI_ANALYST_MODEL", "")
+    PAI_SAFETY_MODEL: str = os.environ.get("PAI_SAFETY_MODEL", "")
     PAI_SAFETY_REASONING_EFFORT: str = os.environ.get("PAI_SAFETY_REASONING_EFFORT", "low")
     PAI_SAFETY_TIMEOUT_MS: int = int(os.environ.get("PAI_SAFETY_TIMEOUT_MS", "3000"))
-    PAI_CLASSIFIER_MODEL: str = os.environ.get("PAI_CLASSIFIER_MODEL", "") or PAI_SAFETY_MODEL or PAI_ANALYST_MODEL or PAI_MODEL
+    PAI_CLASSIFIER_MODEL: str = os.environ.get("PAI_CLASSIFIER_MODEL", "")
     PAI_CLASSIFIER_REASONING_EFFORT: str = os.environ.get("PAI_CLASSIFIER_REASONING_EFFORT", "low")
     PAI_CLASSIFIER_TIMEOUT_MS: int = int(os.environ.get("PAI_CLASSIFIER_TIMEOUT_MS", "8000"))
     PAI_SUMMARY_EVERY_TURNS: int = int(os.environ.get("PAI_SUMMARY_EVERY_TURNS", "4"))
@@ -188,18 +190,18 @@ class Config:
         "PAI_WELLBEING_FALLBACK_REPLY",
         "I'm sorry you're going through this. Please reach out to someone you trust. "
         "If you are in immediate danger, contact local emergency services.")
-    PAI_MIRROR_MODEL: str = os.environ.get("PAI_MIRROR_MODEL", "") or PAI_COUNSELOR_MODEL
+    PAI_MIRROR_MODEL: str = os.environ.get("PAI_MIRROR_MODEL", "")
     PAI_PATH_EXPLAIN_MODEL: str = os.environ.get("PAI_PATH_EXPLAIN_MODEL", "")
-    PAI_ROADMAP_MODEL: str = os.environ.get("PAI_ROADMAP_MODEL", "") or PAI_COUNSELOR_MODEL
+    PAI_ROADMAP_MODEL: str = os.environ.get("PAI_ROADMAP_MODEL", "")
     PAI_RESEARCH_MAX_CALLS_PER_STUDENT: int = int(os.environ.get("PAI_RESEARCH_MAX_CALLS_PER_STUDENT", "40"))
     PAI_RESEARCH_REFRESH_MAX_CALLS: int = int(os.environ.get("PAI_RESEARCH_REFRESH_MAX_CALLS", "8"))
     # Path analysis runs that reach the model, per workspace and UTC day. Quiet
     # (Vault, planner) runs over it are skipped; a run that answers a chat ask still runs.
     PAI_PATH_ANALYSIS_MAX_PER_DAY: int = int(os.environ.get("PAI_PATH_ANALYSIS_MAX_PER_DAY", "20"))
-    PAI_SENSITIVE_CHECK_MODEL: str = os.environ.get("PAI_SENSITIVE_CHECK_MODEL", "") or PAI_ANALYST_MODEL
+    PAI_SENSITIVE_CHECK_MODEL: str = os.environ.get("PAI_SENSITIVE_CHECK_MODEL", "")
     PAI_SEMANTIC_RECALL_ENABLED: bool = os.environ.get("PAI_SEMANTIC_RECALL_ENABLED", "true").lower() == "true"
     PAI_SEMANTIC_RECALL_TOP_K: int = int(os.environ.get("PAI_SEMANTIC_RECALL_TOP_K", "5"))
-    PAI_SUMMARIZER_MODEL: str = os.environ.get("PAI_SUMMARIZER_MODEL", "") or PAI_ANALYST_MODEL
+    PAI_SUMMARIZER_MODEL: str = os.environ.get("PAI_SUMMARIZER_MODEL", "")
     PAI_SESSION_GAP_MINUTES: int = int(os.environ.get("PAI_SESSION_GAP_MINUTES", "30"))
     PAI_SESSION_SWEEP_SECONDS: int = int(os.environ.get("PAI_SESSION_SWEEP_SECONDS", "300"))
     PAI_REPEAT_QUESTION_WINDOW: int = int(os.environ.get("PAI_REPEAT_QUESTION_WINDOW", "5"))

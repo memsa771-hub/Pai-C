@@ -30,6 +30,11 @@ class DeepTurnResult:
     guard_violations: list[str] = field(default_factory=list)
 
 
+def unfence(raw: str) -> str:
+    """Drop a Markdown code fence some models put around JSON."""
+    return re.sub(r"^\s*```(?:json)?\s*|\s*```\s*$", "", raw, flags=re.IGNORECASE).strip()
+
+
 def _parse_response(raw: str, *, violations=None) -> tuple[str, dict, list[str]]:
     def valid(text: str) -> tuple[str, dict, list[str]] | None:
         try:
@@ -47,8 +52,7 @@ def _parse_response(raw: str, *, violations=None) -> tuple[str, dict, list[str]]
     first = valid(raw)
     if first is not None:
         return first
-    unfenced = re.sub(r"^\s*```(?:json)?\s*|\s*```\s*$", "", raw, flags=re.IGNORECASE).strip()
-    second = valid(unfenced)
+    second = valid(unfence(raw))
     if second is not None:
         return second
     if violations is not None and "invalid_json_fallback" not in violations:

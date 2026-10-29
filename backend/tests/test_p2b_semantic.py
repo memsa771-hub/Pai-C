@@ -115,7 +115,7 @@ def test_recall_only_called_by_analyst():
 def test_summarizer_role_fallback_and_reasoning():
     from app.inference.gateway import resolve_model, reasoning_effort
     with patch.object(config, "PAI_SUMMARIZER_MODEL", ""), patch.object(config, "PAI_ANALYST_MODEL", "fake-model"), patch.object(config, "PAI_ANALYST_REASONING_EFFORT", "medium"):
-        assert resolve_model("summarizer") == "fake-model"
+        assert resolve_model("summarizer") == "gpt-5-mini"  # its data default, never the analyst setting
         assert reasoning_effort("summarizer") == "medium"
 
 

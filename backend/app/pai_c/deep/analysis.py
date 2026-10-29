@@ -302,6 +302,11 @@ async def analyze_job(job, db) -> dict:
     """Retryable worker handler. A bad analysis never runs in the reply path."""
     if not job.workspace_id:
         raise ValueError("analysis job requires a workspace")
+    from app.inference import usage
+    if not usage.role_allowed("analyst"):
+        # Monthly model cap (research_paused stage): a quiet skip, logged once a
+        # day. The job completes, so later turns' analyses are not held behind it.
+        return {"status": "cap_paused"}
     payload = job.payload or {}
     user_event_id = payload.get("user_event_id")
     assistant_event_id = payload.get("assistant_event_id")
