@@ -20,7 +20,7 @@ export const fill = (template: string, values: Record<string, unknown>) =>
 type Question = { question: string; topic: string };
 const questionOf = (unknown: MirrorUnknown): Question =>
   (unknown.question_key && (t.questions as Record<string, Question>)[unknown.question_key]) ||
-  { question: unknown.label, topic: fill(t.topicFallback, { label: unknown.label.toLowerCase() }) };
+  { question: unknown.label, topic: fill(t.topicFallback, { label: unknown.label }) };
 /** The chat draft "Tell PAI" opens with. */
 export const topicOf = (unknown: MirrorUnknown) => questionOf(unknown).topic;
 
@@ -141,7 +141,7 @@ export function AreaTile({ area, onWrong }: { area: MirrorArea; onWrong: (ref: s
               <span aria-hidden>·</span>
               <span className="min-w-0 max-w-full truncate">{entry.source_label}</span>
               <button type="button" onClick={() => onWrong(entry.id)} aria-label={fill(t.wrongLabel, { text: entry.text })}
-                className="ms-auto inline-flex min-h-8 items-center rounded-full px-2 font-semibold text-primary hover:bg-accent hover:underline">
+                className="-my-2 ms-auto inline-flex min-h-11 items-center rounded-full px-2 font-semibold text-primary hover:bg-accent hover:underline">
                 {t.wrong}
               </button>
             </div>
@@ -154,7 +154,7 @@ export function AreaTile({ area, onWrong }: { area: MirrorArea; onWrong: (ref: s
 
 function TellPai({ unknown, onTell, variant = "soft" }: { unknown: MirrorUnknown; onTell: (u: MirrorUnknown) => void; variant?: "soft" | "primary" }) {
   return (
-    <Button size="sm" variant={variant} className="mt-2" onClick={() => onTell(unknown)}
+    <Button size="tap" variant={variant} className="mt-2 min-h-11 px-4" onClick={() => onTell(unknown)}
       aria-label={fill(t.tellPaiLabel, { label: unknown.label })}>
       <MessageCircle aria-hidden />{t.tellPai}
     </Button>

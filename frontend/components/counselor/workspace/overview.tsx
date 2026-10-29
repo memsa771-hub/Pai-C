@@ -53,7 +53,7 @@ function MirrorSummary({ picture, onOpen }: { picture: LivingPicture["picture"];
       <p className="mt-2 text-xs font-semibold text-primary">
         {unknowns ? fill(unknowns === 1 ? text.mirrorUnknowns.one : text.mirrorUnknowns.other, { count: unknowns }) : text.mirrorAllKnown}
       </p>
-      <button onClick={onOpen} className="mt-auto inline-flex min-h-8 items-center gap-1 pt-2 text-xs font-semibold text-primary hover:underline">
+      <button onClick={onOpen} className="mt-auto inline-flex min-h-11 items-center gap-1 self-start text-xs font-semibold text-primary hover:underline">
         {text.mirrorOpen}<ArrowRight aria-hidden className="size-3.5" />
       </button>
     </section>

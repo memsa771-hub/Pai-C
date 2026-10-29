@@ -47,7 +47,7 @@ export function StepMeta({ step, time, showStatus = true }: { step: RouteStep; t
       {when && <span className="inline-flex items-center gap-1"><CalendarClock aria-hidden className="size-3.5 shrink-0" /><span>{when}</span></span>}
       {step.rule?.source && (
         <a href={step.rule.source} target="_blank" rel="noopener noreferrer" aria-label={fill(t.steps.ruleLabel, { host: host(step.rule.source) })}
-          className="inline-flex min-h-6 min-w-0 max-w-full items-center gap-1 font-medium text-primary hover:underline">
+          className="-my-3 inline-flex min-h-11 min-w-0 max-w-full items-center gap-1 font-medium text-primary hover:underline">
           <span className="shrink-0">{t.steps.rule}</span><span aria-hidden>·</span>
           <span className="truncate">{host(step.rule.source)}</span><ExternalLink aria-hidden className="size-3 shrink-0" />
         </a>

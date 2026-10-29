@@ -14,11 +14,11 @@ export function MirrorLink({ header }: { header?: MirrorHeader | null }) {
       <span aria-hidden className="flex size-10 shrink-0 items-center justify-center rounded-full bg-brand-soft text-primary">
         <Sparkles className="size-5" />
       </span>
-      <span className="min-w-0 flex-1">
+      <span className="min-w-0 flex-1 basis-48">
         <span className="block text-[11px] font-semibold uppercase tracking-wide text-primary">{copy.mirror.title}</span>
-        {line && <span className="block break-words text-sm font-semibold">{line}</span>}
+        {line && <span className="block text-pretty text-sm font-semibold">{line}</span>}
       </span>
-      <Button size="sm" variant="soft" onClick={() => openWorkspaceView('mirror')}>
+      <Button size="tap" variant="soft" onClick={() => openWorkspaceView('mirror')}>
         {copy.mirror.chatOpen}<ArrowRight aria-hidden />
       </Button>
     </div>

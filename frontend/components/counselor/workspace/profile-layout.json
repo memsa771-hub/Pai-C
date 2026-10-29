@@ -51,17 +51,7 @@
     "scholarship_name"
   ],
   "copy": {
-    "feltUnderstood": "Did you feel understood?",
-    "feltUnderstoodValue": "You felt understood: {value} of 5",
-    "feltScale": [
-      "Not at all",
-      "A little",
-      "Somewhat",
-      "Mostly",
-      "Completely"
-    ],
     "sendRating": "Send",
-    "ratingSaved": "Thank you. PAI will use this to do better.",
     "heatmapTitle": "What PAI understands so far",
     "certaintyTitle": "Your certainty over time",
     "certaintyEmpty": "When you rate how sure you feel, it will show up here.",

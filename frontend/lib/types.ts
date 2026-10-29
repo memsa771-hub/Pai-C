@@ -426,6 +426,9 @@ export function eventToMessage(event: ONMEvent): WorkspaceMessage {
       ...(payload.fact_card ? { fact_card: payload.fact_card } : {}),
       ...(payload.attachments ? { attachments: payload.attachments } : {}),
       ...(payload.todos ? { todos: payload.todos } : {}),
+      // The Mirror chat card (backend deep/actions.py) rides in the payload.
+      ...(payload.message_type === 'counselor_mirror'
+        ? { header: payload.header, unknowns: payload.unknowns, text: payload.text, version: payload.version } : {}),
     },
     createdAt: new Date(event.timestamp).toISOString(),
   };

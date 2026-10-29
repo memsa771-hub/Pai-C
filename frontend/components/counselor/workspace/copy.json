@@ -768,7 +768,7 @@
     "unknownIntro": "Each answer makes your picture clearer.",
     "tellPai": "Tell PAI",
     "tellPaiLabel": "Tell PAI about {label}",
-    "topicFallback": "I want to tell you about {label}.",
+    "topicFallback": "I want to tell you about this: {label}.",
     "allKnown": "Every area has something. Tell PAI when things change.",
     "emptyTitle": "PAI needs a little more to draw your picture",
     "emptyBody": "Start with this one:",

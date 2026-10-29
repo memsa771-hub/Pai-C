@@ -5,11 +5,19 @@ import { it, expect, vi, afterEach, beforeEach } from "vitest";
 import { render, screen, fireEvent, cleanup, within } from "@testing-library/react";
 import { Mirror } from "./mirror";
 import { MirrorLink } from "../mirror-link";
+import { ChatMessage } from "@/components/chat/chat-message";
+import { I18nProvider } from "@/lib/i18n";
+import { eventToMessage, type ONMEvent } from "@/lib/types";
+import { Overview } from "./overview";
+import { journeyProgress, type JourneySignals } from "./use-journey";
+import { picture } from "@/tests/fixtures/counselor";
 import { workspaceApi } from "@/lib/api";
 import { mirrorCard, mirrorEmpty } from "@/tests/fixtures/counselor";
 import copy from "./copy.json";
 
-vi.mock("@/lib/api", () => ({ workspaceApi: { getMirror: vi.fn() } }));
+vi.mock("@/lib/api", () => ({ workspaceApi: { getMirror: vi.fn(), getVault: vi.fn(() => new Promise(() => {})) } }));
+vi.mock("@/lib/workspace-context", () => ({ useWorkspace: () => ({ currentUser: { id: "student", name: "Sam" }, setSelectedFileId: vi.fn() }) }));
+vi.mock("@/components/layout/layout-context", () => ({ useLayout: () => ({ setViewMode: vi.fn() }) }));
 afterEach(() => { cleanup(); vi.clearAllMocks(); window.history.replaceState({}, "", "/student"); });
 beforeEach(() => { vi.mocked(workspaceApi.getMirror).mockResolvedValue(structuredClone(mirrorCard)); });
 
@@ -43,10 +51,10 @@ it("shows each known area with a level bar, its entries, badges and sources", as
 
 it("marks a tension on both areas, with both sides, and resolves nothing", async () => {
   render(<Mirror onChat={vi.fn()} />);
-  const note = mirrorCard.areas[1].tension.length && copy.mirror.templates["tension.family_vs_goal"];
+  const note = copy.mirror.templates["tension.family_vs_goal"];
   for (const label of ["Family", "Goals & whose wish"]) {
     const area = await tile(label);
-    expect(within(area).getByText(note as string)).toBeTruthy();
+    expect(within(area).getByText(note)).toBeTruthy();
   }
   // Each side's entry carries the marker.
   expect(screen.getByText("Mother, wishes MBBS").closest("li")!.querySelector("[data-tension]")).toBeTruthy();
@@ -137,6 +145,44 @@ it("imports none of the removed Mirror components", () => {
     }
   };
   for (const dir of ["app", "components", "lib", "tests"]) walk(join(root, dir));
-  const removed = /counselor-mirror-card|lib\/counselor-mirror\b|\bMirrorPanel\b|\bFeltUnderstood\b|getCounselorSummary|counselorMirror\./;
+  const removed = /counselor-mirror-card|lib\/counselor-mirror\b|\bMirrorPanel\b|\bFeltUnderstood\b|getCounselorSummary|counselorMirror\.|feltUnderstood|feltScale|ratingSaved/;
   expect(files.filter((file) => removed.test(readFileSync(file, "utf8")))).toEqual([]);
+});
+
+it("shows the chat Mirror card from the raw event the backend posts (payload, not metadata)", () => {
+  // As deep/actions.py _post_mirror_card posts it: the card rides in the payload.
+  const event: ONMEvent = {
+    id: "ev-mirror", type: "thread.channel.message", source: "openagents:pai", target: "channel/pai-counselor",
+    payload: { content: mirrorCard.text!.sentences.join(" "), message_type: "counselor_mirror", sender_name: "PAI Counselor",
+      header: mirrorCard.header, unknowns: mirrorCard.unknowns, text: mirrorCard.text, version: mirrorCard.version },
+    metadata: { mirror_card_version: mirrorCard.version }, timestamp: Date.parse("2026-10-28T09:00:00Z"), visibility: "private",
+  };
+  const message = eventToMessage(event);
+  expect(message.metadata).toMatchObject({ header: mirrorCard.header, unknowns: mirrorCard.unknowns, text: mirrorCard.text, version: "v1" });
+  render(<I18nProvider><ChatMessage message={message} /></I18nProvider>);
+  expect(screen.getByText("Sam Taylor · FSc Pre-Engineering, 78%")).toBeTruthy();
+  expect(screen.getByRole("button", { name: "Open your Mirror" })).toBeTruthy();
+});
+
+it("keeps other messages free of Mirror fields", () => {
+  const message = eventToMessage({ id: "e", type: "thread.channel.message", source: "openagents:pai", target: "channel/pai-counselor",
+    payload: { content: "Hello", header: { name: "x" } }, metadata: {}, timestamp: 0, visibility: "private" });
+  expect(message.metadata).not.toHaveProperty("header");
+});
+
+it("gives every Mirror action a 44px target", async () => {
+  const tap = /\b(?:min-h-11|size-11)\b/;
+  render(<Mirror onChat={vi.fn()} />);
+  await tile("Interests");
+  const controls = [...screen.getAllByRole("button", { name: /^Tell PAI about / }), ...screen.getAllByRole("button", { name: /^This is wrong: / })];
+  expect(controls.length).toBeGreaterThan(5);
+  for (const control of controls) expect(control.className).toMatch(tap);
+  cleanup();
+  render(<MirrorLink header={mirrorCard.header} />);
+  expect(screen.getByRole("button", { name: "Open your Mirror" }).className).toMatch(tap);
+  cleanup();
+  const data = { picture, possibilities: [], placesSearched: false, roadmap: null } as JourneySignals;
+  render(<Overview journey={{ data, error: false, busy: false, refresh: vi.fn(), progress: journeyProgress(data) }}
+    navigate={vi.fn()} openPath={vi.fn()} onChat={vi.fn()} />);
+  expect(within(screen.getByRole("region", { name: "Your Mirror" })).getByRole("button", { name: "Open your Mirror" }).className).toMatch(tap);
 });

@@ -78,6 +78,7 @@ it("opens a route sheet: every step with its colour, evidence, rule and time", a
   const rule = within(steps[0]).getByRole("link", { name: /pec\.org\.pk/ });
   expect(rule.getAttribute("href")).toBe("https://www.pec.org.pk/regulations.pdf");
   expect(rule.getAttribute("rel")).toContain("noopener");
+  expect(rule.className).toMatch(/\bmin-h-11\b/); // a 44px target, even when it looks small
   // When: the step's own month, then the entry and the total.
   expect(within(steps[1]).getByText("May 2027")).toBeTruthy();
   expect(within(steps[3]).getByText("June 2027")).toBeTruthy();
