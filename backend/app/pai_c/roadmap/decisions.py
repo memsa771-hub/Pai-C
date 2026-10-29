@@ -14,7 +14,7 @@ from sqlalchemy import select
 from app.models import RouteDecision, StudentJourney, Workspace
 from app.pai_c.possibilities import PossibilityService
 from app.pai_c.roadmap.engine import RoadmapEngine
-from app.pai_c.roadmap.steps import step_key_of_legacy
+from app.pai_c.roadmap.steps import is_tickable, step_key_of_legacy
 
 CHOOSABLE = {"open", "step"}
 REFUSALS = {"not_open": "This field is not open from your education, so it cannot be chosen",
@@ -198,7 +198,10 @@ class RouteDecisionService:
         row = self._active_or_404(workspace_id)
         page = RoadmapEngine(self.db).build(workspace_id)
         card = next((card for card in page["fields"] if card["field_key"] == row.field_key), None)
-        steps = card["steps"] if card else list(row.steps or [])
+        # The field card is gone (the route is stale): its stored steps carry no
+        # `tickable`, so the same rule is read from them rather than refusing
+        # every tick.
+        steps = card["steps"] if card else [{**step, "tickable": is_tickable(step)} for step in row.steps or []]
         keys = [step["key"] for step in steps]
         if key is None and index is not None and 0 <= index < len(keys):
             key = keys[index]

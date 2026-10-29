@@ -30,7 +30,14 @@ export function signalMet(signal: string, data: JourneySignals): boolean {
   // The Roadmap page: a route the student chose, then a first step ticked.
   // Cards alone reach nothing: they exist as soon as paths do.
   if (signal === "route_chosen") return !!data.roadmap?.chosen;
-  if (signal === "route_step_done") return !!data.roadmap?.chosen?.steps_done?.length;
+  // Only a tick the page honours counts: on a step the student may tick, or
+  // one now done. A legacy stored tick on a step the Vault speaks for (shown
+  // as not done) is not progress.
+  if (signal === "route_step_done") {
+    const chosen = data.roadmap?.chosen;
+    const ticks = new Set(chosen?.steps_done || []);
+    return !!chosen?.steps.some((step) => ticks.has(step.key) && (step.tickable || step.status === "done"));
+  }
   return false;
 }
 

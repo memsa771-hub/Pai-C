@@ -292,8 +292,8 @@ export function CompareDialog({ cards, open, onOpenChange }: {
 }
 
 /** The chosen route: its coloured steps (green from the Vault, or ticked by
- * the student where a tick is allowed: applying, and a step not yet done),
- * progress by status, the time to entry, "Change route" behind one confirm,
+ * the student only where the backend marks the step tickable: a tickable kind
+ * the Vault is silent on, with no evidence behind it), progress by status, the time to entry, "Change route" behind one confirm,
  * and family-talk preparation (the backend reads the chosen path). A tick is
  * saved at once and undone if the save fails. */
 export function YourRoute({ route, onWithdrawn, onTicked, onChat }: {

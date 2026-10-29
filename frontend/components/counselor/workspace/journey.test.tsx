@@ -23,3 +23,15 @@ it('keeps a failed load retryable',async()=>{
   render(<Journey navigate={vi.fn()}/>);expect(await screen.findByRole('alert')).toBeTruthy();
   expect(screen.getByRole('button',{name:'Try again'})).toBeTruthy();
 });
+it('audit #13: each stage is read once, by its label, never its letters twice',async()=>{
+  vi.mocked(workspaceApi.getCounselorWorkspace).mockResolvedValue(picture);
+  render(<Journey navigate={vi.fn()}/>);
+  await screen.findByRole('heading',{name:'Stages A to K'});
+  for(const li of screen.getAllByRole('listitem')){
+    const button=li.querySelector('button')!;
+    expect(button.getAttribute('aria-label')).toMatch(/^Stage [A-K]: /);
+    // Every visible letter inside the button is hidden from screen readers.
+    for(const span of Array.from(button.querySelectorAll(':scope > span')))
+      expect(span.getAttribute('aria-hidden')).toBe('true');
+  }
+});

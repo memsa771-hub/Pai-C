@@ -30,7 +30,7 @@ from app.models import BackgroundJob, EventRecord, Workspace
 from app.pai_c.deep.analysis import _workspace_lock
 from app.pai_c.deep.context import _json
 from app.pai_c.deep.prompts import load_prompt
-from app.pai_c.memory import MemoryService, vault_catalog
+from app.pai_c.memory import RECORD_SPECS, MemoryService, display_text, result_text as _result_text, vault_catalog
 from app.pai_c.paths.fields import Candidate, candidate_fields, current_education, read_education, study_fields
 from app.pai_c.planner.view import build_planner_view
 from app.pai_c.policy.controller import load_data
@@ -86,7 +86,7 @@ def _evidence_index(db, workspace_id: str, notebook) -> dict[str, str]:
     for card in MemoryService(db).profile_cards(workspace_id):
         # The stored value, in the workspace language; the raw quote stays
         # backend evidence and is never shown on a path.
-        index[card["id"]] = _card_text(card.get("value"), card.get("kind"))[:300]
+        index[card["id"]] = _card_text(card.get("value"), card.get("kind"), card.get("key"))[:300]
     return index
 
 
@@ -107,6 +107,8 @@ def _education_text(value: dict) -> str:
             continue
         if key == "academic_status":
             parts.append(rules["education_status_labels"].get(node, ""))
+        elif key == "result" and isinstance(node, dict):
+            parts.append(_result_text(node))
         elif key == "details" and isinstance(node, dict):
             parts.extend(word(f"{level}_subjects", str(s)) for s in node.get("subjects") or [])
         elif isinstance(node, str):
@@ -116,9 +118,18 @@ def _education_text(value: dict) -> str:
     return ", ".join(part for part in parts if part and part.strip())
 
 
-def _card_text(value, kind: str | None = None) -> str:
+# Record kinds outside the catalog that still read as the Vault page shows them.
+_DISPLAYED_RECORDS = frozenset(RECORD_SPECS)
+
+
+def _card_text(value, kind: str | None = None, key: str | None = None) -> str:
+    """Evidence words for a profile card. With its catalog key, a card reads
+    exactly as the Vault page shows it (labels, "470/550 (85%)", a budget
+    band), never as "pre_engineering, current" or "600000"."""
     if kind == "education" and isinstance(value, dict):
         return _education_text(value)
+    if (key and vault_catalog().type(key) is not None) or kind in _DISPLAYED_RECORDS:
+        return display_text(key or kind, value)
     if isinstance(value, dict):
         return ", ".join(str(item) for item in value.values() if isinstance(item, (str, int, float)) and str(item).strip())
     return str(value)
@@ -153,7 +164,7 @@ def _recall_query(fields: list[dict], records: list[dict]) -> str:
     """What the student could study and what they want: the candidate field
     titles and the Vault entries of the types `recall_query_types` names."""
     types = set(policy().get("recall_query_types", ()))
-    wanted = [_card_text(card["value"], card["kind"]) for card in records if card["key"] in types]
+    wanted = [_card_text(card["value"], card["kind"], card["key"]) for card in records if card["key"] in types]
     # What the student wants leads, so a long candidate list does not drown it.
     return "; ".join(part for part in [*wanted, *(field["title"] for field in fields)] if part)
 

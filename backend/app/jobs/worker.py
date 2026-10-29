@@ -136,7 +136,8 @@ async def _process_one(job_id: str, worker: str) -> bool:
             # Re-fetch: the rollback detached whatever we had.
             job = service.get(job_id)
             if job is not None and job.locked_by == worker:
-                service.fail(job, f"{type(exc).__name__}: {exc}")
+                # A handler error that says retrying cannot help fails at once.
+                service.fail(job, f"{type(exc).__name__}: {exc}", retry=getattr(exc, "retryable", True))
                 db.commit()
             logger.exception("job failed id=%s type=%s", job_id, getattr(job, "job_type", "?"))
             return False

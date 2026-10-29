@@ -88,6 +88,68 @@ class NormalizeResult:
     source_language: str
     needs_confirmation: bool = False
     rejected_reason: Optional[str] = None
+    # The student's own words name it (a family member they mention): it is
+    # Stated whatever the extractor guessed (audit #5).
+    stated: bool = False
+
+
+def _phrase(text: str) -> re.Pattern:
+    """A whole-word, case-blind pattern; an apostrophe may be straight or curly."""
+    body = re.escape(text).replace("'", "['’]")
+    return re.compile(rf"(?<![\w'’]){body}(?![\w'’])", re.IGNORECASE)
+
+
+_THIRD = [(_phrase(first), third) for first, third in _WORDS["third_person"]["phrases"]]
+
+
+def third_person(text: str) -> str:
+    """"Wants me to become an engineer" -> "Wants the student to become an
+    engineer": family and values entries are about the student, never in their
+    first person (audit #5). Phrases live in normalize_words.json."""
+    out = text
+    for pattern, third in _THIRD:
+        out = pattern.sub(third, out)
+    return out[:1].upper() + out[1:] if text[:1].isupper() else out
+
+
+def _says(text: str, words) -> bool:
+    return any(_phrase(word).search(text or "") for word in words)
+
+
+def _done_not_planned(status: str, quote: str) -> str:
+    """A status the student's own words put in the past ("I built", "bana
+    liya") is done, never planned; a stated plan stays planned (audit #5)."""
+    rule = _WORDS["tense"]
+    if (status == rule["planned"] and _says(quote, rule["done_words"])
+            and not _says(quote, rule["future_words"])):
+        return rule["done"]
+    return status
+
+
+def _phrase_choice(list_name: str, *texts: str) -> Optional[str]:
+    """A choice said inside a sentence ("I can't leave Lahore"): the longest
+    catalog wording of two or more words found in the value or the quote."""
+    catalog = vault_catalog()
+    wordings = sorted(((norm(w), c.code) for c in catalog.choices(list_name)
+                       for w in (c.label, *c.synonyms) if len(norm(w).split()) >= 2),
+                      key=lambda pair: -len(pair[0]))
+    for text in texts:
+        padded = f" {norm(text)} "
+        for wording, code in wordings:
+            if f" {wording} " in padded:
+                return code
+    return None
+
+
+def _named_in_quote(key: Optional[str], value: Any, quote: str) -> bool:
+    rule = _WORDS["stated_types"].get(key or "")
+    if not rule or not isinstance(value, dict) or not isinstance(value.get(rule["field"]), str):
+        return False
+    catalog = vault_catalog()
+    code = catalog.choice_code(rule["list"], value[rule["field"]]) or value[rule["field"]]
+    words = [w for c in catalog.choices(rule["list"]) if c.code == code for w in (c.code, c.label, *c.synonyms)]
+    padded = f" {norm(quote)} "
+    return any(f" {norm(w)} " in padded for w in words if norm(w))
 
 
 def _is_date_field(candidate_type: str, key: str, name: str) -> bool:
@@ -110,6 +172,7 @@ def normalize_candidate(candidate_type: str, key: Optional[str], value: Any, *,
     # Level-aware: a Bachelor's field_of_study is read against study fields.
     choice_fields = catalog.record_choice_fields(spec, value)
     state = {"confirm": False, "reject": None}
+    third_fields = set(_WORDS["third_person"]["types"].get(key or "", ()))
 
     def walk(node: Any, path: str) -> Any:
         if isinstance(node, dict):
@@ -130,7 +193,13 @@ def normalize_candidate(candidate_type: str, key: Optional[str], value: Any, *,
             return text
         if path in choice_fields:
             code = catalog.choice_code(choice_fields[path], text)
+            if code is None and key in _WORDS["phrase_choice_types"]:
+                code = _phrase_choice(choice_fields[path], text, student_text)
             return code if code is not None else text
+        if name in _WORDS["tense"]["fields"]:
+            return _done_not_planned(text, student_text)
+        if candidate_type == "vault_item" and path in third_fields:
+            return third_person(text)
         if _is_date_field(candidate_type, key, name if path else ""):
             return iso_date(text) or text
         return text
@@ -142,7 +211,8 @@ def normalize_candidate(candidate_type: str, key: Optional[str], value: Any, *,
     out = walk(value, "")
     if strict_choices and state["reject"] is None:
         state["reject"] = _off_list(catalog, spec, out)
-    return NormalizeResult(out, language, state["confirm"], state["reject"])
+    stated = candidate_type == "vault_item" and _named_in_quote(key, out, student_text)
+    return NormalizeResult(out, language, state["confirm"], state["reject"], stated=stated)
 
 
 def _off_list(catalog, spec, value) -> Optional[str]:

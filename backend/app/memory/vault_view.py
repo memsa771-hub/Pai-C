@@ -92,28 +92,167 @@ def _skip_in_display(key: str) -> bool:
     return key == "id" or key.endswith("_id") or key.endswith("_ids") or key == "evidence_refs"
 
 
-def _display(spec: Optional[TypeSpec], value: Any) -> str:
-    """English text for a value: choice codes become catalog labels, ids are left out."""
+def _enum_codes(type_key: Optional[str]) -> dict[str, set]:
+    """field path -> the enum codes its schema allows, from wherever the type's
+    shape lives (an item schema, a fact's validation schema, a record spec), so
+    a schema code with no catalog list ("considering", "high") still reads as
+    words."""
+    from .student_schema import RECORD_SPECS
+
+    spec = vault_catalog().type(type_key) if type_key else None
+    schema = None
+    if spec is not None and spec.schema:
+        schema = spec.schema
+    elif spec is not None and spec.field_definition:
+        schema = spec.field_definition.get("validation_schema")
+    elif type_key in RECORD_SPECS:
+        schema = {"properties": RECORD_SPECS[type_key]["properties"]}
+    codes: dict[str, set] = {}
+
+    def walk(node: Any, path: str) -> None:
+        if not isinstance(node, dict):
+            return
+        if node.get("enum"):
+            codes[path] = {str(c) for c in node["enum"]}
+        if isinstance(node.get("items"), dict):
+            walk(node["items"], path)
+        for key, child in (node.get("properties") or {}).items():
+            walk(child, f"{path}.{key}" if path else key)
+
+    walk(schema, "")
+    return codes
+
+
+def _number(value: Any) -> str:
+    return str(int(value)) if isinstance(value, float) and value.is_integer() else str(value)
+
+
+def _result_text(result: dict) -> str:
+    """A result as the student reads it on a result card: "470/550 (85%)"."""
+    words = view_copy()["display"]["result"]
+    got, total, pct = result.get("marks_obtained"), result.get("marks_total"), result.get("percentage")
+    if isinstance(got, (int, float)) and isinstance(total, (int, float)) and total > 0:
+        pct = pct if isinstance(pct, (int, float)) else round(got * 100 / total)
+        return words["marks"].format(obtained=_number(got), total=_number(total), percent=_number(pct))
+    if isinstance(pct, (int, float)):
+        return words["percent"].format(percent=_number(pct))
+    if isinstance(result.get("gpa"), (int, float)):
+        scale = result.get("gpa_scale")
+        return (words["gpa_scale"] if scale else words["gpa"]).format(
+            gpa=_number(result["gpa"]), scale=_number(scale) if scale else "")
+    if result.get("grade"):
+        return words["grade"].format(grade=result["grade"])
+    return ""
+
+
+def _budget_amount(value: dict) -> str:
+    """The budget as its band label; a range or amount the student gave reads
+    as the band it falls in, else in lakh ("3-8 lakh"), never as 600000."""
+    catalog, rules = vault_catalog(), view_copy()["display"]["budget"]
+    if value.get("band"):
+        return catalog.label("budget_bands", value["band"])
+    figures = [value.get(k) for k in rules["amount_fields"]]
+    figures = [f for f in figures if isinstance(f, (int, float)) and not isinstance(f, bool)]
+    if not figures:
+        return ""
+    low, high = min(figures), max(figures)
+    for code, (start, end) in rules["band_ranges"].items():
+        if start <= low and (end is None or high <= end):
+            return catalog.label("budget_bands", code)
+
+    def lakh(n):
+        return _number(round(n / rules["lakh"], 1))
+
+    text = lakh(low) if low == high else f"{lakh(low)}-{lakh(high)}"
+    return rules["lakh_template"].format(amount=text)
+
+
+def _display(spec: Optional[TypeSpec], value: Any, type_key: Optional[str] = None) -> str:
+    """English text for a value, one line: choice codes become catalog labels,
+    schema codes become words, marks read as "470/550 (85%)", a budget as its
+    band, and ids and internal fields are left out (no raw codes on any page).
+    What a type shows, in what order, lives in vault_view.json."""
     catalog = vault_catalog()
+    rules = view_copy()["display"]
+    type_key = spec.key if spec is not None else type_key
+    shape = rules["types"].get(type_key or "", {})
     # A field read against the record's own level: a matric group, a DAE
     # technology or a study field, never a raw code on the Details page.
-    choices = catalog.record_choice_fields(spec, value)
+    choices = dict(catalog.record_choice_fields(spec, value))
+    if spec is not None and spec.key == "education" and isinstance(value, dict):
+        level = catalog.record_level(spec, value)
+        if level and f"{level}_subjects" in catalog.choice_names():
+            choices["details.subjects"] = f"{level}_subjects"
+    wordings = shape.get("wordings", {})
+    choices.update(wordings)
+    enums = _enum_codes(type_key)
+    hidden = set(rules["hidden_fields"]) | set(shape.get("hidden", ()))
 
-    def render(node: Any, path: str) -> str:
-        if node is None:
-            return ""
-        if isinstance(node, bool):
-            return "Yes" if node else "No"
-        if isinstance(node, dict):
-            parts = [render(v, f"{path}.{k}" if path else k) for k, v in node.items() if not _skip_in_display(k)]
-            return ", ".join(p for p in parts if p)
-        if isinstance(node, list):
-            return ", ".join(p for p in (render(v, path) for v in node) if p)
-        if isinstance(node, str) and path in choices:
-            return catalog.label(choices[path], node)
-        return str(node)
+    def word(node: str, path: str) -> str:
+        name = path.rsplit(".", 1)[-1]
+        if path in choices:
+            code = catalog.choice_code(choices[path], node)
+            if code is not None:
+                return catalog.label(choices[path], code)
+            if path in wordings:  # free text where a list was hoped for
+                return node[:1].upper() + node[1:]
+        if node in rules["enum_labels"].get(name, {}):
+            return rules["enum_labels"][name][node]
+        if node in enums.get(path, ()):
+            text = node.replace("_", " ")
+            return text[:1].upper() + text[1:]
+        return node
 
-    return render(value, "")
+    def render(node: Any, path: str) -> list:
+        name = path.rsplit(".", 1)[-1]
+        if node is None or node == "" or (path and (_skip_in_display(name) or name in hidden)):
+            return []
+        if name == "result" and isinstance(node, dict):
+            parts = [_result_text(node)]
+        elif isinstance(node, bool):
+            parts = [rules["yes"] if node else rules["no"]]
+        elif isinstance(node, dict):
+            parts = [p for k, v in node.items() for p in render(v, f"{path}.{k}" if path else k)]
+        elif isinstance(node, list):
+            parts = [p for v in node for p in render(v, path)]
+        elif isinstance(node, str):
+            parts = [word(node, path)]
+        elif isinstance(node, (int, float)):
+            parts = [_number(node)]
+        else:
+            parts = [str(node)]
+        template = rules["field_templates"].get(name)
+        return [template.format(value=p) if template else p for p in parts if p]
+
+    if type_key == "finance.budget" and isinstance(value, dict):
+        parts = [_budget_amount(value)] + render(
+            {k: v for k, v in value.items() if k not in rules["budget"]["amount_fields"]}, "")
+    elif shape.get("fields") and isinstance(value, dict):
+        parts = []
+        for path in shape["fields"]:
+            node = value
+            for part in path.split("."):
+                node = node.get(part) if isinstance(node, dict) else None
+            parts += render(node, path)
+    elif shape.get("order") and isinstance(value, dict):
+        # A record's stored key order is not the reading order: listed fields
+        # first, the rest after.
+        first = [k for k in shape["order"] if k in value]
+        parts = render({**{k: value[k] for k in first}, **value}, "")
+    else:
+        parts = render(value, "")
+    shown, seen = [], set()
+    for part in parts:  # "engineering, engineering" said twice reads once
+        if part and part.strip() and part.casefold() not in seen:
+            seen.add(part.casefold())
+            shown.append(part)
+    return shape.get("join", rules["separator"]).join(shown)
+
+
+def display_text(type_key: Optional[str], value: Any) -> str:
+    """The Vault's one-line words for any entry, for readers outside the view
+    (path evidence), so a path never shows what the Vault page would not."""
+    return _display(vault_catalog().type(type_key) if type_key else None, value, type_key)
 
 
 def _without(value: Any, fields) -> Any:
@@ -311,14 +450,14 @@ class VaultView:
         fresh_until = max(moments) + timedelta(days=days) if days and moments else None
         entry = {
             "kind": kind, "type": type_key, "id": entry_id, "value": value, "label": label,
-            "display": _display(spec, value), "level": level, "badge": badge_for(level, in_question),
+            "display": _display(spec, value, type_key), "level": level, "badge": badge_for(level, in_question),
             "source": source_type, "source_language": source_language or evidence.get("source_language"),
             "document": self._link(refs, files),
             "observed_at": _iso(_aware(observed[0])), "confirmed_at": _iso(confirmed_at),
             "fresh_until": _iso(fresh_until), "stale": bool(fresh_until and now > fresh_until),
             "in_question": in_question,
             "disagreements": [{
-                "value": shown, "display": _display(spec, shown),
+                "value": shown, "display": _display(spec, shown, type_key),
                 "source": d.get("source_type"), "document": self._link([d], files),
             } for d in evidence.get("disagreements", [])
                 for shown in [_without(d.get("value"), omit)] if shown not in (None, {})],
@@ -454,7 +593,7 @@ class VaultView:
             "summary": words["summary"].format(label=label, filename=filename),
             "question": words["question"].format(label=label, filename=filename),
             "current": current, "proposed": proposed,
-            "current_display": _display(spec, current), "proposed_display": _display(spec, proposed),
+            "current_display": _display(spec, current, type_key), "proposed_display": _display(spec, proposed, type_key),
             "answers": list(answers),
             "current_source": self._saved_source(issue, form, type_key, workspace_id, files),
             "proposed_source": self._proposed_source(issue, form, proposed, workspace_id, files),

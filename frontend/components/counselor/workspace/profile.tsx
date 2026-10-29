@@ -65,8 +65,13 @@ function FactField({ entry, type, onOpen, openDocument, questioned }: {
   /** An open conflict asks about this entry: tapping it reviews that conflict. */
   questioned?: boolean;
 }) {
-  const { title, sub } = summary(readable(entry, type));
-  const shown = title || entry.display;
+  // A structured value reads in the Vault's own words (catalog labels,
+  // "470/550 (85%)", a budget band; audit #4), never as its raw fields; a
+  // single value keeps the client's locale formatting (dates).
+  const fallback = summary(readable(entry, type));
+  const structured = !!entry.display && !!entry.value && typeof entry.value === "object" && !Array.isArray(entry.value);
+  const shown = structured ? entry.display : fallback.title || entry.display;
+  const sub = structured ? "" : fallback.sub;
   const aria = questioned ? fill(text.conflictFieldAria, { label: entry.label, value: shown })
     : fill(entry.stale ? text.fieldAriaStale : text.fieldAria, { label: entry.label, value: shown, badge: vaultBadgeLabel(badgeLevel(entry)) });
   return (

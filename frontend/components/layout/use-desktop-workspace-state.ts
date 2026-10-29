@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { desktopHost } from '@/lib/desktop-host';
 import { usePaiAuth } from '@/lib/pai-auth-context';
@@ -19,19 +19,29 @@ export function useDesktopWorkspaceState(): void {
   const { viewMode, openView } = useLayout();
   const [restored, setRestored] = useState('');
   const key = user && desktopHost() ? `oa:desktop:view:${user.email}:${workspaceId}` : '';
+  // The saved view is restored only as the workspace first opens, before the
+  // student does anything (audit #12): a late load must never move a student
+  // who is already chatting, and a link's own ?view= wins.
+  const initialView = useRef(viewMode);
+  const opened = useRef(false);
 
   useEffect(() => {
-    if (!key || loading || restored === key) return;
+    if (loading) return;
+    if (!key) { opened.current = true; return; }
+    if (restored === key) return;
+    const untouched = !opened.current && viewMode === initialView.current
+      && !new URLSearchParams(window.location.search).get('view');
+    opened.current = true;
     try {
       const saved = JSON.parse(localStorage.getItem(key) || 'null');
       const view = saved && (RENAMED[saved.view] || saved.view);
-      if (view && VIEWS.includes(view)) openView(view);
-      if (typeof saved?.thread === 'string' && sessions.some(s => s.sessionId === saved.thread)) {
+      if (untouched && view && VIEWS.includes(view)) openView(view);
+      if (untouched && typeof saved?.thread === 'string' && sessions.some(s => s.sessionId === saved.thread)) {
         setCurrentSessionId(saved.thread, { skipFocus: true });
       }
     } catch { /* A malformed preference cannot prevent opening a workspace. */ }
     setRestored(key);
-  }, [key, loading, restored, sessions, openView, setCurrentSessionId]);
+  }, [key, loading, restored, sessions, openView, setCurrentSessionId, viewMode]);
 
   useEffect(() => {
     if (!key || loading || restored !== key) return;

@@ -75,5 +75,132 @@
   "rupees",
   "روپیہ",
   "روپے"
+ ],
+ "_rules_note": "Audit #5/#7 rules, data not code. third_person: item fields written about the student or the person they belong to; first-person phrases (longest first) become third person. tense: a status the student's quote says is finished is never planned. stated_types: a family member the student names in their own words is what they said (Stated), never PAI's guess. phrase_choice_types: a choice read from a phrase inside the value or the quote (\"I can't leave Lahore\" is relocation willingness no).",
+ "third_person": {
+  "types": {
+   "family_member": [
+    "wish",
+    "concern"
+   ],
+   "value": [
+    "text"
+   ]
+  },
+  "phrases": [
+   [
+    "i am",
+    "the student is"
+   ],
+   [
+    "i'm",
+    "the student is"
+   ],
+   [
+    "i have",
+    "the student has"
+   ],
+   [
+    "i want",
+    "the student wants"
+   ],
+   [
+    "i like",
+    "the student likes"
+   ],
+   [
+    "i need",
+    "the student needs"
+   ],
+   [
+    "i value",
+    "the student values"
+   ],
+   [
+    "i care",
+    "the student cares"
+   ],
+   [
+    "i should",
+    "the student should"
+   ],
+   [
+    "i can",
+    "the student can"
+   ],
+   [
+    "myself",
+    "the student"
+   ],
+   [
+    "mine",
+    "the student's"
+   ],
+   [
+    "my",
+    "the student's"
+   ],
+   [
+    "me",
+    "the student"
+   ],
+   [
+    "i",
+    "the student"
+   ]
+  ]
+ },
+ "tense": {
+  "fields": [
+   "activity_status",
+   "academic_status"
+  ],
+  "planned": "planned",
+  "done": "completed",
+  "done_words": [
+   "built",
+   "made",
+   "created",
+   "finished",
+   "completed",
+   "did",
+   "developed",
+   "wrote",
+   "won",
+   "banaya",
+   "banai",
+   "bana liya",
+   "bana li",
+   "bana chuka",
+   "bana chuki",
+   "kar liya",
+   "kar li",
+   "kar chuka",
+   "kar chuki",
+   "mukammal"
+  ],
+  "future_words": [
+   "will",
+   "plan",
+   "planning",
+   "going to",
+   "want to",
+   "wanna",
+   "karunga",
+   "karungi",
+   "banaunga",
+   "banaungi",
+   "karna hai",
+   "banana hai"
+  ]
+ },
+ "stated_types": {
+  "family_member": {
+   "field": "relation",
+   "list": "relations"
+  }
+ },
+ "phrase_choice_types": [
+  "mobility.relocation_willingness"
  ]
 }

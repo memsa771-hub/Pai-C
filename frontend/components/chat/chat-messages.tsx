@@ -117,6 +117,10 @@ export function ChatMessages({ messages, agents, showAllSteps, className, scroll
   const t = useT();
   const containerRef = useRef<HTMLDivElement>(null);
   const [showScrollBtn, setShowScrollBtn] = useState(false);
+  // "New messages" only when a message really arrived below while the student
+  // read history (audit #13); scrolled up with nothing new, the pill says
+  // "Back to latest".
+  const [unseen, setUnseen] = useState(false);
 
   const prevLengthRef = useRef(0);
   // Track first/last message identity to distinguish prepend (older history
@@ -302,6 +306,9 @@ export function ChatMessages({ messages, agents, showAllSteps, className, scroll
     // ③ Append / replace / new (streamed) message: follow only when the user is
     //    already near the bottom.
     if (userScrolledUpRef.current) {
+      const last = messages[messages.length - 1];
+      // A reply to read, never a step line (thinking, status, todos) or a placeholder.
+      if (grew && last && !['thinking', 'status', 'todos', 'loading'].includes(last.messageType || '')) setUnseen(true);
       scrollDebug('append-skip-userUp', el, { messageCount: messages.length, totalCount });
       return;
     }
@@ -350,6 +357,7 @@ export function ChatMessages({ messages, agents, showAllSteps, className, scroll
     const onScroll = async () => {
       const isNearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 100;
       setShowScrollBtn(!isNearBottom);
+      if (isNearBottom) setUnseen(false);
       userScrolledUpRef.current = !isNearBottom;
 
       // Infinite scroll: load older messages when near the top
@@ -500,10 +508,10 @@ export function ChatMessages({ messages, agents, showAllSteps, className, scroll
             variant="secondary"
             size="sm"
             className="rounded-full shadow-lg"
-            onClick={() => { scrollDebug('user-click-scroll-bottom', containerRef.current); userScrolledUpRef.current = false; scrollToBottom(); }}
+            onClick={() => { scrollDebug('user-click-scroll-bottom', containerRef.current); userScrolledUpRef.current = false; setUnseen(false); scrollToBottom(); }}
           >
-            <ArrowDown className="size-4 mr-1" />
-            {t('chat.newMessages')}
+            <ArrowDown aria-hidden className="size-4 mr-1" />
+            {t(unseen ? 'chat.newMessages' : 'chat.jumpToLatest')}
           </Button>
         </div>
       )}

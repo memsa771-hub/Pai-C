@@ -787,4 +787,28 @@ async def extract_candidates(
             _validate(p, turn, allowed_vault_keys, drops) for p in proposals
         ) if candidate is not None
     ]
-    return ExtractionOutput(validated, drops)
+    return ExtractionOutput(_with_mobility(validated, allowed_vault_keys), drops)
+
+
+_MOBILITY = "mobility.relocation_willingness"
+
+
+def _with_mobility(validated: list, allowed_vault_keys) -> list:
+    """"Lahore se bahar nahi ja sakta" is a mobility limit even when the model
+    only saved the city (audit #7): a quote that says it in a catalog wording
+    adds relocation willingness with that same quote, unless one is proposed."""
+    from app.memory.catalog import vault_catalog
+    from app.memory.normalize import _phrase_choice
+
+    if _MOBILITY not in allowed_vault_keys or any(c.key == _MOBILITY for c in validated):
+        return validated
+    list_name = vault_catalog().type(_MOBILITY).choice_fields.get("")
+    for candidate in validated:
+        quote = (candidate.evidence or {}).get("quote") or ""
+        code = _phrase_choice(list_name, quote) if list_name and quote else None
+        if code:
+            return [*validated, ExtractedCandidate(
+                candidate_type="vault_fact", operation="upsert", key=_MOBILITY, proposed_value=code,
+                content=None, entities={}, confidence=candidate.confidence,
+                evidence={k: v for k, v in candidate.evidence.items() if k in ("quote", "user_event_id")})]
+    return validated

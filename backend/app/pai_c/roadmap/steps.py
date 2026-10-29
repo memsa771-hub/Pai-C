@@ -209,10 +209,18 @@ def _tickable(steps: list[dict]) -> list[dict]:
     Vault is silent: a tickable kind that is red with no Vault entry behind
     it. Where the Vault speaks (marks below the floor, a registered test, a
     course record) the Vault's colour stands."""
-    kinds = set(_policy()["steps"]["tickable_kinds"])
     for step in steps:
-        step["tickable"] = step["kind"] in kinds and step["status"] == "not" and step["evidence"] is None
+        step["tickable"] = is_tickable(step)
     return steps
+
+
+def is_tickable(step: dict) -> bool:
+    """The one tick rule, for live steps and for a route's stored steps (an
+    older row's snapshot holds only key, copy and status: the kind is the key's
+    prefix, as _step names it, and no evidence reads as the Vault silent)."""
+    kind = step.get("kind") or str(step.get("key") or "").split(":")[0]
+    return (kind in set(_policy()["steps"]["tickable_kinds"])
+            and step.get("status") == "not" and step.get("evidence") is None)
 
 
 def _manual(steps: list[dict], steps_done) -> list[dict]:

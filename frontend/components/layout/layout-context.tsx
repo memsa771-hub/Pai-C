@@ -197,18 +197,13 @@ export function LayoutProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     setListPrefs(readListPrefs());
     setIsRailExpanded(readRailPref());
-    // `?view=` is how another page hands the workspace a destination — today
-    // that is the retired Settings → Profile route, which now redirects here
-    // instead of 404ing on anyone's bookmark. Read from `window` rather than
-    // `useSearchParams` so the provider stays out of a Suspense boundary, and
-    // dropped from the URL afterwards so a reload isn't stuck on that view.
+    // `?view=` is how a link or a reload names the view to open. Read from
+    // `window` rather than `useSearchParams` so the provider stays out of a
+    // Suspense boundary. It stays in the URL: the counselor shell reads the
+    // same parameter when it mounts (possibly later than this provider), and
+    // a reload must reopen that view, not chat (audit #11).
     const requested = new URLSearchParams(window.location.search).get('view');
-    if (requested && ROUTABLE_VIEWS.has(requested as ViewMode)) {
-      setViewMode(requested as ViewMode);
-      const url = new URL(window.location.href);
-      url.searchParams.delete('view');
-      window.history.replaceState(null, '', url.toString());
-    }
+    if (requested && ROUTABLE_VIEWS.has(requested as ViewMode)) setViewMode(requested as ViewMode);
   }, []);
 
   // Persist outside the state updater: React may run an updater more than once

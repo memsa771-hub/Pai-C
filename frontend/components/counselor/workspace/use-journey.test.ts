@@ -52,6 +52,9 @@ it('reads the Roadmap page: chosen when a route is chosen, J when a step is tick
   expect(signalMet('route_chosen', data({ ...roadmapPage, chosen: chosenRoute }))).toBe(true);
   expect(signalMet('route_step_done', data({ ...roadmapPage, chosen: chosenRoute }))).toBe(false);
   expect(signalMet('route_step_done', data({ ...roadmapPage, chosen: { ...chosenRoute, steps_done: ['apply'] } }))).toBe(true);
+  // A legacy stored tick on a step the Vault speaks for (not tickable, not done) is not progress.
+  expect(signalMet('route_step_done', data({ ...roadmapPage, chosen: { ...chosenRoute, steps_done: ['degree'] } }))).toBe(false);
+  expect(signalMet('route_step_done', data({ ...roadmapPage, chosen: { ...chosenRoute, steps_done: ['gone-step'] } }))).toBe(false);
 });
 
 it('stays on G when paths are found and none is explored, even with roadmap cards', () => {

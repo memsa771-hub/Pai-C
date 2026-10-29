@@ -60,5 +60,133 @@
       "summary": "PAI needs you to check something in your Vault.",
       "question": "Can you check this entry?"
     }
+  },
+  "display": {
+    "_note": "How an entry reads on every page (VAULT_SPEC Language; audit #4: no raw codes). Choice codes read through the catalog lists; schema codes through enum_labels, else as words; hidden_fields never show; types pick fields and order.",
+    "separator": ", ",
+    "yes": "Yes",
+    "no": "No",
+    "hidden_fields": [
+      "canonical_level",
+      "normalized_name",
+      "currency",
+      "approximate",
+      "goal_type",
+      "voice_type",
+      "influence_type",
+      "student_response",
+      "original_name",
+      "grading_system"
+    ],
+    "enum_labels": {
+      "academic_status": {
+        "current": "Studying now",
+        "completed": "Completed",
+        "incomplete": "Not completed",
+        "planned": "Planned"
+      },
+      "period": {
+        "per_year": "per year",
+        "per_month": "per month",
+        "total": "in total"
+      },
+      "influencer_type": {
+        "parent": "Parent",
+        "sibling": "Brother or sister",
+        "social_media": "Social media",
+        "social_expectation": "What people expect"
+      }
+    },
+    "field_templates": {
+      "influence": "{value} influence",
+      "possible_without_scholarship": "Possible without a scholarship: {value}",
+      "student_alignment": "Student: {value}"
+    },
+    "result": {
+      "marks": "{obtained}/{total} ({percent}%)",
+      "percent": "{percent}%",
+      "gpa": "GPA {gpa}",
+      "gpa_scale": "GPA {gpa}/{scale}",
+      "grade": "Grade {grade}"
+    },
+    "budget": {
+      "amount_fields": [
+        "band",
+        "min",
+        "max",
+        "amount"
+      ],
+      "lakh": 100000,
+      "lakh_template": "{amount} lakh",
+      "band_ranges": {
+        "under_1_lakh": [
+          0,
+          100000
+        ],
+        "1_3_lakh": [
+          100000,
+          300000
+        ],
+        "3_6_lakh": [
+          300000,
+          600000
+        ],
+        "6_10_lakh": [
+          600000,
+          1000000
+        ],
+        "over_10_lakh": [
+          1000000,
+          null
+        ]
+      }
+    },
+    "types": {
+      "education": {"order": ["qualification_name", "field_of_study", "details", "institution_name",
+                              "academic_status", "graduation_year", "result"]},
+      "goal": {
+        "fields": [
+          "title",
+          "details.field_of_study",
+          "commitment",
+          "details.direction_status"
+        ],
+        "wordings": {
+          "title": "study_fields",
+          "details.field_of_study": "study_fields"
+        }
+      },
+      "strength": {
+        "fields": [
+          "text",
+          "basis"
+        ],
+        "join": " — "
+      },
+      "interest": {
+        "fields": [
+          "text",
+          "example"
+        ],
+        "join": " — "
+      },
+      "option": {
+        "fields": [
+          "text",
+          "status"
+        ]
+      },
+      "family_member": {
+        "fields": [
+          "relation",
+          "name",
+          "occupation",
+          "education",
+          "wish",
+          "concern",
+          "influence"
+        ]
+      }
+    }
   }
 }

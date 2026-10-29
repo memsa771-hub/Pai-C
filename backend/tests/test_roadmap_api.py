@@ -293,3 +293,29 @@ def test_migration_118_creates_route_decisions_and_downgrades():
         assert "withdrawn_at IS NULL" in str(index.kwargs["postgresql_where"])
         migration.downgrade()
         op.drop_table.assert_called_once_with("pai_route_decisions")
+
+
+def test_tick_on_a_stale_route_reads_the_rule_from_its_stored_steps():
+    """The field card is gone (the route is stale): its stored steps carry no
+    `tickable`, so the rule is read from them: a silent step still ticks, a
+    step the Vault spoke for is still refused (Task 6 re-review, minor)."""
+    from unittest.mock import patch
+    from app.pai_c.roadmap.decisions import RoadmapEngine
+    with pre_eng() as (client, student, params):
+        data(choose(client, params, "electrical_engineering"))
+        from app.models import RouteDecision
+        with student.factory() as db:
+            row = db.query(RouteDecision).one()
+            row.steps = [{k: v for k, v in step.items() if k != "tickable"} for step in row.steps]
+            db.commit()
+        real = RoadmapEngine.build
+
+        def without_card(self, workspace_id):
+            page = real(self, workspace_id)
+            return {**page, "fields": [f for f in page["fields"] if f["field_key"] != "electrical_engineering"]}
+
+        with patch.object(RoadmapEngine, "build", without_card):
+            ticked = client.post("/v1/roadmap/steps", params=params, headers=TOKEN, json={"key": "apply", "done": True})
+            assert ticked.status_code == 200, ticked.text
+            refused = client.post("/v1/roadmap/steps", params=params, headers=TOKEN, json={"key": "degree", "done": True})
+            assert refused.status_code == 409

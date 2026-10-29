@@ -487,3 +487,14 @@ it("opens the conflict review when the Mirror points at an entry in question", a
   setup();
   expect(await screen.findByText("Which current country is right?")).toBeTruthy();
 });
+
+it("audit #4: a structured entry reads in the Vault's words, never its raw fields", async () => {
+  const budget = { kind: "fact" as const, type: "finance.budget", id: "budget", label: "Budget", level: "stated" as const,
+    badge: "Stated", source: "conversation", document: null, observed_at: null, confirmed_at: null, fresh_until: null,
+    stale: false, in_question: false, disagreements: [],
+    value: { min: 300000, max: 600000, currency: "PKR", period: "per_year" }, display: "3-6 lakh, per year" };
+  setup({ ...vault, details: { ...vault.details, money_and_place: { label: "Money and place", entries: [budget] } } });
+  const shown = await screen.findByRole("button", { name: /^Show source and actions for Budget: / });
+  expect(shown.textContent).toContain("3-6 lakh, per year");
+  expect(shown.textContent).not.toMatch(/600000|300000|per_year/);
+});

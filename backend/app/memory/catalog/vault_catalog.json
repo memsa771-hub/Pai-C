@@ -1540,6 +1540,64 @@
     "code": "rural",
     "label": "Rural"
    }
+  ],
+  "relocation_willingness": [
+   {
+    "code": "yes",
+    "label": "Willing to move",
+    "synonyms": [
+     "willing to move",
+     "willing to relocate",
+     "can move",
+     "can relocate",
+     "ready to move",
+     "bahar ja sakta hoon",
+     "bahar ja sakti hoon"
+    ]
+   },
+   {
+    "code": "within_province",
+    "label": "Only within the province",
+    "synonyms": [
+     "within the province",
+     "only in my province",
+     "province ke andar"
+    ]
+   },
+   {
+    "code": "no",
+    "label": "Not willing to move",
+    "synonyms": [
+     "not willing to move",
+     "not willing to relocate",
+     "can't leave",
+     "cant leave",
+     "cannot leave",
+     "can not leave",
+     "can't move",
+     "cannot move",
+     "cant move",
+     "can't go outside",
+     "cannot go outside",
+     "bahar nahi ja sakta",
+     "bahar nahi ja sakti",
+     "bahar nahin ja sakta",
+     "bahar nahin ja sakti",
+     "nahi chor sakta",
+     "nahi chor sakti",
+     "nahi chhor sakta",
+     "nahi chhor sakti"
+    ]
+   },
+   {
+    "code": "not_sure",
+    "label": "Not sure yet",
+    "synonyms": [
+     "not sure",
+     "maybe",
+     "depends"
+    ]
+   }
   ]
  },
  "types": [
@@ -2123,6 +2181,9 @@
       "conversation": 80
      }
     }
+   },
+   "choice_fields": {
+    "": "relocation_willingness"
    }
   },
   {

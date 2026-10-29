@@ -134,13 +134,14 @@ function JourneyBody({ navigate, onChat, resource }: {
                             aria-pressed={on} aria-label={fill(copy.journey.selected, { id: s.id, title: s.title, state: copy.journeyStates[s.state] })}
                             className={cn("group relative flex h-20 w-full flex-col items-center justify-center gap-1.5 rounded-xl text-sm font-extrabold transition-all",
                               on ? "bg-card shadow-card ring-[1.5px] ring-foreground" : "hover:bg-card/70")}>
-                            <span className={cn("flex size-8 items-center justify-center rounded-full transition-transform group-hover:scale-105",
+                            {/* The label names the stage once; the letters are decoration (audit #13). */}
+                            <span aria-hidden className={cn("flex size-8 items-center justify-center rounded-full transition-transform group-hover:scale-105",
                               s.state === "done" && "bg-foreground text-background",
                               s.state === "now" && "bg-highlight text-highlight-ink ring-[1.5px] ring-highlight-ink",
                               s.state === "next" && "border-[1.5px] border-dashed border-input bg-card text-muted-foreground")}>
                               {s.state === "done" ? <Check aria-hidden className="size-4" strokeWidth={3} /> : s.id}
                             </span>
-                            <span className={cn("text-[11px] font-bold", s.state === "next" ? "text-muted-foreground" : "text-foreground")}>{s.id}</span>
+                            <span aria-hidden className={cn("text-[11px] font-bold", s.state === "next" ? "text-muted-foreground" : "text-foreground")}>{s.id}</span>
                             {s.state === "now" && (
                               <span aria-hidden className="absolute right-2 top-2 size-2 rounded-full bg-foreground motion-safe:animate-pulse" />
                             )}

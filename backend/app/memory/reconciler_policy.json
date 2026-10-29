@@ -1,0 +1,10 @@
+{
+  "_note": "Near-duplicate items (audit #6): a new item of a listed type whose text has token Jaccard >= min_jaccard with an active item of the same type is the same entry, said again. It merges into the earliest one (its wording kept, the new sighting added, evidence raised when stronger). Tokens are catalog-normalized words; a trailing suffix listed is dropped from words longer than min_stem_length, so maths and math agree.",
+  "near_duplicate": {
+    "min_jaccard": 0.8,
+    "fields": {"interest": "text", "strength": "text", "value": "text", "pressure": "text", "option": "text",
+               "myth": "text", "daily_life": "text"},
+    "suffixes": ["s"],
+    "min_stem_length": 3
+  }
+}

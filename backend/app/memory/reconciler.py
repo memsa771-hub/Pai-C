@@ -13,14 +13,18 @@ think my budget is £20,000?"
 Every outcome is recorded on the candidate row, including rejections.
 """
 
+import json
 import logging
 import time
 import uuid
 from dataclasses import dataclass
+from functools import lru_cache
+from pathlib import Path
 from typing import Optional
 
 from app.models import EventRecord, MemoryCandidate
 from .candidates import MemoryCandidateService
+from .catalog import norm
 from .episodic import EpisodicMemoryService
 from .errors import MemoryDataError
 from .evidence import needs_student_confirmation
@@ -58,6 +62,23 @@ _UNKNOWN_DOCUMENT_PROVENANCE = ("unknown_document", "extracted")
 # Sources that are not the student speaking: they may not bring back an entry
 # the student removed (VAULT_SPEC §Conflicts).
 _NON_STUDENT_SOURCES = ("document", "agent", "system")
+
+
+@lru_cache(maxsize=1)
+def _policy() -> dict:
+    return json.loads(Path(__file__).with_name("reconciler_policy.json").read_text(encoding="utf-8"))
+
+
+def _tokens(text: str, rule: dict) -> set:
+    """Words for comparing two entries: catalog-normalized, a plural suffix off."""
+    words = set()
+    for word in norm(text).split():
+        for suffix in rule["suffixes"]:
+            if word.endswith(suffix) and len(word) - len(suffix) >= rule["min_stem_length"]:
+                word = word[: -len(suffix)]
+                break
+        words.add(word)
+    return words
 
 
 def provenance_for(candidate: MemoryCandidate) -> tuple[str, str, Optional[str]]:
@@ -431,6 +452,8 @@ class MemoryReconciler:
             logger.info("chat item_id dropped without a change flag candidate=%s", candidate.id)
             item_id = None
 
+        if not item_id:
+            value = self._same_as_existing(candidate.workspace_id, candidate.key, value)
         # Change flags describe the student's own words, so only the student's
         # channels may raise them (as vault.py does for facts).
         spoken = candidate.source_type in ("conversation", "user_explicit")
@@ -460,6 +483,30 @@ class MemoryReconciler:
                                    outcome=VaultOutcome.NEEDS_REVIEW.value)
         self.candidates.mark_accepted(candidate, write.item.id)
         return ReconcileResult(True, candidate.id, result_id=write.item.id, outcome=write.outcome.value)
+
+    def _same_as_existing(self, workspace_id: str, item_type: str, value: dict) -> dict:
+        """A near-identical item of the same type (audit #6: four "good at
+        maths" lines) is the earliest entry said again: the value takes that
+        entry's wording, so the item store corroborates it (a new sighting,
+        evidence raised when stronger), enriches or updates it, never adds a
+        second line.
+        Threshold and types live in reconciler_policy.json."""
+        rule = _policy()["near_duplicate"]
+        field = rule["fields"].get(item_type)
+        text = value.get(field) if field else None
+        if not isinstance(text, str) or not text.strip():
+            return value
+        mine = _tokens(text, rule)
+        for item in sorted(self.items.active(workspace_id, [item_type]), key=lambda i: i.created_at):
+            theirs = (item.value or {}).get(field)
+            if not isinstance(theirs, str) or not mine:
+                continue
+            other = _tokens(theirs, rule)
+            if len(mine & other) / len(mine | other) >= rule["min_jaccard"]:
+                # Only the wording is the earlier entry's; what else the
+                # student said goes through the item store's usual rules.
+                return {**value, field: theirs}
+        return value
 
     def _confirm_item(self, candidate: MemoryCandidate, item_id: Optional[str], evidence: dict) -> ReconcileResult:
         """The student confirms an item as it stands. The digest names the value

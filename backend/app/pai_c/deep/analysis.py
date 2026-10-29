@@ -3,6 +3,7 @@
 import asyncio
 import hashlib
 import json
+import re
 import logging
 import weakref
 from contextlib import asynccontextmanager
@@ -41,7 +42,26 @@ class AnalysisPredecessorFailed(RuntimeError):
 
 
 class AnalysisPatchRejected(RuntimeError):
-    """Both model attempts failed validation; preserve this job for replay."""
+    """Both model attempts failed validation; preserve this job for replay.
+
+    Not retried by the worker: the same turn gives the same rejection, so a
+    retry only repeats two model calls per attempt (audit #9, retry storm)."""
+    retryable = False
+
+
+_KEY = re.compile(r"^[a-z_]{1,40}$")
+
+
+def _patch_shape(parsed) -> str:
+    """What a rejected patch looked like, never what it said: its top-level
+    keys and each operation's keys (schema words only, no student text)."""
+    if not isinstance(parsed, dict):
+        return "keys=- ops=-"
+    keys = ",".join(sorted(k for k in parsed if isinstance(k, str) and _KEY.match(k))) or "-"
+    operations = parsed.get("patch") if isinstance(parsed.get("patch"), list) else []
+    ops = ";".join(",".join(sorted(k for k in op if isinstance(k, str) and _KEY.match(k)))
+                   if isinstance(op, dict) else "?" for op in operations[:20]) or "-"
+    return f"keys={keys} ops={ops}"
 
 
 def enqueue_turn_analysis(db, workspace_id: str, user_event_id: str,
@@ -227,6 +247,7 @@ async def _candidate(db, workspace_id: str, student: EventRecord,
             response_format={"type": "json_object"},
             reasoning_effort=config.PAI_ANALYST_REASONING_EFFORT,
             base_url=config.PAI_BASE_URL, turn_id=student_id)
+        parsed = None
         try:
             try:
                 parsed = json.loads(raw)
@@ -236,9 +257,12 @@ async def _candidate(db, workspace_id: str, student: EventRecord,
                 raise PatchRejected(-1, "InvalidOutputShape")
             candidate = apply_patch(previous.notebook, parsed.get("patch"), view.ids, query, evidence_refs=evidence_refs)
         except PatchRejected as exc:
-            logger.warning("planner_patch_rejected op_index=%d error_type=%s", exc.index, exc.error_type)
+            logger.warning("planner_patch_rejected turn_id=%s attempt=%d op_index=%d error_type=%s %s",
+                           student_id, attempt + 1, exc.index, exc.error_type,
+                           _patch_shape(parsed))
             if attempt:
-                raise AnalysisPatchRejected("planner patch rejected after correction") from None
+                raise AnalysisPatchRejected(
+                    f"planner patch rejected after correction: error_type={exc.error_type}") from None
             feedback = "\nThe previous patch was rejected: " + str(exc) + ". Return a corrected complete patch and plan."
             continue
         try:
