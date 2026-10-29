@@ -132,16 +132,17 @@ def _records(db, workspace_id: str) -> list[dict]:
 
 def _vault_sources(db, workspace_id: str, records: list[dict]) -> dict[str, dict]:
     """Every citable Vault entry (a profile card: fact, record or item) with
-    the badge a path shows next to its reason: the card's evidence level and
-    where it came from, labelled as the Mirror labels its entries (document
-    name, onboarding, details or chat)."""
+    the badge a path shows next to its reason, exactly as the Vault page shows
+    it: the Vault view's level (one ladder, so an agent's "stated" is "PAI's
+    guess" here too) and where it came from, labelled as the Mirror labels its
+    entries (document name, onboarding, details or chat)."""
     from app.pai_c.mirror.engine import source_label
-    labels = {}
+    badges = {}
     for row in MemoryService(db).vault_rows(workspace_id):
         entry = row.entry
-        labels[("item:" if entry["kind"] == "item" else "") + str(entry["id"])] = source_label(row)
-    return {card["id"]: {"evidence_level": card["evidence_level"], "source_label": labels.get(card["id"])}
-            for card in records}
+        badges[("item:" if entry["kind"] == "item" else "") + str(entry["id"])] = {
+            "evidence_level": entry["level"], "source_label": source_label(row)}
+    return {card["id"]: badges[card["id"]] for card in records if card["id"] in badges}
 
 
 # Recall kinds that name a Vault entry; their hit id is the entry's own id.
@@ -153,7 +154,8 @@ def _recall_query(fields: list[dict], records: list[dict]) -> str:
     titles and the Vault entries of the types `recall_query_types` names."""
     types = set(policy().get("recall_query_types", ()))
     wanted = [_card_text(card["value"], card["kind"]) for card in records if card["key"] in types]
-    return "; ".join(part for part in [*(field["title"] for field in fields), *wanted] if part)
+    # What the student wants leads, so a long candidate list does not drown it.
+    return "; ".join(part for part in [*wanted, *(field["title"] for field in fields)] if part)
 
 
 async def _semantic_recall(db, workspace_id: str, query: str, citable: set[str]) -> list[dict]:
@@ -166,7 +168,11 @@ async def _semantic_recall(db, workspace_id: str, query: str, citable: set[str])
     empty gives no block."""
     if not query:
         return []
-    hits = await MemoryService(db).recall(workspace_id, query, top_k=policy().get("recall_top_k", 8))
+    try:
+        hits = await MemoryService(db).recall(workspace_id, query, top_k=policy().get("recall_top_k", 8))
+    except Exception as exc:  # noqa: BLE001  every feature works without recall (spec 1.3)
+        logger.warning("path_analyzer_recall_failed workspace_id=%s error_type=%s", workspace_id, type(exc).__name__)
+        return []
     shown, seen = [], set()
     for hit in hits:
         kind = str(hit.get("kind") or "")
@@ -228,7 +234,7 @@ def sanitize(analysis: PathAnalysis, evidence: dict[str, str], dismissed: set[st
         if not any(i in vault for i in cited):
             # The why must rest on the Vault (FOUR_FEATURES_SPEC 3), not
             # only on the notebook or nothing.
-            logger.warning("path_analyzer_dropped_uncited_why")
+            logger.warning("path_analyzer_dropped_uncited_why field=%s", path.field_key or "own")
             continue
         fit = []
         for item in path.fit[:rules["max_fit_items"]]:
@@ -502,8 +508,6 @@ async def path_analysis_job(job, db) -> dict:
                   | ({"needs_group": [vault_catalog().label("intermediate_groups", g) for g in c.needs_group]}
                      if c.needs_group else {}) for c in candidates.values()]
         vault = _vault_sources(db, job.workspace_id, records)
-        recall = await _semantic_recall(db, job.workspace_id, _recall_query(fields, records),
-                                        set(vault) & set(evidence))
         reassess = []
         for row in existing:
             if row.status == "dismissed":
@@ -519,8 +523,13 @@ async def path_analysis_job(job, db) -> dict:
             + "<fields>" + _json(fields) + "</fields>\n"
             + workspace_language_block() + "\n"
             + "<existing_paths>" + _json(reassess) + "</existing_paths>\n"
-            + "<dismissed_paths>" + _json([row.title for row in existing if row.status == "dismissed"]) + "</dismissed_paths>"
-            + ("\n<semantic_recall>" + _json(recall) + "</semantic_recall>" if recall else ""))
+            + "<dismissed_paths>" + _json([row.title for row in existing if row.status == "dismissed"]) + "</dismissed_paths>")
+        # No read transaction stays open across the embedding call or the model call.
+        db.rollback()
+        recall = await _semantic_recall(db, job.workspace_id, _recall_query(fields, records),
+                                        set(vault) & set(evidence))
+        if recall:
+            analyst_input += "\n<semantic_recall>" + _json(recall) + "</semantic_recall>"
         db.rollback()
         prompt = load_prompt("path_analyzer")
         analysis = None

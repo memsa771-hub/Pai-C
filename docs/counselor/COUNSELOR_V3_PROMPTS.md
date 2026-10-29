@@ -298,7 +298,7 @@ Find a short passage in the supplied pages that directly addresses the student's
 
 ## 360-degree path analyzer (background)
 
-Runtime: backend/app/pai_c/deep/prompts/path_analyzer.md. Limits and statuses: backend/app/pai_c/policy/path_analyzer.json. Fields come from backend/app/pai_c/policy/study_fields.json, filtered by the student's current education (paths/fields.candidate_fields). Code turns any have, partial or blocker without a valid evidence id into unknown, drops fields outside the candidates, fields with fewer than min_fit_evidence have/partial items and paths that state a world number, and titles each path by its study field, never by the model.
+Runtime: backend/app/pai_c/deep/prompts/path_analyzer.md. Limits and statuses: backend/app/pai_c/policy/path_analyzer.json. Fields come from backend/app/pai_c/policy/study_fields.json, filtered by the student's current education (paths/fields.candidate_fields). Code turns any have, partial or blocker without a valid evidence id into unknown, drops fields outside the candidates, fields with fewer than min_fit_evidence have/partial items, paths that state a world number and paths whose why (evidence_item_ids) cites no Vault entry (fact, record or item; notebook ids and recall hits without an id do not count), and titles each path by its study field, never by the model.
 
 ```text
 You are PAI's path analyzer. You look at one student from every side and suggest the fields of study they could take. You never decide for them.

@@ -193,3 +193,43 @@ async def test_evidence_has_level_and_source():
             client.app.dependency_overrides.clear()
     served = {item["item_id"]: item for item in listed.json()["data"]["possibilities"][0]["evidence"]}
     assert served[VAULT_ITEM]["source_label"] == "Chat" and served[VAULT_ITEM]["evidence_level"] == "stated"
+
+
+@pytest.mark.asyncio
+async def test_agent_stated_fact_shows_as_pai_guess_on_the_path():
+    """One ladder (review Important 1): a fact an agent wrote is "PAI's guess"
+    on the Vault page, so the path citing it says the same, not "stated"."""
+    from app.memory.vault import VaultService
+    from app.memory.vault_view import VaultView
+    with StudentSession() as student, student.factory() as db:
+        seed(student, db)
+        add_education(student, db)
+        VaultService(db).apply_fact(student.workspace_id, "location.current_city", "Lahore", source_type="agent",
+                                    evidence={"quote": "Probably Lahore"})
+        db.commit()
+        fact_id = next(row.entry["id"] for row in VaultView(db).rows(student.workspace_id)
+                       if row.entry["kind"] == "fact" and row.entry["type"] == "location.current_city")
+        assert next(row.entry["level"] for row in VaultView(db).rows(student.workspace_id)
+                    if row.entry["id"] == fact_id) == "inferred"
+        reply = analysis(path("electrical_engineering", ids=["c1", VAULT_ITEM, fact_id]))
+        _, prompt, _ = await run_job(student, db, reply,
+                                     recall=[{"id": fact_id, "kind": "vault_fact", "text": "City: Lahore"}])
+        row = db.scalar(select(PaiPossibility).where(PaiPossibility.workspace_id == student.workspace_id))
+        evidence = {item["item_id"]: item for item in row.evidence}
+    # A fact hit maps to its card id (the VaultFact id) and is citable.
+    assert f'"id":"{fact_id}"' in prompt.split("<semantic_recall>")[1]
+    assert evidence[fact_id]["evidence_level"] == "inferred"
+    assert evidence[VAULT_ITEM]["evidence_level"] == "stated"
+
+
+@pytest.mark.asyncio
+async def test_a_failing_recall_never_fails_the_run():
+    with StudentSession() as student, student.factory() as db:
+        seed(student, db)
+        add_education(student, db)
+        job_id = enqueue_path_analysis(db, student.workspace_id, source_event_id=None, channel=None, reason="vault")
+        db.commit()
+        with patch(MODEL, AsyncMock(return_value=json.dumps(analysis(path("electrical_engineering"))))) as model,              patch(RECALL, AsyncMock(side_effect=RuntimeError("index down"))):
+            result = await path_analysis_job(db.get(BackgroundJob, job_id), db)
+    assert result["status"] == "stored" and len(result["paths"]) == 1
+    assert "<semantic_recall>" not in model.await_args.kwargs["messages"][0]["content"]
