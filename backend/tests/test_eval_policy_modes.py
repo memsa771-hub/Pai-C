@@ -48,6 +48,7 @@ async def test_deep_eval_policy_mode_uses_production_runtime(tmp_path):
     assert turns and all(turn["decision"]["action"] in ("counsel", *asking) for turn in turns)
     assert all(turn["decision"]["question_allowed"] == (turn["decision"]["action"] in asking) for turn in turns)
     assert turns[0]["decision"]["action"] == "intro"
+    assert any(turn["decision"]["action"] in ("bank_question", "explore_area") for turn in turns[1:])
     assert all(turn["reply"] for turn in turns)
 
 

@@ -109,7 +109,7 @@
     }
    },
    "writer": [
-    "A district prize means your work held up next to many others. What is a challenge you have faced that shaped how you work?"
+    "A district prize means your work held up next to many others. Which A-level subjects are you taking, and how are your grades so far?"
    ],
    "extract": [
     {
@@ -124,8 +124,8 @@
     }
    ],
    "expect": {
-    "action": "bank_question",
-    "bank_intent": "obstacles"
+    "action": "explore_area",
+    "topic": "history"
    }
   }
  ],

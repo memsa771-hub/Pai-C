@@ -8,7 +8,6 @@ from app.memory.vault_view import entry_ref  # noqa: F401  re-exported for PAI C
 from app.memory.vault_view import _result_text as result_text, display_text  # noqa: F401  re-exported for PAI C
 from app.memory.student_schema import RECORD_SPECS  # noqa: F401  re-exported for PAI C
 from app.memory.completeness import relevance_version  # noqa: F401  re-exported for PAI C
-from app.memory.normalize import detect_language  # noqa: F401  re-exported for PAI C
 from app.memory.vault_context import (  # noqa: F401  re-exported for PAI C
     context_policy, estimated_tokens, select_context_entries, sensitive_types_for)
 from app.pai_c.deep.notebook import NotebookService
@@ -33,6 +32,19 @@ PROFILE_RECORD_KINDS = (
     "skill", "certification", "research", "achievement", "goal", "financial_sponsor",
     "scholarship_application", "application", "visa", "document",
 )
+
+
+def onboarding_words(db, workspace_id) -> list[str]:
+    """The student's own typed onboarding answers (fields with no choice list,
+    such as their name, country and city): the only words PAI has before the
+    first chat message, so the opening can match their script."""
+    from app.memory.onboarding import ONBOARDING_FIELDS
+    from app.memory.vault import VaultService
+    facts = VaultService(db).snapshot(workspace_id, include_sensitive=True)
+    keys = dict.fromkeys(field.field_key for field in ONBOARDING_FIELDS
+                         if not field.choices and not field.choice_list and not field.is_date
+                         and not field.record_field)
+    return [facts[key] for key in keys if isinstance(facts.get(key), str) and facts[key].strip()]
 
 
 def labelled_value(type_key, value):

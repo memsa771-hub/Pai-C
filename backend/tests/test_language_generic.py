@@ -119,11 +119,6 @@ async def test_render_copy_once_per_language_and_english_never_calls_the_model()
             assert await language.render_copy(db, ws, "other", "Open the Roadmap.") == "Open the Roadmap."
 
 
-def test_onboarding_language_detection_is_data():
-    assert language.detected_language("Lahore") is None
-    assert language.detected_language("main parhai kar raha hoon aur mujhe pasand hai") == ROMAN
-
-
 @pytest.mark.asyncio
 async def test_mirror_text_is_written_in_the_chat_language():
     sentences = ["Tum FSc Pre-Engineering mein ho aur 82% marks hain.", "Tumhe robotics pasand hai.",
@@ -156,3 +151,24 @@ async def test_needs_education_message_is_rendered_in_the_chat_language():
         assert result["status"] == "needs_education"
         assert student.transcript[-1]["content"] == "Pehle apni taleem batao."
         assert json.loads(model.await_args.kwargs["messages"][0]["content"])["text"] == copy
+
+
+def test_no_language_code_constants_in_pai_c():
+    """The chat path never names a language code (BETA_CONVERSATION_SPEC 2.5);
+    the Vault-side detector in memory/normalize keeps its own labels."""
+    found = []
+    for path in (APP / "pai_c").rglob("*.py"):
+        for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
+            if isinstance(node, ast.Constant) and isinstance(node.value, str) and (
+                    node.value == "ur" or "roman_ur" in node.value):
+                found.append(f"{path.relative_to(APP)}:{node.lineno}")
+    assert found == []
+
+
+@pytest.mark.parametrize("text,script", [
+    ("\u0645\u06cc\u06ba \u0627\u0646\u062c\u06cc\u0646\u0626\u0631", "arabic"),
+    ("Main engineer banna chahta hoon", "latin"),
+    ("\u092e\u0948\u0902 \u0907\u0902\u091c\u0940\u0928\u093f\u092f\u0930", "other"), ("2024", None)])
+def test_opening_script_is_script_only(text, script):
+    expected = None if script is None else {"code": None, "script": script}
+    assert language.script_of(text) == expected

@@ -64,6 +64,27 @@ def next_bank_item(*, vault_types, asked, previous, intent, mentioned, declined_
     return None
 
 
+def route_next_step(db, workspace_id: str) -> str | None:
+    """The active route decision's first step that is not done (its choose-time
+    snapshot and the student's ticks), in its roadmap.json copy; None without one."""
+    from app.pai_c.roadmap.decisions import RouteDecisionService, done_keys
+    row = RouteDecisionService(db).active(workspace_id)
+    if row is None:
+        return None
+    done, copy = set(done_keys(row)), load_data("roadmap.json")["copy"]
+    for step in row.steps or []:
+        template = copy.get(step.get("label_key"))
+        if step.get("status") == "done" or step.get("key") in done or not template:
+            continue
+        values = {key: ", ".join(map(str, value)) if isinstance(value, list) else value
+                  for key, value in (step.get("values") or {}).items()}
+        try:
+            return template.format_map(values)
+        except (KeyError, IndexError, ValueError):
+            continue
+    return None
+
+
 def derive_state(signals, *, coverage, mirror_ready, plan, student_count,
                  prior_decisions, replies, student_ordinals, current_event_id,
                  reply_requested_input=None, vault_types=None):
@@ -94,19 +115,22 @@ def derive_state(signals, *, coverage, mirror_ready, plan, student_count,
     window = policy["question_window"]
     requested = reply_requested_input or [False] * len(replies)
     asking = [requested[i] or any(question_sentences(reply)) for i, reply in enumerate(replies)]
-    bank = {"intro_due": False, "next_bank_item": None, "bank_asked": []}
+    bank = {"intro_due": False, "next_bank_item": None, "bank_streak": 0}
     if vault_types is not None:
         asked = bank_asked(prior_decisions, asking)
         skip = load_data("question_bank.json")["skip_intents"]
-        bank = {"bank_asked": asked,
+        streak = 0
+        for row in reversed(prior_decisions):
+            if not row["decision"].get("bank_intent"):
+                break
+            streak += 1
+        bank = {"bank_streak": streak,
                 "intro_due": not any(asking) and data["intent"] not in skip
                     and load_data("question_bank.json")["first_item"] not in asked,
                 "next_bank_item": next_bank_item(vault_types=set(vault_types), asked=asked, previous=previous,
                     intent=data["intent"], mentioned=data["mentioned_areas"], declined_at=declines,
                     student_count=student_count)}
     return {**data, **bank, "coverage": coverage, "mirror_ready": mirror_ready,
-            "short_answer": data["intent"] == policy["short_reply_intent"],
-            "chat_language": data.get("language"),
             "student_count": student_count, "previous": previous,
             "previous_mentioned_areas": previous.get("signals", {}).get("mentioned_areas", []),
             "declined_at": declines, "short_reply_streak": streak,
@@ -152,6 +176,8 @@ def build_state(db, turn, signals, history):
         StudentJourney.journey_type == "counselor_decision", StudentJourney.status == "active"))
     draft = (journey.counselor_summary_draft or {}) if journey else {}
     state["journey_stage"] = journey.current_stage if journey else None
+    # The chosen route's first open step names the next step (next_steps.json step_line).
+    state["route_step"] = route_next_step(db, turn.workspace_id) if journey and journey.current_stage == "CHOSEN" else None
     # The card is posted in chat once, the first time it is ready (spec 2.5).
     posted = draft.get("mirror_posted_version") if draft.get("type") == "mirror_state" else None
     state["mirror_due"] = bool(mirror_ready and journey is not None and not posted)

@@ -19,13 +19,12 @@ from app.memory.student_records import StudentRecordService
 from app.models import CounselorTurnDecision, Workspace
 from app.pai_c.deep.polish import question_count
 from app.pai_c.policy import classifier, controller
+from app.pai_c.voice.guards import ends_with_step
 from scripts.counselor_eval_support import StudentSession
 
 FIXTURES = Path(__file__).parent / "fixtures" / "conversations"
 CASES = sorted(path.stem for path in FIXTURES.glob("*.json"))
 BANNED = [*controller.load_data("mirror.json")["text"]["praise_words"], "great question", "shukriya"]
-MARKERS = [marker.casefold() for phase in controller.load_data("next_steps.json")["phases"].values()
-           for marker in phase["markers"]]
 
 
 def _signals(changes):
@@ -87,7 +86,7 @@ async def test_golden_conversation(monkeypatch, name):
             label = f"{name} turn {index + 1}"
             assert len(rows) == index + 1, label
             assert decision["action"] == expect["action"], label
-            for key in ("bank_intent", "bank_followup"):
+            for key in ("bank_intent", "bank_followup", "topic"):
                 if key in expect:
                     assert decision[key] == expect[key], label
             # The Writer's reply is posted as scripted: the guards did not need to rewrite it.
@@ -98,7 +97,7 @@ async def test_golden_conversation(monkeypatch, name):
                 assert not decision["must_drive"] and question_count(reply) == 0, label
             else:
                 assert decision["must_drive"], label
-                assert question_count(reply) == 1 or any(m in reply.casefold() for m in MARKERS), label
+                assert ends_with_step(reply), label
             assert language == turn["signals"]["language"], label
             if expect.get("about_pai"):
                 assert "<about_pai>" in prompts[0], label

@@ -1,5 +1,5 @@
 {
- "description": "A student who answers in one word: one gentle follow-up per bank item, then PAI moves on.",
+ "description": "A student who answers in one word: one gentle follow-up per bank item, then PAI moves on; after three bank questions in a row a missing education basic comes first.",
  "turns": [
   {
    "student": "hi",
@@ -67,7 +67,7 @@
     }
    },
    "writer": [
-    "Cricket mein tumhe sab se zyada kya acha lagta hai?"
+    "Cricket theek hai. Tum abhi kis class mein ho, aur pichla result kaisa tha?"
    ],
    "extract": [
     {
@@ -82,9 +82,8 @@
     }
    ],
    "expect": {
-    "action": "bank_question",
-    "bank_intent": "hobbies",
-    "bank_followup": true
+    "action": "explore_area",
+    "topic": "history"
    }
   },
   {

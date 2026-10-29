@@ -55,7 +55,8 @@ async def test_direct_information_empty_profile_queues_research_not_an_interview
         # The answer comes first; the drive rule ends the reply with the next step.
         posted = student.transcript[-1]["content"]
         assert posted.startswith("I'll check current sources for that information.")
-        assert posted.endswith(controller.load_data("next_steps.json")["phases"]["getting_to_know"]["line"])
+        # While getting to know the student, an answer ends with the next bank question.
+        assert posted.endswith(controller.bank_item("about_you")["prompt"])
         with student.factory() as db:
             job = db.scalar(select(BackgroundJob).where(BackgroundJob.job_type == "research.claim"))
             assert job and job.payload["request_id"]

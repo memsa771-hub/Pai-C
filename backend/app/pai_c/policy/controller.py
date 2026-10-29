@@ -97,15 +97,18 @@ def bank_item(intent_key):
 
 
 def next_step(state, chosen):
-    """What this reply ends with (next_steps.json): in a phase that asks and a
-    reply allowed a question, the bank question (this move's, else the next
-    one), else the next missing education basic; otherwise the phase's line,
-    a concrete action that names a workspace place."""
+    """What this reply ends with (next_steps.json). In a phase that asks, a
+    reply allowed a question (or one answering a request) ends with the bank
+    question (this move's, else the next one), else the next missing education
+    basic; otherwise with the phase's line, a concrete action that names a
+    workspace place (in the chosen phase, the route's first open step).
+    `question` says whether the step is a question; `line` is the phase line,
+    the fallback when a question step would repeat one already asked."""
     data = load_data("next_steps.json")
     phase = data["stage_phase"].get(state.get("journey_stage") or "", data["default_phase"])
     rules = data["phases"][phase]
-    step = {"phase": phase, "markers": rules["markers"], "place": None}
-    if rules["ask"] and chosen.get("question_allowed"):
+    step = {"phase": phase, "place": None, "question": True, "line": rules["line"], "line_place": rules["place"]}
+    if rules["ask"] and (chosen.get("question_allowed") or chosen.get("action") in data["question_after_actions"]):
         item = bank_item(chosen.get("bank_intent")) or state.get("next_bank_item")
         if item:
             followup = chosen.get("bank_followup") if chosen.get("bank_intent") else item.get("followup")
@@ -115,7 +118,10 @@ def next_step(state, chosen):
         if basic:
             topic_text = load_data("areas_policy.json")["topic_text"].get(basic, "")
             return {**step, "key": "basic:" + basic, "text": data["basic_question"].format(topic_text=topic_text)}
-    return {**step, "key": "phase:" + phase, "text": rules["line"], "place": rules["place"]}
+    text = rules["line"]
+    if rules.get("step_line") and state.get("route_step"):
+        text = rules["step_line"].format(step=state["route_step"])
+    return {**step, "question": False, "key": "phase:" + phase, "text": text, "place": rules["place"]}
 
 
 def decide(state):
@@ -128,6 +134,13 @@ def decide(state):
     state.update(askable_area=next(iter(candidates), None),
                  next_askable_area=next(iter(alternatives), None), previous=previous,
                  askable_basic=next((area for area in candidates if area in basics), None))
+    # After bank_max_in_a_row bank questions, a missing education basic comes
+    # first; the bank continues after it (question_bank.json).
+    bank = load_data("question_bank.json")
+    state["basic_due"] = bool(state.get("next_bank_item") and state["askable_basic"]
+                              and state.get("bank_streak", 0) >= bank["bank_max_in_a_row"])
+    if state["basic_due"]:
+        state["next_bank_item"] = None
     # The classifier judges one message; a missing education basic is a reason to ask that it cannot see.
     state["question_due"] = evaluate(table.get("question_due", {"ref": "question_needed"}), state)
     row = next(row for row in table["rows"] if evaluate(row["when"], state))

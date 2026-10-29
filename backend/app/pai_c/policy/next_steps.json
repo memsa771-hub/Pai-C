@@ -1,20 +1,43 @@
 {
-  "_note": "The drive rule (BETA_CONVERSATION_SPEC 2.3): every reply except care (and a student who said stop) ends with the next step, one question or one concrete action. The phase comes from the counselor journey stage. In a phase that asks, a reply allowed a question gets the next bank question, else the next missing education basic (basic_question); otherwise the phase line, a concrete action that names a workspace place. markers are words that show a reply already names that next step (a question mark always counts). The line is English; it is shown in the student's language through the rendered copy cache.",
+  "_note": "The drive rule (BETA_CONVERSATION_SPEC 2.3): every reply except care (and a student who said stop) ends with the next step, one question or one concrete action. The Writer returns it as the JSON field next_step, posted as the reply's last line. The phase comes from the counselor journey stage. In a phase that asks, a reply allowed a question, or one of question_after_actions (answering a request), ends with the next bank question, else the next missing education basic (basic_question); otherwise with the phase line, a concrete action that names a workspace place. In the chosen phase, step_line names the chosen route's first open step (its roadmap.json copy). Lines are English; they are shown in the student's language through the rendered copy cache.",
   "default_phase": "getting_to_know",
   "stage_phase": {
-    "IDENTITY": "getting_to_know", "FOUNDATION": "getting_to_know", "DIRECTION": "getting_to_know",
-    "MIRROR": "mirror", "RESEARCHING": "mirror", "ASSESSING": "mirror", "NEEDS_INFO": "mirror",
-    "PROPOSED": "proposed", "CHOSEN": "chosen"
+    "IDENTITY": "getting_to_know",
+    "FOUNDATION": "getting_to_know",
+    "DIRECTION": "getting_to_know",
+    "MIRROR": "mirror",
+    "RESEARCHING": "mirror",
+    "ASSESSING": "mirror",
+    "NEEDS_INFO": "mirror",
+    "PROPOSED": "proposed",
+    "CHOSEN": "chosen"
   },
   "basic_question": "Could you tell me {topic_text}?",
   "phases": {
-    "getting_to_know": {"ask": true, "place": "profile", "markers": ["Vault", "Mirror", "Profile"],
-      "line": "Your Profile page shows what I know about you so far; tell me more about yourself whenever you like."},
-    "mirror": {"ask": true, "place": "overview", "markers": ["Mirror"],
-      "line": "Open your Mirror and tell me what feels right and what feels wrong."},
-    "proposed": {"ask": false, "place": "roadmap", "markers": ["Roadmap"],
-      "line": "Your fields are on the Roadmap page: open it and pick the one you want to look at first."},
-    "chosen": {"ask": false, "place": "roadmap", "markers": ["Roadmap"],
-      "line": "Your next step is on the Roadmap page: open your route and do the first open step."}
-  }
+    "getting_to_know": {
+      "ask": true,
+      "place": "profile",
+      "line": "Your Profile page shows what I know about you so far; tell me more about yourself whenever you like."
+    },
+    "mirror": {
+      "ask": true,
+      "place": "overview",
+      "line": "Open your Mirror and tell me what feels right and what feels wrong."
+    },
+    "proposed": {
+      "ask": false,
+      "place": "roadmap",
+      "line": "Your fields are on the Roadmap page: open it and pick the one you want to look at first."
+    },
+    "chosen": {
+      "ask": false,
+      "place": "roadmap",
+      "line": "Your next step is on the Roadmap page: open your route and do the first open step.",
+      "step_line": "Your next step is {step}: open your route on the Roadmap page and tick it off when it is done."
+    }
+  },
+  "question_after_actions": [
+    "answer_request",
+    "about_pai"
+  ]
 }

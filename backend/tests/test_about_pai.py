@@ -48,6 +48,7 @@ async def test_about_pai_is_answered_from_data_without_research_or_a_noted_quest
     async def writer(**kwargs):
         prompts.append(kwargs["system_prompt"])
         return json.dumps({"reply": "PAI tumhara education counselor hai. Profile page par tumhara Vault hai.",
+                           "next_step": "Ab apne baare mein batao: aaj kal kya karte ho?",
                            "moves": ["give"], "action": {"type": "show_place", "place": "profile"}})
 
     with StudentSession() as student:
@@ -62,6 +63,8 @@ async def test_about_pai_is_answered_from_data_without_research_or_a_noted_quest
             posted = db.scalars(select(EventRecord).where(EventRecord.source == "openagents:pai",
                                                           EventRecord.type == "workspace.message.posted")).all()
             assert posted[-1].metadata_.get("workspace_place") == "profile"
+            # The Writer's next step is the posted reply's last line.
+            assert posted[-1].payload["content"].endswith("\n\nAb apne baare mein batao: aaj kal kya karte ho?")
     assert "<about_pai>" in prompts[0] and "_note" not in prompts[0].split("<about_pai>", 1)[1][:40]
     assert "Vault" in prompts[0].split("<about_pai>", 1)[1].split("</about_pai>", 1)[0]
 

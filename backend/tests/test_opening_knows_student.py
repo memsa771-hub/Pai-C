@@ -52,15 +52,22 @@ async def test_opening_names_the_education_line_and_asks_one_open_question():
     assert "Pre-Engineering" in core["education_line"]
     assert "Lahore" in core["facts"].values()
     assert ABOUT_YOU in prompt and "Never ask anything <student_core> already answers" in prompt
-    assert _section(prompt, "opening_language") is None
+    # Only the script of the student's own words (city, name), never a language code.
+    assert _section(prompt, "opening_language") == {"code": None, "script": "latin"}
+    assert "Lahore" in _section(prompt, "student_words")
 
 
 @pytest.mark.asyncio
-async def test_opening_language_is_the_chat_language_else_the_onboarding_text():
+async def test_opening_language_is_the_chat_language_else_the_script_of_the_students_words():
+    words = "\u0645\u06cc\u06ba \u067e\u0691\u06be \u0631\u06c1\u0627 \u06c1\u0648\u06ba"
     with StudentSession() as student, student.factory() as db:
-        _fact(db, student.workspace_id, "identity.current_status", "main abhi parhai kar raha hoon aur mujhe pasand hai")
-        prompt = await _open(student, db)
-        assert _section(prompt, "opening_language") == {"code": "ur", "script": "latin"}
+        # The Vault keeps English, so the student's own script is seen through their typed words.
+        with patch("app.pai_c.memory.onboarding_words", return_value=[words]):
+            prompt = await _open(student, db)
+        # Script only, never a language code: the Writer matches the student's own words.
+        assert _section(prompt, "opening_language") == {"code": None, "script": "arabic"}
+        assert words in _section(prompt, "student_words")
+        assert "same language and script as the student's own words" in prompt
     with StudentSession() as student, student.factory() as db:
         language.set_chat_language(db, student.workspace_id, {"code": "ps", "script": "arabic"})
         db.commit()

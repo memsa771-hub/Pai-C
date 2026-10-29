@@ -40,14 +40,13 @@ def student_core(db, workspace_id: str, name: str) -> dict:
             "facts": facts}
 
 
-def opening_language(db, workspace_id: str, core: dict) -> dict | None:
-    """The chat language when known, else the language of the onboarding
-    answers, else None (English)."""
-    from app.pai_c.language import chat_language, detected_language
+def opening_language(db, workspace_id: str, words: list[str]) -> dict | None:
+    """The chat language when known; else only the script of the student's own
+    onboarding words ({code: None, script}), never a guessed language; else
+    None (English)."""
+    from app.pai_c.language import chat_language, script_of
     known = chat_language(db, workspace_id)
-    if known is not None:
-        return known
-    return detected_language(" ".join(str(value) for value in core["facts"].values()))
+    return known if known is not None else script_of(" ".join(words))
 
 
 def _already_posted(db, workspace_id, channel):
@@ -75,12 +74,15 @@ async def opening_job(job, db):
                                   job_id, None, "system:opening")
         context = await build_context(db, workspace_id, turn)
         core = student_core(db, workspace_id, name)
-        language = opening_language(db, workspace_id, core)
+        from app.pai_c.memory import onboarding_words
+        words = onboarding_words(db, workspace_id)
+        language = opening_language(db, workspace_id, words)
         from app.pai_c.policy.controller import bank_item, load_data
         about_you = bank_item(load_data("question_bank.json")["first_item"])["prompt"]
         instruction = (Path(__file__).parent / "policy/actions/opening.md").read_text(
             encoding="utf-8").replace("{about_you}", about_you)
         sections = ("<student_core>" + json.dumps(core, ensure_ascii=False) + "</student_core>\n"
+                    + "<student_words>" + json.dumps(words, ensure_ascii=False) + "</student_words>\n"
                     + "<opening_language>" + json.dumps(language) + "</opening_language>")
         db.rollback()
         try:
@@ -92,6 +94,9 @@ async def opening_job(job, db):
             from app.pai_c.deep.turn import unfence
             data = json.loads(unfence(raw))
             reply = data.get("reply") if isinstance(data, dict) else None
+            step = data.get("next_step") if isinstance(data, dict) else None
+            if isinstance(reply, str) and isinstance(step, str) and step.strip():
+                reply = reply.rstrip() + "\n\n" + step.strip()
             if not isinstance(reply, str) or not reply.strip() or contains_blocked_script(
                     reply, config.PAI_LANGUAGE_BLOCKED_SCRIPTS):
                 raise ValueError("Invalid opening reply")

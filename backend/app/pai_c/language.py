@@ -17,13 +17,19 @@ model or a failed render all show the English text.
 import hashlib
 import json
 import logging
+import time
 from pathlib import Path
 
+import regex
 from sqlalchemy.orm.attributes import flag_modified
 
 from app.models import Workspace
 
 logger = logging.getLogger(__name__)
+_ARABIC = regex.compile(r"\p{Script=Arabic}")
+_LATIN = regex.compile(r"\p{Script=Latin}")
+# Renders that failed lately (cache key -> monotonic time), per process.
+_FAILED: dict[str, float] = {}
 
 
 def _policy() -> dict:
@@ -63,10 +69,24 @@ def set_chat_language(db, workspace_id: str, language) -> bool:
     return True
 
 
-def detected_language(text: str) -> dict | None:
-    """The language of free text (onboarding answers) by the memory normalizer; None is English."""
-    from app.pai_c.memory import detect_language
-    return valid_language(_policy()["detected"].get(detect_language(text or "")))
+def script_of(text: str) -> dict | None:
+    """The script most of the letters in `text` are written in, never a
+    language: `{code: None, script}`, or None when it has no letters. Used
+    before any classifier has read the student (the opening), so the Writer
+    matches the student's own words instead of PAI guessing their language."""
+    counts = {"arabic": 0, "latin": 0, "other": 0}
+    for char in text or "":
+        if not char.isalpha():
+            continue
+        if _ARABIC.match(char):
+            counts["arabic"] += 1
+        elif _LATIN.match(char):
+            counts["latin"] += 1
+        else:
+            counts["other"] += 1
+    if not any(counts.values()):
+        return None
+    return {"code": None, "script": max(counts, key=counts.get)}
 
 
 def _cache_key(key: str, english: str, language: dict) -> str:
@@ -87,6 +107,9 @@ async def render_copy(db, workspace_id: str, key: str, english: str, language=No
     cached = (workspace.rendered_copy or {}).get(cache_key)
     if isinstance(cached, str) and cached.strip():
         return cached
+    failed_at = _FAILED.get(cache_key)
+    if failed_at is not None and time.monotonic() - failed_at < _policy()["render_retry_seconds"]:
+        return english
     from app.inference import usage
     if not usage.role_allowed("counselor"):
         return english
@@ -106,9 +129,14 @@ async def render_copy(db, workspace_id: str, key: str, english: str, language=No
             raise ValueError("invalid rendered copy")
     except Exception as exc:  # noqa: BLE001  the English copy is always a safe answer
         logger.warning("copy_render_failed key=%s error_type=%s", key, type(exc).__name__)
+        _FAILED[cache_key] = time.monotonic()
         return english
     workspace = db.get(Workspace, workspace_id)
-    workspace.rendered_copy = {**(workspace.rendered_copy or {}), cache_key: text.strip()}
+    # A copy text that changed since (another digest for the same key) is dropped.
+    prefix, own = key + "|", cache_key.rsplit("|", 2)[0] + "|"
+    kept = {name: value for name, value in (workspace.rendered_copy or {}).items()
+            if not name.startswith(prefix) or name.startswith(own)}
+    workspace.rendered_copy = {**kept, cache_key: text.strip()}
     flag_modified(workspace, "rendered_copy")
     db.commit()
     return text.strip()

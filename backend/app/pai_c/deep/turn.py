@@ -9,7 +9,7 @@ from dataclasses import dataclass, field
 
 from app.config import config
 from app.pai_c.deep.context import DeepContext, build_context
-from app.pai_c.deep.polish import contains_blocked_script, polish_reply
+from app.pai_c.deep.polish import contains_blocked_script, polish_reply, question_count
 from app.pai_c.deep.prompts import load_prompt
 from app.pai_c.deep.turn_input import CounselorTurnInput
 from app.pai_c.memory import MemoryService
@@ -74,16 +74,34 @@ def _parse_response(raw: str, *, violations=None) -> tuple[str, dict, list[str]]
     return re.sub(r'\\"\s*,?\s*$', "", stripped), {"type": "none"}, []
 
 
-async def _append_next_step(db, turn, decision, reply, action):
-    """The phase's next step (next_steps.json), in the student's language, after the reply."""
+def _written_step(raw: str) -> str:
+    """The Writer's `next_step` field (the reply's last line), or ""."""
+    for text in (raw, unfence(raw)):
+        try:
+            parsed = json.loads(text)
+        except (ValueError, TypeError):
+            continue
+        step = parsed.get("next_step") if isinstance(parsed, dict) else None
+        return step.strip() if isinstance(step, str) else ""
+    return ""
+
+
+async def _append_next_step(db, turn, decision, reply, action, history=(), avoid=()):
+    """The decision's next step (next_steps.json), in the student's language, as
+    the reply's last line. A question step already asked falls back to the
+    phase line, so the append never repeats a question."""
     from app.pai_c.language import render_copy
+    from app.pai_c.voice.guards import repeated_questions
     step = decision.next_step or {}
-    if not step.get("text"):
+    key, text, place = step.get("key"), step.get("text"), step.get("place")
+    if text and step.get("question") and repeated_questions(text, history, avoid):
+        key, text, place = "phase:" + step["phase"], step.get("line"), step.get("line_place")
+    if not text:
         return reply, action
-    line = await render_copy(db, turn.workspace_id, step["key"], step["text"])
-    reply = polish_reply((reply.rstrip() + " " + line).strip())
-    if step.get("place") and action.get("type", "none") == "none":
-        action = {"type": "show_place", "place": step["place"]}
+    line = await render_copy(db, turn.workspace_id, key, text)
+    reply = polish_reply((reply.rstrip() + "\n\n" + line).strip())
+    if place and action.get("type", "none") == "none":
+        action = {"type": "show_place", "place": place}
     return reply, action
 
 
@@ -121,7 +139,7 @@ async def run_deep_turn(db, turn: CounselorTurnInput, *,
         # Monthly cap reached: a fixed reply that says PAI is paused, no model call.
         return DeepTurnResult(config.PAI_COUNSELOR_FALLBACK_REPLY + "\n\n" + usage.paused_line(),
                               {"type": "none"}, context, 0, 0, [], ["cap_paused"])
-    from app.pai_c.voice.guards import drives, repeated_questions, remove_repeated, question_sentences, repeats_previous_reply
+    from app.pai_c.voice.guards import ends_with_step, repeated_questions, remove_repeated, question_sentences, repeats_previous_reply
     for attempt in range(2):
         started = time.monotonic()
         try:
@@ -199,15 +217,26 @@ async def run_deep_turn(db, turn: CounselorTurnInput, *,
                 polish_ms += int((time.monotonic() - started) * 1000)
                 continue
         # The drive rule: the reply ends with the next step (a question or a
-        # concrete action); one rewrite, then the step is appended (data copy).
-        if decision is not None and decision.must_drive and card is None and not drives(reply, decision.next_step):
+        # concrete action). The Writer returns it as `next_step`, posted as the
+        # last line; a question there only when the step is one and it is new.
+        # One rewrite, then the step is appended (data copy).
+        step_line = ""
+        if decision is not None and decision.must_drive and card is None:
+            step_line = _written_step(raw)
+            if step_line and question_count(step_line) and (
+                    not (decision.next_step or {}).get("question")
+                    or repeated_questions(step_line, history, avoid)):
+                step_line = ""
+            if step_line:
+                reply = polish_reply(reply.rstrip() + "\n\n" + step_line)
+        if decision is not None and decision.must_drive and card is None and not ends_with_step(reply, step_line):
             if attempt == 0:
                 violations.append("drive_retry")
                 retry_line = (Path(__file__).parent.parent / "policy/prompts/drive_retry.md").read_text(
                     encoding="utf-8").strip().replace("{next_step}", (decision.next_step or {}).get("text", ""))
                 polish_ms += int((time.monotonic() - started) * 1000)
                 continue
-            reply, action = await _append_next_step(db, turn, decision, reply, action)
+            reply, action = await _append_next_step(db, turn, decision, reply, action, history, avoid)
             violations.append("drive_appended")
         polish_ms += int((time.monotonic() - started) * 1000)
         break

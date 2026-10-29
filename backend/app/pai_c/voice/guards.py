@@ -51,10 +51,11 @@ def repeats_previous_reply(reply, history):
     return bool(previous.strip()) and similarity(reply, previous) >= config.PAI_REPEAT_REPLY_SIMILARITY
 
 
-def drives(reply, next_step):
-    """True when the reply ends the turn with a next step: a question, or a
-    line naming the phase's next step (next_steps.json markers)."""
-    if any(question_sentences(reply)):
+def ends_with_step(reply, step_line=""):
+    """True when the reply ends with a next step: its last sentence is a
+    question, or its last line is the next step the Writer returned. A page
+    named earlier in the reply is not a next step."""
+    text = reply.rstrip()
+    if text and "QUESTION MARK" in unicodedata.name(text[-1], ""):
         return True
-    text = reply.casefold()
-    return any(marker.casefold() in text for marker in (next_step or {}).get("markers", ()))
+    return bool(step_line.strip()) and text.endswith(step_line.strip())

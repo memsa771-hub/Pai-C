@@ -1,5 +1,5 @@
 {
- "description": "A new student writes in Roman Urdu with no opening posted: intro, then the bank skips what the student already covered or the Vault already holds.",
+ "description": "A new student writes in Roman Urdu with no opening posted: intro, then the bank skips what the student already covered or the Vault already holds; after three bank questions in a row the missing education comes first, then the bank resumes.",
  "turns": [
   {
    "student": "Assalam o alaikum",
@@ -107,7 +107,7 @@
     }
    },
    "writer": [
-    "Shaam ko dukaan sambhalna bhi zimmedari aur hisaab ki samajh deta hai. Class ke bahar kaunsi activities mein tum shamil ho, aur un mein tumhara role kya tha?"
+    "Shaam ko dukaan sambhalna bhi zimmedari aur hisaab ki samajh deta hai. Matric mein tumhara group kya tha aur marks kitne aaye?"
    ],
    "extract": [
     {
@@ -122,8 +122,29 @@
     }
    ],
    "expect": {
+    "action": "explore_area",
+    "topic": "history"
+   }
+  },
+  {
+   "student": "Matric science mein kiya, 1000 mein se 920 aaye.",
+   "signals": {
+    "intent": "sharing",
+    "mentioned_areas": [
+     "history"
+    ],
+    "language": {
+     "code": "ur",
+     "script": "latin"
+    }
+   },
+   "writer": [
+    "Science ke saath achhe marks engineering ka raasta khula rakhte hain. Koi aisi mushkil jis ka tumne saamna kiya ho aur jis ne tumhare sochne ka tareeqa badla ho?"
+   ],
+   "extract": [],
+   "expect": {
     "action": "bank_question",
-    "bank_intent": "extracurriculars"
+    "bank_intent": "obstacles"
    }
   }
  ],

@@ -45,7 +45,8 @@ KEEPING THE CONVERSATION ALIVE
 
 OUTPUT
 Return ONE JSON object and nothing else:
-{"reply": "<what the student sees and hears>", "moves": ["reflect" | "give" | "summarize" | "ask"], "action": {"type": "none" | "mirror" | "wellbeing" | "note_question" | "rethink" | "show_place", "question_to_research": "<only for note_question>", "reason": "<only for rethink>", "place": "<only for show_place>"}}
+{"reply": "<what the student sees and hears, without the next step>", "next_step": "<the reply's last line: the one question or one concrete action from <decision> next_step, in your own words and the student's language; empty only for care or a student who asked to stop>", "moves": ["reflect" | "give" | "summarize" | "ask"], "action": {"type": "none" | "mirror" | "wellbeing" | "note_question" | "rethink" | "show_place", "question_to_research": "<only for note_question>", "reason": "<only for rethink>", "place": "<only for show_place>"}}
+The student sees next_step as the last line of the reply, so never repeat it inside reply. It is a question only when <decision> next_step is one.
 
 FACT OR STORY
 For factual input use only an available <fact_cards> card: action {"type":"collect_fact","card_key":"the available key"}. Do not invent choices. Optional value and quote must be exact spans of the latest student message; confirmation is always required. Other stays editable. If no catalog exists, use text or upload. A card replaces your spoken question. For a story, ask one question only when question_allowed. Never offer a card when questions are not allowed.
