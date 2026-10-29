@@ -112,3 +112,55 @@ the two failure logs' ids:
 - **Three programmes.** Only 3 of the 29 seeded programmes (ovgu-eeit, tu-chemnitz-embedded-systems,
   btu-artificial-intelligence) have the facts an application step needs, so all 12 students use those three. The
   start page offers all 29; the other 26 have no facts (`walk:S1:chip_unknown_says_being_researched`).
+
+## After the fix pass (Task 11)
+
+Date: 2026-10-29. Branch `os/s9-t11-fixes`: batch A `78ce040` and `256fe9c` (backend), batch B `6fe27b6` (screens),
+batch C `9206ccc` (F1 and three review follow-ups). Same 12 fictional students, offline AI, rehearsal mode.
+
+### Re-run
+
+| run | command (from `backend/`) | runtime | end states | failures |
+|---|---|---|---|---|
+| Full | `python -m tests.os.rehearsal.run --students all --out ~/s9-rehearsal/full-3` | 424 s | 12 of 12 `visa_ready`; 12 ready to submit, 12 visa file ready; every scripted event `:ok` | 1: `paused:S7` (owner-accepted) |
+| Kill | `python -m tests.os.rehearsal.run --students all --kill --out ~/s9-rehearsal/kill-3` | 617 s, 54 worker SIGKILLs | the same as the full run | the same 1 id |
+
+- **Admin steps: none.** The driver no longer supplies `visa_target_date`. The visa step's date now comes from the visa
+  programme's `semester_start`; the rehearsal loads fictional semester starts as test data
+  (`backend/tests/os/rehearsal/semester_starts.yaml`, `example.invalid` URLs), since offline research finds nothing.
+- **Kill comparison** (`~/s9-rehearsal/kill-compare-3.txt`): 12 of 12 students have the same state, end points and
+  event outcomes; the failure ids are identical; no `lost_tasks` and no `duplicate:*` entry. Rehearsal days differ by
+  0 to 2 (the kill run draws extra random numbers). **Match.**
+- Both driver runs exit 1 only because `paused:S7` stays in the log. That entry is accepted (below).
+- The short rehearsal in CI (S1, S3, S5) now passes with **no xfail**.
+
+### Outcome of each original failure
+
+The `fixed_by` and `owner_accepted` fields are recorded in `~/s9-rehearsal/full-1`, `kill-1` and `walkthroughs`
+`failures.yaml`.
+
+| id | outcome |
+|---|---|
+| F3 `http:S9:GET /statements:500` | fixed by `78ce040` |
+| F1 `fact_missing:visa_target_date` | fixed by `9206ccc`: the playbook derives the visa date (6 weeks, `visa_before_semester_days`) from the researched `semester_start` of the programme the visa file is for |
+| F2 `left_open:S3:removed_programme` | fixed by `78ce040`, hardened in `256fe9c` |
+| F4 `paused:S7` | owner-accepted: "Accepted as designed (S7-D9) by the user on the owners' behalf, 2026-10-28" |
+| `walk:S3:admission_card_unnamed` | fixed by `6fe27b6` |
+| `walk:S3:statements_page_500` | fixed by `78ce040` (same cause as F3) |
+| `walk:S9:cannot_change_approved_sop` | fixed by `78ce040` (same cause as F3) |
+| `walk:S1:no_menu_on_os_pages` | fixed by `6fe27b6` |
+| `walk:S1:inbox_programme_unnamed` | fixed by `6fe27b6` |
+| `walk:S1:nothing_to_do_while_blocked` | fixed by `9206ccc`: a step blocked on a missing fact is listed under "Waiting" with what it waits for |
+| `walk:S1:visa_admitted_label_one_only` | fixed by `6fe27b6` |
+| `walk:S3:removed_programme_still_shown` | fixed by `6fe27b6` (with F2) |
+| `walk:S1:chip_unknown_says_being_researched` | fixed by `6fe27b6` |
+| `walk:S1:statement_programmes_raw_refs` | fixed by `6fe27b6` |
+| `walk:S1:datasheet_label_overlap` | fixed by `6fe27b6` |
+| `walk:S1:visa_how_to_apply_programme_text` | fixed by `6fe27b6` |
+| `walk:S1:plan_updated_notice_empty` | fixed by `6fe27b6` |
+| `walk:S1:documents_read_needs_tap` | fixed by `6fe27b6` |
+| `walk:S1:done_after_upload` | fixed by `6fe27b6` (wording) |
+| `walk:S1:ticks_before_approve` | fixed by `6fe27b6` (wording) |
+
+The walkthroughs were not played again in a browser after the fix pass. The screen fixes are covered by component
+tests and by the batch B screenshots at 375 px (`~/s9-rehearsal/walkthroughs-2`).
