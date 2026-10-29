@@ -59,11 +59,14 @@ def counselor_workspace(network: str=Query(...),db=Depends(get_db),
         action=(turn.decision or {}).get('action')
         if action and action not in moments: moments[action]=turn.source_event_id
     from app.pai_c.completeness import completeness_from
+    from app.pai_c.mirror import MirrorEngine
     coverage=memory.coverage_areas(wid)
+    card=MirrorEngine(db).build(wid)
     # `coverage` stays one release for the Overview chips; `completeness` replaces it.
     return success_response({'coverage':coverage,'completeness':completeness_from(coverage),'personal':personal, 'sections':memory.profile_sections(wid),
         'capabilities':memory.capability_view(wid),'academic':memory.academic_view(wid),
-        'picture':(draft.get('mirror') or {}).get('core_picture') if draft.get('status')=='confirmed' else None,
+        # The Mirror state card's header, unknowns and text (FOUR_FEATURES_SPEC 2.3).
+        'picture':{key:card[key] for key in ('header','unknowns','text','ready','version')},
         'mirror_status':draft.get('status'),'moments':moments,
         # The server-owned Counselor stage. Moments are the Counselor's planned
         # next moves, not things the student has seen, so the A-K view uses

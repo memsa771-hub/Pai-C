@@ -26,8 +26,10 @@ def test_summary_api_shows_only_student_facing_summary_in_own_workspace():
             result = client.get("/v1/counselor/summary", params=params,
                                 headers={"X-Workspace-Token": "synthetic-test-only"})
             assert result.status_code == 200
-            assert result.json()["data"] == {"status": "awaiting_confirmation",
-                                               "version": 2, "summary": {
-                                                   "stated_goal": {"value": "Study CS", "status": "answered"}}}
+            # The Mirror state card (FOUR_FEATURES_SPEC 2.3); a draft's internals never show.
+            data = result.json()["data"]
+            assert data["type"] == "mirror_state"
+            assert set(data["card"]) == {"version", "header", "areas", "unknowns", "text", "ready"}
+            assert "Internal draft reply" not in result.text
         finally:
             app.dependency_overrides.pop(get_db, None)

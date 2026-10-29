@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+import logging
 from typing import Any
 from uuid import uuid4
 
@@ -31,6 +32,9 @@ UPDATABLE = frozenset({
     "target_outcome", "target_date", "milestones", "decisions",
     "unresolved_decisions", "blockers", "next_milestone", "next_recommended_action",
 })
+
+
+logger = logging.getLogger(__name__)
 
 
 class JourneyError(ValueError):
@@ -192,6 +196,38 @@ class JourneyService:
             }
             self.set_counselor_stage(workspace_id, journey_id, "MIRROR", actor=actor)
         row.updated_at = datetime.now(timezone.utc)
+        self._event(row, JOURNEY_UPDATED, {"changed": ["counselor_summary_draft"]}, actor)
+        return self._view(row)
+
+    @staticmethod
+    def keeps_old_draft(draft: dict) -> bool:
+        """An old 4-line Mirror (or summary) draft still waiting on the student."""
+        return bool(draft) and draft.get("type") != "mirror_state" and draft.get("status") not in (
+            "confirmed", "needs_changes", "failed")
+
+    def set_mirror_text(self, workspace_id: str, text: str, card_version: str,
+                        *, actor: str = "system") -> JourneyView | None:
+        """Store the Mirror text the background job wrote for one state card
+        (FOUR_FEATURES_SPEC 2.2). An old Mirror or summary draft still waiting
+        on the student is left alone (None) until Task 3 retires those drafts;
+        a confirmed, changed or failed one is replaced."""
+        row = self.db.execute(select(StudentJourney).where(
+            StudentJourney.workspace_id == workspace_id,
+            StudentJourney.journey_type == "counselor_decision",
+            StudentJourney.status == "active",
+        ).limit(1).with_for_update()).scalar_one_or_none()
+        if row is None:
+            raise JourneyError("Counselor journey not found")
+        current = row.counselor_summary_draft or {}
+        if self.keeps_old_draft(current):
+            logger.info("mirror_text_kept_old_draft journey_id=%s status=%s", row.id, current.get("status"))
+            return None
+        now = datetime.now(timezone.utc)
+        row.counselor_summary_draft = {
+            "type": "mirror_state", "version": int(current.get("version") or 0) + 1,
+            "text": text, "written_at": now.isoformat(), "card_version": card_version,
+        }
+        row.updated_at = now
         self._event(row, JOURNEY_UPDATED, {"changed": ["counselor_summary_draft"]}, actor)
         return self._view(row)
 

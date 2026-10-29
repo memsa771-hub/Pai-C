@@ -93,6 +93,17 @@ def provenance_for(candidate: MemoryCandidate) -> tuple[str, str, Optional[str]]
     return "agent_inference", "agent_proposal", None
 
 
+#: Called as hook(db, candidate) after each accepted Vault write. Read models
+#: above shared memory (the Counselor's Mirror text) register here from the
+#: capability loader, because shared memory never imports PAI C.
+_ACCEPT_HOOKS: list = []
+
+
+def register_accept_hook(hook) -> None:
+    if hook not in _ACCEPT_HOOKS:
+        _ACCEPT_HOOKS.append(hook)
+
+
 #: A course whose qualification is on a card stays pending until it is answered.
 _WAITING = object()
 
@@ -199,6 +210,9 @@ class MemoryReconciler:
                 payload={"candidate_id": candidate.id},
                 idempotency_key=f"research-resume:{candidate.id}",
             )
+            # `enqueue` above loaded the capability registry, which registers the hooks.
+            for hook in _ACCEPT_HOOKS:
+                hook(self.db, candidate)
         return result
 
     def reconcile_pending(self, workspace_id: str, limit: int = 100) -> list[ReconcileResult]:

@@ -1,0 +1,43 @@
+{
+  "_note": "Mirror state card (FOUR_FEATURES_SPEC 2.1, 2.2; app/pai_c/mirror). Levels: 0 unknown, 1 known with stated/inferred evidence only, 2 one shown/confirmed entry, 3 at least strong_entries_for_3 shown/confirmed entries. ready: the coverage_requirements.json mode named in ready.mode lists notebook coverage keys (said, self); ready.areas maps each key to the coverage areas that stand for it now that the card reads the Vault (education first: history goes with said). tension: pairs of {area, kind, fields} sides and a rule; different_field resolves each side's text to a study field (catalog study_fields wording, then study field titles, then field_words) and marks a tension when the families differ or both name different fields. source_labels: a document's filename wins, then the evidence capture, then the source type. text: the background text job's limits; praise_words and university_words are checked case-insensitively as whole words, a university word only when the card itself does not contain it.",
+  "levels": {"strong": ["shown", "confirmed"], "strong_entries_for_3": 2},
+  "ready": {"mode": "light", "areas": {"said": ["history", "goals"], "self": ["interests"]}},
+  "header_name_fields": ["identity.preferred_name", "identity.full_name"],
+  "education_areas": ["history", "status"],
+  "education_text": {"with_percent": "{level} {groups}, {percent}%", "without_percent": "{level} {groups}",
+                     "groups_joiner": " / "},
+  "tension": [
+    {"a": {"area": "family_social", "kind": "family_member", "fields": ["wish"]},
+     "b": {"area": "goals", "kind": "goal", "fields": ["details.field_of_study", "title"]},
+     "rule": "different_field", "note_key": "tension.family_vs_goal"}
+  ],
+  "field_words": {
+    "doctor": {"field": "mbbs"}, "medicine": {"field": "mbbs"}, "medical": {"family": "health"},
+    "dentist": {"field": "bds"}, "pharmacist": {"field": "pharm_d"}, "pharmacy": {"field": "pharm_d"},
+    "nurse": {"field": "nursing"}, "engineer": {"family": "engineering"}, "engineering": {"family": "engineering"},
+    "computer": {"family": "computing"}, "programming": {"family": "computing"}, "software": {"field": "software_engineering"},
+    "lawyer": {"field": "law_llb"}, "law": {"field": "law_llb"},
+    "business": {"family": "business"}, "accountant": {"field": "accounting_finance"}, "ca": {"field": "accounting_finance"},
+    "teacher": {"field": "education"}, "architect": {"field": "architecture"}, "army": {"family": "army"},
+    "forces": {"family": "army"}, "css": {"family": "civil_service"}
+  },
+  "source_labels": {
+    "captures": {"onboarding": "Onboarding", "vault_api": "Details", "fact_card": "Details"},
+    "source_types": {"user_explicit": "Details", "conversation": "Chat", "document": "Document"},
+    "default": "Chat"
+  },
+  "copy": {
+    "tension.family_vs_goal": "Your family's wish and the field you lean toward point to different fields."
+  },
+  "text": {
+    "min_sentences": 3,
+    "max_sentences": 4,
+    "attempts": 2,
+    "praise_words": ["great", "amazing", "awesome", "impressive", "excellent", "brilliant", "fantastic",
+                     "wonderful", "remarkable", "outstanding", "proud", "well done", "good job", "congratulations",
+                     "zabardast", "shabash", "achi misaalein"],
+    "university_words": ["university", "universities", "nust", "lums", "uet", "giki", "comsats", "pieas",
+                         "aku", "kemu", "iba", "qau", "pu", "bzu"],
+    "second_person": ["you", "your"]
+  }
+}

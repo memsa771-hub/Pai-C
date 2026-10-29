@@ -60,18 +60,20 @@ def _group_freshness(sources, group):
     return max(days) if days and None not in days else None
 
 
-def coverage_areas(notebook, snapshot, items=(), stale_ids=frozenset(), now=None):
+def coverage_areas(notebook, snapshot, items=(), stale_ids=frozenset(), now=None, with_ids=False):
     """`items` are the active Vault items; areas.json names their types.
     `stale_ids` are the Vault entries past their catalog freshness window
     (VaultView.stale_ids): an area that only they cover is `stale`, so the
-    completeness meter counts it unknown and the counselor asks again."""
+    completeness meter counts it unknown and the counselor asks again.
+    `with_ids` adds `entry_ids`: the Vault entries (never notebook rows) that
+    passed the area's filters, so the Mirror shows exactly what covers it."""
     now = now or datetime.now(timezone.utc)
     data = notebook.model_dump(mode="json")
     areas = load_areas(DATA_DIR)
     result = {}
     for area, spec in areas.items():
         locations, min_items = (spec["sources"], spec.get("min_items", 1)) if isinstance(spec, dict) else (spec, 1)
-        evidence, strength, sides, stale = {}, {}, {}, set(stale_ids)
+        evidence, strength, sides, stale, vault_ids = {}, {}, {}, set(stale_ids), []
         for index, location in enumerate(locations):
             # Equivalent notebook and Vault sources share a `group` (areas.json);
             # a source without one is its own group.
@@ -110,6 +112,8 @@ def coverage_areas(notebook, snapshot, items=(), stale_ids=frozenset(), now=None
                 if days and evidence[identity] and now > evidence[identity] + timedelta(days=days):
                     stale.add(identity)
                 strength[identity] = _strength(row)
+                if "path" not in location and identity not in vault_ids:
+                    vault_ids.append(identity)
                 sides.setdefault((group, "path" in location), set()).add(identity)
         dates = [stamp for stamp in evidence.values() if stamp is not None]
         levels = [level for level in strength.values() if level]
@@ -133,6 +137,8 @@ def coverage_areas(notebook, snapshot, items=(), stale_ids=frozenset(), now=None
                         "item_count": count,
                         "min_items": min_items, "last_confirmed": max(dates) if dates else None,
                         "evidence": max(levels, key=EVIDENCE_ORDER.index) if levels else None}
+        if with_ids:
+            result[area]["entry_ids"] = vault_ids
     return result
 
 

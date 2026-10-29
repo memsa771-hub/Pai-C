@@ -8,7 +8,7 @@ from sqlalchemy import select
 
 from app.api.response import success_response
 from app.database import get_db
-from app.models import StudentJourney, StudentJourneyEvent, CounselorMirrorFeedback, Workspace
+from app.models import StudentJourneyEvent, CounselorMirrorFeedback, Workspace
 from app.journey import JourneyService, JourneyError
 from app.routers._workspace_auth import _authorized
 from app.pai_c.summary_access import _journey
@@ -20,18 +20,10 @@ router = APIRouter(prefix="/v1/counselor", tags=["Counselor"])
 def current_summary(network: str = Query(...), db=Depends(get_db),
                     x_workspace_token: str | None = Header(None),
                     authorization: str | None = Header(None)):
+    """The Mirror state card, computed from the Vault on this read."""
+    from app.pai_c.mirror import MirrorEngine
     workspace = _authorized(db, network, x_workspace_token, authorization)
-    row = db.execute(select(StudentJourney).where(
-        StudentJourney.workspace_id == str(workspace.id),
-        StudentJourney.journey_type == "counselor_decision",
-        StudentJourney.status == "active").limit(1)).scalar_one_or_none()
-    draft = (row.counselor_summary_draft or {}) if row else {}
-    if draft.get("type") == "mirror":
-        return success_response({"type": "mirror", "status": draft.get("status"),
-                                 "mirror": draft.get("mirror"), "version": draft.get("version")})
-    return success_response({"status": draft.get("status"),
-                             "summary": draft.get("summary") or {},
-                             "version": draft.get("version")})
+    return success_response({"type": "mirror_state", "card": MirrorEngine(db).build(str(workspace.id))})
 
 
 class MirrorAction(BaseModel):

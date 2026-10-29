@@ -130,6 +130,15 @@ class _Row:
     section: Optional[str]          # Details section, or None for a story type
     sensitivity: str
     file_ids: set
+    capture: Optional[str] = None   # the surface that took it (evidence.capture), never its words
+
+
+def entry_ref(entry: dict) -> str:
+    """An entry named as coverage_areas and profile_cards name it:
+    `fact:<key>`, `<record kind>:<id>`, `item:<id>`."""
+    if entry["kind"] == "fact":
+        return "fact:" + entry["type"]
+    return ("item:" if entry["kind"] == "item" else entry["type"] + ":") + str(entry["id"])
 
 
 class VaultView:
@@ -197,10 +206,14 @@ class VaultView:
         """Entries past their freshness window, named as coverage_areas names
         its sources (`fact:<key>`, `<record kind>:<id>`, `item:<id>`), so the
         completeness meter reads staleness from this one place."""
-        prefix = {"fact": lambda e: "fact:" + e["type"], "record": lambda e: f"{e['type']}:{e['id']}",
-                  "item": lambda e: f"item:{e['id']}"}
         rows = self._rows(workspace_id, [], {}, _aware(now) or datetime.now(timezone.utc))
-        return {prefix[r.entry["kind"]](r.entry) for r in rows if r.entry["stale"]}
+        return {entry_ref(r.entry) for r in rows if r.entry["stale"]}
+
+    def rows(self, workspace_id: str, now: Optional[datetime] = None) -> list[_Row]:
+        """Every entry with its sensitivity and capture, documents linked, for
+        read models built on the view (the Mirror state card)."""
+        return self._rows(workspace_id, self._open_issues(workspace_id), self._files(workspace_id),
+                          _aware(now) or datetime.now(timezone.utc))
 
     # ---- reads -------------------------------------------------------------
 
@@ -315,7 +328,8 @@ class VaultView:
             # whose title is a wording ("BS Computer Science").
             entry["record_level"] = vault_catalog().record_level(spec, value)
         file_ids = {r.get("file_id") for r in refs if isinstance(r, dict) and r.get("file_id")}
-        return _Row(entry, section, sensitivity, file_ids)
+        capture = evidence.get("capture")
+        return _Row(entry, section, sensitivity, file_ids, capture if isinstance(capture, str) else None)
 
     @staticmethod
     def _link(refs: list, files: dict) -> Optional[dict]:

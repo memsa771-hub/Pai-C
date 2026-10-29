@@ -4,6 +4,7 @@ from app.memory.student_snapshot import StudentSnapshotService
 from app.memory.episodic import EpisodicMemoryService
 from app.memory.permissions import capabilities_for_agent
 from app.memory.catalog import vault_catalog  # noqa: F401  re-exported for PAI C
+from app.memory.vault_view import entry_ref  # noqa: F401  re-exported for PAI C
 from app.memory.vault_context import (  # noqa: F401  re-exported for PAI C
     context_policy, estimated_tokens, select_context_entries, sensitive_types_for)
 from app.pai_c.deep.notebook import NotebookService
@@ -159,13 +160,22 @@ class MemoryService:
         spec = vault_catalog().type(type_key)
         return spec is not None and spec.sensitivity == "restricted"
 
-    def coverage_areas(self, workspace_id):
+    def coverage_areas(self, workspace_id, *, rows=None, with_ids=False):
+        """`rows` (from `vault_rows`) saves a second pass over the Vault when
+        the caller already has it; staleness is read from them."""
         from app.pai_c.understanding.views import coverage_areas
         from app.memory.vault_items import VaultItemService
         from app.memory.vault_view import VaultView
+        stale = ({entry_ref(row.entry) for row in rows if row.entry["stale"]} if rows is not None
+                 else VaultView(self.db).stale_ids(workspace_id))
         return coverage_areas(self.truth_map(workspace_id).notebook, self.profile(workspace_id),
-                              VaultItemService(self.db).active(workspace_id),
-                              VaultView(self.db).stale_ids(workspace_id))
+                              VaultItemService(self.db).active(workspace_id), stale, with_ids=with_ids)
+
+    def vault_rows(self, workspace_id):
+        """The Vault view's entries (display text in catalog labels, level,
+        source, document, dates; never evidence) with sensitivity and capture."""
+        from app.memory.vault_view import VaultView
+        return VaultView(self.db).rows(workspace_id)
 
     def academic_view(self, workspace_id):
         from app.pai_c.understanding.views import academic_view
