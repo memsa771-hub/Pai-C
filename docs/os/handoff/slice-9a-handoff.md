@@ -12,10 +12,10 @@ Authority order: parent spec > Slice 9 spec > Slice 9 plan > the rulings in the 
 
 ## 1. Where things stand
 
-9a is built and rehearsed. **Six of the seven gate marks pass; the billed run (mark 6) is approved but not yet run**:
-the key is now set, but the first attempt (2026-10-29) could not reach OpenAI: this environment's network policy
-refuses `api.openai.com` and the universities' sites. It spent $0. So **9a's gate is not yet passed**, and no
-real student may start (spec §10 Q4 and the gate).
+9a is built and rehearsed. **All seven gate marks pass** (mark 5 with its stated limit). The billed run (mark 6) ran
+on 2026-10-29 with real OpenAI: S1 reached `visa_ready` for **$0.49 in total**, research included. What remains is
+the owners' confirmation of D7 (Q5) and the gate itself; no real student may start before 9b's entry conditions
+(§7).
 
 One PR per task, each into `pai-os`:
 
@@ -91,11 +91,36 @@ outside the repo, in `~/s9-rehearsal/`.
 | 3 | No task lost or duplicated, also with the worker killed | **Pass** | `kill-5`: 50 SIGKILLs, 0 lost, 0 duplicated, same end states as `full-5` (`kill-compare-5.txt`) |
 | 4 | The failure log is clear: fixed with a test, or accepted by the owners | **Pass** | 20 distinct ids from Task 10: 19 fixed with a test (`fixed_by` in the logs), 1 accepted (`paused:S7`, by the user on the owners' behalf). The final runs log only that one |
 | 5 | The three phone walkthroughs find nothing that blocks a student | **Pass, with a limit** | Task 10's walkthroughs found 3 `blocks` (2 root causes); all are fixed (`78ce040`, `6fe27b6`). **The walkthroughs were not played again in a browser after the fix pass.** The screen fixes have Vitest tests, and batch B took 375 px screenshots against a mocked API (`~/s9-rehearsal/walkthroughs-2`). The owners' OK for the fake sign-in path was not seen |
-| 6 | The billed run finishes within its cap and gives a cost per student below D7 | **Not run** | Approved by the user on the owners' behalf (2026-10-29), then reduced at the user's request ("as low as possible"): **S1 only, caps 1.5/1/1/0.5 = $4** (guard stop at $3). The key is set; **waiting for the network policy to allow `api.openai.com` and the universities' sites** (first attempt: $0 spent). `--billed`, its check and its preflight are built and tested |
+| 6 | The billed run finishes within its cap and gives a cost per student below D7 | **Pass** | 2026-10-29, `~/s9-rehearsal/billed`: S1 only, caps 1.5/1/1/0.5 = $4 (the user: "as low as possible"). S1 reached `ready_to_submit` and `visa_ready` in 5 rehearsal days. **Total spend $0.49**, no model errors, no guard stop. Failure log: one driver false positive, `duplicate:draft_per_request` (§3 below). The first attempt, blocked by the network policy, spent $0 |
 | 7 | The usual checks pass | **Pass** | See §1: `tests/os`, legacy, standalone (module off), Tach, the single head, Vitest, `tsc`, the OS-enabled build |
 
-**Cost figure for D7: not yet measured — billed run pending key.** When it has run, `python -m scripts.os_costs`
-(command in `rehearsal.md`, "Billed run") gives each student's AI cost and research as a shared cost.
+**Cost figure for D7: $0.30 per student, plus $0.20 of shared research** (`scripts.os_costs`, tenant
+`rehearsal-billed`). Even with all the research charged to one student, that is **$0.49 against D7's $10 per student per
+year**.
+
+| Part | Model | Calls | Cost |
+|---|---|---|---|
+| Documents (S1's own) | gpt-5.4 | 10 | $0.081 |
+| Statements: Writer | gpt-5.4 | 12 | $0.109 |
+| Statements: Critic | gpt-5.4 | 12 | $0.105 |
+| Research (shared, 2 programmes) | gpt-5.4-mini | 17 | $0.196 |
+| Replan | – | 0 | $0 |
+
+Limits:
+- **One student, the plain path.** Events, replans and a third programme would add some cost.
+- **Research is shared.** Its cost falls per student as more students pick the same programmes.
+- **`semester_start` came from the fictional seed** (ruling 31), not from research.
+
+**Findings from the billed run** (fictional data; neither blocks 9a):
+1. **The Critic never accepted a statement.** Each of the 6 Writer runs for the SOP and the CV ended with the Critic
+   asking follow-ups. Each asked for the exact programme and university name and for programme features: S1's SOP is a
+   bundle statement with no single programme. The driver answered each time, so each artifact got 6 versions before
+   S1 approved one. This costs little ($0.21 for both) but is poor for a real student. For 9b: give the Writer and
+   Critic the bundle's programme names, or tell the Critic that a bundle statement is generic on purpose.
+2. **`duplicate:draft_per_request` is a driver false positive.** The check assumes one Writer version per draft request,
+   which holds offline (the canned Critic always accepts). With a real Critic, every follow-up answer starts a new
+   workflow (new inputs, new ID; invariant 8 holds), so the count is expected. For 9b: count follow-up answers as
+   requests in the check.
 
 **Found while building `--billed` (Task 12):** the four caps are **monthly on rehearsal time** (`month_spend` counts
 from the start of the clock's month), and a billed rehearsal crosses several rehearsal months (S5 takes about 170
@@ -219,16 +244,16 @@ The `fixed_by` and `owner_accepted` fields are in `~/s9-rehearsal/full-1`, `kill
 
 From spec §10, updated:
 1. **Q1 the billed run:** approved by the user on the owners' behalf on 2026-10-29, reduced to S1 and $4 (ruling
-   31). The key is set. Still needed: the environment's network policy must allow `api.openai.com` and the
-   universities' sites. Also set a hard spend limit on the OpenAI project that owns the key: the driver's guard is a
-   soft backstop (§3).
+   31). **Done** on 2026-10-29: $0.49 (§3). For the pilot, set a hard spend limit on the OpenAI project that owns
+   the key: the driver's guard was a soft backstop, and the pilot has only the monthly caps.
 2. **Q2 the pilot terms text** (data location, how long files are kept): still open. Until then the placeholder
    cannot be accepted outside rehearsal mode. A qualified review is a 9b item.
 3. **Q3 where the pilot server lives** (its own server from `pai-os`, or the real merge first): open. The rule "never
    open or prepare a `pai-os` → `dev` PR" stands.
 4. **Q4 S8-D3** (the pilot opens when Slice 8 passes on the PAI OS side): still to confirm. Real students also wait for
    the 9a gate, which waits for mark 6.
-5. **Q5 D7** ($10 per student per year): pending the billed run's figure.
+5. **Q5 D7** ($10 per student per year): the billed run measured **$0.49 for one student**, all research included
+   (§3). The owners confirm D7.
 
 Raised during 9a:
 6. **Visa timing:** `visa_before_semester_days` is 6 weeks (an apply-by date), while a visa usually takes about 90
@@ -268,12 +293,8 @@ Raised during 9a:
 
 ## 7. Next steps
 
-**To close 9a:** allow `api.openai.com` and the universities' sites in the environment's network policy; in a new
-session, run the billed rehearsal with S1 and the $4 caps and the cost report (`rehearsal.md`,
-"Billed run", which also says how to read a budget stop); fill in mark 6 and the D7 figure here; the owners confirm
-D7 (Q5). Two things are untested before that run: real research page fetches through this container's proxy, and the
-`--billed` path end to end with a real key. The budget guard's worst case is the $12 stop point plus the work in
-flight during one wait for the worker (the guard looks after every wait, and stops if a wait times out). Optionally replay the three
+**To close 9a:** the owners confirm D7 (Q5) against the billed run's figure (§3) and accept the gate. The billed run
+has now tested real research page fetches and the `--billed` path end to end. Optionally replay the three
 walkthroughs in a browser on the fixed code.
 
 **The final whole-slice review (2026-10-29)** found the work ready for 9b planning, with 0 Critical. Its cheap
