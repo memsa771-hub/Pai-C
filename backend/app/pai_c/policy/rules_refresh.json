@@ -1,0 +1,21 @@
+{
+  "_note": "Monthly rules and calendar refresh (BETA_CONVERSATION_SPEC 3.3; app/research/rules_refresh.py). targets: per policy file, the items to check: glob is a path of keys and list indexes where * matches every key or index (keys starting with _ are skipped), fields are the values the model reads from the item's source, sources names the item's key holding its URL (a string or a list; the first https URL is read). Items sharing a URL are checked with one page read and one model call; each counts against PAI_RULES_REFRESH_MAX_CALLS. A value becomes a proposed diff only when its quote is verbatim on the page and passes required_checks, and it differs from the current value. Nothing is applied: scripts/apply_refresh.py applies a reviewed proposal. validation_tests are what apply_refresh runs before keeping a change.",
+  "targets": {
+    "admission_rules.json": [
+      {"glob": "rules/*", "fields": ["min_percent", "years"], "sources": "sources", "label": "applies_to"},
+      {"glob": "rules/*/entry_tests/*", "fields": ["pass_percent"], "sources": "source", "label": "name"}
+    ],
+    "academic_calendar.json": [
+      {"glob": "events/*", "fields": ["months"], "sources": "sources", "label": "label"},
+      {"glob": "tests/*", "fields": ["register_months", "test_months", "result_months"], "sources": "sources", "label": "key"},
+      {"glob": "intakes/*", "fields": ["apply_months", "merit_list_months", "classes_start_month"], "sources": "sources", "label": "label"},
+      {"glob": "regions/*/*", "fields": ["months"], "sources": "sources", "label": "month_note"}
+    ]
+  },
+  "page_chars": 20000,
+  "max_tokens": 2000,
+  "required_checks": ["current_cycle", "schema", "freshness"],
+  "confidence_levels": ["official", "secondary"],
+  "proposals_dir": "refresh_proposals",
+  "validation_tests": ["tests/test_admission_rules.py", "tests/test_academic_calendar.py"]
+}

@@ -116,6 +116,10 @@ async def _request_path(db, workspace_id, journey, tool_context, possibility_id,
         key += f":refresh:{previous.id}"
     brief = {"possibility_id": row.id, "title": row.title, "why": row.why,
         "evidence": row.evidence or [], "relevance_version": version}
+    if kind == "path_explain" and (row.study_field or {}).get("key"):
+        # The shared field note (BETA_CONVERSATION_SPEC 3.1) is the explanation's first source.
+        from app.pai_c.paths.field_research import student_country
+        brief.update(field_key=row.study_field["key"], country=student_country(db, workspace_id))
     if kind == "program_search":
         from app.pai_c.memory import MemoryService
         brief["route"] = PossibilityService(db).research_route(row)

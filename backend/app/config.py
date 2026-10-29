@@ -198,6 +198,11 @@ class Config:
     # Path analysis runs that reach the model, per workspace and UTC day. Quiet
     # (Vault, planner) runs over it are skipped; a run that answers a chat ask still runs.
     PAI_PATH_ANALYSIS_MAX_PER_DAY: int = int(os.environ.get("PAI_PATH_ANALYSIS_MAX_PER_DAY", "20"))
+    # Field notes (BETA_CONVERSATION_SPEC 3.1) are shared per study field and
+    # country; one older than this many days is researched again.
+    PAI_FIELD_NOTE_DAYS: int = int(os.environ.get("PAI_FIELD_NOTE_DAYS", "90"))
+    # Page reads plus model calls one monthly rules and calendar refresh may make (spec 3.3).
+    PAI_RULES_REFRESH_MAX_CALLS: int = int(os.environ.get("PAI_RULES_REFRESH_MAX_CALLS", "60"))
     PAI_SENSITIVE_CHECK_MODEL: str = os.environ.get("PAI_SENSITIVE_CHECK_MODEL", "")
     PAI_SEMANTIC_RECALL_ENABLED: bool = os.environ.get("PAI_SEMANTIC_RECALL_ENABLED", "true").lower() == "true"
     PAI_SEMANTIC_RECALL_TOP_K: int = int(os.environ.get("PAI_SEMANTIC_RECALL_TOP_K", "5"))

@@ -176,8 +176,9 @@ async def run_worker_loop(
                 next_research_sweep = time.monotonic() + max(60, config.PAI_RESEARCH_SWEEP_SECONDS)
                 db = new_session()
                 try:
-                    from app.research.scheduler import enqueue_due_verification
+                    from app.research.scheduler import enqueue_due_verification, enqueue_monthly_rules_refresh
                     count = enqueue_due_verification(db)
+                    enqueue_monthly_rules_refresh(db)
                     db.commit()
                     if count:
                         logger.info("marked %d expired research sources unconfirmed", count)

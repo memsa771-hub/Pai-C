@@ -29,7 +29,8 @@ def prepare(db, workspace_id):
               for person in people if person.get('evidence')]
     # The student chooses the connection; code never claims a quote answers a worry.
     evidence = [{'id': hashlib.sha256(row['text'].encode()).hexdigest(), 'quote': row['text']} for row in path.evidence or []
-                if isinstance(row, dict) and isinstance(row.get('text'), str) and row['text'].strip()]
+                if isinstance(row, dict) and isinstance(row.get('text'), str) and row['text'].strip()
+                and not row.get('source_url')]  # a field-note fact is the world's, not the student's words
     evidence = list({row['id']: row for row in evidence}.values())
     return {'ready': bool(family and evidence), 'path_id': path.id, 'path': path.title,
         'family': family, 'evidence': evidence,

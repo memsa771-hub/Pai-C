@@ -1861,3 +1861,24 @@ class PaiUsageMonth(Base):
     updated_at = Column(DateTime(timezone=True), default=_now, onupdate=_now, server_default=text("NOW()"))
 
     __table_args__ = (UniqueConstraint("scope", "month", name="uq_usage_months_scope_month"),)
+
+
+class PaiFieldNote(Base):
+    """Researched notes on one study field in one country (migration 124).
+
+    Shared by every student, so research is paid once per field, not per
+    student (BETA_CONVERSATION_SPEC 3.1). `note` holds the sections, each fact
+    with its verbatim quote and source URL; `sources` the pages read. A note
+    older than PAI_FIELD_NOTE_DAYS is researched again.
+    """
+    __tablename__ = "pai_field_notes"
+
+    id = Column(UUID(as_uuid=False), primary_key=True, default=_uuid)
+    field_key = Column(Text, nullable=False)
+    country = Column(Text, nullable=False)
+    note = Column(JSONB, nullable=False, default=dict)
+    sources = Column(JSONB, nullable=False, default=list)
+    confidence = Column(Text, nullable=False)
+    researched_at = Column(DateTime(timezone=True), nullable=False, default=_now)
+
+    __table_args__ = (UniqueConstraint("field_key", "country", name="uq_field_notes_field_country"),)

@@ -22,7 +22,7 @@ from app.models import (
     BackgroundJob, DocumentArtifact, EventRecord, ExecutionRun, FileRecord, CounselorNotedQuestion, PaiTurnPlan, PaiPossibility,
     CounselorTurnDecision, CounselorNotebook, CounselorNotebookHistory, MemoryCandidate, PaiEpisode, PaiMemory, ProfileFieldResponse, ProfileIssue, ProfileRequirement, StudentRecordRevision,
     StudentJourney, StudentJourneyEvent, Institution, InstitutionDomain,
-    Opportunity, RequirementSet, RouteDecision, StudentRequest, PaiUsageMonth,
+    Opportunity, RequirementSet, RouteDecision, StudentRequest, PaiUsageMonth, PaiFieldNote,
     NotificationRecord, User, VaultDrop, VaultFact, VaultFieldDefinition, VaultItem, Workspace,
     WorkspaceMember, VAULT_INTAKE_MODELS,
 )
@@ -79,7 +79,7 @@ class StudentSession:
                   StudentRecordRevision, BackgroundJob,
                   StudentJourney, StudentJourneyEvent, Institution, InstitutionDomain,
                   Opportunity, RequirementSet,
-                  RouteDecision, StudentRequest, NotificationRecord, PaiUsageMonth,
+                  RouteDecision, StudentRequest, NotificationRecord, PaiUsageMonth, PaiFieldNote,
                   *ENTITY_MODELS.values(), *VAULT_INTAKE_MODELS]
         Base.metadata.create_all(self.engine, tables=[m.__table__ for m in models])
         self.factory = sessionmaker(bind=self.engine, autoflush=False)

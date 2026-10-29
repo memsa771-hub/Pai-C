@@ -48,23 +48,42 @@ def validate_explanation(raw, brief):
     result = PathExplanation.model_validate_json(raw)
     if contains_blocked_script(result.model_dump_json(), config.PAI_LANGUAGE_BLOCKED_SCRIPTS):
         raise ValueError("Blocked script in explanation")
-    evidence = {item["text"] for item in brief["evidence"] if isinstance(item, dict) and item.get("text")}
+    # A field-note fact on the path (it has a source_url) is a world fact, not the student's evidence.
+    evidence = {item["text"] for item in brief["evidence"]
+                if isinstance(item, dict) and item.get("text") and not item.get("source_url")}
     if any(item.evidence not in evidence for item in [*result.fit_for, *result.fit_against]):
         raise ValueError("Fit must cite the student's actual evidence")
     return result
 
 
+def note_pages(brief) -> list[dict]:
+    """The shared field note's quotes, one page per source URL, so the
+    explanation starts from research already verified (BETA_CONVERSATION_SPEC
+    3.1) and fetches fewer pages. No note (or no field) gives none."""
+    if not brief.get("field_key") or not brief.get("country"):
+        return []
+    from app.database import new_session
+    from app.pai_c.paths.field_research import fresh_note, note_facts
+    with new_session() as db:
+        note = fresh_note(db, brief["field_key"], brief["country"])
+    pages: dict[str, list[str]] = {}
+    for fact in note_facts(note) if note else []:
+        pages.setdefault(fact["source_url"], []).append(fact["quote"])
+    return [{"url": url, "text": "\n".join(quotes)} for url, quotes in pages.items()]
+
+
 async def explain(context, payload):
     brief = payload["brief"]
     rules = policy()
-    pages = []
+    pages = note_pages(brief)
+    fetches = max(0, rules["fetch_limit"] - len(pages))
     with bounded_research(queries=config.PAI_RESEARCH_MAX_QUERIES,
         fetches=config.PAI_RESEARCH_MAX_FETCHES, seconds=config.PAI_RESEARCH_MAX_SECONDS,
         workspace_id=context.workspace_id, budget_key=daily_key("path_research")) as budget:
-        found = data(await context.tools.invoke("web.search", {"query": rules["query"].format(field=brief["title"]), "limit": rules["search_limit"]}))
-        for hit in (found.get("results") or [])[:rules["fetch_limit"]]:
+        found = data(await context.tools.invoke("web.search", {"query": rules["query"].format(field=brief["title"]), "limit": rules["search_limit"]})) if fetches else {}
+        for hit in (found.get("results") or [])[:fetches]:
             url = hit.get("url")
-            if not public_https(url):
+            if not public_https(url) or any(page["url"] == url for page in pages):
                 continue
             page = data(await context.tools.invoke("web.fetch", {"url": url, "max_chars": rules["page_chars"]}))
             if page.get("content") and public_https(page.get("url", url)):

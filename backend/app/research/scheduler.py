@@ -40,3 +40,13 @@ def enqueue_due_verification(db, *, now: datetime | None = None, limit: int = 50
         count += 1
     db.flush()
     return count
+
+
+def enqueue_monthly_rules_refresh(db, *, now: datetime | None = None):
+    """One rules and calendar refresh per UTC month (BETA_CONVERSATION_SPEC
+    3.3): the worker's research sweep calls this, so its first sweep in a
+    month queues the job and later sweeps find the same key. The caller commits."""
+    from app.research.rules_refresh import JOB_RULES_REFRESH
+    from app.runtime.task_runtime import enqueue
+    now = now or datetime.now(timezone.utc)
+    return enqueue(db, job_type=JOB_RULES_REFRESH, payload={}, idempotency_key=f"rules_refresh:{now:%Y-%m}")

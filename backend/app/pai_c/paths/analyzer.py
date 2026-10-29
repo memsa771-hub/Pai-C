@@ -69,6 +69,8 @@ class AnalyzedPath(_Strict):
     title: str = Field(default="", max_length=120)
     why: str = Field(min_length=1, max_length=600)
     evidence_item_ids: list[str] = Field(default_factory=list)
+    # Facts from this field's <field_notes> the why rests on (world facts with sources).
+    note_ids: list[str] = Field(default_factory=list)
     fit: list[FitItem] = Field(default_factory=list)
 
 
@@ -210,7 +212,7 @@ def _study_field(candidate: Candidate) -> dict:
 
 def sanitize(analysis: PathAnalysis, evidence: dict[str, str], dismissed: set[str],
              candidates: dict[str, Candidate], own: set[str] = frozenset(), *,
-             vault: dict[str, dict]) -> list[dict]:
+             vault: dict[str, dict], notes: dict[str, dict] | None = None) -> list[dict]:
     """Code-level honesty: keep only candidate fields (titled by the field,
     never by the model) or the student's own paths, drop world numbers,
     dismissed paths, paths whose why cites no Vault entry (`vault`: card id ->
@@ -218,7 +220,9 @@ def sanitize(analysis: PathAnalysis, evidence: dict[str, str], dismissed: set[st
     cap the count, and turn any uncited verdict into "unknown". Zero paths is
     a valid result. A field outside the candidates is one the student's group
     rules out. The student's own paths are re-assessed first; fields fill the
-    rest of the cap."""
+    rest of the cap. A cited field-note fact (`notes`, by id) of the path's own
+    field joins its evidence with its source URL, as a world fact beside the
+    student's evidence, never in place of it."""
     rules = policy()
     world_number = re.compile(load_data("grounding.json")["numeric_world_pattern"])
     evidenced = set(rules["evidenced_statuses"])
@@ -260,14 +264,54 @@ def sanitize(analysis: PathAnalysis, evidence: dict[str, str], dismissed: set[st
             logger.warning("path_analyzer_dropped_weak_fit field=%s", candidate.field.key)
             continue
         seen.add(key)
+        prefix = f"note:{candidate.field.key}:" if candidate is not None else None
+        world = [i for i in dict.fromkeys(path.note_ids) if prefix and i.startswith(prefix) and i in (notes or {})]
         kept.append({"title": title, "why": path.why.strip(), "fit": fit,
                      "evidence": [{"text": evidence[i], "item_id": i,
                                    "evidence_level": vault.get(i, {}).get("evidence_level"),
-                                   "source_label": vault.get(i, {}).get("source_label")} for i in cited],
+                                   "source_label": vault.get(i, {}).get("source_label")} for i in cited]
+                                 + [{"text": notes[i]["text"], "item_id": i, "evidence_level": None,
+                                     "source_label": None, "source_url": notes[i]["source_url"]} for i in world],
                      "study_field": _study_field(candidate) if candidate is not None else None})
         if len(kept) == rules["max_paths"]:
             break
     return kept
+
+
+def _note_fields(reassess: list[dict], candidates: dict[str, Candidate]) -> list[str]:
+    """Candidate fields, the ones already shown as paths first."""
+    shown = [row["field_key"] for row in reassess if row.get("field_key") in candidates]
+    return list(dict.fromkeys([*shown, *candidates]))
+
+
+def _field_notes(db, workspace_id: str, reassess: list[dict], candidates: dict[str, Candidate]):
+    """Shared field notes for the prompt (BETA_CONVERSATION_SPEC 3.1). Notes are
+    extra context: without any, or when reading them fails, the run is the
+    same as before."""
+    from app.pai_c.paths.field_research import prompt_notes, student_country
+    try:
+        return prompt_notes(db, _note_fields(reassess, candidates), student_country(db, workspace_id))
+    except Exception as exc:  # noqa: BLE001  the analysis never waits on notes
+        logger.warning("path_analyzer_field_notes_failed workspace_id=%s error_type=%s",
+                       workspace_id, type(exc).__name__)
+        return [], {}
+
+
+def _queue_field_notes(db, workspace_id: str, paths: list[dict], candidates: dict[str, Candidate]) -> None:
+    """After a run, queue research for candidate fields with no fresh note
+    (this run's paths first), at most field_notes_per_run. Skipped while the
+    monthly cap pauses research; a failure never fails the run."""
+    from app.inference import usage
+    from app.pai_c.paths.field_research import enqueue_missing, student_country
+    if not usage.role_allowed("researcher"):
+        return
+    kept = [path["study_field"]["key"] for path in paths if path.get("study_field")]
+    try:
+        with db.begin_nested():
+            enqueue_missing(db, [*kept, *candidates], student_country(db, workspace_id))
+    except Exception as exc:  # noqa: BLE001  the paths outrank their notes
+        logger.warning("path_analyzer_field_note_enqueue_failed workspace_id=%s error_type=%s",
+                       workspace_id, type(exc).__name__)
 
 
 def _prune(service: PossibilityService, rows, candidates: dict[str, Candidate], returned: set[str]) -> None:
@@ -561,6 +605,9 @@ async def path_analysis_job(job, db) -> dict:
                                         set(vault) & set(evidence))
         if recall:
             analyst_input += "\n<semantic_recall>" + _json(recall) + "</semantic_recall>"
+        note_block, notes = _field_notes(db, job.workspace_id, reassess, candidates)
+        if note_block:
+            analyst_input += "\n<field_notes>" + _json(note_block) + "</field_notes>"
         db.rollback()
         prompt = load_prompt("path_analyzer")
         analysis = None
@@ -579,7 +626,8 @@ async def path_analysis_job(job, db) -> dict:
                 prompt += "\nReturn one complete JSON object that follows every output rule."
         if analysis is None:
             return {"status": "invalid", "model_calls": 2}
-        paths = sanitize(analysis, evidence, dismissed, candidates, own, vault=vault)
+        paths = sanitize(analysis, evidence, dismissed, candidates, own, vault=vault, notes=notes)
+        _queue_field_notes(db, job.workspace_id, paths, candidates)
         workspace = db.scalar(select(Workspace).where(
             Workspace.id == job.workspace_id, Workspace.status == "active").with_for_update())
         if workspace is None:

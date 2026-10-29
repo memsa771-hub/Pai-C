@@ -8,6 +8,7 @@ from app.tools.builtin import capabilities
 JOB_TYPES = (
     "counselor.opening",
     "counselor.analyze", "counselor.mirror_text", "counselor.paths",
+    "counselor.field_research", "counselor.rules_refresh",
     "memory.extract", "memory.reconcile", "memory.embed", "memory.unindex",
     "memory.reindex", "memory.resume_research",
     "document.parse", "document.extract", "document.index", "document.unindex", "document.notify",

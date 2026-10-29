@@ -47,6 +47,13 @@ def onboarding_words(db, workspace_id) -> list[str]:
     return [facts[key] for key in keys if isinstance(facts.get(key), str) and facts[key].strip()]
 
 
+def vault_value(db, workspace_id, field_key):
+    """One non-sensitive Vault fact's value (None when absent), for readers
+    such as the field notes that need a single fact, not the whole Vault."""
+    from app.memory.vault import VaultService
+    return VaultService(db).snapshot(workspace_id).get(field_key)
+
+
 def labelled_value(type_key, value):
     """A Vault value with each choice code replaced by its catalog label."""
     catalog = vault_catalog()
