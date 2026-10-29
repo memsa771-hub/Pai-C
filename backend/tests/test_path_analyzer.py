@@ -219,6 +219,31 @@ async def test_job_waits_for_enough_known_and_gives_up_after_two_invalid_replies
         assert PossibilityService(db).list(student.workspace_id) == []
 
 
+
+@pytest.mark.asyncio
+async def test_quiet_runs_over_the_daily_cap_skip_the_model_and_an_ask_still_runs():
+    with StudentSession() as student, student.factory() as db:
+        turn, _, _ = seed(student, db)
+        add_education(student, db)
+        job_id = enqueue_path_analysis(db, student.workspace_id, source_event_id=None, channel=None, reason="vault")
+        db.commit()
+        with patch.object(config, "PAI_PATH_ANALYSIS_MAX_PER_DAY", 0),              patch("app.pai_c.paths.analyzer.chat_completion", AsyncMock()) as call:
+            result = await path_analysis_job(db.get(BackgroundJob, job_id), db)
+        assert result == {"status": "daily_cap"}
+        call.assert_not_awaited()
+        job = db.get(BackgroundJob, job_id)
+        job.status, job.result = "succeeded", result
+        db.commit()
+        # The same input asked in chat is a fresh run, and an ask is answered over the cap.
+        asked = enqueue_path_analysis(db, student.workspace_id, source_event_id=turn.source_event_id,
+                                      channel=turn.channel, reason="asked")
+        db.commit()
+        assert asked != job_id
+        reply = json.dumps(analysis(path("electrical_engineering")))
+        with patch.object(config, "PAI_PATH_ANALYSIS_MAX_PER_DAY", 0),              patch("app.pai_c.paths.analyzer.chat_completion", AsyncMock(return_value=reply)) as call,              patch("app.pai_c.paths.analyzer.send_to_student", AsyncMock(side_effect=fake_post(student))):
+            assert (await path_analysis_job(db.get(BackgroundJob, asked), db))["status"] == "posted"
+        call.assert_awaited()
+
 def test_enqueue_reuses_a_pending_job():
     with StudentSession() as student, student.factory() as db:
         seed(student, db)

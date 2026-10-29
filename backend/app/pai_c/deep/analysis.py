@@ -285,6 +285,16 @@ def _advance_stage(db, workspace_id: str, notebook) -> None:
         foundation_ready=MemoryService(db).foundation_ready(notebook),
         goal_records=[], actor="system:counselor_analyst",
     )
+    # A notebook write can complete the Mirror (coverage reads notebook rows
+    # too), and a card made ready before DIRECTION was reached has no later
+    # Vault write to move it: sync here as the reconciler hook does.
+    from app.pai_c.journey_sync import sync_counselor_stage
+    try:
+        with db.begin_nested():
+            sync_counselor_stage(db, workspace_id, reason="analyst", actor="system:counselor_analyst")
+    except Exception as exc:  # noqa: BLE001  the notebook write outranks the stage move
+        logger.error("analyst_stage_sync_failed workspace_id=%s error_type=%s",
+                     workspace_id, type(exc).__name__)
     db.commit()
 
 

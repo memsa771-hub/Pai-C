@@ -66,12 +66,6 @@ def serialize(row: RouteDecision, cards: list[dict]) -> dict:
             "live_status": card["status"] if card else "unknown"}
 
 
-# The old confirm-gated research wait (RESEARCHING, ASSESSING, NEEDS_INFO). No
-# code enters it any more (migration 121); a journey still there moves on to
-# the route decision when the student chooses.
-WAITING = {"RESEARCHING", "ASSESSING", "NEEDS_INFO"}
-
-
 class RouteDecisionService:
     def __init__(self, db):
         self.db = db
@@ -100,24 +94,26 @@ class RouteDecisionService:
         return True
 
     def follow_active(self, workspace_id: str, actor: str) -> None:
-        """Called once the Path engine lands the journey in PROPOSED: an
-        active route decision (kept through a rethink, or made before the
-        paths) takes it on to CHOSEN."""
+        """Called by the stage sync once the journey is in PROPOSED: an
+        active route decision (made before the paths) takes it on to CHOSEN."""
         journey, row = self._journey(workspace_id), self.active(workspace_id)
         if journey is not None and row is not None:
             self._enter_chosen(journey, row, actor)
 
     def _record_choice(self, workspace_id: str, row: RouteDecision, previous: RouteDecision | None) -> None:
-        """A student who chooses before the journey reaches PROPOSED keeps
-        their stage; the decision itself is still saved, and the first saved
-        paths move them to CHOSEN (follow_active)."""
+        """The choice syncs the stage (journey_sync, reason "chosen"): it is
+        the student's act, so it also ends a re-plan, and a journey lagging in
+        MIRROR or the old research wait moves on with it. A student who
+        chooses before the Mirror keeps their stage; the decision itself is
+        still saved, and the first saved paths move them to CHOSEN
+        (follow_active)."""
+        from app.pai_c.journey_sync import sync_counselor_stage
         journey = self._journey(workspace_id)
         if journey is None:
             return
         if previous is not None:
             self._note_withdrawn(journey, previous)
-        if journey.current_stage in WAITING:
-            self._set_stage(journey, "PROPOSED")
+        sync_counselor_stage(self.db, workspace_id, reason="chosen", actor="human:student")
         if not self._enter_chosen(journey, row, "human:student"):
             return
         journey.decisions = [*(journey.decisions or []), {

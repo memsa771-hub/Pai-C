@@ -186,14 +186,14 @@ async def test_first_paths_move_mirror_to_proposed():
 
 
 def test_escalation_still_works_after_choose():
-    from app.pai_c.paths.analyzer import propose_after_paths
+    from app.pai_c.journey_sync import sync_counselor_stage
     with StudentSession() as student, student.factory() as db:
         ws = student.workspace_id
         _, journey, _ = prepare(student, db)
         JourneyService(db).mark_mirror_ready(ws)
         add_education(student, db, fsc("pre_engineering", 78))
         add_path(student, db, field_title("electrical_engineering"), "electrical_engineering")
-        propose_after_paths(db, ws, actor="system:paths")
+        sync_counselor_stage(db, ws, reason="student")
         db.commit()
         assert stage(db, journey.id) == "PROPOSED"
         client = client_for(student)

@@ -649,6 +649,10 @@ class StudentJourney(Base):
     next_recommended_action = Column(JSONB, nullable=True)
     counselor_summary_draft = Column(JSONB, nullable=True)
     research_request = Column(JSONB, nullable=True)
+    # Stage sync (app/pai_c/journey_sync.py, migration 122): when the journey
+    # first passed the Mirror, and when a rethink or escalation started a re-plan.
+    mirror_ready_at = Column(DateTime(timezone=True), nullable=True)
+    replan_at = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True), default=_now, server_default=text("NOW()"))
     updated_at = Column(DateTime(timezone=True), default=_now, onupdate=_now, server_default=text("NOW()"))
     completed_at = Column(DateTime(timezone=True), nullable=True)
@@ -1832,9 +1836,6 @@ class BackgroundJob(Base):
         Index("idx_background_jobs_claim", "status", "available_at", "priority"),
         Index("idx_background_jobs_workspace", "workspace_id"),
         UniqueConstraint("idempotency_key", name="uq_background_jobs_idempotency"),
-        Index("uq_counselor_mirror_pending", "workspace_id", unique=True,
-              postgresql_where=text("job_type = 'counselor.mirror' AND status IN ('pending', 'running')"),
-              sqlite_where=text("job_type = 'counselor.mirror' AND status IN ('pending', 'running')")),
     )
 
 

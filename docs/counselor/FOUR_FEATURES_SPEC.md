@@ -107,6 +107,10 @@ cite them like facts and records.
   (set by the reconciler after the write that made it ready); MIRROR → PROPOSED when the first path exists
   (set by the Path engine job after it saves paths). RESEARCHING, ASSESSING and NEEDS_INFO are no longer
   entered by any code; migration 121 moves any journey still in them to PROPOSED (with events).
+- All automatic moves go through one stage sync (backend/app/pai_c/journey_sync.py), called by the
+  reconciler's Mirror hook, the analyst's stage step, the Path engine after it saves paths and a route choice.
+  A rethink or a PAI OS escalation is a re-plan (`replan_at`, migration 122): while it is set nothing moves the
+  journey automatically; it ends when the student chooses a route or asks for paths and gets them.
 - Frontend signal `mirror_confirmed` becomes `mirror_ready` (card `ready`). Stage E title "Your Mirror".
 - `guided_state` `options_ready` becomes "any path exists"; `mirror_ready` is the card's `ready`.
 

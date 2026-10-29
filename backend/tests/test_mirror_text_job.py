@@ -63,7 +63,7 @@ async def test_text_job_writes_draft_shape():
         assert kwargs["role"] == "mirror"
         sent = kwargs["system_prompt"] + json.dumps(kwargs["messages"])
         assert QUOTE not in sent
-        assert "Robotics" in sent and load_prompt("mirror_text") in kwargs["system_prompt"]
+        assert "Robotics" in sent and load_prompt("mirror_text").split("[retry]")[0].strip() == kwargs["system_prompt"]
         draft = _draft(db, ws)
         card = MirrorEngine(db).build(ws)
     assert set(draft) == {"type", "version", "text", "written_at", "card_version"}
@@ -105,6 +105,10 @@ async def test_text_job_retries_once_then_drops_invalid_text():
         with patch(MODEL, model):
             result = await mirror_text_job(job, db)
         assert result["status"] == "invalid" and model.await_count == 2
+        # The retry instruction is the prompt file's second section, not code.
+        first, retry = (part.strip() for part in load_prompt("mirror_text").split("\n[retry]\n"))
+        assert model.await_args_list[0].kwargs["system_prompt"] == first
+        assert model.await_args.kwargs["system_prompt"] == first + "\n" + retry
         assert _draft(db, ws) is None
         for wrong in (["You are amazing at physics.", *GOOD[1:]], GOOD[:2], ["You could try NUST.", *GOOD[1:]],
                       ["The student likes robotics.", *GOOD[1:]]):

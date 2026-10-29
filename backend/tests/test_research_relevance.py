@@ -80,7 +80,8 @@ def test_old_budget_keys_are_pruned_when_spending():
     with StudentSession() as student, student.factory() as db:
         workspace = db.get(Workspace, student.workspace_id)
         workspace.settings = {**(workspace.settings or {}), "counselor_research_budgets": {
-            old: 3, recent: 2, "1": 4, "0123456789abcdef": 5, "belief_checks:20389": 1}}
+            old: 3, recent: 2, "1": 4, "0123456789abcdef": 5, "belief_checks:20388": 6,
+            "belief_checks:20389": 1}}
         db.commit()
         with bounded_research(queries=5, fetches=5, seconds=30, workspace_id=student.workspace_id,
                               budget_key=daily_key("path_research")):
@@ -89,6 +90,8 @@ def test_old_budget_keys_are_pruned_when_spending():
         counters = db.get(Workspace, student.workspace_id).settings["counselor_research_budgets"]
     assert old not in counters and "1" not in counters and "0123456789abcdef" not in counters
     assert counters[recent] == 2 and counters["belief_checks:20389"] == 1
+    # An older belief-check period can never be spent again.
+    assert "belief_checks:20388" not in counters
     assert counters[daily_key("path_research")] == 1
 
 

@@ -337,7 +337,7 @@ Return one JSON object and no other text:
 
 ## Mirror text (background)
 
-Runtime: backend/app/pai_c/deep/prompts/mirror_text.md. Job `counselor.mirror_text` (backend/app/pai_c/mirror/text_job.py), queued by the reconciler after a Vault write that can change the Mirror state card. The input is the state card only (labels and English entry text, never chat or evidence quotes). Code checks the reply before storing it (limits in backend/app/pai_c/policy/mirror.json `text`): 3 or 4 sentences, each in the second person, no question mark, no praise word, no university name and no number the card does not hold; one retry, then the last text stays.
+Runtime: backend/app/pai_c/deep/prompts/mirror_text.md. Job `counselor.mirror_text` (backend/app/pai_c/mirror/text_job.py), queued by the reconciler after a Vault write that can change the Mirror state card. The input is the state card only (labels and English entry text, never chat or evidence quotes). Code checks the reply before storing it (limits in backend/app/pai_c/policy/mirror.json `text`): 3 or 4 sentences, each in the second person, no question mark, no praise word, no university name and no number the card does not hold; one retry (the `[retry]` section is added to the prompt), then the last text stays.
 
 ```text
 You write the short text under a student's Mirror in PAI, an educational counselor for students in Pakistan. The Mirror shows the student what PAI knows about them right now.
@@ -358,6 +358,9 @@ Write 3 or 4 sentences to the student:
 
 Return one JSON object and no other text:
 {"sentences": ["...", "...", "..."]}
+
+[retry]
+Your last answer broke a rule. Return 3 or 4 sentences in the second person, no question, no praise, no university, and only numbers that are on the card.
 ```
 
 ## Memory extractor (background)

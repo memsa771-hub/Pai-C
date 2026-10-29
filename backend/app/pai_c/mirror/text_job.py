@@ -10,8 +10,8 @@ then the job gives up and the last text stays; the card renders without it.
 
 The reconciler calls `after_accept` (registered in capabilities/system.py,
 because shared memory never imports PAI C) after every accepted Vault write.
-It moves the journey from DIRECTION to MIRROR when that write made the card
-ready (FOUR_FEATURES_SPEC 2.4), then queues the text. It debounces: one pending
+It syncs the journey stage (journey_sync: DIRECTION to MIRROR when that
+write made the card ready, FOUR_FEATURES_SPEC 2.4), then queues the text. It debounces: one pending
 job per workspace, and none when the stored text was written for the current
 card.
 """
@@ -37,6 +37,7 @@ logger = logging.getLogger(__name__)
 JOB_MIRROR_TEXT = "counselor.mirror_text"
 _NUMBER = re.compile(r"\d+(?:\.\d+)?")
 _LEVEL = "(level {level} of 3)"
+RETRY_SECTION = "\n[retry]\n"
 # The level marks are the brief's scaffolding, not numbers the card states.
 _LEVEL_MARK = re.compile(r"\(level \d+ of 3\)")
 
@@ -71,39 +72,25 @@ def enqueue_mirror_text(db, workspace_id: str, card: dict | None = None) -> str 
     return job.id
 
 
-def _stage(db, workspace_id: str) -> str | None:
-    return db.scalar(select(StudentJourney.current_stage).where(
-        StudentJourney.workspace_id == workspace_id, StudentJourney.journey_type == "counselor_decision",
-        StudentJourney.status == "active").limit(1))
-
-
 def after_accept(db, candidate) -> None:
     """Reconciler hook. The Vault write has happened and must stand whatever
-    the Mirror does: the stage move and the enqueue run in a savepoint and any
-    failure (a database error, a bug or bad policy data in the card) is logged
-    by type and swallowed. The stage and the text only follow the Vault. The
-    card is built only when the stage could move or a text job is due."""
-    if candidate.key not in mirror_types():
-        return
+    the Mirror does: the type check, the stage sync and the enqueue run in a
+    savepoint and any failure (a database error, a bug or bad policy data) is
+    logged by type and swallowed. The stage moves only through the one stage
+    sync (journey_sync), which leaves a re-planning journey where it is."""
     try:
+        if candidate.key not in mirror_types():
+            return
         with db.begin_nested():
-            card, stage = None, _stage(db, candidate.workspace_id)
-            if stage == "DIRECTION":
-                card = MirrorEngine(db).build(candidate.workspace_id)
-                if card["ready"]:
-                    stage = JourneyService(db).mark_mirror_ready(candidate.workspace_id).current_stage
-            if stage == "MIRROR":
-                # Paths saved before the Mirror was ready (or kept through a
-                # rethink) move the journey on without waiting for a new run.
-                from app.pai_c.paths import analyzer
-                try:
-                    # Its own savepoint: a failed stage move keeps MIRROR and the text job.
-                    with db.begin_nested():
-                        analyzer.propose_after_paths(db, candidate.workspace_id, actor="system:mirror_ready")
-                except Exception as exc:  # noqa: BLE001  the stage move is best effort here
-                    logger.error("mirror_propose_failed workspace_id=%s error_type=%s",
-                                 candidate.workspace_id, type(exc).__name__)
-            enqueue_mirror_text(db, candidate.workspace_id, card)
+            from app.pai_c.journey_sync import sync_counselor_stage
+            try:
+                # Its own savepoint: a failed stage move keeps the text job.
+                with db.begin_nested():
+                    sync_counselor_stage(db, candidate.workspace_id, reason="vault", actor="system:mirror_ready")
+            except Exception as exc:  # noqa: BLE001  the stage move is best effort here
+                logger.error("mirror_stage_sync_failed workspace_id=%s error_type=%s",
+                             candidate.workspace_id, type(exc).__name__)
+            enqueue_mirror_text(db, candidate.workspace_id)
     except Exception as exc:  # noqa: BLE001  the Vault write outranks its read model
         logger.error("mirror_text_enqueue_failed workspace_id=%s error_type=%s",
                      candidate.workspace_id, type(exc).__name__)
@@ -165,7 +152,8 @@ async def mirror_text_job(job, db) -> dict:
     if not any(area["level"] for area in card["areas"]):
         return {"status": "empty"}
     brief = card_brief(card)
-    prompt = load_prompt("mirror_text")
+    # The file's second section is the retry instruction (prompts live in .md).
+    prompt, retry = (part.strip() for part in load_prompt("mirror_text").split(RETRY_SECTION, 1))
     messages = [{"role": "user", "content": f"<card>\n{brief}\n</card>"}]
     db.rollback()  # no transaction held open across the model call
     attempts = mirror_policy()["text"]["attempts"]
@@ -182,8 +170,7 @@ async def mirror_text_job(job, db) -> dict:
         if valid_sentences(sentences, brief):
             break
         logger.warning("mirror_text_invalid workspace_id=%s attempt=%d", workspace_id, attempt + 1)
-        prompt += ("\nYour last answer broke a rule. Return 3 or 4 sentences in the second person, no question, "
-                   "no praise, no university, and only numbers that are on the card.")
+        prompt += "\n" + retry
     else:
         return {"status": "invalid", "model_calls": attempts}
     JourneyService(db).ensure_counselor(workspace_id)

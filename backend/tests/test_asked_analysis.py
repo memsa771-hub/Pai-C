@@ -112,7 +112,7 @@ def test_a_failing_stage_move_keeps_the_mirror_ready_and_the_text_job():
             evidence={"quote": "q"}, allow_user_explicit=True)
         with patch.object(MirrorEngine, "ready", return_value=True), \
              patch("app.pai_c.mirror.engine.ready_from", return_value=True), \
-             patch("app.pai_c.paths.analyzer.propose_after_paths", side_effect=RuntimeError("boom")):
+             patch("app.pai_c.journey_sync._propose", side_effect=RuntimeError("boom")):
             assert MemoryReconciler(db).reconcile(candidate).accepted
         db.commit()
         db.expire_all()

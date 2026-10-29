@@ -181,6 +181,9 @@ class Config:
     PAI_ROADMAP_MODEL: str = os.environ.get("PAI_ROADMAP_MODEL", "") or PAI_COUNSELOR_MODEL
     PAI_RESEARCH_MAX_CALLS_PER_STUDENT: int = int(os.environ.get("PAI_RESEARCH_MAX_CALLS_PER_STUDENT", "40"))
     PAI_RESEARCH_REFRESH_MAX_CALLS: int = int(os.environ.get("PAI_RESEARCH_REFRESH_MAX_CALLS", "8"))
+    # Path analysis runs that reach the model, per workspace and UTC day. Quiet
+    # (Vault, planner) runs over it are skipped; a run that answers a chat ask still runs.
+    PAI_PATH_ANALYSIS_MAX_PER_DAY: int = int(os.environ.get("PAI_PATH_ANALYSIS_MAX_PER_DAY", "20"))
     PAI_SENSITIVE_CHECK_MODEL: str = os.environ.get("PAI_SENSITIVE_CHECK_MODEL", "") or PAI_ANALYST_MODEL
     PAI_SEMANTIC_RECALL_ENABLED: bool = os.environ.get("PAI_SEMANTIC_RECALL_ENABLED", "true").lower() == "true"
     PAI_SEMANTIC_RECALL_TOP_K: int = int(os.environ.get("PAI_SEMANTIC_RECALL_TOP_K", "5"))

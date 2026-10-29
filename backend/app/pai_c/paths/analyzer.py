@@ -38,6 +38,7 @@ from app.pai_c.possibilities import PossibilityService
 from app.pai_c.possibility_titles import normalized_title
 from app.pai_c.posting import send_to_student
 from app.pai_c.understanding.data import at_path, load_policy as understanding_policy
+from app.plugins._shared.budget import take_daily
 from app.workspace_language import workspace_language_block
 from app.runtime.task_runtime import enqueue
 
@@ -355,9 +356,10 @@ def enqueue_path_analysis(db, workspace_id: str, *, source_event_id: str | None,
         # The run re-reads `post_to` just before it posts, so a late ask is answered.
         existing.payload = _with_post_to(existing.payload, channel, source_event_id)
         return existing.id
-    if asked and existing is not None and existing.status == "failed":
-        # A failed run under the same input is retried once per asking turn,
-        # rather than answering the student with nothing.
+    if asked and existing is not None and (existing.status == "failed"
+                                           or (existing.result or {}).get("status") == "daily_cap"):
+        # A failed (or capped quiet) run under the same input is retried once
+        # per asking turn, rather than answering the student with nothing.
         key += f":retry:{source_event_id or 'ask'}"
     job = enqueue(db, JOB_ANALYZE_PATHS, {key_: value for key_, value in payload.items() if value is not None},
         workspace_id=workspace_id, idempotency_key=key)
@@ -396,7 +398,31 @@ async def ask_path_analysis(db, workspace_id: str, *, source_event_id: str | Non
         EventRecord.metadata_["paths_reply_to"].as_string() == (source_event_id or job.id)))
     if not replied:
         await _post_finished(db, job, channel, source_event_id or job.id)
+        if (job.result or {}).get("paths"):
+            # Answering the ask with saved paths is the student's act too: it
+            # ends a re-plan as a fresh asked run would (journey_sync).
+            from app.pai_c.journey_sync import sync_counselor_stage
+            try:
+                with db.begin_nested():
+                    sync_counselor_stage(db, workspace_id, reason="asked", actor="system:paths")
+            except Exception as exc:  # noqa: BLE001  the answer outranks the stage move
+                logger.error("paths_stage_move_failed workspace_id=%s error_type=%s",
+                             workspace_id, type(exc).__name__)
     return job_id
+
+
+def _sync_stage(db, workspace_id: str, reason: str | None) -> None:
+    """Saved paths move the journey on through the one stage sync (MIRROR ->
+    PROPOSED, FOUR_FEATURES_SPEC 2.4). The paths are saved; a stage problem
+    must not undo them."""
+    from app.pai_c.journey_sync import sync_counselor_stage
+    try:
+        sync_counselor_stage(db, workspace_id, reason=reason or "paths", actor="system:paths")
+        db.commit()
+    except Exception as exc:  # noqa: BLE001  the saved paths outrank the stage move
+        db.rollback()
+        logger.error("paths_stage_move_failed workspace_id=%s error_type=%s",
+                     workspace_id, type(exc).__name__)
 
 
 async def _post_finished(db, job, channel: str, reply_to: str) -> None:
@@ -427,38 +453,14 @@ def after_accept(db, candidate) -> None:
     paths, and a pending run is reused. Like the Mirror hook, it runs in a
     savepoint and never undoes the Vault write."""
     from app.pai_c.paths.currency import trigger_types
-    if candidate.key not in trigger_types():
-        return
     try:
+        if candidate.key not in trigger_types():
+            return
         with db.begin_nested():
             enqueue_path_analysis(db, candidate.workspace_id, source_event_id=None, channel=None, reason="vault")
     except Exception as exc:  # noqa: BLE001  the Vault write outranks its read model
         logger.error("path_analysis_enqueue_failed workspace_id=%s error_type=%s",
                      candidate.workspace_id, type(exc).__name__)
-
-
-# Stages of the confirm-gated research wait, kept for old data (stages.py).
-_OLD_WAIT = {"RESEARCHING", "ASSESSING", "NEEDS_INFO"}
-
-
-def propose_after_paths(db, workspace_id: str, *, actor: str = "system:paths") -> None:
-    """Saved paths move the journey on (FOUR_FEATURES_SPEC 2.4): MIRROR ->
-    PROPOSED, or DIRECTION -> MIRROR -> PROPOSED when the Mirror is ready but
-    the stage lagged. A route decision already made then takes the journey on
-    to CHOSEN. Without a live path, or before the Mirror, the stage stays.
-    The caller commits."""
-    from app.pai_c.mirror import MirrorEngine
-    from app.pai_c.roadmap.decisions import RouteDecisionService
-    if not any(row.status != "dismissed" for row in PossibilityService(db).list(workspace_id)):
-        return
-    journeys = JourneyService(db)
-    journey = journeys.ensure_counselor(workspace_id)
-    if journey.current_stage == "DIRECTION" and MirrorEngine(db).ready(workspace_id):
-        journey = journeys.mark_mirror_ready(workspace_id, actor=actor)
-    if journey.current_stage != "MIRROR" and journey.current_stage not in _OLD_WAIT:
-        return
-    journeys.set_counselor_stage(workspace_id, journey.id, "PROPOSED", actor=actor)
-    RouteDecisionService(db).follow_active(workspace_id, actor=actor)
 
 
 def _reply_to(payload: dict) -> dict:
@@ -535,6 +537,13 @@ async def path_analysis_job(job, db) -> dict:
             + workspace_language_block() + "\n"
             + "<existing_paths>" + _json(reassess) + "</existing_paths>\n"
             + "<dismissed_paths>" + _json([row.title for row in existing if row.status == "dismissed"]) + "</dismissed_paths>")
+        # Daily cap on model runs (cost): a quiet run over it is skipped, one
+        # that answers a chat ask still runs (and is counted).
+        within = take_daily(db, job.workspace_id, "path_analysis", config.PAI_PATH_ANALYSIS_MAX_PER_DAY)
+        db.commit()
+        if not within and _post_target(db, job, payload).get("reason") != "asked":
+            logger.warning("path_analysis_daily_cap workspace_id=%s", job.workspace_id)
+            return {"status": "daily_cap"}
         # No read transaction stays open across the embedding call or the model call.
         db.rollback()
         recall = await _semantic_recall(db, job.workspace_id, _recall_query(fields, records),
@@ -587,16 +596,9 @@ async def path_analysis_job(job, db) -> dict:
                 row.study_field = path["study_field"]
             ids.append(row.id)
         db.commit()
-        if ids:
-            # The paths are saved; a stage problem must not undo them.
-            try:
-                propose_after_paths(db, job.workspace_id)
-                db.commit()
-            except Exception as exc:  # noqa: BLE001  the saved paths outrank the stage move
-                db.rollback()
-                logger.error("paths_stage_move_failed workspace_id=%s error_type=%s",
-                             job.workspace_id, type(exc).__name__)
         payload = _post_target(db, job, payload)
+        if ids:
+            _sync_stage(db, job.workspace_id, payload.get("reason"))
         channel = payload.get("channel")
         if not channel or not ids:
             # The message is kept so a later chat request can post it unchanged.

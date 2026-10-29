@@ -16,3 +16,6 @@ Write 3 or 4 sentences to the student:
 
 Return one JSON object and no other text:
 {"sentences": ["...", "...", "..."]}
+
+[retry]
+Your last answer broke a rule. Return 3 or 4 sentences in the second person, no question, no praise, no university, and only numbers that are on the card.

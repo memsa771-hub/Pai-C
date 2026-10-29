@@ -11,6 +11,7 @@ import time
 # workspace settings never grow (the allowance itself is one UTC day).
 KEEP_DAYS = 7
 _DATED = re.compile(r":(\d{4}-\d{2}-\d{2})$")
+_PERIOD = re.compile(r"^(.+):(\d+)$")
 # Whole-Vault-version keys written briefly before the daily key (44bd9e4).
 _LEGACY_DIGEST = re.compile(r"^[0-9a-f]{16}$")
 
@@ -20,15 +21,49 @@ def daily_key(scope: str, now: datetime | None = None) -> str:
     return f"{scope}:{(now or datetime.now(timezone.utc)).astimezone(timezone.utc).date().isoformat()}"
 
 
-def _pruned(counters: dict, today: date) -> dict:
-    """Drop dated keys older than KEEP_DAYS and the bare numbers the old
-    per-Mirror-version budget left (and the 16-hex Vault-version keys); other keys (belief-check periods) stay."""
+def _pruned(counters: dict, today: date, current: str | None = None) -> dict:
+    """Drop dated keys older than KEEP_DAYS, the bare numbers the old
+    per-Mirror-version budget left (and the 16-hex Vault-version keys), and
+    every numbered period key (`belief_checks:<period>`) but the latest of its
+    scope: periods only grow, so an older one can never be spent again.
+    `current` is the key about to be written."""
+    latest: dict[str, int] = {}
+    for key in (*counters, *((current,) if current else ())):
+        match = _PERIOD.match(key)
+        if match:
+            latest[match.group(1)] = max(latest.get(match.group(1), 0), int(match.group(2)))
+
     def keep(key: str) -> bool:
         if key.isdigit() or _LEGACY_DIGEST.match(key):
             return False
+        period = _PERIOD.match(key)
+        if period:
+            return int(period.group(2)) >= latest[period.group(1)]
         match = _DATED.search(key)
         return not match or date.fromisoformat(match.group(1)) >= today - timedelta(days=KEEP_DAYS)
     return {key: value for key, value in counters.items() if keep(key)}
+
+
+def take_daily(db, workspace_id: str, scope: str, limit: int, now: datetime | None = None) -> bool:
+    """Count one use of a per-workspace daily allowance (`daily_key`, in the
+    same `counselor_research_budgets` counters as research) and say whether
+    it was within `limit`. The workspace row is locked; the caller commits."""
+    from sqlalchemy import select
+    from app.models import Workspace
+    workspace = db.scalar(select(Workspace).where(Workspace.id == workspace_id).with_for_update())
+    if workspace is None:
+        return False
+    now = now or datetime.now(timezone.utc)
+    key = daily_key(scope, now)
+    settings = dict(workspace.settings or {})
+    counters = _pruned(dict(settings.get("counselor_research_budgets") or {}), now.date(), key)
+    used = int(counters.get(key, 0))
+    if used >= max(0, limit):
+        return False
+    counters[key] = used + 1
+    settings["counselor_research_budgets"] = counters
+    workspace.settings = settings
+    return True
 
 
 @dataclass
@@ -69,9 +104,9 @@ class ResearchBudget:
                 # Counters belong to a key (a UTC day for path research, a
                 # period for belief checks), not a lifetime. Keeping the keys
                 # prevents an old job from resetting a new job's allowance.
-                counters = _pruned(dict(settings.get("counselor_research_budgets") or {}),
-                                   datetime.now(timezone.utc).date())
                 key = str(self.budget_key)
+                counters = _pruned(dict(settings.get("counselor_research_budgets") or {}),
+                                   datetime.now(timezone.utc).date(), key)
                 used = int(counters.get(key, 0))
                 limit = config.PAI_RESEARCH_MAX_CALLS_PER_STUDENT
                 if used >= max(0, limit):

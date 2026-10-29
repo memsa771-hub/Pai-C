@@ -158,8 +158,19 @@ class JourneyService:
             raise JourneyError(str(exc)) from exc
         previous = row.current_stage
         if previous != target:
+            now = datetime.now(timezone.utc)
+            # Stage-sync bookkeeping (app/pai_c/journey_sync.py): back to
+            # DIRECTION from a route decision is a re-plan (rethink or PAI OS
+            # escalation); leaving DIRECTION ends it. Entering MIRROR marks the
+            # first pass, so a still-ready card never re-advances a re-plan.
+            if target == "DIRECTION" and previous in {"PROPOSED", "CHOSEN"}:
+                row.replan_at = now
+            elif previous == "DIRECTION":
+                row.replan_at = None
+            if target == "MIRROR" and row.mirror_ready_at is None:
+                row.mirror_ready_at = now
             row.current_stage = target
-            row.updated_at = datetime.now(timezone.utc)
+            row.updated_at = now
             self._event(row, JOURNEY_STAGE_CHANGED,
                         {"from": previous, "to": target}, actor)
         return self._view(row)

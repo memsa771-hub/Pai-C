@@ -19,7 +19,7 @@ from app.database import get_db
 from app.journey import JourneyService
 from app.main import app
 from app.models import RouteDecision, StudentJourney
-from app.pai_c.paths.analyzer import propose_after_paths
+from app.pai_c.journey_sync import sync_counselor_stage
 from scripts.counselor_eval_support import StudentSession
 from tests.counselor_fixtures import client_for, prepare
 from tests.test_roadmap_engine import add_education, add_path, field_title, fsc
@@ -36,7 +36,7 @@ async def confirmed_student():
         JourneyService(db).mark_mirror_ready(student.workspace_id)
         add_education(student, db, fsc("pre_engineering", 78))
         add_path(student, db, field_title("electrical_engineering"), "electrical_engineering")
-        propose_after_paths(db, student.workspace_id)
+        sync_counselor_stage(db, student.workspace_id, reason="student")
         db.commit()
         client = client_for(student)
         try:
@@ -178,25 +178,32 @@ async def test_choosing_again_records_the_replaced_route_as_withdrawn():
 
 
 @pytest.mark.asyncio
-async def test_mirror_ready_again_after_rethink_returns_to_chosen():
+async def test_rethink_holds_until_the_student_chooses_again():
+    """A rethink is a re-plan: the Mirror is still ready, the paths and the
+    kept route are still there, yet no automatic sync moves the journey out
+    of DIRECTION (journey_sync). Choosing a route ends it."""
     from app.pai_c.deep.actions import dispatch_action
     from app.pai_c.deep.context import DeepContext
     from app.pai_c.deep.notebook_schema import CounselorNotebookData
     from app.pai_c.deep.turn_input import CounselorTurnInput
     async with confirmed_student() as (client, student, db, journey_id):
         with_routes(student, db)
-        decision = choose(client, student, "electrical_engineering")
+        choose(client, student, "electrical_engineering")
         journey = JourneyService(db).get(student.workspace_id, journey_id)
         turn = CounselorTurnInput("channel/pai-counselor", student.workspace_id, "Not sure any more",
                                   (), None, str(uuid4()), student.next_timestamp(), f"human:{student.user_id}", False)
         context = DeepContext("", {}, CounselorNotebookData(), journey, 0)
         assert await dispatch_action(db, turn, {"type": "rethink", "reason": "Unsure"}, context) == ("rethink", "accepted")
-        assert stage(db, journey_id) == "DIRECTION"
-        # The Mirror is ready again and the paths are there: the kept route is chosen again.
-        JourneyService(db).mark_mirror_ready(student.workspace_id)
-        propose_after_paths(db, student.workspace_id)
         db.commit()
+        assert stage(db, journey_id) == "DIRECTION"
+        assert db.get(StudentJourney, journey_id).replan_at is not None
+        for reason in ("vault", "analyst", "planner", "student"):
+            sync_counselor_stage(db, student.workspace_id, reason=reason)
+            db.commit()
+            assert stage(db, journey_id) == "DIRECTION", reason
+        decision = choose(client, student, "computer_engineering")
         assert_chosen_with_goal(db, journey_id, decision)
+        assert db.get(StudentJourney, journey_id).replan_at is None
 
 
 @pytest.mark.asyncio
@@ -209,7 +216,7 @@ async def test_route_chosen_before_the_mirror_is_chosen_once_paths_arrive():
             decision = choose(client, student, "electrical_engineering")
             assert stage(db, journey.id) == "DIRECTION"
             JourneyService(db).mark_mirror_ready(student.workspace_id)
-            propose_after_paths(db, student.workspace_id)
+            sync_counselor_stage(db, student.workspace_id, reason="student")
             db.commit()
             assert_chosen_with_goal(db, journey.id, decision)
         finally:
