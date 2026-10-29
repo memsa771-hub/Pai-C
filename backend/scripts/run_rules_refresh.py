@@ -3,7 +3,7 @@
 Run on the backend host: python -m scripts.run_rules_refresh [--max-calls N]
 Same work as the monthly `counselor.rules_refresh` job (BETA_CONVERSATION_SPEC
 3.3): it reads sources and calls the `researcher` model, writes
-app/pai_c/policy/refresh_proposals/<date>.json and changes no policy file.
+<PAI_PROPOSALS_DIR or app/pai_c/policy/refresh_proposals>/<date>.json and changes no policy file.
 Review the file, then apply it with scripts/apply_refresh.py.
 """
 import argparse

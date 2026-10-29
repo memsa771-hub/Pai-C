@@ -111,8 +111,9 @@ async def opening_job(job, db):
                     reply, config.PAI_LANGUAGE_BLOCKED_SCRIPTS):
                 raise ValueError("Invalid opening reply")
         except _Paused:
-            # Monthly cap reached: the fixed opening, saying PAI is paused, no model call.
-            reply = config.PAI_OPENING_FALLBACK_REPLY.replace("{name}", name) + "\n\n" + usage.paused_line()
+            # Monthly cap reached: only the paused line (no invitation to talk), no model call.
+            from app.pai_c.language import paused_reply
+            reply = await paused_reply(db, workspace_id)
             opening_step = None
         except Exception as exc:
             logger.warning("counselor_opening_error job_id=%s error_type=%s", job_id, type(exc).__name__)

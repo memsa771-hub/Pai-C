@@ -139,10 +139,14 @@ async def run_deep_turn(db, turn: CounselorTurnInput, *,
     violations = []
     posted_step = None
     retry_line = ""
-    if instructions != "wellbeing" and not usage.role_allowed("counselor"):
-        # Monthly cap reached: a fixed reply that says PAI is paused, no model call.
-        return DeepTurnResult(config.PAI_COUNSELOR_FALLBACK_REPLY + "\n\n" + usage.paused_line(),
-                              {"type": "none"}, context, 0, 0, [], ["cap_paused"])
+    if instructions != "wellbeing":
+        from app.pai_c.language import paused_reply, prepare_paused_reply
+        if not usage.role_allowed("counselor"):
+            # Monthly cap reached: only the paused line, in the chat language
+            # when it was rendered before the cap (no model call, no question).
+            return DeepTurnResult(await paused_reply(db, turn.workspace_id),
+                                  {"type": "none"}, context, 0, 0, [], ["cap_paused"])
+        await prepare_paused_reply(db, turn.workspace_id)
     from app.pai_c.voice.guards import ends_with_step, repeated_questions, remove_repeated, question_sentences, repeats_previous_reply
     for attempt in range(2):
         started = time.monotonic()
@@ -165,6 +169,11 @@ async def run_deep_turn(db, turn: CounselorTurnInput, *,
         model_ms += int((time.monotonic() - started) * 1000)
         started = time.monotonic()
         reply, action, moves = _parse_response(raw, violations=violations)
+        if instructions == "wellbeing" and ("invalid_json_fallback" in violations or not reply.strip()):
+            # An empty, cut-off or unreadable care reply must never become the
+            # generic "tell me more" question: the runtime posts the wellbeing
+            # fallback and resources instead.
+            raise ProviderUnavailable("wellbeing reply unusable")
         if instructions == "wellbeing" or action.get("type") == "wellbeing":
             break
         if contains_blocked_script(reply, config.PAI_LANGUAGE_BLOCKED_SCRIPTS):

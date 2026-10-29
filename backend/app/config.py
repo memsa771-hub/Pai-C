@@ -172,6 +172,9 @@ class Config:
     # one role to another): the gateway falls back to model_roles.json.
     PAI_COUNSELOR_MODEL: str = os.environ.get("PAI_COUNSELOR_MODEL", "")
     PAI_ANALYST_MODEL: str = os.environ.get("PAI_ANALYST_MODEL", "")
+    # The per-turn planner (deep/analysis.py) has its own role so it can run on
+    # a cheaper model than path analysis (analyst); default in model_roles.json.
+    PAI_PLANNER_MODEL: str = os.environ.get("PAI_PLANNER_MODEL", "")
     PAI_SAFETY_MODEL: str = os.environ.get("PAI_SAFETY_MODEL", "")
     PAI_SAFETY_REASONING_EFFORT: str = os.environ.get("PAI_SAFETY_REASONING_EFFORT", "low")
     PAI_SAFETY_TIMEOUT_MS: int = int(os.environ.get("PAI_SAFETY_TIMEOUT_MS", "3000"))
@@ -197,12 +200,20 @@ class Config:
     PAI_RESEARCH_REFRESH_MAX_CALLS: int = int(os.environ.get("PAI_RESEARCH_REFRESH_MAX_CALLS", "8"))
     # Path analysis runs that reach the model, per workspace and UTC day. Quiet
     # (Vault, planner) runs over it are skipped; a run that answers a chat ask still runs.
-    PAI_PATH_ANALYSIS_MAX_PER_DAY: int = int(os.environ.get("PAI_PATH_ANALYSIS_MAX_PER_DAY", "20"))
+    PAI_PATH_ANALYSIS_MAX_PER_DAY: int = int(os.environ.get("PAI_PATH_ANALYSIS_MAX_PER_DAY", "6"))
+    # Mirror texts written per workspace and UTC day (each is also debounced by card version).
+    PAI_MIRROR_TEXT_MAX_PER_DAY: int = int(os.environ.get("PAI_MIRROR_TEXT_MAX_PER_DAY", "6"))
     # Field notes (BETA_CONVERSATION_SPEC 3.1) are shared per study field and
     # country; one older than this many days is researched again.
+    # Country of a student whose Vault names none (a catalog `countries` code or name).
+    PAI_DEFAULT_COUNTRY: str = os.environ.get("PAI_DEFAULT_COUNTRY", "pk")
     PAI_FIELD_NOTE_DAYS: int = int(os.environ.get("PAI_FIELD_NOTE_DAYS", "90"))
     # Page reads plus model calls one monthly rules and calendar refresh may make (spec 3.3).
     PAI_RULES_REFRESH_MAX_CALLS: int = int(os.environ.get("PAI_RULES_REFRESH_MAX_CALLS", "60"))
+    # Where the monthly refresh writes its proposals: a folder the founder can
+    # read on the host (docker-compose mounts ./proposals at /app/proposals).
+    # Empty: app/pai_c/policy/refresh_proposals (local runs).
+    PAI_PROPOSALS_DIR: str = os.environ.get("PAI_PROPOSALS_DIR", "")
     PAI_SENSITIVE_CHECK_MODEL: str = os.environ.get("PAI_SENSITIVE_CHECK_MODEL", "")
     PAI_SEMANTIC_RECALL_ENABLED: bool = os.environ.get("PAI_SEMANTIC_RECALL_ENABLED", "true").lower() == "true"
     PAI_SEMANTIC_RECALL_TOP_K: int = int(os.environ.get("PAI_SEMANTIC_RECALL_TOP_K", "5"))

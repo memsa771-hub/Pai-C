@@ -72,4 +72,5 @@ def offline_model_usage(request, monkeypatch):
     monkeypatch.setattr(config, "ANTHROPIC_API_KEY", "")
     if request.node.get_closest_marker("model_usage") is None:
         monkeypatch.setattr(usage, "record_model_call", lambda *args, **kwargs: None)
+        monkeypatch.setattr(usage, "record_web_call", lambda *args, **kwargs: None)
         monkeypatch.setattr(usage, "cap_state", lambda: {"month": "", "spent": 0.0, "cap": 0.0, "stage": "ok"})

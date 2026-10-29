@@ -26,3 +26,6 @@ secrets/
 
 # Subagent-driven development workspaces
 .superpowers/
+
+# Rules refresh proposals written by the worker (docker-compose mounts ./proposals).
+proposals/*.json

@@ -969,6 +969,13 @@
     ]
    }
   ],
+  "countries": [
+   {
+    "code": "pk",
+    "label": "Pakistan",
+    "synonyms": ["Pak", "PK", "Pakistani", "Islamic Republic of Pakistan", "پاکستان"]
+   }
+  ],
   "provinces": [
    {
     "code": "punjab",

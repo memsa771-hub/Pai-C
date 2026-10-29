@@ -95,13 +95,32 @@ def apply_proposal(proposal_path: Path, only: list[str] | None = None, *,
     return {"applied": applied, "stale": stale, "valid": True}
 
 
+def resolve_proposal(given: Path | None) -> Path | None:
+    """The given file; a name not found as given, from the proposals folder;
+    no name, the newest proposal there."""
+    sys.path.insert(0, str(BACKEND))
+    from app.research.rules_refresh import proposals_dir
+    folder = proposals_dir()
+    if given is not None:
+        return given if given.exists() or given.is_absolute() else folder / given
+    found = sorted(folder.glob("*.json"), key=lambda path: path.stat().st_mtime)
+    return found[-1] if found else None
+
+
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("proposal", type=Path)
+    parser.add_argument("proposal", type=Path, nargs="?",
+                        help="proposal file; a bare name is read from the proposals folder "
+                             "(PAI_PROPOSALS_DIR); default: the newest proposal there")
     parser.add_argument("--only", action="append", default=None, metavar="PATH",
                         help="apply only this diff path (repeatable)")
     args = parser.parse_args(argv)
-    result = apply_proposal(args.proposal, args.only)
+    proposal = resolve_proposal(args.proposal)
+    if proposal is None:
+        print("no proposal found")
+        return 1
+    print(f"proposal: {proposal}")
+    result = apply_proposal(proposal, args.only)
     print(f"applied: {len(result['applied'])}  stale: {len(result['stale'])}  valid: {result['valid']}")
     for path in result["stale"]:
         print(f"stale (value changed since the proposal): {path}")

@@ -74,7 +74,7 @@ PAY_QUOTE = "Electrical engineers are paid very well in almost every company we 
 BLOG = "https://careers-blog.example.com/pay"
 
 
-def store_note(db, field_key=FIELD, *, age_days=0, country="pakistan"):
+def store_note(db, field_key=FIELD, *, age_days=0, country="pk"):
     db.add(PaiFieldNote(field_key=field_key, country=country, confidence="medium",
                         researched_at=datetime.now(timezone.utc) - timedelta(days=age_days),
                         note={"sections": {"what_you_study": [{"text": f"You study the core of {field_key}.",
@@ -97,7 +97,7 @@ async def test_note_built_from_sources_with_verified_quotes():
         result, search, read, model = await run_research(db)
         row = db.scalar(select(PaiFieldNote))
     assert result["status"] == "stored" and result["facts"] == 3
-    assert (row.field_key, row.country) == (FIELD, "pakistan")
+    assert (row.field_key, row.country) == (FIELD, "pk")
     sections = row.note["sections"]
     assert set(sections) == {"what_you_study", "work_day", "jobs_and_demand"}
     for facts in sections.values():
@@ -148,6 +148,9 @@ async def test_cached_then_refreshed_by_age():
         row = db.scalar(select(PaiFieldNote))
         assert refreshed["status"] == "stored" and row.note["sections"]
         assert fresh_note(db, FIELD, " pakistan ") is not None
+        # The note is keyed by the catalog country code: other names of the country find it.
+        assert all(fresh_note(db, FIELD, name) is not None for name in ("Pak", "PK", "پاکستان"))
+        assert row.country == "pk"
         assert len(db.scalars(select(PaiFieldNote)).all()) == 1
 
 
@@ -162,7 +165,7 @@ def test_enqueue_is_idempotent_and_capped():
         jobs = db.scalars(select(BackgroundJob).where(BackgroundJob.job_type == JOB_FIELD_RESEARCH)).all()
         keys = [job.payload["field_key"] for job in jobs]
         assert "electronic_engineering" not in keys and keys[0] == "electrical_engineering"
-        assert all(job.workspace_id is None and job.payload["country"] == "pakistan" for job in jobs)
+        assert all(job.workspace_id is None and job.payload["country"] == "pk" for job in jobs)
         # Pending jobs are not queued again; the rest of the list fills the next run.
         assert enqueue_missing(db, fields, "Pakistan") == [
             job.id for job in db.scalars(select(BackgroundJob).where(

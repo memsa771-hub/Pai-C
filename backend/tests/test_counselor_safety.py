@@ -189,3 +189,38 @@ def test_safety_migration_upgrade_and_downgrade():
         assert [c["name"] for c in sa.inspect(connection).get_columns("pai_counselor_turn_decisions")] == ["id"]
         assert connection.execute(sa.text("SELECT id FROM pai_counselor_turn_decisions")).scalar_one() == "old"
     engine.dispose()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("raw", ["", '{"reply": "I hear how hard', "[]"])
+async def test_unusable_wellbeing_reply_posts_the_wellbeing_fallback_not_a_question(raw):
+    """An empty, cut-off or unreadable care reply never becomes the generic
+    "tell me a little more" fallback: the wellbeing fallback and resources are posted."""
+    with StudentSession() as student, patch.object(config,"PAI_API_KEY","fake-only"), \
+            patch.object(config,"PAI_WELLBEING_FALLBACK_REPLY","Please speak to someone you trust."), \
+            patch.object(config,"PAI_WELLBEING_RESOURCES","Configured resource"), \
+            patch.object(gate,"complete",AsyncMock(return_value='{"safety":{"level":"concern","category":"acute_distress"},"intent":"sharing","emotion":"neutral","request":null,"mentioned_areas":[],"declined_area":null}')), \
+            patch("app.pai_c.deep.turn.chat_completion",AsyncMock(return_value=raw)):
+        await student.turn("I cannot cope anymore.")
+        reply = student.transcript[-1]["content"]
+    assert reply == "Please speak to someone you trust.\n\nConfigured resource"
+    assert config.PAI_COUNSELOR_FALLBACK_REPLY not in reply
+
+
+@pytest.mark.asyncio
+async def test_fallen_back_turn_does_not_use_up_its_bank_question():
+    from app.inference.anthropic_client import ProviderUnavailable
+    with StudentSession() as student:
+        with patch("app.pai_c.deep.turn.chat_completion", AsyncMock(side_effect=ProviderUnavailable("down"))):
+            await student.turn("I am in FSc and I like computers.")
+        with student.factory() as db:
+            row = db.scalar(select(CounselorTurnDecision))
+        assert "provider_fallback" in row.guard_violations
+        assert row.decision["bank_intent"] is None and row.decision["step_bank_intent"] is None
+    with StudentSession() as student:
+        with patch("app.pai_c.deep.turn.chat_completion", AsyncMock(return_value='{"reply": "Noted."}')):
+            await student.turn("I am in FSc and I like computers.")
+        with student.factory() as db:
+            row = db.scalar(select(CounselorTurnDecision))
+        # The same turn that got a real reply records the question it asked.
+        assert row.decision["bank_intent"] or row.decision["step_bank_intent"]

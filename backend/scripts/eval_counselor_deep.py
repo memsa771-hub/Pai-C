@@ -541,7 +541,7 @@ async def run_evaluation(*, live: bool = False, max_cost_usd: float | None = Non
     if live:
         ledger.checkpoint_path = result_dir / "live_usage_ledger.json"
     if live:
-        for model in {resolve_model("counselor"), resolve_model("analyst"),
+        for model in {resolve_model("counselor"), resolve_model("analyst"), resolve_model("planner"),
                       resolve_model("sensitive"),
                       *({resolve_model("mirror")} if end_to_end else set()),
                       resolve_model("extractor"),

@@ -18,10 +18,10 @@ from app.pai_c.policy.controller import load_data
 
 CONFIDENCE = ("official", "secondary", "uncertain")
 _DEGREE_META = {"_note", "sources", "confidence"}
-FALLBACK_REGION = "federal_fbise"
-CAMBRIDGE_REGION = "cambridge"
-CAMBRIDGE_LEVELS = ("o_level", "a_level")
-_REGION_META = {"boards", "overrides", "gaps", "_note", "national_fallback_confidence", "ibcc_lag_months",
+# Region names live in the data: the region marked `fallback` is used when
+# nothing else places the student; a region's `levels` (catalog education
+# levels, e.g. O/A level) send those students there whatever their board.
+_REGION_META = {"fallback", "levels", "boards", "overrides", "gaps", "_note", "national_fallback_confidence", "ibcc_lag_months",
                 "ibcc_sources", "ibcc_confidence"}
 _BOARDS_CATALOG = Path(__file__).resolve().parents[2] / "memory" / "catalog" / "vault_catalog.json"
 
@@ -64,8 +64,9 @@ def _validate_regions(data: dict) -> None:
         if region.get("ibcc_lag_months") is not None:
             _sourced(f"region {name} ibcc", {"sources": region.get("ibcc_sources"),
                                               "confidence": region.get("ibcc_confidence")})
-    if FALLBACK_REGION not in regions:
-        raise CalendarError(f"region {FALLBACK_REGION} is required")
+    fallbacks = [name for name, region in regions.items() if region.get("fallback") is True]
+    if len(fallbacks) != 1:
+        raise CalendarError(f"exactly one region must be marked fallback, found {fallbacks}")
     for intake in data["intakes"]:
         for name in intake.get("regions", ()):
             if name not in regions:
@@ -183,21 +184,29 @@ def _board_regions() -> dict:
     return {board["code"]: board["region"] for board in boards if board.get("region")}
 
 
+def fallback_region() -> str:
+    """The region marked `fallback` in the calendar data (validated: exactly one)."""
+    return next(name for name, region in calendar()["regions"].items() if region.get("fallback") is True)
+
+
 def region_for(education_record: dict | None, city: str | None = None) -> str:
-    """The calendar region of a student: Cambridge for O/A level, else the
+    """The calendar region of a student: the region whose data `levels` name the
+    student's level (O/A level: Cambridge), else the
     education record's board (catalog `boards`), else the province of the
     city, else federal. Unknown input never raises; it falls to federal."""
     record = education_record or {}
     catalog = vault_catalog()
     level = catalog.read_education(record.get("qualification_name"), record.get("field_of_study"))[0]
-    if level in CAMBRIDGE_LEVELS:
-        return CAMBRIDGE_REGION
+    regions = calendar()["regions"]
+    for name, region in regions.items():
+        if level and level in (region.get("levels") or ()):
+            return name
     board = record.get("board") or (record.get("details") or {}).get("awarding_body")
     code = catalog.choice_code("boards", str(board)) if board else None
     if code in _board_regions():
         return _board_regions()[code]
     region = calendar().get("city_regions", {}).get(" ".join(str(city or "").casefold().split()))
-    return region if region and region != "_note" else FALLBACK_REGION
+    return region if region and region != "_note" else fallback_region()
 
 
 def calendar_test(codes) -> dict | None:

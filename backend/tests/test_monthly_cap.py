@@ -53,7 +53,7 @@ async def test_cost_recorded_per_role():
             rows = {row.scope: row for row in db.scalars(select(PaiUsageMonth))}
     assert set(rows) == {"models:counselor", "models:analyst"}
     assert rows["models:counselor"].calls == 2
-    assert float(rows["models:counselor"].est_usd) == pytest.approx(2 * (70 * 3 + 30 * 0.3 + 20 * 15) / 1e6)
+    assert float(rows["models:counselor"].est_usd) == pytest.approx(2 * (70 * 2 + 30 * 0.2 + 20 * 10) / 1e6)
     assert float(rows["models:analyst"].est_usd) == pytest.approx((1000 * 1.25 + 100 * 10) / 1e6)
     # An unpriced model uses the data's default rate.
     unknown = SimpleNamespace(prompt_tokens=1_000_000, completion_tokens=0, prompt_tokens_details=None)
@@ -110,7 +110,9 @@ async def test_paused_counselor_replies_fixed_and_extraction_stops():
         _spend(student, models__counselor=100.0)
         with student.factory() as db:
             result = await run_deep_turn(db, _turn(student), history=[])
-        assert result.reply == config.PAI_COUNSELOR_FALLBACK_REPLY + "\n\n" + usage.paused_line()
+        # Only the paused line: no "tell me more" question that contradicts it.
+        assert result.reply == usage.paused_line()
+        assert "?" not in result.reply
         assert usage.paused_line() == gateway.model_roles()["copy"]["paused_line"]
         assert result.guard_violations == ["cap_paused"]
         turn = SimpleNamespace(is_empty=lambda: False)
@@ -147,13 +149,13 @@ async def test_planner_skips_quietly_at_research_paused(caplog):
             patch.object(usage, "_gate_logged", {}), \
             patch("app.pai_c.deep.analysis.chat_completion", AsyncMock()) as planner_model, \
             caplog.at_level(logging.WARNING, logger="app.inference.usage"):
-        _spend(student, models__analyst=81.0)
+        _spend(student, models__planner=81.0)
         job = SimpleNamespace(id="job", workspace_id=student.workspace_id,
                               payload={"user_event_id": "u", "assistant_event_id": "a"})
         assert (await analyze_job(job, Mock()))["status"] == "cap_paused"
         assert (await analyze_job(job, Mock()))["status"] == "cap_paused"
     planner_model.assert_not_awaited()
-    assert len([r for r in caplog.records if r.getMessage().startswith("models: analyst stopped")]) == 1
+    assert len([r for r in caplog.records if r.getMessage().startswith("models: planner stopped")]) == 1
 
 
 @pytest.mark.asyncio
@@ -196,4 +198,71 @@ def test_cache_writes_use_their_own_rate():
     from app.inference.anthropic_client import openai_shaped_usage
     shaped = openai_shaped_usage(SimpleNamespace(input_tokens=100, output_tokens=0, cache_read_input_tokens=0,
                                                  cache_creation_input_tokens=1000))
-    assert usage.estimate_model_usd("claude-sonnet-5-5", shaped) == pytest.approx((100 * 3 + 1000 * 3.75) / 1e6)
+    assert usage.estimate_model_usd("claude-sonnet-5-5", shaped) == pytest.approx((100 * 2 + 1000 * 2.5) / 1e6)
+
+
+@pytest.mark.asyncio
+async def test_paused_line_is_rendered_at_80_percent_and_shown_alone_at_100():
+    """At research_paused the turn renders the paused line once in the chat
+    language; at 100% (render gated off) that cached line is the whole reply."""
+    import json
+    from app.pai_c import language
+    from tests.test_voice_guided import output
+    roman = {"code": "ur", "script": "latin"}
+    render = AsyncMock(return_value=json.dumps({"text": "PAI is mahine ke liye ruka hua hai."}))
+    with StudentSession() as student, patch.object(config, "PAI_MONTHLY_CAP_USD", 100.0), \
+            patch.object(usage, "_gate_logged", {}), patch("app.inference.gateway.complete", render), \
+            patch("app.pai_c.deep.turn.chat_completion", AsyncMock(return_value=output("Theek hai."))) as model:
+        with student.factory() as db:
+            language.set_chat_language(db, student.workspace_id, roman)
+            db.commit()
+        _spend(student, models__researcher=85.0)
+        with student.factory() as db:
+            await run_deep_turn(db, _turn(student), history=[])
+            await run_deep_turn(db, _turn(student), history=[])
+        assert render.await_count == 1  # cached after the first render
+        _spend(student, models__counselor=20.0)
+        with student.factory() as db:
+            result = await run_deep_turn(db, _turn(student), history=[])
+        assert result.reply == "PAI is mahine ke liye ruka hua hai."
+        assert result.guard_violations == ["cap_paused"]
+        assert model.await_count == 2 and render.await_count == 1
+
+
+@pytest.mark.asyncio
+async def test_paused_line_falls_back_to_english_without_a_render():
+    from app.pai_c import language
+    with StudentSession() as student, patch.object(config, "PAI_MONTHLY_CAP_USD", 100.0), \
+            patch.object(usage, "_gate_logged", {}), patch("app.inference.gateway.complete", AsyncMock()) as render:
+        with student.factory() as db:
+            language.set_chat_language(db, student.workspace_id, {"code": "ur", "script": "latin"})
+            db.commit()
+        _spend(student, models__counselor=100.0)
+        with student.factory() as db:
+            result = await run_deep_turn(db, _turn(student), history=[])
+    render.assert_not_awaited()
+    assert result.reply == usage.paused_line()
+
+
+@pytest.mark.asyncio
+async def test_web_search_and_page_reads_count_against_the_cap():
+    from app.plugins._shared import sources
+    with StudentSession() as student, \
+            patch("app.security.network.safe_fetch", AsyncMock(side_effect=RuntimeError("offline"))):
+        usage.record_web_call("web.search")
+        assert await sources.read_page("https://example.com/page", 1000) is None
+        usage.record_web_call("model")  # not a priced web tool: not recorded
+        with student.factory() as db:
+            row = db.scalar(select(PaiUsageMonth).where(PaiUsageMonth.scope == "models:web"))
+        listed = usage.month_rows()
+    rates = usage.model_costs()["usd_per_call"]
+    assert row.calls == 2
+    assert float(row.est_usd) == pytest.approx(rates["web.search"] + rates["web.fetch"])
+    assert (rates["web.search"], rates["web.fetch"]) == (0.005, 0.001)
+    assert ("models:web", 2, pytest.approx(0.006)) in listed
+
+
+def test_rates_match_the_recorded_list_prices():
+    rates = usage.model_costs()["usd_per_million_tokens"]
+    assert rates["claude-sonnet-5-5"] == {"input": 2.0, "output": 10.0, "cached_input": 0.2, "cache_write": 2.5}
+    assert rates["gpt-5"]["input"] == 1.25 and rates["gpt-5-mini"]["input"] == 0.25 and "default" in rates

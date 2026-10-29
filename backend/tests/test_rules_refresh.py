@@ -341,3 +341,23 @@ async def test_pdf_text_is_extracted_off_the_event_loop():
             patch.object(sources.asyncio, "to_thread", to_thread):
         page = await sources.read_page(url, 5000)
     assert calls == ["parse_pdf"] and page["text"].startswith("Candidates need")
+
+
+@pytest.mark.asyncio
+async def test_job_writes_to_the_configured_proposals_dir(tmp_path):
+    """PAI_PROPOSALS_DIR (mounted from the host in docker-compose) holds the
+    proposal; apply_refresh finds the newest one there by itself."""
+    from app.config import config
+    folder = tmp_path / "proposals"
+    read = AsyncMock(side_effect=lambda url, chars: {"url": url, "text": PAGE[url]})
+    with patch.object(config, "PAI_PROPOSALS_DIR", str(folder)), \
+            patch.object(rules_refresh, "read_page", read), \
+            patch.object(rules_refresh, "complete", model_for(VALUES)), \
+            patch.object(rules_refresh, "refresh_items", lambda files=None: refresh_items(FILES)):
+        assert rules_refresh.proposals_dir() == folder
+        result = await rules_refresh_job(SimpleNamespace(payload={}), Mock())
+        assert result["status"] == "proposed" and (folder / result["file"]).exists()
+        assert apply_refresh.resolve_proposal(None) == folder / result["file"]
+        assert apply_refresh.resolve_proposal(Path(result["file"])) == folder / result["file"]
+    with patch.object(config, "PAI_PROPOSALS_DIR", ""):
+        assert rules_refresh.proposals_dir() == POLICY_DIR / rules_refresh.policy()["proposals_dir"]

@@ -57,6 +57,8 @@ def test_gaps_stay_empty_not_invented():
     (lambda d: d["tests"][0].update(test_months=[13]), "1-12"),
     (lambda d: d["intakes"][0].update(apply_months=[0]), "1-12"),
     (lambda d: d["degree_years"].update(bs=4), "study field"),
+    (lambda d: d["regions"]["federal_fbise"].pop("fallback"), "fallback"),
+    (lambda d: d["regions"]["punjab"].update(fallback=True), "fallback"),
 ])
 def test_validator_refuses_a_bad_file(break_it, message):
     data = copy.deepcopy(cal.calendar())
@@ -175,3 +177,12 @@ def test_borrowed_national_rows_are_uncertain_in_every_non_punjab_region():
 def test_regional_intake_applies_only_to_its_region():
     keys = lambda region: {row["key"] for row in cal.intakes_for("electrical_engineering", region)}
     assert "ned_fall" in keys("sindh") and "ned_fall" not in keys("punjab") and "ned_fall" not in keys(None)
+
+
+def test_region_names_come_from_the_calendar_data():
+    """No region name in code: the fallback region and the level-routed region are data."""
+    import inspect
+    source = inspect.getsource(cal)
+    assert "federal_fbise" not in source and '"cambridge"' not in source
+    assert cal.fallback_region() == "federal_fbise"
+    assert cal.calendar()["regions"]["cambridge"]["levels"] == ["o_level", "a_level"]

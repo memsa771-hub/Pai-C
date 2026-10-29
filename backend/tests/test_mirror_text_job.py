@@ -200,3 +200,22 @@ async def test_failed_text_keeps_the_last_text():
         with patch(MODEL, AsyncMock(return_value=_reply(GOOD[:1]))):
             assert (await mirror_text_job(job, db))["status"] == "invalid"
         assert _draft(db, ws) == before
+
+
+@pytest.mark.asyncio
+async def test_text_job_has_a_daily_cap_per_workspace():
+    """Debounced by card version, and at most PAI_MIRROR_TEXT_MAX_PER_DAY texts a day (cost)."""
+    from app.config import config
+    from app.pai_c.mirror import text_job
+    with StudentSession() as student, student.factory() as db, \
+            patch.object(config, "PAI_MIRROR_TEXT_MAX_PER_DAY", 1):
+        ws = student.workspace_id
+        _seed(db, ws)
+        model = AsyncMock(return_value=_reply(GOOD))
+        with patch(MODEL, model):
+            assert (await mirror_text_job(_job(db, ws), db))["status"] == "written"
+            # A new card version would be written again, but the day's allowance is spent.
+            with patch.object(text_job, "_draft", return_value={}):
+                assert (await mirror_text_job(_job(db, ws), db))["status"] == "daily_cap"
+        assert model.await_count == 1
+    assert config.PAI_MIRROR_TEXT_MAX_PER_DAY == 6 and config.PAI_PATH_ANALYSIS_MAX_PER_DAY == 6

@@ -159,6 +159,13 @@ async def mirror_text_job(job, db) -> dict:
         return {"status": "same_version"}
     if not any(area["level"] for area in card["areas"]):
         return {"status": "empty"}
+    # Daily cap per workspace (cost), on top of the card-version debounce above.
+    from app.plugins._shared.budget import take_daily
+    within = take_daily(db, workspace_id, "mirror_text", config.PAI_MIRROR_TEXT_MAX_PER_DAY)
+    db.commit()
+    if not within:
+        logger.warning("mirror_text_daily_cap workspace_id=%s", workspace_id)
+        return {"status": "daily_cap"}
     brief = card_brief(card)
     # The file's second section is the retry instruction (prompts live in .md).
     prompt, retry = (part.strip() for part in load_prompt("mirror_text").split(RETRY_SECTION, 1))

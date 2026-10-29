@@ -14,6 +14,9 @@ from app.pai_c.posting import send_to_student
 from app.pai_c.reliability import policy as reliability_policy, record_fallback
 
 logger = logging.getLogger(__name__)
+# Guard marks of a turn whose reply was a fixed text (provider failure, monthly
+# pause, a reply in a blocked script, a care fallback): its bank question was not asked.
+FELL_BACK = {"provider_fallback", "cap_paused", "language_fallback", "wellbeing_fallback"}
 
 
 def _voice_reply_metadata(event_data: dict) -> Optional[dict]:
@@ -232,6 +235,9 @@ async def _run_deep_turn(db, workspace_id: str, event_data: dict, depth: int):
         logged_decision = decision_log(decision, signals) if decision is not None else None
         if logged_decision is not None and "statement_fallback" in violations:
             logged_decision["statement_fallback"] = True
+        if logged_decision is not None and FELL_BACK & set(violations):
+            # A fixed reply never asked the bank question: it stays unasked.
+            logged_decision["bank_intent"] = logged_decision["step_bank_intent"] = None
         db.add(CounselorTurnDecision(
             workspace_id=workspace_id, source_event_id=turn.source_event_id,
             source_timestamp=turn.timestamp or int(time.time() * 1000),

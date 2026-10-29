@@ -12,6 +12,8 @@ from app.tools.web_search import get_web_search_provider
 
 
 async def fetch(ctx, args):
+    from app.inference.usage import record_web_call
+    record_web_call("web.fetch")
     return await ctx.api.post("/v1/fetch", actor=ctx.source, json={
         "network": ctx.workspace_id,
         "url": args["url"], "mode": args.get("mode", "auto"),
@@ -47,6 +49,8 @@ async def search(ctx, args):
     for attempt in range(attempts):
         try:
             results = await provider.search(query, limit)
+            from app.inference.usage import record_web_call
+            record_web_call("web.search")  # a paid provider call; cache hits above are free
             if not isinstance(results, list):
                 raise ValueError("Search provider returned an invalid result")
             set_bytes(cache_key, json.dumps(results).encode(),

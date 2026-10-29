@@ -31,6 +31,8 @@ x-backend: &backend
     # Uploads live on a volume shared with the worker, which parses them.
     FILE_STORAGE_BACKEND: local
     FILE_STORAGE_PATH: /data/files
+    # Monthly rules refresh proposals land on the host in ./proposals (runbook).
+    PAI_PROPOSALS_DIR: /app/proposals
     CORS_ORIGINS: http://localhost:3000,http://127.0.0.1:3000
     FRONTEND_BASE_URL: http://localhost:3000
     APP_URL: ${APP_URL:-http://localhost:3000}
@@ -41,6 +43,7 @@ x-backend: &backend
     FIREBASE_SERVICE_ACCOUNT: /run/secrets/firebase-service-account.json
   volumes:
     - files:/data/files
+    - ./proposals:/app/proposals
     - type: bind
       source: ${FIREBASE_SERVICE_ACCOUNT_FILE:-./secrets/firebase-service-account.json}
       target: /run/secrets/firebase-service-account.json

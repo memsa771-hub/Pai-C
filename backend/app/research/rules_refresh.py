@@ -29,7 +29,8 @@ def policy() -> dict:
 
 
 def proposals_dir() -> Path:
-    return POLICY_DIR / policy()["proposals_dir"]
+    """PAI_PROPOSALS_DIR (a host-mounted folder in Docker), else the policy folder's own."""
+    return Path(config.PAI_PROPOSALS_DIR) if config.PAI_PROPOSALS_DIR else POLICY_DIR / policy()["proposals_dir"]
 
 
 def _walk(node, parts: list[str], trail: list[str]):

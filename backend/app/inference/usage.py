@@ -12,7 +12,7 @@ if the month's spend cannot be read, no embedding call is made.
 
 Every other model call is recorded too, one row per role (`models:<role>`),
 priced from pai_c/policy/model_costs.json. Together with embeddings they make
-the one monthly spend that `cap_state()` compares with PAI_MONTHLY_CAP_USD;
+the one monthly spend (web searches and page reads too, as `models:web`) that `cap_state()` compares with PAI_MONTHLY_CAP_USD;
 model_roles.json says at which share of the cap which roles stop. That check
 fails open: an unreadable counter must not silence the counselor.
 """
@@ -136,6 +136,17 @@ def record_model_call(role: str, model: str, usage) -> None:
         _bump(f"{MODELS_SCOPE}:{role}", estimate_model_usd(model, usage))
     except Exception:
         logger.warning("models: usage not recorded role=%s", role, exc_info=True)
+
+
+def record_web_call(tool: str) -> None:
+    """A web search or page read, priced per call (model_costs.json
+    usd_per_call), counted against the monthly cap under `models:web`."""
+    try:
+        usd = float(model_costs().get("usd_per_call", {}).get(tool, 0.0))
+        if usd > 0:
+            _bump(f"{MODELS_SCOPE}:web", usd)
+    except Exception:
+        logger.warning("models: web usage not recorded tool=%s", tool, exc_info=True)
 
 
 def month_rows(month: str | None = None) -> list[tuple[str, int, float]]:

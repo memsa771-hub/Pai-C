@@ -6,6 +6,7 @@ reshaped to the OpenAI field names (prompt/completion/cached tokens) so one
 usage callback, one cost estimate and the research budget read both providers.
 """
 
+import logging
 from collections.abc import Callable
 from types import SimpleNamespace
 from typing import Any, Optional
@@ -18,6 +19,8 @@ except ImportError:  # SDK absent: an anthropic role fails at call time, never a
     class AnthropicError(Exception):
         pass
 
+logger = logging.getLogger(__name__)
+
 
 class UnsupportedForProvider(ValueError):
     """The request needs something this provider path does not offer (tools)."""
@@ -27,11 +30,13 @@ class ProviderUnavailable(RuntimeError):
     """The provider failed; callers with a fixed fallback reply use it."""
 
 
-def create_client(api_key: str, base_url: Optional[str] = None, timeout: float = 120):
+def create_client(api_key: str, base_url: Optional[str] = None, timeout: float = 120,
+                  max_retries: Optional[int] = None):
     from app.config import config
     if AsyncAnthropic is None:
         raise ProviderUnavailable("anthropic SDK is not installed")
-    kwargs: dict = {"api_key": api_key, "timeout": timeout, "max_retries": config.LLM_MAX_RETRIES}
+    kwargs: dict = {"api_key": api_key, "timeout": timeout,
+                    "max_retries": config.LLM_MAX_RETRIES if max_retries is None else max_retries}
     if base_url:
         kwargs["base_url"] = base_url
     return AsyncAnthropic(**kwargs)
@@ -67,29 +72,58 @@ def openai_shaped_usage(usage: Any) -> SimpleNamespace | None:
     )
 
 
+def _thinking(effort: Optional[str], settings: dict) -> tuple[dict, int]:
+    """The reasoning effort as Anthropic thinking: low, none or unset turn it
+    off (Sonnet would otherwise think at its own default and bill it as
+    output); medium and high get the data's token budget."""
+    budget = int(settings.get("thinking_budget_by_effort", {}).get((effort or "").lower(), 0) or 0)
+    if budget <= 0:
+        return {"type": "disabled"}, 0
+    return {"type": "enabled", "budget_tokens": budget}, budget
+
+
 async def chat_completion(api_key: str, model: str, messages: list[dict], *, system_prompt: Optional[str] = None,
                           max_tokens: Optional[int] = None, temperature: Optional[float] = None,
-                          base_url: Optional[str] = None, settings: dict,
+                          base_url: Optional[str] = None, settings: dict, reasoning_effort: Optional[str] = None,
                           usage_callback: Optional[Callable[[Any], None]] = None) -> str:
-    """`settings` is the provider block of model_roles.json (max tokens, empty turn)."""
+    """`settings` is the provider block of model_roles.json with the role's own
+    overrides on top (max_tokens, timeout_seconds, max_retries).
+
+    The system prompt is sent as one cached block (prompt caching): the voice
+    and context prefix repeats on every turn. A reply cut off at max_tokens is
+    asked once more for fewer words; a second cut-off or a refusal raises
+    ProviderUnavailable, so the caller's fixed fallback is used."""
     system, turns = _messages(messages, system_prompt, settings["empty_conversation"])
-    kwargs: dict = {"model": model, "max_tokens": max_tokens or settings["default_max_tokens"], "messages": turns}
-    if system:
-        kwargs["system"] = system
-    if temperature is not None:
+    thinking, budget = _thinking(reasoning_effort, settings)
+    kwargs: dict = {"model": model, "messages": turns, "thinking": thinking,
+                    "max_tokens": (max_tokens or settings.get("max_tokens") or settings["default_max_tokens"]) + budget}
+    if temperature is not None and not budget:  # thinking accepts no temperature
         kwargs["temperature"] = temperature
-    client = create_client(api_key, base_url=base_url)
+    client = create_client(api_key, base_url=base_url, timeout=settings.get("timeout_seconds", 120),
+                           max_retries=settings.get("max_retries"))
     try:
-        try:
-            response = await client.messages.create(**kwargs)
-        except AnthropicError as exc:
-            raise ProviderUnavailable(type(exc).__name__) from exc
-        usage = openai_shaped_usage(getattr(response, "usage", None))
-        from app.plugins._shared.budget import record_model_usage
-        record_model_usage(usage)
-        if usage_callback is not None:
-            usage_callback(usage)
-        return "".join(getattr(block, "text", "") for block in (response.content or [])
-                       if getattr(block, "type", "text") == "text")
+        for attempt in range(2):
+            text = system + ("\n\n" + settings["shorter_instruction"] if attempt else "")
+            if text:
+                kwargs["system"] = [{"type": "text", "text": text, "cache_control": {"type": "ephemeral"}}]
+            try:
+                response = await client.messages.create(**kwargs)
+            except AnthropicError as exc:
+                raise ProviderUnavailable(type(exc).__name__) from exc
+            usage = openai_shaped_usage(getattr(response, "usage", None))
+            from app.plugins._shared.budget import record_model_usage
+            record_model_usage(usage)
+            if usage_callback is not None:
+                usage_callback(usage)
+            stop = getattr(response, "stop_reason", None)
+            if stop == "refusal":
+                logger.warning("anthropic_stop model=%s stop_reason=refusal", model)
+                raise ProviderUnavailable("refusal")
+            if stop == "max_tokens":
+                logger.warning("anthropic_stop model=%s stop_reason=max_tokens attempt=%d", model, attempt + 1)
+                continue
+            return "".join(getattr(block, "text", "") for block in (response.content or [])
+                           if getattr(block, "type", "text") == "text")
+        raise ProviderUnavailable("max_tokens")
     finally:
         await client.close()

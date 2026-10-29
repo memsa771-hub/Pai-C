@@ -240,8 +240,8 @@ async def _candidate(db, workspace_id: str, student: EventRecord,
     feedback = ""
     for attempt in range(2):
         db.rollback()
-        raw = await chat_completion(role="analyst",
-            api_key=config.PAI_API_KEY, model=resolve_model("analyst"),
+        raw = await chat_completion(role="planner",
+            api_key=config.PAI_API_KEY, model=resolve_model("planner"),
             messages=[{"role": "user", "content": analyst_input}],
             system_prompt=load_prompt("planner") + "\n\n" + available_playbooks() + feedback,
             response_format={"type": "json_object"},
@@ -303,7 +303,7 @@ async def analyze_job(job, db) -> dict:
     if not job.workspace_id:
         raise ValueError("analysis job requires a workspace")
     from app.inference import usage
-    if not usage.role_allowed("analyst"):
+    if not usage.role_allowed("planner"):
         # Monthly model cap (research_paused stage): a quiet skip, logged once a
         # day. The job completes, so later turns' analyses are not held behind it.
         return {"status": "cap_paused"}

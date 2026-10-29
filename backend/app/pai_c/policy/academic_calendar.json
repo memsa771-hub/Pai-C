@@ -1215,6 +1215,7 @@
    "national_fallback_confidence": "uncertain"
   },
   "federal_fbise": {
+   "fallback": true,
    "boards": [
     "FBISE Islamabad"
    ],
@@ -1363,6 +1364,7 @@
    "national_fallback_confidence": "uncertain"
   },
   "cambridge": {
+   "levels": ["o_level", "a_level"],
    "boards": [
     "Cambridge International (O Level, A Level, IGCSE)"
    ],

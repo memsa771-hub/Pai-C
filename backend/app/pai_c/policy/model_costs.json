@@ -1,9 +1,11 @@
 {
+  "_note": "USD per 1M tokens, list prices checked 2026-10-29: claude-sonnet-5-5 $2 in / $10 out / $0.20 cache read / $2.50 cache write; gpt-5 $1.25 / $10 / $0.125 cached; gpt-5-mini $0.25 / $2 / $0.025 cached. Web tools are priced per call (usd_per_call), recorded under models:web.",
   "usd_per_million_tokens": {
-    "claude-sonnet-5-5": {"input": 3.0, "output": 15.0, "cached_input": 0.3, "cache_write": 3.75},
+    "claude-sonnet-5-5": {"input": 2.0, "output": 10.0, "cached_input": 0.2, "cache_write": 2.5},
     "gpt-5": {"input": 1.25, "output": 10.0, "cached_input": 0.125},
     "gpt-5-mini": {"input": 0.25, "output": 2.0, "cached_input": 0.025},
     "text-embedding-3-small": {"input": 0.02, "output": 0.0, "cached_input": 0.02},
-    "default": {"input": 3.0, "output": 15.0, "cached_input": 0.3, "cache_write": 3.75}
-  }
+    "default": {"input": 2.0, "output": 10.0, "cached_input": 0.2, "cache_write": 2.5}
+  },
+  "usd_per_call": {"web.search": 0.005, "web.fetch": 0.001}
 }

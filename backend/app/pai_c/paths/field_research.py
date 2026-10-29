@@ -36,7 +36,7 @@ def policy() -> dict:
     """The analyzer's policy holds the note knobs; they are data, not code."""
     rules = load_data("path_analyzer.json")
     return {**rules["field_research"], "field_notes_per_run": rules["field_notes_per_run"],
-            "field_notes_in_prompt": rules["field_notes_in_prompt"], "default_country": rules["default_country"]}
+            "field_notes_in_prompt": rules["field_notes_in_prompt"]}
 
 
 class NoteFact(BaseModel):
@@ -60,14 +60,26 @@ class FieldNote(BaseModel):
 
 
 def country_key(country: str | None) -> str:
-    return " ".join(str(country or "").split()).casefold()
+    """The catalog country code ("Pakistan", "Pak" and its Urdu name are one
+    note), else the casefolded wording for a country the catalog lacks."""
+    from app.pai_c.memory import vault_catalog
+    text = " ".join(str(country or "").split())
+    return vault_catalog().choice_code("countries", text) or text.casefold()
+
+
+def country_label(key: str) -> str:
+    """The name searched for: the catalog label of a code, else the wording."""
+    from app.pai_c.memory import vault_catalog
+    label = vault_catalog().label("countries", key)
+    return label if label != key else key.title()
 
 
 def student_country(db, workspace_id: str) -> str:
-    """The student's current country from the Vault, else the policy default."""
+    """The student's current country (catalog code) from the Vault, else
+    PAI_DEFAULT_COUNTRY."""
     from app.pai_c.memory import vault_value
     value = vault_value(db, workspace_id, "location.current_country")
-    return value.strip() if isinstance(value, str) and value.strip() else policy()["default_country"]
+    return country_key(value if isinstance(value, str) and value.strip() else config.PAI_DEFAULT_COUNTRY)
 
 
 def _now() -> datetime:
@@ -217,7 +229,7 @@ async def research_field(field_key: str, country: str, blocked: set[str] | None 
     No database work happens here, so no transaction stays open across it."""
     rules = policy()
     field = study_fields()[field_key]
-    label = country.title() if country == country_key(country) else country
+    label = country_label(country_key(country))
     sections = {name: text.format(country=label) for name, text in rules["sections"].items()}
     pages, seen = [], set()
     # Not charged to any student: the note is shared (spec 3.1).
@@ -270,7 +282,7 @@ async def field_research_job(job, db) -> dict:
         # Monthly model cap (research_paused): a quiet skip, logged once a day.
         return {"status": "cap_paused"}
     payload = dict(job.payload or {})
-    field_key, country = payload.get("field_key"), country_key(payload.get("country") or policy()["default_country"])
+    field_key, country = payload.get("field_key"), country_key(payload.get("country") or config.PAI_DEFAULT_COUNTRY)
     if field_key not in study_fields():
         return {"status": "unknown_field"}
     if fresh_note(db, field_key, country):

@@ -60,6 +60,8 @@ async def read_page(url: str, max_chars: int) -> dict | None:
         return None
     from app.security import network
     from app.routers.fetch import MAX_RESPONSE_BYTES, STATIC_TIMEOUT_SECONDS, USER_AGENT, _extract_text
+    from app.inference.usage import record_web_call
+    record_web_call("web.fetch")
     try:
         fetched = await network.safe_fetch(url, max_bytes=MAX_RESPONSE_BYTES, timeout=STATIC_TIMEOUT_SECONDS,
                                            headers={"User-Agent": USER_AGENT, "Accept-Language": "en"},

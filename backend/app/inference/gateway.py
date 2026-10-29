@@ -37,6 +37,7 @@ _MODELS = {
     'counselor': ('PAI_COUNSELOR_MODEL',),
     'summarizer': ('PAI_SUMMARIZER_MODEL',),
     'analyst': ('PAI_ANALYST_MODEL',),
+    'planner': ('PAI_PLANNER_MODEL',),
     'mirror': ('PAI_MIRROR_MODEL',),
     # PAI_ROADMAP_MODEL is the older name for this setting; it still works.
     'path_explain': ('PAI_PATH_EXPLAIN_MODEL', 'PAI_ROADMAP_MODEL'),
@@ -53,6 +54,7 @@ _EFFORTS = {
     'safety': 'PAI_SAFETY_REASONING_EFFORT',
     'counselor': 'PAI_COUNSELOR_REASONING_EFFORT',
     'analyst': 'PAI_ANALYST_REASONING_EFFORT',
+    'planner': 'PAI_ANALYST_REASONING_EFFORT',
     'summarizer': 'PAI_ANALYST_REASONING_EFFORT',
     'mirror': 'PAI_COUNSELOR_REASONING_EFFORT',
     'path_explain': 'PAI_COUNSELOR_REASONING_EFFORT',
@@ -153,7 +155,8 @@ def resolve_role(role: str) -> RoleConfig:
     if provider == model_roles()['fallback_provider']:
         api_key, _, base_url, _ = _settings(role, None, model, _DEFAULT, None)
         return RoleConfig(provider, model, api_key, base_url, reasoning_effort(role))
-    return RoleConfig(provider, model, _setting(keys['api_key']), _setting(keys['base_url']) or None, None)
+    return RoleConfig(provider, model, _setting(keys['api_key']), _setting(keys['base_url']) or None,
+                      reasoning_effort(role))
 
 
 def resolve_model(role: str) -> str:
@@ -221,7 +224,11 @@ async def complete(role: str, messages: list[dict], system_prompt=None, response
         # Caller overrides name the OpenAI key, endpoint and model; this provider uses its own.
         resolved = resolve_role(role)
         model = model if model and _fits(provider, model) else resolved.model
-        settings = model_roles()['providers'][provider]
+        # The role's own call limits (max_tokens, timeout, retries) over the provider's.
+        settings = {**model_roles()['providers'][provider],
+                    **{key: value for key, value in _defaults(role).items()
+                       if key in ('max_tokens', 'timeout_seconds', 'max_retries')}}
+        effort = resolved.reasoning_effort if reasoning_effort is _DEFAULT else reasoning_effort
         if response_format and response_format.get('type') == 'json_object':
             system_prompt = (system_prompt or '') + '\n' + settings['json_instruction']
         record = _usage_callback(phase or role, model, turn_id, role=role)
@@ -233,7 +240,7 @@ async def complete(role: str, messages: list[dict], system_prompt=None, response
         return await anthropic_client.chat_completion(
             resolved.api_key, model, messages, system_prompt=system_prompt, max_tokens=max_tokens,
             temperature=temperature, base_url=resolved.base_url, settings=settings,
-            usage_callback=on_provider_usage)
+            reasoning_effort=effort, usage_callback=on_provider_usage)
     api_key, model, base_url, effort = _settings(role, api_key, model, base_url, reasoning_effort)
     if response_format and response_format.get('type') == 'json_object':
         # Chat Completions rejects JSON mode unless a message explicitly asks

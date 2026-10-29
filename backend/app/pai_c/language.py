@@ -140,3 +140,24 @@ async def render_copy(db, workspace_id: str, key: str, english: str, language=No
     flag_modified(workspace, "rendered_copy")
     db.commit()
     return text.strip()
+
+
+PAUSED_KEY = "paused_line"
+
+
+async def prepare_paused_reply(db, workspace_id: str) -> None:
+    """Once spend reaches the first cap stage, render the paused line in the
+    chat language while the counselor can still run, so the 100% reply (when
+    render_copy is gated off) can be shown in the student's language. A cached
+    render costs nothing; English needs none."""
+    from app.inference import usage
+    if is_english(chat_language(db, workspace_id)) or usage.cap_state()["stage"] == "ok":
+        return
+    await render_copy(db, workspace_id, PAUSED_KEY, usage.paused_line())
+
+
+async def paused_reply(db, workspace_id: str) -> str:
+    """The whole reply at the monthly cap: the paused line, rendered when a
+    render was cached before the cap, else English."""
+    from app.inference import usage
+    return await render_copy(db, workspace_id, PAUSED_KEY, usage.paused_line())
