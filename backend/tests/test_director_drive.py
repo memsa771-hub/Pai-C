@@ -318,3 +318,53 @@ async def test_a_step_line_with_an_unsourced_world_number_is_never_posted():
         with patch("app.pai_c.deep.turn.chat_completion", model):
             result = await run_deep_turn(db, _turn(student, "ok"), history=[], decision=decision, signals=signals())
     assert "90%" not in result.reply and result.reply.endswith(decision.next_step["text"])
+
+
+
+# ---- next step in the message metadata --------------------------------------------
+
+async def _posted_turn(monkeypatch, sig, writer_output):
+    from sqlalchemy import select
+    from app.config import config
+    from app.models import EventRecord
+    monkeypatch.setattr(config, "PAI_API_KEY", "offline-fake")
+    with StudentSession() as student:
+        with patch("app.pai_c.policy.classifier.complete", AsyncMock(return_value=sig.model_dump_json())), \
+             patch("app.pai_c.deep.turn.chat_completion", AsyncMock(return_value=writer_output)):
+            await student.turn("Theek hai")
+        with student.factory() as db:
+            row = db.scalars(select(EventRecord).where(EventRecord.source == "openagents:pai",
+                                                       EventRecord.type == "workspace.message.posted")
+                             .order_by(EventRecord.timestamp)).all()[-1]
+            return row.payload["content"], row.metadata_ or {}
+
+
+@pytest.mark.asyncio
+async def test_an_appended_step_is_posted_in_the_metadata(monkeypatch):
+    content, metadata = await _posted_turn(monkeypatch, signals(intent="sharing"),
+                                           _reply("Theek hai, samajh gaya."))
+    assert metadata["next_step"] == content.rsplit("\n\n", 1)[1]
+    assert content.endswith(metadata["next_step"])
+
+
+@pytest.mark.asyncio
+async def test_the_writers_step_is_posted_in_the_metadata(monkeypatch):
+    output = json.dumps({"reply": "Theek hai.", "next_step": "Apne baare mein batao: aaj kal kya karte ho?",
+                         "moves": ["ask"], "action": {"type": "none"}})
+    content, metadata = await _posted_turn(monkeypatch, signals(intent="sharing"), output)
+    assert metadata["next_step"] == "Apne baare mein batao: aaj kal kya karte ho?" and content.endswith(metadata["next_step"])
+
+
+@pytest.mark.asyncio
+async def test_a_question_reply_without_a_step_line_has_no_metadata_step(monkeypatch):
+    content, metadata = await _posted_turn(monkeypatch, signals(intent="sharing"),
+                                           _reply("Apne baare mein batao, aaj kal kya karte ho?"))
+    assert content.endswith("?") and "next_step" not in metadata
+
+
+@pytest.mark.asyncio
+async def test_a_care_reply_posts_no_next_step(monkeypatch):
+    sig = signals(intent="sharing", emotion="distressed", safety={"level": "concern", "category": "acute_distress"})
+    content, metadata = await _posted_turn(monkeypatch, sig, _reply("Main yahan hoon. Tum akelay nahi ho.",
+                                                                    {"type": "wellbeing"}))
+    assert "next_step" not in metadata

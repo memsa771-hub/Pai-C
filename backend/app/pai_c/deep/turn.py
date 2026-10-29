@@ -28,6 +28,9 @@ class DeepTurnResult:
     polish_ms: int
     moves: list[str] = field(default_factory=list)
     guard_violations: list[str] = field(default_factory=list)
+    # The next-step line the reply ends with (the Writer's or the appended
+    # data step), for the message metadata; None when there is none.
+    next_step: str | None = None
 
 
 def unfence(raw: str) -> str:
@@ -97,12 +100,12 @@ async def _append_next_step(db, turn, decision, reply, action, history=(), avoid
     if text and step.get("question") and repeated_questions(text, history, avoid):
         key, text, place = "phase:" + step["phase"], step.get("line"), step.get("line_place")
     if not text:
-        return reply, action
+        return reply, action, None
     line = await render_copy(db, turn.workspace_id, key, text)
     reply = polish_reply((reply.rstrip() + "\n\n" + line).strip())
     if place and action.get("type", "none") == "none":
         action = {"type": "show_place", "place": place}
-    return reply, action
+    return reply, action, line
 
 
 async def run_deep_turn(db, turn: CounselorTurnInput, *,
@@ -134,6 +137,7 @@ async def run_deep_turn(db, turn: CounselorTurnInput, *,
     model_ms = 0
     polish_ms = 0
     violations = []
+    posted_step = None
     retry_line = ""
     if instructions != "wellbeing" and not usage.role_allowed("counselor"):
         # Monthly cap reached: a fixed reply that says PAI is paused, no model call.
@@ -239,6 +243,7 @@ async def run_deep_turn(db, turn: CounselorTurnInput, *,
                     step_line = ""
             if step_line:
                 reply = polish_reply(reply.rstrip() + "\n\n" + step_line)
+        posted_step = step_line if step_line and reply.rstrip().endswith(step_line.strip()) else None
         if decision is not None and decision.must_drive and card is None and not ends_with_step(reply, step_line):
             if attempt == 0:
                 violations.append("drive_retry")
@@ -246,8 +251,10 @@ async def run_deep_turn(db, turn: CounselorTurnInput, *,
                     encoding="utf-8").strip().replace("{next_step}", (decision.next_step or {}).get("text", ""))
                 polish_ms += int((time.monotonic() - started) * 1000)
                 continue
-            reply, action = await _append_next_step(db, turn, decision, reply, action, history, avoid)
+            reply, action, line = await _append_next_step(db, turn, decision, reply, action, history, avoid)
+            posted_step = line if line and reply.rstrip().endswith(line.strip()) else None
             violations.append("drive_appended")
         polish_ms += int((time.monotonic() - started) * 1000)
         break
-    return DeepTurnResult(reply, action, context, model_ms, polish_ms, moves, violations)
+    return DeepTurnResult(reply, action, context, model_ms, polish_ms, moves, violations,
+                          posted_step if decision is not None and decision.must_drive else None)

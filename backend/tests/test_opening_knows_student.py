@@ -88,3 +88,15 @@ async def test_the_opening_posts_exactly_one_question():
         posted = student.transcript[-1]["content"]
         assert posted.count("?") == 1 and posted.endswith("aaj kal kya karte ho?")
         assert "no separate next step" in model.await_args.kwargs["system_prompt"]
+
+
+
+@pytest.mark.asyncio
+async def test_the_opening_metadata_has_no_step_when_it_ends_with_its_question():
+    from sqlalchemy import select
+    from app.models import EventRecord
+    with StudentSession() as student, student.factory() as db:
+        await _open(student, db)
+        row = db.scalar(select(EventRecord).where(EventRecord.source == "openagents:pai",
+                                                  EventRecord.type == "workspace.message.posted"))
+        assert "next_step" not in (row.metadata_ or {})

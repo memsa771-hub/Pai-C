@@ -193,6 +193,10 @@ async def _run_deep_turn(db, workspace_id: str, event_data: dict, depth: int):
     if place := shown_place(action):
         # The student sees a link to the place; never a route or system name.
         reply_metadata = {**(reply_metadata or {}), "workspace_place": place}
+    step = getattr(result, "next_step", None) if fallback_reply is None and not flagged else None
+    if step:
+        # The last line the drive rule gave the reply, so the app can show it as the next step.
+        reply_metadata = {**(reply_metadata or {}), "next_step": step}
     inline_card = presentation_card(decision, safety_flagged=flagged)
     if inline_card:
         reply_metadata = {**(reply_metadata or {}), "counselor_card": inline_card}

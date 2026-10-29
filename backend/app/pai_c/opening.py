@@ -85,6 +85,7 @@ async def opening_job(job, db):
                     + "<student_words>" + json.dumps(words, ensure_ascii=False) + "</student_words>\n"
                     + "<opening_language>" + json.dumps(language) + "</opening_language>")
         db.rollback()
+        opening_step = None
         try:
             if not usage.role_allowed("counselor"):
                 raise _Paused()
@@ -101,24 +102,30 @@ async def opening_job(job, db):
             if (isinstance(reply, str) and isinstance(step, str) and step.strip()
                     and not question_count(reply)):
                 reply = reply.rstrip() + "\n\n" + step.strip()
+                opening_step = step.strip()
             if isinstance(reply, str):
                 reply = polish_reply(reply)
+                if opening_step and not reply.rstrip().endswith(opening_step):
+                    opening_step = None
             if not isinstance(reply, str) or not reply.strip() or contains_blocked_script(
                     reply, config.PAI_LANGUAGE_BLOCKED_SCRIPTS):
                 raise ValueError("Invalid opening reply")
         except _Paused:
             # Monthly cap reached: the fixed opening, saying PAI is paused, no model call.
             reply = config.PAI_OPENING_FALLBACK_REPLY.replace("{name}", name) + "\n\n" + usage.paused_line()
+            opening_step = None
         except Exception as exc:
             logger.warning("counselor_opening_error job_id=%s error_type=%s", job_id, type(exc).__name__)
             if not final_attempt:
                 raise
             reply = config.PAI_OPENING_FALLBACK_REPLY.replace("{name}", name)
+            opening_step = None
         # Another normal reply may have arrived while the model was running.
         if _already_posted(db, workspace_id, channel):
             return {"status": "already_posted"}
         posted = await send_to_student(db, workspace_id, channel, PAI_AGENT_NAME,
-                                       reply.strip(), 0)
+                                       reply.strip(), 0,
+                                       metadata={"next_step": opening_step} if opening_step else None)
         if not posted:
             raise RuntimeError("Opening was not posted")
         return {"status": "posted", "event_id": posted}
