@@ -270,7 +270,7 @@ def sanitize(analysis: PathAnalysis, evidence: dict[str, str], dismissed: set[st
                      "evidence": [{"text": evidence[i], "item_id": i,
                                    "evidence_level": vault.get(i, {}).get("evidence_level"),
                                    "source_label": vault.get(i, {}).get("source_label")} for i in cited]
-                                 + [{"text": notes[i]["text"], "item_id": i, "evidence_level": None,
+                                 + [{"text": notes[i]["text"], "item_id": i, "evidence_level": "source",
                                      "source_label": None, "source_url": notes[i]["source_url"]} for i in world],
                      "study_field": _study_field(candidate) if candidate is not None else None})
         if len(kept) == rules["max_paths"]:

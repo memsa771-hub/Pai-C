@@ -22,7 +22,7 @@
   "_recall_note": "Semantic recall (FOUR_FEATURES_SPEC 3): the query is the candidate field titles plus the student's Vault entries of recall_query_types; recall_top_k hits. A hit on a citable Vault entry (a profile card) carries its id; other hits (session summaries, document passages) are shown with id null and cannot be cited. A path's why must cite at least one Vault entry id (evidence_item_ids).",
   "recall_top_k": 8,
   "recall_query_types": ["goal", "interest"],
-  "_field_notes_note": "Shared field notes (BETA_CONVERSATION_SPEC 3.1; paths/field_research.py). After a run the analyzer queues research for at most field_notes_per_run candidate fields with no fresh note (saved paths first); the prompt's <field_notes> block shows the notes of at most field_notes_in_prompt fields. default_country is used when the student's Vault has no current country. field_research: queries ({field}, {country}), search_limit results per query, fetch_limit pages in all, page_chars per page, the sections the note has (the description goes to the model), max_facts_per_section, the SourceVerifier checks a fact must pass, institution_patterns (case-sensitive regexes) and institution_words (whole words, any case) that drop a fact naming an institution, and the confidence thresholds.",
+  "_field_notes_note": "Shared field notes (BETA_CONVERSATION_SPEC 3.1; paths/field_research.py). After a run the analyzer queues research for at most field_notes_per_run candidate fields with no fresh note (saved paths first; a field that found nothing is tried again the next ISO week); the prompt's <field_notes> block shows the trusted facts of at most field_notes_in_prompt fields. default_country is used when the student's Vault has no current country. field_research: queries ({field}, {country}), search_limit results per query, fetch_limit pages in all, page_chars per page, the sections the note has (the description goes to the model), max_facts_per_section. quote_rules: a fact is kept only when its quote is on the page (line breaks ignored), has min_chars characters and min_words words, states every number the fact states, and shares content words with the fact (Jaccard of words of 3+ letters outside stopwords, at least min_overlap). Institutions: a fact naming one is dropped. The blocked names are institution_words plus every name and domain label in the institution catalog (pai_institutions, pai_institution_domains); a name of up to acronym_max_letters letters is matched only in capitals (FAST, UCP), a longer one in any case; institution_patterns are regexes matched in any case ((?-i:...) keeps a part case-sensitive). trusted_domains (with paths/policy.json trusted_domains and the hosts of admission_rules.json rows with confidence official) mark a fact trusted; a fact from any other site is kept as uncertain, never shown to the analyzer and never counted in the note's confidence. confidence: thresholds on trusted facts and sources; none gives uncertain.",
   "field_notes_per_run": 5,
   "field_notes_in_prompt": 6,
   "default_country": "Pakistan",
@@ -36,13 +36,20 @@
     "sections": {
       "what_you_study": "The subjects and skills the degree teaches.",
       "work_day": "What a typical working day looks like after the degree.",
-      "entry_in_pakistan": "How students in {country} usually get in: the school background and the kind of entry test, without naming any institution.",
+      "entry": "How students in {country} usually get in: the school background and the kind of entry test, without naming any institution.",
       "jobs_and_demand": "The kinds of jobs it leads to and how much demand there is in {country}.",
       "myths": "Common beliefs about this field that the sources correct."
     },
-    "required_checks": ["current_cycle", "schema", "freshness"],
-    "institution_patterns": ["\\b(?:University|Institute|College|Academy) of (?:the )?[A-Z]", "\\b[A-Z][A-Za-z]+ (?:University|Institute|College)\\b"],
-    "institution_words": ["nust", "lums", "uet", "giki", "comsats", "pieas", "aku", "kemu", "iba", "qau", "bzu", "fast-nu", "ned"],
+    "quote_rules": {
+      "min_chars": 40,
+      "min_words": 6,
+      "min_overlap": 0.25,
+      "stopwords": ["the", "and", "you", "your", "for", "with", "are", "was", "were", "this", "that", "they", "them", "their", "from", "into", "will", "can", "has", "have", "who", "which", "what", "about", "also", "than", "then", "there", "these", "those", "its", "our", "but", "not", "all", "any", "may", "more", "such", "other"]
+    },
+    "institution_patterns": ["\\b(?:university|institute|college|academy|school) of (?:the )?[a-z]", "\\b(?-i:[A-Z][A-Za-z]+) (?:university|institute|college)\\b"],
+    "institution_words": ["nust", "lums", "uet", "giki", "comsats", "pieas", "aku", "kemu", "iba", "qau", "bzu", "fast", "fast-nu", "ned", "umt", "gcu", "ucp", "riphah", "uol", "uaf", "uvas", "szabist", "bahria", "habib", "dow", "aiou", "vu"],
+    "acronym_max_letters": 4,
+    "trusted_domains": ["gov.pk", "edu.pk"],
     "confidence": {"high": {"min_facts": 8, "min_sources": 2}, "medium": {"min_facts": 3, "min_sources": 1}}
   },
   "message_type": "counselor_paths",

@@ -25,3 +25,18 @@ it('shows no badge when the reason cites no Vault entry', () => {
     evidence={[{ text: 'Older evidence', item_id: null }]} />);
   expect(screen.getByText('Why it fits you').parentElement!.textContent).toBe('Why it fits you');
 });
+
+it('shows a cited field-note fact as a source link beside the reason', () => {
+  render(<PathCardView id="p1" title="Electrical Engineering" whyLabel="Why it fits you"
+    why="Builds on your repair work." actions={null}
+    evidence={[
+      { text: 'Repairing phones', item_id: 'item:v1', evidence_level: 'stated', source_label: 'Chat' },
+      { text: 'Demand is rising.', item_id: 'note:electrical_engineering:2', evidence_level: 'source',
+        source_label: null, source_url: 'https://www.pec.org.pk/demand' },
+    ]} />);
+  const reason = screen.getByText('Why it fits you').parentElement!;
+  expect(reason.textContent).toContain('Stated · Chat');
+  const link = screen.getByRole('link', { name: /pec\.org\.pk/ });
+  expect(link.getAttribute('href')).toBe('https://www.pec.org.pk/demand');
+  expect(reason.textContent).toContain('Source');
+});

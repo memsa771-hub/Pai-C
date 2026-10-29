@@ -67,6 +67,7 @@
     "unknown": "Not known yet"
   },
   "fitFrom": "From what you said",
+  "whySource": "Source",
   "ownPath": "Your idea",
   "pathNeedsCheck": "Needs checking for your group",
   "pathNeedsGroup": "Needs {groups} in intermediate",

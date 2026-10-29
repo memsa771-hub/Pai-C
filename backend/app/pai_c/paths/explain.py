@@ -64,8 +64,11 @@ def note_pages(brief) -> list[dict]:
         return []
     from app.database import new_session
     from app.pai_c.paths.field_research import fresh_note, note_facts
-    with new_session() as db:
-        note = fresh_note(db, brief["field_key"], brief["country"])
+    try:
+        with new_session() as db:
+            note = fresh_note(db, brief["field_key"], brief["country"])
+    except Exception:  # noqa: BLE001  the note is optional context; the explanation researches without it
+        return []
     pages: dict[str, list[str]] = {}
     for fact in note_facts(note) if note else []:
         pages.setdefault(fact["source_url"], []).append(fact["quote"])

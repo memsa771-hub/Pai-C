@@ -1,7 +1,8 @@
 'use client';
-import { CircleCheck, CircleDashed, CircleHelp, CircleX, Compass, Quote, type LucideIcon } from 'lucide-react';
+import { CircleCheck, CircleDashed, CircleHelp, CircleX, Compass, ExternalLink, Quote, type LucideIcon } from 'lucide-react';
 import { EvidenceBadge, StatChip, toneClass, toneFor, vaultBadgeLabel, type Tone } from '@/components/pai';
 import type { FitItem, PathEvidence, StudyField } from '@/lib/possibilities';
+import type { VaultLevel } from '@/lib/vault';
 import { cn } from '@/lib/utils';
 import copy from './workspace/copy.json';
 
@@ -26,24 +27,41 @@ export function FieldNotes({ field, className }: { field?: StudyField | null; cl
 }
 
 /** The Vault badge behind a path's reason: each distinct evidence level and
- * source the reason cites, worded as the Vault words it ("Stated · Chat"). */
+ * source the reason cites, worded as the Vault words it ("Stated · Chat").
+ * A researched field-note fact the reason uses shows as a "Source" link to
+ * its page, once per site. */
 export function WhyEvidence({ evidence, className }: { evidence?: PathEvidence[]; className?: string }) {
   const seen = new Set<string>();
   const badges = (evidence || []).filter((item) => {
-    if (!item.evidence_level) return false;
+    if (!item.evidence_level || item.evidence_level === 'source') return false;
     const key = `${item.evidence_level}|${item.source_label || ''}`;
     if (seen.has(key)) return false;
     seen.add(key);
     return true;
   });
-  if (!badges.length) return null;
+  const sources = new Map<string, string>();
+  for (const item of evidence || []) {
+    if (item.evidence_level !== 'source' || !item.source_url) continue;
+    try {
+      const url = new URL(item.source_url);
+      if (url.protocol === 'https:' && !sources.has(url.hostname)) sources.set(url.hostname, item.source_url);
+    } catch {}
+  }
+  if (!badges.length && !sources.size) return null;
   return (
     <span className={cn('inline-flex flex-wrap items-center gap-x-3 gap-y-1', className)}>
       {badges.map((item) => {
-        const label = vaultBadgeLabel(item.evidence_level!);
-        return <EvidenceBadge key={`${item.evidence_level}|${item.source_label}`} level={item.evidence_level!}
+        const level = item.evidence_level as VaultLevel;
+        const label = vaultBadgeLabel(level);
+        return <EvidenceBadge key={`${level}|${item.source_label}`} level={level}
           label={item.source_label ? `${label} · ${item.source_label}` : label} />;
       })}
+      {[...sources].map(([host, url]) => (
+        <a key={host} href={url} target="_blank" rel="noopener noreferrer"
+          className="inline-flex items-center gap-1 text-xs font-semibold text-brand-ink underline-offset-4 hover:underline">
+          <ExternalLink aria-hidden className="size-3.5" />{copy.whySource} · {host}
+        </a>
+      ))}
     </span>
   );
 }

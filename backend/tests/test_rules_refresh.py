@@ -197,3 +197,112 @@ def test_apply_validates_with_the_admission_rules_and_calendar_tests(tmp_path):
     tests = run.call_args.args[0]
     assert tests == ["tests/test_admission_rules.py", "tests/test_academic_calendar.py"]
     assert all((Path(apply_refresh.BACKEND) / test).exists() for test in tests)
+
+
+# ---- fix round 1: the quote states the value; the rule's own domain; PDFs ------------------
+
+@pytest.mark.asyncio
+async def test_a_proposal_whose_quote_lacks_the_new_value_is_dropped(tmp_path):
+    values = {RULE_URL: [{"path": "admission_rules.json:rules/0/min_percent", "value": 70,
+                          "quote": "Candidates need at least 65% marks in HSSC.", "confidence": "official"}],
+              EVENT_URL: [{"path": "academic_calendar.json:events/0/months", "value": [6],
+                           "quote": "The annual examination will be held in May 2027.", "confidence": "official"}]}
+    proposal, *_ = await refresh(tmp_path, values=values)
+    assert proposal["diffs"] == []
+
+
+@pytest.mark.asyncio
+async def test_a_short_quote_is_dropped(tmp_path):
+    page = {RULE_URL: "65%", EVENT_URL: PAGE[EVENT_URL]}
+    read = AsyncMock(side_effect=lambda url, chars: {"url": url, "text": page[url]})
+    values = {RULE_URL: [{"path": "admission_rules.json:rules/0/min_percent", "value": 65, "quote": "65%",
+                          "confidence": "official"}]}
+    with patch.object(rules_refresh, "read_page", read), patch.object(rules_refresh, "complete", model_for(values)):
+        target = await run_refresh(max_calls=60, out_dir=tmp_path, today=TODAY, files=FILES)
+    assert json.loads(target.read_text())["diffs"] == []
+
+
+@pytest.mark.asyncio
+async def test_refresh_reads_only_the_rule_s_own_domain(tmp_path):
+    moved = AsyncMock(side_effect=lambda url, chars: {"url": "https://elsewhere.example.com/page", "text": PAGE[url]})
+    with patch.object(rules_refresh, "read_page", moved), patch.object(rules_refresh, "complete", AsyncMock()) as model:
+        target = await run_refresh(max_calls=60, out_dir=tmp_path, today=TODAY, files=FILES)
+    proposal = json.loads(target.read_text())
+    assert sorted(proposal["unread_sources"]) == sorted([RULE_URL, EVENT_URL]) and proposal["diffs"] == []
+    model.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_refresh_job_is_gated_on_the_role_it_calls():
+    with patch.object(usage, "role_allowed", lambda role: role != "researcher"), \
+            patch.object(rules_refresh, "run_refresh", AsyncMock()) as run:
+        assert (await rules_refresh_job(SimpleNamespace(payload={}), Mock()))["status"] == "cap_paused"
+    run.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_a_second_run_on_the_same_day_keeps_the_first_file(tmp_path):
+    _, first, *_ = await refresh(tmp_path)
+    _, second, *_ = await refresh(tmp_path)
+    assert first != second and first.exists() and second.exists()
+
+
+def text_pdf(text: str) -> bytes:
+    """A one-page PDF with one line of text, built by hand."""
+    stream = f"BT /F1 12 Tf 72 720 Td ({text}) Tj ET".encode()
+    objects = [b"<< /Type /Catalog /Pages 2 0 R >>", b"<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+               b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R "
+               b"/Resources << /Font << /F1 5 0 R >> >> >>",
+               b"<< /Length %d >>\nstream\n" % len(stream) + stream + b"\nendstream",
+               b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>"]
+    out, offsets = b"%PDF-1.4\n", []
+    for number, body in enumerate(objects, 1):
+        offsets.append(len(out))
+        out += b"%d 0 obj\n" % number + body + b"\nendobj\n"
+    xref = len(out)
+    out += b"xref\n0 %d\n0000000000 65535 f \n" % (len(objects) + 1)
+    out += b"".join(b"%010d 00000 n \n" % offset for offset in offsets)
+    out += b"trailer\n<< /Size %d /Root 1 0 R >>\nstartxref\n%d\n%%%%EOF\n" % (len(objects) + 1, xref)
+    return out
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("truncated", [False, True])
+async def test_read_page_reads_a_pdf_source(truncated):
+    from app.plugins._shared import sources
+    from app.security.network import SafeFetchResult
+    sentence = "Candidates need at least 60 percent marks in HSSC Pre-Engineering."
+    url = "https://www.pec.org.pk/wp-content/uploads/REGULATIONS.pdf"
+    fetched = SafeFetchResult(text_pdf(sentence), 200, {"content-type": "application/pdf"}, url, truncated)
+    with patch("app.security.network.safe_fetch", AsyncMock(return_value=fetched)):
+        page = await sources.read_page(url, 5000)
+    if truncated:
+        assert page is None  # a cut PDF cannot be parsed
+    else:
+        assert page == {"url": url, "text": sentence}
+
+
+@pytest.mark.asyncio
+async def test_read_page_still_reads_html():
+    from app.plugins._shared import sources
+    from app.security.network import SafeFetchResult
+    url = "https://www.hec.gov.pk/page"
+    html = b"<html><body><p>The degree lasts four years for every student.</p></body></html>"
+    fetched = SafeFetchResult(html, 200, {"content-type": "text/html; charset=utf-8"}, url, False)
+    with patch("app.security.network.safe_fetch", AsyncMock(return_value=fetched)):
+        page = await sources.read_page(url, 5000)
+    assert page["text"] == "The degree lasts four years for every student."
+
+
+def test_apply_reverts_when_validation_raises_and_marks_the_proposal(tmp_path):
+    folder, proposal = policy_copy(tmp_path), real_proposal(tmp_path)
+    original = (folder / "admission_rules.json").read_bytes()
+
+    def boom():
+        raise RuntimeError("pytest could not start")
+    with pytest.raises(RuntimeError):
+        apply_refresh.apply_proposal(proposal, policy_dir=folder, validate=boom)
+    assert (folder / "admission_rules.json").read_bytes() == original
+    apply_refresh.apply_proposal(proposal, policy_dir=folder, validate=lambda: True)
+    marked = json.loads(proposal.read_text(encoding="utf-8"))
+    assert marked["applied"] == ["admission_rules.json:rules/0/min_percent", "academic_calendar.json:events/0/months"]

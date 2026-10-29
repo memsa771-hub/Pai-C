@@ -12,8 +12,11 @@ export type FitItem = {
 export type PathEvidence = {
   text: string;
   item_id: string | null;
-  evidence_level?: VaultLevel | null;
+  /** A Vault level, or "source" for a researched field-note fact (a world
+   * fact with its source_url), never the student's own words. */
+  evidence_level?: VaultLevel | 'source' | null;
   source_label?: string | null;
+  source_url?: string | null;
 };
 
 export type Possibility = {

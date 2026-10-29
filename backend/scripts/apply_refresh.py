@@ -74,13 +74,24 @@ def apply_proposal(proposal_path: Path, only: list[str] | None = None, *,
     if not applied:
         return {"applied": [], "stale": stale, "valid": True}
     changed = {path.split(":", 1)[0] for path in applied}
-    for name in changed:
-        _write(policy_dir / name, loaded[name], originals[name])
     validate = validate or (lambda: run_validation(_settings(policy_dir)["validation_tests"]))
-    if not validate():
+    valid = False
+    try:
         for name in changed:
-            (policy_dir / name).write_bytes(originals[name])
+            _write(policy_dir / name, loaded[name], originals[name])
+        valid = bool(validate())
+    finally:
+        # Any failure, including an exception mid-write or in the test run,
+        # puts every file back exactly as it was.
+        if not valid:
+            for name in changed:
+                (policy_dir / name).write_bytes(originals[name])
+    if not valid:
         return {"applied": [], "stale": stale, "valid": False, "reverted": applied}
+    # The proposal records what was applied (it starts as false).
+    done = proposal.get("applied") if isinstance(proposal.get("applied"), list) else []
+    proposal["applied"] = list(dict.fromkeys([*done, *applied]))
+    Path(proposal_path).write_text(json.dumps(proposal, indent=1, ensure_ascii=False) + "\n", encoding="utf-8")
     return {"applied": applied, "stale": stale, "valid": True}
 
 

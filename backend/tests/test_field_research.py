@@ -23,8 +23,8 @@ from tests.test_path_analyzer import VAULT_ITEM, add_education, analysis, path, 
 from tests.test_path_engine_vault import run_job
 
 FIELD = "electrical_engineering"
-PAGE_A = "https://careers.example.org/electrical"
-PAGE_B = "https://jobs.example.net/electrical-demand"
+PAGE_A = "https://www.hec.gov.pk/careers/electrical"
+PAGE_B = "https://www.pec.org.pk/electrical-demand"
 TEXT_A = ("Electrical engineers study circuits, power systems and electronics. "
           "A typical day includes design reviews and testing equipment on site. "
           "Graduates of University of the Punjab often join power companies.")
@@ -44,10 +44,10 @@ def model_reply():
                       "source_url": PAGE_A},
                      {"text": "Engineers work night shifts.", "quote": "Engineers mostly work night shifts.",
                       "source_url": PAGE_A}],  # not on the page: dropped
-        "entry_in_pakistan": [{"text": "Graduates of University of the Punjab join power companies.",
+        "entry": [{"text": "Graduates of University of the Punjab join power companies.",
                                "quote": "Graduates of University of the Punjab often join power companies.",
                                "source_url": PAGE_A}],  # names an institution: dropped
-        "jobs_and_demand": [{"text": "Demand is rising with solar projects.",
+        "jobs_and_demand": [{"text": "Demand for electrical engineers is rising with solar projects.",
                              "quote": "Demand for electrical engineers is rising with new solar projects across the country.",
                              "source_url": PAGE_B},
                             {"text": "Demand is high.", "quote": "Demand for electrical engineers is rising",
@@ -68,15 +68,23 @@ async def run_research(db, *, reply=None, payload=None):
     return result, search, read, model
 
 
+STUDY_QUOTE = "Electrical engineers study circuits, power systems and electronics."
+DEMAND_QUOTE = "Demand for electrical engineers is rising with new solar projects across the country."
+PAY_QUOTE = "Electrical engineers are paid very well in almost every company we surveyed."
+BLOG = "https://careers-blog.example.com/pay"
+
+
 def store_note(db, field_key=FIELD, *, age_days=0, country="pakistan"):
     db.add(PaiFieldNote(field_key=field_key, country=country, confidence="medium",
                         researched_at=datetime.now(timezone.utc) - timedelta(days=age_days),
                         note={"sections": {"what_you_study": [{"text": f"You study the core of {field_key}.",
-                                                               "quote": "Engineers study circuits.",
-                                                               "source_url": PAGE_A}],
+                                                               "quote": STUDY_QUOTE, "source_url": PAGE_A,
+                                                               "confidence": "trusted"}],
                                            "jobs_and_demand": [{"text": "Demand is rising.",
-                                                                "quote": "Demand is rising.",
-                                                                "source_url": PAGE_B}]}},
+                                                                "quote": DEMAND_QUOTE, "source_url": PAGE_B,
+                                                                "confidence": "trusted"},
+                                                               {"text": "Pay is very high.", "quote": PAY_QUOTE,
+                                                                "source_url": BLOG, "confidence": "uncertain"}]}},
                         sources=[{"url": PAGE_A}, {"url": PAGE_B}]))
     db.commit()
 
@@ -95,7 +103,8 @@ async def test_note_built_from_sources_with_verified_quotes():
     for facts in sections.values():
         for fact in facts:
             page = TEXT_A if fact["source_url"] == PAGE_A else TEXT_B
-            assert fact["quote"] in page and set(fact) == {"text", "source_url", "quote"}
+            assert fact["quote"] in page and set(fact) == {"text", "source_url", "quote", "confidence"}
+            assert fact["confidence"] == "trusted"  # hec.gov.pk and pec.org.pk are trusted
     assert "University" not in json.dumps(sections)
     assert [source["url"] for source in row.sources] == [PAGE_A, PAGE_B]
     assert row.confidence == "medium"
@@ -206,7 +215,7 @@ async def test_analyzer_cites_note_facts_with_sources():
     assert result["status"] == "stored"
     world = [item for item in row.evidence if item.get("source_url")]
     # Only a fact of the path's own field that was shown is kept, with its source.
-    assert world == [{"text": "Demand is rising.", "item_id": f"note:{FIELD}:2", "evidence_level": None,
+    assert world == [{"text": "Demand is rising.", "item_id": f"note:{FIELD}:2", "evidence_level": "source",
                       "source_label": None, "source_url": PAGE_B}]
     assert any(item["item_id"] == VAULT_ITEM for item in row.evidence)
     # After the run: candidate fields without a fresh note, at most field_notes_per_run.
@@ -257,14 +266,14 @@ async def test_path_explain_reuses_the_note_as_its_first_source():
                               {"text": "Demand is rising.", "source_url": PAGE_B}],
                  "field_key": FIELD, "country": "Pakistan"}
         reply = {**explanation(), "world_facts": [
-            {"field": "jobs", "value": "Demand is rising", "quote": "Demand is rising.", "source_url": PAGE_B}]}
+            {"field": "jobs", "value": "Demand is rising", "quote": DEMAND_QUOTE, "source_url": PAGE_B}]}
         with patch.object(explain_module, "complete", AsyncMock(return_value=json.dumps(reply))) as model:
             result = await explain_module.explain(context, {"brief": brief})
     sent = json.loads(model.await_args.kwargs["messages"][0]["content"])
-    assert [page["url"] for page in sent["pages"]][:2] == [PAGE_A, PAGE_B]
+    assert [page["url"] for page in sent["pages"]][:3] == [PAGE_A, PAGE_B, BLOG]
     # The note covers fetch_limit pages: no search and no fetch.
     assert invoke.await_count == 0
-    assert result["unconfirmed"][0]["quote"] == "Demand is rising."
+    assert DEMAND_QUOTE in [fact["quote"] for fact in [*result["facts"], *result["unconfirmed"]]]
     # A note fact on the path is never accepted as the student's evidence.
     bad = {**explanation(), "fit_for": [{"observation": "x", "evidence": "Demand is rising."}]}
     with pytest.raises(ValueError):
@@ -277,3 +286,88 @@ def test_research_prompts_are_synced_into_the_prompt_document():
     doc = (Path(__file__).parents[2] / "docs/counselor/COUNSELOR_V3_PROMPTS.md").read_text(encoding="utf-8")
     for name in ("field_research", "rules_refresh", "path_analyzer"):
         assert load_prompt(name).strip() in doc
+
+
+# ---- fix round 1: real quotes, institutions, trusted sources ----------------------------
+
+from app.pai_c.paths.field_research import institution_blocklist, names_institution, verified_facts  # noqa: E402
+
+PAY_PAGE = ("Electrical engineers earn high salaries. They study circuits. "
+            "Most electrical engineers start in design or maintenance roles at power and telecom companies.")
+LONG_QUOTE = "Most electrical engineers start in design or maintenance roles at power and telecom companies."
+
+
+def check(text, quote, url=PAGE_A, page=PAY_PAGE):
+    rules = field_research.policy()
+    kept = verified_facts({"sections": {"work_day": [{"text": text, "quote": quote, "source_url": url}]}},
+                          [{"url": url, "text": page}], rules, datetime.now(timezone.utc),
+                          blocked=institution_blocklist(None), trusted=field_research.trusted_domains())
+    return kept.get("work_day", [])
+
+
+def test_a_short_or_unsupported_quote_never_verifies_a_fact():
+    assert check("Every graduate earns PKR 500,000 a month guaranteed.", "a") == []
+    assert check("Every graduate earns PKR 500,000 a month guaranteed.",
+                 "Electrical engineers earn high salaries.") == []  # too short
+    # A number in the fact that the quote does not state drops it.
+    assert check("Most graduates start in 3 design roles at power companies.", LONG_QUOTE) == []
+    # Words that do not overlap the quote drop it.
+    assert check("Doctors treat patients in hospitals every single day.", LONG_QUOTE) == []
+    kept = check("Most graduates start in design or maintenance roles at power companies.", LONG_QUOTE)
+    assert len(kept) == 1 and kept[0]["confidence"] == "trusted"
+
+
+def test_whitespace_in_a_page_does_not_break_a_real_quote():
+    page = LONG_QUOTE.replace("design or ", "design or\n")
+    assert check("Most graduates start in design or maintenance roles at power companies.", LONG_QUOTE, page=page)
+
+
+@pytest.mark.parametrize("sentence", [
+    "Students of FAST often work abroad after the degree is complete.",
+    "UMT graduates usually find design work after the degree.",
+    "Graduates of the university of lahore often join power companies.",
+    "GCU Lahore runs a strong programme in this field for students.",
+    "UCP students often join software houses after the degree.",
+    "Riphah offers the degree with clinical rotations for students.",
+    "Many Central Punjab Institute students join power companies.",
+    "The Indus Valley School of Art trains designers well.",
+])
+def test_institution_names_are_blocked(sentence):
+    from app.models import Institution, InstitutionDomain
+    with StudentSession() as student, student.factory() as db:
+        for name, domain in (("Central Punjab Institute", "cpi.edu.pk"), ("Indus Valley School", "riphah.edu.pk")):
+            institution = Institution(name=name, normalized_name=name.lower(), country_code="PK", source="catalog")
+            db.add(institution)
+            db.flush()
+            db.add(InstitutionDomain(institution_id=institution.id, domain=domain, source_url=f"https://{domain}",
+                                     origin="catalog", checked_at=datetime.now(timezone.utc)))
+        db.commit()
+        blocked = institution_blocklist(db)
+    assert names_institution(sentence, blocked, field_research.policy())
+
+
+def test_generic_words_are_not_institutions():
+    blocked = institution_blocklist(None)
+    for sentence in ("Most universities ask for FSc Pre-Engineering with good marks.",
+                     "The degree takes four years at a university.",
+                     "Engineers work fast when a deadline is close."):
+        assert not names_institution(sentence, blocked, field_research.policy()), sentence
+
+
+def test_an_untrusted_source_is_kept_uncertain_and_never_cited():
+    kept = check("Most graduates start in design or maintenance roles at power companies.", LONG_QUOTE,
+                 url="https://careers-blog.example.com/x")
+    assert kept and kept[0]["confidence"] == "uncertain"
+    with StudentSession() as student, student.factory() as db:
+        store_note(db, FIELD)
+        block, facts = prompt_notes(db, [FIELD], "Pakistan")
+    assert facts and all(fact["source_url"] != BLOG for fact in facts.values())
+    assert "Pay is very high." not in json.dumps(block)
+    # Regulators named in admission_rules.json (official rows) and the research policy are trusted.
+    assert {"pec.org.pk", "pmdc.pk", "hec.gov.pk"} <= field_research.trusted_domains()
+
+
+def test_note_confidence_counts_only_trusted_facts():
+    rules = field_research.policy()
+    facts = {"work_day": [{"text": "t", "quote": "q", "source_url": BLOG, "confidence": "uncertain"}] * 9}
+    assert field_research._confidence(facts, rules) == "uncertain"

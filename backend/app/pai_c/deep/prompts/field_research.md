@@ -4,7 +4,7 @@ Input: JSON with "field" (the field's title), "country", "sections" (each sectio
 
 For each section, give the facts the pages state, up to the given limit. Each fact has:
 - text: one plain sentence in English saying the fact in your own words.
-- quote: an exact, consecutive passage copied from one page's text that supports the fact. Copy it character for character; do not translate, shorten inside or join two passages.
+- quote: an exact, consecutive passage copied from one page's text that supports the fact: at least one full sentence, containing every number the fact states. Copy it character for character; do not translate, shorten inside or join two passages.
 - source_url: the url of that page, exactly as supplied.
 
 Rules:

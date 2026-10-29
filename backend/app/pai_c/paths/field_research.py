@@ -2,9 +2,11 @@
 
 One bounded research run per field and country, not per student: the path
 analyzer and path explain of every student read the same cached note, so the
-cost is per field. Every fact carries a verbatim quote that the code finds in
-the page it came from (the model's word is never enough), and a fact naming an
-institution is dropped, since places come only at stage H.
+cost is per field. Every fact carries a real passage that the code finds on
+the page it came from and that states the fact's numbers and words (the
+model's word is never enough); a fact naming an institution is dropped, since
+places come only at stage H; a fact from a site outside the trusted domains is
+kept as uncertain and never shown to the analyzer.
 """
 
 import json
@@ -23,8 +25,8 @@ from app.pai_c.deep.prompts import load_prompt
 from app.pai_c.paths.fields import study_fields
 from app.pai_c.policy.controller import load_data
 from app.plugins._shared.budget import bounded_research, record_model_usage, spend
-from app.plugins._shared.sources import public_https, read_page, search_web
-from app.plugins._shared.verification import SourceVerifier
+from app.plugins._shared.sources import public_https, quote_on_page, quote_supports, read_page, search_web
+from app.plugins._shared.verification import official_url
 
 logger = logging.getLogger(__name__)
 JOB_FIELD_RESEARCH = "counselor.field_research"
@@ -42,6 +44,8 @@ class NoteFact(BaseModel):
     text: str = Field(min_length=1, max_length=600)
     source_url: str
     quote: str = Field(min_length=1, max_length=1200)
+    # trusted: from a trusted domain; uncertain: any other site (and notes stored before this field).
+    confidence: str = "uncertain"
 
 
 class FieldNote(BaseModel):
@@ -91,7 +95,7 @@ def note_facts(note: FieldNote) -> list[dict]:
         for fact in note.sections.get(section, []):
             n += 1
             facts.append({"id": f"note:{note.field_key}:{n}", "section": section, "text": fact.text,
-                          "source_url": fact.source_url, "quote": fact.quote})
+                          "source_url": fact.source_url, "quote": fact.quote, "confidence": fact.confidence})
     return facts
 
 
@@ -104,36 +108,75 @@ def _pending(db, field_key: str, country: str) -> bool:
 
 def enqueue_missing(db, field_keys, country: str, limit: int | None = None) -> list[str]:
     """Queue research for fields with no fresh note and none queued, at most
-    `limit` (field_notes_per_run). Idempotent per field, country and day, so a
-    failed run is tried again the next day, not on every analysis. The caller
-    commits."""
+    `limit` (field_notes_per_run). Idempotent per field, country and ISO week,
+    so a run that found nothing is tried again the next week, not on every
+    analysis. The caller commits."""
     from app.runtime.task_runtime import enqueue
     limit = policy()["field_notes_per_run"] if limit is None else limit
-    queued, today = [], _now().date().isoformat()
+    year, week, _ = _now().isocalendar()
+    queued, period = [], f"{year}-W{week:02d}"
     for field_key in dict.fromkeys(field_keys):
         if len(queued) >= limit:
             break
         if field_key not in study_fields() or fresh_note(db, field_key, country) or _pending(db, field_key, country):
             continue
         job = enqueue(db, JOB_FIELD_RESEARCH, {"field_key": field_key, "country": country_key(country)},
-                      idempotency_key=f"field_note:{field_key}:{country_key(country)}:{today}")
+                      idempotency_key=f"field_note:{field_key}:{country_key(country)}:{period}")
         if job is not None and job.status == "pending":
             queued.append(job.id)
     return queued
 
 
-def _names_institution(text: str, rules: dict) -> bool:
-    padded = " " + re.sub(r"[^a-z0-9-]+", " ", text.lower()) + " "
-    return (any(f" {word} " in padded for word in rules["institution_words"])
-            or any(re.search(pattern, text) for pattern in rules["institution_patterns"]))
+def institution_blocklist(db) -> set[str]:
+    """Institution names to keep out of notes: the policy's words plus every
+    name and domain label in the institution catalog. Without a session, the
+    words alone."""
+    blocked = {word.casefold() for word in policy()["institution_words"]}
+    if db is None:
+        return blocked
+    from app.models import Institution, InstitutionDomain
+    for name, normal in db.execute(select(Institution.name, Institution.normalized_name)).all():
+        blocked.update(value.casefold() for value in (name, normal) if value and value.strip())
+    for (domain,) in db.execute(select(InstitutionDomain.domain)).all():
+        labels = [label for label in str(domain or "").casefold().split(".") if label and label != "www"]
+        if labels:
+            blocked.add(labels[0])
+    return {" ".join(word.split()) for word in blocked if word.strip()}
 
 
-def verified_facts(raw: dict, pages: list[dict], rules: dict, checked: datetime) -> dict[str, list[dict]]:
-    """Keep a fact only when its quote is verbatim on the page it cites and
-    passes the policy's SourceVerifier checks, and when neither its text nor
-    its quote names an institution or uses a blocked script."""
+def names_institution(text: str, blocked: set[str], rules: dict) -> bool:
+    """A whole-word match of a blocked name, or an institution pattern. Short
+    names (acronym_max_letters or fewer) match only in capitals, so "FAST" and
+    "UCP" are blocked but "work fast" is not."""
+    lower = " " + re.sub(r"[^a-z0-9-]+", " ", text.lower()) + " "
+    upper = " " + re.sub(r"[^A-Za-z0-9-]+", " ", text) + " "
+    for name in blocked:
+        short = len(name.replace(" ", "")) <= rules["acronym_max_letters"] and " " not in name
+        if (f" {name.upper()} " in upper) if short else (f" {name} " in lower):
+            return True
+    return any(re.search(pattern, text, re.IGNORECASE) for pattern in rules["institution_patterns"])
+
+
+def trusted_domains() -> set[str]:
+    """Sites whose facts count as trusted: the policy's domains, path
+    research's trusted_domains, and the hosts of admission rules researched
+    from an official source."""
+    from urllib.parse import urlparse
+    rules = load_data("admission_rules.json")
+    hosts = {(urlparse(url).hostname or "").casefold().removeprefix("www.")
+             for row in rules["rules"] if row.get("confidence") == "official" for url in row.get("sources", [])}
+    from app.pai_c.paths.explain import policy as research_policy
+    return {domain for domain in (*policy()["trusted_domains"], *research_policy()["trusted_domains"], *hosts) if domain}
+
+
+def verified_facts(raw: dict, pages: list[dict], rules: dict, checked: datetime, *,
+                   blocked: set[str], trusted: set[str]) -> dict[str, list[dict]]:
+    """Keep a fact only when its quote is on the page it cites (line breaks
+    ignored) and supports it (quote_rules: a real passage that states the
+    fact's numbers and shares its words), and when neither its text nor its
+    quote names an institution or uses a blocked script. A fact from a
+    trusted domain is "trusted", any other "uncertain"."""
     by_url = {page["url"]: page["text"] for page in pages}
-    verifier = SourceVerifier(freshness_days=config.PAI_FIELD_NOTE_DAYS)
     sections = raw.get("sections") if isinstance(raw, dict) else None
     kept: dict[str, list[dict]] = {}
     for section in rules["sections"]:
@@ -144,24 +187,22 @@ def verified_facts(raw: dict, pages: list[dict], rules: dict, checked: datetime)
             except ValueError:
                 continue
             text = by_url.get(fact.source_url)
-            if text is None or fact.quote not in text:
+            if text is None or not quote_on_page(fact.quote, text) or not quote_supports(fact.text, fact.quote, rules["quote_rules"]):
                 continue
             words = fact.text + " " + fact.quote
-            if _names_institution(words, rules) or contains_blocked_script(words, config.PAI_LANGUAGE_BLOCKED_SCRIPTS):
+            if names_institution(words, blocked, rules) or contains_blocked_script(words, config.PAI_LANGUAGE_BLOCKED_SCRIPTS):
                 continue
-            claim = {"field": section, "value": fact.text, "quote": fact.quote, "source_url": fact.source_url,
-                     "checked_at": checked.isoformat(), "kind": "explanation"}
-            verdict = verifier.verify(claims=[claim], source_url=fact.source_url, official_domains=set(),
-                                      intake=None, page_text=text, checked_at=checked, now=checked)
-            if not all(verdict.checks[key]["passed"] for key in rules["required_checks"]):
-                continue
+            fact.confidence = "trusted" if official_url(fact.source_url, trusted) else "uncertain"
             if len(kept.setdefault(section, [])) < rules["max_facts_per_section"]:
                 kept[section].append(fact.model_dump())
     return {section: facts for section, facts in kept.items() if facts}
 
 
 def _confidence(sections: dict[str, list[dict]], rules: dict) -> str:
-    facts = [fact for rows in sections.values() for fact in rows]
+    """From trusted facts only; a note with none is uncertain."""
+    facts = [fact for rows in sections.values() for fact in rows if fact.get("confidence") == "trusted"]
+    if not facts:
+        return "uncertain"
     sources = {fact["source_url"] for fact in facts}
     for level in ("high", "medium"):
         need = rules["confidence"][level]
@@ -170,7 +211,7 @@ def _confidence(sections: dict[str, list[dict]], rules: dict) -> str:
     return "low"
 
 
-async def research_field(field_key: str, country: str) -> dict:
+async def research_field(field_key: str, country: str, blocked: set[str] | None = None) -> dict:
     """One bounded run: search, read pages, one `researcher` call, verify.
     No database work happens here, so no transaction stays open across it."""
     rules = policy()
@@ -212,7 +253,8 @@ async def research_field(field_key: str, country: str) -> dict:
         except (TypeError, ValueError):
             return {"status": "invalid", "research_metrics": budget.usage()}
         checked = _now()
-        kept = verified_facts(parsed, pages, rules, checked)
+        kept = verified_facts(parsed, pages, rules, checked, blocked=blocked or institution_blocklist(None),
+                              trusted=trusted_domains())
         if not kept:
             return {"status": "no_verified_facts", "research_metrics": budget.usage()}
         used = {fact["source_url"] for rows in kept.values() for fact in rows}
@@ -232,8 +274,9 @@ async def field_research_job(job, db) -> dict:
         return {"status": "unknown_field"}
     if fresh_note(db, field_key, country):
         return {"status": "fresh"}
+    blocked = institution_blocklist(db)
     db.rollback()
-    result = await research_field(field_key, country)
+    result = await research_field(field_key, country, blocked)
     if result["status"] != "stored":
         logger.info("field_research_%s field=%s", result["status"], field_key)
         return {key: value for key, value in result.items() if key in {"status", "research_metrics"}}
@@ -254,7 +297,8 @@ async def field_research_job(job, db) -> dict:
 def prompt_notes(db, field_keys, country: str) -> tuple[list[dict], dict[str, dict]]:
     """The analyzer's <field_notes> block (fresh notes of at most
     field_notes_in_prompt fields, in the given order) and every shown fact by
-    id, so a path citing one stores its source."""
+    id, so a path citing one stores its source. Only trusted facts are shown,
+    so an uncertain one can never back a path's why."""
     block, facts = [], {}
     fields = study_fields()
     for field_key in dict.fromkeys(field_keys):
@@ -263,7 +307,9 @@ def prompt_notes(db, field_keys, country: str) -> tuple[list[dict], dict[str, di
         note = fresh_note(db, field_key, country) if field_key in fields else None
         if note is None:
             continue
-        shown = note_facts(note)
+        shown = [fact for fact in note_facts(note) if fact["confidence"] == "trusted"]
+        if not shown:
+            continue
         facts.update({fact["id"]: fact for fact in shown})
         block.append({"field_key": field_key, "title": fields[field_key].title,
                       "facts": [{"id": fact["id"], "section": fact["section"], "text": fact["text"]} for fact in shown]})
