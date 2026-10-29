@@ -292,6 +292,43 @@ Spec [FOUR_FEATURES_SPEC.md](FOUR_FEATURES_SPEC.md). Placement AI is four featur
 - Conversation redesign is parked.
 - Postgres round trip of migrations 120 and 121 is not yet run (Docker Desktop was not running); do it before merge.
 
+## 29 October: beta conversation
+
+Spec [BETA_CONVERSATION_SPEC.md](BETA_CONVERSATION_SPEC.md). Branch `beta-conversation`. How to run it: [BETA_RUNBOOK.md](BETA_RUNBOOK.md).
+
+- **Providers and the cap.**
+  - Each role resolves provider, model and key in `inference/gateway.py` from `pai_c/policy/model_roles.json`, overridden by `PAI_<ROLE>_PROVIDER` and `PAI_<ROLE>_MODEL`. Chat (`counselor`) runs on Anthropic `claude-sonnet-5-5` (`inference/anthropic_client.py`); classifier, extractor, safety and summarizer stay on `gpt-5-mini`; `analyst`, `mirror` and the new `researcher` use `gpt-5`. Without `ANTHROPIC_API_KEY` an Anthropic role runs on OpenAI and logs one warning. Tools are refused on Anthropic roles.
+  - One monthly cap, `PAI_MONTHLY_CAP_USD` (100). Every call's estimated USD (`model_costs.json`) is stored per role in `pai_usage_months` (no migration); embeddings count too. At 80 % (`research_paused`) the researcher, path analyzer, Mirror text and rules refresh stop quietly. At 100 % (`paused`) the counselor and opening send the fixed fallback reply plus a "paused for the month" line, and extraction stops. Wellbeing turns are never paused.
+  - `GET /v1/admin/usage` (Firebase bearer, email in `PAI_FOUNDER_EMAILS`) returns month, cap, spent, stage and spend per role. Settings shows it as a spend card to founders; other students see nothing.
+- **Conversation.**
+  - The opening reads the Vault core (name, education line, city, status) and greets by name without asking what onboarding answered; it ends with "tell me about yourself".
+  - Question bank (`policy/question_bank.json`, 9 reflective items mapped to Vault types). Director rows: care, about_pai, answer, intro, bank_question, then the existing flow. A bank item is skipped when its Vault types are filled, it was asked, or the student's last message covered it. Interleave rule: at most 3 bank questions in a row, then an education basic (`bank_max_in_a_row`, data).
+  - Drive rule: a reply must end with a question or a next-step line (the Writer's `next_step` field). A reply without one is rewritten once (`drive_retry.md`), then a data step from `next_steps.json` is appended. Exceptions: `care` and a student who says stop. In CHOSEN the step names the first open route step. The last line is also sent as `metadata.next_step` and the chat renders it as its own line.
+  - Empathy rule in `voice.md` and `voice_guided.md`: acknowledge the feeling in a clause, then move; the praise ban stays.
+  - `about_pai`: new classifier request kind; the answer comes from `policy/about_pai.json`; `<about_pai>` is an allowed grounding source.
+  - `chat_language` (`{code, script}`) comes from the classifier each turn and is stored on the workspace. The opening, Writer, Mirror text and chat-posted messages use it. Fixed copy (paths found, needs education) is rendered once per text and language and cached in `workspaces.rendered_copy`. The blocked-script replacement default is the student's own language; no code assumes Urdu.
+- **Field notes and rules refresh.**
+  - Job `counselor.field_research`: one bounded `researcher` run per study field and country, cached in `pai_field_notes` for `PAI_FIELD_NOTE_DAYS` (90), not charged to any student. A fact is kept only if its quote is verbatim on the cited page, at least 40 characters and 6 words, carries every number in the fact, covers at least 75 % of the fact's content words and agrees on negations. Facts naming an institution (word list, catalog names, domains) are dropped. Facts from hosts outside the trusted list (gov.pk, edu.pk, official rule hosts) are stored as `uncertain` and never shown to the analyzer. PDFs are read through the document PDF parser.
+  - The analyzer gets `<field_notes>` and may cite `note:<field>:<n>` in `why`; the path card shows a "Source" link. Path explain starts from the note's pages.
+  - Job `counselor.rules_refresh` (monthly; also `python -m scripts.run_rules_refresh`): reads each rule's own site and writes a proposal `policy/refresh_proposals/<date>.json` (old, new, quote, source). It applies nothing. Budget `PAI_RULES_REFRESH_MAX_CALLS` (60); the start URL rotates monthly. `scripts/apply_refresh.py` applies a reviewed proposal only where the file still holds the old value, runs the admission-rule and calendar tests, and restores the files if they fail.
+- **Calendar regions.** `academic_calendar.json` has `regions` (Punjab, Sindh, KP, Balochistan, FBISE, AKU-EB, AJK, Gilgit-Baltistan, Cambridge) and `city_regions`. The engine picks the region from the education record's board, else the city. Cambridge A-level rows are separate and the IBCC equivalence lag is its own basis entry. A region event with missing or low confidence is downgraded to uncertain. Empty regions list their `gaps`. More tests and intakes were added (ETEA, USAT, HAT, LAT, GIKI, FAST, LCAT, IBA, NED, MUET).
+- **Extraction golden set.** 16 synthetic cases in `tests/fixtures/extraction/` (10 Roman Urdu, 5 English, 1 Urdu script) pin the normalizer and reconciler with fake models. `python -m scripts.eval_extraction --live --cap-usd 5` runs the real extractor and prints recall and precision; it exits 1 below 90 % core recall. `--replay` scores saved recordings at no cost. Three extractor rules were tightened (stated percentage and grades, "I can move to X", interest source).
+- **Frontend.** Next-step line under PAI replies, spend card in Settings, "Source" link on path evidence.
+- **Migrations.** 123 adds `workspaces.chat_language` and `workspaces.rendered_copy`. 124 adds `pai_field_notes`.
+- **Tests.** Last full backend run: 2014 passed, 13 skipped (after Task 3). Frontend: 193 passed, build green.
+
+### Known limits for beta
+
+- A quote that uses a number in another sense (a fee read as a salary) still passes the field-note check; word overlap cannot see meaning.
+- The calendar is secondary-sourced for most regions. Gaps remain for GB, AJK, AKU-EB HSSC and the Sindh and KP HSSC months; those students see an uncertain time.
+- Mirror text is not re-rendered when only the chat language changes; it follows on the next card change.
+- Refresh proposals are written inside the app package (`policy/refresh_proposals/`). In a container that folder must be writable and kept, or run the script on a host checkout. The first applied proposal also reformats `admission_rules.json`.
+- The institution filter is a word list plus catalog names; an institution outside both could pass. Short names that are also English words (fast, dow, vu, data) match in capitals only.
+- The `usageSession` flag behind the Settings spend card is per browser process; a failed first load shows nothing.
+- The opening's language comes from the script of the onboarding words (Latin in practice), so it is English until the student's first message sets `chat_language`.
+- A bare `current_year` shows as "1" in the education line (no template in `vault_view.json`).
+- Live verification is pending (Task 7): the end-to-end run with real models, the live extraction eval, and the Postgres round trip of migrations 120 to 124.
+
 ## Founder local test
 
 From the existing **workspace** folder, using the founder's existing ignored configuration:

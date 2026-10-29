@@ -2284,3 +2284,35 @@ No owner, queue, model gateway, table, route or OS contract is replaced. Both po
 | First picture / tentative discovery | Existing policy controller | No fixed message count; evidence and student correction remain essential |
 
 Foreground model calls are unchanged (classifier + Voice, existing bounded retries). Planner cadence is unchanged. A direct research request can now initiate the existing bounded researcher before Mirror; this adds asynchronous tool/extraction work only when requested, with cache-first reuse. No live calls were used to validate this amendment. Full detail: [ADAPTIVE_COUNSELING_REPORT.md](ADAPTIVE_COUNSELING_REPORT.md).
+
+## Beta conversation (29 Oct 2026)
+
+Spec: [BETA_CONVERSATION_SPEC.md](BETA_CONVERSATION_SPEC.md). Runbook: [BETA_RUNBOOK.md](BETA_RUNBOOK.md).
+
+### Provider layer and the cap
+
+- `inference/gateway.py` `resolve_role(role)` returns provider, model, key and base URL from `policy/model_roles.json`, then `PAI_<ROLE>_PROVIDER` and `PAI_<ROLE>_MODEL`. `complete()` sends anthropic roles to `inference/anthropic_client.py` (same contract; tools raise `UnsupportedForProvider`). A role whose provider key is missing runs on OpenAI.
+- Roles: counselor -> anthropic `claude-sonnet-5-5`; classifier, extractor, document_extractor, safety, summarizer -> `gpt-5-mini`; analyst, mirror, researcher -> `gpt-5`.
+- `inference/usage.py` records each call's estimated USD (`policy/model_costs.json`) per role in `pai_usage_months` and exposes `cap_state()` (`ok`, `research_paused` at 80 %, `paused` at 100 %) and `role_allowed(role)` from the `cap_gates` data. Stopped at 80 %: path analyzer, Mirror text, research gateway, field notes, rules refresh. Stopped at 100 %: counselor, opening, memory and document extraction (fixed fallback reply plus the paused line; wellbeing exempt). `ProviderUnavailable` in a turn gives the same fallback reply (violation `provider_fallback`).
+- `GET /v1/admin/usage` (`routers/admin_usage.py`): founder emails only.
+
+### Turn flow
+
+1. Classifier: request kind (now including `about_pai`), intent (now including `stop`), mentioned areas, and `language {code, script}`. The language is stored in `workspaces.chat_language`.
+2. Director (`policy/state.py`, `controller.py`, `guided_table.json`), first match: care, about_pai, answer, intro, bank_question, then the existing rows (clear_myth, follow_thread, mirror, first_picture, guide, discover, explore_area, counsel).
+   - `intro`: first exchange. `bank_question`: the next `question_bank.json` item that is unasked, whose Vault types are empty and that the last message did not cover; at most `bank_max_in_a_row` (3) in a row before an education basic. Both allow a question and skip the `useful_question` check. The asked intent is logged (`bank_intent`, `bank_followup`, `step_bank_intent`).
+   - The decision carries `must_drive` (false for care and stop), `next_step` (from `next_steps.json` by phase; in CHOSEN the first open route step) and `student_emotion`.
+3. Context (`deep/context.py`) adds `<language>`, and `<about_pai>` only for the about_pai move.
+4. The Writer returns the body and a `next_step` field. Drive guard in `deep/turn.py`: if the reply does not end in a question or the step line, rewrite once with `drive_retry.md`, else append the data step (rendered in the chat language). A step line with a blocked script or an unsourced world number is dropped first. The final line is returned as `DeepTurnResult.next_step` and posted as `metadata.next_step`.
+5. Language guard: a blocked script is rewritten into the student's own language (`language_retry.md`).
+6. The opening (`opening.py`) uses `<student_core>` (name, education line, city, status) and `<opening_language>`: `chat_language`, else the script of the onboarding words, else English. It ends with the about_you question.
+
+### Research flow
+
+- Field notes: the path analyzer queues `counselor.field_research` for candidate fields that have no fresh note (`pai_field_notes`, migration 124, `PAI_FIELD_NOTE_DAYS` 90, at most 5 per run, skipped when `researcher` is stopped). The job has no workspace. It searches and reads pages (HTML and PDF, SSRF-safe), makes one `researcher` call, and keeps only facts with a verified quote (`quote_supports`), no institution name, and a confidence of trusted or uncertain by host. The next analyzer run gets `<field_notes>` (trusted facts only) and may cite `note:<field>:<n>`; the cited fact becomes a `why` evidence entry with a source URL. Path explain starts from the note's pages.
+- Rules refresh: the worker's research sweep queues `counselor.rules_refresh` once a month (key `rules_refresh:<YYYY-MM>`); `scripts/run_rules_refresh.py` runs it now. It reads each rule's own site, makes `researcher` calls under `PAI_RULES_REFRESH_MAX_CALLS`, and writes `policy/refresh_proposals/<date>.json`. No policy file changes. `scripts/apply_refresh.py` applies a reviewed proposal and reverts if the validation tests fail.
+- Calendar: `roadmap/engine.py` passes `region_for(education record, Vault city)` to `calendar.estimate`; the basis names the region and confidence.
+
+### Migrations
+
+123 `workspaces.chat_language`, `workspaces.rendered_copy`. 124 `pai_field_notes`.

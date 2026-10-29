@@ -384,3 +384,26 @@ The Counselor shell accidentally omitted the shared UserMenu when replacing the 
 - Manual ticks only where the Vault is silent; the degree step is not tickable; the API refuses a tick on an observable step (409).
 - Beta polish: duplicates need a polarity guard; mobility needs move and place cues or the extractor; "stated" only from an explicit wish claim; no tense heuristic; non-PKR budgets get no band.
 - Audit item 12 (stray navigation) is on watch; the one non-click trigger found (desktop view restore) is fixed.
+
+## 29 October: beta conversation (founder, ledger rulings)
+
+- Chat runs on Claude Sonnet 5.5 (`claude-sonnet-5-5`); extraction and classification stay on `gpt-5-mini`; analyst, Mirror text and research on `gpt-5`.
+- One model spend cap of $100 per UTC month: research, path analysis and Mirror text stop at 80 %; chat pauses at 100 %. Wellbeing replies are never paused.
+- `.env` edits are append-only and only of missing names, at the founder's request; values are never read or printed. Keys are set by the founder, never by Claude.
+- The blocked-script list stays configurable; its replacement is the student's own language (default empty), not Roman Urdu.
+- The question bank interleaves with the education basics: at most 3 bank questions in a row (ratio in data).
+- The bank question outranks the older exploration moves; `skip_intents` (stop, pushback, deciding) keep a deciding student on `guide`.
+- Every reply ends with a next step (a question or an action); only `care` and a student who says stop are exempt. A reply without one is rewritten once, then a data line is appended.
+- In CHOSEN the next step names the first open step of the chosen route.
+- An answer to a request (answer_request, about_pai) also ends with the next bank or basic question while PAI is still getting to know the student.
+- The next step travels as `metadata.next_step`; the frontend styles only that, with no text heuristic.
+- Chat language is stored as `workspaces.chat_language` (not in `settings`, which PATCH replaces wholesale); fixed copy is rendered once per language and cached in `rendered_copy`.
+- The Mirror text is not re-rendered on a language switch alone (parked).
+- Field notes are shared per field and country and not charged to a student; a fact needs a verbatim quote of at least 40 characters and 6 words, covering 75 % of its content words, with matching negations.
+- Facts that name an institution are dropped; facts from untrusted hosts are kept as uncertain and never shown to the analyzer. PDF sources must be readable.
+- A reused-number fact passing the quote check is a known beta limit.
+- Rules and calendar refresh only writes a proposal file; nothing is applied until `scripts/apply_refresh.py` is run on a reviewed proposal, and it reverts if the validation tests fail.
+- Calendar: the region comes from the education board, else the city; Cambridge A-level has its own rows and the IBCC lag is a visible basis entry; a region event with no confidence is uncertain; Punjab stands as the official proxy.
+- The pharmacy entry test was removed from the catalog (no test found); placeholders are not shipped.
+- Extraction beta bar: core recall at least 90 % on the golden set; the live eval is capped at $5.
+- The usage endpoint takes the Firebase bearer and checks `PAI_FOUNDER_EMAILS` (the product has no admin auth); non-founders see no spend card.
