@@ -6,7 +6,7 @@ Pure and deterministic like the verdict: the same Vault rows, card and day give
 the same steps. Evidence is the Vault view row the status was read from, with
 the view's level (the one ladder the Mirror and paths show) and its source
 label, so a step done on a stated fact reads "done · stated". A manual tick
-counts as done; it never hides a Vault entry that already proves the step.
+counts as done, and is offered only where the Vault is silent (`tickable`).
 Labels are copy keys with values (policy/roadmap.json copy); each step carries
 the calendar events it waits for (`timing`) for the time estimate.
 """
@@ -204,17 +204,29 @@ def _test(test: dict, rule: Rule | None, attempts: list) -> dict:
     return _step(f"test:{test['name']}", label, values, "not", None, ref, timing)
 
 
+def _tickable(steps: list[dict]) -> list[dict]:
+    """A tick is the student's own claim, so it is offered only where the
+    Vault is silent: a tickable kind that is red with no Vault entry behind
+    it. Where the Vault speaks (marks below the floor, a registered test, a
+    course record) the Vault's colour stands."""
+    kinds = set(_policy()["steps"]["tickable_kinds"])
+    for step in steps:
+        step["tickable"] = step["kind"] in kinds and step["status"] == "not" and step["evidence"] is None
+    return steps
+
+
 def _manual(steps: list[dict], steps_done) -> list[dict]:
+    """Apply the student's ticks; a stored tick on a step the Vault now
+    observes (or older data) is ignored."""
     done = set(steps_done or ())
     policy = _policy()
-    for step in steps:
-        if step["key"] not in done:
+    for step in _tickable(steps):
+        if step["key"] not in done or not step["tickable"]:
             continue
         step["manual_done"] = True
         step["status"] = "done"
-        if step["evidence"] is None:  # a Vault entry behind a half step stays its evidence
-            step["evidence"] = {"id": None, "level": policy["steps"]["manual_level"],
-                                "source_label": policy["copy"]["marked_by_you"]}
+        step["evidence"] = {"id": None, "level": policy["steps"]["manual_level"],
+                            "source_label": policy["copy"]["marked_by_you"]}
     return steps
 
 

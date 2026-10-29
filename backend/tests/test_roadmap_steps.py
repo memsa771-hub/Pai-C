@@ -122,9 +122,9 @@ def test_apply_manual_only():
     assert apply["status"] == "done" and apply["manual_done"] is True
     assert apply["evidence"] == {"id": None, "level": "stated",
                                  "source_label": roadmap_policy()["copy"]["marked_by_you"]}
-    # A tick never hides the Vault entry that already proves a step.
+    # A tick on a step the Vault proves is ignored; the Vault entry stands.
     group = step(route("electrical_engineering", fsc("pre_engineering", 78), steps_done=["group"]), "group")
-    assert group["manual_done"] is True and group["evidence"]["id"] == "education:edu"
+    assert group["manual_done"] is False and group["evidence"]["id"] == "education:edu"
 
 
 def test_bridge_done_with_course_record():
@@ -156,13 +156,39 @@ def test_degree_student_has_no_undergraduate_route():
     assert route("electrical_engineering", bachelor) == []
 
 
-def test_tick_on_half_step_keeps_vault_evidence():
+def test_tickable_only_where_the_vault_is_silent():
+    """A tick is a claim the student makes; it is offered only on applying and
+    on steps the Vault cannot observe yet (a bridge or check with no course, a
+    test with no attempt). Never where the Vault already says something."""
+    steps = route("electrical_engineering", fsc("pre_engineering", 78))
+    assert {s["kind"]: s["tickable"] for s in steps} == {
+        "group": False, "complete_intermediate": False, "marks": False, "test": True, "apply": True, "degree": False}
+    # Marks below the floor are contradicted by the record: no tick.
+    assert step(route("electrical_engineering", fsc("pre_engineering", 55)), "marks")["tickable"] is False
+    # A registered test is under way in the Vault: no tick.
+    registered = row("test_attempt", {"test_type": "MDCAT", "details": {"status": "registered"}}, id="t1")
+    assert step(route("mbbs", fsc("pre_medical", 80), registered), "test")["tickable"] is False
+    # A bridge with no course is unobserved; a course record proves it.
+    assert step(route("computer_science", fsc("pre_medical", 70)), "bridge")["tickable"] is True
+    course = row("course", {"education_id": "edu", "name": "Deficiency Mathematics"}, id="c1")
+    assert step(route("computer_science", fsc("pre_medical", 70), course), "bridge")["tickable"] is False
+    assert set(roadmap_policy()["steps"]["tickable_kinds"]) == {"apply", "bridge", "check", "test"}
+
+
+def test_tick_is_ignored_where_the_vault_speaks():
+    """A stored tick on a step the Vault observes (older data, or a step that
+    became observed later) changes nothing; the Vault's colour stands."""
+    name = rule_for("mbbs").tests_for("mbbs")[0].name
     registered = row("test_attempt", {"test_type": "mdcat", "details": {"status": "registered"}}, id="t1",
                      level="shown", source="document", document={"filename": "mdcat-slip.pdf"})
-    name = rule_for("mbbs").tests_for("mbbs")[0].name
-    ticked = step(route("mbbs", fsc("pre_medical", 80), registered, steps_done=[f"test:{name}"]), "test")
-    assert ticked["status"] == "done" and ticked["manual_done"] is True
-    assert ticked["evidence"] == {"id": "test_attempt:t1", "level": "shown", "source_label": "mdcat-slip.pdf"}
+    half = step(route("mbbs", fsc("pre_medical", 80), registered, steps_done=[f"test:{name}"]), "test")
+    assert half["status"] == "half" and half["manual_done"] is False
+    assert half["evidence"] == {"id": "test_attempt:t1", "level": "shown", "source_label": "mdcat-slip.pdf"}
+    low = step(route("electrical_engineering", fsc("pre_engineering", 55), steps_done=["marks"]), "marks")
+    assert low["status"] == "not" and low["manual_done"] is False
+    # A ticked unobserved test is done "as you marked it" and stays tickable, so it can be unticked.
+    ticked = step(route("mbbs", fsc("pre_medical", 80), steps_done=[f"test:{name}"]), "test")
+    assert ticked["status"] == "done" and ticked["manual_done"] is True and ticked["tickable"] is True
 
 
 def test_steps_follow_the_standings_record():

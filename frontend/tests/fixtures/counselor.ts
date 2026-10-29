@@ -263,7 +263,8 @@ const result = { id: "education:fsc", level: "shown" as const, source_label: "Re
 const PEC = { source: "https://www.pec.org.pk/regulations.pdf", confidence: "official" as const };
 const step = (key: string, label_key: string, values: Record<string, unknown>, status: RouteStep["status"],
   over: Partial<RouteStep> = {}): RouteStep => ({ key, kind: key.split(":")[0], label_key, values, status,
-  colour: ({ done: "green", half: "yellow", not: "red" } as const)[status], evidence: null, rule: null, manual_done: false, ...over });
+  colour: ({ done: "green", half: "yellow", not: "red" } as const)[status], evidence: null, rule: null, manual_done: false,
+  tickable: false, ...over });
 const finish = step("complete_intermediate", "step_finish_exam", { level: "FSc", month: "May", year: 2027 }, "half", { evidence: result });
 const group = step("group", "step_group", { groups: [{ code: "pre_engineering", label: "Pre-Engineering", route_label: "FSc Pre-Engineering" }] },
   "done", { evidence: result, rule: PEC });
@@ -273,8 +274,8 @@ export const eeSteps: RouteStep[] = [
   group, finish,
   step("marks", "step_marks", { min: 60, have: 78 }, "done", { evidence: result, rule: PEC }),
   step("test:ECAT / NET", "step_test_pass", { name: "ECAT / NET", pass: 33 }, "not",
-    { kind: "test", rule: { source: "https://ecat.uet.edu.pk/", confidence: "official" } }),
-  step("apply", "step_apply", { degree: "Electrical Engineering" }, "not"),
+    { kind: "test", tickable: true, rule: { source: "https://ecat.uet.edu.pk/", confidence: "official" } }),
+  step("apply", "step_apply", { degree: "Electrical Engineering" }, "not", { tickable: true }),
   step("degree", "step_degree", { degree: "Electrical Engineering", years: 4 }, "not", { rule: PEC }),
 ];
 export const eeTime: RouteTime = {
@@ -287,9 +288,9 @@ const pharmSteps: RouteStep[] = [
   { ...group, rule: { source: "https://example.org/pharm", confidence: "uncertain" } }, finish,
   step("marks", "step_marks", { min: 60, have: 78 }, "done", { evidence: result }),
   step("bridge", "step_bridge", { text: "Biology bridge course at some universities" }, "not",
-    { rule: { source: "https://example.org/pharm", confidence: "uncertain" } }),
-  step("test:University test", "step_test", { name: "University test" }, "not", { kind: "test" }),
-  step("apply", "step_apply", { degree: "Pharmacy" }, "not"),
+    { tickable: true, rule: { source: "https://example.org/pharm", confidence: "uncertain" } }),
+  step("test:University test", "step_test", { name: "University test" }, "not", { kind: "test", tickable: true }),
+  step("apply", "step_apply", { degree: "Pharmacy" }, "not", { tickable: true }),
   step("degree", "step_degree", { degree: "Pharmacy", years: 5 }, "not"),
 ];
 const pharmTime: RouteTime = {
@@ -306,8 +307,8 @@ export const roadmapCards: FieldCard[] = [
     verdict: verdict({ tests: [{ name: "University test", pass_percent: null }], years: 4, min_percent: 50,
       confidence: "secondary", sources: ["https://www.hec.gov.pk/criteria"] }),
     steps: [group, finish, step("marks", "step_marks", { min: 50, have: 78 }, "done", { evidence: result }),
-      step("test:University test", "step_test", { name: "University test" }, "not", { kind: "test" }),
-      step("apply", "step_apply", { degree: "Computer Science" }, "not"), step("degree", "step_degree", { degree: "Computer Science", years: 4 }, "not")],
+      step("test:University test", "step_test", { name: "University test" }, "not", { kind: "test", tickable: true }),
+      step("apply", "step_apply", { degree: "Computer Science" }, "not", { tickable: true }), step("degree", "step_degree", { degree: "Computer Science", years: 4 }, "not")],
     time: { ...eeTime, to_entry_months: 10, to_finish_years: 4.8, confidence: "uncertain" } },
   { possibility_id: "path-pharm", field_key: "pharmacy", title: "Pharmacy", family: "health",
     why: "You are curious about how medicines help people.", status: "step",

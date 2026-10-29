@@ -198,11 +198,17 @@ class RouteDecisionService:
         row = self._active_or_404(workspace_id)
         page = RoadmapEngine(self.db).build(workspace_id)
         card = next((card for card in page["fields"] if card["field_key"] == row.field_key), None)
-        keys = [step["key"] for step in (card["steps"] if card else row.steps or [])]
+        steps = card["steps"] if card else list(row.steps or [])
+        keys = [step["key"] for step in steps]
         if key is None and index is not None and 0 <= index < len(keys):
             key = keys[index]
         if key not in keys:
             raise RouteDecisionError("No such step on this route", 422)
+        # A tick is offered only where the Vault is silent (steps.py _tickable);
+        # unticking is always allowed, so an old tick can be cleared.
+        if done and not next(step for step in steps if step["key"] == key).get("tickable", False):
+            raise RouteDecisionError("PAI reads this step from your Vault, so it cannot be ticked. "
+                                     "If it is wrong, update it in your Vault.", 409)
         ticks = [item for item in done_keys(row) if item != key] + ([key] if done else [])
         row.steps_done = ticks  # a new list of keys, so the JSON column is marked changed
         self.db.flush()

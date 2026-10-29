@@ -69,11 +69,9 @@ export const uncertain = (card: FieldCard) =>
 export const stepLabel = (step: Pick<RouteStep, "key" | "label_key" | "values">) =>
   step.label_key ? render({ ...(step.values || {}), key: step.label_key }) : render(step as unknown as CopyItem);
 
-/** Whether the student may tick a step themselves: applying, a step that is
- * not yet done (the claim stays "stated"), or one they ticked before. The
- * degree itself is never ticked. */
-export const tickable = (step: RouteStep) =>
-  step.kind === "apply" || step.key === "apply" || !!step.manual_done || (step.status === "not" && step.kind !== "degree");
+/** Whether the student may tick a step: the backend decides (only where the
+ * Vault is silent); the page holds no rule of its own. */
+export const tickable = (step: RouteStep) => !!step.tickable;
 
 export const doneCount = (steps: RouteStep[]) => steps.filter((s) => s.status === "done").length;
 export const stepsDoneText = (steps: RouteStep[] | undefined) =>

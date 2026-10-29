@@ -160,9 +160,11 @@ def test_steps_toggle_persists_and_validates_index():
         assert apply["status"] == "done" and apply["manual_done"] is True
         assert apply["evidence"]["source_label"] == roadmap_policy()["copy"]["marked_by_you"]
         # Older clients name the step by its position in the live steps.
+        test_index = next(i for i, step in enumerate(decision["steps"]) if step["kind"] == "test")
+        test_key = decision["steps"][test_index]["key"]
         by_index = data(client.post("/v1/roadmap/steps", params=params, headers=TOKEN,
-                                    json={"index": 0, "done": True}))
-        assert by_index["steps_done"] == ["apply", decision["steps"][0]["key"]]
+                                    json={"index": test_index, "done": True}))
+        assert by_index["steps_done"] == ["apply", test_key]
         page = data(client.get("/v1/roadmap", params=params, headers=TOKEN))
         assert page["chosen"]["steps_done"] == by_index["steps_done"]
         for body in ({"index": len(decision["steps"])}, {"index": -1}, {"key": "nope"}):
@@ -170,7 +172,25 @@ def test_steps_toggle_persists_and_validates_index():
             assert bad.status_code == 422
         untick = data(client.post("/v1/roadmap/steps", params=params, headers=TOKEN,
                                   json={"key": "apply", "done": False}))
-        assert untick["steps_done"] == [decision["steps"][0]["key"]]
+        assert untick["steps_done"] == [test_key]
+
+
+def test_tick_refused_where_the_vault_speaks():
+    """The group, intermediate and marks steps are read from the education
+    record, and the degree is never claimed: a tick there is a 409 with a
+    sentence for the student, and nothing is saved."""
+    with pre_eng() as (client, _, params):
+        decision = data(choose(client, params, "electrical_engineering"))
+        for key in ("group", "complete_intermediate", "marks", "degree"):
+            refused = client.post("/v1/roadmap/steps", params=params, headers=TOKEN, json={"key": key, "done": True})
+            assert refused.status_code == 409
+            assert "Vault" in refused.json()["detail"]
+        refused = client.post("/v1/roadmap/steps", params=params, headers=TOKEN, json={"index": 0, "done": True})
+        assert refused.status_code == 409
+        page = data(client.get("/v1/roadmap", params=params, headers=TOKEN))
+        assert page["chosen"]["steps_done"] == []
+        assert {s["key"]: s["tickable"] for s in page["chosen"]["steps"]}["apply"] is True
+        assert decision["steps"][0]["tickable"] is False
 
 
 def test_withdraw():

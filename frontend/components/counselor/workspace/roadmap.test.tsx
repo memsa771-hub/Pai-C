@@ -183,6 +183,17 @@ it("chooses a route and shows it at the top: coloured steps, progress by status 
     .toEqual(["Take ECAT / NET (pass 33%)", "Apply for Electrical Engineering"]);
 });
 
+it("offers a tick only where the backend says the Vault is silent", async () => {
+  // Marks below the floor are red but read from the record: no tick, whatever the colour.
+  const steps = chosenRoute.steps.map((s) => (s.key === "marks" ? { ...s, status: "not" as const, values: { min: 60, have: 55 } } : s));
+  vi.mocked(workspaceApi.getRoadmapPage).mockResolvedValue({ ...roadmapPage, chosen: { ...chosenRoute, steps } });
+  render(<Roadmap onNavigate={vi.fn()} />);
+  const route = await screen.findByRole("region", { name: "Your route" });
+  expect(within(route).queryByRole("checkbox", { name: "Meet the 60% marks rule (you have 55%)" })).toBeNull();
+  expect(within(route).queryByRole("checkbox", { name: "Study Electrical Engineering (4 years)" })).toBeNull();
+  expect(within(route).getAllByRole("checkbox")).toHaveLength(2);
+});
+
 it("ticks a step by its key through the API and reverts when it fails", async () => {
   vi.mocked(workspaceApi.getRoadmapPage).mockResolvedValue({ ...roadmapPage, chosen: chosenRoute });
   vi.mocked(workspaceApi.setRouteStep).mockResolvedValueOnce(ticked("test:ECAT / NET", true));

@@ -43,6 +43,8 @@ export type RouteStep = {
   evidence?: { id: string | null; level: VaultLevel; source_label: string } | null;
   rule?: { source: string; confidence: "official" | "secondary" | "uncertain" | null } | null;
   manual_done?: boolean;
+  /** The student may tick it: set by the backend only where the Vault is silent. */
+  tickable?: boolean;
 };
 
 /** A dated calendar event behind the estimate; month null is "date not confirmed". */

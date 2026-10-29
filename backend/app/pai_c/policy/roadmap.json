@@ -40,13 +40,14 @@
   "time_uncertain": "Dates not confirmed; check the official schedule"
  },
  "steps": {
-  "_note": "Coloured route steps (app/pai_c/roadmap/steps.py; FOUR_FEATURES_SPEC 4.1). order: the step kinds in route order. colours: status to colour. month_labels: month number 1-12 as shown. test_pending_statuses: test_attempt details.status values that mean planned or registered (half). bridge_course_terms: a bridge or check step is done when a course record's name and the step's text share one of these words. manual_level: the evidence level a manual tick shows.",
+  "_note": "Coloured route steps (app/pai_c/roadmap/steps.py; FOUR_FEATURES_SPEC 4.1). order: the step kinds in route order. colours: status to colour. month_labels: month number 1-12 as shown. test_pending_statuses: test_attempt details.status values that mean planned or registered (half). bridge_course_terms: a bridge or check step is done when a course record's name and the step's text share one of these words. manual_level: the evidence level a manual tick shows. tickable_kinds: the step kinds a student may tick, and only while the Vault is silent on them (status not, no Vault evidence): applying, a bridge or check with no course record, a test with no attempt. Every other step is read from the Vault and never ticked.",
   "order": ["group", "complete_intermediate", "marks", "bridge", "check", "test", "apply", "degree"],
   "colours": {"done": "green", "half": "yellow", "not": "red"},
   "month_labels": ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"],
   "test_pending_statuses": ["planned", "registered", "booked", "scheduled", "applied"],
   "bridge_course_terms": ["mathematics", "maths", "math", "biology", "physics", "chemistry", "computer science"],
-  "manual_level": "stated"
+  "manual_level": "stated",
+  "tickable_kinds": ["apply", "bridge", "check", "test"]
  },
  "timeline": {
   "_note": "Time estimate (app/pai_c/roadmap/timeline.py; FOUR_FEATURES_SPEC 4.2). Event keys are academic_calendar.json events or tests. tracks: an education level to its calendar track. finish: what a track still sits to finish intermediate; chain events happen in order, each after the one before (a later step's test can follow the exam), and result is the gate the intake waits for but nothing chains after. A current student in details.current_year 1 uses <track>_year_1; a student before intermediate uses <track> while current and <track>_done once it is completed. improve: the exam and result a student below the marks floor sits again; a track with none leaves the step 'date not confirmed'. Steps of other kinds wait for no calendar event (apply goes with the intake).",
