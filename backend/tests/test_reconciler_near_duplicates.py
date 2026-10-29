@@ -55,4 +55,30 @@ def test_6_a_different_option_status_still_updates_the_entry():
         _run(db, ws, "option", {"text": "medicine", "status": "ruled_out"})
         db.commit()
         [row] = _active(db, ws, "option")
-        assert row.value == {"text": "Medicine", "status": "ruled_out"}
+        # Same entry by the item store's own identity (exact text), so the
+        # status change updates it; the near-duplicate merge stays out of it.
+        assert row.value["status"] == "ruled_out" and row.value["text"].lower() == "medicine"
+
+
+def test_6_opposite_polarity_never_merges():
+    """Fix round 1: "not good at maths" is the opposite claim, not a sighting."""
+    with StudentSession() as student, student.factory() as db:
+        ws = student.workspace_id
+        _run(db, ws, "strength", {"text": "I am good at maths"})
+        _run(db, ws, "strength", {"text": "I am not good at maths"})
+        _run(db, ws, "pressure", {"text": "Family pressure to study medicine", "kind": "family"})
+        _run(db, ws, "pressure", {"text": "No family pressure to study medicine", "kind": "family"})
+        db.commit()
+        assert sorted(r.value["text"] for r in _active(db, ws, "strength")) == [
+            "I am good at maths", "I am not good at maths"]
+        assert len(_active(db, ws, "pressure")) == 2
+    assert "nahi" in _policy()["near_duplicate"]["negations"]
+
+
+def test_6_a_different_choice_never_merges():
+    with StudentSession() as student, student.factory() as db:
+        ws = student.workspace_id
+        _run(db, ws, "pressure", {"text": "Fees are very high", "kind": "money"})
+        _run(db, ws, "pressure", {"text": "The fees are very high", "kind": "family"})
+        db.commit()
+        assert len(_active(db, ws, "pressure")) == 2

@@ -696,6 +696,14 @@ def _validate(raw: dict, turn, allowed_vault_keys: set[str],
             validate_schema_instance(spec.schema, value)
         except SchemaValidationError as exc:
             return drop(f"{key} item invalid: {exc}")
+        if (evidence.get("inferred") and key == "family_member" and value.get("wish")
+                and isinstance(attribution, dict) and attribution.get("stated_field") == "wish"):
+            # The extractor says the student stated this person's wish; it is
+            # Stated only when the quote says a wish ("abbu chahte hain"),
+            # never because the quote merely names the person (audit #5).
+            from app.memory.normalize import says_a_wish
+            if says_a_wish(quote):
+                evidence.pop("inferred")
         # An id is passed on only when it names one of this student's items of
         # this type that the turn context showed. Any other id is dropped on
         # its own (and logged): the value is still the student's words, so it
@@ -795,20 +803,20 @@ _MOBILITY = "mobility.relocation_willingness"
 
 def _with_mobility(validated: list, allowed_vault_keys) -> list:
     """"Lahore se bahar nahi ja sakta" is a mobility limit even when the model
-    only saved the city (audit #7): a quote that says it in a catalog wording
-    adds relocation willingness with that same quote, unless one is proposed."""
-    from app.memory.catalog import vault_catalog
-    from app.memory.normalize import _phrase_choice
+    saved only the city (audit #7). Added only where a quote is explicit: a
+    move cue, a place cue and a negation together (normalize.says_cannot_move),
+    and never when the extractor already proposed relocation willingness."""
+    from app.memory.normalize import says_cannot_move
 
     if _MOBILITY not in allowed_vault_keys or any(c.key == _MOBILITY for c in validated):
         return validated
-    list_name = vault_catalog().type(_MOBILITY).choice_fields.get("")
+    cities = [c.proposed_value for c in validated
+              if c.key == "location.current_city" and isinstance(c.proposed_value, str)]
     for candidate in validated:
         quote = (candidate.evidence or {}).get("quote") or ""
-        code = _phrase_choice(list_name, quote) if list_name and quote else None
-        if code:
+        if quote and says_cannot_move(quote, cities):
             return [*validated, ExtractedCandidate(
-                candidate_type="vault_fact", operation="upsert", key=_MOBILITY, proposed_value=code,
+                candidate_type="vault_fact", operation="upsert", key=_MOBILITY, proposed_value="no",
                 content=None, entities={}, confidence=candidate.confidence,
                 evidence={k: v for k, v in candidate.evidence.items() if k in ("quote", "user_event_id")})]
     return validated

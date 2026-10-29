@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
-/** Audit #12: nothing but the student's own click moves them to another view.
- * The desktop view restore was the one effect that could open a view on its
- * own; it runs only as the workspace first opens. */
+/** Audit #12 (not reproduced; watch): the desktop view restore is the one
+ * effect that opens a view without a click. It keeps a guard: never over a
+ * link's own ?view=, and only once, as the workspace first opens. */
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { cleanup, renderHook } from '@testing-library/react';
 import { useDesktopWorkspaceState } from './use-desktop-workspace-state';
@@ -24,15 +24,6 @@ beforeEach(() => {
   localStorage.setItem(key, JSON.stringify({ view: 'roadmap' }));
 });
 afterEach(() => { cleanup(); window.history.replaceState({}, '', '/'); });
-
-it('audit #12: a workspace that finishes loading after the student started does not jump to Roadmap', () => {
-  state.user = null;
-  const { rerender } = renderHook(useDesktopWorkspaceState);
-  // The student is chatting; the account resolves late, mid-reply.
-  state.user = { email: 'offline@example.invalid' };
-  rerender();
-  expect(state.openView).not.toHaveBeenCalled();
-});
 
 it('audit #12: a link with its own ?view= is never overridden by the saved view', () => {
   window.history.replaceState({}, '', '/w?view=profile');

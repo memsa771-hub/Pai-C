@@ -149,10 +149,17 @@ def _budget_amount(value: dict) -> str:
     """The budget as its band label; a range or amount the student gave reads
     as the band it falls in, else in lakh ("3-8 lakh"), never as 600000."""
     catalog, rules = vault_catalog(), view_copy()["display"]["budget"]
-    if value.get("band"):
-        return catalog.label("budget_bands", value["band"])
     figures = [value.get(k) for k in rules["amount_fields"]]
     figures = [f for f in figures if isinstance(f, (int, float)) and not isinstance(f, bool)]
+    currency = value.get("currency")
+    if currency and currency != rules["band_currency"] and figures:
+        # The bands are lakh of the catalog's currency: another currency is
+        # shown as its own figures ("20000 USD"), never as a lakh band.
+        low, high = min(figures), max(figures)
+        amount = _number(low) if low == high else f"{_number(low)}-{_number(high)}"
+        return rules["foreign_template"].format(amount=amount, currency=currency)
+    if value.get("band"):
+        return catalog.label("budget_bands", value["band"])
     if not figures:
         return ""
     low, high = min(figures), max(figures)

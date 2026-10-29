@@ -88,3 +88,10 @@ def test_4_budget_amount_reads_as_lakh_when_no_band_fits():
     assert display_text("finance.budget", {"min": 300000, "max": 800000}) == "3-8 lakh"
     assert display_text("finance.budget", {"amount": 250000}) == "1-3 lakh"
     assert display_text("education", {"qualification_name": "matric", "result": {"percentage": 85}}) == "Matric, 85%"
+
+
+def test_4_budget_in_another_currency_is_never_a_lakh_band():
+    assert display_text("finance.budget", {"amount": 20000, "currency": "USD"}) == "20000 USD"
+    assert display_text("finance.budget", {"min": 5000, "max": 8000, "currency": "USD", "period": "per_year"}) == (
+        "5000-8000 USD, per year")
+    assert display_text("finance.budget", {"amount": 250000, "currency": "PKR"}) == "1-3 lakh"

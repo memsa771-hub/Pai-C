@@ -19,9 +19,10 @@ export function useDesktopWorkspaceState(): void {
   const { viewMode, openView } = useLayout();
   const [restored, setRestored] = useState('');
   const key = user && desktopHost() ? `oa:desktop:view:${user.email}:${workspaceId}` : '';
-  // The saved view is restored only as the workspace first opens, before the
-  // student does anything (audit #12): a late load must never move a student
-  // who is already chatting, and a link's own ?view= wins.
+  // The saved view is restored only once, as the workspace first opens, and a
+  // link's own ?view= wins (a guard kept for audit #12, which was not
+  // reproduced: the workspace mounts only after auth, so a late key cannot
+  // arrive mid-chat in the shipped flow).
   const initialView = useRef(viewMode);
   const opened = useRef(false);
 

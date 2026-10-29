@@ -1,10 +1,36 @@
 {
-  "_note": "Near-duplicate items (audit #6): a new item of a listed type whose text has token Jaccard >= min_jaccard with an active item of the same type is the same entry, said again. It merges into the earliest one (its wording kept, the new sighting added, evidence raised when stronger). Tokens are catalog-normalized words; a trailing suffix listed is dropped from words longer than min_stem_length, so maths and math agree.",
+  "_note": "Near-duplicate items (audit #6): a new item of a listed type whose text has token Jaccard >= min_jaccard with an active item of the same type is the same entry, said again. It merges into the earliest one (its wording kept, the new sighting added, evidence raised when stronger). Tokens are catalog-normalized words; a trailing suffix listed is dropped from words longer than min_stem_length, so maths and math agree. negations: words that turn a claim into its opposite; two texts that differ in whether they hold one never merge (\"good at maths\" vs \"not good at maths\"). A type's catalog choice fields (an option's status, a pressure's kind) must also agree.",
   "near_duplicate": {
     "min_jaccard": 0.8,
-    "fields": {"interest": "text", "strength": "text", "value": "text", "pressure": "text", "option": "text",
-               "myth": "text", "daily_life": "text"},
-    "suffixes": ["s"],
-    "min_stem_length": 3
+    "fields": {
+      "interest": "text",
+      "strength": "text",
+      "value": "text",
+      "pressure": "text",
+      "option": "text",
+      "myth": "text",
+      "daily_life": "text"
+    },
+    "suffixes": [
+      "s"
+    ],
+    "min_stem_length": 3,
+    "negations": [
+      "not",
+      "no",
+      "never",
+      "nahi",
+      "nahin",
+      "na",
+      "don't",
+      "dont",
+      "can't",
+      "cant",
+      "cannot",
+      "won't",
+      "isn't",
+      "doesn't",
+      "didn't"
+    ]
   }
 }

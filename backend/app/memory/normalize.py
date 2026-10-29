@@ -88,9 +88,6 @@ class NormalizeResult:
     source_language: str
     needs_confirmation: bool = False
     rejected_reason: Optional[str] = None
-    # The student's own words name it (a family member they mention): it is
-    # Stated whatever the extractor guessed (audit #5).
-    stated: bool = False
 
 
 def _phrase(text: str) -> re.Pattern:
@@ -113,22 +110,30 @@ def third_person(text: str) -> str:
 
 
 def _says(text: str, words) -> bool:
-    return any(_phrase(word).search(text or "") for word in words)
+    padded = f" {norm(text or '')} "
+    return any(f" {norm(word)} " in padded for word in words if norm(word))
 
 
-def _done_not_planned(status: str, quote: str) -> str:
-    """A status the student's own words put in the past ("I built", "bana
-    liya") is done, never planned; a stated plan stays planned (audit #5)."""
-    rule = _WORDS["tense"]
-    if (status == rule["planned"] and _says(quote, rule["done_words"])
-            and not _says(quote, rule["future_words"])):
-        return rule["done"]
-    return status
+def says_cannot_move(quote: str, places=()) -> bool:
+    """"I can't leave Lahore" / "Lahore se bahar nahi ja sakta": a move cue, a
+    place cue and a negation together (audit #7). Anything less ("not sure
+    about engineering", "move on from medicine") says nothing about moving.
+    Cues live in normalize_words.json; places add the catalog provinces and
+    any city the turn names."""
+    rule = _WORDS["mobility"]
+    catalog = vault_catalog()
+    provinces = [w for c in catalog.choices("provinces") for w in (c.label, *c.synonyms)]
+    return (_says(quote, rule["move"]) and _says(quote, [*rule["place"], *provinces, *places])
+            and _says(quote, rule["negation"]))
+
+
+def says_a_wish(quote: str) -> bool:
+    return _says(quote, _WORDS["wish_cues"])
 
 
 def _phrase_choice(list_name: str, *texts: str) -> Optional[str]:
-    """A choice said inside a sentence ("I can't leave Lahore"): the longest
-    catalog wording of two or more words found in the value or the quote."""
+    """A choice the extractor emitted as a phrase ("can't leave Lahore"): the
+    longest catalog wording of two or more words found in that value."""
     catalog = vault_catalog()
     wordings = sorted(((norm(w), c.code) for c in catalog.choices(list_name)
                        for w in (c.label, *c.synonyms) if len(norm(w).split()) >= 2),
@@ -139,17 +144,6 @@ def _phrase_choice(list_name: str, *texts: str) -> Optional[str]:
             if f" {wording} " in padded:
                 return code
     return None
-
-
-def _named_in_quote(key: Optional[str], value: Any, quote: str) -> bool:
-    rule = _WORDS["stated_types"].get(key or "")
-    if not rule or not isinstance(value, dict) or not isinstance(value.get(rule["field"]), str):
-        return False
-    catalog = vault_catalog()
-    code = catalog.choice_code(rule["list"], value[rule["field"]]) or value[rule["field"]]
-    words = [w for c in catalog.choices(rule["list"]) if c.code == code for w in (c.code, c.label, *c.synonyms)]
-    padded = f" {norm(quote)} "
-    return any(f" {norm(w)} " in padded for w in words if norm(w))
 
 
 def _is_date_field(candidate_type: str, key: str, name: str) -> bool:
@@ -194,10 +188,8 @@ def normalize_candidate(candidate_type: str, key: Optional[str], value: Any, *,
         if path in choice_fields:
             code = catalog.choice_code(choice_fields[path], text)
             if code is None and key in _WORDS["phrase_choice_types"]:
-                code = _phrase_choice(choice_fields[path], text, student_text)
+                code = _phrase_choice(choice_fields[path], text)  # the emitted value, never the quote
             return code if code is not None else text
-        if name in _WORDS["tense"]["fields"]:
-            return _done_not_planned(text, student_text)
         if candidate_type == "vault_item" and path in third_fields:
             return third_person(text)
         if _is_date_field(candidate_type, key, name if path else ""):
@@ -211,8 +203,7 @@ def normalize_candidate(candidate_type: str, key: Optional[str], value: Any, *,
     out = walk(value, "")
     if strict_choices and state["reject"] is None:
         state["reject"] = _off_list(catalog, spec, out)
-    stated = candidate_type == "vault_item" and _named_in_quote(key, out, student_text)
-    return NormalizeResult(out, language, state["confirm"], state["reject"], stated=stated)
+    return NormalizeResult(out, language, state["confirm"], state["reject"])
 
 
 def _off_list(catalog, spec, value) -> Optional[str]:

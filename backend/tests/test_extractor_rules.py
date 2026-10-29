@@ -70,7 +70,8 @@ async def test_5_family_wish_is_third_person_and_stated():
         # writes the wish in the student's first person.
         _proposal("vault_item", "family_member",
                   {"relation": "father", "wish": "Wants me to become an engineer", "influence": "high"},
-                  "Abbu chahte hain main engineer banun", inferred=True),
+                  "Abbu chahte hain main engineer banun", inferred=True,
+                  attribution={"claim_owner": "student", "stated_field": "wish"}),
         _proposal("vault_item", "value", {"text": "I want a stable income"},
                   "he wants me to become an engineer"),
     ])
@@ -88,36 +89,53 @@ async def test_5_a_guess_without_the_person_named_stays_a_guess():
     assert state.items["family_member"].level == "inferred"
 
 
-def test_5_built_is_done_and_a_plan_stays_planned():
-    built = normalize_candidate("student_record", "exploration_experience",
-                                {"domain": "robotics", "activity_type": "project", "title": "Line-following robot",
-                                 "activity_status": "planned"}, student_text="I built a line-following robot")
-    assert built.value["activity_status"] == "completed"
-    roman = normalize_candidate("student_record", "exploration_experience",
-                                {"domain": "apps", "activity_type": "project", "title": "Quiz app",
-                                 "activity_status": "planned"}, student_text="maine quiz app bana liya tha")
-    assert roman.value["activity_status"] == "completed"
-    plan = normalize_candidate("student_record", "exploration_experience",
-                               {"domain": "games", "activity_type": "project", "title": "Game",
-                                "activity_status": "planned"}, student_text="I will make a game next summer")
-    assert plan.value["activity_status"] == "planned"
+def test_5_status_is_never_guessed_from_tense():
+    """Fix round 1: the normalizer keeps the extractor's status; tense is the
+    prompt's rule only ("next year FSc" is planned)."""
+    fsc = normalize_candidate("student_record", "education",
+                              {"qualification_name": "fsc", "academic_status": "planned"},
+                              student_text="I finished matric, next year FSc")
+    assert fsc.value["academic_status"] == "planned"
+    robot = normalize_candidate("student_record", "exploration_experience",
+                                {"domain": "robotics", "activity_type": "project", "title": "Robot",
+                                 "activity_status": "planned"}, student_text="I built a robot and finished it")
+    assert robot.value["activity_status"] == "planned"  # done only if the extractor says so
 
 
 @pytest.mark.asyncio
-async def test_5_built_project_is_saved_completed():
+async def test_5_built_project_is_completed_when_the_extractor_says_so():
     text = "Last year I built a line-following robot for the science fair."
     state = await _run(text, [_proposal(
         "student_record", "exploration_experience",
         {"domain": "robotics", "activity_type": "project", "title": "Line-following robot",
-         "activity_status": "planned"}, "I built a line-following robot")])
+         "activity_status": "completed"}, "I built a line-following robot")])
     [project] = state.records["exploration_experience"]
     assert project["activity_status"] == "completed"
+
+
+@pytest.mark.asyncio
+async def test_5_naming_the_father_does_not_make_a_guessed_wish_stated():
+    state = await _run("My father is a doctor.", [
+        _proposal("vault_item", "family_member",
+                  {"relation": "father", "occupation": "Doctor", "wish": "Wants the student to become a doctor"},
+                  "My father is a doctor", inferred=True,
+                  attribution={"claim_owner": "student", "stated_field": "wish"})])
+    assert state.items["family_member"].level == "inferred"
+
+
+@pytest.mark.asyncio
+async def test_5_a_stated_wish_needs_the_extractor_to_say_so():
+    state = await _run("Abbu chahte hain main engineer banun.", [
+        _proposal("vault_item", "family_member", {"relation": "father", "wish": "Wants the student to be an engineer"},
+                  "Abbu chahte hain main engineer banun", inferred=True)])
+    assert state.items["family_member"].level == "inferred"
 
 
 def test_7_cant_leave_reads_as_the_catalog_no():
     for value, quote in (("can't leave Lahore", "I can't leave Lahore"),
                          ("Lahore se bahar nahi ja sakta", "Lahore se bahar nahi ja sakta"),
                          ("No", "No, I cannot move")):
+        # The extractor emitted the fact: its value is read, never the quote alone.
         result = normalize_candidate("vault_fact", "mobility.relocation_willingness", value, student_text=quote)
         assert result.value == "no", (value, result.value)
 
@@ -127,6 +145,23 @@ async def test_7_cant_leave_lahore_sets_relocation_willingness_even_when_the_mod
     text = "Main Lahore se bahar nahi ja sakta, ammi akeli hain."
     state = await _run(text, [_proposal("vault_fact", "location.current_city", "Lahore",
                                         "Main Lahore se bahar nahi ja sakta")])
+    assert state.mobility == "no"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("text", ["I'm not sure about engineering", "I can move on from medicine",
+                                  "Abbu nahi chahte"])
+async def test_7_quotes_not_about_moving_set_nothing(text):
+    state = await _run(text, [_proposal("vault_item", "option", {"text": "Engineering", "status": "considering"},
+                                        text)])
+    assert state.mobility is None
+
+
+@pytest.mark.asyncio
+async def test_7_cant_leave_lahore_on_any_candidate_sets_no():
+    state = await _run("I can't leave Lahore.", [_proposal("vault_item", "pressure",
+                                                           {"text": "Has to stay in Lahore", "kind": "family"},
+                                                           "I can't leave Lahore")])
     assert state.mobility == "no"
 
 
@@ -141,6 +176,7 @@ def test_5_7_extractor_prompt_states_the_rules_and_is_documented_verbatim():
     prompt = (Path(extractor.__file__).with_name("prompts") / "extractor.md").read_text(encoding="utf-8").rstrip()
     for line in ('"Wants the student to become an engineer", never "wants me to become an engineer"',
                  '"I built a line-following robot" or "maine app banaya" is completed',
+                 '"I finished matric, next year FSc" makes FSc planned',
                  "always mobility.relocation_willingness with the code no",
                  "so it never carries \"inferred\""):
         assert line in prompt

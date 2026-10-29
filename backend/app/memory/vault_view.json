@@ -118,6 +118,8 @@
       ],
       "lakh": 100000,
       "lakh_template": "{amount} lakh",
+      "band_currency": "PKR",
+      "foreign_template": "{amount} {currency}",
       "band_ranges": {
         "under_1_lakh": [
           0,

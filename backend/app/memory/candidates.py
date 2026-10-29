@@ -183,7 +183,7 @@ class MemoryCandidateService:
         if candidate_type in NORMALIZED_TYPES and operation == "upsert" and proposed_value is not None:
             proposed_value, evidence = self._normalize(
                 workspace_id, candidate_type, key, proposed_value, evidence,
-                input_channel, source_event_ids, source_type=source_type)
+                input_channel, source_event_ids)
         candidate = MemoryCandidate(
             workspace_id=workspace_id,
             subject_user_id=subject_user_id,
@@ -256,7 +256,7 @@ class MemoryCandidateService:
         return {**saved, **given}
 
     def _normalize(self, workspace_id, candidate_type, key, value, evidence,
-                   input_channel, source_event_ids, source_type=None):
+                   input_channel, source_event_ids):
         """English/codes/ISO before the row exists; a rejection is logged, then raised."""
         from app.memory.normalize import normalize_candidate
 
@@ -277,10 +277,6 @@ class MemoryCandidateService:
                         payload, source_ref=ref)
             raise MemoryDataError(result.rejected_reason)
         evidence["source_language"] = result.source_language
-        if result.stated and evidence.get("inferred") and source_type == "conversation":
-            # The student named this person in their own words: what they
-            # said about them is Stated, not PAI's guess (audit #5).
-            evidence.pop("inferred")
         if result.needs_confirmation:
             evidence["inferred"] = True
         return result.value, evidence

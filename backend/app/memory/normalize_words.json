@@ -76,7 +76,7 @@
   "روپیہ",
   "روپے"
  ],
- "_rules_note": "Audit #5/#7 rules, data not code. third_person: item fields written about the student or the person they belong to; first-person phrases (longest first) become third person. tense: a status the student's quote says is finished is never planned. stated_types: a family member the student names in their own words is what they said (Stated), never PAI's guess. phrase_choice_types: a choice read from a phrase inside the value or the quote (\"I can't leave Lahore\" is relocation willingness no).",
+ "_rules_note": "Audit #5/#7 rules, data not code. third_person: item fields written about the student or the person they belong to; first-person phrases (longest first) become third person. phrase_choice_types: an emitted value said as a phrase (\"can't leave Lahore\") reads as its catalog code. mobility: a quote says the student cannot move only when it holds a move cue, a place cue (these, the catalog provinces, or a city the turn names) and a negation. wish_cues: a family wish the extractor marks as the student's own statement (attribution.stated_field wish) is Stated only when the quote says a wish.",
  "third_person": {
   "types": {
    "family_member": [
@@ -150,57 +150,66 @@
    ]
   ]
  },
- "tense": {
-  "fields": [
-   "activity_status",
-   "academic_status"
-  ],
-  "planned": "planned",
-  "done": "completed",
-  "done_words": [
-   "built",
-   "made",
-   "created",
-   "finished",
-   "completed",
-   "did",
-   "developed",
-   "wrote",
-   "won",
-   "banaya",
-   "banai",
-   "bana liya",
-   "bana li",
-   "bana chuka",
-   "bana chuki",
-   "kar liya",
-   "kar li",
-   "kar chuka",
-   "kar chuki",
-   "mukammal"
-  ],
-  "future_words": [
-   "will",
-   "plan",
-   "planning",
-   "going to",
-   "want to",
-   "wanna",
-   "karunga",
-   "karungi",
-   "banaunga",
-   "banaungi",
-   "karna hai",
-   "banana hai"
-  ]
- },
- "stated_types": {
-  "family_member": {
-   "field": "relation",
-   "list": "relations"
-  }
- },
  "phrase_choice_types": [
   "mobility.relocation_willingness"
+ ],
+ "mobility": {
+  "move": [
+   "move",
+   "relocate",
+   "leave",
+   "shift",
+   "jana",
+   "ja",
+   "jaa",
+   "bahar",
+   "chor",
+   "chhor"
+  ],
+  "place": [
+   "city",
+   "shehar",
+   "shahar",
+   "province",
+   "lahore",
+   "karachi",
+   "islamabad",
+   "rawalpindi",
+   "peshawar",
+   "quetta",
+   "multan",
+   "faisalabad",
+   "hyderabad",
+   "sialkot",
+   "gujranwala",
+   "abroad",
+   "ghar",
+   "home"
+  ],
+  "negation": [
+   "not",
+   "no",
+   "never",
+   "can't",
+   "cant",
+   "cannot",
+   "nahi",
+   "nahin",
+   "na"
+  ]
+ },
+ "wish_cues": [
+  "chahte",
+  "chahti",
+  "chahta",
+  "want",
+  "wants",
+  "wanted",
+  "wish",
+  "wishes",
+  "kehte",
+  "kehti",
+  "expects",
+  "expect"
  ]
 }

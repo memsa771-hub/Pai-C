@@ -24,7 +24,7 @@ from typing import Optional
 
 from app.models import EventRecord, MemoryCandidate
 from .candidates import MemoryCandidateService
-from .catalog import norm
+from .catalog import norm, vault_catalog
 from .episodic import EpisodicMemoryService
 from .errors import MemoryDataError
 from .evidence import needs_student_confirmation
@@ -79,6 +79,11 @@ def _tokens(text: str, rule: dict) -> set:
                 break
         words.add(word)
     return words
+
+
+def _negated(text: str, rule: dict) -> bool:
+    padded = f" {norm(text)} "
+    return any(f" {norm(word)} " in padded for word in rule["negations"])
 
 
 def provenance_for(candidate: MemoryCandidate) -> tuple[str, str, Optional[str]]:
@@ -497,9 +502,17 @@ class MemoryReconciler:
         if not isinstance(text, str) or not text.strip():
             return value
         mine = _tokens(text, rule)
+        choices = vault_catalog().type(item_type).choice_fields if vault_catalog().type(item_type) else {}
         for item in sorted(self.items.active(workspace_id, [item_type]), key=lambda i: i.created_at):
             theirs = (item.value or {}).get(field)
             if not isinstance(theirs, str) or not mine:
+                continue
+            # Opposite claims ("not good at maths") and a different choice (a
+            # pressure's kind, an option's status) are never the same entry.
+            if _negated(text, rule) != _negated(theirs, rule):
+                continue
+            if any(value.get(name) is not None and (item.value or {}).get(name) is not None
+                   and value.get(name) != (item.value or {}).get(name) for name in choices):
                 continue
             other = _tokens(theirs, rule)
             if len(mine & other) / len(mine | other) >= rule["min_jaccard"]:
