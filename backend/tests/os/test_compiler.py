@@ -247,7 +247,7 @@ def test_programme_anchor_rules():
     with pytest.raises(ValueError, match="programme"):
         Playbook.model_validate(data)
     with pytest.raises(ValueError, match="placeholder"):
-        visa_book(note="{month} before")
+        visa_book(note="{month} before")  # neither a note field nor a playbook constant
 
 
 def test_germany_visa_date_from_the_semester_start():
@@ -309,11 +309,11 @@ def test_note_month_does_not_follow_the_locale(monkeypatch):
         locale.setlocale(locale.LC_TIME, "C")
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError, reason="visa date semantics pending user decision")
 def test_visa_date_does_not_pull_applications_before_their_deadlines():
-    """Regression (Task 11 review, critical): on the real Germany playbook with realistic dates (semester start 1 Oct,
-    application deadline 15 Jul, visa programme chosen), no apply step may be due before its cited deadline minus its
-    own lead time, and no admission result before the application deadline."""
+    """Regression (Task 11 review, critical; the user's option A): on the real Germany playbook with realistic dates
+    (semester start 1 Oct, application deadline 15 Jul, visa programme chosen), the visa step is due on its apply-by
+    date, 6 weeks before the semester starts; no apply step is due before its cited deadline minus its own lead time,
+    and no admission result before the application deadline."""
     gm = load_playbook(Path(__file__).parents[2] / "app/os/playbooks/germany_master.v1.yaml")
     refs = ["p1", "p2"]
     berlin = "Europe/Berlin"
@@ -326,6 +326,11 @@ def test_visa_date_does_not_pull_applications_before_their_deadlines():
     d = compile_plan(contract(refs, destination="DE"), gm, {}, prog, date(2026, 12, 1), chosen={"visa": "p1"})
     deadline = end_of_day(date(2027, 7, 15), berlin)
     lead = timedelta(days=int(gm.constants["uni_assist_lead_days"].value))
+    visa = task(d, "visa_apply")
+    assert visa.latest_finish == end_of_day(date(2027, 10, 1), berlin) - timedelta(days=42)
+    assert visa.blocked_reason is None and not d.at_risk
+    assert visa.citations[0]["note"] == ("Apply by 20 August 2027: 6 weeks before your semester starts on 1 October "
+                                         "2027. A visa usually takes about 90 days.")
     for t in d.tasks:
         if t.template_key == "uni_assist_apply":
             assert t.latest_finish >= deadline - lead, (t.instance_key, t.latest_finish)
@@ -333,3 +338,16 @@ def test_visa_date_does_not_pull_applications_before_their_deadlines():
             assert t.latest_finish >= deadline, (t.instance_key, t.latest_finish)
         if t.template_key == "admission_result":
             assert t.latest_finish is None or t.latest_finish >= deadline, (t.instance_key, t.latest_finish)
+
+
+def test_note_names_the_due_date_and_playbook_constants():
+    """A note may name the derived date ({due}, the step's own due date) and any playbook constant by its name."""
+    facts = {**deadlines(p1="2027-07-15"), **starts(p1="2027-10-01")}
+    data = visa_book().model_dump(mode="json", by_alias=True, exclude_none=True)
+    data["constants"] = {"wait": {"value": 90, "estimate": True}}
+    data["tasks"][1]["anchor"]["note"] = "Apply by {due} ({wait} days)"
+    visa = task(compile_plan(contract(["p1"]), Playbook.model_validate(data), {}, facts, TODAY), "visa")
+    assert visa.citations[0]["note"] == "Apply by 20 August 2027 (90 days)"
+    data["tasks"][1]["anchor"]["note"] = "{nope}"
+    with pytest.raises(ValueError, match="placeholder"):
+        Playbook.model_validate(data)

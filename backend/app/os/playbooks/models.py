@@ -35,15 +35,21 @@ class Condition(_Model):
         return self
 
 
-NOTE_FIELDS = frozenset({"date", "days", "weeks"})
+NOTE_FIELDS = frozenset({"date", "due", "days", "weeks"})
+
+
+def placeholders(note: str) -> set[str]:
+    return {name for _, name, _, _ in Formatter().parse(note) if name is not None}
 
 
 class Anchor(_Model):
     """The fact a step's date comes from. `programme: visa` (Slice 9 Task 11, F1): a step that is not fanned out takes
     the fact of the programme the student's visa file is for (before they choose: the earliest of the plan's
-    candidate programmes). `note`: the plain explanation shown with the date, e.g. "{weeks} weeks before your
-    semester starts on {date}" ({days} and {weeks} are the lead time); `note_earliest`: the same when the date is
-    the earliest of several programmes'. `waiting`: what the student is told while the fact is missing."""
+    candidate programmes). `note`: the plain explanation shown with the date, e.g. "Apply by {due}: {weeks} weeks
+    before your semester starts on {date}" ({date} is the fact's date, {due} the step's own due date, {days} and
+    {weeks} the lead time; any playbook constant by its name, e.g. {visa_processing_days}); `note_earliest`: the same
+    when the date is the earliest of several programmes'. `waiting`: what the student is told while the fact is
+    missing."""
     fact: str
     programme: Literal["visa"] | None = None
     note: str | None = None
@@ -52,11 +58,12 @@ class Anchor(_Model):
 
     @field_validator("note", "note_earliest")
     @classmethod
-    def _known_placeholders(cls, note: str | None) -> str | None:
+    def _plain_placeholders(cls, note: str | None) -> str | None:
+        """Only plain names ({due}, not {due.year} or {0}); which names are known is checked by the playbook."""
         if note is not None:
-            unknown = {name for _, name, _, _ in Formatter().parse(note) if name is not None} - NOTE_FIELDS
-            if unknown:
-                raise ValueError(f"unknown note placeholder {sorted(unknown)} (known: {sorted(NOTE_FIELDS)})")
+            for name in placeholders(note):
+                if not name.isidentifier():
+                    raise ValueError(f"note placeholder {{{name}}} must be a plain name")
         return note
 
 
@@ -147,6 +154,11 @@ class Playbook(_Model):
             for name in (t.lead_time.constant if t.lead_time else None, t.duration_constant):
                 if name is not None and name not in self.constants:
                     raise ValueError(f"unknown constant '{name}' in {t.template_key}")
+            for note in (t.anchor.note, t.anchor.note_earliest) if t.anchor else ():
+                unknown = placeholders(note or "") - NOTE_FIELDS - set(self.constants)
+                if unknown:
+                    raise ValueError(f"unknown note placeholder {sorted(unknown)} in {t.template_key} (known: "
+                                     f"{sorted(NOTE_FIELDS)} and the playbook's constants)")
             if self.require_citations and not t.citations and not t.citation_from_fact:
                 raise ValueError(f"task {t.template_key} needs a citation (require_citations is on)")
         return self

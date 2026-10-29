@@ -66,12 +66,15 @@ constants:
     estimate: true   # includes the separate signature-attestation appointment (S9)
     citations:
       - {source: S9, url: "https://pakistan.diplo.de/pk-en/service/1995528-1995528"}
-  # Slice 9 Task 11 (F1): the visa should be in hand this long before the semester starts. No official source gives
-  # a date for the visa, so the visa step's date is derived: the semester start of the programme the visa file is
-  # for, minus these days. The owners chose 6 weeks; it is a planning choice, not an official figure.
+  # Slice 9 Task 11 (F1, the user's option A): apply for the visa at the latest this long before the semester
+  # starts. No official source gives a date for the visa, so the visa step's apply-by date is derived: the semester
+  # start of the programme the visa file is for, minus these days. The owners chose 6 weeks; it is a planning
+  # choice, not an official figure.
   visa_before_semester_days:
     value: 42
     estimate: true
+  # Shown to the student as an estimate in the visa step's note; since Slice 9 Task 11 it is not a scheduling input
+  # (as visa_apply's duration it pulled every application before its deadline: the step is applying, not waiting).
   visa_processing_days:
     value: 90
     estimate: true   # planning buffer chosen by the developers; S11 gives no waiting time (Spike 5 C5)
@@ -266,16 +269,19 @@ tasks:
     title: Apply for the student visa on the Consular Services Portal
     kind: student
     inbox_kind: act
-    # Slice 9 Task 11 (F1): the date comes from the visa programme's researched semester_start (cited, with the
-    # note), 6 weeks before it; until that programme's start is known the step waits and says what for.
+    # Slice 9 Task 11 (F1, option A): the due date is the apply-by date, 6 weeks before the visa programme's
+    # researched semester_start (cited, with the note); until that start is known the step waits and says what for.
+    # 2 days for the act of applying, like the other online submissions (uni_assist_apply, direct_apply).
     anchor:
       fact: semester_start
       programme: visa
-      note: "{weeks} weeks before your semester starts on {date}"
-      note_earliest: "{weeks} weeks before the earliest semester start of your programmes ({date})"
+      note: "Apply by {due}: {weeks} weeks before your semester starts on {date}. A visa usually takes about
+        {visa_processing_days} days."
+      note_earliest: "Apply by {due}: {weeks} weeks before the earliest semester start of your programmes ({date}).
+        A visa usually takes about {visa_processing_days} days."
       waiting: "Waiting for your programme's semester start date"
     lead_time: {constant: visa_before_semester_days}
-    duration_constant: visa_processing_days
+    duration_days: 2
     depends_on:
       - {key: admission_result}
       - {key: blocked_account}

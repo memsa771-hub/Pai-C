@@ -519,7 +519,7 @@ def test_visa_with_two_admissions_asks_first(engine, clean, os_db):
 
 # ---- batch C: F1, the visa date from the semester start ------------------------------------------------------------
 
-VISA_NOTE = "6 weeks before your semester starts on {}"
+VISA_NOTE = "Apply by {}: 6 weeks before your semester starts on {}. A visa usually takes about 90 days."
 WAITING = "Waiting for your programme's semester start date"
 
 
@@ -569,13 +569,13 @@ def test_visa_date_follows_the_visa_programme(engine, clean, os_db):
         step = _visa_step(engine, web.plan_id)
         assert step.due_at == _visa_due("2027-10-01") and not step.provisional
         assert step.citations[0] == {"source": "fact:semester_start", "url": f"https://uni.example/{uni_one}/dates",
-                                     "note": VISA_NOTE.format("1 October 2027")}
+                                     "note": VISA_NOTE.format("20 August 2027", "1 October 2027")}
         assert ["programme", uni_one, "semester_start"] in step.fact_refs
         va.admitted(web, uni_two)  # a second admission: the student chooses which one the visa is for
         assert web.put(f"{va.V}/choice", headers=va.ME, json={"programme_ref": uni_two}).status_code == 200
         step = _visa_step(engine, web.plan_id)
         assert step.due_at == _visa_due("2027-10-15")
-        assert step.citations[0]["note"] == VISA_NOTE.format("15 October 2027")
+        assert step.citations[0]["note"] == VISA_NOTE.format("3 September 2027", "15 October 2027")
     finally:
         next(gen, None)
 

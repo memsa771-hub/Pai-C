@@ -20,6 +20,10 @@ MONTHS = ("January", "February", "March", "April", "May", "June", "July", "Augus
           "November", "December")
 
 
+def _day(d: date) -> str:
+    return f"{d.day} {MONTHS[d.month - 1]} {d.year}"
+
+
 class CompileError(ValueError):
     pass
 
@@ -287,8 +291,10 @@ def compile_plan(
                         note = t.anchor.note_earliest if len(sources) > 1 and t.anchor.note_earliest \
                             else t.anchor.note
                         if note:  # and say plainly how the date follows from it (F1)
-                            cite["note"] = note.format(date=f"{d.day} {MONTHS[d.month - 1]} {d.year}",
-                                                       days=lead_days, weeks=lead_days // 7)
+                            cite["note"] = note.format(
+                                **{k: c.value for k, c in playbook.constants.items()},
+                                date=_day(d), due=_day(d - timedelta(days=lead_days)), days=lead_days,
+                                weeks=lead_days // 7)
                         inst.citations.insert(0, cite)
                     inst.deadline = end_of_day(d, inst.tz) - timedelta(days=lead_days)
                     if not fact.confirmed or len(sources) > 1:  # several: it may move once one is chosen
