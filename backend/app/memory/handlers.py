@@ -257,7 +257,7 @@ async def reconcile_memory(job, db) -> dict:
     from app.config import config
     embed_count = sum(bool(result.result_id) and
                       MemoryCandidateService(db).get(workspace_id, result.candidate_id).candidate_type
-                      in {"vault_fact", "student_record"} for result in accepted) if config.PAI_SEMANTIC_RECALL_ENABLED else 0
+                      in {"vault_fact", "student_record", "vault_item"} for result in accepted) if config.PAI_SEMANTIC_RECALL_ENABLED else 0
 
     # A document's candidates are now decided: let the document pipeline tell
     # the student what actually happened. Enqueued in this transaction, so the
@@ -300,22 +300,23 @@ async def embed_memory(job, db) -> dict:
         episode_ids=payload.get("episode_ids") or [],
         fact_ids=payload.get("fact_ids") or [],
         record_refs=payload.get("record_refs") or [],
+        item_ids=payload.get("item_ids") or [],
     )
 
     indexed = await get_memory_index().index(records) if records else 0
     logger.info(
         "memory.embed: job=%s workspace=%s requested=%d indexed=%d",
         job.id, workspace_id,
-        sum(len(payload.get(key) or []) for key in ("memory_ids", "episode_ids", "fact_ids", "record_refs")),
+        sum(len(payload.get(key) or []) for key in ("memory_ids", "episode_ids", "fact_ids", "record_refs", "item_ids")),
         indexed,
     )
     return {"indexed": indexed}
 
 
 def _records_for(db, workspace_id: str, memory_ids: list, episode_ids: list,
-                 fact_ids=None, record_refs=None) -> list:
-    """Only canonical accepted facts/records and session summaries get new vectors."""
-    from app.models import VaultFact
+                 fact_ids=None, record_refs=None, item_ids=None) -> list:
+    """Only canonical accepted facts/records/Vault items and session summaries get new vectors."""
+    from app.models import VaultFact, VaultItem
     from app.memory.student_records import ENTITY_MODELS
     from app.memory.index_sources import canonical_text
     records = []
@@ -335,6 +336,12 @@ def _records_for(db, workspace_id: str, memory_ids: list, episode_ids: list,
             kind = "student_record:" + ref["kind"]
             records.append(MemoryRecord(id=row.id, workspace_id=workspace_id, kind=kind,
                 text=canonical_text(row, kind), filters={"status": "active"}))
+    for item_id in item_ids or []:
+        row = db.scalar(select(VaultItem).where(VaultItem.workspace_id == workspace_id,
+            VaultItem.id == item_id, VaultItem.status == "active"))
+        if row is not None:
+            records.append(MemoryRecord(id=row.id, workspace_id=workspace_id, kind="vault_item",
+                text=canonical_text(row, "vault_item"), filters={"status": "active"}))
     for episode_id in episode_ids:
         row = db.scalar(select(PaiEpisode).where(PaiEpisode.workspace_id == workspace_id,
             PaiEpisode.id == episode_id, PaiEpisode.status == "active",
@@ -371,7 +378,7 @@ async def reindex_workspace(job, db) -> dict:
     changed. Canonical data is untouched, so this is always safe to re-run.
     """
     from app.config import config
-    from app.models import VaultFact
+    from app.models import VaultFact, VaultItem
     from app.memory.student_records import ENTITY_MODELS
     workspace_id = job.workspace_id
     if not workspace_id:
@@ -392,12 +399,16 @@ async def reindex_workspace(job, db) -> dict:
             records_count += len(batch)
             total += await index.index(_records_for(db, workspace_id, [], [],
                 record_refs=[{"kind": kind, "id": item} for item in batch]))
+    items = 0
+    for batch in _iter_ids(db, workspace_id, VaultItem, batch_size):
+        items += len(batch)
+        total += await index.index(_records_for(db, workspace_id, [], [], item_ids=batch))
     for batch in _iter_ids(db, workspace_id, PaiEpisode, batch_size):
         records = _records_for(db, workspace_id, [], batch)
         episodes += len(records)
         if records:
             total += await index.index(records)
-    return {"indexed": total, "facts": facts, "records": records_count,
+    return {"indexed": total, "facts": facts, "records": records_count, "items": items,
             "memories": 0, "episodes": episodes}
 
 

@@ -261,6 +261,10 @@ class Config:
     # so a model change is detectable and can trigger a reindex rather than
     # silently mixing incompatible vector spaces.
     MEMORY_EMBEDDING_DIM: int = int(os.environ.get("MEMORY_EMBEDDING_DIM", "1536"))
+    # Estimated embeddings spend per calendar month (UTC). At the cap the
+    # gateway returns no vectors and recall falls back to lexical search.
+    # Rates: app/pai_c/policy/embedding_costs.json; counter: pai_usage_months.
+    PAI_EMBEDDING_MONTHLY_CAP_USD: float = float(os.environ.get("PAI_EMBEDDING_MONTHLY_CAP_USD", "5.0"))
     # Sparse (lexical) encoder. Qdrant/bm25 via fastembed, with the collection's
     # sparse vector configured with Modifier.IDF so Qdrant computes real BM25
     # scoring server-side rather than us approximating it.

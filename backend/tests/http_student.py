@@ -24,7 +24,7 @@ from app.models import (
     BackgroundJob, EventRecord, FileRecord, MemoryCandidate, PaiEpisode, PaiMemory,
     ProfileFieldResponse, ProfileIssue, ProfileRequirement, StudentRecordRevision, User, VaultFact,
     VaultFieldDefinition, Workspace, VAULT_INTAKE_MODELS,
-    VaultDrop, VaultItem,
+    VaultDrop, VaultItem, CounselorNotebook,
 )
 
 
@@ -69,7 +69,8 @@ def api():
               ProfileFieldResponse,
               StudentRecordRevision,
               BackgroundJob, *ENTITY_MODELS.values(), *VAULT_INTAKE_MODELS]
-    tables.extend([VaultDrop, VaultItem])
+    # The notebook backs the completeness meter on GET /v1/vault.
+    tables.extend([VaultDrop, VaultItem, CounselorNotebook])
     Base.metadata.create_all(engine, tables=[model.__table__ for model in tables])
 
     session = Session(engine, autoflush=False)

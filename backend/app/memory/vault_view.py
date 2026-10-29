@@ -193,6 +193,15 @@ class VaultView:
         kind = view_copy()["file_record_kind"]
         return [r.entry for r in rows if file_id in r.file_ids and r.entry["type"] != kind]
 
+    def stale_ids(self, workspace_id: str, now: Optional[datetime] = None) -> set[str]:
+        """Entries past their freshness window, named as coverage_areas names
+        its sources (`fact:<key>`, `<record kind>:<id>`, `item:<id>`), so the
+        completeness meter reads staleness from this one place."""
+        prefix = {"fact": lambda e: "fact:" + e["type"], "record": lambda e: f"{e['type']}:{e['id']}",
+                  "item": lambda e: f"item:{e['id']}"}
+        rows = self._rows(workspace_id, [], {}, _aware(now) or datetime.now(timezone.utc))
+        return {prefix[r.entry["kind"]](r.entry) for r in rows if r.entry["stale"]}
+
     # ---- reads -------------------------------------------------------------
 
     def _open_issues(self, workspace_id: str) -> list[ProfileIssue]:

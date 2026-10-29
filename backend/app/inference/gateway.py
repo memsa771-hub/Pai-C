@@ -1,7 +1,8 @@
 """Single model boundary; transport and provider adaptation remain in client.py.
 
 Existing caller overrides preserve injected provider instances and test seams.
-The gateway adds usage records, not new prompts, retries or budget policy.
+The gateway adds usage records, not new prompts or retries; its one budget is
+the embeddings monthly cap (app/inference/usage.py).
 """
 
 import logging
@@ -179,10 +180,15 @@ async def embed(role: str, texts: list[str], *, api_key=None, model=None, base_u
             base_url = resolved_url or None
     if not texts:
         return []
+    # Monthly cap (app/inference/usage.py): over it, no vectors; callers fall back to lexical.
+    from app.inference import usage
+    if not usage.embedding_allowed():
+        return []
     client = transport.create_embedding_client(api_key, base_url=base_url)
     try:
         response = await client.embeddings.create(model=model, input=texts)
         _usage_callback(phase or role, model, turn_id)(getattr(response, 'usage', None))
+        usage.record_embedding(model, texts)
         return [item.embedding for item in response.data]
     finally:
         await client.close()

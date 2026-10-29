@@ -44,5 +44,29 @@
     "sure": "how sure they feel about the field they lean toward, on a scale from 0 to 10",
     "goals": "the field of study they lean toward and why",
     "options": "the fields of study and entrance tests (ECAT, MDCAT, NAT, SAT) they are considering"
+  },
+  "labels": {
+    "status": "Current life",
+    "history": "Education & experience",
+    "interests": "Interests",
+    "strengths": "Strengths",
+    "family_social": "Family",
+    "values": "Values",
+    "pressures": "Pressures & limits",
+    "sure": "Certainty",
+    "goals": "Goals & whose wish",
+    "options": "Options & myths"
+  },
+  "questions": {
+    "history": "topic_text.history",
+    "goals": "topic_text.goals",
+    "options": "topic_text.options",
+    "pressures": "topic_text.pressures",
+    "interests": "topic_text.interests",
+    "status": "topic_text.status",
+    "family_social": "topic_text.family_social",
+    "sure": "topic_text.sure",
+    "values": "topic_text.values",
+    "strengths": "topic_text.strengths"
   }
 }

@@ -140,8 +140,16 @@ async def test_embedding_provider_uses_gateway_and_preserves_vectors_metadata():
                                   model='injected-model', base_url='https://example.test')
 
 
+@pytest.fixture
+def embedding_budget():
+    """The monthly cap's counter is a database row (test_embeddings_cap covers it)."""
+    from app.inference import usage
+    with patch.object(usage, 'embedding_allowed', return_value=True),          patch.object(usage, 'record_embedding') as record:
+        yield record
+
+
 @pytest.mark.asyncio
-async def test_embed_resolves_model_logs_usage_and_closes_client(caplog):
+async def test_embed_resolves_model_logs_usage_and_closes_client(caplog, embedding_budget):
     response = SimpleNamespace(data=[SimpleNamespace(embedding=[0.1, 0.2])],
                                usage=SimpleNamespace(prompt_tokens=2))
     client = SimpleNamespace(embeddings=SimpleNamespace(create=AsyncMock(return_value=response)), close=AsyncMock())
@@ -154,10 +162,11 @@ async def test_embed_resolves_model_logs_usage_and_closes_client(caplog):
     client.embeddings.create.assert_awaited_once_with(model='configured-embedding', input=['text'])
     assert 'phase=embeddings turn_id=embedding-turn model=configured-embedding input=2' in caplog.text
     client.close.assert_awaited_once()
+    embedding_budget.assert_called_once_with('configured-embedding', ['text'])
 
 
 @pytest.mark.asyncio
-async def test_embed_failure_closes_client():
+async def test_embed_failure_closes_client(embedding_budget):
     client = SimpleNamespace(embeddings=SimpleNamespace(create=AsyncMock(side_effect=RuntimeError('offline failure'))), close=AsyncMock())
     with patch.object(gateway.transport, 'create_embedding_client', return_value=client):
         with pytest.raises(RuntimeError, match='offline failure'):

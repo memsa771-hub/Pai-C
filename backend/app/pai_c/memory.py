@@ -56,8 +56,8 @@ class MemoryService:
         return {"saved": result.accepted, "id": result.result_id, "candidate_id": candidate.id}
 
     def profile_cards(self, workspace_id):
-        """The student's facts and records with their evidence level, for the
-        data export and the path analyzer's citable evidence."""
+        """The student's facts, records and Vault items with their evidence
+        level, for the data export and the path analyzer's citable evidence."""
         from app.memory.student_records import StudentRecordService
         from app.memory.evidence import evidence_level, evidence_policy, value_digest
         from app.memory.vault import VaultService
@@ -83,6 +83,19 @@ class MemoryService:
             metadata = {row["id"]: row for row in snapshot.records.get(kind, [])}
             for row in records.list(workspace_id, kind):
                 append(kind, kind, metadata[row.id], records._values(kind, row))
+        # Vault items cite as `item:<id>` (FOUR_FEATURES_SPEC 1.2). A guess
+        # (inferred) is not evidence, and a restricted type never leaves the Vault.
+        from app.memory.catalog import vault_catalog
+        from app.memory.vault_items import VaultItemService
+        for item in VaultItemService(self.db).active(workspace_id):
+            spec = vault_catalog().type(item.item_type)
+            if item.level == "inferred" or spec is None or spec.sensitivity == "restricted":
+                continue
+            evidence = item.evidence or {}
+            cards.append({"kind": "item", "key": item.item_type, "id": "item:" + item.id, "value": item.value,
+                "digest": value_digest(item.value), "evidence_level": item.level,
+                "source": {name: evidence[name] for name in evidence_policy()["source_fields"] if name in evidence},
+                "source_type": item.source_type, "updated_at": item.updated_at or item.observed_at})
         return cards
 
     def recent_turns(self, turn, owner_id, *, limit=24):
@@ -135,8 +148,10 @@ class MemoryService:
     def coverage_areas(self, workspace_id):
         from app.pai_c.understanding.views import coverage_areas
         from app.memory.vault_items import VaultItemService
+        from app.memory.vault_view import VaultView
         return coverage_areas(self.truth_map(workspace_id).notebook, self.profile(workspace_id),
-                              VaultItemService(self.db).active(workspace_id))
+                              VaultItemService(self.db).active(workspace_id),
+                              VaultView(self.db).stale_ids(workspace_id))
 
     def academic_view(self, workspace_id):
         from app.pai_c.understanding.views import academic_view
@@ -376,7 +391,7 @@ class MemoryService:
         from app.memory.student_records import ENTITY_MODELS
         if not config.PAI_SEMANTIC_RECALL_ENABLED:
             return []
-        kinds = ("episode", "vault_fact", "document_chunk") + tuple("student_record:" + kind for kind in ENTITY_MODELS)
+        kinds = ("episode", "vault_fact", "vault_item", "document_chunk") + tuple("student_record:" + kind for kind in ENTITY_MODELS)
         retriever = MemoryRetriever(self.db)
         try:
             result = await asyncio.wait_for(retriever.retrieve(workspace_id, query,

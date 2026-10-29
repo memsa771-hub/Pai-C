@@ -58,7 +58,10 @@ def counselor_workspace(network: str=Query(...),db=Depends(get_db),
     for turn in turns:
         action=(turn.decision or {}).get('action')
         if action and action not in moments: moments[action]=turn.source_event_id
-    return success_response({'coverage':memory.coverage_areas(wid),'personal':personal, 'sections':memory.profile_sections(wid),
+    from app.pai_c.completeness import completeness_from
+    coverage=memory.coverage_areas(wid)
+    # `coverage` stays one release for the Overview chips; `completeness` replaces it.
+    return success_response({'coverage':coverage,'completeness':completeness_from(coverage),'personal':personal, 'sections':memory.profile_sections(wid),
         'capabilities':memory.capability_view(wid),'academic':memory.academic_view(wid),
         'picture':(draft.get('mirror') or {}).get('core_picture') if draft.get('status')=='confirmed' else None,
         'mirror_status':draft.get('status'),'moments':moments,

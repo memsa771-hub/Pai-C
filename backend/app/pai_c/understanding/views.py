@@ -47,8 +47,11 @@ def _readable_education(snapshot) -> bool:
 _REQUIREMENTS = {"readable_education": _readable_education}
 
 
-def coverage_areas(notebook, snapshot, items=()):
-    """`items` are the active Vault items; areas.json names their types."""
+def coverage_areas(notebook, snapshot, items=(), stale_ids=frozenset()):
+    """`items` are the active Vault items; areas.json names their types.
+    `stale_ids` are the Vault entries past their catalog freshness window
+    (VaultView.stale_ids): an area that only they cover is `stale`, so the
+    completeness meter counts it unknown and the counselor asks again."""
     data = notebook.model_dump(mode="json")
     areas = json.loads((DATA_DIR / "areas.json").read_text(encoding="utf-8"))
     result = {}
@@ -97,14 +100,19 @@ def coverage_areas(notebook, snapshot, items=()):
         # groups add up. Both stay read until a recorded eval proves extraction
         # recall (no backfill: existing students have notebooks, not items).
         groups = {group for group, _ in sides}
-        count = sum(max(len(sides.get((group, True), ())), len(sides.get((group, False), ())))
-                    for group in groups)
+
+        def counted(skip=frozenset()):
+            return sum(max(len(sides.get((group, True), set()) - skip),
+                           len(sides.get((group, False), set()) - skip)) for group in groups)
+        count = counted()
         # `requires` names conditions beyond a count: an education record that
         # names no group or field ("FSc" alone) leaves the education basic
         # open, so the counselor asks for the group before anything else.
         required = spec.get("requires", ()) if isinstance(spec, dict) else ()
         met = all(_REQUIREMENTS[name](snapshot) for name in required)
-        result[area] = {"covered": count >= min_items and met, "item_count": count,
+        covered = count >= min_items and met
+        result[area] = {"covered": covered, "stale": covered and counted(stale_ids) < min_items,
+                        "item_count": count,
                         "min_items": min_items, "last_confirmed": max(dates) if dates else None,
                         "evidence": max(levels, key=EVIDENCE_ORDER.index) if levels else None}
     return result

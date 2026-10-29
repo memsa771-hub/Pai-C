@@ -218,6 +218,10 @@ class MemoryRetriever:
             from app.models import VaultFact
             row = self.db.scalar(select(VaultFact).where(VaultFact.workspace_id == workspace_id,
                 VaultFact.id == record_id))
+        elif kind == "vault_item":
+            from app.models import VaultItem
+            row = self.db.scalar(select(VaultItem).where(VaultItem.workspace_id == workspace_id,
+                VaultItem.id == record_id))
         elif kind.startswith("student_record:"):
             from .student_records import ENTITY_MODELS
             model = ENTITY_MODELS.get(kind.partition(":")[2])
@@ -282,10 +286,11 @@ class MemoryRetriever:
             ):
                 result.add(KIND_EPISODE, row)
 
-        from app.models import VaultFact, FileRecord
+        from app.models import VaultFact, VaultItem, FileRecord
         from .student_records import ENTITY_MODELS
         for kind in kinds:
-            model = VaultFact if kind == "vault_fact" else ENTITY_MODELS.get(kind.partition(":")[2]) if kind.startswith("student_record:") else None
+            model = (VaultFact if kind == "vault_fact" else VaultItem if kind == "vault_item"
+                     else ENTITY_MODELS.get(kind.partition(":")[2]) if kind.startswith("student_record:") else None)
             if model is not None:
                 rows = self.db.scalars(select(model).where(model.workspace_id == workspace_id,
                     model.status == "active").order_by(model.id)).all()

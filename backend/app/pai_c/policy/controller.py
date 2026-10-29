@@ -56,13 +56,16 @@ class Decision:
 
 
 def askable_areas(state, policy=None, excluded=()):
+    """The Vault's unknown areas (pai_c/completeness.py, priority order) that
+    pass the cooldown and sensitivity rules; one list with the completeness meter."""
+    from app.pai_c.completeness import unknown_areas
     policy = policy if policy is not None else load_data("areas_policy.json")
     count = state["student_count"]
     mentioned = state.get("mentioned_areas", [])
     previous = state.get("previous_mentioned_areas", [])
     candidates = []
-    for area in policy["priority"]:
-        if area in excluded or state.get("coverage", {}).get(area, {}).get("covered", False):
+    for area in unknown_areas(state.get("coverage", {}), policy):
+        if area in excluded or area not in policy["priority"]:
             continue
         declined_at = state.get("declined_at", {}).get(area)
         if declined_at is not None and count - declined_at < policy["declined_cooldown_student_messages"]:

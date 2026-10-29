@@ -23,6 +23,7 @@ from sqlalchemy import (
     ForeignKey,
     Index,
     Integer,
+    Numeric,
     PrimaryKeyConstraint,
     Text,
     UniqueConstraint,
@@ -1853,3 +1854,22 @@ class BackgroundJob(Base):
               postgresql_where=text("job_type = 'counselor.mirror' AND status IN ('pending', 'running')"),
               sqlite_where=text("job_type = 'counselor.mirror' AND status IN ('pending', 'running')")),
     )
+
+
+class PaiUsageMonth(Base):
+    """Estimated provider spend per scope and calendar month (migration 120).
+
+    One small row per scope ("embeddings") and month ('YYYY-MM', UTC), not per
+    workspace: the monthly cap is a budget for the whole deployment. The
+    estimate is chars/4 tokens times the rate in policy/embedding_costs.json.
+    """
+    __tablename__ = "pai_usage_months"
+
+    id = Column(UUID(as_uuid=False), primary_key=True, default=_uuid)
+    scope = Column(Text, nullable=False)
+    month = Column(Text, nullable=False)
+    calls = Column(Integer, nullable=False, default=0, server_default=text("0"))
+    est_usd = Column(Numeric(12, 6, asdecimal=False), nullable=False, default=0, server_default=text("0"))
+    updated_at = Column(DateTime(timezone=True), default=_now, onupdate=_now, server_default=text("NOW()"))
+
+    __table_args__ = (UniqueConstraint("scope", "month", name="uq_usage_months_scope_month"),)

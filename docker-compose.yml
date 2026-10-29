@@ -23,8 +23,9 @@ x-backend: &backend
     REDIS_URL: redis://redis:6379/0
     MEMORY_VECTOR_BACKEND: ${MEMORY_VECTOR_BACKEND:-qdrant}
     QDRANT_URL: http://qdrant:6333
-    # Semantic recall needs Qdrant plus an embeddings key; off for the MVP.
-    PAI_SEMANTIC_RECALL_ENABLED: ${PAI_SEMANTIC_RECALL_ENABLED:-false}
+    # Semantic recall: Qdrant plus MEMORY_EMBEDDING_API_KEY from .env. Without a
+    # key recall stays lexical; spend stops at PAI_EMBEDDING_MONTHLY_CAP_USD.
+    PAI_SEMANTIC_RECALL_ENABLED: ${PAI_SEMANTIC_RECALL_ENABLED:-true}
     # Uploads live on a volume shared with the worker, which parses them.
     FILE_STORAGE_BACKEND: local
     FILE_STORAGE_PATH: /data/files

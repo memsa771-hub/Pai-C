@@ -1,0 +1,8 @@
+{
+  "chars_per_token": 4,
+  "usd_per_million_tokens": {
+    "text-embedding-3-small": 0.02,
+    "text-embedding-3-large": 0.13,
+    "default": 0.13
+  }
+}

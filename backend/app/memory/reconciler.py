@@ -181,10 +181,9 @@ class MemoryReconciler:
         if result.accepted and candidate.candidate_type in {"vault_fact", "student_record", "vault_item"}:
             from app.runtime.task_runtime import enqueue
             from app.config import config
-            # The embed job reads facts and records only; items are not indexed yet.
-            if (config.PAI_SEMANTIC_RECALL_ENABLED and result.result_id and candidate.operation != "retract"
-                    and candidate.candidate_type != "vault_item"):
+            if config.PAI_SEMANTIC_RECALL_ENABLED and result.result_id and candidate.operation != "retract":
                 payload = ({"fact_ids": [result.result_id]} if candidate.candidate_type == "vault_fact"
+                           else {"item_ids": [result.result_id]} if candidate.candidate_type == "vault_item"
                            else {"record_refs": [{"kind": candidate.key, "id": result.result_id}]})
                 enqueue(self.db, job_type="memory.embed", workspace_id=candidate.workspace_id,
                         payload=payload, idempotency_key=f"embed-candidate:{candidate.id}")

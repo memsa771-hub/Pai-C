@@ -221,7 +221,10 @@ def get_vault(
     workspace, error = _workspace(db, network, x_workspace_token, authorization)
     if error:
         return error
-    return success_response(VaultView(db).build(str(workspace.id), include_sensitive=True))
+    from app.pai_c.completeness import VaultCompleteness
+    workspace_id = str(workspace.id)
+    return success_response({**VaultView(db).build(workspace_id, include_sensitive=True),
+                             "completeness": VaultCompleteness(db).build(workspace_id)})
 
 
 @router.get("/catalog")
