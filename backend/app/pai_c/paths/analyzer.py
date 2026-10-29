@@ -270,6 +270,30 @@ def enqueue_path_analysis(db, workspace_id: str, *, source_event_id: str | None,
     return job.id if job else None
 
 
+# Stages of the confirm-gated research wait, kept for old data (stages.py).
+_OLD_WAIT = {"RESEARCHING", "ASSESSING", "NEEDS_INFO"}
+
+
+def propose_after_paths(db, workspace_id: str, *, actor: str = "system:paths") -> None:
+    """Saved paths move the journey on (FOUR_FEATURES_SPEC 2.4): MIRROR ->
+    PROPOSED, or DIRECTION -> MIRROR -> PROPOSED when the Mirror is ready but
+    the stage lagged. A route decision already made then takes the journey on
+    to CHOSEN. Without a live path, or before the Mirror, the stage stays.
+    The caller commits."""
+    from app.pai_c.mirror import MirrorEngine
+    from app.pai_c.roadmap.decisions import RouteDecisionService
+    if not any(row.status != "dismissed" for row in PossibilityService(db).list(workspace_id)):
+        return
+    journeys = JourneyService(db)
+    journey = journeys.ensure_counselor(workspace_id)
+    if journey.current_stage == "DIRECTION" and MirrorEngine(db).ready(workspace_id):
+        journey = journeys.mark_mirror_ready(workspace_id, actor=actor)
+    if journey.current_stage != "MIRROR" and journey.current_stage not in _OLD_WAIT:
+        return
+    journeys.set_counselor_stage(workspace_id, journey.id, "PROPOSED", actor=actor)
+    RouteDecisionService(db).follow_active(workspace_id, actor=actor)
+
+
 async def _needs_education(db, job, payload: dict, education: list[dict]) -> dict:
     """A student who asked in chat hears, in one short line, what PAI still
     needs (their group, subjects, field or education); the copy is data."""
@@ -381,6 +405,8 @@ async def path_analysis_job(job, db) -> dict:
             if path["study_field"] is not None:
                 row.study_field = path["study_field"]
             ids.append(row.id)
+        if ids:
+            propose_after_paths(db, job.workspace_id)
         db.commit()
         channel = payload.get("channel")
         if not channel or not ids:

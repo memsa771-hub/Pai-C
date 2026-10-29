@@ -1,14 +1,11 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Eye, MessageCircle, Scale, Sparkles, Target } from 'lucide-react';
 import { workspaceApi } from '@/lib/api';
 import { useT } from '@/lib/i18n';
 import type { CounselorMirrorDraft } from '@/lib/counselor-mirror';
-import { Button } from '@/components/ui/button';
-import { Textarea } from '@/components/ui/textarea';
 import { QuadrantCard, type Quadrant } from '@/components/pai';
-import { FeltUnderstood } from '@/components/counselor/workspace/profile-parts';
 
 const QUADRANTS = [
   { key: 'you_say', icon: MessageCircle, tone: 'blue' },
@@ -17,53 +14,26 @@ const QUADRANTS = [
   { key: 'you_want', icon: Target, tone: 'violet' },
 ] as const;
 
-/** The Mirror in the conversation: PAI's picture as four quadrants, with
- * the dimensions and evidence one tap away. The student agrees or asks for
- * a change; a confirmed version may then be rated once (or skipped). */
+/** An old Mirror in the conversation: PAI's picture as four quadrants, with
+ * the dimensions and evidence one tap away. Read-only: the confirm, edit and
+ * rating routes are gone (FOUR_FEATURES_SPEC 2.3); the Mirror page replaces
+ * this card. */
 export function CounselorMirrorCard({ refreshKey, onUpdated }: {
   refreshKey: string | number;
   onUpdated?: () => void;
 }) {
   const t = useT();
   const [draft, setDraft] = useState<CounselorMirrorDraft | null>(null);
-  const [editing, setEditing] = useState(false);
-  const [text, setText] = useState('');
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState(false);
-  const [feedbackVersion, setFeedbackVersion] = useState<number | null>(null);
-  const version = useRef<number | null>(null);
-  const feedback = useRef<HTMLDivElement>(null);
-  // After agreeing, bring the rating into view inside the scrolling card.
-  useEffect(() => {
-    if (feedbackVersion !== null) feedback.current?.scrollIntoView?.({ block: 'nearest', behavior: 'smooth' });
-  }, [feedbackVersion]);
+  void onUpdated;
 
   useEffect(() => {
     let active = true;
-    workspaceApi.getCounselorSummary().then((result) => {
-      if (!active) return;
-      setDraft(result);
-      if (version.current !== result.version) {
-        version.current = result.version;
-        setEditing(false); setText(''); setError(false); setFeedbackVersion(null);
-      }
-    }).catch(() => { if (active) setError(true); });
+    workspaceApi.getCounselorSummary().then((result) => { if (active) setDraft(result); }).catch(() => undefined);
     return () => { active = false; };
   }, [refreshKey]);
 
   if (draft?.type !== 'mirror' || !draft.mirror || draft.version === null) return null;
   const mirror = draft.mirror;
-  const act = async (edit: boolean) => {
-    setBusy(true); setError(false);
-    try {
-      if (edit) await workspaceApi.editCounselorMirror(draft.version!, text.trim());
-      else await workspaceApi.confirmCounselorMirror(draft.version!);
-      setDraft({ ...draft, status: edit ? 'needs_changes' : 'confirmed' });
-      if (!edit) setFeedbackVersion(draft.version);
-      setEditing(false); setText(''); onUpdated?.();
-    } catch { setError(true); }
-    finally { setBusy(false); }
-  };
 
   const renderDimensions = () => (<div className="mt-3 divide-y rounded-2xl border px-4">
       {mirror.dimensions.map((dimension) => <details key={dimension.key} className="group py-3">
@@ -101,26 +71,5 @@ export function CounselorMirrorCard({ refreshKey, onUpdated }: {
     <h4 className="mt-4 font-semibold">{t('counselorMirror.opinion')}</h4>
     <p className="mt-1 whitespace-pre-wrap break-words">{mirror.opinion}</p>
     <p className="mt-3 whitespace-pre-wrap break-words font-medium">{mirror.question}</p>
-    {draft.status === 'confirmed' && <p role="status" className="mt-3 text-muted-foreground">{t('counselorMirror.confirmed')}</p>}
-    {draft.status === 'needs_changes' && <p role="status" className="mt-3 text-muted-foreground">{t('counselorMirror.sent')}</p>}
-    {error && <p role="alert" className="mt-2 font-medium text-danger-ink">{t('counselorMirror.error')}</p>}
-    {feedbackVersion === draft.version && <div ref={feedback}><FeltUnderstood version={feedbackVersion}
-      labels={{ legend: t('counselorMirror.understood'), certainty: `${t('counselorMirror.certaintyAfter')} (${t('counselorMirror.optional')})`,
-        send: t('counselorMirror.sendFeedback'), skip: t('counselorMirror.skipFeedback') }}
-      onSaved={() => onUpdated?.()} onSkip={() => { setFeedbackVersion(null); setError(false); }} /></div>}
-    {draft.status === 'awaiting_confirmation' && <div className="mt-4">
-      {editing ? <form onSubmit={(event) => { event.preventDefault(); void act(true); }}>
-        <label className="block text-sm font-semibold">{t('counselorMirror.editHint')}
-          <Textarea className="mt-2 min-h-24 rounded-xl" value={text} maxLength={8000} disabled={busy} onChange={(event) => setText(event.target.value)} />
-        </label>
-        <div className="mt-3 flex flex-wrap gap-2">
-          <Button size="tap" type="submit" disabled={busy || !text.trim()}>{t('counselorMirror.saveEdits')}</Button>
-          <Button size="tap" type="button" variant="ghost" disabled={busy} onClick={() => setEditing(false)}>{t('common.cancel')}</Button>
-        </div>
-      </form> : <div className="flex flex-wrap gap-2">
-        <Button size="tap" type="button" disabled={busy} onClick={() => void act(false)}>{t('counselorMirror.confirm')}</Button>
-        <Button size="tap" type="button" variant="outline" disabled={busy} onClick={() => setEditing(true)}>{t('counselorMirror.edit')}</Button>
-      </div>}
-    </div>}
   </section>;
 }

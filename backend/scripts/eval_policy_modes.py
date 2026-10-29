@@ -51,7 +51,7 @@ def replay(script: dict, mode: str) -> list[dict]:
         state = derive_state(signals, coverage={area: {"covered": area in turn.get("covered", [])} for area in areas},
                              mirror_ready=False, plan=None, student_count=index, prior_decisions=prior,
                              replies=replies, student_ordinals=dict(ordinals), current_event_id=event_id)
-        state.update(mirror_correction=False, mirror_allowed=False, discover_available=False,
+        state.update(mirror_due=False, discover_available=False,
                      possibility_id=None, open_requests=[])
         decision = controller.decide(state)
         asks = decision.question_allowed and decision.action != "care"

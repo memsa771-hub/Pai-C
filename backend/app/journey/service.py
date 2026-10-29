@@ -164,125 +164,62 @@ class JourneyService:
                         {"from": previous, "to": target}, actor)
         return self._view(row)
 
-    def set_counselor_summary(self, workspace_id: str, journey_id: str,
-                              summary: dict, reply: str, source_event_id: str,
-                              *, actor: str = "openagents:pai",
-                              notebook_version: int | None = None,
-                              channel: str | None = None,
-                              certainty_before: int | None = None) -> JourneyView:
-        """Keep the reviewed draft on the student's Counselor Journey."""
-        row = self.db.execute(select(StudentJourney).where(
-            StudentJourney.workspace_id == workspace_id,
-            StudentJourney.id == journey_id,
-            StudentJourney.journey_type == "counselor_decision",
-        ).with_for_update()).scalar_one_or_none()
-        if row is None:
-            raise JourneyError("Counselor journey not found")
-        if row.current_stage != "DIRECTION":
-            raise JourneyError("Summary belongs to direction discovery")
-        current = row.counselor_summary_draft or {}
-        if current.get("source_event_id") == source_event_id:
-            return self._view(row)
-        row.counselor_summary_draft = {
-            "status": "awaiting_confirmation", "summary": summary,
-            "reply": reply, "source_event_id": source_event_id,
-            "version": int(current.get("version") or 0) + 1,
-        }
-        if notebook_version is not None:
-            row.counselor_summary_draft = {
-                **row.counselor_summary_draft, "type": "mirror", "mirror": summary,
-                "notebook_version": notebook_version, "channel": channel,
-                "certainty_before": certainty_before,
-            }
-            self.set_counselor_stage(workspace_id, journey_id, "MIRROR", actor=actor)
-        row.updated_at = datetime.now(timezone.utc)
-        self._event(row, JOURNEY_UPDATED, {"changed": ["counselor_summary_draft"]}, actor)
-        return self._view(row)
-
-    @staticmethod
-    def keeps_old_draft(draft: dict) -> bool:
-        """An old 4-line Mirror (or summary) draft still waiting on the student."""
-        return bool(draft) and draft.get("type") != "mirror_state" and draft.get("status") not in (
-            "confirmed", "needs_changes", "failed")
-
-    def set_mirror_text(self, workspace_id: str, text: str, card_version: str,
-                        *, actor: str = "system") -> JourneyView | None:
-        """Store the Mirror text the background job wrote for one state card
-        (FOUR_FEATURES_SPEC 2.2). An old Mirror or summary draft still waiting
-        on the student is left alone (None) until Task 3 retires those drafts;
-        a confirmed, changed or failed one is replaced."""
-        row = self.db.execute(select(StudentJourney).where(
+    def _counselor_row(self, workspace_id: str):
+        return self.db.execute(select(StudentJourney).where(
             StudentJourney.workspace_id == workspace_id,
             StudentJourney.journey_type == "counselor_decision",
             StudentJourney.status == "active",
         ).limit(1).with_for_update()).scalar_one_or_none()
+
+    @staticmethod
+    def _mirror_draft(row) -> dict:
+        """The Mirror state draft; an old-shape draft (the confirm-gated
+        Mirror, retired by migration 121) reads as none."""
+        draft = row.counselor_summary_draft or {}
+        return draft if draft.get("type") == "mirror_state" else {}
+
+    def set_mirror_text(self, workspace_id: str, text: str, card_version: str,
+                        *, actor: str = "system") -> JourneyView:
+        """Store the Mirror text the background job wrote for one state card
+        (FOUR_FEATURES_SPEC 2.2). Any old-shape draft is replaced; whether the
+        card was posted in chat is kept."""
+        row = self._counselor_row(workspace_id)
         if row is None:
             raise JourneyError("Counselor journey not found")
         current = row.counselor_summary_draft or {}
-        if self.keeps_old_draft(current):
-            logger.info("mirror_text_kept_old_draft journey_id=%s status=%s", row.id, current.get("status"))
-            return None
+        posted = self._mirror_draft(row).get("mirror_posted_version")
         now = datetime.now(timezone.utc)
         row.counselor_summary_draft = {
             "type": "mirror_state", "version": int(current.get("version") or 0) + 1,
             "text": text, "written_at": now.isoformat(), "card_version": card_version,
+            **({"mirror_posted_version": posted} if posted else {}),
         }
         row.updated_at = now
         self._event(row, JOURNEY_UPDATED, {"changed": ["counselor_summary_draft"]}, actor)
         return self._view(row)
 
-    def queue_counselor_research(self, workspace_id: str, journey_id: str,
-                                 confirmation_event_id: str,
-                                 *, actor: str = "openagents:pai",
-                                 expected_version: int | None = None) -> JourneyView:
-        """Queue once after explicit confirmation of the current draft."""
-        row = self.db.execute(select(StudentJourney).where(
-            StudentJourney.workspace_id == workspace_id,
-            StudentJourney.id == journey_id,
-            StudentJourney.journey_type == "counselor_decision",
-        ).with_for_update()).scalar_one_or_none()
+    def note_mirror_posted(self, workspace_id: str, card_version: str,
+                           *, actor: str = "openagents:pai") -> JourneyView | None:
+        """Remember that the ready card was posted in chat, so the guided
+        table's `mirror` rule fires once."""
+        row = self._counselor_row(workspace_id)
         if row is None:
-            raise JourneyError("Counselor journey not found")
-        draft = row.counselor_summary_draft or {}
-        if expected_version is not None and draft.get("version") != expected_version:
-            raise JourneyError("The Counselor summary has changed")
-        if draft.get("status") == "confirmed" and row.research_request:
-            return self._view(row)
-        if row.current_stage != "MIRROR" or draft.get("status") != "awaiting_confirmation":
-            raise JourneyError("There is no Counselor summary awaiting confirmation")
-        row.research_request = {
-            "id": new_id("research"), "status": "queued",
-            "payload": draft.get("mirror") or draft["summary"], "summary_version": draft["version"],
-            "confirmation_event_id": confirmation_event_id,
-            "queued_at": datetime.now(timezone.utc).isoformat(),
-        }
-        row.counselor_summary_draft = {**draft, "status": "confirmed",
-                                       "confirmation_event_id": confirmation_event_id}
+            return None
+        draft = self._mirror_draft(row) or {"type": "mirror_state"}
+        row.counselor_summary_draft = {**draft, "mirror_posted_version": card_version}
         row.updated_at = datetime.now(timezone.utc)
-        self._event(row, "counselor.mirror.confirmed", {
-            "workspace_id": workspace_id, "mirror_version": draft["version"],
-            "confirmed_at": row.updated_at.isoformat(),
-            "certainty_before": draft.get("certainty_before"),
-        }, actor)
-        self._event(row, JOURNEY_UPDATED,
-                    {"changed": ["counselor_summary_draft", "research_request"]}, actor)
-        return self.set_counselor_stage(workspace_id, journey_id, "RESEARCHING", actor=actor)
-
-    def request_counselor_summary_changes(self, workspace_id: str, journey_id: str,
-                                           expected_version: int, *, actor: str) -> JourneyView:
-        row = self.db.execute(select(StudentJourney).where(
-            StudentJourney.workspace_id == workspace_id, StudentJourney.id == journey_id,
-            StudentJourney.journey_type == "counselor_decision", StudentJourney.status == "active",
-        ).with_for_update()).scalar_one_or_none()
-        draft = (row.counselor_summary_draft or {}) if row else {}
-        if (row is None or row.current_stage != "MIRROR"
-                or draft.get("version") != expected_version
-                or draft.get("status") != "awaiting_confirmation"):
-            raise JourneyError("There is no current Mirror awaiting changes")
-        row.counselor_summary_draft = {**draft, "status": "needs_changes"}
-        row.research_request = None
         self._event(row, JOURNEY_UPDATED, {"changed": ["counselor_summary_draft"]}, actor)
-        return self.set_counselor_stage(workspace_id, journey_id, "DIRECTION", actor=actor)
+        return self._view(row)
+
+    def mark_mirror_ready(self, workspace_id: str, *, actor: str = "system:mirror_ready") -> JourneyView | None:
+        """DIRECTION -> MIRROR once the Mirror state card is ready (spec 2.4).
+        Any other stage is left as it is; the caller decides readiness."""
+        row = self._counselor_row(workspace_id)
+        if row is None:
+            return None
+        if row.current_stage != "DIRECTION":
+            return self._view(row)
+        return self.set_counselor_stage(workspace_id, row.id, "MIRROR", actor=actor)
 
     def resolve_primary(self, workspace_id: str) -> JourneyView | None:
         """Deprecated exact-primary alias; fallback is explicit in resolve_active."""

@@ -19,7 +19,7 @@ from app.memory.student_records import ENTITY_MODELS, StudentRecordService
 from app.memory.vault import VaultService
 from app.memory.vault_items import VaultItemService
 from app.models import (
-    BackgroundJob, DocumentArtifact, EventRecord, ExecutionRun, FileRecord, CounselorNotedQuestion, PaiTurnPlan, CounselorMirrorFeedback, PaiPossibility,
+    BackgroundJob, DocumentArtifact, EventRecord, ExecutionRun, FileRecord, CounselorNotedQuestion, PaiTurnPlan, PaiPossibility,
     CounselorTurnDecision, CounselorNotebook, CounselorNotebookHistory, MemoryCandidate, PaiEpisode, PaiMemory, ProfileFieldResponse, ProfileIssue, ProfileRequirement, StudentRecordRevision,
     StudentJourney, StudentJourneyEvent, Institution, InstitutionDomain,
     Opportunity, RequirementSet, RouteDecision, StudentRequest, PaiUsageMonth,
@@ -75,7 +75,7 @@ class StudentSession:
                   DocumentArtifact,
                   VaultFact, VaultItem, VaultDrop, VaultFieldDefinition, MemoryCandidate, PaiMemory, PaiEpisode,
                   ProfileFieldResponse, ProfileIssue, ProfileRequirement,
-                  CounselorTurnDecision, CounselorNotebook, CounselorNotebookHistory, CounselorNotedQuestion, PaiTurnPlan, CounselorMirrorFeedback, PaiPossibility,
+                  CounselorTurnDecision, CounselorNotebook, CounselorNotebookHistory, CounselorNotedQuestion, PaiTurnPlan, PaiPossibility,
                   StudentRecordRevision, BackgroundJob,
                   StudentJourney, StudentJourneyEvent, Institution, InstitutionDomain,
                   Opportunity, RequirementSet,

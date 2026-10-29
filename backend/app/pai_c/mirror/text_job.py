@@ -10,8 +10,10 @@ then the job gives up and the last text stays; the card renders without it.
 
 The reconciler calls `after_accept` (registered in capabilities/system.py,
 because shared memory never imports PAI C) after every accepted Vault write.
-It debounces: one pending job per workspace, and none when the stored text was
-written for the current card.
+It moves the journey from DIRECTION to MIRROR when that write made the card
+ready (FOUR_FEATURES_SPEC 2.4), then queues the text. It debounces: one pending
+job per workspace, and none when the stored text was written for the current
+card.
 """
 
 import json
@@ -53,13 +55,13 @@ def _draft(db, workspace_id: str) -> dict:
         StudentJourney.status == "active").limit(1)) or {}
 
 
-def enqueue_mirror_text(db, workspace_id: str) -> str | None:
+def enqueue_mirror_text(db, workspace_id: str, card: dict | None = None) -> str | None:
     pending = db.scalar(select(BackgroundJob.id).where(
         BackgroundJob.workspace_id == workspace_id, BackgroundJob.job_type == JOB_MIRROR_TEXT,
         BackgroundJob.status == "pending").limit(1))
     if pending:
         return None
-    version = MirrorEngine(db).build(workspace_id)["version"]
+    version = (card or MirrorEngine(db).build(workspace_id))["version"]
     draft = _draft(db, workspace_id)
     if draft.get("type") == "mirror_state" and draft.get("card_version") == version:
         return None
@@ -69,16 +71,28 @@ def enqueue_mirror_text(db, workspace_id: str) -> str | None:
     return job.id
 
 
+def _stage(db, workspace_id: str) -> str | None:
+    return db.scalar(select(StudentJourney.current_stage).where(
+        StudentJourney.workspace_id == workspace_id, StudentJourney.journey_type == "counselor_decision",
+        StudentJourney.status == "active").limit(1))
+
+
 def after_accept(db, candidate) -> None:
     """Reconciler hook. The Vault write has happened and must stand whatever
-    the Mirror does: the enqueue runs in a savepoint and any failure (a
-    database error, a bug or bad policy data in the card) is logged by type
-    and swallowed. The text is only a derived read model."""
+    the Mirror does: the stage move and the enqueue run in a savepoint and any
+    failure (a database error, a bug or bad policy data in the card) is logged
+    by type and swallowed. The stage and the text only follow the Vault. The
+    card is built only when the stage could move or a text job is due."""
     if candidate.key not in mirror_types():
         return
     try:
         with db.begin_nested():
-            enqueue_mirror_text(db, candidate.workspace_id)
+            card = None
+            if _stage(db, candidate.workspace_id) == "DIRECTION":
+                card = MirrorEngine(db).build(candidate.workspace_id)
+                if card["ready"]:
+                    JourneyService(db).mark_mirror_ready(candidate.workspace_id)
+            enqueue_mirror_text(db, candidate.workspace_id, card)
     except Exception as exc:  # noqa: BLE001  the Vault write outranks its read model
         logger.error("mirror_text_enqueue_failed workspace_id=%s error_type=%s",
                      candidate.workspace_id, type(exc).__name__)
@@ -137,9 +151,6 @@ async def mirror_text_job(job, db) -> dict:
     draft = _draft(db, workspace_id)
     if draft.get("type") == "mirror_state" and draft.get("card_version") == card["version"]:
         return {"status": "same_version"}
-    if JourneyService.keeps_old_draft(draft):  # checked again on write; this saves the model call
-        logger.info("mirror_text_skipped_old_mirror workspace_id=%s", workspace_id)
-        return {"status": "old_mirror_waiting"}
     if not any(area["level"] for area in card["areas"]):
         return {"status": "empty"}
     brief = card_brief(card)
@@ -165,9 +176,6 @@ async def mirror_text_job(job, db) -> dict:
     else:
         return {"status": "invalid", "model_calls": attempts}
     JourneyService(db).ensure_counselor(workspace_id)
-    written = JourneyService(db).set_mirror_text(workspace_id, " ".join(sentences), card["version"])
-    if written is None:
-        db.rollback()
-        return {"status": "old_mirror_waiting"}
+    JourneyService(db).set_mirror_text(workspace_id, " ".join(sentences), card["version"])
     db.commit()
     return {"status": "written", "card_version": card["version"]}

@@ -161,6 +161,8 @@ async def _run_deep_turn(db, workspace_id: str, event_data: dict, depth: int):
     reply = fallback_reply if fallback_reply is not None else result.reply
     action = {"type": "wellbeing"} if flagged else result.action
     if decision is not None and not flagged and action.get("type") != "wellbeing":
+        # Only the guided table posts the Mirror card (its `mirror` rule fires
+        # once, when the card is first ready); a model-chosen mirror is dropped.
         if decision.action == "mirror":
             action = {"type": "mirror"}
         elif action.get("type") == "mirror":
@@ -174,9 +176,6 @@ async def _run_deep_turn(db, workspace_id: str, event_data: dict, depth: int):
     reply_metadata = _voice_reply_metadata(event_data)
     if decision is not None and decision.action == "discover":
         reply_metadata = {**(reply_metadata or {}), "possibility_id": decision.topic}
-    if (reply_metadata and action.get("type") == "mirror"
-            and context.notebook.mirror_ready):
-        reply_metadata["mirror_pending"] = True
     from app.pai_c.fact_cards import validated_card, presentation_card
     card = validated_card(action, context.fact_cards, turn.student_text) if context and decision and decision.question_allowed and not flagged else None
     from app.pai_c.deep.actions import shown_place

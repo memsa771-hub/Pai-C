@@ -445,40 +445,24 @@ async def _policy_turn(db, student, turn, session_id):
 
 
 async def complete_mirror_pipeline(student):
-    """Exercise existing durable jobs, confirmation, gateway and Operator.
-
-    Confirmation belongs only to the synthetic evaluation student. No existing
-    database is opened, and external write actions remain disabled by EvalWorkspaceApi.
-    """
+    """The Mirror follows the Vault, so there is nothing to confirm: report the
+    state card the student now sees, the journey stage and the paths saved so
+    far (FOUR_FEATURES_SPEC 2.3). Only the synthetic evaluation student is read."""
     from sqlalchemy import select
-    from app.pai_c.deep.mirror import mirror_job, enqueue_confirmed_research, confirmed_research_job, JOB_MIRROR
     from app.journey import JourneyService
     from app.models import PaiPossibility
+    from app.pai_c.mirror import MirrorEngine
     with student.factory() as db:
-        job=db.scalar(select(BackgroundJob).where(BackgroundJob.workspace_id==student.workspace_id,
-            BackgroundJob.job_type==JOB_MIRROR,BackgroundJob.status=='pending'))
-        if job is None: return {'status':'mirror_not_queued'}
-        with phase('mirror'), patch('app.pai_c.deep.mirror.send_to_student',student.post_response):
-            outcome=await mirror_job(job,db)
-        job.status='succeeded'; db.commit()
-        journey=JourneyService(db).ensure_counselor(student.workspace_id)
-        draft=journey.counselor_summary_draft or {}
-        result={'status':outcome['status'],'mirror':draft.get('mirror'),'transcript':[]}
-        if draft.get('status')!='awaiting_confirmation': return result
-        result['transcript'].append({'role':'mirror','content':draft.get('mirror')})
-        journey=JourneyService(db).queue_counselor_research(student.workspace_id,journey.id,str(uuid.uuid4()),
-            actor='human:evaluation_confirmation',expected_version=draft['version'])
-        research_id=enqueue_confirmed_research(db,student.workspace_id,journey);db.commit()
-        # A confirmed Mirror creates paths; routes come from the roadmap engine
-        # on the Roadmap page, not from this pipeline.
-        with phase('paths_from_mirror'):
-            await confirmed_research_job(db.get(BackgroundJob,research_id),db)
-        db.expire_all()
-        rows=db.scalars(select(PaiPossibility).where(PaiPossibility.workspace_id==student.workspace_id)).all()
-        result['paths']=[{'kind':row.kind,'title':row.title,'status':row.status,'why':row.why} for row in rows]
-        result['status']='paths_ready' if rows else 'no_paths'
-        result['transcript'].append({'role':'paths','content':result['paths']})
-        return result
+        card = MirrorEngine(db).build(student.workspace_id)
+        journey = JourneyService(db).ensure_counselor(student.workspace_id)
+        db.commit()
+        rows = db.scalars(select(PaiPossibility).where(PaiPossibility.workspace_id == student.workspace_id)).all()
+        mirror = {key: card[key] for key in ("header", "unknowns", "text", "ready", "version")}
+        paths = [{"kind": row.kind, "title": row.title, "status": row.status, "why": row.why} for row in rows]
+        status = "paths_ready" if paths else "mirror_ready" if card["ready"] else "mirror_not_ready"
+        transcript = [{"role": "mirror", "content": mirror}, *([{"role": "paths", "content": paths}] if paths else [])]
+        return {"status": status, "stage": journey.current_stage, "mirror": mirror, "paths": paths,
+                "transcript": transcript}
 
 
 def write_report(report: dict, directory: Path) -> tuple[Path, Path]:

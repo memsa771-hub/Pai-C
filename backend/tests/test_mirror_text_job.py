@@ -116,30 +116,6 @@ async def test_text_job_retries_once_then_drops_invalid_text():
             db.commit()
 
 
-@pytest.mark.asyncio
-async def test_text_job_leaves_old_mirror_awaiting_confirmation():
-    with StudentSession() as student, student.factory() as db:
-        ws = student.workspace_id
-        _seed(db, ws)
-        row = db.scalar(select(StudentJourney).where(StudentJourney.workspace_id == ws))
-        old = {"type": "mirror", "status": "awaiting_confirmation", "version": 3, "mirror": {}}
-        row.counselor_summary_draft = old
-        db.commit()
-        job = _job(db, ws)
-        model = AsyncMock(side_effect=AssertionError("no model call while an old Mirror waits"))
-        with patch(MODEL, model):
-            assert (await mirror_text_job(job, db))["status"] == "old_mirror_waiting"
-        assert _draft(db, ws) == old
-        assert JourneyService(db).set_mirror_text(ws, " ".join(GOOD), "v1") is None
-        row = db.scalar(select(StudentJourney).where(StudentJourney.workspace_id == ws))
-        row.counselor_summary_draft = {**old, "status": "confirmed"}
-        db.commit()
-        with patch(MODEL, AsyncMock(return_value=_reply(GOOD))):
-            assert (await mirror_text_job(job, db))["status"] == "written"
-        draft = _draft(db, ws)
-    assert draft["type"] == "mirror_state" and draft["version"] == 4
-
-
 def test_reconciler_enqueues_mirror_text_after_a_mirror_relevant_write():
     def accept(db, ws, kind, key, value):
         candidate = MemoryCandidateService(db).propose(workspace_id=ws, candidate_type=kind, key=key,

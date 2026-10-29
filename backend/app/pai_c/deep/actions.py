@@ -34,6 +34,36 @@ def _record(db, turn: CounselorTurnInput, name: str, status: str, **details) -> 
     db.commit()
 
 
+async def _post_mirror_card(db, turn: CounselorTurnInput) -> tuple[str, str | None]:
+    """The ready Mirror goes into chat once, as a `counselor_mirror` card
+    (header, unknowns, text, version) after the voice's one short line. It
+    asks nothing; the student opens the Mirror page from it (spec 2.5)."""
+    from app.journey import JourneyService
+    from app.pai_c.mirror import MirrorEngine
+    from app.pai_c.mirror.engine import mirror_policy
+    from app.pai_c.posting import send_to_student
+    from app.services.pai import PAI_AGENT_NAME
+
+    journey = JourneyService(db).ensure_counselor(turn.workspace_id)
+    draft = journey.counselor_summary_draft or {}
+    if draft.get("type") == "mirror_state" and draft.get("mirror_posted_version"):
+        return "ignored", "already_posted"
+    card = MirrorEngine(db).build(turn.workspace_id)
+    if not card["ready"]:
+        return "ignored", "not_ready"
+    text = card["text"]
+    content = " ".join(text["sentences"]) if text else mirror_policy()["copy"]["chat_card"]
+    posted = await send_to_student(
+        db, turn.workspace_id, turn.channel, PAI_AGENT_NAME, content, 0, message_type="counselor_mirror",
+        extra_payload={key: card[key] for key in ("header", "unknowns", "text", "version")},
+        metadata={"mirror_card_version": card["version"]})
+    if not posted:
+        return "failed", "not_posted"
+    JourneyService(db).note_mirror_posted(turn.workspace_id, card["version"])
+    db.commit()
+    return "posted", None
+
+
 async def dispatch_action(db, turn: CounselorTurnInput, action: dict,
                           context: DeepContext, *, reply_event_id: str | None = None) -> tuple[str, str]:
     kind = action.get("type") if isinstance(action, dict) else None
@@ -54,15 +84,10 @@ async def dispatch_action(db, turn: CounselorTurnInput, action: dict,
         _record(db, turn, kind, status)
         return kind, status
     if kind == "mirror":
-        ready = bool(context.notebook.mirror_ready)
-        logger.info("counselor: mirror requested ready=%s", ready)
-        if ready:
-            from app.pai_c.deep.mirror import enqueue_mirror
-
-            enqueue_mirror(db, turn)
-        _record(db, turn, kind, "requested" if ready else "ignored",
-                reason=None if ready else "not_ready")
-        return kind, "requested" if ready else "ignored"
+        status, reason = await _post_mirror_card(db, turn)
+        logger.info("counselor: mirror card status=%s", status)
+        _record(db, turn, kind, status, reason=reason)
+        return kind, status
     if kind == "note_question":
         from app.pai_c.deep.noted_questions import NotedQuestionService, request_policy
 

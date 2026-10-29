@@ -4,7 +4,7 @@ from sqlalchemy import select
 from app.database import get_db
 from app.api.response import success_response
 from app.routers._workspace_auth import _authorized
-from app.models import CounselorMirrorFeedback, StudentJourney, CounselorTurnDecision
+from app.models import StudentJourney, CounselorTurnDecision
 from app.pai_c.memory import MemoryService
 from pydantic import BaseModel, ConfigDict, Field
 from uuid import UUID
@@ -48,10 +48,7 @@ def counselor_workspace(network: str=Query(...),db=Depends(get_db),
     memory=MemoryService(db)
     journey=db.scalar(select(StudentJourney).where(StudentJourney.workspace_id==wid,
         StudentJourney.journey_type=='counselor_decision',StudentJourney.status=='active'))
-    draft=(journey.counselor_summary_draft or {}) if journey else {}
     personal=memory.personal_view(wid)
-    feedback=db.scalars(select(CounselorMirrorFeedback).where(CounselorMirrorFeedback.workspace_id==wid)
-        .order_by(CounselorMirrorFeedback.created_at)).all()
     turns=db.scalars(select(CounselorTurnDecision).where(CounselorTurnDecision.workspace_id==wid)
         .order_by(CounselorTurnDecision.source_timestamp)).all()
     moments={}
@@ -67,13 +64,14 @@ def counselor_workspace(network: str=Query(...),db=Depends(get_db),
         'capabilities':memory.capability_view(wid),'academic':memory.academic_view(wid),
         # The Mirror state card's header, unknowns and text (FOUR_FEATURES_SPEC 2.3).
         'picture':{key:card[key] for key in ('header','unknowns','text','ready','version')},
-        'mirror_status':draft.get('status'),'moments':moments,
+        'moments':moments,
         # The server-owned Counselor stage. Moments are the Counselor's planned
         # next moves, not things the student has seen, so the A-K view uses
         # this to keep its progress honest.
         'stage':journey.current_stage if journey else None,
-        'ratings':[{'version':r.mirror_version,'understood':r.understood,'before':r.certainty_before,
-                    'after':r.certainty_after} for r in feedback]})
+        # The "understood" rating is gone with the confirm gate; the list stays
+        # empty until the frontend Mirror page (Task 6) drops its reader.
+        'ratings':[]})
 
 
 @router.get('/export')

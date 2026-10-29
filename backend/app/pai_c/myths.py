@@ -222,11 +222,11 @@ async def _check_job(job, db):
         granted_capabilities=MemoryService(db).agent_capabilities(PAI_AGENT_NAME))
     db.rollback()
     pages = []
-    # A separate bounded window avoids consuming a future Mirror's allowance or
+    # A separate bounded window avoids consuming path research's allowance or
     # locking the student out of belief checks for the lifetime of the workspace.
     period = int(datetime.now(timezone.utc).timestamp() // (rules['budget_period_days'] * 86400))
     with bounded_research(queries=1, fetches=rules["fetch_limit"], seconds=config.PAI_RESEARCH_MAX_SECONDS,
-            workspace_id=job.workspace_id, mirror_version=f"belief_checks:{period}") as budget:
+            workspace_id=job.workspace_id, budget_key=f"belief_checks:{period}") as budget:
         found = data(await get_tool_executor().execute("web.search", {"query": rules["query"].format(claim=claim), "limit": rules["search_limit"]}, ctx))
         for hit in (found.get("results") or [])[:rules["fetch_limit"]]:
             if not public_https(hit.get("url")):

@@ -13,7 +13,7 @@ from app.pai_c.deep.context import build_context
 from app.pai_c.deep.prompts import load_prompt
 from app.workspace_language import workspace_language, workspace_language_block
 from scripts.counselor_eval_support import StudentSession
-from tests.test_counselor_mirror import prepare
+from tests.counselor_fixtures import prepare
 
 
 def test_language_comes_from_data():
@@ -25,7 +25,7 @@ def test_language_comes_from_data():
 
 def test_prompts_that_write_for_the_workspace_name_the_workspace_language():
     assert "<workspace_language>" in SYSTEM_PROMPT
-    for name in ("planner", "mirror", "path_analyzer"):
+    for name in ("planner", "path_analyzer"):
         assert "<workspace_language>" in load_prompt(name), name
     # The analyzer's chat message still follows the student.
     assert "in the language and script the student writes in" in load_prompt("path_analyzer")
@@ -42,10 +42,10 @@ async def test_extractor_receives_the_workspace_language():
 
 
 @pytest.mark.asyncio
-async def test_only_the_mirror_context_carries_the_workspace_language():
+async def test_the_voice_context_does_not_carry_the_workspace_language():
+    # The old Mirror job was the only context with it; the Mirror text job
+    # reads the state card, which is in English already.
     with StudentSession() as student, student.factory() as db:
         turn, _, _ = prepare(student, db)
-        mirror = await build_context(db, student.workspace_id, turn, mirror=True)
         voice = await build_context(db, student.workspace_id, turn)
-    assert "<workspace_language>" in mirror.text
     assert "<workspace_language>" not in voice.text

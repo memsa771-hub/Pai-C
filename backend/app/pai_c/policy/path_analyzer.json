@@ -15,8 +15,7 @@
   "statuses": ["have", "partial", "blocker", "unknown"],
   "evidenced_statuses": ["have", "partial", "blocker"],
   "triggers": {
-    "request_kinds": ["decision_help"],
-    "after_mirror_confirmed": true
+    "request_kinds": ["decision_help"]
   },
   "message_type": "counselor_paths",
   "_needs_education_note": "When a chat-requested analysis cannot place the student, PAI posts one short message saying what it needs. needs_education_by_level picks the message from the level the education record names; a level not listed (or none) asks for the education itself. Only runs the student asked for in chat (needs_education_post_reasons) post it; the Paths page says it on its own.",

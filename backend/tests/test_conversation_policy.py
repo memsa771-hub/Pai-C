@@ -12,7 +12,7 @@ from app.pai_c.policy.state import derive_state, decision_log
 def state(**changes):
     base = {**classifier.fallback_signals().model_dump(), "coverage": {
         area: {"covered": True} for area in controller.load_data("areas_policy.json")["priority"]},
-        "student_count": 10, "mirror_allowed": False, "summary_due": False,
+        "student_count": 10, "mirror_due": False, "summary_due": False,
         "invite_pending": False, "insight_available": False,
         "questions_in_last_two": False, "short_reply_streak": 0, "previous": {}, "question_needed": True}
     return {**base, **changes}

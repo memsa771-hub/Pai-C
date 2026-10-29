@@ -14,19 +14,22 @@ NEEDS_INFO = "NEEDS_INFO"
 PROPOSED = "PROPOSED"
 CHOSEN = "CHOSEN"
 
-# The roadmap engine computes routes on read, so a confirmed Mirror goes
-# straight from RESEARCHING to PROPOSED. ASSESSING and NEEDS_INFO were the old
-# roadmap research wait; journeys left there may still move on to PROPOSED.
-# Withdrawing a chosen route goes back to PROPOSED.
+# The journey follows the Vault (FOUR_FEATURES_SPEC 2.4): DIRECTION -> MIRROR
+# when the Mirror state card is ready (the reconciler, after the write that made
+# it ready), MIRROR -> PROPOSED when the Path engine saves the first paths.
+# RESEARCHING, ASSESSING and NEEDS_INFO were the confirm-gated research wait; no
+# code enters them any more (migration 121 moved the journeys left there), but
+# the names stay for old data and a journey still there may move on to PROPOSED.
+# Withdrawing a chosen route goes back to PROPOSED; a rethink goes to DIRECTION.
 TRANSITIONS = {
     IDENTITY: frozenset({FOUNDATION}),
     FOUNDATION: frozenset({DIRECTION}),
     DIRECTION: frozenset({MIRROR}),
-    MIRROR: frozenset({DIRECTION, RESEARCHING}),
-    RESEARCHING: frozenset({ASSESSING, PROPOSED}),
-    ASSESSING: frozenset({NEEDS_INFO, PROPOSED}),
-    NEEDS_INFO: frozenset({ASSESSING, PROPOSED}),
-    PROPOSED: frozenset({DIRECTION, RESEARCHING, CHOSEN}),
+    MIRROR: frozenset({PROPOSED}),
+    RESEARCHING: frozenset({PROPOSED}),
+    ASSESSING: frozenset({PROPOSED}),
+    NEEDS_INFO: frozenset({PROPOSED}),
+    PROPOSED: frozenset({DIRECTION, CHOSEN}),
     CHOSEN: frozenset({DIRECTION, PROPOSED}),
 }
 

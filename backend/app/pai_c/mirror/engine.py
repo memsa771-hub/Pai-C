@@ -98,6 +98,17 @@ def _different_field(first, second) -> bool:
 RULES = {"different_field": _different_field}
 
 
+def ready_from(coverage: dict) -> bool:
+    """The coverage_requirements.json mode's notebook keys, read as the
+    coverage areas mirror.json maps them to; all must be known. Policy state
+    and chat context read this from the coverage they already hold."""
+    from app.pai_c.deep.coverage import requirements
+    ready = mirror_policy()["ready"]
+    areas = [area for key in requirements()[ready["mode"]] for area in ready["areas"][key]]
+    return all(coverage.get(area, {}).get("covered") and not coverage.get(area, {}).get("stale")
+               for area in areas)
+
+
 # ---- the card -----------------------------------------------------------------------
 
 class MirrorEngine:
@@ -133,7 +144,7 @@ class MirrorEngine:
         self._tensions(areas, shown)
 
         card = {"header": {"name": self._name(rows), "education_line": line},
-                "areas": areas, "unknowns": completeness["unknowns"], "ready": self._ready(coverage)}
+                "areas": areas, "unknowns": completeness["unknowns"], "ready": ready_from(coverage)}
         card["version"] = card_version(card)
         card["text"] = self._text(workspace_id)
         return card
@@ -231,15 +242,9 @@ class MirrorEngine:
                 return facts[key]["display"]
         return None
 
-    @staticmethod
-    def _ready(coverage: dict) -> bool:
-        """The coverage_requirements.json mode's notebook keys, read as the
-        coverage areas mirror.json maps them to; all must be known."""
-        from app.pai_c.deep.coverage import requirements
-        ready = mirror_policy()["ready"]
-        areas = [area for key in requirements()[ready["mode"]] for area in ready["areas"][key]]
-        return all(coverage.get(area, {}).get("covered") and not coverage.get(area, {}).get("stale")
-                   for area in areas)
+    def ready(self, workspace_id: str) -> bool:
+        """The card's `ready` without building the card: one coverage read."""
+        return ready_from(MemoryService(self.db).coverage_areas(workspace_id))
 
     def _text(self, workspace_id: str) -> dict | None:
         from sqlalchemy import select

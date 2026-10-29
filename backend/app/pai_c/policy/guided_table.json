@@ -120,25 +120,9 @@
       }
     },
     {
-      "id": "mirror_changes",
-      "when": {
-        "ref": "mirror_correction"
-      },
-      "set": {
-        "action": "explore_correction",
-        "question_allowed": true,
-        "topic": {
-          "first": {
-            "ref": "mentioned_areas"
-          }
-        },
-        "invite": false
-      }
-    },
-    {
       "id": "mirror",
       "when": {
-        "ref": "mirror_allowed"
+        "ref": "mirror_due"
       },
       "set": {
         "action": "mirror",
@@ -275,14 +259,6 @@
                 "ref": "chosen.action"
               },
               "first_picture"
-            ]
-          },
-          {
-            "ne": [
-              {
-                "ref": "chosen.action"
-              },
-              "explore_correction"
             ]
           },
           {

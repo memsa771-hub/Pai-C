@@ -1,16 +1,13 @@
 // @vitest-environment jsdom
 
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, render, screen } from '@testing-library/react';
 import { CounselorMirrorCard } from './counselor-mirror-card';
 import { I18nProvider } from '../../lib/i18n';
 import { workspaceApi } from '../../lib/api';
 import type { CounselorMirrorDraft } from '../../lib/counselor-mirror';
 
-vi.mock('../../lib/api', () => ({ workspaceApi: {
-  getCounselorSummary: vi.fn(), confirmCounselorMirror: vi.fn(), editCounselorMirror: vi.fn(),
-  submitCounselorMirrorFeedback: vi.fn(),
-} }));
+vi.mock('../../lib/api', () => ({ workspaceApi: { getCounselorSummary: vi.fn() } }));
 
 const draft: CounselorMirrorDraft = {
   type: 'mirror', status: 'awaiting_confirmation', version: 3,
@@ -24,48 +21,21 @@ const draft: CounselorMirrorDraft = {
 
 beforeEach(() => {
   vi.mocked(workspaceApi.getCounselorSummary).mockResolvedValue(structuredClone(draft));
-  vi.mocked(workspaceApi.confirmCounselorMirror).mockResolvedValue(undefined);
-  vi.mocked(workspaceApi.editCounselorMirror).mockResolvedValue(undefined);
 });
 afterEach(() => { cleanup(); vi.resetAllMocks(); });
 
 const show = () => render(<I18nProvider><CounselorMirrorCard refreshKey="one" /></I18nProvider>);
 
-it('renders translated controls and expandable picture/evidence without internal lane data', async () => {
+it('renders an old picture read-only, with expandable evidence and no internal lane data', async () => {
   show();
   expect(await screen.findByRole('region', { name: 'Your 360-degree picture' })).toBeTruthy();
   expect(screen.getByText('You described a completed project.', { exact: false })).toBeTruthy();
   const summary = screen.getByText('Your learning');
   expect(summary.closest('details')).toBeTruthy();
-  expect(screen.getByRole('button', { name: 'Yes, that is right' })).toBeTruthy();
+  // No confirm, edit or rating: those routes are gone (FOUR_FEATURES_SPEC 2.3).
+  expect(screen.queryByRole('button')).toBeNull();
   expect(screen.queryByText('roadmap_lanes')).toBeNull();
   expect(document.body.textContent).not.toContain('counselorMirror.');
-});
-
-it('confirms the current version once and replaces buttons with translated status', async () => {
-  show();
-  fireEvent.click(await screen.findByRole('button', { name: 'Yes, that is right' }));
-  await waitFor(() => expect(workspaceApi.confirmCounselorMirror).toHaveBeenCalledExactlyOnceWith(3));
-  expect(await screen.findByRole('status')).toBeTruthy();
-  expect(screen.queryByRole('button', { name: 'Yes, that is right' })).toBeNull();
-});
-
-it('opens Edit and posts the correction through the versioned API', async () => {
-  show();
-  fireEvent.click(await screen.findByRole('button', { name: 'Edit' }));
-  fireEvent.change(screen.getByRole('textbox', { name: 'What should PAI change?' }),
-    { target: { value: '  My available time is different.  ' } });
-  fireEvent.click(screen.getByRole('button', { name: 'Send corrections to PAI' }));
-  await waitFor(() => expect(workspaceApi.editCounselorMirror).toHaveBeenCalledExactlyOnceWith(3, 'My available time is different.'));
-  expect(workspaceApi.confirmCounselorMirror).not.toHaveBeenCalled();
-});
-
-it('keeps the review actionable after an API error and shows a translated error', async () => {
-  vi.mocked(workspaceApi.confirmCounselorMirror).mockRejectedValue(new Error('internal details'));
-  show();
-  fireEvent.click(await screen.findByRole('button', { name: 'Yes, that is right' }));
-  expect((await screen.findByRole('alert')).textContent).toBe('We could not complete that action. Please try again.');
-  expect(document.body.textContent).not.toContain('internal details');
 });
 
 it('renders v2 picture before collapsed details, while old drafts have no placeholder picture', async () => {
@@ -89,43 +59,4 @@ it('renders v2 picture before collapsed details, while old drafts have no placeh
   await screen.findByText('Your learning');
   expect(screen.queryByText('You say')).toBeNull();
   expect(screen.queryByText('Details')).toBeNull();
-});
-
-it('offers feedback only after confirmation and sends the exact confirmed version', async () => {
-  show();
-  await screen.findByText('Your learning');
-  expect(screen.queryByRole('radiogroup')).toBeNull();
-  fireEvent.click(screen.getByRole('button', {name: 'Yes, that is right'}));
-  expect(await screen.findByRole('radiogroup', {name: 'Did PAI understand you?'})).toBeTruthy();
-  fireEvent.click(screen.getByRole('radio', {name: '4: Mostly'}));
-  fireEvent.change(screen.getByRole('slider', {name: /How sure do you feel/}),
-    {target: {value: '0'}});
-  fireEvent.click(screen.getByRole('button', {name: 'Send'}));
-  await waitFor(() => expect(workspaceApi.submitCounselorMirrorFeedback).toHaveBeenCalledExactlyOnceWith(3, 4, 0));
-  await waitFor(() => expect(screen.queryByRole('radiogroup')).toBeNull());
-});
-
-it('Skip records no feedback and historical confirmed cards do not show the feedback step', async () => {
-  show();
-  fireEvent.click(await screen.findByRole('button', {name: 'Yes, that is right'}));
-  fireEvent.click(await screen.findByRole('button', {name: 'Skip'}));
-  expect(workspaceApi.submitCounselorMirrorFeedback).not.toHaveBeenCalled();
-  expect(screen.queryByRole('radiogroup')).toBeNull();
-  cleanup();
-  vi.mocked(workspaceApi.getCounselorSummary).mockResolvedValue({...draft, status: 'confirmed'});
-  show();
-  await screen.findByRole('status');
-  expect(screen.queryByRole('radiogroup')).toBeNull();
-});
-
-it('allows omission of optional certainty and keeps feedback retryable after failure', async () => {
-  vi.mocked(workspaceApi.submitCounselorMirrorFeedback).mockRejectedValueOnce(new Error('internal'));
-  show();
-  fireEvent.click(await screen.findByRole('button', {name: 'Yes, that is right'}));
-  fireEvent.click(await screen.findByRole('radio', {name: '5: Completely'}));
-  fireEvent.click(screen.getByRole('button', {name: 'Send'}));
-  await screen.findByRole('alert');
-  expect(workspaceApi.submitCounselorMirrorFeedback).toHaveBeenCalledWith(3, 5, undefined);
-  fireEvent.click(screen.getByRole('button', {name: 'Send'}));
-  await waitFor(() => expect(screen.queryByRole('radiogroup')).toBeNull());
 });

@@ -13,7 +13,7 @@ from app.pai_c.paths.analyzer import (PathAnalysis, _card_text, enqueue_path_ana
 from app.pai_c.paths.fields import candidate_fields, student_groups, study_fields
 from app.pai_c.possibilities import PossibilityService
 from scripts.counselor_eval_support import StudentSession
-from tests.test_counselor_mirror import fake_post
+from tests.counselor_fixtures import fake_post
 from tests.test_path_analyzer import EVIDENCE, seed
 
 FSC_MEDICAL = {"qualification_name": "fsc", "field_of_study": "pre_medical", "academic_status": "current"}
@@ -204,7 +204,7 @@ async def test_no_paths_without_education():
 @pytest.mark.asyncio
 async def test_zero_paths_allowed():
     from app.main import app
-    from tests.test_counselor_mirror import client_for
+    from tests.counselor_fixtures import client_for
     from tests.test_path_analyzer import HEADERS
     with StudentSession() as student, student.factory() as db:
         result, call, _, _ = await run(student, db, {"message": "Not enough yet.", "paths": [
@@ -451,7 +451,7 @@ async def test_planner_proposal_enqueues_analysis_and_creates_no_row():
 def test_analysis_status_endpoint_reports_the_last_outcome():
     from app.main import app
     from app.pai_c.paths.analyzer import JOB_ANALYZE_PATHS
-    from tests.test_counselor_mirror import client_for
+    from tests.counselor_fixtures import client_for
     from tests.test_path_analyzer import HEADERS
     with StudentSession() as student, student.factory() as db:
         client = client_for(student)

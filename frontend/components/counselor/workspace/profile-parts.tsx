@@ -8,9 +8,7 @@ import { workspaceApi } from "@/lib/api";
 import type { LivingPicture } from "@/lib/counselor-workspace";
 import type { CounselorMirrorDraft } from "@/lib/counselor-mirror";
 import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
 import { EmptyState, SectionCard, StatChip, type Quadrant, type Tone } from "@/components/pai";
-import { cn } from "@/lib/utils";
 import copy from "./copy.json";
 import layout from "./profile-layout.json";
 
@@ -81,12 +79,12 @@ const loadSummary = async (): Promise<CounselorMirrorDraft | null> => {
   try { return await workspaceApi.getCounselorSummary(); } catch { return null; }
 };
 
-/** The Mirror at the top of the profile. A draft can be agreed or changed;
- * an agreed Mirror asks once how understood the student felt. */
+/** The Mirror at the top of the profile, read-only: the confirm, edit and
+ * rating routes are gone (FOUR_FEATURES_SPEC 2.3); corrections go through the
+ * Vault, and the Mirror page replaces this panel. */
 export function MirrorPanel({ picture, onChat, onChanged }: { picture: LivingPicture; onChat: (topic?: string) => void; onChanged: () => void }) {
   const [draft, setDraft] = useState<CounselorMirrorDraft | null>(null);
-  const [editing, setEditing] = useState(false), [note, setNote] = useState("");
-  const [busy, setBusy] = useState(false), [error, setError] = useState(false);
+  void onChanged;
   useEffect(() => { let alive = true; void loadSummary().then((d) => { if (alive) setDraft(d); }); return () => { alive = false; }; }, []);
   const core = draft?.mirror?.core_picture;
   // Only an old 4-line picture fills this panel; the new state card (a header, not lines) is the Mirror page's.
@@ -95,18 +93,6 @@ export function MirrorPanel({ picture, onChat, onChanged }: { picture: LivingPic
   const lines: Record<string, string> | null = core
     ? Object.fromEntries(QUADRANTS.map(({ key }) => [key, core[key]?.text || ""]))
     : oldPicture ? Object.fromEntries(QUADRANTS.map(({ key }) => [key, oldPicture[key]?.text || ""])) : null;
-  const version = draft?.version ?? picture.ratings.at(-1)?.version ?? null;
-  const rated = picture.ratings.find((r) => r.version === version);
-  async function act(edit: boolean) {
-    if (version === null) return;
-    setBusy(true); setError(false);
-    try {
-      if (edit) await workspaceApi.editCounselorMirror(version, note.trim());
-      else await workspaceApi.confirmCounselorMirror(version);
-      setDraft((d) => d ? { ...d, status: edit ? "needs_changes" : "confirmed" } : d);
-      setEditing(false); setNote(""); onChanged();
-    } catch { setError(true); } finally { setBusy(false); }
-  }
   if (!lines) {
     return (
       <SectionCard id="mirror" className="scroll-mt-6" title={text.mirrorTitle}>
@@ -139,96 +125,7 @@ export function MirrorPanel({ picture, onChat, onChanged }: { picture: LivingPic
           </div>
         ))}
       </dl>
-      {error && <p role="alert" className="mt-3 text-sm font-medium text-danger-ink">{copy.error}</p>}
-      {status === "awaiting_confirmation" && (editing ? (
-        <form className="mt-4 space-y-3" onSubmit={(e) => { e.preventDefault(); void act(true); }}>
-          <label className="block text-sm font-semibold">{text.mirrorEditHint}
-            <Textarea className="mt-2 min-h-24 rounded-xl" value={note} maxLength={8000} disabled={busy} onChange={(e) => setNote(e.target.value)} />
-          </label>
-          <div className="flex flex-wrap gap-2">
-            <Button size="tap" type="submit" disabled={busy || !note.trim()}>{text.mirrorSend}</Button>
-            <Button size="tap" type="button" variant="ghost" onClick={() => setEditing(false)}>{copy.cancel}</Button>
-          </div>
-        </form>
-      ) : (
-        <div className="mt-4 flex flex-wrap gap-2">
-          <Button size="tap" disabled={busy} onClick={() => void act(false)}>{text.mirrorAgree}</Button>
-          <Button size="tap" variant="outline" disabled={busy} onClick={() => setEditing(true)}>{text.mirrorEdit}</Button>
-        </div>
-      ))}
-      {status === "confirmed" && (rated
-        ? <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
-            <FeltValue value={rated.understood} />
-            <Button size="tap" variant="ghost" onClick={() => onChat(text.mirrorTalk)}><MessageCircle aria-hidden />{text.mirrorTalk}</Button>
-          </div>
-        : version !== null && <FeltUnderstood version={version} onSaved={onChanged} />)}
     </SectionCard>
   );
 }
 
-function FeltValue({ value }: { value: number }) {
-  return (
-    <p className="flex items-center gap-2 text-sm font-medium">
-      <span aria-hidden className="flex gap-1">{[1, 2, 3, 4, 5].map((n) => (
-        <span key={n} className={cn("h-2 w-5 rounded-full", n <= value ? "bg-success" : "bg-muted")} />
-      ))}</span>
-      {fill(text.feltUnderstoodValue, { value })}
-    </p>
-  );
-}
-
-type FeltLabels = { legend: string; certainty: string; send: string; saved: string; skip?: string };
-/** One rating per Mirror version: 1-5 understood, optional 0-10 certainty.
- * Shared by the profile and the Mirror card in the conversation. */
-export function FeltUnderstood({ version, onSaved, onSkip, labels }: {
-  version: number; onSaved: () => void; onSkip?: () => void; labels?: Partial<FeltLabels>;
-}) {
-  const l: FeltLabels = { legend: text.feltUnderstood, certainty: text.certaintyAfter, send: text.sendRating, saved: text.ratingSaved, ...labels };
-  const [understood, setUnderstood] = useState<number | null>(null);
-  const [certainty, setCertainty] = useState<number | null>(null);
-  const [busy, setBusy] = useState(false), [error, setError] = useState(false), [saved, setSaved] = useState(false);
-  const name = useId();
-  if (saved) return <p role="status" className="mt-4 text-sm font-medium text-success-ink">{l.saved}</p>;
-  async function send() {
-    if (understood === null) return;
-    setBusy(true); setError(false);
-    try { await workspaceApi.submitCounselorMirrorFeedback(version, understood, certainty ?? undefined); setSaved(true); onSaved(); }
-    catch { setError(true); } finally { setBusy(false); }
-  }
-  return (
-    <form className="mt-5 rounded-2xl bg-muted/60 p-4" onSubmit={(e) => { e.preventDefault(); void send(); }}>
-      <fieldset disabled={busy}>
-        <legend className="text-sm font-semibold">{l.legend}</legend>
-        <div role="radiogroup" aria-label={l.legend} className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-5">
-          {text.feltScale.map((label, i) => (
-            <label key={label} className={cn("flex min-h-11 cursor-pointer items-center gap-3 rounded-xl border-2 bg-card px-3 text-sm font-medium transition-colors has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-ring sm:min-h-14 sm:flex-col sm:justify-center sm:gap-0.5 sm:px-1 sm:text-center sm:text-xs",
-              understood === i + 1 ? "border-foreground bg-secondary text-foreground ring-1 ring-foreground" : "border-transparent hover:border-border")}>
-              <input type="radio" name={name} value={i + 1} checked={understood === i + 1} onChange={() => setUnderstood(i + 1)}
-                aria-label={`${i + 1}: ${label}`} className="sr-only" />
-              <span aria-hidden className="text-base font-bold">{i + 1}</span><span aria-hidden className="leading-tight">{label}</span>
-            </label>
-          ))}
-        </div>
-      </fieldset>
-      <label className="mt-4 block text-sm font-medium">
-        {l.certainty}
-        <span className="mt-2 flex items-center gap-3">
-          {/* Unset until touched; pressing the thumb (or a key) records the
-              value under it, so 5 is choosable without moving away and back. */}
-          <input type="range" min={0} max={10} step={1} value={certainty ?? 5} disabled={busy}
-            onChange={(e) => setCertainty(Number(e.target.value))}
-            onPointerDown={(e) => { if (certainty === null) setCertainty(Number(e.currentTarget.value)); }}
-            onKeyDown={(e) => { if (certainty === null && [" ", "Enter"].includes(e.key)) setCertainty(Number(e.currentTarget.value)); }}
-            className={cn("h-11 flex-1 accent-[var(--brand)]", certainty === null && "opacity-50")}
-            aria-valuetext={certainty === null ? copy.notSet : `${certainty} / 10`} />
-          <span aria-hidden className="w-12 text-right font-bold tabular-nums">{certainty === null ? "–" : `${certainty}/10`}</span>
-        </span>
-      </label>
-      {error && <p role="alert" className="mt-2 text-sm font-medium text-danger-ink">{copy.error}</p>}
-      <div className="mt-3 flex flex-wrap gap-2">
-        <Button size="tap" type="submit" disabled={busy || understood === null}>{l.send}</Button>
-        {onSkip && <Button size="tap" type="button" variant="ghost" disabled={busy} onClick={onSkip}>{l.skip}</Button>}
-      </div>
-    </form>
-  );
-}

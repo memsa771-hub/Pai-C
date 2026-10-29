@@ -20,7 +20,7 @@ from app.pai_c.possibilities import PossibilityService
 from app.pai_c.possibility_titles import normalized_title
 from scripts.counselor_eval_support import StudentSession
 from tests.test_adaptive_counseling import reply, signals
-from tests.test_counselor_mirror import client_for, draft_ready, fake_post, prepare
+from tests.counselor_fixtures import client_for, fake_post, prepare
 from tests.truth_map_fixtures import item
 
 ROOT = Path(__file__).parents[1]
@@ -234,20 +234,6 @@ async def test_asking_for_paths_queues_the_analyzer_in_the_background(monkeypatc
             assert (job is not None) is queued
             if queued:
                 assert job.payload["reason"] == "asked" and job.payload["channel"]
-
-
-def test_confirming_the_mirror_queues_the_analyzer():
-    from app.main import app
-    with StudentSession() as student, student.factory() as db:
-        draft_ready(student, db)
-        client = client_for(student)
-        try:
-            url = f"/v1/counselor/summary/confirm?network={student.workspace_id}"
-            assert client.post(url, json={"version": 1}, headers=HEADERS).status_code == 200
-            jobs = db.scalars(select(BackgroundJob).where(BackgroundJob.job_type == JOB_ANALYZE_PATHS)).all()
-            assert len(jobs) == 1 and jobs[0].payload["reason"] == "mirror"
-        finally:
-            app.dependency_overrides.clear()
 
 
 def test_student_adds_own_path_and_asks_for_analysis():

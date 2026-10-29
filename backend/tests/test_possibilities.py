@@ -7,13 +7,12 @@ from sqlalchemy import select
 from app.models import PaiPossibility, StudentJourney
 from app.pai_c.possibilities import PossibilityService, PossibilityError
 from app.pai_c.possibility_titles import valid_title
-from app.pai_c.deep.mirror_schema import CounselorMirror, SavedCounselorMirror
 from app.pai_c.planner.plan import validate_plan
 from app.pai_c.planner.view import build_planner_view
 from app.pai_c.deep.notebook_schema import CounselorNotebookData
 from app.pai_c.policy.controller import decide, decision_context
 from scripts.counselor_eval_support import StudentSession
-from tests.test_counselor_mirror import mirror_data, prepare, client_for, draft_ready
+from tests.counselor_fixtures import prepare, client_for
 from tests.test_conversation_policy import state
 from tests.truth_map_fixtures import item
 
@@ -24,18 +23,6 @@ from tests.truth_map_fixtures import item
     ('one two three four five six seven', False)])
 def test_structural_title(title, expected):
     assert valid_title(title) is expected
-
-
-def test_new_lane_title_evidence_required_old_read_accepted():
-    data = mirror_data()
-    CounselorMirror.model_validate(data)
-    del data['roadmap_lanes'][0]['title']
-    SavedCounselorMirror.model_validate(data)
-    with pytest.raises(ValueError): CounselorMirror.model_validate(data)
-    data = mirror_data()
-    next(lane for lane in data['roadmap_lanes'] if lane['lane'] == 'strength_based')['evidence'] = []
-    with pytest.raises(ValueError): CounselorMirror.model_validate(data)
-    SavedCounselorMirror.model_validate(data)
 
 
 @pytest.mark.parametrize('action', ['explore', 'save', 'dismiss'])
@@ -56,39 +43,6 @@ def test_every_transition(action, status):
             updated, changed = service.transition(student.workspace_id, row.id, action)
             assert updated.status == expected[action][status]
             assert changed is (status != expected[action][status])
-
-
-def test_mirror_idempotency_dismissal_and_restore():
-    with StudentSession() as student, student.factory() as db:
-        _, journey, _ = prepare(student, db)
-        journey = db.get(StudentJourney, journey.id)
-        journey.counselor_summary_draft = {'status':'confirmed','version':1,'mirror':mirror_data()}
-        service = PossibilityService(db)
-        pairs = service.from_mirror(journey)
-        before = [deepcopy(service.serialize(row)) for _, row in pairs]
-        assert [service.serialize(row) for _, row in service.from_mirror(journey)] == before
-        lane, row = pairs[0]
-        service.transition(student.workspace_id, row.id, 'dismiss')
-        journey.counselor_summary_draft = {'status':'confirmed','version':2,'mirror':mirror_data()}
-        assert service.from_mirror(journey)[0][1].status == 'dismissed'
-        service.transition(student.workspace_id, row.id, 'explore')
-        assert row.status == 'exploring' and row.mirror_versions == [1,2]
-        assert len(service.list(student.workspace_id)) == len(pairs)
-
-
-def test_lane_title_fallback():
-    with StudentSession() as student, student.factory() as db:
-        _, journey, _ = prepare(student, db)
-        journey = db.get(StudentJourney, journey.id)
-        service = PossibilityService(db)
-        lane = {'lane':'stated_goal','why':'An original direction','route':{'field':'Original field'}}
-        assert service.lane_title(journey,lane) == 'Original field'
-        lane['route'] = {}
-        with patch('app.pai_c.possibilities.load_data',return_value={'stated_goal':'Edited label'}):
-            assert service.lane_title(journey,lane) == 'Edited label'
-        assert service.lane_title(journey,{**lane,'title':'Own title'}) == 'Own title'
-        journey.counselor_summary_draft = {'status':'confirmed','version':1,'mirror':{'roadmap_lanes':[lane]}}
-        assert service.from_mirror(journey)[0][1].title == service.lane_title(journey,lane)
 
 
 def test_planner_optional_validation_and_dismissed_title_not_readded():
@@ -133,25 +87,9 @@ def test_explore_route_uses_possibility_not_old_goal_or_evidence(kind, places, e
                 'place_preference':expected, 'kind':''}
 
 
-@pytest.mark.parametrize('lane_field,expected', [('Lane direction','Lane direction'), ('','Data engineering')])
-def test_mirror_explore_route_uses_lane_field_then_title(lane_field, expected):
-    from types import SimpleNamespace
-    with StudentSession() as student, student.factory() as db:
-        _, journey, _ = prepare(student, db)
-        journey = db.get(StudentJourney, journey.id)
-        journey.counselor_summary_draft = {'mirror':{'roadmap_lanes':[
-            {'lane':'strength_based','route':{'field':lane_field}}]}}
-        service = PossibilityService(db)
-        row = service.add(student.workspace_id, journey.id, title='Data engineering', why='Evidence',
-            kind='strength_based', source='mirror', status='saved',
-            evidence=[{'text':'Private evidence quote', 'item_id':None}])
-        with patch('app.pai_c.memory.MemoryService.profile', return_value=SimpleNamespace(records={})):
-            assert service.research_route(row) == {'field':expected, 'level':'', 'place_preference':'', 'kind':''}
-
-
 def test_discover_policy_and_text():
     from types import SimpleNamespace
-    inputs=state(); inputs.update(mirror_allowed=False,summary_due=False,discover_available=True,possibility_id='candidate',questions_in_last_two=False)
+    inputs=state(); inputs.update(mirror_due=False,summary_due=False,discover_available=True,possibility_id='candidate',questions_in_last_two=False)
     result=decide(inputs)
     assert (result.action,result.topic,result.question_allowed,result.invite)==('discover','candidate',True,False)
     inputs['previous']=result.as_dict()
@@ -166,20 +104,15 @@ def test_discover_policy_and_text():
 
 def test_discover_uses_evidence_and_mention_receipt_not_message_count():
     from uuid import uuid4
-    from app.models import EventRecord, StudentJourneyEvent, CounselorTurnDecision
+    from app.models import EventRecord, CounselorTurnDecision
     from app.pai_c.policy.state import build_state
     from app.pai_c.policy.classifier import fallback_signals
     from app.pai_c.deep.turn_input import CounselorTurnInput
     with StudentSession() as student, student.factory() as db:
         _, journey, _ = prepare(student, db)
-        journey = db.get(StudentJourney, journey.id)
-        journey.counselor_summary_draft = {'status':'confirmed','version':1,'mirror':mirror_data()}
         service=PossibilityService(db)
         possibility=service.add(student.workspace_id,journey.id,title='Practical direction',why='Evidence',kind='discovered',source='planner',status='suggested', evidence=[{'text':'Student experience','item_id':'experience'}])
         stamp=student.next_timestamp()
-        db.add(StudentJourneyEvent(workspace_id=student.workspace_id,journey_id=journey.id,
-            event_type='counselor.mirror.confirmed',payload={'mirror_version':1},
-            created_at=datetime.fromtimestamp(stamp/1000,timezone.utc)))
         for number in range(1,13):
             event=EventRecord(id=str(uuid4()),network_id=student.workspace_id,type='workspace.message.posted',
                 source=f'human:{student.user_id}',target='channel/pai-counselor',payload={'content':'Student evidence'},timestamp=stamp+number)
@@ -197,11 +130,9 @@ def test_possibility_endpoints_auth_scope_and_explore_once():
     from app.main import app
     from app.models import StudentJourney, ExecutionRun
     with StudentSession() as student, student.factory() as db:
-        journey=draft_ready(student,db)
+        _,journey,_=prepare(student,db)  # no Mirror confirmation: paths are explored as soon as they exist
         client=client_for(student); headers={'X-Workspace-Token':'synthetic-test-only'}
         try:
-            assert client.post(f'/v1/counselor/summary/confirm?network={student.workspace_id}',json={'version':1},headers=headers).status_code==200
-            db.expire_all(); journey=db.get(StudentJourney,journey.id)
             service=PossibilityService(db)
             row=service.add(student.workspace_id,journey.id,title='New practical field',why='Student evidence',kind='discovered',source='planner',status='suggested')
             run=ExecutionRun(workspace_id=student.workspace_id,requested_by='pai',task_type='path_explain',objective='Research',status='queued')

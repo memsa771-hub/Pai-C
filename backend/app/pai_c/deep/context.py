@@ -125,16 +125,19 @@ class DeepContext:
     world_facts: tuple = ()
 
 
-def guided_state(db, workspace_id, notebook, draft, decision, coverage, open_requests):
-    """Compact counseling state for the guided Voice: what is known, missing and recent."""
+def guided_state(db, workspace_id, decision, coverage, open_requests):
+    """Compact counseling state for the guided Voice: what is known, missing and recent.
+    `options_ready` means a live path exists; `mirror_ready` is the Mirror card's
+    `ready` (FOUR_FEATURES_SPEC 2.4)."""
     from app.models import CounselorTurnDecision, PaiPossibility
-    chosen = db.scalar(select(PaiPossibility.id).where(
-        PaiPossibility.workspace_id == workspace_id, PaiPossibility.status == "chosen").limit(1))
-    if chosen is not None:
+    from app.pai_c.mirror import ready_from
+    statuses = set(db.scalars(select(PaiPossibility.status).where(
+        PaiPossibility.workspace_id == workspace_id, PaiPossibility.status != "dismissed")).all())
+    if "chosen" in statuses:
         stage = "chosen"
-    elif draft.get("status") == "confirmed":
+    elif statuses:
         stage = "options_ready"
-    elif notebook.mirror_ready:
+    elif ready_from(coverage):
         stage = "mirror_ready"
     elif decision.action == "first_picture":
         stage = "first_picture_due"
@@ -151,9 +154,20 @@ def guided_state(db, workspace_id, notebook, draft, decision, coverage, open_req
             "question_allowed": decision.question_allowed}
 
 
+def _mirror_section(draft: dict, coverage: dict) -> dict:
+    """The Mirror for the Voice: the card's text and what is still unknown,
+    never the areas' raw entries (FOUR_FEATURES_SPEC 2.5). An old-shape draft
+    has no text here."""
+    from app.pai_c.completeness import completeness_from
+    from app.pai_c.mirror.engine import split_sentences
+    text = draft.get("text") if draft.get("type") == "mirror_state" else None
+    return {"text": split_sentences(text) if text else [],
+            "unknowns": [row["label"] for row in completeness_from(coverage)["unknowns"]]}
+
+
 async def build_context(db, workspace_id: str, turn: CounselorTurnInput, *,
                         wellbeing: bool = False,
-                        decision=None, signals=None, mirror: bool = False) -> DeepContext:
+                        decision=None, signals=None) -> DeepContext:
     """Build every section from workspace-scoped reads; make no model calls."""
     started = time.monotonic()
     if workspace_id != turn.workspace_id:
@@ -176,23 +190,9 @@ async def build_context(db, workspace_id: str, turn: CounselorTurnInput, *,
     }
     memory = MemoryService(db)
     notebook = memory.truth_map(workspace_id).notebook
-    if mirror:
-        # Allowlist public views before serialization; private interpretation is
-        # never carried through the general Voice notebook projection.
-        public = memory.personal_view(workspace_id)
-        public.update({key: [item.model_dump(mode="json") for item in getattr(notebook, key)
-                             if item.status == "active"] for key in ("said", "shown")})
-        public["depth_mode"] = notebook.depth_mode
-        sections["notebook"] = _json(public)
-        sections["personal_view"] = _json(memory.personal_view(workspace_id))
-        sections["capability_view"] = _json(memory.capability_view(workspace_id))
-        sections["private_gap_context"] = _json([
-            {"between": item.between, "evidence": item.evidence, "status": item.status}
-            for item in notebook.tensions])
-    else:
-        from app.pai_c.memory import sensitive_types_for
-        sections["notebook"] = _json(_trim_notebook(
-            notebook, sensitive_types_for(f"{trigger_text} {turn.student_text}", topics)))
+    from app.pai_c.memory import sensitive_types_for
+    sections["notebook"] = _json(_trim_notebook(
+        notebook, sensitive_types_for(f"{trigger_text} {turn.student_text}", topics)))
     from app.pai_c.deep.noted_questions import NotedQuestionService
     sections["open_requests"] = _json(NotedQuestionService(db).open_requests(workspace_id))
     journey = next((item for item in JourneyService(db).list(workspace_id, status="active")
@@ -204,7 +204,7 @@ async def build_context(db, workspace_id: str, turn: CounselorTurnInput, *,
         "session_summaries": [{"summary": row.summary, "entities": row.entities} for row in recent],
         "open_threads": [item.question_intent for item in notebook.open_questions[:3]],
     })
-    if plan is not None and not mirror:
+    if plan is not None:
         if not wellbeing and plan.next_move != "care" and plan.playbooks:
             from app.pai_c.playbooks.registry import selected_playbooks
             sections["playbooks"] = selected_playbooks(plan.playbooks)
@@ -221,20 +221,21 @@ async def build_context(db, workspace_id: str, turn: CounselorTurnInput, *,
     if research is not None:
         sections["research"] = _json(research)
     draft = (journey.counselor_summary_draft or {}) if journey else {}
-    if decision is not None and not wellbeing and not mirror:
-        sections["state"] = _json(guided_state(db, workspace_id, notebook, draft, decision,
-            memory.coverage_areas(workspace_id), NotedQuestionService(db).open_requests(workspace_id)))
+    coverage = memory.coverage_areas(workspace_id, profile=snapshot)
+    from app.pai_c.mirror import ready_from
+    if not wellbeing:
+        sections["mirror"] = _json(_mirror_section(draft, coverage))
+    if decision is not None and not wellbeing:
+        sections["state"] = _json(guided_state(db, workspace_id, decision, coverage,
+            NotedQuestionService(db).open_requests(workspace_id)))
     sections["journey"] = _json({"stage": journey.current_stage if journey else "IDENTITY",
-        "mirror_status": draft.get("status"), "mirror_notebook_version": draft.get("notebook_version")})
-    if not wellbeing and not mirror:
+        "mirror_ready": ready_from(coverage)})
+    if not wellbeing:
         from app.pai_c.deep.actions import workspace_places
         sections["workspace_places"] = _json(workspace_places())
-    if mirror:
-        from app.workspace_language import workspace_language
-        sections["workspace_language"] = _json(workspace_language())
     from app.pai_c.fact_cards import available_cards
     cards = ()
-    if decision is not None and decision.question_allowed and not wellbeing and not mirror and decision.action in {"explore_area", "answer_request", "counsel"}:
+    if decision is not None and decision.question_allowed and not wellbeing and decision.action in {"explore_area", "answer_request", "counsel"}:
         cards = tuple(available_cards(snapshot, None if decision.topic == "request" else decision.topic))
         sections["fact_cards"] = _json(cards)
     text = "<context>\n" + "\n".join(

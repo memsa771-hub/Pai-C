@@ -1,1 +1,0 @@
-The student corrected your picture of them. Acknowledge it in a few words, without thanking or apologising at length. Reflect the correction in your own words so they know you understood what was wrong. Then ask one open question that helps you understand that part better{topic_clause}. Do not repeat the old picture.

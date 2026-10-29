@@ -160,15 +160,17 @@ class MemoryService:
         spec = vault_catalog().type(type_key)
         return spec is not None and spec.sensitivity == "restricted"
 
-    def coverage_areas(self, workspace_id, *, rows=None, with_ids=False):
+    def coverage_areas(self, workspace_id, *, rows=None, with_ids=False, profile=None):
         """`rows` (from `vault_rows`) saves a second pass over the Vault when
-        the caller already has it; staleness is read from them."""
+        the caller already has it; staleness is read from them. `profile`
+        likewise saves a second profile read."""
         from app.pai_c.understanding.views import coverage_areas
         from app.memory.vault_items import VaultItemService
         from app.memory.vault_view import VaultView
         stale = ({entry_ref(row.entry) for row in rows if row.entry["stale"]} if rows is not None
                  else VaultView(self.db).stale_ids(workspace_id))
-        return coverage_areas(self.truth_map(workspace_id).notebook, self.profile(workspace_id),
+        return coverage_areas(self.truth_map(workspace_id).notebook,
+                              profile if profile is not None else self.profile(workspace_id),
                               VaultItemService(self.db).active(workspace_id), stale, with_ids=with_ids)
 
     def vault_rows(self, workspace_id):
@@ -265,9 +267,8 @@ class MemoryService:
 
     def delete_for_workspace(self, workspace_id):
         from sqlalchemy import delete
-        from app.models import PaiTurnPlan, CounselorMirrorFeedback
+        from app.models import PaiTurnPlan
         self.db.execute(delete(PaiTurnPlan).where(PaiTurnPlan.workspace_id == workspace_id))
-        self.db.execute(delete(CounselorMirrorFeedback).where(CounselorMirrorFeedback.workspace_id == workspace_id))
         return NotebookService(self.db).delete_for_workspace(workspace_id)
 
     def export_truth_map(self, workspace_id):

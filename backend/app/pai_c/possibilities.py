@@ -2,7 +2,7 @@
 from datetime import datetime, timezone
 import logging
 from sqlalchemy import select
-from app.models import PaiPossibility, Workspace, StudentJourney
+from app.models import PaiPossibility, Workspace
 from app.pai_c.policy.controller import load_data
 from app.pai_c.possibility_titles import normalized_title
 
@@ -57,42 +57,6 @@ class PossibilityService:
         logger.info("possibility_stored possibility_id=%s title=%s", row.id, row.title)
         return row
 
-    def lane_title(self, journey, lane):
-        return (lane.get("title") or (lane.get("route") or {}).get("field")
-                or load_data("lane_labels.json")[lane["lane"]])
-
-    def from_mirror(self, journey):
-        journey = self.db.scalar(select(StudentJourney).where(
-            StudentJourney.workspace_id == journey.workspace_id, StudentJourney.id == journey.id))
-        if journey is None:
-            return []
-        draft = journey.counselor_summary_draft or {}
-        if draft.get("status") != "confirmed":
-            return []
-        self.lock(journey.workspace_id)
-        result = []
-        bindings = dict(draft.get("possibility_ids") or {})
-        for lane in (draft.get("mirror") or {}).get("roadmap_lanes", []):
-            row = (self.get(journey.workspace_id, bindings[lane["lane"]]) if lane["lane"] in bindings else
-                self.add(journey.workspace_id, journey.id, title=self.lane_title(journey, lane),
-                why=lane["why"], kind=lane["lane"], source="mirror", status="exploring",
-                evidence=[{"text": text, "item_id": None} for text in lane.get("evidence", [])],
-                unknowns=lane.get("unknowns", [])))
-            bindings[lane["lane"]] = row.id
-            if draft["version"] not in row.mirror_versions:
-                if row.status in {"suggested", "saved"}:
-                    row.status = "exploring"
-                known = {item["text"] for item in row.evidence}
-                row.evidence = [*row.evidence, *[{"text": text, "item_id": None}
-                    for text in dict.fromkeys(lane.get("evidence", [])) if text not in known]]
-                row.mirror_versions = [*row.mirror_versions, draft["version"]]
-                row.updated_at = datetime.now(timezone.utc)
-            result.append((lane, row))
-        if bindings != draft.get("possibility_ids"):
-            journey.counselor_summary_draft = {**draft, "possibility_ids": bindings}
-        self.db.flush()
-        return result
-
     def transition(self, workspace_id, id, action):
         self.lock(workspace_id)
         row = self.get(workspace_id, id)
@@ -134,15 +98,7 @@ class PossibilityService:
         goals = profile.records.get("goal", [])
         details = (goals[0].get("details") or {}) if goals else {}
         countries = details.get("target_countries") or []
-        field = row.title
-        if row.kind not in {"discovered", "student_added"}:
-            journey = self.db.scalar(select(StudentJourney).where(
-                StudentJourney.workspace_id == row.workspace_id, StudentJourney.id == row.journey_id))
-            draft = (journey.counselor_summary_draft or {}) if journey else {}
-            lane = next((lane for lane in (draft.get("mirror") or {}).get("roadmap_lanes", [])
-                         if lane.get("lane") == row.kind), {})
-            field = (lane.get("route") or {}).get("field") or row.title
-        return {"field": field,
+        return {"field": row.title,
                 "level": details.get("degree_level") or "",
                 "place_preference": countries[0] if len(countries) == 1 else "", "kind": ""}
 

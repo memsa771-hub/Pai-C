@@ -17,7 +17,7 @@ class ResearchBudget:
     output_tokens: int = 0
     model_calls: int = 0
     workspace_id: str | None = None
-    mirror_version: int | None = None
+    budget_key: str | None = None
     scope: str = "path_research"
     refresh_key: str | None = None
     exhausted: bool = False
@@ -41,11 +41,11 @@ class ResearchBudget:
                     self.exhausted = True
                     return "research_student_budget_exceeded"
                 settings = dict(workspace.settings or {})
-                # Counters belong to a confirmed Mirror version, not a lifetime.
-                # Keeping version keys prevents an old job from resetting a new
-                # job's allowance.
+                # Counters belong to a key (the Vault version path research
+                # read, or a belief-check period), not a lifetime. Keeping the
+                # keys prevents an old job from resetting a new job's allowance.
                 counters = dict(settings.get("counselor_research_budgets") or {})
-                key = str(self.mirror_version)
+                key = str(self.budget_key)
                 used = int(counters.get(key, 0))
                 limit = config.PAI_RESEARCH_MAX_CALLS_PER_STUDENT
                 if used >= max(0, limit):
@@ -79,10 +79,10 @@ _budget: ContextVar[ResearchBudget | None] = ContextVar("research_budget", defau
 
 @contextmanager
 def bounded_research(*, queries: int, fetches: int, seconds: float, workspace_id=None,
-                     mirror_version=None, scope="path_research", refresh_key=None):
+                     budget_key=None, scope="path_research", refresh_key=None):
     budget = ResearchBudget(max(0, queries), max(0, fetches),
                             time.monotonic() + max(1, seconds), workspace_id=workspace_id,
-                            mirror_version=mirror_version, scope=scope, refresh_key=refresh_key)
+                            budget_key=budget_key, scope=scope, refresh_key=refresh_key)
     token = _budget.set(budget)
     try:
         yield budget

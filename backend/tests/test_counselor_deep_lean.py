@@ -20,6 +20,7 @@ from app.pai_c.deep.notebook_schema import CounselorNotebookData
 from app.pai_c.deep.sensitive import check_notebook_before_mirror
 from app.pai_c.deep.turn_input import CounselorTurnInput
 from app.research.gateway import request_research
+from app.pai_c.possibilities import PossibilityService
 from app.journey import JourneyService
 from app.models import CounselorNotedQuestion, EventRecord, StudentJourney
 from scripts.counselor_eval_support import StudentSession
@@ -79,11 +80,10 @@ async def test_question_cannot_use_another_workspace_source_or_blank_question():
         assert db.scalar(select(CounselorNotedQuestion)) is None
 
 
-def research_journey(student, db, stage="RESEARCHING", confirmed=False):
+def research_journey(student, db, stage="PROPOSED"):
+    """A Counselor journey at a stage; there is no Mirror to confirm."""
     journey = JourneyService(db).ensure_counselor(student.workspace_id)
-    row = db.get(StudentJourney, journey.id)
-    row.current_stage = stage
-    row.counselor_summary_draft = {"type": "mirror", "version": 1, "mirror": {}, "status": "confirmed" if confirmed else "draft"}
+    db.get(StudentJourney, journey.id).current_stage = stage
     db.commit()
     return JourneyService(db).get(student.workspace_id, journey.id)
 
@@ -92,29 +92,25 @@ def research_journey(student, db, stage="RESEARCHING", confirmed=False):
 async def test_deep_context_has_no_research_block_without_requested_facts():
     with StudentSession() as student, student.factory() as db:
         turn = source_turn(student, db)
-        research_journey(student, db, confirmed=False)
-        assert "<research>" not in (await build_context(db, student.workspace_id, turn)).text
-        research_journey(student, db, confirmed=True)
+        research_journey(student, db)
         assert "<research>" not in (await build_context(db, student.workspace_id, turn)).text
 
 
 @pytest.mark.asyncio
-async def test_research_gateway_always_enforces_confirmation():
+async def test_research_gateway_scopes_requests_and_has_no_mirror_kind():
     with StudentSession() as student, student.factory() as db:
         journey = research_journey(student, db)
-        ctx = SimpleNamespace(workspace_id=student.workspace_id)
-        kwargs = dict(db=db, journey=journey, tool_context=ctx)
+        row = PossibilityService(db).add(student.workspace_id, journey.id, title="Practical design", why="Evidence",
+                                         kind="discovered", source="planner", status="exploring")
+        db.commit()
+        kwargs = dict(db=db, journey=journey, tool_context=SimpleNamespace(workspace_id="another-workspace"))
         with patch("app.tools.get_tool_executor", return_value=SimpleNamespace(execute=AsyncMock(return_value={"ok": True}))) as mocked:
             delegate = mocked.return_value.execute
-            assert await request_research("from_mirror", student.workspace_id, **kwargs) is None
+            assert await request_research("path_explain", student.workspace_id, possibility_id=row.id, **kwargs) is None
             delegate.assert_not_awaited()
-            kwargs["journey"] = research_journey(student, db, confirmed=True)
-            assert (await request_research("from_mirror", student.workspace_id, **kwargs))["data"]["status"] == "paths_ready"
-            delegate.assert_not_awaited()
-            kwargs["tool_context"] = SimpleNamespace(workspace_id="another-workspace")
-            assert await request_research("from_mirror", student.workspace_id, **kwargs) is None
-            with pytest.raises(ValueError, match="unknown"):
-                await request_research("other", student.workspace_id, **kwargs)
+            for kind in ("from_mirror", "other"):
+                with pytest.raises(ValueError, match="unknown"):
+                    await request_research(kind, student.workspace_id, **kwargs)
 
 
 def test_only_research_gateway_directly_calls_operator_delegate():

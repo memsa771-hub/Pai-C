@@ -87,7 +87,7 @@ async def test_result_is_interpreted_by_counselor_and_does_not_create_student_fa
                 result={"final_message": "Detailed evidence and program constraints", "observations": []})
             db.add(run)
             db.commit()
-            with patch.object(operator, "_baseline_is_current", return_value=True), \
+            with patch.object(operator, "_result_context_current", return_value=True), \
                  patch("app.pai_c.orchestrator.handle_research_result", AsyncMock(
                     return_value="Given your budget, verify the academic credits before paying an application fee.")) as explain:
                 await operator._post_result(db, student.workspace_id, "channel/pai-counselor", run.id,
@@ -99,7 +99,7 @@ async def test_result_is_interpreted_by_counselor_and_does_not_create_student_fa
 
 
 @pytest.mark.asyncio
-async def test_operator_result_cannot_bypass_unconfirmed_baseline():
+async def test_operator_result_for_an_older_vault_is_not_explained():
     with StudentSession() as student:
         with student.factory() as db:
             db.add(ProfileRequirement(
@@ -111,6 +111,8 @@ async def test_operator_result_cannot_bypass_unconfirmed_baseline():
             run = ExecutionRun(
                 workspace_id=student.workspace_id, requested_by="openagents:pai",
                 objective="Rank universities for this student", status="completed",
+                # Read on a Vault that has changed since (FOUR_FEATURES_SPEC 2.3).
+                constraints={"vault_version": "an-older-vault"},
                 result={"final_message": "Secret personalized ranking", "observations": []},
             )
             db.add(run)
@@ -123,4 +125,4 @@ async def test_operator_result_cannot_bypass_unconfirmed_baseline():
                 )
         explain.assert_not_awaited()
         assert "Secret personalized ranking" not in student.transcript[-1]["content"]
-        assert "confirm that my understanding" in student.transcript[-1]["content"]
+        assert "has changed since it started" in student.transcript[-1]["content"]

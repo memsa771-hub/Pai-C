@@ -2,29 +2,35 @@
 from sqlalchemy import select
 
 from app.config import config
-from app.models import CounselorTurnDecision, EventRecord, BackgroundJob, StudentJourney, PaiPossibility
+from app.models import CounselorTurnDecision, StudentJourney, PaiPossibility
 from app.pai_c.memory import MemoryService
 from app.pai_c.policy.controller import load_data
 from app.pai_c.voice.guards import question_sentences
 
 
-def first_picture_due(*, coverage, student_count, prior_decisions, summary_confirmed):
-    """A provisional picture uses evidence coverage, never elapsed turn count."""
+def _known(area: dict) -> bool:
+    """Known as the Vault completeness meter counts it: covered and not stale."""
+    return bool(area.get("covered")) and not area.get("stale")
+
+
+def first_picture_due(*, coverage, student_count, prior_decisions, mirror_ready):
+    """A provisional picture uses evidence coverage, never elapsed turn count.
+    Once the Mirror is ready the card is the picture."""
     rules = load_data("guided_table.json")["derived"]
-    covered = sum(bool(area.get("covered")) for area in coverage.values())
-    return (not summary_confirmed
+    known = sum(_known(area) for area in coverage.values())
+    return (not mirror_ready
             and not any(row["decision"].get("action") == rules["first_picture_action"] for row in prior_decisions)
-            and covered >= rules["first_picture_min_covered_areas"]
-            and all(coverage.get(area, {}).get("covered") for area in rules["first_picture_required_areas"]))
+            and known >= rules["first_picture_min_covered_areas"]
+            and all(_known(coverage.get(area, {})) for area in rules["first_picture_required_areas"]))
 
 
 def derive_state(signals, *, coverage, mirror_ready, plan, student_count,
                  prior_decisions, replies, student_ordinals, current_event_id,
-                 summary_confirmed=False, reply_requested_input=None):
+                 reply_requested_input=None):
     policy = load_data("guided_table.json")["derived"]
     data = signals.model_dump()
     previous = prior_decisions[-1]["decision"] if prior_decisions else {}
-    covered = sum(bool(area.get("covered")) for area in coverage.values())
+    covered = sum(_known(area) for area in coverage.values())
     by_event = {row["event_id"]: row["decision"] for row in prior_decisions}
     summaries = [student_ordinals.get(row["event_id"], 0) for row in prior_decisions
                  if row["decision"].get("action") == policy["summary_action"]]
@@ -54,9 +60,8 @@ def derive_state(signals, *, coverage, mirror_ready, plan, student_count,
             "summary_due": student_count - max(summaries, default=0) >= config.PAI_SUMMARY_EVERY_TURNS
                 and covered >= policy["summary_min_covered"],
             "insight_available": bool(plan and plan.give.strip()),
-            "summary_confirmed": summary_confirmed,
             "first_picture_due": first_picture_due(coverage=coverage, student_count=student_count,
-                prior_decisions=prior_decisions, summary_confirmed=summary_confirmed),
+                prior_decisions=prior_decisions, mirror_ready=mirror_ready),
             "invite_pending": covered < policy["invite_max_covered"] and not any(
                 row["decision"].get("invite") for row in prior_decisions)}
 
@@ -76,37 +81,26 @@ def build_state(db, turn, signals, history):
     ).order_by(CounselorTurnDecision.source_timestamp, CounselorTurnDecision.source_event_id)).all()
     prior = [{"event_id": row.source_event_id, "decision": row.decision or {}} for row in rows]
     plan = memory.latest_plan(turn.workspace_id)
-    state = derive_state(signals, coverage=memory.coverage_areas(turn.workspace_id),
-        mirror_ready=memory.truth_map(turn.workspace_id).notebook.mirror_ready,
+    coverage = memory.coverage_areas(turn.workspace_id)
+    from app.pai_c.mirror import ready_from
+    # The Mirror state card's `ready`, read once per turn from this coverage.
+    mirror_ready = ready_from(coverage)
+    state = derive_state(signals, coverage=coverage, mirror_ready=mirror_ready,
         plan=plan, student_count=len(ordinals), prior_decisions=prior,
         replies=[row["content"] for row in history if row["role"] == "assistant"],
         reply_requested_input=[bool(row.get("requested_input")) for row in history if row["role"] == "assistant"],
         student_ordinals=ordinals, current_event_id=turn.source_event_id)
     from app.pai_c.deep.noted_questions import NotedQuestionService
     state["open_requests"] = NotedQuestionService(db).open_requests(turn.workspace_id)
-    current = db.scalar(select(EventRecord).where(
-        EventRecord.network_id == turn.workspace_id, EventRecord.id == turn.source_event_id))
-    edits = db.scalars(select(EventRecord).where(
-        EventRecord.network_id == turn.workspace_id, EventRecord.id.in_(list(ordinals)),
-        EventRecord.metadata_["mirror_edit_version"].as_string().is_not(None),
-    ).order_by(EventRecord.timestamp.desc(), EventRecord.id.desc())).all()
-    last_edit = edits[0] if edits else None
     journey = db.scalar(select(StudentJourney).where(
         StudentJourney.workspace_id == turn.workspace_id,
         StudentJourney.journey_type == "counselor_decision", StudentJourney.status == "active"))
-    pending = db.scalar(select(BackgroundJob.id).where(
-        BackgroundJob.workspace_id == turn.workspace_id, BackgroundJob.job_type == "counselor.mirror",
-        BackgroundJob.status.in_(("pending", "running"))).limit(1))
-    enough_after_edit = last_edit is None or memory.patch_applied_since(turn.workspace_id, last_edit.id)
-    state["mirror_correction"] = bool(current and (current.metadata_ or {}).get("mirror_edit_version") is not None)
-    state["mirror_allowed"] = bool(state["mirror_ready"] and journey
-        and journey.current_stage == "DIRECTION" and pending is None and enough_after_edit)
+    draft = (journey.counselor_summary_draft or {}) if journey else {}
+    # The card is posted in chat once, the first time it is ready (spec 2.5).
+    posted = draft.get("mirror_posted_version") if draft.get("type") == "mirror_state" else None
+    state["mirror_due"] = bool(mirror_ready and journey is not None and not posted)
     state["discover_available"] = False
     state["possibility_id"] = None
-    draft = (journey.counselor_summary_draft or {}) if journey else {}
-    state["summary_confirmed"] = draft.get("status") == "confirmed"
-    if state["summary_confirmed"]:
-        state["first_picture_due"] = False
     # Evidence-validated possibilities can be offered tentatively before a Mirror.
     # Being offered one does not select it, authorize execution, or assert eligibility.
     possibility = db.scalar(select(PaiPossibility).where(

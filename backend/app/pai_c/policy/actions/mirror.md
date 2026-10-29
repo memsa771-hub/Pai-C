@@ -1,1 +1,1 @@
-The picture is clear enough. Tell the student you will now show them how you see them, and set action mirror. Do not write the picture yourself.
+Their Mirror is ready: a card with what PAI knows about them and what is still unknown is posted right after your reply. Say so in one short line and set action mirror. Do not describe the picture yourself and ask no question.

@@ -19,7 +19,7 @@ from sqlalchemy import select, text
 
 from app.database import new_session
 from app.pai_c.memory import MemoryService
-from app.models import (CounselorNotedQuestion, CounselorTurnDecision, CounselorMirrorFeedback, StudentJourneyEvent,
+from app.models import (CounselorNotedQuestion, CounselorTurnDecision, StudentJourneyEvent,
                         EventRecord, RouteDecision, StudentJourney, Workspace)
 from scripts.eval.cost import load_prices, token_record
 
@@ -106,8 +106,6 @@ def export_session(db, workspace_id, usage_logs=()):
             noted_questions=[row_data(q) for q in rows(CounselorNotedQuestion,
                 "workspace_id", CounselorNotedQuestion.created_at, CounselorNotedQuestion.id)],
             mirror_drafts=mirrors, mirror_history=mirror_events,
-            mirror_feedback=[row_data(row) for row in rows(CounselorMirrorFeedback,
-                "workspace_id", CounselorMirrorFeedback.mirror_version)],
             mirror_confirmations=[row_data(row) for row in rows(StudentJourneyEvent,
                 "workspace_id", StudentJourneyEvent.created_at, StudentJourneyEvent.id)
                 if row.event_type == "counselor.mirror.confirmed"],

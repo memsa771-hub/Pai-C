@@ -34,7 +34,7 @@ async def search(context, payload):
         return {'programs': [], 'missing': ['place_preference']}
     with bounded_research(queries=config.PAI_RESEARCH_MAX_QUERIES, fetches=config.PAI_RESEARCH_MAX_FETCHES,
         seconds=config.PAI_RESEARCH_MAX_SECONDS, workspace_id=context.workspace_id,
-        mirror_version=brief['mirror_version']) as budget:
+        budget_key=brief['vault_version']) as budget:
         found = await context.capabilities('program.discover', {'objective': route['field'],
             'country': route['place_preference'], 'level': route.get('level', '')})
         programs = []

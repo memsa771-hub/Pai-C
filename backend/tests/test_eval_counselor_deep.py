@@ -184,26 +184,18 @@ def test_usage_checkpoint_survives_a_reserved_but_failed_call(tmp_path):
     assert data['reserved_usd']>0 and data['calls']==[]
 
 @pytest.mark.asyncio
-async def test_end_to_end_completion_runs_existing_mirror_job_and_confirmation_offline():
-    from unittest.mock import AsyncMock
+async def test_end_to_end_completion_reports_the_state_card_without_confirmation():
     from sqlalchemy import select
     from scripts.counselor_eval_support import StudentSession
     from scripts.eval_counselor_deep import complete_mirror_pipeline
-    from app.pai_c.deep.mirror import enqueue_mirror
-    from app.models import BackgroundJob, StudentJourney
-    from test_counselor_mirror import prepare, mirror_data, safe_model
+    from app.models import BackgroundJob
+    from tests.counselor_fixtures import prepare
+    from tests.test_mirror_engine import _education
     with StudentSession() as student, student.factory() as db:
-        turn,journey,_=prepare(student,db)
-        enqueue_mirror(db,turn); db.commit()
-        async def confirmed(job,db):
-            current=db.get(StudentJourney,job.payload['journey_id'])
-            assert current.counselor_summary_draft['status']=='confirmed'
-            assert current.current_stage=='RESEARCHING'
-            return {'status':'done'}
-        with patch('app.pai_c.deep.mirror.chat_completion',AsyncMock(return_value=json.dumps(mirror_data()))), \
-             patch('app.pai_c.deep.sensitive.chat_completion',AsyncMock(side_effect=safe_model)), \
-             patch('app.pai_c.deep.mirror.confirmed_research_job',AsyncMock(side_effect=confirmed)) as research:
-            result=await complete_mirror_pipeline(student)
-        research.assert_awaited_once()
-        assert result['mirror'] and result['status']=='no_paths'
-        assert db.scalar(select(BackgroundJob.id).where(BackgroundJob.job_type=='counselor.mirror_research'))
+        prepare(student, db)
+        _education(db, student.workspace_id)
+        result = await complete_mirror_pipeline(student)
+        assert result['status'] == 'mirror_not_ready' and result['stage'] == 'DIRECTION'
+        assert result['mirror']['header']['education_line'] and result['paths'] == []
+        assert not db.scalar(select(BackgroundJob.id).where(
+            BackgroundJob.job_type.in_(('counselor.mirror', 'counselor.mirror_research'))))

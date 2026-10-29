@@ -112,7 +112,7 @@ def _state(coverage, **changes):
     signals = classifier.fallback_signals()
     state = derive_state(signals, coverage=coverage, mirror_ready=False, plan=None, student_count=10,
                          prior_decisions=[], replies=[], student_ordinals={}, current_event_id="e10")
-    state.update(mirror_allowed=False, mirror_correction=False, first_picture_due=False,
+    state.update(mirror_due=False, first_picture_due=False,
                  discover_available=False, possibility_id=None, relevant_myth=None,
                  open_requests=[], question_needed=True, **changes)
     return state

@@ -1,9 +1,14 @@
-"""Path-scoped exploration; shared research gateway owns durable work."""
+"""Path-scoped exploration; shared research gateway owns durable work.
+
+A stored explanation or program search is current while the Vault is the one it
+read (`vault_version`); otherwise the student asks again and it is re-run. No
+Mirror confirmation is needed (FOUR_FEATURES_SPEC 2.3)."""
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from sqlalchemy import select
 from app.api.response import success_response
 from app.database import get_db
 from app.journey import JourneyService
+from app.memory.completeness import vault_version
 from app.models import ExecutionRun
 from app.pai_c.memory import MemoryService
 from app.pai_c.possibilities import PossibilityService, PossibilityError
@@ -28,15 +33,15 @@ class TryItConsent(BaseModel):
 def accept_try_it(path_id: str, body: TryItConsent, network: str=Query(...), db=Depends(get_db),
     x_workspace_token: str | None=Header(None), authorization: str | None=Header(None)):
     from app.pai_c.checkins import schedule
-    from app.research.gateway import mirror_is_current
     workspace = _authorized(db, network, x_workspace_token, authorization)
     wid = str(workspace.id)
     path = path_row(db, wid, path_id)
     runs = db.scalars(select(ExecutionRun).where(ExecutionRun.workspace_id == wid,
         ExecutionRun.task_type == 'path_explain', ExecutionRun.status == 'completed')
         .order_by(ExecutionRun.created_at.desc())).all()
+    version = vault_version(db, wid)
     run = next((run for run in runs if (run.constraints or {}).get('possibility_id') == path.id
-        and mirror_is_current(db, wid, (run.constraints or {}).get('mirror_version'))), None)
+        and (run.constraints or {}).get('vault_version') == version), None)
     if path.status == 'dismissed' or not run or not (((run.result or {}).get('capability_result') or {}).get('path') or {}).get('try_it'):
         raise HTTPException(409, 'A current path activity is required')
     job = schedule(db, wid, 'try_it', run.id)
@@ -64,12 +69,11 @@ def tool_context(workspace, db):
 def get_path(path_id: str, network: str = Query(...), db=Depends(get_db), x_workspace_token: str | None = Header(None), authorization: str | None = Header(None)):
     workspace = _authorized(db, network, x_workspace_token, authorization)
     row = path_row(db, str(workspace.id), path_id)
-    journey = JourneyService(db).get(str(workspace.id), row.journey_id)
-    version = (journey.counselor_summary_draft or {}).get("version")
+    version = vault_version(db, str(workspace.id))
     runs = db.scalars(select(ExecutionRun).where(ExecutionRun.workspace_id == str(workspace.id),
         ExecutionRun.task_type == "path_explain").order_by(ExecutionRun.created_at.desc())).all()
     run = next((item for item in runs if (item.constraints or {}).get("possibility_id") == row.id
-                and (item.constraints or {}).get("mirror_version") == version), None)
+                and (item.constraints or {}).get("vault_version") == version), None)
     result = ((run.result or {}).get("capability_result") or {}) if run and run.status == "completed" else {}
     from app.pai_c.paths.explain import current_path_result
     result, expired = current_path_result(result)
@@ -83,9 +87,7 @@ async def explore(path_id: str, network: str = Query(...), db=Depends(get_db), x
     workspace = _authorized(db, network, x_workspace_token, authorization)
     workspace_id = str(workspace.id)
     row = path_row(db, workspace_id, path_id)
-    from app.research.gateway import mirror_is_current, request_research
-    if not mirror_is_current(db, workspace_id):
-        raise HTTPException(409, "Confirm your current Mirror before exploring")
+    from app.research.gateway import request_research
     try:
         row, _ = PossibilityService(db).transition(workspace_id, path_id, "explore")
     except PossibilityError as exc:
@@ -110,7 +112,7 @@ async def search_programs(path_id: str, body: ProgramConsent, network: str = Que
         journey=JourneyService(db).get(str(workspace.id), row.journey_id),
         tool_context=tool_context(workspace, db), possibility_id=path_id, trigger='student_route')
     if outcome is None:
-        raise HTTPException(409, 'Explore this path and confirm your current Mirror first')
+        raise HTTPException(409, 'Explore this path first')
     if not outcome.get('ok'):
         raise HTTPException(503, 'Program search could not start. Try again')
     return success_response(outcome['data'])
@@ -121,12 +123,11 @@ def get_programs(path_id: str, network: str = Query(...), db=Depends(get_db),
     x_workspace_token: str | None = Header(None), authorization: str | None = Header(None)):
     workspace = _authorized(db, network, x_workspace_token, authorization)
     row = path_row(db, str(workspace.id), path_id)
-    journey = JourneyService(db).get(str(workspace.id), row.journey_id)
-    version = (journey.counselor_summary_draft or {}).get('version')
+    version = vault_version(db, str(workspace.id))
     runs = db.scalars(select(ExecutionRun).where(ExecutionRun.workspace_id == str(workspace.id),
         ExecutionRun.task_type == 'program_search').order_by(ExecutionRun.created_at.desc())).all()
     run = next((run for run in runs if (run.constraints or {}).get('possibility_id') == row.id
-        and (run.constraints or {}).get('mirror_version') == version), None)
+        and (run.constraints or {}).get('vault_version') == version), None)
     result = ((run.result or {}).get('capability_result') or {}) if run and run.status == 'completed' else {}
     from app.pai_c.paths.programs import current_programs, reusable_program_run
     result, _ = current_programs(db, str(workspace.id), result,

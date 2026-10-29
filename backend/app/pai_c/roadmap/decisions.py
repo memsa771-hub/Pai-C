@@ -65,9 +65,9 @@ def serialize(row: RouteDecision, cards: list[dict]) -> dict:
             "route": row.route, "snapshot_verdict": row.verdict, "live_status": live}
 
 
-# Stages before the route decision that a confirmed Mirror may leave for it:
-# RESEARCHING (before engine routes were computed on read) and the old roadmap
-# research wait (ASSESSING, NEEDS_INFO).
+# The old confirm-gated research wait (RESEARCHING, ASSESSING, NEEDS_INFO). No
+# code enters it any more (migration 121); a journey still there moves on to
+# the route decision when the student chooses.
 WAITING = {"RESEARCHING", "ASSESSING", "NEEDS_INFO"}
 
 
@@ -86,8 +86,9 @@ class RouteDecisionService:
 
     def _enter_chosen(self, journey: StudentJourney, row: RouteDecision, actor: str) -> bool:
         """The journey follows the decision: from PROPOSED to CHOSEN, with the
-        route as the active goal. Shared by choose and by a Mirror confirmed
-        while a route is already chosen. False when the stage cannot move."""
+        route as the active goal. Shared by choose and by the first paths
+        arriving while a route is already chosen. False when the stage cannot
+        move."""
         if journey.current_stage == "PROPOSED":
             self._set_stage(journey, "CHOSEN", actor=actor, validated_choice=True)
         if journey.current_stage != "CHOSEN":
@@ -98,24 +99,23 @@ class RouteDecisionService:
         return True
 
     def follow_active(self, workspace_id: str, actor: str) -> None:
-        """Called once the Mirror lands the journey in PROPOSED: an active
-        route decision (kept through a rethink, or made before the Mirror)
-        takes it on to CHOSEN."""
+        """Called once the Path engine lands the journey in PROPOSED: an
+        active route decision (kept through a rethink, or made before the
+        paths) takes it on to CHOSEN."""
         journey, row = self._journey(workspace_id), self.active(workspace_id)
         if journey is not None and row is not None:
             self._enter_chosen(journey, row, actor)
 
     def _record_choice(self, workspace_id: str, row: RouteDecision, previous: RouteDecision | None) -> None:
-        """A student who chooses before the Mirror is confirmed keeps their
-        stage; the decision itself is still saved, and the next Mirror
-        confirmation moves them to CHOSEN (follow_active)."""
+        """A student who chooses before the journey reaches PROPOSED keeps
+        their stage; the decision itself is still saved, and the first saved
+        paths move them to CHOSEN (follow_active)."""
         journey = self._journey(workspace_id)
         if journey is None:
             return
         if previous is not None:
             self._note_withdrawn(journey, previous)
-        confirmed = (journey.counselor_summary_draft or {}).get("status") == "confirmed"
-        if journey.current_stage in WAITING and confirmed:
+        if journey.current_stage in WAITING:
             self._set_stage(journey, "PROPOSED")
         if not self._enter_chosen(journey, row, "human:student"):
             return

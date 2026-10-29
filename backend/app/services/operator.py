@@ -150,8 +150,8 @@ async def _post_result(
         context_current = bool(run and _result_context_current(db, run))
         if run is not None and str(run.workspace_id) == workspace_id and run.result:
             if not context_current:
-                message = ("The background work is complete. I can interpret it for you "
-                           "after we confirm that my understanding of your situation is accurate.")
+                message = ("The background work is complete, but what you have told me has changed "
+                           "since it started. Ask me again and I will look with what I know now.")
             else:
                 handoff = {
                     "objective": run.objective, "constraints": run.constraints,
@@ -284,13 +284,13 @@ async def delegate(ctx, objective: str, constraints: Optional[dict], context_ref
     return {"ok": True, "data": data}
 
 
-def _baseline_is_current(db, workspace_id: str) -> bool:
-    from app.research.gateway import mirror_is_current
-    return mirror_is_current(db, workspace_id)
-
-
 def _result_context_current(db, run: ExecutionRun) -> bool:
-    return _baseline_is_current(db, run.workspace_id)
+    """A result is explained to the student only while the Vault is the one
+    the run read (FOUR_FEATURES_SPEC 2.3). A run that recorded no Vault
+    version did not read the student, so it never goes out of date."""
+    from app.memory.completeness import vault_version
+    version = (run.constraints or {}).get("vault_version")
+    return version is None or version == vault_version(db, run.workspace_id)
 
 
 async def resume(ctx, run_id: str, action: dict) -> dict:

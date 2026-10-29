@@ -213,5 +213,7 @@ def test_summary_and_workspace_picture_read_the_card():
     assert summary == {"type": "mirror_state", "card": card}
     assert data["picture"] == {"header": card["header"], "unknowns": card["unknowns"], "text": None,
                                "ready": False, "version": card["version"]}
-    for kept in ("mirror_status", "moments", "ratings", "coverage", "completeness"):
+    for kept in ("moments", "ratings", "coverage", "completeness"):
         assert kept in data
+    # The confirm gate is gone (Task 3): no Mirror status, and no ratings to show.
+    assert "mirror_status" not in data and data["ratings"] == []

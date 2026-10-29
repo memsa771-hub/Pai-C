@@ -28,15 +28,12 @@ def test_fit_requires_actual_student_quote_and_strict_output():
 
 
 @pytest.mark.asyncio
-async def test_path_workflow_queued_once_and_confirmation_does_not_search_places():
+async def test_path_workflow_queued_once_without_a_mirror():
     with StudentSession() as student, student.factory() as db:
-        journey=research_journey(student,db,confirmed=True)
+        journey=research_journey(student,db)
         ctx=ToolContext(student.workspace_id,'pai',None,conversation='pai-counselor',
             allowed_tools=frozenset({'operator.delegate'}),audience=AUDIENCE_COUNSELOR,
             granted_capabilities=frozenset({'web.read','operator.delegate'}))
-        confirmed=await request_research('from_mirror',student.workspace_id,db=db,journey=journey,tool_context=ctx,trigger='mirror_confirmed')
-        assert confirmed['data']['status']=='paths_ready'
-        assert not db.scalars(select(ExecutionRun)).all()
         row=PossibilityService(db).add(student.workspace_id,journey.id,title='Practical design',
             why='Student evidence',kind='discovered',source='planner',status='exploring')
         db.commit()

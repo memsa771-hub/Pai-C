@@ -14,7 +14,7 @@ from tests.test_policy_guided import state
 
 
 @pytest.mark.parametrize("action", [
-    "care", "explore_correction", "mirror", "first_picture", "guide", "discover",
+    "care", "mirror", "first_picture", "guide", "discover",
     "counsel", "answer_request",
 ])
 def test_usefulness_guard_covers_every_action_without_replacing_it(monkeypatch, action):
@@ -28,14 +28,14 @@ def test_usefulness_guard_covers_every_action_without_replacing_it(monkeypatch, 
         table if name == "guided_table.json" else load(name))
     decision = controller.decide(state(questions_in_last_two=True))
     assert (decision.action, decision.topic, decision.invite) == (action, "history", True)
-    exempt = action in {"care", "answer_request", "first_picture", "explore_correction"}
+    exempt = action in {"care", "answer_request", "first_picture"}
     assert decision.question_allowed is exempt
     assert decision.rule_id == ("selected" if exempt else "selected+useful_question")
 
 
 @pytest.mark.parametrize("changes,action", [
     ({"first_picture_due": True}, "first_picture"),
-    ({"intent": "deciding", "summary_confirmed": True}, "guide"),
+    ({"intent": "deciding", "mirror_ready": True}, "guide"),
 ])
 def test_selected_action_survives_two_asking_replies(changes, action):
     uncapped = controller.decide(state(**changes, question_needed=True))
@@ -53,9 +53,9 @@ def test_selected_action_survives_two_asking_replies(changes, action):
 def test_cadence_is_observed_but_does_not_decide_necessity(replies, capped):
     signals = classifier.fallback_signals().model_copy(update={"intent": "deciding"})
     inputs = derive_state(signals, coverage={area: {"covered": True} for area in
-        controller.load_data("areas_policy.json")["priority"]}, mirror_ready=False, plan=None,
+        controller.load_data("areas_policy.json")["priority"]}, mirror_ready=True, plan=None,
         student_count=10, prior_decisions=[], replies=replies, student_ordinals={},
-        current_event_id="current", summary_confirmed=True)
+        current_event_id="current")
     result = controller.decide(inputs)
     assert inputs["questions_in_last_two"] is capped
     assert result.action == "guide" and not result.question_allowed
@@ -66,7 +66,7 @@ def test_cadence_is_observed_but_does_not_decide_necessity(replies, capped):
 async def test_reproductions_reach_voice_without_a_third_question(monkeypatch, action):
     decision = controller.decide(state(
         first_picture_due=action == "first_picture", intent="deciding",
-        summary_confirmed=action == "guide", questions_in_last_two=True))
+        mirror_ready=action == "guide", questions_in_last_two=True))
     invitation = "Tell me what feels right and what feels wrong."
     text = "Your interests and what you have tried point in similar directions. " + invitation
     model = AsyncMock(return_value=json.dumps({"reply": text + " Which matters most?",
@@ -92,7 +92,7 @@ async def test_reproductions_reach_voice_without_a_third_question(monkeypatch, a
 def test_distress_keeps_care_priority_and_cap_is_inactive(monkeypatch):
     result = controller.decide(state(
         safety={"level": "urgent"}, first_picture_due=True, intent="deciding",
-        summary_confirmed=True, questions_in_last_two=True))
+        mirror_ready=True, questions_in_last_two=True))
     assert result.action == "care" and result.rule_id == "care"
 
 

@@ -213,8 +213,8 @@ async def test_pending_information_waits_for_care_without_repeating_research(mon
 
 def test_early_picture_depends_on_evidence_not_count_and_correction_is_retained():
     coverage = {key: {"covered": True} for key in ("status", "history", "interests", "family_social")}
-    assert first_picture_due(coverage=coverage, student_count=2, prior_decisions=[], summary_confirmed=False)
-    assert not first_picture_due(coverage={}, student_count=200, prior_decisions=[], summary_confirmed=False)
+    assert first_picture_due(coverage=coverage, student_count=2, prior_decisions=[], mirror_ready=False)
+    assert not first_picture_due(coverage={}, student_count=200, prior_decisions=[], mirror_ready=False)
     before = CounselorNotebookData.model_validate({"self": [item(id="old", value="An old interpretation")]})
     after = apply_patch(before, [{"op": "retire", "id": "old", "reason": "Student rejected it"},
         addition("self", "value.changed", "I now value time with family")], {"old"}, "I now value time with family")

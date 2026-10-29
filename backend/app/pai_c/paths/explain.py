@@ -60,7 +60,7 @@ async def explain(context, payload):
     pages = []
     with bounded_research(queries=config.PAI_RESEARCH_MAX_QUERIES,
         fetches=config.PAI_RESEARCH_MAX_FETCHES, seconds=config.PAI_RESEARCH_MAX_SECONDS,
-        workspace_id=context.workspace_id, mirror_version=brief["mirror_version"]) as budget:
+        workspace_id=context.workspace_id, budget_key=brief["vault_version"]) as budget:
         found = data(await context.tools.invoke("web.search", {"query": rules["query"].format(field=brief["title"]), "limit": rules["search_limit"]}))
         for hit in (found.get("results") or [])[:rules["fetch_limit"]]:
             url = hit.get("url")
@@ -92,7 +92,7 @@ async def explain(context, payload):
             destination = sources if verdict.status == "verified" else unconfirmed
             destination.extend({**item, "status": verdict.status} for item in facts)
         public = explanation.model_dump(exclude={"world_facts"})
-        return {"path": public, "possibility_id": brief["possibility_id"], "mirror_version": brief["mirror_version"],
+        return {"path": public, "possibility_id": brief["possibility_id"], "vault_version": brief["vault_version"],
             "facts": sources, "unconfirmed": unconfirmed,
             "missing": [] if sources else [rules["missing_sources"]],
             "summary": rules["summary"], "research_metrics": budget.usage()}

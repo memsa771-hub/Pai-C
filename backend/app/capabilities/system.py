@@ -3,7 +3,7 @@ from .contract import CapabilityContract
 
 
 def load_system_capabilities(registry):
-    from app.pai_c.deep import analysis, mirror
+    from app.pai_c.deep import analysis
     from app.pai_c.paths import analyzer as paths
     from app.pai_c import sessions, opening, myths, checkins, reliability
     from app.memory import handlers as memory
@@ -13,7 +13,8 @@ def load_system_capabilities(registry):
     from app.pai_c.mirror import text_job as mirror_text
     from app.memory.reconciler import register_accept_hook
 
-    # The reconciler queues the Mirror text after Mirror-relevant Vault writes.
+    # After Mirror-relevant Vault writes the reconciler moves the journey to
+    # MIRROR when the card is ready and queues the Mirror text.
     register_accept_hook(mirror_text.after_accept)
 
     string = {"type": "string"}
@@ -26,8 +27,6 @@ def load_system_capabilities(registry):
         (sessions.JOB_SWEEP, sessions.sweep_job, {}),
         (sessions.JOB_SUMMARIZE, sessions.summarize_job, {"workspace_id": string, "first_event_id": string, "last_event_id": string}),
         (analysis.JOB_ANALYZE, analysis.analyze_job, {"user_event_id": string, "assistant_event_id": string, "source_timestamp": {"type": "number"}}),
-        (mirror.JOB_MIRROR, mirror.mirror_job, {"notebook_version": {"type": "integer"}, "journey_id": string, "source_event_id": string, "channel": string, "mirror_attempt": {"type": "integer"}}),
-        (mirror.JOB_RESEARCH, mirror.confirmed_research_job, {"journey_id": string, "version": {"type": "integer"}}),
         (mirror_text.JOB_MIRROR_TEXT, mirror_text.mirror_text_job, {"workspace_id": string, "card_version": string}),
         (paths.JOB_ANALYZE_PATHS, paths.path_analysis_job, {"notebook_version": {"type": "integer"}, "source_event_id": string, "channel": string, "reason": string}),
         (memory.JOB_EXTRACT, memory.extract_memory, {"source_type": string, "channel": string, "user_event_id": string, "assistant_event_id": string, "agent_name": string, "candidates": array}),
