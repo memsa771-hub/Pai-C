@@ -1,0 +1,145 @@
+# Production stack for app.placement-ai.com (frontend) and api.placement-ai.com (backend).
+# Run from the repository root on the server, with .env filled in from
+# .env.production.example and secrets/firebase-service-account.json in place:
+#   docker compose -f docker-compose.prod.yml up -d --build
+# Ports bind to 127.0.0.1 only; nginx on the host terminates TLS and proxies
+# (deploy/nginx). Full steps: docs/DEPLOY.md.
+#
+# The public origins are fixed here on purpose: the backend refuses to start in
+# production unless CORS_ORIGINS is exactly https://app.placement-ai.com
+# (backend/app/main.py), and the frontend compiles its API origin into the
+# bundle at build time. Values set under `environment` win over .env.
+name: pai-beta
+
+x-logging: &logging
+  driver: json-file
+  options: {max-size: "20m", max-file: "5"}
+
+x-backend: &backend
+  image: pai-beta-backend:prod
+  pull_policy: never
+  env_file: .env
+  environment:
+    APP_ENV: production
+    DATABASE_URL: postgresql+psycopg2://${DB_USER:-pai_admin}:${DB_PASSWORD:?DB_PASSWORD must be set in .env}@postgres:5432/openagents_workspace
+    REDIS_URL: redis://redis:6379/0
+    MEMORY_VECTOR_BACKEND: ${MEMORY_VECTOR_BACKEND:-qdrant}
+    QDRANT_URL: http://qdrant:6333
+    PAI_SEMANTIC_RECALL_ENABLED: ${PAI_SEMANTIC_RECALL_ENABLED:-true}
+    ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+    FILE_STORAGE_BACKEND: local
+    FILE_STORAGE_PATH: /data/files
+    PAI_PROPOSALS_DIR: /app/proposals
+    CORS_ORIGINS: https://app.placement-ai.com
+    FRONTEND_BASE_URL: https://app.placement-ai.com
+    APP_URL: https://app.placement-ai.com
+    WORKSPACE_ENDPOINT: https://api.placement-ai.com
+    FIREBASE_PROJECT_ID: ${FIREBASE_PROJECT_ID:?FIREBASE_PROJECT_ID must be set in .env}
+    FIREBASE_SERVICE_ACCOUNT: /run/secrets/firebase-service-account.json
+    # uvicorn workers for the API container (the worker service is separate).
+    WEB_CONCURRENCY: ${WEB_CONCURRENCY:-2}
+  volumes:
+    - files:/data/files
+    - ./proposals:/app/proposals
+    - type: bind
+      source: ${FIREBASE_SERVICE_ACCOUNT_FILE:-./secrets/firebase-service-account.json}
+      target: /run/secrets/firebase-service-account.json
+      read_only: true
+  logging: *logging
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: openagents_workspace
+      POSTGRES_USER: ${DB_USER:-pai_admin}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD must be set in .env}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    logging: *logging
+
+  redis:
+    image: redis:7.4-alpine
+    command: ["redis-server", "--save", "", "--appendonly", "no",
+              "--maxmemory", "256mb", "--maxmemory-policy", "allkeys-lru"]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    logging: *logging
+
+  qdrant:
+    image: qdrant/qdrant:v1.19.1
+    volumes:
+      - qdrant_data:/qdrant/storage
+    restart: unless-stopped
+    logging: *logging
+
+  migrate:
+    <<: *backend
+    entrypoint: ["alembic", "upgrade", "head"]
+    depends_on:
+      postgres: {condition: service_healthy}
+    restart: "no"
+
+  backend:
+    <<: *backend
+    pull_policy: build
+    build:
+      context: ./backend
+      provenance: false
+      target: ${BACKEND_IMAGE_TARGET:-browser}
+    depends_on:
+      migrate: {condition: service_completed_successfully}
+      redis: {condition: service_healthy}
+      qdrant: {condition: service_started}
+    ports:
+      - "127.0.0.1:8000:8000"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3)"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  worker:
+    <<: *backend
+    entrypoint: ["python", "-m", "app.jobs.worker"]
+    depends_on:
+      migrate: {condition: service_completed_successfully}
+      redis: {condition: service_healthy}
+      qdrant: {condition: service_started}
+    restart: unless-stopped
+
+  frontend:
+    image: pai-beta-frontend:prod
+    build:
+      context: ./frontend
+      provenance: false
+      args:
+        NEXT_PUBLIC_API_URL: https://api.placement-ai.com
+        NEXT_PUBLIC_FIREBASE_API_KEY: ${NEXT_PUBLIC_FIREBASE_API_KEY:?NEXT_PUBLIC_FIREBASE_API_KEY must be set in .env}
+        NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: ${NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN:?NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN must be set in .env}
+        NEXT_PUBLIC_FIREBASE_PROJECT_ID: ${FIREBASE_PROJECT_ID:?FIREBASE_PROJECT_ID must be set in .env}
+        NEXT_PUBLIC_FIREBASE_APP_ID: ${NEXT_PUBLIC_FIREBASE_APP_ID:?NEXT_PUBLIC_FIREBASE_APP_ID must be set in .env}
+        NEXT_PUBLIC_ENABLE_DMS: "false"
+    depends_on:
+      backend: {condition: service_healthy}
+    ports:
+      - "127.0.0.1:3000:3000"
+    restart: unless-stopped
+    logging: *logging
+
+volumes:
+  pgdata:
+  qdrant_data:
+  files:

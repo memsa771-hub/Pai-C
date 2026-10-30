@@ -5,6 +5,10 @@ Placement AI is a FastAPI/PostgreSQL backend with a standalone Next.js frontend.
 Sign-in (Firebase Auth), the account emails and the Firebase console setup are
 documented in [docs/AUTH_SESSION.md](docs/AUTH_SESSION.md).
 
+## Deploy
+
+Production (Ubuntu server, Docker, nginx, app.placement-ai.com and api.placement-ai.com): [docs/DEPLOY.md](docs/DEPLOY.md).
+
 ## Run locally
 
 Requirements: Docker Desktop and Python 3. Copy `.env.example` to `.env` and
