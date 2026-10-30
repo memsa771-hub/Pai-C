@@ -84,7 +84,10 @@ def _thinking(effort: Optional[str], settings: dict) -> tuple[dict, int]:
     output); medium and high get the data's token budget."""
     budget = int(settings.get("thinking_budget_by_effort", {}).get((effort or "").lower(), 0) or 0)
     if budget <= 0:
-        return {"type": "disabled"}, 0
+        # The "off" value is per model family and lives in data: Sonnet 5.5
+        # rejects "disabled" and asks for "between_tools" (no thinking before
+        # the reply; only short updates between tool calls, which we never use).
+        return dict(settings.get("thinking_off") or {"type": "disabled"}), 0
     return {"type": "enabled", "budget_tokens": budget}, budget
 
 

@@ -4,6 +4,7 @@
     "anthropic": {"api_key": "ANTHROPIC_API_KEY", "base_url": "ANTHROPIC_BASE_URL",
                   "model_prefixes": ["claude"], "default_model": "claude-sonnet-5-5", "default_max_tokens": 2048,
                   "timeout_seconds": 120, "max_retries": 2,
+                  "thinking_off": {"type": "between_tools"},
                   "thinking_budget_by_effort": {"medium": 1024, "high": 4096},
                   "empty_conversation": "Begin.",
                   "shorter_instruction": "Your previous answer was cut off. Give the complete answer again in fewer words.",

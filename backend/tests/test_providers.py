@@ -103,7 +103,7 @@ async def test_anthropic_client_maps_request_and_records_usage(caplog):
     first, second = (call.kwargs for call in client.messages.create.await_args_list)
     # The system prompt is one cached block (prompt caching); effort low turns thinking off.
     assert first == {"model": "claude-sonnet-5-5", "max_tokens": 300, "temperature": 0.3,
-        "thinking": {"type": "disabled"},
+        "thinking": {"type": "between_tools"},
         "system": [{"type": "text", "cache_control": {"type": "ephemeral"},
                     "text": "instructions\n" + gateway.model_roles()["providers"]["anthropic"]["json_instruction"]
                             + "\n\nExtra rule."}],
@@ -218,7 +218,7 @@ async def test_effort_maps_to_thinking_budget_from_data():
     # The budget comes on top of the reply's own max_tokens; thinking takes no temperature.
     assert medium["max_tokens"] == 1200 + 1024 and "temperature" not in medium
     assert high["thinking"]["budget_tokens"] == 4096 and high["max_tokens"] == 1200 + 4096
-    assert unset["thinking"] == {"type": "disabled"} and unset["max_tokens"] == 1200
+    assert unset["thinking"] == {"type": "between_tools"} and unset["max_tokens"] == 1200
 
 
 @pytest.mark.asyncio
