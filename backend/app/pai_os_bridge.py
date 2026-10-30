@@ -8,11 +8,15 @@ touches both products. Shared with the Counsellor team, who review every change.
   Counsellor's escalation code.
 - PAI OS never reads Counsellor tables: this file reads the decision records and the Counsellor's export function,
   and hands PAI OS the export. When PAI OS is not mounted, every function does nothing.
+- `recipient_email(student_ref)` (PAI OS Slice 9b): the email a student signed up with, for PAI OS's reminders. The
+  API gets it through `mount_os(recipient_lookup=)`, the worker through `OS_RECIPIENT_LOOKUP=app.pai_os_bridge:
+  recipient_email`.
 """
 
 import asyncio
 import importlib
 import logging
+import uuid
 from datetime import datetime, timezone
 
 from fastapi import HTTPException
@@ -20,7 +24,7 @@ from pydantic import ValidationError
 from sqlalchemy import select
 
 from app.config import config
-from app.models import DecisionRecord
+from app.models import DecisionRecord, User, Workspace
 from app.os import ports
 from app.os.ports import escalation as os_escalation
 from app.os.ports import plan_source
@@ -156,3 +160,19 @@ def start_sweep() -> asyncio.Task:
             await asyncio.sleep(SWEEP_SECONDS)
 
     return asyncio.create_task(loop())
+
+
+def recipient_email(student_ref: str) -> str | None:
+    """The email address of the student's PAI account: the active workspace `student_ref` names, then its owner. None
+    for an unknown or inactive workspace and for one with no owner (agent-made or legacy); PAI OS then blocks the
+    message as `no_address`. A database error raises, so PAI OS retries. Opens its own session: PAI OS calls it on its
+    worker thread."""
+    try:
+        workspace_id = str(uuid.UUID(student_ref))
+    except (TypeError, ValueError):
+        return None
+    from app.database import new_session
+
+    with new_session() as db:
+        return db.execute(select(User.email).join(Workspace, Workspace.owner_user_id == User.id)
+                          .where(Workspace.id == workspace_id, Workspace.status == "active")).scalar_one_or_none()
