@@ -102,7 +102,11 @@ services:
       redis: {condition: service_healthy}
       qdrant: {condition: service_started}
     ports:
-      - "127.0.0.1:8000:8000"
+      - "127.0.0.1:${BACKEND_PORT:-8000}:8000"
+    networks:
+      default:
+      proxy:
+        aliases: [pai-backend]
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3)"]
@@ -135,9 +139,25 @@ services:
     depends_on:
       backend: {condition: service_healthy}
     ports:
-      - "127.0.0.1:3000:3000"
+      # Another service may already hold 3000 on this host (the website): set FRONTEND_PORT in .env.
+      - "127.0.0.1:${FRONTEND_PORT:-3000}:3000"
+    networks:
+      default:
+      proxy:
+        aliases: [pai-frontend]
     restart: unless-stopped
     logging: *logging
+
+networks:
+  default:
+  # The reverse proxy's network. A proxy on the host (Caddy or nginx) does not
+  # use it, but it must exist: `docker network create pai-beta_proxy` once.
+  # A proxy running in Docker (the website's Caddy container) sets
+  # PROXY_NETWORK in .env to its compose network (docker network ls) and
+  # reaches the stack as pai-frontend:3000 and pai-backend:8000.
+  proxy:
+    external: true
+    name: ${PROXY_NETWORK:-pai-beta_proxy}
 
 volumes:
   pgdata:

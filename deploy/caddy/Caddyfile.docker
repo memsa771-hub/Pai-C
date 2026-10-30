@@ -1,0 +1,21 @@
+# Site blocks for a Caddy that itself runs in Docker (for example the website's
+# caddy container). The Placement AI stack joins that container's network
+# (PROXY_NETWORK in .env), so the upstreams are the stack's network aliases,
+# not host ports. Append these blocks to that container's Caddyfile and reload:
+#   docker exec <caddy container> caddy reload --config /etc/caddy/Caddyfile
+
+app.placement-ai.com {
+	encode gzip
+	request_body {
+		max_size 50MB
+	}
+	reverse_proxy pai-frontend:3000
+}
+
+api.placement-ai.com {
+	encode gzip
+	request_body {
+		max_size 50MB
+	}
+	reverse_proxy pai-backend:8000
+}

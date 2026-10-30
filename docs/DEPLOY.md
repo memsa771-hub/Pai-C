@@ -70,6 +70,19 @@ the backend refuses to start with anything else.
 
 ## 4. Build and start
 
+The stack joins the reverse proxy's Docker network (`proxy` in the compose
+file). With a proxy on the host (Caddy or nginx installed on Ubuntu) create an
+empty one once:
+
+```
+docker network create pai-beta_proxy
+```
+
+With a proxy that runs in Docker (the website's `caddy` container), skip that
+and set `PROXY_NETWORK` in `.env` to the proxy's network instead (section 5).
+If something on this server already listens on port 3000 (a website container
+does), set `FRONTEND_PORT=3001` in `.env` as well.
+
 ```
 docker compose -f docker-compose.prod.yml up -d --build
 ```
@@ -80,7 +93,7 @@ Next.js build). Then:
 ```
 docker compose -f docker-compose.prod.yml ps        # backend (healthy), frontend, worker, postgres, redis, qdrant up; migrate exited 0
 curl -s http://127.0.0.1:8000/health                # {"status": ...}
-curl -sI http://127.0.0.1:3000 | head -1            # HTTP/1.1 200 OK
+curl -sI http://127.0.0.1:3000 | head -1            # HTTP/1.1 200 OK (3001 when FRONTEND_PORT=3001)
 docker compose -f docker-compose.prod.yml logs --tail 50 migrate backend worker
 ```
 
@@ -119,14 +132,40 @@ sudo cp deploy/caddy/Caddyfile /etc/caddy/Caddyfile      # add the website's blo
 sudo systemctl enable --now caddy
 ```
 
-### Caddy in a Docker container (a dockerised website)
+### Caddy in a Docker container (the website's caddy container)
 
-The two blocks go into that container's Caddyfile, but its upstreams are the
-host, not 127.0.0.1: use `host.docker.internal:3000` and
-`host.docker.internal:8000`, and give the caddy service
-`extra_hosts: ["host.docker.internal:host-gateway"]` in its compose file (not
-needed when it runs with `network_mode: host`). Then `docker compose exec caddy
-caddy reload --config /etc/caddy/Caddyfile` in that project.
+The stack joins the caddy container's network and Caddy reaches it as
+`pai-frontend:3000` and `pai-backend:8000`; no host ports are involved.
+
+1. Find the network and the Caddyfile that container uses:
+
+   ```
+   docker inspect pai-website-caddy-1 --format '{{range $k, $v := .NetworkSettings.Networks}}{{$k}}{{"
+"}}{{end}}'
+   docker inspect pai-website-caddy-1 --format '{{range .Mounts}}{{.Source}} -> {{.Destination}}{{"
+"}}{{end}}'
+   ```
+
+   The first prints the network (for example `pai-website_default`); the
+   second shows where the Caddyfile lives on the host (the mount whose
+   destination is `/etc/caddy/Caddyfile`).
+
+2. In `~/pai-c/.env` set `PROXY_NETWORK=<that network>` and
+   `FRONTEND_PORT=3001` (the website holds 3000), then
+   `docker compose -f docker-compose.prod.yml up -d --build` (section 4).
+
+3. Append the blocks from `deploy/caddy/Caddyfile.docker` to the website's
+   Caddyfile (the host path from step 1) and reload:
+
+   ```
+   sudo sh -c 'cat ~/pai-c/deploy/caddy/Caddyfile.docker >> <host path of the Caddyfile>'
+   docker exec pai-website-caddy-1 caddy validate --config /etc/caddy/Caddyfile
+   docker exec pai-website-caddy-1 caddy reload --config /etc/caddy/Caddyfile
+   docker logs --since 2m pai-website-caddy-1 2>&1 | tail -20      # certificates obtained for both names
+   ```
+
+   The website's own block stays as it is. The container names above are the
+   website project's; `docker ps` shows them.
 
 ### nginx on the host instead
 
@@ -214,6 +253,8 @@ Spend and the monthly cap, evals and the rules refresh: docs/counselor/BETA_RUNB
 | Caddy log: certificate for app/api not obtained | DNS does not point at this server yet, or 80/443 are not open in the security group. Fix, then `sudo systemctl reload caddy`. |
 | Sign-in page shows `auth/unauthorized-domain` | Add `app.placement-ai.com` to Firebase authorized domains. |
 | App loads, every request fails with a network or CORS error | The frontend image was built with another API origin. `docker compose -f docker-compose.prod.yml build --no-cache frontend && docker compose -f docker-compose.prod.yml up -d frontend`. |
+| `network pai-beta_proxy declared as external, but could not be found` | Host proxy: `docker network create pai-beta_proxy`. Docker proxy: set `PROXY_NETWORK` in `.env` to the proxy's network. |
+| `Bind for 127.0.0.1:3000 failed: port is already allocated` | Another container holds 3000: set `FRONTEND_PORT=3001` in `.env` and run `up -d` again. |
 | 502 from Caddy or nginx | The container is not healthy: `docker compose -f docker-compose.prod.yml ps`, then its logs. |
 | Build killed, "exit code 137" | Out of memory: add swap (section 1) and rerun. |
 | Disk full | `docker system prune -f` removes old images and build cache; volumes are kept. |
