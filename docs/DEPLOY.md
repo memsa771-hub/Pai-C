@@ -21,6 +21,12 @@ Everything runs from `docker-compose.prod.yml`. The containers bind to
 - DNS: two A records pointing at the server's public (Elastic) IP:
   `app.placement-ai.com` and `api.placement-ai.com`. Check with
   `dig +short app.placement-ai.com` before requesting certificates.
+  On Cloudflare: DNS, Records, Add record, Type A, Name `app` (then `api`),
+  IPv4 address = the server IP, Proxy status **DNS only** (grey cloud), TTL
+  Auto. Keep both records DNS only: Caddy then issues the certificates itself
+  and no Cloudflare proxy timeout (100 s) sits in front of long requests.
+  Turning the orange cloud on later is possible once the certificates exist
+  (SSL/TLS mode Full (strict)), but it is not needed for the beta.
 - Keys at hand: OpenAI key, Anthropic key, Tavily key, Resend key, the Firebase
   web-app config and the Firebase service-account JSON (docs/AUTH_SESSION.md).
 
