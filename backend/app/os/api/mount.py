@@ -5,6 +5,7 @@ instead of failing every request (spec §4.1, review I7). Research profiles are 
 (Slice 2 spec §4.2). Building them does not connect to the database.
 """
 
+import logging
 import os
 from collections.abc import Callable, Mapping
 from pathlib import Path
@@ -21,24 +22,32 @@ from app.os.packs.config import PACK_DIR, load_checked_pack_configs
 from app.os.statements.config import check_config, load_statement_configs
 from app.os.knowledge.profile import PROFILE_DIR, load_profile_dir
 from app.os.playbooks import PLAYBOOK_DIR, load_playbook_dir
+from app.os.ports.recipients import RecipientLookup
 from app.os.settings import ModelModeError, flag, load_settings
 
 PREFIX = "/v1/os"
+log = logging.getLogger("app.os.mount")
 
 
 def mount_os(app: FastAPI, *, env: Mapping[str, str] | None = None,
              student_dependency: Callable[..., str] | None = None,
              student_write_dependency: Callable[..., str] | None = None,
              playbook_dir: Path = PLAYBOOK_DIR, profile_dir: Path = PROFILE_DIR,
-             document_types_dir: Path = TYPES_DIR, pack_dir: Path = PACK_DIR) -> bool:
+             document_types_dir: Path = TYPES_DIR, pack_dir: Path = PACK_DIR,
+             recipient_lookup: RecipientLookup | None = None) -> bool:
+    """False when the OS stays off. `recipient_lookup` (Slice 9b): the host's student ref -> email address function,
+    handed to the RecipientLookup port for this process (the worker loads its own from OS_RECIPIENT_LOOKUP)."""
+    enabled = flag(os.environ if env is None else env, "OS_ENABLED")
     try:
         settings = load_settings(env)
     except ModelModeError:
-        if flag(os.environ if env is None else env, "OS_ENABLED"):
+        if enabled:
             raise  # Slice 9a: e.g. offline AI without rehearsal mode refuses to start, with the reason
         return False
-    except ValueError:
-        return False  # no database configured: the OS stays off
+    except ValueError as e:  # e.g. no database, or resend without its key: the OS stays off
+        if enabled:  # Slice 9b: say so loudly instead of failing silently (the message names settings, no values)
+            log.error("PAI OS is enabled but not mounted: invalid settings (%s)", e)
+        return False
     if not settings.os_enabled:
         return False
     # an invalid research profile stops startup (Slice 2 spec §4.2): loaded below with the playbooks
@@ -57,7 +66,7 @@ def mount_os(app: FastAPI, *, env: Mapping[str, str] | None = None,
     services = make_services(settings, playbooks=books, document_types=types, statement_configs=statement_configs,
                              pack_configs=pack_configs, visa_configs=visa_configs)
     app.include_router(build_router(lambda: services), prefix=PREFIX)
-    ports.configure(services)  # the host's Slice 8 calls go through the ports, never the services directly
+    ports.configure(services, recipient_lookup)  # the host calls go through the ports, never the services directly
     if student_dependency is not None:
         app.dependency_overrides[current_student_ref] = student_dependency
     if student_write_dependency is not None:

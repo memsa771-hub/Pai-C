@@ -5,6 +5,9 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from app.os.ports import recipients
+from app.os.ports.recipients import RecipientLookup
+
 if TYPE_CHECKING:  # the replan code and the worker import the ports: they must not pull in the API
     from app.os.api.services import Services
 
@@ -16,9 +19,11 @@ class OsUnavailable(RuntimeError):
 _services: Services | None = None
 
 
-def configure(services: Services | None) -> None:
+def configure(services: Services | None, recipient_lookup: RecipientLookup | None = None) -> None:
+    """Called by `mount_os`. Slice 9b: also sets the RecipientLookup port (ports.recipients) for this process."""
     global _services
     _services = services
+    recipients.configure(recipient_lookup)
 
 
 def services() -> Services:

@@ -29,6 +29,7 @@ from app.os.api.queries import (
 from app.os.api.schemas import (
     CompleteIn,
     CostReportOut,
+    EmailStatusOut,
     ConsentIn,
     ConsentOut,
     CompleteOut,
@@ -569,6 +570,13 @@ def build_router(get_services: Callable[[], Services]) -> APIRouter:
         if end < start:
             raise HTTPException(status_code=422, detail="to is before from")
         return asdict(cost_report(svc.engine, svc.settings.tenant_id, start, end))
+
+    @router.get("/admin/email-status", response_model=EmailStatusOut, dependencies=[Depends(require_admin)])
+    def email_status_route(svc: Services = Depends(services)) -> dict:
+        """Slice 9b: the sender, the recipient lookup, outbox email rows per status and the last config error."""
+        from app.os.outbox.status import email_status
+
+        return email_status(svc.engine, svc.settings)
 
     add_pack_routes(router, services)  # Slice 6a (spec §4)
     add_visa_routes(router, services)  # Slice 6b (spec §4)

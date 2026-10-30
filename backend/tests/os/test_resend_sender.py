@@ -16,9 +16,9 @@ from app.os.outbox.senders import (
     NotAllowed,
     ProviderUnavailable,
     Refused,
-    ResendSender,
     make_sender,
 )
+from app.os.outbox.senders import ResendSender as _ResendSender
 from app.os.settings import load_settings
 
 KEY = "re_test_dummy"
@@ -41,8 +41,18 @@ def client(handler):
     return httpx.Client(transport=httpx.MockTransport(wrapped)), calls
 
 
+# Slice 9b: the recipient is a student ref resolved by a lookup. These 9a tests use refs that look like addresses and
+# a lookup that returns the ref, so the allow-list and logging rules are tested as before.
+PAYLOAD = {"task_id": 1, "title": "Passport copy", "due_at": "2027-07-16T21:59:00+00:00", "due_tz": "Europe/Berlin",
+           "slot": "d:2027-07-10"}
+
+
+def ResendSender(s, http):
+    return _ResendSender(s, http, lambda ref: ref)
+
+
 def msg(recipient="ali@example.com", key="k1"):
-    return OutboxMessage(1, key, "email", recipient, "inbox_reminder", {"task": "Passport copy"})
+    return OutboxMessage(1, key, "email", recipient, "inbox_reminder", PAYLOAD)
 
 
 def ok(request):
@@ -64,7 +74,7 @@ def test_sends_with_idempotency_key():
 def test_not_on_allowlist_is_blocked_not_sent(engine, clean):
     http, calls = client(ok)
     box = Outbox(engine, "pai")
-    box.add("k1", "email", "stranger@example.com", "inbox_reminder", {})
+    box.add("k1", "email", "stranger@example.com", "inbox_reminder", PAYLOAD)
     assert box.deliver(ResendSender(settings(), http)) == 0
     assert calls == []
     with engine.connect() as conn:
@@ -90,21 +100,21 @@ def test_allowlist_normalises_case_and_space():
     assert len(calls) == 1
 
 
-def test_4xx_marks_failed(engine, clean, caplog):
-    http, _ = client(lambda r: httpx.Response(422, json={"message": "bad"}))
+def test_4xx_marks_failed(engine, clean, caplog):  # 9b: 401/403/422 are config errors (test_email_pilot.py)
+    http, _ = client(lambda r: httpx.Response(400, json={"message": "bad"}))
     box = Outbox(engine, "pai")
-    box.add("k1", "email", "ali@example.com", "inbox_reminder", {})
-    box.add("k2", "email", "ali@example.com", "inbox_reminder", {})
+    box.add("k1", "email", "ali@example.com", "inbox_reminder", PAYLOAD)
+    box.add("k2", "email", "ali@example.com", "inbox_reminder", PAYLOAD)
     ok_http = ResendSender(settings(), http)
     with pytest.raises(Refused) as exc:
         ok_http.send(msg())
-    assert exc.value.status == 422 and KEY not in str(exc.value)
+    assert exc.value.status == 400 and KEY not in str(exc.value)
     with caplog.at_level(logging.INFO, logger="app.os.outbox"):
         assert box.deliver(ok_http) == 0
     with engine.connect() as conn:
         rows = conn.execute(select(models.outbox).order_by(models.outbox.c.id)).all()
     assert [r.status for r in rows] == ["failed", "failed"]  # terminal; the loop went on to the next row
-    assert "422" in caplog.text
+    assert "400" in caplog.text
 
 
 def test_5xx_raises_for_step_retry(engine, clean):
@@ -117,7 +127,7 @@ def test_5xx_raises_for_step_retry(engine, clean):
     http, _ = client(handler)
     box = Outbox(engine, "pai")
     for k in ("k1", "k2", "k3"):
-        box.add(k, "email", "ali@example.com", "inbox_reminder", {})
+        box.add(k, "email", "ali@example.com", "inbox_reminder", PAYLOAD)
     with pytest.raises(ProviderUnavailable):
         box.deliver(ResendSender(settings(), http))
     with engine.connect() as conn:
@@ -146,19 +156,19 @@ def test_resend_needs_key_and_from():
 
 
 def test_make_sender_builds_resend():
-    assert isinstance(make_sender(settings(), None), ResendSender)
+    assert isinstance(make_sender(settings(), None, lookup=lambda ref: ref), _ResendSender)
 
 
 def test_log_never_contains_address(engine, clean, caplog):
     http, _ = client(ok)
     refused, _ = client(lambda r: httpx.Response(400))
     box = Outbox(engine, "pai")
-    box.add("k1", "email", " Ali@Example.com", "inbox_reminder", {})
-    box.add("k2", "email", "Stranger@Example.com", "inbox_reminder", {})
-    box.add("k3", "email", "ali@example.com", "inbox_reminder", {})
+    box.add("k1", "email", " Ali@Example.com", "inbox_reminder", PAYLOAD)
+    box.add("k2", "email", "Stranger@Example.com", "inbox_reminder", PAYLOAD)
+    box.add("k3", "email", "ali@example.com", "inbox_reminder", PAYLOAD)
     with caplog.at_level(logging.DEBUG):
         box.deliver(ResendSender(settings(), http))
-        box.add("k4", "email", "ali@example.com", "inbox_reminder", {})
+        box.add("k4", "email", "ali@example.com", "inbox_reminder", PAYLOAD)
         box.deliver(ResendSender(settings(), refused))
     text = caplog.text.lower()
     assert "example.com" not in text and "ali@" not in text and "stranger" not in text and KEY not in text
@@ -201,7 +211,7 @@ def test_retryable_errors_do_not_carry_the_key(handler, engine, clean):
     assert KEY not in repr(e) and KEY not in str(e) and KEY.encode() not in pickle.dumps(e)
     # through the outbox: it propagates and the row stays pending
     box = Outbox(engine, "pai")
-    box.add("k1", "email", "ali@example.com", "inbox_reminder", {})
+    box.add("k1", "email", "ali@example.com", "inbox_reminder", PAYLOAD)
     with pytest.raises(ProviderUnavailable):
         box.deliver(ResendSender(settings(), http))
     with engine.connect() as conn:
@@ -209,7 +219,7 @@ def test_retryable_errors_do_not_carry_the_key(handler, engine, clean):
 
 
 def test_other_4xx_is_still_refused():
-    for code in (400, 401, 403, 404, 422):
+    for code in (400, 404, 409):  # 9b: 401, 403 and 422 are configuration errors now
         http, _ = client(lambda r, c=code: httpx.Response(c))
         with pytest.raises(Refused):
             ResendSender(settings(), http).send(msg())
