@@ -5,6 +5,13 @@ import { PackDetails } from './pack-details';
 import { approveBlockers, canApprove, packStatusLabel, todoCount, type OsPack } from '@/lib/os-packs';
 import { workspaceApi } from '@/lib/api';
 
+// Merge pai-c + pai-os: on pai-c the bearer is a fresh Firebase ID token (lib/auth/service currentIdToken), and
+// configure()'s third argument only marks the client signed in. Stand in the token these tests expect.
+vi.mock('@/lib/auth/service', async (original) => ({
+  ...(await original<typeof import('@/lib/auth/service')>()),
+  currentIdToken: async () => 'bearer-x',
+}));
+
 // Fictional values only.
 function pack(over: Partial<OsPack> = {}): OsPack {
   return {

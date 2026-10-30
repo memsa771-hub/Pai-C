@@ -24,7 +24,9 @@ from pydantic import ValidationError
 from sqlalchemy import select
 
 from app.config import config
-from app.models import DecisionRecord, User, Workspace
+# Merge pai-c + pai-os: pai-c replaced the old decision-record table (migration 119) with `RouteDecision`
+# (`pai_route_decisions`), which has the same id / workspace_id / chosen_at the sweep reads.
+from app.models import RouteDecision, User, Workspace
 from app.os import ports
 from app.os.ports import escalation as os_escalation
 from app.os.ports import plan_source
@@ -78,8 +80,8 @@ def _submit_since_mark(db) -> tuple[int, int]:
         return 0, 0
     mark = plan_source.sweep_mark()
     after = (datetime.fromisoformat(mark["chosen_at"]), mark["decision_id"]) if mark else None
-    rows = db.execute(select(DecisionRecord.id, DecisionRecord.workspace_id, DecisionRecord.chosen_at)
-                      .order_by(DecisionRecord.chosen_at, DecisionRecord.id)).all()
+    rows = db.execute(select(RouteDecision.id, RouteDecision.workspace_id, RouteDecision.chosen_at)
+                      .order_by(RouteDecision.chosen_at, RouteDecision.id)).all()
     rows = [r for r in rows if after is None or (_aware(r.chosen_at), r.id) > after]
     submitted = failed = 0
     for workspace_id in dict.fromkeys(r.workspace_id for r in rows):  # each student once, oldest change first

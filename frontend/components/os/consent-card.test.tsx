@@ -6,6 +6,13 @@ import { ConsentCard } from './consent-card';
 import { workspaceApi } from '@/lib/api';
 import { consentCode, type OsConsent } from '@/lib/os-consent';
 
+// Merge pai-c + pai-os: on pai-c the bearer is a fresh Firebase ID token (lib/auth/service currentIdToken), and
+// configure()'s third argument only marks the client signed in. Stand in the token these tests expect.
+vi.mock('@/lib/auth/service', async (original) => ({
+  ...(await original<typeof import('@/lib/auth/service')>()),
+  currentIdToken: async () => 'bearer-x',
+}));
+
 vi.mock('@/lib/api', () => ({ workspaceApi: { agreeOsConsent: vi.fn(), getOsConsent: vi.fn() } }));
 
 // Fictional terms.

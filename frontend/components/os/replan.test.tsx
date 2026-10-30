@@ -6,6 +6,13 @@ import { SupportList } from './support-list';
 import { opText, stepName, type OsProposal, type OsReplanOp, type OsSupportCase } from '@/lib/os-replan';
 import { workspaceApi } from '@/lib/api';
 
+// Merge pai-c + pai-os: on pai-c the bearer is a fresh Firebase ID token (lib/auth/service currentIdToken), and
+// configure()'s third argument only marks the client signed in. Stand in the token these tests expect.
+vi.mock('@/lib/auth/service', async (original) => ({
+  ...(await original<typeof import('@/lib/auth/service')>()),
+  currentIdToken: async () => 'bearer-x',
+}));
+
 // Fictional values only.
 const R = 'The programme did not admit you: its remaining steps are removed.';
 const NAMES = { 'prog-a': 'MSc Example', 'prog-c': 'MSc Other' };

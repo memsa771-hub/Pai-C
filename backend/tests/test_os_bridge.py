@@ -58,7 +58,10 @@ def test_os_admin_token_survives_the_session_middleware():
     from app.os.api import mount_os
 
     app = FastAPI()
-    app.add_middleware(main.PaiSessionBoundaryMiddleware)
+    # Merge pai-c + pai-os: pai-c removed PaiSessionBoundaryMiddleware with Supabase (3112f0e); run the
+    # check through the /v1/ middlewares main.py has now instead.
+    app.add_middleware(main.PrivateApiMiddleware)
+    app.add_middleware(main.SafeAccessLogMiddleware)
     env = {"DATABASE_URL": "postgresql://x/y", "OS_ENABLED": "true", "OS_ADMIN_TOKEN": "admin-secret"}
     assert mount_os(app, env=env)
     client = TestClient(app)

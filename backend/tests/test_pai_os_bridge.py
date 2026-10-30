@@ -13,7 +13,7 @@ from sqlalchemy import text
 from app import pai_os_bridge as bridge
 from app.config import config
 from app.journey import JourneyService
-from app.models import DecisionRecord, StudentJourney
+from app.models import RouteDecision, StudentJourney
 from app.os import ports
 from app.os.contracts.escalation import EscalationV1
 from app.os.ports import escalation as os_escalation
@@ -67,7 +67,9 @@ def journey_at(student, stage: str) -> str:
     with student.factory() as db:
         service = JourneyService(db)
         journey = service.ensure_counselor(student.workspace_id)
-        for s in ("FOUNDATION", "DIRECTION", "MIRROR", "RESEARCHING", "ASSESSING", "PROPOSED", "CHOSEN"):
+        # Merge pai-c + pai-os: pai-c's stage machine goes MIRROR -> PROPOSED (RESEARCHING / ASSESSING are only
+        # for old data now, app/pai_c/stages.py).
+        for s in ("FOUNDATION", "DIRECTION", "MIRROR", "PROPOSED", "CHOSEN"):
             journey = service.set_counselor_stage(student.workspace_id, journey.id, s,
                                                   validated_choice=s == "CHOSEN")
             if s == stage:
@@ -83,9 +85,11 @@ def escalation(student, journey_id: str, reason: str = "blocking_gap", key: str 
 
 def record(db, workspace_id: str, n: int, chosen_at: datetime) -> str:
     db.execute(text("PRAGMA foreign_keys=OFF"))  # the roadmap and journey rows are not needed for the sweep
-    row = DecisionRecord(id=f"rec-{n}", workspace_id=workspace_id, journey_id="j-1", roadmap_id="r-1",
-                         roadmap_version=n, confirmed_summary={}, accepted_gaps=[], accepted_risks=[], assumptions=[],
-                         choice_channel="chat", chosen_at=chosen_at)
+    # Merge pai-c + pai-os: pai-c's decision record is RouteDecision (migration 119 dropped the old model). One
+    # active row per workspace, so each fake row is already withdrawn (the sweep reads every row by chosen_at).
+    # Ids are UUIDs with letters: SQLite would store all-digit hex as a number.
+    row = RouteDecision(id=f"decd{n:04d}-aaaa-4aaa-8aaa-aaaaaaaaaaaa", workspace_id=workspace_id,
+                        field_key="f-1", title="Route", verdict={}, route={}, steps=[], steps_done=[], chosen_at=chosen_at, withdrawn_at=chosen_at)
     db.add(row)
     db.commit()
     return row.id

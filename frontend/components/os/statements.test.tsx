@@ -19,6 +19,13 @@ import {
   type OsStatement,
 } from '@/lib/os-statements';
 
+// Merge pai-c + pai-os: on pai-c the bearer is a fresh Firebase ID token (lib/auth/service currentIdToken), and
+// configure()'s third argument only marks the client signed in. Stand in the token these tests expect.
+vi.mock('@/lib/auth/service', async (original) => ({
+  ...(await original<typeof import('@/lib/auth/service')>()),
+  currentIdToken: async () => 'bearer-x',
+}));
+
 // Fictional values only.
 function q(over: Partial<OsInterviewItem>): OsInterviewItem {
   return { id: 'field_why', prompt: 'Why this field?', hint: 'A moment that got you interested.', required: true,

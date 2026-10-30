@@ -21,7 +21,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
 
-from app.application_workspace.access import _auth as _workspace_auth
 from app.config import config
 from app.database import get_db
 from app.os.api import mount_os
@@ -422,6 +421,22 @@ app.include_router(workspaces.router)
 
 # PAI OS (backend/app/os): mounted under /v1/os only when OS_ENABLED is set. The OS never imports
 # Counsellor code, so the signed-in student is passed in here: the student's workspace is their ref.
+def _workspace_auth(db, network, token, authorization, *, write=False):
+    """Merge pai-c + pai-os: pai-os imported this as `_auth` from app.application_workspace.access, a
+    package pai-c deleted (9e70c95). Same checks, built from the helpers pai-c still has."""
+    from app.routers.network import _resolve_workspace, _verify_workspace_access
+    from app.security.event_identity import resolve_human
+
+    workspace = _resolve_workspace(db, network)
+    if workspace is None:
+        return None, json_response(ResponseCode.NOT_FOUND, "Workspace not found")
+    if not _verify_workspace_access(workspace, token, authorization):
+        return None, json_response(ResponseCode.UNAUTHORIZED, "Invalid credentials")
+    if write and resolve_human(db, workspace, authorization) is None:
+        return None, json_response(ResponseCode.FORBIDDEN, "Student account required")
+    return workspace, None
+
+
 def _os_student(db, network, x_workspace_token, authorization, *, write: bool) -> str:
     workspace, error = _workspace_auth(db, network, x_workspace_token, authorization, write=write)
     if error is not None:  # keep the host's status and message (e.g. 403 "Student account required")
