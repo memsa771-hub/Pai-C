@@ -50,8 +50,8 @@ echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
 ## 2. Get the code
 
 ```
-git clone https://github.com/memsa771-hub/Pai-beta.git ~/pai-beta
-cd ~/pai-beta
+git clone https://github.com/memsa771-hub/Pai-beta.git ~/pai-c
+cd ~/pai-c
 ```
 
 ## 3. Secrets
@@ -171,7 +171,7 @@ signed-in founder account (the Settings page shows the same card).
 Update to a new release:
 
 ```
-cd ~/pai-beta && git pull && docker compose -f docker-compose.prod.yml up -d --build
+cd ~/pai-c && git pull && docker compose -f docker-compose.prod.yml up -d --build
 ```
 
 Only the images whose source changed are rebuilt; data in the volumes
@@ -194,7 +194,7 @@ sh scripts/backup-postgres.sh        # writes backups/openagents_workspace_<time
 Run it daily from cron and copy the files off the server (S3 or your machine):
 
 ```
-(crontab -l 2>/dev/null; echo "15 3 * * * cd $HOME/pai-beta && sh scripts/backup-postgres.sh >> backups/backup.log 2>&1") | crontab -
+(crontab -l 2>/dev/null; echo "15 3 * * * cd $HOME/pai-c && sh scripts/backup-postgres.sh >> backups/backup.log 2>&1") | crontab -
 ```
 
 Restore: `docker compose -f docker-compose.prod.yml exec -T postgres pg_restore -U pai_admin -d openagents_workspace --clean --if-exists < backups/<file>.dump`.
