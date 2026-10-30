@@ -127,3 +127,34 @@ async def test_replay_skips_an_incomplete_recording_and_goes_on(tmp_path, monkey
     assert report["skipped"] == [{"id": multi["id"], "reason": "incomplete_recording"}]
     assert [case["id"] for case in report["cases"]] == [single["id"]]
     assert all(item["found"] for item in report["cases"][0]["expected"])
+
+
+def _entry(display, value=None, type_="pressure"):
+    return {"type": type_, "kind": "item", "display": display, "value": value, "level": "stated"}
+
+
+def test_a_label_matches_the_display_or_the_stored_value_case_insensitively():
+    spec = {"kind": "item", "type": "pressure", "display": ["shop", "Time"]}
+    assert eval_extraction.entry_matches(spec, _entry("Sits at the father's SHOP, Time"))
+    # The stored value carries the label the display words differently.
+    assert eval_extraction.entry_matches(spec, _entry("Sits at the father's shop", {"text": "x", "kind": "time"}))
+    assert not eval_extraction.entry_matches(spec, _entry("Sits at the father's store, Time"))
+
+
+def test_accept_any_names_synonyms_for_one_label_only():
+    spec = {"kind": "item", "type": "pressure", "display": ["shop", "Time"], "accept_any": {"shop": ["store"]}}
+    assert eval_extraction.entry_matches(spec, _entry("Sits at the father's store, Time"))
+    assert not eval_extraction.entry_matches(spec, _entry("Sits at the father's store, Money"))
+    eval_extraction.validate_case({"id": "x", "language": "en", "student_messages": ["hi"],
+                                   "extractor_output": {"candidates": []}, "expected_vault": [spec]})
+    with pytest.raises(ValueError, match="accept_any"):
+        eval_extraction.validate_case({"id": "x", "language": "en", "student_messages": ["hi"],
+                                       "extractor_output": {"candidates": []},
+                                       "expected_vault": [{**spec, "accept_any": {"Fees": ["fee"]}}]})
+
+
+def test_must_not_is_never_loosened_by_synonyms():
+    case = {"id": "x", "language": "en", "expected_vault": [],
+            "must_not": [{"type": "goal", "why": "a parent's wish is never the student's goal"}]}
+    entries = [{"type": "goal", "kind": "record", "display": "Prefers engineering", "value": {}, "level": "stated"}]
+    assert eval_extraction.score_case(case, entries, 0)["violations"]

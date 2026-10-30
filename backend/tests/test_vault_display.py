@@ -95,3 +95,24 @@ def test_4_budget_in_another_currency_is_never_a_lakh_band():
     assert display_text("finance.budget", {"min": 5000, "max": 8000, "currency": "USD", "period": "per_year"}) == (
         "5000-8000 USD, per year")
     assert display_text("finance.budget", {"amount": 250000, "currency": "PKR"}) == "1-3 lakh"
+
+
+def test_4_exploration_reads_what_where_outcome_never_a_comma_blob():
+    """Live golden run: an exploration showed 'Completed, Circuits chapter ...,
+    Yes, ..., school_course, Introductory'. It reads what, where, outcome."""
+    value = {"domain": "Electronics / Circuits", "activity_type": "school_course",
+             "title": "Circuits chapter in physics class", "activity_status": "completed",
+             "exposure_level": "introductory",
+             "student_reflection": {"enjoyed": True, "what_enjoyed": "Liked the circuits chapter and understood it."}}
+    assert display_text("exploration_experience", value) == (
+        "Circuits chapter in physics class — School course — Completed — Liked the circuits chapter and understood it")
+    assert display_text("exploration_experience", {"title": "Web design", "activity_type": "online_course",
+                                                   "domain": "web"}) == "Web design — Online course"
+    for kind in ("course", "project", "workshop", "visit", "work", "internship", "school_course"):
+        text = display_text("exploration_experience", {"title": "T", "activity_type": kind, "domain": "d"})
+        assert "_" not in text and text.split(" — ")[1][:1].isupper(), text
+
+
+def test_4_a_sentence_ending_in_a_full_stop_does_not_leave_it_before_the_next_part():
+    assert display_text("pressure", {"text": "Has a big problem paying fees.", "kind": "money"}) == (
+        "Has a big problem paying fees, Money")

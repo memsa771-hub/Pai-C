@@ -59,7 +59,18 @@
         "not built"
       ],
       "evidence_level": "stated",
-      "core": true
+      "core": true,
+      "accept_any": {
+        "not built": [
+          "never built",
+          "hasn't built",
+          "not made",
+          "never made",
+          "hasn't made",
+          "nothing built",
+          "built nothing"
+        ]
+      }
     },
     {
       "kind": "item",

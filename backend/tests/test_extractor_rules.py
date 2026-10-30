@@ -176,3 +176,23 @@ def test_5_7_extractor_prompt_states_the_rules_and_is_documented_verbatim():
         pytest.skip("docs are not mounted")
     section = DOCS.read_text(encoding="utf-8").split("## Memory extractor (background)", 1)[1]
     assert section.split("```text\n", 1)[1].split("\n```", 1)[0].rstrip() == prompt
+
+
+def test_live_golden_rules_are_in_the_prompt():
+    """The first live golden run missed names, merged two interests, made a
+    liking a goal, logged watched reels as an exploration, kept one pressure of
+    two and dropped the student's own strength word."""
+    prompt = extractor.SYSTEM_PROMPT
+    for line in ("is identity.preferred_name",
+                 '"mera naam Hamza hai"',
+                 "is only that family_member's wish, never a goal",
+                 "is an interest item, never a goal",
+                 "is a goal (commitment exploratory or considering",
+                 "One interest item per distinct thing",
+                 "never merge two things",
+                 "exploration_experience is only for something the student actually did",
+                 "Watching videos or reels",
+                 "one pressure item per kind",
+                 "Two pressures in one message are two items",
+                 "that word in English is the strength's text"):
+        assert line in prompt, line

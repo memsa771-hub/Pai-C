@@ -50,7 +50,12 @@
         "Time"
       ],
       "evidence_level": "stated",
-      "core": true
+      "core": true,
+      "accept_any": {
+        "shop": [
+          "store"
+        ]
+      }
     }
   ],
   "must_not": [

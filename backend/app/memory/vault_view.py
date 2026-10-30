@@ -24,6 +24,7 @@ Rules this module exists to enforce (VAULT_SPEC §Language, §Evidence ladder,
 """
 
 import json
+import re
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from functools import lru_cache
@@ -86,6 +87,9 @@ def _aware(moment: Any) -> Optional[datetime]:
 
 def _iso(moment: Optional[datetime]) -> Optional[str]:
     return moment.isoformat() if moment else None
+
+
+_CODE = re.compile(r"[a-z]+(?:_[a-z]+)+")
 
 
 def _skip_in_display(key: str) -> bool:
@@ -205,7 +209,9 @@ def _display(spec: Optional[TypeSpec], value: Any, type_key: Optional[str] = Non
                 return node[:1].upper() + node[1:]
         if node in rules["enum_labels"].get(name, {}):
             return rules["enum_labels"][name][node]
-        if node in enums.get(path, ()):
+        if node in enums.get(path, ()) or _CODE.fullmatch(node):
+            # A schema code, or a code-shaped free-text value ("online_course"
+            # in a free activity_type) that no list names: words, never the code.
             text = node.replace("_", " ")
             return text[:1].upper() + text[1:]
         return node
@@ -250,7 +256,8 @@ def _display(spec: Optional[TypeSpec], value: Any, type_key: Optional[str] = Non
         parts = render(value, "")
     shown, seen = [], set()
     for part in parts:  # "engineering, engineering" said twice reads once
-        if part and part.strip() and part.casefold() not in seen:
+        part = part.strip().rstrip(".").rstrip() if isinstance(part, str) else part
+        if part and part.casefold() not in seen:
             seen.add(part.casefold())
             shown.append(part)
     return shape.get("join", rules["separator"]).join(shown)

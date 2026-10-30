@@ -62,7 +62,7 @@
     }
   },
   "display": {
-    "_note": "How an entry reads on every page (VAULT_SPEC Language; audit #4: no raw codes). Choice codes read through the catalog lists; schema codes through enum_labels, else as words; hidden_fields never show; types pick fields and order.",
+    "_note": "How an entry reads on every page (VAULT_SPEC Language; audit #4: no raw codes). Choice codes read through the catalog lists; schema codes through enum_labels, else as words (a free-text code such as online_course reads as words too); hidden_fields never show; types pick fields and order; a part's closing full stop is dropped before the next part.",
     "separator": ", ",
     "yes": "Yes",
     "no": "No",
@@ -89,6 +89,22 @@
         "per_year": "per year",
         "per_month": "per month",
         "total": "in total"
+      },
+      "activity_type": {
+        "school_course": "School course",
+        "course": "Course",
+        "online_course": "Online course",
+        "project": "Project",
+        "workshop": "Workshop",
+        "visit": "Visit",
+        "work": "Work",
+        "internship": "Internship",
+        "competition": "Competition",
+        "volunteering": "Volunteering",
+        "club": "Club",
+        "extracurricular": "Extracurricular",
+        "leadership": "Leadership",
+        "other": "Other"
       },
       "influencer_type": {
         "parent": "Parent",
@@ -169,6 +185,17 @@
         "fields": [
           "text",
           "example"
+        ],
+        "join": " — "
+      },
+      "exploration_experience": {
+        "_note": "What, where, outcome: the title, the kind of activity (activity_type labels above), its status and what the student took from it.",
+        "fields": [
+          "title",
+          "activity_type",
+          "activity_status",
+          "student_reflection.what_enjoyed",
+          "student_reflection.what_disliked"
         ],
         "join": " — "
       },

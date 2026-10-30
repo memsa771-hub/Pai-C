@@ -61,6 +61,11 @@ def validate_case(case: dict) -> None:
             raise ValueError(f"{case['id']}: expected kind/type {spec}")
         if spec.get("evidence_level", "stated") not in LEVELS:
             raise ValueError(f"{case['id']}: evidence_level {spec}")
+        accept = spec.get("accept_any", {})
+        if not isinstance(accept, dict) or any(
+                label not in spec.get("display", ()) or not isinstance(words, list) or not words
+                for label, words in accept.items()):
+            raise ValueError(f"{case['id']}: accept_any names synonyms for one of its display labels {spec}")
     for spec in case.get("must_not", []):
         if not spec.get("type") or not spec.get("why"):
             raise ValueError(f"{case['id']}: must_not needs type and why")
@@ -90,14 +95,25 @@ def vault_entries(db, workspace_id: str) -> tuple[list[dict], int]:
     return entries, len(view["conflicts"])
 
 
+def _haystack(entry: dict) -> str:
+    """What a label is looked for in: the display line, then the stored value
+    (a choice code or a field the display words differently), casefolded."""
+    value = json.dumps(entry.get("value"), ensure_ascii=False) if entry.get("value") is not None else ""
+    return f"{entry.get('display') or ''} | {value}".casefold()
+
+
 def entry_matches(spec: dict, entry: dict) -> bool:
-    """Labels, never codes: a spec matches on the entry's display line."""
+    """A spec matches when each label is in the entry's display or stored value
+    (case-insensitive), or one of that label's `accept_any` synonyms is: a
+    synonym is for wording with the same meaning only, never a looser rule."""
     if entry["type"] != spec["type"] or (spec.get("kind") and entry["kind"] != spec["kind"]):
         return False
-    display = (entry.get("display") or "").casefold()
-    if not all(part.casefold() in display for part in spec.get("display", ())):
+    text = _haystack(entry)
+    accept = spec.get("accept_any", {})
+    if not all(any(word.casefold() in text for word in (part, *accept.get(part, ())))
+               for part in spec.get("display", ())):
         return False
-    if spec.get("display_any") and not any(part.casefold() in display for part in spec["display_any"]):
+    if spec.get("display_any") and not any(part.casefold() in text for part in spec["display_any"]):
         return False
     return "evidence_level" not in spec or entry["level"] == spec["evidence_level"]
 
@@ -118,6 +134,8 @@ def score_case(case: dict, entries: list[dict], conflicts: int) -> dict:
         expected.append({**spec, "found": hit is not None,
                          "seen": None if hit else [e["display"] for e in entries if e["type"] == spec["type"]]})
     violations = []
+    # A must-not reads the display line only, as the student sees it, and
+    # takes no synonyms: the rule it guards is never loosened.
     for spec in case.get("must_not", []):
         bad = [e["display"] for e in entries if e["type"] == spec["type"]
                and all(p.casefold() in (e.get("display") or "").casefold() for p in spec.get("display", ()))]
