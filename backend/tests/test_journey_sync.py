@@ -47,7 +47,8 @@ def proposed_student(student, db):
     _, journey, _ = prepare(student, db)
     make_ready(db, ws)
     assert stage(db, journey.id) == "MIRROR"
-    add_education(student, db, fsc("pre_engineering", 78))
+    # Still the current education: an onboarded student always has a status (city, current level).
+    add_education(student, db, fsc("pre_engineering", 78, academic_status="current"))
     add_path(student, db, field_title("electrical_engineering"), "electrical_engineering")
     accept_item(db, ws, "interest", {"text": "Drawing"})
     assert stage(db, journey.id) == "PROPOSED"

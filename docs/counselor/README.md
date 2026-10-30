@@ -13,6 +13,7 @@ Work in `workspace` on branch `pai-c`. `pai-os` is the PAI OS developer's branch
 - `FOUR_FEATURES_SPEC.md` - the four core features (Vault, Mirror, Path engine, Roadmap engine) and what helps them; no Mirror confirm gate, embeddings on, coloured route steps with a time estimate
 - `BETA_CONVERSATION_SPEC.md` - beta launch decisions: Claude chat with a $100 monthly cap, PAI drives the conversation, field research, Pakistan-wide calendar, extraction golden set
 - `BETA_RUNBOOK.md` - how to run and watch the beta: env names, spend, evals, rules refresh, what to do when the cap pauses
+- `BETA_SMOKE_REPORT.md`, `BETA_SMOKE_REPORT_EN.md` - the live end-to-end smoke runs of 30 Oct 2026 (Roman Urdu, English): checks, latency, spend, transcript
 - `BUILD_REPORT_V1.md` - locked-workflow implementation, card checklist, tests and founder start command
 - `DECISIONS.md`, `BLOCKERS.md` - implementation choices and safely unavailable/deferred items
 - `COUNSELOR_V3_PROMPTS.md` - copy of the runtime prompts; tests check it matches the prompt files

@@ -86,7 +86,42 @@ A diff whose file value has changed since is reported stale and skipped. The adm
 - The first applied proposal reformats `admission_rules.json`.
 - The institution filter is a word list plus catalog names.
 - The Settings spend card hides itself after a failed first load in a browser session.
-- Cost estimate after the final fixes (Sonnet at $2/$10 with the static voice prompt cached as its own system block (the per-turn context is not cached), thinking off at effort low, planner on gpt-5-mini, path analysis and Mirror text at 6 runs per workspace and day, web calls counted): about $1.5–2 per student over 30 turns, so the $100 cap covers roughly 50–65 such students. The 80 % stage (path analysis, planner, Mirror text and research stop for everyone) comes earlier. For a larger cohort the founder may raise `PAI_MONTHLY_CAP_USD`. Task 7 must measure the real figure.
+- Cost estimate after the final fixes (Sonnet at $2/$10 with the static voice prompt cached as its own system block (the per-turn context is not cached), thinking off at effort low, planner on gpt-5-mini, path analysis and Mirror text at 6 runs per workspace and day, web calls counted): about $1.5–2 per student over 30 turns, so the $100 cap covers roughly 50–65 such students. The 80 % stage (path analysis, planner, Mirror text and research stop for everyone) comes earlier. For a larger cohort the founder may raise `PAI_MONTHLY_CAP_USD`. Measured on 30 Oct 2026 (section 9): $0.71 (Roman Urdu) and $0.31 (English) for onboarding, the opening, six turns, the Vault, Mirror, paths, roadmap and one about-PAI answer, so the 30-turn estimate stands.
 - The monthly cap is not a hard ceiling: the classifier, safety, summarizer and sensitive check still run at 100 %.
 - A chat-asked path analysis is not held by the daily cap (only by the 80 % stage).
-- Live end-to-end verification with real models (Task 7) is pending; run it before inviting students.
+- Live end-to-end verification ran on 30 Oct 2026 (section 9). Run it again after any prompt or model change.
+
+## 9. Beta smoke results (30 Oct 2026)
+
+Command, from `backend/` with the stack running:
+
+```
+python -m scripts.beta_smoke --create-student --spend-from-docker --cap-usd 5 --language roman_ur --report ../docs/counselor/BETA_SMOKE_REPORT.md
+python -m scripts.beta_smoke --create-student --spend-from-docker --cap-usd 5 --language en --report ../docs/counselor/BETA_SMOKE_REPORT_EN.md
+```
+
+Both runs pass every check (sign-in, onboarding, opening, six turns in the student's language, Vault, Mirror ready and redrawn, paths with Vault-cited reasons, roadmap steps with region dates, choose to CHOSEN, tick a step, how PAI works). Reports: `BETA_SMOKE_REPORT.md` (Roman Urdu) and `BETA_SMOKE_REPORT_EN.md` (English).
+
+| Run | Cost | Chat reply latency | Extractor job | Planner job (queue + run) |
+| --- | --- | --- | --- | --- |
+| Roman Urdu | $0.71 | 6–12 s | median 7 s, max 44 s | median 134 s |
+| English | $0.31 | 4–8 s | median 3 s, max 4 s | median 96 s |
+
+Extraction golden set (live, `scripts/eval_extraction.py --live --cap-usd 5`): 93 % recall and precision, core recall 92 %, 0 violations, $0.05.
+
+What the five live runs found and what changed (all on `pai-beta`):
+
+- The opening arrived 67 s late behind a workspace analysis: it has its own lock scope and job priority.
+- The opening did not end with a question: a guard retries once, then appends a question-bank question.
+- Planner patches were rejected twice per turn with no reason in the retry feedback: the reason (schema words only) now goes back to the planner and into the log; `category` outside `source` is dropped instead of failing the patch.
+- The Mirror never became ready: readiness read `history`, which needs two past entries while onboarding records only the current education; it now reads `status` (current education), `goals` and `interests`.
+- A Roman Urdu turn carrying English terms ("78% marks", "Lahore board") was classified as English for one reply: the classifier decides by grammar and function words.
+- The Writer put its next step in the reply and in `next_step`, so the student saw the line twice: it is posted once.
+- Extraction: a dislike is not an interest; a name goes to `identity.preferred_name`; one interest per thing.
+
+Still observed, documented, not blocking:
+
+- The planner's background analyses run one at a time per workspace and finish 1.5–2 minutes after a burst of turns; the chat, Vault, Mirror and paths do not wait for them.
+- One extractor job in the Roman Urdu run took 44 s (the others under 10 s).
+- "How does PAI work" named two or three of the four features in the live runs; the prompt now asks for all four (not re-run live).
+
