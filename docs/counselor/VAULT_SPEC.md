@@ -73,7 +73,7 @@ values in English with the original quote kept; one place for everything; a new 
 catalog entry alone; document entries open the right file and page; every conflict type has a test.
 
 ## Status (24 Oct 2026, branch vault-core)
-Built (backend, plan docs/superpowers/plans/2026-10-24-vault-core.md, tasks 1-12):
+Built (backend, tasks 1-12):
 - One catalog (backend/app/memory/catalog/vault_catalog.json) for every type, choice list, onboarding
   question, money marker and fact field definition; onboarding and fact cards read it.
 - Item store and drop log (migration 116), normalization to English and codes, the conflict engine and the
