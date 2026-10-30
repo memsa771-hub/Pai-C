@@ -31,7 +31,7 @@ async def test_9_rejection_logs_reason_and_patch_keys_without_student_text(caplo
     assert model.await_count == 2  # one correction, no more
     lines = [r.getMessage() for r in caplog.records if r.getMessage().startswith("planner_patch_rejected")]
     assert len(lines) == 2
-    assert "attempt=2" in lines[1] and "error_type=" in lines[1]
+    assert "attempt=2" in lines[1] and "error_type=" in lines[1] and "reason=id not present in Planner view" in lines[1]
     assert "keys=patch,plan" in lines[1] and "ops=item,op,part;evidence,id,op" in lines[1]
     skipped = [r.getMessage() for r in caplog.records if r.getMessage().startswith("planner_patch_skipped")]
     assert len(skipped) == 1 and "error_type=" in skipped[0] and "keys=patch,plan" in skipped[0]

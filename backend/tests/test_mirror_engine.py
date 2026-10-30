@@ -217,3 +217,20 @@ def test_summary_and_workspace_picture_read_the_card():
         assert kept in data
     # The confirm gate is gone (Task 3): no Mirror status, and no ratings to show.
     assert "mirror_status" not in data and data["ratings"] == []
+
+
+def test_ready_needs_the_current_education_a_goal_and_two_interests_not_a_second_history_entry():
+    """Onboarding records only the current education; the card must become
+    ready from that plus a goal and two interests (FOUR_FEATURES_SPEC 6)."""
+    with StudentSession() as student, student.factory() as db:
+        ws = student.workspace_id
+        _record(db, ws, "education", {"qualification_name": "FSc", "field_of_study": "Pre-Engineering",
+                                      "academic_status": "current", "result": {"percentage": 78}},
+                capture="onboarding")
+        _record(db, ws, "goal", {"goal_type": "study", "title": "Electrical Engineering"})
+        _item(db, ws, "interest", {"text": "Robotics"})
+        assert MirrorEngine(db).ready(ws) is False
+        _item(db, ws, "interest", {"text": "Circuits"})
+        card = MirrorEngine(db).build(ws)
+        assert card["ready"] is True
+        assert "history" in {u["area"] for u in card["unknowns"]}  # the past is still asked for, it just never gates the card

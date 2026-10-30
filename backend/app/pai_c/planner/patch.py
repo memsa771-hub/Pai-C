@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 import re
 from typing import Any, Literal, Annotated
 from uuid import uuid4
-from pydantic import BaseModel, ConfigDict, Field, TypeAdapter
+from pydantic import BaseModel, ConfigDict, Field, TypeAdapter, ValidationError
 from app.pai_c.deep.notebook_schema import CounselorNotebookData, Item, SourceItem, Rating
 from app.pai_c.deep.notebook_sanitize import sanitize_notebook
 from app.pai_c.deep.coverage import enforce_mirror_readiness, requirements
@@ -103,9 +103,24 @@ OPERATION = TypeAdapter(Annotated[Add | Update | Confirm | Retire | UpsertPerson
 
 
 class PatchRejected(ValueError):
-    def __init__(self, index, error_type):
-        self.index, self.error_type = index, error_type
-        super().__init__(f"op_index={index} error_type={error_type}")
+    """`reason` is why the op failed, in schema words only (field paths, error
+    types, this module's fixed messages): it goes back to the planner as
+    correction feedback and into the log, so it never carries student text."""
+    def __init__(self, index, error_type, reason=""):
+        self.index, self.error_type, self.reason = index, error_type, reason
+        super().__init__(f"op_index={index} error_type={error_type}" + (f" reason={reason}" if reason else ""))
+
+
+def rejection_reason(exc) -> str:
+    """A pydantic error reduced to field paths and error types (never the
+    input); this module's own ValueErrors are fixed strings; anything else
+    gives no reason beyond its type."""
+    if isinstance(exc, ValidationError):
+        return "; ".join(".".join(str(part) for part in error["loc"]) + ": " + error["type"]
+                         for error in exc.errors()[:6])
+    if type(exc) is ValueError:
+        return str(exc)
+    return ""
 
 
 def apply_patch(notebook, operations, visible_ids, latest_student_text, *, now=None, evidence_refs=()):
@@ -203,4 +218,4 @@ def apply_patch(notebook, operations, visible_ids, latest_student_text, *, now=N
                     for key in requirements()[cleaned.depth_mode])
         return enforce_mirror_readiness(cleaned.model_copy(update={"mirror_ready": ready}))
     except Exception as exc:
-        raise PatchRejected(index, type(exc).__name__) from None
+        raise PatchRejected(index, type(exc).__name__, rejection_reason(exc)) from None

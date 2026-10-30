@@ -390,3 +390,16 @@ def test_plan_age_counts_only_later_student_messages_in_workspace():
         assert MemoryService(db).latest_plan(student.workspace_id) is not None
         _turn_job(student,db)
         assert MemoryService(db).latest_plan(student.workspace_id) is None
+
+
+def test_rejection_carries_a_schema_only_reason_for_the_planner():
+    """The correction feedback names why the op failed (this module's fixed
+    message, or a pydantic field path and error type), never the student's words."""
+    before=notebook()
+    with pytest.raises(PatchRejected) as error:
+        apply_patch(before,[{"op":"confirm","id":"not-visible","evidence":"private student text"}],build_planner_view(before).ids,"")
+    assert error.value.reason == "id not present in Planner view" and "reason=id not present" in str(error.value)
+    with pytest.raises(PatchRejected) as error:
+        apply_patch(before,[{"op":"add","part":"said","item":{**new_item(value="private student text"),"kind":"private student text"}}],build_planner_view(before).ids,"")
+    assert error.value.error_type == "ValidationError" and "kind" in error.value.reason
+    assert "private student text" not in str(error.value)

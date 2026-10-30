@@ -376,7 +376,7 @@ The Counselor shell accidentally omitted the shared UserMenu when replacing the 
 - Completeness lives in `app/pai_c/completeness.py` (memory must not import pai_c); `vault_version` and `relevance_version` live in `app/memory/` and read Vault tables only.
 - The next question keeps mentioned-first among unknowns; stale entries never count toward `min_items`; notebook sources inherit the freshness of their Vault type.
 - Migration 120 is the usage counter; 121 removes the Mirror gate and drops `pai_counselor_mirror_feedback` (table drop approved for this cleanup).
-- Mirror `ready` maps the light keys: said to history and goals, self to interests; card `version` is a content digest string.
+- Mirror `ready` maps the light keys: said to status and goals (history needs two past entries, which onboarding never gives, so it never gates the card), self to interests; card `version` is a content digest string.
 - The research budget is keyed per workspace and UTC day (keys older than 7 days pruned), not per Vault version.
 - Results stay current by `relevance_version` over `vault_trigger_types`; a finished run is never discarded, only flagged stale, and re-runs only when asked.
 - A path's `why` must cite a Vault entry; evidence badge levels come from the Vault ladder, not the profile card.

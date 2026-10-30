@@ -272,8 +272,8 @@ async def _candidate(db, workspace_id: str, student: EventRecord,
                 raise PatchRejected(-1, "InvalidOutputShape")
             candidate = apply_patch(previous.notebook, parsed.get("patch"), view.ids, query, evidence_refs=evidence_refs)
         except PatchRejected as exc:
-            logger.warning("planner_patch_rejected turn_id=%s attempt=%d op_index=%d error_type=%s %s",
-                           student_id, attempt + 1, exc.index, exc.error_type,
+            logger.warning("planner_patch_rejected turn_id=%s attempt=%d op_index=%d error_type=%s reason=%s %s",
+                           student_id, attempt + 1, exc.index, exc.error_type, exc.reason or "-",
                            _patch_shape(parsed))
             if attempt:
                 # One bad turn never fails the job: the patch is skipped, the
