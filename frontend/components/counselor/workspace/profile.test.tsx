@@ -498,3 +498,8 @@ it("audit #4: a structured entry reads in the Vault's words, never its raw field
   expect(shown.textContent).toContain("3-6 lakh, per year");
   expect(shown.textContent).not.toMatch(/600000|300000|per_year/);
 });
+
+it("the header ring is the completeness meter (areas known of ten), not the basics list", async () => {
+  setup({ ...vault, completeness: { known: 2, total: 10, unknowns: [] } });
+  expect(await screen.findByRole("img", { name: "20% complete" })).toBeTruthy();
+});

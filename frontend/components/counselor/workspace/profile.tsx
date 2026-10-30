@@ -170,7 +170,12 @@ export function LivingProfile({
   const name = first("identity.full_name")?.display || copy.nav.profile;
   const missing = missingBasics(entries);
   const toProve = resultsToProve(entries);
-  const pct = Math.round(((layout.basics.length - missing.length) / layout.basics.length) * 100);
+  // The ring is the Vault's completeness meter (areas known of ten, as the
+  // Mirror counts them); the basics list is only the fallback for an old payload.
+  const meter = vault.completeness;
+  const pct = meter && meter.total > 0
+    ? Math.round((meter.known / meter.total) * 100)
+    : Math.round(((layout.basics.length - missing.length) / layout.basics.length) * 100);
   const sections = layout.vaultSections as Record<string, string>;
   const groups = Object.entries(vault.details)
     .map(([id, section]) => ({ id, title: sections[id] || section.label, rows: section.entries.filter(visible) }))

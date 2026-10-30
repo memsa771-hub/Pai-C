@@ -88,6 +88,8 @@ export type VaultView = {
   details: Record<string, VaultSection>;
   story: VaultStoryCard[];
   conflicts: VaultConflict[];
+  /** The completeness meter: areas PAI knows of the total (same numbers the Mirror shows). */
+  completeness?: { known: number; total: number; unknowns?: unknown[] };
   stale: VaultEntry[];
 };
 
