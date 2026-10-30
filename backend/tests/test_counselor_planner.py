@@ -69,7 +69,6 @@ def test_each_patch_operation_is_atomic_and_keeps_unmentioned_items(op):
 @pytest.mark.parametrize("op", [
     {"op":"add","part":"said","item":new_item(id="model-id")},
     {"op":"add","part":"said","item":new_item(first_seen=STAMP)},
-    {"op":"add","part":"said","item":new_item(category="self")},
     {"op":"update","id":"a","fields":{"value":"No evidence"}},
     {"op":"confirm","id":"unknown","evidence":"Evidence"},
     {"op":"set_private","field":"chapter","value":"coach"},
@@ -403,3 +402,9 @@ def test_rejection_carries_a_schema_only_reason_for_the_planner():
         apply_patch(before,[{"op":"add","part":"said","item":{**new_item(value="private student text"),"kind":"private student text"}}],build_planner_view(before).ids,"")
     assert error.value.error_type == "ValidationError" and "kind" in error.value.reason
     assert "private student text" not in str(error.value)
+
+
+def test_category_outside_source_is_dropped_not_rejected():
+    before=notebook()
+    after=apply_patch(before,[{"op":"add","part":"said","item":new_item(category="self")}],build_planner_view(before).ids,"",now=NOW)
+    assert after.said[-1].model_dump().get("category") is None and len(after.said)==len(before.said)+1

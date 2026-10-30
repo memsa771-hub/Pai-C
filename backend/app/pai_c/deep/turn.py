@@ -255,7 +255,8 @@ async def run_deep_turn(db, turn: CounselorTurnInput, *,
                 if step_violations:
                     violations.extend(item for item in step_violations if item not in violations)
                     step_line = ""
-            if step_line:
+            # A Writer that already closed the reply with its step gets it once.
+            if step_line and not reply.rstrip().endswith(step_line.strip()):
                 reply = polish_reply(reply.rstrip() + "\n\n" + step_line)
         posted_step = step_line if step_line and reply.rstrip().endswith(step_line.strip()) else None
         if decision is not None and decision.must_drive and card is None and not ends_with_step(reply, step_line):

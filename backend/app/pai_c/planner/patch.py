@@ -117,7 +117,7 @@ def rejection_reason(exc) -> str:
     gives no reason beyond its type."""
     if isinstance(exc, ValidationError):
         return "; ".join(".".join(str(part) for part in error["loc"]) + ": " + error["type"]
-                         for error in exc.errors()[:6])
+                         + " (" + error["msg"] + ")" for error in exc.errors()[:6])
     if type(exc) is ValueError:
         return str(exc)
     return ""
@@ -149,8 +149,10 @@ def apply_patch(notebook, operations, visible_ids, latest_student_text, *, now=N
                 # A model cannot promote a report into independent evidence.
                 if (entry.get("kind") != "said" or entry.get("capability_status") == "demonstrated" or entry.get("level") == "proven") and entry.get("vault_fact_ref") not in evidence_refs:
                     raise ValueError("independent evidence requires a supported profile reference")
-                if operation.part != "source" and "category" in entry:
-                    raise ValueError("category is source-only")
+                # category means something only on source items; elsewhere it
+                # is dropped rather than failing the whole patch (planners add it often).
+                if operation.part != "source":
+                    entry.pop("category", None)
                 if operation.part == "source" and entry.get("category") is None:
                     entry.pop("category", None)
                 entry.update(id=str(uuid4()), first_seen=stamp, last_confirmed=stamp)

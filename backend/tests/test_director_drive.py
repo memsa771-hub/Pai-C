@@ -394,3 +394,19 @@ async def test_a_language_fallback_with_an_appended_bank_step_records_the_step_a
             row = db.scalar(select(CounselorTurnDecision))
     assert "language_fallback" in row.guard_violations and "drive_appended" in row.guard_violations
     assert row.decision["step_bank_intent"]
+
+
+@pytest.mark.asyncio
+async def test_a_step_already_closing_the_reply_is_posted_once():
+    """Smoke run 5: the Writer put its step inside `reply` and in `next_step`; the
+    student saw the line twice."""
+    decision = controller.decide({**inputs(replies=["Hi?"]), "journey_stage": "PROPOSED"})
+    step = "Open the Roadmap page and pick one."
+    output = json.dumps({"reply": "Those two fields both use maths.\n\n" + step, "next_step": step,
+                         "moves": ["give"], "action": {"type": "none"}})
+    model = AsyncMock(return_value=output)
+    with StudentSession() as student, student.factory() as db:
+        with patch("app.pai_c.deep.turn.chat_completion", model):
+            result = await run_deep_turn(db, _turn(student, "ok"), history=[], decision=decision, signals=signals())
+    assert result.reply == "Those two fields both use maths.\n\n" + step
+    assert result.reply.count("Open the Roadmap page") == 1 and result.next_step == step
