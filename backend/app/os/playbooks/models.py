@@ -19,8 +19,12 @@ class Citation(_Model):
 
 
 class Dependency(_Model):
+    """`pull: false` (Slice 9b): the step still waits for the dependency (a hard edge gates it), but the step's own
+    date does not pull the dependency earlier in the backward pass. For a step whose date is a target the student
+    cannot bring forward through it, e.g. the visa apply-by date and the admission result (Task 11C)."""
     key: str
     hard: bool = True
+    pull: bool = True
 
 
 class Condition(_Model):
@@ -35,7 +39,7 @@ class Condition(_Model):
         return self
 
 
-NOTE_FIELDS = frozenset({"date", "due", "days", "weeks"})
+NOTE_FIELDS = frozenset({"date", "due", "days", "weeks", "days_left"})
 
 
 def placeholders(note: str) -> set[str]:
@@ -49,15 +53,24 @@ class Anchor(_Model):
     before your semester starts on {date}" ({date} is the fact's date, {due} the step's own due date, {days} and
     {weeks} the lead time; any playbook constant by its name, e.g. {visa_processing_days}); `note_earliest`: the same
     when the date is the earliest of several programmes'. `waiting`: what the student is told while the fact is
-    missing; `waiting_none`: while no programme is left to take it from (every one said "not admitted")."""
+    missing; `waiting_none`: while no programme is left to take it from (every one said "not admitted").
+    `note_passed` (Slice 9b): when set, a date the lead time gives that has already passed when the plan is compiled
+    is never shown as the due date; the step is due on the fact's own date instead (the last day the step still
+    makes sense) and shows this note ({due} is then the passed date, {days_left} the days from today to the fact's
+    date); `note_passed_earliest`: the same when the date is the earliest of several programmes'."""
     fact: str
     programme: Literal["visa"] | None = None
     note: str | None = None
     note_earliest: str | None = None  # the note when the date is the earliest of several programmes' (provisional)
     waiting: str | None = None
     waiting_none: str | None = None  # blocked `no_candidate:<programme>` (Slice 9 Task 11)
+    note_passed: str | None = None  # the lead time's date has passed: due on the fact's date (Slice 9b)
+    note_passed_earliest: str | None = None
 
-    @field_validator("note", "note_earliest")
+    def notes(self) -> tuple[str | None, ...]:
+        return self.note, self.note_earliest, self.note_passed, self.note_passed_earliest
+
+    @field_validator("note", "note_earliest", "note_passed", "note_passed_earliest")
     @classmethod
     def _plain_placeholders(cls, note: str | None) -> str | None:
         """Only plain names ({due}, not {due.year} or {0}); which names are known is checked by the playbook."""
@@ -105,6 +118,9 @@ class TaskTemplate(_Model):
             raise ValueError(f"work task cannot have inbox_kind ({self.template_key})")
         if self.anchor and self.anchor.programme and self.fan_out == "programme":
             raise ValueError(f"a fanned-out step anchors on its own programme, not anchor.programme "
+                             f"({self.template_key})")
+        if self.anchor and (self.anchor.note_passed or self.anchor.note_passed_earliest) and not self.lead_time:
+            raise ValueError(f"anchor.note_passed needs a lead_time: without one the date cannot pass early "
                              f"({self.template_key})")
         return self
 
@@ -155,7 +171,7 @@ class Playbook(_Model):
             for name in (t.lead_time.constant if t.lead_time else None, t.duration_constant):
                 if name is not None and name not in self.constants:
                     raise ValueError(f"unknown constant '{name}' in {t.template_key}")
-            for note in (t.anchor.note, t.anchor.note_earliest) if t.anchor else ():
+            for note in t.anchor.notes() if t.anchor else ():
                 unknown = placeholders(note or "") - NOTE_FIELDS - set(self.constants)
                 if unknown:
                     raise ValueError(f"unknown note placeholder {sorted(unknown)} in {t.template_key} (known: "

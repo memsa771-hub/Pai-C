@@ -17,6 +17,10 @@ on 2026-10-29 with real OpenAI: S1 reached `visa_ready` for **$0.49 in total**, 
 the owners' confirmation of D7 (Q5) and the gate itself; no real student may start before 9b's entry conditions
 (§7).
 
+**Update 2026-10-30:** the user, on the owners' behalf, **confirmed D7 (Q5) and accepted the 9a gate** (ruling 34).
+**9a is closed.** The same day the user decided the visa apply-by figure, 9b entry condition 1 (§7): 15 weeks
+(rulings 35 to 37, branch `os/s9b-visa-lead`).
+
 One PR per task, each into `pai-os`:
 
 | Task | Branch | PR | What |
@@ -60,8 +64,8 @@ One PR per task, each into `pai-os`:
   `terms_not_set`); the "Study abroad plan" menu in the phone drawer and a header with a Menu button on every OS page;
   `ResendSender` with an allow-list (rehearsals keep `log`); a per-student cost report.
 - **Fixes from the rehearsal** (Task 11): the statements list 500 (F3), steps left open after a programme is removed
-  (F2), the visa step's date (F1, now an apply-by date 6 weeks before the visa programme's researched
-  `semester_start`), named per-programme inbox cards and a confirmation before "Not admitted", the 8 wording findings,
+  (F2), the visa step's date (F1, now an apply-by date before the visa programme's researched `semester_start`:
+  6 weeks in 9a, 15 weeks since 2026-10-30, ruling 35), named per-programme inbox cards and a confirmation before "Not admitted", the 8 wording findings,
   paying and applying after approval (pack configs v2), the four old Slice 7 minors (S9-D10), and a rehearsal-only
   start date (`os_0017`) so the rehearsal does not depend on the real date.
 - **Task 12:** `--billed` on the rehearsal command (see §3, mark 6).
@@ -93,6 +97,8 @@ outside the repo, in `~/s9-rehearsal/`.
 | 5 | The three phone walkthroughs find nothing that blocks a student | **Pass, with a limit** | Task 10's walkthroughs found 3 `blocks` (2 root causes); all are fixed (`78ce040`, `6fe27b6`). **The walkthroughs were not played again in a browser after the fix pass.** The screen fixes have Vitest tests, and batch B took 375 px screenshots against a mocked API (`~/s9-rehearsal/walkthroughs-2`). The owners' OK for the fake sign-in path was not seen |
 | 6 | The billed run finishes within its cap and gives a cost per student below D7 | **Pass** | 2026-10-29, `~/s9-rehearsal/billed`: S1 only, caps 1.5/1/1/0.5 = $4 (the user: "as low as possible"). S1 reached `ready_to_submit` and `visa_ready` in 5 rehearsal days. **Total spend $0.49**, no model errors, no guard stop. Failure log: one driver false positive, `duplicate:draft_per_request` (§3 below). The first attempt, blocked by the network policy, spent $0 |
 | 7 | The usual checks pass | **Pass** | See §1: `tests/os`, legacy, standalone (module off), Tach, the single head, Vitest, `tsc`, the OS-enabled build |
+
+**Gate accepted** on 2026-10-30 by the user on the owners' behalf, with D7 confirmed (ruling 34).
 
 **Cost figure for D7: $0.30 per student, plus $0.20 of shared research** (`scripts.os_costs`, tenant
 `rehearsal-billed`). Even with all the research charged to one student, that is **$0.49 against D7's $10 per student per
@@ -172,13 +178,14 @@ four caps are set and sum to at most $15.
 22. F1: the visa date is derived from the programme's start date minus a playbook offset, with provenance, explained
     to the student (the user's choice B, #166).
 23. That start is a new researched fact `semester_start`; the visa date is 6 weeks before it (the user's option A,
-    #166).
+    #166). *The 6 weeks are superseded by ruling 35.*
 24. F4 (`paused:S7`) is accepted as designed (S7-D9), by the user on the owners' behalf, 2026-10-28 (#166).
 25. All 8 wording findings are fixed in Task 11 (the user's choice A, #166).
 26. Paying and "applied" ticks come after approval: approval means "the contents are right" (#166).
 27. The removal message wording (`rejected_kept`) is kept as it is (#166).
 28. The 6-week date is the **apply-by** date for `visa_apply` (2 days to apply); the 90-day processing time is only an
-    estimate in the text (the user's option A, #166).
+    estimate in the text (the user's option A, #166). *Still the apply-by date; its figure is now 15 weeks (ruling
+    35).*
 29. The billed run is approved: S1, S3, S5, cap $15 (5/4/4/2), the owners set a budgeted key; the key is never
     printed, logged or committed (the user on the owners' behalf, 2026-10-29; this branch).
 30. (Task 12, final design confirmed by the controller in fix round 1) A billed run also has a whole-run budget
@@ -193,6 +200,29 @@ four caps are set and sum to at most $15.
     first attempt ran 2 h against a blocked network (#168).
 33. With rehearsal off, startup is refused while the tenant has a rehearsal clock row, so rehearsal data never
     becomes a pilot database. An unreachable database when the API is mounted is logged, not refused (#168).
+34. D7 (Q5, $10 per student per year) is **confirmed** against the billed run's $0.49, and the **9a gate is
+    accepted**: the user on the owners' behalf, 2026-10-30.
+35. **The visa apply-by date** (9b entry condition 1, the user's decision, 2026-10-30): the semester start minus the
+    processing time (`visa_processing_days`, 90) minus a 2-week buffer, rounded up to whole weeks because the note
+    says `{weeks}`: **15 weeks, 105 days** (`visa_before_semester_days` in the playbook, invariant 12). The notes
+    say why: "Apply by {due}: 15 weeks before your semester starts on {date}, so that the visa (about 90 days) can
+    arrive in time." `germany_master.v1` is edited in place again: still no real students (invariant 10)
+    (`os/s9b-visa-lead`).
+36. **A passed apply-by date** (e.g. a July admission for an October start): the step says "Apply now, as soon as you
+    can", warns that the visa may arrive after the semester starts and says how many days are left (the anchor's
+    `note_passed` / `note_passed_earliest`). Its due date is the **semester start itself**, not today and not the
+    passed date. The passed date would make the step overdue on the day it becomes possible (a daily escalation
+    reminder, `deadline_at_risk`, an at-risk plan); "today" would move every day, so the step would always be due
+    within 48 hours (twice-daily reminders) with negative slack (a new `deadline_at_risk` each day). The semester
+    start is stable, is the last day applying still makes sense, gives normal slack-based reminders, and pulls
+    nothing before the application deadlines. "Passed" means the apply-by day is before the compile day (the day
+    itself still counts). The note's day count refreshes in place on each recompile (citations are not structural,
+    so no revision); the switch itself is one revision (`os/s9b-visa-lead`).
+37. **Task 11C kept:** 15 weeks before an October start (mid June) falls before typical application deadlines
+    (15 July), so the date alone would pull the admission result and the applications weeks early. The visa step's
+    dependency on `admission_result` is `pull: false` (a new playbook field): it still waits for the admission (a
+    hard edge for the kernel), but its date does not pull it earlier. The visa preparation steps (blocked account,
+    insurance, visa file) are still pulled by it. The regression test keeps its realistic dates (`os/s9b-visa-lead`).
 
 **Other PR rulings:**
 - #156: no sign-in workaround was built; the existing test entry point is only documented.
@@ -253,11 +283,12 @@ From spec §10, updated:
 4. **Q4 S8-D3** (the pilot opens when Slice 8 passes on the PAI OS side): still to confirm. Real students also wait for
    the 9a gate, which waits for mark 6.
 5. **Q5 D7** ($10 per student per year): the billed run measured **$0.49 for one student**, all research included
-   (§3). The owners confirm D7.
+   (§3). **Confirmed** by the user on the owners' behalf, 2026-10-30 (ruling 34).
 
 Raised during 9a:
-6. **Visa timing:** `visa_before_semester_days` is 6 weeks (an apply-by date), while a visa usually takes about 90
-   days. Is 6 weeks enough, or should the apply-by date be earlier? (A planning constant in the playbook.)
+6. **Visa timing:** `visa_before_semester_days` was 6 weeks (an apply-by date), while a visa usually takes about 90
+   days. **Resolved** 2026-10-30 (the user): 15 weeks, with an "Apply now" warning once the date has passed
+   (rulings 35 to 37).
 7. **Email recipients:** outbox recipients are student refs, not addresses. Resend needs a student → email lookup
    (through a port, invariant 11) before the pilot; until then every row would be `blocked`.
 8. **Walkthrough sign-in:** the owners' OK for the fake sign-in path (one fixed student) was never seen. If refused,
@@ -293,14 +324,16 @@ Raised during 9a:
 
 ## 7. Next steps
 
-**To close 9a:** the owners confirm D7 (Q5) against the billed run's figure (§3) and accept the gate. The billed run
+**To close 9a:** the owners confirm D7 (Q5) against the billed run's figure (§3) and accept the gate. **Done**
+2026-10-30: the user, on the owners' behalf, confirmed D7 and accepted the gate (ruling 34). The billed run
 has now tested real research page fetches and the `--billed` path end to end. Optionally replay the three
 walkthroughs in a browser on the fixed code.
 
 **The final whole-slice review (2026-10-29)** found the work ready for 9b planning, with 0 Critical. Its cheap
 findings were fixed in #168. Three findings are **9b entry conditions**, to be settled before any real student:
 1. **The visa apply-by figure.** Applying 6 weeks before the semester contradicts the ~90-day processing time shown
-   in the same note. The owners choose `visa_before_semester_days`.
+   in the same note. The owners choose `visa_before_semester_days`. **Resolved** 2026-10-30 (the user's decision):
+   15 weeks (105 days), "Apply now" once passed, no pull on the admission (rulings 35 to 37, `os/s9b-visa-lead`).
 2. **Real research of `semester_start`,** plus an admin runbook for supplying it when research can't find it.
 3. **Usable email:** a recipient lookup port; real templates (today the body is the raw payload); and 401/403/422
    from Resend treated as configuration errors that stop and alert, not as rows marked `failed`.
