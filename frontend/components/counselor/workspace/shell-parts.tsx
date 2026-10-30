@@ -9,6 +9,10 @@ import {
   Command, CommandDialog, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList, CommandShortcut,
 } from "@/components/ui/command";
 import { cn } from "@/lib/utils";
+import { useParams, useRouter } from "next/navigation";
+import { OS_PAGES } from "@/components/os/os-nav-group";
+import { OS_UI_ENABLED } from "@/lib/config";
+import { useT } from "@/lib/i18n";
 import copy from "./copy.json";
 
 export type SectionKey = keyof typeof copy.sections;
@@ -114,6 +118,10 @@ export function CommandMenu({ open, onOpenChange, onGo, onAsk }: {
 }) {
   const [q, setQ] = React.useState("");
   React.useEffect(() => { if (!open) setQ(""); }, [open]);
+  // Merge pai-c + pai-os: PAI OS pages (only when NEXT_PUBLIC_OS_ENABLED=true).
+  const router = useRouter();
+  const { workspaceId } = useParams<{ workspaceId: string }>() ?? {};
+  const t = useT();
   const run = (fn: () => void) => { onOpenChange(false); fn(); };
   const places = SECTIONS.flatMap((section) =>
     section.views.filter((view) => view !== "notifications").map((view) => ({
@@ -150,6 +158,16 @@ export function CommandMenu({ open, onOpenChange, onGo, onAsk }: {
             );
           })}
         </CommandGroup>
+        {OS_UI_ENABLED && workspaceId && (
+          <CommandGroup heading={t("nav.studyAbroadPlan")}>
+            {OS_PAGES.map(([page, key]) => (
+              <CommandItem key={page} value={`${t("nav.studyAbroadPlan")} ${t(key)}`}
+                onSelect={() => run(() => router.push(`/${workspaceId}/${page}`))}>
+                <span>{t(key)}</span>
+              </CommandItem>
+            ))}
+          </CommandGroup>
+        )}
         {q.trim() && (
           <CommandGroup heading={copy.shell.commandAskGroup}>
             <CommandItem value={`ask ${q}`} onSelect={() => run(() => onAsk(q.trim()))}>

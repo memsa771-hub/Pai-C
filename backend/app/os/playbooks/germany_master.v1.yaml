@@ -1,0 +1,352 @@
+# Germany master's route for Pakistani bachelor's graduates, winter semester intakes.
+# Source walkthrough: docs/os/spikes/spike5-germany-playbook.md (Spike 5 part 1). Citation `source` values
+# are that document's source IDs (S1-S18). Durations without an official figure are planning estimates
+# (constants with estimate: true) and the inbox labels them "estimated".
+key: germany_master
+version: 1
+route: {origin: PK, destination: DE, level: master}
+default_timezone: Europe/Berlin
+require_citations: true
+
+# Slice 4 (spec S4-D9): the route builder completes this task with the student's programmes.
+self_serve:
+  choose_task: choose_programmes
+
+# Slice 4 eligibility (spec S4-D2). Generic checks; this route's numbers. An estimate, never a block (S4-D5).
+# linear_scale with target 1.0 (best) / 4.0 (worst pass) is the modified Bavarian formula. Rounding: German exam
+# regulations count only the first decimal and drop the rest; unverified against the KMK decision of 12.09.2013
+# (cited by https://backend.uni-heidelberg.de/de/dokumente/modifizierte-bayerische-formel-0/download).
+# Provisional minimum passes (owners, spec Q2) apply until the student's letter is confirmed (S4-D6, Task 4).
+eligibility:
+  grade:
+    - method: linear_scale
+      requirement: grade_requirement
+      part: german_max
+      better: lower
+      target: {best: 1.0, worst_pass: 4.0, decimals: 1, rounding: truncate}
+      scales: [cgpa_4, percent]
+    - method: threshold
+      requirement: grade_requirement
+      part: percent_min
+      better: higher
+      scales: [percent]
+  language:
+    - {language: english, requirement: english_requirement, level_key: cefr, scores: {ielts: ielts_trf.overall}}
+    - {language: german, requirement: german_requirement, level_key: level}
+  test: {requirement: admission_test, list_key: any_of}
+  grade_scales:
+    cgpa_4: {best: 4.0, provisional_min_pass: 2.0, value: transcript.cgpa, scale_value: transcript.cgpa_scale,
+             min_pass: min_passing_grade_letter.min_pass, min_pass_scale: min_passing_grade_letter.scale_best}
+    percent: {best: 100, provisional_min_pass: 33, value: transcript.percentage,
+              min_pass: min_passing_grade_letter.min_pass, min_pass_scale: min_passing_grade_letter.scale_best}
+
+constants:
+  # Slice 6a (spec S6a-D11, Q2): the handling fee for the first programme, shown in the pack with its source.
+  uni_assist_fee_eur:
+    value: 75
+    citations:
+      - {source: S5, url: "https://www.uni-assist.de/en/how-to-apply/apply-online/pay-submit/"}
+  uni_assist_lead_days:
+    value: 56
+    estimate: true   # S6: "at least 8 weeks before the application deadline" (a recommendation)
+    citations:
+      - {source: S6, url: "https://www.uni-assist.de/en/faqs/apply-online/"}
+  hec_attestation_days:
+    value: 14
+    estimate: true   # no official processing time found on S8 (Spike 5 A1)
+    citations:
+      - {source: S8, url: "https://www.hec.gov.pk/english/services/students/das/Pages/Degree-Attestation.aspx"}
+  english_test_days:
+    value: 30
+    estimate: true   # booking plus results; the score itself is per programme
+    citations:
+      - {source: S13, url: "https://digital.diplo.de/studium"}
+  blocked_account_days:
+    value: 21
+    estimate: true   # includes the separate signature-attestation appointment (S9)
+    citations:
+      - {source: S9, url: "https://pakistan.diplo.de/pk-en/service/1995528-1995528"}
+  # Slice 9 Task 11 (F1, the user's option A): apply for the visa at the latest this long before the semester
+  # starts. No official source gives a date for the visa, so the visa step's apply-by date is derived: the semester
+  # start of the programme the visa file is for, minus these days. It is a planning choice, not an official figure.
+  # Slice 9b (the user, 2026-10-30; was 42, 6 weeks): the processing time (visa_processing_days, 90) plus a 2-week
+  # buffer (14) = 104 days, rounded up to whole weeks = 15 weeks, 105 days (the note says {weeks}, which the
+  # playbook check only allows for a multiple of 7). Change it together with visa_processing_days.
+  visa_before_semester_days:
+    value: 105
+    estimate: true
+  # Shown to the student as an estimate in the visa step's note; since Slice 9 Task 11 it is not a scheduling input
+  # (as visa_apply's duration it pulled every application before its deadline: the step is applying, not waiting).
+  visa_processing_days:
+    value: 90
+    estimate: true   # planning buffer chosen by the developers; S11 gives no waiting time (Spike 5 C5)
+    citations:
+      - {source: S11, url: "https://pakistan.diplo.de/pk-en/service/2-study-visa-seite-1676104"}
+
+tasks:
+  # ---- Phase A: documents --------------------------------------------------------------------
+  - template_key: choose_programmes
+    task_type: student.choose
+    title: Confirm the programmes you will apply to
+    kind: student
+    inbox_kind: choose
+    duration_days: 3
+    citations:
+      - {source: S4, url: "https://www.uni-assist.de/en/faqs/plan-your-application/"}
+
+  - template_key: hec_attestation
+    task_type: student.provide
+    title: Get your degree and transcripts attested by HEC (online e-Attestation)
+    kind: student
+    inbox_kind: provide
+    duration_constant: hec_attestation_days
+    citations:
+      - {source: S1, url: "https://www.uni-assist.de/en/tools/info-country-by-country/details-country/country/pk/"}
+      - {source: S8, url: "https://www.hec.gov.pk/english/services/students/das/Pages/Degree-Attestation.aspx"}
+
+  - template_key: school_certificates
+    task_type: student.provide
+    title: Upload your SSC and HSSC certificates with subjects and grades
+    kind: student
+    inbox_kind: provide
+    duration_days: 2
+    citations:
+      - {source: S1, url: "https://www.uni-assist.de/en/tools/info-country-by-country/details-country/country/pk/"}
+
+  - template_key: min_passing_grade_letter
+    task_type: student.provide
+    title: Get a statement of your university's minimum passing grade for the degree
+    kind: student
+    inbox_kind: provide
+    duration_days: 7
+    citations:
+      - {source: S1, url: "https://www.uni-assist.de/en/tools/info-country-by-country/details-country/country/pk/"}
+
+  - template_key: grading_system_doc
+    task_type: student.provide
+    title: Upload your university's official grading system
+    kind: student
+    inbox_kind: provide
+    duration_days: 2
+    citations:
+      - {source: S2, url: "https://www.uni-assist.de/en/how-to-apply/plan-your-application/educational-certificates-translations/"}
+
+  - template_key: english_test
+    task_type: student.act
+    title: Take a recognised English test (score per programme)
+    kind: student
+    inbox_kind: act
+    duration_constant: english_test_days
+    citations:
+      - {source: S13, url: "https://digital.diplo.de/studium"}
+
+  - template_key: admission_test
+    task_type: student.act
+    title: Take the admission test this programme asks for (GRE / GATE / TestAS)
+    kind: student
+    inbox_kind: act
+    fan_out: programme
+    condition: {fact: admission_test, present: true}
+    duration_days: 30
+    citation_from_fact: admission_test
+
+  - template_key: application_documents
+    task_type: student.provide
+    title: Prepare this programme's application documents (CV, letters, module descriptions)
+    kind: student
+    inbox_kind: provide
+    fan_out: programme
+    depends_on: [{key: choose_programmes}]
+    duration_days: 7
+    citation_from_fact: required_documents
+
+  # Slice 6a (spec S6a-D8): the student approves this programme's application pack (a manifest version).
+  - template_key: review_pack
+    task_type: student.approve
+    title: Review and approve this programme's application pack
+    kind: student
+    inbox_kind: approve
+    fan_out: programme
+    depends_on: [{key: application_documents}]
+    duration_days: 2
+    citation_from_fact: required_documents
+
+  # ---- Phase B: application ------------------------------------------------------------------
+  - template_key: uni_assist_apply
+    task_type: student.act
+    title: Submit the uni-assist application and pay the handling fee
+    kind: student
+    inbox_kind: act
+    fan_out: programme
+    condition: {fact: application_route, in: [uni_assist, uni_assist_vpd]}
+    anchor: {fact: deadline_close}
+    lead_time: {constant: uni_assist_lead_days}
+    duration_days: 2
+    depends_on:
+      - {key: hec_attestation}
+      - {key: school_certificates}
+      - {key: min_passing_grade_letter}
+      - {key: grading_system_doc}
+      - {key: english_test}
+      - {key: admission_test}
+      - {key: application_documents}
+      - {key: review_pack}
+    citations:
+      - {source: S4, url: "https://www.uni-assist.de/en/faqs/plan-your-application/"}
+      - {source: S5, url: "https://www.uni-assist.de/en/how-to-apply/apply-online/pay-submit/"}
+      - {source: S6, url: "https://www.uni-assist.de/en/faqs/apply-online/"}
+
+  - template_key: direct_apply
+    task_type: student.act
+    title: Apply in the university's own portal
+    kind: student
+    inbox_kind: act
+    fan_out: programme
+    condition: {fact: application_route, in: [direct, uni_assist_vpd]}
+    anchor: {fact: deadline_close}
+    duration_days: 2
+    depends_on:
+      - {key: uni_assist_apply}
+      - {key: application_documents}
+      - {key: review_pack}
+      - {key: english_test}
+      - {key: hec_attestation}
+    citation_from_fact: portal_url
+
+  - template_key: applications_submitted
+    task_type: system.milestone
+    title: All applications submitted
+    kind: work
+    depends_on:
+      - {key: uni_assist_apply}
+      - {key: direct_apply}
+    duration_days: 0
+    citations:
+      - {source: S6, url: "https://www.uni-assist.de/en/faqs/apply-online/"}
+
+  - template_key: admission_result
+    task_type: student.choose
+    title: Tell us this programme's admission result
+    kind: student
+    inbox_kind: choose
+    fan_out: programme
+    depends_on: [{key: applications_submitted}]
+    duration_days: 1
+    citation_from_fact: decision_date
+
+  # ---- Phase C: visa (Islamabad or Karachi) --------------------------------------------------
+  - template_key: blocked_account
+    task_type: student.act
+    title: Open a blocked account (or arrange another proof of funds)
+    kind: student
+    inbox_kind: act
+    duration_constant: blocked_account_days
+    citations:
+      - {source: S9, url: "https://pakistan.diplo.de/pk-en/service/1995528-1995528"}
+
+  - template_key: travel_insurance
+    task_type: student.act
+    title: Buy travel health insurance from your travel date
+    kind: student
+    inbox_kind: act
+    duration_days: 2
+    citations:
+      - {source: S15, url: "https://pakistan.diplo.de/resource/blob/2208710/4a44b499964d27c04ecb6e5770fdb824/study-visa---leaflet-data.pdf"}
+
+  # Slice 6b (spec S6b-D9): the student approves the visa file (a manifest version) before applying.
+  - template_key: review_visa_file
+    task_type: student.approve
+    title: Review and approve your visa file
+    kind: student
+    inbox_kind: approve
+    depends_on:
+      - {key: blocked_account}
+      - {key: travel_insurance}
+    duration_days: 2
+    citations:
+      - {source: S11, url: "https://pakistan.diplo.de/pk-en/service/2-study-visa-seite-1676104"}
+
+  - template_key: visa_apply
+    task_type: student.act
+    title: Apply for the student visa on the Consular Services Portal
+    kind: student
+    inbox_kind: act
+    # Slice 9 Task 11 (F1, option A): the due date is the apply-by date, visa_before_semester_days (15 weeks since
+    # Slice 9b) before the visa programme's researched semester_start (cited, with the note); until that start is
+    # known the step waits and says what for. 2 days for the act of applying, like the other online submissions
+    # (uni_assist_apply, direct_apply).
+    # Slice 9b: when the apply-by date has already passed at compile time (e.g. a July admission for an October
+    # start), the step says "Apply now" (note_passed) and is due on the semester start itself, so it is never
+    # overdue for the day it becomes possible.
+    anchor:
+      fact: semester_start
+      programme: visa
+      note: "Apply by {due}: {weeks} weeks before your semester starts on {date}, so that the visa (about
+        {visa_processing_days} days) can arrive in time."
+      note_earliest: "Apply by {due}: {weeks} weeks before the earliest semester start of your programmes ({date}),
+        so that the visa (about {visa_processing_days} days) can arrive in time."
+      note_passed: "Apply now, as soon as you can. The date to apply by ({due}, {weeks} weeks before your semester
+        starts on {date}) has passed. A visa usually takes about {visa_processing_days} days, so it may arrive after
+        your semester starts. {days_left} days are left before your semester starts."
+      note_passed_earliest: "Apply now, as soon as you can. The date to apply by ({due}, {weeks} weeks before the
+        earliest semester start of your programmes, {date}) has passed. A visa usually takes about
+        {visa_processing_days} days, so it may arrive after your semester starts. {days_left} days are left before
+        that semester starts."
+      waiting: "Waiting for your programme's semester start date"
+      waiting_none: "Waiting until a programme admits you"
+    lead_time: {constant: visa_before_semester_days}
+    duration_days: 2
+    # Slice 9b (keeps Task 11C): the step waits for the admission, but its apply-by date never pulls the admission
+    # result (and through it the applications) earlier: 15 weeks before an October start falls before many
+    # application deadlines. The visa preparation steps below are still pulled by it.
+    depends_on:
+      - {key: admission_result, pull: false}
+      - {key: blocked_account}
+      - {key: travel_insurance}
+      - {key: review_visa_file}
+    citations:
+      - {source: S11, url: "https://pakistan.diplo.de/pk-en/service/2-study-visa-seite-1676104"}
+      - {source: S13, url: "https://digital.diplo.de/studium"}
+
+  # ---- Phase D: after arrival ----------------------------------------------------------------
+  - template_key: register_address
+    task_type: student.act
+    title: Register your address at the local registration office
+    kind: student
+    inbox_kind: act
+    depends_on: [{key: visa_apply}]
+    duration_days: 7
+    citations:
+      - {source: S17, url: "https://www.daad.de/en/studying-in-germany/living-in-germany/registering/"}
+
+  - template_key: health_insurance
+    task_type: student.act
+    title: Get health insurance that the university accepts for enrolment
+    kind: student
+    inbox_kind: act
+    depends_on: [{key: visa_apply}]
+    duration_days: 7
+    citations:
+      - {source: S18, url: "https://www.daad.de/deutschland/nach-deutschland/bewerbung/en/58221-health-insurance/"}
+
+  - template_key: enrol
+    task_type: student.act
+    title: Enrol at your university
+    kind: student
+    inbox_kind: act
+    depends_on:
+      - {key: register_address}
+      - {key: health_insurance}
+    duration_days: 3
+    citations:
+      - {source: S18, url: "https://www.daad.de/deutschland/nach-deutschland/bewerbung/en/58221-health-insurance/"}
+
+  - template_key: residence_permit
+    task_type: student.act
+    title: Apply for your residence permit before the visa expires
+    kind: student
+    inbox_kind: act
+    depends_on: [{key: enrol}]
+    duration_days: 14
+    citations:
+      - {source: S17, url: "https://www.daad.de/en/studying-in-germany/living-in-germany/registering/"}

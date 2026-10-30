@@ -1,0 +1,175 @@
+# PAI OS Slice 3: Documents (design)
+
+Date: 2026-10-20. Parent: `docs/superpowers/specs/2026-10-12-pai-os-design.md` (§3.2 Documents pipeline, §5
+Spike 2, §6 Slice 3). Builds on Slices 0–2 on `pai-os`.
+
+**Goal.** A student uploads their documents. The OS reads them, checks that they agree with each other, and the
+student confirms every value before it is used.
+
+**Done when (parent §6):**
+- Spike 2 holds: ≥ 90% of fields correct, and every cross-document mismatch caught.
+- A new document type is added by config only.
+
+## 1. Decisions
+
+| # | Topic | Decision |
+|---|---|---|
+| S3-D1 | Approach | Build the production pipeline first. **Spike 2 is its quality gate**, like Slice 2's research gate. There is no throwaway harness. "Whole page or tiles" is a setting that Spike 2 decides. |
+| S3-D2 | Document types | One YAML per type in `app/os/documents/types/`: `passport`, `degree_certificate`, `transcript`, `ssc_certificate`, `hssc_certificate` and `ielts_trf`. Degree and transcript are general (any level: associate, bachelor, master), with the degree title as a field; the real set includes an associate degree. Each field has a generic type, and Python knows only those types (invariant 12). **A new type is a new YAML file.** The fields per type follow the answer key's field names (`docs/os/spikes/spike2-fields.md`, written with Task 1). |
+| S3-D3 | File storage | The file bytes go in the database (`os_document_files`), at most 10 MB per file. The API and the worker share them with no new storage service, and backups already cover them. Duplicates are detected by SHA-256 per student. |
+| S3-D4 | Getting at the content | Allowed: JPEG (also `.jfif`), PNG, WebP and PDF, recognised by their magic bytes, not their extension. For a PDF, a page whose text layer (`pypdf`) has at least 200 characters is read as text; any other page is rendered with `pypdfium2` at 200 dpi. Images are normalised with Pillow (EXIF rotation, long side at most 2,000 px). **No new dependencies:** `pypdf` and `pypdfium2` are already in `requirements.txt`, and Pillow is installed. If Pillow is not listed explicitly, it is pinned, which is the only shared-file change. |
+| S3-D5 | Reading | **One reading per document** on the `cheap` vision tier, by a tool-less reader (invariants 6 and 9). Mode `whole` sends each page as one image. Mode `tiles` sends each page as 2 overlapping bands (3 for very tall pages) in the **same request**, in order. The mode is set in the agent spec; Spike 2 picks it. Images go inline; no provider file storage is used. |
+| S3-D6 | Validators (no AI) | By generic type: a `date` must be a real date; `grade` (value and scale) needs value ≤ scale; `band` (IELTS) is 0–9 in steps of 0.5; `code` matches its pattern; `mrz` (two machine-readable lines) must pass the **ICAO 9303 check digits**, and its passport number, date of birth and expiry must equal the visual fields. **Rules between a type's fields** are config: for example, an IELTS overall band must equal the mean of the four section bands rounded the IELTS way (a mean ending .25 rounds up to the half band, .75 up to the whole), and marks obtained must be ≤ marks total. A failed check marks the field `check_failed` with a reason, and the student sees it. An expired passport is **flagged** to the student but still read. |
+| S3-D7 | Document type | The student picks the type when uploading. The reader also reports `detected_type`. If they differ, the document is `needs_student` ("This looks like a transcript. Is that right?"). It is never rejected silently. |
+| S3-D8 | Cross-checks (no AI) | Over one student's documents: `full_name`, `father_name` and `date_of_birth`. Names are compared after normalising (case, spaces, punctuation, word order for two-part names). Spelling variants are listed in `documents/name_variants.yaml` (Muhammad/Mohammad/Muhammed, …; route data, invariant 12). Equal → ok; variant → **flag**; different → **mismatch**. A date of birth must be equal. Each finding names its documents and values. |
+| S3-D9 | Confirmation | The student confirms or corrects **every** field of a document (invariant 4: agents propose, the student confirms). The value read is kept for audit. Confirmed values become the student's profile (`os_profile_values`), with the source document. An open mismatch must be resolved, by the student choosing the right value, before those profile values are set. |
+| S3-D10 | Privacy | Files are never logged and never shown to admins in Slice 3 (admins see status, fields and checks). A student can delete a document: its bytes and fields go, and an audit row stays. The OS never claims a document is genuine (parent §3.2). |
+| S3-D11 | Spend | Each reading is an `os_agent_runs` row (as in Slice 2). The cap is $0.05 per document. The monthly cap is `OS_DOCUMENTS_MONTHLY_USD`, default 10; over the cap, reading waits and a `budget_exceeded` event is written. |
+| S3-D12 | Spike 2 sets | **Real set:** private, never in the repo. It lives in `~/spike2-docs/docs/` (18 files with consent: p1's 5 documents, 4 degrees, 2 transcripts, 4 passports, 3 IELTS results), with `answer_key.yaml` next to it, drafted by the developer and **verified by the owner**. It covers PDFs (with and without a text layer), phone photos, a 90°-rotated scan, low-resolution images, stock-watermarked and partly redacted images, and expired passports. A redacted or blank value is `null` in the key, and a reader that fills it in scores wrong. **Sample set:** in the repo, generated by a deterministic script. It has fictional people and fictional institutions, each page carries a "SAMPLE – TEST DOCUMENT" mark, and it forms 5 "same person" bundles with planted mismatches. |
+
+## 2. Components (`app/os/documents/`)
+
+- **`types.py`:** `DocumentType`, `FieldSpec` (name, generic type, hint, `cross_check`, `required`) and the loader.
+  The loader validates every YAML at startup (an invalid type stops startup, naming the file and field) and builds
+  the reading model with `pydantic.create_model`, as the research profile does.
+- **`intake.py`:**
+  - `check_upload(name, content_type, data)`: type, size and magic-byte checks;
+  - `prepare(data) -> list[PagePart]`: text for text pages, normalised images for the others;
+  - `tiles(image, mode) -> list[image]`: overlapping bands, deterministic.
+- **`validators.py`:** one function per generic type, and `mrz_check(lines)` (ICAO 9303: the 7-3-1 weights, the
+  document number, birth date, expiry and composite digits).
+- **`reader.py`:** `agents/documents.v1.yaml` (zone `reader`, tier `cheap`, tools `[]`, mode
+  `whole | tiles`, timeout 90 s, retries `{tools: 0, output: 2}`). `build_reader(model, types, spec)` and
+  `read_document(...)`.
+  - The prompt holds the type's field hints. Page text is fenced as in Slice 2, and the images are attached in
+    order, labelled "page N" or "page N, part M of K".
+  - It reuses Slice 2's single reading loop and `AgentRuns`.
+- **`checks.py`:** `cross_check(documents) -> list[Finding]`, a pure function.
+- **`run.py`:** the `os.document(document_id)` DBOS workflow, with the steps `load`, `prepare`, `read` (model
+  requests as steps), `validate`, `store` and `cross_check`. The API enqueues it through `DBOSClient`, using
+  workflow ID `document:{tenant}:{id}:{sha}` so each upload is read once.
+- **`store.py`:** documents, fields, confirmations, profile values and findings.
+
+## 3. Tables (Alembic `os` branch, `os_0004`; every table has `tenant_id`)
+
+- **`os_documents`:** `id`, `student_ref`, `doc_type`, `type_version`, `filename`, `content_type`, `size`, `sha256`
+  (unique per student), `pages`, `status`, `detected_type`, `error`, `created_at`, `read_at`, `confirmed_at`,
+  `deleted_at`.
+  - `status` is one of `uploaded`, `reading`, `read`, `needs_student`, `confirmed`, `failed`, `deleted`.
+- **`os_document_files`:** `document_id` (primary key, foreign key) and `data` (bytea). Deleted with the document.
+- **`os_document_fields`:** `document_id`, `field`, `value_read`, `check` (`ok` | `check_failed` | `missing`),
+  `reasons`, `value_confirmed`, `confirmed_by` (`student`), `confirmed_at`. Unique on (document, field).
+- **`os_document_findings`:** `student_ref`, `kind` (`variant` | `mismatch`), `field`, `items` (document id and
+  value pairs), `status` (`open` | `resolved`), `resolution` (the value the student chose), `resolved_at`.
+- **`os_profile_values`:** `student_ref`, `key`, `value`, `source_document_id`, `confirmed_at`. Unique on
+  (tenant, student, key).
+- `os_agent_runs` is reused (`reading` = `document:{id}`).
+
+## 4. API (under `/v1/os`; student calls use the host's sign-in, writes need write access)
+
+| Method and path | Auth | Purpose |
+|---|---|---|
+| `POST /documents` (multipart: `file`, `doc_type`) | student (write) | Upload. `201` with the document; `409` for a duplicate of the student's own file; `422` for an unsupported type or a file that is too big. |
+| `GET /documents` | student | Own documents with status, fields (value read, check, value confirmed) and open findings |
+| `POST /documents/{id}/confirm` (`{fields: {name: value}}`) | student (write) | Confirm or correct every field. Partial bodies are refused (`422`). |
+| `POST /documents/findings/{id}/resolve` (`{value}`) | student (write) | Choose the right value for a variant or mismatch |
+| `DELETE /documents/{id}` | student (write) | Delete the file and its fields |
+| `GET /profile` | student | Confirmed profile values with their source documents |
+| `GET /documents/admin?student=` | admin | Status, fields and findings only; never file bytes |
+
+## 5. Student screens (mobile-first, 360 px)
+
+**Your documents** (`frontend/app/[workspaceId]/os-documents/page.tsx`, behind `NEXT_PUBLIC_OS_ENABLED`):
+
+```
+┌ Your documents ───────────────────┐
+│ [+ Upload]  type: [Passport ▾]    │
+│ Passport · read · ⚠ check 2 fields│
+│ BS transcript · confirmed ✓       │
+│ FSc certificate · reading…        │
+│ ⚠ Your name differs: passport     │
+│   "MUHAMMAD ALI", degree "Mohammad│
+│   Ali". Which is right? [Choose]  │
+└───────────────────────────────────┘
+```
+
+**Check what we read** (one document): each field with the value read, an edit box, and a mark when a check
+failed ("the expiry date does not match the passport's machine lines"). Below it: **Confirm all**. The page says
+plainly: "We read this automatically; please check every value."
+
+## 6. Error handling
+
+| Failure | Handling | Ends in |
+|---|---|---|
+| Unsupported or too-big file, bad magic bytes | refused at upload | `422`, nothing stored |
+| PDF that cannot be rendered, or a corrupt image | recorded | `failed`, with the reason shown to the student |
+| Model service down or a timeout | DBOS step retry, max 3 | `failed`; the student can retry |
+| Invalid output | Pydantic AI repair, max 2 | `failed` if still invalid |
+| Type mismatch (`detected_type`) | asked | `needs_student` |
+| Budget exceeded | not read; `budget_exceeded` event | waits; retried the next day |
+| Worker crash | DBOS resumes | no duplicate fields or agent rows |
+
+## 7. Invariants touched
+
+- **3:** a profile value always names its source document.
+- **4:** profile values are set only by the student's confirmation.
+- **6, 9:** the reader has no tools; page text is fenced, and images are data.
+- **7, 8:** DBOS step retries only; idempotent upserts keyed by document and field.
+- **11:** no Counsellor `app/documents` code is imported (Tach).
+- **12:** document types, the name variants and the Pakistan-specific boards are YAML. Python holds generic types.
+
+## 8. Testing (TDD; `tach check`, the heads check and `pytest tests/os` before every push)
+
+1. **Types:** they load; an invalid type stops startup; the built model accepts each type's values; the red-flag
+   test still passes; **adding a type in a temporary directory needs no code**.
+2. **Intake:** the allowed and refused types and sizes; magic bytes; a PDF text page vs a scanned page; EXIF
+   rotation; deterministic tile geometry and overlap.
+3. **Validators:** a table per generic type; MRZ check digits on ICAO 9303 specimen lines (valid, one wrong digit,
+   swapped fields).
+4. **Cross-checks:** equal, variant and different names; date-of-birth mismatch; a finding names its documents;
+   resolving it sets the profile value.
+5. **Workflow** (fake model): an upload is read once; fields stored; checks applied; findings written; type
+   mismatch → `needs_student`; budget exceeded.
+6. **Crash:** SIGKILL during reading; no duplicate fields or agent rows (Linux CI).
+7. **API:** a student sees and changes only their own documents; partial confirm refused; delete removes the
+   bytes; admins never get bytes.
+8. **Screens** (Vitest): upload, status labels, the check-failed mark, finding resolution, confirm-all, 360 px.
+9. **Spike 2** (`tests/os/quality/run_document_quality.py`, billed, about $1–3 a run):
+   - Field accuracy on the real set, in both modes.
+   - The planted mismatches in the sample set, with no extra mismatch findings on consistent bundles.
+   - Scoring: names compared after normalisation, dates and numbers exactly. A value the key says is absent but
+     the reader gives counts as **wrong** (invented).
+
+## 9. Done when (the slice gate)
+
+- §8 is green in CI (`os` and `legacy`).
+- **Spike 2:**
+  - On the real set, the chosen mode reaches **≥ 90% of fields correct in each of 2 runs**.
+    - **Owners' pilot bar (2026-10-21): ≥ 89%**, with tiles on the strong tier, after two fix rounds measured
+      0.905 and 0.892. Students confirm every value. See `docs/os/slice-3-quality-report.md`; the 0.90 target
+      stands for the re-gate on a larger real set.
+  - On the sample set, **every planted mismatch is caught** and **no consistent bundle gets more than one
+    variant flag**.
+- If Spike 2 fails: stop and report. The parent's fallbacks (self-hosted OCR, or students type key values) are
+  the owners' call.
+
+## 10. Build order (one branch and PR per task, off `pai-os`, not stacked)
+
+1. Document types: config, loader and model.
+2. Tables `os_0004` and the store.
+3. Intake: checks, PDF and image preparation, tiles.
+4. Validators, including MRZ.
+5. The reader agent and spec (`whole | tiles`).
+6. Cross-checks and name variants.
+7. The `os.document` workflow and enqueue.
+8. The API.
+9. Screens (the shared file `frontend/lib/api.ts` needs a Counsellor reviewer).
+10. The sample set generator, the Spike 2 quality runner, the crash test, then the billed gate and its report.
+
+## 11. Open questions for the owners
+
+| # | Question | Proposal |
+|---|---|---|
+| Q1 | How long are files kept? | Until the student deletes them, or 12 months after their plan ends |
+| Q2 | Should admins be able to see files (for support)? | Not in Slice 3; decide before the pilot |
+| Q3 | Who maintains the name-variant list? | The developers, in `name_variants.yaml`, reviewed like playbooks |

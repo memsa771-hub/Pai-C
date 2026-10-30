@@ -11,6 +11,7 @@ import { NotificationsMenu } from "@/components/layout/notifications-menu";
 import { UserMenu } from "@/components/layout/user-menu";
 import { NotificationsCenterView } from "@/components/notifications/notifications-center-view";
 import { SidebarProvider } from "@/components/ui/sidebar";
+import { OsNavGroup } from "@/components/os/os-nav-group";
 import { cn } from "@/lib/utils";
 import { LivingProfile } from "./profile";
 import { Journey } from "./journey";
@@ -212,6 +213,11 @@ export function CounselorShell() {
                 <NavItem key={item.key} section={item} current={section.key === item.key} collapsed={collapsed}
                   onSelect={() => navigate(item.views[0])} />
               ))}
+              {/* Merge pai-c + pai-os: the PAI OS "Study abroad plan" links (pai-os had them in the old
+                  nav-main.tsx drawer, which pai-c removed). Renders nothing unless NEXT_PUBLIC_OS_ENABLED=true.
+                  Text links, so only on the expanded rail; phones and the collapsed rail reach them from
+                  the command menu (see CommandMenu in shell-parts.tsx). */}
+              {!collapsed && <OsNavGroup />}
             </nav>
             <div className="space-y-1 pt-3">
               {stage && (collapsed ? (

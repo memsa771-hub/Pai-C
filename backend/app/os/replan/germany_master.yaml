@@ -1,0 +1,3 @@
+# Replan settings for Germany master's (Slice 7 spec §2). Route data, validated at startup.
+route_key: germany_master
+min_programmes: 1  # after a rejection leaves fewer programmes than this, propose a close match

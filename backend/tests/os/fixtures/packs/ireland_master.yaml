@@ -1,0 +1,33 @@
+# Fake route (spec S6a-D12): a second destination's pack with no code change. Fictional rules.
+route_key: ireland_master
+version: 1
+data_sheet:
+  - title: About you
+    fields:
+      - {key: family_name, label: Family name, source: passport.surname, required: true}
+      - {key: first_names, label: First names, source: passport.given_names, required: true}
+      - {key: birth_date, label: Date of birth, source: passport.date_of_birth, required: true}
+      - {key: passport_no, label: Passport number, source: passport.passport_number, required: true}
+      - {key: email, label: Email, source: entered, required: true}
+      - {key: referee_name, label: Referee's name, source: entered, required: true}
+  - title: Studies
+    fields:
+      - {key: percentage, label: Final percentage, source: transcript.percentage, required: true}
+      - {key: ielts_overall, label: IELTS overall, source: ielts_trf.overall}
+checklist:
+  - {key: passport, label: Passport, kind: document, ref: passport}
+  - {key: transcript, label: Final transcript, kind: document, ref: transcript}
+  - {key: english, label: English test result, kind: document, ref: ielts_trf, format: small}
+  - {key: personal_statement, label: Personal statement, kind: statement, ref: sop}
+  - {key: cv, label: CV, kind: statement, ref: cv}
+  - {key: referee, label: Referee named, kind: entered, ref: referee_name}
+formats:
+  default: {types: [pdf], max_mb: 10}
+  named:
+    small: {types: [pdf], max_mb: 2}
+instructions:
+  online:
+    - {text: "Apply on the programme's online system before {deadline_close}.", source: "fact:deadline_close"}
+    - {text: "Upload the checklist files and name your referee.", source: "fact:application_route"}
+fees:
+  - {label: Application fee, source: "fact:application_fee"}

@@ -1,0 +1,218 @@
+# Research profile for the Germany master's route (Slice 2 spec §4.2). Country-specific research data
+# lives here, not in Python (invariant 12). Field names and value shapes match the Spike 1 answer key
+# (backend/tests/os/quality/spike1_answer_key.yaml, plan ruling R2-P3), so the key scores production output.
+# Values and aliases come from the Spike 1 harness (backend/spikes/spike1/fields.py, agent.py) and the
+# Spike 1 report's lessons. Aliases are what a quote must contain for a value to count as stated (spec §4.4).
+key: germany_master_research
+version: 1
+route_key: germany_master
+
+# Official sources shared by every programme on this route (parent §3.2: uni-assist, DAAD; myGUIDE is DAAD's).
+# Each programme adds its university's own domains (os_programmes.official_domains).
+official_sources: [uni-assist.de, daad.de, myguide.de]
+
+# Rule-based link ranking (Spike 1 SP1-D5): a link is followed only if its URL or anchor names one of these.
+link_keywords: [apply, application, admission, deadline, requirement, bewerbung, zulassung, fee, language,
+  international, faq, how-to, dates, tuition, semester, master, programme, program, course, studiengang,
+  handout, merkblatt, sprachnachweis, proof]
+
+month_names:
+  1: [january, januar, jan]
+  2: [february, februar, feb]
+  3: [march, märz, maerz, mar]
+  4: [april, apr]
+  5: [may, mai]
+  6: [june, juni, jun]
+  7: [july, juli, jul]
+  8: [august, aug]
+  9: [september, sep, sept]
+  10: [october, oktober, oct, okt]
+  11: [november, nov]
+  12: [december, dezember, dec, dez]
+
+# Phrases that state "not required" (spec §4.4: a `none` value must be stated, not assumed).
+none_phrases:
+  german_requirement:
+    - no minimum language level required
+    - do not need to show a proof of german
+    - no german language skills required
+    - no german needed
+    - german is not required
+    - keine deutschkenntnisse
+  admission_test:
+    - no admission test
+    - no entrance test
+    - not required
+  tuition_fee_non_eu_eur:
+    - none
+    - no tuition
+    - not applicable
+    - free of charge
+    - keine studiengebühren
+
+# A one-item list (one intake, one test) is complete only if the quote says so (Spike 1 lesson 3).
+exclusive_phrases: [only, exclusively, no summer intake, no summer semester, winter semester only, nur]
+
+# A rule on a general page counts for a programme only if its scope quote names the programme or says the
+# rule is for every programme (spec §4.4 rule 6, Spike 1 lesson 2).
+scope_all_phrases: [all programmes, all programs, all degree programmes, all degree programs, all study programmes,
+  all master's programmes, all master programmes, international bachelor or master, alle studiengänge,
+  alle masterstudiengänge]
+
+# A field marked `university_wide` (one value for all of a university's programmes) may come from the university's
+# own academic calendar page, which names no programme: a page on the programme's official domain whose title
+# names one of these (Slice 9b entry condition 2). No other field is affected.
+university_wide_titles: [academic calendar, semester dates, dates for the winter semester, akademischer kalender,
+  semestertermine, semesterzeiten, termine zum semesterablauf, terminplan, studienjahresablaufplan]
+
+# The intake every reader is told it researches, with the run's intake year (Slice 9b): a page that lists several
+# semesters (an academic calendar) must give the intake's. No trust rule depends on it.
+target_cycle: >-
+  Target intake: the winter semester {year}/{next_yy} (WS {year}/{next_yy}). When a page gives a fact for several
+  semesters or years, give the one for this intake. If the pages give it only for another intake, give that one and
+  copy its semester or year as the cycle.
+
+# "Ask the university" draft for unconfirmed facts (spec §4.9). The student sends it; the OS never does.
+draft_email: |
+  Dear admissions team,
+
+  I am a prospective student from outside the EU and I plan to apply to {programme} at {university}
+  for the {intake} intake. Could you please confirm: {question}
+
+  Your website says: "{quote}" ({url}). Is this still correct for {intake}?
+
+  Thank you very much.
+
+fields:
+  - name: language_of_instruction
+    type: enum
+    hint: >-
+      Teaching language. "english" = the whole programme is taught in English; "english_or_german" = it can be
+      studied fully in English or fully in German; "mostly_english" = most courses are in English.
+    values:
+      english: [english, englisch]
+      english_or_german: [english or german, german or english, english and german, english/german,
+        englisch/deutsch, in either language]
+      mostly_english: [mostly english, mainly english, mostly in english, mainly in english]
+      german: [german]
+
+  - name: tuition_fee_non_eu_eur
+    type: amount
+    cycle_bound: true
+    hint: Tuition per semester in EUR for non-EU students; 0 if there is none.
+
+  - name: semester_contribution_eur
+    type: amount
+    cycle_bound: true
+    hint: The semester contribution (semester fee) in EUR, which every student pays.
+
+  - name: deadline_open
+    type: month_day
+    cycle_bound: true
+    hint: First day of the winter application window for applicants with a foreign (non-EU) degree, as MM-DD.
+
+  - name: deadline_close
+    type: month_day
+    cycle_bound: true
+    hint: Last day of the winter application window for applicants with a foreign (non-EU) degree, as MM-DD.
+
+  # Slice 9 Task 11 (F1): the visa step's date is derived from this (the playbook's visa_apply anchor).
+  # Slice 9b: the lecture start is the same for every programme of a university, so the university's academic
+  # calendar page counts for it (see university_wide_titles).
+  - name: semester_start
+    type: month_day
+    cycle_bound: true
+    university_wide: true
+    value_year_is_cycle: true  # "Classes: October 11, 2027 - January 28, 2028" is for 2027, not 2028
+    hint: >-
+      First day of the winter semester's lectures (Vorlesungsbeginn, Lehrveranstaltungszeit, lecture period,
+      classes) for this programme, as MM-DD; the semester's official start if the pages give no lecture start.
+      The university's academic calendar counts. Copy which winter semester the date is for (e.g. 2027/28) as the
+      cycle.
+
+  - name: application_route
+    type: enum
+    hint: >-
+      How applicants with a foreign degree apply: "uni_assist" (through uni-assist), "uni_assist_vpd"
+      (a uni-assist VPD, then directly to the university), or "direct" (only to the university).
+    values:
+      uni_assist: [uni-assist, uni assist, uniassist]
+      uni_assist_vpd: [vpd, vorprüfungsdokumentation]
+      direct: [directly, direct application, online application, application portal, apply online, portal]
+
+  - name: english_requirement
+    type: level_scores
+    hint: >-
+      English proof: the CEFR level and every minimum test score the pages state (IELTS, TOEFL iBT, PTE),
+      including scores in a linked handout. moi_accepted only if a page says whether a medium-of-instruction
+      letter is accepted instead of a test.
+    levels: [A1, A2, B1, B2, C1, C2]
+    scores: [ielts, toefl_ibt, pte]
+    flags: [moi_accepted]
+    # What a quote or page must name for a score or flag to count (spec §4.4 rule 4; Spike 1 D2).
+    values:
+      ielts: [ielts]
+      toefl_ibt: [toefl]
+      pte: [pte]
+      moi_accepted: [medium of instruction, medium-of-instruction, moi]
+
+  - name: german_requirement
+    type: level
+    hint: >-
+      German needed at the time of application: the CEFR level, or "none" if the pages say no German is needed
+      to apply. Check which programmes a rule on a general page applies to.
+    levels: [A1, A2, B1, B2, C1, C2]
+
+  - name: grade_requirement
+    type: grade
+    hint: >-
+      Minimum bachelor's grade: german_max = the worst accepted grade on the German scale (1.0 best, 4.0 pass);
+      percent_min = a minimum percentage, if given that way.
+    parts: [german_max, percent_min]
+
+  - name: statement_requirement
+    type: numbers
+    hint: >-
+      Whether this programme asks for its own statement of purpose or motivation letter (needed: true only if the
+      pages say so), and its length limit: limit_words or limit_chars, exactly as the pages state it. Null if the
+      pages say nothing about a statement for this programme.
+    parts: [limit_words, limit_chars]
+    flags: [needed]
+    values:
+      needed: [statement of purpose, motivation letter, letter of motivation, motivational letter, personal statement]
+
+  - name: required_documents
+    type: name_set
+    hint: >-
+      The documents this programme's application asks for, as the pages list them (Slice 6a: the pack checklist).
+      Null if the pages give no list for this programme.
+    values:
+      passport: [passport]
+      degree: [degree certificate, bachelor's certificate, bachelor certificate, degree]
+      transcript: [transcript, transcript of records, mark sheet, marksheet]
+      hssc: [higher secondary, intermediate certificate, hssc, school-leaving certificate]
+      ssc: [secondary school certificate, matriculation, ssc]
+      english_test: [ielts, toefl, english proficiency, english language certificate]
+      min_passing_grade: [minimum passing grade, grading system]
+      sop: [statement of purpose, motivation letter, letter of motivation]
+      cv: [curriculum vitae, cv, resume, résumé]
+      other: []
+
+  - name: admission_test
+    type: name_set
+    hint: >-
+      Admission tests that satisfy the requirement (any one of them); an empty list if the pages say no test
+      is required.
+    values:
+      TestAS: [testas]
+      GATE: [gate, graduate aptitude test]
+      GRE: [gre, graduate record]
+      dMat: [dmat, digital master test]
+      other: []
+
+  - name: intakes
+    type: season_set
+    hint: Every semester in which a student with a foreign degree can start, per the pages.
+    values:
+      winter: [winter, wintersemester]
+      summer: [summer, sommersemester]

@@ -1,0 +1,14 @@
+# Fictional samples for the Counsellor connection (Slice 8 spec §8). Both teams test against these.
+# `exports` run in this order for one student and journey; `result` is what PAI OS records on the intake row.
+# The Germany places are the real seed programmes; export_new_country uses the fake Ireland route
+# (tests/os/playbooks) with fake places `ie-p1` and `ie-p2`. No PK→PK master route exists, real or fake.
+exports:
+  - {file: export_valid_de.json, result: planned}
+  - {file: export_same_route_new_places.json, result: revised}  # same route: the same plan, revised
+  - {file: export_new_country.json, result: replaced}  # new destination: the old plan closes, a new one starts
+  - {file: export_not_authorized.json, result: "refused:not_authorized"}
+  - {file: export_unknown_programme.json, result: "refused:unknown_programme"}
+  - {file: export_pk_pk.json, result: "refused:route_not_supported"}
+valid:  # validate as their contract
+  - summary.json
+  - escalation.json

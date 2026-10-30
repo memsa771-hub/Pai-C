@@ -1,0 +1,716 @@
+# Spike 1 answer key: the expected per-programme facts for the 30 shortlist programmes.
+#
+# Source: docs/os/spikes/PAI-OS-Programme-Shortlist-WS2027-verified.xlsx, column "Your check", where the
+# developers re-read each programme's official pages (DAAD as a lead). Values are transcribed from those
+# notes; where a note corrects the shortlist ("Wrong — ..."), the corrected value is used.
+#
+# This is a quality set kept forever (parent spec §5): it is re-run on any change to the research
+# agent's prompts, models or specs. Update it only with a cited reason.
+#
+# Corrections after Spike 1 run 1 (2026-10-19), each from an official quote the run verified on the page;
+# details in docs/os/spikes/spike1-report.md: intakes set to null where the developers' check is silent
+# (the transcription had defaulted them to winter only); OVGU semester fee 311.30 and Saarland 394.30
+# (current DAAD pages); TU Chemnitz Automotive Software Engineering and Web Engineering need German A1
+# with the application (TU Chemnitz application page).
+#
+# `cycle` is the intake the developers' check refers to. Most pages show WS 2026/27 or older; only rows
+# that say WS 2027/28 are for the pilot intake (see the Spike 1 design, SP1-D1).
+#
+# Field shapes (null = the page states nothing; the agent should then report not_found):
+#   language_of_instruction: english | english_or_german | mostly_english
+#   tuition_fee_non_eu_eur:  per semester; 0 = none
+#   semester_contribution_eur: {value, approx: true when the check says "~" or gives an older year}
+#   deadline_open / deadline_close: "MM-DD" for the non-EU winter application window in `cycle`
+#   application_route: uni_assist | uni_assist_vpd | direct
+#   english_requirement: {cefr, ielts, toefl_ibt, pte, other, moi_accepted}
+#   german_requirement: null | {level, when: application | before_semester_3 | ...}
+#   grade_requirement: null | {german_max, percent_min, note}   (German scale: lower is better)
+#   admission_test: null | {applies_to, any_of: [...], waived_if}
+#   intakes: [winter] | [winter, summer]
+#   key_status: confirmed | needs_followup | conflict | excluded
+#     needs_followup / conflict rows and the fields listed under `open_fields` are scored separately:
+#     the key itself is not settled there.
+
+programmes:
+  tu-chemnitz-automotive-software-engineering:
+    row: 1
+    university: TU Chemnitz
+    programme: Automotive Software Engineering (MSc)
+    cycle: WS 2026/27
+    key_status: confirmed
+    sources:
+      - https://www2.daad.de/deutschland/studienangebote/international-programmes/en/detail/4122/
+      - https://www.tu-chemnitz.de/studierendenservice/studserv/bewerbung/bew_bamala.php.en
+    facts:
+      language_of_instruction: english
+      tuition_fee_non_eu_eur: 0
+      semester_contribution_eur: {value: 340.50, approx: true}
+      deadline_open: "04-01"
+      deadline_close: "07-15"
+      application_route: direct
+      english_requirement: {cefr: B2, ielts: 5.5, toefl_ibt: 72, pte: 59}
+      german_requirement: {level: A1, when: application}  # corrected, see the Web Engineering note
+      grade_requirement: null
+      admission_test: null
+      intakes: null  # not stated in the developers' check (corrected 2026-10-19, see the Spike 1 report)
+    notes: "Direct via the TU Chemnitz EduApplication Portal. Needs a CS or closely related bachelor."
+
+  tu-chemnitz-embedded-systems:
+    row: 2
+    university: TU Chemnitz
+    programme: Embedded Systems (MSc)
+    cycle: "DAAD 2024/25; TU Chemnitz current page"
+    key_status: confirmed
+    sources:
+      - https://www2.daad.de/deutschland/studienangebote/international-programmes/en/detail/4493
+      - https://www.tu-chemnitz.de/studierendenservice/studserv/bewerbung/bew_bamala.php.en
+    facts:
+      language_of_instruction: english
+      tuition_fee_non_eu_eur: 0
+      semester_contribution_eur: {value: 340, approx: true}
+      deadline_open: null
+      deadline_close: "07-15"
+      application_route: uni_assist
+      english_requirement: {ielts: 5.5, toefl_ibt: 72}
+      german_requirement: {level: A1, when: application, then: "A2 by the end of semester 3"}
+      grade_requirement: null
+      admission_test: null
+      intakes: null  # not stated in the developers' check (corrected 2026-10-19, see the Spike 1 report)
+    notes: "Bachelor in Electrical Engineering & IT or equivalent. The DAAD fee (~296) is old."
+
+  tu-chemnitz-web-engineering:
+    row: 3
+    university: TU Chemnitz
+    programme: Web Engineering (MSc)
+    cycle: WS 2025/26
+    key_status: confirmed
+    sources:
+      - https://www2.daad.de/deutschland/studienangebote/international-programmes/en/detail/4655/
+      - https://www.tu-chemnitz.de/studierendenservice/studserv/bewerbung/bew_bamala.php.en
+    facts:
+      language_of_instruction: english
+      tuition_fee_non_eu_eur: 0
+      semester_contribution_eur: {value: 340, approx: true}
+      deadline_open: null
+      deadline_close: "07-15"
+      application_route: direct
+      english_requirement: {ielts: 5.5, toefl_ibt: 72, pte: 59}
+      german_requirement: {level: A1, when: application, then: "A2 by the end of semester 3"}  # corrected, see below
+      grade_requirement: null
+      admission_test: null
+      intakes: null  # not stated in the developers' check (corrected 2026-10-19, see the Spike 1 report)
+    notes: >-
+      Shortlist said uni-assist; the check found a direct application (EduApplication Portal).
+      German corrected 2026-10-19 (Spike 1 run 1): TU Chemnitz's application page says "Applicants applying
+      for a degree programme offered in English language need to show a German language proof at minimum
+      level A1 ... at the time of application." The developers' note said no German was needed to apply;
+      developers to confirm.
+
+  tu-chemnitz-micro-and-nano-systems:
+    row: 4
+    university: TU Chemnitz
+    programme: Micro and Nano Systems (MSc)
+    cycle: WS 2026/27
+    key_status: confirmed
+    sources:
+      - https://www2.daad.de/deutschland/studienangebote/international-programmes/en/detail/4103/
+      - https://www.tu-chemnitz.de/studierendenservice/studserv/bewerbung/bew_bamala.php.en
+    facts:
+      language_of_instruction: english
+      tuition_fee_non_eu_eur: 0
+      semester_contribution_eur: {value: 340.50, approx: true}
+      deadline_open: "04-01"
+      deadline_close: "07-15"
+      application_route: uni_assist
+      english_requirement: {cefr: B2, ielts: 5.5, toefl_ibt: 72, pte: 59}
+      german_requirement: {level: A1, when: application}
+      grade_requirement: null
+      admission_test: null
+      intakes: null  # not stated in the developers' check (corrected 2026-10-19, see the Spike 1 report)
+
+  ovgu-eeit:
+    row: 5
+    university: Otto von Guericke University Magdeburg
+    programme: Electrical Engineering and Information Technology (MSc)
+    cycle: current OVGU page
+    key_status: confirmed
+    sources:
+      - https://www.ovgu.de/en/-p-17627
+      - https://www.ovgu.de/en/-p-107232
+      - https://www2.daad.de/deutschland/studienangebote/international-programmes/en/detail/6091
+    facts:
+      language_of_instruction: english
+      tuition_fee_non_eu_eur: 0
+      semester_contribution_eur: {value: 311.30, approx: true}  # corrected: DAAD "Currently, the semester fee is 311.30 EUR."
+      deadline_open: null
+      deadline_close: "07-15"
+      application_route: uni_assist
+      english_requirement: {cefr: B2, ielts: 6.0, toefl_ibt: 80, other: [Cambridge FCE]}
+      german_requirement: null
+      grade_requirement: {german_max: 2.0}
+      admission_test: null
+      intakes: [winter]
+
+  btu-artificial-intelligence:
+    row: 6
+    university: BTU Cottbus-Senftenberg
+    programme: Artificial Intelligence (MSc)
+    cycle: WS 2027/28
+    key_status: confirmed
+    sources:
+      - https://www.b-tu.de/en/artificial-intelligence-ms/faq
+    facts:
+      language_of_instruction: english
+      tuition_fee_non_eu_eur: 0
+      semester_contribution_eur: null
+      deadline_open: "03-01"
+      deadline_close: "07-15"
+      application_route: uni_assist
+      english_requirement: {ielts: 6.0, toefl_ibt: 79, moi_accepted: false}
+      german_requirement: null
+      grade_requirement: null
+      admission_test: null
+      intakes: [winter, summer]
+    notes: "uni-assist only (direct submission not possible). IELTS/TOEFL from BTU's general English handout. Summer window 1 Nov 2026 - 15 Jan 2027."
+
+  btu-cyber-security:
+    row: 7
+    university: BTU Cottbus-Senftenberg
+    programme: Cyber Security (MSc)
+    cycle: WS 2026/27
+    key_status: confirmed
+    sources:
+      - https://www.b-tu.de/en/cybersecurity-ms/admission
+    facts:
+      language_of_instruction: english
+      tuition_fee_non_eu_eur: 0
+      semester_contribution_eur: null
+      deadline_open: "03-01"
+      deadline_close: "05-15"
+      application_route: uni_assist
+      english_requirement: {ielts: 6.0, toefl_ibt: 79, moi_accepted: false}
+      german_requirement: null
+      grade_requirement: null
+      admission_test: null
+      intakes: [winter]
+    notes: "Shortlist said 15 Jul (third-party); 15 Aug is EU/EEA only. Tier B."
+
+  btu-micro-and-nanoelectronics:
+    row: 8
+    university: BTU Cottbus-Senftenberg
+    programme: Micro- and Nanoelectronics (MSc)
+    cycle: WS 2027/28
+    key_status: confirmed
+    sources:
+      - https://www.b-tu.de/micro-nano-electronics-ms/faq
+    facts:
+      language_of_instruction: english
+      tuition_fee_non_eu_eur: 0
+      semester_contribution_eur: null
+      deadline_open: "03-01"
+      deadline_close: "05-15"
+      application_route: uni_assist
+      english_requirement: {ielts: 6.0, toefl_ibt: 79, moi_accepted: false}
+      german_requirement: null
+      grade_requirement: null
+      admission_test: null
+      intakes: null  # not stated in the developers' check (corrected 2026-10-19, see the Spike 1 report)
+    notes: "Shortlist said 15 Jul (third-party). Tier B."
+
+  btu-environmental-resource-management:
+    row: 9
+    university: BTU Cottbus-Senftenberg
+    programme: Environmental and Resource Management (MSc)
+    cycle: "WS 2025/26 programme page; WS 2026/27 BTU overview"
+    key_status: confirmed
+    sources:
+      - https://www.b-tu.de/en/environment-ms/prospective-students/how-to-apply
+    facts:
+      language_of_instruction: english
+      tuition_fee_non_eu_eur: 0
+      semester_contribution_eur: {value: 300, approx: true}
+      deadline_open: null
+      deadline_close: "05-15"
+      application_route: uni_assist
+      english_requirement: {ielts: 6.0, toefl_ibt: 79}
+      german_requirement: null
+      grade_requirement: null
+      admission_test: null
+      intakes: null  # not stated in the developers' check (corrected 2026-10-19, see the Spike 1 report)
+    notes: "The DAAD page (1 Jun) is the 2021/22 cycle. Tier B."
+
+  hsrw-mechanical-engineering:
+    row: 10
+    university: Rhine-Waal University of Applied Sciences (Kleve)
+    programme: Mechanical Engineering (MSc)
+    cycle: WS 2026/27
+    key_status: confirmed
+    sources:
+      - https://www2.daad.de/deutschland/studienangebote/international-programmes/en/detail/4492
+      - https://www.hochschule-rhein-waal.de/en/node/6903
+    facts:
+      language_of_instruction: english
+      tuition_fee_non_eu_eur: 0
+      semester_contribution_eur: {value: 295, approx: true}
+      deadline_open: null
+      deadline_close: "07-15"
+      application_route: uni_assist
+      english_requirement: {cefr: C1}
+      german_requirement: null
+      grade_requirement: {german_max: 2.5, note: "210 ECTS (7 semesters)"}
+      admission_test:
+        applies_to: non_ehea_degree
+        any_of: ["TestAS Core + Engineering >= 100", "GATE (no threshold published)", "GRE Q160 V145 AW4.5"]
+      intakes: null  # not stated in the developers' check (corrected 2026-10-19, see the Spike 1 report)
+
+  hsrw-information-engineering-computer-science:
+    row: 11
+    university: Rhine-Waal University of Applied Sciences (Kamp-Lintfort)
+    programme: Information Engineering and Computer Science (MSc)
+    cycle: WS 2026/27
+    key_status: confirmed
+    sources:
+      - https://www2.daad.de/deutschland/studienangebote/international-programmes/en/detail/4490
+      - https://www.hochschule-rhein-waal.de/en/node/6903
+    facts:
+      language_of_instruction: english
+      tuition_fee_non_eu_eur: 0
+      semester_contribution_eur: {value: 295, approx: true}
+      deadline_open: null
+      deadline_close: "07-15"
+      application_route: uni_assist
+      english_requirement: {cefr: B2}
+      german_requirement: null
+      grade_requirement: {german_max: 2.3, note: "restricted admission"}
+      admission_test:
+        applies_to: non_ehea_degree
+        any_of: ["TestAS >= 100", "GATE", "GRE Q160 V145 AW4.5"]
+      intakes: null  # not stated in the developers' check (corrected 2026-10-19, see the Spike 1 report)
+
+  hildesheim-data-analytics:
+    row: 12
+    university: University of Hildesheim
+    programme: Data Analytics (MSc)
+    cycle: "current page (WS 2025/26, SS 2026 intakes shown)"
+    key_status: confirmed
+    open_fields: [english_requirement]
+    sources:
+      - https://www.ismll.uni-hildesheim.de/da/index_en.html
+    facts:
+      language_of_instruction: english
+      tuition_fee_non_eu_eur: 0
+      semester_contribution_eur: {value: 439.85}
+      deadline_open: null
+      deadline_close: "06-30"
+      application_route: direct
+      english_requirement: {ielts: 6.0}
+      german_requirement: null
+      grade_requirement: null
+      admission_test: null
+      intakes: [winter, summer]
+    notes: "The page's TOEFL 'computer-based 61' looks wrong; confirm the TOEFL iBT score by email. Rolling admission. Summer deadline 15 Dec."
+
+  anhalt-electrical-computer-engineering:
+    row: 13
+    university: Anhalt University of Applied Sciences (Köthen)
+    programme: Electrical and Computer Engineering (MEng)
+    cycle: current official page
+    key_status: confirmed
+    sources:
+      - https://www.hs-anhalt.de/studiengaenge/met/studium.html
+    facts:
+      language_of_instruction: english
+      tuition_fee_non_eu_eur: 0
+      semester_contribution_eur: {value: 322.80}
+      deadline_open: "03-15"
+      deadline_close: "07-15"
+      application_route: uni_assist
+      english_requirement: {cefr: C1, ielts: 7.0, toefl_ibt: 94}
+      german_requirement: null
+      grade_requirement: {german_max: 2.4, note: "at least 1 year of relevant work experience; motivation letter; possible interview"}
+      admission_test: null
+      intakes: [winter, summer]
+
+  anhalt-biomedical-engineering:
+    row: 14
+    university: Anhalt University of Applied Sciences (Köthen)
+    programme: Biomedical Engineering (MSc)
+    cycle: current official page
+    key_status: needs_followup
+    open_fields: [language_of_instruction, english_requirement]
+    sources:
+      - https://www.hs-anhalt.de/studiengaenge/mbe/
+    facts:
+      language_of_instruction: null
+      tuition_fee_non_eu_eur: 0
+      semester_contribution_eur: {value: 322.80}
+      deadline_open: "03-15"
+      deadline_close: "07-15"
+      application_route: uni_assist
+      english_requirement: {other: ["TOEFL or IELTS required, minimum not stated"], moi_accepted: false}
+      german_requirement: null
+      grade_requirement: null
+      admission_test: null
+      intakes: [winter, summer]
+    notes: "Teaching language, minimum English score and campus not stated on the official pages read."
+
+  anhalt-photovoltaics-engineering-science:
+    row: 15
+    university: Anhalt University of Applied Sciences (Köthen)
+    programme: Photovoltaics Engineering Science (MSc)
+    cycle: current official page
+    key_status: conflict
+    open_fields: [english_requirement]
+    sources:
+      - https://www.hs-anhalt.de/en/
+    facts:
+      language_of_instruction: english
+      tuition_fee_non_eu_eur: 0
+      semester_contribution_eur: {value: 322.80, note: "304.80-322.80"}
+      deadline_open: "03-15"
+      deadline_close: "07-15"
+      application_route: uni_assist
+      english_requirement: {cefr: B2, toefl_ibt: 100, other: ["myGUIDE says IELTS 6.0 / TOEFL iBT 90"]}
+      german_requirement: null
+      grade_requirement: {german_max: 2.5, note: ">= 210 ECTS; university rated H+ in anabin; pre-assessment recommended before 15 Jun"}
+      admission_test: null
+      intakes: [winter, summer]
+    notes: "English scores conflict: the official page says TOEFL iBT 100, myGUIDE says 90. Duolingo not accepted. The developers' note gives the official page only as hs-anhalt.de/en/…/photovoltaics-engineering-science-master-of-science.html; complete the URL."
+
+  ovgu-data-knowledge-engineering:
+    row: 16
+    university: Otto von Guericke University Magdeburg
+    programme: Data and Knowledge Engineering (MSc)
+    cycle: current OVGU uni-assist FAQ
+    key_status: confirmed
+    sources:
+      - https://www.ovgu.de/en/-p-107232
+      - https://www2.daad.de/deutschland/studienangebote/international-programmes/en/detail/4429
+    facts:
+      language_of_instruction: english_or_german
+      tuition_fee_non_eu_eur: 0
+      semester_contribution_eur: {value: 311.30, approx: true}  # corrected: DAAD "Currently, the semester fee is 311.30 EUR."
+      deadline_open: "04-15"
+      deadline_close: "05-15"
+      application_route: uni_assist
+      english_requirement: {cefr: C1}
+      german_requirement: null
+      grade_requirement: null
+      admission_test: null
+      intakes: null  # not stated in the developers' check (corrected 2026-10-19, see the Spike 1 report)
+    notes: "C1 in the chosen language of study."
+
+  ovgu-digital-engineering:
+    row: 17
+    university: Otto von Guericke University Magdeburg
+    programme: Digital Engineering (MSc)
+    cycle: current OVGU uni-assist FAQ
+    key_status: confirmed
+    sources:
+      - https://www.ovgu.de/en/-p-107232
+      - https://www2.daad.de/deutschland/studienangebote/international-programmes/en/detail/4427
+    facts:
+      language_of_instruction: english_or_german
+      tuition_fee_non_eu_eur: 0
+      semester_contribution_eur: {value: 311.30, approx: true}  # corrected: DAAD "Currently, the semester fee is 311.30 EUR."
+      deadline_open: "04-15"
+      deadline_close: "05-15"
+      application_route: uni_assist
+      english_requirement: {cefr: C1}
+      german_requirement: null
+      grade_requirement: null
+      admission_test: null
+      intakes: null  # not stated in the developers' check (corrected 2026-10-19, see the Spike 1 report)
+
+  btu-power-engineering:
+    row: 18
+    university: BTU Cottbus-Senftenberg
+    programme: Power Engineering (MSc)
+    cycle: WS 2026/27
+    key_status: confirmed
+    sources:
+      - https://www.b-tu.de/en/powerengineering-ms/admission
+    facts:
+      language_of_instruction: english
+      tuition_fee_non_eu_eur: 0
+      semester_contribution_eur: null
+      deadline_open: "03-01"
+      deadline_close: "05-15"
+      application_route: uni_assist
+      english_requirement: {cefr: B2, ielts: 6.0, toefl_ibt: 79}
+      german_requirement: null
+      grade_requirement: null
+      admission_test: null
+      intakes: [winter]
+    notes: "Conflict resolved: 15 May (the third-party 15 Jul is wrong). EPE and PGF specialisations are separate uni-assist applications."
+
+  tu-ilmenau-research-computer-systems-engineering:
+    row: 19
+    university: TU Ilmenau
+    programme: Research in Computer & Systems Engineering (MSc)
+    cycle: DAAD 2024/25
+    key_status: needs_followup
+    sources:
+      - https://www2.daad.de/deutschland/studienangebote/international-programmes/en/detail/4092
+    facts:
+      language_of_instruction: english
+      tuition_fee_non_eu_eur: 0
+      semester_contribution_eur: {value: 150, approx: true}
+      deadline_open: "01-16"
+      deadline_close: "05-15"
+      application_route: direct
+      english_requirement: {cefr: C1, ielts: 7.0, toefl_ibt: 95, other: [CAE]}
+      german_requirement: null
+      grade_requirement: {note: "bachelor in CS or computer engineering, >= 180 credits"}
+      admission_test: null
+      intakes: null  # not stated in the developers' check (corrected 2026-10-19, see the Spike 1 report)
+    notes: "TU Ilmenau's site blocks automated reading; only DAAD was checked. Visa applicants should apply 3 months before the deadline."
+
+  paderborn-computer-science:
+    row: 20
+    university: Paderborn University
+    programme: Computer Science (MSc)
+    cycle: current department page
+    key_status: confirmed
+    sources:
+      - https://cs.uni-paderborn.de/en/studies/getting-started/information-for-international-students
+      - https://www2.daad.de/deutschland/studienangebote/international-programmes/en/detail/5616
+    facts:
+      language_of_instruction: mostly_english
+      tuition_fee_non_eu_eur: 0
+      semester_contribution_eur: null
+      deadline_open: null
+      deadline_close: "05-31"
+      application_route: uni_assist
+      english_requirement: {ielts: 6.5, toefl_ibt: 80, pte: 75, other: [Duolingo 105], moi_accepted: false}
+      german_requirement: null
+      grade_requirement: {note: "minimum credits: SE 20, Theoretical CS 20, Technical CS 15, Maths 15, HCI 8"}
+      admission_test:
+        applies_to: all
+        any_of: ["GRE General Q >= 157 AW >= 4.0", "dMat CS >= 50%"]
+        waived_if: "bachelor grade better than 1.8 (German scale)"
+      intakes: [winter, summer]
+
+  paderborn-computer-engineering:
+    row: 21
+    university: Paderborn University
+    programme: Computer Engineering (MSc)
+    cycle: current university page
+    key_status: confirmed
+    sources:
+      - https://www.uni-paderborn.de/en/studyoffer/course_of_study/computer-engineering-master
+    facts:
+      language_of_instruction: english
+      tuition_fee_non_eu_eur: 0
+      semester_contribution_eur: {value: 310, approx: true}
+      deadline_open: null
+      deadline_close: "05-31"
+      application_route: uni_assist
+      english_requirement: {ielts: 6.5, toefl_ibt: 80, other: [CAE grade B]}
+      german_requirement: null
+      grade_requirement: null
+      admission_test:
+        applies_to: non_eu
+        any_of: ["GRE Q >= 157 AW >= 4.0"]
+        waived_if: "bachelor grade better than 1.8 (German scale)"
+      intakes: [winter, summer]
+    notes: "The department flyer says fully English; the university page says it can also be taken in German."
+
+  saarland-embedded-systems:
+    row: 22
+    university: Saarland University
+    programme: Embedded Systems (MSc)
+    cycle: myGUIDE / DAAD listing
+    key_status: confirmed
+    sources:
+      - https://www2.daad.de/deutschland/studienangebote/international-programmes/en/detail/3923
+    facts:
+      language_of_instruction: english
+      tuition_fee_non_eu_eur: 0
+      semester_contribution_eur: {value: 394.30}  # corrected: DAAD "an administrative fee of 394.30 EUR per semester"
+      deadline_open: null
+      deadline_close: "05-15"
+      application_route: direct
+      english_requirement: {cefr: C1, other: ["TOEFL / IELTS / CPE certificate"]}
+      german_requirement: null
+      grade_requirement: {percent_min: 75, note: "2 recommendation letters; GRE recommended, not mandatory"}
+      admission_test: null
+      intakes: null  # not stated in the developers' check (corrected 2026-10-19, see the Spike 1 report)
+    notes: "Direct via apply.cs.uni-saarland.de. Early deadline 15 Nov, normal 15 May. The check used myGUIDE/DAAD only."
+
+  tu-dortmund-automation-robotics:
+    row: 23
+    university: TU Dortmund
+    programme: Automation and Robotics (MSc)
+    cycle: DAAD 2024/25
+    key_status: needs_followup
+    sources:
+      - https://www2.daad.de/deutschland/studienangebote/international-programmes/en/detail/8996
+    facts:
+      language_of_instruction: english
+      tuition_fee_non_eu_eur: 0
+      semester_contribution_eur: {value: 340, approx: true}
+      deadline_open: "02-01"
+      deadline_close: "05-15"
+      application_route: uni_assist
+      english_requirement: {cefr: C1, ielts: 7.0, toefl_ibt: 95, other: ["test not older than 2 years"]}
+      german_requirement: null
+      grade_requirement: null
+      admission_test: null
+      intakes: null  # not stated in the developers' check (corrected 2026-10-19, see the Spike 1 report)
+    notes: "uni-assist opens in early February (exact day not given). TU Dortmund's own page showed no admission details."
+
+  passau-computer-science:
+    row: 24
+    university: University of Passau
+    programme: Computer Science (MSc)
+    cycle: WS 2026/27
+    key_status: confirmed
+    sources:
+      - https://www2.daad.de/deutschland/studienangebote/international-programmes/en/detail/4455/
+      - https://www.uni-passau.de/en/degree-seeking
+    facts:
+      language_of_instruction: english_or_german
+      tuition_fee_non_eu_eur: 0
+      semester_contribution_eur: {value: 130, approx: true}
+      deadline_open: "04-01"
+      deadline_close: "05-31"
+      application_route: uni_assist
+      english_requirement: {cefr: B2, ielts: 5.5, toefl_ibt: 87, other: ["or German B2"]}
+      german_requirement: null
+      grade_requirement: {german_max: 2.7, note: "or top 70%; >= 110 ECTS of CS"}
+      admission_test: null
+      intakes: null  # not stated in the developers' check (corrected 2026-10-19, see the Spike 1 report)
+    notes: "No tuition 'at this time'; Bavaria lets universities charge non-EU students, so re-check before 2027."
+
+  siegen-computer-science:
+    row: 25
+    university: University of Siegen
+    programme: Computer Science (MSc)
+    cycle: WS 2026/27
+    key_status: confirmed
+    sources:
+      - https://www.uni-siegen.de/node/6003
+      - https://www2.daad.de/deutschland/studienangebote/international-programmes/en/detail/4591/
+    facts:
+      language_of_instruction: english
+      tuition_fee_non_eu_eur: 0
+      semester_contribution_eur: {value: 372, approx: true}
+      deadline_open: "01-01"
+      deadline_close: "04-30"
+      application_route: direct
+      english_requirement: {cefr: C1, ielts: 6.5, toefl_ibt: 88, other: ["TOEFL 22 per section", CAE], moi_accepted: false}
+      german_requirement: null
+      grade_requirement: null
+      admission_test: null
+      intakes: [winter]
+    notes: "Direct via unisono.uni-siegen.de. Incomplete applications are rejected automatically."
+
+  siegen-mechatronics:
+    row: 26
+    university: University of Siegen
+    programme: Mechatronics (MSc)
+    cycle: current official page
+    key_status: confirmed
+    sources:
+      - https://www.uni-siegen.de/en/study/master/mechatronics
+    facts:
+      language_of_instruction: english
+      tuition_fee_non_eu_eur: 0
+      semester_contribution_eur: {value: 372, approx: true}
+      deadline_open: "01-01"
+      deadline_close: "04-30"
+      application_route: direct
+      english_requirement: {cefr: B2}
+      german_requirement: null
+      grade_requirement: null
+      admission_test: null
+      intakes: null  # not stated in the developers' check (corrected 2026-10-19, see the Spike 1 report)
+    notes: "Separate direct application (faculty + unisono). Open admission; engineering bachelor required."
+
+  rptu-commercial-vehicle-technology:
+    row: 27
+    university: RPTU Kaiserslautern-Landau
+    programme: Commercial Vehicle Technology (MSc)
+    cycle: current official page
+    key_status: confirmed
+    sources:
+      - https://rptu.de/en/cvt/master-program-cvt/application-admission-requirements
+    facts:
+      language_of_instruction: english
+      tuition_fee_non_eu_eur: 0
+      semester_contribution_eur: null
+      deadline_open: null
+      deadline_close: "04-30"
+      application_route: direct
+      english_requirement: {ielts: 6.0, toefl_ibt: 80, other: ["may be waived for an English-taught bachelor"]}
+      german_requirement: {level: A1, when: application}
+      grade_requirement: {note: "German grade 1.0-3.0; bachelor in engineering or CS"}
+      admission_test: null
+      intakes: [winter]
+
+  tu-freiberg-computational-materials-science:
+    row: 28
+    university: TU Bergakademie Freiberg
+    programme: Computational Materials Science (MSc)
+    cycle: current DAAD / myGUIDE / brochure
+    key_status: confirmed
+    sources:
+      - https://www2.daad.de/deutschland/studienangebote/international-programmes/en/detail/4288
+      - https://tu-freiberg.de/media/2369/download
+    facts:
+      language_of_instruction: english
+      tuition_fee_non_eu_eur: 0
+      semester_contribution_eur: {value: 107}
+      deadline_open: "01-01"
+      deadline_close: "04-15"
+      application_route: direct
+      english_requirement: {ielts: 6.5, toefl_ibt: 90, other: ["an older brochure says TOEFL 79; use the higher figure"]}
+      german_requirement: null
+      grade_requirement: {percent_min: 75}
+      admission_test: null
+      intakes: null  # not stated in the developers' check (corrected 2026-10-19, see the Spike 1 report)
+
+  hof-software-engineering-industrial-applications:
+    row: 29
+    university: Hof University of Applied Sciences
+    programme: Software Engineering for Industrial Applications (MEng)
+    cycle: myGUIDE / master-and-more
+    key_status: excluded
+    sources:
+      - https://www.myguide.de/en/international-programmes-master/detail/hochschule-hof-software-engineering-for-industrial-applications-meng-3667/?ip-id=3667
+    facts:
+      language_of_instruction: english
+      tuition_fee_non_eu_eur: 3300
+      semester_contribution_eur: null
+      deadline_open: "04-15"
+      deadline_close: "05-31"
+      application_route: null
+      english_requirement: {ielts: 6.5, toefl_ibt: 90}
+      german_requirement: {level: A2, when: "before the internship"}
+      grade_requirement: {note: "1 year of work experience after graduating"}
+      admission_test: null
+      intakes: null  # not stated in the developers' check (corrected 2026-10-19, see the Spike 1 report)
+    notes: "Excluded: fails the no-tuition criterion (EUR 3,300 per semester for all students). The Hof website could not be loaded."
+
+  koblenz-web-data-science:
+    row: 30
+    university: University of Koblenz
+    programme: Web and Data Science (MSc)
+    cycle: current official page
+    key_status: confirmed
+    sources:
+      - https://www.uni-koblenz.de/en/degree-programs/web-and-data-science-msc
+    facts:
+      language_of_instruction: english
+      tuition_fee_non_eu_eur: 0
+      semester_contribution_eur: {value: 290, approx: true}
+      deadline_open: null
+      deadline_close: "06-15"
+      application_route: uni_assist
+      english_requirement: {ielts: 6.5, toefl_ibt: 79, other: ["Cambridge B2+"]}
+      german_requirement: null
+      grade_requirement: {german_max: 2.5, note: "CGPA 65% / grade B; upload the bachelor thesis or a major project report"}
+      admission_test: null
+      intakes: [winter]
+    notes: "15 Jun fits Tier A."

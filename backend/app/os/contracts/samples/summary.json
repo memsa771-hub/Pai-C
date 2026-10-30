@@ -1,0 +1,42 @@
+{
+  "schema": "pai.plan_summary.v1",
+  "student_ref": "ws-sample-1",
+  "plan_id": 1,
+  "route": {
+    "origin_country": "PK",
+    "destination_country": "DE",
+    "level": "master",
+    "target_intake": {
+      "term": "winter",
+      "year": 2027
+    }
+  },
+  "built_at": "2027-02-01T08:00:00+00:00",
+  "state": "needs_student",
+  "next_deadlines": [
+    {
+      "title": "Submit the application",
+      "template_key": "submit_application",
+      "programme_ref": "ovgu-eeit",
+      "due_at": "2027-03-15T23:59:00+01:00",
+      "due_tz": "Europe/Berlin"
+    }
+  ],
+  "waiting_on_student": [
+    {
+      "title": "Upload your passport",
+      "template_key": "upload_passport",
+      "programme_ref": null,
+      "due_at": null,
+      "due_tz": null
+    }
+  ],
+  "blocked": [
+    {
+      "title": "Book the language test",
+      "template_key": "book_language_test",
+      "reason": "waiting_on_dependency"
+    }
+  ],
+  "support_case_open": false
+}

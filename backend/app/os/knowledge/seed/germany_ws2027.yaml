@@ -1,0 +1,87 @@
+# Hand-seeded Knowledge for the Germany master's route, winter semester 2027/28 (spec S1-D2).
+# Route facts come from docs/os/spikes/spike5-germany-playbook.md (quotes copied word for word).
+# Programme facts are leads from the developers' shortlist (PAI-OS-Programme-Shortlist-WS2027.xlsx,
+# gathered 2026-10-12). Nothing here is confirmed for WS 2027/28 (plan ruling R-P4): an admin confirms
+# each fact through POST /v1/os/facts/{id}/confirm once its official page is re-read. Slice 2's
+# research agent fills the same table.
+intake_year: 2027
+route_key: germany_master
+
+route:
+  blocked_account_yearly_eur:
+    value: 11904
+    quote: "From 1 January 2025 the presumed annual requirement that must be paid into the blocked account when applying for a visa will increase to 992,00 Euros monthly or 11.904,00 Euros yearly."
+    url: "https://pakistan.diplo.de/pk-en/service/1995528-1995528"
+    checked_at: 2026-10-17
+    status: unconfirmed
+    conflict_note: "Older embassy documents give 11,208 EUR (leaflet 10/2023) and 10,236 EUR (Karachi checklist); the amount is set per year, so re-check for 2027 (Spike 5 C2)."
+  uni_assist_fee_first_eur:
+    value: 75
+    quote: "Cost for the first chosen course of study: EUR 75.00"
+    url: "https://www.uni-assist.de/en/how-to-apply/apply-online/pay-submit/"
+    checked_at: 2026-10-17
+    status: unconfirmed
+  uni_assist_fee_additional_eur:
+    value: 30
+    quote: "For each additional chosen course of study: EUR 30.00"
+    url: "https://www.uni-assist.de/en/how-to-apply/apply-online/pay-submit/"
+    checked_at: 2026-10-17
+    status: unconfirmed
+  # There is no visa_target_date fact (Slice 9 Task 11, F1): no official source gives one. The playbook derives the
+  # visa step's date from the visa programme's semester_start (a programme fact research looks up, with its page),
+  # 15 weeks before it (the visa_before_semester_days constant; 6 weeks before Slice 9b). No semester_start is
+  # seeded here: until research finds it for a programme, visa_apply waits for it and the student is told so
+  # (Spike 5 C5).
+
+programmes:
+  tu-chemnitz-embedded-systems:
+    deadline_close:
+      value: {date: "2027-07-15", tz: Europe/Berlin}
+      url: "https://www2.daad.de/deutschland/studienangebote/international-programmes/en/detail/4493"
+      checked_at: 2026-10-12
+      status: unconfirmed
+      conflict_note: "Lead: 15 July in the DAAD 2024/25 listing; the WS 2027/28 date is not published yet."
+    application_route:
+      value: uni_assist
+      url: "https://www2.daad.de/deutschland/studienangebote/international-programmes/en/detail/4493"
+      checked_at: 2026-10-12
+      status: unconfirmed
+    english_requirement:
+      value: "IELTS 5.5 / TOEFL 72"
+      url: "https://www2.daad.de/deutschland/studienangebote/international-programmes/en/detail/4493"
+      checked_at: 2026-10-12
+      status: unconfirmed
+  ovgu-eeit:
+    deadline_close:
+      value: {date: "2027-07-15", tz: Europe/Berlin}
+      url: "https://www2.daad.de/deutschland/studienangebote/international-programmes/en/detail/6091"
+      checked_at: 2026-10-12
+      status: unconfirmed
+      conflict_note: "Lead: 15 July (international) in the DAAD listing; the WS 2027/28 date is not published yet."
+    application_route:
+      value: uni_assist
+      url: "https://www2.daad.de/deutschland/studienangebote/international-programmes/en/detail/6091"
+      checked_at: 2026-10-12
+      status: unconfirmed
+    english_requirement:
+      value: "IELTS 6.0 / TOEFL 80"
+      url: "https://www2.daad.de/deutschland/studienangebote/international-programmes/en/detail/6091"
+      checked_at: 2026-10-12
+      status: unconfirmed
+  btu-artificial-intelligence:
+    deadline_close:
+      value: {date: "2027-07-15", tz: Europe/Berlin}
+      url: "https://www.b-tu.de/en/artificial-intelligence-ms/faq"
+      checked_at: 2026-10-12
+      status: unconfirmed
+      conflict_note: "Lead: the shortlist records 1 Mar 2027 - 15 Jul 2027 from BTU's own page; not re-read yet."
+    application_route:
+      value: uni_assist
+      url: "https://www.b-tu.de/en/artificial-intelligence-ms/faq"
+      checked_at: 2026-10-12
+      status: unconfirmed
+    english_requirement:
+      value: "Certificate required; no medium-of-instruction letters"
+      url: "https://www.b-tu.de/en/artificial-intelligence-ms/faq"
+      checked_at: 2026-10-12
+      status: unconfirmed

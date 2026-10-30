@@ -1,0 +1,12 @@
+# Minimum passing grade letter (Slice 4 spec S4-D6): the student's institution states its grade scale and the lowest
+# passing grade. It replaces the route's provisional default in the grade estimate. Added by config only (S3 promise).
+key: min_passing_grade_letter
+version: 1
+label: Minimum passing grade letter
+fields:
+  - {name: institution, type: text, hint: "The university or board that issued the letter, as printed"}
+  - {name: scale_best, label: "Best grade on the scale", type: number, hint: "The best grade on the scale the letter describes, e.g. 4.0 for a CGPA out of 4, or 100 for percentages"}
+  - {name: min_pass, label: "Minimum passing grade", type: number, hint: "The minimum passing grade the letter states, on that same scale, e.g. 2.0"}
+  - {name: issue_date, type: date, hint: "Date the letter was issued, YYYY-MM-DD"}
+rules:
+  - {kind: lte, fields: [min_pass, scale_best]}

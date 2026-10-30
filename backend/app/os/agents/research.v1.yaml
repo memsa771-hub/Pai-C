@@ -1,0 +1,15 @@
+# The research agent (Slice 2 spec §4.5, S2-D5): reads fenced page text and fills the route's reading model.
+# It has no tools: pages are fetched and links chosen by rule (the page gateway), never by the agent.
+id: research
+version: 1
+zone: reader
+tier: cheap
+tools: []
+output: profile_reading
+limits:
+  max_readings: 3              # A and B always; C only when a field has a single valid reading (S2-D7)
+  timeout_s: 120               # per reading
+  spend_usd_per_programme: 0.10
+retries:
+  tools: 0
+  output: 2                    # invariant 7: answer repair through output validation, at most 2

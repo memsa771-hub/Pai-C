@@ -156,6 +156,13 @@ class WorkspaceApi {
   }
 
   private async request<T>(path: string, options: RequestInit = {}): Promise<T> {
+    const json: ApiResponse<T> = await this.requestJson<ApiResponse<T>>(path, options);
+    return json.data;
+  }
+
+  /** Like request(), but returns the body as-is (the PAI OS API has no {data} envelope). */
+  private async requestJson<T>(path: string, options: RequestInit = {}): Promise<T> {
+    // Merge pai-c + pai-os: pai-c's Firebase authHeaders() replaces pai-os's token/bearerToken block.
     const authHeaders = await this.authHeaders();
     const url = `${API_URL}${path}`;
     const res = await fetch(url, {
@@ -179,8 +186,410 @@ class WorkspaceApi {
       throw new Error(`API ${res.status}: ${body}`);
     }
 
-    const json: ApiResponse<T> = await res.json();
-    return json.data;
+    return (await res.json()) as T;
+  }
+
+  // ---------------------------------------------------------------------------
+  // PAI OS student inbox (backend/app/os, mounted only when OS_ENABLED)
+  // ---------------------------------------------------------------------------
+
+  async getOsInbox(): Promise<import('./os-inbox').OsInboxItem[]> {
+    const params = new URLSearchParams({ network: this.requireWorkspace() });
+    const body = await this.requestJson<{ items: import('./os-inbox').OsInboxItem[] }>(`/v1/os/inbox?${params}`);
+    return body.items;
+  }
+
+  async completeOsInboxItem(id: number, payload: Record<string, unknown> = {}): Promise<{ completed: boolean }> {
+    const params = new URLSearchParams({ network: this.requireWorkspace() });
+    return this.requestJson(`/v1/os/inbox/${id}/complete?${params}`, {
+      method: 'POST', body: JSON.stringify({ payload }),
+    });
+  }
+
+  /** PAI OS: the facts of the programmes in the student's plan (Slice 2 spec §4.8). */
+  async getOsProgrammes(): Promise<import('./os-programmes').OsProgramme[]> {
+    const params = new URLSearchParams({ network: this.requireWorkspace() });
+    const body = await this.requestJson<{ programmes: import('./os-programmes').OsProgramme[] }>(`/v1/os/programmes?${params}`);
+    return body.programmes;
+  }
+
+  /** PAI OS: the student's documents, their open findings and the document types (Slice 3 spec §4). */
+  async getOsDocuments(): Promise<import('./os-documents').OsDocuments> {
+    const params = new URLSearchParams({ network: this.requireWorkspace() });
+    return this.requestJson(`/v1/os/documents?${params}`);
+  }
+
+  /**
+   * PAI OS: upload one document. Multipart, so this is a bare fetch with the same auth headers and **no**
+   * `Content-Type` (the browser sets the multipart boundary); requestJson would send application/json.
+   */
+  async uploadOsDocument(file: File, docType: string): Promise<import('./os-documents').OsDocument> {
+    const params = new URLSearchParams({ network: this.requireWorkspace() });
+    const form = new FormData();
+    form.append('file', file);
+    form.append('doc_type', docType);
+    const headers: Record<string, string> = {};
+    // Merge pai-c + pai-os: pai-c's Firebase auth headers (no bearerToken field any more).
+    Object.assign(headers, await this.authHeaders());
+    const res = await fetch(`${API_URL}/v1/os/documents?${params}`, {
+      method: 'POST', body: form, headers, credentials: 'include', cache: 'no-store',
+    });
+    if (!res.ok) {
+      if (res.status === 401 && typeof window !== 'undefined') window.dispatchEvent(new Event(AUTH_INVALID_EVENT));
+      const text = await res.text();
+      let detail = text;
+      try {
+        detail = (JSON.parse(text) as { detail?: string }).detail ?? text;
+      } catch { /* not JSON: keep the text */ }
+      throw new Error(`API ${res.status}: ${detail}`);
+    }
+    return (await res.json()) as import('./os-documents').OsDocument;
+  }
+
+  /** PAI OS: confirm or correct every field of one document. */
+  async confirmOsDocument(id: number, fields: Record<string, unknown>): Promise<import('./os-documents').OsDocument> {
+    const params = new URLSearchParams({ network: this.requireWorkspace() });
+    return this.requestJson(`/v1/os/documents/${id}/confirm?${params}`, {
+      method: 'POST', body: JSON.stringify({ fields }),
+    });
+  }
+
+  /** PAI OS: choose the right value for a finding across documents. */
+  async resolveOsFinding(id: number, value: unknown): Promise<import('./os-documents').OsFinding> {
+    const params = new URLSearchParams({ network: this.requireWorkspace() });
+    return this.requestJson(`/v1/os/documents/findings/${id}/resolve?${params}`, {
+      method: 'POST', body: JSON.stringify({ value }),
+    });
+  }
+
+  /** PAI OS: delete a document (its file and fields go; an audit row stays). */
+  async deleteOsDocument(id: number): Promise<void> {
+    const params = new URLSearchParams({ network: this.requireWorkspace() });
+    const headers: Record<string, string> = {};
+    // Merge pai-c + pai-os: pai-c's Firebase auth headers (no bearerToken field any more).
+    Object.assign(headers, await this.authHeaders());
+    const res = await fetch(`${API_URL}/v1/os/documents/${id}?${params}`, {
+      method: 'DELETE', headers, credentials: 'include', cache: 'no-store',
+    });
+    if (!res.ok) throw new Error(`API ${res.status}: ${await res.text()}`);
+  }
+
+  // ---------------------------------------------------------------------------
+  // PAI OS self-serve start and eligibility (Slice 4 spec §4)
+  // ---------------------------------------------------------------------------
+
+  /** PAI OS: the student's eligibility change notes (the inbox's `notes`). */
+  async getOsInboxNotes(): Promise<import('./os-self-serve').OsNote[]> {
+    const params = new URLSearchParams({ network: this.requireWorkspace() });
+    const body = await this.requestJson<{ notes?: import('./os-self-serve').OsNote[] }>(`/v1/os/inbox?${params}`);
+    return body.notes ?? [];
+  }
+
+  /** PAI OS: mark an eligibility note read (204, no body). */
+  async readOsNote(id: number): Promise<void> {
+    const params = new URLSearchParams({ network: this.requireWorkspace() });
+    const headers: Record<string, string> = {};
+    // Merge pai-c + pai-os: pai-c's Firebase auth headers (no bearerToken field any more).
+    Object.assign(headers, await this.authHeaders());
+    const res = await fetch(`${API_URL}/v1/os/inbox/notes/${id}/read?${params}`, {
+      method: 'POST', headers, credentials: 'include', cache: 'no-store',
+    });
+    if (!res.ok) throw new Error(`API ${res.status}: ${await res.text()}`);
+  }
+
+  async getOsRoutes(): Promise<import('./os-self-serve').OsRoute[]> {
+    const params = new URLSearchParams({ network: this.requireWorkspace() });
+    const body = await this.requestJson<{ routes: import('./os-self-serve').OsRoute[] }>(`/v1/os/routes?${params}`);
+    return body.routes;
+  }
+
+  /** PAI OS: the route's programmes, each with the student's eligibility card. */
+  async getOsRouteProgrammes(route: string, intakeYear: number): Promise<import('./os-self-serve').OsRouteProgramme[]> {
+    const params = new URLSearchParams({ network: this.requireWorkspace(), intake: String(intakeYear) });
+    const body = await this.requestJson<{ programmes: import('./os-self-serve').OsRouteProgramme[] }>(
+      `/v1/os/routes/${encodeURIComponent(route)}/programmes?${params}`);
+    return body.programmes;
+  }
+
+  /** PAI OS: one programme's card, with up to 3 swap suggestions. */
+  async getOsEligibility(programmeRef: string, route: string, intakeYear: number): Promise<import('./os-self-serve').OsEligibility> {
+    const params = new URLSearchParams({ network: this.requireWorkspace(), route, intake: String(intakeYear) });
+    return this.requestJson(`/v1/os/eligibility/${encodeURIComponent(programmeRef)}?${params}`);
+  }
+
+  /** PAI OS: the current pilot terms and whether the student agreed to them (Slice 9a spec §3.2). */
+  async getOsConsent(): Promise<import('./os-consent').OsConsent> {
+    const params = new URLSearchParams({ network: this.requireWorkspace() });
+    return this.requestJson(`/v1/os/consent?${params}`);
+  }
+
+  /** PAI OS: agree to this version of the pilot terms (204, no body; 409 with a code if refused). */
+  async agreeOsConsent(version: number): Promise<void> {
+    const params = new URLSearchParams({ network: this.requireWorkspace() });
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    // Merge pai-c + pai-os: pai-c's Firebase auth headers (no bearerToken field any more).
+    Object.assign(headers, await this.authHeaders());
+    const res = await fetch(`${API_URL}/v1/os/consent?${params}`, {
+      method: 'POST', body: JSON.stringify({ version }), headers, credentials: 'include', cache: 'no-store',
+    });
+    if (!res.ok) {
+      if (res.status === 401 && typeof window !== 'undefined') window.dispatchEvent(new Event(AUTH_INVALID_EVENT));
+      throw new Error(`API ${res.status}: ${await res.text()}`);
+    }
+  }
+
+  /** PAI OS: start the student's own plan (or get the one they already have). */
+  async startOsPlan(route: string, intake: { term: string; year: number },
+                    choices: { programme_ref: string; rank: number }[]): Promise<import('./os-self-serve').OsSelfPlan> {
+    const params = new URLSearchParams({ network: this.requireWorkspace() });
+    return this.requestJson(`/v1/os/plans/self?${params}`, {
+      method: 'POST', body: JSON.stringify({ route, intake, choices }),
+    });
+  }
+
+  /** PAI OS: swap one programme for another (the screen asks the student first). */
+  async swapOsProgramme(planId: number, outRef: string, inRef: string): Promise<import('./os-self-serve').OsSelfPlan> {
+    const params = new URLSearchParams({ network: this.requireWorkspace() });
+    return this.requestJson(`/v1/os/plans/${planId}/swap?${params}`, {
+      method: 'POST', body: JSON.stringify({ out: outRef, in: inRef }),
+    });
+  }
+
+  /** PAI OS: drop one programme from the plan while nothing for it has started. */
+  async removeOsProgramme(planId: number, ref: string): Promise<import('./os-self-serve').OsSelfPlan> {
+    const params = new URLSearchParams({ network: this.requireWorkspace() });
+    return this.requestJson(`/v1/os/plans/${planId}/programmes/${encodeURIComponent(ref)}?${params}`, {
+      method: 'DELETE',
+    });
+  }
+
+  /** PAI OS: ask for a programme that is not on the list; it is researched once and shared. */
+  async requestOsProgramme(request: import('./os-self-serve').OsProgrammeRequest): Promise<{ programme_ref: string; created: boolean }> {
+    const params = new URLSearchParams({ network: this.requireWorkspace() });
+    return this.requestJson(`/v1/os/programmes/requests?${params}`, {
+      method: 'POST', body: JSON.stringify(request),
+    });
+  }
+
+  /** PAI OS: the student's confirmed profile values, each with its source document. */
+  async getOsProfile(): Promise<import('./os-documents').OsProfileValue[]> {
+    const params = new URLSearchParams({ network: this.requireWorkspace() });
+    const body = await this.requestJson<{ values: import('./os-documents').OsProfileValue[] }>(`/v1/os/profile?${params}`);
+    return body.values;
+  }
+
+  // ---------------------------------------------------------------------------
+  // PAI OS statements: the SOP and CV the student co-writes (Slice 5 spec §4)
+  // ---------------------------------------------------------------------------
+
+  /** PAI OS: the route's interview questions with the student's answers (open follow-ups first). */
+  async getOsInterview(): Promise<import('./os-statements').OsInterview> {
+    const params = new URLSearchParams({ network: this.requireWorkspace() });
+    return this.requestJson(`/v1/os/statements/interview?${params}`);
+  }
+
+  /** PAI OS: save one answer. `drafting` counts the drafts started again by the last follow-up answer. */
+  async saveOsAnswer(questionId: string, answer: string): Promise<{ saved: boolean; drafting: number }> {
+    const params = new URLSearchParams({ network: this.requireWorkspace() });
+    return this.requestJson(`/v1/os/statements/answers/${encodeURIComponent(questionId)}?${params}`, {
+      method: 'PUT', body: JSON.stringify({ answer }),
+    });
+  }
+
+  /** PAI OS: the student's statements, and each plan programme's statement rules. */
+  async getOsStatements(): Promise<import('./os-statements').OsStatements> {
+    const params = new URLSearchParams({ network: this.requireWorkspace() });
+    const body = await this.requestJson<import('./os-statements').OsStatements>(`/v1/os/statements?${params}`);
+    return { statements: body.statements, programmes: body.programmes ?? [] };
+  }
+
+  /** PAI OS: start a draft (202). A 409 names the questions still to answer. */
+  async draftOsStatement(kind: import('./os-statements').OsStatementKind,
+                         programmeRef: string | null = null): Promise<import('./os-statements').OsStatement> {
+    const params = new URLSearchParams({ network: this.requireWorkspace() });
+    return this.requestJson(`/v1/os/statements/${kind}/draft?${params}`, {
+      method: 'POST', body: JSON.stringify({ programme_ref: programmeRef }),
+    });
+  }
+
+  /** PAI OS: save the student's edit as a new version; the answer carries its flags. */
+  async saveOsStatementText(id: number, text: string): Promise<import('./os-statements').OsStatement> {
+    const params = new URLSearchParams({ network: this.requireWorkspace() });
+    return this.requestJson(`/v1/os/statements/${id}/text?${params}`, {
+      method: 'PUT', body: JSON.stringify({ text }),
+    });
+  }
+
+  async approveOsStatement(id: number, version: number): Promise<import('./os-statements').OsApproval & { completed_tasks: number[] }> {
+    const params = new URLSearchParams({ network: this.requireWorkspace() });
+    return this.requestJson(`/v1/os/statements/${id}/approve?${params}`, {
+      method: 'POST', body: JSON.stringify({ version }),
+    });
+  }
+
+  /** PAI OS: the prompt and limit the student pasted from a programme's page (204, no body). */
+  async saveOsStatementRules(programmeRef: string,
+                             rules: { prompt?: string | null; limit_words?: number | null; limit_chars?: number | null }): Promise<void> {
+    const params = new URLSearchParams({ network: this.requireWorkspace() });
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    // Merge pai-c + pai-os: pai-c's Firebase auth headers (no bearerToken field any more).
+    Object.assign(headers, await this.authHeaders());
+    const res = await fetch(`${API_URL}/v1/os/statements/rules/${encodeURIComponent(programmeRef)}?${params}`, {
+      method: 'PUT', body: JSON.stringify(rules), headers, credentials: 'include', cache: 'no-store',
+    });
+    if (!res.ok) throw new Error(`API ${res.status}: ${await res.text()}`);
+  }
+
+  // ---------------------------------------------------------------------------
+  // PAI OS application packs (Slice 6a spec §4)
+  // ---------------------------------------------------------------------------
+
+  /** PAI OS: one pack per programme in the student's plan (reading also starts any rebuild that is due). */
+  async getOsPacks(): Promise<import('./os-packs').OsPacks> {
+    const params = new URLSearchParams({ network: this.requireWorkspace() });
+    return this.requestJson(`/v1/os/packs?${params}`);
+  }
+
+  async buildOsPack(programmeRef: string): Promise<{ workflow_id: string }> {
+    const params = new URLSearchParams({ network: this.requireWorkspace() });
+    return this.requestJson(`/v1/os/packs/${encodeURIComponent(programmeRef)}/build?${params}`, { method: 'POST' });
+  }
+
+  /** PAI OS: the details no document shows (email, phone, address…). */
+  async saveOsPackDetails(fields: Record<string, string | null>): Promise<{ saved: number }> {
+    const params = new URLSearchParams({ network: this.requireWorkspace() });
+    return this.requestJson(`/v1/os/packs/details?${params}`, { method: 'PUT', body: JSON.stringify({ fields }) });
+  }
+
+  async updateOsPackItems(programmeRef: string,
+                          change: { tick?: string[]; untick?: string[]; add?: { label: string }[] }): Promise<{ added: string[] }> {
+    const params = new URLSearchParams({ network: this.requireWorkspace() });
+    return this.requestJson(`/v1/os/packs/${encodeURIComponent(programmeRef)}/items?${params}`, {
+      method: 'PUT', body: JSON.stringify(change),
+    });
+  }
+
+  /**
+   * PAI OS: one rendered file, fetched with the same auth headers (no token in a URL), returned as a Blob with the
+   * file name the server gave, for the page to save.
+   */
+  async downloadOsPackFile(programmeRef: string, sha256: string): Promise<{ blob: Blob; filename: string }> {
+    const params = new URLSearchParams({ network: this.requireWorkspace() });
+    const headers: Record<string, string> = {};
+    // Merge pai-c + pai-os: pai-c's Firebase auth headers (no bearerToken field any more).
+    Object.assign(headers, await this.authHeaders());
+    const res = await fetch(`${API_URL}/v1/os/packs/${encodeURIComponent(programmeRef)}/files/${sha256}?${params}`, {
+      headers, credentials: 'include', cache: 'no-store',
+    });
+    if (!res.ok) throw new Error(`API ${res.status}: ${await res.text()}`);
+    const m = /filename="([^"]+)"/.exec(res.headers.get('Content-Disposition') ?? '');
+    return { blob: await res.blob(), filename: m ? m[1] : `${sha256.slice(0, 12)}.pdf` };
+  }
+
+  /** PAI OS: approve the pack version the student is looking at (409 if it changed or is incomplete). */
+  async approveOsPack(programmeRef: string, sha256: string): Promise<{ sha256: string; version: number }> {
+    const params = new URLSearchParams({ network: this.requireWorkspace() });
+    return this.requestJson(`/v1/os/packs/${encodeURIComponent(programmeRef)}/approve?${params}`, {
+      method: 'POST', body: JSON.stringify({ sha256 }),
+    });
+  }
+
+  // ---------------------------------------------------------------------------
+  // PAI OS replanning (Slice 7 spec §4)
+  // ---------------------------------------------------------------------------
+
+  /** PAI OS: what changed in the student's open plan, and the suggestions waiting for their answer. */
+  async getOsChanges(): Promise<import('./os-replan').OsChanges> {
+    const params = new URLSearchParams({ network: this.requireWorkspace() });
+    return this.requestJson(`/v1/os/changes?${params}`);
+  }
+
+  async acceptOsProposal(id: number): Promise<{ status: string; revision: number | null }> {
+    const params = new URLSearchParams({ network: this.requireWorkspace() });
+    return this.requestJson(`/v1/os/proposals/${id}/accept?${params}`, { method: 'POST' });
+  }
+
+  async declineOsProposal(id: number): Promise<{ status: string }> {
+    const params = new URLSearchParams({ network: this.requireWorkspace() });
+    return this.requestJson(`/v1/os/proposals/${id}/decline?${params}`, { method: 'POST' });
+  }
+
+  /**
+   * PAI OS admin calls: the admin token goes in its own header only, never in a URL. A 401 here means a wrong admin
+   * token, not an expired session, so it never signs the user out (unlike requestJson).
+   */
+  private async adminJson<T>(path: string, adminToken: string, options: RequestInit = {}): Promise<T> {
+    const headers: Record<string, string> = { 'Content-Type': 'application/json', 'X-OS-Admin-Token': adminToken };
+    // Merge pai-c + pai-os: pai-c's Firebase auth headers (no bearerToken field any more).
+    Object.assign(headers, await this.authHeaders());
+    const res = await fetch(`${API_URL}${path}`, { ...options, credentials: 'include', cache: 'no-store', headers });
+    if (!res.ok) throw new Error(`API ${res.status}: ${await res.text()}`);
+    return (await res.json()) as T;
+  }
+
+  /** PAI OS admin: support cases. */
+  async getOsSupportCases(adminToken: string, status?: 'open' | 'resolved'): Promise<import('./os-replan').OsSupportCase[]> {
+    const params = new URLSearchParams({ network: this.requireWorkspace(), ...(status ? { status } : {}) });
+    const body = await this.adminJson<{ cases: import('./os-replan').OsSupportCase[] }>(
+      `/v1/os/admin/support?${params}`, adminToken);
+    return body.cases;
+  }
+
+  async resolveOsSupportCase(adminToken: string, id: number, note: string, unpause: boolean): Promise<import('./os-replan').OsSupportCase> {
+    const params = new URLSearchParams({ network: this.requireWorkspace() });
+    return this.adminJson(`/v1/os/admin/support/${id}/resolve?${params}`, adminToken, {
+      method: 'POST', body: JSON.stringify({ note, unpause }),
+    });
+  }
+
+  // ---------------------------------------------------------------------------
+  // PAI OS visa file (Slice 6b spec §4)
+  // ---------------------------------------------------------------------------
+
+  /** PAI OS: the visa file for the chosen (or pre-selected) programme, with the funds the student must show. */
+  async getOsVisa(): Promise<import('./os-visa').OsVisa> {
+    const params = new URLSearchParams({ network: this.requireWorkspace() });
+    return this.requestJson(`/v1/os/visa?${params}`);
+  }
+
+  async saveOsVisaChoice(choice: { programme_ref?: string; reduction?: number }): Promise<{ programme_ref: string | null; reduction: number }> {
+    const params = new URLSearchParams({ network: this.requireWorkspace() });
+    return this.requestJson(`/v1/os/visa/choice?${params}`, { method: 'PUT', body: JSON.stringify(choice) });
+  }
+
+  async buildOsVisa(): Promise<{ workflow_id: string }> {
+    const params = new URLSearchParams({ network: this.requireWorkspace() });
+    return this.requestJson(`/v1/os/visa/build?${params}`, { method: 'POST' });
+  }
+
+  async saveOsVisaDetails(fields: Record<string, string | null>): Promise<{ saved: number }> {
+    const params = new URLSearchParams({ network: this.requireWorkspace() });
+    return this.requestJson(`/v1/os/visa/details?${params}`, { method: 'PUT', body: JSON.stringify({ fields }) });
+  }
+
+  async updateOsVisaItems(change: { tick?: string[]; untick?: string[]; add?: { label: string }[] }): Promise<{ added: string[] }> {
+    const params = new URLSearchParams({ network: this.requireWorkspace() });
+    return this.requestJson(`/v1/os/visa/items?${params}`, { method: 'PUT', body: JSON.stringify(change) });
+  }
+
+  /** PAI OS: one visa file, fetched with the auth headers (no token in a URL). */
+  async downloadOsVisaFile(sha256: string): Promise<{ blob: Blob; filename: string }> {
+    const params = new URLSearchParams({ network: this.requireWorkspace() });
+    const headers: Record<string, string> = {};
+    // Merge pai-c + pai-os: pai-c's Firebase auth headers (no bearerToken field any more).
+    Object.assign(headers, await this.authHeaders());
+    const res = await fetch(`${API_URL}/v1/os/visa/files/${sha256}?${params}`, {
+      headers, credentials: 'include', cache: 'no-store',
+    });
+    if (!res.ok) throw new Error(`API ${res.status}: ${await res.text()}`);
+    const m = /filename="([^"]+)"/.exec(res.headers.get('Content-Disposition') ?? '');
+    return { blob: await res.blob(), filename: m ? m[1] : `${sha256.slice(0, 12)}.pdf` };
+  }
+
+  /** PAI OS: approve the visa file version the student is looking at (409 if it changed, is incomplete or unchosen). */
+  async approveOsVisa(sha256: string): Promise<{ sha256: string; version: number }> {
+    const params = new URLSearchParams({ network: this.requireWorkspace() });
+    return this.requestJson(`/v1/os/visa/approve?${params}`, { method: 'POST', body: JSON.stringify({ sha256 }) });
   }
 
   // ---------------------------------------------------------------------------

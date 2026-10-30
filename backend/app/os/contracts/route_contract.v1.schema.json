@@ -1,0 +1,116 @@
+{
+  "$defs": {
+    "IntakeRef": {
+      "additionalProperties": false,
+      "properties": {
+        "term": {
+          "pattern": "^[a-z_]+$",
+          "title": "Term",
+          "type": "string"
+        },
+        "year": {
+          "maximum": 2100,
+          "minimum": 2025,
+          "title": "Year",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "term",
+        "year"
+      ],
+      "title": "IntakeRef",
+      "type": "object"
+    },
+    "ProgrammeChoice": {
+      "additionalProperties": false,
+      "properties": {
+        "programme_ref": {
+          "minLength": 1,
+          "title": "Programme Ref",
+          "type": "string"
+        },
+        "rank": {
+          "minimum": 1,
+          "title": "Rank",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "programme_ref",
+        "rank"
+      ],
+      "title": "ProgrammeChoice",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "contract_version": {
+      "const": "1",
+      "title": "Contract Version",
+      "type": "string"
+    },
+    "destination_country": {
+      "title": "Destination Country",
+      "type": "string"
+    },
+    "external_ref": {
+      "minLength": 1,
+      "title": "External Ref",
+      "type": "string"
+    },
+    "level": {
+      "enum": [
+        "foundation",
+        "bachelor",
+        "master",
+        "phd"
+      ],
+      "title": "Level",
+      "type": "string"
+    },
+    "origin_country": {
+      "title": "Origin Country",
+      "type": "string"
+    },
+    "programmes": {
+      "items": {
+        "$ref": "#/$defs/ProgrammeChoice"
+      },
+      "maxItems": 10,
+      "minItems": 1,
+      "title": "Programmes",
+      "type": "array"
+    },
+    "source": {
+      "enum": [
+        "self_serve",
+        "counsellor"
+      ],
+      "title": "Source",
+      "type": "string"
+    },
+    "student_ref": {
+      "minLength": 1,
+      "title": "Student Ref",
+      "type": "string"
+    },
+    "target_intake": {
+      "$ref": "#/$defs/IntakeRef"
+    }
+  },
+  "required": [
+    "contract_version",
+    "source",
+    "external_ref",
+    "student_ref",
+    "origin_country",
+    "destination_country",
+    "level",
+    "programmes",
+    "target_intake"
+  ],
+  "title": "RouteContract",
+  "type": "object"
+}

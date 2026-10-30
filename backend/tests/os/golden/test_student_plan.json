@@ -1,0 +1,908 @@
+{
+ "revision": 1,
+ "status": "active",
+ "tasks": [
+  {
+   "blocked_reason": null,
+   "citations": [],
+   "critical": false,
+   "due_at": null,
+   "due_tz": "Europe/Berlin",
+   "estimated": false,
+   "inbox_kind": "choose",
+   "instance_key": "admission_result@btu-artificial-intelligence",
+   "kind": "student",
+   "programme_ref": "btu-artificial-intelligence",
+   "provisional": false,
+   "slack_days": null,
+   "state": "pending",
+   "title": "Tell us this programme's admission result"
+  },
+  {
+   "blocked_reason": null,
+   "citations": [],
+   "critical": false,
+   "due_at": null,
+   "due_tz": "Europe/Berlin",
+   "estimated": false,
+   "inbox_kind": "choose",
+   "instance_key": "admission_result@ovgu-eeit",
+   "kind": "student",
+   "programme_ref": "ovgu-eeit",
+   "provisional": false,
+   "slack_days": null,
+   "state": "pending",
+   "title": "Tell us this programme's admission result"
+  },
+  {
+   "blocked_reason": null,
+   "citations": [],
+   "critical": false,
+   "due_at": null,
+   "due_tz": "Europe/Berlin",
+   "estimated": false,
+   "inbox_kind": "choose",
+   "instance_key": "admission_result@tu-chemnitz-embedded-systems",
+   "kind": "student",
+   "programme_ref": "tu-chemnitz-embedded-systems",
+   "provisional": false,
+   "slack_days": null,
+   "state": "pending",
+   "title": "Tell us this programme's admission result"
+  },
+  {
+   "blocked_reason": null,
+   "citations": [],
+   "critical": true,
+   "due_at": "2027-05-18T21:59:59+00:00",
+   "due_tz": "Europe/Berlin",
+   "estimated": false,
+   "inbox_kind": "act",
+   "instance_key": "admission_test@btu-artificial-intelligence",
+   "kind": "student",
+   "programme_ref": "btu-artificial-intelligence",
+   "provisional": true,
+   "slack_days": 76,
+   "state": "waiting_student",
+   "title": "Take the admission test this programme asks for (GRE / GATE / TestAS)"
+  },
+  {
+   "blocked_reason": null,
+   "citations": [],
+   "critical": true,
+   "due_at": "2027-05-18T21:59:59+00:00",
+   "due_tz": "Europe/Berlin",
+   "estimated": false,
+   "inbox_kind": "act",
+   "instance_key": "admission_test@ovgu-eeit",
+   "kind": "student",
+   "programme_ref": "ovgu-eeit",
+   "provisional": true,
+   "slack_days": 76,
+   "state": "waiting_student",
+   "title": "Take the admission test this programme asks for (GRE / GATE / TestAS)"
+  },
+  {
+   "blocked_reason": null,
+   "citations": [],
+   "critical": true,
+   "due_at": "2027-05-18T21:59:59+00:00",
+   "due_tz": "Europe/Berlin",
+   "estimated": false,
+   "inbox_kind": "act",
+   "instance_key": "admission_test@tu-chemnitz-embedded-systems",
+   "kind": "student",
+   "programme_ref": "tu-chemnitz-embedded-systems",
+   "provisional": true,
+   "slack_days": 76,
+   "state": "waiting_student",
+   "title": "Take the admission test this programme asks for (GRE / GATE / TestAS)"
+  },
+  {
+   "blocked_reason": null,
+   "citations": [],
+   "critical": false,
+   "due_at": "2027-05-16T21:59:59+00:00",
+   "due_tz": "Europe/Berlin",
+   "estimated": false,
+   "inbox_kind": "provide",
+   "instance_key": "application_documents@btu-artificial-intelligence",
+   "kind": "student",
+   "programme_ref": "btu-artificial-intelligence",
+   "provisional": false,
+   "slack_days": 94,
+   "state": "pending",
+   "title": "Prepare this programme's application documents (CV, letters, module descriptions)"
+  },
+  {
+   "blocked_reason": null,
+   "citations": [],
+   "critical": false,
+   "due_at": "2027-05-16T21:59:59+00:00",
+   "due_tz": "Europe/Berlin",
+   "estimated": false,
+   "inbox_kind": "provide",
+   "instance_key": "application_documents@ovgu-eeit",
+   "kind": "student",
+   "programme_ref": "ovgu-eeit",
+   "provisional": false,
+   "slack_days": 94,
+   "state": "pending",
+   "title": "Prepare this programme's application documents (CV, letters, module descriptions)"
+  },
+  {
+   "blocked_reason": null,
+   "citations": [],
+   "critical": false,
+   "due_at": "2027-05-16T21:59:59+00:00",
+   "due_tz": "Europe/Berlin",
+   "estimated": false,
+   "inbox_kind": "provide",
+   "instance_key": "application_documents@tu-chemnitz-embedded-systems",
+   "kind": "student",
+   "programme_ref": "tu-chemnitz-embedded-systems",
+   "provisional": false,
+   "slack_days": 94,
+   "state": "pending",
+   "title": "Prepare this programme's application documents (CV, letters, module descriptions)"
+  },
+  {
+   "blocked_reason": null,
+   "citations": [
+    {
+     "source": "S6",
+     "url": "https://www.uni-assist.de/en/faqs/apply-online/"
+    }
+   ],
+   "critical": false,
+   "due_at": null,
+   "due_tz": "Europe/Berlin",
+   "estimated": false,
+   "inbox_kind": null,
+   "instance_key": "applications_submitted",
+   "kind": "work",
+   "programme_ref": null,
+   "provisional": false,
+   "slack_days": null,
+   "state": "pending",
+   "title": "All applications submitted"
+  },
+  {
+   "blocked_reason": null,
+   "citations": [
+    {
+     "source": "S9",
+     "url": "https://pakistan.diplo.de/pk-en/service/1995528-1995528"
+    }
+   ],
+   "critical": false,
+   "due_at": null,
+   "due_tz": "Europe/Berlin",
+   "estimated": true,
+   "inbox_kind": "act",
+   "instance_key": "blocked_account",
+   "kind": "student",
+   "programme_ref": null,
+   "provisional": false,
+   "slack_days": null,
+   "state": "waiting_student",
+   "title": "Open a blocked account (or arrange another proof of funds)"
+  },
+  {
+   "blocked_reason": null,
+   "citations": [
+    {
+     "source": "S4",
+     "url": "https://www.uni-assist.de/en/faqs/plan-your-application/"
+    }
+   ],
+   "critical": false,
+   "due_at": "2027-05-09T21:59:59+00:00",
+   "due_tz": "Europe/Berlin",
+   "estimated": false,
+   "inbox_kind": "choose",
+   "instance_key": "choose_programmes",
+   "kind": "student",
+   "programme_ref": null,
+   "provisional": false,
+   "slack_days": 94,
+   "state": "waiting_student",
+   "title": "Confirm the programmes you will apply to"
+  },
+  {
+   "blocked_reason": null,
+   "citations": [],
+   "critical": false,
+   "due_at": null,
+   "due_tz": "Europe/Berlin",
+   "estimated": false,
+   "inbox_kind": null,
+   "instance_key": "confirm_fact@btu-artificial-intelligence:admission_test",
+   "kind": "work",
+   "programme_ref": "btu-artificial-intelligence",
+   "provisional": false,
+   "slack_days": null,
+   "state": "ready",
+   "title": "Confirm admission_test for btu-artificial-intelligence"
+  },
+  {
+   "blocked_reason": null,
+   "citations": [],
+   "critical": false,
+   "due_at": null,
+   "due_tz": "Europe/Berlin",
+   "estimated": false,
+   "inbox_kind": null,
+   "instance_key": "confirm_fact@btu-artificial-intelligence:application_route",
+   "kind": "work",
+   "programme_ref": "btu-artificial-intelligence",
+   "provisional": false,
+   "slack_days": null,
+   "state": "ready",
+   "title": "Confirm application_route for btu-artificial-intelligence"
+  },
+  {
+   "blocked_reason": null,
+   "citations": [],
+   "critical": false,
+   "due_at": null,
+   "due_tz": "Europe/Berlin",
+   "estimated": false,
+   "inbox_kind": null,
+   "instance_key": "confirm_fact@btu-artificial-intelligence:deadline_close",
+   "kind": "work",
+   "programme_ref": "btu-artificial-intelligence",
+   "provisional": false,
+   "slack_days": null,
+   "state": "ready",
+   "title": "Confirm deadline_close for btu-artificial-intelligence"
+  },
+  {
+   "blocked_reason": null,
+   "citations": [],
+   "critical": false,
+   "due_at": null,
+   "due_tz": "Europe/Berlin",
+   "estimated": false,
+   "inbox_kind": null,
+   "instance_key": "confirm_fact@btu-artificial-intelligence:decision_date",
+   "kind": "work",
+   "programme_ref": "btu-artificial-intelligence",
+   "provisional": false,
+   "slack_days": null,
+   "state": "ready",
+   "title": "Confirm decision_date for btu-artificial-intelligence"
+  },
+  {
+   "blocked_reason": null,
+   "citations": [],
+   "critical": false,
+   "due_at": null,
+   "due_tz": "Europe/Berlin",
+   "estimated": false,
+   "inbox_kind": null,
+   "instance_key": "confirm_fact@btu-artificial-intelligence:required_documents",
+   "kind": "work",
+   "programme_ref": "btu-artificial-intelligence",
+   "provisional": false,
+   "slack_days": null,
+   "state": "ready",
+   "title": "Confirm required_documents for btu-artificial-intelligence"
+  },
+  {
+   "blocked_reason": null,
+   "citations": [],
+   "critical": false,
+   "due_at": null,
+   "due_tz": "Europe/Berlin",
+   "estimated": false,
+   "inbox_kind": null,
+   "instance_key": "confirm_fact@btu-artificial-intelligence:semester_start",
+   "kind": "work",
+   "programme_ref": "btu-artificial-intelligence",
+   "provisional": false,
+   "slack_days": null,
+   "state": "ready",
+   "title": "Confirm semester_start for btu-artificial-intelligence"
+  },
+  {
+   "blocked_reason": null,
+   "citations": [],
+   "critical": false,
+   "due_at": null,
+   "due_tz": "Europe/Berlin",
+   "estimated": false,
+   "inbox_kind": null,
+   "instance_key": "confirm_fact@ovgu-eeit:admission_test",
+   "kind": "work",
+   "programme_ref": "ovgu-eeit",
+   "provisional": false,
+   "slack_days": null,
+   "state": "ready",
+   "title": "Confirm admission_test for ovgu-eeit"
+  },
+  {
+   "blocked_reason": null,
+   "citations": [],
+   "critical": false,
+   "due_at": null,
+   "due_tz": "Europe/Berlin",
+   "estimated": false,
+   "inbox_kind": null,
+   "instance_key": "confirm_fact@ovgu-eeit:application_route",
+   "kind": "work",
+   "programme_ref": "ovgu-eeit",
+   "provisional": false,
+   "slack_days": null,
+   "state": "ready",
+   "title": "Confirm application_route for ovgu-eeit"
+  },
+  {
+   "blocked_reason": null,
+   "citations": [],
+   "critical": false,
+   "due_at": null,
+   "due_tz": "Europe/Berlin",
+   "estimated": false,
+   "inbox_kind": null,
+   "instance_key": "confirm_fact@ovgu-eeit:deadline_close",
+   "kind": "work",
+   "programme_ref": "ovgu-eeit",
+   "provisional": false,
+   "slack_days": null,
+   "state": "ready",
+   "title": "Confirm deadline_close for ovgu-eeit"
+  },
+  {
+   "blocked_reason": null,
+   "citations": [],
+   "critical": false,
+   "due_at": null,
+   "due_tz": "Europe/Berlin",
+   "estimated": false,
+   "inbox_kind": null,
+   "instance_key": "confirm_fact@ovgu-eeit:decision_date",
+   "kind": "work",
+   "programme_ref": "ovgu-eeit",
+   "provisional": false,
+   "slack_days": null,
+   "state": "ready",
+   "title": "Confirm decision_date for ovgu-eeit"
+  },
+  {
+   "blocked_reason": null,
+   "citations": [],
+   "critical": false,
+   "due_at": null,
+   "due_tz": "Europe/Berlin",
+   "estimated": false,
+   "inbox_kind": null,
+   "instance_key": "confirm_fact@ovgu-eeit:required_documents",
+   "kind": "work",
+   "programme_ref": "ovgu-eeit",
+   "provisional": false,
+   "slack_days": null,
+   "state": "ready",
+   "title": "Confirm required_documents for ovgu-eeit"
+  },
+  {
+   "blocked_reason": null,
+   "citations": [],
+   "critical": false,
+   "due_at": null,
+   "due_tz": "Europe/Berlin",
+   "estimated": false,
+   "inbox_kind": null,
+   "instance_key": "confirm_fact@ovgu-eeit:semester_start",
+   "kind": "work",
+   "programme_ref": "ovgu-eeit",
+   "provisional": false,
+   "slack_days": null,
+   "state": "ready",
+   "title": "Confirm semester_start for ovgu-eeit"
+  },
+  {
+   "blocked_reason": null,
+   "citations": [],
+   "critical": false,
+   "due_at": null,
+   "due_tz": "Europe/Berlin",
+   "estimated": false,
+   "inbox_kind": null,
+   "instance_key": "confirm_fact@tu-chemnitz-embedded-systems:admission_test",
+   "kind": "work",
+   "programme_ref": "tu-chemnitz-embedded-systems",
+   "provisional": false,
+   "slack_days": null,
+   "state": "ready",
+   "title": "Confirm admission_test for tu-chemnitz-embedded-systems"
+  },
+  {
+   "blocked_reason": null,
+   "citations": [],
+   "critical": false,
+   "due_at": null,
+   "due_tz": "Europe/Berlin",
+   "estimated": false,
+   "inbox_kind": null,
+   "instance_key": "confirm_fact@tu-chemnitz-embedded-systems:application_route",
+   "kind": "work",
+   "programme_ref": "tu-chemnitz-embedded-systems",
+   "provisional": false,
+   "slack_days": null,
+   "state": "ready",
+   "title": "Confirm application_route for tu-chemnitz-embedded-systems"
+  },
+  {
+   "blocked_reason": null,
+   "citations": [],
+   "critical": false,
+   "due_at": null,
+   "due_tz": "Europe/Berlin",
+   "estimated": false,
+   "inbox_kind": null,
+   "instance_key": "confirm_fact@tu-chemnitz-embedded-systems:deadline_close",
+   "kind": "work",
+   "programme_ref": "tu-chemnitz-embedded-systems",
+   "provisional": false,
+   "slack_days": null,
+   "state": "ready",
+   "title": "Confirm deadline_close for tu-chemnitz-embedded-systems"
+  },
+  {
+   "blocked_reason": null,
+   "citations": [],
+   "critical": false,
+   "due_at": null,
+   "due_tz": "Europe/Berlin",
+   "estimated": false,
+   "inbox_kind": null,
+   "instance_key": "confirm_fact@tu-chemnitz-embedded-systems:decision_date",
+   "kind": "work",
+   "programme_ref": "tu-chemnitz-embedded-systems",
+   "provisional": false,
+   "slack_days": null,
+   "state": "ready",
+   "title": "Confirm decision_date for tu-chemnitz-embedded-systems"
+  },
+  {
+   "blocked_reason": null,
+   "citations": [],
+   "critical": false,
+   "due_at": null,
+   "due_tz": "Europe/Berlin",
+   "estimated": false,
+   "inbox_kind": null,
+   "instance_key": "confirm_fact@tu-chemnitz-embedded-systems:required_documents",
+   "kind": "work",
+   "programme_ref": "tu-chemnitz-embedded-systems",
+   "provisional": false,
+   "slack_days": null,
+   "state": "ready",
+   "title": "Confirm required_documents for tu-chemnitz-embedded-systems"
+  },
+  {
+   "blocked_reason": null,
+   "citations": [],
+   "critical": false,
+   "due_at": null,
+   "due_tz": "Europe/Berlin",
+   "estimated": false,
+   "inbox_kind": null,
+   "instance_key": "confirm_fact@tu-chemnitz-embedded-systems:semester_start",
+   "kind": "work",
+   "programme_ref": "tu-chemnitz-embedded-systems",
+   "provisional": false,
+   "slack_days": null,
+   "state": "ready",
+   "title": "Confirm semester_start for tu-chemnitz-embedded-systems"
+  },
+  {
+   "blocked_reason": null,
+   "citations": [
+    {
+     "source": "S13",
+     "url": "https://digital.diplo.de/studium"
+    }
+   ],
+   "critical": true,
+   "due_at": "2027-05-18T21:59:59+00:00",
+   "due_tz": "Europe/Berlin",
+   "estimated": true,
+   "inbox_kind": "act",
+   "instance_key": "english_test",
+   "kind": "student",
+   "programme_ref": null,
+   "provisional": false,
+   "slack_days": 76,
+   "state": "waiting_student",
+   "title": "Take a recognised English test (score per programme)"
+  },
+  {
+   "blocked_reason": null,
+   "citations": [
+    {
+     "source": "S18",
+     "url": "https://www.daad.de/deutschland/nach-deutschland/bewerbung/en/58221-health-insurance/"
+    }
+   ],
+   "critical": false,
+   "due_at": null,
+   "due_tz": "Europe/Berlin",
+   "estimated": false,
+   "inbox_kind": "act",
+   "instance_key": "enrol",
+   "kind": "student",
+   "programme_ref": null,
+   "provisional": false,
+   "slack_days": null,
+   "state": "pending",
+   "title": "Enrol at your university"
+  },
+  {
+   "blocked_reason": null,
+   "citations": [
+    {
+     "source": "S2",
+     "url": "https://www.uni-assist.de/en/how-to-apply/plan-your-application/educational-certificates-translations/"
+    }
+   ],
+   "critical": false,
+   "due_at": "2027-05-18T21:59:59+00:00",
+   "due_tz": "Europe/Berlin",
+   "estimated": false,
+   "inbox_kind": "provide",
+   "instance_key": "grading_system_doc",
+   "kind": "student",
+   "programme_ref": null,
+   "provisional": false,
+   "slack_days": 104,
+   "state": "waiting_student",
+   "title": "Upload your university's official grading system"
+  },
+  {
+   "blocked_reason": null,
+   "citations": [
+    {
+     "source": "S18",
+     "url": "https://www.daad.de/deutschland/nach-deutschland/bewerbung/en/58221-health-insurance/"
+    }
+   ],
+   "critical": false,
+   "due_at": null,
+   "due_tz": "Europe/Berlin",
+   "estimated": false,
+   "inbox_kind": "act",
+   "instance_key": "health_insurance",
+   "kind": "student",
+   "programme_ref": null,
+   "provisional": false,
+   "slack_days": null,
+   "state": "pending",
+   "title": "Get health insurance that the university accepts for enrolment"
+  },
+  {
+   "blocked_reason": null,
+   "citations": [
+    {
+     "source": "S1",
+     "url": "https://www.uni-assist.de/en/tools/info-country-by-country/details-country/country/pk/"
+    },
+    {
+     "source": "S8",
+     "url": "https://www.hec.gov.pk/english/services/students/das/Pages/Degree-Attestation.aspx"
+    }
+   ],
+   "critical": false,
+   "due_at": "2027-05-18T21:59:59+00:00",
+   "due_tz": "Europe/Berlin",
+   "estimated": true,
+   "inbox_kind": "provide",
+   "instance_key": "hec_attestation",
+   "kind": "student",
+   "programme_ref": null,
+   "provisional": false,
+   "slack_days": 92,
+   "state": "waiting_student",
+   "title": "Get your degree and transcripts attested by HEC (online e-Attestation)"
+  },
+  {
+   "blocked_reason": null,
+   "citations": [
+    {
+     "source": "S1",
+     "url": "https://www.uni-assist.de/en/tools/info-country-by-country/details-country/country/pk/"
+    }
+   ],
+   "critical": false,
+   "due_at": "2027-05-18T21:59:59+00:00",
+   "due_tz": "Europe/Berlin",
+   "estimated": false,
+   "inbox_kind": "provide",
+   "instance_key": "min_passing_grade_letter",
+   "kind": "student",
+   "programme_ref": null,
+   "provisional": false,
+   "slack_days": 99,
+   "state": "waiting_student",
+   "title": "Get a statement of your university's minimum passing grade for the degree"
+  },
+  {
+   "blocked_reason": null,
+   "citations": [
+    {
+     "source": "S17",
+     "url": "https://www.daad.de/en/studying-in-germany/living-in-germany/registering/"
+    }
+   ],
+   "critical": false,
+   "due_at": null,
+   "due_tz": "Europe/Berlin",
+   "estimated": false,
+   "inbox_kind": "act",
+   "instance_key": "register_address",
+   "kind": "student",
+   "programme_ref": null,
+   "provisional": false,
+   "slack_days": null,
+   "state": "pending",
+   "title": "Register your address at the local registration office"
+  },
+  {
+   "blocked_reason": null,
+   "citations": [
+    {
+     "source": "S17",
+     "url": "https://www.daad.de/en/studying-in-germany/living-in-germany/registering/"
+    }
+   ],
+   "critical": false,
+   "due_at": null,
+   "due_tz": "Europe/Berlin",
+   "estimated": false,
+   "inbox_kind": "act",
+   "instance_key": "residence_permit",
+   "kind": "student",
+   "programme_ref": null,
+   "provisional": false,
+   "slack_days": null,
+   "state": "pending",
+   "title": "Apply for your residence permit before the visa expires"
+  },
+  {
+   "blocked_reason": null,
+   "citations": [],
+   "critical": false,
+   "due_at": "2027-05-18T21:59:59+00:00",
+   "due_tz": "Europe/Berlin",
+   "estimated": false,
+   "inbox_kind": "approve",
+   "instance_key": "review_pack@btu-artificial-intelligence",
+   "kind": "student",
+   "programme_ref": "btu-artificial-intelligence",
+   "provisional": false,
+   "slack_days": 94,
+   "state": "pending",
+   "title": "Review and approve this programme's application pack"
+  },
+  {
+   "blocked_reason": null,
+   "citations": [],
+   "critical": false,
+   "due_at": "2027-05-18T21:59:59+00:00",
+   "due_tz": "Europe/Berlin",
+   "estimated": false,
+   "inbox_kind": "approve",
+   "instance_key": "review_pack@ovgu-eeit",
+   "kind": "student",
+   "programme_ref": "ovgu-eeit",
+   "provisional": false,
+   "slack_days": 94,
+   "state": "pending",
+   "title": "Review and approve this programme's application pack"
+  },
+  {
+   "blocked_reason": null,
+   "citations": [],
+   "critical": false,
+   "due_at": "2027-05-18T21:59:59+00:00",
+   "due_tz": "Europe/Berlin",
+   "estimated": false,
+   "inbox_kind": "approve",
+   "instance_key": "review_pack@tu-chemnitz-embedded-systems",
+   "kind": "student",
+   "programme_ref": "tu-chemnitz-embedded-systems",
+   "provisional": false,
+   "slack_days": 94,
+   "state": "pending",
+   "title": "Review and approve this programme's application pack"
+  },
+  {
+   "blocked_reason": null,
+   "citations": [
+    {
+     "source": "S11",
+     "url": "https://pakistan.diplo.de/pk-en/service/2-study-visa-seite-1676104"
+    }
+   ],
+   "critical": false,
+   "due_at": null,
+   "due_tz": "Europe/Berlin",
+   "estimated": false,
+   "inbox_kind": "approve",
+   "instance_key": "review_visa_file",
+   "kind": "student",
+   "programme_ref": null,
+   "provisional": false,
+   "slack_days": null,
+   "state": "pending",
+   "title": "Review and approve your visa file"
+  },
+  {
+   "blocked_reason": null,
+   "citations": [
+    {
+     "source": "S1",
+     "url": "https://www.uni-assist.de/en/tools/info-country-by-country/details-country/country/pk/"
+    }
+   ],
+   "critical": false,
+   "due_at": "2027-05-18T21:59:59+00:00",
+   "due_tz": "Europe/Berlin",
+   "estimated": false,
+   "inbox_kind": "provide",
+   "instance_key": "school_certificates",
+   "kind": "student",
+   "programme_ref": null,
+   "provisional": false,
+   "slack_days": 104,
+   "state": "waiting_student",
+   "title": "Upload your SSC and HSSC certificates with subjects and grades"
+  },
+  {
+   "blocked_reason": null,
+   "citations": [
+    {
+     "source": "S15",
+     "url": "https://pakistan.diplo.de/resource/blob/2208710/4a44b499964d27c04ecb6e5770fdb824/study-visa---leaflet-data.pdf"
+    }
+   ],
+   "critical": false,
+   "due_at": null,
+   "due_tz": "Europe/Berlin",
+   "estimated": false,
+   "inbox_kind": "act",
+   "instance_key": "travel_insurance",
+   "kind": "student",
+   "programme_ref": null,
+   "provisional": false,
+   "slack_days": null,
+   "state": "waiting_student",
+   "title": "Buy travel health insurance from your travel date"
+  },
+  {
+   "blocked_reason": null,
+   "citations": [
+    {
+     "source": "fact:deadline_close",
+     "url": "https://www.b-tu.de/en/artificial-intelligence-ms/faq"
+    },
+    {
+     "source": "S4",
+     "url": "https://www.uni-assist.de/en/faqs/plan-your-application/"
+    },
+    {
+     "source": "S5",
+     "url": "https://www.uni-assist.de/en/how-to-apply/apply-online/pay-submit/"
+    },
+    {
+     "source": "S6",
+     "url": "https://www.uni-assist.de/en/faqs/apply-online/"
+    }
+   ],
+   "critical": true,
+   "due_at": "2027-05-20T21:59:59+00:00",
+   "due_tz": "Europe/Berlin",
+   "estimated": true,
+   "inbox_kind": "act",
+   "instance_key": "uni_assist_apply@btu-artificial-intelligence",
+   "kind": "student",
+   "programme_ref": "btu-artificial-intelligence",
+   "provisional": true,
+   "slack_days": 76,
+   "state": "pending",
+   "title": "Submit the uni-assist application and pay the handling fee"
+  },
+  {
+   "blocked_reason": null,
+   "citations": [
+    {
+     "source": "fact:deadline_close",
+     "url": "https://www2.daad.de/deutschland/studienangebote/international-programmes/en/detail/6091"
+    },
+    {
+     "source": "S4",
+     "url": "https://www.uni-assist.de/en/faqs/plan-your-application/"
+    },
+    {
+     "source": "S5",
+     "url": "https://www.uni-assist.de/en/how-to-apply/apply-online/pay-submit/"
+    },
+    {
+     "source": "S6",
+     "url": "https://www.uni-assist.de/en/faqs/apply-online/"
+    }
+   ],
+   "critical": true,
+   "due_at": "2027-05-20T21:59:59+00:00",
+   "due_tz": "Europe/Berlin",
+   "estimated": true,
+   "inbox_kind": "act",
+   "instance_key": "uni_assist_apply@ovgu-eeit",
+   "kind": "student",
+   "programme_ref": "ovgu-eeit",
+   "provisional": true,
+   "slack_days": 76,
+   "state": "pending",
+   "title": "Submit the uni-assist application and pay the handling fee"
+  },
+  {
+   "blocked_reason": null,
+   "citations": [
+    {
+     "source": "fact:deadline_close",
+     "url": "https://www2.daad.de/deutschland/studienangebote/international-programmes/en/detail/4493"
+    },
+    {
+     "source": "S4",
+     "url": "https://www.uni-assist.de/en/faqs/plan-your-application/"
+    },
+    {
+     "source": "S5",
+     "url": "https://www.uni-assist.de/en/how-to-apply/apply-online/pay-submit/"
+    },
+    {
+     "source": "S6",
+     "url": "https://www.uni-assist.de/en/faqs/apply-online/"
+    }
+   ],
+   "critical": true,
+   "due_at": "2027-05-20T21:59:59+00:00",
+   "due_tz": "Europe/Berlin",
+   "estimated": true,
+   "inbox_kind": "act",
+   "instance_key": "uni_assist_apply@tu-chemnitz-embedded-systems",
+   "kind": "student",
+   "programme_ref": "tu-chemnitz-embedded-systems",
+   "provisional": true,
+   "slack_days": 76,
+   "state": "pending",
+   "title": "Submit the uni-assist application and pay the handling fee"
+  },
+  {
+   "blocked_reason": "fact_missing:semester_start",
+   "citations": [
+    {
+     "source": "S11",
+     "url": "https://pakistan.diplo.de/pk-en/service/2-study-visa-seite-1676104"
+    },
+    {
+     "source": "S13",
+     "url": "https://digital.diplo.de/studium"
+    }
+   ],
+   "critical": false,
+   "due_at": null,
+   "due_tz": "Europe/Berlin",
+   "estimated": true,
+   "inbox_kind": "act",
+   "instance_key": "visa_apply",
+   "kind": "student",
+   "programme_ref": null,
+   "provisional": false,
+   "slack_days": null,
+   "state": "blocked",
+   "title": "Apply for the student visa on the Consular Services Portal"
+  }
+ ]
+}

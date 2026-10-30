@@ -38,7 +38,7 @@ services:
       retries: 20
   migrate:
     <<: *app
-    entrypoint: [alembic, upgrade, head]
+    entrypoint: [alembic, upgrade, heads]
     depends_on:
       postgres: {condition: service_healthy}
   backend:

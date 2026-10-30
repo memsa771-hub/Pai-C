@@ -1,0 +1,17 @@
+# Offline Writer (Slice 9a spec §2.3): a fixed draft per statement kind, filled from the student's own interview answers
+# ({answers}, one paragraph each) and confirmed profile values ({profile}, joined with "; "), then cut to the
+# statement's word or character limit. The fixed words are generic, so the invented-facts check finds nothing.
+sop: |-
+  Dear Admissions Committee,
+
+  {answers}
+
+  My record: {profile}.
+
+  Yours sincerely
+cv: |-
+  EDUCATION AND PROFILE
+  {profile}
+
+  EXPERIENCE AND PROJECTS
+  {answers}

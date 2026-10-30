@@ -1,0 +1,70 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "schema": {
+      "const": "pai.escalation.v1",
+      "default": "pai.escalation.v1",
+      "title": "Schema",
+      "type": "string"
+    },
+    "key": {
+      "minLength": 1,
+      "title": "Key",
+      "type": "string"
+    },
+    "case_id": {
+      "anyOf": [
+        {
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Case Id"
+    },
+    "journey_id": {
+      "minLength": 1,
+      "title": "Journey Id",
+      "type": "string"
+    },
+    "student_ref": {
+      "minLength": 1,
+      "title": "Student Ref",
+      "type": "string"
+    },
+    "reason": {
+      "enum": [
+        "not_eligible",
+        "all_rejected",
+        "deadline_passed",
+        "blocking_gap",
+        "other"
+      ],
+      "title": "Reason",
+      "type": "string"
+    },
+    "note": {
+      "maxLength": 500,
+      "minLength": 1,
+      "title": "Note",
+      "type": "string"
+    },
+    "raised_at": {
+      "format": "date-time",
+      "title": "Raised At",
+      "type": "string"
+    }
+  },
+  "required": [
+    "key",
+    "case_id",
+    "journey_id",
+    "student_ref",
+    "reason",
+    "note",
+    "raised_at"
+  ],
+  "title": "EscalationV1",
+  "type": "object"
+}

@@ -84,7 +84,10 @@ services:
 
   migrate:
     <<: *backend
-    entrypoint: ["alembic", "upgrade", "head"]
+    # Merge pai-c + pai-os: `heads`, not `head`. PAI OS has its own Alembic branch `os`
+    # (backend/alembic/versions_os, schema `os`), so there are two heads (ported from pai-os's
+    # docker-compose.prod.yml, which pai-c deleted).
+    entrypoint: ["alembic", "upgrade", "heads"]
     depends_on:
       postgres: {condition: service_healthy}
     restart: "no"

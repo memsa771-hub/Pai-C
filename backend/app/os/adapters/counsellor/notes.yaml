@@ -1,0 +1,7 @@
+# The fixed note sent with each escalation reason (Slice 8 spec §2.5, S8-D12). Never student, document or
+# Supervisor text. Every reason must have one; checked when PAI OS is mounted.
+not_eligible: The plan no longer fits the student's route. Please talk the route through with them.
+all_rejected: Every programme on the plan has turned the student down. Please help them choose what comes next.
+deadline_passed: A programme deadline can no longer be met with this plan. Please help the student decide.
+blocking_gap: A required step is blocked and the plan cannot fix it alone. Please help the student with it.
+other: PAI OS could not take this decision as it stands. Please check it with the student.

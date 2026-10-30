@@ -1,0 +1,94 @@
+# The application pack for Germany master's (Slice 6a spec S6a-D2, D4, D6). Route data, validated at startup.
+# Data-sheet sources are confirmed profile keys ("<doc_type>.<field>") or "entered" (the student types them).
+# Instruction sources are a programme fact's page or a playbook citation (S4-S6: uni-assist, see the playbook).
+route_key: germany_master
+# 2: payment comes after approval (Slice 9 Task 11): every pack is rebuilt once without it in the approved part
+version: 2
+
+data_sheet:
+  - title: Personal details
+    fields:
+      - {key: surname, label: Surname (family name), source: passport.surname, required: true}
+      - {key: given_names, label: Given names, source: passport.given_names, required: true}
+      - {key: date_of_birth, label: Date of birth, source: passport.date_of_birth, required: true}
+      - {key: sex, label: Sex, source: passport.sex}
+      - {key: place_of_birth, label: Place of birth, source: passport.place_of_birth}
+      - {key: nationality, label: Nationality, source: passport.nationality, required: true}
+      - {key: passport_number, label: Passport number, source: passport.passport_number, required: true}
+      - {key: passport_expiry, label: Passport valid until, source: passport.expiry_date, required: true}
+  - title: Contact
+    fields:
+      - {key: email, label: Email, source: entered, required: true, hint: The address you will check for replies}
+      - {key: phone, label: Phone (with country code), source: entered, required: true}
+      - {key: address_line, label: Street address, source: entered, required: true}
+      - {key: city, label: City, source: entered, required: true}
+      - {key: postcode, label: Postcode, source: entered}
+      - {key: country_of_residence, label: Country of residence, source: entered, required: true}
+  - title: Bachelor's degree
+    fields:
+      - {key: degree_title, label: Degree, source: degree_certificate.degree_title, required: true}
+      - {key: institution, label: University, source: degree_certificate.institution, required: true}
+      - {key: completion_date, label: Completed on, source: degree_certificate.completion_date}
+      - {key: cgpa, label: CGPA, source: transcript.cgpa}
+      - {key: cgpa_scale, label: CGPA scale, source: transcript.cgpa_scale}
+      - {key: percentage, label: Percentage, source: transcript.percentage}
+      - {key: credit_hours, label: Credit hours, source: transcript.credit_hours}
+  - title: School
+    fields:
+      - {key: hssc_year, label: Higher secondary certificate year, source: hssc_certificate.exam_year}
+      - {key: hssc_marks, label: Higher secondary marks obtained, source: hssc_certificate.marks_obtained}
+      - {key: hssc_total, label: Higher secondary marks total, source: hssc_certificate.marks_total}
+      - {key: ssc_year, label: Secondary certificate year, source: ssc_certificate.exam_year}
+      - {key: ssc_marks, label: Secondary marks obtained, source: ssc_certificate.marks_obtained}
+      - {key: ssc_total, label: Secondary marks total, source: ssc_certificate.marks_total}
+  - title: English
+    fields:
+      - {key: english_overall, label: IELTS overall band, source: ielts_trf.overall}
+      - {key: english_test_date, label: IELTS test date, source: ielts_trf.test_date}
+      - {key: english_trf, label: IELTS TRF number, source: ielts_trf.trf_number}
+
+checklist:
+  - {key: passport, label: Passport (data page), kind: document, ref: passport}
+  - {key: degree, label: Degree certificate, kind: document, ref: degree_certificate, format: attested}
+  - {key: transcript, label: Transcript, kind: document, ref: transcript, format: attested}
+  - {key: hssc, label: Higher secondary certificate, kind: document, ref: hssc_certificate, format: attested}
+  - {key: ssc, label: Secondary school certificate, kind: document, ref: ssc_certificate, format: attested}
+  - {key: english_test, label: IELTS Test Report Form, kind: document, ref: ielts_trf}
+  - {key: min_passing_grade, label: Minimum passing grade letter, kind: document, ref: min_passing_grade_letter}
+  - {key: sop, label: Statement of purpose, kind: statement, ref: sop}
+  - {key: cv, label: CV, kind: statement, ref: cv}
+  # after_approval: a step after approving ("these documents are right"); it never blocks approval (Slice 9 Task 11)
+  - key: fee_paid
+    label: Paid the application fee
+    kind: manual
+    after_approval: true
+    note: Pay the application fee in the portal, then tick this.
+
+formats:
+  default: {types: [pdf], max_mb: 5}
+  named:
+    attested:
+      types: [pdf]
+      max_mb: 5
+      colour: true
+      notes: ["Upload a colour scan of the attested copy, not the original"]
+
+instructions:
+  uni_assist:
+    - {text: "Create an account on the uni-assist portal and add this programme.", source: "citation:S6"}
+    - {text: "Fill in the online form; copy each value from the data sheet below.", source: "citation:S6"}
+    - {text: "Upload each file in the checklist; they are already in the required format.", source: "citation:S6"}
+    - {text: "Pay the uni-assist handling fee, then submit. Apply well before {deadline_close}.", source: "citation:S5"}
+  uni_assist_vpd:
+    - {text: "Request a VPD from uni-assist first; upload the checklist files there.", source: "citation:S4"}
+    - {text: "Pay the uni-assist fee and wait for the VPD.", source: "citation:S5"}
+    - {text: "Then apply in the university's own portal before {deadline_close}, attaching the VPD.", source: "fact:deadline_close"}
+  direct:
+    - {text: "Create an account in the university's own application portal.", source: "fact:application_route"}
+    - {text: "Fill in the form from the data sheet and upload the checklist files.", source: "fact:application_route"}
+    - {text: "Submit before {deadline_close}.", source: "fact:deadline_close"}
+
+fees:
+  - {label: uni-assist handling fee (first programme), source: "constant:uni_assist_fee_eur"}
+  - {label: Tuition per semester (non-EU), source: "fact:tuition_fee_non_eu_eur"}
+  - {label: Semester contribution, source: "fact:semester_contribution_eur"}

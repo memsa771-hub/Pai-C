@@ -1,0 +1,3 @@
+# Offline research (Slice 9a spec §2.3): every field of the reading gets the "not found" value. No page is fetched
+# (the worker gives the workflow OfflinePages), so seeded facts stay as they are and unconfirmed stays unconfirmed.
+not_found: null

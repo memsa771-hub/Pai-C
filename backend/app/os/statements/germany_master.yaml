@@ -1,0 +1,41 @@
+# Statements for the Germany master's route (Slice 5 spec S5-D3). The interview's questions are the only material the
+# Writer may use beside the confirmed profile values listed per kind (S5-D4). English only (spec Q2).
+route_key: germany_master
+documents_task: application_documents
+allowed_names: [Germany, German, Pakistan, Pakistani, Europe, European, DAAD, uni-assist]
+questions:
+  - {id: field_why, prompt: "Which field do you want to study, and why does it interest you?", hint: "A moment or experience that started it is better than a general statement."}
+  - {id: key_project, prompt: "Describe your most important academic or personal project.", hint: "What was the problem, what did you do yourself, and what was the result?"}
+  - {id: work, prompt: "What work, internship or volunteering have you done?", hint: "Name the place, your role, the dates and one thing you achieved.", required: false}
+  - {id: skills, prompt: "Which skills (technical or other) will help you in this programme?", hint: "Give an example of using each one."}
+  - {id: achievement, prompt: "What academic achievement are you most proud of?", hint: "Only things you can show, such as a grade, a prize or a publication."}
+  - {id: why_now, prompt: "Why do you want a master's degree now?", hint: "How it fits where you are in your studies or career."}
+  - {id: why_country, prompt: "Why do you want to study in Germany?", hint: "Teaching, research, industry links, or something specific to you."}
+  - {id: goal, prompt: "What do you want to do after the degree?", hint: "A concrete role, field or kind of organisation."}
+  - {id: challenge, prompt: "Describe a challenge you overcame and what you learned.", hint: "Keep it about your studies or work."}
+  - {id: anything_else, prompt: "Is there anything else the university should know about you?", hint: "For example a gap year, a change of field, or a grade you want to explain.", required: false}
+kinds:
+  sop:
+    default_words: 1000
+    rubric:
+      criteria:
+        - "Clear motivation for the field, with a concrete origin"
+        - "Fit with this programme, citing what it offers when the prompt or programme is known"
+        - "Concrete evidence: projects, work and results, not adjectives"
+        - "Logical structure: introduction, background, goals, why this programme, conclusion"
+        - "Plain, sincere tone; no clichés or exaggeration"
+        - "Within the word limit"
+    profile_keys: [transcript.institution, transcript.degree_title, transcript.cgpa, transcript.cgpa_scale,
+                   transcript.percentage, transcript.completion_date, ielts_trf.overall]
+  cv:
+    default_words: 700
+    rubric:
+      criteria:
+        - "Sections present: education, experience, projects, skills, languages"
+        - "Reverse-chronological order within each section"
+        - "Dates consistent and in one format"
+        - "Gaps of more than six months explained"
+        - "One to two pages; no photo, age or marital status"
+    profile_keys: [transcript.institution, transcript.degree_title, transcript.cgpa, transcript.cgpa_scale,
+                   transcript.percentage, transcript.admission_date, transcript.completion_date, ielts_trf.overall,
+                   ielts_trf.test_date]

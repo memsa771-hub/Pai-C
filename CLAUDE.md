@@ -40,3 +40,13 @@ Figma board (locked): https://www.figma.com/board/NjVJfdxERWfRHPycy1wDkF
 - Core engineering is mostly built (see BUILD_REPORT_V1.md). Freeze new modules.
 - Next: validate with real students (assessment -> profile report with traffic lights -> counselor), using
   established frameworks (RIASEC interests, work values) and a small Pakistan eligibility data layer.
+
+## PAI OS working rules (from the `pai-os` branch)
+These rules apply to PAI OS work: code under `backend/app/os`, `backend/app/pai_os_bridge.py`,
+`frontend/components/os/` and the `os-*` app routes. They came in with the trial merge of `pai-os` into `pai-c`.
+- Never paste API keys or real student data into Claude.
+- One component per PR.
+- Task branches start from and rebase on `pai-os`. `pai-os` merges into `dev` only at slice gates.
+- OS code lives only in `backend/app/os`.
+- Shared files need a reviewer from each team.
+- Run `tach check` and `pytest tests/os` before pushing.

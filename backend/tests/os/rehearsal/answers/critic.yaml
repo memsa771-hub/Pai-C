@@ -1,0 +1,5 @@
+# Offline Critic (Slice 9a spec §2.3): one passing review. Every rubric criterion in the prompt gets `score`.
+score: 4
+fixes: []
+follow_ups: []
+ok: true

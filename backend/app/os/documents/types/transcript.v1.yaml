@@ -1,0 +1,24 @@
+# Transcript of any degree level (Slice 3 spec S3-D2).
+key: transcript
+version: 1
+label: Transcript
+fields:
+  - {name: student_name, type: name, cross_check: full_name, hint: "The student's name exactly as printed"}
+  - {name: father_name, type: name, cross_check: father_name, hint: "Father's name if printed"}
+  - {name: date_of_birth, type: date, cross_check: date_of_birth, hint: "Date of birth as YYYY-MM-DD, if printed"}
+  - {name: national_id, type: code, hint: "National identity (CNIC) or passport number if printed, as printed"}
+  - {name: institution, type: text, hint: "The university's name only, as in the transcript's heading; leave out the campus, city and address unless they are part of the printed name"}
+  - {name: degree_title, type: text, hint: "The degree or programme, copied exactly as printed, with its brackets, dots and commas; the full title, not an abbreviation, unless only the abbreviation is printed"}
+  - {name: student_id, type: code, hint: "Student ID if printed"}
+  - {name: registration_number, type: code, hint: "Registration number"}
+  - {name: enrollment_number, type: code, hint: "Enrollment number if printed"}
+  - {name: admission_date, type: date, hint: "Date of admission or registration, YYYY-MM-DD"}
+  - {name: completion_date, type: date, hint: "Date of completion or result notification, YYYY-MM-DD"}
+  - {name: cgpa, type: grade, hint: "Final cumulative GPA (CGPA), not a semester GPA"}
+  - {name: cgpa_scale, type: number, hint: "The CGPA scale if printed, e.g. 4.0; leave empty if not printed"}
+  - {name: percentage, type: number, hint: "Overall percentage if printed"}
+  - {name: credit_hours, type: number, hint: "Total credit hours completed or earned"}
+  - {name: issue_date, type: date, hint: "Date the transcript was issued or printed, YYYY-MM-DD"}
+  - {name: serial_number, type: code, hint: "Serial number of the transcript"}
+rules:
+  - {kind: lte, fields: [cgpa, cgpa_scale]}

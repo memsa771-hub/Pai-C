@@ -1,0 +1,22 @@
+# Secondary School Certificate (matric) with its marks (Slice 3 spec S3-D2).
+key: ssc_certificate
+version: 1
+label: Secondary School Certificate (matric)
+fields:
+  - {name: student_name, type: name, cross_check: full_name, hint: "The candidate's name exactly as printed"}
+  - {name: father_name, type: name, cross_check: father_name, hint: "Father's name ('son/daughter of')"}
+  - {name: date_of_birth, type: date, cross_check: date_of_birth, hint: "Date of birth as YYYY-MM-DD, if printed"}
+  - {name: board, type: text, hint: "The examining board's full name in words (not its initials), then a comma and the board's city, e.g. Board of Intermediate and Secondary Education, Lahore"}
+  - {name: exam, type: text, hint: "The examination written as: its name ending in Examination, a comma, the session (Annual or Supplementary) and the year, e.g. Secondary School Certificate Examination, Annual 2020; not the group"}
+  - {name: exam_year, type: number, hint: "Year of the examination"}
+  - {name: roll_number, type: code, hint: "Roll number"}
+  - {name: registration_number, type: code, hint: "Registration number"}
+  - {name: certificate_number, type: code, hint: "Certificate number"}
+  - {name: group, type: text, hint: "Group, e.g. SCIENCE"}
+  - {name: institution, type: text, hint: "The school or college the candidate appeared from"}
+  - {name: marks_obtained, type: number, hint: "Total marks obtained"}
+  - {name: marks_total, type: number, hint: "Total maximum marks"}
+  - {name: grade, type: text, hint: "Overall grade, e.g. A1"}
+  - {name: issue_date, type: date, hint: "Date the certificate was issued, YYYY-MM-DD"}
+rules:
+  - {kind: lte, fields: [marks_obtained, marks_total]}

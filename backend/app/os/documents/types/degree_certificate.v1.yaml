@@ -1,0 +1,23 @@
+# Degree certificate of any level: associate, bachelor, master (Slice 3 spec S3-D2).
+key: degree_certificate
+version: 1
+label: Degree certificate
+fields:
+  - {name: student_name, type: name, cross_check: full_name, hint: "The graduate's name exactly as printed"}
+  - {name: father_name, type: name, cross_check: father_name, hint: "Father's name if printed ('son/daughter of')"}
+  - {name: institution, type: text, hint: "The awarding university's name only, as in the certificate's heading; leave out the campus, city, address and any motto unless they are part of the printed name"}
+  - {name: college, type: text, hint: "The affiliated college, if one is named separately"}
+  - {name: faculty, type: text, hint: "The faculty, if named"}
+  - {name: degree_title, type: text, hint: "The degree awarded, copied exactly as printed, with its brackets, dots and dashes, e.g. Bachelor of Science (Hons) in Computer Science; not the division, grade or year"}
+  - {name: session, type: text, hint: "Session or years of study if printed, e.g. 2018-2022"}
+  - {name: exam, type: text, hint: "The examination the degree was awarded on, only if the certificate names one, copied as printed with its brackets, then a comma and the year"}
+  - {name: completion_date, type: date, hint: "Date the requirements were completed or the result declared, YYYY-MM-DD, only if printed as its own date; never the issue date"}
+  - {name: issue_date, type: date, hint: "Date the certificate was issued or dated, YYYY-MM-DD"}
+  - {name: registration_number, type: code, hint: "Registration number"}
+  - {name: roll_number, type: code, hint: "Roll number if printed"}
+  - {name: serial_number, type: code, hint: "Only the number printed after a Serial No. label, digits only; never a registration, roll or certificate number"}
+  - {name: cgpa, type: grade, hint: "CGPA if printed on the certificate"}
+  - {name: cgpa_scale, type: number, hint: "The CGPA scale if printed, e.g. 4.0"}
+  - {name: division, type: text, hint: "Division, class or grade if printed, e.g. First, Third"}
+rules:
+  - {kind: lte, fields: [cgpa, cgpa_scale]}
