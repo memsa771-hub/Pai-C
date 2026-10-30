@@ -1,0 +1,30 @@
+# Caddy site blocks for the Placement AI beta. Caddy obtains and renews the TLS
+# certificates itself (ports 80 and 443 must be open to the internet).
+#
+# Host Caddy: append these two blocks to /etc/caddy/Caddyfile (keep the
+# website's own block), then:
+#   sudo caddy validate --config /etc/caddy/Caddyfile && sudo systemctl reload caddy
+#
+# Caddy running in Docker (not in host network mode): the upstreams are not
+# 127.0.0.1 but the host, so replace 127.0.0.1 with host.docker.internal and
+# give the caddy service `extra_hosts: ["host.docker.internal:host-gateway"]`.
+
+app.placement-ai.com {
+	encode gzip
+	# Uploads (result cards, transcripts) are allowed up to MAX_FILE_SIZE (50 MB).
+	request_body {
+		max_size 50MB
+	}
+	reverse_proxy 127.0.0.1:3000
+}
+
+api.placement-ai.com {
+	encode gzip
+	request_body {
+		max_size 50MB
+	}
+	# Caddy forwards Host, X-Forwarded-For and X-Forwarded-Proto by default and
+	# applies no response timeout, so a 10-20 s chat reply or a long document
+	# parse is never cut off.
+	reverse_proxy 127.0.0.1:8000
+}

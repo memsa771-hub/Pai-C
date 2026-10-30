@@ -2,8 +2,8 @@
 # Run from the repository root on the server, with .env filled in from
 # .env.production.example and secrets/firebase-service-account.json in place:
 #   docker compose -f docker-compose.prod.yml up -d --build
-# Ports bind to 127.0.0.1 only; nginx on the host terminates TLS and proxies
-# (deploy/nginx). Full steps: docs/DEPLOY.md.
+# Ports bind to 127.0.0.1 only; Caddy (deploy/caddy) or nginx (deploy/nginx) on
+# the host terminates TLS and proxies. Full steps: docs/DEPLOY.md.
 #
 # The public origins are fixed here on purpose: the backend refuses to start in
 # production unless CORS_ORIGINS is exactly https://app.placement-ai.com

@@ -7,7 +7,7 @@ documented in [docs/AUTH_SESSION.md](docs/AUTH_SESSION.md).
 
 ## Deploy
 
-Production (Ubuntu server, Docker, nginx, app.placement-ai.com and api.placement-ai.com): [docs/DEPLOY.md](docs/DEPLOY.md).
+Production (Ubuntu server, Docker, Caddy or nginx, app.placement-ai.com and api.placement-ai.com): [docs/DEPLOY.md](docs/DEPLOY.md).
 
 ## Run locally
 
