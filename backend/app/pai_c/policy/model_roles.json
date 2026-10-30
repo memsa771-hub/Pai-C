@@ -14,8 +14,9 @@
   "roles": {
     "counselor": {"provider": "anthropic", "model": "claude-sonnet-5-5",
                   "max_tokens": 1200, "timeout_seconds": 60, "max_retries": 2},
-    "classifier": {"provider": "openai", "model": "gpt-5-mini"},
-    "extractor": {"provider": "openai", "model": "gpt-5-mini"},
+    "classifier": {"provider": "openai", "model": "gpt-5-mini", "reasoning_effort": "minimal"},
+    "extractor": {"provider": "openai", "model": "gpt-5-mini", "reasoning_effort": "minimal",
+                  "max_output_tokens": 1500},
     "document_extractor": {"provider": "openai", "model": "gpt-5-mini"},
     "safety": {"provider": "openai", "model": "gpt-5-mini"},
     "sensitive": {"provider": "openai", "model": "gpt-5-mini"},

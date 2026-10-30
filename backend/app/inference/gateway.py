@@ -61,6 +61,7 @@ _EFFORTS = {
     'sensitive': 'PAI_SENSITIVE_CHECK_REASONING_EFFORT',
     'document_extractor': 'DOCUMENT_EXTRACTOR_REASONING_EFFORT',
     'operator': 'PAI_OPERATOR_REASONING_EFFORT',
+    'extractor': 'MEMORY_EXTRACTOR_REASONING_EFFORT',
 }
 
 
@@ -164,8 +165,13 @@ def resolve_model(role: str) -> str:
 
 
 def reasoning_effort(role: str):
+    """A role with a data default (`reasoning_effort` in model_roles.json)
+    uses it unless its env setting is set; other roles use the config setting."""
     name = _EFFORTS.get(role)
-    return (getattr(config, name) or None) if name else None
+    data = _defaults(role).get('reasoning_effort')
+    if data:
+        return (os.environ.get(name, '').strip() if name else '') or data
+    return (_setting(name) or None) if name else None
 
 
 @contextmanager
@@ -249,6 +255,9 @@ async def complete(role: str, messages: list[dict], system_prompt=None, response
             temperature=temperature, base_url=resolved.base_url, settings=settings,
             reasoning_effort=effort, usage_callback=on_provider_usage)
     api_key, model, base_url, effort = _settings(role, api_key, model, base_url, reasoning_effort)
+    if max_tokens is None:
+        # The role's data cap on output (reasoning included) when the caller sets none.
+        max_tokens = _defaults(role).get('max_output_tokens')
     if response_format and response_format.get('type') == 'json_object':
         # Chat Completions rejects JSON mode unless a message explicitly asks
         # for JSON. Keep this at the provider boundary for every role.

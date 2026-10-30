@@ -128,6 +128,9 @@ async def _workspace_lock(db, workspace_id: str, scope: str | None = None):
         local.release()
 
 
+_failed_predecessors_logged: set = set()
+
+
 def _prior_job_pending(db, job) -> bool:
     payload = job.payload or {}
     current_order = (payload.get("source_timestamp"), payload.get("user_event_id"))
@@ -144,7 +147,14 @@ def _prior_job_pending(db, job) -> bool:
         earlier = (item.get("source_timestamp"), item.get("user_event_id"))
         if isinstance(earlier[0], int) and isinstance(earlier[1], str) and earlier < current_order:
             if other.status == "failed":
-                raise AnalysisPredecessorFailed("earlier analysis failed; replay required")
+                # Settled: analysis goes on from the current notebook rather
+                # than blocking every later turn (replay_failed_analyses can
+                # still re-run it).
+                if other.id not in _failed_predecessors_logged:
+                    _failed_predecessors_logged.add(other.id)
+                    logger.warning("analysis_predecessor_failed_skipped workspace_id=%s job_id=%s predecessor_id=%s",
+                                   job.workspace_id, job.id, other.id)
+                continue
             return True
     return False
 
@@ -266,8 +276,11 @@ async def _candidate(db, workspace_id: str, student: EventRecord,
                            student_id, attempt + 1, exc.index, exc.error_type,
                            _patch_shape(parsed))
             if attempt:
-                raise AnalysisPatchRejected(
-                    f"planner patch rejected after correction: error_type={exc.error_type}") from None
+                # One bad turn never fails the job: the patch is skipped, the
+                # notebook stays as it was, and later turns' analyses go on.
+                logger.warning("planner_patch_skipped turn_id=%s error_type=%s %s",
+                               student_id, exc.error_type, _patch_shape(parsed))
+                return None, None, attempt + 1
             feedback = "\nThe previous patch was rejected: " + str(exc) + ". Return a corrected complete patch and plan."
             continue
         try:

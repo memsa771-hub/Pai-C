@@ -35,6 +35,13 @@ work, the spend source reads and the models resolve. With --create-student it
 also creates the Firebase account and workspace and stops before onboarding
 (onboarding queues the opening, a model call); without, it only checks that the
 service account and web key are present.
+
+Background settle: with a docker or db spend source the run also reads the
+workspace's background_jobs. Before the Vault, Mirror and choose checks it waits
+(up to --settle-timeout s) until no memory.extract, memory.reconcile,
+counselor.analyze, counselor.mirror_text or counselor.paths job is pending or
+running, and the report lists the extractor and planner job durations
+(created_at -> updated_at).
 """
 import argparse
 import json
@@ -105,6 +112,26 @@ for role in gateway.model_roles()["roles"]:
 print("BETA_SMOKE_PROBE " + json.dumps({"spent": state["spent"], "cap": state["cap"], "stage": state["stage"],
                                         "month": state["month"], "by_role": by_role, "roles": roles}))
 '''
+
+SETTLE_JOB_TYPES = ("memory.extract", "memory.reconcile", "counselor.analyze", "counselor.mirror_text",
+                    "counselor.paths")
+TIMED_JOB_TYPES = {"memory.extract": "extractor", "counselor.analyze": "planner"}
+
+JOBS_PROBE = r"""
+import json, sys
+from sqlalchemy import select
+from app.database import SessionLocal
+from app.models import BackgroundJob
+db = SessionLocal()
+try:
+    rows = db.scalars(select(BackgroundJob).where(BackgroundJob.workspace_id == sys.argv[1])
+                      .order_by(BackgroundJob.created_at)).all()
+    jobs = [{"type": j.job_type, "status": j.status, "created_at": j.created_at.isoformat(),
+             "seconds": round((j.updated_at - j.created_at).total_seconds(), 1)} for j in rows]
+finally:
+    db.close()
+print("BETA_SMOKE_JOBS " + json.dumps(jobs))
+"""
 
 
 # ---- pure checks (tested offline) ------------------------------------------
@@ -273,6 +300,7 @@ class Run:
     student: dict = field(default_factory=dict)
     spend: dict = field(default_factory=dict)
     roles: dict = field(default_factory=dict)
+    jobs: list = field(default_factory=list)
     stopped: str | None = None
 
     @property
@@ -315,6 +343,16 @@ def write_report(run: Run, path: Path) -> str:
             lines.append(f"  - {role}: ${usd:.4f}")
     else:
         lines.append("- not read")
+    lines += ["", "## Latency", ""]
+    timed = [c for c in run.checks if c.name.startswith(("3 ", "4.", "9 "))]
+    lines += [f"- {c.name.split(':')[0]}: {c.ms / 1000:.1f} s" for c in timed] or ["- no turns"]
+    for job_type, role in TIMED_JOB_TYPES.items():
+        secs = sorted(j["seconds"] for j in run.jobs if j.get("type") == job_type and j.get("status") == "succeeded")
+        if secs:
+            lines.append(f"- {role} ({job_type}) jobs: {len(secs)}, median {secs[len(secs) // 2]:.1f} s, "
+                         f"max {secs[-1]:.1f} s (created_at -> updated_at)")
+        else:
+            lines.append(f"- {role} ({job_type}) jobs: none read")
     lines += ["", "## Models per role (as resolved)", ""]
     if run.roles:
         lines += ["| Role | Provider | Model |", "| --- | --- | --- |"]
@@ -355,6 +393,44 @@ def probe_local() -> dict:
     if done.returncode:
         raise RuntimeError(f"local probe failed: {done.stderr[-400:]}")
     return _parse_probe(done.stdout)
+
+
+def _parse_jobs(output: str) -> list[dict]:
+    for line in output.splitlines():
+        if line.startswith("BETA_SMOKE_JOBS "):
+            return json.loads(line[len("BETA_SMOKE_JOBS "):])
+    raise RuntimeError("jobs probe printed no result: " + output[-400:])
+
+
+def jobs_docker(workspace_id: str) -> list[dict]:
+    done = subprocess.run(["docker", "compose", "exec", "-T", "backend", "python", "-c", JOBS_PROBE, workspace_id],
+                          cwd=REPO, capture_output=True, text=True, timeout=120)
+    if done.returncode:
+        raise RuntimeError(f"docker jobs probe failed: {done.stderr[-400:]}")
+    return _parse_jobs(done.stdout)
+
+
+def jobs_local(workspace_id: str) -> list[dict]:
+    done = subprocess.run([sys.executable, "-c", JOBS_PROBE, workspace_id], cwd=ROOT, capture_output=True,
+                          text=True, timeout=120)
+    if done.returncode:
+        raise RuntimeError(f"local jobs probe failed: {done.stderr[-400:]}")
+    return _parse_jobs(done.stdout)
+
+
+def wait_for_settle(poll, workspace: str, timeout: float = 120.0, *, sleep=time.sleep, clock=time.monotonic,
+                    interval: float = 5.0) -> tuple[bool, float, list[str]]:
+    """Poll the workspace's background jobs until none of SETTLE_JOB_TYPES is
+    pending or running, or `timeout` s pass. Returns (settled, seconds waited,
+    the job types still busy)."""
+    started = clock()
+    while True:
+        busy = sorted({j["type"] for j in poll(workspace) or []
+                       if j.get("type") in SETTLE_JOB_TYPES and j.get("status") in ("pending", "running")})
+        waited = clock() - started
+        if not busy or waited >= timeout:
+            return not busy, waited, busy
+        sleep(min(interval, timeout - waited))
 
 
 class Spend:
@@ -462,9 +538,10 @@ def create_firebase_student(email: str, name: str) -> str:
 
 class Smoke:
     def __init__(self, run: Run, api: Api, spend: Spend | None, *, sleep=time.sleep, clock=time.monotonic,
-                 reply_timeout: float = 120.0):
+                 reply_timeout: float = 120.0, jobs=None, settle_timeout: float = 120.0):
         self.run, self.api, self.spend = run, api, spend
         self.sleep, self.clock, self.reply_timeout = sleep, clock, reply_timeout
+        self.jobs, self.settle_timeout = jobs, settle_timeout
         self.cursor = None
         self.banned, self.about = praise_words(), about_words()
 
@@ -538,6 +615,17 @@ class Smoke:
             value = fetch()
         return value
 
+    def settle(self) -> str:
+        """Wait for background extraction and analysis; returns the check's note."""
+        if self.jobs is None:
+            return "settle: no job source"
+        try:
+            settled, waited, busy = wait_for_settle(self.jobs, self.api.workspace_id, self.settle_timeout,
+                                                    sleep=self.sleep, clock=self.clock)
+        except Exception as exc:  # the check still runs; the note says why it did not wait
+            return f"settle: unread ({type(exc).__name__})"
+        return f"settled in {waited:.0f} s" if settled else f"not settled after {waited:.0f} s (busy {busy})"
+
     # -- steps --
 
     def sign_in(self, args) -> None:
@@ -582,13 +670,19 @@ class Smoke:
             self.step(f"4.{i} turn: {text[:40]}", go, model=True)
 
     def vault(self) -> None:
-        self.step("5 vault", lambda: check_vault(self.api.call("GET", "/v1/vault")))
+        def go():
+            settle = self.settle()
+            ok, note = check_vault(self.api.call("GET", "/v1/vault"))
+            return ok, f"{note}; {settle}"
+        self.step("5 vault", go)
 
     def mirror(self) -> None:
         def go():
+            settle = self.settle()
             card = self.poll(lambda: self.api.call("GET", "/v1/counselor/summary")["card"],
                              lambda c: c.get("ready") and mirror_text(c).strip(), 90)
-            return check_mirror(card, getattr(self, "earlier", None))
+            ok, note = check_mirror(card, getattr(self, "earlier", None))
+            return ok, f"{note}; {settle}"
         self.step("6 mirror ready, text, redrawn", go, model=True)
 
     def paths(self) -> None:
@@ -616,9 +710,13 @@ class Smoke:
         def choose():
             if card is None:
                 return False, "no open/step field to choose"
+            settle = self.settle()
+            # Choosing needs a ready Mirror; without one the choose is skipped (a defect).
+            if not self.api.call("GET", "/v1/counselor/summary")["card"].get("ready"):
+                return False, f"skipped: Mirror not ready; {settle}"
             self.api.call("POST", "/v1/roadmap/choose", body={"field_key": card["field_key"]})
             stage = self.api.call("GET", "/v1/counselor/workspace").get("stage")
-            return stage == "CHOSEN", f"chose {card['field_key']}; stage {stage}"
+            return stage == "CHOSEN", f"chose {card['field_key']}; stage {stage}; {settle}"
         if not self.step("8b choose -> CHOSEN", choose):
             return
 
@@ -675,10 +773,11 @@ class Smoke:
         self.step("credentials", credentials)
 
 
-def run_smoke(args, *, api=None, spend=None, sleep=time.sleep, clock=time.monotonic) -> Run:
+def run_smoke(args, *, api=None, spend=None, jobs=None, sleep=time.sleep, clock=time.monotonic) -> Run:
     run = Run(args.language, args.base_url, args.cap_usd, dry_run=args.dry_run)
     api = api or Api(args.base_url, args.token)
-    smoke = Smoke(run, api, spend, sleep=sleep, clock=clock, reply_timeout=args.reply_timeout)
+    smoke = Smoke(run, api, spend, sleep=sleep, clock=clock, reply_timeout=args.reply_timeout, jobs=jobs,
+                  settle_timeout=getattr(args, "settle_timeout", 120.0))
     try:
         if spend is not None:
             smoke.step("spend baseline", lambda: (True, f"month ${spend.start()['spent']:.4f}"), hard=True)
@@ -693,6 +792,11 @@ def run_smoke(args, *, api=None, spend=None, sleep=time.sleep, clock=time.monoto
             except Exception:  # the report is written either way; a cap stop is already recorded
                 pass
             run.spend = spend.summary()
+        if jobs is not None and api.workspace_id:
+            try:
+                run.jobs = jobs(api.workspace_id) or []
+            except Exception:  # the report then says "none read"
+                pass
     return run
 
 
@@ -711,6 +815,15 @@ def make_spend(args) -> Spend | None:
     return None
 
 
+def make_jobs(args):
+    """The workspace's background_jobs reader, from the same place as the spend."""
+    if args.spend_from_docker:
+        return jobs_docker
+    if args.spend_from_db:
+        return jobs_local
+    return None
+
+
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--base-url", default="http://localhost:8000")
@@ -725,6 +838,8 @@ def main(argv=None) -> int:
     source.add_argument("--spend-from-docker", action="store_true")
     source.add_argument("--spend-from-db", action="store_true")
     parser.add_argument("--reply-timeout", type=float, default=120.0, help="seconds to wait for each reply")
+    parser.add_argument("--settle-timeout", type=float, default=120.0,
+                        help="seconds to wait for background extraction/analysis before Vault, Mirror, choose")
     parser.add_argument("--dry-run", action="store_true", help="no model calls: check stack, auth, spend, models")
     args = parser.parse_args(argv)
     if not args.dry_run:
@@ -734,7 +849,7 @@ def main(argv=None) -> int:
             parser.error("a live run needs a spend source: --founder-token, --spend-from-docker or --spend-from-db")
         if not args.cap_usd > 0:
             parser.error("--cap-usd must be greater than zero")
-    run = run_smoke(args, spend=make_spend(args))
+    run = run_smoke(args, spend=make_spend(args), jobs=make_jobs(args))
     report_path = Path(args.report)
     write_report(run, report_path)
     for c in run.checks:

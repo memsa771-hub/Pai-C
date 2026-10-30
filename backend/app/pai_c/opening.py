@@ -82,9 +82,12 @@ async def opening_job(job, db):
         words = onboarding_words(db, workspace_id)
         language = opening_language(db, workspace_id, words)
         from app.pai_c.policy.controller import bank_item, load_data
-        about_you = bank_item(load_data("question_bank.json")["first_item"])["prompt"]
+        about_item = bank_item(load_data("question_bank.json")["first_item"])
+        about_you = about_item["prompt"]
         instruction = (Path(__file__).parent / "policy/actions/opening.md").read_text(
             encoding="utf-8").replace("{about_you}", about_you)
+        end_retry = (Path(__file__).parent / "policy/prompts/opening_end_retry.md").read_text(
+            encoding="utf-8").strip().replace("{about_you}", about_you)
         sections = ("<student_core>" + json.dumps(core, ensure_ascii=False) + "</student_core>\n"
                     + "<student_words>" + json.dumps(words, ensure_ascii=False) + "</student_words>\n"
                     + "<opening_language>" + json.dumps(language) + "</opening_language>")
@@ -93,28 +96,44 @@ async def opening_job(job, db):
         try:
             if not usage.role_allowed("counselor"):
                 raise _Paused()
-            # The static voice prompt is its own (cached) system block; the student's context follows.
-            blocks = [load_prompt("voice"), context.text + "\n\n" + sections + "\n\n" + instruction]
-            raw = await complete("counselor", messages=[], system_prompt="\n\n".join(blocks), system_blocks=blocks,
-                response_format={"type": "json_object"}, phase="opening", turn_id=job_id)
             from app.pai_c.deep.turn import unfence
-            data = json.loads(unfence(raw))
-            reply = data.get("reply") if isinstance(data, dict) else None
-            step = data.get("next_step") if isinstance(data, dict) else None
-            # One question: the opening ends with its own question; a step is
-            # added only to a body that asks none, and at most one question stays.
             from app.pai_c.deep.polish import polish_reply, question_count
-            if (isinstance(reply, str) and isinstance(step, str) and step.strip()
-                    and not question_count(reply)):
-                reply = reply.rstrip() + "\n\n" + step.strip()
-                opening_step = step.strip()
-            if isinstance(reply, str):
-                reply = polish_reply(reply)
-                if opening_step and not reply.rstrip().endswith(opening_step):
-                    opening_step = None
-            if not isinstance(reply, str) or not reply.strip() or contains_blocked_script(
-                    reply, config.PAI_LANGUAGE_BLOCKED_SCRIPTS):
-                raise ValueError("Invalid opening reply")
+            from app.pai_c.voice.guards import ends_with_step
+            for attempt in range(2):
+                # The static voice prompt is its own (cached) system block; the student's context follows.
+                blocks = [load_prompt("voice"), context.text + "\n\n" + sections + "\n\n" + instruction
+                          + ("\n\n" + end_retry if attempt else "")]
+                raw = await complete("counselor", messages=[], system_prompt="\n\n".join(blocks),
+                    system_blocks=blocks, response_format={"type": "json_object"},
+                    phase="opening_retry" if attempt else "opening", turn_id=job_id)
+                data = json.loads(unfence(raw))
+                reply = data.get("reply") if isinstance(data, dict) else None
+                step = data.get("next_step") if isinstance(data, dict) else None
+                # One question: the opening ends with its own question; a step is
+                # added only to a body that asks none, and at most one question stays.
+                opening_step = None
+                if (isinstance(reply, str) and isinstance(step, str) and step.strip()
+                        and not question_count(reply)):
+                    reply = reply.rstrip() + "\n\n" + step.strip()
+                    opening_step = step.strip()
+                if isinstance(reply, str):
+                    reply = polish_reply(reply)
+                    if opening_step and not reply.rstrip().endswith(opening_step):
+                        opening_step = None
+                if not isinstance(reply, str) or not reply.strip() or contains_blocked_script(
+                        reply, config.PAI_LANGUAGE_BLOCKED_SCRIPTS):
+                    raise ValueError("Invalid opening reply")
+                # The same end-check the turns use: the last sentence is a question.
+                if ends_with_step(reply):
+                    break
+                logger.info("counselor_opening_no_question job_id=%s attempt=%d", job_id, attempt + 1)
+            else:
+                # Still no question after the one retry: the bank's question, in the opening language.
+                from app.pai_c.language import render_copy
+                line = await render_copy(db, workspace_id, "opening:" + about_item["id"],
+                                         about_item["question"], language=language)
+                reply = polish_reply(reply.rstrip() + "\n\n" + line.strip())
+                opening_step = None
         except _Paused:
             # Monthly cap reached: only the paused line (no invitation to talk), no model call.
             from app.pai_c.language import paused_reply

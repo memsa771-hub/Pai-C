@@ -1,5 +1,5 @@
 {
-  "_note": "Reflective questions PAI asks, in this order, to get to know the student (BETA_CONVERSATION_SPEC 2.2). The prompt is English; the Writer asks it in the student's own words and language. intent_key is logged in the turn decision and never asked twice. An item is skipped while any of its vault_types already holds an entry, when the student's last message already covered its area, and under the area's decline cooldown and sensitivity rules (areas_policy.json). followup_prompt is asked once when the student answers an item with a short reply. about_you is the open first question: the opening or the intro asks it. bank_max_in_a_row: after that many bank questions in a row (the intro counts), a missing education basic (areas_policy education_basics) is asked before the bank continues.",
+  "_note": "Reflective questions PAI asks, in this order, to get to know the student (BETA_CONVERSATION_SPEC 2.2). The prompt is English; the Writer asks it in the student's own words and language. intent_key is logged in the turn decision and never asked twice. An item is skipped while any of its vault_types already holds an entry, when the student's last message already covered its area, and under the area's decline cooldown and sensitivity rules (areas_policy.json). followup_prompt is asked once when the student answers an item with a short reply. about_you is the open first question: the opening or the intro asks it; its question is the same prompt as a question, appended to an opening that does not end with one. bank_max_in_a_row: after that many bank questions in a row (the intro counts), a missing education basic (areas_policy education_basics) is asked before the bank continues.",
   "first_item": "about_you",
   "skip_intents": [
     "stop",
@@ -14,6 +14,7 @@
       "vault_types": [],
       "intent_key": "about_you",
       "prompt": "Tell me about yourself: what you do these days and what matters to you.",
+      "question": "What do you do these days, and what matters to you?",
       "followup_prompt": "Tell me a bit more: what does a normal day look like for you?"
     },
     {

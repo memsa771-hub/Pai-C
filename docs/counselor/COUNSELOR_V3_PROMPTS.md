@@ -405,7 +405,7 @@ For explicit corrections include attribution.correction and correction_quote; fo
 
 ## 9. Conversation drive and language (beta)
 
-BETA_CONVERSATION_SPEC 2. The Director (policy/guided_table.json) adds `about_pai` before `answer`, then `intro` and `bank_question` (policy/question_bank.json) after it. Every move except `care` (and a student who said stop) carries `must_drive` and a `next_step` (policy/next_steps.json): a reply that does not end with a question or the step is rewritten once with `drive_retry.md`, then the step is appended in the student's language (rendered once per language with `copy_render.md` and cached on the workspace). The opening uses `opening.md` with the Vault core.
+BETA_CONVERSATION_SPEC 2. The Director (policy/guided_table.json) adds `about_pai` before `answer`, then `intro` and `bank_question` (policy/question_bank.json) after it. Every move except `care` (and a student who said stop) carries `must_drive` and a `next_step` (policy/next_steps.json): a reply that does not end with a question or the step is rewritten once with `drive_retry.md`, then the step is appended in the student's language (rendered once per language with `copy_render.md` and cached on the workspace). The opening uses `opening.md` with the Vault core and ends with its question (`opening_end_retry.md`, then the bank question appended).
 
 ### Opening (`policy/actions/opening.md`)
 
@@ -444,6 +444,15 @@ The student asked about PAI itself: what it is, how it works, or what happens to
 ```text
 Your draft did not end with a next step. Return it again with "next_step" set: one last line for the student, with this meaning, in your own words and in the student's language: {next_step}
 It is a question only when that meaning is a question; otherwise it is one concrete action and there is no question. Keep the rest of the reply. Return the same JSON structure and no other text.
+```
+
+### Opening end retry (`policy/prompts/opening_end_retry.md`)
+
+An opening whose last sentence is not a question is rewritten once with this; if it still is not, the bank's `about_you` question (question_bank.json `question`) is appended in the opening language.
+
+```text
+Your draft did not end with a question. Return it again so that its last sentence is the open question itself, as a question (ending with a question mark), with this meaning, in your own words and in the same language: {about_you}
+Keep the rest of the reply, ask nothing else, and leave next_step empty. Return the same JSON structure and no other text.
 ```
 
 ### Language retry (`deep/prompts/language_retry.md`)

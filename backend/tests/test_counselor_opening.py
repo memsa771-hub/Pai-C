@@ -49,7 +49,7 @@ async def test_opening_posts_once_and_rechecks_after_model():
             assert not db.in_transaction()
             assert "This is the first message" in kwargs["system_prompt"]
             assert kwargs["messages"] == []
-            return json.dumps({"reply": "Welcome. Tell me about yourself.", "moves": ["ask"], "action": {"type": "none"}})
+            return json.dumps({"reply": "Welcome. What do you do these days?", "moves": ["ask"], "action": {"type": "none"}})
         with patch.object(opening, "complete", AsyncMock(side_effect=model)) as fake:
             assert (await opening.opening_job(job, db))["status"] == "posted"
             assert (await opening.opening_job(job, db))["status"] == "already_posted"
@@ -128,3 +128,37 @@ def test_opening_is_claimed_before_queued_analysis():
         assert first.priority == JOB_PRIORITY[opening.JOB_OPENING] and paths.priority == 0
         claimed = BackgroundJobService(db).claim(limit=1, worker_id="w")
         assert [job.job_type for job in claimed] == [opening.JOB_OPENING]
+
+
+IMPERATIVE = json.dumps({"reply": "Hi Ali. I'm PAI, your personal counselor. Tell me about yourself: what you do "
+                                  "these days and what matters to you.", "moves": ["ask"], "action": {"type": "none"}})
+
+
+@pytest.mark.asyncio
+async def test_opening_without_a_question_is_retried_once_then_ends_with_the_bank_question():
+    from app.pai_c.policy.controller import bank_item
+    with StudentSession() as student, student.factory() as db:
+        job = SimpleNamespace(id="opening-imperative", workspace_id=student.workspace_id, attempts=1, max_attempts=3)
+        model = AsyncMock(return_value=IMPERATIVE)
+        with patch.object(opening, "complete", model):
+            assert (await opening.opening_job(job, db))["status"] == "posted"
+        assert model.await_count == 2
+        retry_prompt = model.await_args_list[1].kwargs["system_prompt"]
+        assert "as a question" in retry_prompt
+        assert "as a question" not in model.await_args_list[0].kwargs["system_prompt"]
+        posted = student.transcript[-1]["content"]
+        assert posted.rstrip().endswith(bank_item("about_you")["question"])
+        assert posted.count("?") == 1
+
+
+@pytest.mark.asyncio
+async def test_opening_retry_that_ends_with_a_question_is_posted_as_is():
+    with StudentSession() as student, student.factory() as db:
+        job = SimpleNamespace(id="opening-retry", workspace_id=student.workspace_id, attempts=1, max_attempts=3)
+        fixed = json.dumps({"reply": "Hi Ali. I'm PAI, your personal counselor. What do you do these days, "
+                                     "and what matters to you?", "moves": ["ask"], "action": {"type": "none"}})
+        model = AsyncMock(side_effect=[IMPERATIVE, fixed])
+        with patch.object(opening, "complete", model):
+            assert (await opening.opening_job(job, db))["status"] == "posted"
+        assert model.await_count == 2
+        assert student.transcript[-1]["content"].endswith("what matters to you?")

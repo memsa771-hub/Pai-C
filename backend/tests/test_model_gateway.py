@@ -85,9 +85,18 @@ def test_role_keeps_reasoning_setting(role, setting):
         assert gateway.reasoning_effort(role) == 'medium'
 
 
-@pytest.mark.parametrize('role', ['extractor', 'ocr', 'research_extract', 'router', 'embeddings'])
+@pytest.mark.parametrize('role', ['ocr', 'research_extract', 'router', 'embeddings'])
 def test_roles_without_existing_reasoning_setting_omit_it(role):
     assert gateway.reasoning_effort(role) is None
+
+
+def test_extractor_and_classifier_default_to_minimal_effort_from_data(monkeypatch):
+    monkeypatch.delenv('MEMORY_EXTRACTOR_REASONING_EFFORT', raising=False)
+    monkeypatch.delenv('PAI_CLASSIFIER_REASONING_EFFORT', raising=False)
+    assert gateway.resolve_role('extractor').reasoning_effort == 'minimal'
+    assert gateway.resolve_role('classifier').reasoning_effort == 'minimal'
+    monkeypatch.setenv('MEMORY_EXTRACTOR_REASONING_EFFORT', 'low')
+    assert gateway.reasoning_effort('extractor') == 'low'
 
 
 def usage():
@@ -309,3 +318,16 @@ async def test_dedicated_credentials_and_endpoint_fallback_are_unchanged(role, p
         await gateway.complete(role, [])
     assert call.call_args.kwargs['api_key'] == 'fallback-key'
     assert call.call_args.kwargs['base_url'] == 'https://example.test/fallback'
+
+
+@pytest.mark.asyncio
+async def test_extractor_sends_minimal_effort_and_data_output_cap_for_gpt5_mini(monkeypatch):
+    monkeypatch.delenv('MEMORY_EXTRACTOR_REASONING_EFFORT', raising=False)
+    client = fake_client('{}')
+    with patch.object(config, 'MEMORY_EXTRACTOR_MODEL', ''),          patch.object(gateway.transport, 'create_client', return_value=client):
+        await gateway.complete('extractor', [{'role': 'user', 'content': 'turn'}],
+                               system_prompt='extract', api_key='fake')
+    request = client.chat.completions.create.call_args.kwargs
+    assert request['model'] == 'gpt-5-mini'
+    assert request['reasoning_effort'] == 'minimal'
+    assert request['max_completion_tokens'] == gateway.model_roles()['roles']['extractor']['max_output_tokens']

@@ -25,16 +25,17 @@ async def test_9_rejection_logs_reason_and_patch_keys_without_student_text(caplo
                "plan": PLAN}
         model = AsyncMock(return_value=json.dumps(bad))
         with patch("app.pai_c.deep.analysis.chat_completion", model):
-            with pytest.raises(AnalysisPatchRejected) as raised:
-                await analyze_job(job, db)
+            # Skipped, never raised: the job completes so later turns' analyses go on.
+            result = await analyze_job(job, db)
+    assert result["status"] == "patch_rejected" and result["model_calls"] == 2
     assert model.await_count == 2  # one correction, no more
     lines = [r.getMessage() for r in caplog.records if r.getMessage().startswith("planner_patch_rejected")]
     assert len(lines) == 2
     assert "attempt=2" in lines[1] and "error_type=" in lines[1]
     assert "keys=patch,plan" in lines[1] and "ops=item,op,part;evidence,id,op" in lines[1]
+    skipped = [r.getMessage() for r in caplog.records if r.getMessage().startswith("planner_patch_skipped")]
+    assert len(skipped) == 1 and "error_type=" in skipped[0] and "keys=patch,plan" in skipped[0]
     assert "private student text" not in caplog.text
-    assert "error_type=" in str(raised.value)
-    assert raised.value.retryable is False
 
 
 def test_9_worker_does_not_retry_a_rejection():

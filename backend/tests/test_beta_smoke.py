@@ -266,3 +266,69 @@ def test_live_run_refuses_without_a_spend_source(capsys):
     with pytest.raises(SystemExit):
         smoke.main(["--token", "t"])
     assert "spend source" in capsys.readouterr().err
+
+
+# ---- background settle ------------------------------------------------------
+
+class Poller:
+    """Fake background_jobs reader: busy for the first `busy_polls` reads."""
+
+    def __init__(self, busy_polls, busy_type="memory.extract"):
+        self.calls, self.busy_polls, self.busy_type = 0, busy_polls, busy_type
+
+    def __call__(self, workspace):
+        assert workspace == "w1"
+        self.calls += 1
+        rows = [{"type": "memory.embed", "status": "pending", "seconds": 1.0},
+                {"type": "memory.extract", "status": "succeeded", "seconds": 12.0},
+                {"type": "counselor.analyze", "status": "succeeded", "seconds": 30.0}]
+        if self.calls <= self.busy_polls:
+            rows.append({"type": self.busy_type, "status": "running", "seconds": 0.0})
+        return rows
+
+
+def test_wait_for_settle_polls_until_no_settle_job_is_busy():
+    clock, poller = Clock(), Poller(3, "counselor.analyze")
+    settled, waited, busy = smoke.wait_for_settle(poller, "w1", 120, sleep=clock.sleep, clock=clock)
+    assert settled and busy == [] and waited == 15 and poller.calls == 4  # memory.embed is not waited for
+
+
+def test_wait_for_settle_gives_up_at_the_timeout():
+    clock = Clock()
+    settled, waited, busy = smoke.wait_for_settle(Poller(10 ** 6), "w1", 12, sleep=clock.sleep, clock=clock)
+    assert not settled and waited == 12 and busy == ["memory.extract"]
+
+
+def test_run_waits_for_settle_before_vault_mirror_and_choose_and_reports_job_times(tmp_path):
+    poller = Poller(2)
+    clock = Clock()
+    api = smoke.Api("http://fake", "tok", http=FakeStack())
+    run = smoke.run_smoke(_args(), api=api, jobs=poller, sleep=clock.sleep, clock=clock)
+    assert run.passed, [(c.name, c.note) for c in run.checks if not c.ok]
+    notes = {c.name: c.note for c in run.checks}
+    assert "settled in 10 s" in notes["5 vault"]
+    assert "settled in 0 s" in notes["6 mirror ready, text, redrawn"]
+    assert "settled in 0 s" in notes["8b choose -> CHOSEN"]
+    report = smoke.write_report(run, tmp_path / "r.md")
+    assert "## Latency" in report and "- 4.1 turn" in report
+    assert "extractor (memory.extract) jobs: 1, median 12.0 s" in report
+    assert "planner (counselor.analyze) jobs: 1, median 30.0 s" in report
+
+
+def test_choose_is_skipped_as_a_defect_when_the_mirror_is_not_ready():
+    stack = FakeStack()
+    ready = {"n": 0}
+    original = stack.request
+
+    def request(method, path, **kw):
+        response = original(method, path, **kw)
+        if path == "/v1/counselor/summary":
+            ready["n"] += 1
+            if ready["n"] > 2:  # ready for the Mirror check, not when choosing
+                response._data["data"]["card"]["ready"] = False
+        return response
+    stack.request = request
+    run = _run(stack)
+    choose = next(c for c in run.checks if c.name.startswith("8b"))
+    assert not choose.ok and "skipped: Mirror not ready" in choose.note
+    assert stack.chosen is None and not any(c.name.startswith("8c") for c in run.checks)

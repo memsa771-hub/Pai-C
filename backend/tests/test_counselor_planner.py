@@ -180,10 +180,8 @@ async def test_patch_retry_is_whole_and_second_rejection_preserves_map_plan_logs
         before=MemoryService(db).truth_map(student.workspace_id)
         bad={"patch":[{"op":"add","part":"said","item":new_item(value="private student text")},{"op":"confirm","id":"not-visible","evidence":"private student text"}],"plan":PLAN}
         model=AsyncMock(return_value=json.dumps(bad))
-        from app.pai_c.deep.analysis import AnalysisPatchRejected
         with patch("app.pai_c.deep.analysis.chat_completion",model):
-            with pytest.raises(AnalysisPatchRejected):
-                await analyze_job(job,db)
+            assert (await analyze_job(job,db))["status"]=="patch_rejected"
         assert MemoryService(db).truth_map(student.workspace_id) == before
         assert not db.scalars(select(PaiTurnPlan)).all()
         assert "op_index=1" in caplog.text and "private student text" not in caplog.text

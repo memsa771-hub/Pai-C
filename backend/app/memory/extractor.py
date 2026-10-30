@@ -775,7 +775,7 @@ async def extract_candidates(
     raw = await chat_completion(role="extractor",
         api_key=api_key, model=model,
         messages=[{"role": "user", "content": build_user_prompt(turn, specs) + "\n" + workspace_language_block()}],
-        system_prompt=SYSTEM_PROMPT, max_tokens=4000, base_url=base_url,
+        system_prompt=SYSTEM_PROMPT, base_url=base_url,  # output cap: model_roles.json
     )
 
     drops: list[dict] = []

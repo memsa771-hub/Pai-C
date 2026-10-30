@@ -41,7 +41,10 @@ def test_bank_has_nine_ordered_items_with_copy():
     assert ORDER == ["about_you", "hobbies", "accomplishments", "extracurriculars", "obstacles",
                      "identity", "character", "values", "more"]
     for item in BANK["items"]:
-        assert set(item) == {"id", "area", "vault_types", "intent_key", "prompt", "followup_prompt"}
+        # The first item also carries its prompt as a question (appended to an opening without one).
+        extra = {"question"} if item["id"] == BANK["first_item"] else set()
+        assert set(item) == {"id", "area", "vault_types", "intent_key", "prompt", "followup_prompt"} | extra
+        assert not extra or item["question"].rstrip().endswith("?")
         assert item["area"] in AREAS and item["prompt"].strip() and item["followup_prompt"].strip()
 
 
