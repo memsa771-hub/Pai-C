@@ -23,6 +23,8 @@ def enqueue(db, job_type, payload=None, **kwargs):
     contract = _system(job_type)
     validate_instance({"type": "object"}, payload if payload is not None else {}, "job payload")
     _validate(contract, payload if payload is not None else {})
+    # The job type's own priority unless the caller names one.
+    kwargs.setdefault("priority", contract.priority)
     return BackgroundJobService(db).enqueue(job_type=job_type, payload=payload, **kwargs)
 
 

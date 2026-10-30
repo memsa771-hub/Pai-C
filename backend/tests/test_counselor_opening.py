@@ -93,3 +93,38 @@ def test_prefixed_identity_is_in_never_ask_block():
         profile = _profile(db, student.workspace_id)
         assert profile["identity_never_ask"]["identity.preferred_name"]["value"] == "Alex"
         assert "identity.preferred_name" not in {entry["type"] for entry in profile["entries"]}
+
+
+@pytest.mark.asyncio
+async def test_opening_never_waits_behind_workspace_analysis():
+    """Path analysis (counselor.paths) holds the workspace-analysis lock for a
+    long model call; the opening only reads the Vault and runs at once."""
+    from app.pai_c.deep.analysis import AnalysisOrderPending, _workspace_lock
+    with StudentSession() as student, student.factory() as db:
+        job = SimpleNamespace(id="opening-now", workspace_id=student.workspace_id, attempts=1, max_attempts=3)
+        reply = json.dumps({"reply": "Welcome. Tell me about yourself."})
+        with patch.object(opening, "complete", AsyncMock(return_value=reply)):
+            async with _workspace_lock(db, student.workspace_id):  # a running counselor.paths job
+                assert (await opening.opening_job(job, db))["status"] == "posted"
+        assert len(student.transcript) == 1
+        # A second run of the opening while one holds its own lock still waits (exactly once).
+        async with _workspace_lock(db, student.workspace_id, scope=opening.JOB_OPENING):
+            with pytest.raises(AnalysisOrderPending):
+                await opening.opening_job(job, db)
+
+
+def test_opening_is_claimed_before_queued_analysis():
+    from app.capabilities.system import JOB_PRIORITY
+    from app.jobs.service import BackgroundJobService
+    from app.pai_c.paths.analyzer import JOB_ANALYZE_PATHS
+    from app.runtime.task_runtime import enqueue
+    assert JOB_PRIORITY[opening.JOB_OPENING] > JOB_PRIORITY.get(JOB_ANALYZE_PATHS, 0)
+    with StudentSession() as student, student.factory() as db:
+        paths = enqueue(db, job_type=JOB_ANALYZE_PATHS, workspace_id=student.workspace_id,
+                        payload={"reason": "vault"}, idempotency_key="paths-1")
+        first = enqueue(db, job_type=opening.JOB_OPENING, workspace_id=student.workspace_id,
+                        payload={}, idempotency_key=f"counselor:opening:{student.workspace_id}")
+        db.commit()
+        assert first.priority == JOB_PRIORITY[opening.JOB_OPENING] and paths.priority == 0
+        claimed = BackgroundJobService(db).claim(limit=1, worker_id="w")
+        assert [job.job_type for job in claimed] == [opening.JOB_OPENING]

@@ -93,25 +93,30 @@ def enqueue_turn_analysis(db, workspace_id: str, user_event_id: str,
 
 
 @asynccontextmanager
-async def _workspace_lock(db, workspace_id: str):
-    local = _locks.get(workspace_id)
+async def _workspace_lock(db, workspace_id: str, scope: str | None = None):
+    """One holder per workspace (and per `scope`): analysis jobs share the
+    unscoped lock; a job that only reads the Vault (the opening) takes its own
+    scope so it never waits behind a long analysis."""
+    name = workspace_id if scope is None else f"{scope}:{workspace_id}"
+    busy = "workspace analysis already running" if scope is None else f"workspace {scope} already running"
+    local = _locks.get(name)
     if local is None:
         local = asyncio.Lock()
-        _locks[workspace_id] = local
+        _locks[name] = local
     if local.locked():
-        raise AnalysisOrderPending("workspace analysis already running")
+        raise AnalysisOrderPending(busy)
     await local.acquire()
     connection = None
     acquired = False
     try:
         if db.bind.dialect.name == "postgresql":
             key = int.from_bytes(hashlib.blake2b(
-                workspace_id.encode("utf-8"), digest_size=8).digest(), "big", signed=True)
+                name.encode("utf-8"), digest_size=8).digest(), "big", signed=True)
             connection = db.bind.connect()
             acquired = bool(connection.execute(
                 text("SELECT pg_try_advisory_lock(:key)"), {"key": key}).scalar_one())
             if not acquired:
-                raise AnalysisOrderPending("workspace analysis already running")
+                raise AnalysisOrderPending(busy)
         yield
     finally:
         if connection is not None:

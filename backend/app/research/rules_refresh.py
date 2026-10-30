@@ -14,7 +14,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from app.config import config
-from app.inference.gateway import complete
+from app.inference.gateway import _defaults as role_defaults, complete
 from app.plugins._shared.budget import record_model_usage
 from app.pai_c.deep.prompts import load_prompt
 from app.pai_c.policy.controller import POLICY_DIR, load_data
@@ -146,16 +146,23 @@ async def run_refresh(*, max_calls: int | None = None, out_dir: Path | None = No
         page = await read_page(url, rules["page_chars"])
         # Only the rule's own site counts: a redirect elsewhere is unread.
         if page is None or not same_site(page["url"], url):
+            logger.warning("rules_refresh_unread url=%s reason=page", url)
             unread.append(url)
             continue
         calls -= 1
-        raw = await complete(role="researcher", phase="rules_refresh", system_prompt=load_prompt("rules_refresh"),
-            messages=[{"role": "user", "content": json.dumps({
-                "source_url": url, "page": page["text"],
-                "items": [{"path": item["path"], "label": item["label"], "field": item["field"],
-                           "current": item["current"]} for item in items]}, ensure_ascii=False)}],
-            response_format={"type": "json_object"}, max_tokens=rules["max_tokens"],
-            usage_callback=record_model_usage)
+        try:
+            raw = await complete(role="researcher", phase="rules_refresh", system_prompt=load_prompt("rules_refresh"),
+                messages=[{"role": "user", "content": json.dumps({
+                    "source_url": url, "page": page["text"],
+                    "items": [{"path": item["path"], "label": item["label"], "field": item["field"],
+                               "current": item["current"]} for item in items]}, ensure_ascii=False)}],
+                response_format={"type": "json_object"}, max_tokens=role_defaults("researcher").get("max_tokens"),
+                usage_callback=record_model_usage)
+        except Exception as exc:  # noqa: BLE001  one source's failure (output limit, 400, 5xx, timeout) is that source unread
+            logger.warning("rules_refresh_unread url=%s reason=model error_type=%s error=%s",
+                           url, type(exc).__name__, str(exc)[:200])
+            unread.append(url)
+            continue
         checked_items += len(items)
         asked = {item["path"]: item for item in items}
         for row in _parse(raw):

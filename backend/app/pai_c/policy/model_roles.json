@@ -24,7 +24,7 @@
     "analyst": {"provider": "openai", "model": "gpt-5"},
     "planner": {"provider": "openai", "model": "gpt-5-mini"},
     "mirror": {"provider": "openai", "model": "gpt-5"},
-    "researcher": {"provider": "openai", "model": "gpt-5"},
+    "researcher": {"provider": "openai", "model": "gpt-5", "max_tokens": 4000},
     "path_explain": {"same_as": "researcher"},
     "research_extract": {"same_as": "researcher"},
     "operator": {"provider": "openai", "model": null},

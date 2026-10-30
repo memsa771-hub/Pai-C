@@ -48,6 +48,8 @@ class CapabilityContract:
     run_status_hook: Callable[[Any, Any], None] | None = None
     provider: str = "native"
     kind: str = "business"
+    # Queue priority for a system job: higher is claimed first (jobs/service.claim).
+    priority: int = 0
 
     def __post_init__(self):
         object.__setattr__(self, "fallback_policy", FallbackPolicy(self.fallback_policy))

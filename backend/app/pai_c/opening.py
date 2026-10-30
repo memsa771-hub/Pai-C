@@ -62,7 +62,11 @@ async def opening_job(job, db):
     workspace_id, job_id = job.workspace_id, job.id
     final_attempt = job.attempts >= job.max_attempts
     channel = f"channel/{PAI_PRIMARY_CHANNEL}"
-    async with _workspace_lock(db, workspace_id):
+    # Its own lock scope: the opening only reads the Vault, so it never waits
+    # behind path or turn analysis that holds the workspace-analysis lock.
+    # Exactly-once still holds: one job per idempotency key, this lock against
+    # a parallel run of it, and the posted-message check before and after the model.
+    async with _workspace_lock(db, workspace_id, scope=JOB_OPENING):
         if _already_posted(db, workspace_id, channel):
             return {"status": "already_posted"}
         workspace = db.get(Workspace, workspace_id)

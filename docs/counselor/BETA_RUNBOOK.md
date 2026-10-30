@@ -21,6 +21,7 @@ Edit `.env`. Only names are listed here; values are the founder's. `.env.example
 | `PAI_PROPOSALS_DIR` | set by docker-compose to `/app/proposals` (host `./proposals`). |
 | `PAI_SEMANTIC_RECALL_ENABLED` | `true`. |
 | `PAI_FIELD_NOTE_DAYS`, `PAI_RULES_REFRESH_MAX_CALLS` | optional; defaults 90 and 60. |
+| `PAI_RULES_REFRESH_INTERVAL_DAYS`, `PAI_RULES_REFRESH_MIN_UPTIME_MIN` | optional; defaults 30 and 60. The refresh is queued only when the last one is that many days old and the worker has been up that many minutes (never on a fresh stack's first boot). |
 
 ## 2. Start
 

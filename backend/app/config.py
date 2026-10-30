@@ -210,6 +210,11 @@ class Config:
     PAI_FIELD_NOTE_DAYS: int = int(os.environ.get("PAI_FIELD_NOTE_DAYS", "90"))
     # Page reads plus model calls one monthly rules and calendar refresh may make (spec 3.3).
     PAI_RULES_REFRESH_MAX_CALLS: int = int(os.environ.get("PAI_RULES_REFRESH_MAX_CALLS", "60"))
+    # The refresh is queued only when the last one (job or proposal file) is at
+    # least this many days old, and never before the worker has been up this
+    # many minutes: a fresh stack's first boot never spends on a refresh.
+    PAI_RULES_REFRESH_INTERVAL_DAYS: int = int(os.environ.get("PAI_RULES_REFRESH_INTERVAL_DAYS", "30"))
+    PAI_RULES_REFRESH_MIN_UPTIME_MIN: int = int(os.environ.get("PAI_RULES_REFRESH_MIN_UPTIME_MIN", "60"))
     # Where the monthly refresh writes its proposals: a folder the founder can
     # read on the host (docker-compose mounts ./proposals at /app/proposals).
     # Empty: app/pai_c/policy/refresh_proposals (local runs).

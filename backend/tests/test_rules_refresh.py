@@ -123,14 +123,83 @@ async def test_research_paused_skips_the_job():
     run.assert_not_awaited()
 
 
-def test_scheduled_once_a_month():
-    with StudentSession() as student, student.factory() as db:
-        first = enqueue_monthly_rules_refresh(db, now=TODAY)
-        again = enqueue_monthly_rules_refresh(db, now=TODAY.replace(day=20))
-        later = enqueue_monthly_rules_refresh(db, now=datetime(2026, 12, 1, tzinfo=timezone.utc))
+def test_scheduled_once_per_interval(tmp_path):
+    """Queued only when the last refresh is PAI_RULES_REFRESH_INTERVAL_DAYS old."""
+    from datetime import timedelta
+    now = datetime.now(timezone.utc)
+    up = now - timedelta(hours=2)
+    with StudentSession() as student, student.factory() as db,             patch.object(rules_refresh, "proposals_dir", lambda: tmp_path):
+        first = enqueue_monthly_rules_refresh(db, now=now, started_at=up)
+        db.commit()
+        again = enqueue_monthly_rules_refresh(db, now=now + timedelta(days=20), started_at=up)
+        later = enqueue_monthly_rules_refresh(db, now=now + timedelta(days=31), started_at=up)
         db.commit()
         jobs = db.scalars(select(BackgroundJob).where(BackgroundJob.job_type == JOB_RULES_REFRESH)).all()
-    assert first.id == again.id != later.id and len(jobs) == 2
+    assert first is not None and again is None and later is not None and first.id != later.id
+    assert len(jobs) == 2
+
+
+def test_not_on_first_boot_and_not_after_a_recent_proposal(tmp_path):
+    """A fresh stack's first sweep queues nothing; after the minimum uptime it
+    does, unless a proposal file is newer than the interval."""
+    from datetime import timedelta
+    from app.config import config
+    now = datetime.now(timezone.utc)
+    with StudentSession() as student, student.factory() as db,             patch.object(rules_refresh, "proposals_dir", lambda: tmp_path),             patch.object(config, "PAI_RULES_REFRESH_MIN_UPTIME_MIN", 60):
+        assert enqueue_monthly_rules_refresh(db, now=now, started_at=now - timedelta(minutes=1)) is None
+        (tmp_path / f"{(now - timedelta(days=3)).date().isoformat()}.json").write_text("{}", encoding="utf-8")
+        assert enqueue_monthly_rules_refresh(db, now=now, started_at=now - timedelta(hours=2)) is None
+        (tmp_path / f"{(now - timedelta(days=3)).date().isoformat()}.json").unlink()
+        (tmp_path / f"{(now - timedelta(days=40)).date().isoformat()}.json").write_text("{}", encoding="utf-8")
+        assert enqueue_monthly_rules_refresh(db, now=now, started_at=now - timedelta(hours=2)) is not None
+        db.commit()
+
+
+@pytest.mark.asyncio
+async def test_a_failing_source_is_unread_and_the_refresh_goes_on(tmp_path):
+    """An output-limit 400 or a 5xx/timeout on one source's model call lists
+    that source as unread; the other source is still checked."""
+    import httpx
+    import openai
+    request = httpx.Request("POST", "https://api.example.org/v1/chat/completions")
+    errors = [openai.BadRequestError("Could not finish the message because max_tokens or model output limit was reached",
+                                     response=httpx.Response(400, request=request), body=None),
+              openai.InternalServerError("boom", response=httpx.Response(500, request=request), body=None),
+              openai.APITimeoutError(request=request)]
+    for error in errors:
+        good = model_for(VALUES)
+
+        async def model(**kwargs):
+            if json.loads(kwargs["messages"][0]["content"])["source_url"] == RULE_URL:
+                raise error
+            return await good(**kwargs)
+        read = AsyncMock(side_effect=lambda url, chars: {"url": url, "text": PAGE[url]})
+        with patch.object(rules_refresh, "read_page", read),                 patch.object(rules_refresh, "complete", AsyncMock(side_effect=model)):
+            target = await run_refresh(max_calls=60, out_dir=tmp_path / type(error).__name__, today=TODAY, files=FILES)
+        proposal = json.loads(target.read_text())
+        assert proposal["unread_sources"] == [RULE_URL]
+        assert [diff["path"] for diff in proposal["diffs"]] == ["academic_calendar.json:events/0/months"]
+
+
+@pytest.mark.asyncio
+async def test_a_5xx_page_is_unread(tmp_path):
+    """A source site answering 500 (or timing out) is unread, never a failed job."""
+    from app.plugins._shared import sources
+    from app.security.network import SafeFetchResult
+    broken = SafeFetchResult(b"error", 500, {"content-type": "text/html"}, RULE_URL, False)
+    with patch("app.security.network.safe_fetch", AsyncMock(return_value=broken)):
+        assert await sources.read_page(RULE_URL, 5000) is None
+    with patch("app.security.network.safe_fetch", AsyncMock(side_effect=TimeoutError())):
+        assert await sources.read_page(RULE_URL, 5000) is None
+
+
+@pytest.mark.asyncio
+async def test_researcher_output_limit_comes_from_the_role(tmp_path):
+    from app.inference.gateway import model_roles
+    limit = model_roles()["roles"]["researcher"]["max_tokens"]
+    assert limit >= 4000
+    _, _, _, model = await refresh(tmp_path)
+    assert {call.kwargs["max_tokens"] for call in model.await_args_list} == {limit}
 
 
 # ---- scripts/apply_refresh -----------------------------------------------------------------

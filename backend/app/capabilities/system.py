@@ -2,6 +2,12 @@
 from .contract import CapabilityContract
 
 
+# Claim priority per job type (higher first; unlisted 0). The opening is the
+# student's first message and only reads the Vault, so it goes ahead of any
+# queued background analysis.
+JOB_PRIORITY = {"counselor.opening": 100}
+
+
 def load_system_capabilities(registry):
     from app.pai_c.deep import analysis
     from app.pai_c.paths import analyzer as paths
@@ -61,4 +67,5 @@ def load_system_capabilities(registry):
                           **({"required": ["workspace_id", "first_event_id", "last_event_id"]}
                              if job_type == sessions.JOB_SUMMARIZE else {})},
             output_schema={"type": "object"}, handler=handler,
+            priority=JOB_PRIORITY.get(job_type, 0),
         ))

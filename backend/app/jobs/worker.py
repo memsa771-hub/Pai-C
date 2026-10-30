@@ -161,6 +161,8 @@ async def run_worker_loop(
         "job worker starting id=%s concurrency=%d handlers=%s",
         worker, concurrency, sorted(item.id for item in get_capability_registry().all(kind="system")),
     )
+    from datetime import datetime, timezone
+    started_at = datetime.now(timezone.utc)
     tick = 0
     next_research_sweep = 0.0
     next_session_sweep = 0.0
@@ -178,7 +180,7 @@ async def run_worker_loop(
                 try:
                     from app.research.scheduler import enqueue_due_verification, enqueue_monthly_rules_refresh
                     count = enqueue_due_verification(db)
-                    enqueue_monthly_rules_refresh(db)
+                    enqueue_monthly_rules_refresh(db, started_at=started_at)
                     db.commit()
                     if count:
                         logger.info("marked %d expired research sources unconfirmed", count)
