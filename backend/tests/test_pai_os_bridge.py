@@ -234,3 +234,35 @@ def test_decision_changed_with_a_bad_export_is_none(student, os_stub, monkeypatc
                         lambda export: (_ for _ in ()).throw(ValueError("export lacks decision_id")))
     with student.factory() as db:
         assert bridge.decision_changed(student.workspace_id, db) is None  # logged; never raised at the Counsellor
+
+
+# --- PAI OS Slice 9b: the recipient lookup for PAI OS's reminder emails --------------------------------------------
+
+def test_recipient_email_is_the_workspace_owners(student):
+    assert bridge.recipient_email(student.workspace_id) == "counselor-eval@example.test"
+
+
+@pytest.mark.parametrize("ref", ["", "not-a-uuid", "rehearsal-s1", "00000000-0000-4000-8000-000000000000"])
+def test_recipient_email_unknown_ref_is_none(student, ref):
+    assert bridge.recipient_email(ref) is None
+
+
+def test_recipient_email_none_without_owner_or_when_inactive(student):
+    from app.database import new_session
+    from app.models import Workspace
+
+    with new_session() as db:
+        orphan = Workspace(name="Agent-made", owner_user_id=None, password_hash="synthetic-test-only")
+        db.add(orphan)
+        db.flush()
+        orphan_id = str(orphan.id)
+        db.get(Workspace, student.workspace_id).status = "archived"
+        db.commit()
+    assert bridge.recipient_email(orphan_id) is None
+    assert bridge.recipient_email(student.workspace_id) is None
+
+
+def test_recipient_email_loads_as_the_workers_lookup():
+    from app.os.ports import recipients
+
+    assert recipients.load("app.pai_os_bridge:recipient_email") is bridge.recipient_email

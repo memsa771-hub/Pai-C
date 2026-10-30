@@ -25,6 +25,7 @@ from app.application_workspace.access import _auth as _workspace_auth
 from app.config import config
 from app.database import get_db
 from app.os.api import mount_os
+from app.pai_os_bridge import recipient_email
 from app.security.errors import IdentityUnavailable
 from app.api.response import ResponseCode, json_response
 from app.routers import account, app_version, application_workspace, auth, browser, counselor_summary, counselor_voice, deadlines, decision_records, escalations, events, feedback, fetch, files, integrations, knowledge, network, notifications, operator, roadmaps, routines, search, shares, student_profile, student_requests, tasks, timers, todos, workflows, workspaces
@@ -792,7 +793,8 @@ def _os_student_ref_for_write(
     return _os_student(db, network, x_workspace_token, authorization, write=True)
 
 
-OS_MOUNTED = mount_os(app, student_dependency=_os_student_ref, student_write_dependency=_os_student_ref_for_write)
+OS_MOUNTED = mount_os(app, student_dependency=_os_student_ref, student_write_dependency=_os_student_ref_for_write,
+                      recipient_lookup=recipient_email)
 
 
 @app.get("/health")
