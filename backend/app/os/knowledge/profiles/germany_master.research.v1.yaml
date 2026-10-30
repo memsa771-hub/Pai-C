@@ -65,6 +65,13 @@ scope_all_phrases: [all programmes, all programs, all degree programmes, all deg
 university_wide_titles: [academic calendar, semester dates, dates for the winter semester, akademischer kalender,
   semestertermine, semesterzeiten, termine zum semesterablauf, terminplan, studienjahresablaufplan]
 
+# The intake every reader is told it researches, with the run's intake year (Slice 9b): a page that lists several
+# semesters (an academic calendar) must give the intake's. No trust rule depends on it.
+target_cycle: >-
+  Target intake: the winter semester {year}/{next_yy} (WS {year}/{next_yy}). When a page gives a fact for several
+  semesters or years, give the one for this intake. If the pages give it only for another intake, give that one and
+  copy its semester or year as the cycle.
+
 # "Ask the university" draft for unconfirmed facts (spec §4.9). The student sends it; the OS never does.
 draft_email: |
   Dear admissions team,

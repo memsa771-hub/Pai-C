@@ -31,7 +31,8 @@ https://www.b-tu.de/studium/im-studium/studienorganisation/quicklinks/termine-fr
 2027/28 is "Studienjahresablaufplan 2027/2028" (Amtliche Bekanntmachung Nr. 62/2025): Lehrveranstaltungszeit from
 11 October 2027.
 
-A date for an older winter semester is never confirmed for a later intake: the fact stays `unconfirmed` with the
+Every reader is told the target intake (the profile's `target_cycle`, e.g. "WS 2027/28"), so on a calendar that
+lists several semesters it gives that intake's date. A date for an older winter semester is never confirmed for a later intake: the fact stays `unconfirmed` with the
 reason `cycle_old:<year>` and the note "page shows ...". Research runs again each day while the check is open, so it
 confirms the date by itself once the page has the new semester.
 

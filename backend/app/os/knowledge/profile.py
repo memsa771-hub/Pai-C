@@ -81,6 +81,9 @@ class ResearchProfile(_Model):
     scope_all_phrases: list[str] = []  # a scope quote with one of these says a rule is for every programme
     # a page whose title names one of these is the university's academic calendar (for university_wide fields)
     university_wide_titles: list[str] = []
+    # Told to every reader with the run's intake year (readings.user_prompt), so a page that lists several
+    # semesters gives the intake's. Placeholders: {year}, {next_year}, {next_yy}. Empty: nothing is said.
+    target_cycle: str = ""
     draft_email: str
     fields: list[FieldSpec]
 
@@ -96,12 +99,21 @@ class ResearchProfile(_Model):
         for f in self.fields:
             if f.university_wide and not self.university_wide_titles:
                 raise ValueError(f"university_wide field '{f.name}' needs university_wide_titles")
+        try:
+            self.target_cycle_for(2027)
+        except (KeyError, IndexError, ValueError) as e:
+            raise ValueError(f"target_cycle has an unknown placeholder: {e}") from None
         if set(self.month_names) != set(range(1, 13)):
             raise ValueError("month_names needs all 12 months")
         for domain in self.official_sources:
             if not _DOMAIN.match(domain):
                 raise ValueError(f"official source '{domain}' must be a bare domain like example.org")
         return self
+
+    def target_cycle_for(self, intake_year: int) -> str:
+        """The profile's target-cycle wording for one intake year, e.g. 2027 -> '... WS 2027/28 ...'."""
+        return self.target_cycle.format(year=intake_year, next_year=intake_year + 1,
+                                        next_yy=f"{(intake_year + 1) % 100:02d}")
 
     def field(self, name: str) -> FieldSpec:
         return next(f for f in self.fields if f.name == name)

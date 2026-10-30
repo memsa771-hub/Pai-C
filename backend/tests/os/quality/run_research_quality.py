@@ -73,7 +73,7 @@ def research_one(p: Programme, gateway: PageGateway, fetch, readers, spec, profi
                  billed: bool = True) -> dict:
     """One programme: collect -> A, B (-> C) -> judge, as the os.research workflow does (minus the store)."""
     pages = gateway.collect(p, profile, fetch=fetch)
-    prompt = user_prompt(p, pages)
+    prompt = user_prompt(p, pages, profile, min_cycle)
     price = (lambda u: cost(u, settings, spec.tier)) if billed else (lambda u: 0.0)
     readings, spent, errors = {}, 0.0, {}
     for name in ("A", "B"):

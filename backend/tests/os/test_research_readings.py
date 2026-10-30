@@ -233,3 +233,27 @@ def test_month_spend_follows_the_shared_clock(engine, clean):
         assert runs.month_spend(clock.now(), "research") == pytest.approx(0.25)
     finally:
         clock.configure(None)
+
+
+def test_prompt_names_the_target_cycle():
+    """The reader is told which intake it looks for, in the profile's words with the run's intake year, so a page
+    that lists several semesters (an academic calendar) gives the right one. Without a year, nothing is added."""
+    assert PROFILE.target_cycle  # the wording lives in the profile (invariant 12)
+    prompt = user_prompt(PROG, [PAGE], PROFILE, 2027)
+    assert "WS 2027/28" in prompt and "2027" in prompt.split("<<<PAGE", 1)[0]
+    assert "WS 2027/28" not in user_prompt(PROG, [PAGE])
+    assert "WS 2028/29" in user_prompt(PROG, [PAGE], PROFILE, 2028)
+    assert "WS 2100/01" in user_prompt(PROG, [PAGE], PROFILE, 2100)
+
+
+def test_target_cycle_template_is_checked(tmp_path):
+    import yaml
+
+    from app.os.knowledge.profile import PROFILE_DIR, ProfileError, load_profile
+
+    data = yaml.safe_load((PROFILE_DIR / "germany_master.research.v1.yaml").read_text(encoding="utf-8"))
+    data["target_cycle"] = "the winter semester {decade}"
+    path = tmp_path / "p.research.v1.yaml"
+    path.write_text(yaml.safe_dump(data, allow_unicode=True), encoding="utf-8")
+    with pytest.raises(ProfileError, match="target_cycle has an unknown placeholder"):
+        load_profile(path)

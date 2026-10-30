@@ -124,9 +124,14 @@ def _fenced(text: str) -> str:
     return text.replace(_FENCE_MARK, "‹‹‹")  # page text cannot close its fence or open a new one
 
 
-def user_prompt(programme, pages: Sequence) -> str:
-    """The programme and its readable pages, each fenced, within TOTAL_CHARS."""
-    parts, left = [f"Programme: {programme.name}\nUniversity: {programme.university}\n"], TOTAL_CHARS
+def user_prompt(programme, pages: Sequence, profile: ResearchProfile | None = None,
+                intake_year: int | None = None) -> str:
+    """The programme, the intake it is researched for (the profile's `target_cycle` wording with the run's
+    intake year), and its readable pages, each fenced, within TOTAL_CHARS."""
+    head = f"Programme: {programme.name}\nUniversity: {programme.university}\n"
+    if profile is not None and intake_year is not None and profile.target_cycle:
+        head += profile.target_cycle_for(intake_year).strip() + "\n"
+    parts, left = [head], TOTAL_CHARS
     for p in pages:
         if not p.ok or left <= 0:
             continue
