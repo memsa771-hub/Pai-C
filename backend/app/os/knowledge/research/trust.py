@@ -23,6 +23,7 @@ QUOTE_WINDOW = 400  # a label and its value, or the pieces of a cut passage, sit
 SCOPE_WINDOW = 2000  # a scope quote must be this close to the quote it scopes
 SCORE_WINDOW = 150  # a page "lists scores" when a score's name has a number this close after it
 _YEAR = re.compile(r"\b(20\d\d)\b")
+_ACADEMIC_YEAR = re.compile(r"\b(20\d\d)\s?[/-]\s?(?:20)?\d\d\b(?![./-]\d)")  # 2026/27, 2026/2027, 2026-27
 _NUMBER = re.compile(r"(?<![\d.,])\d+(?:[.,]\d+)*")
 
 
@@ -243,10 +244,31 @@ def _page_is_specific(page, programme) -> bool:
     return False
 
 
-def scope_ok(page, programme, quote: str, scope_quote: str | None, profile) -> bool:
+def _title(page) -> str:
+    """The page's first non-blank line (an HTML page's <title>), normalised; a byte order mark is not text."""
+    for line in (page.text or "").replace("\ufeff", "").splitlines():
+        if line.strip():
+            return normalise(line)
+    return ""
+
+
+def _university_calendar(page, programme, spec, profile) -> bool:
+    """For a field the profile marks `university_wide` (one value for every programme, like the lecture start):
+    the page is on the programme's own university domain (not a shared source, not after a redirect off it) and
+    its title says it is the academic calendar. Every other field keeps the general rule."""
+    if spec is None or not spec.university_wide:
+        return False
+    urls = [u for u in (page.url, page.final_url) if u]
+    own = set(programme.official_domains)
+    return (bool(urls) and all(domain_of(u) in own for u in urls)
+            and _any(profile.university_wide_titles, _title(page)))
+
+
+def scope_ok(page, programme, quote: str, scope_quote: str | None, profile, spec=None) -> bool:
     """A rule on a general page counts only with a scope quote that is on the page, within SCOPE_WINDOW
-    characters of the quote, and names the programme or says the rule is for every programme (lesson 2, D3)."""
-    if _page_is_specific(page, programme):
+    characters of the quote, and names the programme or says the rule is for every programme (lesson 2, D3).
+    A `university_wide` field (`spec`) may also come from the university's own academic calendar page."""
+    if _page_is_specific(page, programme) or _university_calendar(page, programme, spec, profile):
         return True
     if not scope_quote:
         return False
@@ -272,9 +294,30 @@ def _lists_scores(page_norm: str, spec) -> bool:
     return False
 
 
-def cycle_year(fact, page_norm: str) -> int | None:
-    """The newest year named by the fact's cycle or quote that also appears on its page."""
-    years = [int(y) for y in _YEAR.findall(f"{fact.cycle or ''} {fact.quote}") if y in page_norm]
+def _value_years(spec, value, quote: str, profile) -> list[int]:
+    """For a month_day field marked `value_year_is_cycle`: the years the quote writes with the value's own date
+    ('11. Oktober 2027', 'October 11, 2027', '11.10.2027', '2027-10-11'), so the end of a period after it does not
+    count."""
+    if spec is None or profile is None or spec.type != "month_day" or not spec.value_year_is_cycle:
+        return []
+    month, day = (int(x) for x in str(_dump(value)).split("-"))
+    q = normalise(quote or "")
+    names = "|".join(re.escape(normalise(m)) for m in profile.month_names[month])
+    d, y = rf"(?<!\d)0?{day}", r"(20\d\d)\b"
+    patterns = (rf"{d}\s?[./]\s?0?{month}\s?[./]\s?{y}", rf"{d}\.?\s+(?:{names})\.?\s+{y}",
+                rf"(?<!\w)(?:{names})\.?\s+0?{day},?\s+{y}", rf"\b(20\d\d)-0?{month}-0?{day}(?!\d)")
+    return [int(m) for p in patterns for m in re.findall(p, q)]
+
+
+def cycle_year(fact, page_norm: str, spec=None, profile=None) -> int | None:
+    """The year a fact is for, if the page shows it: for a `value_year_is_cycle` date, the year the quote gives that
+    date; otherwise the newest year named by the fact's cycle or quote. An academic year ('2026/27', '2026/2027')
+    is its first year."""
+    own = [y for y in _value_years(spec, fact.value, fact.quote, profile) if str(y) in page_norm]
+    if own:
+        return max(own)
+    named = _ACADEMIC_YEAR.sub(r"\1", f"{fact.cycle or ''} {fact.quote}")
+    years = [int(y) for y in _YEAR.findall(named) if y in page_norm]
     return max(years) if years else None
 
 
@@ -310,7 +353,7 @@ def _check(spec, fact, texts: Mapping[str, str], by_url: Mapping, programme, pro
         problems.append("value_not_in_quote")
     if not list_complete(spec, fact.value, fact.quote, profile):
         problems.append("list_not_complete")
-    if not scope_ok(page, programme, fact.quote, fact.scope_quote, profile):
+    if not scope_ok(page, programme, fact.quote, fact.scope_quote, profile, spec):
         problems.append("scope_unclear")
     if spec.type == "level_scores" and run_lists_scores:
         v = _dump(fact.value)
@@ -351,7 +394,7 @@ def judge(spec, readings: Mapping[str, Any], pages: Sequence, programme, profile
         v.conflict_note = " ".join(f"{n}={_dump(f.value)!r}" for n, f in good.items())
         return v
     if spec.cycle_bound:
-        years = [y for f in good.values() if (y := cycle_year(f, texts[f.url])) is not None]
+        years = [y for f in good.values() if (y := cycle_year(f, texts[f.url], spec, profile)) is not None]
         v.cycle_year = max(years) if years else None
         if v.cycle_year is None:
             v.reasons.append("cycle_unknown")

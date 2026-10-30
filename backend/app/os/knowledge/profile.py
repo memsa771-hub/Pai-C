@@ -33,6 +33,12 @@ class FieldSpec(_Model):
     type: FieldType
     hint: str
     cycle_bound: bool = False
+    # one value for every programme of a university (the semester's lecture start): the university's own academic
+    # calendar page counts as in scope for it, though it names no programme (trust.scope_ok)
+    university_wide: bool = False
+    # month_day: the date falls in the intake's own year (a winter lecture start), so the year the quote writes with
+    # the date is the fact's cycle, not the end of a period after it (trust.cycle_year)
+    value_year_is_cycle: bool = False
     # value -> aliases a quote may use (enum, name_set, season_set); level_scores: score or flag -> aliases
     values: dict[str, list[str]] = {}
     levels: list[str] = []  # level, level_scores
@@ -52,6 +58,8 @@ class FieldSpec(_Model):
             for key in self.values:
                 if key not in (*self.scores, *self.flags):
                     raise ValueError(f"field '{self.name}': values names unknown score or flag '{key}'")
+        if self.value_year_is_cycle and self.type != "month_day":
+            raise ValueError(f"field '{self.name}': value_year_is_cycle is for month_day fields")
         if self.type in ("grade", "numbers") and not self.parts:
             raise ValueError(f"field '{self.name}' ({self.type}) needs parts")
         if self.type == "numbers":
@@ -71,6 +79,8 @@ class ResearchProfile(_Model):
     none_phrases: dict[str, list[str]] = {}
     exclusive_phrases: list[str]
     scope_all_phrases: list[str] = []  # a scope quote with one of these says a rule is for every programme
+    # a page whose title names one of these is the university's academic calendar (for university_wide fields)
+    university_wide_titles: list[str] = []
     draft_email: str
     fields: list[FieldSpec]
 
@@ -83,6 +93,9 @@ class ResearchProfile(_Model):
         for name in self.none_phrases:
             if name not in names:
                 raise ValueError(f"none_phrases names unknown field '{name}'")
+        for f in self.fields:
+            if f.university_wide and not self.university_wide_titles:
+                raise ValueError(f"university_wide field '{f.name}' needs university_wide_titles")
         if set(self.month_names) != set(range(1, 13)):
             raise ValueError("month_names needs all 12 months")
         for domain in self.official_sources:

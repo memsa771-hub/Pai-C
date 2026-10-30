@@ -65,6 +65,7 @@ def _field(data: dict, name: str) -> dict:
     (lambda d: d["month_names"].pop(7), "month_names needs all 12 months"),
     (lambda d: d["official_sources"].append("https://example.org"), "domain"),
     (lambda d: d.update(colour="blue"), "colour"),
+    (lambda d: _field(d, "intakes").update(value_year_is_cycle=True), "value_year_is_cycle is for month_day"),
 ])
 def test_invalid_profile_rejected(tmp_path, mutate, msg):
     data = germany_data()
@@ -152,3 +153,10 @@ def test_worker_build_fails_on_invalid_profile(monkeypatch, tmp_path):
     monkeypatch.setattr(worker, "PROFILE_SOURCE", tmp_path)
     with pytest.raises(ProfileError, match="bad.research.v1.yaml"):
         worker.build(load_settings({"DATABASE_URL": "postgresql://x/y", "OS_WORKER_ID": "w1"}))
+
+
+def test_university_wide_field_needs_calendar_titles(tmp_path):
+    data = germany_data()
+    data["university_wide_titles"] = []
+    with pytest.raises(ProfileError, match="university_wide field .* needs university_wide_titles"):
+        load_profile(write(tmp_path, data))
