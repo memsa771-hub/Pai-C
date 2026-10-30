@@ -70,6 +70,7 @@ class _Inst:
     kind: str
     inbox_kind: str | None
     deps: list[tuple[str, bool]] = field(default_factory=list)
+    no_pull: set[str] = field(default_factory=set)  # deps this step's date does not pull earlier (`pull: false`)
     provisional: bool = False
     estimated: bool = False
     blocked_reason: str | None = None
@@ -185,12 +186,14 @@ def _apply_overrides(insts: dict[str, _Inst], confirms: dict[str, tuple[str, str
             while f"{base_key}#{n}" in insts:
                 n += 1
             key = f"{base_key}#{n}"
-            insts[key] = replace(base, key=key, deps=list(base.deps), citations=list(base.citations),
-                                 fact_refs=list(base.fact_refs))
+            insts[key] = replace(base, key=key, deps=list(base.deps), no_pull=set(base.no_pull),
+                                 citations=list(base.citations), fact_refs=list(base.fact_refs))
             for inst in insts.values():  # what waited for the base step now also waits for the new one
                 if inst.key != key and (base_key, True) in inst.deps:
                     inst.deps.append((key, True))
                     inst.deps.sort()
+                    if base_key in inst.no_pull:
+                        inst.no_pull.add(key)
         elif o.op == "reprioritise":
             before = insts.get(o.payload.get("before", ""))
             if before is not None and o.target in insts and before.key not in _waits_for(insts, o.target) \
@@ -288,17 +291,25 @@ def compile_plan(
                 else:
                     (d, tz), fact = min(usable, key=lambda u: u[0][0])
                     inst.tz = tz or playbook.default_timezone
+                    several = len(sources) > 1
+                    lead_date = d - timedelta(days=lead_days)
+                    # Slice 9b: a lead-time date already gone is not shown as the due date; with note_passed the
+                    # step is due on the fact's own date (no overdue step, nothing pulled into the past)
+                    passed = lead_date < today and bool(t.anchor.note_passed or t.anchor.note_passed_earliest)
                     if fact.url:  # the date comes from this page: cite it first (invariant 3, review I5)
                         cite = {"source": f"fact:{t.anchor.fact}", "url": fact.url}
-                        note = t.anchor.note_earliest if len(sources) > 1 and t.anchor.note_earliest \
-                            else t.anchor.note
+                        if passed:
+                            note = t.anchor.note_passed_earliest if several and t.anchor.note_passed_earliest \
+                                else t.anchor.note_passed
+                        else:
+                            note = t.anchor.note_earliest if several and t.anchor.note_earliest else t.anchor.note
                         if note:  # and say plainly how the date follows from it (F1)
                             cite["note"] = note.format(
                                 **{k: c.value for k, c in playbook.constants.items()},
-                                date=_day(d), due=_day(d - timedelta(days=lead_days)), days=lead_days,
-                                weeks=lead_days // 7)
+                                date=_day(d), due=_day(lead_date), days=lead_days, weeks=lead_days // 7,
+                                days_left=max((d - today).days, 0))
                         inst.citations.insert(0, cite)
-                    inst.deadline = end_of_day(d, inst.tz) - timedelta(days=lead_days)
+                    inst.deadline = end_of_day(d, inst.tz) - timedelta(days=0 if passed else lead_days)
                     if not fact.confirmed or len(sources) > 1:  # several: it may move once one is chosen
                         inst.provisional = True
             if t.citation_from_fact:
@@ -317,6 +328,8 @@ def compile_plan(
             if inst.ref is not None and playbook.task(dep.key).fan_out == "programme":
                 targets = [x for x in targets if x.ref == inst.ref]
             inst.deps.extend((x.key, dep.hard) for x in targets)
+            if not dep.pull:
+                inst.no_pull.update(x.key for x in targets)
         inst.deps.sort()
 
     _apply_overrides(insts, confirms, overrides)
@@ -341,7 +354,7 @@ def compile_plan(
     nodes = {
         k: Node(key=k, duration_days=duration(insts[k]), tz=insts[k].tz, deadline=insts[k].deadline,
                 hard_preds=[d for d, hard in insts[k].deps if hard],
-                hard_succs=[s for s in keys if (k, True) in insts[s].deps])
+                hard_succs=[s for s in keys if (k, True) in insts[s].deps and k not in insts[s].no_pull])
         for k in keys
     }
     schedule(nodes, order, today)

@@ -68,10 +68,12 @@ constants:
       - {source: S9, url: "https://pakistan.diplo.de/pk-en/service/1995528-1995528"}
   # Slice 9 Task 11 (F1, the user's option A): apply for the visa at the latest this long before the semester
   # starts. No official source gives a date for the visa, so the visa step's apply-by date is derived: the semester
-  # start of the programme the visa file is for, minus these days. The owners chose 6 weeks; it is a planning
-  # choice, not an official figure.
+  # start of the programme the visa file is for, minus these days. It is a planning choice, not an official figure.
+  # Slice 9b (the user, 2026-10-30; was 42, 6 weeks): the processing time (visa_processing_days, 90) plus a 2-week
+  # buffer (14) = 104 days, rounded up to whole weeks = 15 weeks, 105 days (the note says {weeks}, which the
+  # playbook check only allows for a multiple of 7). Change it together with visa_processing_days.
   visa_before_semester_days:
-    value: 42
+    value: 105
     estimate: true
   # Shown to the student as an estimate in the visa step's note; since Slice 9 Task 11 it is not a scheduling input
   # (as visa_apply's duration it pulled every application before its deadline: the step is applying, not waiting).
@@ -269,22 +271,36 @@ tasks:
     title: Apply for the student visa on the Consular Services Portal
     kind: student
     inbox_kind: act
-    # Slice 9 Task 11 (F1, option A): the due date is the apply-by date, 6 weeks before the visa programme's
-    # researched semester_start (cited, with the note); until that start is known the step waits and says what for.
-    # 2 days for the act of applying, like the other online submissions (uni_assist_apply, direct_apply).
+    # Slice 9 Task 11 (F1, option A): the due date is the apply-by date, visa_before_semester_days (15 weeks since
+    # Slice 9b) before the visa programme's researched semester_start (cited, with the note); until that start is
+    # known the step waits and says what for. 2 days for the act of applying, like the other online submissions
+    # (uni_assist_apply, direct_apply).
+    # Slice 9b: when the apply-by date has already passed at compile time (e.g. a July admission for an October
+    # start), the step says "Apply now" (note_passed) and is due on the semester start itself, so it is never
+    # overdue for the day it becomes possible.
     anchor:
       fact: semester_start
       programme: visa
-      note: "Apply by {due}: {weeks} weeks before your semester starts on {date}. A visa usually takes about
-        {visa_processing_days} days."
-      note_earliest: "Apply by {due}: {weeks} weeks before the earliest semester start of your programmes ({date}).
-        A visa usually takes about {visa_processing_days} days."
+      note: "Apply by {due}: {weeks} weeks before your semester starts on {date}, so that the visa (about
+        {visa_processing_days} days) can arrive in time."
+      note_earliest: "Apply by {due}: {weeks} weeks before the earliest semester start of your programmes ({date}),
+        so that the visa (about {visa_processing_days} days) can arrive in time."
+      note_passed: "Apply now, as soon as you can. The date to apply by ({due}, {weeks} weeks before your semester
+        starts on {date}) has passed. A visa usually takes about {visa_processing_days} days, so it may arrive after
+        your semester starts. {days_left} days are left before your semester starts."
+      note_passed_earliest: "Apply now, as soon as you can. The date to apply by ({due}, {weeks} weeks before the
+        earliest semester start of your programmes, {date}) has passed. A visa usually takes about
+        {visa_processing_days} days, so it may arrive after your semester starts. {days_left} days are left before
+        that semester starts."
       waiting: "Waiting for your programme's semester start date"
       waiting_none: "Waiting until a programme admits you"
     lead_time: {constant: visa_before_semester_days}
     duration_days: 2
+    # Slice 9b (keeps Task 11C): the step waits for the admission, but its apply-by date never pulls the admission
+    # result (and through it the applications) earlier: 15 weeks before an October start falls before many
+    # application deadlines. The visa preparation steps below are still pulled by it.
     depends_on:
-      - {key: admission_result}
+      - {key: admission_result, pull: false}
       - {key: blocked_account}
       - {key: travel_insurance}
       - {key: review_visa_file}

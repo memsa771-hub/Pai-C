@@ -29,8 +29,9 @@ route:
     status: unconfirmed
   # There is no visa_target_date fact (Slice 9 Task 11, F1): no official source gives one. The playbook derives the
   # visa step's date from the visa programme's semester_start (a programme fact research looks up, with its page),
-  # 6 weeks before it (the visa_before_semester_days constant). No semester_start is seeded here: until research
-  # finds it for a programme, visa_apply waits for it and the student is told so (Spike 5 C5).
+  # 15 weeks before it (the visa_before_semester_days constant; 6 weeks before Slice 9b). No semester_start is
+  # seeded here: until research finds it for a programme, visa_apply waits for it and the student is told so
+  # (Spike 5 C5).
 
 programmes:
   tu-chemnitz-embedded-systems:

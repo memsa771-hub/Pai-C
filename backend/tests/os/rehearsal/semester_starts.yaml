@@ -1,5 +1,5 @@
 # Rehearsal test data (Slice 9 Task 11, F1): a FICTIONAL semester start for each programme the students use. The visa
-# step's date is derived from the visa programme's semester_start (6 weeks before it, the playbook's
+# step's date is derived from the visa programme's semester_start (15 weeks before it since Slice 9b, the playbook's
 # visa_before_semester_days). In production research finds it on the programme's official page; offline research
 # finds nothing, so the rehearsal loads these values with the seed. They are not real dates and the URLs do not exist.
 # Different days on purpose, so the visa date shows which programme it follows.
