@@ -16,7 +16,7 @@ jobs:
   # Required status check. Branch protection expects this exact job id: `os`.
   os:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30  # tests/os takes about 18 min (Slice 9b); 20 cut slower runners off
     services:
       postgres:
         image: postgres:16
