@@ -256,7 +256,7 @@ def register_research(engine: Engine, settings: OsSettings, kernel, service, gat
         seen = set(programme.start_urls) | {p.final_url for p in pages if p.final_url}
         pages += [get_page(u, own, shared)
                   for u in rank_links([p for p in pages if p.ok], own, profile.link_keywords, seen)]
-        prompt = user_prompt(programme, pages)
+        prompt = user_prompt(programme, pages, profile, intake_year)  # the intake it looks for
         readings, spent = {}, 0.0
         for name in ("A", "B"):
             readings[name], c = read(name, agents, run_id, prompt)

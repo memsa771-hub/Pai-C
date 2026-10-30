@@ -335,6 +335,14 @@ findings were fixed in #168. Three findings are **9b entry conditions**, to be s
    in the same note. The owners choose `visa_before_semester_days`. **Resolved** 2026-10-30 (the user's decision):
    15 weeks (105 days), "Apply now" once passed, no pull on the admission (rulings 35 to 37, `os/s9b-visa-lead`).
 2. **Real research of `semester_start`,** plus an admin runbook for supplying it when research can't find it.
+   **Resolved (2026-10-30, `os/s9b-semester-start`):**
+   - Each university's official semester-dates page is in the seed for all 12 OVGU, TU Chemnitz and BTU programmes.
+   - `semester_start` alone may read such a university-wide page.
+   - The readers are told the target intake ("WS 2027/28").
+   - One real run confirmed ovgu-eeit's start as 2027-10-11 for $0.03.
+   - The fallback is `scripts/os_supply_fact.py`, described in `docs/os/runbooks/semester-start.md`.
+   - TU Chemnitz has not published 2027/28 yet.
+   - BTU's PDF URL changes each year.
 3. **Usable email:** a recipient lookup port; real templates (today the body is the raw payload); and 401/403/422
    from Resend treated as configuration errors that stop and alert, not as rows marked `failed`.
    - **OS side done** (branch `os/s9b-email-os`): the `RecipientLookup` port (`app/os/ports/recipients.py`; the

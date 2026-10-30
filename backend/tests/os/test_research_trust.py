@@ -349,3 +349,116 @@ def test_seed_own_pages_leave_out_shared_start_pages():
     chemnitz = _seed_programme("tu-chemnitz-web-engineering")
     shared = "https://www.tu-chemnitz.de/studierendenservice/studserv/bewerbung/bew_bamala.php.en"
     assert shared in chemnitz.start_urls and shared not in chemnitz.own_pages
+
+
+# --- university-wide fields (Slice 9b entry condition 2: semester_start on the academic calendar) ------------
+# A synthetic academic calendar: one page on the university's own domain that gives the semester dates for every
+# programme, and names none of them. The profile marks semester_start `university_wide`; no other field is.
+
+CALENDAR_URL = UNI + "/studium/academic-calendar.html"
+CALENDAR_TEXT = ("Academic Calendar | Uni X\nWinter semester 2027/28 - October 01, 2027 - March 31, 2028\n"
+                 "Classes: October 11, 2027 - January 28, 2028\nApplication deadline: July 15, 2027")
+CLASSES = "Classes: October 11, 2027 - January 28, 2028"
+
+
+def test_only_semester_start_is_university_wide():
+    assert [f.name for f in PROFILE.fields if f.university_wide] == ["semester_start"]
+    assert PROFILE.university_wide_titles  # what a calendar page's title names
+
+
+def test_scope_calendar_page_counts_for_a_university_wide_field_only():
+    p = page(CALENDAR_URL, CALENDAR_TEXT)
+    assert scope_ok(p, PROG, CLASSES, None, PROFILE, spec("semester_start"))
+    assert not scope_ok(p, PROG, "Application deadline: July 15, 2027", None, PROFILE, spec("deadline_close"))
+    assert not scope_ok(p, PROG, CLASSES, None, PROFILE)  # no field given: the general rule, unchanged
+
+
+def test_scope_calendar_page_title_may_follow_a_byte_order_mark():
+    p = page(CALENDAR_URL, "﻿\n" + CALENDAR_TEXT)
+    assert scope_ok(p, PROG, CLASSES, None, PROFILE, spec("semester_start"))
+
+
+def test_scope_university_wide_needs_own_domain_and_calendar_title():
+    start = spec("semester_start")
+    # a shared source (DAAD) is official, but it is not the programme's university
+    assert not scope_ok(page("https://www2.daad.de/academic-calendar", CALENDAR_TEXT), PROG, CLASSES, None,
+                        PROFILE, start)
+    # another university's calendar
+    assert not scope_ok(page("https://www.uni-y.de/academic-calendar", CALENDAR_TEXT), PROG, CLASSES, None,
+                        PROFILE, start)
+    # redirected off the programme's domain
+    moved = Page(url=CALENDAR_URL, final_url="https://www.uni-y.de/cal", http_status=200, text=CALENDAR_TEXT)
+    assert not scope_ok(moved, PROG, CLASSES, None, PROFILE, start)
+    # the university's own domain, but not its calendar: another programme's page
+    other = page(UNI + "/studies/physics/info.html", "Physics | Uni X\n" + CLASSES)
+    assert not scope_ok(other, PROG, CLASSES, None, PROFILE, start)
+
+
+def test_judge_confirms_semester_start_from_the_calendar_and_not_other_fields():
+    pages = [page(CALENDAR_URL, CALENDAR_TEXT)]
+    v = run("semester_start", {"A": found("semester_start", "10-11", CLASSES, CALENDAR_URL, cycle="2027/28"),
+                               "B": found("semester_start", "10-11", CLASSES, CALENDAR_URL)}, pages=pages)
+    assert v.status == "confirmed" and v.value == "10-11" and v.cycle_year == 2027, v.reasons
+    q = "Application deadline: July 15, 2027"
+    v = run("deadline_close", {"A": found("deadline_close", "07-15", q, CALENDAR_URL),
+                               "B": found("deadline_close", "07-15", q, CALENDAR_URL)}, pages=pages)
+    assert v.status == "unconfirmed" and "A:scope_unclear" in v.reasons and "B:scope_unclear" in v.reasons
+
+
+def test_judge_calendar_with_last_years_dates_is_cycle_old():
+    """The calendar has not published the intake's winter semester yet: never confirmed for it."""
+    text = "Academic Calendar | Uni X\nWinter semester 2026/27\nClasses: October 12, 2026 - January 29, 2027"
+    q = "Classes: October 12, 2026 - January 29, 2027"
+    v = run("semester_start", {"A": found("semester_start", "10-12", q, CALENDAR_URL, cycle="2026/27"),
+                               "B": found("semester_start", "10-12", q, CALENDAR_URL)},
+            pages=[page(CALENDAR_URL, text)])
+    assert v.status == "unconfirmed" and "cycle_old:2026" in v.reasons
+
+
+def test_judge_academic_year_written_in_full_is_its_first_year():
+    """'winter term 2026/2027' is the 2026 intake, not 2027; and a lecture start's own year decides, not the
+    end of the lecture period that follows it."""
+    text = ("Academic Calendar | Uni X\nSemester dates in general winter term 2026/2027\nBegin of lectures\n"
+            "12.10.2026\nEnd of lectures\n05.02.2027")
+    q = "Begin of lectures\n12.10.2026\nEnd of lectures\n05.02.2027"
+    v = run("semester_start", {"A": found("semester_start", "10-12", q, CALENDAR_URL, cycle="winter term 2026/2027"),
+                               "B": found("semester_start", "10-12", q, CALENDAR_URL,
+                                          cycle="winter term 2026/2027")},
+            pages=[page(CALENDAR_URL, text)])
+    assert v.status == "unconfirmed" and "cycle_old:2026" in v.reasons
+
+
+# The universities' real academic calendars (Slice 9b): the URL and the page's real title (first line) only;
+# the dates below are synthetic.
+CALENDARS = {
+    "ovgu-": ("https://www.ovgu.de/unimagdeburg/en/academiccalendar-p-49226.html", "OVGU - Academic Calendar"),
+    "tu-chemnitz-": ("https://www.tu-chemnitz.de/studierendenservice/termine.php.en",
+                     "﻿\nAcademic Calendar | Student Service and Central Course Guidance Service | TU Chemnitz"),
+    "btu-": ("https://www-docs.b-tu.de/studierende/public/termine-fristen/Termine_WiSe_2027_28.pdf",
+             "Terminplan Wintersemester 2027/28 / Dates for the Winter Semester 2027/28"),
+}
+
+
+def test_seed_every_programme_of_the_three_universities_reads_its_calendar():
+    seed = yaml.safe_load(PROGRAMME_SEED.read_text(encoding="utf-8"))
+    refs = [r for r in seed["programmes"] if r.startswith(tuple(CALENDARS))]
+    assert len(refs) == 12
+    for ref in refs:
+        url, title = next(v for k, v in CALENDARS.items() if ref.startswith(k))
+        prog = _seed_programme(ref)
+        assert url in prog.start_urls and url not in prog.own_pages, ref  # shared, so never "specific"
+        p = page(url, title + "\nLecture period: 11.10.2027 - 28.01.2028")
+        assert scope_ok(p, prog, "Lecture period: 11.10.2027 - 28.01.2028", None, PROFILE, spec("semester_start"))
+        assert not scope_ok(p, prog, "Lecture period: 11.10.2027 - 28.01.2028", None, PROFILE,
+                            spec("deadline_close")), ref
+
+
+def test_an_application_window_opening_the_year_before_stays_the_intakes():
+    """Only a field whose date falls in the intake's own year (`value_year_is_cycle`, the lecture start) takes its
+    cycle from the date's year: an application window for WS 2027/28 may open in December 2026."""
+    assert [f.name for f in PROFILE.fields if f.value_year_is_cycle] == ["semester_start"]
+    text = "MSc Data Science | Uni X\nWinter semester 2027/28: application period 01.12.2026 - 15.07.2027"
+    q = "Winter semester 2027/28: application period 01.12.2026 - 15.07.2027"
+    v = run("deadline_open", {"A": found("deadline_open", "12-01", q, SPECIFIC, cycle="2027/28"),
+                              "B": found("deadline_open", "12-01", q, SPECIFIC)}, pages=[page(SPECIFIC, text)])
+    assert v.status == "confirmed" and v.cycle_year == 2027, v.reasons

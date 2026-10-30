@@ -59,6 +59,19 @@ scope_all_phrases: [all programmes, all programs, all degree programmes, all deg
   all master's programmes, all master programmes, international bachelor or master, alle studiengänge,
   alle masterstudiengänge]
 
+# A field marked `university_wide` (one value for all of a university's programmes) may come from the university's
+# own academic calendar page, which names no programme: a page on the programme's official domain whose title
+# names one of these (Slice 9b entry condition 2). No other field is affected.
+university_wide_titles: [academic calendar, semester dates, dates for the winter semester, akademischer kalender,
+  semestertermine, semesterzeiten, termine zum semesterablauf, terminplan, studienjahresablaufplan]
+
+# The intake every reader is told it researches, with the run's intake year (Slice 9b): a page that lists several
+# semesters (an academic calendar) must give the intake's. No trust rule depends on it.
+target_cycle: >-
+  Target intake: the winter semester {year}/{next_yy} (WS {year}/{next_yy}). When a page gives a fact for several
+  semesters or years, give the one for this intake. If the pages give it only for another intake, give that one and
+  copy its semester or year as the cycle.
+
 # "Ask the university" draft for unconfirmed facts (spec §4.9). The student sends it; the OS never does.
 draft_email: |
   Dear admissions team,
@@ -104,12 +117,18 @@ fields:
     hint: Last day of the winter application window for applicants with a foreign (non-EU) degree, as MM-DD.
 
   # Slice 9 Task 11 (F1): the visa step's date is derived from this (the playbook's visa_apply anchor).
+  # Slice 9b: the lecture start is the same for every programme of a university, so the university's academic
+  # calendar page counts for it (see university_wide_titles).
   - name: semester_start
     type: month_day
     cycle_bound: true
+    university_wide: true
+    value_year_is_cycle: true  # "Classes: October 11, 2027 - January 28, 2028" is for 2027, not 2028
     hint: >-
-      First day of the winter semester's lectures (Vorlesungsbeginn) for this programme, as MM-DD; the semester's
-      official start if the pages give no lecture start.
+      First day of the winter semester's lectures (Vorlesungsbeginn, Lehrveranstaltungszeit, lecture period,
+      classes) for this programme, as MM-DD; the semester's official start if the pages give no lecture start.
+      The university's academic calendar counts. Copy which winter semester the date is for (e.g. 2027/28) as the
+      cycle.
 
   - name: application_route
     type: enum

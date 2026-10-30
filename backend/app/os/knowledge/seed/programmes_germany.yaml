@@ -13,6 +13,7 @@ programmes:
     start_urls:
     - https://www2.daad.de/deutschland/studienangebote/international-programmes/en/detail/4122/
     - https://www.tu-chemnitz.de/studierendenservice/studserv/bewerbung/bew_bamala.php.en
+    - https://www.tu-chemnitz.de/studierendenservice/termine.php.en
     official_domains:
     - tu-chemnitz.de
     status: active
@@ -24,6 +25,7 @@ programmes:
     start_urls:
     - https://www2.daad.de/deutschland/studienangebote/international-programmes/en/detail/4493
     - https://www.tu-chemnitz.de/studierendenservice/studserv/bewerbung/bew_bamala.php.en
+    - https://www.tu-chemnitz.de/studierendenservice/termine.php.en
     official_domains:
     - tu-chemnitz.de
     status: active
@@ -35,6 +37,7 @@ programmes:
     start_urls:
     - https://www2.daad.de/deutschland/studienangebote/international-programmes/en/detail/4655/
     - https://www.tu-chemnitz.de/studierendenservice/studserv/bewerbung/bew_bamala.php.en
+    - https://www.tu-chemnitz.de/studierendenservice/termine.php.en
     official_domains:
     - tu-chemnitz.de
     status: active
@@ -46,6 +49,7 @@ programmes:
     start_urls:
     - https://www2.daad.de/deutschland/studienangebote/international-programmes/en/detail/4103/
     - https://www.tu-chemnitz.de/studierendenservice/studserv/bewerbung/bew_bamala.php.en
+    - https://www.tu-chemnitz.de/studierendenservice/termine.php.en
     official_domains:
     - tu-chemnitz.de
     status: active
@@ -58,6 +62,7 @@ programmes:
     - https://www.ovgu.de/en/-p-17627
     - https://www.ovgu.de/en/-p-107232
     - https://www2.daad.de/deutschland/studienangebote/international-programmes/en/detail/6091
+    - https://www.ovgu.de/unimagdeburg/en/academiccalendar-p-49226.html
     official_domains:
     - ovgu.de
     status: active
@@ -68,6 +73,7 @@ programmes:
     - Artificial Intelligence
     start_urls:
     - https://www.b-tu.de/en/artificial-intelligence-ms/faq
+    - https://www-docs.b-tu.de/studierende/public/termine-fristen/Termine_WiSe_2027_28.pdf
     official_domains:
     - b-tu.de
     status: active
@@ -78,6 +84,7 @@ programmes:
     - Cyber Security
     start_urls:
     - https://www.b-tu.de/en/cybersecurity-ms/admission
+    - https://www-docs.b-tu.de/studierende/public/termine-fristen/Termine_WiSe_2027_28.pdf
     official_domains:
     - b-tu.de
     status: active
@@ -89,6 +96,7 @@ programmes:
     - micro-nano-electronics  # the programme's URL path (www.b-tu.de/en/micro-nano-electronics-ms/...)
     start_urls:
     - https://www.b-tu.de/micro-nano-electronics-ms/faq
+    - https://www-docs.b-tu.de/studierende/public/termine-fristen/Termine_WiSe_2027_28.pdf
     official_domains:
     - b-tu.de
     status: active
@@ -100,6 +108,7 @@ programmes:
     - environment-ms  # the programme's URL path (www.b-tu.de/en/environment-ms/...)
     start_urls:
     - https://www.b-tu.de/en/environment-ms/prospective-students/how-to-apply
+    - https://www-docs.b-tu.de/studierende/public/termine-fristen/Termine_WiSe_2027_28.pdf
     official_domains:
     - b-tu.de
     status: active
@@ -177,6 +186,7 @@ programmes:
     start_urls:
     - https://www.ovgu.de/en/-p-107232
     - https://www2.daad.de/deutschland/studienangebote/international-programmes/en/detail/4429
+    - https://www.ovgu.de/unimagdeburg/en/academiccalendar-p-49226.html
     official_domains:
     - ovgu.de
     status: active
@@ -188,6 +198,7 @@ programmes:
     start_urls:
     - https://www.ovgu.de/en/-p-107232
     - https://www2.daad.de/deutschland/studienangebote/international-programmes/en/detail/4427
+    - https://www.ovgu.de/unimagdeburg/en/academiccalendar-p-49226.html
     official_domains:
     - ovgu.de
     status: active
@@ -198,6 +209,7 @@ programmes:
     - Power Engineering
     start_urls:
     - https://www.b-tu.de/en/powerengineering-ms/admission
+    - https://www-docs.b-tu.de/studierende/public/termine-fristen/Termine_WiSe_2027_28.pdf
     official_domains:
     - b-tu.de
     status: active
