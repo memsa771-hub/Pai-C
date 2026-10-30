@@ -304,6 +304,17 @@ findings were fixed in #168. Three findings are **9b entry conditions**, to be s
 2. **Real research of `semester_start`,** plus an admin runbook for supplying it when research can't find it.
 3. **Usable email:** a recipient lookup port; real templates (today the body is the raw payload); and 401/403/422
    from Resend treated as configuration errors that stop and alert, not as rows marked `failed`.
+   - **OS side done** (branch `os/s9b-email-os`): the `RecipientLookup` port (`app/os/ports/recipients.py`; the
+     worker loads `OS_RECIPIENT_LOOKUP=module.path:callable` at start and refuses to start with `resend` and no
+     lookup; the API gets it through `mount_os(..., recipient_lookup=...)` → `ports.configure`); the address is
+     resolved at send time, checked against `OS_EMAIL_ALLOWLIST`, never stored or logged; `blocked` / `failed` rows
+     get an event with the reason; real templates (`app/os/outbox/templates.yaml`, checked at worker start, link from
+     `OS_APP_URL`); 401/403/422 stop the pass with rows left `pending`, one `email_config_error` event and an ERROR
+     log; `GET /v1/os/admin/email-status`; `mount_os` logs invalid settings at ERROR. Setup:
+     `docs/os/runbooks/email.md`.
+   - **Pending: the host-side lookup PR** (shared files): the function workspace → `owner_user_id` → `users.email`,
+     passed to `mount_os` in `backend/app/main.py`, and `OS_RECIPIENT_LOOKUP` set on the worker. Until it lands, the
+     pilot can run only with `OS_EMAIL_SENDER=log`.
 
 **9b, the real pilot (spec §11, its own full spec once 9a passes):**
 - **Before students:** the pilot server (Q3) with `OS_ENABLED`, its own `OS_WORKER_ID` per replica, `OS_ADMIN_TOKEN`,

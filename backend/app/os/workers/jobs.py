@@ -27,7 +27,10 @@ def _reminders(settings, engine, kernel, client):
 
 
 def _deliver(settings, engine, kernel, client):
-    box, sender = Outbox(engine, settings.tenant_id), make_sender(settings, engine)
+    """The worker's recipient lookup was set from OS_RECIPIENT_LOOKUP by the runner's build(), before this runs."""
+    from app.os.ports import recipients
+
+    box, sender = Outbox(engine, settings.tenant_id), make_sender(settings, engine, lookup=recipients.current())
     return lambda: box.deliver(sender)
 
 

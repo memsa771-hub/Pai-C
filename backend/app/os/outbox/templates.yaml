@@ -1,0 +1,72 @@
+# Email texts (Slice 9b). Plain text, Python str.format placeholders, like the playbook notes ("Apply by {due}").
+# Checked when the worker starts (app/os/outbox/templates.py): every template below must exist, have a subject and a
+# body, and use only the fields its kind allows. Never put student documents or AI text in an email.
+#
+# Fields:
+#   inbox_reminder.*: {title} the step's title; {due} its date in the task's own time zone, in words,
+#                     e.g. "Friday 16 July 2027, 23:59 (Asia/Tokyo)".
+#   replan_request:   none (the request's own words may come from the AI Supervisor, so they stay in the inbox).
+#   link:             {inbox_url} = OS_APP_URL + inbox_path. Without OS_APP_URL, `no_link` is used instead.
+#   inbox_path:       {student_ref} (in the pilot, the workspace id).
+version: 1
+inbox_path: "/{student_ref}/os-inbox"
+greeting: "Hello,"
+link: "Open your inbox: {inbox_url}"
+no_link: "You will find it in your inbox in PAI."
+footer: >-
+  You are getting this email because you are taking part in the PAI pilot and your application plan has a step
+  waiting for you. We only email you about the dates in your plan.
+
+templates:
+  # The reminder cadence (workers/reminders.py): w = weekly (more than 14 days of slack), d3 = every 3 days
+  # (7 to 14), d = daily (less than 7), h12 = twice a day (due within 48 hours), esc = the date has passed.
+  inbox_reminder.w:
+    subject: "Coming up: {title}"
+    body: |-
+      A step in your application plan is waiting for you:
+
+        {title}
+        Due: {due}
+
+      There is still plenty of time, but it is easier to do it early.
+  inbox_reminder.d3:
+    subject: "Reminder: {title}"
+    body: |-
+      A step in your application plan is waiting for you:
+
+        {title}
+        Due: {due}
+
+      Please set aside some time for it this week.
+  inbox_reminder.d:
+    subject: "Due soon: {title}"
+    body: |-
+      A step in your application plan is due soon:
+
+        {title}
+        Due: {due}
+
+      Please do it in the next few days.
+  inbox_reminder.h12:
+    subject: "Due in less than 2 days: {title}"
+    body: |-
+      A step in your application plan is due in less than two days:
+
+        {title}
+        Due: {due}
+
+      Please do it today if you can.
+  inbox_reminder.esc:
+    subject: "Overdue: {title}"
+    body: |-
+      The date for this step in your application plan has passed:
+
+        {title}
+        Was due: {due}
+
+      Please do it as soon as you can. If something is stopping you, tell us in your inbox so we can help.
+  replan_request:
+    subject: "Your application plan needs something from you"
+    body: |-
+      Something changed in your application plan, and we need a short answer or a document from you to keep it
+      on track. Please look at your inbox to see what is needed.

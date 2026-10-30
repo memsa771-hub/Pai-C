@@ -2,7 +2,9 @@
 
 Environment: OS_DATABASE_URL (also the DBOS system database), OS_DBOS_SYSTEM_SCHEMA, OS_WORKER_ID
 (required, stable per replica), OS_TENANT_ID, OS_EXTRA_MODULES (tests only: `pkg.mod:NAME,...`),
-OS_PARENT_PID (optional: exit when that parent is gone). Stops on SIGTERM/SIGINT.
+OS_PARENT_PID (optional: exit when that parent is gone), OS_RECIPIENT_LOOKUP (Slice 9b: the host's
+`module.path:callable` mapping a student reference to an email address; required with OS_EMAIL_SENDER=resend, else
+the worker refuses to start). Stops on SIGTERM/SIGINT.
 
 Besides running DBOS workflows, the main loop is the enqueuer: about once a second it sends the
 kernel's unsent enqueue requests to the queue (the reconciler, every 5 minutes, is only the backstop),
@@ -29,6 +31,7 @@ from app.os.db import make_engine
 from app.os.kernel import Kernel
 from app.os.knowledge.profile import PROFILE_DIR, load_profile_dir
 from app.os.playbooks import PLAYBOOK_DIR, load_playbook_dir
+from app.os.ports import recipients
 from app.os.rehearsal.store import install_clock
 from app.os.rehearsal.tick import register_tick
 from app.os.runner.enqueue import enqueue_pending
@@ -195,6 +198,7 @@ def register_replan_always(settings: OsSettings, engine: Engine, kernel: Kernel,
 
 
 def build(settings: OsSettings) -> tuple[Registry, Kernel, DBOSClient, Engine]:
+    recipients.configure(recipients.from_settings(settings))  # Slice 9b: before the deliver job is made; may refuse
     registry = default_registry()
     for module in _extra_modules(os.environ.get("OS_EXTRA_MODULES", "")):
         registry.register(module)
@@ -261,6 +265,11 @@ def main(argv: list[str] | None = None) -> int:
     stop = threading.Event()
     for sig in (signal.SIGTERM, signal.SIGINT):
         signal.signal(sig, lambda *_: stop.set())
+    try:  # Slice 9b: checked first, so a resend worker without a recipient lookup never starts
+        recipients.from_settings(settings)
+    except recipients.RecipientLookupError as e:
+        print(str(e), file=sys.stderr)
+        return 2
     parent = int(os.environ["OS_PARENT_PID"]) if os.environ.get("OS_PARENT_PID") else None
     _, _, client, engine = build(settings)
     launch()

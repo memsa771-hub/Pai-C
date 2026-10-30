@@ -490,3 +490,19 @@ class CostReportOut(BaseModel):
     research_usd: Decimal
     unlinked_rows: int
     unlinked_usd: Decimal
+
+
+class EmailConfigErrorOut(BaseModel):
+    at: datetime
+    status: int | None
+
+
+class EmailStatusOut(BaseModel):
+    """Slice 9b: GET /admin/email-status. Never an address, a key or the lookup's module path."""
+    sender: str
+    lookup_setting: bool
+    lookup_in_api: bool
+    allowlist_size: int
+    app_url_set: bool
+    counts: dict[str, int]
+    last_config_error: EmailConfigErrorOut | None
