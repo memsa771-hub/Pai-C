@@ -522,7 +522,8 @@ def test_visa_with_two_admissions_asks_first(engine, clean, os_db):
 
 # ---- batch C: F1, the visa date from the semester start ------------------------------------------------------------
 
-VISA_NOTE = "Apply by {}: 6 weeks before your semester starts on {}. A visa usually takes about 90 days."
+VISA_NOTE = ("Apply by {}: 15 weeks before your semester starts on {}, so that the visa (about 90 days) can arrive "
+             "in time.")
 WAITING = "Waiting for your programme's semester start date"
 
 
@@ -544,11 +545,11 @@ def _visa_step(engine, plan_id: int):
 def _visa_due(day: str) -> datetime:
     from app.os.compiler import end_of_day
 
-    return end_of_day(date.fromisoformat(day), "Europe/Berlin") - timedelta(days=42)
+    return end_of_day(date.fromisoformat(day), "Europe/Berlin") - timedelta(days=105)
 
 
 def test_visa_date_follows_the_visa_programme(engine, clean, os_db):
-    """F1 (`fact_missing:visa_target_date`): the visa step's date is 6 weeks before the semester start of the
+    """F1 (`fact_missing:visa_target_date`): the visa step's date is 15 weeks (Slice 9b; 6 until then) before the semester start of the
     programme the visa file is for, cites that programme's page with a plain note, and moves when that programme
     changes: before any admission the earliest start (provisional), then the one admitted programme, then, with two
     admissions, the one the student chooses."""
@@ -572,13 +573,13 @@ def test_visa_date_follows_the_visa_programme(engine, clean, os_db):
         step = _visa_step(engine, web.plan_id)
         assert step.due_at == _visa_due("2027-10-01") and not step.provisional
         assert step.citations[0] == {"source": "fact:semester_start", "url": f"https://uni.example/{uni_one}/dates",
-                                     "note": VISA_NOTE.format("20 August 2027", "1 October 2027")}
+                                     "note": VISA_NOTE.format("18 June 2027", "1 October 2027")}
         assert ["programme", uni_one, "semester_start"] in step.fact_refs
         va.admitted(web, uni_two)  # a second admission: the student chooses which one the visa is for
         assert web.put(f"{va.V}/choice", headers=va.ME, json={"programme_ref": uni_two}).status_code == 200
         step = _visa_step(engine, web.plan_id)
         assert step.due_at == _visa_due("2027-10-15")
-        assert step.citations[0]["note"] == VISA_NOTE.format("3 September 2027", "15 October 2027")
+        assert step.citations[0]["note"] == VISA_NOTE.format("2 July 2027", "15 October 2027")
     finally:
         next(gen, None)
 

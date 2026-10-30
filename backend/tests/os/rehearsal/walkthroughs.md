@@ -56,7 +56,7 @@ what happened, and a severity (`blocks` | `workaround` | `wording`). One screens
 | 11 | Admission results as `students.yaml` says ("Not admitted" asks again, naming the programme: confirm it) | `os-inbox` | tick |
 | 12 | Read a suggestion and accept it; read "What changed" | `os-inbox` | tick |
 | 13 | Upload and confirm the admission letter; the visa file: choose the programme, details, ticks, "Approve visa file" ("Applied on the Consular Services Portal" and "Paid the visa fee" are under "After you approve", not needed to approve) | `os-documents`, `os-visa` | tick |
-| 14 | Visa file ready: `visa_apply` waits in the inbox, its date "6 weeks before your semester starts on ..." (the visa programme's `semester_start`; load `semester_starts.yaml` with the seed, as the driver does). If it is still under "Waiting", log it. On the visa file, tick both steps under "After you approve": it must stay "Approved ✓" | `os-inbox`, `os-visa` | tick |
+| 14 | Visa file ready: `visa_apply` waits in the inbox, its date "15 weeks before your semester starts on ..." (6 weeks before Slice 9b) (the visa programme's `semester_start`; load `semester_starts.yaml` with the seed, as the driver does). If it is still under "Waiting", log it. On the visa file, tick both steps under "After you approve": it must stay "Approved ✓" | `os-inbox`, `os-visa` | tick |
 
 ## Per student
 
