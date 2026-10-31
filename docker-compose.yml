@@ -4,7 +4,13 @@
 # Secrets and model settings come from .env. Anything the app does not find
 # there falls back to the defaults in backend/app/config.py, so only values
 # that differ inside Docker (service hostnames, local URLs) are set here.
-name: pai-c
+#
+# Branch pai-merge (local test of PAI C + PAI OS): this stack is kept apart from any pai-c stack
+# on the same PC. Its own project name (so its own containers, network and volumes:
+# pai-merge_pgdata and so on), its own image names, a Firebase Auth emulator instead of a real
+# Firebase project, and PAI OS on in rehearsal mode with offline AI (no OpenAI calls). Copy
+# .env.local-test.example to .env; no keys are needed. Guide: docs/local-test/WINDOWS-GUIDE.md
+name: pai-merge
 
 x-logging: &logging
   driver: json-file
@@ -14,10 +20,10 @@ x-logging: &logging
 # builder stamps its own service label on the image, so building it three
 # times gives a new image ID every run and restarts unchanged containers.
 x-backend: &backend
-  image: pai-c-backend:local
+  image: pai-merge-backend:local  # pai-merge: not pai-c-backend, so a pai-c stack's image is never reused
   pull_policy: never
   env_file: .env
-  environment:
+  environment: &backend-env
     APP_ENV: development
     DATABASE_URL: postgresql+psycopg2://${DB_USER:-pai_admin}:${DB_PASSWORD:-pai_local}@postgres:5432/openagents_workspace
     REDIS_URL: redis://redis:6379/0
@@ -33,16 +39,32 @@ x-backend: &backend
     FRONTEND_BASE_URL: http://localhost:3000
     APP_URL: ${APP_URL:-http://localhost:3000}
     WORKSPACE_ENDPOINT: http://localhost:8000
-    # Firebase Auth: the service-account JSON is mounted read-only below and
-    # never committed (secrets/ is git-ignored).
-    FIREBASE_PROJECT_ID: ${FIREBASE_PROJECT_ID:-}
-    FIREBASE_SERVICE_ACCOUNT: /run/secrets/firebase-service-account.json
+    # Firebase Auth (pai-merge): always the local Auth emulator (service firebase-auth), never a
+    # real Firebase project. With FIREBASE_AUTH_EMULATOR_HOST set the backend needs no service
+    # account; "demo-" project ids are offline-only by Firebase's own rules.
+    FIREBASE_AUTH_EMULATOR_HOST: firebase-auth:9099
+    FIREBASE_PROJECT_ID: demo-pai-merge
+    FIREBASE_WEB_API_KEY: demo-local-key
+    FIREBASE_SERVICE_ACCOUNT: ""
+    # Account emails (verify, reset) are not sent: no RESEND_API_KEY, so each send is only logged.
+    RESEND_API_KEY: ""
+    # PAI OS (backend/app/os), switched on for the local test. Pinned here, not left to .env, so
+    # this stack can only run in rehearsal mode with offline (canned) AI and logged emails:
+    # no OpenAI call, no real email, a clock moved only by the admin calls.
+    OS_ENABLED: "true"
+    OS_DATABASE_URL: postgresql+psycopg2://${DB_USER:-pai_admin}:${DB_PASSWORD:-pai_local}@postgres:5432/openagents_workspace
+    OS_TENANT_ID: pai
+    OS_REHEARSAL: "on"
+    OS_MODEL_MODE: offline
+    OS_OPENAI_API_KEY: ""
+    # Written by the os-setup service below (canned answers keyed to the sample documents).
+    OS_OFFLINE_ANSWERS_DIR: /data/os-answers
+    OS_EMAIL_SENDER: log
+    OS_ADMIN_TOKEN: ${OS_ADMIN_TOKEN:-local-test-admin-token}
+    OS_APP_URL: http://localhost:3000
   volumes:
     - files:/data/files
-    - type: bind
-      source: ${FIREBASE_SERVICE_ACCOUNT_FILE:-./secrets/firebase-service-account.json}
-      target: /run/secrets/firebase-service-account.json
-      read_only: true
+    - os_answers:/data/os-answers
   logging: *logging
 
 services:
@@ -92,6 +114,22 @@ services:
       postgres: {condition: service_healthy}
     restart: "no"
 
+  # pai-merge local test: once per start, after migrate. Loads the OS programme registry, the
+  # seeded facts and the fictional semester starts, writes the offline AI answers for the sample
+  # documents (docs/local-test/sample-documents and the rehearsal fixtures), and sets the
+  # rehearsal clock to 1 Dec 2026 on a fresh database. Safe to run again: it never deletes data.
+  os-setup:
+    <<: *backend
+    entrypoint: ["python", "-m", "tests.os.rehearsal.local_stack"]
+    volumes:
+      - os_answers:/data/os-answers
+      # tests/ is not in the image (.dockerignore); read-only, for the seed and answer tools.
+      - ./backend/tests:/app/tests:ro
+      - ./docs/local-test/sample-documents:/samples:ro
+    depends_on:
+      migrate: {condition: service_completed_successfully}
+    restart: "no"
+
   backend:
     <<: *backend
     pull_policy: build
@@ -104,8 +142,10 @@ services:
       target: ${BACKEND_IMAGE_TARGET:-browser}
     depends_on:
       migrate: {condition: service_completed_successfully}
+      os-setup: {condition: service_completed_successfully}
       redis: {condition: service_healthy}
       qdrant: {condition: service_started}
+      firebase-auth: {condition: service_healthy}
     ports:
       - "127.0.0.1:8000:8000"
     restart: unless-stopped
@@ -124,18 +164,59 @@ services:
       qdrant: {condition: service_started}
     restart: unless-stopped
 
+  # pai-merge: the PAI OS worker (DBOS workflows: reading documents, plans, packs, the
+  # rehearsal tick). In rehearsal mode it runs no cron: jobs run only on an admin tick.
+  os-worker:
+    <<: *backend
+    entrypoint: ["python", "-m", "app.os.runner.worker"]
+    environment:
+      <<: *backend-env
+      OS_WORKER_ID: local-os-worker-1
+    depends_on:
+      migrate: {condition: service_completed_successfully}
+      os-setup: {condition: service_completed_successfully}
+    restart: unless-stopped
+
+  # pai-merge: Firebase Auth emulator (docker/firebase-auth), so sign-in never touches a real
+  # Firebase project. 9099 is reached by the browser; 4000 is the emulator's page of test users.
+  firebase-auth:
+    image: pai-merge-firebase-auth:local
+    build:
+      context: ./docker/firebase-auth
+      provenance: false
+    volumes:
+      - firebase_auth_data:/emulator/store
+    ports:
+      - "127.0.0.1:9099:9099"
+      - "127.0.0.1:4000:4000"
+    # firebase-tools exports the test users on a clean stop (SIGINT), so they survive restarts.
+    stop_signal: SIGINT
+    stop_grace_period: 30s
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://127.0.0.1:9099/',r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+    logging: *logging
+
   frontend:
-    image: pai-c-frontend:local
+    image: pai-merge-frontend:local
     build:
       context: ./frontend
       provenance: false
       # NEXT_PUBLIC_* values are compiled into the bundle at build time.
       args:
         NEXT_PUBLIC_API_URL: http://localhost:8000
-        NEXT_PUBLIC_FIREBASE_API_KEY: ${NEXT_PUBLIC_FIREBASE_API_KEY:-}
-        NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: ${NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN:-}
-        NEXT_PUBLIC_FIREBASE_PROJECT_ID: ${FIREBASE_PROJECT_ID:-}
-        NEXT_PUBLIC_FIREBASE_APP_ID: ${NEXT_PUBLIC_FIREBASE_APP_ID:-}
+        # pai-merge: the browser signs in against the local Auth emulator. These are fake,
+        # public placeholder values; the emulator accepts any API key.
+        NEXT_PUBLIC_FIREBASE_API_KEY: demo-local-key
+        NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: localhost
+        NEXT_PUBLIC_FIREBASE_PROJECT_ID: demo-pai-merge
+        NEXT_PUBLIC_FIREBASE_APP_ID: demo-local-app
+        NEXT_PUBLIC_FIREBASE_AUTH_EMULATOR_HOST: localhost:9099
+        # pai-merge: show the PAI OS pages ("Study abroad plan").
+        NEXT_PUBLIC_OS_ENABLED: "true"
         NEXT_PUBLIC_ENABLE_DMS: ${NEXT_PUBLIC_ENABLE_DMS:-false}
     depends_on:
       backend: {condition: service_healthy}
@@ -144,7 +225,11 @@ services:
     restart: unless-stopped
     logging: *logging
 
+# pai-merge: Compose prefixes these with the project name (pai-merge_pgdata, ...), so they are
+# never a pai-c stack's volumes (pai-c_pgdata, ...).
 volumes:
   pgdata:
   qdrant_data:
   files:
+  os_answers:
+  firebase_auth_data:

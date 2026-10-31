@@ -1,25 +1,24 @@
 """Delete EVERYTHING Docker holds for this project, back to zero.
 
-Containers, volumes (database, Qdrant, uploads), networks, images and build
-cache all go. The next `run.py` builds and starts a completely fresh copy.
+Containers, volumes (database, Qdrant, uploads, test users), networks and the
+app images all go. The next `run.py` builds and starts a completely fresh copy.
 
-Also removes leftovers from older stacks of this repo that ran under other
-Compose project names (pai-c-test2, pai-c-v2, ...): anything whose Compose
-project name starts with "pai".
+Branch pai-merge: only the `pai-merge` Compose project is touched. A pai-c
+stack on the same PC (its containers, its database volume, its images) is
+left alone. (On pai-c this script also removed anything named "pai*"; that
+would delete a local pai-c database, so it is narrowed here.)
 
 Double-click it, or: python scripts/del.py
 Starts Docker Desktop (as administrator) if it is not running.
 """
 import time
 
-from _docker import docker, ensure_docker, run_script
+from _docker import PROJECT, docker, ensure_docker, run_script
 
-PROJECT_PREFIX = "pai"
 PROJECT_LABEL = "com.docker.compose.project"
-APP_IMAGES = ("pai-c-backend", "pai-c-frontend", "placement-ai-backend", "placement-ai-frontend")
-# Pulled base images hold no project data; removing them forces a fresh pull.
-# `docker rmi` without -f leaves any that another project's container still uses.
-BASE_IMAGES = ("postgres:16-alpine", "redis:7.4-alpine", "qdrant/qdrant:v1.19.1", "caddy:2-alpine")
+APP_IMAGES = ("pai-merge-backend", "pai-merge-frontend", "pai-merge-firebase-auth")
+# pai-merge: pulled base images (postgres, redis, qdrant) are kept, since a pai-c stack may use them.
+BASE_IMAGES = ()
 CANCEL_SECONDS = 5
 
 
@@ -37,8 +36,7 @@ def owned(kind):
     found = []
     for row in lines(*cmd, "--format", fmt):
         ref, name, project = (row.split("\t") + ["", ""])[:3]
-        # Volumes from very old runs carry no Compose label, only the name prefix.
-        if project.startswith(PROJECT_PREFIX) or (kind == "volume" and name.startswith(PROJECT_PREFIX + "_")):
+        if project == PROJECT or (kind == "volume" and name.startswith(PROJECT + "_")):
             found.append((ref, name))
     return found
 
@@ -61,7 +59,6 @@ def wipe():
     print(f"  volumes:    {', '.join(n for _, n in volumes) or '-'}  (database, Qdrant, uploads)")
     print(f"  networks:   {', '.join(n for _, n in networks) or '-'}")
     print(f"  images:     {', '.join(imgs) or '-'}")
-    print("  build cache: all of it (Docker cannot tell which cache belongs to which project)")
     for left in range(CANCEL_SECONDS, 0, -1):
         print(f"\rStarting in {left}s... press Ctrl+C to cancel ", end="", flush=True)
         time.sleep(1)
@@ -82,8 +79,8 @@ def wipe():
             print(f"  kept {image}: another container still uses it")
     # Untagged layers left behind by earlier rebuilds of the app images.
     docker("image", "prune", "-f")
-    print("Removing build cache...")
-    docker("builder", "prune", "-a", "-f")
+    # pai-merge: the build cache is not pruned (Docker cannot tell which cache is whose, and a
+    # pai-c stack would lose its cache too). Untagged layers above are enough for a fresh start.
     print("\nDone: zero. The next run.py starts completely fresh.")
 
 

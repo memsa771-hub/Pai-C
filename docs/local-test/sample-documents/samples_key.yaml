@@ -1,0 +1,157 @@
+# Fictional sample documents for the local test (student S1, bundle 1). Not real people or papers.
+# Used by tests/os/rehearsal/local_stack.py to write the offline AI answers. Do not edit by hand.
+documents:
+  b1_degree_certificate.png:
+    fields:
+      cgpa: 3.1
+      cgpa_scale: 4.0
+      college: null
+      completion_date: '2020-07-11'
+      degree_title: Bachelor of Science in Computer Science
+      division: null
+      exam: null
+      faculty: null
+      father_name: Ahmed Raza Khan
+      institution: University of Exampleton
+      issue_date: null
+      registration_number: UOE-1014-CS
+      roll_number: null
+      serial_number: null
+      session: 2015-2019
+      student_name: Sara Ahmed Khan
+    type: degree_certificate
+  b1_hssc_certificate.png:
+    fields:
+      board: Board of Sample Education, Exampleton
+      certificate_number: null
+      date_of_birth: '2001-04-12'
+      exam: null
+      exam_year: '2018'
+      father_name: Ahmed Raza Khan
+      grade: null
+      group: null
+      institution: Exampleton Model School
+      issue_date: null
+      marks_obtained: 910
+      marks_total: 1100
+      registration_number: null
+      roll_number: '120181'
+      student_name: Sara Ahmed Khan
+    type: hssc_certificate
+  b1_ielts_trf.png:
+    fields:
+      candidate_id: null
+      candidate_number: null
+      cefr: null
+      centre_number: null
+      date_of_birth: '2001-04-12'
+      family_name: KHAN
+      first_language: null
+      first_name: SARA AHMED
+      issue_date: null
+      listening: 7.0
+      module: Academic
+      nationality: null
+      overall: 7.0
+      reading: 7.0
+      sex: F
+      speaking: 7.0
+      test_date: '2024-01-11'
+      trf_number: 24ZZ00111SAMP101A
+      writing: 6.5
+    type: ielts_trf
+  b1_passport.png:
+    fields:
+      booklet_number: null
+      country_code: ZZZ
+      date_of_birth: '2001-04-12'
+      expiry_date: '2031-01-11'
+      father_or_husband_name: null
+      given_names: SARA AHMED
+      issue_date: '2021-01-11'
+      mrz_line1: P<ZZZKHAN<<SARA<AHMED<<<<<<<<<<<<<<<<<<<<<<<
+      mrz_line2: ZS10417194ZZZ0104126F3101115<<<<<<<<<<<<<<04
+      national_id: null
+      nationality: SAMPLELAND
+      passport_number: ZS1041719
+      place_of_birth: EXAMPLE CITY
+      sex: F
+      surname: KHAN
+      tracking_number: null
+    type: passport
+  b1_ssc_certificate.png:
+    fields:
+      board: Board of Sample Education, Exampleton
+      certificate_number: null
+      date_of_birth: '2001-04-12'
+      exam: null
+      exam_year: '2016'
+      father_name: Ahmed Raza Khan
+      grade: null
+      group: null
+      institution: Exampleton Model School
+      issue_date: null
+      marks_obtained: 910
+      marks_total: 1100
+      registration_number: null
+      roll_number: '120161'
+      student_name: Sara Ahmed Khan
+    type: ssc_certificate
+  b1_transcript.png:
+    fields:
+      admission_date: null
+      cgpa: 3.1
+      cgpa_scale: 4.0
+      completion_date: null
+      credit_hours: 131
+      date_of_birth: '2001-04-12'
+      degree_title: Bachelor of Science in Computer Science
+      enrollment_number: null
+      father_name: Ahmed Raza Khan
+      institution: University of Exampleton
+      issue_date: '2020-08-01'
+      national_id: null
+      percentage: null
+      registration_number: UOE-1014-CS
+      serial_number: null
+      student_id: null
+      student_name: Sara Ahmed Khan
+    type: transcript
+  s1_admission_letter_ovgu-eeit.png:
+    fields:
+      institution: Otto von Guericke University Magdeburg
+      issue_date: '2027-02-01'
+      programme: Electrical Engineering and Information Technology
+      start_date: '2027-10-01'
+      student_name: Sara Ahmed Khan
+    type: admission_letter
+  s1_admission_letter_tu-chemnitz-embedded-systems.png:
+    fields:
+      institution: TU Chemnitz
+      issue_date: '2027-02-01'
+      programme: Embedded Systems
+      start_date: '2027-10-01'
+      student_name: Sara Ahmed Khan
+    type: admission_letter
+  s1_blocked_account_confirmation.png:
+    fields:
+      amount: 11904
+      holder_name: Sara Ahmed Khan
+      issue_date: '2027-01-10'
+      monthly_payout: 992
+      provider: Sample Blocked Accounts
+    type: blocked_account_confirmation
+  s1_insurance_certificate.png:
+    fields:
+      cover_end: '2028-09-14'
+      cover_start: '2027-09-15'
+      holder_name: Sara Ahmed Khan
+      insurer: Sample Health Insurance
+    type: insurance_certificate
+  s1_min_passing_grade_letter.png:
+    fields:
+      institution: University of Exampleton
+      issue_date: '2024-03-01'
+      min_pass: 2.0
+      scale_best: 4.0
+    type: min_passing_grade_letter

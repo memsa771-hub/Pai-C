@@ -22,7 +22,8 @@ import webbrowser
 from _docker import PROJECT, ROOT, ensure_docker, run_script
 
 APP_URL = "http://localhost:3000"
-PORTS = (3000, 8000)
+# pai-merge: 9099 and 4000 are the Firebase Auth emulator and its page of test users.
+PORTS = (3000, 8000, 9099, 4000)
 START_TIMEOUT_SECONDS = 300
 
 
@@ -65,7 +66,7 @@ def main():
     else:
         ensure_docker()
     if not (ROOT / ".env").is_file():
-        sys.exit(f"Missing {ROOT / '.env'}. Copy .env.example to .env and fill in the keys.")
+        sys.exit(f"Missing {ROOT / '.env'}. Copy .env.local-test.example to .env (no keys needed).")
 
     for port in PORTS:
         owner = port_owner(port)
@@ -84,7 +85,7 @@ def main():
             sys.exit(f"The app did not answer at {APP_URL} within {START_TIMEOUT_SECONDS}s.")
         time.sleep(3)
 
-    print(f"\nPAI is running: {APP_URL}  (API: http://localhost:8000)")
+    print(f"\nPAI is running: {APP_URL}  (API: http://localhost:8000, test users: http://localhost:4000/auth)")
     print("Logs: docker compose logs -f    Stop: docker compose stop")
     webbrowser.open(APP_URL)
 

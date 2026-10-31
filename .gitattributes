@@ -1,1 +1,8 @@
 *.sh text eol=lf
+# pai-merge (Windows checkouts): files read inside Linux containers keep LF line endings.
+Dockerfile text eol=lf
+**/Dockerfile text eol=lf
+firebase.json text eol=lf
+.firebaserc text eol=lf
+*.png binary
+*.jpg binary

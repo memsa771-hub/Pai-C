@@ -7,7 +7,8 @@ import time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-PROJECT = "pai-c"
+# pai-merge: must match `name:` in docker-compose.yml. Kept apart from a local pai-c stack.
+PROJECT = "pai-merge"
 DOCKER_START_TIMEOUT_SECONDS = 180
 
 

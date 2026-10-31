@@ -2,6 +2,7 @@
 .env
 .env.*
 !.env.example
+!.env.local-test.example
 
 # Generated files and local dependencies
 **/__pycache__/
