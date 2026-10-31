@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
@@ -24,9 +24,11 @@ export default function SignUpPage() {
   const [field, setField] = useState<FieldError>(null);
   const [busy, setBusy] = useState(false);
   const [checkEmail, setCheckEmail] = useState(false);
+  // Set while Google sign-in runs, so only its handler navigates (see sign-in/page.tsx).
+  const signingIn = useRef(false);
 
   useEffect(() => {
-    if (idToken) router.replace('/');
+    if (idToken && !signingIn.current) router.replace('/');
   }, [idToken, router]);
 
   const fail = (message: string, which: FieldError = null) => { setError(message); setField(which); };
@@ -53,11 +55,13 @@ export default function SignUpPage() {
   const google = async () => {
     setError(null);
     setBusy(true);
+    signingIn.current = true;
     try {
       await signInWithGoogle();
       await applySession();
       router.replace('/');
     } catch (err) {
+      signingIn.current = false;
       if (!(err instanceof SignInCancelled)) {
         fail(err instanceof Error && err.message ? err.message : t('auth.errorOAuth'));
       }

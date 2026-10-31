@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Input } from '@/components/ui/input';
@@ -18,9 +18,13 @@ export default function SignInPage() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [field, setField] = useState<'email' | 'password' | null>(null);
+  // Set while a sign-in on this page runs: its handler navigates once, after applySession.
+  // A second router.replace('/') from the effect below could land after Home has started
+  // its redirect into the workspace, cancel it, and leave Home on its spinner.
+  const signingIn = useRef(false);
 
   useEffect(() => {
-    if (!loading && user) router.replace('/');
+    if (!loading && user && !signingIn.current) router.replace('/');
   }, [loading, user, router]);
 
   const submit = async (e: React.FormEvent) => {
@@ -29,12 +33,14 @@ export default function SignInPage() {
     if (!isEmail(email)) { setError(t('auth.errorEmail')); setField('email'); return; }
     if (!password) { setError(t('auth.errorPasswordRequired')); setField('password'); return; }
     setBusy(true);
+    signingIn.current = true;
     try {
       const user = await signInWithPassword(email.trim(), password);
       if (needsEmailVerification(user)) { router.replace(VERIFY_EMAIL_PATH); return; }
       await applySession();
       router.replace('/');
     } catch (err) {
+      signingIn.current = false;
       setError(err instanceof Error && err.message ? err.message : t('auth.errorSignIn'));
     } finally {
       setBusy(false);
@@ -44,11 +50,13 @@ export default function SignInPage() {
   const google = async () => {
     setError(null);
     setBusy(true);
+    signingIn.current = true;
     try {
       await signInWithGoogle();
       await applySession();
       router.replace('/');
     } catch (err) {
+      signingIn.current = false;
       if (!(err instanceof SignInCancelled)) {
         setError(err instanceof Error && err.message ? err.message : t('auth.errorOAuth'));
       }
