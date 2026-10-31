@@ -138,7 +138,7 @@ fine with 16 GB. If you have only 8 GB, close other big programs (browsers with 
    Accept the Windows "Do you want to allow…" prompt if one appears.
 
 3. **The first start takes a while: about 15 to 30 minutes**, depending on your internet and PC. Docker downloads
-   the base images and builds three images: the backend (about 2.5 GB, because it includes a web browser), the
+   the base images and builds three images: the backend (about 2 GB, because it includes a web browser), the
    frontend and the sign-in emulator. Lots of text scrolls by, which is normal. Later starts take less than a minute.
 
 4. It is **ready** when the window shows:
