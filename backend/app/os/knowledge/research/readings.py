@@ -99,8 +99,8 @@ def model_for(settings: OsSettings, tier: str) -> OpenAIChatModel:
 
 def model_for_spec(settings: OsSettings, spec: AgentSpec) -> Model:
     """The model for one agent: its offline model in offline mode (rehearsals only, Slice 9a spec §2.3), else the
-    OpenAI model for its tier."""
-    if settings.model_mode == "offline":
+    OpenAI model for its tier. An agent named in OS_LIVE_AGENTS uses OpenAI even in offline mode."""
+    if settings.model_mode == "offline" and spec.id not in settings.live_agents:
         return offline_model(spec.id, Path(settings.offline_answers_dir))
     return model_for(settings, spec.tier)
 

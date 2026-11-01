@@ -10,7 +10,7 @@ import yaml
 from sqlalchemy import select
 
 from app.os import models
-from app.os.documents.run import READ_FAILED
+from app.os.documents.run import READ_FAILED_OFFLINE
 from app.os.knowledge.programmes import PROGRAMME_SEED
 from app.os.knowledge.seed import SEED_DIR
 from tests.os.rehearsal.driver import (
@@ -126,7 +126,7 @@ def test_missing_offline_answer_logged_run_continues(os_db, tmp_path):
     s1 = {r.doc_type: r.status for r in rows if r.student_ref == student_ref("S1")}
     s6 = {r.doc_type: r.status for r in rows if r.student_ref == student_ref("S6")}
     assert s1.pop("transcript") == "failed" and set(s1.values()) == {"confirmed"}
-    assert error == "UnexpectedModelBehavior" and doc_error == READ_FAILED
+    assert error == "UnexpectedModelBehavior" and doc_error == READ_FAILED_OFFLINE  # offline: only the samples can be read
     assert s6 and set(s6.values()) == {"confirmed"}
 
 

@@ -54,6 +54,24 @@ def test_mode_defaults_and_offline_accepted():
     assert load_settings(BASE).model_mode == "openai" and load_settings(BASE).offline_answers_dir is None
     s = load_settings(OFFLINE)
     assert (s.model_mode, s.offline_answers_dir, s.rehearsal) == ("offline", str(ANSWERS), True)
+    assert s.live_agents == frozenset()
+
+
+def test_live_agents_need_offline_mode_and_a_key():
+    with pytest.raises(ValueError, match="OS_OPENAI_API_KEY"):
+        load_settings({**OFFLINE, "OS_LIVE_AGENTS": "documents"})
+    with pytest.raises(ValueError, match="offline mode only"):
+        load_settings({**BASE, "OS_LIVE_AGENTS": "documents", "OS_OPENAI_API_KEY": "sk-test"})
+
+
+def test_live_agent_uses_openai_in_offline_mode():
+    from app.os.knowledge.research.readings import model_for_spec
+
+    s = load_settings({**OFFLINE, "OS_LIVE_AGENTS": " Documents ", "OS_OPENAI_API_KEY": "sk-test"})
+    assert s.live_agents == frozenset({"documents"})
+    assert model_for_spec(s, DOC_SPEC).model_name != "offline"
+    writer = load_agent_spec(AGENT_DIR / "writer.v1.yaml")
+    assert model_for_spec(s, writer).model_name == "offline"
 
 
 # --- documents -----------------------------------------------------------------------------------------------

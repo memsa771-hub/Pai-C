@@ -36,6 +36,9 @@ from app.os.settings import OsSettings
 
 DOCUMENT_WORKFLOW = "os.document"
 READ_FAILED = "We could not read this document. Please try again."
+# Rehearsals with canned answers: only the sample files have an answer, so "try again" would never help.
+READ_FAILED_OFFLINE = ("This test can read only the sample documents. Upload one of the sample files, with its "
+                       "matching type.")
 COMPARED = ("read", "needs_student", "confirmed")  # documents whose fields take part in cross-checks
 D = models.documents
 
@@ -246,7 +249,9 @@ def register_documents(engine: Engine, settings: OsSettings, readers: Mapping[st
         model = readers[doc_type].model.model_name
         record_step(document_id, model, usage, cost(reading.usage, settings, spec.tier, model), error)
         if reading.values is None:
-            finish_step(document_id, "failed", READ_FAILED, None, checked["pages"])
+            offline = settings.model_mode == "offline" and spec.id not in settings.live_agents
+            finish_step(document_id, "failed", READ_FAILED_OFFLINE if offline else READ_FAILED, None,
+                        checked["pages"])
             return {"status": "failed"}
         checks = validate_step(doc_type, reading.values)
         store_step(document_id, reading.values, checks)

@@ -73,5 +73,8 @@ def run_script(main):
         print("\nCancelled.")
         code = 1
     if sys.platform == "win32" and sys.stdin.isatty():
-        input("\nPress Enter to close...")
+        try:
+            input("\nPress Enter to close...")
+        except EOFError:  # run from another program: no one to press Enter
+            pass
     sys.exit(code)

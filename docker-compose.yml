@@ -56,7 +56,10 @@ x-backend: &backend
     OS_TENANT_ID: pai
     OS_REHEARSAL: "on"
     OS_MODEL_MODE: offline
-    OS_OPENAI_API_KEY: ""
+    # Real document reading in this test (optional): put OS_OPENAI_API_KEY and OS_LIVE_AGENTS=documents in .env.
+    # Only the document reader then calls OpenAI, capped by OS_DOCUMENTS_MONTHLY_USD; everything else stays offline.
+    OS_OPENAI_API_KEY: ${OS_OPENAI_API_KEY:-}
+    OS_LIVE_AGENTS: ${OS_LIVE_AGENTS:-}
     # Written by the os-setup service below (canned answers keyed to the sample documents).
     OS_OFFLINE_ANSWERS_DIR: /data/os-answers
     OS_EMAIL_SENDER: log
@@ -172,6 +175,8 @@ services:
     environment:
       <<: *backend-env
       OS_WORKER_ID: local-os-worker-1
+      # The worker never mounts the API, so it loads the student-email lookup itself (PAI OS Slice 9b).
+      OS_RECIPIENT_LOOKUP: app.pai_os_bridge:recipient_email
     depends_on:
       migrate: {condition: service_completed_successfully}
       os-setup: {condition: service_completed_successfully}

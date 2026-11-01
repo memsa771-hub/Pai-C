@@ -41,6 +41,9 @@ class OsSettings:
     rehearsal: bool = False  # Slice 9a rehearsal mode: stored clock offset, no cron, admin advance/tick (spec §2.2)
     model_mode: str = "openai"  # Slice 9a: "openai", or "offline" (canned answers, rehearsal only; spec §2.3)
     offline_answers_dir: str | None = None  # the canned answers' folder (offline mode only)
+    # Offline mode only: agents that still use OpenAI (OS_LIVE_AGENTS, e.g. "documents" so a rehearsal can read a
+    # real document). Each keeps its own monthly cap; every other agent stays canned.
+    live_agents: frozenset[str] = frozenset()
 
 
 TRUTHY = {"1", "true", "yes", "on"}
@@ -73,6 +76,11 @@ def load_settings(env: Mapping[str, str] | None = None) -> OsSettings:
         raise ModelModeError("OS_MODEL_MODE=offline needs rehearsal mode: set OS_REHEARSAL=on, or use OS_MODEL_MODE=openai")
     if model_mode == "offline" and answers_dir is None:
         raise ModelModeError("OS_MODEL_MODE=offline needs OS_OFFLINE_ANSWERS_DIR (the folder of canned answers)")
+    live_agents = frozenset(a.strip().lower() for a in (env.get("OS_LIVE_AGENTS") or "").split(",") if a.strip())
+    if live_agents and model_mode != "offline":
+        raise ModelModeError("OS_LIVE_AGENTS is for offline mode only: with OS_MODEL_MODE=openai every agent is live")
+    if live_agents and not (env.get("OS_OPENAI_API_KEY") or "").strip():
+        raise ModelModeError("OS_LIVE_AGENTS needs OS_OPENAI_API_KEY (the live agents call OpenAI)")
     email_sender = (env.get("OS_EMAIL_SENDER") or "").strip().lower() or "log"
     resend_api_key = (env.get("OS_RESEND_API_KEY") or "").strip() or None
     email_from = (env.get("OS_EMAIL_FROM") or "").strip() or None
@@ -112,4 +120,5 @@ def load_settings(env: Mapping[str, str] | None = None) -> OsSettings:
         rehearsal=flag(env, "OS_REHEARSAL"),
         model_mode=model_mode,
         offline_answers_dir=answers_dir,
+        live_agents=live_agents,
     )
