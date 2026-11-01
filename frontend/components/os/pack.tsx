@@ -13,6 +13,7 @@ import {
   type OsPack,
   type OsPackFile,
 } from '@/lib/os-packs';
+import { degreeMismatch } from '@/lib/os-profile';
 
 /** "Your application packs" (Slice 6a spec §5): one row per programme in the plan, with its status. */
 export function PackList({ packs, onOpen }: { packs: OsPack[]; onOpen: (p: OsPack) => void }) {
@@ -20,9 +21,9 @@ export function PackList({ packs, onOpen }: { packs: OsPack[]; onOpen: (p: OsPac
     return <p className="px-4 py-10 text-center text-sm text-muted-foreground">No programmes in your plan yet.</p>;
   }
   return (
-    <ul className="mx-auto flex w-full max-w-md flex-col gap-2">
+    <ul className="flex w-full flex-col gap-2">
       {packs.map((p) => (
-        <li key={p.programme_ref} className="rounded-lg border bg-card p-3 text-sm">
+        <li key={p.programme_ref} className="rounded-2xl border bg-card p-4 shadow-card text-sm">
           <button type="button" onClick={() => onOpen(p)} className="w-full break-words text-left">
             <span className="font-medium">{programmeTitle(p)}</span>
             <span className="text-muted-foreground"> · {packStatusLabel(p)}</span>
@@ -44,12 +45,17 @@ interface PackViewProps {
   onRebuild: () => void;
   onDetails: () => void;
   noun?: string; // what is shown: 'pack' (default) or 'visa file' (Slice 6b)
+  /** The degree field in the student's PAI profile: a document that names another is pointed out. */
+  profileDegree?: string | null;
+  /** The PAI profile, for the "check which is right" link. */
+  profileHref?: string;
   notice?: string;
 }
 
 /** One programme's pack: how to apply, fees, the checklist with downloads, the data sheet, Approve, and then the steps
  * after approving (paying, applying: Slice 9 Task 11), tickable once approved. */
 export function PackView({ pack, busy, onTick, onAdd, onApprove, onDownload, onRebuild, onDetails, noun = 'pack',
+                           profileDegree = null, profileHref,
                            notice = 'You submit and pay yourself. We never send anything for you.' }: PackViewProps) {
   const [extra, setExtra] = useState('');
   // A tick shows at once and stays until the pack from the server agrees: saving a tick can rebuild the pack, and
@@ -72,8 +78,8 @@ export function PackView({ pack, busy, onTick, onAdd, onApprove, onDownload, onR
   const sheet = fileFor(pack, DATA_SHEET_KEY);
   const sections = [...new Set(pack.data_sheet.map((r) => r.section))];
   return (
-    <div className="mx-auto flex w-full max-w-md flex-col gap-4 text-sm">
-      <p className="rounded-md bg-muted p-2">{notice}</p>
+    <div className="flex w-full flex-col gap-4 text-sm">
+      <p className="rounded-2xl bg-muted px-4 py-3">{notice}</p>
       {pack.status === 'building' && <p className="text-muted-foreground">Your {noun} is being prepared…</p>}
       {pack.status === 'failed' && (
         <p className="text-destructive">
@@ -82,7 +88,7 @@ export function PackView({ pack, busy, onTick, onAdd, onApprove, onDownload, onR
         </p>
       )}
 
-      <section aria-label="How to apply" className="rounded-lg border bg-card p-3">
+      <section aria-label="How to apply" className="rounded-2xl border bg-card p-4 shadow-card">
         <h2 className="mb-2 font-semibold">How to apply</h2>
         <ol className="flex list-none flex-col gap-2">
           {pack.instructions.map((s) => (
@@ -113,7 +119,7 @@ export function PackView({ pack, busy, onTick, onAdd, onApprove, onDownload, onR
         )}
       </section>
 
-      <section aria-label="Checklist" className="rounded-lg border bg-card p-3">
+      <section aria-label="Checklist" className="rounded-2xl border bg-card p-4 shadow-card">
         <h2 className="mb-1 font-semibold">Checklist</h2>
         <p className="mb-2 break-words text-xs text-muted-foreground">
           Tick a box yourself once you have done that step. You can approve only when every item has a ✓ or a tick.
@@ -150,11 +156,21 @@ export function PackView({ pack, busy, onTick, onAdd, onApprove, onDownload, onR
         </form>
       </section>
 
-      <section aria-label="Data sheet" className="rounded-lg border bg-card p-3">
+      <section aria-label="Data sheet" className="rounded-2xl border bg-card p-4 shadow-card">
         <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
           <h2 className="font-semibold">Data sheet</h2>
           {sheet && <Button size="sm" variant="outline" disabled={busy} onClick={() => onDownload(sheet)}>Download</Button>}
         </div>
+        {(() => {
+          const doc = pack.data_sheet.find((r) => r.key === 'degree_title')?.value ?? null;
+          return degreeMismatch(profileDegree, doc) ? (
+            <p role="note" className="mb-3 rounded-2xl bg-warning-soft px-4 py-3 text-sm text-warning-ink">
+              Your PAI profile says <strong>{profileDegree}</strong>, but your degree certificate says <strong>{doc}</strong>.
+              Check which is right, then correct your{' '}
+              {profileHref ? <a href={profileHref} className="font-semibold underline">profile</a> : 'profile'} or upload the right document.
+            </p>
+          ) : null;
+        })()}
         {sections.map((section) => (
           <div key={section} className="mb-3">
             <h3 className="mb-1 text-xs font-semibold uppercase text-muted-foreground">{section}</h3>
@@ -198,7 +214,7 @@ export function PackView({ pack, busy, onTick, onAdd, onApprove, onDownload, onR
       )}
 
       {(pack.after_approval ?? []).length > 0 && (
-        <section aria-label="After you approve" className="rounded-lg border bg-card p-3">
+        <section aria-label="After you approve" className="rounded-2xl border bg-card p-4 shadow-card">
           <h2 className="mb-1 font-semibold">After you approve</h2>
           <p className="mb-2 break-words text-xs text-muted-foreground">
             {pack.approved

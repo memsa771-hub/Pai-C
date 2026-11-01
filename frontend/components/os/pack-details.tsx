@@ -9,18 +9,25 @@ interface PackDetailsProps {
   busy: boolean;
   onSave: (fields: Record<string, string>) => void;
   onBack: () => void;
+  /** Values PAI already has (email, city, country), keyed like the rows: they fill empty fields for the student to
+   * check, so nothing PAI knows is asked again from nothing. */
+  suggested?: Record<string, string>;
 }
 
 /** "A few more details" (Slice 6a spec S6a-D4): the data-sheet fields no document shows; the student types them. */
-export function PackDetails({ rows, busy, onSave, onBack }: PackDetailsProps) {
+export function PackDetails({ rows, busy, onSave, onBack, suggested = {} }: PackDetailsProps) {
   const entered = rows.filter((r) => r.entered);
   const [text, setText] = useState<Record<string, string>>(
-    () => Object.fromEntries(entered.map((r) => [r.key, r.value ?? ''])),
+    () => Object.fromEntries(entered.map((r) => [r.key, r.value ?? suggested[r.key] ?? ''])),
   );
+  const fromProfile = entered.some((r) => r.value === null && suggested[r.key]);
   return (
-    <form className="mx-auto flex w-full max-w-md flex-col gap-3 text-sm"
+    <form className="flex w-full max-w-xl flex-col gap-3 text-sm"
           onSubmit={(e) => { e.preventDefault(); onSave(text); }}>
-      <p className="rounded-md bg-muted p-2">These are not on your documents. Type them as the portal should show them.</p>
+      <p className="rounded-2xl bg-muted px-4 py-3">These are not on your documents. Type them as the portal should show them.</p>
+      {fromProfile && (
+        <p className="rounded-2xl bg-brand-soft px-4 py-3">We filled in what PAI already knows from your profile. Check each one before you save.</p>
+      )}
       {entered.map((r) => (
         <div key={r.key} className="min-w-0">
           <label htmlFor={`detail-${r.key}`} className="text-xs font-medium text-muted-foreground">

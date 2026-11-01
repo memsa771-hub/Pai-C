@@ -38,6 +38,10 @@ export const DMS_UI_ENABLED = process.env.NEXT_PUBLIC_ENABLE_DMS === 'true';
  * matching the backend's OS_ENABLED switch.
  */
 export const OS_UI_ENABLED = process.env.NEXT_PUBLIC_OS_ENABLED === 'true';
+/** PAI OS rehearsal (local tests only): the study abroad plan is open at any journey stage, so it can be walked
+ * without the AI counsellor. Otherwise it opens from stage H, "Where to study" (paths first, places later). */
+export const OS_REHEARSAL_UI = process.env.NEXT_PUBLIC_OS_REHEARSAL === 'true';
+export const OS_FROM_STAGE = 'H';
 
 /**
  * The sign-in page, on this origin.

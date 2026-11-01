@@ -84,7 +84,7 @@ export default function OsStatementsPage({ params }: { params: Promise<{ workspa
   const open = statements?.find((s) => s.id === openId);
 
   return (
-    <main className="mx-auto w-full max-w-md px-4 py-6">
+    <div className="mx-auto w-full max-w-3xl">
       <OsHeader workspaceId={workspaceId} current="os-statements" title={open ? 'Your draft' : 'Your statement and CV'} />
       {error && <p role="alert" className="mb-3 break-words text-sm text-destructive">{error}</p>}
       {interview === null || statements === null ? (
@@ -102,7 +102,7 @@ export default function OsStatementsPage({ params }: { params: Promise<{ workspa
         </>
       ) : (
         <div className="flex flex-col gap-4">
-          <div className="flex flex-col gap-2 rounded-lg border bg-card p-3">
+          <div className="flex flex-col gap-2 rounded-2xl border bg-card p-4 shadow-card">
             {statements.map((s) => (
               <button key={s.id} type="button" disabled={!s.version}
                       className="flex flex-wrap justify-between gap-2 text-left text-sm" onClick={() => setOpenId(s.id)}>
@@ -125,6 +125,6 @@ export default function OsStatementsPage({ params }: { params: Promise<{ workspa
                                                           'Could not save your answer. Please try again.')} />
         </div>
       )}
-    </main>
+    </div>
   );
 }

@@ -19,9 +19,9 @@ export function DocumentConfirm({ document, onConfirm, onBack, busy = false }: D
     () => Object.fromEntries(document.fields.map((f) => [f.field, startValue(f)])),
   );
   return (
-    <form className="mx-auto flex w-full max-w-md flex-col gap-3"
+    <form className="flex w-full max-w-xl flex-col gap-3"
           onSubmit={(e) => { e.preventDefault(); onConfirm(formValues(document.fields, text)); }}>
-      <p className="rounded-md bg-muted p-2 text-sm">We read this automatically; please check every value.</p>
+      <p className="rounded-2xl bg-muted px-4 py-3 text-sm">We read this automatically; please check every value.</p>
       {document.fields.map((f) => {
         const id = `field-${document.id}-${f.field}`;
         const failed = f.check === 'check_failed';

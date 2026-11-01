@@ -36,7 +36,7 @@ export function StatementEditor({ statement, names = {}, onSave, onRewrite, onAp
   const approved = statement.approval?.version === v.number && !edited ? statement.approval : null;
   const fixes = v.critic?.fixes ?? [];
   return (
-    <div className="mx-auto flex w-full max-w-md flex-col gap-3">
+    <div className="flex w-full flex-col gap-3">
       <h2 className="break-words text-base font-semibold">{kindLabel(statement.kind, statement.programme_ref, names)}</h2>
       <textarea aria-label="Your text" rows={14} value={text} disabled={busy}
                 className="w-full rounded-md border bg-background p-2 text-sm" onChange={(e) => setText(e.target.value)} />
@@ -54,7 +54,7 @@ export function StatementEditor({ statement, names = {}, onSave, onRewrite, onAp
         </div>
       )}
       {fixes.length > 0 && (
-        <div className="rounded-lg border bg-card p-3">
+        <div className="rounded-2xl border bg-card p-4 shadow-card">
           <p className="mb-1 text-xs font-medium">Notes from the reviewer</p>
           <ul className="list-disc pl-5 text-sm">
             {fixes.map((f, i) => <li key={i} className="break-words">{f}</li>)}

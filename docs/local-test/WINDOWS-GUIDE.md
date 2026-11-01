@@ -261,8 +261,8 @@ You can also click **Continue with Google**. A pretend Google window opens. Clic
 
 ### 4.3 The Counsellor home, and finding "Study abroad plan"
 
-You land on the Counsellor ("Hi, I am PAI"). **The chat will not answer** in this test, because there is no AI key on
-purpose. You may see the typing dots for a long time. That is expected.
+You land on the Counsellor ("Hi, I am PAI"). **The chat will not really answer** in this test, because there is no AI
+key on purpose. If you send a message, PAI replies "PAI is temporarily unavailable". That is expected.
 
 <img src="screenshots/06-counsellor-home.png" width="260" alt="Counsellor home">
 
@@ -388,7 +388,9 @@ On a computer screen the same pages look like this:
 
 ### What is expected to look odd in this test
 
-- **The Counsellor chat does not reply.** There is no AI key, on purpose.
+- **The Counsellor chat only says "PAI is temporarily unavailable".** There is no AI key, on purpose.
+- **"Study abroad plan" shows at Stage B.** For a real student it opens only from stage H ("Where to study"); this test
+  opens it at any stage so you can walk it without the AI counsellor.
 - **Most programme facts are "unconfirmed" or "being researched"**, because research is offline.
 - **The consent text says PLACEHOLDER.** The real pilot terms are not written yet.
 - **"Approved: … 10/31/2026"** and similar stamps show the real date, while the plan's dates follow the rehearsal
@@ -480,6 +482,19 @@ note in Part 5 about lost test accounts.
 **A document stays "could not be read"**
 Only the sample files, each with its matching type, can be read in this test (see the table in Part 4). Delete it
 and upload it again with the right type.
+
+**Reading your own documents (optional, costs money)**
+The test reads only the sample files. To have it read your own documents with OpenAI, open `.env` in Notepad and set:
+
+```
+OS_OPENAI_API_KEY=your OpenAI key
+OS_LIVE_AGENTS=documents
+OS_DOCUMENTS_MONTHLY_USD=5
+```
+
+Then run `python scripts/run.py` again. Only document reading uses OpenAI; everything else stays offline. Each document
+you upload is sent to OpenAI, and reading stops for the month once it has cost the amount in
+`OS_DOCUMENTS_MONTHLY_USD` (US dollars). Choose the right type for each document, as before.
 
 **Something else is wrong**
 Look at the status and the last log lines:

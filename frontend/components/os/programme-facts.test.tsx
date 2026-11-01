@@ -100,7 +100,7 @@ describe('ProgrammeFacts', () => {
   it('fits 360 px: no horizontal overflow, long text wraps', () => {
     expect(html).not.toMatch(/overflow-x|whitespace-nowrap|w-\[\d{3,}px\]|min-w-\[/);
     expect(html).toContain('break-words');
-    expect(html).toContain('max-w-md');
+    expect(html).toContain('w-full');  // fills the page column the counsellor shell bounds
   });
 
   it('shows an empty state', () => {

@@ -129,7 +129,7 @@ export default function OsInboxPage({ params }: { params: Promise<{ workspaceId:
   if (!OS_UI_ENABLED) notFound();
 
   return (
-    <main className="mx-auto w-full max-w-md px-4 py-6">
+    <div className="mx-auto w-full max-w-3xl">
       <OsHeader workspaceId={workspaceId} current="os-inbox" title="Your next steps" />
       {error && <p role="alert" className="mb-3 break-words text-sm text-destructive">{error}</p>}
       {changes?.changes_paused && <PausedBanner />}
@@ -161,6 +161,6 @@ export default function OsInboxPage({ params }: { params: Promise<{ workspaceId:
           <ChangesList changes={changes.changes} names={names} />
         </section>
       )}
-    </main>
+    </div>
   );
 }

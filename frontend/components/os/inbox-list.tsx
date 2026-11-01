@@ -50,7 +50,7 @@ function NoteCard({ note, names, onSwap, onReadNote }: { note: OsNote; names: Re
   const name = names[note.programme_ref] ?? note.programme_ref;
   const reasons = note.payload.lines.filter((l) => l.status !== 'likely_meets');
   return (
-    <li className="rounded-lg border bg-card p-3 text-sm">
+    <li className="rounded-2xl border bg-card p-4 shadow-card text-sm">
       <p className="flex flex-wrap items-center gap-2 font-medium">
         <span className="min-w-0 break-words">{name}</span>
         <span className={`rounded px-1.5 py-0.5 text-xs ${chipTone(note.verdict)}`}>{chipLabel(note.verdict)}</span>
@@ -122,7 +122,7 @@ export function InboxList({ items, now, onComplete, busyId = null, factStatus = 
               const hint = actionHint(item);
               const note = dueNote(item);
               return (
-                <li key={item.id} className="rounded-lg border bg-card p-3">
+                <li key={item.id} className="rounded-2xl border bg-card p-4 shadow-card">
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0 flex-1">
                       <p className="text-sm font-medium leading-snug">

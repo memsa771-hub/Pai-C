@@ -23,7 +23,7 @@ function CaseItem({ kase, busy, onResolve }: { kase: OsSupportCase; busy: boolea
   const [note, setNote] = useState('');
   const [unpause, setUnpause] = useState(kase.changes_paused);
   return (
-    <li className="rounded-lg border bg-card p-3">
+    <li className="rounded-2xl border bg-card p-4 shadow-card">
       <p className="break-words font-medium">{kase.reason}</p>
       <p className="mt-0.5 break-words text-xs text-muted-foreground">
         Plan {kase.plan_id} · student {kase.student_ref} · {new Date(kase.created_at).toLocaleString()}

@@ -39,7 +39,7 @@ export function ConsentCard({ consent, refused = false, onAgreed, onChanged }: {
 
   const message = error ?? (refused ? CONSENT_NEEDED_TEXT : null);
   return (
-    <section aria-labelledby="os-consent-title" className="rounded-lg border bg-card p-4 text-sm">
+    <section aria-labelledby="os-consent-title" className="rounded-2xl border bg-card p-5 shadow-card text-sm">
       <h2 id="os-consent-title" className="font-semibold">This is a pilot</h2>
       {message && <p role="alert" className="mt-2 break-words text-destructive">{message}</p>}
       <div className="mt-3 max-h-[60vh] overflow-y-auto whitespace-pre-wrap break-words text-muted-foreground">

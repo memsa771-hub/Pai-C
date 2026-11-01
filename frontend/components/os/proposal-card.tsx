@@ -9,7 +9,7 @@ export function ProposalCard({ proposal, names, busy, onAccept, onDecline }: {
 }) {
   const by = answerBy(proposal);
   return (
-    <li className="rounded-lg border bg-card p-3 text-sm">
+    <li className="rounded-2xl border bg-card p-4 shadow-card text-sm">
       <p className="font-medium">We suggest:</p>
       <ul className="mt-1 flex list-disc flex-col gap-0.5 pl-5">
         {proposal.ops.map((op, i) => <li key={i} className="break-words">{opText(op, names)}</li>)}

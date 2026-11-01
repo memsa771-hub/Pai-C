@@ -18,7 +18,7 @@ interface StatementProgrammesProps {
 export function StatementProgrammes({ programmes, statements, onDraft, onPaste, disabled = false }: StatementProgrammesProps) {
   if (programmes.length === 0) return null;
   return (
-    <div className="flex flex-col gap-2 rounded-lg border bg-card p-3">
+    <div className="flex flex-col gap-2 rounded-2xl border bg-card p-4 shadow-card">
       <p className="text-sm font-medium">Your programmes</p>
       {programmes.map((p) => (
         <ProgrammeRow key={p.programme_ref} rules={p} disabled={disabled} onDraft={onDraft} onPaste={onPaste}

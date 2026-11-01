@@ -31,8 +31,8 @@ interface DocumentListProps {
 export function DocumentList({ documents, findings, docTypes, onUpload, onOpen, onResolve, onDelete, busy = false }: DocumentListProps) {
   const [docType, setDocType] = useState(docTypes[0]?.key ?? '');
   return (
-    <div className="mx-auto flex w-full max-w-md flex-col gap-4">
-      <div className="flex flex-wrap items-center gap-2 rounded-lg border bg-card p-3">
+    <div className="flex w-full flex-col gap-4">
+      <div className="flex flex-wrap items-center gap-2 rounded-2xl border bg-card p-4 shadow-card">
         <label className="inline-flex cursor-pointer items-center rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground">
           + Upload
           <input type="file" accept={ACCEPT} className="sr-only" disabled={busy || !docType}
@@ -105,7 +105,7 @@ function DocumentRow({ doc, docTypes, onOpen, onDelete, busy }: DocumentRowProps
     </>
   );
   return (
-    <li className="rounded-lg border bg-card p-3 text-sm">
+    <li className="rounded-2xl border bg-card p-4 shadow-card text-sm">
       {open ? (
         <button type="button" onClick={() => onOpen(doc)} className="w-full break-words text-left">{summary}</button>
       ) : (

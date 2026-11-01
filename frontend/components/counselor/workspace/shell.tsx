@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
+import { usePathname, useRouter } from "next/navigation";
 import { AnimatePresence, LayoutGroup, MotionConfig, motion } from "motion/react";
 import { PanelLeftClose, PanelLeftOpen, Search, Settings } from "lucide-react";
 import { useLayout, type ViewMode } from "@/components/layout/layout-context";
@@ -11,7 +12,7 @@ import { NotificationsMenu } from "@/components/layout/notifications-menu";
 import { UserMenu } from "@/components/layout/user-menu";
 import { NotificationsCenterView } from "@/components/notifications/notifications-center-view";
 import { SidebarProvider } from "@/components/ui/sidebar";
-import { OsNavGroup } from "@/components/os/os-nav-group";
+import { OS_PAGES, OsNavGroup, osOpenAt, type OsPage } from "@/components/os/os-nav-group";
 import { cn } from "@/lib/utils";
 import { LivingProfile } from "./profile";
 import { Journey } from "./journey";
@@ -33,8 +34,13 @@ import copy from "./copy.json";
 const health = () => workspaceApi.getCounselorHealth();
 const COLLAPSE_KEY = "pai.sidebar.collapsed";
 
-export function CounselorShell() {
+/** `children`: a PAI OS page (app/[workspaceId]/(os)), shown in this shell's main area so the study abroad plan and
+ * the counsellor are one app: one rail, one header, one tab bar. Without it the shell shows its own views. */
+export function CounselorShell({ children }: { children?: React.ReactNode } = {}) {
   const { viewMode, openView } = useLayout();
+  const router = useRouter();
+  const pathname = usePathname();
+  const osPage = children ? (OS_PAGES.find(([page]) => pathname?.split("/")[2] === page)?.[0] ?? null) as OsPage | null : null;
   const { currentSessionId, setCurrentSessionId } = useWorkspace();
   const [draft, setDraft] = useState("");
   const [path, setPath] = useState<string | null>(null),
@@ -91,7 +97,9 @@ export function CounselorShell() {
     setPlaces(false);
     const q = new URLSearchParams({ view });
     if (event) q.set("moment", event);
-    window.history.pushState({}, "", `${base}?${q}`);
+    // On a study abroad plan page the counsellor's views are another route: go there.
+    if (children) router.push(`${base}?${q}`);
+    else window.history.pushState({}, "", `${base}?${q}`);
   };
   const openPath = (id: string) => {
     void journey.refresh();
@@ -112,8 +120,11 @@ export function CounselorShell() {
   const active = Object.hasOwn(copy.nav, requested) ? requested : "threads";
   const section = sectionOf(active);
   const subViews = section.views.filter((view) => view in copy.subTabs);
-  const content =
-    active === "threads" ? (
+  const content = children ? (
+      <div data-scroll-area className="relative min-h-0 flex-1 overflow-y-auto">
+        <div className="mx-auto max-w-6xl px-4 pb-16 pt-6 sm:px-8 sm:pt-8">{children}</div>
+      </div>
+    ) : active === "threads" ? (
       <div className="min-h-0 flex-1">
         <ChatView counselorOnly initialDraft={draft} />
       </div>
@@ -210,14 +221,12 @@ export function CounselorShell() {
           <LayoutGroup id="sidebar">
             <nav className="min-h-0 flex-1 space-y-1 overflow-y-auto overflow-x-hidden" aria-label={copy.brand}>
               {MAIN_SECTIONS.map((item) => (
-                <NavItem key={item.key} section={item} current={section.key === item.key} collapsed={collapsed}
+                <NavItem key={item.key} section={item} current={!children && section.key === item.key} collapsed={collapsed}
                   onSelect={() => navigate(item.views[0])} />
               ))}
-              {/* Merge pai-c + pai-os: the PAI OS "Study abroad plan" links (pai-os had them in the old
-                  nav-main.tsx drawer, which pai-c removed). Renders nothing unless NEXT_PUBLIC_OS_ENABLED=true.
-                  Text links, so only on the expanded rail; phones and the collapsed rail reach them from
-                  the command menu (see CommandMenu in shell-parts.tsx). */}
-              {!collapsed && <OsNavGroup />}
+              {/* The PAI OS "Study abroad plan" places, styled as the counsellor's own; open from stage H (any
+                  stage in a rehearsal). Phones reach them from the command menu (CommandMenu in shell-parts.tsx). */}
+              <OsNavGroup stageId={stage?.id} current={osPage} collapsed={collapsed} />
             </nav>
             <div className="space-y-1 pt-3">
               {stage && (collapsed ? (
@@ -251,7 +260,7 @@ export function CounselorShell() {
             <span className="flex size-8 items-center justify-center rounded-lg bg-white ring-1 ring-border lg:hidden">
               <img src="/pai-emblem.png" alt={copy.brand} className="size-5 object-contain" />
             </span>
-            {subViews.length > 1 && (
+            {!children && subViews.length > 1 && (
               <SubTabs views={subViews} current={active} onSelect={navigate} className="max-md:hidden" />
             )}
             <div className="ms-auto flex items-center gap-1">
@@ -269,7 +278,7 @@ export function CounselorShell() {
               <span className="lg:hidden"><UserMenu side="bottom" align="end" variant="avatar" /></span>
             </div>
           </header>
-          {subViews.length > 1 && (
+          {!children && subViews.length > 1 && (
             <div className="shrink-0 px-4 pb-2 md:hidden">
               <SubTabs views={subViews} current={active} onSelect={navigate} className="flex w-full" />
             </div>
@@ -292,7 +301,7 @@ export function CounselorShell() {
         <LayoutGroup id="tabs">
           <nav aria-label={copy.brand} className="grid shrink-0 grid-cols-5 border-t bg-card px-2 pb-[env(safe-area-inset-bottom)] lg:hidden">
             {MAIN_SECTIONS.map((item) => {
-              const current = section.key === item.key;
+              const current = !children && section.key === item.key;
               const Icon = item.icon;
               return (
                 <button key={item.key} onClick={() => navigate(item.views[0])} aria-current={current ? "page" : undefined}
@@ -307,7 +316,7 @@ export function CounselorShell() {
           </nav>
         </LayoutGroup>
         </div>
-        <CommandMenu open={command} onOpenChange={setCommand} onGo={navigate} onAsk={chat} />
+        <CommandMenu open={command} onOpenChange={setCommand} onGo={navigate} onAsk={chat} osOpen={osOpenAt(stage?.id)} />
       </div>
     </SidebarProvider>
     </MotionConfig>

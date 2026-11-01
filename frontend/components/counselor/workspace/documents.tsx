@@ -7,6 +7,7 @@ import { useWorkspace } from "@/lib/workspace-context";
 import { useLayout } from "@/components/layout/layout-context";
 import { cn } from "@/lib/utils";
 import { TrashView } from "@/components/files/trash-view";
+import { OsVaultStrip } from "@/components/os/vault-strip";
 import copy from "./copy.json";
 
 /** Documents: the file list and a preview, with one upload action (the same
@@ -27,6 +28,7 @@ export function DocumentsView({ list, preview }: { list: React.ReactNode; previe
             onChange={(e) => { if (e.target.files?.length) enqueueUploads(Array.from(e.target.files), currentFilePath || ""); e.target.value = ""; }} />
           <Button size="tap" onClick={() => input.current?.click()}><Upload aria-hidden />{copy.documents.upload}</Button>
         </div>
+        <OsVaultStrip />
         <div className="flex min-h-[420px] flex-1 overflow-hidden rounded-[22px] bg-card shadow-card ring-1 ring-border/70">
           <div className={cn("w-full shrink-0 sm:w-72 sm:border-r sm:border-border/70", detail && "hidden sm:block")}>{list}</div>
           <div className={cn("flex min-w-0 flex-1 flex-col", !detail && "hidden sm:flex")}>

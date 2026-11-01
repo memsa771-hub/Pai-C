@@ -128,7 +128,7 @@ describe('DocumentList', () => {
                         findings: [FINDING] });
     expect(html).not.toMatch(/\bw-\[\d+px\]|\bmin-w-\[\d+px\]|overflow-x-(auto|scroll)|whitespace-nowrap/);
     expect(html).toContain('break-words');
-    expect(html).toContain('max-w-md');
+    expect(html).toContain('w-full');  // fills the page column the counsellor shell bounds
   });
 });
 

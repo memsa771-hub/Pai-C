@@ -87,7 +87,7 @@ export function RouteBuilder(props: RouteBuilderProps) {
               const verdict: Verdict = p.card && p.research_state === 'researched' ? p.card.verdict : 'unknown';
               const chosen = choices.includes(p.ref);
               return (
-                <li key={p.ref} className="rounded-lg border bg-card p-3">
+                <li key={p.ref} className="rounded-2xl border bg-card p-4 shadow-card">
                   <div className="flex items-start justify-between gap-2">
                     <button type="button" className="min-w-0 flex-1 text-left" onClick={() => onOpen?.(openRef === p.ref ? null : p.ref)}>
                       <p className="break-words text-sm font-medium">{p.name}</p>

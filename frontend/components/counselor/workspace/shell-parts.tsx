@@ -110,11 +110,13 @@ export function shortcutLabel() {
 
 /** Jump anywhere, or hand a question straight to PAI as a draft. Nothing is
  * sent from here: asking only opens the conversation with the words typed. */
-export function CommandMenu({ open, onOpenChange, onGo, onAsk }: {
+export function CommandMenu({ open, onOpenChange, onGo, onAsk, osOpen = false }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onGo: (view: string) => void;
   onAsk: (text: string) => void;
+  /** Whether the study abroad plan is open to the student (osOpenAt): its pages are listed only then. */
+  osOpen?: boolean;
 }) {
   const [q, setQ] = React.useState("");
   React.useEffect(() => { if (!open) setQ(""); }, [open]);
@@ -158,7 +160,7 @@ export function CommandMenu({ open, onOpenChange, onGo, onAsk }: {
             );
           })}
         </CommandGroup>
-        {OS_UI_ENABLED && workspaceId && (
+        {OS_UI_ENABLED && osOpen && workspaceId && (
           <CommandGroup heading={t("nav.studyAbroadPlan")}>
             {OS_PAGES.map(([page, key]) => (
               <CommandItem key={page} value={`${t("nav.studyAbroadPlan")} ${t(key)}`}

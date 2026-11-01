@@ -11,6 +11,8 @@ import { OS_UI_ENABLED } from '@/lib/config';
 import type { OsPackFile } from '@/lib/os-packs';
 import { asPack, type OsVisa } from '@/lib/os-visa';
 import { usePaiAuth } from '@/lib/pai-auth-context';
+import { profileDefaults, profileDegreeField } from '@/lib/os-profile';
+import type { VaultView } from '@/lib/vault';
 import { goToSignIn } from '@/lib/auth-redirects';
 
 const POLL_MS = 4000; // while the visa file is being prepared
@@ -44,6 +46,7 @@ export default function OsVisaPage({ params }: { params: Promise<{ workspaceId: 
   const [details, setDetails] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [profile, setProfile] = useState<VaultView | null>(null);  // the PAI profile: defaults and the degree check
 
   const load = useCallback(() => workspaceApi.getOsVisa().then(
     (d) => { setVisa(d); setError(null); },
@@ -59,6 +62,7 @@ export default function OsVisaPage({ params }: { params: Promise<{ workspaceId: 
     // Placement AI: the bearer alone authorizes the call (no workspace token in the browser).
     workspaceApi.configure(workspaceId, '', idToken || undefined);
     load();
+    workspaceApi.getVault().then(setProfile, () => setProfile(null));
   }, [loading, user, idToken, workspaceId, load]);
 
   const building = visa?.status === 'building';
@@ -86,13 +90,14 @@ export default function OsVisaPage({ params }: { params: Promise<{ workspaceId: 
   }
 
   return (
-    <main className="mx-auto flex w-full max-w-md flex-col gap-4 px-4 py-6">
+    <div className="mx-auto flex w-full max-w-3xl flex-col gap-4">
       <OsHeader workspaceId={workspaceId} current="os-visa" title="Your visa file" />
       {error && <p role="alert" className="break-words text-sm text-destructive">{error}</p>}
       {visa === null ? (
         <p className="text-sm text-muted-foreground">Loading…</p>
       ) : details ? (
         <PackDetails rows={visa.data_sheet} busy={busy} onBack={() => setDetails(false)}
+                     suggested={profileDefaults(profile, user?.email ?? null)}
                      onSave={(fields) => act(async () => {
                        await workspaceApi.saveOsVisaDetails(fields);
                        setDetails(false);
@@ -107,6 +112,7 @@ export default function OsVisaPage({ params }: { params: Promise<{ workspaceId: 
                                                   'Could not save the amount. Please try again.')} />
           {visa.status !== 'no_choice' && (
             <PackView pack={asPack(visa)} busy={busy} noun="visa file"
+                    profileDegree={profileDegreeField(profile)} profileHref={`/${workspaceId}?view=profile`}
                       notice="You apply and pay yourself. We never send anything for you."
                       onTick={(key, ticked) => act(() => workspaceApi.updateOsVisaItems(
                         ticked ? { tick: [key] } : { untick: [key] }), 'Could not save. Please try again.')}
@@ -123,6 +129,6 @@ export default function OsVisaPage({ params }: { params: Promise<{ workspaceId: 
           )}
         </>
       )}
-    </main>
+    </div>
   );
 }

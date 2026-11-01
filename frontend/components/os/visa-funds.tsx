@@ -10,7 +10,7 @@ import { admittedRefs, fundsLine, programmeLabel, type OsFunds, type OsVisa } fr
 export function VisaChoice({ visa, busy, onChoose }: { visa: OsVisa; busy: boolean; onChoose: (ref: string) => void }) {
   const admitted = admittedRefs(visa);
   return (
-    <section aria-label="Programme" className="rounded-lg border bg-card p-3 text-sm">
+    <section aria-label="Programme" className="rounded-2xl border bg-card p-4 shadow-card text-sm">
       {visa.programme_ref === null && admitted.length > 1 && (
         <p className="mb-2 break-words font-medium">
           You were admitted to more than one programme. Choose the one your visa is for: we prepare the visa file
@@ -43,7 +43,7 @@ export function VisaFunds({ funds, busy, onReduction }: { funds: OsFunds | null;
                                                          onReduction: (amount: number) => void }) {
   const [amount, setAmount] = useState(String(funds?.reduction ?? 0));
   return (
-    <section aria-label="Funds" className="rounded-lg border bg-card p-3 text-sm">
+    <section aria-label="Funds" className="rounded-2xl border bg-card p-4 shadow-card text-sm">
       <h2 className="mb-1 font-semibold">Funds you need: {fundsLine(funds)}</h2>
       {funds && funds.required !== null && (
         <p className="break-words text-muted-foreground">

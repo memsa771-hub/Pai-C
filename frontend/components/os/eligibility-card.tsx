@@ -25,7 +25,7 @@ interface EligibilityCardProps {
 export function EligibilityCard({ card, suggestions = [], onSwap }: EligibilityCardProps) {
   const provisional = card.lines.some((l) => l.provisional);
   return (
-    <div className="flex flex-col gap-2 rounded-lg border bg-card p-3 text-sm">
+    <div className="flex flex-col gap-2 rounded-2xl border bg-card p-4 shadow-card text-sm">
       <ul className="flex flex-col gap-2">
         {card.lines.map((l) => (
           <li key={l.check} className="flex flex-col gap-0.5">

@@ -104,7 +104,7 @@ export default function OsDocumentsPage({ params }: { params: Promise<{ workspac
   const open: OsDocument | undefined = data?.documents.find((d) => d.id === openId);
 
   return (
-    <main className="mx-auto w-full max-w-md px-4 py-6">
+    <div className="mx-auto w-full max-w-3xl">
       <OsHeader workspaceId={workspaceId} current="os-documents"
                 title={open && data ? `Check what we read: ${typeLabel(open.doc_type, data.doc_types)}` : 'Your documents'} />
       {error && <p role="alert" className="mb-3 break-words text-sm text-destructive">{error}</p>}
@@ -139,6 +139,6 @@ export default function OsDocumentsPage({ params }: { params: Promise<{ workspac
                       onDelete={(d) => act(() => workspaceApi.deleteOsDocument(d.id),
                                            'Could not delete. Please try again.')} />
       )}
-    </main>
+    </div>
   );
 }

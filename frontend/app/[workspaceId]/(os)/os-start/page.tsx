@@ -120,7 +120,7 @@ export default function OsStartPage({ params }: { params: Promise<{ workspaceId:
   if (!OS_UI_ENABLED) notFound();
 
   return (
-    <main className="mx-auto w-full max-w-md px-4 py-6">
+    <div className="mx-auto w-full max-w-3xl">
       <OsHeader workspaceId={workspaceId} current="os-start" title="Start your plan" />
       {error && <p role="alert" className="mb-3 break-words text-sm text-destructive">{error}</p>}
       {consent === null ? (
@@ -137,6 +137,6 @@ export default function OsStartPage({ params }: { params: Promise<{ workspaceId:
                       openRef={openRef} openCard={open?.card ?? null} openSuggestions={open?.suggestions ?? []}
                       onOpen={openCard} onRequest={request} requestError={requestError} requestSent={requestSent} />
       )}
-    </main>
+    </div>
   );
 }

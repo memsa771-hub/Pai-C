@@ -19,6 +19,8 @@ ARG NEXT_PUBLIC_FIREBASE_AUTH_EMULATOR_HOST
 ARG NEXT_PUBLIC_ENABLE_DMS=false
 # pai-merge: the PAI OS pages are compiled in only when this is "true" (docker-compose.yml sets it).
 ARG NEXT_PUBLIC_OS_ENABLED=false
+# pai-merge local test: the study abroad plan at any journey stage (rehearsal); otherwise it opens from stage H.
+ARG NEXT_PUBLIC_OS_REHEARSAL=false
 ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL} \
     NEXT_PUBLIC_FIREBASE_API_KEY=${NEXT_PUBLIC_FIREBASE_API_KEY} \
     NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=${NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN} \
@@ -27,6 +29,7 @@ ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL} \
     NEXT_PUBLIC_FIREBASE_AUTH_EMULATOR_HOST=${NEXT_PUBLIC_FIREBASE_AUTH_EMULATOR_HOST} \
     NEXT_PUBLIC_ENABLE_DMS=${NEXT_PUBLIC_ENABLE_DMS} \
     NEXT_PUBLIC_OS_ENABLED=${NEXT_PUBLIC_OS_ENABLED} \
+    NEXT_PUBLIC_OS_REHEARSAL=${NEXT_PUBLIC_OS_REHEARSAL} \
     NEXT_TELEMETRY_DISABLED=1
 
 # webpack remains required because BuildKit/Turbopack has produced stale chunks

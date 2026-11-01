@@ -15,7 +15,7 @@ interface StatementInterviewProps {
 export function StatementInterview({ items, onSave, busy = false }: StatementInterviewProps) {
   const ordered = [...items.filter((i) => i.follow_up), ...items.filter((i) => !i.follow_up)];
   return (
-    <div className="mx-auto flex w-full max-w-md flex-col gap-3">
+    <div className="flex w-full flex-col gap-3">
       <p className="text-sm text-muted-foreground">{progressLabel(items)}</p>
       {ordered.map((item) => <QuestionCard key={item.id} item={item} onSave={onSave} busy={busy} />)}
     </div>

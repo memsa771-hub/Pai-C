@@ -10,6 +10,8 @@ import { workspaceApi } from '@/lib/api';
 import { OS_UI_ENABLED } from '@/lib/config';
 import { programmeTitle, type OsPack, type OsPackFile } from '@/lib/os-packs';
 import { usePaiAuth } from '@/lib/pai-auth-context';
+import { profileDefaults, profileDegreeField } from '@/lib/os-profile';
+import type { VaultView } from '@/lib/vault';
 import { goToSignIn } from '@/lib/auth-redirects';
 
 const POLL_MS = 4000; // while a pack is being prepared
@@ -44,6 +46,7 @@ export default function OsPackPage({ params }: { params: Promise<{ workspaceId: 
   const [details, setDetails] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [profile, setProfile] = useState<VaultView | null>(null);  // the PAI profile: defaults and the degree check
 
   const load = useCallback(() => workspaceApi.getOsPacks().then(
     (d) => { setPacks(d.programmes); setError(null); },
@@ -59,6 +62,7 @@ export default function OsPackPage({ params }: { params: Promise<{ workspaceId: 
     // Placement AI: the bearer alone authorizes the call (no workspace token in the browser).
     workspaceApi.configure(workspaceId, '', idToken || undefined);
     load();
+    workspaceApi.getVault().then(setProfile, () => setProfile(null));
   }, [loading, user, idToken, workspaceId, load]);
 
   const building = packs?.some((p) => p.status === 'building') ?? false;
@@ -88,13 +92,14 @@ export default function OsPackPage({ params }: { params: Promise<{ workspaceId: 
   const open = packs?.find((p) => p.programme_ref === openRef);
 
   return (
-    <main className="mx-auto w-full max-w-md px-4 py-6">
+    <div className="mx-auto w-full max-w-3xl">
       <OsHeader workspaceId={workspaceId} current="os-pack" title={open ? programmeTitle(open) : 'Your application packs'} />
       {error && <p role="alert" className="mb-3 break-words text-sm text-destructive">{error}</p>}
       {packs === null ? (
         <p className="text-sm text-muted-foreground">Loading…</p>
       ) : open && details ? (
         <PackDetails rows={open.data_sheet} busy={busy} onBack={() => setDetails(false)}
+                     suggested={profileDefaults(profile, user?.email ?? null)}
                      onSave={(fields) => act(async () => {
                        await workspaceApi.saveOsPackDetails(fields);
                        setDetails(false);
@@ -102,6 +107,7 @@ export default function OsPackPage({ params }: { params: Promise<{ workspaceId: 
       ) : open ? (
         <>
           <PackView pack={open} busy={busy}
+                    profileDegree={profileDegreeField(profile)} profileHref={`/${workspaceId}?view=profile`}
                     onTick={(key, ticked) => act(() => workspaceApi.updateOsPackItems(open.programme_ref,
                       ticked ? { tick: [key] } : { untick: [key] }), 'Could not save. Please try again.')}
                     onAdd={(label) => act(() => workspaceApi.updateOsPackItems(open.programme_ref, { add: [{ label }] }),
@@ -120,6 +126,6 @@ export default function OsPackPage({ params }: { params: Promise<{ workspaceId: 
       ) : (
         <PackList packs={packs} onOpen={(p) => setOpenRef(p.programme_ref)} />
       )}
-    </main>
+    </div>
   );
 }

@@ -10,7 +10,7 @@ export function ChangesList({ changes, names }: { changes: OsChange[]; names: Re
   return (
     <ul className="flex flex-col gap-2 text-sm">
       {newestFirst(changes).map((c) => (
-        <li key={c.proposal_id} className="rounded-lg border bg-card p-3">
+        <li key={c.proposal_id} className="rounded-2xl border bg-card p-4 shadow-card">
           <p className="text-xs text-muted-foreground">
             {new Date(c.at).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })}
           </p>

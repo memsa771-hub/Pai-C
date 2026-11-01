@@ -136,7 +136,7 @@ describe('StatementEditor', () => {
     const ours = html.replace(/<button data-slot="button"[^>]*>/g, '<button>'); // the shared Button's own classes
     expect(ours).not.toMatch(/\bw-\[\d+px\]|\bmin-w-\[\d+px\]|overflow-x-(auto|scroll)|whitespace-nowrap/);
     expect(html).toContain('break-words');
-    expect(html).toContain('max-w-md');
+    expect(html).toContain('w-full');  // fills the page column the counsellor shell bounds
   });
 });
 

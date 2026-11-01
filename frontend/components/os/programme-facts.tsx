@@ -19,9 +19,9 @@ export function ProgrammeFacts({ programmes }: { programmes: OsProgramme[] }) {
     return <p className="px-4 py-10 text-center text-sm text-muted-foreground">No programmes in your plan yet.</p>;
   }
   return (
-    <div className="mx-auto flex w-full max-w-md flex-col gap-4">
+    <div className="flex w-full flex-col gap-4">
       {programmes.map((p) => (
-        <section key={`${p.ref}:${p.intake_year}`} id={p.ref} aria-label={p.name} className="rounded-lg border bg-card p-3">
+        <section key={`${p.ref}:${p.intake_year}`} id={p.ref} aria-label={p.name} className="rounded-2xl border bg-card p-4 shadow-card">
           <h2 className="mb-2 break-words text-sm font-semibold">
             {p.university ? `${p.university} · ${p.name}` : p.name}
           </h2>

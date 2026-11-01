@@ -48,7 +48,8 @@ function OnboardingLoadError({ retry }: { retry: () => void }) {
   );
 }
 
-export function Wrapper() {
+/** `children`: a PAI OS page, shown inside the counsellor shell in place of the workspace views. */
+export function Wrapper({ children }: { children?: React.ReactNode } = {}) {
   useDesktopWorkspaceState();
   const { loading } = useWorkspace();
   const [onboarding, setOnboarding] = useState<OnboardingState | null>(null);
@@ -85,5 +86,5 @@ export function Wrapper() {
         onDone={() => setOnboarding({ ...onboarding, required: false })}
       />
     );
-  return <CounselorShell />;
+  return <CounselorShell>{children}</CounselorShell>;
 }

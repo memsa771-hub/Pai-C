@@ -34,7 +34,7 @@ export default function OsProgrammesPage({ params }: { params: Promise<{ workspa
   if (!OS_UI_ENABLED) notFound();
 
   return (
-    <main className="mx-auto w-full max-w-md px-4 py-6">
+    <div className="mx-auto w-full max-w-3xl">
       <OsHeader workspaceId={workspaceId} current="os-programmes" title="Your programmes" />
       {error && <p role="alert" className="mb-3 text-sm text-destructive">{error}</p>}
       {programmes === null ? (
@@ -42,6 +42,6 @@ export default function OsProgrammesPage({ params }: { params: Promise<{ workspa
       ) : (
         <ProgrammeFacts programmes={programmes} />
       )}
-    </main>
+    </div>
   );
 }

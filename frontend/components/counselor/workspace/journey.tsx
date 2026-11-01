@@ -1,4 +1,5 @@
 "use client";
+import { OsPlanCard } from "@/components/os/plan-card";
 import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { ArrowRight, Check, MessageCircle } from "lucide-react";
@@ -82,6 +83,7 @@ function JourneyBody({ navigate, onChat, resource }: {
   return (
     <>
       <Heading title={copy.journeyTitle} description={copy.journeyIntro} />
+      <OsPlanCard />
 
       {/* Where you are, said plainly, with PAI beside you. */}
       <section className="relative overflow-hidden rounded-[28px] border bg-card shadow-card">
