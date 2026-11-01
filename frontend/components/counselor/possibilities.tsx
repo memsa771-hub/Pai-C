@@ -55,14 +55,21 @@ export function Possibilities({ id, refreshKey, onUpdated }: { id?: string; refr
 
 /** The analyzer's result in chat: which paths it found and how each fits, at
  * a glance, with the way to the full picture. */
-export function PathsFound({ ids }: { ids: string[] }) {
-  const [rows, setRows] = useState<Possibility[]>([]);
+export type PathSnapshot = Pick<Possibility, 'id' | 'title' | 'why' | 'fit' | 'study_field'>;
+
+/** `snapshot`: the paths as they stood when PAI posted the message. A message keeps what it said; a later run's
+ * list is one tap away, with a note when it differs. Older messages without one read the current list. */
+export function PathsFound({ ids, snapshot }: { ids: string[]; snapshot?: PathSnapshot[] }) {
+  const [rows, setRows] = useState<Possibility[] | null>(null);
   useEffect(() => {
     let active = true;
     workspaceApi.getPossibilities().then(value => { if (active) setRows(value); }).catch(() => {});
     return () => { active = false; };
   }, [ids.join()]); // eslint-disable-line react-hooks/exhaustive-deps
-  const found = rows.filter(row => ids.includes(row.id) && row.status !== 'dismissed');
+  const current = (rows ?? []).filter(row => row.status !== 'dismissed');
+  const found: PathSnapshot[] = snapshot?.length ? snapshot : current.filter(row => ids.includes(row.id));
+  const changed = !!snapshot?.length && rows !== null
+    && (current.filter(row => row.source === 'analyzer').map(row => row.id).sort().join() !== [...ids].sort().join());
   if (!found.length) return null;
   return (
     <section className="my-3 max-w-lg rounded-3xl border bg-card p-5 shadow-card">
@@ -77,6 +84,7 @@ export function PathsFound({ ids }: { ids: string[] }) {
           </li>
         ))}
       </ul>
+      {changed && <p className="mt-4 text-sm text-muted-foreground">{copy.pathsFoundChanged}</p>}
       <Button size="tap" className="mt-5" onClick={() => openWorkspaceView('paths')}>{copy.pathsFoundOpen}<ArrowRight aria-hidden /></Button>
     </section>
   );

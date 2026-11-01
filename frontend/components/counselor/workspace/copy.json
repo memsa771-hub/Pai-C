@@ -89,6 +89,7 @@
     "other": "{count} paths, each checked against what you shared."
   },
   "pathsFoundOpen": "Open your paths",
+  "pathsFoundChanged": "Your paths have changed since this message. Open them to see where they stand now.",
   "pathLoading": "PAI is working on this path. You can keep chatting while it checks.",
   "pathEmpty": "Explore this path to learn what it involves.",
   "places": "Where could I study this?",

@@ -148,6 +148,18 @@ def provision_workspace(db: Session, user: User, name: str = "My Workspace") -> 
     return ws
 
 
+def _backfill_pai(db: Session, ws: Workspace) -> None:
+    """A workspace made while no PAI key was set has no PAI Counselor and no counsellor channel, so the student's
+    messages reached no one. Once a key is set, add them on the next visit (both steps are idempotent)."""
+    try:
+        from app.services.pai import provision_pai, seed_welcome_thread
+        with db.begin_nested():
+            if provision_pai(db, ws):
+                seed_welcome_thread(db, ws)
+    except Exception:
+        logger.warning("get_or_create_owned_workspace: PAI Counselor backfill failed", exc_info=True)
+
+
 def resolve_owned_workspace(db: Session, user: User) -> Optional[Workspace]:
     """The student's one personal workspace, or None if not yet provisioned."""
     return db.execute(
@@ -171,6 +183,7 @@ def get_or_create_owned_workspace(db: Session, user: User) -> Workspace:
     """
     existing = resolve_owned_workspace(db, user)
     if existing is not None:
+        _backfill_pai(db, existing)
         return existing
 
     try:

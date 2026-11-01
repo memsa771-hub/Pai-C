@@ -373,12 +373,25 @@ async def test_weak_fit_on_rerun_removes_the_suggested_field():
 
 
 @pytest.mark.asyncio
-async def test_a_second_run_replaces_the_first_suggestions():
+async def test_a_second_run_keeps_the_paths_it_left_out():
+    """pai-merge hand test: on the same evidence one run named CS, AI and Data Science and the next run other fields,
+    so the student's paths changed between two page loads. A path the model leaves out stays; with the list full,
+    a new field waits for a slot."""
     with StudentSession() as student, student.factory() as db:
         await run(student, db, reply_with("mbbs", "bds", "pharm_d", "nursing", "zoology"))
-        assert len(by_title(student, db)) == 5
+        first = set(by_title(student, db))
+        assert len(first) == 5
         await again(student, db, reply_with("botany", "biotechnology", "microbiology"))
-        assert set(by_title(student, db)) == {title("botany"), title("biotechnology"), title("microbiology")}
+        assert set(by_title(student, db)) == first
+
+
+@pytest.mark.asyncio
+async def test_a_new_field_takes_the_slot_of_one_found_weak():
+    with StudentSession() as student, student.factory() as db:
+        await run(student, db, reply_with("mbbs", "bds", "pharm_d", "nursing", "zoology"))
+        weak = path("zoology", fits=[fit("Interest", "have")])  # reassessed: too little fit now
+        await again(student, db, {"message": "x", "paths": [weak, path("botany")]})
+        assert set(by_title(student, db)) == {title(k) for k in ("mbbs", "bds", "pharm_d", "nursing", "botany")}
 
 
 @pytest.mark.asyncio

@@ -3,7 +3,7 @@
 import { ConversationCard, type InlineCard } from '@/components/counselor/workspace/inline-card';
 import { FactCard, type OfferedFact } from '@/components/counselor/workspace/fact-card';
 import { cn } from '@/lib/utils';
-import { Possibilities, PathsFound } from '@/components/counselor/possibilities';
+import { Possibilities, PathsFound, type PathSnapshot } from '@/components/counselor/possibilities';
 import { PlaceLink } from '@/components/counselor/place-link';
 import { MirrorLink } from '@/components/counselor/mirror-link';
 import type { MirrorHeader } from '@/lib/mirror';
@@ -291,7 +291,8 @@ export const ChatMessage = memo(function ChatMessage({ message, agents = [] }: C
           </div>
           {!!message.metadata?.fact_card && <FactCard card={message.metadata.fact_card as OfferedFact}/>}
           {typeof message.metadata?.possibility_id === 'string' && <Possibilities id={message.metadata.possibility_id} />}
-          {Array.isArray(message.metadata?.paths_found) && <PathsFound ids={message.metadata.paths_found as string[]} />}
+          {Array.isArray(message.metadata?.paths_found) && <PathsFound ids={message.metadata.paths_found as string[]}
+            snapshot={Array.isArray(message.metadata?.paths_snapshot) ? message.metadata.paths_snapshot as PathSnapshot[] : undefined} />}
           {typeof message.metadata?.workspace_place === 'string' && <PlaceLink place={message.metadata.workspace_place} />}
           {message.messageType === 'counselor_mirror' && <MirrorLink header={message.metadata?.header as MirrorHeader | undefined} />}
 

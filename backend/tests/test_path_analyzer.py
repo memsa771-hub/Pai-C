@@ -191,6 +191,10 @@ async def test_job_stores_paths_updates_fit_posts_once_and_never_revives_dismiss
         event = db.scalar(select(EventRecord).where(EventRecord.source == "openagents:pai"))
         assert event.metadata_["paths_job_id"] == job.id
         assert event.metadata_["paths_found"] == first["paths"] == [own.id, added.id]
+        # the card keeps what was said then (pai-merge hand test: an old card changed on reload)
+        snapshot = event.metadata_["paths_snapshot"]
+        assert [p["id"] for p in snapshot] == [own.id, added.id]
+        assert snapshot[1]["title"] == added.title and snapshot[1]["fit"] == added.fit
 
 
 @pytest.mark.asyncio

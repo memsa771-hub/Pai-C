@@ -189,7 +189,12 @@ async def _handle_message_posted(event: Event, ctx: PipelineContext) -> Optional
         # themselves; human recipients get the no-response sentinel.
         if not event.metadata.get("target_agents"):
             tgt = event.target or ""
-            if tgt.startswith("openagents:"):
+            from app.services.pai import PAI_AGENT_NAME, PAI_PRIMARY_CHANNEL
+            if tgt == f"channel/{PAI_PRIMARY_CHANNEL}" and event.source.startswith("human:"):
+                # The counsellor's channel before PAI was provisioned (no PAI key when the workspace was made): the
+                # message still goes to PAI, which then says it is unavailable instead of leaving the student waiting.
+                event.metadata["target_agents"] = [PAI_AGENT_NAME]
+            elif tgt.startswith("openagents:"):
                 event.metadata["target_agents"] = [tgt[len("openagents:"):]]
             elif tgt.startswith("human:"):
                 event.metadata["target_agents"] = ["__no_response__"]

@@ -269,11 +269,16 @@ def sanitize(analysis: PathAnalysis, evidence: dict[str, str], dismissed: set[st
     return kept
 
 
-def _prune(service: PossibilityService, rows, candidates: dict[str, Candidate], returned: set[str]) -> None:
+def _prune(service: PossibilityService, rows, candidates: dict[str, Candidate], returned: set[str],
+           reassessed: set[str] | None = None) -> None:
     """Every finished run leaves only what this run stands behind.
 
-    A suggested field that is outside today's candidates or was not returned
-    again (weak fit, the group changed) is removed. A field the student saved,
+    A suggested field that is outside today's candidates (the group changed),
+    or that this run reassessed and did not keep (weak fit, uncited why), is
+    removed. With `reassessed` (the fields the model answered about), a field
+    the model simply left out stays: a model run varies, and paths must not
+    come and go between two runs on the same evidence (pai-merge hand test).
+    Without it, every field not returned is removed. A field the student saved,
     is exploring or chose stays, with its group notes refreshed, and is marked
     out_of_group when the student's current group no longer opens it (not when
     the education is simply unknown). Paths from before fields of study
@@ -287,7 +292,8 @@ def _prune(service: PossibilityService, rows, candidates: dict[str, Candidate], 
             continue
         key = (row.study_field or {}).get("key")
         if row.status == "suggested":
-            if key not in candidates or key not in returned:
+            dropped = key not in returned and (reassessed is None or key in reassessed)
+            if key not in candidates or dropped:
                 service.db.delete(row)
             continue
         if key in candidates:
@@ -425,6 +431,15 @@ def _sync_stage(db, workspace_id: str, reason: str | None) -> None:
                      workspace_id, type(exc).__name__)
 
 
+def _paths_snapshot(db, workspace_id: str, ids: list[str]) -> list[dict]:
+    """The found paths as they stood when the message was posted, kept with the message: an old chat card shows what
+    PAI said then, never a later run's list (pai-merge hand test: a card went from 5 paths to 2 on a reload)."""
+    service = PossibilityService(db)
+    rows = {row.id: row for row in service.list(workspace_id)}
+    return [{"id": i, "title": rows[i].title, "why": rows[i].why, "fit": rows[i].fit or [],
+             "study_field": rows[i].study_field} for i in ids if i in rows]
+
+
 async def _post_finished(db, job, channel: str, reply_to: str) -> None:
     result = job.result or {}
     if result.get("status") == "needs_education":
@@ -441,7 +456,8 @@ async def _post_finished(db, job, channel: str, reply_to: str) -> None:
         message = ((event.payload or {}).get("content") if event else None)
     message = message or policy()["paths_found_message"]
     posted = await send_to_student(db, job.workspace_id, channel, "pai", message, 0,
-        metadata={"paths_job_id": job.id, "paths_found": paths, "paths_reply_to": reply_to})
+        metadata={"paths_job_id": job.id, "paths_found": paths, "paths_reply_to": reply_to,
+                  "paths_snapshot": _paths_snapshot(db, job.workspace_id, paths)})
     if not posted:
         raise RuntimeError("path analysis message was not persisted")
 
@@ -574,17 +590,24 @@ async def path_analysis_job(job, db) -> dict:
         if workspace is None:
             return {"status": "inactive"}
         _prune(service, service.list(job.workspace_id), candidates,
-               {path["study_field"]["key"] for path in paths if path["study_field"]})
+               {path["study_field"]["key"] for path in paths if path["study_field"]},
+               reassessed={path.field_key for path in analysis.paths if path.field_key})
         if not paths:
             db.commit()
             return {"status": "no_paths"}
         journey = JourneyService(db).ensure_counselor(job.workspace_id)
+        # Paths the student already sees keep their place: a new field joins only while there is room under the
+        # cap, so the list changes when the evidence does, not with each run.
+        active = {row.id for row in service.list(job.workspace_id) if row.status != "dismissed" and row.source != "mirror"}
         ids = []
         for path in paths:
             row = service.by_title(job.workspace_id, path["title"])
             if row is None:
+                if len(active) >= rules["max_paths"]:
+                    continue
                 row = service.add(job.workspace_id, journey.id, title=path["title"], why=path["why"],
                     kind="discovered", source="analyzer", status="suggested", evidence=path["evidence"])
+                active.add(row.id)
             if row.status == "dismissed":
                 continue
             row.fit = path["fit"]
@@ -604,7 +627,8 @@ async def path_analysis_job(job, db) -> dict:
             # The message is kept so a later chat request can post it unchanged.
             return {"status": "stored", "paths": ids, "message": analysis.message}
         message = await send_to_student(db, job.workspace_id, channel, "pai", analysis.message, 0,
-            metadata={"paths_job_id": job.id, "paths_found": ids, **_reply_to(payload)})
+            metadata={"paths_job_id": job.id, "paths_found": ids, **_reply_to(payload),
+                      "paths_snapshot": _paths_snapshot(db, job.workspace_id, ids)})
         if not message:
             raise RuntimeError("path analysis message was not persisted")
         return {"status": "posted", "message_id": message, "paths": ids}
