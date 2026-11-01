@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import {
   DATA_SHEET_KEY,
@@ -36,7 +36,8 @@ export function PackList({ packs, onOpen }: { packs: OsPack[]; onOpen: (p: OsPac
 interface PackViewProps {
   pack: OsPack;
   busy: boolean;
-  onTick: (key: string, ticked: boolean) => void;
+  /** Saves a tick; resolves false when it was refused, so the box goes back. */
+  onTick: (key: string, ticked: boolean) => Promise<boolean> | void;
   onAdd: (label: string) => void;
   onApprove: () => void;
   onDownload: (file: OsPackFile) => void;
@@ -51,6 +52,23 @@ interface PackViewProps {
 export function PackView({ pack, busy, onTick, onAdd, onApprove, onDownload, onRebuild, onDetails, noun = 'pack',
                            notice = 'You submit and pay yourself. We never send anything for you.' }: PackViewProps) {
   const [extra, setExtra] = useState('');
+  // A tick shows at once and stays until the pack from the server agrees: saving a tick can rebuild the pack, and
+  // until then the server still sends the old state, which made a saved tick look as if it had not taken.
+  const [pending, setPending] = useState<Record<string, boolean>>({});
+  const items = [...pack.checklist, ...(pack.after_approval ?? [])];
+  useEffect(() => {
+    setPending((p) => {
+      const left = Object.fromEntries(Object.entries(p).filter(([k, v]) => items.find((i) => i.key === k)?.ticked !== v));
+      return Object.keys(left).length === Object.keys(p).length ? p : left;
+    });
+  }, [pack]);  // eslint-disable-line react-hooks/exhaustive-deps
+  const ticked = (key: string, server: boolean) => pending[key] ?? server;
+  const tick = async (key: string, value: boolean) => {
+    setPending((p) => ({ ...p, [key]: value }));
+    if ((await onTick(key, value)) === false) {
+      setPending((p) => Object.fromEntries(Object.entries(p).filter(([k]) => k !== key)));
+    }
+  };
   const sheet = fileFor(pack, DATA_SHEET_KEY);
   const sections = [...new Set(pack.data_sheet.map((r) => r.section))];
   return (
@@ -103,14 +121,14 @@ export function PackView({ pack, busy, onTick, onAdd, onApprove, onDownload, onR
         <ul className="flex flex-col gap-3">
           {pack.checklist.map((i) => {
             const file = fileFor(pack, i.key);
-            const mark = i.state === 'ready' || (i.state === 'manual' && i.ticked) ? '✓' : i.state === 'manual' ? '☐' : '⚠';
+            const mark = i.state === 'ready' || (i.state === 'manual' && ticked(i.key, i.ticked)) ? '✓' : i.state === 'manual' ? '☐' : '⚠';
             return (
               <li key={i.key} className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
                   {i.tickable ? (
                     <label className="flex min-w-0 flex-1 items-center gap-2 break-words">
-                      <input type="checkbox" checked={i.ticked} disabled={busy}
-                             onChange={(e) => onTick(i.key, e.target.checked)} />
+                      <input type="checkbox" checked={ticked(i.key, i.ticked)} disabled={busy}
+                             onChange={(e) => void tick(i.key, e.target.checked)} />
                       {i.label}
                     </label>
                   ) : (
@@ -191,8 +209,8 @@ export function PackView({ pack, busy, onTick, onAdd, onApprove, onDownload, onR
             {(pack.after_approval ?? []).map((i) => (
               <li key={i.key} className="min-w-0">
                 <label className="flex min-w-0 items-center gap-2 break-words">
-                  <input type="checkbox" checked={i.ticked} disabled={busy || !pack.approved}
-                         onChange={(e) => onTick(i.key, e.target.checked)} />
+                  <input type="checkbox" checked={ticked(i.key, i.ticked)} disabled={busy || !pack.approved}
+                         onChange={(e) => void tick(i.key, e.target.checked)} />
                   {i.label}
                 </label>
                 {i.note && <p className="mt-0.5 break-words text-xs text-muted-foreground">{i.note}</p>}

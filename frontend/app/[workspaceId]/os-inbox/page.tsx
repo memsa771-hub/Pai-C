@@ -150,7 +150,7 @@ export default function OsInboxPage({ params }: { params: Promise<{ workspaceId:
         <p className="text-sm text-muted-foreground">Loading…</p>
       ) : (
         <InboxList items={items} now={new Date()} onComplete={complete} busyId={busyId}
-                   factStatus={factStatus} programmesHref={`/${workspaceId}/os-programmes`}
+                   factStatus={factStatus} programmesHref={`/${workspaceId}/os-programmes`} basePath={`/${workspaceId}`}
                    notes={notes} names={names} onSwap={swap} onReadNote={readNote} />
       )}
       {changes && (

@@ -48,7 +48,7 @@ export function VisaFunds({ funds, busy, onReduction }: { funds: OsFunds | null;
       {funds && funds.required !== null && (
         <p className="break-words text-muted-foreground">
           {funds.status !== 'confirmed' && <span className="text-amber-900">⚠ {funds.status} </span>}
-          {funds.reduction > 0 && <>after {funds.reduction} {funds.currency_label} of other proof </>}
+          {funds.reduction > 0 && <>after {funds.reduction.toLocaleString('en-US')} {funds.currency_label} of other proof </>}
           {funds.url && (
             <a href={funds.url} target="_blank" rel="noopener noreferrer"
                className="text-primary underline-offset-2 hover:underline">source</a>

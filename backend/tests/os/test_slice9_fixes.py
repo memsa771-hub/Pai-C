@@ -777,3 +777,16 @@ def test_visa_step_waits_for_an_admission_when_every_programme_is_out(engine, cl
         assert visa["state"] == "blocked" and visa["waiting_for"] == NO_ADMISSION
     finally:
         next(gen, None)
+
+
+def test_review_step_cannot_be_marked_done_by_hand(api):
+    """pai-merge hand test F13: "Review and approve … pack" is closed by approving the pack, never by Mark as done (a
+    hand-closed review would let the plan move on with no approved pack)."""
+    with api.engine.begin() as conn:
+        row = conn.execute(select(T.c.id).where(T.c.plan_id == api.plan_id, T.c.template_key == "review_pack")
+                           .order_by(T.c.id).limit(1)).first()
+        conn.execute(T.update().where(T.c.id == row.id).values(state="waiting_student"))
+    r = api.post(f"/v1/os/inbox/{row.id}/complete", headers=ME, json={})
+    assert r.status_code == 409 and "approve the pack" in r.json()["detail"]
+    with api.engine.connect() as conn:
+        assert conn.execute(select(T.c.state).where(T.c.id == row.id)).scalar_one() == "waiting_student"

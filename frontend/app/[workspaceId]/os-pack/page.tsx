@@ -70,13 +70,16 @@ export default function OsPackPage({ params }: { params: Promise<{ workspaceId: 
 
   if (!OS_UI_ENABLED) notFound();
 
-  async function act(fn: () => Promise<unknown>, fallback: string) {
+  /** Runs a change, then reloads; false when the change was refused (the error is shown). */
+  async function act(fn: () => Promise<unknown>, fallback: string): Promise<boolean> {
     setBusy(true);
     try {
       await fn();
       await load();
+      return true;
     } catch (e) {
       setError(reason(e, fallback));
+      return false;
     } finally {
       setBusy(false);
     }

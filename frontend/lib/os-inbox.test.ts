@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { dateLabels, formatDue, groupItems, sourceHost, tzLabel, type OsInboxItem } from './os-inbox';
+import {
+  collapseNotices, completeActions, dateLabels, formatDue, groupItems, reviewPage, sourceHost, tzLabel, NOTICE_PREFIX,
+  type OsInboxItem,
+} from './os-inbox';
 
 const NOW = new Date('2027-03-10T09:00:00Z');
 
@@ -40,5 +43,30 @@ describe('due labels', () => {
     expect(sourceHost('https://www.hec.gov.pk/english/x')).toBe('hec.gov.pk');
     expect(sourceHost('https://www2.daad.de/a')).toBe('daad.de');
     expect(sourceHost('not a url')).toBe('not a url');
+  });
+});
+
+describe('review steps', () => {
+  it('link to their pack or visa file instead of offering Mark as done', () => {
+    const pack = item({ instance_key: 'review_pack@ovgu-eeit', inbox_kind: 'approve' });
+    const visa = item({ instance_key: 'review_visa_file', inbox_kind: 'approve' });
+    expect(reviewPage(pack)).toEqual({ page: 'os-pack', label: 'Open pack' });
+    expect(reviewPage(visa)).toEqual({ page: 'os-visa', label: 'Open visa file' });
+    expect(completeActions(pack)).toEqual([]);
+    expect(completeActions(item({ instance_key: 'visa_apply' })).map((a) => a.label)).toEqual(['Mark as done']);
+  });
+});
+
+describe('collapseNotices', () => {
+  it('shows a plan update once when copies say the same, and keeps the copies for its OK', () => {
+    const change = { change: 'changed' as const, instance_key: 'visa_apply', title: 'Apply', programme_ref: null };
+    const a = item({ id: 1, instance_key: `${NOTICE_PREFIX}1`, title: 'Your plan was updated', changes: [change] });
+    const b = item({ id: 2, instance_key: `${NOTICE_PREFIX}2`, title: 'Your plan was updated', changes: [change] });
+    const other = item({ id: 3, instance_key: `${NOTICE_PREFIX}3`, title: 'Your plan was updated',
+                         changes: [{ ...change, change: 'added' as const }] });
+    const step = item({ id: 4 });
+    const { items, copies } = collapseNotices([a, b, other, step]);
+    expect(items.map((i) => i.id)).toEqual([1, 3, 4]);
+    expect(copies.get(1)).toEqual([2]);
   });
 });

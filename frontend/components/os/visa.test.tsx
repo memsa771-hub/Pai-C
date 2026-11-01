@@ -61,7 +61,7 @@ function file(v: OsVisa): string {
 describe('VisaFunds', () => {
   it('shows the amount and label, the status, the source link and the reduction input', () => {
     const html = fundsBox(funds());
-    expect(html).toContain('11904');
+    expect(html).toContain('11,904');
     expect(html).toContain('XYZ');
     expect(html).toContain('unconfirmed');
     expect(html).toContain('href="https://embassy.example/funds"');
@@ -75,8 +75,8 @@ describe('VisaFunds', () => {
   });
 
   it('shows the reduction taken off', () => {
-    expect(fundsLine(funds({ required: 9904, reduction: 2000 }))).toBe('9904 XYZ');
-    expect(fundsBox(funds({ required: 9904, reduction: 2000 }))).toContain('2000');
+    expect(fundsLine(funds({ required: 9904, reduction: 2000 }))).toBe('9,904 XYZ');
+    expect(fundsBox(funds({ required: 9904, reduction: 2000 }))).toContain('2,000');
   });
 });
 

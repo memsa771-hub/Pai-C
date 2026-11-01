@@ -19,6 +19,8 @@ import {
   sourceHost,
   waitingText,
   type OsInboxItem,
+  reviewPage,
+  collapseNotices,
 } from '@/lib/os-inbox';
 import { statusLabel, type FactStatus } from '@/lib/os-programmes';
 import { checkLabel, chipLabel, chipTone, lineText, type OsNote } from '@/lib/os-self-serve';
@@ -32,6 +34,8 @@ interface InboxListProps {
   factStatus?: Record<string, FactStatus | null>;
   /** The programme facts page; items of a programme link to its section there. */
   programmesHref?: string;
+  /** The workspace's base path (`/<workspace>`): a review step links to its pack or visa file there. */
+  basePath?: string;
   /** Slice 4: eligibility changes, with up to 3 suggested swaps each. */
   notes?: OsNote[];
   /** Programme ref -> its name, for notes and suggestions. */
@@ -69,7 +73,7 @@ function NoteCard({ note, names, onSwap, onReadNote }: { note: OsNote; names: Re
 }
 
 /** The PAI OS student inbox (Slice 1 spec §4.11): mobile-first, one action per item. */
-export function InboxList({ items, now, onComplete, busyId = null, factStatus = {}, programmesHref, notes = [],
+export function InboxList({ items, now, onComplete, busyId = null, factStatus = {}, programmesHref, basePath, notes = [],
                             names = {}, onSwap, onReadNote }: InboxListProps) {
   // an answer that asks first (Slice 9 Task 11): "Not admitted" names the programme and waits for a second tap
   const [asking, setAsking] = useState<{ id: number; action: CompleteAction } | null>(null);
@@ -85,7 +89,8 @@ export function InboxList({ items, now, onComplete, busyId = null, factStatus = 
       setReturnTo(null);
     }
   }, [asking, returnTo]);
-  const todo = items.filter((i) => !isWaiting(i));
+  const { items: shown, copies } = collapseNotices(items);
+  const todo = shown.filter((i) => !isWaiting(i));
   const waiting = items.filter(isWaiting);  // blocked on a fact: listed to say what the plan waits for
   if (items.length === 0 && notes.length === 0) {
     return <p className="px-4 py-10 text-center text-sm text-muted-foreground">Nothing to do right now.</p>;
@@ -168,11 +173,20 @@ export function InboxList({ items, now, onComplete, busyId = null, factStatus = 
                     </div>
                     {asking?.id !== item.id && (
                       <div className="flex shrink-0 flex-col gap-1">
+                        {(() => {
+                          const review = reviewPage(item);
+                          return review && basePath ? (
+                            <Button asChild size="sm" variant="outline">
+                              <a href={`${basePath}/${review.page}`}>{review.label}</a>
+                            </Button>
+                          ) : null;
+                        })()}
                         {completeActions(item, names).map((a) => (
                           <Button key={a.label} size="sm" variant="outline" disabled={busyId === item.id}
                                   data-ask={`${item.id}:${a.label}`}
                                   onClick={() => (a.confirm ? setAsking({ id: item.id, action: a })
-                                    : onComplete(item, a.payload))}>
+                                    : [item.id, ...(copies.get(item.id) ?? [])].forEach((id) =>
+                                        onComplete(id === item.id ? item : { ...item, id }, a.payload)))}>
                             {a.label}
                           </Button>
                         ))}

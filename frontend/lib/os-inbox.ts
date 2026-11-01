@@ -117,7 +117,7 @@ export function sourceHost(url: string): string {
 }
 
 const ADMISSION_PREFIX = 'admission_result@'; // the plan's per-programme admission step (Slice 6b S6b-D8)
-const NOTICE_PREFIX = 'plan_updated@'; // "Your plan was updated" (the kernel's notice of a revision)
+export const NOTICE_PREFIX = 'plan_updated@'; // "Your plan was updated" (the kernel's notice of a revision)
 
 /** The programme an item is for, by name: "MSc Example (Uni Sample)". Never the internal ref: null when no name is
  * known (Slice 9 Task 11). `names` is the page's ref -> name map, used when the item has no name of its own. */
@@ -130,6 +130,26 @@ export function programmeName(item: OsInboxItem, names: Record<string, string> =
 
 export function isNotice(item: OsInboxItem): boolean {
   return item.instance_key.startsWith(NOTICE_PREFIX);
+}
+
+/** "Your plan was updated" notices that say exactly the same thing (two admissions can each update the same step)
+ * are shown once: the first of each, with the ids of its copies, so its OK acknowledges them all. */
+export function collapseNotices(items: OsInboxItem[]): { items: OsInboxItem[]; copies: Map<number, number[]> } {
+  const firstBySay = new Map<string, OsInboxItem>();
+  const copies = new Map<number, number[]>();
+  const kept: OsInboxItem[] = [];
+  for (const item of items) {
+    if (!isNotice(item)) { kept.push(item); continue; }
+    const say = JSON.stringify([item.title, (item.changes ?? []).map((c) => [c.change, c.instance_key]).sort()]);
+    const first = firstBySay.get(say);
+    if (first) {
+      copies.set(first.id, [...(copies.get(first.id) ?? []), item.id]);
+    } else {
+      firstBySay.set(say, item);
+      kept.push(item);
+    }
+  }
+  return { items: kept, copies };
 }
 
 const CHANGE_WORDS: Record<OsPlanChange['change'], string> = {
@@ -152,6 +172,14 @@ export interface CompleteAction {
   confirm?: { question: string; yes: string };
 }
 
+/** A review step is closed by approving its pack or visa file on that page, never by hand (the API refuses it):
+ * the page it opens, or null for any other step. */
+export function reviewPage(item: OsInboxItem): { page: 'os-pack' | 'os-visa'; label: string } | null {
+  if (item.instance_key.startsWith('review_visa_file')) return { page: 'os-visa', label: 'Open visa file' };
+  if (item.instance_key.startsWith('review_pack')) return { page: 'os-pack', label: 'Open pack' };
+  return null;
+}
+
 /** The buttons an item offers and what each sends: an admission result says admitted or not (the visa page
  * pre-selects the admitted programme); "Not admitted" names the programme and asks first, since it starts removing
  * that programme. Other choices confirm; a plan update is acknowledged; the rest are marked done. */
@@ -163,6 +191,7 @@ export function completeActions(item: OsInboxItem, names: Record<string, string>
               confirm: { question: `Did ${name} say no? We will then suggest removing ${name} from your plan.`,
                          yes: `Yes, ${name} did not admit me` } }];
   }
+  if (reviewPage(item)) return [];
   if (isNotice(item)) return [{ label: 'OK', payload: {} }];
   if (item.inbox_kind === 'choose') return [{ label: 'Confirm', payload: {} }];
   return [{ label: 'Mark as done', payload: {} }];

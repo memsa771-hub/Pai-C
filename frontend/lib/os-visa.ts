@@ -46,7 +46,8 @@ export interface OsVisa extends Omit<OsPack, 'programme_ref' | 'status'> {
 /** "11904 EUR", or "not confirmed yet" when the route's amount is missing. */
 export function fundsLine(f: OsFunds | null): string {
   if (f === null || f.required === null) return 'not confirmed yet';
-  return `${Number.isInteger(f.required) ? f.required : f.required.toFixed(2)} ${f.currency_label}`;
+  const digits = Number.isInteger(f.required) ? 0 : 2;  // grouped, so 11904 reads as 11,904
+  return `${f.required.toLocaleString('en-US', { minimumFractionDigits: digits, maximumFractionDigits: digits })} ${f.currency_label}`;
 }
 
 export function programmeLabel(p: OsVisaProgramme): string {
