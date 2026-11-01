@@ -5,7 +5,7 @@ programme's facts, the playbook's constants and citations, and the student's tic
 from dataclasses import asdict, dataclass, field
 from typing import Any
 
-from app.os.packs.config import PackConfig
+from app.os.packs.config import ENTERED, PackConfig
 from app.os.packs.funds import FundsResult
 
 ENTERED_PREFIX = "entered."  # profile key of a value the student typed: "entered.<data-sheet field key>"
@@ -106,16 +106,29 @@ def load_inputs(engine, tenant_id: str, knowledge, book, cfg: PackConfig, statem
         required_override=override, funds=funds, kind=kind, programme_ref=programme_ref if visa else None)
 
 
+def read_by(cfg: PackConfig) -> tuple[set[str], set[str]]:
+    """The document types and profile keys this pack is built from: its checklist's documents, and its data sheet's
+    sources (a document field, or a value the student typed)."""
+    fields = cfg.fields()
+    docs = {i.ref for i in cfg.checklist if i.kind == "document" and i.ref}
+    docs |= {f.source.split(".", 1)[0] for f in fields if f.source != ENTERED}
+    profile = {f.source for f in fields if f.source != ENTERED} | {ENTERED_PREFIX + f.key for f in fields if f.source == ENTERED}
+    return docs, profile
+
+
 def inputs_sha(inp: PackInputs) -> str:
-    """A fingerprint of everything the pack is built from: a change to any input gives a new build (and version)."""
+    """A fingerprint of everything the pack is built from: a change to any input gives a new build (and version).
+    Only the documents and profile values the pack reads count (pai-merge hand test: confirming an admission letter
+    for the visa file rebuilt both approved packs with the same content, and dropped their approvals)."""
     import hashlib
     import json
 
+    docs, profile = read_by(inp.cfg)
     body = {
         "config": [inp.cfg.route_key, inp.cfg.version],
-        "documents": {k: [d.status, d.document_id, d.sha256] for k, d in inp.documents.items()},
+        "documents": {k: [d.status, d.document_id, d.sha256] for k, d in inp.documents.items() if k in docs},
         "statements": inp.statements,
-        "profile": {k: [v.value, v.source, v.document_id] for k, v in inp.profile.items()},
+        "profile": {k: [v.value, v.source, v.document_id] for k, v in inp.profile.items() if k in profile},
         "facts": {k: [f.value, f.status, f.url] for k, f in inp.facts.items()},
         "constants": {k: c.value for k, c in inp.constants.items()},
         # a tick after approving (paid the fee) is not part of what is approved: it never makes a new version

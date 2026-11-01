@@ -273,3 +273,20 @@ def test_manifest_records_its_inputs(packs):
     art = packs.pack()
     manifest = json.loads(ArtifactStore(packs.engine, TENANT).version(art.id, art.current_version).text)
     assert manifest["inputs_sha256"] == inputs_sha(packs.inputs())
+
+
+def test_unread_document_or_profile_value_keeps_the_fingerprint(packs):
+    """pai-merge hand test: confirming an admission letter for the visa file rebuilt both approved packs with the same
+    content and dropped their approvals. A pack's fingerprint counts only what the pack reads."""
+    from dataclasses import replace
+
+    from app.os.packs.inputs import DocState, ProfileValue, read_by
+
+    base = packs.inputs()
+    docs, profile = read_by(CFG)
+    assert "admission_letter" not in docs and "passport" in docs and "entered.email" in profile
+    extra = replace(base, documents={**base.documents, "admission_letter": DocState("confirmed", 99, "f" * 64)},
+                    profile={**base.profile, "admission_letter.programme": ProfileValue("MSc Example", "document", 99)})
+    assert inputs_sha(extra) == inputs_sha(base)
+    changed = replace(base, documents={**base.documents, "passport": DocState("confirmed", 98, "e" * 64)})
+    assert inputs_sha(changed) != inputs_sha(base)
