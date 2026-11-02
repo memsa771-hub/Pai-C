@@ -402,6 +402,48 @@ expected and what happened, and take a screenshot.
 
 ---
 
+## Part 4b: A live demo, end to end (optional, costs money)
+
+Part 4 runs with the AI switched off. For a demo with the real counsellor and real AI in the whole study abroad
+plan, you add OpenAI keys. **Every message, document and draft is then sent to OpenAI and costs money.** Use a
+made-up student and made-up documents only.
+
+1. **Set a budget first.** In the OpenAI dashboard, open **Settings → Limits** and set a monthly budget for the key
+   you use, so a long demo cannot run up a surprise bill.
+2. **Edit `.env`.** Open `.env` (in `pai-merge-test`) in Notepad. Change `OS_MODEL_MODE=offline` to
+   `OS_MODEL_MODE=openai`, and add:
+
+   ```
+   PAI_ENABLED=true
+   PAI_API_KEY=your OpenAI key
+   OS_OPENAI_API_KEY=your OpenAI key
+   OS_DOCUMENTS_MONTHLY_USD=5
+   OS_STATEMENTS_MONTHLY_USD=5
+   OS_RESEARCH_MONTHLY_USD=5
+   OS_REPLAN_MONTHLY_USD=2
+   ```
+
+   Each `..._MONTHLY_USD` line stops that part of PAI OS for the month at that many US dollars. The counsellor has
+   no dollar cap of its own (only 20 path analyses a day), which is why the budget in step 1 matters.
+3. **Start fresh**, so the demo student has a clean history: `python scripts/run.py --fresh`. (Plain
+   `python scripts/run.py` keeps your old test students; PAI is added to them the next time they sign in.)
+4. **Run the demo:**
+   - Create the student (Part 4.1) and answer the three questions (4.2).
+   - **Talk with the counsellor.** It now answers, finds paths and moves the student along the journey.
+   - **Open "Study abroad plan"** and follow Parts 4.4 to 4.12. Documents are read for real: upload real-looking
+     made-up documents with the right type. Statements and the CV are written for real from the answers.
+     Programme facts are researched from the universities' own pages.
+   - Move time with `python scripts/os_clock.py`, as before.
+
+What stays local and safe in the demo: sign-in is still the pretend Google, emails are only written to the log, and
+the PAI OS clock moves only when you run `os_clock.py`. The counsellor's choice of paths does not yet flow into
+the study abroad plan by itself: the student picks programmes on its Start page. "Study abroad plan" shows at any
+stage; add `NEXT_PUBLIC_OS_REHEARSAL=false` to `.env` to show it only from stage H, as for a real student.
+
+**Back to the free test:** set `OS_MODEL_MODE=offline` again and empty the key lines, then `python scripts/run.py`.
+
+---
+
 ## Part 5: Stop, wipe, restart
 
 | I want to… | Type this (inside `pai-merge-test`) |

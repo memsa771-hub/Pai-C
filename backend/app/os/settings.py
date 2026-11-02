@@ -77,8 +77,8 @@ def load_settings(env: Mapping[str, str] | None = None) -> OsSettings:
     if model_mode == "offline" and answers_dir is None:
         raise ModelModeError("OS_MODEL_MODE=offline needs OS_OFFLINE_ANSWERS_DIR (the folder of canned answers)")
     live_agents = frozenset(a.strip().lower() for a in (env.get("OS_LIVE_AGENTS") or "").split(",") if a.strip())
-    if live_agents and model_mode != "offline":
-        raise ModelModeError("OS_LIVE_AGENTS is for offline mode only: with OS_MODEL_MODE=openai every agent is live")
+    if model_mode != "offline":
+        live_agents = frozenset()  # every agent is live already
     if live_agents and not (env.get("OS_OPENAI_API_KEY") or "").strip():
         raise ModelModeError("OS_LIVE_AGENTS needs OS_OPENAI_API_KEY (the live agents call OpenAI)")
     email_sender = (env.get("OS_EMAIL_SENDER") or "").strip().lower() or "log"

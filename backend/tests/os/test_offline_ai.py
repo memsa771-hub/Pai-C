@@ -57,11 +57,11 @@ def test_mode_defaults_and_offline_accepted():
     assert s.live_agents == frozenset()
 
 
-def test_live_agents_need_offline_mode_and_a_key():
+def test_live_agents_need_a_key_and_matter_only_offline():
     with pytest.raises(ValueError, match="OS_OPENAI_API_KEY"):
         load_settings({**OFFLINE, "OS_LIVE_AGENTS": "documents"})
-    with pytest.raises(ValueError, match="offline mode only"):
-        load_settings({**BASE, "OS_LIVE_AGENTS": "documents", "OS_OPENAI_API_KEY": "sk-test"})
+    # with every agent live, the list has nothing to switch: ignored, so a .env that keeps it still starts
+    assert load_settings({**BASE, "OS_LIVE_AGENTS": "documents", "OS_OPENAI_API_KEY": "sk-test"}).live_agents == frozenset()
 
 
 def test_live_agent_uses_openai_in_offline_mode():

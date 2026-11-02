@@ -48,14 +48,14 @@ x-backend: &backend
     FIREBASE_SERVICE_ACCOUNT: ""
     # Account emails (verify, reset) are not sent: no RESEND_API_KEY, so each send is only logged.
     RESEND_API_KEY: ""
-    # PAI OS (backend/app/os), switched on for the local test. Pinned here, not left to .env, so
-    # this stack can only run in rehearsal mode with offline (canned) AI and logged emails:
-    # no OpenAI call, no real email, a clock moved only by the admin calls.
+    # PAI OS (backend/app/os), switched on for the local test. Rehearsal mode and logged emails are pinned here,
+    # not left to .env: no real email, and a clock moved only by the admin calls. The AI is offline (canned) unless
+    # .env says otherwise (OS_MODEL_MODE=openai for a live demo; see the Windows guide).
     OS_ENABLED: "true"
     OS_DATABASE_URL: postgresql+psycopg2://${DB_USER:-pai_admin}:${DB_PASSWORD:-pai_local}@postgres:5432/openagents_workspace
     OS_TENANT_ID: pai
     OS_REHEARSAL: "on"
-    OS_MODEL_MODE: offline
+    OS_MODEL_MODE: ${OS_MODEL_MODE:-offline}
     # Real document reading in this test (optional): put OS_OPENAI_API_KEY and OS_LIVE_AGENTS=documents in .env.
     # Only the document reader then calls OpenAI, capped by OS_DOCUMENTS_MONTHLY_USD; everything else stays offline.
     OS_OPENAI_API_KEY: ${OS_OPENAI_API_KEY:-}
@@ -124,6 +124,11 @@ services:
   os-setup:
     <<: *backend
     entrypoint: ["python", "-m", "tests.os.rehearsal.local_stack"]
+    # Seeding only (programmes, facts, clock, sample answers): always offline, whatever the services' AI mode.
+    environment:
+      <<: *backend-env
+      OS_MODEL_MODE: offline
+      OS_LIVE_AGENTS: ""
     volumes:
       - os_answers:/data/os-answers
       # tests/ is not in the image (.dockerignore); read-only, for the seed and answer tools.
@@ -223,7 +228,7 @@ services:
         # pai-merge: show the PAI OS pages ("Study abroad plan").
         NEXT_PUBLIC_OS_ENABLED: "true"
         # pai-merge: rehearsal, so the plan is reachable at any journey stage (the AI counsellor is off here).
-        NEXT_PUBLIC_OS_REHEARSAL: "true"
+        NEXT_PUBLIC_OS_REHEARSAL: ${NEXT_PUBLIC_OS_REHEARSAL:-true}
         NEXT_PUBLIC_ENABLE_DMS: ${NEXT_PUBLIC_ENABLE_DMS:-false}
     depends_on:
       backend: {condition: service_healthy}
