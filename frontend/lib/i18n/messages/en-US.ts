@@ -718,8 +718,8 @@ export const messages = {
     chip: 'Set Journey',
     steps: {
       '1': { title: 'What is your name?', bubble: 'I like making things, but I am not sure which path fits me. Where should I start?' },
-      '2': { title: 'Where are you in your studies?', bubble: 'Nice to meet you. Tell me where you are in your studies.', eyebrow: 'GETTING TO KNOW YOU', heading: 'A little context. A better journey.' },
-      '3': { title: 'A little about you', bubble: 'Last one. Knowing where you are helps me talk about real options later.', eyebrow: 'ONE LAST DETAIL', heading: 'Your next chapter starts here.' },
+      '2': { title: 'A little about you', bubble: 'Nice to meet you. Knowing where you live helps me talk about real options later.', eyebrow: 'GETTING TO KNOW YOU', heading: 'A little context. A better journey.' },
+      '3': { title: 'Where are you in your studies?', bubble: 'Last one. Tell me where you are in your studies.', eyebrow: 'ONE LAST DETAIL', heading: 'Your next chapter starts here.' },
     },
     field: {
       firstName: 'First name',

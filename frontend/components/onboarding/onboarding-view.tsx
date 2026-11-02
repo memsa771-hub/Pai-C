@@ -2,7 +2,7 @@
 
 /** Three short steps of schema-driven questions; deeper discovery stays in the
  * conversation. The backend owns which fields exist, their step, choices,
- * defaults and which answer reveals them (step 2 asks the level, then its
+ * defaults and which answer reveals them (step 3 asks the level, then its
  * group, subjects, technology or field, then status and year); this file owns
  * how they look. */
 
@@ -109,8 +109,8 @@ export function OnboardingView({ state, onDone }: {
   const back = () => { setDirection(-1); setIndex(index - 1); };
 
   const stepKey = String(step);
-  // One Figma frame per step: 01 Your name, 02 About you, 03 Your location.
-  const panel: AuthPanel = (['name', 'about', 'location'] as const)[Math.min(index, 2)];
+  // One Figma frame per step: 01 Your name, 02 Your location, 03 Your studies.
+  const panel: AuthPanel = (['name', 'location', 'about'] as const)[Math.min(index, 2)];
   const first = index === 0;
   return (
     <MotionConfig reducedMotion="user">

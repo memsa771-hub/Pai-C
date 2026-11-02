@@ -15,10 +15,10 @@ beforeAll(() => {
 afterEach(() => { cleanup(); api.submit.mockReset(); });
 
 const spec = (name: string, extra: Partial<OnboardingFieldSpec> = {}): OnboardingFieldSpec => ({
-  name, fieldKey: 'education', required: true, choices: [], isDate: false, step: 2, ...extra,
+  name, fieldKey: 'education', required: true, choices: [], isDate: false, step: 3, ...extra,
 });
 const notDegree = ['matric', 'o_level', 'intermediate', 'a_level', 'masters'];
-// Shaped like GET /v1/vault/onboarding; step 2 alone, so the form opens on it.
+// Shaped like GET /v1/vault/onboarding; the education step alone, so the form opens on it.
 const state: OnboardingState = {
   required: true, completedAt: null, prefill: {},
   fields: [

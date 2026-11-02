@@ -159,7 +159,7 @@ function PanelContent({ panel, prompt }: { panel: AuthPanel; prompt: string }) {
       </>
     );
   }
-  const step = panel === 'about' ? '2' : '3';
+  const step = panel === 'location' ? '2' : '3';
   return (
     <>
       {/* Steps 2–3: the orbit around PAI and two small accents. */}

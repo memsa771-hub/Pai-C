@@ -1912,11 +1912,11 @@
    "freshness_days": null,
    "version": 1,
    "onboarding": {
-    "order": 3,
+    "order": 4,
     "prompt": "When were you born?",
     "input": "date",
     "name": "dateOfBirth",
-    "step": 3
+    "step": 2
    },
    "field_definition": {
     "category": "identity",
@@ -2059,12 +2059,12 @@
    "freshness_days": 180,
    "version": 1,
    "onboarding": {
-    "order": 5,
+    "order": 2,
     "prompt": "Which country do you live in?",
     "input": "text",
     "default": "Pakistan",
     "name": "currentCountry",
-    "step": 3,
+    "step": 2,
     "options": [
      "Pakistan"
     ]
@@ -2109,11 +2109,11 @@
    "freshness_days": 180,
    "version": 1,
    "onboarding": {
-    "order": 6,
+    "order": 3,
     "prompt": "Which city do you live in?",
     "input": "text",
     "name": "currentCity",
-    "step": 3
+    "step": 2
    },
    "field_definition": {
     "category": "location",
@@ -2478,7 +2478,7 @@
    "freshness_days": null,
    "version": 1,
    "onboarding": {
-    "order": 4,
+    "order": 5,
     "prompt": "What is your gender?",
     "input": "choice",
     "choices": [
@@ -2487,7 +2487,7 @@
      "undisclosed"
     ],
     "name": "gender",
-    "step": 3
+    "step": 2
    },
    "field_definition": {
     "category": "identity",
@@ -2682,12 +2682,12 @@
     }
    },
    "onboarding": {
-    "order": 2,
+    "order": 6,
     "prompt": "Where are you now?",
     "input": "choice",
     "choices": "levels",
     "name": "level",
-    "step": 2,
+    "step": 3,
     "record_field": "qualification_name",
     "allow_other": true,
     "shown": [

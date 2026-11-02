@@ -5,7 +5,7 @@ choose a professional field of study and then a place to study it. Hobbies, side
 supporting evidence only, never the goal of the conversation.
 
 ## 1. Onboarding captures current education exactly
-Step 2 of onboarding asks, with taps only:
+Step 3 of onboarding asks, with taps only (step 2 asks country and city first, so this step can follow the country):
 1. **Where are you now?** Matric · O-level · Intermediate · A-level · DAE (diploma) · Bachelor's · Master's ·
    Other.
 2. **Which group?** Shown only for the first answer that has one:
@@ -19,7 +19,7 @@ Marks stay optional (later, by chat card or result card).
 All answers become ONE education record, Stated, through the existing propose → reconcile door. Intermediate
 keeps today's codes: Pre-Engineering and Pre-Medical are qualification `fsc` with `field_of_study`
 `pre_engineering` or `pre_medical`; ICS, I.Com and FA keep `ics`, `icom`, `fa`. Lists live in the Vault catalog.
-Date of birth, gender, country and city stay as they are.
+Country, city, date of birth and gender are step 2 (country first).
 
 ## 2. Study fields, and which fields a group opens
 A data file (`pai_c/policy/study_fields.json`) lists the fields of study students in Pakistan and abroad
