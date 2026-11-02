@@ -188,7 +188,7 @@ def _redirect(field: OnboardingField, value: Any) -> Optional[str]:
 
 def _redirects(field: OnboardingField) -> dict:
     """Every normalised wording of a level -> its chip, so the form can say
-    "Choose Intermediate above" on step 2 instead of failing at the end."""
+    "Choose Intermediate above" on the education step instead of failing at the end."""
     if not (field.allow_other and field.choice_list and field.choices):
         return {}
     out = {}

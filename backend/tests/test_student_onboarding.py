@@ -305,13 +305,15 @@ THREE_STEPS = {"firstName": "Sam", "lastName": "Taylor", "level": "Secondary edu
 
 def test_three_step_form_is_advertised_in_order_with_no_reply_language(db):
     state = OnboardingService(db).state(db.info["workspace"])
-    # Step 2 is the student's education alone; date of birth and gender moved
-    # beside the location so step 2 stays short on a phone.
+    # Step 2 asks where the student lives first (the education step will
+    # depend on the country), then date of birth and gender; step 3 is the
+    # student's education alone.
     assert [(f["name"], f["step"]) for f in state["fields"]] == [
-        ("firstName", 1), ("lastName", 1), ("level", 2), ("group", 2), ("group", 2),
-        ("subjects", 2), ("subjects", 2), ("technology", 2), ("field", 2), ("field", 2),
-        ("status", 2), ("year", 2), ("year", 2), ("year", 2), ("year", 2),
-        ("dateOfBirth", 3), ("gender", 3), ("currentCountry", 3), ("currentCity", 3)]
+        ("firstName", 1), ("lastName", 1),
+        ("currentCountry", 2), ("currentCity", 2), ("dateOfBirth", 2), ("gender", 2),
+        ("level", 3), ("group", 3), ("group", 3),
+        ("subjects", 3), ("subjects", 3), ("technology", 3), ("field", 3), ("field", 3),
+        ("status", 3), ("year", 3), ("year", 3), ("year", 3), ("year", 3)]
     assert "replyLanguage" not in {f["name"] for f in state["fields"]}
     # The default country is data, shown pre-selected for a new student.
     assert state["prefill"]["currentCountry"] == "Pakistan"
@@ -632,7 +634,7 @@ def test_other_and_the_level_wordings_are_advertised(db):
     db.commit()
     assert _education_rows(db)[0].qualification_name == "other"
     level = next(f for f in service.state(db.info["workspace"])["fields"] if f["name"] == "level")
-    # Normalised wordings -> the chip they mean, so the form says so before step 3.
+    # Normalised wordings -> the chip they mean, so the form says so before the form is sent.
     assert level["redirects"]["inter"] == "intermediate"
     assert level["redirects"]["bs"] == "bachelor"
     assert level["redirects"]["o levels"] == "o_level"
