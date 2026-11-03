@@ -13,6 +13,55 @@ browser --https--> Caddy or nginx (host, ports 80/443)
 Everything runs from `docker-compose.prod.yml`. The containers bind to
 127.0.0.1 only, so nothing is reachable from the internet except through the proxy.
 
+## The short way: operator.py
+
+`operator.py` at the repo root does sections 1 to 8 below on its own. Copy that
+one file to a fresh Ubuntu server (or run it from a checkout) and:
+
+```
+python3 operator.py deploy
+```
+
+It updates apt, installs Docker (and Caddy when nothing holds ports 80/443),
+adds swap on small servers, clones the repo to `~/pai-c`, asks for the secrets
+it does not have (keys are typed hidden; the Firebase JSON is pasted or given
+with `--firebase-json`), picks free ports when 3000/8000 are taken, joins the
+website's Caddy container when that is the proxy, builds, waits for health,
+writes the two site blocks, reloads the proxy, checks the public URLs and adds a
+daily backup to cron. Re-running it is safe: finished steps are skipped. Every
+decision is printed and kept in `operator.log`; secrets never are.
+
+Afterwards:
+
+```
+python3 operator.py status                   containers, RAM, disk, health, live URLs, spend
+python3 operator.py update                   backup, git pull, rebuild what changed, check
+python3 operator.py logs                     follow backend + worker
+python3 operator.py backup                   Postgres dump -> backups/ (14 kept)
+python3 operator.py restore backups/<file>   put a dump back (asks first)
+python3 operator.py env PAI_MONTHLY_CAP_USD=40 PAI_RESEARCHER_MODEL=gpt-5-mini
+                                             set .env values and restart backend + worker
+python3 operator.py restart | stop | start
+```
+
+Moving to another server:
+
+```
+python3 operator.py export                   db + uploads + .env + secrets -> one .tar.gz
+python3 operator.py import <that file>       on the new server, then `deploy`
+python3 operator.py migrate-from ubuntu@old-server      the two steps above over ssh
+                                             (the new server needs ssh access to the old one)
+```
+
+The RAM check refuses a server under 1.5 GB (`--force` overrides) and warns
+under 4 GB: the stack is sized for a t3.medium. The rest of this document is
+the same procedure by hand, for when you want to see or change a step.
+
+One caution about the file name: a `operator.py` in the current folder shadows
+Python's standard `operator` module for *other* Python programs started from
+that folder (`python3 -c ...`, `python3 -m ...` in `~/pai-c`). The script
+guards itself; run other Python from a different folder.
+
 ## 0. Before you start
 
 - Server: Ubuntu 22.04 or 24.04, at least 2 vCPU and 4 GB RAM (8 GB is

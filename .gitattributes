@@ -1,1 +1,2 @@
 *.sh text eol=lf
+operator.py text eol=lf
