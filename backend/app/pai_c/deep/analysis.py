@@ -37,10 +37,6 @@ class AnalysisOrderPending(JobDeferred):
     """An older turn must finish its analysis before this one can apply."""
 
 
-class AnalysisPredecessorFailed(RuntimeError):
-    """A prior turn needs replay before later evidence can be interpreted."""
-
-
 class AnalysisPatchRejected(RuntimeError):
     """Both model attempts failed validation; preserve this job for replay.
 
@@ -123,7 +119,7 @@ async def _workspace_lock(db, workspace_id: str):
         local.release()
 
 
-def _prior_job_pending(db, job) -> bool:
+def _earlier_analyses(db, job, statuses) -> list:
     payload = job.payload or {}
     current_order = (payload.get("source_timestamp"), payload.get("user_event_id"))
     if not isinstance(current_order[0], int) or not isinstance(current_order[1], str):
@@ -132,23 +128,43 @@ def _prior_job_pending(db, job) -> bool:
         BackgroundJob.workspace_id == job.workspace_id,
         BackgroundJob.job_type == JOB_ANALYZE,
         BackgroundJob.id != job.id,
-        BackgroundJob.status.in_(("pending", "running", "failed")),
+        BackgroundJob.status.in_(statuses),
     )).scalars().all()
+    earlier_rows = []
     for other in rows:
         item = other.payload or {}
         earlier = (item.get("source_timestamp"), item.get("user_event_id"))
         if isinstance(earlier[0], int) and isinstance(earlier[1], str) and earlier < current_order:
-            if other.status == "failed":
-                raise AnalysisPredecessorFailed("earlier analysis failed; replay required")
-            return True
-    return False
+            earlier_rows.append((earlier, other))
+    return [other for _, other in sorted(earlier_rows, key=lambda pair: pair[0])]
+
+
+def _prior_job_pending(db, job) -> bool:
+    """True only while an earlier turn is still pending or running. A failed
+    earlier turn never blocks: it is kept for replay (R-47)."""
+    return bool(_earlier_analyses(db, job, ("pending", "running")))
+
+
+def _skip_failed_predecessors(db, job) -> list[str]:
+    """Mark earlier failed analyses as skipped by this job; they stay failed
+    and replayable. Returns their ids, in order."""
+    failed = _earlier_analyses(db, job, ("failed",))
+    for other in failed:
+        result = other.result or {}
+        if "skipped_by" not in result:
+            other.result = {**result, "skipped_by": job.id}
+    if failed:
+        db.commit()
+        logger.info("counselor_analysis_predecessor_skipped workspace_id=%s job_id=%s skipped=%d",
+                    job.workspace_id, job.id, len(failed))
+    return [other.id for other in failed]
 
 
 def replay_failed_analyses(db, workspace_id: str) -> int:
     """Operator recovery after fixing a permanent failure; retain original order.
 
-    Reuse the existing rows and idempotency keys. Successful turns are never
-    replayed, and live analyses cannot be reset beneath another worker.
+    Replays failed turns, including ones a later analysis skipped. Reuse the
+    existing rows and idempotency keys. Successful turns are never replayed, and live analyses cannot be reset beneath another worker.
     """
     workspace = db.scalar(select(Workspace).where(
         Workspace.id == workspace_id, Workspace.status == "active").with_for_update())
@@ -312,6 +328,8 @@ async def analyze_job(job, db) -> dict:
     async with _workspace_lock(db, job.workspace_id):
         if _prior_job_pending(db, job):
             raise AnalysisOrderPending("earlier analysis pending")
+        skipped = _skip_failed_predecessors(db, job)
+        extra = {"skipped_predecessors": skipped} if skipped else {}
         duplicate = db.execute(select(CounselorNotebookHistory.id).where(
             CounselorNotebookHistory.workspace_id == job.workspace_id,
             CounselorNotebookHistory.source_event_id == user_event_id,
@@ -319,7 +337,7 @@ async def analyze_job(job, db) -> dict:
         if duplicate:
             _advance_stage(db, job.workspace_id,
                            MemoryService(db).truth_map(job.workspace_id).notebook)
-            return {"status": "duplicate"}
+            return {"status": "duplicate", **extra}
         student = db.execute(select(EventRecord).where(
             EventRecord.id == user_event_id,
             EventRecord.network_id == job.workspace_id,
@@ -339,7 +357,7 @@ async def analyze_job(job, db) -> dict:
             candidate, plan, calls = await _candidate(db, job.workspace_id, student, assistant, previous)
             model_calls += calls
             if candidate is None:
-                return {"status": "patch_rejected", "model_calls": model_calls}
+                return {"status": "patch_rejected", "model_calls": model_calls, **extra}
             try:
                 if plan is not None:
                     db.add(PaiTurnPlan(workspace_id=job.workspace_id, source_event_id=user_event_id,
@@ -356,7 +374,7 @@ async def analyze_job(job, db) -> dict:
                     db.commit()
                 return {"status": "applied", "version": snapshot.version,
                         "sanitized": len(storage_issues), "sensitive_removed": 0,
-                        "model_calls": model_calls}
+                        "model_calls": model_calls, **extra}
             except NotebookVersionConflict:
                 db.rollback()
                 if attempt:
