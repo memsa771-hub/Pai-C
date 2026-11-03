@@ -30,6 +30,10 @@ export type Possibility = {
    * Matric student would need; outdated: a kept path from before fields;
    * out_of_group: a kept field the student's current group does not open. */
   study_field?: StudyField | null;
+  /** Why the path was dismissed for the student: a field they excluded in
+   * chat (the Vault option and their words); restored_at once they brought
+   * it back. */
+  dismissal?: { reason: string; item_id: string; quote?: string; at: string; restored_at?: string } | null;
   unknowns: string[];
 };
 

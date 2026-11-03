@@ -149,6 +149,14 @@ async def check_job(job, db):
     return result
 
 
+def care_active(db, workspace_id) -> bool:
+    """The latest turn was care (a wellbeing move or the care action): a
+    fixed message from a background job waits until it is over."""
+    last = db.scalar(select(CounselorTurnDecision).where(CounselorTurnDecision.workspace_id == workspace_id)
+        .order_by(CounselorTurnDecision.source_timestamp.desc()).limit(1))
+    return bool(last and (last.move == "wellbeing" or (last.decision or {}).get("action") == "care"))
+
+
 async def _deliver_information(job, db, result):
     from app.pai_c.posting import send_to_student
     from app.services.pai import PAI_AGENT_NAME
@@ -163,9 +171,7 @@ async def _deliver_information(job, db, result):
         EventRecord.id == job.payload.get("source_event_id")))
     if request is None or source is None or request.status not in {"open", "unanswered"}:
         return
-    last = db.scalar(select(CounselorTurnDecision).where(CounselorTurnDecision.workspace_id == job.workspace_id)
-        .order_by(CounselorTurnDecision.source_timestamp.desc()).limit(1))
-    if last and (last.move == "wellbeing" or (last.decision or {}).get("action") == "care"):
+    if care_active(db, job.workspace_id):
         deferred = JobDeferred("Information delivery waits for care")
         deferred.delay_seconds = policy()["care_retry_seconds"]
         raise deferred

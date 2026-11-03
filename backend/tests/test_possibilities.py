@@ -176,9 +176,10 @@ def test_migration_111_upgrade_constraints_and_downgrade():
             connection.exec_driver_sql('CREATE TABLE pai_roadmaps (id TEXT PRIMARY KEY)')
             operations=Operations(MigrationContext.configure(connection))
             with patch.object(migration,'op',operations): migration.upgrade()
-            # The model is at head; 112 and 117 only add these columns (SQLite cannot swap 112's check).
+            # The model is at head; 112, 117 and 123 only add these columns (SQLite cannot swap 112's check).
             operations.add_column('pai_possibilities',sa.Column('fit',JSONB(),nullable=False,server_default=sa.text("'[]'")))
             operations.add_column('pai_possibilities',sa.Column('study_field',JSONB(),nullable=True))
+            operations.add_column('pai_possibilities',sa.Column('dismissal',JSONB(),nullable=True))
         with student.factory() as db:
             _,journey,_=prepare(student,db)
             row=PossibilityService(db).add(student.workspace_id,journey.id,title='Practical route',why='Evidence',kind='discovered',source='planner',status='suggested')
@@ -189,6 +190,37 @@ def test_migration_111_upgrade_constraints_and_downgrade():
         with student.engine.begin() as connection:
             with patch.object(migration,'op',Operations(MigrationContext.configure(connection))): migration.downgrade()
             assert 'pai_possibilities' not in inspect(connection).get_table_names()
+
+
+@pytest.mark.req("R-47")
+def test_migration_123_adds_and_drops_dismissal_column():
+    import importlib.util
+    from pathlib import Path
+    from alembic.migration import MigrationContext
+    from alembic.operations import Operations
+    from sqlalchemy import inspect
+    spec=importlib.util.spec_from_file_location('migration123',Path(__file__).parents[1]/'alembic/versions/123_possibility_dismissal.py')
+    migration=importlib.util.module_from_spec(spec); spec.loader.exec_module(migration)
+    assert migration.revision=='123' and migration.down_revision=='122'
+    def columns(connection):
+        return {column['name'] for column in inspect(connection).get_columns('pai_possibilities')}
+    with StudentSession() as student:
+        with student.engine.begin() as connection:
+            operations=Operations(MigrationContext.configure(connection))
+            # The model is at head: step back to 122 first.
+            operations.drop_column('pai_possibilities','dismissal')
+            before=columns(connection)
+            with patch.object(migration,'op',operations): migration.upgrade()
+            assert columns(connection)-before=={'dismissal'}
+        with student.factory() as db:
+            _,journey,_=prepare(student,db)
+            row=PossibilityService(db).add(student.workspace_id,journey.id,title='Practical route',why='Evidence',kind='discovered',source='planner',status='suggested')
+            row.dismissal={'reason':'student_excluded','item_id':'i1','quote':'not for me','at':'2026-11-03T00:00:00+00:00'}
+            db.commit(); db.expire_all()
+            assert db.get(PaiPossibility,row.id).dismissal['item_id']=='i1'
+        with student.engine.begin() as connection:
+            with patch.object(migration,'op',Operations(MigrationContext.configure(connection))): migration.downgrade()
+            assert columns(connection)==before
 
 
 @pytest.mark.asyncio

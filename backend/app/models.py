@@ -174,6 +174,10 @@ class PaiPossibility(Base):
     # "needs_group": [{"code", "label"}]}; {"outdated": true} marks a kept path
     # from before fields of study; null for the student's own and older rows.
     study_field = Column(JSONB, nullable=True)
+    # Why a path was dismissed for the student (migration 123): {"reason":
+    # "student_excluded", "item_id", "quote", "at", "restored_at"?}, the Vault
+    # option they ruled out in their own words; null otherwise.
+    dismissal = Column(JSONB, nullable=True)
     mentioned_at = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True), nullable=False, default=_now)
     updated_at = Column(DateTime(timezone=True), nullable=False, default=_now)

@@ -65,8 +65,14 @@ class PossibilityService:
             raise PossibilityError("This action is not available for this possibility")
         if row.status == target:
             return row, False
+        now = datetime.now(timezone.utc)
+        if (row.status == "dismissed" and action in {"save", "explore"}
+                and (row.dismissal or {}).get("reason") == "student_excluded"):
+            # The student brought back a path they had excluded: the same
+            # exclusion must not dismiss it again (paths/exclusions.py).
+            row.dismissal = {**row.dismissal, "restored_at": now.isoformat()}
         row.status = target
-        row.updated_at = datetime.now(timezone.utc)
+        row.updated_at = now
         self.db.flush()
         return row, True
 
