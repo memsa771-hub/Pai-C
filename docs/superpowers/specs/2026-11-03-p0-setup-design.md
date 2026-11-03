@@ -25,6 +25,8 @@ Also started here, owned by P1: the freeze CI check and CODEOWNERS entries for R
 | P0-D3 | **Standalone suite = a marker.** A `standalone` pytest marker on the tests that prove PAI OS works with the Counsellor module off (the Slice 4–7 gates and the module-off tests). CI job `standalone` runs `pytest tests/os -m standalone` against Postgres. |
 | P0-D4 | **P0-T1 "baseline green" is added.** `pai-merge` has 7 failing tests today; they are fixed at their cause, never by weakening a test. P0-T1 merges into `pai-connect` before Task 0, so Task 0's CI can be green. |
 | P0-D5 | **Freeze check is a script, not a path filter.** Path rules for the frozen files, and for `backend/app/config.py` a comparison of the Counsellor model settings only, so other settings stay editable. It runs in its own workflow so a label change doesn't rerun the 18-minute OS job. |
+| P0-D6 | **`backend/app/config.py` is owned by the Counsellor lead alone** (CODEOWNERS), so a change to the frozen Counsellor model settings needs the lead's approval. PAI OS keeps its own settings in `backend/app/os/settings.py`, so this costs the OS developers little. |
+| P0-D7 | **Branch rulesets are kept as files** in `docs/connect/rulesets/` (`pai-connect`: squash, six required checks including `freeze`; `pai-merge`: merge commit, five checks), with Code Owner review required on both. A repository admin imports them; `backend/tests/test_connect_rulesets.py` keeps them in step with the CI jobs. Until imported, CI and CODEOWNERS are advisory. |
 
 ## 3. Baseline found on `pai-merge` (`c3360b1`)
 
