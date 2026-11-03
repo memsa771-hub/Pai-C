@@ -69,8 +69,8 @@ def main(argv):
         return 2
     before, after = load(argv[1]), load(argv[2])
     for key in ("mode", "policy_mode"):
-        if before.get(key) != after.get(key):
-            print(f"Warning: comparing {key} {before.get(key)} with {after.get(key)}")
+        if before.get(key, "default") != after.get(key, "default"):
+            print(f"Warning: comparing {key} {before.get(key, 'default')} with {after.get(key, 'default')}")
             print()
     rows = compare(before, after)
     if not rows:
