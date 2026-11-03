@@ -89,6 +89,7 @@ async def test_question_trim_leaves_opening_wording_for_prompt_and_eval():
         assert result.reply == "Great, tell me what you built?"
 
 
+@pytest.mark.req("R-47")
 @pytest.mark.asyncio
 async def test_configured_blocked_script_retries_once_then_uses_configured_fallback():
     with StudentSession() as student, student.factory() as db:
@@ -102,9 +103,27 @@ async def test_configured_blocked_script_retries_once_then_uses_configured_fallb
         retry_prompt = model.call_args.kwargs["system_prompt"]
         assert '"blocked_scripts":["Greek"]' in retry_prompt
         assert '"replacement":"configured replacement"' in retry_prompt
+        assert "configured replacement" not in model.call_args_list[0].kwargs["system_prompt"]
         assert "<context>" in retry_prompt
         assert result.reply == "Configured fallback."
         assert result.action["type"] == "none"
+
+
+@pytest.mark.req("R-47")
+@pytest.mark.asyncio
+async def test_language_policy_names_no_replacement_before_a_blocked_reply():
+    with StudentSession() as student, student.factory() as db:
+        model = AsyncMock(return_value=_answer("Tell me what you enjoy?"))
+        with patch("app.pai_c.deep.turn.chat_completion", model), \
+                patch.object(config, "PAI_LANGUAGE_BLOCKED_SCRIPTS", "Greek"), \
+                patch.object(config, "PAI_LANGUAGE_BLOCKED_SCRIPT_REPLACEMENT", "configured replacement"):
+            result = await run_deep_turn(db, _turn(student))
+        assert model.await_count == 1
+        system_prompt = model.call_args.kwargs["system_prompt"]
+        assert '"blocked_scripts":["Greek"]' in system_prompt
+        assert "configured replacement" not in system_prompt
+        assert '"replacement"' not in system_prompt
+        assert result.reply == "Tell me what you enjoy?"
 
 
 @pytest.mark.asyncio

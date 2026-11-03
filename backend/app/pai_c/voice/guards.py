@@ -1,5 +1,8 @@
-"""Question repetition checks based only on Unicode punctuation and tokens."""
+"""Question repetition and repeat-greeting checks based only on Unicode punctuation and tokens."""
+import json
 import unicodedata
+from functools import lru_cache
+from pathlib import Path
 
 import regex
 
@@ -49,3 +52,42 @@ def repeats_previous_reply(reply, history):
     """True when the draft restates the previous counselor reply (token Jaccard)."""
     previous = next((row.get("content", "") for row in reversed(history) if row.get("role") == "assistant"), "")
     return bool(previous.strip()) and similarity(reply, previous) >= config.PAI_REPEAT_REPLY_SIMILARITY
+
+
+_GREETING_END = "!.?\u061f\n"
+
+
+@lru_cache(maxsize=1)
+def _greetings():
+    data = json.loads((Path(__file__).parent / "greetings.json").read_text(encoding="utf-8"))
+    return [phrase.casefold().split() for phrase in data["phrases"]], int(data["max_extra_words"])
+
+
+def _word_tokens(text):
+    return "".join(char if not unicodedata.category(char).startswith("P") else " "
+                   for char in text.casefold()).split()
+
+
+def leading_greeting(text: str) -> int:
+    """End offset of a leading greeting sentence (terminator included), or 0 when none."""
+    end = next((index + 1 for index, char in enumerate(text) if char in _GREETING_END), len(text))
+    tokens = _word_tokens(text[:end])
+    phrases, max_extra = _greetings()
+    for phrase in phrases:
+        if tokens[:len(phrase)] == phrase and len(tokens) - len(phrase) <= max_extra:
+            return end
+    return 0
+
+
+def drop_repeat_greeting(reply: str, history: list[dict]) -> str:
+    """Drop the reply's opening greeting when an earlier assistant reply already greeted."""
+    if not any(row.get("role") == "assistant" and leading_greeting(row.get("content", "")) > 0
+               for row in history):
+        return reply
+    end = leading_greeting(reply)
+    if not end:
+        return reply
+    rest = reply[end:].lstrip()
+    if not rest:
+        return reply
+    return rest[0].upper() + rest[1:]
