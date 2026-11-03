@@ -111,5 +111,5 @@ shows reply-language changes, easiest to read once the others are in).
 3. The live-run student (fictional Ayesha Malik, `docs/local-test/live-run-issues-2026-11-02.md`) reaches stage H
    with only MBBS and BDS.
 4. Counsellor evaluations pass; a replay shows only the fixed behaviour changed.
-5. Handoff `docs/connect/handoff/p0-handoff.md` written; both owners sign off. **Blocked on master §15 Q5** (which OS
-   developer owns integration).
+5. Handoff `docs/connect/handoff/p0-handoff.md` written; both owners sign off: the Counsellor lead (`@memsa771-hub`) and
+   the integration owner (`@MusawirKtk`, master §15 Q5).
