@@ -1,26 +1,26 @@
 #!/usr/bin/env python3
-"""operator.py: one file that takes a Ubuntu server from nothing to a live
+"""pai.py: one file that takes a Ubuntu server from nothing to a live
 Placement AI stack behind Caddy, and runs it afterwards.
 
 Copy this one file to any Ubuntu server (or run it from a checkout) and:
 
-    python3 operator.py deploy            fresh server -> live (installs Docker,
+    python3 pai.py deploy            fresh server -> live (installs Docker,
                                           Caddy, clones the repo, asks for the
                                           secrets, builds, hosts; safe to re-run)
-    python3 operator.py update            git pull, rebuild what changed, check
-    python3 operator.py status            is everything running? (containers,
+    python3 pai.py update            git pull, rebuild what changed, check
+    python3 pai.py status            is everything running? (containers,
                                           RAM, disk, health, live URLs)
-    python3 operator.py logs              follow backend + worker logs
-    python3 operator.py backup            Postgres dump -> backups/
-    python3 operator.py restore FILE      restore a dump
-    python3 operator.py export            everything (db, uploads, .env,
+    python3 pai.py logs              follow backend + worker logs
+    python3 pai.py backup            Postgres dump -> backups/
+    python3 pai.py restore FILE      restore a dump
+    python3 pai.py export            everything (db, uploads, .env,
                                           secrets) -> one .tar.gz
-    python3 operator.py import FILE       load an export on this server
-    python3 operator.py migrate-from USER@OLDHOST[:DIR]
+    python3 pai.py import FILE       load an export on this server
+    python3 pai.py migrate-from USER@OLDHOST[:DIR]
                                           export on the old server over ssh,
                                           copy here, import, deploy
-    python3 operator.py env KEY=VALUE ... set .env values, restart backend+worker
-    python3 operator.py restart|stop|start
+    python3 pai.py env KEY=VALUE ... set .env values, restart backend+worker
+    python3 pai.py restart|stop|start
 
 Only the Python standard library is used, so it runs on a bare Ubuntu 22.04 or
 24.04 (python3 is preinstalled). Everything it decides is printed; secrets are
@@ -28,16 +28,7 @@ never printed. Details: docs/DEPLOY.md.
 """
 from __future__ import annotations
 
-import sys
-
-# A file called operator.py shadows the standard library's `operator` module
-# whenever its folder is first on sys.path, which it is when this file runs as
-# `python3 operator.py` (collections, functools and argparse all import
-# `operator`). Drop that entry before anything else is imported.
-if __name__ == "__main__" and sys.path:
-    sys.path.pop(0)
-
-import argparse  # noqa: E402
+import argparse
 import getpass
 import json
 import os
@@ -46,6 +37,7 @@ import secrets as _secrets
 import shutil
 import socket
 import subprocess
+import sys
 import tarfile
 import tempfile
 import time
@@ -62,7 +54,7 @@ APP_DOMAIN = "app.placement-ai.com"        # fixed in docker-compose.prod.yml (C
 API_DOMAIN = "api.placement-ai.com"
 PROXY_NETWORK_HOST = "pai-beta_proxy"      # external network when the proxy is on the host
 FRONTEND_ALIAS, BACKEND_ALIAS = "pai-frontend", "pai-backend"
-MARK_BEGIN, MARK_END = "# >>> pai-beta (managed by operator.py) >>>", "# <<< pai-beta <<<"
+MARK_BEGIN, MARK_END = "# >>> pai-beta (managed by pai.py) >>>", "# <<< pai-beta <<<"
 MIN_RAM_GB, GOOD_RAM_GB, MIN_DISK_GB = 1.5, 3.5, 8.0
 DB_NAME, DB_USER = "openagents_workspace", "pai_admin"
 FIREBASE_FILE = Path("secrets/firebase-service-account.json")
@@ -140,7 +132,7 @@ def sudo(cmd: list[str], **kw) -> subprocess.CompletedProcess:
 
 
 def sudo_write(path: str, text: str, mode: str = "644") -> None:
-    with tempfile.NamedTemporaryFile("w", delete=False, suffix=".operator") as tmp:
+    with tempfile.NamedTemporaryFile("w", delete=False, suffix=".pai") as tmp:
         tmp.write(text)
     sudo(["install", "-m", mode, tmp.name, path], quiet=True)
     os.unlink(tmp.name)
@@ -293,7 +285,7 @@ def public_ip() -> str:
 
 
 def http_get(url: str, timeout: int = 10) -> tuple[int, str]:
-    req = urllib.request.Request(url, headers={"User-Agent": "operator.py"})
+    req = urllib.request.Request(url, headers={"User-Agent": "pai.py"})
     try:
         with urllib.request.urlopen(req, timeout=timeout) as resp:
             return resp.status, resp.read(300).decode(errors="replace")
@@ -319,7 +311,7 @@ def wait_for(url: str, want: int = 200, seconds: int = 120, label: str = "") -> 
 def preflight() -> None:
     step("Checking this server")
     if sys.platform != "linux":
-        die("operator.py runs on the Ubuntu server, not on Windows/macOS.")
+        die("pai.py runs on the Ubuntu server, not on Windows/macOS.")
     if os.geteuid() != 0 and run(["sudo", "-n", "true"], check=False, quiet=True).returncode != 0:
         say("sudo will ask for your password once.")
         run(["sudo", "-v"], capture=False, quiet=True)
@@ -396,7 +388,7 @@ def ensure_checkout() -> None:
         die(f"{target} exists and is not a checkout of the stack. Use --dir for another folder.")
     run(["git", "clone", "--branch", ARGS.branch, ARGS.repo, str(target)], capture=False)
     global LOG_PATH
-    LOG_PATH = target / "operator.log"
+    LOG_PATH = target / "pai.log"
 
 
 def read_firebase_json(path_hint: str | None) -> str:
@@ -577,7 +569,7 @@ def check_dns() -> None:
 def build_and_start() -> None:
     step("Build images and start the stack (first time 10-20 minutes; do not press Ctrl+C)")
     if compose_stream("up", "-d", "--build", "--remove-orphans") != 0:
-        die("docker compose failed; the output above says why (also in operator.log).")
+        die("docker compose failed; the output above says why (also in pai.log).")
 
 
 def wait_healthy(front: int, back: int) -> None:
@@ -647,9 +639,9 @@ def verify_live() -> bool:
 
 
 def ensure_backup_cron() -> None:
-    line = f"15 3 * * * cd {ARGS.dir} && python3 operator.py backup >> backups/backup.log 2>&1"
+    line = f"15 3 * * * cd {ARGS.dir} && python3 pai.py backup >> backups/backup.log 2>&1"
     current = out(["crontab", "-l"], check=False)
-    if "operator.py backup" in current:
+    if "pai.py backup" in current:
         return
     run(["crontab", "-"], inp=(current + "\n" if current else "") + line + "\n", quiet=True)
     say("daily backup at 03:15 added to crontab (backups/)")
@@ -675,15 +667,15 @@ def cmd_deploy() -> None:
     say(f"app:   https://{APP_DOMAIN}\napi:   https://{API_DOMAIN}/health\n"
         f"dir:   {ARGS.dir}   log: {LOG_PATH}\n"
         f"next:  Firebase console, Authentication, Settings, Authorized domains: add {APP_DOMAIN}.\n"
-        f"       python3 operator.py status   any time.")
+        f"       python3 pai.py status   any time.")
     if not live:
-        say("If DNS was just changed, wait a few minutes and run: python3 operator.py status")
+        say("If DNS was just changed, wait a few minutes and run: python3 pai.py status")
 
 
 # --------------------------------------------------------------------------- day to day
 def require_checkout() -> dict[str, str]:
     if not (ARGS.dir / COMPOSE_FILE).exists():
-        die(f"No stack at {ARGS.dir}. Run: python3 operator.py deploy")
+        die(f"No stack at {ARGS.dir}. Run: python3 pai.py deploy")
     os.chdir(ARGS.dir)
     return parse_env((ARGS.dir / ".env").read_text()) if (ARGS.dir / ".env").exists() else {}
 
@@ -743,7 +735,7 @@ def cmd_backup() -> Path:
                                f"--username={DB_USER}", f"--dbname={DB_NAME}"], stdout=fh)
     if proc.returncode != 0 or tmp.stat().st_size == 0:
         tmp.unlink(missing_ok=True)
-        die("pg_dump failed (is postgres running? python3 operator.py status)")
+        die("pg_dump failed (is postgres running? python3 pai.py status)")
     tmp.chmod(0o600)
     tmp.rename(target)
     say(f"backup written: {target} ({target.stat().st_size // 1024} KB)")
@@ -813,7 +805,7 @@ def cmd_export() -> None:
                     tar.add(ARGS.dir / rel, rel)
     target.chmod(0o600)
     say(f"export written: {target} ({target.stat().st_size // 1024 // 1024} MB)")
-    say(f"On the new server:  python3 operator.py import {target.name}   then   python3 operator.py deploy")
+    say(f"On the new server:  python3 pai.py import {target.name}   then   python3 pai.py deploy")
 
 
 def cmd_import() -> None:
@@ -852,7 +844,7 @@ def cmd_import() -> None:
                 volume_tar(f"{PROJECT}_{volume}", tmp, f"{volume}.tar", extract=True)
         run([*docker_cmd(), "volume", "create", f"{PROJECT}_pgdata"], quiet=True)
         restore_dump(tmp / "db.dump")
-    say("import done. Now run:  python3 operator.py deploy")
+    say("import done. Now run:  python3 pai.py deploy")
 
 
 def cmd_migrate_from() -> None:
@@ -860,11 +852,11 @@ def cmd_migrate_from() -> None:
     remote_dir = remote_dir or "~/pai-c"
     step(f"Exporting on {host} ({remote_dir})")
     remote_out = "/tmp/pai-export.tar.gz"
-    if run(["ssh", host, f"cd {remote_dir} && python3 operator.py export --out {remote_out}"],
+    if run(["ssh", host, f"cd {remote_dir} && python3 pai.py export --out {remote_out}"],
            capture=False, check=False).returncode != 0:
-        # old checkout without operator.py: send this file over first
-        run(["scp", str(Path(__file__).resolve()), f"{host}:{remote_dir}/operator.py"], capture=False)
-        run(["ssh", host, f"cd {remote_dir} && python3 operator.py export --out {remote_out}"], capture=False)
+        # old checkout without pai.py: send this file over first
+        run(["scp", str(Path(__file__).resolve()), f"{host}:{remote_dir}/pai.py"], capture=False)
+        run(["ssh", host, f"cd {remote_dir} && python3 pai.py export --out {remote_out}"], capture=False)
     local = Path.home() / "pai-export.tar.gz"
     run(["scp", f"{host}:{remote_out}", str(local)], capture=False)
     run(["ssh", host, f"rm -f {remote_out}"], capture=False, check=False)
@@ -906,7 +898,7 @@ def cmd_start() -> None:
 # --------------------------------------------------------------------------- main
 def main(argv: list[str] | None = None) -> None:
     global ARGS, LOG_PATH
-    parser = argparse.ArgumentParser(prog="operator.py", description=__doc__,
+    parser = argparse.ArgumentParser(prog="pai.py", description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--dir", type=Path, default=None, help=f"stack folder (default {DEFAULT_DIR})")
     parser.add_argument("--repo", default=REPO_URL)
@@ -929,7 +921,7 @@ def main(argv: list[str] | None = None) -> None:
     here = Path(__file__).resolve().parent
     ARGS.dir = (ARGS.dir or (here if (here / COMPOSE_FILE).exists() else DEFAULT_DIR)).expanduser().resolve()
     if ARGS.dir.exists():
-        LOG_PATH = ARGS.dir / "operator.log"
+        LOG_PATH = ARGS.dir / "pai.log"
     handlers = {
         "deploy": cmd_deploy, "update": cmd_update, "status": cmd_status, "logs": cmd_logs,
         "backup": cmd_backup, "restore": cmd_restore, "export": cmd_export, "import": cmd_import,

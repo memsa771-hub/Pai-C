@@ -7,7 +7,7 @@ documented in [docs/AUTH_SESSION.md](docs/AUTH_SESSION.md).
 
 ## Deploy
 
-Production (Ubuntu server, Docker, Caddy or nginx, app.placement-ai.com and api.placement-ai.com): `python3 operator.py deploy` on the server does it all; [docs/DEPLOY.md](docs/DEPLOY.md) has the same steps by hand plus update, backup, restore and server-to-server migration.
+Production (Ubuntu server, Docker, Caddy or nginx, app.placement-ai.com and api.placement-ai.com): `python3 pai.py deploy` on the server does it all; [docs/DEPLOY.md](docs/DEPLOY.md) has the same steps by hand plus update, backup, restore and server-to-server migration.
 
 ## Run locally
 

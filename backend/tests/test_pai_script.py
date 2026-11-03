@@ -1,11 +1,11 @@
-"""The pure helpers of operator.py (the one-file server deployer at the repo root)."""
+"""The pure helpers of pai.py (the one-file server deployer at the repo root)."""
 import importlib.util
 from pathlib import Path
 
 import pytest
 
 ROOT = Path(__file__).resolve().parents[2]
-SPEC = importlib.util.spec_from_file_location("operator_script", ROOT / "operator.py")
+SPEC = importlib.util.spec_from_file_location("pai_script", ROOT / "pai.py")
 op = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(op)
 
