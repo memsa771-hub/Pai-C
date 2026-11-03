@@ -72,13 +72,15 @@ Approved by the owner on 2026-11-03 (design in chat; decisions P0-D8 and P0-D9 b
 
 ### 5.1 Rules for every fix
 
-- **Proof:** an offline replay (`backend/scripts/eval_counselor_deep.py --offline`, recorded personas, no model calls)
-  before and after; the only differences are the answers the fix is meant to change. A live graded run is not part of
+- **Proof:** an offline replay (`python -m scripts.eval_counselor_deep --offline` from `backend/`, recorded personas,
+  no model calls) before and after shows that nothing else changed. The replay does not run path analysis, research,
+  onboarding or the frontend, and replays recorded model outputs, so each fix is proved by its own targeted tests
+  (named per task in the plan). A live graded run is not part of
   P0 (master R-46: before real students, with the owner's approval and a cost cap).
 - **Frozen files:** a fix that changes a frozen path (master §10) goes in its own PR with the `freeze-exception`
   label, R-47 in the title, the replay, and the Counsellor lead's approval. Only C2 and C6 need this.
 - **No new chat messages from the OS, no change of tone or style** (master D-05, R-45). Notices added here are the
-  Counsellor's own fixed sentences, held in policy data, in the language rule of C6.
+  Counsellor's own fixed sentences in non-frozen data files, in English like the existing fixed sentences (P0-D10).
 - **Tests** carry `@pytest.mark.req("R-47")`; when all six land, `R-47` is set `built: true`.
 
 ### 5.2 The fixes
@@ -97,6 +99,7 @@ Approved by the owner on 2026-11-03 (design in chat; decisions P0-D8 and P0-D9 b
 | # | Decision |
 |---|---|
 | P0-D8 | C7 in P0 asks for matric marks, intermediate marks (the total so far) and the entry-test score. Storing intermediate Part-I and Part-II separately stays in P1 (R-16, R-80). |
+| P0-D10 | Fixed sentences stay English for now. The C1 notice reads "I've removed {titles} from your paths, since you said it isn't for you." (plural "…they aren't…"). C7: marks of a completed exam are required, current-study marks and the entry test optional. C2: replaying a skipped analysis after newer ones is acceptable. A dismissal keeps its reason and evidence in a new nullable `pai_possibilities.dismissal` column (migration). |
 | P0-D9 | C6: the reply follows the language of the student's latest message. Roman Urdu is used only as the replacement when a reply came out in a blocked script (Devanagari). |
 
 ### 5.4 Order
