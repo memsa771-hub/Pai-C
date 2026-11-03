@@ -14,13 +14,13 @@ it('renders the first picture without inventing content',()=>{
 it('rating is an explicit student message, with zero valid and no direct map write',async()=>{
  render(<ConversationCard channel='pai-counselor' card={{kind:'rating',min:0,max:10}}>How certain?</ConversationCard>);
  const send=screen.getByRole('button',{name:'Send my rating'});expect((send as HTMLButtonElement).disabled).toBe(true);
- fireEvent.click(screen.getByRole('button',{name:'0',exact:true}));expect(workspaceApi.sendMessage).not.toHaveBeenCalled();fireEvent.click(send);
+ fireEvent.click(screen.getByRole('button',{name:'0'}));expect(workspaceApi.sendMessage).not.toHaveBeenCalled();fireEvent.click(send);
  await waitFor(()=>expect(workspaceApi.sendMessage).toHaveBeenCalledExactlyOnceWith('pai-counselor','My certainty about my direction is 0 out of 10.','Student',undefined,undefined,'student'));
  expect(await screen.findByRole('status')).toBeTruthy();
 });
 it('preserves a failed rating for retry',async()=>{
  vi.mocked(workspaceApi.sendMessage).mockRejectedValue(new Error());
  render(<ConversationCard channel='pai-counselor' card={{kind:'rating',min:0,max:10}}>How certain?</ConversationCard>);
- fireEvent.click(screen.getByRole('button',{name:'4',exact:true}));fireEvent.click(screen.getByRole('button',{name:'Send my rating'}));
- expect(await screen.findByRole('alert')).toBeTruthy();expect(screen.getByRole('button',{name:'4',exact:true}).getAttribute('aria-pressed')).toBe('true');
+ fireEvent.click(screen.getByRole('button',{name:'4'}));fireEvent.click(screen.getByRole('button',{name:'Send my rating'}));
+ expect(await screen.findByRole('alert')).toBeTruthy();expect(screen.getByRole('button',{name:'4'}).getAttribute('aria-pressed')).toBe('true');
 });

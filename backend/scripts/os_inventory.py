@@ -73,16 +73,7 @@ KEPT_S2 = (
     "Counsellor's per-student research; revisit when the Slice 8 spec decides whether the Counsellor reads OS Knowledge."
 )
 KEPT_S3 = " Kept: Slice 3 only partly replaces this for the Counsellor; revisit with the Slice 3 spec's Documents port."
-SLICE1_DEADLINES = "Slice 1 (deadline engine + inbox reminders)"
-SLICES_1_6 = "Slices 1 and 6 (deadlines/inbox, application pack)"
 SLICES_1_6_TASKS = "Slices 1 and 6 (plan tasks + inbox, application pack)"
-DEADLINES_REASON = (
-    "A live Deadlines screen with in-app reminders that students use today; it stays running, frozen, "
-    "until Slice 1 ships its replacement, then it is retired."
-)
-WORKSPACE_REASON = (
-    "The live application tracker and its review routines; frozen until Slices 1 and 6 replace them, then retired."
-)
 
 
 def _entries(fate: str, replaced_by: str, items: dict[str, str], suffix: str = "") -> dict[str, Fate]:
@@ -139,11 +130,9 @@ FATES: dict[str, Fate] = {
         "app.plugins._shared.verification": "It decides which facts count as verified on the Counsellor's per-student roadmaps.",
         "app.plugins.program_discovery": "It finds candidate programme pages for each lane of the Counsellor's per-student roadmap.",
         "app.plugins.program_research": "It extracts cited admission, fee and deadline facts for the Counsellor's per-student roadmaps.",
-        "app.plugins.roadmap_builder": "It is the Counsellor's per-student roadmap-research workflow, publishing roadmap cards and moving the student's stage.",
         "app.research": "Its modules run the Counsellor's per-student roadmap research.",
         "app.research.gateway": "It is the single entry point for the Counsellor's per-student roadmap research and its is-the-Mirror-current check.",
         "app.research.jobs": "It resumes the Counsellor's per-student roadmap research after each accepted fact and advances the discovery stage.",
-        "app.research.light": "It collects the cited facts behind each lane of the Counsellor's per-student roadmap.",
         "app.research.requirements": "It stores the cited facts that the Counsellor's per-student roadmaps display.",
         "app.research.scheduler": "It marks the Counsellor's per-student roadmap facts stale when evidence ages out, and the OS freshness sweeper (Slice 1) covers only OS Knowledge.",
         "app.routers.operator": "It feeds the \"PAI is researching\" status on Counsellor screens while per-student roadmap research runs.",
@@ -151,32 +140,15 @@ FATES: dict[str, Fate] = {
         "app.tools.builtin.capabilities": "It is the tool that starts the roadmap plugin for each Counsellor per-student research run.",
         "app.tools.builtin.operator": "It is the hand-off tool that the Counsellor's research gateway uses to start a per-student research run.",
     }, KEPT_S2),
-    # --- read-only: live screens until Slice 1 / 6 ship ---
-    **_entries("read-only", SLICE1_DEADLINES, {
-        "app.deadlines": DEADLINES_REASON,
-        "app.deadlines.service": DEADLINES_REASON,
-        "app.routers.deadlines": DEADLINES_REASON,
-    }),
-    **_entries("read-only", SLICES_1_6, {
-        "app.application_workspace": WORKSPACE_REASON,
-        "app.application_workspace.access": WORKSPACE_REASON,
-        "app.application_workspace.calendar": WORKSPACE_REASON,
-        "app.application_workspace.catalog": WORKSPACE_REASON,
-        "app.application_workspace.context": WORKSPACE_REASON,
-        "app.application_workspace.operations": WORKSPACE_REASON,
-        "app.application_workspace.plans": WORKSPACE_REASON,
-        "app.application_workspace.queries": WORKSPACE_REASON,
-        "app.application_workspace.schemas": WORKSPACE_REASON,
-        "app.application_workspace.serializers": WORKSPACE_REASON,
-        "app.routers.application_workspace": WORKSPACE_REASON,
-        "app.routers.routines": WORKSPACE_REASON,
-    }),
     # --- retire: old-OS only, with notes on what to salvage first ---
-    "app.plugins._shared.costs": Fate("retire", "—", "A test-only fee helper that nothing in the running app calls."),
     "app.plugins.scholarship_discovery": Fate("retire", "—", "No v1 slice builds scholarship listing and nothing calls it."),
     "app.routers.escalations": Fate("keep", "Slice 8 glue (app.pai_os_bridge)", "The Counsellor's escalation intake: since Slice 8 the glue hands PAI OS route problems to it. Counsellor-owned; it takes the five shared reasons once the Counsellor team adopts them (hand-over doc)."),
     "app.plugins.qualification_recognition": Fate("retire", "Slice 1 playbook (data only)", "Registered but never called; its sourced packs (DAAD, uni-assist, HEC attestation, APS, with official URLs) must be copied into the Slice 1 Germany playbook/Knowledge before deletion."),
-    "app.plugins.gap_assessment": Fate("retire", "—", "Registered but never called; its meets / does-not-meet / unknown logic is a reference for the Slice 1 eligibility checks."),
+    "app.plugins.gap_assessment": Fate("keep", "Stage H research in P2", "Now imported by `app/pai_c/paths/programs.py`, so the Counsellor uses it; kept until P2, when it is retired with stage H research. Its meets / does-not-meet / unknown logic stays a reference for the Slice 1 eligibility checks."),
+    "app.documents.owner": Fate("keep", "—", "The Vault's check that a document is the student's own; nothing replaces it."),
+    "app.plugins.path_explainer": Fate("keep", "—", "The stage G owner workflow; it belongs to the Counsellor, not the old OS."),
+    "app.plugins.program_search": Fate("keep", "ProgrammeList / ProgrammeFacts (R-49), until P2", "Stage H research; kept until P2, when ProgrammeList / ProgrammeFacts (R-49, master §4) replace it for OS-run routes."),
+    "app.research.seasons": Fate("keep", "Knowledge season monitoring (R-27), until P2", "Season bounds for research freshness; kept until P2, when Knowledge season monitoring (R-27) replaces it."),
     # --- read-only: workflow and task features driven by the live application workspace ---
     **_entries("read-only", SLICES_1_6_TASKS, {
         "app.routers.tasks": "The live application workspace links requirements to these tasks (`application_workspace/operations.py`, `calendar.py`, `serializers.py`) and the deadlines service reads them, so it is frozen until those features are replaced, then retired with them.",
@@ -189,23 +161,13 @@ FATES: dict[str, Fate] = {
         "app.browser.manager": "It renders JavaScript-heavy pages for `POST /v1/fetch` (`routers/fetch.py:36`), which is how the kept Counsellor research (`program_research` via tool `web.fetch`) reads university pages; this use goes over HTTP, so the import graph cannot see it.",
         "app.browser.egress": "It is the network egress filter inside the kept browser manager that renders pages for `POST /v1/fetch`, which the Counsellor's research uses to read university pages.",
         "app.browser.credentials": "Its `redact` helper is used by the kept browser manager that renders pages for `POST /v1/fetch`, which the Counsellor's research uses; the stored-credential flows are not needed for research.",
-        "app.browser.maintenance": "It sweeps leaked browser sessions and tabs for the kept browser manager (`main.py` browser sweep).",
-        "app.routers.browser": "`/v1/fetch` imports its `_resolve_bf_key` (`routers/fetch.py:45`), so it stays for the Counsellor's research fetches; only that helper and the ephemeral render path are needed, so the interactive tab endpoints and credential flows are candidates to split out and switch off.",
     }),
-    # --- retire: agent tools with no Counsellor function ---
-    "app.tools.builtin.browser": Fate("retire", "—", "Operator-only interactive tab control; research uses `web.fetch`, not `browser.*`, and the spec forbids agent login/credential tools (invariant 6, §10)."),
-    "app.tools.builtin.tasks": Fate("retire", "—", "An agent tool for the Operator's general loop; it is listed in `PAI_ALLOWED_TOOLS`, but the deep Counsellor never calls tools (`services/pai.py:52-54`) and every Counsellor caller narrows the allowed tools to `operator.delegate`."),
-    "app.routers.timers": Fate("retire", "—", "Agent planning endpoints that nothing in the backend creates and the Counsellor never does; Counsellor screens only poll the always-empty list, and no slice builds agent timers because the Slice 1 scheduler covers timed work."),
-    "app.routers.todos": Fate("retire", "—", "Agent planning endpoints that nothing in the backend creates and the Counsellor never does; Counsellor screens only poll the always-empty list, and no slice builds agent to-dos because the Slice 1 scheduler covers timed work."),
 }
 
 
-# Retire fates that touch Counsellor code or screens. Signed off 2026-10-14 (see render_markdown).
+# Retire fates that touch Counsellor code or screens (none at present; sign-off is recorded in render_markdown).
 # module -> how it touches the Counsellor.
 COUNSELLOR_TOUCHING_RETIRES: dict[str, str] = {
-    "app.tools.builtin.tasks": "`tasks.list` is in the Counsellor's allowed-tool list and the tool is in the shared registry",
-    "app.routers.timers": "polled by the Counsellor chat status bar",
-    "app.routers.todos": "polled and cancelled by the Counsellor chat status bar",
 }
 
 
@@ -468,11 +430,18 @@ def render_markdown(rows: list[InventoryRow]) -> str:
         ]
         lines.append("| " + " | ".join(cells) + " |")
     lines += ["", "## Retires that touch Counsellor code or screens", ""]
-    lines += [
-        "Signed off 2026-10-14: the Counsellor lead delegated sign-off to the project owner, who delegated these decisions to Claude; each row's reason gives the rationale.",
-        "",
-    ]
-    lines += [f"- `{module}`: {why}." for module, why in COUNSELLOR_TOUCHING_RETIRES.items()]
+    if COUNSELLOR_TOUCHING_RETIRES:
+        lines += [
+            "Signed off 2026-10-14: the Counsellor lead delegated sign-off to the project owner, who delegated these decisions to Claude; each row's reason gives the rationale.",
+            "",
+        ]
+        lines += [f"- `{module}`: {why}." for module, why in COUNSELLOR_TOUCHING_RETIRES.items()]
+    else:
+        lines += [
+            "Signed off 2026-10-14: the Counsellor lead delegated sign-off to the project owner, who delegated these decisions to Claude. "
+            "Those retires (`app.tools.builtin.tasks`, `app.routers.timers`, `app.routers.todos`) are done and the modules are gone from `app/`; "
+            "no retire row is used by the Counsellor now.",
+        ]
     lines += ["", "## Before retiring anything", ""]
     lines += [f"- {note}" for note in PRESERVE_NOTES]
     return "\n".join(lines) + "\n"
