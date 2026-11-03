@@ -31,7 +31,7 @@ def _pr_jobs_for(branch):
             continue
         branches = (triggers["pull_request"] or {}).get("branches")
         if branches is None or branch in branches:
-            jobs |= set(data["jobs"])
+            jobs |= {job.get("name", job_id) for job_id, job in data["jobs"].items()}  # GitHub reports `name:` if set
     return jobs
 
 
