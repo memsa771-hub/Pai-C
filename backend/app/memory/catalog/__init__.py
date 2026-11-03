@@ -128,6 +128,8 @@ def _check_follow_ups(onboarding: dict, choices: dict, storage: str) -> None:
         if "record" in ask and not (isinstance(ask["record"], dict) and ask["record"]
                                     and all(isinstance(v, str) for v in ask["record"].values())):
             raise ValueError("onboarding follow-up record must be fixed text values")
+        if ask.get("required_until_onboarded") and ask.get("required", True) is not True:
+            raise ValueError("onboarding required_until_onboarded needs a required follow-up")
         if "when_empty" in ask and not isinstance(ask["when_empty"], dict):
             raise ValueError("onboarding follow-up when_empty must map record fields to values")
         listed = ask.get("choices")

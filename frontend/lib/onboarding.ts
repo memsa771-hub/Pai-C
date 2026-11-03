@@ -53,6 +53,13 @@ export interface OnboardingFieldSpec {
   isNumber?: boolean;
   /** Free text in the student's own words (grades). */
   isText?: boolean;
+  /** The question this number may not be more than (marks -> total marks). */
+  atMost?: string | null;
+  /** The range a number must be in. */
+  minimum?: number | null;
+  maximum?: number | null;
+  /** The longest a text answer may be. */
+  maxLength?: number | null;
   /** A long chip list with a search box (study fields). */
   searchable?: boolean;
   /** Copy key when questions share a name (the year asked three ways). */

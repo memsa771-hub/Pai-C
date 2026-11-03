@@ -2946,13 +2946,14 @@
         ]
        }
       },
-      "required": true
+      "required": true,
+      "required_until_onboarded": true
      },
      {
       "name": "marksTotal",
       "prompt": "Out of how many?",
       "input": "number",
-      "minimum": 0,
+      "minimum": 1,
       "maximum": 9999,
       "record_field": "result.marks_total",
       "depends_on": {
@@ -2968,7 +2969,8 @@
         ]
        }
       },
-      "required": true
+      "required": true,
+      "required_until_onboarded": true
      },
      {
       "name": "marksObtained",
@@ -2998,7 +3000,7 @@
       "name": "marksTotal",
       "prompt": "Out of how many?",
       "input": "number",
-      "minimum": 0,
+      "minimum": 1,
       "maximum": 9999,
       "record_field": "result.marks_total",
       "depends_on": {
@@ -3035,7 +3037,8 @@
         ]
        }
       },
-      "required": true
+      "required": true,
+      "required_until_onboarded": true
      },
      {
       "name": "grades",
@@ -3077,7 +3080,8 @@
         "dae"
        ]
       },
-      "required": true
+      "required": true,
+      "required_until_onboarded": true
      },
      {
       "name": "matricMarksTotal",
@@ -3087,7 +3091,7 @@
       },
       "prompt": "Out of how many?",
       "input": "number",
-      "minimum": 0,
+      "minimum": 1,
       "maximum": 9999,
       "record_field": "result.marks_total",
       "depends_on": {
@@ -3097,7 +3101,8 @@
         "dae"
        ]
       },
-      "required": true
+      "required": true,
+      "required_until_onboarded": true
      },
      {
       "name": "oLevelGrades",
@@ -3115,7 +3120,8 @@
         "a_level"
        ]
       },
-      "required": true
+      "required": true,
+      "required_until_onboarded": true
      }
     ]
    }

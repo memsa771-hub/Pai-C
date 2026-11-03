@@ -103,6 +103,9 @@ class OnboardingField:
     # Record values written when this question is shown but left empty (a
     # test chosen with no score is planned).
     when_empty: dict | None = None
+    # Required only on the first onboarding (the marks of a completed exam):
+    # a student who already finished it can reopen and save without them.
+    required_until_onboarded: bool = False
 
 
 # The order here is the order the form asks them in.
@@ -160,7 +163,8 @@ def _catalog_fields() -> tuple[OnboardingField, ...]:
                 is_number=follow["input"] == "number", is_text=follow["input"] == "text",
                 max_length=follow.get("max_length", 200), minimum=follow.get("minimum"),
                 maximum=follow.get("maximum"), record=follow.get("record"), at_most=follow.get("at_most"),
-                when_empty=follow.get("when_empty")))
+                when_empty=follow.get("when_empty"),
+                required_until_onboarded=follow.get("required_until_onboarded", False)))
     return tuple(fields)
 
 
@@ -484,13 +488,20 @@ class OnboardingService:
                     answers[field.name] = answer
         return answers
 
-    def _field_state(self, f: OnboardingField) -> dict:
+    @staticmethod
+    def _required(f: OnboardingField, user) -> bool:
+        """Whether a question must be answered for this account now."""
+        onboarded = user is not None and user.onboarded_at is not None
+        return f.required and not (f.required_until_onboarded and onboarded)
+
+    def _field_state(self, f: OnboardingField, user=None) -> dict:
         offered = self._offered(f)
-        return {"name": f.name, "fieldKey": f.field_key, "required": f.required,
+        return {"name": f.name, "fieldKey": f.field_key, "required": self._required(f, user),
                 "choices": [code for code, _ in offered], "isDate": f.is_date, "allowOther": f.allow_other,
                 "step": f.step, "default": f.default, "options": list(f.options),
                 "depends_on": f.depends_on, "multi": f.multi, "isYear": f.is_year,
-                "isNumber": f.is_number, "isText": f.is_text,
+                "isNumber": f.is_number, "isText": f.is_text, "atMost": f.at_most,
+                "minimum": f.minimum, "maximum": f.maximum, "maxLength": f.max_length if f.is_text else None,
                 "searchable": f.searchable, "labelKey": f.label_key,
                 # Catalog and study-field wording for chips the UI has no copy for.
                 "labels": {code: label for code, label in offered if label != code},
@@ -543,7 +554,7 @@ class OnboardingService:
             "required": user is not None and user.onboarded_at is None,
             "completedAt": user.onboarded_at.isoformat()
             if user is not None and user.onboarded_at else None,
-            "fields": [self._field_state(f) for f in ONBOARDING_FIELDS],
+            "fields": [self._field_state(f, user) for f in ONBOARDING_FIELDS],
             "prefill": {k: v for k, v in prefill.items() if v},
         }
 
@@ -593,13 +604,18 @@ class OnboardingService:
             required = tuple(FIELDS_BY_NAME[name] for name in ("fullName", "level", "currentCity"))
         else:
             required = LEGACY_FIELDS
-        missing = [f.name for f in required if f.required and f.name not in cleaned]
+        user = self.owner(workspace)
+        missing = [f.name for f in required if self._required(f, user) and f.name not in cleaned]
         if missing:
             raise MemoryDataError(f"Missing required answer: {', '.join(missing)}")
-        # Marks obtained can never be more than the total they are out of.
+        # Marks obtained are always given with the total they are out of, and
+        # can never be more than it.
         for field in asked.values():
-            if (field.at_most and field.name in cleaned and field.at_most in cleaned
-                    and int(cleaned[field.name]) > int(cleaned[field.at_most])):
+            if not (field.at_most and field.name in cleaned):
+                continue
+            if field.at_most not in cleaned:
+                raise MemoryDataError(f"Missing required answer: {field.at_most}")
+            if int(cleaned[field.name]) > int(cleaned[field.at_most]):
                 raise MemoryDataError(f"{field.name} cannot be more than {field.at_most}")
         # Compose split answers (first + last name) into the field they form,
         # in declared order.
@@ -609,7 +625,6 @@ class OnboardingService:
                 cleaned[target] = " ".join(parts)
 
         workspace_id = str(workspace.id)
-        user = self.owner(workspace)
         saved, rejected = [], {}
         existing_facts = self.vault.snapshot(workspace_id, include_sensitive=True)
         writes = []  # (field, value, quote, record key)

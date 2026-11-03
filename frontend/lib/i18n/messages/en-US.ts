@@ -714,6 +714,8 @@ export const messages = {
     next: 'Continue',
     required: 'Please fill this in.',
     useChip: 'Choose {chip} above',
+    marksAboveTotal: "Your marks can't be more than the total marks.",
+    numberRange: 'Enter a number from {min} to {max}.',
     otherPlaceholder: 'Type it in your own words',
     chip: 'Set Journey',
     steps: {

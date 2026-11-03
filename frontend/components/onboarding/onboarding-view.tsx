@@ -94,6 +94,26 @@ export function OnboardingView({ state, onDone }: {
       document.querySelector<HTMLElement>(`[data-field="${missing[0].name}"]`)?.focus();
       return;
     }
+    // Numbers: within their range, marks given with their total and never
+    // more than it. Said here, beside the box, before anything is sent.
+    const numberErrors: [string, boolean | string][] = [];
+    for (const f of fields) {
+      if (!f.isNumber || !filled(f)) continue;
+      const n = Number(answers[f.name]);
+      if ((f.minimum != null && n < f.minimum) || (f.maximum != null && n > f.maximum)) {
+        numberErrors.push([f.name, t('onboarding.numberRange', { min: f.minimum ?? 0, max: f.maximum ?? n })]);
+        continue;
+      }
+      const total = f.atMost ? fields.find((other) => other.name === f.atMost) : undefined;
+      if (!total) continue;
+      if (!filled(total)) numberErrors.push([total.name, true]);
+      else if (n > Number(answers[total.name])) numberErrors.push([f.name, t('onboarding.marksAboveTotal')]);
+    }
+    if (numberErrors.length) {
+      setErrors(Object.fromEntries(numberErrors));
+      document.querySelector<HTMLElement>(`[data-field="${numberErrors[0][0]}"]`)?.focus();
+      return;
+    }
     // Other text that is a level we offer ("FSc") points to that chip here,
     // rather than failing when the last step is sent.
     const redirected = fields.map((f) => [f, levelRedirect(f, answers[f.name])] as const).find(([, chip]) => chip);
@@ -259,7 +279,7 @@ function Field({ field, label, placeholder, value, error, size, onChange }: {
         <Input {...props} data-field={field.name} value={text} inputMode="numeric" maxLength={4}
           className={authInputClass} onChange={(e) => onChange(e.target.value.replace(/\D/g, ''))} />
       ) : field.isText ? (
-        <Input {...props} data-field={field.name} value={text}
+        <Input {...props} data-field={field.name} value={text} maxLength={field.maxLength ?? undefined}
           className={authInputClass} onChange={(e) => onChange(e.target.value)} />
       ) : field.options && field.options.length > 0 ? (
         <div className="relative">

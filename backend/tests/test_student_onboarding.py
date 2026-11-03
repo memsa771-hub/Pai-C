@@ -946,3 +946,81 @@ def test_a_test_the_form_does_not_offer_never_prefills_the_entry_test(db):
     db.commit()
     tests = {row["test_type"]: row for row in _records(db, "test_attempt")}
     assert (tests["ielts"]["overall_score"], tests["mdcat"]["overall_score"]) == ("7.5", "140")
+
+
+# -- R-47 C7 fix round 1 -------------------------------------------------------
+
+FIRST_ONLY = ("marksObtained", "marksTotal", "grades", "matricMarksObtained", "matricMarksTotal", "oLevelGrades")
+
+
+def _required_by_name(state):
+    """name -> required for each question; shared names are required if any variant is."""
+    out = {}
+    for f in state["fields"]:
+        out[f["name"]] = out.get(f["name"], False) or f["required"]
+    return out
+
+
+@pytest.mark.req("R-47")
+def test_completed_exam_marks_are_required_only_on_first_onboarding(db):
+    service = OnboardingService(db)
+    workspace = db.info["workspace"]
+    first = _required_by_name(service.state(workspace))
+    assert all(first[name] for name in FIRST_ONLY)
+    service.apply(workspace, INTERMEDIATE_WITH_MARKS)
+    db.commit()
+    again = _required_by_name(service.state(workspace))
+    assert not any(again[name] for name in FIRST_ONLY)
+    # Every other question is still required once onboarded.
+    assert again["level"] and again["group"] and again["status"] and again["firstName"]
+
+
+@pytest.mark.req("R-47")
+def test_reonboarding_without_prior_or_completed_marks_saves(db):
+    service = OnboardingService(db)
+    workspace = db.info["workspace"]
+    service.apply(workspace, INTERMEDIATE_WITH_MARKS)
+    db.commit()
+    result = service.apply(workspace, {**PERSON, "level": "intermediate", "group": "pre_medical",
+                                       "status": "completed", "year": "2025", "matricMarksObtained": "",
+                                       "matricMarksTotal": ""})
+    db.commit()
+    assert result["completed"] and not result["rejected"], result
+    education = {row["qualification_name"]: row for row in _records(db, "education")}
+    assert education["fsc"]["academic_status"] == "completed"
+    # The marks saved the first time are kept, not cleared.
+    assert education["matric"]["result"] == {"marks_obtained": 950, "marks_total": 1100}
+
+
+@pytest.mark.req("R-47")
+def test_first_onboarding_still_requires_completed_exam_marks(db):
+    answers = {**PERSON, "level": "matric", "group": "arts", "status": "completed", "year": "2024"}
+    with pytest.raises(MemoryDataError, match="Missing required answer: marksObtained, marksTotal"):
+        OnboardingService(db).apply(db.info["workspace"], answers)
+
+
+@pytest.mark.req("R-47")
+def test_field_state_sends_the_marks_checks(db):
+    fields = OnboardingService(db).state(db.info["workspace"])["fields"]
+    obtained = next(f for f in fields if f["name"] == "marksObtained")
+    total = next(f for f in fields if f["name"] == "marksTotal")
+    grades = next(f for f in fields if f["name"] == "grades")
+    assert (obtained["atMost"], obtained["minimum"], obtained["maximum"]) == ("marksTotal", 0, 9999)
+    assert (total["minimum"], total["maximum"]) == (1, 9999)
+    assert next(f for f in fields if f["name"] == "matricMarksTotal")["minimum"] == 1
+    assert grades["maxLength"] == 120 and obtained["maxLength"] is None
+
+
+@pytest.mark.req("R-47")
+@pytest.mark.parametrize("name", ["marksTotal", "matricMarksTotal"])
+def test_a_total_of_zero_is_rejected(db, name):
+    with pytest.raises(MemoryDataError, match=f"{name} must be between 1 and 9999"):
+        OnboardingService(db).apply(db.info["workspace"], {**INTERMEDIATE_WITH_MARKS, name: "0"})
+
+
+@pytest.mark.req("R-47")
+def test_marks_so_far_need_their_total(db):
+    answers = {k: v for k, v in INTERMEDIATE_WITH_MARKS.items() if k != "marksTotal"}
+    with pytest.raises(MemoryDataError, match="^Missing required answer: marksTotal$"):
+        OnboardingService(db).apply(db.info["workspace"], answers)
+    assert _education_rows(db) == []
