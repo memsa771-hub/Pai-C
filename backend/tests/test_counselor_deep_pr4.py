@@ -13,7 +13,7 @@ from tests.truth_map_fixtures import item, v2_fixture
 from app.config import config
 from app.pai_c import runtime
 from app.pai_c.deep.analysis import (
-    AnalysisOrderPending, AnalysisPredecessorFailed, _workspace_lock,
+    AnalysisOrderPending, AnalysisPatchRejected, _workspace_lock,
     analyze_job, enqueue_turn_analysis, replay_failed_analyses,
 )
 from app.pai_c.deep.coverage import enforce_mirror_readiness
@@ -128,30 +128,74 @@ async def test_analysis_waits_for_earlier_workspace_turn():
         assert model.await_count == 2
 
 
+@pytest.mark.req("R-47")
 @pytest.mark.asyncio
-async def test_failed_prior_turn_requires_replay_and_preserves_order():
+async def test_failed_prior_turn_is_skipped_and_kept_for_replay():
     with StudentSession() as student, student.factory() as db:
-        first, _ = _turn_job(student, db, 'First statement')
-        second, _ = _turn_job(student, db, 'Later statement')
-        first.status = 'failed'
+        first, _ = _turn_job(student, db, "First statement")
+        second, _ = _turn_job(student, db, "Later statement")
+        first.status = "failed"
         first.attempts = first.max_attempts
         db.commit()
-        with patch('app.pai_c.deep.analysis.chat_completion', AsyncMock()) as model:
-            with pytest.raises(AnalysisPredecessorFailed, match='replay required'):
-                await analyze_job(second, db)
-            model.assert_not_awaited()
+        with patch("app.pai_c.deep.analysis.chat_completion",
+                   AsyncMock(return_value=_model_notebook())):
+            result = await analyze_job(second, db)
+        assert result["status"] == "applied" and result["version"] == 1
+        assert result["skipped_predecessors"] == [first.id]
+        db.refresh(first)
+        assert first.status == "failed" and first.result == {"skipped_by": second.id}
         assert replay_failed_analyses(db, student.workspace_id) == 1
         db.commit()
-        assert first.status == 'pending' and first.attempts == 0
-        assert replay_failed_analyses(db, student.workspace_id) == 0
-        model = AsyncMock(return_value=_model_notebook())
-        with patch('app.pai_c.deep.analysis.chat_completion', model):
+        assert first.status == "pending" and first.attempts == 0
+
+
+@pytest.mark.req("R-47")
+@pytest.mark.asyncio
+async def test_pending_retry_of_a_failed_attempt_still_blocks():
+    with StudentSession() as student, student.factory() as db:
+        first, _ = _turn_job(student, db, "First statement")
+        second, _ = _turn_job(student, db, "Later statement")
+        first.status = "pending"
+        first.attempts = 1
+        first.last_error = "AnalysisPatchRejected: x"
+        db.commit()
+        with patch("app.pai_c.deep.analysis.chat_completion", AsyncMock()) as model:
             with pytest.raises(AnalysisOrderPending):
                 await analyze_job(second, db)
-            assert (await analyze_job(first, db))['version'] == 1
-            first.status = 'succeeded'
-            db.commit()
-            assert (await analyze_job(second, db))['version'] == 2
+            model.assert_not_awaited()
+
+
+@pytest.mark.req("R-47")
+@pytest.mark.asyncio
+async def test_running_predecessor_still_blocks():
+    with StudentSession() as student, student.factory() as db:
+        first, _ = _turn_job(student, db, "First statement")
+        second, _ = _turn_job(student, db, "Later statement")
+        first.status = "running"
+        db.commit()
+        with patch("app.pai_c.deep.analysis.chat_completion", AsyncMock()) as model:
+            with pytest.raises(AnalysisOrderPending):
+                await analyze_job(second, db)
+            model.assert_not_awaited()
+
+
+@pytest.mark.req("R-47")
+@pytest.mark.asyncio
+async def test_later_turn_advances_stage_after_patch_rejection():
+    with StudentSession() as student, student.factory() as db:
+        first, _ = _turn_job(student, db, "First statement")
+        second, _ = _turn_job(student, db, "Later statement")
+        with patch("app.pai_c.deep.analysis.chat_completion", AsyncMock(return_value="not json")):
+            with pytest.raises(AnalysisPatchRejected):
+                await analyze_job(first, db)
+        BackgroundJobService(db).fail(first, "x", retry=False)
+        db.refresh(first)
+        assert first.status == "failed"
+        with patch("app.pai_c.deep.analysis.chat_completion",
+                   AsyncMock(return_value=_model_notebook())), \
+                patch("app.pai_c.deep.analysis._advance_stage") as advance:
+            assert (await analyze_job(second, db))["status"] == "applied"
+        advance.assert_called_once()
 
 
 @pytest.mark.asyncio
