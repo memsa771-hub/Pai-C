@@ -30,3 +30,19 @@ def test_leading_greeting_offsets():
 def test_user_greetings_do_not_count_as_an_earlier_greeting():
     history = [{"role": "user", "content": "Hello!"}, {"role": "assistant", "content": "Tell me about you."}]
     assert drop_repeat_greeting("Hello Ayesha. Let's look at BDS.", history) == "Hello Ayesha. Let's look at BDS."
+
+
+@pytest.mark.req("R-47")
+def test_greeting_sentence_ending_in_a_question_is_kept():
+    assert drop_repeat_greeting("Hey, MBBS kyun? Batao.", EARLIER) == "Hey, MBBS kyun? Batao."
+    assert drop_repeat_greeting("Hi, kaise ho? Batao.", EARLIER) == "Hi, kaise ho? Batao."
+    assert drop_repeat_greeting("Salam Ayesha\u061f Batao.", EARLIER) == "Salam Ayesha\u061f Batao."
+
+
+@pytest.mark.req("R-47")
+def test_long_earlier_greeting_still_counts():
+    long_earlier = [{"role": "assistant", "content": "Assalam o alaikum Ayesha, main PAI hoon aapki counsellor! Batao."}]
+    assert leading_greeting(long_earlier[0]["content"]) == 0
+    assert drop_repeat_greeting("Hello Ayesha. Let's look at BDS.", long_earlier) == "Let's look at BDS."
+    assert drop_repeat_greeting("Hello Ayesha, welcome back to your counselling session. BDS next.", long_earlier) \
+        == "Hello Ayesha, welcome back to your counselling session. BDS next."

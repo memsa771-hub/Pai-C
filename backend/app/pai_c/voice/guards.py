@@ -68,24 +68,32 @@ def _word_tokens(text):
                    for char in text.casefold()).split()
 
 
-def leading_greeting(text: str) -> int:
-    """End offset of a leading greeting sentence (terminator included), or 0 when none."""
+def _leading_greeting(text, limit_extra):
     end = next((index + 1 for index, char in enumerate(text) if char in _GREETING_END), len(text))
     tokens = _word_tokens(text[:end])
     phrases, max_extra = _greetings()
     for phrase in phrases:
-        if tokens[:len(phrase)] == phrase and len(tokens) - len(phrase) <= max_extra:
+        if tokens[:len(phrase)] == phrase and (not limit_extra or len(tokens) - len(phrase) <= max_extra):
             return end
     return 0
 
 
+def leading_greeting(text: str) -> int:
+    """End offset of a leading greeting sentence (terminator included), or 0 when none."""
+    return _leading_greeting(text, True)
+
+
 def drop_repeat_greeting(reply: str, history: list[dict]) -> str:
-    """Drop the reply's opening greeting when an earlier assistant reply already greeted."""
-    if not any(row.get("role") == "assistant" and leading_greeting(row.get("content", "")) > 0
+    """Drop the reply's opening greeting when an earlier assistant reply already greeted.
+
+    Any earlier assistant reply that opens with a greeting phrase counts, however long that
+    sentence is. A greeting sentence that ends in a question is real content and is kept.
+    """
+    if not any(row.get("role") == "assistant" and _leading_greeting(row.get("content", ""), False) > 0
                for row in history):
         return reply
     end = leading_greeting(reply)
-    if not end:
+    if not end or reply[end - 1] in "?\u061f":
         return reply
     rest = reply[end:].lstrip()
     if not rest:
