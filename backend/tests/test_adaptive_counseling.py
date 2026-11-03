@@ -294,3 +294,242 @@ async def test_information_runs_existing_source_pipeline_with_fake_tools(draft, 
             assert result["fact"]["quote"] == "A program is listed." and result["fact"]["checked_at"]
         else:
             assert not result.get("fact")
+
+
+# R-47 C3: every "I'll check" runs, or the student is told it couldn't.
+
+QUESTION = "DAE Electronics fee range in Lahore"
+
+
+def _research_signals(needs_research=True, **changes):
+    return signals(intent="asking_info", request={"text": QUESTION, "kind": "information",
+        "needs_context": False, "needs_research": needs_research}, **changes)
+
+
+def _decision(action):
+    from app.pai_c.policy.controller import Decision
+    return Decision(rule_id="test", action=action, topic=None, question_allowed=False,
+                    invite=False, summary_due=False)
+
+
+async def _ask(student, sig, *, voice_action=None, decision=None, research=None):
+    """One student turn through the real runtime with offline fakes."""
+    async def voice(**kwargs):
+        return json.dumps({"reply": "I will check that from official sources.", "moves": ["give"],
+                           "action": voice_action or {"type": "none"}})
+    patches = [patch("app.pai_c.policy.classifier.complete", AsyncMock(return_value=sig.model_dump_json())),
+               patch("app.pai_c.deep.turn.chat_completion", voice)]
+    if decision is not None:
+        patches.append(patch("app.pai_c.policy.controller.decide", return_value=_decision(decision)))
+    if research is not None:
+        patches.append(patch("app.research.gateway.request_research", research))
+    for item_patch in patches:
+        item_patch.start()
+    try:
+        await student.turn("Lahore mein electronics ke courses kitne ke hain?")
+    finally:
+        for item_patch in reversed(patches):
+            item_patch.stop()
+
+
+def _claim_jobs(db):
+    return db.scalars(select(BackgroundJob).where(BackgroundJob.job_type == "research.claim")).all()
+
+
+@pytest.mark.req("R-47")
+@pytest.mark.asyncio
+async def test_classifier_recorded_question_starts_research_when_voice_note_is_duplicate(monkeypatch):
+    """The classifier already saved the question, so Voice's note_question is a
+    duplicate and the decision is not answer_request: the check still runs, once."""
+    monkeypatch.setattr(config, "PAI_API_KEY", "offline-fake")
+    with StudentSession() as student:
+        await _ask(student, _research_signals(), decision="counsel",
+                   voice_action={"type": "note_question", "question_to_research": QUESTION})
+        with student.factory() as db:
+            noted = db.scalar(select(CounselorNotedQuestion))
+            decision = db.scalar(select(CounselorTurnDecision))
+            assert decision.move == "note_question" and decision.decision["action"] == "counsel"
+            jobs = _claim_jobs(db)
+            assert len(jobs) == 1 and jobs[0].payload["request_id"] == noted.id
+
+
+@pytest.mark.req("R-47")
+@pytest.mark.asyncio
+@pytest.mark.parametrize("voice_type", ["none", "note_question"])
+@pytest.mark.parametrize("decision", ["answer_request", "explore_area"])
+async def test_recorded_question_starts_research_whatever_the_decision(monkeypatch, voice_type, decision):
+    monkeypatch.setattr(config, "PAI_API_KEY", "offline-fake")
+    action = {"type": "note_question", "question_to_research": QUESTION} if voice_type == "note_question" else None
+    with StudentSession() as student:
+        await _ask(student, _research_signals(), decision=decision, voice_action=action)
+        with student.factory() as db:
+            noted = db.scalar(select(CounselorNotedQuestion))
+            jobs = _claim_jobs(db)
+            assert len(jobs) == 1 and jobs[0].payload["request_id"] == noted.id
+
+
+@pytest.mark.req("R-47")
+@pytest.mark.asyncio
+async def test_research_starts_on_a_wellbeing_turn_and_delivery_waits_for_care(monkeypatch):
+    from app.jobs.service import JobDeferred
+    monkeypatch.setattr(config, "PAI_API_KEY", "offline-fake")
+    sig = _research_signals(safety={"level": "concern", "category": "acute_distress"})
+    with StudentSession() as student:
+        await _ask(student, sig)
+        with student.factory() as db:
+            assert db.scalar(select(CounselorTurnDecision)).move == "wellbeing"
+            jobs = _claim_jobs(db)
+            assert len(jobs) == 1
+            checker = AsyncMock(return_value={"status": "unanswered"})
+            with patch.object(myths, "_check_job", checker), pytest.raises(JobDeferred):
+                await myths.check_job(jobs[0], db)
+            assert db.scalar(select(CounselorNotedQuestion)).status == "open"
+
+
+@pytest.mark.req("R-47")
+@pytest.mark.asyncio
+async def test_busy_research_start_is_retried_once(monkeypatch):
+    monkeypatch.setattr(config, "PAI_API_KEY", "offline-fake")
+    research = AsyncMock(side_effect=[{"ok": False, "error": {"code": "research_busy"}},
+                                      {"ok": True, "data": {"job_id": "j"}}])
+    with StudentSession() as student:
+        await _ask(student, _research_signals(), research=research)
+    assert research.await_count == 2
+    assert all(call.args[0] == "information" for call in research.await_args_list)
+
+
+@pytest.mark.req("R-47")
+@pytest.mark.asyncio
+async def test_busy_research_start_gives_up_after_one_retry(monkeypatch):
+    monkeypatch.setattr(config, "PAI_API_KEY", "offline-fake")
+    research = AsyncMock(return_value={"ok": False, "error": {"code": "research_busy"}})
+    with StudentSession() as student:
+        await _ask(student, _research_signals(), research=research)
+        assert student.transcript[-1] == {"role": "assistant", "message_type": "chat",
+                                          "content": "I will check that from official sources."}
+    assert research.await_count == 2
+
+
+@pytest.mark.req("R-47")
+@pytest.mark.asyncio
+async def test_research_start_that_raises_is_retried_once(monkeypatch):
+    monkeypatch.setattr(config, "PAI_API_KEY", "offline-fake")
+    research = AsyncMock(side_effect=[RuntimeError("database went away"), {"ok": True, "data": {"job_id": "j"}}])
+    with StudentSession() as student:
+        await _ask(student, _research_signals(), research=research)
+        assert student.transcript[-1]["content"] == "I will check that from official sources."
+    assert research.await_count == 2
+
+
+@pytest.mark.req("R-47")
+@pytest.mark.asyncio
+async def test_question_without_research_need_starts_nothing(monkeypatch):
+    monkeypatch.setattr(config, "PAI_API_KEY", "offline-fake")
+    research = AsyncMock(return_value={"ok": True, "data": {"job_id": "j"}})
+    with StudentSession() as student:
+        await _ask(student, _research_signals(needs_research=False), research=research)
+    research.assert_not_awaited()
+
+
+def _open_question(student, db, *, age_minutes, now):
+    from datetime import timedelta
+    from app.pai_c.deep.noted_questions import NotedQuestionService
+    from tests.test_counselor_deep_pr4 import _turn_job
+    _, event_id = _turn_job(student, db)
+    assert NotedQuestionService(db).record(student.workspace_id, event_id, QUESTION,
+        kind="information", needs_research=True, pending=True) == "recorded"
+    row = db.scalar(select(CounselorNotedQuestion).where(CounselorNotedQuestion.source_event_id == event_id))
+    row.created_at = now - timedelta(minutes=age_minutes)
+    db.commit()
+    return row
+
+
+def _notice_jobs(db):
+    return db.scalars(select(BackgroundJob).where(BackgroundJob.job_type == "research.claim",
+        BackgroundJob.idempotency_key.like("information-unanswered:%"))).all()
+
+
+@pytest.mark.req("R-47")
+@pytest.mark.asyncio
+async def test_sweep_tells_the_student_after_30_minutes_without_a_job():
+    from app.pai_c.policy.controller import load_data
+    now = datetime.now(timezone.utc)
+    with StudentSession() as student, student.factory() as db:
+        row = _open_question(student, db, age_minutes=31, now=now)
+        assert myths.sweep_unstarted_information(db, now=now) == 1
+        [job] = _notice_jobs(db)
+        assert job.payload == {"request_id": row.id, "source_event_id": row.source_event_id, "not_started": True}
+        assert job.idempotency_key == f"information-unanswered:{student.workspace_id}:{row.id}"
+        checker = AsyncMock(return_value={"status": "sourced"})
+        with patch.object(myths, "_check_job", checker):
+            assert (await myths.check_job(job, db)) == {"status": "not_started"}
+            await myths.check_job(job, db)
+        checker.assert_not_awaited()
+        notice = load_data("myths.json")["information_unanswered"]
+        assert [turn["content"] for turn in student.transcript].count(notice) == 1
+        db.refresh(row)
+        assert row.status == "unanswered" and row.answer is None
+
+
+@pytest.mark.req("R-47")
+@pytest.mark.asyncio
+@pytest.mark.parametrize("age,started", [(29, None), (31, "pending"), (31, "running"), (31, "succeeded")])
+async def test_sweep_leaves_recent_or_started_questions(age, started):
+    now = datetime.now(timezone.utc)
+    with StudentSession() as student, student.factory() as db:
+        row = _open_question(student, db, age_minutes=age, now=now)
+        if started:
+            job = myths.enqueue_information(db, student.workspace_id, row.source_event_id)
+            assert job.idempotency_key == f"information:{student.workspace_id}:{row.id}"
+            job.status = started
+            db.commit()
+        assert myths.sweep_unstarted_information(db, now=now) == 0
+        assert _notice_jobs(db) == []
+
+
+@pytest.mark.req("R-47")
+@pytest.mark.asyncio
+async def test_sweep_covers_a_failed_research_job():
+    now = datetime.now(timezone.utc)
+    with StudentSession() as student, student.factory() as db:
+        row = _open_question(student, db, age_minutes=31, now=now)
+        job = myths.enqueue_information(db, student.workspace_id, row.source_event_id)
+        job.status = "failed"
+        db.commit()
+        assert myths.sweep_unstarted_information(db, now=now) == 1
+
+
+@pytest.mark.req("R-47")
+@pytest.mark.asyncio
+async def test_sweep_skips_answered_and_non_information_questions():
+    now = datetime.now(timezone.utc)
+    with StudentSession() as student, student.factory() as db:
+        answered = _open_question(student, db, age_minutes=31, now=now)
+        answered.status = "unanswered"
+        task = _open_question(student, db, age_minutes=31, now=now)
+        task.kind = "task"
+        db.commit()
+        assert myths.sweep_unstarted_information(db, now=now) == 0
+
+
+@pytest.mark.req("R-47")
+@pytest.mark.asyncio
+async def test_sweep_is_idempotent():
+    now = datetime.now(timezone.utc)
+    with StudentSession() as student, student.factory() as db:
+        _open_question(student, db, age_minutes=31, now=now)
+        assert myths.sweep_unstarted_information(db, now=now) == 1
+        assert myths.sweep_unstarted_information(db, now=now) == 0
+        assert len(_notice_jobs(db)) == 1
+
+
+@pytest.mark.req("R-47")
+@pytest.mark.asyncio
+async def test_session_sweep_runs_the_information_sweep():
+    from app.pai_c.sessions import sweep_job
+    now = datetime.now(timezone.utc)
+    with StudentSession() as student, student.factory() as db:
+        _open_question(student, db, age_minutes=31, now=now)
+        result = await sweep_job(SimpleNamespace(payload={}), db)
+        assert result["information_notices"] == 1
+        assert len(_notice_jobs(db)) == 1

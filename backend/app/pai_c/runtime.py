@@ -229,24 +229,22 @@ async def _run_deep_turn(db, workspace_id: str, event_data: dict, depth: int):
         db.commit()
     # Queue after the reply and its decision are durable: a cache hit must not
     # overtake the acknowledgment, and a Voice safety override must win.
-    # Research starts whenever the student is told it will: on the policy's
-    # answer_request with a research need, and equally when Voice itself noted
-    # a question for research (its prompt says "I will check" and sets
-    # note_question). Without the second case PAI promised a check that never
-    # ran. The job is idempotent per request, so both paths queue it once.
-    voice_noted = move == "note_question" and status == "recorded"
-    policy_asked = (decision is not None and decision.action == "answer_request" and signals.request
-                    and signals.request.needs_research)
-    if (policy_asked or voice_noted) and action.get("type") != "wellbeing":
-        from app.research.gateway import request_research
-        from app.tools import ToolContext
-        try:
-            await request_research("information", workspace_id, db=db, journey=None,
-                tool_context=ToolContext(workspace_id=workspace_id, agent_name=PAI_AGENT_NAME, api=None),
-                refresh_key=turn.source_event_id)
-        except Exception as exc:
-            db.rollback()
-            logger.warning("information_enqueue_failed error_type=%s", type(exc).__name__)
+    # Research starts whenever this turn left a saved information question
+    # that needs research, whoever saved it (the classifier's request or
+    # Voice's note_question) and whatever the decision was. On a wellbeing
+    # turn it starts too; delivery waits while care is active. A promise that
+    # still never starts is closed by the session sweep (R-47). The job is
+    # idempotent per request, so it is queued once.
+    from app.pai_c.myths import open_research_question
+    try:
+        needs_research = open_research_question(db, workspace_id, turn.source_event_id) is not None
+    except Exception as exc:
+        # The reply is already posted; the session sweep closes this promise.
+        db.rollback()
+        logger.warning("information_enqueue_failed error_type=%s attempt=%d", type(exc).__name__, 0)
+        needs_research = False
+    if needs_research:
+        await _start_information_research(db, workspace_id, turn.source_event_id)
     # A student asking which paths they have gets them worked out in the
     # background by the path analyzer; the reply above never waits for it.
     from app.pai_c.paths.analyzer import ask_path_analysis, policy as path_policy
@@ -268,6 +266,29 @@ async def _run_deep_turn(db, workspace_id: str, event_data: dict, depth: int):
         int((time.monotonic() - started) * 1000), move, status, moves,
     )
     return assistant_event_id, turn.channel
+
+
+async def _start_information_research(db, workspace_id: str, source_event_id: str) -> Optional[dict]:
+    """Queue the turn's research; a busy gateway or an error gets one retry."""
+    from app.research.gateway import request_research
+    from app.services.pai import PAI_AGENT_NAME
+    from app.tools import ToolContext
+    result = None
+    for attempt in (1, 2):
+        try:
+            result = await request_research("information", workspace_id, db=db, journey=None,
+                tool_context=ToolContext(workspace_id=workspace_id, agent_name=PAI_AGENT_NAME, api=None),
+                refresh_key=source_event_id)
+        except Exception as exc:
+            db.rollback()
+            logger.warning("information_enqueue_failed error_type=%s attempt=%d", type(exc).__name__, attempt)
+            result = None
+            continue
+        if isinstance(result, dict) and (result.get("error") or {}).get("code") == "research_busy":
+            logger.warning("information_enqueue_failed error_type=%s attempt=%d", "research_busy", attempt)
+            continue
+        return result
+    return result
 
 
 def _event_order_boundary(event_data: dict) -> Optional[int]:

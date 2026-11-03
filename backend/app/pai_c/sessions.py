@@ -16,7 +16,8 @@ async def sweep_job(job, db):
                 idempotency_key=f"session-summary:{session['workspace_id']}:{session['last_event_id']}")
     from app.pai_c.reliability import enqueue_alerts
     enqueue_alerts(db)
-    return {"sessions_enqueued": len(sessions)}
+    from app.pai_c.myths import sweep_unstarted_information
+    return {"sessions_enqueued": len(sessions), "information_notices": sweep_unstarted_information(db)}
 
 
 async def summarize_job(job, db):

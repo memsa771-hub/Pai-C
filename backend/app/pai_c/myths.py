@@ -111,15 +111,20 @@ class ClaimPassage(BaseModel):
     source_url: str
 
 
-def enqueue_information(db, workspace_id, source_event_id):
-    """Use the existing bounded claim researcher for a saved direct request."""
-    from app.runtime.task_runtime import enqueue
-    request = db.scalar(select(CounselorNotedQuestion).where(
+def open_research_question(db, workspace_id, source_event_id):
+    """The turn's saved information question that still needs research, if any."""
+    return db.scalar(select(CounselorNotedQuestion).where(
         CounselorNotedQuestion.workspace_id == workspace_id,
         CounselorNotedQuestion.source_event_id == source_event_id,
         CounselorNotedQuestion.kind == "information",
         CounselorNotedQuestion.needs_research.is_(True),
         CounselorNotedQuestion.status.in_(("open", "unanswered"))))
+
+
+def enqueue_information(db, workspace_id, source_event_id):
+    """Use the existing bounded claim researcher for a saved direct request."""
+    from app.runtime.task_runtime import enqueue
+    request = open_research_question(db, workspace_id, source_event_id)
     if request is None:
         return None
     job = enqueue(db, job_type=JOB_CHECK, workspace_id=workspace_id,
@@ -140,8 +145,45 @@ def information_facts(db, workspace_id):
     return [row.answer for row in rows if isinstance(row.answer, dict) and current_fact(row.answer)]
 
 
+def sweep_unstarted_information(db, *, now=None):
+    """A promised check that never started (or whose research failed) ends with
+    the existing "couldn't verify" notice instead of silence (R-47)."""
+    from app.runtime.task_runtime import enqueue
+    from app.pai_c.reliability import policy as reliability_policy
+    now = now or datetime.now(timezone.utc)
+    cutoff = now - timedelta(minutes=reliability_policy()["unstarted_question_minutes"])
+    rows = db.scalars(select(CounselorNotedQuestion).join(
+        Workspace, Workspace.id == CounselorNotedQuestion.workspace_id).where(
+        Workspace.status == "active",
+        CounselorNotedQuestion.status == "open",
+        CounselorNotedQuestion.kind == "information",
+        CounselorNotedQuestion.needs_research.is_(True),
+        CounselorNotedQuestion.created_at <= cutoff)
+        .order_by(CounselorNotedQuestion.created_at, CounselorNotedQuestion.id)).all()
+    count = 0
+    for row in rows:
+        workspace_id = str(row.workspace_id)
+        research = db.scalar(select(BackgroundJob.status).where(
+            BackgroundJob.idempotency_key == f"information:{workspace_id}:{row.id}"))
+        if research is not None and research != "failed":
+            continue
+        key = f"information-unanswered:{workspace_id}:{row.id}"
+        if db.scalar(select(BackgroundJob.id).where(BackgroundJob.idempotency_key == key)):
+            continue
+        enqueue(db, job_type=JOB_CHECK, workspace_id=workspace_id,
+            payload={"request_id": row.id, "source_event_id": row.source_event_id, "not_started": True},
+            idempotency_key=key)
+        count += 1
+    db.commit()
+    return count
+
+
 async def check_job(job, db):
-    result = job.result if job.payload.get("request_id") and job.result else await _check_job(job, db)
+    if job.payload.get("not_started") is True:
+        # The sweep's notice: no research ran, so there is no fact to deliver.
+        result = {"status": "not_started"}
+    else:
+        result = job.result if job.payload.get("request_id") and job.result else await _check_job(job, db)
     if job.payload.get("request_id"):
         job.result = result
         db.commit()
