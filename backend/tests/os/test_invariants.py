@@ -113,3 +113,15 @@ def test_clock_check_catches_a_violation(tmp_path):
     (tmp_path / "workers" / "bad.py").write_text("x = datetime.now(timezone.utc)\ny = date.today()\nz = datetime.now\n")
     (tmp_path / "clock.py").write_text("x = datetime.now(timezone.utc)\n")
     assert direct_clock_calls(tmp_path) == ["workers/bad.py:1", "workers/bad.py:2", "workers/bad.py:3"]
+
+
+@pytest.mark.req("R-58")
+def test_fake_routes_stay_in_tests():
+    """The fake Ireland master's and Pakistan BS routes are test fixtures only: they exist where the tests load them
+    and nowhere under app/os (invariant 12: real routes are data, fakes never ship)."""
+    packs = Path(__file__).parent / "fixtures" / "packs"
+    for route in ("ireland_master", "pakistan_bs"):
+        text = (packs / f"{route}.yaml").read_text(encoding="utf-8")
+        assert re.search(rf"^route_key: {route}$", text, re.M), route
+        assert "Fake" in text.splitlines()[0], route
+        assert not list(APP_OS.rglob(f"{route}*")), route

@@ -140,3 +140,9 @@ def test_yaml_phases_match_master_section_12():
 
 def test_repository_passes_its_own_check(capsys):
     assert ct.main([]) == 0, capsys.readouterr().out
+
+
+@pytest.mark.parametrize("flag", ["--report", "--gate"])
+def test_unknown_phase_exits_2(flag, capsys):
+    assert ct.main([flag, "P9"]) == 2
+    assert "unknown phase P9" in capsys.readouterr().err

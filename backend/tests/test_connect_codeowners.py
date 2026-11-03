@@ -39,6 +39,11 @@ def owners_for(path: str, codeowners_text: str) -> list[str]:
     "backend/app/pai_c/deep/analysis.py",
     "backend/app/pai_os_bridge.py",
     "frontend/components/counselor/workspace/inline-card.tsx",
+    "scripts/check_freeze.py",
+    "scripts/check_traceability.py",
+    ".github/workflows/freeze.yml",
+    "docs/requirements/connection.yaml",
+    "docs/counselor/COUNSELOR_V3_PROMPTS.md",
 ])
 def test_counsellor_lead_owns_counsellor_paths(path):
     assert owners_for(path, CODEOWNERS.read_text()) == ["@memsa771-hub"]
@@ -46,3 +51,9 @@ def test_counsellor_lead_owns_counsellor_paths(path):
 
 def test_os_paths_keep_os_owners():
     assert owners_for("backend/app/os/kernel/x.py", CODEOWNERS.read_text()) == ["@10Faheem", "@MusawirKtk"]
+
+
+def test_ci_workflow_keeps_shared_owners():
+    # Overlaps the earlier /.github/ rule; pins last-match-wins.
+    assert owners_for(".github/workflows/ci.yml", CODEOWNERS.read_text()) == [
+        "@10Faheem", "@MusawirKtk", "@memsa771-hub"]

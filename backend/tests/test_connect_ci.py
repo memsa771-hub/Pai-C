@@ -1,4 +1,5 @@
 """CI workflow shape: every required job exists and the standalone marker selects the gate tests (R-59)."""
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -36,9 +37,13 @@ def test_ci_has_every_required_job():
 def test_frontend_job_runs_tsc_tests_and_build():
     job = _load("ci.yml")["jobs"]["frontend"]
     runs = [r.strip() for r in _run_lines(job)]
-    for cmd in ("npm ci", "npx tsc --noEmit", "npm test", "npm run build"):
+    for cmd in ("npm ci", "npx tsc --noEmit", "npm test", "npx next build --webpack"):
         assert cmd in runs
     assert job["defaults"]["run"]["working-directory"] == "frontend"
+    dockerfile = (Path(__file__).resolve().parents[2] / "frontend" / "Dockerfile").read_text()
+    major = re.search(r"^FROM node:(\d+)", dockerfile, re.M).group(1)
+    node_steps = [s for s in job["steps"] if str(s.get("uses", "")).startswith("actions/setup-node")]
+    assert str(node_steps[0]["with"]["node-version"]) == major
 
 
 def test_os_job_keeps_tach_and_alembic_checks():
@@ -61,6 +66,8 @@ def test_push_runs_on_integration_branches():
 def test_freeze_workflow_reacts_to_labels():
     data = _load("freeze.yml")
     assert {"labeled", "unlabeled", "edited", "synchronize"} <= set(_triggers(data)["pull_request"]["types"])
+    assert _triggers(data)["pull_request"]["branches"] == ["pai-connect"]
+    assert data["concurrency"]["cancel-in-progress"] is True
     assert "check_freeze.py" in "\n".join(_run_text(j) for j in data["jobs"].values())
 
 

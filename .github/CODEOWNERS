@@ -27,3 +27,8 @@
 /backend/app/pai_c/                   @memsa771-hub
 /backend/app/pai_os_bridge.py         @memsa771-hub
 /frontend/components/counselor/       @memsa771-hub
+/scripts/check_freeze.py              @memsa771-hub
+/scripts/check_traceability.py        @memsa771-hub
+/.github/workflows/freeze.yml         @memsa771-hub
+/docs/requirements/                   @memsa771-hub
+/docs/counselor/                      @memsa771-hub

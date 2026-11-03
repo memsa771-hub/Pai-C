@@ -33,9 +33,10 @@ MODEL_SETTING = re.compile(
 )
 
 CONFIG_PATH = "backend/app/config.py"
+REQUIREMENTS_PATH = "docs/requirements/connection.yaml"
 FAIL_MESSAGE = (
-    "Frozen Counsellor files changed (master spec section 10). Add the freeze-exception label "
-    "and the R-ID to the PR, with a replay and the Counsellor lead's approval."
+    "Frozen Counsellor files or model settings changed (master spec section 10). Add the "
+    "freeze-exception label and a known R-ID to the PR, with a replay and the Counsellor lead's approval."
 )
 
 
@@ -70,12 +71,28 @@ def changed_model_settings(old_src: str, new_src: str) -> list[str]:
     return sorted(n for n in old.keys() | new.keys() if old.get(n) != new.get(n))
 
 
-def exception_allowed(labels: list[str], pr_text: str) -> bool:
-    return "freeze-exception" in labels and bool(re.search(r"\bR-\d{2}\b", pr_text))
+def exception_allowed(labels: list[str], pr_text: str, known_rids: set[str]) -> bool:
+    """The label plus at least one R-ID in the text that is a real requirement."""
+    if "freeze-exception" not in labels:
+        return False
+    return any(r in known_rids for r in re.findall(r"\bR-\d{2}\b", pr_text))
+
+
+def known_requirement_ids(root: str) -> set[str]:
+    """R-IDs listed under `requirements:` (two-space-indented keys); none if the file is missing."""
+    path = Path(root) / REQUIREMENTS_PATH
+    if not path.is_file():
+        return set()
+    return set(re.findall(r"^  (R-\d{2}):", path.read_text(encoding="utf-8"), re.M))
 
 
 def _git(root: str, *args: str) -> subprocess.CompletedProcess:
     return subprocess.run(["git", *args], cwd=root, capture_output=True, text=True)
+
+
+def _config_at(root: str, rev: str) -> str:
+    show = _git(root, "show", f"{rev}:{CONFIG_PATH}")
+    return show.stdout if show.returncode == 0 else ""
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -95,24 +112,38 @@ def main(argv: list[str] | None = None) -> int:
         return 2
     files = frozen_files(diff.stdout.splitlines())
 
-    show = _git(root, "show", f"{args.base}:{CONFIG_PATH}")
-    old_src = show.stdout if show.returncode == 0 else ""
-    cfg = Path(root) / CONFIG_PATH
-    new_src = cfg.read_text(encoding="utf-8") if cfg.is_file() else ""
-    settings = changed_model_settings(old_src, new_src)
+    mb = _git(root, "merge-base", args.base, "HEAD")
+    if mb.returncode != 0:
+        print(mb.stderr.strip(), file=sys.stderr)
+        return 2
+    base_rev = mb.stdout.strip()
+    try:
+        settings = changed_model_settings(_config_at(root, base_rev), _config_at(root, "HEAD"))
+    except SyntaxError:
+        for rev in (base_rev, "HEAD"):
+            try:
+                _settings(_config_at(root, rev))
+            except SyntaxError:
+                print(f"{CONFIG_PATH} does not parse at {rev}", file=sys.stderr)
+                break
+        return 2
 
     if not files and not settings:
         print("Freeze check: no frozen Counsellor file or model setting changed.")
         return 0
 
-    for f in files:
-        print(f"frozen file changed: {f}")
-    for s in settings:
-        print(f"model setting changed: {s}")
+    if files:
+        print("Frozen files changed:")
+        for f in files:
+            print(f"  {f}")
+    if settings:
+        print("Model settings changed:")
+        for s in settings:
+            print(f"  {s}")
 
     labels = [x.strip() for x in os.environ.get("PR_LABELS", "").split(",") if x.strip()]
-    if exception_allowed(labels, os.environ.get("PR_TEXT", "")):
-        print("freeze-exception label and R-ID present: allowed.")
+    if exception_allowed(labels, os.environ.get("PR_TEXT", ""), known_requirement_ids(root)):
+        print("freeze-exception label and known R-ID present: allowed.")
         return 0
     print(FAIL_MESSAGE)
     return 1

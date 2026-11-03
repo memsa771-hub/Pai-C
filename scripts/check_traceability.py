@@ -147,6 +147,10 @@ def main(argv: list[str] | None = None) -> int:
     except SpecError as exc:
         print(f"SpecError: {exc}")
         return 1
+    for phase in (args.gate, args.report):
+        if phase is not None and phase not in phases:
+            print(f"unknown phase {phase}", file=sys.stderr)
+            return 2
     tags = collect_tags(REPO)
     if args.report:
         print(render_report(reqs, tags, args.report))

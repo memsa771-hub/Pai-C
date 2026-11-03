@@ -45,7 +45,7 @@ Figma board (locked): https://www.figma.com/board/NjVJfdxERWfRHPycy1wDkF
 - Never invent data: no institution, date, fee, merit figure or rule from memory. Data enters only through the
   registry, research and the review queue.
 - No Pakistani or other country-specific names in `app/os` code (red-flag search, R-58).
-- Do not touch the frozen Counsellor files in connection work (R-43, master spec section 10).
+- Do not touch the frozen Counsellor files in connection work (R-43, master spec section 10) except through the freeze exception process (master §10: `freeze-exception` label, the R-ID, a replay showing only the intended answers changed, and the Counsellor lead's approval).
 - Every change of data ownership follows master spec section 4. A copy of another owner's data is a defect.
 - Stop and ask when unclear. Never weaken a test to make it pass.
 - The OS developers build the connection work, Counsellor side included (D-16). The Counsellor lead

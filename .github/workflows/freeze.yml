@@ -2,14 +2,20 @@ name: Freeze
 
 on:
   pull_request:
+    branches: [pai-connect]
     types: [opened, synchronize, reopened, edited, labeled, unlabeled]
 
 permissions:
   contents: read
 
+concurrency:
+  group: freeze-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
 jobs:
   freeze:
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
         with:

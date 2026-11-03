@@ -60,6 +60,11 @@ def _rename_repo(tmp_path):
     src.write_text("x = 1\n")
     _git(tmp_path, "add", "-A")
     _git(tmp_path, "commit", "-qm", "one")
+    reqs = tmp_path / "docs/requirements/connection.yaml"
+    reqs.parent.mkdir(parents=True)
+    reqs.write_text("requirements:\n  R-47:\n")
+    _git(tmp_path, "add", "-A")
+    _git(tmp_path, "commit", "-qm", "reqs")
     _git(tmp_path, "mv", "backend/app/pai_c/deep/a.py", "backend/app/pai_c/a.py")
     _git(tmp_path, "commit", "-qm", "two")
 
@@ -103,10 +108,64 @@ def test_added_and_removed_settings_are_caught():
     assert cf.changed_model_settings("class C:\n    PAI_MODEL = 'x'\n", "") == ["PAI_MODEL"]
 
 
+KNOWN = {"R-47", "R-43"}
+
+
 def test_label_without_rid_fails():
-    assert cf.exception_allowed(["freeze-exception"], "fix C1") is False
+    assert cf.exception_allowed(["freeze-exception"], "fix C1", KNOWN) is False
 
 
 def test_label_with_rid_passes():
-    assert cf.exception_allowed(["freeze-exception"], "R-47: fix C1") is True
-    assert cf.exception_allowed([], "R-47") is False
+    assert cf.exception_allowed(["freeze-exception"], "R-47: fix C1", KNOWN) is True
+    assert cf.exception_allowed([], "R-47", KNOWN) is False
+
+
+def test_label_with_unknown_rid_fails():
+    assert cf.exception_allowed(["freeze-exception"], "R-99", KNOWN) is False
+    assert cf.exception_allowed(["freeze-exception"], "R-99 and R-47", KNOWN) is True
+
+
+def _config_repo(tmp_path, first='"a"', second='"b"', with_yaml=False):
+    _git(tmp_path, "init", "-q")
+    _git(tmp_path, "config", "user.email", "t@example.com")
+    _git(tmp_path, "config", "user.name", "t")
+    _git(tmp_path, "config", "commit.gpgsign", "false")
+    cfg = tmp_path / "backend/app/config.py"
+    cfg.parent.mkdir(parents=True)
+    cfg.write_text(f"class Settings:\n    PAI_COUNSELOR_MODEL: str = {first}\n")
+    _git(tmp_path, "add", "-A")
+    _git(tmp_path, "commit", "-qm", "one")
+    cfg.write_text(f"class Settings:\n    PAI_COUNSELOR_MODEL: str = {second}\n")
+    if with_yaml:
+        y = tmp_path / "docs/requirements/connection.yaml"
+        y.parent.mkdir(parents=True)
+        y.write_text("requirements:\n  R-47:\n")
+    _git(tmp_path, "add", "-A")
+    _git(tmp_path, "commit", "-qm", "two")
+
+
+def test_main_catches_model_setting_change(tmp_path, monkeypatch, capsys):
+    _config_repo(tmp_path, with_yaml=True)
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.delenv("PR_LABELS", raising=False)
+    monkeypatch.delenv("PR_TEXT", raising=False)
+    assert cf.main(["--base", "HEAD~1"]) == 1
+    assert "PAI_COUNSELOR_MODEL" in capsys.readouterr().out
+    monkeypatch.setenv("PR_LABELS", "freeze-exception")
+    monkeypatch.setenv("PR_TEXT", "R-47 fix")
+    assert cf.main(["--base", "HEAD~1"]) == 0
+
+
+def test_main_unknown_rid_in_repo_is_not_allowed(tmp_path, monkeypatch):
+    _config_repo(tmp_path, with_yaml=True)
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("PR_LABELS", "freeze-exception")
+    monkeypatch.setenv("PR_TEXT", "R-99 fix")
+    assert cf.main(["--base", "HEAD~1"]) == 1
+
+
+def test_main_unparsable_config_returns_2(tmp_path, monkeypatch, capsys):
+    _config_repo(tmp_path, second="(")
+    monkeypatch.chdir(tmp_path)
+    assert cf.main(["--base", "HEAD~1"]) == 2
+    assert "does not parse at" in capsys.readouterr().err
