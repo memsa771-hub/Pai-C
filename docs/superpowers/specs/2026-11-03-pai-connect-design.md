@@ -24,8 +24,7 @@ document.
    (§13.1).
 5. **A phase is done only when its gate (§12) passes in full,** its handoff is written, and both owners sign it off.
    The owners are the **Counsellor lead** (MSAQLAIN, `@memsa771-hub`) and the **integration owner**, one of the OS
-   developers (`@10Faheem`, `@MusawirKtk`) named in §15 Q5. Until Q5 is answered, P0 task 0 can start but no gate can
-   be signed.
+   developers: **`@MusawirKtk`** (owner's answer to §15 Q5, 2026-11-03).
 6. **When a step is unclear or a test can't pass as written: stop and ask the owner.** Never improvise, never weaken a
    test, never invent data.
 
@@ -603,6 +602,6 @@ The critical path is P2's verification work, not code.
 | Q2 | Guardian consent | Email verification (D-14). **Still open:** who does the legal review of the terms |
 | Q3 | Abroad | Germany, UK, US, bachelor's and master's (D-12) |
 | Q4 | Urdu screens | No (D-15) |
-| Q5 | Who builds | The OS developers build everything, Counsellor side included (D-16). **Still open:** which of the two developers owns integration (merges and gates) |
+| Q5 | Who builds | The OS developers build everything, Counsellor side included (D-16). Integration owner (merges and gates): **`@MusawirKtk`** (answered 2026-11-03) |
 | Q6 | Urdu sources | Yes (D-15) |
 | Q7 | Intake | Every year and every intake (D-17); 2027 is the first target |
