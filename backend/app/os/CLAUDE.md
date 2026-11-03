@@ -17,3 +17,14 @@ These invariants hold for all code in this package. Each has a check.
 13. All dates are stored timezone-aware with their source timezone; deadlines are end-of-day in the institution's timezone unless the source says otherwise.
 
 Done means the task's tests pass and the PR template is complete.
+
+## Connection work
+
+Applies when building the PAI Counsellor and PAI OS connection (master spec `docs/superpowers/specs/2026-11-03-pai-connect-design.md`).
+
+- Read master spec sections 2-3 and the current phase spec first. Name the R-IDs the task builds.
+- Never invent data: no institution, date, fee, merit figure or rule from memory.
+- Invariant 12 is enforced by the red-flag search (R-58).
+- Do not touch the frozen Counsellor files (R-43, master spec section 10) except through the freeze exception process (master §10: `freeze-exception` label, the R-ID, a replay showing only the intended answers changed, and the Counsellor lead's approval).
+- Ownership of data follows master spec section 4. A copy of another owner's data is a defect.
+- Stop and ask when unclear. Never weaken a test to make it pass.

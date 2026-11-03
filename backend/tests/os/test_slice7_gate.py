@@ -29,6 +29,8 @@ from app.os.settings import load_settings
 from tests.os.conftest import TEST_DBOS_SCHEMA, reset_dbos_schema
 from tests.os.test_golden import TEST_STUDENT
 
+pytestmark = pytest.mark.standalone
+
 HERE = Path(__file__).parent
 CASES = yaml.safe_load((HERE / "replan_cases.yaml").read_text(encoding="utf-8"))
 ROUTES = {"germany_master": ("DE", "master"), "ireland_master": ("IE", "master"), "pakistan_bs": ("PK", "bachelor")}

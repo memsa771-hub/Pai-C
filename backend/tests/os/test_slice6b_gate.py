@@ -26,6 +26,8 @@ from tests.os.conftest import TEST_DBOS_SCHEMA, reset_dbos_schema
 from tests.os.test_slice6a_gate import CHECKED, CONFIGS, HERE, ROUTES, STATEMENTS, jpeg
 from tests.os.test_api import TEST_TERMS, agree
 
+pytestmark = pytest.mark.standalone
+
 VISAS = load_pack_configs(kind="visa")
 P = "/v1/os"
 ME = {"X-Test-Student": "stu-1"}

@@ -27,6 +27,7 @@ class FakeSink:
         return self.case_id
 
 
+@pytest.mark.standalone
 def test_standalone_sink_opens_case(engine, clean):
     p = plan(engine)
     cid = StandaloneSink(engine, "pai").escalate(p, [4], "a step failed twice")
@@ -60,6 +61,7 @@ def test_replanner_support_goes_through_sink(engine):
     assert fake.calls == [(3, [9], "No automatic change: fictional.", 5)]
 
 
+@pytest.mark.standalone
 def test_services_escalate_through_standalone(engine, clean, os_db):
     from app.os.api.replan import replanner_for
     from app.os.api.services import make_services

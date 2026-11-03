@@ -126,6 +126,7 @@ def test_intake_support_cases_not_sent(svc):
     assert sent(svc) == []
 
 
+@pytest.mark.standalone
 def test_module_off_not_sent(svc):
     with svc.engine.begin() as conn:
         conn.execute(models.modules.update().values(enabled=False))

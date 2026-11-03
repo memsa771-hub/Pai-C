@@ -25,6 +25,8 @@ from tests.os.conftest import TEST_DBOS_SCHEMA, reset_dbos_schema
 from tests.os.quality.run_statement_quality import _test_model
 from tests.os.test_api import TEST_TERMS, agree
 
+pytestmark = pytest.mark.standalone
+
 HERE = Path(__file__).parent
 CONFIGS = load_statement_configs() | load_statement_configs(HERE / "statements")
 CHECKED = datetime(2027, 3, 1, tzinfo=timezone.utc)

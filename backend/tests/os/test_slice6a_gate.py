@@ -28,6 +28,8 @@ from app.os.statements.config import load_statement_configs
 from tests.os.conftest import TEST_DBOS_SCHEMA, reset_dbos_schema
 from tests.os.test_api import TEST_TERMS, agree
 
+pytestmark = pytest.mark.standalone
+
 HERE = Path(__file__).parent
 CONFIGS = load_pack_configs() | load_pack_configs(HERE / "fixtures" / "packs")
 STATEMENTS = load_statement_configs() | load_statement_configs(HERE / "statements")

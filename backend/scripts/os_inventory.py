@@ -144,16 +144,16 @@ FATES: dict[str, Fate] = {
     "app.plugins.scholarship_discovery": Fate("retire", "—", "No v1 slice builds scholarship listing and nothing calls it."),
     "app.routers.escalations": Fate("keep", "Slice 8 glue (app.pai_os_bridge)", "The Counsellor's escalation intake: since Slice 8 the glue hands PAI OS route problems to it. Counsellor-owned; it takes the five shared reasons once the Counsellor team adopts them (hand-over doc)."),
     "app.plugins.qualification_recognition": Fate("retire", "Slice 1 playbook (data only)", "Registered but never called; its sourced packs (DAAD, uni-assist, HEC attestation, APS, with official URLs) must be copied into the Slice 1 Germany playbook/Knowledge before deletion."),
-    "app.plugins.gap_assessment": Fate("keep", "Stage H research in P2", "Now imported by `app/pai_c/paths/programs.py`, so the Counsellor uses it; kept until P2, when it is retired with stage H research. Its meets / does-not-meet / unknown logic stays a reference for the Slice 1 eligibility checks."),
+    "app.plugins.gap_assessment": Fate("keep", "— (retired with stage H research in P2)", "Now imported by `app/pai_c/paths/programs.py`, so the Counsellor uses it; kept until P2, when it is retired with stage H research. Its meets / does-not-meet / unknown logic stays a reference for the Slice 1 eligibility checks."),
     "app.documents.owner": Fate("keep", "—", "The Vault's check that a document is the student's own; nothing replaces it."),
     "app.plugins.path_explainer": Fate("keep", "—", "The stage G owner workflow; it belongs to the Counsellor, not the old OS."),
     "app.plugins.program_search": Fate("keep", "ProgrammeList / ProgrammeFacts (R-49), until P2", "Stage H research; kept until P2, when ProgrammeList / ProgrammeFacts (R-49, master §4) replace it for OS-run routes."),
     "app.research.seasons": Fate("keep", "Knowledge season monitoring (R-27), until P2", "Season bounds for research freshness; kept until P2, when Knowledge season monitoring (R-27) replaces it."),
     # --- read-only: workflow and task features driven by the live application workspace ---
     **_entries("read-only", SLICES_1_6_TASKS, {
-        "app.routers.tasks": "The Kanban task routes (`/v1/tasks`) are still mounted and fetched by the workspace screens (`frontend/lib/workspace-context.tsx`), and they call the workflow service, so it is frozen until Slices 1 and 6 replace them, then retired.",
-        "app.routers.workflows": "Workflow-bound threads drive workflows, and `advance_workflow` runs after every event, including Counsellor replies, as a no-op without an active run, so it is frozen until Slices 1 and 6 replace them, then retired.",
-        "app.services.workflow": "Workflow-bound threads drive workflows, and `advance_workflow` runs after every event, including Counsellor replies, as a no-op without an active run, so it is frozen until Slices 1 and 6 replace them, then retired.",
+        "app.routers.tasks": "The Kanban task routes (`/v1/tasks`) are still mounted and fetched by the workspace screens (`frontend/lib/workspace-context.tsx`), and they call the workflow service, so it is read-only until it is retired.",
+        "app.routers.workflows": "Workflow-bound threads drive workflows, and `advance_workflow` runs after every event, including Counsellor replies, as a no-op without an active run, so it is read-only until it is retired.",
+        "app.services.workflow": "Workflow-bound threads drive workflows, and `advance_workflow` runs after every event, including Counsellor replies, as a no-op without an active run, so it is read-only until it is retired.",
     }),
     # --- keep: browser rendering behind POST /v1/fetch, used by the kept Counsellor research (checked by hand) ---
     **_entries("keep", "—", {
