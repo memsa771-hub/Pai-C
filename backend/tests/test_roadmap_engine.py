@@ -3,9 +3,9 @@ fields are open, need a step, are not open, or cannot be checked yet. Pure and
 deterministic (spec docs/counselor/ROADMAP_ENGINE_SPEC.md §2 and §5)."""
 
 from pathlib import Path
+from unittest.mock import patch
 
 import pytest
-from unittest.mock import patch
 
 from app.journey import JourneyService
 from app.memory.student_records import StudentRecordService

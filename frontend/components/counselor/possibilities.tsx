@@ -67,7 +67,9 @@ export function PathsFound({ ids, snapshot, newest }: { ids: string[]; snapshot?
     return () => { active = false; };
   }, [ids.join(), newest]); // eslint-disable-line react-hooks/exhaustive-deps
   const current = (rows ?? []).filter(row => row.status !== 'dismissed');
-  const found: PathSnapshot[] = newest ? current : snapshot?.length ? snapshot : current.filter(row => ids.includes(row.id));
+  // The newest card shows the current list once it has loaded; until then (or if the call fails) its snapshot.
+  const found: PathSnapshot[] = newest && rows !== null ? current
+    : snapshot?.length ? snapshot : current.filter(row => ids.includes(row.id));
   const changed = !newest && !!snapshot?.length && rows !== null
     && (current.filter(row => row.source === 'analyzer').map(row => row.id).sort().join() !== [...ids].sort().join());
   if (!found.length) return null;

@@ -66,3 +66,16 @@ it('an older paths card keeps its snapshot and does not read the current list', 
   expect(screen.queryByText('Path c')).toBeNull();
   expect(workspaceApi.getCurrentPaths).not.toHaveBeenCalled();
 });
+it('the newest paths card shows its snapshot while the current paths are loading', async () => {
+  vi.mocked(workspaceApi.getCurrentPaths).mockReturnValue(new Promise(() => {}));
+  render(<I18nProvider><PathsFound newest ids={['a', 'b']} snapshot={[snap('a'), snap('b')]} /></I18nProvider>);
+  await screen.findByText('Path a');
+  expect(screen.getByText('Path b')).toBeTruthy();
+});
+it('the newest paths card keeps its snapshot when the current paths cannot be loaded', async () => {
+  vi.mocked(workspaceApi.getCurrentPaths).mockRejectedValue(new Error('offline'));
+  render(<I18nProvider><PathsFound newest ids={['a', 'b']} snapshot={[snap('a'), snap('b')]} /></I18nProvider>);
+  await waitFor(() => expect(workspaceApi.getCurrentPaths).toHaveBeenCalled());
+  await screen.findByText('Path a');
+  expect(screen.getByText('Path b')).toBeTruthy();
+});

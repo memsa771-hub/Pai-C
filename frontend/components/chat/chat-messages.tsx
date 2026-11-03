@@ -57,6 +57,12 @@ function groupMessages(messages: WorkspaceMessage[]): MessageGroup[] {
 }
 
 // Stable key for a group
+/** The message id of the newest paths card among the chat groups. */
+function newestPathsGroupId(groups: MessageGroup[]): string | null {
+  return newestPathsMessageId(groups.flatMap(group =>
+    group.type === 'chat' ? [{ id: group.message.messageId, metadata: group.message.metadata }] : []));
+}
+
 function groupKey(group: MessageGroup): string {
   if (group.type === 'chat') return group.message.messageId;
   if (group.type === 'thinking') return `thinking-${group.messages[0].messageId}`;
@@ -206,7 +212,7 @@ export function ChatMessages({ messages, agents, showAllSteps, className, scroll
 
   // Group into chat messages and intermediate step clusters
   const groups = useMemo(() => groupMessages(filteredMessages), [filteredMessages]);
-  const newestPathsId = useMemo(() => newestPathsMessageId(groups.flatMap(group => group.type === 'chat' ? [{ id: group.message.messageId, metadata: group.message.metadata }] : [])), [groups]);
+  const newestPathsId = useMemo(() => newestPathsGroupId(groups), [groups]);
 
   const hasTerminalStatus = realMessages.some(isTerminalStatus);
 
