@@ -463,11 +463,11 @@ async def _post_finished(db, job, channel: str, reply_to: str) -> None:
         raise RuntimeError("path analysis message was not persisted")
 
 
-def _apply_exclusions(db, workspace_id: str, source_event_id: str | None) -> None:
+def _apply_exclusions(db, workspace_id: str, source_event_id: str | None, excluded: dict | None = None) -> None:
     """Dismiss the paths whose field the student ruled out and queue the one
-    notice for them (paths/exclusions.py). The caller holds a savepoint or the
-    workspace lock and commits."""
-    rows = exclusions.apply_exclusions(db, workspace_id)
+    notice for them (paths/exclusions.py). The caller holds a savepoint and
+    commits."""
+    rows = exclusions.apply_exclusions(db, workspace_id, excluded)
     if rows:
         exclusions.enqueue_exclusion_notice(db, workspace_id, rows, source_event_id=source_event_id)
 
@@ -550,9 +550,18 @@ async def path_analysis_job(job, db) -> dict:
             return {"status": "not_enough_known", "items": len(evidence)}
         # A field the student ruled out is dismissed before the run reads its
         # paths, and never offered to the model (R-47 C1).
-        _apply_exclusions(db, job.workspace_id, payload.get("source_event_id"))
+        # A failure here skips only the exclusion step, never the run.
+        excluded = None
+        try:
+            with db.begin_nested():
+                excluded = exclusions.excluded_fields(db, job.workspace_id)
+                _apply_exclusions(db, job.workspace_id, payload.get("source_event_id"), excluded)
+        except Exception as exc:  # noqa: BLE001  the path run outranks the exclusion step
+            excluded = None
+            logger.error("paths_exclusion_failed workspace_id=%s error_type=%s",
+                         job.workspace_id, type(exc).__name__)
         existing = service.list(job.workspace_id)
-        hidden = exclusions.hidden_field_keys(db, job.workspace_id, existing)
+        hidden = exclusions.hidden_field_keys(db, job.workspace_id, existing, excluded)
         offered = {key: c for key, c in candidates.items() if key not in hidden}
         dismissed = {row.normalized_title for row in existing if row.status == "dismissed"}
         own = {row.normalized_title for row in existing if row.source == "student" and row.status != "dismissed"}

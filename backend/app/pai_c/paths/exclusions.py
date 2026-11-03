@@ -53,22 +53,34 @@ def _restored(row: PaiPossibility, option: dict) -> bool:
     return dismissal.get("item_id") == option["item_id"] and bool(dismissal.get("restored_at"))
 
 
-def apply_exclusions(db, workspace_id: str) -> list[PaiPossibility]:
+def _dismissal(option: dict) -> dict:
+    return {"reason": REASON, "item_id": option["item_id"], "quote": option["quote"],
+            "at": datetime.now(timezone.utc).isoformat()}
+
+
+def apply_exclusions(db, workspace_id: str, excluded: dict[str, dict] | None = None) -> list[PaiPossibility]:
     """Dismiss every open path whose field the student ruled out, unless the
-    student restored it against the same Vault option. Flushes; the caller
-    commits. Returns the rows it dismissed."""
-    excluded = excluded_fields(db, workspace_id)
+    student restored it against the same Vault option. A matching path the
+    student had already dismissed by hand is only marked with the exclusion
+    (no transition, no notice), so restoring it later is the undo there too.
+    `excluded` is `excluded_fields`, when the caller already has it. Flushes;
+    the caller commits. Returns the rows it dismissed."""
+    excluded = excluded_fields(db, workspace_id) if excluded is None else excluded
     if not excluded:
         return []
     service = PossibilityService(db)
     changed = []
     for row in service.list(workspace_id):
         option = excluded.get((row.study_field or {}).get("key"))
-        if row.status not in _OPEN or option is None or _restored(row, option):
+        if option is None:
+            continue
+        if row.status == "dismissed" and (row.dismissal or {}).get("reason") != REASON:
+            row.dismissal = _dismissal(option)
+            continue
+        if row.status not in _OPEN or _restored(row, option):
             continue
         service.transition(workspace_id, row.id, "dismiss")
-        row.dismissal = {"reason": REASON, "item_id": option["item_id"], "quote": option["quote"],
-                         "at": datetime.now(timezone.utc).isoformat()}
+        row.dismissal = _dismissal(option)
         changed.append(row)
     db.flush()
     if changed:
@@ -76,21 +88,25 @@ def apply_exclusions(db, workspace_id: str) -> list[PaiPossibility]:
     return changed
 
 
-def hidden_field_keys(db, workspace_id: str, rows) -> set[str]:
+def hidden_field_keys(db, workspace_id: str, rows, excluded: dict[str, dict] | None = None) -> set[str]:
     """Fields the analyzer must not offer: every excluded field, except one
     whose path the student kept or restored (it stays theirs to reassess)."""
     kept = {(row.study_field or {}).get("key") for row in rows if row.status != "dismissed"}
-    return set(excluded_fields(db, workspace_id)) - kept
+    return set(excluded_fields(db, workspace_id) if excluded is None else excluded) - kept
 
 
 def enqueue_exclusion_notice(db, workspace_id: str, rows, *, source_event_id: str | None) -> str | None:
-    """Queue the one notice for these dismissed paths. The caller commits."""
+    """Queue the one notice for these dismissed paths. The key names each
+    path with the Vault option that dismissed it: a re-reconcile or retry
+    reuses the job, a new exclusion after a restore is a new notice. The
+    caller commits."""
     ids = sorted(row.id for row in rows)
     if not ids:
         return None
+    pairs = sorted(f"{row.id}:{(row.dismissal or {}).get('item_id')}" for row in rows)
     payload = {"possibility_ids": ids, **({"source_event_id": source_event_id} if source_event_id else {})}
     job = enqueue(db, JOB_PATHS_EXCLUDED, payload, workspace_id=workspace_id,
-                  idempotency_key=f"paths-excluded:{workspace_id}:{','.join(ids)}")
+                  idempotency_key=f"paths-excluded:{workspace_id}:{','.join(pairs)}")
     return job.id if job else None
 
 

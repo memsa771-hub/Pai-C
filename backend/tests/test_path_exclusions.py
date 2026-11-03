@@ -164,19 +164,83 @@ async def test_restored_path_is_not_dismissed_again():
 
 def test_new_exclusion_after_restore_dismisses_again():
     with StudentSession() as student, student.factory() as db:
-        _, journey = setup(student, db)
+        turn, journey = setup(student, db)
         row = add_path(db, student, journey, "pharm_d")
         first = option(db, student, "Pharm-D", quote="Pharm-D nahi karni")
-        exclusions.apply_exclusions(db, student.workspace_id)
+        rows = exclusions.apply_exclusions(db, student.workspace_id)
+        first_notice = exclusions.enqueue_exclusion_notice(db, student.workspace_id, rows,
+                                                           source_event_id=turn.source_event_id)
+        db.get(BackgroundJob, first_notice).status = "succeeded"
         PossibilityService(db).transition(student.workspace_id, row.id, "explore")
         db.commit()
         assert row.status == "exploring"
         first.status = "superseded"
         later = option(db, student, "Pharm-D", quote="Nahi, Pharm-D bilkul nahi")
-        assert [r.id for r in exclusions.apply_exclusions(db, student.workspace_id)] == [row.id]
+        rows = exclusions.apply_exclusions(db, student.workspace_id)
+        assert [r.id for r in rows] == [row.id]
         assert row.status == "dismissed"
         assert row.dismissal["item_id"] == later.id and "restored_at" not in row.dismissal
         assert row.dismissal["quote"] == "Nahi, Pharm-D bilkul nahi"
+        # The new exclusion is a new notice, not the finished one from before.
+        second_notice = exclusions.enqueue_exclusion_notice(db, student.workspace_id, rows,
+                                                            source_event_id=turn.source_event_id)
+        db.commit()
+        assert second_notice and second_notice != first_notice
+        assert db.get(BackgroundJob, second_notice).status == "pending"
+        assert len(notice_jobs(db, student.workspace_id)) == 2
+        # Retrying the same exclusion reuses that job.
+        assert exclusions.enqueue_exclusion_notice(db, student.workspace_id, rows,
+                                                   source_event_id=turn.source_event_id) == second_notice
+
+
+@pytest.mark.asyncio
+async def test_path_dismissed_by_hand_then_excluded_and_restored_is_not_dismissed_again():
+    from app.memory.candidates import MemoryCandidateService
+    from app.memory.reconciler import MemoryReconciler
+    with StudentSession() as student, student.factory() as db:
+        turn, journey = setup(student, db)
+        row = add_path(db, student, journey, "pharm_d")
+        service = PossibilityService(db)
+        service.transition(student.workspace_id, row.id, "dismiss")
+        db.commit()
+        assert row.dismissal is None
+        candidate = MemoryCandidateService(db).propose(workspace_id=student.workspace_id, candidate_type="vault_item",
+            key="option", proposed_value={"text": "Pharm-D", "status": "ruled_out"}, confidence=0.9,
+            source_type="user_explicit", source_event_ids=[turn.source_event_id],
+            evidence={"quote": "Pharm-D nahi karni"}, allow_user_explicit=True)
+        assert MemoryReconciler(db).reconcile(candidate).accepted
+        db.commit()
+        db.expire_all()
+        row = db.get(PaiPossibility, row.id)
+        # Already dismissed: only marked with the exclusion, no second notice for it.
+        assert row.status == "dismissed" and row.dismissal["reason"] == "student_excluded"
+        assert notice_jobs(db, student.workspace_id) == []
+        restored, _ = service.transition(student.workspace_id, row.id, "save")
+        db.commit()
+        assert restored.dismissal["restored_at"]
+        # An unrelated Vault write runs the hook again.
+        other = MemoryCandidateService(db).propose(workspace_id=student.workspace_id, candidate_type="vault_item",
+            key="option", proposed_value={"text": "MBBS", "status": "considering"}, confidence=0.9,
+            source_type="user_explicit", evidence={"quote": "MBBS soch raha hoon"}, allow_user_explicit=True)
+        assert MemoryReconciler(db).reconcile(other).accepted
+        db.commit()
+        assert db.get(PaiPossibility, row.id).status == "saved"
+        result, sent = await run_paths(db, student, turn, analysis(path("pharm_d")))
+        db.expire_all()
+        row = db.get(PaiPossibility, row.id)
+        assert row.status == "saved" and row.id in result["paths"]
+        assert '"key":"pharm_d"' in sent[0]
+        assert notice_jobs(db, student.workspace_id) == []
+
+
+@pytest.mark.asyncio
+async def test_a_failing_exclusion_step_does_not_fail_the_path_run():
+    with StudentSession() as student, student.factory() as db:
+        turn, _ = setup(student, db)
+        with patch("app.pai_c.paths.exclusions.apply_exclusions", side_effect=RuntimeError("boom")):
+            result, _ = await run_paths(db, student, turn, analysis(path("mbbs")))
+        assert result["status"] == "stored"
+        assert [row.title for row in PossibilityService(db).list(student.workspace_id)] == [title("mbbs")]
 
 
 @pytest.mark.asyncio
