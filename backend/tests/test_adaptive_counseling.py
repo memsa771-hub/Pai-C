@@ -489,14 +489,17 @@ async def test_sweep_leaves_recent_or_started_questions(age, started):
 
 @pytest.mark.req("R-47")
 @pytest.mark.asyncio
-async def test_sweep_covers_a_failed_research_job():
+@pytest.mark.parametrize("ended", ["failed", "cancelled"])
+async def test_sweep_covers_a_failed_research_job(ended):
     now = datetime.now(timezone.utc)
     with StudentSession() as student, student.factory() as db:
         row = _open_question(student, db, age_minutes=31, now=now)
         job = myths.enqueue_information(db, student.workspace_id, row.source_event_id)
-        job.status = "failed"
+        job.status = ended
         db.commit()
         assert myths.sweep_unstarted_information(db, now=now) == 1
+        [notice] = _notice_jobs(db)
+        assert notice.payload["request_id"] == row.id
 
 
 @pytest.mark.req("R-47")
@@ -533,3 +536,104 @@ async def test_session_sweep_runs_the_information_sweep():
         result = await sweep_job(SimpleNamespace(payload={}), db)
         assert result["information_notices"] == 1
         assert len(_notice_jobs(db)) == 1
+
+
+def _turn_decision(student, db, source_event_id, *, action=None, move="none"):
+    db.add(CounselorTurnDecision(workspace_id=student.workspace_id, source_event_id=source_event_id,
+        source_timestamp=student.next_timestamp(), move=move, guard_violations=[],
+        decision={"action": action} if action else None))
+    db.commit()
+
+
+@pytest.mark.req("R-47")
+@pytest.mark.asyncio
+async def test_clear_myth_turn_starts_no_information_research(monkeypatch):
+    """The myth check researches and answers the claim; no second research."""
+    monkeypatch.setattr(config, "PAI_API_KEY", "offline-fake")
+    research = AsyncMock(return_value={"ok": True, "data": {"job_id": "j"}})
+    with StudentSession() as student:
+        await _ask(student, _research_signals(), decision="clear_myth", research=research)
+        with student.factory() as db:
+            assert db.scalar(select(CounselorNotedQuestion)).status == "open"
+    assert [call.args[0] for call in research.await_args_list] == ["myth_check"]
+
+
+@pytest.mark.req("R-47")
+@pytest.mark.asyncio
+async def test_sweep_skips_a_myth_turn_question():
+    now = datetime.now(timezone.utc)
+    with StudentSession() as student, student.factory() as db:
+        row = _open_question(student, db, age_minutes=31, now=now)
+        _turn_decision(student, db, row.source_event_id, action="clear_myth")
+        assert myths.sweep_unstarted_information(db, now=now) == 0
+        assert _notice_jobs(db) == []
+
+
+@pytest.mark.req("R-47")
+@pytest.mark.asyncio
+async def test_sweep_leaves_questions_older_than_48_hours():
+    now = datetime.now(timezone.utc)
+    with StudentSession() as student, student.factory() as db:
+        _open_question(student, db, age_minutes=49 * 60, now=now)
+        assert myths.sweep_unstarted_information(db, now=now) == 0
+
+
+@pytest.mark.req("R-47")
+@pytest.mark.asyncio
+async def test_sweep_posts_one_notice_per_workspace_per_tick():
+    now = datetime.now(timezone.utc)
+    with StudentSession() as student, student.factory() as db:
+        first = _open_question(student, db, age_minutes=40, now=now)
+        second = _open_question(student, db, age_minutes=35, now=now)
+        assert myths.sweep_unstarted_information(db, now=now) == 1
+        assert [job.payload["request_id"] for job in _notice_jobs(db)] == [first.id]
+        assert myths.sweep_unstarted_information(db, now=now) == 1
+        assert {job.payload["request_id"] for job in _notice_jobs(db)} == {first.id, second.id}
+        assert myths.sweep_unstarted_information(db, now=now) == 0
+
+
+@pytest.mark.req("R-47")
+@pytest.mark.asyncio
+async def test_sweep_notice_waits_for_care_and_is_not_dropped():
+    from app.jobs.service import JobDeferred
+    from app.pai_c.policy.controller import load_data
+    now = datetime.now(timezone.utc)
+    with StudentSession() as student, student.factory() as db:
+        row = _open_question(student, db, age_minutes=31, now=now)
+        _turn_decision(student, db, row.source_event_id, action="care", move="wellbeing")
+        assert myths.sweep_unstarted_information(db, now=now) == 1
+        [job] = _notice_jobs(db)
+        with pytest.raises(JobDeferred):
+            await myths.check_job(job, db)
+        db.refresh(row)
+        assert row.status == "open"
+        _turn_decision(student, db, str(row.id), action="counsel")
+        await myths.check_job(job, db)
+        db.refresh(row)
+        assert row.status == "unanswered"
+        notice = load_data("myths.json")["information_unanswered"]
+        assert [turn["content"] for turn in student.transcript].count(notice) == 1
+
+
+@pytest.mark.req("R-47")
+@pytest.mark.asyncio
+async def test_sweep_notice_is_superseded_when_research_started_meanwhile():
+    now = datetime.now(timezone.utc)
+    with StudentSession() as student, student.factory() as db:
+        row = _open_question(student, db, age_minutes=31, now=now)
+        assert myths.sweep_unstarted_information(db, now=now) == 1
+        [job] = _notice_jobs(db)
+        myths.enqueue_information(db, student.workspace_id, row.source_event_id)
+        assert (await myths.check_job(job, db)) == {"status": "superseded"}
+        db.refresh(row)
+        assert row.status == "open" and student.transcript == []
+
+
+@pytest.mark.req("R-47")
+@pytest.mark.asyncio
+async def test_session_sweep_survives_an_information_sweep_error():
+    from app.pai_c.sessions import sweep_job
+    with StudentSession() as student, student.factory() as db:
+        with patch.object(myths, "sweep_unstarted_information", side_effect=RuntimeError("boom")):
+            result = await sweep_job(SimpleNamespace(payload={}), db)
+        assert result["information_notices"] == 0 and "sessions_enqueued" in result

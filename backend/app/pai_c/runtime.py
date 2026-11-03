@@ -235,14 +235,17 @@ async def _run_deep_turn(db, workspace_id: str, event_data: dict, depth: int):
     # turn it starts too; delivery waits while care is active. A promise that
     # still never starts is closed by the session sweep (R-47). The job is
     # idempotent per request, so it is queued once.
+    # A clear_myth turn's claim is researched and answered by its myth check.
+    from sqlalchemy.exc import SQLAlchemyError
     from app.pai_c.myths import open_research_question
-    try:
-        needs_research = open_research_question(db, workspace_id, turn.source_event_id) is not None
-    except Exception as exc:
-        # The reply is already posted; the session sweep closes this promise.
-        db.rollback()
-        logger.warning("information_enqueue_failed error_type=%s attempt=%d", type(exc).__name__, 0)
-        needs_research = False
+    needs_research = False
+    if decision is None or decision.action != "clear_myth":
+        try:
+            needs_research = open_research_question(db, workspace_id, turn.source_event_id) is not None
+        except SQLAlchemyError:
+            # The reply is already posted; the session sweep closes this promise.
+            db.rollback()
+            logger.exception("information_lookup_failed")
     if needs_research:
         await _start_information_research(db, workspace_id, turn.source_event_id)
     # A student asking which paths they have gets them worked out in the

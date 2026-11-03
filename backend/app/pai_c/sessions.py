@@ -1,8 +1,11 @@
 """Durable session lifecycle; the shared worker only knows job names."""
+import logging
 import time
 
 from app.pai_c.memory import MemoryService
 from app.runtime.task_runtime import enqueue
+
+logger = logging.getLogger(__name__)
 
 JOB_SWEEP = "session.sweep"
 JOB_SUMMARIZE = "session.summarize"
@@ -17,7 +20,14 @@ async def sweep_job(job, db):
     from app.pai_c.reliability import enqueue_alerts
     enqueue_alerts(db)
     from app.pai_c.myths import sweep_unstarted_information
-    return {"sessions_enqueued": len(sessions), "information_notices": sweep_unstarted_information(db)}
+    try:
+        notices = sweep_unstarted_information(db)
+    except Exception as exc:
+        # The information sweep never fails the session sweep; it runs again next tick.
+        db.rollback()
+        logger.warning("information_sweep_failed error_type=%s", type(exc).__name__)
+        notices = 0
+    return {"sessions_enqueued": len(sessions), "information_notices": notices}
 
 
 async def summarize_job(job, db):
