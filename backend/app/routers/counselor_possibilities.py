@@ -18,6 +18,15 @@ def list_possibilities(network: str = Query(...), db=Depends(get_db),
     return success_response({"possibilities": [service.serialize(row) for row in service.list(str(workspace.id))]})
 
 
+@router.get("/current")
+def current_possibilities(network: str = Query(...), db=Depends(get_db),
+                          x_workspace_token: str | None = Header(None), authorization: str | None = Header(None)):
+    """The student's current paths (not dismissed): the list Roadmaps shows."""
+    workspace = _authorized(db, network, x_workspace_token, authorization)
+    service = PossibilityService(db)
+    return success_response({"possibilities": [service.serialize(row) for row in service.current(str(workspace.id))]})
+
+
 class OwnPath(BaseModel):
     model_config = ConfigDict(extra="forbid")
     title: str = Field(min_length=1, max_length=120)

@@ -3,6 +3,8 @@ fields are open, need a step, are not open, or cannot be checked yet. Pure and
 deterministic (spec docs/counselor/ROADMAP_ENGINE_SPEC.md §2 and §5)."""
 
 from pathlib import Path
+
+import pytest
 from unittest.mock import patch
 
 from app.journey import JourneyService
@@ -278,3 +280,19 @@ def test_o_level_line_names_no_group():
     record = {"qualification_name": "o_level", "academic_status": "current",
               "details": {"subjects": ["physics", "chemistry", "mathematics"]}}
     assert education_line(standing_of(record))["groups"] == []
+
+
+@pytest.mark.req("R-47")
+def test_roadmap_and_current_paths_read_one_list():
+    keys = list(study_fields())[:6]
+    with StudentSession() as student, student.factory() as db:
+        add_education(student, db, fsc("pre_engineering", 80))
+        for key in keys[:3]:  # kept from earlier runs
+            add_path(student, db, field_title(key), key, source="analyzer")
+        for key in keys[3:5]:  # the latest run
+            add_path(student, db, field_title(key), key, source="analyzer")
+        add_path(student, db, field_title(keys[5]), keys[5], status="dismissed")
+        current = PossibilityService(db).current(student.workspace_id)
+        fields = RoadmapEngine(db).build(student.workspace_id)["fields"]
+        assert sorted(c["possibility_id"] for c in fields) == sorted(r.id for r in current)
+        assert len(fields) == 5

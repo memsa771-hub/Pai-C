@@ -36,6 +36,11 @@ class PossibilityService:
         return self.db.scalars(select(PaiPossibility).where(
             PaiPossibility.workspace_id == workspace_id).order_by(PaiPossibility.created_at, PaiPossibility.id)).all()
 
+    def current(self, workspace_id):
+        """The student's current paths: everything not dismissed, in list order.
+        The one reader behind the newest chat card, Roadmaps and the journey."""
+        return [row for row in self.list(workspace_id) if row.status != "dismissed"]
+
     @staticmethod
     def serialize(row):
         return {column.name: (value.isoformat() if isinstance(value, datetime) else value)

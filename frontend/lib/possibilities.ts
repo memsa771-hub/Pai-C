@@ -47,3 +47,12 @@ export type StudyField = {
 
 /** The latest path analysis, so the Paths page knows when to stop waiting. */
 export type PathAnalysisStatus = { job_id: string | null; done: boolean; outcome: string | null };
+
+/** The id of the last message that carries a non-empty `paths_found`: only that card shows the live list. */
+export function newestPathsMessageId(messages: { id: string; metadata?: Record<string, unknown> | null }[]): string | null {
+  for (let index = messages.length - 1; index >= 0; index--) {
+    const found = messages[index].metadata?.paths_found;
+    if (Array.isArray(found) && found.length) return messages[index].id;
+  }
+  return null;
+}

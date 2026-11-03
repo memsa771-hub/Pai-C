@@ -752,6 +752,13 @@ class WorkspaceApi {
     return result.possibilities;
   }
 
+  /** The student's current paths (not dismissed): the same list Roadmaps shows. */
+  async getCurrentPaths(): Promise<import('./possibilities').Possibility[]> {
+    const result = await this.request<{ possibilities: import('./possibilities').Possibility[] }>(
+      `/v1/counselor/possibilities/current?network=${this.requireWorkspace()}`);
+    return result.possibilities;
+  }
+
   async changePossibility(id: string, action: 'explore' | 'save' | 'dismiss'): Promise<import('./possibilities').Possibility> {
     return this.request(`/v1/counselor/possibilities/${encodeURIComponent(id)}/${action}?network=${this.requireWorkspace()}`,
       { method: 'POST' });

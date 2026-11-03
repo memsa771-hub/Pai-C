@@ -246,3 +246,30 @@ async def test_planner_possibility_is_logged_and_queues_analysis_without_a_row()
         assert PossibilityService(db).list(student.workspace_id)==[]
         assert len(db.scalars(select(BackgroundJob).where(BackgroundJob.job_type==JOB_ANALYZE_PATHS)).all())==1
         assert db.scalar(select(PaiTurnPlan)).plan['possibility']['title']=='Practical collaboration'
+
+
+@pytest.mark.req("R-47")
+def test_current_paths_endpoint_matches_roadmap():
+    from app.main import app
+    from app.pai_c.paths.fields import study_fields
+    from tests.test_roadmap_engine import add_path, field_title
+    keys = list(study_fields())[:4]
+    with StudentSession() as student, student.factory() as db:
+        for key in keys[:3]:
+            add_path(student, db, field_title(key), key)
+        dismissed = add_path(student, db, field_title(keys[3]), keys[3], status="dismissed")
+        client = client_for(student); headers = {'X-Workspace-Token': 'synthetic-test-only'}
+        try:
+            network = student.workspace_id
+            current = client.get(f'/v1/counselor/possibilities/current?network={network}', headers=headers)
+            assert current.status_code == 200, current.text
+            ids = {row['id'] for row in current.json()['data']['possibilities']}
+            roadmap = client.get(f'/v1/roadmap?network={network}', headers=headers).json()['data']
+            assert ids == {card['possibility_id'] for card in roadmap['fields']}
+            assert len(ids) == 3 and dismissed.id not in ids
+            assert client.get(f'/v1/counselor/possibilities/current?network={network}').status_code == 401
+            stranger = '00000000-0000-0000-0000-000000000000'
+            listed = client.get(f'/v1/counselor/possibilities?network={stranger}', headers=headers)
+            other = client.get(f'/v1/counselor/possibilities/current?network={stranger}', headers=headers)
+            assert other.status_code == listed.status_code and other.status_code >= 400
+        finally: app.dependency_overrides.clear()
