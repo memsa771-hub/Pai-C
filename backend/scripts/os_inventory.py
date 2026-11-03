@@ -151,9 +151,9 @@ FATES: dict[str, Fate] = {
     "app.research.seasons": Fate("keep", "Knowledge season monitoring (R-27), until P2", "Season bounds for research freshness; kept until P2, when Knowledge season monitoring (R-27) replaces it."),
     # --- read-only: workflow and task features driven by the live application workspace ---
     **_entries("read-only", SLICES_1_6_TASKS, {
-        "app.routers.tasks": "The live application workspace links requirements to these tasks (`application_workspace/operations.py`, `calendar.py`, `serializers.py`) and the deadlines service reads them, so it is frozen until those features are replaced, then retired with them.",
-        "app.routers.workflows": "The application workspace and workflow-bound threads drive workflows, and `advance_workflow` runs after every event, including Counsellor replies, as a no-op without an active run, so it is frozen until Slices 1 and 6 replace the application workspace, then retired.",
-        "app.services.workflow": "The application workspace and workflow-bound threads drive workflows, and `advance_workflow` runs after every event, including Counsellor replies, as a no-op without an active run, so it is frozen until Slices 1 and 6 replace the application workspace, then retired.",
+        "app.routers.tasks": "The Kanban task routes (`/v1/tasks`) are still mounted and fetched by the workspace screens (`frontend/lib/workspace-context.tsx`), and they call the workflow service, so it is frozen until Slices 1 and 6 replace them, then retired.",
+        "app.routers.workflows": "Workflow-bound threads drive workflows, and `advance_workflow` runs after every event, including Counsellor replies, as a no-op without an active run, so it is frozen until Slices 1 and 6 replace them, then retired.",
+        "app.services.workflow": "Workflow-bound threads drive workflows, and `advance_workflow` runs after every event, including Counsellor replies, as a no-op without an active run, so it is frozen until Slices 1 and 6 replace them, then retired.",
     }),
     # --- keep: browser rendering behind POST /v1/fetch, used by the kept Counsellor research (checked by hand) ---
     **_entries("keep", "—", {
@@ -165,9 +165,17 @@ FATES: dict[str, Fate] = {
 }
 
 
-# Retire fates that touch Counsellor code or screens (none at present; sign-off is recorded in render_markdown).
+# Retire fates that touch Counsellor code or screens. None at present; the history of the signed-off retires is below.
 # module -> how it touches the Counsellor.
-COUNSELLOR_TOUCHING_RETIRES: dict[str, str] = {
+COUNSELLOR_TOUCHING_RETIRES: dict[str, str] = {}
+
+# Retires signed off on this date that have since been carried out (the modules are gone from `app/`).
+RETIRE_SIGNOFF_DATE = "2026-10-14"
+# module -> how it touched the Counsellor.
+HISTORIC_SIGNED_OFF_RETIRES: dict[str, str] = {
+    "app.tools.builtin.tasks": "`tasks.list` was in the Counsellor's allowed-tool list and the tool was in the shared registry",
+    "app.routers.timers": "polled by the Counsellor chat status bar",
+    "app.routers.todos": "polled and cancelled by the Counsellor chat status bar",
 }
 
 
@@ -367,20 +375,10 @@ Only watched modules get a row (the `WATCHED_*` constants in the script). "Impor
 """
 
 PRESERVE_NOTES = (
-    "`application_workspace/plans.py:111,171,191` (old OS, read-only) imports `deadlines.service.expire_deadline_notices` (read-only): retire the two together, or move that helper first.",
-    "`main.py:110-111` runs the hourly deadlines sweep (`sweep_due_notices`): switch it off only when Slice 1 reminders are live.",
-    "`deadlines.service` and `application_workspace` read the `KanbanTask` model: do not drop it when the tasks router and tool are retired.",
-    "`PAI_ALLOWED_TOOLS` in `services/pai.py:59` lists `tasks.list` and is guarded by `TestToolBoundary` in `tests/test_pai.py`: remove the entry and update the test together with `tools/builtin/tasks.py`.",
-    "`pai_c/posting.py:224-237` calls `advance_workflow` from `app.services.workflow` after every reply; it is a no-op without an active workflow run (known incidental hook). Remove the call before retiring `app.services.workflow`; `services/integrations.py:237`, `routers/events.py:392`, `routers/workspaces.py:625` (`get_active_run`, `start_run`) and `routers/tasks.py:256,473,505,717` also use the workflow service.",
-    "`main.py:114-373` `_fire_due` fires timers and routines and imports `routers.routines` (line 127): change it before retiring the timers router or moving routines.",
-    "`tools/builtin/__init__.py:3,36,51,53-61` imports and registers the `tasks.*` and `browser.*` tools: remove the registrations with the tool modules (`tools/builtin/tasks.py` and `browser.py`).",
-    "Counsellor chat renders `ThreadStatusBar` for every session (`frontend/components/chat/chat-view.tsx:983,1000`); it polls `/v1/timers` every 15 seconds (`thread-status-bar.tsx:34-46`) and calls `cancelChannelTodos` on `/v1/todos` (`thread-status-bar.tsx:106`): remove that polling and cancelling before the timers and todos routers go.",
-    "`frontend/lib/workspace-context.tsx:797-804` and `:1245-1250` fetch tasks, workflows, routines, todos and browser tabs on every screen: remove the todos fetch before the todos router goes, and the tasks, workflows and routines fetches only when the application workspace group retires.",
-    "Split candidate: the interactive shared-tab endpoints and credential flows in `routers/browser.py` and `app.browser.credentials` are not needed by `/v1/fetch`, so they can be switched off in a dedicated PR once `_resolve_bf_key` and the render path are isolated.",
-    "A \"Browser\" nav item exists (`frontend/components/layout/workspace-navigation.tsx:52-54`): check student use before switching off the interactive browser endpoints.",
-    "`frontend/components/applications/application-operations.tsx:30,36` (read-only application workspace) calls `/v1/tasks` and `/v1/workflows`: the tasks and workflows routers and the workflow service are read-only and retire together with the application workspace group, not before.",
-    "`plugins/roadmap_builder/__init__.py:5-8` `DEPENDENCIES` names `qualification.recognize`, `scholarship.discover` and `gap.assess`: remove those names before deleting the three plugins.",
-    "`app.plugins.qualification_recognition` packs (`packs/de.json`, `pk.json`, `uk.json`: DAAD, uni-assist, HEC attestation, APS, with official URLs) must be copied into the Slice 1 Germany playbook/Knowledge before the plugin is deleted.",
+    "`KanbanTask` is still used by `routers/tasks.py`, `services/workflow.py` and `eventing/handlers/workflows.py`: do not drop the model until all three are retired.",
+    "`pai_c/posting.py` calls `advance_workflow` from `app.services.workflow` after every reply; it is a no-op without an active workflow run (known incidental hook). Remove the call before retiring `app.services.workflow`; `routers/events.py:392`, `routers/workspaces.py:625` (`get_active_run`, `start_run`) and `routers/tasks.py:256,473,505,717` also use the workflow service.",
+    "`frontend/lib/workspace-context.tsx` fetches tasks and workflows on every screen: remove those fetches when the tasks and workflows routers retire.",
+    "`plugins/qualification_recognition` packs (`packs/de.json`, `pk.json`, `uk.json`: DAAD, uni-assist, HEC attestation, APS, with official URLs) must be copied into the Slice 1 Germany playbook/Knowledge before the plugin is deleted.",
     "`app.plugins.gap_assessment` meets / does-not-meet / unknown logic is a reference for the Slice 1 eligibility checks: read it before deleting.",
     "`routers/escalations.py` needs `PAI_OS_SERVICE_TOKEN`: the Slice 8 glue (`app/pai_os_bridge.py`) calls it, so it is kept (`tests/test_counselor_escalations.py`, `tests/test_pai_os_bridge.py`).",
 )
@@ -430,18 +428,16 @@ def render_markdown(rows: list[InventoryRow]) -> str:
         ]
         lines.append("| " + " | ".join(cells) + " |")
     lines += ["", "## Retires that touch Counsellor code or screens", ""]
+    signoff = (
+        f"Signed off {RETIRE_SIGNOFF_DATE}: the Counsellor lead delegated sign-off to the project owner, "
+        "who delegated these decisions to Claude; each row's reason gives the rationale."
+    )
     if COUNSELLOR_TOUCHING_RETIRES:
-        lines += [
-            "Signed off 2026-10-14: the Counsellor lead delegated sign-off to the project owner, who delegated these decisions to Claude; each row's reason gives the rationale.",
-            "",
-        ]
+        lines += [signoff, ""]
         lines += [f"- `{module}`: {why}." for module, why in COUNSELLOR_TOUCHING_RETIRES.items()]
     else:
-        lines += [
-            "Signed off 2026-10-14: the Counsellor lead delegated sign-off to the project owner, who delegated these decisions to Claude. "
-            "Those retires (`app.tools.builtin.tasks`, `app.routers.timers`, `app.routers.todos`) are done and the modules are gone from `app/`; "
-            "no retire row is used by the Counsellor now.",
-        ]
+        lines += [signoff, "", "These sign-offs are done and their modules are gone from `app/`; no retire row is used by the Counsellor now:", ""]
+        lines += [f"- `{module}`: {why}." for module, why in HISTORIC_SIGNED_OFF_RETIRES.items()]
     lines += ["", "## Before retiring anything", ""]
     lines += [f"- {note}" for note in PRESERVE_NOTES]
     return "\n".join(lines) + "\n"
