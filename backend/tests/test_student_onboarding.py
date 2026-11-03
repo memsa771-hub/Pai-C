@@ -242,7 +242,11 @@ def test_account_display_name_does_not_guess_legal_or_preferred_name(db):
 def test_every_identity_answer_is_required(db):
     state = OnboardingService(db).state(db.info["workspace"])
     assert state["fields"]
-    assert all(field["required"] for field in state["fields"])
+    # Only the marks of a record still being studied and the entry test are
+    # optional (R-47 C7); every other question is required.
+    optional = {(f["name"], f["labelKey"]) for f in state["fields"] if not f["required"]}
+    assert optional == {("marksObtained", "marksSoFar"), ("marksTotal", None), ("grades", None),
+                        ("entryTest", None), ("entryTestScore", "entryTestScore")}
 
 
 def test_existing_equal_canonical_value_keeps_its_original_provenance(db):
@@ -313,7 +317,10 @@ def test_three_step_form_is_advertised_in_order_with_no_reply_language(db):
         ("currentCountry", 2), ("currentCity", 2), ("dateOfBirth", 2), ("gender", 2),
         ("level", 3), ("group", 3), ("group", 3),
         ("subjects", 3), ("subjects", 3), ("technology", 3), ("field", 3), ("field", 3),
-        ("status", 3), ("year", 3), ("year", 3), ("year", 3), ("year", 3)]
+        ("status", 3), ("year", 3), ("year", 3), ("year", 3), ("year", 3),
+        ("marksObtained", 3), ("marksTotal", 3), ("marksObtained", 3), ("marksTotal", 3),
+        ("grades", 3), ("grades", 3), ("matricMarksObtained", 3), ("matricMarksTotal", 3), ("oLevelGrades", 3),
+        ("entryTest", 3), ("entryTestScore", 3)]
     assert "replyLanguage" not in {f["name"] for f in state["fields"]}
     # The default country is data, shown pre-selected for a new student.
     assert state["prefill"]["currentCountry"] == "Pakistan"
@@ -412,8 +419,15 @@ def test_a_legacy_stored_level_prefills_as_its_catalog_chip(db):
 
 # -- Exact current education (EDUCATION_FOCUS_SPEC section 1) ----------------
 
+# The marks of the record before the current one (R-47 C7): asked of an
+# Intermediate or DAE student (Matric) and an A-level student (O-level), and
+# required; dropped as hidden answers for every other level.
+PRIOR = {"matricMarksObtained": "900", "matricMarksTotal": "1100", "oLevelGrades": "A B"}
+PRIOR_LEVELS = ("matric", "o_level")
+# The marks or grades a completed record requires.
+COMPLETED_MARKS = {"marksObtained": "450", "marksTotal": "550", "grades": "A B"}
 PERSON = {"firstName": "Sam", "lastName": "Taylor", "dateOfBirth": "2008-03-12", "gender": "female",
-          "currentCountry": "Pakistan", "currentCity": "My city"}
+          "currentCountry": "Pakistan", "currentCity": "My city", **PRIOR}
 STUDY_FIELDS = {"study_fields.bachelor": [("computer_science", "Computer Science"), ("mbbs", "MBBS (Medicine)")],
                 "study_fields.master": [("computer_science", "Computer Science")]}
 
@@ -421,6 +435,12 @@ STUDY_FIELDS = {"study_fields.bachelor": [("computer_science", "Computer Science
 def _education_rows(db):
     from app.memory.student_records import StudentRecordService
     return StudentRecordService(db).list(str(db.info["workspace"].id), "education")
+
+
+def _studied_rows(db):
+    """The education rows other than the separate prior record (Matric or
+    O-level) onboarding writes beside an Intermediate, DAE or A-level answer."""
+    return [row for row in _education_rows(db) if row.qualification_name not in PRIOR_LEVELS]
 
 
 def _education_candidates(db):
@@ -442,9 +462,11 @@ def test_intermediate_pre_med_writes_fsc_record(db):
         **PERSON, "level": "intermediate", "group": "pre_medical", "status": "current", "year": "year_2"})
     db.commit()
     assert result["completed"] and not result["rejected"], result
-    # ONE record, through one candidate, holding every education answer.
-    assert len(_education_candidates(db)) == 1
-    [row] = _education_rows(db)
+    # ONE record, through one candidate, holding every answer about it (the
+    # prior Matric is its own record, through its own candidate).
+    candidates = [c.proposed_value["value"]["qualification_name"] for c in _education_candidates(db)]
+    assert sorted(candidates) == ["fsc", "matric"]
+    [row] = _studied_rows(db)
     assert (row.qualification_name, row.field_of_study, row.academic_status) == ("fsc", "pre_medical", "current")
     assert row.details["current_year"] == 2
     assert row.graduation_year is None
@@ -455,19 +477,19 @@ def test_intermediate_pre_med_writes_fsc_record(db):
                                           ("fa_humanities", "fa")])
 def test_intermediate_groups_keep_todays_codes(db, group, level):
     OnboardingService(db).apply(db.info["workspace"], {
-        **PERSON, "level": "intermediate", "group": group, "status": "completed", "year": "2025"})
+        **PERSON, **COMPLETED_MARKS, "level": "intermediate", "group": group, "status": "completed", "year": "2025"})
     db.commit()
-    [row] = _education_rows(db)
+    [row] = _studied_rows(db)
     assert (row.qualification_name, row.field_of_study) == (level, group)
     assert (row.academic_status, row.graduation_year) == ("completed", 2025)
 
 
 def test_a_level_subjects_saved(db):
     OnboardingService(db).apply(db.info["workspace"], {
-        **PERSON, "level": "a_level", "subjects": ["physics", "mathematics", "chemistry"],
+        **PERSON, **COMPLETED_MARKS, "level": "a_level", "subjects": ["physics", "mathematics", "chemistry"],
         "status": "completed", "year": "2024"})
     db.commit()
-    [row] = _education_rows(db)
+    [row] = _studied_rows(db)
     assert row.qualification_name == "a_level"
     assert row.details["subjects"] == ["physics", "mathematics", "chemistry"]
     assert (row.academic_status, row.graduation_year) == ("completed", 2024)
@@ -506,7 +528,7 @@ def test_dae_technology_is_the_field_of_study(db):
     OnboardingService(db).apply(db.info["workspace"], {**PERSON, "level": "dae", "technology": "electrical",
                                                       "status": "current", "year": "year_3"})
     db.commit()
-    [row] = _education_rows(db)
+    [row] = _studied_rows(db)
     assert (row.qualification_name, row.field_of_study, row.details["current_year"]) == ("dae", "electrical", 3)
 
 
@@ -553,10 +575,10 @@ def test_other_level_needs_no_group(db):
 def test_answers_for_hidden_questions_are_dropped(db):
     """A group left over from a level the student changed away from never lands."""
     OnboardingService(db).apply(db.info["workspace"], {
-        **PERSON, "level": "a_level", "group": "pre_medical", "subjects": ["biology"],
+        **PERSON, **COMPLETED_MARKS, "level": "a_level", "group": "pre_medical", "subjects": ["biology"],
         "status": "completed", "year": "2023"})
     db.commit()
-    [row] = _education_rows(db)
+    [row] = _studied_rows(db)
     assert row.field_of_study is None
 
 
@@ -581,7 +603,7 @@ def test_completing_a_legacy_fsc_record_keeps_one_education_record(db):
     OnboardingService(db).apply(db.info["workspace"], {
         **PERSON, "level": "intermediate", "group": "pre_engineering", "status": "current", "year": "year_1"})
     db.commit()
-    [row] = _education_rows(db)
+    [row] = _studied_rows(db)
     assert (row.qualification_name, row.field_of_study, row.academic_status) == (
         "fsc", "pre_engineering", "current")
 
@@ -643,8 +665,8 @@ def test_other_and_the_level_wordings_are_advertised(db):
 
 
 def test_matric_arts_is_stored_as_arts(db):
-    OnboardingService(db).apply(db.info["workspace"], {**PERSON, "level": "matric", "group": "arts",
-                                                      "status": "completed", "year": "2024"})
+    OnboardingService(db).apply(db.info["workspace"], {**PERSON, **COMPLETED_MARKS, "level": "matric",
+                                                      "group": "arts", "status": "completed", "year": "2024"})
     db.commit()
     [row] = _education_rows(db)
     assert row.field_of_study == "arts"
@@ -662,7 +684,7 @@ def test_confirming_a_legacy_fsc_ics_record_updates_it(db):
     OnboardingService(db).apply(db.info["workspace"], {
         **PERSON, "level": "intermediate", "group": "ics", "status": "current", "year": "year_2"})
     db.commit()
-    [row] = _education_rows(db)
+    [row] = _studied_rows(db)
     assert row.id == legacy.id
     assert (row.qualification_name, row.field_of_study, row.academic_status) == ("ics", "ics", "current")
     assert row.institution_name == "Govt College"
@@ -691,7 +713,7 @@ def test_switching_to_studying_now_clears_the_graduation_year(db):
     OnboardingService(db).apply(db.info["workspace"], {
         **PERSON, "level": "intermediate", "group": "pre_medical", "status": "current", "year": "year_2"})
     db.commit()
-    [row] = _education_rows(db)
+    [row] = _studied_rows(db)
     assert (row.academic_status, row.graduation_year, row.details["current_year"]) == ("current", None, 2)
 
 
@@ -713,7 +735,7 @@ def test_subjects_that_belong_to_no_question_of_the_level_are_cleared(db):
     OnboardingService(db).apply(db.info["workspace"], {
         **PERSON, "level": "intermediate", "group": "pre_engineering", "status": "current", "year": "year_1"})
     db.commit()
-    [row] = _education_rows(db)
+    [row] = _studied_rows(db)
     assert row.field_of_study == "pre_engineering" and "subjects" not in (row.details or {})
 
 
@@ -728,3 +750,199 @@ def test_leaving_o_level_keeps_its_subjects_off_the_new_level(db):
     rows = {row.qualification_name: row for row in _education_rows(db)}
     assert rows["a_level"].details["subjects"] == ["mathematics"] and rows["a_level"].graduation_year is None
     assert rows["o_level"].details["subjects"] == ["biology", "physics"]
+    # The O-level grades asked beside A-level complete that same row (R-47 C7).
+    assert len(_education_rows(db)) == 2 and rows["o_level"].result == {"grade": "A B"}
+
+
+# -- R-47 C7: onboarding asks for marks ---------------------------------------
+
+MARKS_QUESTIONS = ("marksObtained", "marksTotal", "grades", "matricMarksObtained", "matricMarksTotal",
+                   "oLevelGrades", "entryTest", "entryTestScore")
+INTERMEDIATE_WITH_MARKS = {
+    **PERSON, "level": "intermediate", "group": "pre_medical", "status": "current", "year": "year_2",
+    "marksObtained": "480", "marksTotal": "550", "matricMarksObtained": "950", "matricMarksTotal": "1100",
+    "entryTest": "mdcat", "entryTestScore": "140"}
+
+
+def _records(db, kind):
+    from app.memory.student_snapshot import StudentSnapshotService
+    return StudentSnapshotService(db).build(str(db.info["workspace"].id)).records[kind]
+
+
+@pytest.mark.req("R-47")
+def test_onboarding_state_lists_the_marks_questions(db):
+    fields = OnboardingService(db).state(db.info["workspace"])["fields"]
+    names = {f["name"] for f in fields}
+    assert set(MARKS_QUESTIONS) <= names
+    # The current-study marks question has its own label ("marks so far").
+    assert "marksSoFar" in {f["labelKey"] for f in fields}
+    assert next(f for f in fields if f["name"] == "marksObtained")["isNumber"] is True
+    assert next(f for f in fields if f["name"] == "grades")["isText"] is True
+    entry = next(f for f in fields if f["name"] == "entryTest")
+    assert entry["required"] is False and entry["fieldKey"] == "test_attempt"
+    assert entry["choices"] == ["mdcat", "ecat", "nat", "net", "sat"]
+
+
+@pytest.mark.req("R-47")
+def test_intermediate_marks_and_matric_marks_are_saved_stated(db):
+    result = OnboardingService(db).apply(db.info["workspace"], INTERMEDIATE_WITH_MARKS)
+    db.commit()
+    assert result["rejected"] == {} and result["completed"], result
+    education = {row["qualification_name"]: row for row in _records(db, "education")}
+    assert set(education) == {"fsc", "matric"}
+    assert education["fsc"]["academic_status"] == "current"
+    assert education["fsc"]["result"] == {"marks_obtained": 480, "marks_total": 550}
+    assert education["matric"]["academic_status"] == "completed"
+    assert education["matric"]["result"] == {"marks_obtained": 950, "marks_total": 1100}
+    [test] = _records(db, "test_attempt")
+    assert test["test_type"] == "mdcat" and test["overall_score"] == "140"
+    assert "status" not in (test.get("details") or {})
+    for row in [*education.values(), test]:
+        assert row["evidence_level"] == "stated" and row["source_type"] == "user_explicit"
+
+
+@pytest.mark.req("R-47")
+def test_marks_are_optional_while_studying(db):
+    answers = {k: v for k, v in INTERMEDIATE_WITH_MARKS.items()
+               if k not in ("marksObtained", "marksTotal", "entryTest", "entryTestScore")}
+    result = OnboardingService(db).apply(db.info["workspace"], answers)
+    db.commit()
+    assert result["completed"] and not result["rejected"], result
+    education = {row["qualification_name"]: row for row in _records(db, "education")}
+    assert not education["fsc"].get("result")
+    assert _records(db, "test_attempt") == []
+
+
+@pytest.mark.req("R-47")
+def test_completed_intermediate_requires_its_marks(db):
+    answers = {**PERSON, "level": "intermediate", "group": "pre_medical", "status": "completed", "year": "2025",
+               "matricMarksObtained": "950", "matricMarksTotal": "1100"}
+    with pytest.raises(MemoryDataError, match="Missing required answer: .*marksObtained"):
+        OnboardingService(db).apply(db.info["workspace"], answers)
+    assert _education_rows(db) == []
+
+
+@pytest.mark.req("R-47")
+def test_prior_matric_marks_of_an_intermediate_student_are_required(db):
+    answers = {k: v for k, v in INTERMEDIATE_WITH_MARKS.items() if not k.startswith("matric")}
+    with pytest.raises(MemoryDataError, match="Missing required answer: .*matricMarksObtained"):
+        OnboardingService(db).apply(db.info["workspace"], answers)
+
+
+@pytest.mark.req("R-47")
+def test_o_and_a_level_get_grades_not_marks(db):
+    service = OnboardingService(db)
+    workspace = db.info["workspace"]
+    answers = {**PERSON, "level": "a_level", "subjects": ["physics"], "status": "completed", "year": "2025",
+               "grades": " A* A  B ", "oLevelGrades": "3A* 4A",
+               "marksObtained": "480", "marksTotal": "550", "matricMarksObtained": "950"}
+    result = service.apply(workspace, answers)
+    db.commit()
+    assert result["completed"] and not result["rejected"], result
+    education = {row["qualification_name"]: row for row in _records(db, "education")}
+    assert education["a_level"]["result"] == {"grade": "A* A B"}
+    assert education["o_level"]["result"] == {"grade": "3A* 4A"}
+    assert education["o_level"]["academic_status"] == "completed"
+    assert "matric" not in education
+    prefill = service.state(workspace)["prefill"]
+    assert (prefill["level"], prefill["grades"], prefill["oLevelGrades"]) == ("a_level", "A* A B", "3A* 4A")
+    assert "marksObtained" not in prefill and "matricMarksObtained" not in prefill
+    with pytest.raises(MemoryDataError, match="grades is too long"):
+        service.apply(workspace, {**answers, "grades": "A" * 121})
+
+
+@pytest.mark.req("R-47")
+def test_marks_obtained_cannot_exceed_total(db):
+    with pytest.raises(MemoryDataError, match="^marksObtained cannot be more than marksTotal$"):
+        OnboardingService(db).apply(db.info["workspace"], {
+            **INTERMEDIATE_WITH_MARKS, "marksObtained": "600", "marksTotal": "550"})
+    with pytest.raises(MemoryDataError, match="^matricMarksObtained cannot be more than matricMarksTotal$"):
+        OnboardingService(db).apply(db.info["workspace"], {
+            **INTERMEDIATE_WITH_MARKS, "matricMarksObtained": "1101"})
+    assert _education_rows(db) == [] and _records(db, "test_attempt") == []
+    assert db.info["user"].onboarded_at is None
+
+
+@pytest.mark.req("R-47")
+@pytest.mark.parametrize("marks, message", [("9a5", "whole number"), ("-5", "whole number"),
+                                            ("10000", "between 0 and 9999")])
+def test_marks_must_be_a_whole_number_in_range(db, marks, message):
+    with pytest.raises(MemoryDataError, match=f"marksObtained must be .*{message}"):
+        OnboardingService(db).apply(db.info["workspace"], {**INTERMEDIATE_WITH_MARKS, "marksObtained": marks})
+
+
+@pytest.mark.req("R-47")
+def test_entry_test_without_score_is_planned(db):
+    answers = {k: v for k, v in INTERMEDIATE_WITH_MARKS.items() if k != "entryTestScore"}
+    OnboardingService(db).apply(db.info["workspace"], answers)
+    db.commit()
+    [test] = _records(db, "test_attempt")
+    assert test["test_type"] == "mdcat" and test["details"]["status"] == "planned"
+    assert "overall_score" not in test
+    # The score given later corrects the same record, which is then no longer planned.
+    OnboardingService(db).apply(db.info["workspace"], INTERMEDIATE_WITH_MARKS)
+    db.commit()
+    [test] = _records(db, "test_attempt")
+    assert test["overall_score"] == "140" and "status" not in (test.get("details") or {})
+
+
+@pytest.mark.req("R-47")
+def test_prefill_after_prior_matric_record_keeps_intermediate(db):
+    service = OnboardingService(db)
+    workspace = db.info["workspace"]
+    service.apply(workspace, {**INTERMEDIATE_WITH_MARKS, "status": "completed", "year": "2025"})
+    db.commit()
+    # The completed Matric record is written after the Intermediate one, so
+    # it is the newest row; the form still opens on Intermediate.
+    prefill = service.state(workspace)["prefill"]
+    assert (prefill["level"], prefill["group"], prefill["status"]) == ("intermediate", "pre_medical", "completed")
+    assert (prefill["marksObtained"], prefill["marksTotal"]) == ("480", "550")
+    assert (prefill["matricMarksObtained"], prefill["matricMarksTotal"]) == ("950", "1100")
+    assert (prefill["entryTest"], prefill["entryTestScore"]) == ("mdcat", "140")
+
+
+@pytest.mark.req("R-47")
+def test_reonboarding_corrects_existing_matric_record_in_place(db):
+    service = OnboardingService(db)
+    workspace = db.info["workspace"]
+    service.apply(workspace, INTERMEDIATE_WITH_MARKS)
+    db.commit()
+    service.apply(workspace, {**INTERMEDIATE_WITH_MARKS, "matricMarksObtained": "960"})
+    db.commit()
+    rows = _education_rows(db)
+    matric = [row for row in rows if row.qualification_name == "matric"]
+    assert len(matric) == 1 and matric[0].result["marks_obtained"] == 960
+    assert len(rows) == 2 and len(_records(db, "test_attempt")) == 1
+
+
+@pytest.mark.req("R-47")
+def test_an_existing_matric_row_takes_the_marks_in_place(db):
+    """A student first onboarded at Matric, now at Intermediate: the matric
+    marks complete that row rather than adding a second Matric record."""
+    _add_education(db, qualification_name="matric", field_of_study="science_biology", academic_status="current",
+                   details={"current_year": 2})
+    OnboardingService(db).apply(db.info["workspace"], INTERMEDIATE_WITH_MARKS)
+    db.commit()
+    matric = [row for row in _education_rows(db) if row.qualification_name == "matric"]
+    assert len(matric) == 1
+    assert (matric[0].academic_status, matric[0].field_of_study, matric[0].result["marks_total"]) == (
+        "completed", "science_biology", 1100)
+
+
+@pytest.mark.req("R-47")
+def test_a_test_the_form_does_not_offer_never_prefills_the_entry_test(db):
+    """An IELTS record from chat is not an entry test: the form opens with
+    no test picked, and choosing MDCAT adds its own record beside it."""
+    from app.memory.student_records import ENTITY_MODELS
+    workspace = db.info["workspace"]
+    db.add(ENTITY_MODELS["test_attempt"](workspace_id=workspace.id, test_type="ielts", overall_score="7.5",
+                                          source_type="user_explicit", claim_origin="student",
+                                          capture_method="chat"))
+    db.commit()
+    service = OnboardingService(db)
+    prefill = service.state(workspace)["prefill"]
+    assert "entryTest" not in prefill and "entryTestScore" not in prefill
+    service.apply(workspace, INTERMEDIATE_WITH_MARKS)
+    db.commit()
+    tests = {row["test_type"]: row for row in _records(db, "test_attempt")}
+    assert (tests["ielts"]["overall_score"], tests["mdcat"]["overall_score"]) == ("7.5", "140")

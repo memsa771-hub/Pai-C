@@ -136,3 +136,93 @@ it('the field search has its own label, wraps long titles and takes focus when n
   await screen.findByText('Please fill this in.');
   expect(document.activeElement).toBe(search);
 });
+
+// -- R-47 C7: marks, grades and the entry test ---------------------------------
+
+// req: R-47
+const marksState: OnboardingState = {
+  ...state,
+  fields: [
+    ...state.fields,
+    spec('marksObtained', { isNumber: true, depends_on: { field: 'status', values: ['completed'],
+      and: { field: 'level', values: ['matric', 'intermediate'] } } }),
+    spec('marksTotal', { isNumber: true, depends_on: { field: 'status', values: ['completed'],
+      and: { field: 'level', values: ['matric', 'intermediate'] } } }),
+    spec('marksObtained', { isNumber: true, required: false, labelKey: 'marksSoFar', depends_on: { field: 'status',
+      values: ['current'], and: { field: 'level', values: ['matric', 'intermediate'] } } }),
+    spec('marksTotal', { isNumber: true, required: false, depends_on: { field: 'status', values: ['current'],
+      and: { field: 'level', values: ['matric', 'intermediate'] } } }),
+    spec('grades', { isText: true, depends_on: { field: 'status', values: ['completed'],
+      and: { field: 'level', values: ['o_level', 'a_level'] } } }),
+    spec('grades', { isText: true, required: false, depends_on: { field: 'status', values: ['current'],
+      and: { field: 'level', values: ['o_level', 'a_level'] } } }),
+    spec('matricMarksObtained', { isNumber: true, depends_on: { field: 'level', values: ['intermediate', 'dae'] } }),
+    spec('matricMarksTotal', { isNumber: true, depends_on: { field: 'level', values: ['intermediate', 'dae'] } }),
+    spec('oLevelGrades', { isText: true, depends_on: { field: 'level', values: ['a_level'] } }),
+    spec('entryTest', { fieldKey: 'test_attempt', required: false, choices: ['mdcat', 'ecat'],
+      labels: { mdcat: 'MDCAT', ecat: 'ECAT' } }),
+    spec('entryTestScore', { fieldKey: 'test_attempt', isNumber: true, required: false, labelKey: 'entryTestScore',
+      depends_on: { field: 'entryTest' } }),
+  ],
+};
+
+// req: R-47
+it('asks marks as numbers and lets a current student skip them', async () => {
+  api.submit.mockResolvedValue({ saved: ['education'], rejected: {}, completed: true });
+  view(marksState);
+  fireEvent.click(chip('Intermediate'));
+  fireEvent.click(chip('FSc Pre-Medical'));
+  fireEvent.click(chip('Studying now'));
+  fireEvent.click(chip('2nd year'));
+  const soFar = screen.getByLabelText('Marks so far') as HTMLInputElement;
+  expect(soFar.inputMode).toBe('numeric');
+  fireEvent.change(soFar, { target: { value: '9a5' } });
+  expect(soFar.value).toBe('95');
+  fireEvent.change(soFar, { target: { value: '' } });
+  fireEvent.change(screen.getByLabelText('Matric marks obtained'), { target: { value: '950' } });
+  fireEvent.change(screen.getByLabelText('Matric total marks'), { target: { value: '1100' } });
+  // The entry test is optional; a picked test can be unpicked, and its score is a number.
+  fireEvent.click(chip('MDCAT'));
+  fireEvent.change(screen.getByLabelText('Entry test score'), { target: { value: '140' } });
+  fireEvent.click(chip('MDCAT'));
+  expect(screen.queryByLabelText('Entry test score')).toBeNull();
+  fireEvent.click(screen.getByRole('button', { name: 'Start with PAI' }));
+  await waitFor(() => expect(api.submit).toHaveBeenCalledTimes(1));
+  expect(api.submit.mock.calls[0][0]).toEqual({
+    level: 'intermediate', group: 'pre_medical', status: 'current', year: 'year_2',
+    matricMarksObtained: '950', matricMarksTotal: '1100',
+  });
+});
+
+// req: R-47
+it('needs the marks of a completed exam before continuing', async () => {
+  view(marksState);
+  fireEvent.click(chip('Matric'));
+  fireEvent.click(chip('Arts'));
+  fireEvent.click(chip('Completed'));
+  fireEvent.change(screen.getByLabelText('Year completed'), { target: { value: '2024' } });
+  fireEvent.change(screen.getByLabelText('Marks obtained'), { target: { value: '900' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Start with PAI' }));
+  expect(await screen.findByText('Please fill this in.')).toBeTruthy();
+  expect(api.submit).not.toHaveBeenCalled();
+});
+
+// req: R-47
+it('asks grades as text for A-level', async () => {
+  api.submit.mockResolvedValue({ saved: ['education'], rejected: {}, completed: true });
+  view(marksState);
+  fireEvent.click(chip('A-level'));
+  fireEvent.click(chip('Completed'));
+  fireEvent.change(screen.getByLabelText('Year completed'), { target: { value: '2025' } });
+  expect(screen.queryByLabelText('Marks obtained')).toBeNull();
+  expect(screen.queryByLabelText('Matric marks obtained')).toBeNull();
+  const grades = screen.getByLabelText('Your grades') as HTMLInputElement;
+  expect(grades.inputMode).not.toBe('numeric');
+  fireEvent.change(grades, { target: { value: 'A* A B' } });
+  fireEvent.change(screen.getByLabelText('Your O-level grades'), { target: { value: 'A B' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Start with PAI' }));
+  await waitFor(() => expect(api.submit).toHaveBeenCalledTimes(1));
+  expect(api.submit.mock.calls[0][0]).toEqual({
+    level: 'a_level', status: 'completed', year: '2025', grades: 'A* A B', oLevelGrades: 'A B',
+  });
+});

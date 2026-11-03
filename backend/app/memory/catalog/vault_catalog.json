@@ -2924,6 +2924,198 @@
         "completed"
        ]
       }
+     },
+     {
+      "name": "marksObtained",
+      "at_most": "marksTotal",
+      "prompt": "How many marks did you get?",
+      "input": "number",
+      "minimum": 0,
+      "maximum": 9999,
+      "record_field": "result.marks_obtained",
+      "depends_on": {
+       "field": "status",
+       "values": [
+        "completed"
+       ],
+       "and": {
+        "field": "level",
+        "values": [
+         "matric",
+         "intermediate"
+        ]
+       }
+      },
+      "required": true
+     },
+     {
+      "name": "marksTotal",
+      "prompt": "Out of how many?",
+      "input": "number",
+      "minimum": 0,
+      "maximum": 9999,
+      "record_field": "result.marks_total",
+      "depends_on": {
+       "field": "status",
+       "values": [
+        "completed"
+       ],
+       "and": {
+        "field": "level",
+        "values": [
+         "matric",
+         "intermediate"
+        ]
+       }
+      },
+      "required": true
+     },
+     {
+      "name": "marksObtained",
+      "label": "marksSoFar",
+      "at_most": "marksTotal",
+      "prompt": "How many marks have you got so far?",
+      "input": "number",
+      "minimum": 0,
+      "maximum": 9999,
+      "record_field": "result.marks_obtained",
+      "depends_on": {
+       "field": "status",
+       "values": [
+        "current"
+       ],
+       "and": {
+        "field": "level",
+        "values": [
+         "matric",
+         "intermediate"
+        ]
+       }
+      },
+      "required": false
+     },
+     {
+      "name": "marksTotal",
+      "prompt": "Out of how many?",
+      "input": "number",
+      "minimum": 0,
+      "maximum": 9999,
+      "record_field": "result.marks_total",
+      "depends_on": {
+       "field": "status",
+       "values": [
+        "current"
+       ],
+       "and": {
+        "field": "level",
+        "values": [
+         "matric",
+         "intermediate"
+        ]
+       }
+      },
+      "required": false
+     },
+     {
+      "name": "grades",
+      "prompt": "Which grades did you get?",
+      "input": "text",
+      "max_length": 120,
+      "record_field": "result.grade",
+      "depends_on": {
+       "field": "status",
+       "values": [
+        "completed"
+       ],
+       "and": {
+        "field": "level",
+        "values": [
+         "o_level",
+         "a_level"
+        ]
+       }
+      },
+      "required": true
+     },
+     {
+      "name": "grades",
+      "prompt": "Which grades have you got so far?",
+      "input": "text",
+      "max_length": 120,
+      "record_field": "result.grade",
+      "depends_on": {
+       "field": "status",
+       "values": [
+        "current"
+       ],
+       "and": {
+        "field": "level",
+        "values": [
+         "o_level",
+         "a_level"
+        ]
+       }
+      },
+      "required": false
+     },
+     {
+      "name": "matricMarksObtained",
+      "at_most": "matricMarksTotal",
+      "record": {
+       "qualification_name": "matric",
+       "academic_status": "completed"
+      },
+      "prompt": "How many marks did you get in Matric?",
+      "input": "number",
+      "minimum": 0,
+      "maximum": 9999,
+      "record_field": "result.marks_obtained",
+      "depends_on": {
+       "field": "level",
+       "values": [
+        "intermediate",
+        "dae"
+       ]
+      },
+      "required": true
+     },
+     {
+      "name": "matricMarksTotal",
+      "record": {
+       "qualification_name": "matric",
+       "academic_status": "completed"
+      },
+      "prompt": "Out of how many?",
+      "input": "number",
+      "minimum": 0,
+      "maximum": 9999,
+      "record_field": "result.marks_total",
+      "depends_on": {
+       "field": "level",
+       "values": [
+        "intermediate",
+        "dae"
+       ]
+      },
+      "required": true
+     },
+     {
+      "name": "oLevelGrades",
+      "record": {
+       "qualification_name": "o_level",
+       "academic_status": "completed"
+      },
+      "prompt": "Which grades did you get in O-level?",
+      "input": "text",
+      "max_length": 120,
+      "record_field": "result.grade",
+      "depends_on": {
+       "field": "level",
+       "values": [
+        "a_level"
+       ]
+      },
+      "required": true
      }
     ]
    }
@@ -2961,6 +3153,41 @@
    "version": 1,
    "choice_fields": {
     "test_type": "tests"
+   },
+   "onboarding": {
+    "order": 7,
+    "prompt": "Which entry test are you taking, if any?",
+    "step": 3,
+    "name": "entryTest",
+    "input": "choice",
+    "choices": "tests",
+    "shown": [
+     "mdcat",
+     "ecat",
+     "nat",
+     "net",
+     "sat"
+    ],
+    "record_field": "test_type",
+    "required": false,
+    "follow_ups": [
+     {
+      "name": "entryTestScore",
+      "label": "entryTestScore",
+      "prompt": "What did you score?",
+      "input": "number",
+      "minimum": 0,
+      "maximum": 9999,
+      "record_field": "overall_score",
+      "required": false,
+      "depends_on": {
+       "field": "entryTest"
+      },
+      "when_empty": {
+       "details.status": "planned"
+      }
+     }
+    ]
    }
   },
   {

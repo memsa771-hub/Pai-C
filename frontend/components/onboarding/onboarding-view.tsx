@@ -193,7 +193,8 @@ function Field({ field, label, placeholder, value, error, size, onChange }: {
   };
   const pick = (choice: string) => {
     setOther(false);
-    if (!field.multi) onChange(choice);
+    // An optional single choice (the entry test) can be picked off again.
+    if (!field.multi) onChange(!field.required && picked.includes(choice) ? '' : choice);
     else onChange(picked.includes(choice) ? picked.filter((c) => c !== choice) : [...picked, choice]);
   };
   // A long list (study fields) shows what is picked plus the first matches.
@@ -254,6 +255,12 @@ function Field({ field, label, placeholder, value, error, size, onChange }: {
       ) : field.isYear ? (
         <Input {...props} data-field={field.name} value={text} inputMode="numeric" maxLength={4} placeholder={t('onboarding.yearPlaceholder')}
           className={authInputClass} onChange={(e) => onChange(e.target.value.replace(/\D/g, ''))} />
+      ) : field.isNumber ? (
+        <Input {...props} data-field={field.name} value={text} inputMode="numeric" maxLength={4}
+          className={authInputClass} onChange={(e) => onChange(e.target.value.replace(/\D/g, ''))} />
+      ) : field.isText ? (
+        <Input {...props} data-field={field.name} value={text}
+          className={authInputClass} onChange={(e) => onChange(e.target.value)} />
       ) : field.options && field.options.length > 0 ? (
         <div className="relative">
           <select {...props} data-field={field.name} value={text} onChange={(e) => onChange(e.target.value)}
