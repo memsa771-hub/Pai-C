@@ -83,8 +83,8 @@ requirements:
   R-55: {title: "Label test fails on another route's country, body or document", phases: [P1], built: false}
   R-56: {title: "Every phase: spec, plan, build, gate, handoff, sign-off", phases: [P5], built: false}
   R-57: {title: "Requirement traceability check in CI", phases: [P0], built: true}
-  R-58: {title: "Fake routes stay in tests; red-flag search for country names", phases: [P0], built: false}
-  R-59: {title: "Every phase passes the full suite in CI", phases: [P0, P1], built: false}
+  R-58: {title: "Fake routes stay in tests; red-flag search for country names", phases: [P0], built: true}
+  R-59: {title: "Every phase passes the full suite in CI", phases: [P0, P1], built: true}
   R-60: {title: "Cycle-bound facts stored per intake; nothing overwritten", phases: [P2], built: false}
   R-61: {title: "Yearly rollover opens a new intake from the previous one", phases: [P2], built: false}
   R-62: {title: "More than one intake per year works the same way", phases: [P2], built: false}

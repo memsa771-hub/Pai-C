@@ -5,6 +5,8 @@ import ast
 import re
 from pathlib import Path
 
+import pytest
+
 APP_OS = Path(__file__).resolve().parents[2] / "app" / "os"
 PLAN_TABLES = ("plans", "tasks", "task_edges", "plan_revisions")
 _CORE = re.compile(r"\b(insert|update|delete)\(\s*(?:models\.)?(" + "|".join(PLAN_TABLES) + r")\b")
@@ -12,7 +14,8 @@ _SQL = re.compile(r"\b(INSERT\s+INTO|UPDATE|DELETE\s+FROM)\s+(?:os\.)?os_(" + "|
 
 COUNTRY_TERMS = re.compile(
     r"\b(Germany|German|Pakistan|Pakistani|Ireland|Irish|DAAD|HEC|IBCC|uni[-_]assist|EUR|PKR|Berlin|Karachi|"
-    r"Islamabad|PK|DE|IE)\b"
+    r"Islamabad|PK|DE|IE|Punjab|Sindh|Khyber|Pakhtunkhwa|Balochistan|Kashmir|Gilgit|Baltistan|MDCAT|ECAT|PMDC|UHS|"
+    r"Lahore|Peshawar|Quetta|Rawalpindi)\b"
 )
 
 
@@ -66,6 +69,7 @@ def test_provider_sdk_check_catches_a_violation(tmp_path):
     assert provider_sdk_imports(tmp_path) == ["a.py:1"]
 
 
+@pytest.mark.req("R-58")
 def test_no_country_terms_in_python():
     hits = []
     for path in APP_OS.rglob("*.py"):
@@ -73,6 +77,15 @@ def test_no_country_terms_in_python():
             if COUNTRY_TERMS.search(line):
                 hits.append(f"{path.relative_to(APP_OS).as_posix()}:{n}: {line.strip()}")
     assert hits == []
+
+
+@pytest.mark.req("R-58")
+def test_country_terms_cover_pakistani_names():
+    for term in ("Pakistan", "Punjab", "Sindh", "Khyber", "Pakhtunkhwa", "Balochistan", "Kashmir", "Gilgit", "Baltistan",
+                 "MDCAT", "ECAT", "PMDC", "UHS", "Lahore", "Peshawar", "Quetta", "Rawalpindi"):
+        assert COUNTRY_TERMS.search(term), term
+    for inside in ("xPunjab_", "MDCATS"):
+        assert not COUNTRY_TERMS.search(inside), inside
 
 
 _CLOCK_CALL = re.compile(r"\b(datetime\.now|datetime\.utcnow|date\.today)\b")
