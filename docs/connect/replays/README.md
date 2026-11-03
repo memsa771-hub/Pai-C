@@ -7,7 +7,7 @@ Offline replays of the Counsellor (recorded model outputs, no network, no API ke
 - `r47-before/default/` - replay on the base before any R-47 fix, default policy mode.
 - `r47-before/guided/` - the same with `--policy-mode guided`.
 - Each holds `counselor_deep_<date>.json` (compared by `compare.py`) and `.md` (readable).
-- `compare.py` - `python docs/connect/replays/compare.py BEFORE.json AFTER.json` prints a markdown table of every persona turn whose `reply`, `action.type`, `action_status`, `decision` or `guard_violations` differ, plus persona `status`/`stop_reason` changes. Prints `No differences.` when none. Ids, timings, usage and cost are ignored.
+- `compare.py` - `python docs/connect/replays/compare.py BEFORE.json AFTER.json` prints a markdown table of every persona turn whose `reply`, `action.type`, `action_status`, `decision` or `guard_violations` differ, plus persona `status`/`stop_reason` changes. Prints `No differences.` when none. If the two files' `policy_mode` (or `mode`) differ it prints a `Warning: comparing policy_mode X with Y` line before the table (a warning, not an error). Exit code is 0 whether or not there are differences, 2 on bad usage. One-sided rows read `only in BEFORE` / `only in AFTER`. Ids, timings, usage and cost are ignored.
 
 ## Commands (from `backend/`)
 
@@ -23,6 +23,6 @@ Use another `--result-dir` (for example `r47-after/default`) for an AFTER run, t
 - It forces each analysis job to `succeeded`, so C2's cascade never appears.
 - It runs no path analysis, research, onboarding or frontend, so C1, the C3 sweep, C5 and C7 show only "nothing else changed".
 - It replays recorded model outputs, so a prompt-only change (C6 language policy) shows no reply difference.
-- C3's runtime start is exercised only in `--policy-mode guided`.
+- Offline, every guided turn carries `guard_violations: ['classifier_fallback']` (the classifier raises offline), so guided decisions come from the fallback path (for example `explore_area`), not a real classifier result. C3's runtime change is therefore NOT shown by this replay either; C3 is proved by its targeted tests.
 
 Each fix is proved by its named tests, not by this replay.

@@ -3,6 +3,8 @@
 
 Usage: python docs/connect/replays/compare.py BEFORE.json AFTER.json
 
+Prints a warning line first if the two files' policy_mode/mode differ.
+Exit code: 0 whether or not there are differences, 2 on bad usage.
 Prints a markdown table of every persona turn whose reply, action.type,
 action_status, decision or guard_violations differ, plus persona
 status/stop_reason changes. Prints "No differences." when none.
@@ -36,12 +38,12 @@ def turn_fields(turn):
 
 def compare(before, after):
     rows = []
-    bp = {p["persona"]: p for p in before.get("personas", [])}
-    ap = {p["persona"]: p for p in after.get("personas", [])}
-    for name in sorted(set(bp) | set(ap)):
+    bp = {p.get("persona"): p for p in before.get("personas", [])}
+    ap = {p.get("persona"): p for p in after.get("personas", [])}
+    for name in sorted(set(bp) | set(ap), key=str):
         if name not in bp or name not in ap:
-            rows.append((name, "-", "persona", "present" if name in bp else "missing",
-                         "present" if name in ap else "missing"))
+            rows.append((name, "-", "persona", "present" if name in bp else "only in AFTER",
+                         "present" if name in ap else "only in BEFORE"))
             continue
         b, a = bp[name], ap[name]
         for key in ("status", "stop_reason"):
@@ -51,8 +53,8 @@ def compare(before, after):
         at = {t.get("turn"): t for t in a.get("turns", [])}
         for n in sorted(set(bt) | set(at), key=lambda x: (x is None, x)):
             if n not in bt or n not in at:
-                rows.append((name, n, "turn", "present" if n in bt else "missing",
-                             "present" if n in at else "missing"))
+                rows.append((name, n, "turn", "present" if n in bt else "only in AFTER",
+                             "present" if n in at else "only in BEFORE"))
                 continue
             fb, fa = turn_fields(bt[n]), turn_fields(at[n])
             for field in fb:
@@ -65,7 +67,12 @@ def main(argv):
     if len(argv) != 3:
         print(__doc__)
         return 2
-    rows = compare(load(argv[1]), load(argv[2]))
+    before, after = load(argv[1]), load(argv[2])
+    for key in ("mode", "policy_mode"):
+        if before.get(key) != after.get(key):
+            print(f"Warning: comparing {key} {before.get(key)} with {after.get(key)}")
+            print()
+    rows = compare(before, after)
     if not rows:
         print("No differences.")
         return 0
