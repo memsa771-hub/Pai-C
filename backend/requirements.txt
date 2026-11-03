@@ -1,5 +1,6 @@
 # Placement AI Workspace Backend
-fastapi>=0.115.0
+# <0.137: 0.137.0 keeps included routers as _IncludedRouter, so app.routes no longer lists their paths
+fastapi>=0.115.0,<0.137
 uvicorn[standard]>=0.30.0
 pydantic~=2.14.1
 sqlalchemy>=2.0.0
