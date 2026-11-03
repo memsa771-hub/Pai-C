@@ -22,3 +22,8 @@
 /docker-compose*.yml        @10Faheem @MusawirKtk @memsa771-hub
 /CLAUDE.md                  @10Faheem @MusawirKtk @memsa771-hub
 /.github/                   @10Faheem @MusawirKtk @memsa771-hub
+
+# Counsellor (lead review required, master spec section 10)
+/backend/app/pai_c/                   @memsa771-hub
+/backend/app/pai_os_bridge.py         @memsa771-hub
+/frontend/components/counselor/       @memsa771-hub
