@@ -1,0 +1,28 @@
+# Counsellor offline replays
+
+Offline replays of the Counsellor (recorded model outputs, no network, no API key) used to show what each R-47 fix changed.
+
+## Folders
+
+- `r47-before/default/` - replay on the base before any R-47 fix, default policy mode.
+- `r47-before/guided/` - the same with `--policy-mode guided`.
+- Each holds `counselor_deep_<date>.json` (compared by `compare.py`) and `.md` (readable).
+- `compare.py` - `python docs/connect/replays/compare.py BEFORE.json AFTER.json` prints a markdown table of every persona turn whose `reply`, `action.type`, `action_status`, `decision` or `guard_violations` differ, plus persona `status`/`stop_reason` changes. Prints `No differences.` when none. Ids, timings, usage and cost are ignored.
+
+## Commands (from `backend/`)
+
+```
+env -u PAI_API_KEY python -m scripts.eval_counselor_deep --offline --result-dir ../docs/connect/replays/r47-before/default
+env -u PAI_API_KEY python -m scripts.eval_counselor_deep --offline --policy-mode guided --result-dir ../docs/connect/replays/r47-before/guided
+```
+
+Use another `--result-dir` (for example `r47-after/default`) for an AFTER run, then compare the two JSON files.
+
+## What the replay cannot show
+
+- It forces each analysis job to `succeeded`, so C2's cascade never appears.
+- It runs no path analysis, research, onboarding or frontend, so C1, the C3 sweep, C5 and C7 show only "nothing else changed".
+- It replays recorded model outputs, so a prompt-only change (C6 language policy) shows no reply difference.
+- C3's runtime start is exercised only in `--policy-mode guided`.
+
+Each fix is proved by its named tests, not by this replay.
