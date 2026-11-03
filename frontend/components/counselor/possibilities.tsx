@@ -63,6 +63,7 @@ export function PathsFound({ ids, snapshot, newest }: { ids: string[]; snapshot?
   const [rows, setRows] = useState<Possibility[] | null>(null);
   useEffect(() => {
     let active = true;
+    setRows(null); // what is loaded always belongs to the current ids and mode
     (newest ? workspaceApi.getCurrentPaths() : workspaceApi.getPossibilities()).then(value => { if (active) setRows(value); }).catch(() => {});
     return () => { active = false; };
   }, [ids.join(), newest]); // eslint-disable-line react-hooks/exhaustive-deps

@@ -56,13 +56,13 @@ function groupMessages(messages: WorkspaceMessage[]): MessageGroup[] {
   return groups;
 }
 
-// Stable key for a group
 /** The message id of the newest paths card among the chat groups. */
 function newestPathsGroupId(groups: MessageGroup[]): string | null {
   return newestPathsMessageId(groups.flatMap(group =>
     group.type === 'chat' ? [{ id: group.message.messageId, metadata: group.message.metadata }] : []));
 }
 
+// Stable key for a group
 function groupKey(group: MessageGroup): string {
   if (group.type === 'chat') return group.message.messageId;
   if (group.type === 'thinking') return `thinking-${group.messages[0].messageId}`;

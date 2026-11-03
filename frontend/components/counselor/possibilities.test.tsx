@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { PathsFound, PossibilityCard } from './possibilities';
 import { workspaceApi } from '@/lib/api';
 import { I18nProvider } from '@/lib/i18n';
@@ -76,6 +76,19 @@ it('the newest paths card keeps its snapshot when the current paths cannot be lo
   vi.mocked(workspaceApi.getCurrentPaths).mockRejectedValue(new Error('offline'));
   render(<I18nProvider><PathsFound newest ids={['a', 'b']} snapshot={[snap('a'), snap('b')]} /></I18nProvider>);
   await waitFor(() => expect(workspaceApi.getCurrentPaths).toHaveBeenCalled());
+  await act(async () => {});
   await screen.findByText('Path a');
   expect(screen.getByText('Path b')).toBeTruthy();
+});
+it('a card that becomes the newest drops the list it loaded as an older card', async () => {
+  vi.mocked(workspaceApi.getPossibilities).mockResolvedValue(five);
+  vi.mocked(workspaceApi.getCurrentPaths).mockReturnValue(new Promise(() => {}));
+  const card = (newest: boolean) => <I18nProvider><PathsFound newest={newest} ids={['a', 'b']} snapshot={[snap('a'), snap('b')]} /></I18nProvider>;
+  const view = render(card(false));
+  await waitFor(() => expect(workspaceApi.getPossibilities).toHaveBeenCalled());
+  await act(async () => {});
+  view.rerender(card(true));
+  await act(async () => {});
+  expect(screen.getByText('Path a')).toBeTruthy();
+  expect(screen.queryByText('Path c')).toBeNull();
 });
