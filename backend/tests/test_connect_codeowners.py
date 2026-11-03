@@ -38,6 +38,7 @@ def owners_for(path: str, codeowners_text: str) -> list[str]:
 @pytest.mark.parametrize("path", [
     "backend/app/pai_c/deep/analysis.py",
     "backend/app/pai_os_bridge.py",
+    "backend/app/config.py",
     "frontend/components/counselor/workspace/inline-card.tsx",
     "scripts/check_freeze.py",
     "scripts/check_traceability.py",

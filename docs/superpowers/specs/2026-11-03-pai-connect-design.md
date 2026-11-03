@@ -499,7 +499,7 @@ A person checks every citation. The playbooks are written from these walkthrough
 - **Flags:**
   - With the Counsellor module off, it behaves byte-for-byte as today.
   - Each part has its own flag (stage H source, roadmap from `PlanView`, check-ins, merit answers).
-- **The P0 Counsellor fixes (R-47)** are built by the OS developers (D-16), reviewed by the Counsellor lead, and are outside the freeze. They pass the Counsellor
+- **The P0 Counsellor fixes (R-47)** are built by the OS developers (D-16), reviewed by the Counsellor lead, and go through the freeze exception process above (exception 1). They pass the Counsellor
   evaluations and a replay that shows only the fixed behaviour changed.
 
 ---
