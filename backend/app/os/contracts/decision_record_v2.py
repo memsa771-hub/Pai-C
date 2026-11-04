@@ -8,7 +8,7 @@ from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, field_validato
 
 from app.os.contracts.decision_record import iso_country
 from app.os.contracts.route_contract import IntakeRef, ProgrammeChoice
-from app.os.contracts.route_contract_v2 import Level, RouteContractV2
+from app.os.contracts.route_contract_v2 import Level, RouteContractV2, check_places
 
 
 class DecisionRecordV2(BaseModel):
@@ -40,11 +40,7 @@ class DecisionRecordV2(BaseModel):
 
     @model_validator(mode="after")
     def _check_places(self) -> "DecisionRecordV2":
-        refs = [p.programme_ref for p in self.programmes]
-        if len(set(refs)) != len(refs):
-            raise ValueError("duplicate programme_ref in programmes")
-        if sorted(p.rank for p in self.programmes) != list(range(1, len(refs) + 1)):
-            raise ValueError("programme ranks must be 1..n")
+        check_places(self.programmes)
         if self.status == "chosen" and self.os_supported:
             if not self.programmes:
                 raise ValueError("a chosen, supported route needs at least one programme")
@@ -59,7 +55,8 @@ class DecisionRecordV2(BaseModel):
     def to_route_contract(self) -> RouteContractV2:
         if self.status == "withdrawn" or not self.os_supported:
             raise ValueError("only a chosen, supported decision becomes a route contract")
-        assert self.target_intake is not None  # guaranteed by the validator
+        if self.target_intake is None:  # the validator guarantees it; kept explicit so it holds under python -O
+            raise ValueError("a route contract needs a target_intake")
         return RouteContractV2(contract_version="2", source="counsellor", external_ref=self.external_ref,
                                student_ref=self.student_ref, origin_country=self.origin_country,
                                destination_country=self.destination_country, level=self.level,

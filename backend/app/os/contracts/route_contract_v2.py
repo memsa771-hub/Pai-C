@@ -10,8 +10,17 @@ from app.os.contracts.route_contract import IntakeRef, ProgrammeChoice
 Level = Literal["intermediate", "foundation", "bachelor", "master", "phd"]
 
 
+def check_places(programmes: list[ProgrammeChoice]) -> None:
+    """Shared by the v2 contracts: programme refs are unique and ranks run 1..n."""
+    refs = [p.programme_ref for p in programmes]
+    if len(set(refs)) != len(refs):
+        raise ValueError("duplicate programme_ref in programmes")
+    if sorted(p.rank for p in programmes) != list(range(1, len(refs) + 1)):
+        raise ValueError("programme ranks must be 1..n")
+
+
 class RouteContractV2(BaseModel):
-    model_config = ConfigDict(extra="forbid", frozen=True)
+    model_config = ConfigDict(extra="forbid", frozen=True, populate_by_name=True)
 
     contract_version: Literal["2"]
     source: Literal["self_serve", "counsellor"]
@@ -35,11 +44,7 @@ class RouteContractV2(BaseModel):
 
     @model_validator(mode="after")
     def _check_programmes(self) -> "RouteContractV2":
-        refs = [p.programme_ref for p in self.programmes]
-        if len(set(refs)) != len(refs):
-            raise ValueError("duplicate programme_ref in programmes")
-        if sorted(p.rank for p in self.programmes) != list(range(1, len(refs) + 1)):
-            raise ValueError("programme ranks must be 1..n")
+        check_places(self.programmes)
         return self
 
     @property

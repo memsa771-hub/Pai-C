@@ -13,7 +13,7 @@ class OsEventV1(BaseModel):
     key: str = Field(min_length=1)  # the outbox key
     student_ref: str = Field(min_length=1)
     plan_id: int | None
-    decision_version: int | None
+    decision_version: int | None = Field(ge=1)
     kind: Literal["plan_created", "plan_revised", "plan_paused", "plan_stopped", "plan_finished", "step_done",
                   "student_needed", "deadline_at_risk", "proposal_waiting"]
     instance_key: str | None

@@ -3,8 +3,9 @@ Codes and IDs, not sentences; `title` is playbook route data. Frozen: a change i
 
 from typing import Annotated, Literal
 
-from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, model_validator
+from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from app.os.contracts.decision_record import iso_country
 from app.os.contracts.route_contract import IntakeRef
 from app.os.contracts.route_contract_v2 import Level
 
@@ -21,6 +22,11 @@ class PlanRoute(_View):
     destination_country: str
     level: Level
     target_intake: IntakeRef
+
+    @field_validator("origin_country", "destination_country", mode="before")
+    @classmethod
+    def _country(cls, value: object) -> object:
+        return iso_country(value)
 
 
 class ConsentState(_View):
@@ -67,7 +73,7 @@ class DocumentNeed(_View):
 
 
 class PlanChange(_View):
-    revision: int
+    revision: int = Field(ge=1)
     at: AwareDatetime
     cause: Code
     kind: Literal["added", "removed", "moved", "done", "revised"]
@@ -80,8 +86,8 @@ class PlanViewV1(_View):
     state: Literal["empty", "active", "needs_student", "paused", "stopped", "finished"]
     stop_reason: Code | None
     plan_id: int | None
-    decision_version: int | None
-    revision: int | None
+    decision_version: int | None = Field(ge=1)
+    revision: int | None = Field(ge=1)
     route: PlanRoute | None
     pages: list[Code]
     consent: ConsentState | None

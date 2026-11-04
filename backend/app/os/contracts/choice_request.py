@@ -6,6 +6,7 @@ from typing import Literal
 from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, model_validator
 
 from app.os.contracts.route_contract import IntakeRef, ProgrammeChoice
+from app.os.contracts.route_contract_v2 import check_places
 
 
 class ChoiceRequestV1(BaseModel):
@@ -26,9 +27,5 @@ class ChoiceRequestV1(BaseModel):
         if self.programmes is None and self.target_intake is None:
             raise ValueError("a choice request changes programmes, target_intake or both")
         if self.programmes is not None:
-            refs = [p.programme_ref for p in self.programmes]
-            if len(set(refs)) != len(refs):
-                raise ValueError("duplicate programme_ref in programmes")
-            if sorted(p.rank for p in self.programmes) != list(range(1, len(refs) + 1)):
-                raise ValueError("programme ranks must be 1..n")
+            check_places(self.programmes)
         return self

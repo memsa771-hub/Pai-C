@@ -79,6 +79,7 @@
       "additionalProperties": false,
       "properties": {
         "revision": {
+          "minimum": 1,
           "title": "Revision",
           "type": "integer"
         },
@@ -452,6 +453,7 @@
     "decision_version": {
       "anyOf": [
         {
+          "minimum": 1,
           "type": "integer"
         },
         {
@@ -463,6 +465,7 @@
     "revision": {
       "anyOf": [
         {
+          "minimum": 1,
           "type": "integer"
         },
         {

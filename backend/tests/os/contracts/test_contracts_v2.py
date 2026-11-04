@@ -216,3 +216,48 @@ def test_vault_event_needs_keys():
         VaultEventV1.model_validate({**base, "keys": []})
     with pytest.raises(ValidationError):
         VaultEventV1.model_validate({**base, "keys": ["Marks Total"]})
+
+
+# ---- Fix round 1 ----
+
+from app.os.contracts.os_event import OsEventV1  # noqa: E402
+
+
+def test_plan_route_countries_are_iso():
+    bad = {**ROUTE, "destination_country": "XYZ"}
+    with pytest.raises(ValidationError, match="two-letter"):
+        PlanViewV1.model_validate(plan_view(state="active", plan_id=1, route=bad, revision=1))
+    ok = {**ROUTE, "destination_country": "de", "origin_country": "pk"}
+    v = PlanViewV1.model_validate(plan_view(state="active", plan_id=1, route=ok, revision=1))
+    assert (v.route.origin_country, v.route.destination_country) == ("PK", "DE")
+
+
+def test_plan_view_versions_start_at_one():
+    with pytest.raises(ValidationError):
+        PlanViewV1.model_validate(plan_view(state="active", plan_id=1, route=ROUTE, revision=0))
+    with pytest.raises(ValidationError):
+        PlanViewV1.model_validate(plan_view(state="active", plan_id=1, route=ROUTE, revision=1, decision_version=0))
+    change = {"revision": 0, "at": "2027-01-10T09:00:00+00:00", "cause": "counsellor", "kind": "added",
+              "instance_key": None}
+    with pytest.raises(ValidationError):
+        PlanViewV1.model_validate(plan_view(state="active", plan_id=1, route=ROUTE, revision=1, changes=[change]))
+
+
+def test_os_event_rejects_unknown_kind_and_zero_version():
+    base = {"schema": "pai.os_event.v1", "key": "e:1", "student_ref": "ws-1", "plan_id": 1, "decision_version": 1,
+            "kind": "step_done", "instance_key": None, "at": "2027-01-10T09:00:00+00:00"}
+    assert OsEventV1.model_validate(base).kind == "step_done"
+    with pytest.raises(ValidationError):
+        OsEventV1.model_validate({**base, "kind": "plan_exploded"})
+    with pytest.raises(ValidationError):
+        OsEventV1.model_validate({**base, "decision_version": 0})
+
+
+def test_choice_request_duplicate_ref_rejected():
+    dup = [{"programme_ref": "a", "rank": 1}, {"programme_ref": "a", "rank": 2}]
+    with pytest.raises(ValidationError, match="duplicate programme"):
+        ChoiceRequestV1.model_validate(choice_request(programmes=dup))
+
+
+def test_guardian_required_defaults_false():
+    assert DecisionRecordV2.model_validate(export_v2()).guardian_required is False
