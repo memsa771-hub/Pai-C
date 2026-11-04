@@ -1,4 +1,5 @@
 """Private diagnostics count fallbacks and detect delayed analysis offline."""
+import pytest
 from datetime import datetime, timedelta, timezone
 from app.models import BackgroundJob
 from app.pai_c.reliability import health, record_fallback
@@ -44,3 +45,17 @@ def test_health_counts_unanswered_requests_without_returning_text():
         result=health(db,student.workspace_id)
         assert result['open_questions']==1 and result['open_requests']==0
         assert 'Private question' not in str(result)
+
+
+@pytest.mark.req("R-47")
+def test_removed_greeting_is_not_a_reliability_failure():
+    from app.pai_c.reliability import enqueue_alerts
+    with StudentSession() as student, student.factory() as db:
+        now=datetime.now(timezone.utc)
+        stamp=int(now.timestamp()*1000)
+        for index in range(5):
+            record_fallback(db,student.workspace_id,{'id':f'greet-{index}','timestamp':stamp},'greeting_removed')
+        record_fallback(db,student.workspace_id,{'id':'other','timestamp':stamp},'repeated_question')
+        result=health(db,student.workspace_id,now=now)
+        assert result['fallbacks']=={'repeated_question':1}
+        assert enqueue_alerts(db)==0
