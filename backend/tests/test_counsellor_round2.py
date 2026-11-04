@@ -385,3 +385,46 @@ def test_r2_5_a_quote_the_student_never_wrote_is_still_dropped_with_a_reason_cod
     lines = [r.getMessage() for r in caplog.records if "memory_candidate_dropped" in r.getMessage()]
     assert lines == ["memory_candidate_dropped reason=quote_not_found candidate_type=vault_fact key=finance.budget"]
     assert "25 lakh" not in caplog.text and "15 lakh" not in caplog.text
+
+
+# R2-5 fix round 1: no student figure and no exception text in the app log.
+
+@pytest.mark.req("R-47")
+def test_r2_5_dropped_budget_log_lines_hold_no_figure_or_exception_text(caplog):
+    import logging
+    import re
+    caplog.set_level(logging.INFO, logger="app.memory.extractor")
+    candidate, drops = _budget("We can pay around 15 to 20 lakh a year.", "We can pay around 15 to 20 lakh a year",
+                               value={"min": 1730000, "max": 2000000, "currency": "PKR", "period": "per_year"})
+    assert candidate is None
+    lines = [r.getMessage() for r in caplog.records if "dropped candidate" in r.getMessage()
+             or "memory_candidate_dropped" in r.getMessage()]
+    assert len(lines) == 2
+    assert not any(re.search(r"\d", line) for line in lines), lines
+    assert "reason=money_not_in_student_text" in lines[1]
+    # The Vault drop log keeps its payload as before.
+    assert drops[0]["payload"]["proposed_value"]["min"] == 1730000
+
+
+@pytest.mark.req("R-47")
+def test_r2_5_schema_errors_are_logged_as_codes_not_exception_text(caplog):
+    import logging
+    import types
+    from app.memory import extractor
+    from app.memory.field_definitions import catalog_field_definitions
+    caplog.set_level(logging.INFO, logger="app.memory.extractor")
+    keys = {spec["key"] for spec in catalog_field_definitions()}
+    text = "I love robotics."
+    turn = types.SimpleNamespace(user_text=text, vault={}, vault_guesses=(), records={}, items=[],
+                                 user_event_id="u", assistant_event_id="a", source_language="en")
+    raw = {"candidate_type": "vault_item", "operation": "upsert", "key": "interest",
+           "proposed_value": {"text": "robotics", "unknown_field_xyz": "private student text"},
+           "quote": "I love robotics", "confidence": 0.9}
+    drops = []
+    assert extractor._validate(raw, turn, keys, drops) is None
+    lines = [r.getMessage() for r in caplog.records if "dropped candidate" in r.getMessage()
+             or "memory_candidate_dropped" in r.getMessage()]
+    assert lines == ["memory: dropped candidate — interest item invalid",
+                     "memory_candidate_dropped reason=item_invalid candidate_type=vault_item key=interest"]
+    assert "private student text" not in caplog.text and "unknown_field_xyz" not in caplog.text
+    assert drops and drops[0]["reason"].startswith("interest item invalid")

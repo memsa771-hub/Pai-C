@@ -523,12 +523,16 @@ def _validate(raw: dict, turn, allowed_vault_keys: set[str],
     """
     original = raw
 
-    def drop(reason: str, redact: bool = False, code: Optional[str] = None) -> None:
-        logger.info("memory: dropped candidate — %s", reason)
-        # A fixed reason code and schema names only, never the quote or a value.
+    loggable_keys = _loggable_keys(allowed_vault_keys)
+
+    def drop(reason: str, redact: bool = False, code: Optional[str] = None,
+             log_reason: Optional[str] = None) -> None:
+        # App logs carry no student text, figure or exception text (R-47 R2-5):
+        # `log_reason` replaces a reason that holds one; the drop log keeps it.
+        logger.info("memory: dropped candidate — %s", log_reason or reason)
         logger.info("memory_candidate_dropped reason=%s candidate_type=%s key=%s",
                     code or _DROP_CODES.get(reason, "other"), _schema_name(raw.get("candidate_type") if isinstance(raw, dict) else None, CANDIDATE_TYPES),
-                    _schema_name(raw.get("key") if isinstance(raw, dict) else None, _loggable_keys(allowed_vault_keys)))
+                    _schema_name(raw.get("key") if isinstance(raw, dict) else None, loggable_keys))
         if drops is not None:
             if redact:
                 # The drop log must never hold the figure either: no value, no quote.
@@ -626,7 +630,9 @@ def _validate(raw: dict, turn, allowed_vault_keys: set[str],
                 # budget is more damaging than a missing one: it looks
                 # legitimate and silently misprices every recommendation.
                 if not _money_is_evidenced(figure, turn.user_text):
-                    return drop(f"vault_fact {key!r} {money}={figure!r} is not in the student's words", code="money_not_in_student_text")
+                    return drop(f"vault_fact {key!r} {money}={figure!r} is not in the student's words",
+                                code="money_not_in_student_text",
+                                log_reason=f"vault_fact {key!r} {money} is not in the student's words")
         return ExtractedCandidate(
             candidate_type="vault_fact", operation="upsert", key=key,
             proposed_value=proposed, content=None,
@@ -656,23 +662,23 @@ def _validate(raw: dict, turn, allowed_vault_keys: set[str],
                 return drop("course education_id was not in this student's context")
         value = _strip_placeholders(value)
         if not isinstance(value, dict) or not value:
-            return drop(f"{kind} record stated no actual values")
+            return drop(f"{kind} record stated no actual values", code="record_no_value")
         if kind == "goal" and isinstance(value.get("details"), dict):
             value = {**value, "details": {key: child for key, child in value["details"].items() if key in _GOAL_TARGET_DETAILS}}
         value = _drop_unevidenced_dates(value, turn.user_text)
         value = _normalize_currencies(value)
         if not value:
-            return drop(f"{kind} record stated no actual values")
+            return drop(f"{kind} record stated no actual values", code="record_no_value")
         if kind in {"goal", "student_voice_statement", "external_influence"}:
             owner = validated_attribution(attribution, kind=kind, quote=quote,
                 message=turn.user_text, voice_type=value.get("voice_type"))
             if owner is None:
-                return drop(f"{kind} lacks valid claim ownership")
+                return drop(f"{kind} lacks valid claim ownership", code="claim_owner_invalid")
             evidence["attribution"] = owner
         try:
             value = validate_record(kind, value, partial="record_id" in clean_entities)
         except MemoryDataError as exc:
-            return drop(str(exc))
+            return drop(str(exc), code="record_invalid", log_reason=f"{kind} record invalid")
         return ExtractedCandidate(
             candidate_type="student_record", operation="upsert", key=kind,
             proposed_value=value, content=None, entities=clean_entities,
@@ -688,7 +694,7 @@ def _validate(raw: dict, turn, allowed_vault_keys: set[str],
             return drop(f"unknown item type {key!r}", code="unknown_item_type")
         value = _strip_placeholders(raw.get("proposed_value"))
         if not isinstance(value, dict):
-            return drop(f"{key} item stated no actual values")
+            return drop(f"{key} item stated no actual values", code="item_no_value")
         if key == "family_member":
             # A parent's pay in a free-text field ("Shopkeeper, about 50,000 a
             # month") loses that field; the rest of the person is kept.
@@ -699,7 +705,7 @@ def _validate(raw: dict, turn, allowed_vault_keys: set[str],
         try:
             validate_schema_instance(spec.schema, value)
         except SchemaValidationError as exc:
-            return drop(f"{key} item invalid: {exc}")
+            return drop(f"{key} item invalid: {exc}", code="item_invalid", log_reason=f"{key} item invalid")
         if (evidence.get("inferred") and key == "family_member" and value.get("wish")
                 and isinstance(attribution, dict) and attribution.get("stated_field") == "wish"):
             # The extractor says the student stated this person's wish; it is
@@ -729,7 +735,7 @@ def _validate(raw: dict, turn, allowed_vault_keys: set[str],
         return drop("content not a string")
     content = raw["content"].strip()
     if not content:
-        return drop(f"{candidate_type} without content")
+        return drop(f"{candidate_type} without content", code="no_content")
 
     if candidate_type == "semantic_memory":
         memory_type = raw.get("memory_type", "context")
