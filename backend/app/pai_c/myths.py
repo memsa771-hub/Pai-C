@@ -126,14 +126,17 @@ def promise_research(db, workspace_id, source_event_id):
     becomes an open information question that needs research, whatever the
     classifier guessed, so research starts or the sweep tells the student
     (R-47 R2-2). An answered or closed question is left alone."""
+    from app.pai_c.deep.noted_questions import request_policy
+    statuses = request_policy()
     row = db.scalar(select(CounselorNotedQuestion).where(
         CounselorNotedQuestion.workspace_id == workspace_id,
         CounselorNotedQuestion.source_event_id == source_event_id,
-        CounselorNotedQuestion.status.in_(("open", "answered_now"))).with_for_update())
+        CounselorNotedQuestion.status.in_((statuses["pending_status"], statuses["immediate_status"]))).with_for_update())
     if row is None:
         db.rollback()
         return None
-    row.kind, row.needs_research, row.status, row.answered_event_id = "information", True, "open", None
+    row.kind, row.needs_research, row.answered_event_id = "information", True, None
+    row.status = statuses["pending_status"]
     db.commit()
     return row
 

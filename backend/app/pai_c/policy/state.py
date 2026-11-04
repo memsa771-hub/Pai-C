@@ -1,4 +1,6 @@
 """Workspace-scoped causal inputs and deterministic controller signals."""
+from functools import lru_cache
+
 from sqlalchemy import select
 
 from app.config import config
@@ -24,7 +26,9 @@ def first_picture_due(*, coverage, student_count, prior_decisions, mirror_ready)
             and all(_known(coverage.get(area, {})) for area in rules["first_picture_required_areas"]))
 
 
+@lru_cache(maxsize=1)
 def repeat_ask_rules():
+    """understanding/repeat_ask.json, read once per process."""
     from app.pai_c.understanding.data import DATA_DIR
     import json
     return json.loads((DATA_DIR / "repeat_ask.json").read_text(encoding="utf-8"))

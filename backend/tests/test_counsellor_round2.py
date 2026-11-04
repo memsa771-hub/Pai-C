@@ -428,3 +428,21 @@ def test_r2_5_schema_errors_are_logged_as_codes_not_exception_text(caplog):
                      "memory_candidate_dropped reason=item_invalid candidate_type=vault_item key=interest"]
     assert "private student text" not in caplog.text and "unknown_field_xyz" not in caplog.text
     assert drops and drops[0]["reason"].startswith("interest item invalid")
+
+
+@pytest.mark.req("R-47")
+@pytest.mark.asyncio
+async def test_r2_2_a_string_false_research_flag_still_counts_as_a_promise(monkeypatch):
+    from app.config import config
+    from app.models import CounselorNotedQuestion
+    from sqlalchemy import select
+    from tests.test_adaptive_counseling import QUESTION, _ask, _claim_jobs
+    monkeypatch.setattr(config, "PAI_API_KEY", "offline-fake")
+    with StudentSession() as student:
+        # Only the boolean False is "answered on the spot"; anything else errs toward checking.
+        await _ask(student, _signals_with_request("information", False), decision="answer_request",
+                   voice_action={"type": "note_question", "question_to_research": QUESTION, "needs_research": "false"})
+        with student.factory() as db:
+            noted = db.scalar(select(CounselorNotedQuestion))
+            assert (noted.status, noted.needs_research) == ("open", True)
+            assert len(_claim_jobs(db)) == 1
