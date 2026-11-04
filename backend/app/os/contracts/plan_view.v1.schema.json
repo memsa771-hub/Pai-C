@@ -427,7 +427,7 @@
       "title": "State",
       "type": "string"
     },
-    "stop_reason": {
+    "state_reason": {
       "anyOf": [
         {
           "pattern": "^[a-z_]+$",
@@ -437,7 +437,7 @@
           "type": "null"
         }
       ],
-      "title": "Stop Reason"
+      "title": "State Reason"
     },
     "plan_id": {
       "anyOf": [
@@ -539,7 +539,7 @@
   "required": [
     "student_ref",
     "state",
-    "stop_reason",
+    "state_reason",
     "plan_id",
     "decision_version",
     "revision",

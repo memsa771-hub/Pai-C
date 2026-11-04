@@ -1,5 +1,7 @@
 """Plan view v1 (P1 spec §3.9, master §9.1): what PAI OS returns for one student's plan, for the Counsellor to show.
-Codes and IDs, not sentences; `title` is playbook route data. Frozen: a change is a new version file."""
+Codes and IDs, not sentences; `title` is playbook route data. `empty` covers both "no choice yet" and
+"choice not yet applied by the OS"; the adapter tells them apart by comparing decision versions.
+Frozen: a change is a new version file."""
 
 from typing import Annotated, Literal
 
@@ -84,7 +86,7 @@ class PlanViewV1(_View):
     schema_: Literal["pai.plan_view.v1"] = Field("pai.plan_view.v1", alias="schema")
     student_ref: str = Field(min_length=1)
     state: Literal["empty", "active", "needs_student", "paused", "stopped", "finished"]
-    stop_reason: Code | None
+    state_reason: Code | None
     plan_id: int | None
     decision_version: int | None = Field(ge=1)
     revision: int | None = Field(ge=1)
@@ -103,6 +105,9 @@ class PlanViewV1(_View):
             raise ValueError("state is empty exactly when plan_id is None")
         if self.state != "empty" and (self.route is None or self.revision is None):
             raise ValueError("a plan needs a route and a revision")
-        if self.stop_reason is not None and self.state != "stopped":
-            raise ValueError("stop_reason only when state is stopped")
+        if self.state_reason is not None and self.state not in ("paused", "stopped"):
+            raise ValueError("state_reason only when state is paused or stopped")
+        if self.state == "empty" and (self.route is not None or self.steps or self.requests
+                                      or self.documents_needed or self.changes):
+            raise ValueError("an empty plan view has no route, steps, requests, documents or changes")
         return self

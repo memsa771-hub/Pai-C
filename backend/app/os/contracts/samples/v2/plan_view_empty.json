@@ -2,7 +2,7 @@
   "schema": "pai.plan_view.v1",
   "student_ref": "ws-sample-1",
   "state": "empty",
-  "stop_reason": null,
+  "state_reason": null,
   "plan_id": null,
   "decision_version": null,
   "revision": null,

@@ -15,9 +15,17 @@ class StudentFact(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     key: str = Field(pattern=FACT_KEY)
-    value: str | int | float | bool | list[str] | dict[str, str | int | float | bool | None] | None
+    value: str | int | float | bool | list[str] | dict[str, str | int | float | bool | list[str] | None] | None
     evidence: Literal["stated", "shown", "confirmed", "unknown"]
     vault_version: int = Field(ge=0)
+    document_ref: str | None = None  # the document a shown fact came from (R-54: source on screen)
+    as_of: AwareDatetime | None = None  # when the fact was recorded or confirmed (R-54: date on screen)
+
+    @model_validator(mode="after")
+    def _unknown_has_no_value(self) -> "StudentFact":
+        if self.evidence == "unknown" and self.value is not None:
+            raise ValueError("an unknown fact has no value")
+        return self
 
 
 class StudentFactsV1(BaseModel):
@@ -27,7 +35,7 @@ class StudentFactsV1(BaseModel):
     student_ref: str = Field(min_length=1)
     vault_version: int = Field(ge=0)
     built_at: AwareDatetime
-    eligible_levels: list[Level]
+    eligible_levels: list[Level] | None  # None = unknown (e.g. the Vault has no education yet)
     facts: list[StudentFact]
 
     @model_validator(mode="after")
@@ -35,4 +43,8 @@ class StudentFactsV1(BaseModel):
         keys = [f.key for f in self.facts]
         if len(set(keys)) != len(keys):
             raise ValueError("duplicate fact key in facts")
+        if self.eligible_levels is not None and len(set(self.eligible_levels)) != len(self.eligible_levels):
+            raise ValueError("duplicate level in eligible_levels")
+        if any(f.vault_version > self.vault_version for f in self.facts):
+            raise ValueError("a fact's vault_version cannot exceed the top-level vault_version")
         return self

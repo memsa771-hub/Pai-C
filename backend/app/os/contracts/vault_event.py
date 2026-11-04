@@ -15,6 +15,6 @@ class VaultEventV1(BaseModel):
     key: str = Field(min_length=1)
     student_ref: str = Field(min_length=1)
     vault_version: int = Field(ge=1)
-    kind: Literal["fact_changed"]
+    kind: Literal["student_fact_changed"]  # fact_changed is taken by Knowledge facts (P1-D14)
     keys: list[Annotated[str, Field(pattern=FACT_KEY)]] = Field(min_length=1)
     at: AwareDatetime

@@ -3,7 +3,7 @@
   "key": "vault:3",
   "student_ref": "ws-sample-1",
   "vault_version": 3,
-  "kind": "fact_changed",
+  "kind": "student_fact_changed",
   "keys": [
     "marks.total"
   ],

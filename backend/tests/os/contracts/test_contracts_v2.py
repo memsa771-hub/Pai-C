@@ -104,7 +104,7 @@ def test_escalation_v2_keeps_five_reasons():
 
 
 def plan_view(**over) -> dict:
-    base = {"schema": "pai.plan_view.v1", "student_ref": "ws-1", "state": "empty", "stop_reason": None,
+    base = {"schema": "pai.plan_view.v1", "student_ref": "ws-1", "state": "empty", "state_reason": None,
             "plan_id": None, "decision_version": None, "revision": None, "route": None, "pages": [],
             "consent": None, "steps": [], "requests": [], "documents_needed": [], "changes": [],
             "proposals_waiting": 0}
@@ -128,9 +128,9 @@ def test_plan_view_empty_state():
     assert PlanViewV1.model_validate(plan_view(state="active", plan_id=1, route=ROUTE, revision=1)).plan_id == 1
 
 
-def test_plan_view_stop_reason_only_when_stopped():
-    ok = plan_view(state="stopped", plan_id=1, route=ROUTE, revision=2, stop_reason="withdrawn")
-    assert PlanViewV1.model_validate(ok).stop_reason == "withdrawn"
+def test_plan_view_state_reason_only_when_paused_or_stopped():
+    ok = plan_view(state="stopped", plan_id=1, route=ROUTE, revision=2, state_reason="withdrawn")
+    assert PlanViewV1.model_validate(ok).state_reason == "withdrawn"
     with pytest.raises(ValidationError):
         PlanViewV1.model_validate({**ok, "state": "active"})
 
@@ -210,7 +210,7 @@ def test_student_fact_inferred_is_not_an_evidence_level():
 
 def test_vault_event_needs_keys():
     base = {"schema": "pai.vault_event.v1", "key": "vault:1", "student_ref": "ws-1", "vault_version": 4,
-            "kind": "fact_changed", "keys": ["marks.total"], "at": "2027-01-10T09:00:00+00:00"}
+            "kind": "student_fact_changed", "keys": ["marks.total"], "at": "2027-01-10T09:00:00+00:00"}
     assert VaultEventV1.model_validate(base).keys == ["marks.total"]
     with pytest.raises(ValidationError):
         VaultEventV1.model_validate({**base, "keys": []})
@@ -261,3 +261,64 @@ def test_choice_request_duplicate_ref_rejected():
 
 def test_guardian_required_defaults_false():
     assert DecisionRecordV2.model_validate(export_v2()).guardian_required is False
+
+
+# ---- Final-review fix wave ----
+
+
+def test_fact_source_and_date_optional():
+    f = StudentFactsV1.model_validate(facts({**fact(evidence="shown"), "document_ref": "doc-1",
+                                             "as_of": "2027-01-09T10:00:00+00:00"})).facts[0]
+    assert f.document_ref == "doc-1" and f.as_of is not None
+    plain = StudentFactsV1.model_validate(facts(fact())).facts[0]
+    assert plain.document_ref is None and plain.as_of is None
+    with pytest.raises(ValidationError, match="timezone"):
+        StudentFactsV1.model_validate(facts({**fact(), "as_of": "2027-01-09T10:00:00"}))
+
+
+def test_eligible_levels_unknown_and_unique():
+    assert StudentFactsV1.model_validate(facts(eligible_levels=None)).eligible_levels is None
+    with pytest.raises(ValidationError, match="duplicate level"):
+        StudentFactsV1.model_validate(facts(eligible_levels=["master", "master"]))
+
+
+def test_unknown_fact_has_no_value():
+    with pytest.raises(ValidationError, match="unknown fact has no value"):
+        StudentFactsV1.model_validate(facts(fact(evidence="unknown", value=5)))
+
+
+def test_fact_version_cannot_exceed_top_level():
+    with pytest.raises(ValidationError, match="cannot exceed"):
+        StudentFactsV1.model_validate(facts({**fact(), "vault_version": 4}))  # top-level is 3
+    assert StudentFactsV1.model_validate(facts({**fact(), "vault_version": 3})).facts[0].vault_version == 3
+
+
+def test_fact_dict_value_may_hold_a_list():
+    v = {"scope": "local", "regions": ["code_a"]}
+    assert StudentFactsV1.model_validate(facts(fact("constraint.scope", value=v))).facts[0].value == v
+
+
+def test_vault_event_kind_is_student_fact_changed():
+    base = {"schema": "pai.vault_event.v1", "key": "vault:1", "student_ref": "ws-1", "vault_version": 4,
+            "kind": "fact_changed", "keys": ["marks.total"], "at": "2027-01-10T09:00:00+00:00"}
+    with pytest.raises(ValidationError):
+        VaultEventV1.model_validate(base)
+    assert VaultEventV1.model_validate({**base, "kind": "student_fact_changed"}).kind == "student_fact_changed"
+
+
+def test_plan_view_state_reason_paused_ok_active_not():
+    paused = plan_view(state="paused", plan_id=1, route=ROUTE, revision=1, state_reason="waiting_guardian")
+    assert PlanViewV1.model_validate(paused).state_reason == "waiting_guardian"
+    with pytest.raises(ValidationError, match="state_reason only"):
+        PlanViewV1.model_validate({**paused, "state": "active"})
+
+
+def test_empty_plan_view_holds_nothing():
+    req = {"request_id": 1, "need": {"kind": "fact", "ref": "marks.total", "evidence": "stated"},
+           "status": "open", "due_at": None, "due_tz": None}
+    with pytest.raises(ValidationError, match="empty plan view"):
+        PlanViewV1.model_validate(plan_view(requests=[req]))
+    with pytest.raises(ValidationError, match="empty plan view"):
+        PlanViewV1.model_validate(plan_view(documents_needed=[{"doc_type": "transcript", "status": "missing"}]))
+    with pytest.raises(ValidationError, match="empty plan view"):
+        PlanViewV1.model_validate(plan_view(route=ROUTE))

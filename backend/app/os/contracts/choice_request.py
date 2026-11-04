@@ -1,5 +1,5 @@
 """Choice request v1 (master §9.1, P1 spec §3.9): a change of places or intake that PAI OS proposes and the Counsellor
-puts to the student. IDs and codes only. Frozen: a change is a new version file."""
+puts to the student. IDs and codes only. Dropping every place is not a choice request (R-22: that is an escalation). Frozen: a change is a new version file."""
 
 from typing import Literal
 

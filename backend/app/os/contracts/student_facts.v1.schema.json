@@ -44,6 +44,12 @@
                     "type": "boolean"
                   },
                   {
+                    "items": {
+                      "type": "string"
+                    },
+                    "type": "array"
+                  },
+                  {
                     "type": "null"
                   }
                 ]
@@ -70,6 +76,31 @@
           "minimum": 0,
           "title": "Vault Version",
           "type": "integer"
+        },
+        "document_ref": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Document Ref"
+        },
+        "as_of": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "As Of"
         }
       },
       "required": [
@@ -106,18 +137,25 @@
       "type": "string"
     },
     "eligible_levels": {
-      "items": {
-        "enum": [
-          "intermediate",
-          "foundation",
-          "bachelor",
-          "master",
-          "phd"
-        ],
-        "type": "string"
-      },
-      "title": "Eligible Levels",
-      "type": "array"
+      "anyOf": [
+        {
+          "items": {
+            "enum": [
+              "intermediate",
+              "foundation",
+              "bachelor",
+              "master",
+              "phd"
+            ],
+            "type": "string"
+          },
+          "type": "array"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Eligible Levels"
     },
     "facts": {
       "items": {

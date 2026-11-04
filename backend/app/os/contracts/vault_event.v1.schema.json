@@ -23,7 +23,7 @@
       "type": "integer"
     },
     "kind": {
-      "const": "fact_changed",
+      "const": "student_fact_changed",
       "title": "Kind",
       "type": "string"
     },

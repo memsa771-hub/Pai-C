@@ -18,7 +18,9 @@
       "key": "marks.total",
       "value": 3.1,
       "evidence": "shown",
-      "vault_version": 3
+      "vault_version": 3,
+      "document_ref": "doc-sample-1",
+      "as_of": "2027-01-09T10:00:00+00:00"
     },
     {
       "key": "constraint.excluded_fields",
@@ -33,6 +35,17 @@
       "value": null,
       "evidence": "unknown",
       "vault_version": 0
+    },
+    {
+      "key": "constraint.scope",
+      "value": {
+        "scope": "local",
+        "regions": [
+          "code_a"
+        ]
+      },
+      "evidence": "stated",
+      "vault_version": 1
     }
   ]
 }
