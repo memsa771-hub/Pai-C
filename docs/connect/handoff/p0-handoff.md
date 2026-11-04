@@ -27,7 +27,7 @@ Status: draft, 2026-11-04. Phase spec: `docs/superpowers/specs/2026-11-03-p0-set
 | 2 | `python scripts/check_traceability.py --gate P0` passes | Passes (exit 0) |
 | 3 | Live-run student (Ayesha Malik) reaches stage H with only MBBS and BDS | PASS on 2026-11-04 (second live run, $0.31, 12 fixed messages, code = pai-connect + #186 + #187): stage H, MBBS exploring, BDS suggested, Pharm-D removed with her words. Caveat: the Explore action ran without a research Operator (see open items). First run failed at stage D; fixed by round 2 |
 | 4 | Counsellor evaluations pass; a replay shows only the fixed behaviour changed | Offline replay only: no differences in default or guided mode (`docs/connect/replays/r47-diff.md`). Each fix is proved by its targeted tests |
-| 5 | Handoff written; both owners sign off | Handoff drafted here. Sign-off pending from both owners: `@memsa771-hub` and `@MusawirKtk` |
+| 5 | Handoff written; the owner signs off | Handoff drafted here. Sign-off pending from the owner, MSAQLAIN (`@memsa771-hub`) only (owner decision P0-D13; no sign-off from `@MusawirKtk` or `@10Faheem`) |
 
 Output of `python scripts/check_traceability.py --report P0`:
 
@@ -70,7 +70,8 @@ Also recorded: the owner approved C6 in chat on 2026-11-04, and approved the wor
 
 ## 5. Open items
 
-- Sign-off by `@memsa771-hub` and `@MusawirKtk`.
+- Sign-off by the owner, MSAQLAIN (`@memsa771-hub`), only (P0-D13).
+- No merge into `pai-merge` until the whole plan is complete (P0-D14); work stays on `pai-connect`.
 - `paths/explain.py` still names the language replacement for the path page; follow-up task queued.
 - `greeting_removed` may be logged twice on a retry (frozen `turn.py`).
 - C1 matches only the field names in the path analyzer's field list; an exclusion naming another field changes nothing.
