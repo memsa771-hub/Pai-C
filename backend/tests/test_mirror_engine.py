@@ -80,7 +80,11 @@ def test_area_levels_from_evidence():
     assert _area(card, "strengths")["level"] == 2
     assert _area(card, "interests")["level"] == 3
     assert _area(card, "pressures")["level"] == 0
-    assert [e["evidence"] for e in _area(card, "interests")["entries"]] == ["shown", "shown"]
+    # P0-D15 (R-47 R2-1): a strength also counts toward interests, so the
+    # interests area lists it with the two interests.
+    interests = _area(card, "interests")["entries"]
+    assert [e["evidence"] for e in interests] == ["shown", "shown", "shown"]
+    assert sorted(e["text"] for e in interests) == ["Circuits", "Mathematics", "Robotics"]
 
 
 def test_entries_use_catalog_labels_never_codes():

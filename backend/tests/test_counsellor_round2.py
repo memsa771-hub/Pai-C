@@ -168,3 +168,85 @@ async def test_r2_2_sweep_tells_the_student_when_the_start_failed(monkeypatch):
             assert myths.sweep_unstarted_information(db, now=now) == 1
             [notice] = _notice_jobs(db)
             assert notice.idempotency_key == f"information-unanswered:{student.workspace_id}:{row.id}"
+
+
+# R2-1: strengths count toward the Mirror's interests (owner decision P0-D15).
+
+def _mirror_basics(student, db):
+    from tests.counselor_fixtures import prepare
+    from tests.test_mirror_engine import _education, _record
+    turn, journey, _ = prepare(student, db)
+    _education(db, student.workspace_id)
+    _record(db, student.workspace_id, "goal", {"goal_type": "study", "title": "Medicine"})
+    student.prepared_event_id = turn.source_event_id
+    return journey
+
+
+def _write_notebook(student, db, parts):
+    from app.pai_c.deep.notebook import NotebookService
+    from tests.truth_map_fixtures import item
+    NotebookService(db).apply(student.workspace_id, {
+        "said": [item("I study and work on practical projects.", key="daily_life")], "mirror_ready": True,
+        **parts}, student.prepared_event_id, expected_version=1)
+    db.commit()
+
+
+def _stage(db, journey_id):
+    from app.models import StudentJourney
+    db.expire_all()
+    return db.get(StudentJourney, journey_id).current_stage
+
+
+@pytest.mark.req("R-47")
+def test_r2_1_two_notebook_strengths_cover_interests_and_ready_the_mirror():
+    from app.pai_c.journey_sync import sync_counselor_stage
+    from app.pai_c.mirror import MirrorEngine
+    from app.pai_c.mirror.engine import ready_from
+    from app.pai_c.memory import MemoryService
+    from tests.truth_map_fixtures import item
+    from tests.test_roadmap_engine import add_path, field_title
+    with StudentSession() as student, student.factory() as db:
+        ws = student.workspace_id
+        journey = _mirror_basics(student, db)
+        assert not MirrorEngine(db).ready(ws)
+        _write_notebook(student, db, {"self": [
+            item("Biology is my strongest subject", key="strength.biology", id="s1"),
+            item("Stays calm under pressure", key="strength.calm", id="s2")]})
+        coverage = MemoryService(db).coverage_areas(ws)
+        assert coverage["interests"]["covered"] and coverage["interests"]["item_count"] == 2
+        assert MirrorEngine(db).ready(ws)
+        assert sync_counselor_stage(db, ws, reason="analyst") == "MIRROR"
+        db.commit()
+        add_path(student, db, field_title("electrical_engineering"), "electrical_engineering")
+        assert sync_counselor_stage(db, ws, reason="paths") == "PROPOSED"
+        db.commit()
+        assert _stage(db, journey.id) == "PROPOSED"
+        assert ready_from(coverage)
+
+
+@pytest.mark.req("R-47")
+def test_r2_1_two_vault_strength_items_move_direction_to_mirror():
+    from app.pai_c.mirror import MirrorEngine
+    from tests.test_mirror_gate_removed import accept_item
+    with StudentSession() as student, student.factory() as db:
+        ws = student.workspace_id
+        journey = _mirror_basics(student, db)
+        accept_item(db, ws, "strength", {"text": "Biology is my strongest subject"})
+        assert not MirrorEngine(db).build(ws)["ready"]
+        accept_item(db, ws, "strength", {"text": "Stays calm under pressure"})
+        assert MirrorEngine(db).build(ws)["ready"]
+        assert _stage(db, journey.id) == "MIRROR"
+
+
+@pytest.mark.req("R-47")
+def test_r2_1_a_strength_and_an_interest_add_up_but_one_strength_alone_does_not():
+    from app.pai_c.understanding.views import coverage_areas
+    from app.pai_c.deep.notebook_schema import CounselorNotebookData
+    from types import SimpleNamespace
+    from tests.truth_map_fixtures import item
+    empty = SimpleNamespace(facts={}, records={})
+    one = CounselorNotebookData.model_validate({"self": [item("Biology", key="strength.biology", id="s1")]})
+    assert not coverage_areas(one, empty)["interests"]["covered"]
+    both = CounselorNotebookData.model_validate({"self": [item("Biology", key="strength.biology", id="s1"),
+                                                           item("Drawing", key="interest.drawing", id="i1")]})
+    assert coverage_areas(both, empty)["interests"]["covered"]
