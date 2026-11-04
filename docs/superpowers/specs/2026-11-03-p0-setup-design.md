@@ -1,6 +1,6 @@
 # P0: setup and Counsellor fixes (phase spec)
 
-Status: **draft for owner review** · 2026-11-03 · Owner: MSAQLAIN
+Status: **done**, signed off by the owner 2026-11-04 · 2026-11-03 · Owner: MSAQLAIN
 Master spec: `docs/superpowers/specs/2026-11-03-pai-connect-design.md` (§12 row P0, §10, §13).
 Visual overview: https://www.figma.com/board/X25QOs43qaDABBYEmzUPxk
 

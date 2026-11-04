@@ -7,7 +7,7 @@
 
 ## Read first
 1. docs/superpowers/specs/2026-11-03-pai-connect-design.md sections 2-3 (master spec: decisions and requirements R-01...). FigJam overview: https://www.figma.com/board/X25QOs43qaDABBYEmzUPxk
-2. The current phase spec in docs/superpowers/specs/ (P0: 2026-11-03-p0-setup-design.md)
+2. The current phase spec in docs/superpowers/specs/ (P1: 2026-11-04-p1-connection-core-design.md)
 3. The latest handoff in docs/connect/handoff/ (p<N>-handoff.md)
 4. docs/counselor/README.md (index)
 5. docs/counselor/PAI_C_WORKFLOW_LOCK_V1.md (locked workflow A-K, PAI OS contract, Operator)
@@ -54,8 +54,9 @@ Figma board (locked): https://www.figma.com/board/NjVJfdxERWfRHPycy1wDkF
   squash-merged. Nothing merges into `pai-merge` until the whole plan is complete (owner, P0-D14); then merge with a
   merge commit. Phase handoffs are signed off by the owner alone (P0-D13).
 
-## Current direction (3 Nov 2026)
-- Connection work per the master spec. Now: phase P0 (setup and Counsellor fixes). Next: P1.
+## Current direction (4 Nov 2026)
+- Connection work per the master spec. P0 done (signed off 4 Nov). Now: phase P1 (connection core), phase spec
+  docs/superpowers/specs/2026-11-04-p1-connection-core-design.md. Next: P2.
 
 ## PAI OS working rules
 These rules apply to PAI OS work: code under `backend/app/os`, `backend/app/pai_os_bridge.py`,

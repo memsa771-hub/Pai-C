@@ -17,8 +17,8 @@
 # Phase status is one of planned, current, done; at most one is current.
 
 phases:
-  P0: {name: "Setup and Counsellor fixes", status: current}
-  P1: {name: "Connection core", status: planned}
+  P0: {name: "Setup and Counsellor fixes", status: done}
+  P1: {name: "Connection core", status: current}
   P2: {name: "National data system", status: planned}
   P3: {name: "Intermediate family", status: planned}
   P4: {name: "Bachelor's family", status: planned}
