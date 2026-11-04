@@ -83,12 +83,15 @@ def leading_greeting(text: str) -> int:
     return _leading_greeting(text, True)
 
 
-def drop_repeat_greeting(reply: str, history: list[dict]) -> str:
+def drop_repeat_greeting(reply: str, history: list[dict], student_text: str = "") -> str:
     """Drop the reply's opening greeting when an earlier assistant reply already greeted.
 
     Any earlier assistant reply that opens with a greeting phrase counts, however long that
     sentence is. A greeting sentence that ends in a question is real content and is kept.
+    When the student's own message opens with a greeting, PAI returns it and the reply is kept.
     """
+    if _leading_greeting(student_text, False) > 0:
+        return reply
     if not any(row.get("role") == "assistant" and _leading_greeting(row.get("content", ""), False) > 0
                for row in history):
         return reply

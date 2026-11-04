@@ -149,7 +149,7 @@ async def run_deep_turn(db, turn: CounselorTurnInput, *,
         reply, grounding_violations = guard_reply(reply, raw, context.world_facts, student_sections + turn.student_text)
         violations.extend(grounding_violations)
         reply = polish_reply(reply)
-        greeted = drop_repeat_greeting(reply, history)
+        greeted = drop_repeat_greeting(reply, history, student_text=turn.student_text)
         if greeted != reply:
             reply = greeted
             violations.append("greeting_removed")

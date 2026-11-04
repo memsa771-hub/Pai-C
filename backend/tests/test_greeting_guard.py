@@ -46,3 +46,13 @@ def test_long_earlier_greeting_still_counts():
     assert drop_repeat_greeting("Hello Ayesha. Let's look at BDS.", long_earlier) == "Let's look at BDS."
     assert drop_repeat_greeting("Hello Ayesha, welcome back to your counselling session. BDS next.", long_earlier) \
         == "Hello Ayesha, welcome back to your counselling session. BDS next."
+
+
+@pytest.mark.req("R-47")
+def test_students_salaam_is_returned_but_no_greeting_means_still_dropped():
+    reply = "Wa alaikum assalam! Aaj kya baat karein?"
+    assert drop_repeat_greeting(reply, EARLIER, student_text="Assalam o alaikum") == reply
+    assert drop_repeat_greeting("Wa alaikum assalam! Aaj batao.", EARLIER, student_text="Assalam o alaikum, main Ayesha hoon, kaise hain aap") \
+        == "Wa alaikum assalam! Aaj batao."
+    assert drop_repeat_greeting("Wa alaikum assalam! Aaj batao.", EARLIER, student_text="MBBS ke baare mein batao") == "Aaj batao."
+    assert drop_repeat_greeting("Wa alaikum assalam! Aaj batao.", EARLIER) == "Aaj batao."
