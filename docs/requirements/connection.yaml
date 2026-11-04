@@ -72,7 +72,7 @@ requirements:
   R-44: {title: "Counsellor reads OS data in the same shape as today", phases: [P1], built: false}
   R-45: {title: "OS adds no chat messages", phases: [P1], built: false}
   R-46: {title: "Proof per PR and phase: replays unchanged, live graded run", phases: [P1], built: false}
-  R-47: {title: "Counsellor fixes from the live run", phases: [P0], built: false}
+  R-47: {title: "Counsellor fixes from the live run", phases: [P0], built: true}
   R-48: {title: "Merit and admission answers come from MeritCheck and ProgrammeFacts", phases: [P2], built: false}
   R-49: {title: "Stage H lists places from OS registry with coverage level", phases: [P3, P4], built: false}
   R-50: {title: "Study abroad plan renamed My plan everywhere", phases: [P1], built: false}
