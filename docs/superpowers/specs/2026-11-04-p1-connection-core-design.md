@@ -1,6 +1,6 @@
 # P1: connection core (phase spec)
 
-Status: **draft for owner review** · 2026-11-04 · Owner: MSAQLAIN
+Status: **approved** by the owner in chat, 2026-11-04 ("p1 spec approved") · 2026-11-04 · Owner: MSAQLAIN
 Master spec: `docs/superpowers/specs/2026-11-03-pai-connect-design.md` (§3, §4, §6, §9, §10, §11, §12 row P1).
 P0 handoff: `docs/connect/handoff/p0-handoff.md`. Visual overview: https://www.figma.com/board/X25QOs43qaDABBYEmzUPxk
 
