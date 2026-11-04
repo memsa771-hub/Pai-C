@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ArrowRight, Bookmark, Compass, X } from 'lucide-react';
 import { workspaceApi } from '@/lib/api';
 import { useT } from '@/lib/i18n';
@@ -59,14 +59,18 @@ export type PathSnapshot = Pick<Possibility, 'id' | 'title' | 'why' | 'fit' | 's
 
 /** `snapshot`: the paths as they stood when PAI posted the message. A message keeps what it said; a later run's
  * list is one tap away, with a note when it differs. Older messages without one read the current list. */
-export function PathsFound({ ids, snapshot, newest }: { ids: string[]; snapshot?: PathSnapshot[]; newest?: boolean }) {
+export function PathsFound({ ids, snapshot, newest, refreshKey }: { ids: string[]; snapshot?: PathSnapshot[]; newest?: boolean; refreshKey?: string }) {
   const [rows, setRows] = useState<Possibility[] | null>(null);
+  const loadedFor = useRef('');
   useEffect(() => {
     let active = true;
-    setRows(null); // what is loaded always belongs to the current ids and mode
+    // What is loaded always belongs to the current ids and mode. A later message that changed the paths (refreshKey)
+    // refetches but keeps the shown list until the new one arrives.
+    const scope = `${ids.join()}|${newest ? 'new' : 'old'}`;
+    if (loadedFor.current !== scope) { setRows(null); loadedFor.current = scope; }
     (newest ? workspaceApi.getCurrentPaths() : workspaceApi.getPossibilities()).then(value => { if (active) setRows(value); }).catch(() => {});
     return () => { active = false; };
-  }, [ids.join(), newest]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [ids.join(), newest, newest ? refreshKey : undefined]); // eslint-disable-line react-hooks/exhaustive-deps
   const current = (rows ?? []).filter(row => row.status !== 'dismissed');
   // The newest card shows the current list once it has loaded; until then (or if the call fails) its snapshot.
   const found: PathSnapshot[] = newest && rows !== null ? current

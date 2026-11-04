@@ -92,3 +92,29 @@ it('a card that becomes the newest drops the list it loaded as an older card', a
   expect(screen.getByText('Path a')).toBeTruthy();
   expect(screen.queryByText('Path c')).toBeNull();
 });
+it('the newest paths card drops a removed path when a paths-excluded notice arrives; an unrelated message changes nothing', async () => {
+  vi.mocked(workspaceApi.getCurrentPaths).mockResolvedValue(five.slice(0, 2));
+  const card = (key?: string) => <I18nProvider><PathsFound newest refreshKey={key} ids={['a', 'b']} snapshot={[snap('a'), snap('b')]} /></I18nProvider>;
+  const view = render(card(undefined));
+  await screen.findByText('Path b');
+  expect(workspaceApi.getCurrentPaths).toHaveBeenCalledTimes(1);
+  vi.mocked(workspaceApi.getCurrentPaths).mockResolvedValue([five[0]]);
+  view.rerender(card('notice-1'));
+  await waitFor(() => expect(screen.queryByText('Path b')).toBeNull());
+  expect(screen.getByText('Path a')).toBeTruthy();
+  expect(workspaceApi.getCurrentPaths).toHaveBeenCalledTimes(2);
+  view.rerender(card('notice-1')); // an unrelated message leaves the key as it was
+  await act(async () => {});
+  expect(workspaceApi.getCurrentPaths).toHaveBeenCalledTimes(2);
+  expect(screen.getByText('Path a')).toBeTruthy();
+});
+it('an older paths card ignores the refresh key', async () => {
+  vi.mocked(workspaceApi.getPossibilities).mockResolvedValue(five);
+  const card = (key: string) => <I18nProvider><PathsFound refreshKey={key} ids={['a', 'b']} snapshot={[snap('a'), snap('b')]} /></I18nProvider>;
+  const view = render(card('x'));
+  await screen.findByText('Path a');
+  view.rerender(card('y'));
+  await act(async () => {});
+  expect(workspaceApi.getPossibilities).toHaveBeenCalledTimes(1);
+  expect(workspaceApi.getCurrentPaths).not.toHaveBeenCalled();
+});

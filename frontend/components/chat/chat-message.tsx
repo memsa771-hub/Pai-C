@@ -191,10 +191,12 @@ interface ChatMessageProps {
   agents?: WorkspaceAgent[];
   /** This message holds the newest paths card: it shows the current list, not its snapshot. */
   newestPaths?: boolean;
+  /** Changes when a later message removed a path: the newest paths card then reads the current list again. */
+  pathsRefreshKey?: string;
 
 }
 
-export const ChatMessage = memo(function ChatMessage({ message, agents = [], newestPaths }: ChatMessageProps) {
+export const ChatMessage = memo(function ChatMessage({ message, agents = [], newestPaths, pathsRefreshKey }: ChatMessageProps) {
   const { currentUser } = useWorkspace();
   const t = useT();
   const { formatTime } = useFormatters();
@@ -293,7 +295,7 @@ export const ChatMessage = memo(function ChatMessage({ message, agents = [], new
           </div>
           {!!message.metadata?.fact_card && <FactCard card={message.metadata.fact_card as OfferedFact}/>}
           {typeof message.metadata?.possibility_id === 'string' && <Possibilities id={message.metadata.possibility_id} />}
-          {Array.isArray(message.metadata?.paths_found) && <PathsFound ids={message.metadata.paths_found as string[]} newest={newestPaths}
+          {Array.isArray(message.metadata?.paths_found) && <PathsFound ids={message.metadata.paths_found as string[]} newest={newestPaths} refreshKey={pathsRefreshKey}
             snapshot={Array.isArray(message.metadata?.paths_snapshot) ? message.metadata.paths_snapshot as PathSnapshot[] : undefined} />}
           {typeof message.metadata?.workspace_place === 'string' && <PlaceLink place={message.metadata.workspace_place} />}
           {message.messageType === 'counselor_mirror' && <MirrorLink header={message.metadata?.header as MirrorHeader | undefined} />}

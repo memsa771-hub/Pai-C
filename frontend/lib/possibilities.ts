@@ -56,3 +56,12 @@ export function newestPathsMessageId(messages: { id: string; metadata?: Record<s
   }
   return null;
 }
+
+/** The id of the last message that tells the student a path was removed (the paths-excluded notice). The newest
+ * paths card refetches the current list when it changes. */
+export function latestPathsChangeMessageId(messages: { id: string; metadata?: Record<string, unknown> | null }[]): string | undefined {
+  for (let index = messages.length - 1; index >= 0; index--) {
+    if (messages[index].metadata?.paths_excluded_job_id) return messages[index].id;
+  }
+  return undefined;
+}

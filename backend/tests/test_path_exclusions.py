@@ -234,6 +234,42 @@ async def test_path_dismissed_by_hand_then_excluded_and_restored_is_not_dismisse
 
 
 @pytest.mark.asyncio
+async def test_excluded_restored_dismissed_by_hand_then_excluded_by_another_option_is_restamped():
+    with StudentSession() as student, student.factory() as db:
+        turn, journey = setup(student, db)
+        row = add_path(db, student, journey, "pharm_d")
+        service = PossibilityService(db)
+        first = option(db, student, "Pharm-D", quote="Pharm-D nahi karni")
+        assert [r.id for r in exclusions.apply_exclusions(db, student.workspace_id)] == [row.id]
+        service.transition(student.workspace_id, row.id, "save")
+        db.commit()
+        assert row.dismissal["item_id"] == first.id and row.dismissal["restored_at"]
+        service.transition(student.workspace_id, row.id, "dismiss")
+        db.commit()
+        # A different option now excludes the field (the latest one wins); the first is superseded.
+        first.status = "superseded"
+        second = option(db, student, "Pharm-D", quote="Nahi, Pharm-D bilkul nahi")
+        assert exclusions.apply_exclusions(db, student.workspace_id) == []  # no transition, no notice
+        db.commit()
+        db.expire_all()
+        row = db.get(PaiPossibility, row.id)
+        assert row.status == "dismissed"
+        assert row.dismissal["item_id"] == second.id and "restored_at" not in row.dismissal
+        restored, _ = service.transition(student.workspace_id, row.id, "save")
+        db.commit()
+        assert restored.dismissal["item_id"] == second.id and restored.dismissal["restored_at"]
+        # Neither an unrelated Vault write nor the next analyzer run dismisses it again.
+        assert exclusions.apply_exclusions(db, student.workspace_id) == []
+        db.commit()
+        assert db.get(PaiPossibility, row.id).status == "saved"
+        result, sent = await run_paths(db, student, turn, analysis(path("pharm_d")))
+        db.expire_all()
+        row = db.get(PaiPossibility, row.id)
+        assert row.status == "saved" and row.id in result["paths"]
+        assert notice_jobs(db, student.workspace_id) == []
+
+
+@pytest.mark.asyncio
 async def test_a_failing_exclusion_step_does_not_fail_the_path_run():
     with StudentSession() as student, student.factory() as db:
         turn, _ = setup(student, db)
