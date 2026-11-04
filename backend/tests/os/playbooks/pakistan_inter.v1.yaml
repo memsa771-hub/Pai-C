@@ -1,0 +1,29 @@
+# Fake local route (P1 spec §3.8, R-41): fictional, for tests only.
+key: pakistan_inter
+version: 1
+route: {origin: PK, destination: PK, level: intermediate}
+default_timezone: Asia/Karachi
+eligibility:
+  grade:
+    - method: weighted_aggregate
+      requirement: merit_closing
+      part: aggregate
+      better: higher
+      weights: {ssc_certificate.marks_obtained: 1.0}
+      totals: {ssc_certificate.marks_obtained: ssc_certificate.marks_total}
+tasks:
+  - template_key: admission_form
+    task_type: student.act
+    title: Submit the admission form
+    kind: student
+    inbox_kind: act
+    duration_days: 1
+  - template_key: merit_list
+    task_type: student.choose
+    title: Choose from the merit-list offers
+    kind: student
+    inbox_kind: choose
+    fan_out: programme
+    depends_on: [{key: admission_form}]
+    anchor: {fact: merit_list_date}
+    duration_days: 2
