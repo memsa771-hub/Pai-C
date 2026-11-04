@@ -102,12 +102,32 @@ Approved by the owner on 2026-11-03 (design in chat; decisions P0-D8 and P0-D9 b
 | P0-D10 | Fixed sentences stay English for now. The C1 notice reads "I've removed {titles} from your paths, since you said it isn't for you." (plural "…they aren't…"). C7: marks of a completed exam are required, current-study marks and the entry test optional. C2: replaying a skipped analysis after newer ones is acceptable. A dismissal keeps its reason and evidence in a new nullable `pai_possibilities.dismissal` column (migration). |
 | P0-D11 | The Counsellor lead's approval of a freeze-exception PR is given in the Claude session chat (owner, 2026-11-03): PRs are opened from the lead's own account, so GitHub cannot take the lead's review. Before such a PR is merged, the change is shown to the lead in chat, the lead's "approved" is quoted in the PR description, and the integration owner merges only after it is there. |
 | P0-D12 | C7 (owner, 2026-11-03/04): marks of a completed exam are required only on a student's first onboarding (no `onboarded_at` yet); already-onboarded students can save edits without them. Approved copy: "Your marks can't be more than the total marks." and "Enter a number from {min} to {max}." C6 approved by the Counsellor lead in chat on 2026-11-04 (P0-D11). |
+| P0-D15 | Strengths count toward the `interests` area of the Mirror (owner, 2026-11-04): "subjects they like and are good at". |
+| P0-D16 | PAI refers to itself in the neutral first-person plural in Roman Urdu ("hum dekhenge"), never masculine or feminine first-person forms (owner, 2026-11-04; approval of the voice prompt change). |
 | P0-D9 | C6: the reply follows the language of the student's latest message. Roman Urdu is used only as the replacement when a reply came out in a blocked script (Devanagari). |
 
 ### 5.4 Order
 
 C2 first (it unblocks analysis, which C1 and C5 rely on in the replay), then C1, C5, C3, C7, and C6 last (its replay
 shows reply-language changes, easiest to read once the others are in).
+
+### 5.5 Round 2 (after the live run of 2026-11-04)
+
+The live run (`docs/local-test/live-run-2026-11-04.md`, $0.28) failed gate item 3: the student stayed at stage D. Root
+causes were traced offline from the run's record and the code. Fixes, all tagged R-47:
+
+| # | Problem | Cause | Fix | Frozen? |
+|---|---|---|---|---|
+| R2-1 | Stuck at stage D | The Mirror needs 2 `interests`; only `interest.*` notebook keys and Vault `interest` items count, so "Biology is my strongest subject" (a strength) never counts, though the area's own wording is "subjects they like and are good at" | `backend/app/pai_c/understanding/areas.json`: `interests` also counts notebook `strength.*` keys and Vault `strength` items (owner decision P0-D15) | No (Counsellor file: lead review) |
+| R2-2 | "I'll check" with no check | The classifier marked the turn's question `answered_now` (or not information/needs_research); Voice's `note_question` then hit a duplicate, so neither the start nor the C3 sweep saw an open research question | `pai_c/runtime.py` + helper in `pai_c/myths.py`: when Voice's action is `note_question`, the turn's question becomes kind information, needs_research, open (never `answered_now`), so research starts or the sweep notifies | No |
+| R2-3 | First analyses rejected twice | `planner/patch.py` keeps only the exception type, so the retry feedback carries no reason and the model repeats the mistake (`set_coverage` with no active evidence) | `PatchRejected` message carries a fixed reason code (e.g. `coverage_without_evidence part=said`), never student text | No |
+| R2-4 | Same question three times | The controller only cools down explicitly declined areas; an area asked and ignored is chosen again | `pai_c/policy/state.py` / `controller.py`: an area asked with no new coverage on the next turn cools down for one turn (threshold in non-frozen data) | No |
+| R2-5 | Budget not saved | Most likely the extractor's quote check: `_normalize` only casefolds, so a quote with a different dash or quote mark fails | `memory/extractor.py` `_normalize` folds dash and quote variants; the drop reason is logged (no student text) | No |
+| R2-6 | Masculine Roman Urdu ("karunga") | No self-reference for PAI is defined anywhere | One line in `voice/prompts/voice.md` and `voice_guided.md` (and the `COUNSELOR_V3_PROMPTS.md` sync): PAI refers to itself in the first-person plural ("hum dekhenge"), never with gendered first-person forms (owner decision P0-D16; owner approved in chat, P0-D11) | **Yes**: exception PR |
+| R2-7 | Not enough evidence in the live run | The run kept token counts only | The live driver records raw model outputs, the Vault drop log and the noted-question rows (scratchpad tool, not product code) | — |
+
+Order: R2-3, R2-2, R2-1, R2-4, R2-5 on one branch (non-frozen); R2-6 in its own exception PR; then the live run again
+(gate item 3).
 
 ## 6. Gate (master §12, P0)
 
