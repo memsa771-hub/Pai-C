@@ -12,7 +12,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from app.os.contracts.decision_record import DecisionRecordV1  # noqa: E402
 from app.os.contracts.decision_record_v2 import DecisionRecordV2  # noqa: E402
 from app.os.contracts.escalation import EscalationV1  # noqa: E402
+from app.os.contracts.escalation_v2 import EscalationV2  # noqa: E402
 from app.os.contracts.plan_summary import PlanSummaryV1  # noqa: E402
+from app.os.contracts.plan_view import PlanViewV1  # noqa: E402
 from app.os.contracts.programme_list import ProgrammeListV1  # noqa: E402
 from app.os.contracts.route_contract_v2 import RouteContractV2  # noqa: E402
 
@@ -20,7 +22,8 @@ CONTRACTS = Path(__file__).resolve().parents[1] / "app" / "os" / "contracts"
 # file stem (name.vN) -> model; the file is <stem>.schema.json
 MODELS = {"decision_record.v1": DecisionRecordV1, "plan_summary.v1": PlanSummaryV1, "escalation.v1": EscalationV1,
           "programme_list.v1": ProgrammeListV1, "decision_record.v2": DecisionRecordV2,
-          "route_contract.v2": RouteContractV2}
+          "route_contract.v2": RouteContractV2, "escalation.v2": EscalationV2,
+          "plan_view.v1": PlanViewV1}
 
 
 def main() -> None:

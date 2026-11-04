@@ -77,3 +77,80 @@ def test_route_contract_v2_from_decision():
 def test_extra_fields_forbidden():
     with pytest.raises(ValidationError, match="Extra inputs"):
         DecisionRecordV2.model_validate(export_v2(truth_map={}))
+
+
+# ---- Task 2: escalation.v2 and plan_view.v1 ----
+
+from app.os.contracts.escalation_v2 import EscalationV2  # noqa: E402
+from app.os.contracts.plan_view import PlanStep, PlanViewV1  # noqa: E402
+from app.os.kernel.states import TaskState  # noqa: E402
+
+
+def escalation_v2(**over) -> dict:
+    base = {"schema": "pai.escalation.v2", "key": "escalation:1", "case_id": 1, "journey_id": "j-1",
+            "student_ref": "ws-1", "reason": "blocking_gap", "note": "A fixed sentence.",
+            "raised_at": "2027-01-10T09:00:00+00:00", "decision_version": 2}
+    return {**base, **over}
+
+
+def test_escalation_v2_keeps_five_reasons():
+    for reason in ("not_eligible", "all_rejected", "deadline_passed", "blocking_gap", "other"):
+        assert EscalationV2.model_validate(escalation_v2(reason=reason)).reason == reason
+    with pytest.raises(ValidationError, match="reason"):
+        EscalationV2.model_validate(escalation_v2(reason="route_not_possible"))
+    assert EscalationV2.model_validate(escalation_v2(decision_version=None)).decision_version is None
+    with pytest.raises(ValidationError):
+        EscalationV2.model_validate(escalation_v2(decision_version=0))
+
+
+def plan_view(**over) -> dict:
+    base = {"schema": "pai.plan_view.v1", "student_ref": "ws-1", "state": "empty", "stop_reason": None,
+            "plan_id": None, "decision_version": None, "revision": None, "route": None, "pages": [],
+            "consent": None, "steps": [], "requests": [], "documents_needed": [], "changes": [],
+            "proposals_waiting": 0}
+    return {**base, **over}
+
+
+ROUTE = {"route_key": "germany_master", "origin_country": "PK", "destination_country": "DE", "level": "master",
+         "target_intake": {"term": "winter", "year": 2027}}
+
+
+def test_plan_view_empty_state():
+    assert PlanViewV1.model_validate(plan_view()).state == "empty"
+    with pytest.raises(ValidationError):
+        PlanViewV1.model_validate(plan_view(plan_id=1))
+    with pytest.raises(ValidationError):
+        PlanViewV1.model_validate(plan_view(state="active", route=ROUTE, revision=1))
+    with pytest.raises(ValidationError):
+        PlanViewV1.model_validate(plan_view(state="active", plan_id=1, revision=1))  # no route
+    with pytest.raises(ValidationError):
+        PlanViewV1.model_validate(plan_view(state="active", plan_id=1, route=ROUTE))  # no revision
+    assert PlanViewV1.model_validate(plan_view(state="active", plan_id=1, route=ROUTE, revision=1)).plan_id == 1
+
+
+def test_plan_view_stop_reason_only_when_stopped():
+    ok = plan_view(state="stopped", plan_id=1, route=ROUTE, revision=2, stop_reason="withdrawn")
+    assert PlanViewV1.model_validate(ok).stop_reason == "withdrawn"
+    with pytest.raises(ValidationError):
+        PlanViewV1.model_validate({**ok, "state": "active"})
+
+
+def test_plan_view_codes_not_text():
+    base = plan_view(state="active", plan_id=1, route=ROUTE, revision=1)
+    step = {"task_id": 1, "instance_key": "k", "template_key": "t", "title": "Do it", "owner": "student",
+            "status": "blocked", "blocked_reason": "waiting_on_marks", "inbox_kind": None, "programme_ref": None,
+            "due_at": None, "due_tz": None, "depends_on": [], "provisional": False, "estimated": False,
+            "needs": []}
+    assert PlanViewV1.model_validate({**base, "steps": [step]}).steps[0].blocked_reason == "waiting_on_marks"
+    with pytest.raises(ValidationError):
+        PlanViewV1.model_validate({**base, "steps": [{**step, "blocked_reason": "waiting on marks"}]})
+    change = {"revision": 1, "at": "2027-01-10T09:00:00+00:00", "cause": "counsellor", "kind": "added",
+              "instance_key": None}
+    assert PlanViewV1.model_validate({**base, "changes": [change]}).changes[0].cause == "counsellor"
+    with pytest.raises(ValidationError):
+        PlanViewV1.model_validate({**base, "changes": [{**change, "cause": "Counsellor said so"}]})
+
+
+def test_plan_view_step_status_matches_kernel():
+    literal = PlanStep.model_json_schema()["properties"]["status"]["enum"]
+    assert set(literal) == {s.value for s in TaskState}
