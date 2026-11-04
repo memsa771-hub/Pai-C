@@ -523,8 +523,12 @@ def _validate(raw: dict, turn, allowed_vault_keys: set[str],
     """
     original = raw
 
-    def drop(reason: str, redact: bool = False) -> None:
+    def drop(reason: str, redact: bool = False, code: Optional[str] = None) -> None:
         logger.info("memory: dropped candidate — %s", reason)
+        # A fixed reason code and schema names only, never the quote or a value.
+        logger.info("memory_candidate_dropped reason=%s candidate_type=%s key=%s",
+                    code or _DROP_CODES.get(reason, "other"), _schema_name(raw.get("candidate_type") if isinstance(raw, dict) else None, CANDIDATE_TYPES),
+                    _schema_name(raw.get("key") if isinstance(raw, dict) else None, _loggable_keys(allowed_vault_keys)))
         if drops is not None:
             if redact:
                 # The drop log must never hold the figure either: no value, no quote.
@@ -549,11 +553,11 @@ def _validate(raw: dict, turn, allowed_vault_keys: set[str],
     if not _chat_proposable(raw):
         return drop("not a chat input for this type")
     if candidate_type not in CANDIDATE_TYPES:
-        return drop(f"unknown candidate_type {candidate_type!r}")
+        return drop(f"unknown candidate_type {candidate_type!r}", code="unknown_candidate_type")
 
     operation = raw.get("operation", "upsert")
     if operation not in OPERATIONS:
-        return drop(f"extraction may not propose operation {operation!r}")
+        return drop(f"extraction may not propose operation {operation!r}", code="operation_not_allowed")
 
     # The evidence rule, enforced rather than requested: the quote must
     # actually appear in the student's message. This is what stops the
@@ -594,12 +598,12 @@ def _validate(raw: dict, turn, allowed_vault_keys: set[str],
     if candidate_type == "vault_fact":
         key = raw.get("key")
         if not key or key not in allowed_vault_keys:
-            return drop(f"unknown vault key {key!r}")
+            return drop(f"unknown vault key {key!r}", code="unknown_vault_key")
         if "proposed_value" not in raw:
             return drop("vault_fact without proposed_value")
         proposed = _strip_placeholders(raw["proposed_value"])
         if proposed is None:
-            return drop(f"vault_fact {key!r} stated no actual value")
+            return drop(f"vault_fact {key!r} stated no actual value", code="no_value")
         proposed = _normalize_currencies(proposed)
         # A money field of 0 is a model filling in a blank, not a figure the
         # student gave ("Cost is important" became {"amount": 0} in testing).
@@ -617,12 +621,12 @@ def _validate(raw: dict, turn, allowed_vault_keys: set[str],
                 if isinstance(figure, bool) or figure is None or figure == saved.get(money):
                     continue
                 if isinstance(figure, (int, float)) and figure <= 0:
-                    return drop(f"vault_fact {key!r} proposed a non-positive {money}")
+                    return drop(f"vault_fact {key!r} proposed a non-positive {money}", code="non_positive_money")
                 # A figure the student never said is invented, and a wrong
                 # budget is more damaging than a missing one: it looks
                 # legitimate and silently misprices every recommendation.
                 if not _money_is_evidenced(figure, turn.user_text):
-                    return drop(f"vault_fact {key!r} {money}={figure!r} is not in the student's words")
+                    return drop(f"vault_fact {key!r} {money}={figure!r} is not in the student's words", code="money_not_in_student_text")
         return ExtractedCandidate(
             candidate_type="vault_fact", operation="upsert", key=key,
             proposed_value=proposed, content=None,
@@ -681,7 +685,7 @@ def _validate(raw: dict, turn, allowed_vault_keys: set[str],
         key = raw.get("key")
         spec = vault_catalog().type(key) if isinstance(key, str) else None
         if spec is None or spec.storage != "item" or "chat" not in spec.inputs:
-            return drop(f"unknown item type {key!r}")
+            return drop(f"unknown item type {key!r}", code="unknown_item_type")
         value = _strip_placeholders(raw.get("proposed_value"))
         if not isinstance(value, dict):
             return drop(f"{key} item stated no actual values")
@@ -743,9 +747,46 @@ def _validate(raw: dict, turn, allowed_vault_keys: set[str],
     )
 
 
+# Dash and quote-mark variants a model may swap when it copies a quote
+# ("15–20" for "15-20", ’ for '); folded so only the words decide (R-47 R2-5).
+_QUOTE_FOLD = str.maketrans({
+    **{dash: "-" for dash in "\u2010\u2011\u2012\u2013\u2014\u2015\u2212\ufe58\ufe63\uff0d"},
+    **{mark: "'" for mark in "\u2018\u2019\u201a\u201b\u2032\u00b4`\u201c\u201d\u201e\u201f\u2033\u00ab\u00bb\"\uff02\uff07"},
+})
+
+
 def _normalize(text: str) -> str:
-    """Casefold + collapse whitespace, for quote matching."""
-    return re.sub(r"\s+", " ", (text or "")).strip().casefold()
+    """Casefold, fold dash and quote-mark variants, collapse whitespace, for quote matching."""
+    return re.sub(r"\s+", " ", (text or "").translate(_QUOTE_FOLD)).strip().casefold()
+
+
+_DROP_CODES = {
+    "not an object": "not_an_object",
+    "household_income": "household_income",
+    "not a chat input for this type": "not_chat_input",
+    "quote not a string": "quote_not_string",
+    "no quote": "no_quote",
+    "quote not found in the student's message": "quote_not_found",
+    "confidence not a number": "confidence_not_number",
+    "confidence not finite": "confidence_not_finite",
+    "vault_fact without proposed_value": "no_value",
+    "invalid student record proposal": "invalid_record",
+    "record reference was not in this student's context": "record_ref_not_in_context",
+    "only goals may supersede another goal": "supersede_not_goal",
+    "course education_id was not in this student's context": "record_ref_not_in_context",
+    "content not a string": "content_not_string",
+}
+
+
+def _loggable_keys(allowed_vault_keys) -> set:
+    from app.memory.catalog import vault_catalog
+    return {*allowed_vault_keys, *(spec.key for spec in vault_catalog().types(storage="item")),
+            *(spec.key for spec in vault_catalog().types(storage="record"))}
+
+
+def _schema_name(value, allowed) -> str:
+    """A catalog or schema name as it is; anything else (model text) as "-"."""
+    return value if isinstance(value, str) and value in allowed else "-"
 
 
 async def extract_candidates(

@@ -341,3 +341,47 @@ async def test_r2_4_runtime_logs_the_entry_count_of_the_asked_area(monkeypatch):
         with student.factory() as db:
             logged = db.scalar(select(CounselorTurnDecision)).decision
     assert logged["topic"] == "interests" and logged["topic_items"] == 0
+
+
+# R2-5: a quote that differs from the student's text only in dash or quote marks is found.
+
+def _budget(student_text, quote, value=None):
+    import types
+    from app.memory import extractor
+    from app.memory.field_definitions import catalog_field_definitions
+    keys = {spec["key"] for spec in catalog_field_definitions()}
+    turn = types.SimpleNamespace(user_text=student_text, vault={}, vault_guesses=(), records=[], items=[],
+                                 user_event_id="u", assistant_event_id="a", source_language="en")
+    raw = {"candidate_type": "vault_fact", "operation": "upsert", "key": "finance.budget",
+           "proposed_value": value or {"min": 1500000, "max": 2000000, "currency": "PKR", "period": "per_year"},
+           "quote": quote, "confidence": 0.9}
+    drops = []
+    return extractor._validate(raw, turn, keys, drops), drops
+
+
+@pytest.mark.req("R-47")
+@pytest.mark.parametrize("student_text, quote", [
+    ("Budget ka masla hai - my family can afford 15 to 20 lakh a year.", "Budget ka masla hai — my family can afford 15 to 20 lakh a year"),
+    ("Budget ka masla hai — my family can afford 15 to 20 lakh a year.", "Budget ka masla hai - my family can afford 15 to 20 lakh a year"),
+    ("We can pay 15-20 lakh per year.", "15–20 lakh per year"),
+    ("We can pay 15–20 lakh per year.", "15-20 lakh per year"),
+    ("My family’s limit is 15 to 20 lakh.", "My family's limit is 15 to 20 lakh"),
+    ('Abbu said "15 to 20 lakh max".', "Abbu said “15 to 20 lakh max”"),
+    ("Abbu said ‘15 to 20 lakh max’.", "Abbu said '15 to 20 lakh max'"),
+])
+def test_r2_5_budget_quote_matches_across_dash_and_quote_variants(student_text, quote):
+    candidate, drops = _budget(student_text, quote)
+    assert drops == []
+    assert candidate is not None and candidate.key == "finance.budget"
+
+
+@pytest.mark.req("R-47")
+def test_r2_5_a_quote_the_student_never_wrote_is_still_dropped_with_a_reason_code(caplog):
+    import logging
+    caplog.set_level(logging.INFO, logger="app.memory.extractor")
+    candidate, drops = _budget("We can pay 15 lakh per year.", "We can pay 25 lakh per year")
+    assert candidate is None
+    assert [row["reason"] for row in drops] == ["quote not found in the student's message"]
+    lines = [r.getMessage() for r in caplog.records if "memory_candidate_dropped" in r.getMessage()]
+    assert lines == ["memory_candidate_dropped reason=quote_not_found candidate_type=vault_fact key=finance.budget"]
+    assert "25 lakh" not in caplog.text and "15 lakh" not in caplog.text
