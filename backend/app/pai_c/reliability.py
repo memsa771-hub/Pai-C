@@ -31,11 +31,12 @@ def health(db, workspace_id, *, now=None):
     now = now or datetime.now(timezone.utc)
     midnight = now.replace(hour=0,minute=0,second=0,microsecond=0)
     counts = Counter()
+    ignored = set(policy().get('not_failures', []))
     for violations in db.scalars(select(CounselorTurnDecision.guard_violations).where(
         CounselorTurnDecision.workspace_id == workspace_id,
         CounselorTurnDecision.source_timestamp >= int(midnight.timestamp()*1000),
         CounselorTurnDecision.source_timestamp < int((midnight + timedelta(days=1)).timestamp()*1000))):
-        counts.update(set(violations or []))
+        counts.update(set(violations or []) - ignored)
     jobs = db.scalars(select(BackgroundJob).where(BackgroundJob.workspace_id == workspace_id,
         BackgroundJob.job_type == 'counselor.analyze', BackgroundJob.status.in_(['pending','running']))).all()
     def age(job):

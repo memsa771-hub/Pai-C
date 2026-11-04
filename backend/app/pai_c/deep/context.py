@@ -182,7 +182,6 @@ async def build_context(db, workspace_id: str, turn: CounselorTurnInput, *,
         "language_policy": _json({
             "blocked_scripts": [name.strip() for name in config.PAI_LANGUAGE_BLOCKED_SCRIPTS.split(",")
                                 if name.strip()],
-            "replacement": config.PAI_LANGUAGE_BLOCKED_SCRIPT_REPLACEMENT,
             "fallback_reply": config.PAI_COUNSELOR_FALLBACK_REPLY,
         }),
         "profile": _json(_profile(db, workspace_id, snapshot, student_text=turn.student_text,

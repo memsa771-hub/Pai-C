@@ -190,7 +190,7 @@ which uses no model prompt.
 <research> sourced facts the student asked for (information requests) only; no research during counseling </research>
 <mirror> the Mirror text's sentences + the labels of what is still unknown (never the areas' raw entries) </mirror>
 <journey> stage and mirror_ready (the state card is ready) </journey>
-<language_policy> configured blocked scripts, replacement and fallback </language_policy>
+<language_policy> configured blocked scripts and fallback; the replacement is named only when a reply is redone for a blocked script </language_policy>
 </context>
 ```
 

@@ -1,1 +1,1 @@
-Rewrite your previous reply while following <language_policy> exactly. Avoid every blocked script and use the configured replacement. Return the same JSON structure and no other text.
+Rewrite your previous reply without any script listed in <language_policy> blocked_scripts. Write it in the language named in <language_replacement>. Return the same JSON structure and no other text.
