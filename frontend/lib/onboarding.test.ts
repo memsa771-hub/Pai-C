@@ -99,3 +99,27 @@ describe('Other text that names a level', () => {
     expect(chipKey(fields, 'level', 'intermediate')).not.toBe(chipKey(fields, 'level', 'bachelor'));
   });
 });
+
+// req: R-47
+describe('marks questions', () => {
+  const MARKS: OnboardingFieldSpec[] = [
+    ...EDUCATION,
+    spec('marksObtained', { isNumber: true, depends_on: { field: 'status', values: ['completed'] } }),
+    spec('marksObtained', { isNumber: true, required: false, depends_on: { field: 'status', values: ['current'] } }),
+    spec('entryTest', { required: false, choices: ['mdcat'] }),
+  ];
+
+  it('does not require a required follow-up its condition hides', () => {
+    const shown = visibleOnboardingFields(MARKS, { level: 'intermediate', status: 'current' });
+    expect(shown.filter((f) => f.name === 'marksObtained').map((f) => f.required)).toEqual([false]);
+    const done = visibleOnboardingFields(MARKS, { level: 'intermediate', status: 'completed' });
+    expect(done.filter((f) => f.name === 'marksObtained').map((f) => f.required)).toEqual([true]);
+  });
+
+  it('leaves an optional question left empty out of the answers', () => {
+    expect(visibleOnboardingAnswers(MARKS, { level: 'other', status: 'current' }))
+      .toEqual({ level: 'other', status: 'current' });
+    expect(visibleOnboardingAnswers(MARKS, { level: 'other', status: 'current', entryTest: 'mdcat' }))
+      .toEqual({ level: 'other', status: 'current', entryTest: 'mdcat' });
+  });
+});

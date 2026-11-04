@@ -116,6 +116,22 @@ class MemoryService:
                 "source_type": item.source_type, "updated_at": item.updated_at or item.observed_at})
         return cards
 
+    def ruled_out_options(self, workspace_id):
+        """The options the student ruled out themselves (said, shown or
+        confirmed; never PAI's guess), with their own words: the quote on the
+        entry, else the latest sighting's, else the entry's text."""
+        from app.memory.vault_items import VaultItemService
+        options = []
+        for item in VaultItemService(self.db).active(workspace_id, ["option"]):
+            value = item.value or {}
+            if value.get("status") != "ruled_out" or item.level == "inferred" or not value.get("text"):
+                continue
+            evidence = item.evidence or {}
+            sightings = [c.get("quote") for c in evidence.get("corroborations") or [] if c.get("quote")]
+            quote = evidence.get("quote") or (sightings[-1] if sightings else None) or value["text"]
+            options.append({"item_id": item.id, "text": value["text"], "quote": quote, "level": item.level})
+        return options
+
     def recent_turns(self, turn, owner_id, *, limit=24):
         return shared_history(self.db, turn, owner_id, limit=limit)
 

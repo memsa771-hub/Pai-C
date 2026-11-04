@@ -11,6 +11,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import type { WorkspaceMessage, WorkspaceAgent } from '@/lib/types';
 import { useT } from '@/lib/i18n';
+import { newestPathsMessageId } from '@/lib/possibilities';
 
 // ── Message Grouping ──
 
@@ -53,6 +54,12 @@ function groupMessages(messages: WorkspaceMessage[]): MessageGroup[] {
 
   flushSteps();
   return groups;
+}
+
+/** The message id of the newest paths card among the chat groups. */
+function newestPathsGroupId(groups: MessageGroup[]): string | null {
+  return newestPathsMessageId(groups.flatMap(group =>
+    group.type === 'chat' ? [{ id: group.message.messageId, metadata: group.message.metadata }] : []));
 }
 
 // Stable key for a group
@@ -205,6 +212,7 @@ export function ChatMessages({ messages, agents, showAllSteps, className, scroll
 
   // Group into chat messages and intermediate step clusters
   const groups = useMemo(() => groupMessages(filteredMessages), [filteredMessages]);
+  const newestPathsId = useMemo(() => newestPathsGroupId(groups), [groups]);
 
   const hasTerminalStatus = realMessages.some(isTerminalStatus);
 
@@ -481,6 +489,7 @@ export function ChatMessages({ messages, agents, showAllSteps, className, scroll
                     <ChatMessage
                       message={group.message}
                       agents={agents}
+                      newestPaths={group.message.messageId === newestPathsId}
                     />
                   ) : group.type === 'thinking' ? (
                     <ThinkingMessage

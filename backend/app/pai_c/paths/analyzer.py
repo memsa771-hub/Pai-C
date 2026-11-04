@@ -31,6 +31,7 @@ from app.pai_c.deep.analysis import _workspace_lock
 from app.pai_c.deep.context import _json
 from app.pai_c.deep.prompts import load_prompt
 from app.pai_c.memory import RECORD_SPECS, MemoryService, display_text, result_text as _result_text, vault_catalog
+from app.pai_c.paths import exclusions
 from app.pai_c.paths.fields import Candidate, candidate_fields, current_education, read_education, study_fields
 from app.pai_c.planner.view import build_planner_view
 from app.pai_c.policy.controller import load_data
@@ -462,13 +463,30 @@ async def _post_finished(db, job, channel: str, reply_to: str) -> None:
         raise RuntimeError("path analysis message was not persisted")
 
 
+def _apply_exclusions(db, workspace_id: str, source_event_id: str | None, excluded: dict | None = None) -> None:
+    """Dismiss the paths whose field the student ruled out and queue the one
+    notice for them (paths/exclusions.py). The caller holds a savepoint and
+    commits."""
+    rows = exclusions.apply_exclusions(db, workspace_id, excluded)
+    if rows:
+        exclusions.enqueue_exclusion_notice(db, workspace_id, rows, source_event_id=source_event_id)
+
+
 def after_accept(db, candidate) -> None:
     """Reconciler hook: a write to a path-relevant Vault type
     (`vault_trigger_types`) queues the Path engine (reason "vault"). The
     enqueue is idempotent on the relevance version and the student's own
-    paths, and a pending run is reused. Like the Mirror hook, it runs in a
-    savepoint and never undoes the Vault write."""
+    paths, and a pending run is reused. An `option` write first dismisses the
+    paths whose field the student ruled out (R-47 C1). Like the Mirror hook,
+    it runs in savepoints and never undoes the Vault write."""
     from app.pai_c.paths.currency import trigger_types
+    if candidate.candidate_type == "vault_item" and candidate.key == "option":
+        try:
+            with db.begin_nested():
+                _apply_exclusions(db, candidate.workspace_id, (candidate.source_event_ids or [None])[0])
+        except Exception as exc:  # noqa: BLE001  the Vault write outranks its read model
+            logger.error("paths_exclusion_failed workspace_id=%s error_type=%s",
+                         candidate.workspace_id, type(exc).__name__)
     try:
         if candidate.key not in trigger_types():
             return
@@ -530,12 +548,26 @@ async def path_analysis_job(job, db) -> dict:
         evidence = _evidence_index(db, job.workspace_id, snapshot.notebook)
         if len(evidence) < rules["min_notebook_items"]:
             return {"status": "not_enough_known", "items": len(evidence)}
+        # A field the student ruled out is dismissed before the run reads its
+        # paths, and never offered to the model (R-47 C1).
+        # A failure here skips only the exclusion step, never the run.
+        excluded = None
+        try:
+            with db.begin_nested():
+                excluded = exclusions.excluded_fields(db, job.workspace_id)
+                _apply_exclusions(db, job.workspace_id, payload.get("source_event_id"), excluded)
+        except Exception as exc:  # noqa: BLE001  the path run outranks the exclusion step
+            excluded = None
+            logger.error("paths_exclusion_failed workspace_id=%s error_type=%s",
+                         job.workspace_id, type(exc).__name__)
         existing = service.list(job.workspace_id)
+        hidden = exclusions.hidden_field_keys(db, job.workspace_id, existing, excluded)
+        offered = {key: c for key, c in candidates.items() if key not in hidden}
         dismissed = {row.normalized_title for row in existing if row.status == "dismissed"}
         own = {row.normalized_title for row in existing if row.source == "student" and row.status != "dismissed"}
         fields = [{"key": c.field.key, "title": c.field.title, "family": c.field.family, "standing": c.standing}
                   | ({"needs_group": [vault_catalog().label("intermediate_groups", g) for g in c.needs_group]}
-                     if c.needs_group else {}) for c in candidates.values()]
+                     if c.needs_group else {}) for c in offered.values()]
         vault = _vault_sources(db, job.workspace_id, records)
         reassess = []
         for row in existing:
@@ -584,7 +616,7 @@ async def path_analysis_job(job, db) -> dict:
                 prompt += "\nReturn one complete JSON object that follows every output rule."
         if analysis is None:
             return {"status": "invalid", "model_calls": 2}
-        paths = sanitize(analysis, evidence, dismissed, candidates, own, vault=vault)
+        paths = sanitize(analysis, evidence, dismissed, offered, own, vault=vault)
         workspace = db.scalar(select(Workspace).where(
             Workspace.id == job.workspace_id, Workspace.status == "active").with_for_update())
         if workspace is None:

@@ -4,7 +4,7 @@ from .contract import CapabilityContract
 
 def load_system_capabilities(registry):
     from app.pai_c.deep import analysis
-    from app.pai_c.paths import analyzer as paths
+    from app.pai_c.paths import analyzer as paths, exclusions
     from app.pai_c import sessions, opening, myths, checkins, reliability
     from app.memory import handlers as memory
     from app.research import jobs as research
@@ -31,6 +31,7 @@ def load_system_capabilities(registry):
         (analysis.JOB_ANALYZE, analysis.analyze_job, {"user_event_id": string, "assistant_event_id": string, "source_timestamp": {"type": "number"}}),
         (mirror_text.JOB_MIRROR_TEXT, mirror_text.mirror_text_job, {"workspace_id": string, "card_version": string}),
         (paths.JOB_ANALYZE_PATHS, paths.path_analysis_job, {"notebook_version": {"type": "integer"}, "source_event_id": string, "channel": string, "reason": string}),
+        (exclusions.JOB_PATHS_EXCLUDED, exclusions.paths_excluded_job, {"possibility_ids": array, "source_event_id": string}),
         (memory.JOB_EXTRACT, memory.extract_memory, {"source_type": string, "channel": string, "user_event_id": string, "assistant_event_id": string, "agent_name": string, "candidates": array}),
         (memory.JOB_RECONCILE, memory.reconcile_memory, {"candidate_ids": array}),
         (memory.JOB_EMBED, memory.embed_memory, {"memory_ids": array, "episode_ids": array, "fact_ids": array, "record_refs": array}),

@@ -118,8 +118,20 @@ def _check_follow_ups(onboarding: dict, choices: dict, storage: str) -> None:
     for ask in follow_ups:
         if not isinstance(ask.get("name"), str) or not ask["name"] or not ask.get("prompt"):
             raise ValueError("onboarding follow-up needs a name and a prompt")
-        if ask.get("input") not in (*ONBOARDING_INPUTS, "year") or not ask.get("record_field"):
+        if ask.get("input") not in (*ONBOARDING_INPUTS, "year", "number") or not ask.get("record_field"):
             raise ValueError("onboarding follow-up needs an input and a record_field")
+        if ask["input"] == "number" and not (isinstance(ask.get("minimum"), int) and isinstance(ask.get("maximum"), int)
+                                             and ask["minimum"] <= ask["maximum"]):
+            raise ValueError("onboarding number follow-up needs an integer minimum and maximum")
+        # A separate record of the same type (the Matric before Intermediate):
+        # the fixed values it is written with.
+        if "record" in ask and not (isinstance(ask["record"], dict) and ask["record"]
+                                    and all(isinstance(v, str) for v in ask["record"].values())):
+            raise ValueError("onboarding follow-up record must be fixed text values")
+        if ask.get("required_until_onboarded") and ask.get("required", True) is not True:
+            raise ValueError("onboarding required_until_onboarded needs a required follow-up")
+        if "when_empty" in ask and not isinstance(ask["when_empty"], dict):
+            raise ValueError("onboarding follow-up when_empty must map record fields to values")
         listed = ask.get("choices")
         if isinstance(listed, str):
             codes = {c.code for c in choices.get(listed, [])}
@@ -137,6 +149,9 @@ def _check_follow_ups(onboarding: dict, choices: dict, storage: str) -> None:
             raise ValueError("onboarding level_by_choice must name codes of the main choice list")
         _check_condition(ask.get("depends_on"), asked)
         asked.append(ask["name"])
+    names = {ask["name"] for ask in follow_ups}
+    if not all(ask.get("at_most") in names for ask in follow_ups if "at_most" in ask):
+        raise ValueError("onboarding follow-up at_most must name another follow-up")
 
 
 def _build_type(raw: dict, choices: dict) -> TypeSpec:

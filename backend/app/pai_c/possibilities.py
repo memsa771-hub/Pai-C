@@ -36,6 +36,11 @@ class PossibilityService:
         return self.db.scalars(select(PaiPossibility).where(
             PaiPossibility.workspace_id == workspace_id).order_by(PaiPossibility.created_at, PaiPossibility.id)).all()
 
+    def current(self, workspace_id):
+        """The student's current paths: everything not dismissed, in list order.
+        The one reader behind the newest chat card, Roadmaps and the journey."""
+        return [row for row in self.list(workspace_id) if row.status != "dismissed"]
+
     @staticmethod
     def serialize(row):
         return {column.name: (value.isoformat() if isinstance(value, datetime) else value)
@@ -65,8 +70,14 @@ class PossibilityService:
             raise PossibilityError("This action is not available for this possibility")
         if row.status == target:
             return row, False
+        now = datetime.now(timezone.utc)
+        if (row.status == "dismissed" and action in {"save", "explore"}
+                and (row.dismissal or {}).get("reason") == "student_excluded"):
+            # The student brought back a path they had excluded: the same
+            # exclusion must not dismiss it again (paths/exclusions.py).
+            row.dismissal = {**row.dismissal, "restored_at": now.isoformat()}
         row.status = target
-        row.updated_at = datetime.now(timezone.utc)
+        row.updated_at = now
         self.db.flush()
         return row, True
 

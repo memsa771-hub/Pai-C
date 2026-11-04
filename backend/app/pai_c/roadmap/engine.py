@@ -250,9 +250,7 @@ class RoadmapEngine:
         decision = RouteDecisionService(self.db).active(workspace_id)
         order = roadmap_policy()["status_order"]
         cards = []
-        for row in PossibilityService(self.db).list(workspace_id):
-            if row.status == "dismissed":
-                continue
+        for row in PossibilityService(self.db).current(workspace_id):
             field_key = (row.study_field or {}).get("key")
             study = study_fields().get(field_key) if field_key else None
             result = verdict(field_key, standing)
