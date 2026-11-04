@@ -49,6 +49,17 @@ export interface OnboardingFieldSpec {
   multi?: boolean;
   /** A four-digit year typed by the student. */
   isYear?: boolean;
+  /** A whole number typed by the student (marks, a test score). */
+  isNumber?: boolean;
+  /** Free text in the student's own words (grades). */
+  isText?: boolean;
+  /** The question this number may not be more than (marks -> total marks). */
+  atMost?: string | null;
+  /** The range a number must be in. */
+  minimum?: number | null;
+  maximum?: number | null;
+  /** The longest a text answer may be. */
+  maxLength?: number | null;
   /** A long chip list with a search box (study fields). */
   searchable?: boolean;
   /** Copy key when questions share a name (the year asked three ways). */
@@ -107,11 +118,13 @@ export function visibleOnboardingFields(
 }
 
 /** Include only fields rendered to the student, even when the prefill has
- * older answers or a generated account handle. */
+ * older answers or a generated account handle. An optional question left
+ * empty (marks while studying, the entry test) is not sent at all. */
 export function visibleOnboardingAnswers(
   fields: OnboardingFieldSpec[], answers: OnboardingAnswers,
 ): OnboardingAnswers {
   return Object.fromEntries(visibleOnboardingFields(fields, answers)
+    .filter((field) => field.required || filledAnswer(answers[field.name]))
     .map((field) => [field.name, answers[field.name] || (field.multi ? [] : '')]));
 }
 

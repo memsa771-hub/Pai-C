@@ -1,0 +1,9 @@
+{
+  "_note": "R-47 C1: a field the student excluded in chat (a ruled-out Vault option that names a study field) is dismissed from their paths, and PAI says so once in this fixed sentence. {titles} is the dismissed paths' titles joined with list_separator and list_last. English only, like the other fixed sentences (owner decision 2026-11-03); translations later, as data.",
+  "notice": {
+    "one": "I've removed {titles} from your paths, since you said it isn't for you.",
+    "other": "I've removed {titles} from your paths, since you said they aren't for you."
+  },
+  "list_separator": ", ",
+  "list_last": " and "
+}

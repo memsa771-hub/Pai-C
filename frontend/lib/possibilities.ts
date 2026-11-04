@@ -30,6 +30,10 @@ export type Possibility = {
    * Matric student would need; outdated: a kept path from before fields;
    * out_of_group: a kept field the student's current group does not open. */
   study_field?: StudyField | null;
+  /** Why the path was dismissed for the student: a field they excluded in
+   * chat (the Vault option and their words); restored_at once they brought
+   * it back. */
+  dismissal?: { reason: string; item_id: string; quote?: string; at: string; restored_at?: string } | null;
   unknowns: string[];
 };
 
@@ -43,3 +47,12 @@ export type StudyField = {
 
 /** The latest path analysis, so the Paths page knows when to stop waiting. */
 export type PathAnalysisStatus = { job_id: string | null; done: boolean; outcome: string | null };
+
+/** The id of the last message that carries a non-empty `paths_found`: only that card shows the live list. */
+export function newestPathsMessageId(messages: { id: string; metadata?: Record<string, unknown> | null }[]): string | null {
+  for (let index = messages.length - 1; index >= 0; index--) {
+    const found = messages[index].metadata?.paths_found;
+    if (Array.isArray(found) && found.length) return messages[index].id;
+  }
+  return null;
+}

@@ -176,9 +176,10 @@ def test_migration_111_upgrade_constraints_and_downgrade():
             connection.exec_driver_sql('CREATE TABLE pai_roadmaps (id TEXT PRIMARY KEY)')
             operations=Operations(MigrationContext.configure(connection))
             with patch.object(migration,'op',operations): migration.upgrade()
-            # The model is at head; 112 and 117 only add these columns (SQLite cannot swap 112's check).
+            # The model is at head; 112, 117 and 123 only add these columns (SQLite cannot swap 112's check).
             operations.add_column('pai_possibilities',sa.Column('fit',JSONB(),nullable=False,server_default=sa.text("'[]'")))
             operations.add_column('pai_possibilities',sa.Column('study_field',JSONB(),nullable=True))
+            operations.add_column('pai_possibilities',sa.Column('dismissal',JSONB(),nullable=True))
         with student.factory() as db:
             _,journey,_=prepare(student,db)
             row=PossibilityService(db).add(student.workspace_id,journey.id,title='Practical route',why='Evidence',kind='discovered',source='planner',status='suggested')
@@ -189,6 +190,37 @@ def test_migration_111_upgrade_constraints_and_downgrade():
         with student.engine.begin() as connection:
             with patch.object(migration,'op',Operations(MigrationContext.configure(connection))): migration.downgrade()
             assert 'pai_possibilities' not in inspect(connection).get_table_names()
+
+
+@pytest.mark.req("R-47")
+def test_migration_123_adds_and_drops_dismissal_column():
+    import importlib.util
+    from pathlib import Path
+    from alembic.migration import MigrationContext
+    from alembic.operations import Operations
+    from sqlalchemy import inspect
+    spec=importlib.util.spec_from_file_location('migration123',Path(__file__).parents[1]/'alembic/versions/123_possibility_dismissal.py')
+    migration=importlib.util.module_from_spec(spec); spec.loader.exec_module(migration)
+    assert migration.revision=='123' and migration.down_revision=='122'
+    def columns(connection):
+        return {column['name'] for column in inspect(connection).get_columns('pai_possibilities')}
+    with StudentSession() as student:
+        with student.engine.begin() as connection:
+            operations=Operations(MigrationContext.configure(connection))
+            # The model is at head: step back to 122 first.
+            operations.drop_column('pai_possibilities','dismissal')
+            before=columns(connection)
+            with patch.object(migration,'op',operations): migration.upgrade()
+            assert columns(connection)-before=={'dismissal'}
+        with student.factory() as db:
+            _,journey,_=prepare(student,db)
+            row=PossibilityService(db).add(student.workspace_id,journey.id,title='Practical route',why='Evidence',kind='discovered',source='planner',status='suggested')
+            row.dismissal={'reason':'student_excluded','item_id':'i1','quote':'not for me','at':'2026-11-03T00:00:00+00:00'}
+            db.commit(); db.expire_all()
+            assert db.get(PaiPossibility,row.id).dismissal['item_id']=='i1'
+        with student.engine.begin() as connection:
+            with patch.object(migration,'op',Operations(MigrationContext.configure(connection))): migration.downgrade()
+            assert columns(connection)==before
 
 
 @pytest.mark.asyncio
@@ -214,3 +246,30 @@ async def test_planner_possibility_is_logged_and_queues_analysis_without_a_row()
         assert PossibilityService(db).list(student.workspace_id)==[]
         assert len(db.scalars(select(BackgroundJob).where(BackgroundJob.job_type==JOB_ANALYZE_PATHS)).all())==1
         assert db.scalar(select(PaiTurnPlan)).plan['possibility']['title']=='Practical collaboration'
+
+
+@pytest.mark.req("R-47")
+def test_current_paths_endpoint_matches_roadmap():
+    from app.main import app
+    from app.pai_c.paths.fields import study_fields
+    from tests.test_roadmap_engine import add_path, field_title
+    keys = list(study_fields())[:4]
+    with StudentSession() as student, student.factory() as db:
+        for key in keys[:3]:
+            add_path(student, db, field_title(key), key)
+        dismissed = add_path(student, db, field_title(keys[3]), keys[3], status="dismissed")
+        client = client_for(student); headers = {'X-Workspace-Token': 'synthetic-test-only'}
+        try:
+            network = student.workspace_id
+            current = client.get(f'/v1/counselor/possibilities/current?network={network}', headers=headers)
+            assert current.status_code == 200, current.text
+            ids = {row['id'] for row in current.json()['data']['possibilities']}
+            roadmap = client.get(f'/v1/roadmap?network={network}', headers=headers).json()['data']
+            assert ids == {card['possibility_id'] for card in roadmap['fields']}
+            assert len(ids) == 3 and dismissed.id not in ids
+            assert client.get(f'/v1/counselor/possibilities/current?network={network}').status_code == 401
+            stranger = '00000000-0000-0000-0000-000000000000'
+            listed = client.get(f'/v1/counselor/possibilities?network={stranger}', headers=headers)
+            other = client.get(f'/v1/counselor/possibilities/current?network={stranger}', headers=headers)
+            assert other.status_code == listed.status_code and other.status_code >= 400
+        finally: app.dependency_overrides.clear()

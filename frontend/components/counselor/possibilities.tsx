@@ -59,16 +59,19 @@ export type PathSnapshot = Pick<Possibility, 'id' | 'title' | 'why' | 'fit' | 's
 
 /** `snapshot`: the paths as they stood when PAI posted the message. A message keeps what it said; a later run's
  * list is one tap away, with a note when it differs. Older messages without one read the current list. */
-export function PathsFound({ ids, snapshot }: { ids: string[]; snapshot?: PathSnapshot[] }) {
+export function PathsFound({ ids, snapshot, newest }: { ids: string[]; snapshot?: PathSnapshot[]; newest?: boolean }) {
   const [rows, setRows] = useState<Possibility[] | null>(null);
   useEffect(() => {
     let active = true;
-    workspaceApi.getPossibilities().then(value => { if (active) setRows(value); }).catch(() => {});
+    setRows(null); // what is loaded always belongs to the current ids and mode
+    (newest ? workspaceApi.getCurrentPaths() : workspaceApi.getPossibilities()).then(value => { if (active) setRows(value); }).catch(() => {});
     return () => { active = false; };
-  }, [ids.join()]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [ids.join(), newest]); // eslint-disable-line react-hooks/exhaustive-deps
   const current = (rows ?? []).filter(row => row.status !== 'dismissed');
-  const found: PathSnapshot[] = snapshot?.length ? snapshot : current.filter(row => ids.includes(row.id));
-  const changed = !!snapshot?.length && rows !== null
+  // The newest card shows the current list once it has loaded; until then (or if the call fails) its snapshot.
+  const found: PathSnapshot[] = newest && rows !== null ? current
+    : snapshot?.length ? snapshot : current.filter(row => ids.includes(row.id));
+  const changed = !newest && !!snapshot?.length && rows !== null
     && (current.filter(row => row.source === 'analyzer').map(row => row.id).sort().join() !== [...ids].sort().join());
   if (!found.length) return null;
   return (

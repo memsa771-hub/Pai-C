@@ -111,15 +111,20 @@ class ClaimPassage(BaseModel):
     source_url: str
 
 
-def enqueue_information(db, workspace_id, source_event_id):
-    """Use the existing bounded claim researcher for a saved direct request."""
-    from app.runtime.task_runtime import enqueue
-    request = db.scalar(select(CounselorNotedQuestion).where(
+def open_research_question(db, workspace_id, source_event_id):
+    """The turn's saved information question that still needs research, if any."""
+    return db.scalar(select(CounselorNotedQuestion).where(
         CounselorNotedQuestion.workspace_id == workspace_id,
         CounselorNotedQuestion.source_event_id == source_event_id,
         CounselorNotedQuestion.kind == "information",
         CounselorNotedQuestion.needs_research.is_(True),
         CounselorNotedQuestion.status.in_(("open", "unanswered"))))
+
+
+def enqueue_information(db, workspace_id, source_event_id):
+    """Use the existing bounded claim researcher for a saved direct request."""
+    from app.runtime.task_runtime import enqueue
+    request = open_research_question(db, workspace_id, source_event_id)
     if request is None:
         return None
     job = enqueue(db, job_type=JOB_CHECK, workspace_id=workspace_id,
@@ -140,13 +145,83 @@ def information_facts(db, workspace_id):
     return [row.answer for row in rows if isinstance(row.answer, dict) and current_fact(row.answer)]
 
 
+UNSTARTED_RESEARCH = ("failed", "cancelled")
+
+
+def _research_started(db, workspace_id, request_id):
+    """The question's own research job is queued, running or done."""
+    status = db.scalar(select(BackgroundJob.status).where(
+        BackgroundJob.idempotency_key == f"information:{workspace_id}:{request_id}"))
+    return status is not None and status not in UNSTARTED_RESEARCH
+
+
+def sweep_unstarted_information(db, *, now=None):
+    """A promised check that never started (or whose research failed or was
+    cancelled) ends with the existing "couldn't verify" notice instead of
+    silence (R-47). A myth claim is answered by its own check, never here."""
+    from sqlalchemy import exists
+    from app.runtime.task_runtime import enqueue
+    from app.pai_c.reliability import policy as reliability_policy
+    rules = reliability_policy()
+    now = now or datetime.now(timezone.utc)
+    cutoff = now - timedelta(minutes=rules["unstarted_question_minutes"])
+    oldest = now - timedelta(hours=rules["unstarted_question_max_age_hours"])
+    myth_turn = exists().where(
+        CounselorTurnDecision.workspace_id == CounselorNotedQuestion.workspace_id,
+        CounselorTurnDecision.source_event_id == CounselorNotedQuestion.source_event_id,
+        CounselorTurnDecision.decision["action"].as_string() == "clear_myth")
+    rows = db.scalars(select(CounselorNotedQuestion).join(
+        Workspace, Workspace.id == CounselorNotedQuestion.workspace_id).where(
+        Workspace.status == "active",
+        CounselorNotedQuestion.status == "open",
+        CounselorNotedQuestion.kind == "information",
+        CounselorNotedQuestion.needs_research.is_(True),
+        CounselorNotedQuestion.created_at <= cutoff,
+        CounselorNotedQuestion.created_at > oldest,
+        ~myth_turn)
+        .order_by(CounselorNotedQuestion.created_at, CounselorNotedQuestion.id)
+        .limit(rules["unstarted_question_sweep_limit"])).all()
+    # The job keys are built in Python (the stored UUID text differs between
+    # databases), so both are read in one query on the unique key column.
+    keys = {row.id: (f"information:{row.workspace_id}:{row.id}",
+                     f"information-unanswered:{row.workspace_id}:{row.id}") for row in rows}
+    jobs = dict(db.execute(select(BackgroundJob.idempotency_key, BackgroundJob.status).where(
+        BackgroundJob.idempotency_key.in_([key for pair in keys.values() for key in pair]))).all()) if keys else {}
+    told = set()
+    for row in rows:
+        workspace_id = str(row.workspace_id)
+        research, notice = keys[row.id]
+        if workspace_id in told or notice in jobs or jobs.get(research, "failed") not in UNSTARTED_RESEARCH:
+            continue  # At most one notice per workspace per sweep tick; the rest wait.
+        enqueue(db, job_type=JOB_CHECK, workspace_id=workspace_id,
+            payload={"request_id": row.id, "source_event_id": row.source_event_id, "not_started": True},
+            idempotency_key=notice)
+        told.add(workspace_id)
+    db.commit()
+    return len(told)
+
+
 async def check_job(job, db):
-    result = job.result if job.payload.get("request_id") and job.result else await _check_job(job, db)
+    if job.payload.get("not_started") is True:
+        # The sweep's notice: no research ran, so there is no fact to deliver.
+        # Research that started meanwhile answers the question instead.
+        started = _research_started(db, job.workspace_id, job.payload.get("request_id"))
+        result = {"status": "superseded" if started else "not_started"}
+    else:
+        result = job.result if job.payload.get("request_id") and job.result else await _check_job(job, db)
     if job.payload.get("request_id"):
         job.result = result
         db.commit()
         await _deliver_information(job, db, result)
     return result
+
+
+def care_active(db, workspace_id) -> bool:
+    """The latest turn was care (a wellbeing move or the care action): a
+    fixed message from a background job waits until it is over."""
+    last = db.scalar(select(CounselorTurnDecision).where(CounselorTurnDecision.workspace_id == workspace_id)
+        .order_by(CounselorTurnDecision.source_timestamp.desc()).limit(1))
+    return bool(last and (last.move == "wellbeing" or (last.decision or {}).get("action") == "care"))
 
 
 async def _deliver_information(job, db, result):
@@ -163,9 +238,7 @@ async def _deliver_information(job, db, result):
         EventRecord.id == job.payload.get("source_event_id")))
     if request is None or source is None or request.status not in {"open", "unanswered"}:
         return
-    last = db.scalar(select(CounselorTurnDecision).where(CounselorTurnDecision.workspace_id == job.workspace_id)
-        .order_by(CounselorTurnDecision.source_timestamp.desc()).limit(1))
-    if last and (last.move == "wellbeing" or (last.decision or {}).get("action") == "care"):
+    if care_active(db, job.workspace_id):
         deferred = JobDeferred("Information delivery waits for care")
         deferred.delay_seconds = policy()["care_retry_seconds"]
         raise deferred

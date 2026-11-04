@@ -11,7 +11,7 @@ Visual overview: https://www.figma.com/board/X25QOs43qaDABBYEmzUPxk
 | R-57 | Requirement traceability check in CI | Task 0 | `backend/tests/test_connect_traceability.py`; CI job `traceability` |
 | R-58 | Red-flag search on country-specific names in `app/os` Python code | Task 0 | `backend/tests/os/test_invariants.py::test_no_country_terms_in_python`, `::test_country_terms_cover_pakistani_names` |
 | R-59 | Every phase passes the full suite; missing CI jobs added | Task 0, P0-T1 | `backend/tests/test_connect_ci.py`; CI jobs `os`, `legacy`, `frontend`, `standalone`, `traceability`, `freeze` green |
-| R-47 | Counsellor fixes C1, C2, C3, C5, C6, C7 | P0-T2 onward | Designed in a second round of this spec (§5), after reading the Counsellor code they touch |
+| R-47 | Counsellor fixes C1, C2, C3, C5, C6, C7 | P0-T4 (§5) | Tests tagged R-47 per fix (§5.2); offline replay before and after (§5.1) |
 
 Also started here, owned by P1: the freeze CI check and CODEOWNERS entries for R-43
 (`backend/tests/test_connect_freeze.py`, `backend/tests/test_connect_codeowners.py`).
@@ -65,14 +65,48 @@ Legacy suite: 7 failed, 2699 passed, 620 skipped (no OS database). Frontend: vit
 | `CLAUDE.md` (root) | Replaces "Branch pai-c only… PAI OS is another developer's work", "This repo is PAI C only", "Freeze new modules" and "Task branches start from and rebase on `pai-os`" with: master §13.2 rules, the `pai-connect` branch model (§13.4), D-16 (OS developers build the connection, Counsellor lead reviews), and the new check commands. Keeps: who and what, product rules, Roman Urdu or English, commands, no live calls without approval |
 | `backend/app/os/CLAUDE.md` | Keeps invariants 1–13; adds a "Connection work" section: read master §2–§3 and the phase spec first and name the R-IDs, never invent data, invariant 12 is enforced by R-58, frozen Counsellor files (R-43), ownership per master §4, stop and ask when unclear |
 
-## 5. Counsellor fixes (R-47): second design round
+## 5. Counsellor fixes (R-47)
 
-C1, C2, C3, C5, C6 and C7 each change Counsellor behaviour and go through the freeze exception process (master §10):
-the `freeze-exception` label, the R-ID, a replay showing only the intended answers changed, and the Counsellor
-lead's approval. They are designed after Task 0, once the freeze check exists, in an addendum to this spec. That
-round reads `deep/analysis.py`, the planner patch path (`AnalysisPatchRejected`), `possibilities.py` and the
-onboarding view, and settles C6 from the live-run finding. C7 depends on R-80 (P1) for the Vault write; P0 adds only
-the onboarding questions if the addendum shows that can be done without the P1 Vault projection.
+Approved by the owner on 2026-11-03 (design in chat; decisions P0-D8 and P0-D9 below). Source of each problem:
+`docs/local-test/live-run-issues-2026-11-02.md`.
+
+### 5.1 Rules for every fix
+
+- **Proof:** an offline replay (`python -m scripts.eval_counselor_deep --offline` from `backend/`, recorded personas,
+  no model calls) before and after shows that nothing else changed. The replay does not run path analysis, research,
+  onboarding or the frontend, and replays recorded model outputs, so each fix is proved by its own targeted tests
+  (named per task in the plan). A live graded run is not part of
+  P0 (master R-46: before real students, with the owner's approval and a cost cap).
+- **Frozen files:** a fix that changes a frozen path (master §10) goes in its own PR with the `freeze-exception`
+  label, R-47 in the title, the replay, and the Counsellor lead's approval. Only C2 and C6 need this.
+- **No new chat messages from the OS, no change of tone or style** (master D-05, R-45). Notices added here are the
+  Counsellor's own fixed sentences in non-frozen data files, in English like the existing fixed sentences (P0-D10).
+- **Tests** carry `@pytest.mark.req("R-47")`; when all six land, `R-47` is set `built: true`.
+
+### 5.2 The fixes
+
+| # | Problem | Cause (where) | Fix | Frozen? |
+|---|---|---|---|---|
+| C1 | A field the student excluded keeps being suggested | Only the Dismiss button dismisses a path (`routers/counselor_possibilities.py`). The Vault already records a stated exclusion as an `option` item with status `ruled_out` (`memory/catalog/vault_catalog.json`), but nothing reads it. Since `87aa26f`, a path a newer run leaves out is kept, so it stays on Roadmaps | When the Vault holds `option` = `ruled_out` for a field, the matching path is dismissed with reason `student_excluded` and the student's words as evidence, and the path analyzer treats it as dismissed so it is never suggested again. A one-line notice tells the student what was removed and why. The match is by the field key the path analyzer already uses; an exclusion that matches no path changes nothing. Undoing it is the existing restore of a dismissed path | No (`pai_c/possibilities.py`, `pai_c/paths/analyzer.py`, a Vault-change hook) |
+| C2 | One failed analysis blocks every later one | `deep/analysis.py`: a rejected planner patch raises `AnalysisPatchRejected` (not retryable, job `failed`); every later `counselor.analyze` finds a failed predecessor and raises `AnalysisPredecessorFailed` ("earlier analysis failed; replay required"), which also ends `failed`. Stage advance and path analysis only run on success, so the journey stays at stage D | A failed earlier analysis no longer blocks: it is recorded as `skipped` (kept for the operator's replay tool) and the next analysis runs, from the full conversation as it does today. Pending or running predecessors still make the job wait, so order is kept. The stage H gate (G4) needs no separate change: it opens once analyses run again | **Yes** (`deep/analysis.py`): exception PR |
+| C3 | "I'll check official sources", then nothing | `pai_c/runtime.py` starts research only when the reply's action is `note_question` **and** recorded, or the decision is `answer_request`. A question the classifier already recorded makes the model's action a `duplicate`; other decisions and a busy research lock (`research/gateway.py`) end silently | Every recorded question that needs research starts a research job, whatever the turn's decision, and a failed start is retried once. A sweep finds questions still open with no job after 30 minutes and posts the existing "couldn't find an answer" notice (`information_unanswered`, already in policy). The student is never left with a silent promise | No (`pai_c/runtime.py`, `pai_c/myths.py`, `research/gateway.py`, a job for the sweep) |
+| C5 | Chat cards show 1–2 paths, Roadmaps shows 5 | The chat card lists only the paths the latest run returned (`paths/analyzer.py`, `paths_found`); Roadmaps lists every non-dismissed path (`roadmap/engine.py`) | One reader for "the student's current paths", used by Roadmaps and by the newest paths card. Older cards keep the snapshot of what they said (from `87aa26f`), so past messages don't change | No (`pai_c/possibilities.py`, `roadmap/engine.py`, `frontend/components/counselor/possibilities.tsx`) |
+| C6 | Roman Urdu reply to an English message; "Wa alaikum assalam" twice | The `<language_policy>` built in `deep/context.py` always names the replacement ("Roman Urdu") for the blocked Devanagari script, which nudges the model even when the student writes English. Nothing stops a second greeting (`voice/guards.py` only compares whole replies and questions) | **Rule (P0-D9): follow the student.** The reply uses the language of the student's latest message; the replacement language is named only when a reply has to be redone because it came out in a blocked script. A guard drops a second greeting in the same conversation | **Yes** (`deep/context.py`): exception PR; the greeting guard (`voice/guards.py`) is not frozen |
+| C7 | Onboarding doesn't ask for marks | The onboarding form is built from the Vault catalog's `onboarding` blocks (`memory/onboarding.py`, `memory/catalog/vault_catalog.json`); marks have no block, though the Vault already stores them (`education.result`; entry tests as `test_attempt`) | **Scope (P0-D8):** onboarding asks for matric marks, intermediate marks (total so far, optional while studying) and an entry-test score (optional, e.g. MDCAT), saved as `stated` through the normal onboarding path. O/A-level students get grades instead of marks. Part-I and Part-II separately is P1 (R-16, R-80) | No (catalog JSON, `memory/onboarding.py`, `frontend/components/onboarding/`) |
+
+### 5.3 Decisions
+
+| # | Decision |
+|---|---|
+| P0-D8 | C7 in P0 asks for matric marks, intermediate marks (the total so far) and the entry-test score. Storing intermediate Part-I and Part-II separately stays in P1 (R-16, R-80). |
+| P0-D10 | Fixed sentences stay English for now. The C1 notice reads "I've removed {titles} from your paths, since you said it isn't for you." (plural "…they aren't…"). C7: marks of a completed exam are required, current-study marks and the entry test optional. C2: replaying a skipped analysis after newer ones is acceptable. A dismissal keeps its reason and evidence in a new nullable `pai_possibilities.dismissal` column (migration). |
+| P0-D11 | The Counsellor lead's approval of a freeze-exception PR is given in the Claude session chat (owner, 2026-11-03): PRs are opened from the lead's own account, so GitHub cannot take the lead's review. Before such a PR is merged, the change is shown to the lead in chat, the lead's "approved" is quoted in the PR description, and the integration owner merges only after it is there. |
+| P0-D9 | C6: the reply follows the language of the student's latest message. Roman Urdu is used only as the replacement when a reply came out in a blocked script (Devanagari). |
+
+### 5.4 Order
+
+C2 first (it unblocks analysis, which C1 and C5 rely on in the replay), then C1, C5, C3, C7, and C6 last (its replay
+shows reply-language changes, easiest to read once the others are in).
 
 ## 6. Gate (master §12, P0)
 
