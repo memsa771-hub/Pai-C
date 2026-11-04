@@ -11,8 +11,13 @@ Status: draft, 2026-11-04. Phase spec: `docs/superpowers/specs/2026-11-03-p0-set
 | Integration owner | Integration owner set to `@MusawirKtk` (master §15 Q5) | #179 |
 | C2 | A failed analysis no longer blocks later ones (frozen file, freeze-exception) | #180 |
 | C1, C3, C5, C7 | Excluded field not suggested again; recorded questions always get research or a notice; chat card and Roadmaps share one reader of current paths; onboarding asks for marks | #181 |
-| C6 | Reply language follows the student's latest message; one greeting per conversation (frozen `deep/context.py`, freeze-exception) | this C6 PR (branch `pc/p0-t4-c6-language`; number given when opened) |
-| R-47 | `built: true` in `docs/requirements/connection.yaml`; offline replay before and after in `docs/connect/replays/r47-diff.md` | this C6 PR |
+| C6 | Reply language follows the student's latest message; one greeting per conversation (frozen `deep/context.py`, freeze-exception) | #182 (also: PAI returns a student's salaam; removed greetings are not reliability failures) |
+| R-47 | `built: true` in `docs/requirements/connection.yaml`; offline replay before and after in `docs/connect/replays/r47-diff.md` | #182 |
+| Follow-ups from the final review | The newest paths card refreshes after a removal notice; a changed exclusion is re-stamped | #183 |
+| CI health | An intermittent `tests/os` research test reads its task by base key | #185 |
+| Round 2 (after live run 1) | R2-1 strengths count toward interests (P0-D15); R2-2 every "I'll check" opens research; R2-3 rejected patches say why; R2-4 an ignored question cools down; R2-5 quote check ignores dash/quote variants, no student data in drop logs | #187 |
+| Round 2, R2-6 | PAI refers to itself as "hum" in Roman Urdu (frozen voice prompts, freeze-exception, P0-D16) | #186 |
+| Live runs | Run 1: FAIL (stuck at stage D), $0.28. Run 2 after round 2: PASS, $0.31 | `docs/local-test/live-run-2026-11-04.md`, `live-run-2026-11-04b.md` |
 
 ## 2. Gate report (phase spec §6)
 
@@ -20,7 +25,7 @@ Status: draft, 2026-11-04. Phase spec: `docs/superpowers/specs/2026-11-03-p0-set
 |---|---|---|
 | 1 | P0-T1 and Task 0 merged into `pai-connect` with every CI job green | Merged. CI green on this branch: pending the C6 PR's CI run |
 | 2 | `python scripts/check_traceability.py --gate P0` passes | Passes (exit 0) |
-| 3 | Live-run student (Ayesha Malik) reaches stage H with only MBBS and BDS | NOT YET RUN. Needs a live run with the owner's approval and a cost cap (master R-46) |
+| 3 | Live-run student (Ayesha Malik) reaches stage H with only MBBS and BDS | PASS on 2026-11-04 (second live run, $0.31, 12 fixed messages, code = pai-connect + #186 + #187): stage H, MBBS exploring, BDS suggested, Pharm-D removed with her words. Caveat: the Explore action ran without a research Operator (see open items). First run failed at stage D; fixed by round 2 |
 | 4 | Counsellor evaluations pass; a replay shows only the fixed behaviour changed | Offline replay only: no differences in default or guided mode (`docs/connect/replays/r47-diff.md`). Each fix is proved by its targeted tests |
 | 5 | Handoff written; both owners sign off | Handoff drafted here. Sign-off pending from both owners: `@memsa771-hub` and `@MusawirKtk` |
 
@@ -65,8 +70,16 @@ Also recorded: the owner approved C6 in chat on 2026-11-04, and approved the wor
 
 ## 5. Open items
 
-- Live run (gate item 3) with the owner's approval and a cost cap (master R-46).
 - Sign-off by `@memsa771-hub` and `@MusawirKtk`.
 - `paths/explain.py` still names the language replacement for the path page; follow-up task queued.
 - `greeting_removed` may be logged twice on a retry (frozen `turn.py`).
 - C1 matches only the field names in the path analyzer's field list; an exclusion naming another field changes nothing.
+- From live run 2 (follow-ups, none blocks the gate):
+  - Explore marks a path "exploring" even when starting research fails (`app/research/gateway.py` commits before the Operator call); pre-existing.
+  - The Mirror shows "budget over 10 lakh" for a stated 15–20 lakh (catalog band `over_10_lakh` drops the ceiling).
+  - "Local first, abroad only as a fallback" is not saved: no Vault item type for place preference (P1: R-13, R-78).
+  - A Vault strength note says "he" for a female student.
+  - The Mirror text can be built before the same turn's extraction lands ("family still unknown").
+  - One Roman Urdu reply still used "karunga"; the same question was still asked twice (not three times).
+  - The R2-3 rejection reason reaches the retry prompt but not the app log line (frozen `deep/analysis.py`).
+  - Duplicate Vault entries (3 BDS options, 2 MDCAT records); MBBS stored as "considering" (the `option` status has no "chosen").
