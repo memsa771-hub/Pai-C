@@ -121,6 +121,23 @@ def open_research_question(db, workspace_id, source_event_id):
         CounselorNotedQuestion.status.in_(("open", "unanswered"))))
 
 
+def promise_research(db, workspace_id, source_event_id):
+    """Voice said it would check (note_question): the turn's saved question
+    becomes an open information question that needs research, whatever the
+    classifier guessed, so research starts or the sweep tells the student
+    (R-47 R2-2). An answered or closed question is left alone."""
+    row = db.scalar(select(CounselorNotedQuestion).where(
+        CounselorNotedQuestion.workspace_id == workspace_id,
+        CounselorNotedQuestion.source_event_id == source_event_id,
+        CounselorNotedQuestion.status.in_(("open", "answered_now"))).with_for_update())
+    if row is None:
+        db.rollback()
+        return None
+    row.kind, row.needs_research, row.status, row.answered_event_id = "information", True, "open", None
+    db.commit()
+    return row
+
+
 def enqueue_information(db, workspace_id, source_event_id):
     """Use the existing bounded claim researcher for a saved direct request."""
     from app.runtime.task_runtime import enqueue

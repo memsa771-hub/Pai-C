@@ -199,7 +199,12 @@ async def _run_deep_turn(db, workspace_id: str, event_data: dict, depth: int):
         from app.pai_c.possibilities import PossibilityService
         PossibilityService(db).mark_mentioned(workspace_id, decision.topic)
         db.commit()
-    if decision is not None and decision.action in {"answer_request", "counsel"} and signals.request is not None and not signals.request.needs_research and action.get("type") != "wellbeing":
+    # Voice's note_question is a promise to check: that turn's question is never
+    # marked answered now (R-47 R2-2). A note Voice itself marks as needing no
+    # research (a task it answered on the spot) is no promise and stays answered.
+    promised = (action.get("type") in {"note_question", "ask_research"}
+                and action.get("needs_research") is not False)
+    if decision is not None and decision.action in {"answer_request", "counsel"} and signals.request is not None and not signals.request.needs_research and action.get("type") != "wellbeing" and not promised:
         NotedQuestionService(db).mark_answered_now(workspace_id, turn.source_event_id, assistant_event_id)
     move = "none"
     status = "none"
@@ -237,10 +242,12 @@ async def _run_deep_turn(db, workspace_id: str, event_data: dict, depth: int):
     # idempotent per request, so it is queued once.
     # A clear_myth turn's claim is researched and answered by its myth check.
     from sqlalchemy.exc import SQLAlchemyError
-    from app.pai_c.myths import open_research_question
+    from app.pai_c.myths import open_research_question, promise_research
     needs_research = False
     if decision is None or decision.action != "clear_myth":
         try:
+            if promised:
+                promise_research(db, workspace_id, turn.source_event_id)
             needs_research = open_research_question(db, workspace_id, turn.source_event_id) is not None
         except SQLAlchemyError:
             # The reply is already posted; the session sweep closes this promise.
