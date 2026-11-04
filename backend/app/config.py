@@ -346,6 +346,14 @@ class Config:
     PAI_RESEARCH_MAX_FETCHES: int = int(os.environ.get("PAI_RESEARCH_MAX_FETCHES", "12"))
     PAI_RESEARCH_MAX_SECONDS: int = int(os.environ.get("PAI_RESEARCH_MAX_SECONDS", "240"))
     PAI_OS_SERVICE_TOKEN: str = os.environ.get("PAI_OS_SERVICE_TOKEN", "")
+    # Counsellor/PAI OS connection parts (P1-D9): each is off by default and counts only while the OS `counsellor`
+    # module is also on (see app.pai_c.connect.flags.part_on).
+    CONNECT_HANDOFF: bool = os.environ.get("CONNECT_HANDOFF", "false").lower() in ("true", "1", "yes")
+    CONNECT_ROADMAP_FROM_PLANVIEW: bool = os.environ.get("CONNECT_ROADMAP_FROM_PLANVIEW", "false").lower() in ("true", "1", "yes")
+    CONNECT_CHECKINS_FROM_PLANVIEW: bool = os.environ.get("CONNECT_CHECKINS_FROM_PLANVIEW", "false").lower() in ("true", "1", "yes")
+    CONNECT_STUDENT_FACTS: bool = os.environ.get("CONNECT_STUDENT_FACTS", "false").lower() in ("true", "1", "yes")
+    CONNECT_ONE_UPLOAD: bool = os.environ.get("CONNECT_ONE_UPLOAD", "false").lower() in ("true", "1", "yes")
+    CONNECT_MY_PLAN: bool = os.environ.get("CONNECT_MY_PLAN", "false").lower() in ("true", "1", "yes")
 
     # Transactional email. Delivery goes through Resend when a key is
     # configured (otherwise sends are logged no-ops).

@@ -16,3 +16,4 @@ def test_fake_intermediate_route_loads():
     book = select_playbook(books, "PK", "PK", "intermediate")
     assert book.key == "pakistan_inter"
     assert not any("visa" in t.template_key for t in book.tasks)
+    assert book.default_timezone == "Asia/Karachi"
