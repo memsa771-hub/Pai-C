@@ -1,0 +1,16 @@
+{
+  "schema": "pai.choice_request.v1",
+  "key": "choice:1",
+  "student_ref": "ws-sample-1",
+  "journey_id": "j-sample-1",
+  "proposal_id": 1,
+  "based_on_version": 1,
+  "programmes": [
+    {
+      "programme_ref": "ovgu-eeit",
+      "rank": 1
+    }
+  ],
+  "target_intake": null,
+  "requested_at": "2027-01-15T09:00:00+00:00"
+}

@@ -1,0 +1,10 @@
+{
+  "schema": "pai.os_event.v1",
+  "key": "event:1",
+  "student_ref": "ws-sample-1",
+  "plan_id": 1,
+  "decision_version": 1,
+  "kind": "student_needed",
+  "instance_key": "upload_transcript",
+  "at": "2027-01-12T10:00:00+00:00"
+}

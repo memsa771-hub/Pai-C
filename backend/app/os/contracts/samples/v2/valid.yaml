@@ -1,0 +1,11 @@
+# Fictional v2 samples. Each file validates as its contract (stem = file name of the schema without .schema.json).
+- {file: decision_chosen_de.json, contract: decision_record.v2}
+- {file: decision_withdrawn_de.json, contract: decision_record.v2}
+- {file: decision_unsupported_pk_inter.json, contract: decision_record.v2}
+- {file: escalation_v2.json, contract: escalation.v2}
+- {file: plan_view_empty.json, contract: plan_view.v1}
+- {file: plan_view_de.json, contract: plan_view.v1}
+- {file: os_event.json, contract: os_event.v1}
+- {file: choice_request.json, contract: choice_request.v1}
+- {file: student_facts.json, contract: student_facts.v1}
+- {file: vault_event.json, contract: vault_event.v1}

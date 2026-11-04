@@ -1,0 +1,100 @@
+{
+  "schema": "pai.plan_view.v1",
+  "student_ref": "ws-sample-1",
+  "state": "needs_student",
+  "stop_reason": null,
+  "plan_id": 1,
+  "decision_version": 1,
+  "revision": 2,
+  "route": {
+    "route_key": "germany_master",
+    "origin_country": "PK",
+    "destination_country": "DE",
+    "level": "master",
+    "target_intake": {
+      "term": "winter",
+      "year": 2027
+    }
+  },
+  "pages": [
+    "overview",
+    "documents"
+  ],
+  "consent": {
+    "student": "given",
+    "guardian": "not_needed"
+  },
+  "steps": [
+    {
+      "task_id": 1,
+      "instance_key": "upload_transcript",
+      "template_key": "upload_transcript",
+      "title": "Upload your transcript",
+      "owner": "student",
+      "status": "waiting_student",
+      "blocked_reason": null,
+      "inbox_kind": "provide",
+      "programme_ref": null,
+      "due_at": null,
+      "due_tz": null,
+      "depends_on": [],
+      "provisional": false,
+      "estimated": false,
+      "needs": [
+        {
+          "kind": "document",
+          "ref": "transcript",
+          "evidence": "shown"
+        }
+      ]
+    },
+    {
+      "task_id": 2,
+      "instance_key": "apply:tu-chemnitz-embedded-systems",
+      "template_key": "submit_application",
+      "title": "Submit the application",
+      "owner": "pai",
+      "status": "pending",
+      "blocked_reason": null,
+      "inbox_kind": "act",
+      "programme_ref": "tu-chemnitz-embedded-systems",
+      "due_at": "2027-05-31T21:59:00+00:00",
+      "due_tz": "Europe/Berlin",
+      "depends_on": [
+        "upload_transcript"
+      ],
+      "provisional": false,
+      "estimated": false,
+      "needs": []
+    }
+  ],
+  "requests": [
+    {
+      "request_id": 1,
+      "need": {
+        "kind": "document",
+        "ref": "transcript",
+        "evidence": "shown"
+      },
+      "status": "open",
+      "due_at": "2027-03-01T12:00:00+00:00",
+      "due_tz": "Europe/Berlin"
+    }
+  ],
+  "documents_needed": [
+    {
+      "doc_type": "transcript",
+      "status": "missing"
+    }
+  ],
+  "changes": [
+    {
+      "revision": 2,
+      "at": "2027-01-12T10:00:00+00:00",
+      "cause": "counsellor",
+      "kind": "revised",
+      "instance_key": null
+    }
+  ],
+  "proposals_waiting": 0
+}

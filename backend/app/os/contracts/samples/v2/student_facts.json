@@ -1,0 +1,38 @@
+{
+  "schema": "pai.student_facts.v1",
+  "student_ref": "ws-sample-1",
+  "vault_version": 3,
+  "built_at": "2027-01-10T08:59:00+00:00",
+  "eligible_levels": [
+    "bachelor",
+    "master"
+  ],
+  "facts": [
+    {
+      "key": "education.level",
+      "value": "bachelor",
+      "evidence": "confirmed",
+      "vault_version": 2
+    },
+    {
+      "key": "marks.total",
+      "value": 3.1,
+      "evidence": "shown",
+      "vault_version": 3
+    },
+    {
+      "key": "constraint.excluded_fields",
+      "value": [
+        "law"
+      ],
+      "evidence": "stated",
+      "vault_version": 1
+    },
+    {
+      "key": "language.test",
+      "value": null,
+      "evidence": "unknown",
+      "vault_version": 0
+    }
+  ]
+}

@@ -154,3 +154,65 @@ def test_plan_view_codes_not_text():
 def test_plan_view_step_status_matches_kernel():
     literal = PlanStep.model_json_schema()["properties"]["status"]["enum"]
     assert set(literal) == {s.value for s in TaskState}
+
+
+# ---- Task 3: os_event, choice_request, student_facts, vault_event ----
+
+from app.os.contracts.choice_request import ChoiceRequestV1  # noqa: E402
+from app.os.contracts.student_facts import StudentFactsV1  # noqa: E402
+from app.os.contracts.vault_event import VaultEventV1  # noqa: E402
+
+
+def choice_request(**over) -> dict:
+    base = {"schema": "pai.choice_request.v1", "key": "choice:1", "student_ref": "ws-1", "journey_id": "j-1",
+            "proposal_id": 1, "based_on_version": 1, "programmes": None, "target_intake": None,
+            "requested_at": "2027-01-10T09:00:00+00:00"}
+    return {**base, **over}
+
+
+def test_choice_request_needs_a_change():
+    with pytest.raises(ValidationError):
+        ChoiceRequestV1.model_validate(choice_request())
+    ok = ChoiceRequestV1.model_validate(choice_request(target_intake={"term": "summer", "year": 2028}))
+    assert ok.programmes is None
+
+
+def test_choice_request_places_ranked():
+    with pytest.raises(ValidationError, match="ranks must be 1..n"):
+        ChoiceRequestV1.model_validate(choice_request(programmes=[{"programme_ref": "a", "rank": 2}]))
+    with pytest.raises(ValidationError):
+        ChoiceRequestV1.model_validate(choice_request(programmes=[]))
+    ok = ChoiceRequestV1.model_validate(choice_request(programmes=[{"programme_ref": "a", "rank": 1}]))
+    assert ok.programmes[0].programme_ref == "a"
+
+
+def facts(*items, **over) -> dict:
+    base = {"schema": "pai.student_facts.v1", "student_ref": "ws-1", "vault_version": 3,
+            "built_at": "2027-01-10T09:00:00+00:00", "eligible_levels": ["intermediate"], "facts": list(items)}
+    return {**base, **over}
+
+
+def fact(key="marks.total", evidence="stated", value=800) -> dict:
+    return {"key": key, "value": value, "evidence": evidence, "vault_version": 2}
+
+
+def test_student_facts_unique_keys():
+    assert len(StudentFactsV1.model_validate(facts(fact(), fact("education.level", value="x"))).facts) == 2
+    with pytest.raises(ValidationError, match="duplicate fact key"):
+        StudentFactsV1.model_validate(facts(fact(), fact()))
+
+
+def test_student_fact_inferred_is_not_an_evidence_level():
+    assert StudentFactsV1.model_validate(facts(fact(evidence="unknown", value=None))).facts[0].value is None
+    with pytest.raises(ValidationError):
+        StudentFactsV1.model_validate(facts(fact(evidence="inferred")))
+
+
+def test_vault_event_needs_keys():
+    base = {"schema": "pai.vault_event.v1", "key": "vault:1", "student_ref": "ws-1", "vault_version": 4,
+            "kind": "fact_changed", "keys": ["marks.total"], "at": "2027-01-10T09:00:00+00:00"}
+    assert VaultEventV1.model_validate(base).keys == ["marks.total"]
+    with pytest.raises(ValidationError):
+        VaultEventV1.model_validate({**base, "keys": []})
+    with pytest.raises(ValidationError):
+        VaultEventV1.model_validate({**base, "keys": ["Marks Total"]})

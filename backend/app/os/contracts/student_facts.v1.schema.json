@@ -1,0 +1,139 @@
+{
+  "$defs": {
+    "StudentFact": {
+      "additionalProperties": false,
+      "properties": {
+        "key": {
+          "pattern": "^[a-z_]+(\\.[a-z0-9_]+)*$",
+          "title": "Key",
+          "type": "string"
+        },
+        "value": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "integer"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "boolean"
+            },
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "additionalProperties": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "boolean"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Value"
+        },
+        "evidence": {
+          "enum": [
+            "stated",
+            "shown",
+            "confirmed",
+            "unknown"
+          ],
+          "title": "Evidence",
+          "type": "string"
+        },
+        "vault_version": {
+          "minimum": 0,
+          "title": "Vault Version",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "key",
+        "value",
+        "evidence",
+        "vault_version"
+      ],
+      "title": "StudentFact",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "schema": {
+      "const": "pai.student_facts.v1",
+      "default": "pai.student_facts.v1",
+      "title": "Schema",
+      "type": "string"
+    },
+    "student_ref": {
+      "minLength": 1,
+      "title": "Student Ref",
+      "type": "string"
+    },
+    "vault_version": {
+      "minimum": 0,
+      "title": "Vault Version",
+      "type": "integer"
+    },
+    "built_at": {
+      "format": "date-time",
+      "title": "Built At",
+      "type": "string"
+    },
+    "eligible_levels": {
+      "items": {
+        "enum": [
+          "intermediate",
+          "foundation",
+          "bachelor",
+          "master",
+          "phd"
+        ],
+        "type": "string"
+      },
+      "title": "Eligible Levels",
+      "type": "array"
+    },
+    "facts": {
+      "items": {
+        "$ref": "#/$defs/StudentFact"
+      },
+      "title": "Facts",
+      "type": "array"
+    }
+  },
+  "required": [
+    "student_ref",
+    "vault_version",
+    "built_at",
+    "eligible_levels",
+    "facts"
+  ],
+  "title": "StudentFactsV1",
+  "type": "object"
+}

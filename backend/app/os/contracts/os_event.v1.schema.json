@@ -1,0 +1,85 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "schema": {
+      "const": "pai.os_event.v1",
+      "default": "pai.os_event.v1",
+      "title": "Schema",
+      "type": "string"
+    },
+    "key": {
+      "minLength": 1,
+      "title": "Key",
+      "type": "string"
+    },
+    "student_ref": {
+      "minLength": 1,
+      "title": "Student Ref",
+      "type": "string"
+    },
+    "plan_id": {
+      "anyOf": [
+        {
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Plan Id"
+    },
+    "decision_version": {
+      "anyOf": [
+        {
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Decision Version"
+    },
+    "kind": {
+      "enum": [
+        "plan_created",
+        "plan_revised",
+        "plan_paused",
+        "plan_stopped",
+        "plan_finished",
+        "step_done",
+        "student_needed",
+        "deadline_at_risk",
+        "proposal_waiting"
+      ],
+      "title": "Kind",
+      "type": "string"
+    },
+    "instance_key": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Instance Key"
+    },
+    "at": {
+      "format": "date-time",
+      "title": "At",
+      "type": "string"
+    }
+  },
+  "required": [
+    "key",
+    "student_ref",
+    "plan_id",
+    "decision_version",
+    "kind",
+    "instance_key",
+    "at"
+  ],
+  "title": "OsEventV1",
+  "type": "object"
+}
