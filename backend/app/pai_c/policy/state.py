@@ -24,6 +24,30 @@ def first_picture_due(*, coverage, student_count, prior_decisions, mirror_ready)
             and all(_known(coverage.get(area, {})) for area in rules["first_picture_required_areas"]))
 
 
+def repeat_ask_rules():
+    from app.pai_c.understanding.data import DATA_DIR
+    import json
+    return json.loads((DATA_DIR / "repeat_ask.json").read_text(encoding="utf-8"))
+
+
+def stalled_areas(prior_decisions, coverage, rules=None):
+    """Areas asked on each of the last few turns with no new entry since the
+    first of those asks (R-47 R2-4); the controller skips them for a turn so
+    an ignored question is not repeated. Counts come from the decision log."""
+    rules = rules or repeat_ask_rules()
+    size, decisions = rules["asks_without_gain"], [row["decision"] for row in prior_decisions]
+    stalled = set()
+    for end in range(len(decisions), max(len(decisions) - rules["cooldown_turns"], size - 1), -1):
+        window = decisions[end - size:end]
+        topic = window[0].get("topic")
+        if not topic or any(row.get("action") != rules["action"] or row.get("topic") != topic
+                            or type(row.get("topic_items")) is not int for row in window):
+            continue
+        if (coverage.get(topic) or {}).get("item_count", 0) <= window[0]["topic_items"]:
+            stalled.add(topic)
+    return sorted(stalled)
+
+
 def derive_state(signals, *, coverage, mirror_ready, plan, student_count,
                  prior_decisions, replies, student_ordinals, current_event_id,
                  reply_requested_input=None):
@@ -56,6 +80,7 @@ def derive_state(signals, *, coverage, mirror_ready, plan, student_count,
             "student_count": student_count, "previous": previous,
             "previous_mentioned_areas": previous.get("signals", {}).get("mentioned_areas", []),
             "declined_at": declines, "short_reply_streak": streak,
+            "stalled_areas": stalled_areas(prior_decisions, coverage),
             "questions_in_last_two": len(asking) >= window and all(asking[-window:]),
             "summary_due": student_count - max(summaries, default=0) >= config.PAI_SUMMARY_EVERY_TURNS
                 and covered >= policy["summary_min_covered"],
@@ -114,9 +139,13 @@ def build_state(db, turn, signals, history):
     return state
 
 
-def decision_log(decision, signals):
+def decision_log(decision, signals, coverage=None):
     request = signals.request
-    return {**decision.as_dict(), "signals": {
+    extra = {}
+    if coverage is not None and decision.topic and decision.action == repeat_ask_rules()["action"]:
+        # Only a count, so the next turns can tell whether asking added anything.
+        extra["topic_items"] = int((coverage.get(decision.topic) or {}).get("item_count", 0))
+    return {**decision.as_dict(), **extra, "signals": {
         "intent": signals.intent, "emotion": signals.emotion,
         "request_kind": request.kind if request else None,
         "needs_research": request.needs_research if request else None,

@@ -67,6 +67,9 @@ def askable_areas(state, policy=None, excluded=()):
     for area in unknown_areas(state.get("coverage", {}), policy):
         if area in excluded or area not in policy["priority"]:
             continue
+        # Asked and ignored on the last turns (state.stalled_areas, R-47 R2-4).
+        if area in state.get("stalled_areas", ()):
+            continue
         declined_at = state.get("declined_at", {}).get(area)
         if declined_at is not None and count - declined_at < policy["declined_cooldown_student_messages"]:
             continue

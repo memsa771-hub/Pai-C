@@ -250,3 +250,94 @@ def test_r2_1_a_strength_and_an_interest_add_up_but_one_strength_alone_does_not(
     both = CounselorNotebookData.model_validate({"self": [item("Biology", key="strength.biology", id="s1"),
                                                            item("Drawing", key="interest.drawing", id="i1")]})
     assert coverage_areas(both, empty)["interests"]["covered"]
+
+
+# R2-4: an area asked and ignored is not asked a third time in a row.
+
+def _ask_row(event_id, topic, items):
+    return {"event_id": event_id, "decision": {"action": "explore_area", "topic": topic,
+            "question_allowed": True, "topic_items": items, "signals": {}}}
+
+
+def _round2_state(prior, interests_items, **changes):
+    from types import SimpleNamespace
+    from app.pai_c.policy.classifier import fallback_signals
+    from app.pai_c.policy.state import derive_state
+    from tests.test_policy_guided import AREAS, state
+    coverage = {area: {"covered": True, "item_count": 2} for area in AREAS}
+    coverage["interests"] = {"covered": False, "item_count": interests_items, "min_items": 2}
+    coverage["status"] = {"covered": False, "item_count": 0, "min_items": 1}
+    signals = fallback_signals().model_copy(update=changes)
+    ordinals = {row["event_id"]: index + 1 for index, row in enumerate(prior)}
+    ordinals["now"] = len(ordinals) + 1
+    derived = derive_state(signals, coverage=coverage, mirror_ready=False, plan=SimpleNamespace(give=""),
+        student_count=10, prior_decisions=prior, replies=["Statement."] * 2,
+        student_ordinals=ordinals, current_event_id="now")
+    return state(**{**derived, "student_count": 10, "summary_due": False, "first_picture_due": False,
+                    "invite_pending": False, "questions_in_last_two": False})
+
+
+@pytest.mark.req("R-47")
+def test_r2_4_two_asks_without_new_coverage_cool_the_area_down():
+    from app.pai_c.policy import controller
+    prior = [_ask_row("e1", "interests", 0), _ask_row("e2", "interests", 0)]
+    current = _round2_state(prior, 0, question_needed=True)
+    assert current["stalled_areas"] == ["interests"]
+    decision = controller.decide(current)
+    assert decision.topic != "interests"
+    assert (decision.action, decision.topic) == ("explore_area", "status")
+    # With nothing else worth a question PAI counsels instead of repeating it.
+    quiet = controller.decide(_round2_state(prior, 0))
+    assert quiet.topic != "interests"
+
+
+@pytest.mark.req("R-47")
+@pytest.mark.parametrize("prior, items", [
+    ([_ask_row("e1", "interests", 0), _ask_row("e2", "interests", 0)], 1),   # gained an entry
+    ([_ask_row("e1", "goals", 0), _ask_row("e2", "interests", 0)], 0),       # asked only once
+    ([_ask_row("e1", "interests", 0)], 0),
+    ([_ask_row("e1", "interests", 0), _ask_row("e2", "interests", 0),
+      {"event_id": "e3", "decision": {"action": "counsel", "topic": None}}], 0),  # cooled for one turn only
+])
+def test_r2_4_an_area_that_gained_coverage_or_was_not_repeated_is_asked(prior, items):
+    from app.pai_c.policy import controller
+    current = _round2_state(prior, items)
+    assert current["stalled_areas"] == []
+    assert (controller.decide(current).action, controller.decide(current).topic) == ("explore_area", "interests")
+
+
+@pytest.mark.req("R-47")
+def test_r2_4_decision_log_keeps_the_asked_area_entry_count_only():
+    import json as _json
+    from app.pai_c.policy import controller
+    from app.pai_c.policy.classifier import fallback_signals
+    from app.pai_c.policy.state import decision_log
+    current = _round2_state([], 1)
+    decision = controller.decide(current)
+    assert decision.topic == "interests"
+    record = decision_log(decision, fallback_signals(), coverage=current["coverage"])
+    assert record["topic_items"] == 1
+    other = controller.Decision(rule_id="counsel", action="counsel", topic=None, question_allowed=False,
+                                invite=False, summary_due=False)
+    assert "topic_items" not in decision_log(other, fallback_signals(), coverage=current["coverage"])
+    assert "topic_items" not in _json.dumps(decision_log(decision, fallback_signals()))
+
+
+@pytest.mark.req("R-47")
+@pytest.mark.asyncio
+async def test_r2_4_runtime_logs_the_entry_count_of_the_asked_area(monkeypatch):
+    from app.config import config
+    from app.models import CounselorTurnDecision
+    from app.pai_c.policy.classifier import fallback_signals
+    from app.pai_c.policy.controller import Decision
+    from sqlalchemy import select
+    from tests.test_adaptive_counseling import _ask
+    monkeypatch.setattr(config, "PAI_API_KEY", "offline-fake")
+    asked = Decision(rule_id="explore_area", action="explore_area", topic="interests", question_allowed=True,
+                     invite=False, summary_due=False)
+    with StudentSession() as student:
+        with patch("app.pai_c.policy.controller.decide", return_value=asked):
+            await _ask(student, fallback_signals())
+        with student.factory() as db:
+            logged = db.scalar(select(CounselorTurnDecision)).decision
+    assert logged["topic"] == "interests" and logged["topic_items"] == 0

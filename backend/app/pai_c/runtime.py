@@ -109,7 +109,7 @@ async def _run_deep_turn(db, workspace_id: str, event_data: dict, depth: int):
     safety = None
     classifier_ms = 0
     decision = signals = None
-    history = None
+    history = policy_state = None
     if turn.source.startswith("human:"):
         from app.pai_c.memory import MemoryService
         from app.inference.gateway import token_usage_turn
@@ -131,7 +131,8 @@ async def _run_deep_turn(db, workspace_id: str, event_data: dict, depth: int):
             request = signals.request
             NotedQuestionService(db).record(workspace_id, turn.source_event_id, request.text,
                 kind=request.kind, needs_research=request.needs_research, pending=True)
-        decision = decide(build_state(db, turn, signals, recent))
+        policy_state = build_state(db, turn, signals, recent)
+        decision = decide(policy_state)
         if decision.action == "clear_myth":
             from app.research.gateway import request_research
             from app.tools import ToolContext
@@ -219,7 +220,7 @@ async def _run_deep_turn(db, workspace_id: str, event_data: dict, depth: int):
         CounselorTurnDecision.source_event_id == turn.source_event_id,
     )).scalar_one_or_none():
         from app.pai_c.policy.state import decision_log
-        logged_decision = decision_log(decision, signals) if decision is not None else None
+        logged_decision = decision_log(decision, signals, coverage=(policy_state or {}).get("coverage")) if decision is not None else None
         if logged_decision is not None and "statement_fallback" in violations:
             logged_decision["statement_fallback"] = True
         db.add(CounselorTurnDecision(
