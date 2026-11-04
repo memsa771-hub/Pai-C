@@ -51,7 +51,8 @@ Figma board (locked): https://www.figma.com/board/NjVJfdxERWfRHPycy1wDkF
 - The OS developers build the connection work, Counsellor side included (D-16). The Counsellor lead
   (`@memsa771-hub`) reviews every PR that touches Counsellor files.
 - Branches: integration branch `pai-connect` (cut from `pai-merge`). Task branches `pc/p<N>-t<M>-<name>`,
-  squash-merged. At each gate, merge into `pai-merge` with a merge commit, tagged `connect-p<N>`.
+  squash-merged. Nothing merges into `pai-merge` until the whole plan is complete (owner, P0-D14); then merge with a
+  merge commit. Phase handoffs are signed off by the owner alone (P0-D13).
 
 ## Current direction (3 Nov 2026)
 - Connection work per the master spec. Now: phase P0 (setup and Counsellor fixes). Next: P1.

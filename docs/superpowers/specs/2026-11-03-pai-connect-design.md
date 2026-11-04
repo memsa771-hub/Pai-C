@@ -22,9 +22,9 @@ document.
 4. **Every requirement has at least one test** tagged `@pytest.mark.req("R-xx")` (backend) or `// req: R-xx`
    (frontend). `scripts/check_traceability.py` fails CI when an R-ID assigned to a finished phase has no tagged test
    (§13.1).
-5. **A phase is done only when its gate (§12) passes in full,** its handoff is written, and both owners sign it off.
-   The owners are the **Counsellor lead** (MSAQLAIN, `@memsa771-hub`) and the **integration owner**, one of the OS
-   developers: **`@MusawirKtk`** (owner's answer to §15 Q5, 2026-11-03).
+5. **A phase is done only when its gate (§12) passes in full,** its handoff is written, and the owner, MSAQLAIN (`@memsa771-hub`), signs it off alone (owner decision
+   2026-11-04, P0-D13). The **integration owner**, one of the OS developers, is **`@MusawirKtk`** (owner's answer to
+   §15 Q5, 2026-11-03): he reviews and merges into `pai-connect`, but does not sign off phases.
 6. **When a step is unclear or a test can't pass as written: stop and ask the owner.** Never improvise, never weaken a
    test, never invent data.
 
@@ -567,7 +567,7 @@ The critical path is P2's verification work, not code.
 ### 13.4 Branches
 - **One integration branch for this work,** `pai-connect`, cut from `pai-merge`.
 - **Task branches:** `pc/p<N>-t<M>-<name>`, squash-merged.
-- **At each gate,** merge into `pai-merge` with a merge commit, tagged `connect-p<N>`.
+- **At each gate,** merge into `pai-merge` with a merge commit, tagged `connect-p<N>`. **Owner decision 2026-11-04 (P0-D14): no merge into `pai-merge` until the whole plan is complete; every phase stays on `pai-connect` until then.**
 - **P0 work** is done on `pai-connect` task branches like every other phase.
 
 ### 13.5 Handoffs

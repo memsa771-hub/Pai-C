@@ -102,6 +102,8 @@ Approved by the owner on 2026-11-03 (design in chat; decisions P0-D8 and P0-D9 b
 | P0-D10 | Fixed sentences stay English for now. The C1 notice reads "I've removed {titles} from your paths, since you said it isn't for you." (plural "…they aren't…"). C7: marks of a completed exam are required, current-study marks and the entry test optional. C2: replaying a skipped analysis after newer ones is acceptable. A dismissal keeps its reason and evidence in a new nullable `pai_possibilities.dismissal` column (migration). |
 | P0-D11 | The Counsellor lead's approval of a freeze-exception PR is given in the Claude session chat (owner, 2026-11-03): PRs are opened from the lead's own account, so GitHub cannot take the lead's review. Before such a PR is merged, the change is shown to the lead in chat, the lead's "approved" is quoted in the PR description, and the integration owner merges only after it is there. |
 | P0-D12 | C7 (owner, 2026-11-03/04): marks of a completed exam are required only on a student's first onboarding (no `onboarded_at` yet); already-onboarded students can save edits without them. Approved copy: "Your marks can't be more than the total marks." and "Enter a number from {min} to {max}." C6 approved by the Counsellor lead in chat on 2026-11-04 (P0-D11). |
+| P0-D13 | Phase sign-off (owner, 2026-11-04): handoffs are signed off by the owner, MSAQLAIN (`@memsa771-hub`), only; the OS developers (`@MusawirKtk`, `@10Faheem`) do not sign off. Applies to every phase. |
+| P0-D14 | No gate merges (owner, 2026-11-04): nothing is merged into `pai-merge` until the whole plan (P0–P6) is complete; every phase stays on `pai-connect`. The `connect-p<N>` gate tags are not made until then. |
 | P0-D15 | Strengths count toward the `interests` area of the Mirror (owner, 2026-11-04): "subjects they like and are good at". |
 | P0-D16 | PAI refers to itself in the neutral first-person plural in Roman Urdu ("hum dekhenge"), never masculine or feminine first-person forms (owner, 2026-11-04; approval of the voice prompt change). |
 | P0-D9 | C6: the reply follows the language of the student's latest message. Roman Urdu is used only as the replacement when a reply came out in a blocked script (Devanagari). |
@@ -136,5 +138,4 @@ Order: R2-3, R2-2, R2-1, R2-4, R2-5 on one branch (non-frozen); R2-6 in its own 
 3. The live-run student (fictional Ayesha Malik, `docs/local-test/live-run-issues-2026-11-02.md`) reaches stage H
    with only MBBS and BDS.
 4. Counsellor evaluations pass; a replay shows only the fixed behaviour changed.
-5. Handoff `docs/connect/handoff/p0-handoff.md` written; both owners sign off: the Counsellor lead (`@memsa771-hub`) and
-   the integration owner (`@MusawirKtk`, master §15 Q5).
+5. Handoff `docs/connect/handoff/p0-handoff.md` written; the owner, MSAQLAIN (`@memsa771-hub`), signs off alone (P0-D13).
