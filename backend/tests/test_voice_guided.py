@@ -111,3 +111,11 @@ async def test_question_guard_still_enforced_in_guided_mode(monkeypatch):
         with patch("app.pai_c.deep.turn.chat_completion", model):
             result = await run_deep_turn(db, _turn(student), history=[], decision=REST)
         assert result.reply == "That took courage." and "question_removed" in result.guard_violations
+
+
+@pytest.mark.req("R-47")
+def test_voice_prompts_use_neutral_first_person_plural():
+    for name in ("voice", "voice_guided"):
+        text = load_prompt(name)
+        assert 'use the neutral first-person plural ("hum dekhenge", "hum check karenge")' in text
+        assert 'never gendered first-person forms such as "karunga", "karungi", "dunga" or "chahta hoon"' in text
