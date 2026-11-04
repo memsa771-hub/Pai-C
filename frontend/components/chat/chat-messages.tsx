@@ -11,7 +11,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import type { WorkspaceMessage, WorkspaceAgent } from '@/lib/types';
 import { useT } from '@/lib/i18n';
-import { newestPathsMessageId } from '@/lib/possibilities';
+import { latestPathsChangeMessageId, newestPathsMessageId } from '@/lib/possibilities';
 
 // ── Message Grouping ──
 
@@ -59,6 +59,12 @@ function groupMessages(messages: WorkspaceMessage[]): MessageGroup[] {
 /** The message id of the newest paths card among the chat groups. */
 function newestPathsGroupId(groups: MessageGroup[]): string | null {
   return newestPathsMessageId(groups.flatMap(group =>
+    group.type === 'chat' ? [{ id: group.message.messageId, metadata: group.message.metadata }] : []));
+}
+
+/** The id of the latest paths-excluded notice among the chat groups. */
+function pathsChangeGroupId(groups: MessageGroup[]): string | undefined {
+  return latestPathsChangeMessageId(groups.flatMap(group =>
     group.type === 'chat' ? [{ id: group.message.messageId, metadata: group.message.metadata }] : []));
 }
 
@@ -213,6 +219,7 @@ export function ChatMessages({ messages, agents, showAllSteps, className, scroll
   // Group into chat messages and intermediate step clusters
   const groups = useMemo(() => groupMessages(filteredMessages), [filteredMessages]);
   const newestPathsId = useMemo(() => newestPathsGroupId(groups), [groups]);
+  const pathsChangeId = useMemo(() => pathsChangeGroupId(groups), [groups]);
 
   const hasTerminalStatus = realMessages.some(isTerminalStatus);
 
@@ -490,6 +497,7 @@ export function ChatMessages({ messages, agents, showAllSteps, className, scroll
                       message={group.message}
                       agents={agents}
                       newestPaths={group.message.messageId === newestPathsId}
+                      pathsRefreshKey={pathsChangeId}
                     />
                   ) : group.type === 'thinking' ? (
                     <ThinkingMessage

@@ -61,8 +61,9 @@ def _dismissal(option: dict) -> dict:
 def apply_exclusions(db, workspace_id: str, excluded: dict[str, dict] | None = None) -> list[PaiPossibility]:
     """Dismiss every open path whose field the student ruled out, unless the
     student restored it against the same Vault option. A matching path the
-    student had already dismissed by hand is only marked with the exclusion
-    (no transition, no notice), so restoring it later is the undo there too.
+    student had already dismissed by hand, or for another option, is only marked
+    with the current exclusion (no transition, no notice), so restoring it later
+    is the undo there too.
     `excluded` is `excluded_fields`, when the caller already has it. Flushes;
     the caller commits. Returns the rows it dismissed."""
     excluded = excluded_fields(db, workspace_id) if excluded is None else excluded
@@ -74,8 +75,12 @@ def apply_exclusions(db, workspace_id: str, excluded: dict[str, dict] | None = N
         option = excluded.get((row.study_field or {}).get("key"))
         if option is None:
             continue
-        if row.status == "dismissed" and (row.dismissal or {}).get("reason") != REASON:
-            row.dismissal = _dismissal(option)
+        if row.status == "dismissed":
+            # Dismissed by hand, or by another option than the one excluding it now (restored, dismissed by hand,
+            # then excluded by a different option): stamp the current option, so a restore is recorded against it.
+            stamped = row.dismissal or {}
+            if stamped.get("reason") != REASON or stamped.get("item_id") != option["item_id"]:
+                row.dismissal = _dismissal(option)
             continue
         if row.status not in _OPEN or _restored(row, option):
             continue
