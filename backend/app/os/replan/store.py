@@ -109,6 +109,14 @@ class ProposalStore:
         with self.engine.begin() as conn:
             conn.execute(update(PR).where(PR.c.tenant_id == self.tenant_id, PR.c.id == proposal_id).values(**values))
 
+    def expire_if_pending(self, proposal_id: int) -> bool:
+        """Expires the proposal only while it is still pending; an answered one is left as it is. True if it changed."""
+        with self.engine.begin() as conn:
+            done = conn.execute(update(PR).where(PR.c.tenant_id == self.tenant_id, PR.c.id == proposal_id,
+                                                 PR.c.status == "pending").values(status="expired",
+                                                                                  answered_at=func.now()))
+        return done.rowcount == 1
+
 
 class OverrideStore:
     def __init__(self, engine: Engine, tenant_id: str) -> None:

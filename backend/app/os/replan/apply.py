@@ -124,7 +124,7 @@ class Replanner:
                 continue
             if all(op.get("op") == "cancel_programme" and op.get("reason") == REASONS["fact_below"] for op in p.ops) \
                     and any(op.get("programme_ref") not in firm for op in p.ops):
-                self.proposals.set_status(p.id, "expired")
+                self.proposals.expire_if_pending(p.id)
 
     def state(self, plan_id: int, with_suggestions: bool = False, with_below: bool = False) -> PlanState:
         contract, _ = self.plans._contract(plan_id)

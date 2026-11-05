@@ -316,3 +316,16 @@ def test_a_provisional_below_verdict_shows_in_the_note_but_proposes_no_removal(c
         assert any(line.get("provisional") for _, _, lines in notes for line in lines)
     finally:
         ports.configure(None)
+
+
+def test_an_expiry_never_overwrites_an_answered_proposal(world):
+    """The student accepted at the moment the fact improved: the proposal stays accepted and keeps its revision."""
+    plan_id = start(world)
+    assert send(world, plan_id, 1, 1000).status == "applied"
+    first = send(world, plan_id, 2, 800)
+    world.replanner.accept("stu-1", first.proposal_id)
+    before = world.replanner.proposals.get(first.proposal_id)
+    assert before.status == "accepted" and before.revision is not None
+    assert world.replanner.proposals.expire_if_pending(first.proposal_id) is False
+    after = world.replanner.proposals.get(first.proposal_id)
+    assert (after.status, after.revision) == ("accepted", before.revision)
