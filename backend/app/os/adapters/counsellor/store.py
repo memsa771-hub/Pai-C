@@ -21,7 +21,7 @@ class Intake:
     export: dict
     export_sha256: str
     chosen_at: datetime
-    status: str  # pending | planned | revised | replaced | refused | stale | withdrawn | unsupported
+    status: str  # pending | planned | revised | replaced | refused | stale | withdrawn | unsupported | held | paused
     reason: str | None
     plan_id: int | None
     counsellor_status: str | None

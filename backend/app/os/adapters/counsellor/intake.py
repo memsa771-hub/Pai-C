@@ -25,6 +25,7 @@ REFUSALS = ("not_authorized", "invalid_export", "route_not_supported", "unknown_
 TO_COUNSELLOR = REFUSALS[:4]  # should never arrive, so the Counsellor hears of them (`other`, by journey)
 SELF_SERVE_REASON = "A Counsellor decision arrived while the student has an open self-serve plan: a person decides."
 CLOSED_REASON = "A Counsellor decision names a route whose plan was closed: a person decides."
+CONSENT_MISSING = "consent_missing"
 SOURCE = "counsellor"
 V2_SCHEMA = "pai.decision_record.v2"
 P = models.plans
@@ -32,7 +33,7 @@ P = models.plans
 
 @dataclass(frozen=True)
 class IntakeResult:
-    status: str  # planned | revised | replaced | refused | stale | withdrawn | unsupported
+    status: str  # planned | revised | replaced | refused | stale | withdrawn | unsupported | held | paused
     reason: str | None = None
     plan_id: int | None = None
 
@@ -121,6 +122,22 @@ def _unsupported(svc, decision: DecisionRecordV2) -> IntakeResult:
     return _close_all(svc, decision, "unsupported", "unsupported")
 
 
+def _consent_missing(decision: DecisionRecordV2) -> bool:
+    return decision.authorized_at is None or (decision.guardian_required and decision.guardian_authorized_at is None)
+
+
+def _hold_or_pause(svc, decision: DecisionRecordV2) -> IntakeResult:
+    """A consent is missing (P1-D11): an open plan on this route is paused (no reminders, no promotion) and a
+    decision with no plan yet is held. Neither is escalated: the Counsellor already asks the student or guardian.
+    A repeat changes nothing more."""
+    plan = next((p for p in _plans_of(svc, decision.student_ref, SOURCE)
+                 if p.external_ref == decision.to_route_contract().external_ref and p.status in PLAN_OPEN), None)
+    if plan is None:
+        return IntakeResult("held", CONSENT_MISSING)
+    svc.kernel.pause_plan(plan.id, CONSENT_MISSING)  # False when it is already paused
+    return IntakeResult("paused", CONSENT_MISSING, plan.id)
+
+
 def process(svc, intake: Intake) -> IntakeResult:
     if intake.export.get("schema") == V2_SCHEMA:
         try:
@@ -139,7 +156,10 @@ def process(svc, intake: Intake) -> IntakeResult:
             decision = DecisionRecordV1.model_validate(intake.export)
         except ValidationError:
             return _refuse(svc, intake, "invalid_export")
-    if decision.authorized_at is None:
+    if isinstance(decision, DecisionRecordV2):
+        if _consent_missing(decision):
+            return _hold_or_pause(svc, decision)
+    elif decision.authorized_at is None:
         return _refuse(svc, intake, "not_authorized")
     if isinstance(decision, DecisionRecordV2) and decision.level == "intermediate":
         return _refuse(svc, intake, "route_not_supported")  # intermediate waits for the v2 plan engine (D-b)
@@ -161,6 +181,8 @@ def process(svc, intake: Intake) -> IntakeResult:
         return _refuse(svc, intake, "plan_closed", same.id)
     try:
         if same is not None:
+            if same.status == "paused":  # the consent is back (P1-D11)
+                svc.kernel.resume_plan(same.id)
             _revise(svc, same.id, contract, f"counsellor:{decision.decision_id}")
             plan_id, status = same.id, "revised"
         else:

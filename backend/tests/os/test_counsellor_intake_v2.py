@@ -289,7 +289,9 @@ def test_invalid_v2_is_invalid_export(svc):
     assert (r.status, r.reason) == ("refused", "invalid_export")
 
 
-def test_v2_not_authorized(svc):
+def test_v2_missing_consent_is_held_not_refused(svc):
+    """Superseded rule (P1-T3 Task 1, P1-D11): a v2 decision without consent is held (or its plan paused), never
+    refused as `not_authorized`; that refusal stays for v1 exports. The full cases: test_consent_pause.py."""
     r = run(svc, chosen(1, authorized_at=None))
-    assert (r.status, r.reason) == ("refused", "not_authorized")
+    assert (r.status, r.reason) == ("held", "consent_missing")
 

@@ -35,6 +35,7 @@ def run_reminders(engine: Engine, outbox: Outbox, now: datetime, tenant_id: str)
                                    T.c.instance_key, T.c.inbox_kind, P.c.student_ref)
                             .join(P, P.c.id == T.c.plan_id).where(
             T.c.tenant_id == tenant_id, T.c.state == "waiting_student", T.c.due_at.is_not(None),
+            P.c.status != "paused",  # a paused plan (consent missing) sends nothing
         ).order_by(T.c.id)).all()
     added = 0
     for r in rows:

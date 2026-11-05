@@ -538,9 +538,11 @@ visa_choices = Table(
 PROPOSAL_STATUSES = ("applied", "pending", "accepted", "declined", "expired", "refused")
 OVERRIDE_OPS = ("skip", "cancel", "cancel_programme", "add", "reprioritise")
 # Slice 8 (spec S8-D10, S8-D12)
-INTAKE_STATUSES = ("pending", "planned", "revised", "replaced", "refused", "stale", "withdrawn", "unsupported")
+INTAKE_STATUSES = ("pending", "planned", "revised", "replaced", "refused", "stale", "withdrawn", "unsupported",
+                   "held", "paused")
 INTAKE_REFUSALS = ("not_authorized", "invalid_export", "route_not_supported", "unknown_programme",
                    "self_serve_plan_open", "plan_closed")
+INTAKE_REASONS = (*INTAKE_REFUSALS, "consent_missing")  # refusals, and why a decision is held or its plan paused (P1-D11)
 COUNSELLOR_DELIVERY = ("pending", "sent", "refused")
 ESCALATION_REASONS = ("not_eligible", "all_rejected", "deadline_passed", "blocking_gap", "other")
 
@@ -621,7 +623,7 @@ counsellor_intake = Table(
     Column("decision_status", Text),
     UniqueConstraint("tenant_id", "decision_id", name="uq_os_counsellor_intake_decision"),
     _in("status", INTAKE_STATUSES, "ck_os_counsellor_intake_status"),
-    _in("reason", INTAKE_REFUSALS, "ck_os_counsellor_intake_reason"),
+    _in("reason", INTAKE_REASONS, "ck_os_counsellor_intake_reason"),
     _in("counsellor_status", COUNSELLOR_DELIVERY, "ck_os_counsellor_intake_delivery"),
     Index("ix_os_counsellor_intake_pending", "tenant_id", "status", "student_ref", "chosen_at"),
     Index("ix_os_counsellor_intake_version", "tenant_id", "student_ref", "decision_version"),
