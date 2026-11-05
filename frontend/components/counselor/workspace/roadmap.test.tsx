@@ -6,13 +6,19 @@ import { render, screen, fireEvent, waitFor, cleanup, within } from "@testing-li
 import { Roadmap } from "./roadmap";
 import { render as renderItem } from "./roadmap-text";
 import { workspaceApi } from "@/lib/api";
-import { chosenRoute, roadmapCards, roadmapPage } from "@/tests/fixtures/counselor";
+import { chosenRoute, choiceOptionsOff, choiceOptionsOn, offeredPlaces, roadmapCards, roadmapPage, routeChoice } from "@/tests/fixtures/counselor";
+import { I18nProvider } from "@/lib/i18n";
 import copy from "./copy.json";
 
 vi.mock("@/lib/api", () => ({
   workspaceApi: {
     getRoadmapPage: vi.fn(),
     chooseRoute: vi.fn(),
+    choiceOptions: vi.fn(),
+    places: vi.fn(),
+    withdrawConsent: vi.fn(),
+    giveConsent: vi.fn(),
+    resendGuardian: vi.fn(),
     setRouteStep: vi.fn(),
     withdrawRoute: vi.fn(),
     getFamilyTalk: vi.fn(),
@@ -25,6 +31,7 @@ afterEach(() => {
 });
 beforeEach(() => {
   vi.mocked(workspaceApi.getRoadmapPage).mockResolvedValue(roadmapPage);
+  vi.mocked(workspaceApi.choiceOptions).mockResolvedValue(choiceOptionsOff);
 });
 const card = async (title: string) => (await screen.findByRole("heading", { name: title })).closest("article")!;
 
@@ -319,4 +326,102 @@ it("fits a 375px phone: the route list and the sheet wrap instead of overflowing
   const widths = [...baseElement.querySelectorAll("[class]")].flatMap((el) =>
     [...String(el.getAttribute("class")).matchAll(/\b(?:min-)?w-\[(\d+)px\]/g)].map((m) => +m[1]));
   expect(widths.every((w) => w <= 343)).toBe(true);
+});
+
+// req: R-79
+it("with the hand-off off, Choose is one click: no choice screens, chooseRoute with the field key only", async () => {
+  vi.mocked(workspaceApi.chooseRoute).mockResolvedValue(chosenRoute);
+  render(<Roadmap onNavigate={vi.fn()} />);
+  fireEvent.click(await screen.findByRole("button", { name: "See route for Electrical Engineering" }));
+  fireEvent.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Choose this route" }));
+  await waitFor(() => expect(workspaceApi.chooseRoute).toHaveBeenCalledTimes(1));
+  expect(vi.mocked(workspaceApi.chooseRoute).mock.calls[0]).toEqual(["electrical_engineering"]);
+  expect(workspaceApi.choiceOptions).toHaveBeenCalledWith("electrical_engineering");
+  expect(screen.queryByTestId("choice-step")).toBeNull();
+});
+
+// req: R-79
+it("with the hand-off on, Choose opens the choice screens and saves nothing yet", async () => {
+  vi.mocked(workspaceApi.choiceOptions).mockResolvedValue(choiceOptionsOn);
+  vi.mocked(workspaceApi.places).mockResolvedValue({ handoff: true, places: offeredPlaces });
+  vi.mocked(workspaceApi.chooseRoute).mockResolvedValue({ ...chosenRoute, choice: routeChoice() });
+  const changed = vi.fn();
+  render(<I18nProvider><Roadmap onNavigate={vi.fn()} onChanged={changed} /></I18nProvider>);
+  fireEvent.click(await screen.findByRole("button", { name: "See route for Electrical Engineering" }));
+  fireEvent.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Choose this route" }));
+  expect((await screen.findByTestId("choice-step")).textContent).toBe("Step 1 of 4: Country");
+  expect(workspaceApi.chooseRoute).not.toHaveBeenCalled();
+  // Through to the end: the page reloads and the shell is told.
+  const c = copy.roadmap.choice;
+  fireEvent.click(screen.getAllByRole("radio")[1]);
+  fireEvent.click(screen.getByRole("button", { name: c.next }));
+  fireEvent.change(screen.getByLabelText(c.intake.term), { target: { value: "winter" } });
+  fireEvent.change(screen.getByLabelText(c.intake.year), { target: { value: "2027" } });
+  fireEvent.click(screen.getByRole("button", { name: c.next }));
+  fireEvent.click(await screen.findByRole("checkbox", { name: "Alpha University" }));
+  fireEvent.click(screen.getByRole("button", { name: c.next }));
+  fireEvent.click(screen.getByRole("checkbox", { name: c.consent.agree }));
+  vi.mocked(workspaceApi.getRoadmapPage).mockResolvedValue({ ...roadmapPage, chosen: { ...chosenRoute, choice: routeChoice() } });
+  fireEvent.click(screen.getByRole("button", { name: c.submit }));
+  await waitFor(() => expect(changed).toHaveBeenCalledTimes(1));
+  expect(await screen.findByRole("region", { name: "Your route" })).toBeTruthy();
+});
+
+const cs = copy.roadmap.choice.consentState;
+const chosenWith = (choice: ReturnType<typeof routeChoice>) => ({ ...roadmapPage, chosen: { ...chosenRoute, choice } });
+
+// req: R-10
+it("shows who has agreed on the chosen route, in words", async () => {
+  vi.mocked(workspaceApi.getRoadmapPage).mockResolvedValue(chosenWith(routeChoice({ consent: { student: "given", guardian: "missing" } })));
+  render(<Roadmap onNavigate={vi.fn()} />);
+  const panel = await screen.findByRole("region", { name: cs.title });
+  expect(within(panel).getByText(cs.studentGiven)).toBeTruthy();
+  expect(within(panel).getByText(cs.guardianMissing)).toBeTruthy();
+  expect(within(panel).getByText(cs.waiting)).toBeTruthy();
+});
+
+// req: R-10
+it("shows no consent block when the hand-off is off (no choice on the route)", async () => {
+  vi.mocked(workspaceApi.getRoadmapPage).mockResolvedValue({ ...roadmapPage, chosen: chosenRoute });
+  render(<Roadmap onNavigate={vi.fn()} />);
+  await screen.findByRole("region", { name: "Your route" });
+  expect(screen.queryByRole("region", { name: cs.title })).toBeNull();
+});
+
+// req: R-10
+it("withdraws consent behind one confirm, then gives it again and asks for the guardian link to be resent", async () => {
+  vi.mocked(workspaceApi.getRoadmapPage).mockResolvedValue(chosenWith(routeChoice({ consent: { student: "given", guardian: "missing" } })));
+  render(<Roadmap onNavigate={vi.fn()} />);
+  const panel = await screen.findByRole("region", { name: cs.title });
+  fireEvent.click(within(panel).getByRole("button", { name: cs.withdraw }));
+  expect(workspaceApi.withdrawConsent).not.toHaveBeenCalled(); // asks first
+  vi.mocked(workspaceApi.withdrawConsent).mockResolvedValue({ choice: routeChoice({ consent: { student: "missing", guardian: "missing" } }) });
+  fireEvent.click(within(panel).getByRole("button", { name: cs.withdrawYes }));
+  expect(await within(panel).findByText(cs.studentMissing)).toBeTruthy();
+  expect(within(panel).getByText(cs.pausedNote)).toBeTruthy();
+  // Give it again: the old guardian link no longer counts, so the student is asked to send a new one.
+  vi.mocked(workspaceApi.giveConsent).mockResolvedValue({ choice: routeChoice({ consent: { student: "given", guardian: "missing" } }) });
+  fireEvent.click(within(panel).getByRole("button", { name: cs.give }));
+  expect(await within(panel).findByText(cs.resendPrompt)).toBeTruthy();
+  // The address is asked again: it is not kept for a resend.
+  vi.mocked(workspaceApi.resendGuardian).mockResolvedValue({ sent: true });
+  fireEvent.click(within(panel).getByRole("button", { name: cs.resendSend }));
+  expect(within(panel).getByRole("alert").textContent).toContain(cs.resendRequired);
+  expect(workspaceApi.resendGuardian).not.toHaveBeenCalled();
+  fireEvent.change(within(panel).getByLabelText(cs.resendLabel), { target: { value: "parent@example.com" } });
+  fireEvent.click(within(panel).getByRole("button", { name: cs.resendSend }));
+  await waitFor(() => expect(workspaceApi.resendGuardian).toHaveBeenCalledWith("parent@example.com"));
+  expect(await within(panel).findByText(cs.resendSent)).toBeTruthy();
+});
+
+// req: R-10
+it("keeps consent as it was and says so when withdrawing fails", async () => {
+  vi.mocked(workspaceApi.getRoadmapPage).mockResolvedValue(chosenWith(routeChoice()));
+  vi.mocked(workspaceApi.withdrawConsent).mockRejectedValue(new Error("API 500: x"));
+  render(<Roadmap onNavigate={vi.fn()} />);
+  const panel = await screen.findByRole("region", { name: cs.title });
+  fireEvent.click(within(panel).getByRole("button", { name: cs.withdraw }));
+  fireEvent.click(within(panel).getByRole("button", { name: cs.withdrawYes }));
+  expect((await within(panel).findByRole("alert")).textContent).toContain(cs.error);
+  expect(within(panel).getByText(cs.studentGiven)).toBeTruthy();
 });

@@ -744,6 +744,109 @@
       "legend": "Green is done, yellow is partly done, red is not yet.",
       "none": "PAI has no steps for this field yet.",
       "tick": "Mark as done"
+    },
+    "choice": {
+      "title": "Choose {title}",
+      "intro": "A few short steps. You can change your mind later.",
+      "loading": "Loading your options",
+      "stepOf": "Step {n} of {total}: {name}",
+      "progress": "Steps",
+      "steps": {
+        "destination": "Country",
+        "intake": "Intake",
+        "places": "Places",
+        "dob": "Date of birth",
+        "consent": "Consent",
+        "guardian": "Parent or guardian"
+      },
+      "destination": {
+        "legend": "Where do you want to study?",
+        "unsupported": "PAI OS cannot plan this country yet. You can still choose it.",
+        "supported": "PAI OS can plan this",
+        "required": "Pick a country."
+      },
+      "intake": {
+        "term": "Term",
+        "year": "Year",
+        "termRequired": "Pick a term.",
+        "yearRequired": "Pick a year.",
+        "hint": "When do you want to start?"
+      },
+      "places": {
+        "legend": "Pick up to {max} places",
+        "hint": "Pick the ones you like, then put them in order. 1 is your first choice.",
+        "loading": "Loading places",
+        "none": "No places are listed for this yet. You can add them later.",
+        "empty": "Pick at least one place.",
+        "full": "You picked {max}. Remove one to add another.",
+        "ranking": "Your order",
+        "rank": "{rank}. {name}",
+        "up": "Move {name} up",
+        "down": "Move {name} down",
+        "remove": "Remove {name}",
+        "error": "Places did not load. Try again.",
+        "retry": "Try again"
+      },
+      "dob": {
+        "label": "Your date of birth",
+        "hint": "PAI uses it to know if a parent or guardian must agree. It is saved to your Vault.",
+        "required": "Add your date of birth.",
+        "vault": "Open your Vault",
+        "vaultNote": "Your date of birth in the Vault needs your confirmation first."
+      },
+      "consent": {
+        "legend": "Your consent",
+        "agree": "I agree",
+        "required": "Tick the box to continue.",
+        "unavailable": "The consent text is not ready yet, so this route cannot be shared. Try again later.",
+        "version": "Text version {version}"
+      },
+      "guardian": {
+        "label": "Parent or guardian email",
+        "hint": "You are under 18, so a parent or guardian must agree too. We email them a link.",
+        "required": "Add a valid email address."
+      },
+      "back": "Back",
+      "next": "Next",
+      "submit": "Choose this route",
+      "cancel": "Cancel",
+      "saving": "Saving",
+      "error": "This did not save. Try again.",
+      "done": {
+        "title": "Your route is saved",
+        "body": "PAI will share it with your plan once everyone has agreed.",
+        "button": "Done",
+        "sent": "We emailed your parent or guardian.",
+        "notSent": "Your route is saved, but the email to your parent or guardian was not sent.",
+        "notSentAction": "Send it again below."
+      },
+      "consentState": {
+        "title": "Sharing with your plan",
+        "student": "Your consent",
+        "guardian": "Parent or guardian",
+        "studentGiven": "Given",
+        "studentMissing": "Withdrawn",
+        "guardianNotNeeded": "Not needed",
+        "guardianGiven": "Agreed",
+        "guardianMissing": "Waiting",
+        "pausedNote": "Your plan is paused until you give consent again.",
+        "withdraw": "Withdraw my consent",
+        "withdrawConfirm": "Withdraw consent? Your plan pauses. Your choices are kept.",
+        "withdrawYes": "Yes, withdraw",
+        "withdrawNo": "Keep it",
+        "give": "Give consent again",
+        "resendPrompt": "Your parent or guardian must agree again. Send them a new link.",
+        "waiting": "Your parent or guardian has not agreed yet.",
+        "resend": "Send the link again",
+        "resendLabel": "Parent or guardian email",
+        "resendSend": "Send link",
+        "resendSent": "We emailed a new link.",
+        "resendRequired": "Add a valid email address.",
+        "error": "This did not save. Try again.",
+        "rate": "Too many emails. Try again later.",
+        "textNotReady": "The consent text is not ready yet. Try again later.",
+        "notSupported": "PAI OS cannot plan this route yet."
+      }
     }
   },
   "pathMayBeOld": "Your Vault changed since PAI wrote this, so parts of it may be out of date.",

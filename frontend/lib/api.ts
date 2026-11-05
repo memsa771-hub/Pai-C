@@ -656,9 +656,36 @@ class WorkspaceApi {
     return this.request(`/v1/roadmap?network=${this.requireWorkspace()}`);
   }
 
-  async chooseRoute(fieldKey: string): Promise<import('./roadmap').ChosenRoute> {
+  /** Choose a field. With `details` (the choice flow) the body also carries places, intake and consent. */
+  async chooseRoute(fieldKey: string, details?: import('./roadmap').ChoiceDetails): Promise<import('./roadmap').ChooseAnswer> {
     return this.request(`/v1/roadmap/choose?network=${this.requireWorkspace()}`,
-      { method: 'POST', body: JSON.stringify({ field_key: fieldKey }) });
+      { method: 'POST', body: JSON.stringify(details ? { field_key: fieldKey, details } : { field_key: fieldKey }) });
+  }
+
+  /** What the choice screens offer; `{handoff: false}` when the hand-off to PAI OS is off. */
+  async choiceOptions(fieldKey: string): Promise<import('./roadmap').ChoiceOptions> {
+    const params = new URLSearchParams({ field_key: fieldKey, network: this.requireWorkspace() });
+    return this.request(`/v1/roadmap/choice-options?${params}`);
+  }
+
+  /** The places to rank for a destination, level and intake. */
+  async places(destination: string, level: string, term: string, year: number): Promise<{ handoff: boolean; places: import('./roadmap').OfferedPlace[] }> {
+    const params = new URLSearchParams({ destination, level, term, year: String(year), network: this.requireWorkspace() });
+    return this.request(`/v1/roadmap/places?${params}`);
+  }
+
+  async withdrawConsent(): Promise<import('./roadmap').ConsentAnswer> {
+    return this.request(`/v1/roadmap/consent/withdraw?network=${this.requireWorkspace()}`, { method: 'POST' });
+  }
+
+  async giveConsent(): Promise<import('./roadmap').ConsentAnswer> {
+    return this.request(`/v1/roadmap/consent/give?network=${this.requireWorkspace()}`, { method: 'POST' });
+  }
+
+  /** Email the guardian a new link. The address is not kept for resend, so the client sends it again. */
+  async resendGuardian(guardianEmail?: string): Promise<{ sent: boolean }> {
+    return this.request(`/v1/roadmap/guardian/resend?network=${this.requireWorkspace()}`,
+      { method: 'POST', body: JSON.stringify(guardianEmail ? { guardian_email: guardianEmail } : {}) });
   }
 
   /** Tick or untick one step of the chosen route, named by its key. */

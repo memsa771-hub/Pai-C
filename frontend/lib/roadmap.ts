@@ -86,6 +86,20 @@ export type EducationLine = {
   percent: number | null;
 };
 
+/** Consent on a choice (backend routers/roadmap.py `_choice_view`). */
+export type ConsentState = { student: "given" | "missing"; guardian: "not_needed" | "given" | "missing" };
+
+/** The live choice: what was picked and who has agreed. Present only when the hand-off is on. */
+export type RouteChoice = {
+  version: number;
+  places: { ref: string; rank: number }[];
+  intake: { term: string; year: number } | null;
+  destination: string | null;
+  level: string | null;
+  os_supported: boolean;
+  consent: ConsentState;
+};
+
 export type ChosenRoute = {
   id: string;
   field_key: string;
@@ -101,7 +115,43 @@ export type ChosenRoute = {
   steps_done: string[];
   snapshot_verdict: Verdict | null;
   live_status: RoadmapStatus;
+  /** Consent state of the live choice; absent when the hand-off is off. */
+  choice?: RouteChoice | null;
 };
+
+/** One country on the choice screen: an ISO code, with a name only if the API sends one. */
+export type ChoiceDestination = { code: string; supported: boolean; route_key: string | null; name?: string };
+
+/** GET /v1/roadmap/choice-options. `handoff: false` means today's one-click choose. */
+export type ChoiceOptions =
+  | { handoff: false }
+  | {
+      handoff: true;
+      origin: string | null;
+      level: string;
+      destinations: ChoiceDestination[];
+      preselected_destination: string | null;
+      intake_terms: Record<string, string[]>;
+      years: number[];
+      /** The approved text, from the API. Null while it is not approved. */
+      consent_text: string | null;
+      consent_version: string | number | null;
+      needs_dob: boolean;
+    };
+
+export type OfferedPlace = { ref: string; name: string };
+
+/** The body of POST /v1/roadmap/choose when the flow ran. */
+export type ChoiceDetails = {
+  destination: string;
+  places: { ref: string; rank: number }[];
+  intake: { term: string; year: number };
+  date_of_birth?: string;
+  consent: true;
+  guardian_email?: string;
+};
+
+export type ChooseAnswer = ChosenRoute & { guardian_email_sent?: boolean };
 
 export type RoadmapPage = {
   education_line: EducationLine | null;
@@ -112,3 +162,6 @@ export type RoadmapPage = {
   /** When the admission rules were last checked, "YYYY-MM". */
   rules_as_of?: string | null;
 };
+
+/** The answer of consent/withdraw and consent/give: the live choice with the new consent state. */
+export type ConsentAnswer = { choice: RouteChoice | null };
