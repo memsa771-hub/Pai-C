@@ -10,6 +10,7 @@ from sqlalchemy import insert, update
 from app.os import models, ports
 from app.os.adapters.counsellor.store import IntakeStore
 from app.os.contracts.plan_view import PlanViewV1
+from app.os.playbooks import load_playbook_dir
 from app.os.plan_view import build_plan_view
 from app.os.ports import plan_query
 from test_counsellor_intake_v2 import chosen, run, svc, v1, withdrawn  # noqa: F401
@@ -17,13 +18,15 @@ from test_plan_summary import STUDENT, plan, task
 
 pytestmark = [pytest.mark.req("R-04"), pytest.mark.req("R-44")]
 
+BOOKS = load_playbook_dir()
 AT = datetime(2027, 1, 12, 9, tzinfo=timezone.utc)
 
 
 class _Svc:  # what the builder needs of the services
-    def __init__(self, engine):
+    def __init__(self, engine, books=None, tenant="pai"):
         self.engine = engine
-        self.settings = type("S", (), {"tenant_id": "pai"})()
+        self.settings = type("S", (), {"tenant_id": tenant})()
+        self.plans = type("P", (), {"playbooks": BOOKS if books is None else books})()
 
 
 def decision(engine, status: str, plan_id: int | None, version: int | None = 1, n: int = 1, **export):
@@ -87,14 +90,30 @@ def test_no_decision_is_empty(engine, clean):
     assert (v.state, v.plan_id, v.steps, v.decision_version, v.consent) == ("empty", None, [], None, None)
 
 
-def test_not_yet_applied_decision_is_empty(engine, clean):
-    """Review focus 1: the newest decision is stored but not applied yet, so the older plan is not shown as current."""
+@pytest.mark.parametrize("newer", ["pending", "held", "refused", "stale"])
+def test_newer_unapplied_decision_does_not_hide_the_applied_plan(engine, clean, newer):
+    """Replaces test_not_yet_applied_decision_is_empty (controller ruling, fix round 1): the lag shows in
+    decision_version, the plan stays."""
     p = plan(engine)
     task(engine, p, "a", "running")
     decision(engine, "planned", p, version=1, n=1)
-    assert view(engine).state == "active"
-    decision(engine, "pending", None, version=2, n=2)
+    decision(engine, newer, None, version=2, n=2)
+    v = view(engine)
+    assert (v.state, v.plan_id, v.decision_version) == ("active", p, 1)
+
+
+def test_only_a_pending_decision_is_empty(engine, clean):
+    plan(engine)
+    decision(engine, "pending", None, version=1)
     assert view(engine).state == "empty"
+
+
+def test_withdrawn_row_with_open_plan_is_stopped(engine, clean):
+    p = plan(engine)  # still active
+    task(engine, p, "a", "running")
+    decision(engine, "withdrawn", p)
+    v = view(engine)
+    assert (v.state, v.state_reason) == ("stopped", "withdrawn")
 
 
 def test_self_serve_plan_is_not_used_for_a_decision(engine, clean):
@@ -116,12 +135,8 @@ def test_decision_version_is_the_newest_applied_to_the_plan(engine, clean):
     decision(engine, "planned", p, version=1, n=1)
     decision(engine, "revised", p, version=3, n=3)
     decision(engine, "stale", p, version=2, n=2)
-    decision(engine, "refused", None, version=4, n=4)  # newest overall, but applied nowhere: empty
-    assert view(engine).state == "empty"
-    with engine.begin() as conn:
-        conn.execute(models.counsellor_intake.delete().where(models.counsellor_intake.c.decision_id == "d-4"))
-    v = view(engine)
-    assert (v.state, v.decision_version) == ("active", 3)
+    decision(engine, "refused", None, version=4, n=4)
+    assert view(engine).decision_version == 3
 
 
 def test_v1_decision_has_no_version(engine, clean):
@@ -251,3 +266,40 @@ def test_unknown_student_is_empty_through_the_port(svc):
         assert plan_query.plan_view("nobody").state == "empty"
     finally:
         ports.configure(None)
+
+
+def test_route_key_from_the_newest_pin(engine, clean):
+    p = plan(engine)
+    with engine.begin() as conn:
+        conn.execute(insert(models.playbook_pins).values(tenant_id="pai", plan_id=p, playbook_key="germany_master",
+                                                         version=1))
+    decision(engine, "planned", p)
+    assert view(engine).route.route_key == "germany_master"
+
+
+def test_no_pin_derives_the_key_from_the_playbooks(engine, clean):
+    p = plan(engine)
+    decision(engine, "planned", p)
+    v = build_plan_view(_Svc(engine), STUDENT)
+    assert v.route.route_key == "germany_master"
+
+
+def test_no_pin_and_no_playbook_is_an_error(engine, clean):
+    p = plan(engine)
+    decision(engine, "planned", p)
+    with pytest.raises(ValueError, match="no playbook pin"):
+        build_plan_view(_Svc(engine, {}), STUDENT)
+
+
+def test_other_students_and_tenants_are_never_returned(engine, clean):
+    mine = plan(engine)
+    task(engine, mine, "a", "running")
+    decision(engine, "planned", mine, n=1)
+    other = plan(engine, ref="j-9:DE:master")
+    with engine.begin() as conn:
+        conn.execute(update(models.plans).where(models.plans.c.id == other).values(student_ref="ws-other"))
+    decision(engine, "planned", other, n=2, student_ref="ws-other")
+    assert view(engine).plan_id == mine
+    assert build_plan_view(_Svc(engine), "ws-other").plan_id == other
+    assert build_plan_view(_Svc(engine), "ws-nobody").state == "empty"
+    assert build_plan_view(_Svc(engine, tenant="other"), STUDENT).state == "empty"
