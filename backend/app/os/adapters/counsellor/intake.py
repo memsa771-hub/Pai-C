@@ -10,9 +10,10 @@ from sqlalchemy import and_, insert, select
 
 from app.os import models
 from app.os.adapters.counsellor.escalation import intake_refused
-from app.os.adapters.counsellor.store import Intake
+from app.os.adapters.counsellor.store import Intake, IntakeStore
 from app.os.compiler import CompileError
 from app.os.contracts.decision_record import DecisionRecordV1
+from app.os.contracts.decision_record_v2 import DecisionRecordV2
 from app.os.contracts.route_contract import RouteContract
 from app.os.kernel import StaleDraft
 from app.os.kernel.states import PLAN_CLOSED, PLAN_OPEN
@@ -25,12 +26,13 @@ TO_COUNSELLOR = REFUSALS[:4]  # should never arrive, so the Counsellor hears of 
 SELF_SERVE_REASON = "A Counsellor decision arrived while the student has an open self-serve plan: a person decides."
 CLOSED_REASON = "A Counsellor decision names a route whose plan was closed: a person decides."
 SOURCE = "counsellor"
+V2_SCHEMA = "pai.decision_record.v2"
 P = models.plans
 
 
 @dataclass(frozen=True)
 class IntakeResult:
-    status: str  # planned | revised | replaced | refused
+    status: str  # planned | revised | replaced | refused | stale | withdrawn
     reason: str | None = None
     plan_id: int | None = None
 
@@ -91,13 +93,43 @@ def _revise(svc, plan_id: int, contract: RouteContract, cause: str) -> None:
     raise StaleDraft(f"plan {plan_id} kept changing during the Counsellor revision")
 
 
+def _v1_contract(decision: DecisionRecordV2) -> RouteContract:
+    """The plan engine takes the v1 contract (D-b): a v2 decision of one of the four v1 levels converts to it."""
+    two = decision.to_route_contract()
+    return RouteContract(contract_version="1", source="counsellor", external_ref=two.external_ref,
+                         student_ref=two.student_ref, origin_country=two.origin_country,
+                         destination_country=two.destination_country, level=two.level,
+                         programmes=two.programmes, target_intake=two.target_intake)
+
+
+def _withdraw(svc, decision: DecisionRecordV2) -> IntakeResult:
+    """The student withdrew the decision: every open Counsellor plan of the student is closed by the kernel."""
+    closed = [p.id for p in _plans_of(svc, decision.student_ref, SOURCE) if p.status in PLAN_OPEN]
+    for plan_id in closed:
+        svc.kernel.close_plan(plan_id, f"withdrawn:{decision.decision_id}")
+    return IntakeResult("withdrawn", None, closed[-1] if closed else None)
+
+
 def process(svc, intake: Intake) -> IntakeResult:
-    try:
-        decision = DecisionRecordV1.model_validate(intake.export)
-    except ValidationError:
-        return _refuse(svc, intake, "invalid_export")
+    if intake.export.get("schema") == V2_SCHEMA:
+        try:
+            decision = DecisionRecordV2.model_validate(intake.export)
+        except ValidationError:
+            return _refuse(svc, intake, "invalid_export")
+        newest = IntakeStore(svc.engine, svc.kernel.tenant_id).newest_processed_version(decision.student_ref, intake.id)
+        if newest is not None and decision.decision_version <= newest:
+            return IntakeResult("stale")
+        if decision.status == "withdrawn":
+            return _withdraw(svc, decision)
+    else:
+        try:
+            decision = DecisionRecordV1.model_validate(intake.export)
+        except ValidationError:
+            return _refuse(svc, intake, "invalid_export")
     if decision.authorized_at is None:
         return _refuse(svc, intake, "not_authorized")
+    if isinstance(decision, DecisionRecordV2) and (not decision.os_supported or decision.level == "intermediate"):
+        return _refuse(svc, intake, "route_not_supported")  # intermediate waits for the v2 plan engine (D-b)
     try:
         book = select_playbook(svc.plans.playbooks, decision.origin_country, decision.destination_country,
                                decision.level)
@@ -109,7 +141,7 @@ def process(svc, intake: Intake) -> IntakeResult:
     own = [p for p in _plans_of(svc, decision.student_ref, "self_serve") if p.status in PLAN_OPEN]
     if own:
         return _refuse(svc, intake, "self_serve_plan_open", own[-1].id)
-    contract = decision.to_route_contract()
+    contract = _v1_contract(decision) if isinstance(decision, DecisionRecordV2) else decision.to_route_contract()
     theirs = _plans_of(svc, decision.student_ref, SOURCE)
     same = next((p for p in theirs if p.external_ref == contract.external_ref), None)
     if same is not None and same.status == PLAN_CLOSED:

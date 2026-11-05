@@ -21,17 +21,19 @@ class Intake:
     export: dict
     export_sha256: str
     chosen_at: datetime
-    status: str  # pending | planned | revised | replaced | refused
+    status: str  # pending | planned | revised | replaced | refused | stale | withdrawn
     reason: str | None
     plan_id: int | None
     counsellor_status: str | None
     created_at: datetime
     processed_at: datetime | None
+    decision_version: int | None = None  # null for v1 rows
+    decision_status: str | None = None
 
 
 def _intake(r) -> Intake:
     return Intake(r.id, r.decision_id, r.student_ref, r.journey_id, r.export, r.export_sha256, r.chosen_at, r.status,
-                  r.reason, r.plan_id, r.counsellor_status, r.created_at, r.processed_at)
+                  r.reason, r.plan_id, r.counsellor_status, r.created_at, r.processed_at, r.decision_version, r.decision_status)
 
 
 class IntakeStore:
@@ -46,6 +48,7 @@ class IntakeStore:
             got = conn.execute(insert(I).values(
                 tenant_id=self.tenant_id, decision_id=export["decision_id"], student_ref=export["student_ref"],
                 journey_id=export["journey_id"], export=export, export_sha256=sha,
+                decision_version=export.get("decision_version"), decision_status=export.get("status"),
                 chosen_at=datetime.fromisoformat(chosen_at) if isinstance(chosen_at, str) else chosen_at,
             ).on_conflict_do_nothing(constraint="uq_os_counsellor_intake_decision").returning(I.c.id)).first()
         return got is not None
@@ -56,11 +59,26 @@ class IntakeStore:
         return _intake(row) if row else None
 
     def pending(self, limit: int = 100) -> list[Intake]:
-        """Pending rows per student in `chosen_at` order, so a student's newest decision is processed last."""
+        """Pending rows per student by decision version (v1 rows, which have none, first), then `chosen_at`, so a
+        student's newest decision is processed last."""
         with self.engine.connect() as conn:
             rows = conn.execute(select(I).where(I.c.tenant_id == self.tenant_id, I.c.status == "pending")
-                                .order_by(I.c.student_ref, I.c.chosen_at, I.c.id).limit(limit)).all()
+                                .order_by(I.c.student_ref, I.c.decision_version.nulls_first(), I.c.chosen_at, I.c.id)
+                                .limit(limit)).all()
         return [_intake(r) for r in rows]
+
+    def latest_version(self, student_ref: str) -> int | None:
+        """The highest decision version stored for the student, whatever its outcome."""
+        with self.engine.connect() as conn:
+            return conn.execute(select(func.max(I.c.decision_version)).where(
+                I.c.tenant_id == self.tenant_id, I.c.student_ref == student_ref)).scalar()
+
+    def newest_processed_version(self, student_ref: str, excluding_id: int) -> int | None:
+        """The highest version already processed (status not `pending`) for the student."""
+        with self.engine.connect() as conn:
+            return conn.execute(select(func.max(I.c.decision_version)).where(
+                I.c.tenant_id == self.tenant_id, I.c.student_ref == student_ref, I.c.status != "pending",
+                I.c.id != excluding_id)).scalar()
 
     def finish(self, intake_id: int, status: str, reason: str | None = None, plan_id: int | None = None) -> None:
         with self.engine.begin() as conn:

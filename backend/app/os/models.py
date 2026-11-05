@@ -538,7 +538,7 @@ visa_choices = Table(
 PROPOSAL_STATUSES = ("applied", "pending", "accepted", "declined", "expired", "refused")
 OVERRIDE_OPS = ("skip", "cancel", "cancel_programme", "add", "reprioritise")
 # Slice 8 (spec S8-D10, S8-D12)
-INTAKE_STATUSES = ("pending", "planned", "revised", "replaced", "refused")
+INTAKE_STATUSES = ("pending", "planned", "revised", "replaced", "refused", "stale", "withdrawn")
 INTAKE_REFUSALS = ("not_authorized", "invalid_export", "route_not_supported", "unknown_programme",
                    "self_serve_plan_open", "plan_closed")
 COUNSELLOR_DELIVERY = ("pending", "sent", "refused")
@@ -617,11 +617,14 @@ counsellor_intake = Table(
     Column("counsellor_status", Text),  # a refusal sent to the Counsellor by journey (spec §2.5)
     _created(),
     Column("processed_at", DateTime(timezone=True)),
+    Column("decision_version", Integer),  # P1-T2 (os_0018): null for v1 rows
+    Column("decision_status", Text),
     UniqueConstraint("tenant_id", "decision_id", name="uq_os_counsellor_intake_decision"),
     _in("status", INTAKE_STATUSES, "ck_os_counsellor_intake_status"),
     _in("reason", INTAKE_REFUSALS, "ck_os_counsellor_intake_reason"),
     _in("counsellor_status", COUNSELLOR_DELIVERY, "ck_os_counsellor_intake_delivery"),
     Index("ix_os_counsellor_intake_pending", "tenant_id", "status", "student_ref", "chosen_at"),
+    Index("ix_os_counsellor_intake_version", "tenant_id", "student_ref", "decision_version"),
 )
 
 counsellor_sweep = Table(
