@@ -15,7 +15,7 @@ from tests.test_route_journey import confirmed_student, with_routes
 
 pytestmark = [pytest.mark.req("R-03"), pytest.mark.req("R-79")]
 
-DETAILS = ChoiceDetails(origin_country="PK", destination_country="GB", level="undergraduate",
+DETAILS = ChoiceDetails(origin_country="PK", destination_country="GB", level="bachelor",
                         places=(("uni-a:cs", 1), ("uni-b:cs", 2)), intake=("autumn", 2027))
 
 
@@ -63,6 +63,8 @@ async def test_outbox_row_in_same_transaction():
         assert payload["programmes"] == [{"programme_ref": "uni-a:cs", "rank": 1},
                                          {"programme_ref": "uni-b:cs", "rank": 2}]
         assert payload["chosen_at"].endswith("+00:00")
+        from app.os.contracts.decision_record_v2 import DecisionRecordV2
+        DecisionRecordV2.model_validate(payload)
         assert [i.key for i in outbox.pending_for(db, ws)] == [row.key]
         assert outbox.pending_for(db, "other") == []
 
@@ -82,6 +84,8 @@ async def test_withdraw_writes_a_withdrawn_export():
         assert second.payload["status"] == "withdrawn" and second.payload["programmes"] == []
         assert second.payload["decision_version"] == 2 and second.payload["target_intake"] is None
         assert second.payload["os_supported"] is True
+        from app.os.contracts.decision_record_v2 import DecisionRecordV2
+        DecisionRecordV2.model_validate(second.payload)
 
 
 @pytest.mark.asyncio
@@ -120,3 +124,15 @@ async def test_no_journey_is_not_sent():
             assert decision_record_v2(db, service.newest(student.workspace_id)) is None
         (row,) = items(db, student.workspace_id)
         assert row.status == "not_sent" and row.last_error == "no_journey" and row.payload is None
+
+
+@pytest.mark.asyncio
+async def test_supported_but_incomplete_is_not_sent():
+    async with confirmed_student() as (_, student, db, _journey):
+        with_routes(student, db)
+        bare = ChoiceDetails(origin_country="PK", destination_country="GB", level="bachelor", places=(), intake=None)
+        with on(), patch("app.pai_os_bridge.route_supported", return_value=True):
+            RouteDecisionService(db).choose(student.workspace_id, "electrical_engineering", details=bare)
+            db.commit()
+        (row,) = items(db, student.workspace_id)
+        assert row.status == "not_sent" and row.last_error == "incomplete"

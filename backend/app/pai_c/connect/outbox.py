@@ -15,6 +15,8 @@ def record(db, row: RouteDecision) -> OsOutbox | None:
         return None
     export = decision_record_v2(db, row)
     error = "no_journey" if export is None else None if row.os_supported else "not_supported"
+    if error is None and row.status == "chosen" and not (row.places and row.intake):
+        error = "incomplete"  # the OS contract needs a programme and an intake for a supported, chosen route
     item = OsOutbox(workspace_id=row.workspace_id, kind="decision",
                     key=f"decision:{row.workspace_id}:{row.decision_version}", payload=export,
                     status="pending" if error is None else "not_sent", last_error=error)

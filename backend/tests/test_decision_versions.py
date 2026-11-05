@@ -24,7 +24,7 @@ def rows(db, workspace_id):
                            .order_by(RouteDecision.decision_version)))
 
 
-DETAILS = ChoiceDetails(origin_country="PK", destination_country="GB", level="undergraduate",
+DETAILS = ChoiceDetails(origin_country="PK", destination_country="GB", level="bachelor",
                         places=(("uni-a:cs", 1), ("uni-b:cs", 2)), intake=("autumn", 2027), path_ref="path-1")
 
 
@@ -98,10 +98,10 @@ async def test_details_stored(supported):
         with_routes(student, db)
         with patch("app.pai_os_bridge.route_supported", return_value=supported) as check:
             RouteDecisionService(db).choose(student.workspace_id, "electrical_engineering", details=DETAILS)
-        check.assert_called_once_with("PK", "GB", "undergraduate")
+        check.assert_called_once_with("PK", "GB", "bachelor")
         db.commit()
         row = rows(db, student.workspace_id)[0]
-        assert (row.origin_country, row.destination_country, row.level) == ("PK", "GB", "undergraduate")
+        assert (row.origin_country, row.destination_country, row.level) == ("PK", "GB", "bachelor")
         assert row.places == [{"programme_ref": "uni-a:cs", "rank": 1}, {"programme_ref": "uni-b:cs", "rank": 2}]
         assert row.intake == {"term": "autumn", "year": 2027} and row.path_ref == "path-1"
         assert row.os_supported is supported and row.status == "chosen"
@@ -165,9 +165,9 @@ def test_route_supported_is_false_on_any_failure(monkeypatch):
     from app.os.ports import plan_source
 
     monkeypatch.setattr(plan_source, "supports", lambda *a: True)
-    assert pai_os_bridge.route_supported("PK", "GB", "undergraduate") is True
+    assert pai_os_bridge.route_supported("PK", "GB", "bachelor") is True
     for error in (ports.OsUnavailable("off"), RuntimeError("boom")):
         def fail(*args, _error=error):
             raise _error
         monkeypatch.setattr(plan_source, "supports", fail)
-        assert pai_os_bridge.route_supported("PK", "GB", "undergraduate") is False
+        assert pai_os_bridge.route_supported("PK", "GB", "bachelor") is False
