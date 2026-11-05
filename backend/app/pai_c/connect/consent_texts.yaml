@@ -38,6 +38,14 @@ guardian_page:
     - "You can withdraw your agreement at any time with the link in the confirmation email. Their plan then pauses."
   agree_button: "I agree"
 
+# The page the guardian sees when they open the withdraw link of the confirmation email.
+guardian_withdraw_page:
+  title: "Withdraw your agreement for {student_first_name}"
+  body:
+    - "You agreed that Placement AI shares {student_first_name}'s choice with their plan."
+    - "If you withdraw, Placement AI stops sharing it and {student_first_name}'s plan pauses."
+  withdraw_button: "Withdraw my agreement"
+
 # The email sent once the guardian has agreed. It carries the withdraw link.
 guardian_confirmation:
   subject: "You agreed for {student_first_name} - Placement AI"

@@ -16,7 +16,7 @@ import {
 type View =
   | { kind: 'loading' }
   | { kind: 'ask'; mode: GuardianMode; page: GuardianPage }
-  | { kind: 'done'; answer: GuardianAnswer }
+  | { kind: 'done'; answer: GuardianAnswer; mode: GuardianMode; confirmationSent: boolean }
   | { kind: 'error'; problem: 'busy' | 'unavailable' | 'network' };
 
 type Key = Parameters<ReturnType<typeof useT>>[0];
@@ -27,6 +27,8 @@ const DONE: Record<GuardianAnswer, [Key, Key]> = {
   used: ['guardian.usedTitle', 'guardian.usedBody'],
   stale: ['guardian.staleTitle', 'guardian.staleBody'],
 };
+const STALE_WITHDRAW: [Key, Key] = ['guardian.staleWithdrawTitle', 'guardian.staleWithdrawBody'];
+const AGREED_NO_MAIL: [Key, Key] = ['guardian.agreedTitle', 'guardian.agreedNoMailBody'];
 const PROBLEM: Record<'busy' | 'unavailable' | 'network', [Key, Key]> = {
   busy: ['guardian.busyTitle', 'guardian.busyBody'],
   unavailable: ['guardian.unavailableTitle', 'guardian.unavailableBody'],
@@ -45,7 +47,8 @@ export default function GuardianPageRoute({ params }: { params: Promise<{ token:
     loadGuardianPage(token).then(
       ({ mode, page }) => {
         if (!live) return;
-        setView(page.state === 'ok' ? { kind: 'ask', mode, page } : { kind: 'done', answer: page.state });
+        setView(page.state === 'ok' ? { kind: 'ask', mode, page }
+          : { kind: 'done', answer: page.state, mode, confirmationSent: false });
       },
       (e) => live && setView({ kind: 'error', problem: e instanceof GuardianError ? e.kind : 'network' }),
     );
@@ -58,7 +61,8 @@ export default function GuardianPageRoute({ params }: { params: Promise<{ token:
     if (sending) return;
     setSending(true);
     try {
-      setView({ kind: 'done', answer: await answerGuardian(token, mode) });
+      const { state, confirmationSent } = await answerGuardian(token, mode);
+      setView({ kind: 'done', answer: state, mode, confirmationSent });
     } catch (e) {
       setView({ kind: 'error', problem: e instanceof GuardianError ? e.kind : 'network' });
     } finally {
@@ -76,11 +80,19 @@ export default function GuardianPageRoute({ params }: { params: Promise<{ token:
           </div>
         )}
         {view.kind === 'ask' && <Ask view={view} sending={sending} onPress={press} />}
-        {view.kind === 'done' && <Message title={t(DONE[view.answer][0])} body={t(DONE[view.answer][1])} />}
+        {view.kind === 'done' && <Done view={view} />}
         {view.kind === 'error' && <Message title={t(PROBLEM[view.problem][0])} body={t(PROBLEM[view.problem][1])} />}
       </div>
     </main>
   );
+}
+
+function Done({ view }: { view: Extract<View, { kind: 'done' }> }) {
+  const t = useT();
+  // A withdraw link that finds no agreement has its own wording; so has an agreement whose mail did not go out.
+  const [title, body] = view.answer === 'stale' && view.mode === 'withdraw' ? STALE_WITHDRAW
+    : view.answer === 'agreed' && !view.confirmationSent ? AGREED_NO_MAIL : DONE[view.answer];
+  return <Message title={t(title)} body={t(body)} />;
 }
 
 function Message({ title, body }: { title: string; body: string }) {
@@ -95,11 +107,10 @@ function Message({ title, body }: { title: string; body: string }) {
 function Ask({ view, sending, onPress }: { view: Extract<View, { kind: 'ask' }>; sending: boolean; onPress: (m: GuardianMode) => void }) {
   const t = useT();
   const { mode, page } = view;
-  const name = page.student_first_name || t('guardian.thisStudent');
-  // The withdraw page's wording is the screen's own; the agree page shows the approved text the API sends.
-  const title = mode === 'agree' ? page.text?.title : t('guardian.withdrawTitle', { name });
-  const body = mode === 'agree' ? page.text?.body ?? [] : [t('guardian.withdrawBody', { name })];
-  const button = mode === 'agree' ? page.text?.agree_button : t('guardian.withdrawButton');
+  // Both pages show the approved wording the API sends.
+  const title = page.text?.title;
+  const body = page.text?.body ?? [];
+  const button = mode === 'agree' ? page.text?.agree_button : page.text?.withdraw_button;
   return (
     <div className="space-y-4" data-testid={`guardian-${mode}`}>
       <h1 className="text-xl font-semibold">{title}</h1>

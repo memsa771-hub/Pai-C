@@ -177,27 +177,39 @@ def _locked(db, token: str, purpose: str) -> tuple[GuardianConsent | None, str]:
     return row, _resolve(db, row)
 
 
-def open(db, token: str, *, ip: str | None = None, purpose: str = AGREE) -> dict:  # noqa: A001 - the spec's name
-    """What the link page shows: `{"state": "ok|expired|used|stale", "text", "student_first_name"}`."""
-    if purpose != WITHDRAW:  # withdrawing is never blocked by the text gate
+def open(db, token: str, *, ip: str | None = None, purpose: str | None = None) -> dict:  # noqa: A001 - the spec's name
+    """What the link page shows: `{"state": "ok|expired|used|stale", "purpose", "text", "student_first_name"}`.
+    With no `purpose` the token says which kind it is (one lookup, so one page load counts once). An unknown token is
+    taken for an agree link. A withdraw link is neither gated by the text approval nor counted by the rate limit."""
+    if purpose is None:
+        purpose = db.scalar(select(GuardianConsent.purpose).where(
+            GuardianConsent.token_hash == _digest(token or ""))) or AGREE
+    if purpose != WITHDRAW:  # withdrawing is never blocked by the text gate nor the rate limit
         consent.ensure_usable()
-    _limit_ip(ip)
+        _limit_ip(ip)
     row, state = _locked(db, token, purpose)
     if row is None or state != "ok":
-        return {"state": state, "text": None, "student_first_name": None}
+        return {"state": state, "purpose": purpose, "text": None, "student_first_name": None}
     name = _first_name(db, row.workspace_id)
-    return {"state": "ok", "student_first_name": name,
-            "text": _fill(consent.texts()["guardian_page"], student_first_name=name)}
+    key = "guardian_withdraw_page" if purpose == WITHDRAW else "guardian_page"
+    return {"state": "ok", "purpose": purpose, "student_first_name": name,
+            "text": _fill(consent.texts()[key], student_first_name=name)}
 
 
 def agree(db, token: str, *, ip: str | None = None) -> str:
     """The guardian agrees: a new decision version carries `guardian_authorized_at`. Returns
     `agreed|expired|used|stale`; on `agreed` the guardian gets the confirmation e-mail with the withdraw link."""
+    return agree_with_mail(db, token, ip=ip)[0]
+
+
+def agree_with_mail(db, token: str, *, ip: str | None = None) -> tuple[str, bool]:
+    """Like `agree`, and says whether the confirmation e-mail (the only place of the withdraw link) was sent. A mail
+    problem never undoes the agreement: it is logged (class name only) and reported as not sent."""
     consent.ensure_usable()
     _limit_ip(ip)
     row, state = _locked(db, token, AGREE)
     if row is None or state != "ok":
-        return state
+        return state, False
     service = RouteDecisionService(db)
     moment = now()
     service.update_consent(row.workspace_id, guardian_authorized_at=moment)
@@ -206,17 +218,21 @@ def agree(db, token: str, *, ip: str | None = None) -> str:
     withdraw_row, withdraw_token = _issue(db, row.workspace_id, service.newest(row.workspace_id), row.email,
                                           WITHDRAW, None)
     mail = _fill(texts["guardian_confirmation"], student_first_name=_first_name(db, row.workspace_id))
-    auth_emails.send_guardian_confirmation_email(
-        row.email, auth_emails.guardian_link(withdraw_token), subject=mail["subject"], title=mail["title"],
-        paragraphs=mail["paragraphs"], button=mail["button"], footer=mail["footer"])
+    try:
+        sent = bool(auth_emails.send_guardian_confirmation_email(
+            row.email, auth_emails.guardian_link(withdraw_token), subject=mail["subject"], title=mail["title"],
+            paragraphs=mail["paragraphs"], button=mail["button"], footer=mail["footer"]))
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("guardian: confirmation mail to %s failed (%s)", mask_email(row.email), type(exc).__name__)
+        sent = False
     logger.info("guardian: %s agreed for decision version %s", mask_email(row.email), row.decision_version)
-    return "agreed"
+    return "agreed", sent
 
 
 def withdraw(db, token: str, *, ip: str | None = None) -> str:
     """The guardian withdraws with the link of the confirmation e-mail: a new version clears
-    `guardian_authorized_at`. Returns `withdrawn|expired|used|stale`. Never blocked by the text gate."""
-    _limit_ip(ip)
+    `guardian_authorized_at`. Returns `withdrawn|expired|used|stale`. Never blocked by the text gate or counted by
+    the rate limit (the token is 256 bits; a normal withdraw must never be turned away)."""
     row, state = _locked(db, token, WITHDRAW)
     if row is None or state != "ok":
         return state

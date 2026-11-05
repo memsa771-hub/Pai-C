@@ -10,11 +10,13 @@ vi.mock("next/image", () => ({ default: (p: { alt: string }) => <span>{p.alt}</s
 
 const TOKEN = "tok-abc_123";
 const agreeText = { title: "Sam asks for your agreement", body: ["Sam chose a study route.", "Nothing else is shared."], agree_button: "I agree" };
+const withdrawText = { title: "Withdraw your agreement for Sam", body: ["You agreed that Placement AI shares Sam's choice with their plan."], withdraw_button: "Withdraw my agreement" };
 const g = messages.guardian;
 
 type Reply = { status?: number; data?: unknown };
 const ok = (data: unknown): Reply => ({ data });
-const page = (state: string, withText = state === "ok") => ok({ state, student_first_name: "Sam", text: withText ? agreeText : null });
+const page = (state: string, purpose = "agree") =>
+  ok({ state, purpose, student_first_name: "Sam", text: state !== "ok" ? null : purpose === "agree" ? agreeText : withdrawText });
 
 /** The API by route: "GET " + path after the token, "POST " + path. */
 function api(routes: Record<string, Reply>) {
@@ -47,7 +49,7 @@ const message = async (title: string) => {
 
 // req: R-10 R-79
 it("shows the approved text with an Agree button, and agrees only when the button is pressed", async () => {
-  const calls = api({ "GET ": page("ok"), "POST /agree": ok({ state: "agreed" }) });
+  const calls = api({ "GET ": page("ok"), "POST /agree": ok({ state: "agreed", confirmation_sent: true }) });
   await open();
   await screen.findByRole("heading", { name: agreeText.title });
   agreeText.body.forEach((line) => expect(screen.getByText(line)).toBeTruthy());
@@ -79,43 +81,64 @@ it.each([
   ["used", g.usedTitle],
   ["stale", g.staleTitle],
 ])("says so for a %s link and offers no button", async (state, title) => {
-  api({ "GET ": page(state), "GET /withdraw": page("expired") });
+  api({ "GET ": page(state) });
   await open();
   await message(title);
   expect(screen.queryByRole("button")).toBeNull();
 });
 
 // req: R-10 R-79
-it("a used agree link is never looked up as a withdraw link", async () => {
-  const calls = api({ "GET ": page("used") });
+it("the confirmation mail's link opens the withdraw page with the API's wording, in one lookup", async () => {
+  const calls = api({ "GET ": page("ok", "withdraw"), "POST /withdraw": ok({ state: "withdrawn" }) });
   await open();
-  await message(g.usedTitle);
-  expect(calls).toHaveLength(1);
-});
-
-// req: R-10 R-79
-it("the confirmation mail's link opens the withdraw page and withdraws on the button", async () => {
-  const calls = api({ "GET ": page("expired"), "GET /withdraw": page("ok"), "POST /withdraw": ok({ state: "withdrawn" }) });
-  await open();
-  await screen.findByRole("heading", { name: g.withdrawTitle.replace("{name}", "Sam") });
+  await screen.findByRole("heading", { name: withdrawText.title });
+  expect(screen.getByText(withdrawText.body[0])).toBeTruthy();
   expect(screen.queryByRole("button", { name: agreeText.agree_button })).toBeNull();
-  fireEvent.click(screen.getByRole("button", { name: g.withdrawButton }));
+  expect(calls).toHaveLength(1); // one page load, one count against the rate limit
+  fireEvent.click(screen.getByRole("button", { name: withdrawText.withdraw_button }));
   await message(g.withdrawnTitle);
-  expect(calls.map((c) => `${c.init.method ?? "GET"} ${c.url.split(TOKEN)[1]}`)).toEqual(["GET ", "GET /withdraw", "POST /withdraw"]);
+  expect(calls.map((c) => `${c.init.method ?? "GET"} ${c.url.split(TOKEN)[1]}`)).toEqual(["GET ", "POST /withdraw"]);
 });
 
 // req: R-10 R-79
 it("a withdraw link that was already used says so", async () => {
-  api({ "GET ": page("expired"), "GET /withdraw": page("used") });
+  api({ "GET ": page("used", "withdraw") });
   await open();
   await message(g.usedTitle);
 });
 
 // req: R-10 R-79
-it("reaches the withdraw page even while agreeing is paused (409)", async () => {
-  api({ "GET ": { status: 409 }, "GET /withdraw": page("ok") });
+it("a stale withdraw link says there is nothing to withdraw, not that the choice changed", async () => {
+  api({ "GET ": page("stale", "withdraw") });
   await open();
-  await screen.findByRole("button", { name: g.withdrawButton });
+  await message(g.staleWithdrawTitle);
+  expect(screen.getByTestId("guardian-message").textContent).toContain(g.staleWithdrawBody);
+  expect(screen.getByTestId("guardian-message").textContent).not.toContain("changed their choice");
+});
+
+// req: R-10 R-79
+it("a withdraw click that finds nothing to withdraw says the same", async () => {
+  api({ "GET ": page("ok", "withdraw"), "POST /withdraw": ok({ state: "stale" }) });
+  await open();
+  fireEvent.click(await screen.findByRole("button", { name: withdrawText.withdraw_button }));
+  await message(g.staleWithdrawTitle);
+});
+
+// req: R-10 R-79
+it("mentions the confirmation email only when it was sent", async () => {
+  api({ "GET ": page("ok"), "POST /agree": ok({ state: "agreed", confirmation_sent: true }) });
+  await open();
+  fireEvent.click(await screen.findByRole("button", { name: agreeText.agree_button }));
+  await message(g.agreedTitle);
+  expect(screen.getByTestId("guardian-message").textContent).toContain(g.agreedBody);
+  cleanup();
+  api({ "GET ": page("ok"), "POST /agree": ok({ state: "agreed", confirmation_sent: false }) });
+  await open();
+  fireEvent.click(await screen.findByRole("button", { name: agreeText.agree_button }));
+  await message(g.agreedTitle);
+  const text = screen.getByTestId("guardian-message").textContent!;
+  expect(text).toContain(g.agreedNoMailBody);
+  expect(text).not.toContain("We sent a confirmation");
 });
 
 // req: R-10 R-79
@@ -132,7 +155,7 @@ it.each([
   [409, g.unavailableTitle],
   [500, g.errorTitle],
 ])("shows a calm message for HTTP %s", async (status, title) => {
-  api({ "GET ": { status }, "GET /withdraw": { status } });
+  api({ "GET ": { status } });
   await open();
   await message(title);
 });

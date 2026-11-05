@@ -72,6 +72,14 @@ def plans_of(svc, who) -> list:  # noqa: F811
                                  .where(PLAN.c.student_ref == who.workspace_id)))
 
 
+def events_of(svc, plan_id: int) -> list[str]:  # noqa: F811
+    E = models.events
+    with svc.engine.connect() as conn:
+        return list(conn.execute(select(E.c.type).where(E.c.plan_id == plan_id,
+                                                        E.c.type.in_(("plan_paused", "plan_resumed")))
+                                 .order_by(E.c.id)).scalars())
+
+
 def count(svc, table) -> int:  # noqa: F811
     with svc.engine.connect() as conn:
         return conn.execute(select(func.count()).select_from(table)).scalar()
@@ -112,6 +120,7 @@ def test_an_adult_chooses_withdraws_and_gives_consent_again(svc, world):  # noqa
         assert run_os(svc) == [("paused", "consent_missing")]
         (paused,) = plans_of(svc, who)
         assert (paused.id, paused.status) == (plan.id, "paused") and count(svc, models.support_cases) == 0
+        assert events_of(svc, plan.id) == ["plan_paused"]
 
         # 3. the student gives consent again: the plan resumes, no second plan
         back = data(post(client, params, "consent/give"))
@@ -119,6 +128,7 @@ def test_an_adult_chooses_withdraws_and_gives_consent_again(svc, world):  # noqa
         assert run_os(svc) == [("revised", None)]
         (resumed,) = plans_of(svc, who)
         assert (resumed.id, resumed.status) == (plan.id, "active")
+        assert events_of(svc, plan.id) == ["plan_paused", "plan_resumed"]
         assert count(svc, models.counsellor_intake) == 3
 
         # the 5-minute sweep finds nothing left to send or to catch up on
@@ -143,7 +153,7 @@ def test_an_under_18_student_is_held_until_the_guardian_agrees_and_paused_when_t
         for _ in range(2):  # a mail scanner opening the link
             assert public(client, "get", agree_token)["state"] == "ok"
         assert run_os(svc) == []
-        assert public(client, "post", f"{agree_token}/agree") == {"state": "agreed"}
+        assert public(client, "post", f"{agree_token}/agree") == {"state": "agreed", "confirmation_sent": True}
         assert run_os(svc) == [("planned", None)]
         (plan,) = plans_of(svc, who)
         assert plan.status == "active" and [p["programme_ref"] for p in plan.contract["programmes"]] == ["pk-p1"]
@@ -152,13 +162,14 @@ def test_an_under_18_student_is_held_until_the_guardian_agrees_and_paused_when_t
         assert len(mails) == 2
         withdraw_token = link_token(mails[1])
         assert public(client, "get", agree_token)["state"] == "used"
-        assert public(client, "get", withdraw_token)["state"] == "expired"  # why the page then asks /withdraw
-        page = public(client, "get", f"{withdraw_token}/withdraw")
-        assert page["state"] == "ok" and run_os(svc) == []
+        page = public(client, "get", withdraw_token)  # the mail links to the same path; the token says its kind
+        assert (page["state"], page["purpose"]) == ("ok", "withdraw") and page["text"]["withdraw_button"]
+        assert public(client, "get", f"{withdraw_token}/withdraw")["text"] == page["text"] and run_os(svc) == []
         assert public(client, "post", f"{withdraw_token}/withdraw") == {"state": "withdrawn"}
         assert run_os(svc) == [("paused", "consent_missing")]
         (paused,) = plans_of(svc, who)
         assert (paused.id, paused.status) == (plan.id, "paused") and len(mails) == 3
+        assert events_of(svc, plan.id) == ["plan_paused"]
         assert public(client, "post", f"{withdraw_token}/withdraw") == {"state": "used"}
         assert run_os(svc) == []
         with who.factory() as db:

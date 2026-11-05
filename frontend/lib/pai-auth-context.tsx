@@ -10,6 +10,7 @@
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import type { User } from 'firebase/auth';
 import { identify, resetIdentity } from './analytics';
+import { isPrivatePath } from './analytics-snippets';
 import { workspaceApi } from './api';
 import {
   AUTH_INVALID_EVENT, AUTH_UNVERIFIED_EVENT, FIREBASE_SESSION, onUserChange, signedInUser,
@@ -114,7 +115,9 @@ export function PaiAuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const hosted = isPaiHostname(window.location.hostname);
     setIsPaiDeployment(hosted);
-    if (!hosted) { setLoading(false); return; }
+    // A link page (guardian, shared conversation) is for people who have no account: this provider leaves it
+    // alone, so it neither redirects nor identifies anybody there.
+    if (!hosted || isPrivatePath(window.location.pathname)) { setLoading(false); return; }
 
     const unsubscribe = onUserChange((firebaseUser) => {
       const path = window.location.pathname;

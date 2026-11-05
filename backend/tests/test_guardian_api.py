@@ -70,7 +70,7 @@ def test_post_agrees_once_and_get_never_does(os_stub, stubs):
         token = minor((client, student, params), stubs)
         assert client.get(f"/v1/guardian/{token}/agree").status_code == 405  # POST only
         out = public_ok(client.post(f"/v1/guardian/{token}/agree"))
-        assert out == {"state": "agreed"}
+        assert out == {"state": "agreed", "confirmation_sent": True}
         latest = rows(student)[-1]
         assert latest.decision_version == 2 and latest.guardian_authorized_at is not None
         assert len(stubs) == 2 and stubs[1]["to"] == EMAIL  # the confirmation with the withdraw link
@@ -186,4 +186,62 @@ def test_with_the_flag_off_the_public_routes_answer_stale_and_write_nothing(os_s
             assert public_ok(client.post(f"/v1/guardian/{token}/withdraw")) == {"state": "stale"}
         assert ([(c.outcome, c.used_at) for c in rows(student, GuardianConsent)], len(rows(student)),
                 len(stubs)) == before
-        assert public_ok(client.post(f"/v1/guardian/{token}/agree")) == {"state": "agreed"}  # on again: link still good
+        assert public_ok(client.post(f"/v1/guardian/{token}/agree")) == {"state": "agreed", "confirmation_sent": True}  # on again: link still good
+
+
+def test_one_get_answers_for_the_kind_of_token_it_is_given(os_stub, stubs):
+    with pre_eng() as (client, student, params), flag(True):
+        agree = minor((client, student, params), stubs)
+        assert public_ok(client.get(f"/v1/guardian/{agree}"))["purpose"] == "agree"
+        public_ok(client.post(f"/v1/guardian/{agree}/agree"))
+        withdraw = token_of(stubs[1])
+        page = public_ok(client.get(f"/v1/guardian/{withdraw}"))  # the same path the mail links to
+        assert page["state"] == "ok" and page["purpose"] == "withdraw"
+        assert page["text"]["title"].startswith("Withdraw your agreement") and "withdraw_button" in page["text"]
+        assert "agree_button" not in page["text"] and page["student_first_name"] in page["text"]["title"]
+        assert public_ok(client.get(f"/v1/guardian/{withdraw}/withdraw"))["text"] == page["text"]
+        assert public_ok(client.get("/v1/guardian/not-a-token"))["state"] == "expired"
+
+
+def test_a_stale_withdraw_link_says_stale_with_its_kind(os_stub, stubs):
+    with pre_eng() as (client, student, params), flag(True):
+        token = minor((client, student, params), stubs)
+        public_ok(client.post(f"/v1/guardian/{token}/agree"))
+        withdraw = token_of(stubs[1])
+        with student.factory() as db:  # no live guardian agreement now (a later version without it)
+            live = db.scalar(select(RouteDecision).where(RouteDecision.withdrawn_at.is_(None)))
+            live.guardian_authorized_at = None
+            db.commit()
+        page = public_ok(client.get(f"/v1/guardian/{withdraw}"))
+        assert (page["state"], page["purpose"]) == ("stale", "withdraw")
+
+
+def test_a_withdraw_never_meets_the_rate_limit_but_agree_and_unknown_links_do(os_stub, stubs):
+    with pre_eng() as (client, student, params), flag(True):
+        token = minor((client, student, params), stubs)
+        public_ok(client.post(f"/v1/guardian/{token}/agree"))
+        withdraw = token_of(stubs[1])
+        with patch("app.pai_c.connect.guardian.rate_limit.allow", return_value=False):
+            assert public_ok(client.get(f"/v1/guardian/{withdraw}"))["state"] == "ok"
+            assert public_ok(client.get(f"/v1/guardian/{withdraw}/withdraw"))["state"] == "ok"
+            assert client.get("/v1/guardian/not-a-token").status_code == 429
+            assert client.get(f"/v1/guardian/{token}").status_code == 429
+            assert public_ok(client.post(f"/v1/guardian/{withdraw}/withdraw")) == {"state": "withdrawn"}
+
+
+def test_a_page_load_counts_once_for_an_agree_link(os_stub, stubs):
+    with pre_eng() as (client, student, params), flag(True):
+        token = minor((client, student, params), stubs)
+        with patch("app.pai_c.connect.guardian.rate_limit.allow", return_value=True) as allow:
+            public_ok(client.get(f"/v1/guardian/{token}"))
+        assert allow.call_count == 1
+
+
+def test_the_answer_says_if_the_confirmation_mail_went_out(os_stub, stubs):
+    with pre_eng() as (client, student, params), flag(True):
+        token = minor((client, student, params), stubs)
+        with patch.object(auth_emails, "send_email", side_effect=RuntimeError(f"smtp down for {EMAIL}")):
+            out = public_ok(client.post(f"/v1/guardian/{token}/agree"))
+        assert out == {"state": "agreed", "confirmation_sent": False}  # the agreement stands
+        assert rows(student)[-1].guardian_authorized_at is not None
+        assert os_stub["submitted"][-1]["guardian_authorized_at"]

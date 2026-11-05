@@ -2,7 +2,7 @@
 """
 The guardian's one-time link (R-10): public, no sign-in. The token in the path is the only credential.
 
-GET  /v1/guardian/{token}            What the agree page shows (no change except the audit row)
+GET  /v1/guardian/{token}            What the page shows for the token's own kind (agree or withdraw) (no change except the audit row)
 POST /v1/guardian/{token}/agree      The guardian agrees
 GET  /v1/guardian/{token}/withdraw   What the withdraw page shows (no change except the audit row)
 POST /v1/guardian/{token}/withdraw   The guardian withdraws
@@ -65,8 +65,11 @@ def _changed(db, token: str, state: str, done: str) -> None:
 
 @router.post("/{token}/agree")
 def agree(token: str, request: Request, db=Depends(get_db)):
-    answer = _answer(db, lambda: {"state": guardian.agree(db, token, ip=_ip(request))},
-                    {"state": "stale"})
+    def call():
+        state, sent = guardian.agree_with_mail(db, token, ip=_ip(request))
+        return {"state": state, **({"confirmation_sent": sent} if state == "agreed" else {})}
+
+    answer = _answer(db, call, {"state": "stale"})
     if isinstance(answer, dict):
         _changed(db, token, answer["data"]["state"], "agreed")
     return answer

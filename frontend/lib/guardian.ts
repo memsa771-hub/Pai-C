@@ -7,14 +7,18 @@ export type GuardianMode = 'agree' | 'withdraw';
 /** What a click on the button answers. */
 export type GuardianAnswer = 'agreed' | 'withdrawn' | 'expired' | 'used' | 'stale';
 
+/** The approved wording from the API: `agree_button` on an agree page, `withdraw_button` on a withdraw page. */
 export interface GuardianText {
   title: string;
   body: string[];
-  agree_button: string;
+  agree_button?: string;
+  withdraw_button?: string;
 }
 
 export interface GuardianPage {
   state: GuardianState;
+  /** Which kind of link this is; absent while the connection is off (the API then answers `stale` and nothing else). */
+  purpose?: GuardianMode;
   text: GuardianText | null;
   student_first_name: string | null;
 }
@@ -52,24 +56,20 @@ async function call<T>(token: string, path: string, method: 'GET' | 'POST'): Pro
 
 /**
  * What the page shows. Both e-mails link to the same /guardian/<token>: the first mail carries an agree token, the
- * confirmation mail a withdraw token. An agree lookup of a withdraw token answers `expired` (an unknown link looks
- * old), so then, and when agreeing is paused (409), the withdraw lookup decides. Neither lookup changes anything.
+ * confirmation mail a withdraw token. One lookup answers for whichever kind the token is (`purpose`), so a page load
+ * counts once against the rate limit. The lookup changes nothing.
  */
 export async function loadGuardianPage(token: string): Promise<{ mode: GuardianMode; page: GuardianPage }> {
-  let agree: GuardianPage | null = null;
-  try {
-    agree = await call<GuardianPage>(token, '', 'GET');
-  } catch (e) {
-    if (!(e instanceof GuardianError) || e.kind !== 'unavailable') throw e;
-  }
-  if (agree && agree.state !== 'expired') return { mode: 'agree', page: agree };
-  const withdraw = await call<GuardianPage>(token, '/withdraw', 'GET');
-  if (agree && withdraw.state === 'expired') return { mode: 'agree', page: agree };
-  return { mode: 'withdraw', page: withdraw };
+  const page = await call<GuardianPage>(token, '', 'GET');
+  return { mode: page.purpose ?? 'agree', page };
 }
 
 /** The guardian presses the button. Only POST changes anything. */
-export async function answerGuardian(token: string, mode: GuardianMode): Promise<GuardianAnswer> {
-  const data = await call<{ state: GuardianAnswer }>(token, mode === 'agree' ? '/agree' : '/withdraw', 'POST');
-  return data.state;
+export async function answerGuardian(
+  token: string,
+  mode: GuardianMode,
+): Promise<{ state: GuardianAnswer; confirmationSent: boolean }> {
+  const data = await call<{ state: GuardianAnswer; confirmation_sent?: boolean }>(
+    token, mode === 'agree' ? '/agree' : '/withdraw', 'POST');
+  return { state: data.state, confirmationSent: data.confirmation_sent === true };
 }

@@ -64,7 +64,7 @@ def test_texts_are_approved_and_versioned():
     texts = consent.texts()
     assert consent.current_version() == "1" and texts["approved"] is True
     assert texts["approved_by"] == "owner, chat 2026-11-05"
-    assert {"student", "guardian_email", "guardian_page", "guardian_confirmation"} <= set(texts)
+    assert {"student", "guardian_email", "guardian_page", "guardian_withdraw_page", "guardian_confirmation"} <= set(texts)
     consent.ensure_usable()
     blob = str(texts).lower()
     for word in ("pakistan", "germany", "ireland", "united", "gdpr", "law ", "legal"):
