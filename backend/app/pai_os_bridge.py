@@ -208,3 +208,33 @@ def route_supported(origin: str, destination: str, level: str) -> bool:
     except Exception:
         log.exception("route support could not be read; treated as not supported")
         return False
+
+
+def list_routes() -> list[dict]:
+    """The routes PAI OS serves, `{key, origin, destination, level, intake_terms}`. `[]` when PAI OS is not mounted, and
+    on any failure (logged)."""
+    try:
+        from app.os.ports import plan_query
+
+        return plan_query.routes()
+    except ports.OsUnavailable:
+        return []
+    except Exception:
+        log.exception("routes could not be read; treated as none")
+        return []
+
+
+def programmes_for(route_key: str, term: str, year: int) -> list[dict]:
+    """The places for a route and intake, `{ref, name, university}`. `[]` when PAI OS is not mounted, and on any
+    failure (logged)."""
+    try:
+        from app.os.contracts.route_contract import IntakeRef
+        from app.os.ports import plan_query
+
+        listing = plan_query.programme_list(route_key, IntakeRef(term=term, year=year))
+        return [{"ref": p.programme_ref, "name": p.name, "university": p.university} for p in listing.programmes]
+    except ports.OsUnavailable:
+        return []
+    except Exception:
+        log.exception("programmes could not be read; treated as none")
+        return []

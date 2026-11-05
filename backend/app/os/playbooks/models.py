@@ -1,5 +1,6 @@
 """Playbook schema: a versioned route template, validated at load time (spec §4.1)."""
 
+import re
 from string import Formatter
 from typing import Literal
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
@@ -143,10 +144,19 @@ class Playbook(_Model):
     route: Route
     default_timezone: str
     require_citations: bool = False
+    intake_terms: list[str] = []  # the intake terms the route offers (D-g), e.g. one lowercase word per term
     constants: dict[str, Constant] = {}
     tasks: list[TaskTemplate]
     eligibility: EligibilityRules | None = None  # Slice 4: the route's eligibility checks (S4-D2)
     self_serve: SelfServe | None = None  # Slice 4: what the route builder completes (S4-D9)
+
+    @field_validator("intake_terms")
+    @classmethod
+    def _plain_terms(cls, terms: list[str]) -> list[str]:
+        for term in terms:
+            if not re.fullmatch(r"[a-z_]+", term):  # the same shape as IntakeRef.term
+                raise ValueError(f"intake term '{term}' must be lowercase letters and underscores")
+        return terms
 
     @field_validator("default_timezone")
     @classmethod

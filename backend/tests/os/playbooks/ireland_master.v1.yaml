@@ -3,6 +3,7 @@ key: ireland_master
 version: 1
 route: {origin: PK, destination: IE, level: master}
 default_timezone: Europe/Dublin
+intake_terms: [winter]
 # Slice 4: a different grade method on another destination, same code (spec S4-D2).
 eligibility:
   grade:

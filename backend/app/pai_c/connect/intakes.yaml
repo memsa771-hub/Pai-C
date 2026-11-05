@@ -1,0 +1,4 @@
+# Generic intake terms for a route PAI OS does not serve (generic words; names only, no dates or deadlines).
+# Years come from the calendar: today's year to three years later.
+terms: [winter, summer, spring, autumn, fall]
+years_ahead: 3

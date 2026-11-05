@@ -3,6 +3,7 @@ key: pakistan_inter
 version: 1
 route: {origin: PK, destination: PK, level: intermediate}
 default_timezone: Asia/Karachi
+intake_terms: [winter]
 eligibility:
   grade:
     - method: weighted_aggregate
