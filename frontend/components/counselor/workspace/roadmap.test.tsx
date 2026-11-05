@@ -534,3 +534,43 @@ it("renders a flag-off route (no plan, no OS steps) with no plan banner or owner
   await screen.findByRole("checkbox", { name: "Take ECAT / NET (pass 33%)" });
   expect(document.querySelector("[data-plan-state],[data-owner],[data-unsupported]")).toBeNull();
 });
+
+// req: R-44, R-04 (fix round 1)
+it("words a paused plan by its reason when copy.json has one, else neutrally", async () => {
+  vi.mocked(workspaceApi.getRoadmapPage).mockResolvedValue(osPage({ plan: { state: "paused", state_reason: "consent_missing" } }));
+  render(<Roadmap onNavigate={vi.fn()} />);
+  expect(await screen.findByText(copy.roadmap.plan.paused_consent_missing)).toBeTruthy();
+  cleanup();
+  vi.mocked(workspaceApi.getRoadmapPage).mockResolvedValue(osPage({ plan: { state: "paused", state_reason: "some_new_reason" } }));
+  render(<Roadmap onNavigate={vi.fn()} />);
+  expect(await screen.findByText(copy.roadmap.plan.paused)).toBeTruthy();
+  cleanup();
+  vi.mocked(workspaceApi.getRoadmapPage).mockResolvedValue(osPage({ plan: { state: "stopped", state_reason: "route_changed" } }));
+  render(<Roadmap onNavigate={vi.fn()} />);
+  expect(await screen.findByText(copy.roadmap.plan.stopped)).toBeTruthy();
+});
+
+it("never renders a tick for a PAI-owned step even when tickable is true", async () => {
+  const route = osPage().chosen;
+  vi.mocked(workspaceApi.getRoadmapPage).mockResolvedValue(osPage({ steps: route.steps.map((s) =>
+    s.key === "draft-statement" ? { ...s, tickable: true, owner: "pai" as const } : s) }));
+  render(<Roadmap onNavigate={vi.fn()} />);
+  await screen.findByText("Draft the statement of purpose");
+  expect(screen.queryByRole("checkbox", { name: "Draft the statement of purpose" })).toBeNull();
+});
+
+it("keeps an OS step's checkbox (disabled) while it saves, and reverts with the alert when the save fails", async () => {
+  vi.mocked(workspaceApi.getRoadmapPage).mockResolvedValue(osPage());
+  let fail!: (error: Error) => void;
+  vi.mocked(workspaceApi.setRouteStep).mockReturnValueOnce(new Promise((_, reject) => { fail = reject; }));
+  render(<Roadmap onNavigate={vi.fn()} />);
+  fireEvent.click(await screen.findByRole("checkbox", { name: "Collect your transcripts" }));
+  const box = screen.getByRole("checkbox", { name: "Collect your transcripts" }) as HTMLInputElement;
+  expect(box.disabled).toBe(true);
+  fail(new Error("503"));
+  expect(await screen.findByRole("alert")).toBeTruthy();
+  const back = screen.getByRole("checkbox", { name: "Collect your transcripts" }) as HTMLInputElement;
+  expect(back.checked).toBe(false);
+  expect(back.disabled).toBe(false);
+  expect(screen.getByText("Collect your transcripts").closest("li")!.getAttribute("data-status")).toBe("half");
+});

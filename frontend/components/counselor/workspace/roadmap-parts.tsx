@@ -295,7 +295,9 @@ export function CompareDialog({ cards, open, onOpenChange }: {
 /** What the OS plan is doing, in words: preparing, waiting for the student, paused, stopped or finished.
  * An active plan needs no banner. Nothing shows when the plan view is off (no `plan`). */
 function PlanBanner({ plan }: { plan: RoutePlan | undefined }) {
-  const text = plan && (t.plan as Record<string, string>)[plan.state];
+  const words = t.plan as Record<string, string>;
+  // The reason's own words when copy.json has them (`<state>_<reason>`), else the neutral line for the state.
+  const text = plan && ((plan.state_reason && words[`${plan.state}_${plan.state_reason}`]) || words[plan.state]);
   if (!text) return null;
   return (
     <p role="status" data-plan-state={plan.state} className="mb-3 flex items-start gap-2 rounded-2xl bg-info-soft px-4 py-3 text-sm text-info-ink">
@@ -320,6 +322,7 @@ export function YourRoute({ route, onWithdrawn, onTicked, onChat }: {
   const [error, setError] = useState(false), [confirming, setConfirming] = useState(false), [busy, setBusy] = useState(false),
     [savingView, setSavingView] = useState(false), [familyOpen, setFamilyOpen] = useState(false);
   const saving = useRef(false);
+  const [osSaving, setOsSaving] = useState<string | null>(null);
   useEffect(() => { setSteps(route.steps); setChoice(route.choice ?? null); }, [route]);
   // One save at a time: the ticks are disabled while one is saving, so a
   // double click cannot send (key, true) then (key, false) and replies never
@@ -329,7 +332,9 @@ export function YourRoute({ route, onWithdrawn, onTicked, onChat }: {
     saving.current = true;
     setSavingView(true);
     const put = (next: RouteStep) => setSteps((list) => list.map((s) => (s.key === step.key ? next : s)));
-    put({ ...step, status: value ? "done" : "not", manual_done: value });
+    // An OS step keeps its (disabled) checkbox while the save runs; the optimistic done only shows once it returns.
+    const os = step.kind === "os";
+    if (os) setOsSaving(step.key); else put({ ...step, status: value ? "done" : "not", manual_done: value });
     setError(false);
     try {
       const saved = await workspaceApi.setRouteStep(step.key, value);
@@ -339,6 +344,7 @@ export function YourRoute({ route, onWithdrawn, onTicked, onChat }: {
       put(step);
       setError(true);
     } finally {
+      setOsSaving(null);
       saving.current = false;
       setSavingView(false);
     }
@@ -390,9 +396,9 @@ export function YourRoute({ route, onWithdrawn, onTicked, onChat }: {
                   <p className="break-words text-sm font-medium leading-snug">{label}</p>
                   <StepMeta step={step} time={route.time} />
                 </div>
-                {tickable(step) && !(step.kind === "os" && step.status === "done") && (
+                {tickable(step) && step.owner !== "pai" && !(step.kind === "os" && step.status === "done") && (
                   <label title={t.steps.tick} className="-my-1.5 -me-2 flex size-11 shrink-0 cursor-pointer items-center justify-center rounded-full hover:bg-accent">
-                    <input type="checkbox" aria-label={label} checked={step.status === "done"} disabled={savingView}
+                    <input type="checkbox" aria-label={label} checked={step.status === "done" || osSaving === step.key} disabled={savingView}
                       onChange={(e) => tick(step, e.target.checked)} className="size-[18px] cursor-[inherit] accent-[var(--brand)]" />
                   </label>
                 )}
