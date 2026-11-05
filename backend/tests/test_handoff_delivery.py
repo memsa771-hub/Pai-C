@@ -281,3 +281,121 @@ async def test_backfill_reset_clears_delivered_at(os_stub):
             bridge._backfill(db)
         (row,) = rows(db, ws)
         assert row.status == "pending" and row.delivered_at is None
+
+
+# ---- Vault events (P1-T4, R-13) -----------------------------------------------------------------------------------
+
+@pytest.fixture
+def vault_stub(monkeypatch, os_stub):
+    from app.os.ports import student_facts
+
+    got = {"events": [], "raises": None, "held": None}
+
+    def record(event):
+        if got["raises"]:
+            raise got["raises"]
+        got["events"].append(event)
+        got["held"] = max(got["held"] or 0, event["vault_version"])
+        return "stored"
+
+    monkeypatch.setattr(student_facts, "record_event", record)
+    monkeypatch.setattr(student_facts, "latest_vault_version", lambda ref: got["held"])
+    yield got
+
+
+def facts_flag(value):
+    return patch.object(config, "CONNECT_STUDENT_FACTS", value, create=True)
+
+
+def vault_rows(db, ws):
+    return [r for r in rows(db, ws) if r.kind == "vault_event"]
+
+
+def vault_write(db, ws, province="punjab"):
+    from app.memory.candidates import MemoryCandidateService
+    from app.memory.reconciler import MemoryReconciler
+
+    c = MemoryCandidateService(db).propose(
+        ws, "vault_item", key="domicile", proposed_value={"province": province}, confidence=0.9,
+        source_type="user_explicit", allow_user_explicit=True, input_channel="profile",
+        evidence={"quote": "q", "capture": "details"})
+    assert MemoryReconciler(db).reconcile(c).accepted
+    db.commit()
+
+
+@pytest.mark.asyncio
+@pytest.mark.req("R-13")
+async def test_vault_event_is_delivered_and_a_repeat_is_harmless(vault_stub):
+    async with confirmed_student() as (_, student, db, _j):
+        ws = student.workspace_id
+        with facts_flag(True):
+            vault_write(db, ws)
+            (row,) = vault_rows(db, ws)
+            assert row.status == "pending"
+            assert bridge.deliver_pending(db, ws) == {"delivered": 1, "failed": 0, "not_sent": 0}
+            assert bridge.deliver_pending(db, ws) == {"delivered": 0, "failed": 0, "not_sent": 0}
+        (row,) = vault_rows(db, ws)
+        assert row.status == "delivered" and vault_stub["events"] == [row.payload]
+
+
+@pytest.mark.asyncio
+@pytest.mark.req("R-13")
+async def test_os_down_keeps_the_vault_event_pending_and_the_sweep_delivers_it(vault_stub):
+    async with confirmed_student() as (_, student, db, _j):
+        ws = student.workspace_id
+        vault_stub["raises"] = ports.OsUnavailable()
+        with facts_flag(True):
+            vault_write(db, ws)
+            bridge.deliver_pending(db, ws)
+            (row,) = vault_rows(db, ws)
+            assert row.status == "pending" and row.attempts == 0
+            vault_stub["raises"] = None
+            bridge.sweep_once(db)
+        (row,) = vault_rows(db, ws)
+        assert row.status == "delivered" and len(vault_stub["events"]) == 1
+
+
+@pytest.mark.asyncio
+@pytest.mark.req("R-13")
+async def test_invalid_vault_event_is_not_sent(vault_stub):
+    async with confirmed_student() as (_, student, db, _j):
+        ws = student.workspace_id
+        with facts_flag(True):
+            vault_write(db, ws)
+            (row,) = vault_rows(db, ws)
+            row.payload = {"schema": "pai.vault_event.v1"}
+            db.commit()
+            assert bridge.deliver_pending(db, ws) == {"delivered": 0, "failed": 0, "not_sent": 1}
+        (row,) = vault_rows(db, ws)
+        assert row.status == "not_sent" and row.last_error == "invalid_export" and vault_stub["events"] == []
+
+
+@pytest.mark.asyncio
+@pytest.mark.req("R-13")
+async def test_sweep_backfills_the_newest_vault_version_with_every_key_since(vault_stub):
+    async with confirmed_student() as (_, student, db, _j):
+        ws = student.workspace_id
+        with facts_flag(True), patch("app.pai_c.connect.outbox.part_on", return_value=False):
+            vault_write(db, ws, "punjab")  # the part was off: version counted, no event queued
+            vault_write(db, ws, "sindh")
+        assert vault_rows(db, ws) == []
+        with facts_flag(True):
+            bridge.sweep_once(db)
+        (row,) = vault_rows(db, ws)
+        assert row.status == "delivered" and row.payload["vault_version"] == 2
+        assert row.payload["keys"] == ["constraint.domicile"] and vault_stub["held"] == 2
+        with facts_flag(True):
+            bridge.sweep_once(db)  # the OS now holds it: nothing more is queued
+        assert len(vault_rows(db, ws)) == 1
+
+
+@pytest.mark.asyncio
+@pytest.mark.req("R-13")
+async def test_flag_off_leaves_vault_events_alone(vault_stub):
+    async with confirmed_student() as (_, student, db, _j):
+        ws = student.workspace_id
+        with facts_flag(True):
+            vault_write(db, ws)
+        with facts_flag(False), flag(True):
+            assert bridge.deliver_pending(db, ws) == {"delivered": 0, "failed": 0, "not_sent": 0}
+        assert vault_stub["events"] == [] and vault_rows(db, ws)[0].status == "pending"

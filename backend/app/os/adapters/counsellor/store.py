@@ -103,3 +103,28 @@ class SweepStore:
         with self.engine.begin() as conn:
             conn.execute(insert(W).values(tenant_id=self.tenant_id, mark=mark).on_conflict_do_update(
                 index_elements=[W.c.tenant_id], set_={"mark": mark, "updated_at": func.now()}))
+
+
+class VaultEventStore:
+    """The Vault events a student's Counsellor sent (P1-T4): one row per student and Vault version."""
+
+    def __init__(self, engine: Engine, tenant_id: str) -> None:
+        self.engine, self.tenant_id = engine, tenant_id
+
+    def add(self, event: dict) -> bool:
+        """False when this student's version is already stored: the first copy stays, so a repeat is harmless."""
+        at = event["at"]
+        with self.engine.begin() as conn:
+            got = conn.execute(insert(models.vault_events).values(
+                tenant_id=self.tenant_id, student_ref=event["student_ref"], vault_version=event["vault_version"],
+                keys=list(event["keys"]), event=event,
+                occurred_at=datetime.fromisoformat(at) if isinstance(at, str) else at,
+            ).on_conflict_do_nothing(constraint="uq_os_vault_events_version")
+                .returning(models.vault_events.c.id)).first()
+        return got is not None
+
+    def latest_version(self, student_ref: str) -> int | None:
+        V = models.vault_events
+        with self.engine.connect() as conn:
+            return conn.execute(select(func.max(V.c.vault_version)).where(
+                V.c.tenant_id == self.tenant_id, V.c.student_ref == student_ref)).scalar()

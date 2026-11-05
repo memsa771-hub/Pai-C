@@ -46,6 +46,8 @@ def test_os_tables_present():
         "os_rehearsal_clock",
         # Slice 9a (os_0015)
         "os_consents",
+        # P1-T4 (os_0020)
+        "os_vault_events",
     }
 
 

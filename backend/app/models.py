@@ -838,6 +838,18 @@ class OsOutbox(Base):
     __table_args__ = (Index("idx_os_outbox_status_created", "status", "created_at"),)
 
 
+class VaultVersion(Base):
+    """The student's Vault version (P1-T4, R-13): one row per workspace, raised by one for each accepted Vault write
+    that touches a StudentFacts key (only while CONNECT_STUDENT_FACTS is on). `key_versions` maps each such key to
+    the version that last changed it, so a fact can say when it changed."""
+    __tablename__ = "pai_vault_versions"
+
+    workspace_id = Column(UUID(as_uuid=False), ForeignKey("workspaces.id", ondelete="CASCADE"), primary_key=True)
+    version = Column(Integer, nullable=False, default=0, server_default=text("0"))
+    key_versions = Column(JSONB, nullable=False, default=dict, server_default=text("'{}'"))
+    updated_at = Column(DateTime(timezone=True), nullable=False, default=_now, server_default=text("NOW()"))
+
+
 class GuardianConsent(Base):
     """One guardian e-mail link (R-10) and what came of it: the audit of the under-18 consent.
 
