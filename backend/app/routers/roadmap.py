@@ -22,6 +22,7 @@ from app.services.email import mask_email
 from app.pai_c.roadmap.decisions import RouteDecisionError, RouteDecisionService
 from app.pai_c.roadmap.engine import RoadmapEngine
 from app.routers._workspace_auth import _authorized
+from app.security.event_identity import resolve_human
 
 log = logging.getLogger(__name__)
 router = APIRouter(prefix="/v1/roadmap", tags=["Roadmap"])
@@ -381,8 +382,10 @@ def resend_guardian(body: ResendAction | None = None, network: str = Query(...),
 def tick_step(body: StepAction, network: str = Query(...), db=Depends(get_db),
               x_workspace_token: str | None = Header(None), authorization: str | None = Header(None)):
     workspace = _authorized(db, network, x_workspace_token, authorization)
+    # A step of the OS plan is completed in PAI OS, which needs a signed-in student; asked only for those steps.
     return _write(lambda: RouteDecisionService(db).set_step(
-        str(workspace.id), body.done, key=body.key, index=body.index), db, str(workspace.id))
+        str(workspace.id), body.done, key=body.key, index=body.index,
+        is_human=lambda: resolve_human(db, workspace, authorization) is not None), db, str(workspace.id))
 
 
 @router.post("/withdraw")

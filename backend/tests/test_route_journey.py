@@ -221,3 +221,31 @@ async def test_route_chosen_before_the_mirror_is_chosen_once_paths_arrive():
             assert_chosen_with_goal(db, journey.id, decision)
         finally:
             app.dependency_overrides.pop(get_db, None)
+
+
+@pytest.mark.asyncio
+@pytest.mark.req("R-04")
+async def test_choose_and_withdraw_move_the_journey_the_same_with_the_plan_flag_on():
+    """The plan adapter changes what the chosen route shows, not the journey: CHOSEN with the goal, PROPOSED after the
+    withdrawal, and the page of a route the OS runs carries the empty plan state while the OS has no plan yet."""
+    from app import pai_os_bridge
+    async with confirmed_student() as (client, student, db, journey_id):
+        with_routes(student, db)
+        with patch.object(config, "CONNECT_ROADMAP_FROM_PLANVIEW", True, create=True), \
+                patch.object(pai_os_bridge, "counsellor_module_on", lambda: True), \
+                patch.object(pai_os_bridge, "plan_view", side_effect=AssertionError("row is not os_supported")):
+            decision = choose(client, student, "electrical_engineering")
+            assert stage(db, journey_id) == "CHOSEN" and "plan" not in decision
+            row = db.get(StudentJourney, journey_id)
+            assert row.active_goal["route_decision_id"] == decision["id"]
+        db.query(RouteDecision).filter(RouteDecision.id == decision["id"]).update({"os_supported": True})
+        db.commit()
+        empty = {"state": "empty", "steps": []}
+        with patch.object(config, "CONNECT_ROADMAP_FROM_PLANVIEW", True, create=True), \
+                patch.object(pai_os_bridge, "counsellor_module_on", lambda: True), \
+                patch.object(pai_os_bridge, "plan_view", lambda ref: empty):
+            shown = client.get("/v1/roadmap", params={"network": student.workspace_id}, headers=TOKEN)
+            assert shown.json()["data"]["chosen"]["plan"] == {"state": "empty"} and stage(db, journey_id) == "CHOSEN"
+            withdrawn = client.post("/v1/roadmap/withdraw", params={"network": student.workspace_id}, headers=TOKEN)
+            assert withdrawn.status_code == 200 and "plan" not in withdrawn.json()["data"]
+        assert stage(db, journey_id) == "PROPOSED"

@@ -330,6 +330,50 @@ def list_routes() -> list[dict]:
         return []
 
 
+class StepError(Exception):
+    """A step could not be completed through PAI OS. `code` is not_found, not_yours, not_waiting, review_required or
+    unavailable (PAI OS is not mounted or failed)."""
+
+    def __init__(self, code: str):
+        super().__init__(code)
+        self.code = code
+
+
+def plan_view(student_ref: str) -> dict | None:
+    """The student's plan as PAI OS shows it (a JSON dict valid as `PlanViewV1`), each step carrying `review`: True
+    when the step is closed by approving a pack or visa file, never by hand. None when PAI OS is not mounted, and on any
+    failure (logged); the Counsellor then shows its own view."""
+    try:
+        from app.os.ports import plan_query
+        from app.os.replan.events import REVIEW_TEMPLATES
+
+        view = plan_query.plan_view(student_ref).model_dump(mode="json", by_alias=True)
+    except ports.OsUnavailable:
+        return None
+    except Exception:
+        log.exception("plan view could not be read; the Counsellor's own view is shown")
+        return None
+    for step in view["steps"]:
+        step["review"] = step["template_key"] in REVIEW_TEMPLATES
+    return view
+
+
+def complete_step(student_ref: str, task_id: int, payload: dict | None = None) -> str:
+    """The student's tick on a plan step, done through PAI OS: "done", or "already_done" on a repeat. Raises StepError."""
+    try:
+        from app.os.ports import plan_actions
+
+        return plan_actions.complete_step(student_ref, task_id, payload)
+    except ports.OsUnavailable:
+        raise StepError("unavailable") from None
+    except Exception as exc:
+        code = getattr(exc, "code", None)
+        if type(exc).__name__ == "StepActionError" and code:
+            raise StepError(code) from None
+        log.exception("a plan step could not be completed")
+        raise StepError("unavailable") from None
+
+
 def programmes_for(route_key: str, term: str, year: int) -> list[dict]:
     """The places for a route and intake, `{ref, name, university}`. `[]` when PAI OS is not mounted, and on any
     failure (logged)."""

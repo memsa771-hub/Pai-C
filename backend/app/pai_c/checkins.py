@@ -51,6 +51,10 @@ async def checkin_job(job, db):
             same_choice = referenced is not None and active is not None and (active.id == referenced.id or (
                 active.field_key == referenced.field_key and active.chosen_at == referenced.chosen_at))
             current = active.id if same_choice else None
+            if current is not None:  # CONNECT_CHECKINS_FROM_PLANVIEW: a stopped or finished plan ends the follow-up
+                from app.pai_c.roadmap import plan_adapter
+                if plan_adapter.plan_superseded(active):
+                    current = None
         else:
             run = db.scalar(select(ExecutionRun).where(ExecutionRun.id == reference,
                 ExecutionRun.workspace_id == job.workspace_id, ExecutionRun.task_type == 'path_explain', ExecutionRun.status == 'completed'))

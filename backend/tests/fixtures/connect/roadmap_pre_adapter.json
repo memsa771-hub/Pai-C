@@ -1,0 +1,3438 @@
+{
+ "choose": {
+  "body": {
+   "code": 0,
+   "data": {
+    "chosen_at": "<stamp>",
+    "field_key": "electrical_engineering",
+    "id": "<uuid>",
+    "live_status": "open",
+    "possibility_id": "<uuid>",
+    "route": {
+     "degree": {
+      "title": "Electrical Engineering",
+      "years": 4
+     },
+     "needs": [],
+     "now": {
+      "groups": [
+       {
+        "code": "pre_engineering",
+        "label": "Pre-Engineering"
+       }
+      ],
+      "level": "fsc",
+      "level_label": "FSc",
+      "percent": 78
+     },
+     "sources": [
+      "https://www.pec.org.pk/wp-content/uploads/2022/11/REGULATIONS-FOR-ENGG-EDU.pdf",
+      "https://ucp.edu.pk/blog/pec-allows-fsc-pre-medical-students-opt-engineering-courses/"
+     ],
+     "tests": [
+      {
+       "body": "UET/NUST/university; PEC requires an institution test",
+       "codes": [
+        "ecat",
+        "net"
+       ],
+       "name": "ECAT (UET) / NET (NUST) / university test",
+       "pass_percent": 33,
+       "scope_fields": null,
+       "source": "https://blog.maqsad.io/blog/uet-ecat-complete-guide"
+      }
+     ]
+    },
+    "snapshot_steps": [
+     {
+      "key": "group",
+      "label_key": "step_group",
+      "status": "done",
+      "values": {
+       "groups": [
+        {
+         "code": "pre_engineering",
+         "label": "Pre-Engineering",
+         "route_label": "FSc Pre-Engineering"
+        }
+       ]
+      }
+     },
+     {
+      "key": "complete_intermediate",
+      "label_key": "step_finish",
+      "status": "done",
+      "values": {
+       "level": "FSc"
+      }
+     },
+     {
+      "key": "marks",
+      "label_key": "step_marks",
+      "status": "done",
+      "values": {
+       "have": 78,
+       "min": 60
+      }
+     },
+     {
+      "key": "test:ECAT (UET) / NET (NUST) / university test",
+      "label_key": "step_test_pass",
+      "status": "not",
+      "values": {
+       "name": "ECAT (UET) / NET (NUST) / university test",
+       "pass": 33
+      }
+     },
+     {
+      "key": "apply",
+      "label_key": "step_apply",
+      "status": "not",
+      "values": {
+       "degree": "Electrical Engineering"
+      }
+     },
+     {
+      "key": "degree",
+      "label_key": "step_degree",
+      "status": "not",
+      "values": {
+       "degree": "Electrical Engineering",
+       "years": 4
+      }
+     }
+    ],
+    "snapshot_verdict": {
+     "confidence": "official",
+     "min_percent": 60,
+     "needs": [],
+     "reasons": [],
+     "sources": [
+      "https://www.pec.org.pk/wp-content/uploads/2022/11/REGULATIONS-FOR-ENGG-EDU.pdf",
+      "https://ucp.edu.pk/blog/pec-allows-fsc-pre-medical-students-opt-engineering-courses/"
+     ],
+     "status": "open",
+     "student_percent": 78,
+     "subjects": [
+      "Physics",
+      "Chemistry",
+      "Mathematics"
+     ],
+     "tests": [
+      {
+       "body": "UET/NUST/university; PEC requires an institution test",
+       "codes": [
+        "ecat",
+        "net"
+       ],
+       "name": "ECAT (UET) / NET (NUST) / university test",
+       "pass_percent": 33,
+       "scope_fields": null,
+       "source": "https://blog.maqsad.io/blog/uet-ecat-complete-guide"
+      }
+     ],
+     "years": 4
+    },
+    "steps": [
+     {
+      "colour": "green",
+      "evidence": {
+       "id": "education:<uuid>",
+       "level": "stated",
+       "source_label": "Details"
+      },
+      "key": "group",
+      "kind": "group",
+      "label_key": "step_group",
+      "manual_done": false,
+      "rule": {
+       "confidence": "official",
+       "source": "https://www.pec.org.pk/wp-content/uploads/2022/11/REGULATIONS-FOR-ENGG-EDU.pdf"
+      },
+      "status": "done",
+      "tickable": false,
+      "timing": null,
+      "values": {
+       "groups": [
+        {
+         "code": "pre_engineering",
+         "label": "Pre-Engineering",
+         "route_label": "FSc Pre-Engineering"
+        }
+       ]
+      }
+     },
+     {
+      "colour": "green",
+      "evidence": {
+       "id": "education:<uuid>",
+       "level": "stated",
+       "source_label": "Details"
+      },
+      "key": "complete_intermediate",
+      "kind": "complete_intermediate",
+      "label_key": "step_finish",
+      "manual_done": false,
+      "rule": null,
+      "status": "done",
+      "tickable": false,
+      "timing": null,
+      "values": {
+       "level": "FSc"
+      }
+     },
+     {
+      "colour": "green",
+      "evidence": {
+       "id": "education:<uuid>",
+       "level": "stated",
+       "source_label": "Details"
+      },
+      "key": "marks",
+      "kind": "marks",
+      "label_key": "step_marks",
+      "manual_done": false,
+      "rule": {
+       "confidence": "official",
+       "source": "https://www.pec.org.pk/wp-content/uploads/2022/11/REGULATIONS-FOR-ENGG-EDU.pdf"
+      },
+      "status": "done",
+      "tickable": false,
+      "timing": null,
+      "values": {
+       "have": 78,
+       "min": 60
+      }
+     },
+     {
+      "colour": "red",
+      "evidence": null,
+      "key": "test:ECAT (UET) / NET (NUST) / university test",
+      "kind": "test",
+      "label_key": "step_test_pass",
+      "manual_done": false,
+      "rule": {
+       "confidence": "official",
+       "source": "https://blog.maqsad.io/blog/uet-ecat-complete-guide"
+      },
+      "status": "not",
+      "tickable": true,
+      "timing": {
+       "chain": [
+        "ecat"
+       ],
+       "result": "ecat:result"
+      },
+      "values": {
+       "name": "ECAT (UET) / NET (NUST) / university test",
+       "pass": 33
+      }
+     },
+     {
+      "colour": "red",
+      "evidence": null,
+      "key": "apply",
+      "kind": "apply",
+      "label_key": "step_apply",
+      "manual_done": false,
+      "rule": null,
+      "status": "not",
+      "tickable": true,
+      "timing": null,
+      "values": {
+       "degree": "Electrical Engineering"
+      }
+     },
+     {
+      "colour": "red",
+      "evidence": null,
+      "key": "degree",
+      "kind": "degree",
+      "label_key": "step_degree",
+      "manual_done": false,
+      "rule": {
+       "confidence": "official",
+       "source": "https://www.pec.org.pk/wp-content/uploads/2022/11/REGULATIONS-FOR-ENGG-EDU.pdf"
+      },
+      "status": "not",
+      "tickable": false,
+      "timing": null,
+      "values": {
+       "degree": "Electrical Engineering",
+       "years": 4
+      }
+     }
+    ],
+    "steps_done": [],
+    "time": {
+     "basis": [
+      {
+       "confidence": "official",
+       "event_key": "ecat",
+       "month": 6,
+       "source": "https://ecat.uet.edu.pk/",
+       "step": "test:ECAT (UET) / NET (NUST) / university test",
+       "year": 2027
+      },
+      {
+       "confidence": "official",
+       "event_key": "ecat:result",
+       "month": 6,
+       "source": "https://ecat.uet.edu.pk/",
+       "step": "test:ECAT (UET) / NET (NUST) / university test",
+       "year": 2027
+      },
+      {
+       "confidence": "official",
+       "event_key": "nust_ug",
+       "month": 9,
+       "source": "https://nust.edu.pk/admissions/undergraduates/dates-to-remember/",
+       "step": null,
+       "year": 2027
+      }
+     ],
+     "confidence": "official",
+     "degree_years": 4,
+     "next_intake": {
+      "label": "September intake",
+      "start_month": 9,
+      "year": 2027
+     },
+     "to_entry_months": 10,
+     "to_finish_years": 4.8
+    },
+    "title": "Electrical Engineering",
+    "withdrawn_at": null
+   },
+   "message": "ok"
+  },
+  "status": 200
+ },
+ "get_after_choice": {
+  "body": {
+   "code": 0,
+   "data": {
+    "calendar_as_of": "2026-10",
+    "chosen": {
+     "chosen_at": "<stamp>",
+     "field_key": "electrical_engineering",
+     "id": "<uuid>",
+     "live_status": "open",
+     "possibility_id": "<uuid>",
+     "route": {
+      "degree": {
+       "title": "Electrical Engineering",
+       "years": 4
+      },
+      "needs": [],
+      "now": {
+       "groups": [
+        {
+         "code": "pre_engineering",
+         "label": "Pre-Engineering"
+        }
+       ],
+       "level": "fsc",
+       "level_label": "FSc",
+       "percent": 78
+      },
+      "sources": [
+       "https://www.pec.org.pk/wp-content/uploads/2022/11/REGULATIONS-FOR-ENGG-EDU.pdf",
+       "https://ucp.edu.pk/blog/pec-allows-fsc-pre-medical-students-opt-engineering-courses/"
+      ],
+      "tests": [
+       {
+        "body": "UET/NUST/university; PEC requires an institution test",
+        "codes": [
+         "ecat",
+         "net"
+        ],
+        "name": "ECAT (UET) / NET (NUST) / university test",
+        "pass_percent": 33,
+        "scope_fields": null,
+        "source": "https://blog.maqsad.io/blog/uet-ecat-complete-guide"
+       }
+      ]
+     },
+     "snapshot_steps": [
+      {
+       "key": "group",
+       "label_key": "step_group",
+       "status": "done",
+       "values": {
+        "groups": [
+         {
+          "code": "pre_engineering",
+          "label": "Pre-Engineering",
+          "route_label": "FSc Pre-Engineering"
+         }
+        ]
+       }
+      },
+      {
+       "key": "complete_intermediate",
+       "label_key": "step_finish",
+       "status": "done",
+       "values": {
+        "level": "FSc"
+       }
+      },
+      {
+       "key": "marks",
+       "label_key": "step_marks",
+       "status": "done",
+       "values": {
+        "have": 78,
+        "min": 60
+       }
+      },
+      {
+       "key": "test:ECAT (UET) / NET (NUST) / university test",
+       "label_key": "step_test_pass",
+       "status": "not",
+       "values": {
+        "name": "ECAT (UET) / NET (NUST) / university test",
+        "pass": 33
+       }
+      },
+      {
+       "key": "apply",
+       "label_key": "step_apply",
+       "status": "not",
+       "values": {
+        "degree": "Electrical Engineering"
+       }
+      },
+      {
+       "key": "degree",
+       "label_key": "step_degree",
+       "status": "not",
+       "values": {
+        "degree": "Electrical Engineering",
+        "years": 4
+       }
+      }
+     ],
+     "snapshot_verdict": {
+      "confidence": "official",
+      "min_percent": 60,
+      "needs": [],
+      "reasons": [],
+      "sources": [
+       "https://www.pec.org.pk/wp-content/uploads/2022/11/REGULATIONS-FOR-ENGG-EDU.pdf",
+       "https://ucp.edu.pk/blog/pec-allows-fsc-pre-medical-students-opt-engineering-courses/"
+      ],
+      "status": "open",
+      "student_percent": 78,
+      "subjects": [
+       "Physics",
+       "Chemistry",
+       "Mathematics"
+      ],
+      "tests": [
+       {
+        "body": "UET/NUST/university; PEC requires an institution test",
+        "codes": [
+         "ecat",
+         "net"
+        ],
+        "name": "ECAT (UET) / NET (NUST) / university test",
+        "pass_percent": 33,
+        "scope_fields": null,
+        "source": "https://blog.maqsad.io/blog/uet-ecat-complete-guide"
+       }
+      ],
+      "years": 4
+     },
+     "steps": [
+      {
+       "colour": "green",
+       "evidence": {
+        "id": "education:<uuid>",
+        "level": "stated",
+        "source_label": "Details"
+       },
+       "key": "group",
+       "kind": "group",
+       "label_key": "step_group",
+       "manual_done": false,
+       "rule": {
+        "confidence": "official",
+        "source": "https://www.pec.org.pk/wp-content/uploads/2022/11/REGULATIONS-FOR-ENGG-EDU.pdf"
+       },
+       "status": "done",
+       "tickable": false,
+       "timing": null,
+       "values": {
+        "groups": [
+         {
+          "code": "pre_engineering",
+          "label": "Pre-Engineering",
+          "route_label": "FSc Pre-Engineering"
+         }
+        ]
+       }
+      },
+      {
+       "colour": "green",
+       "evidence": {
+        "id": "education:<uuid>",
+        "level": "stated",
+        "source_label": "Details"
+       },
+       "key": "complete_intermediate",
+       "kind": "complete_intermediate",
+       "label_key": "step_finish",
+       "manual_done": false,
+       "rule": null,
+       "status": "done",
+       "tickable": false,
+       "timing": null,
+       "values": {
+        "level": "FSc"
+       }
+      },
+      {
+       "colour": "green",
+       "evidence": {
+        "id": "education:<uuid>",
+        "level": "stated",
+        "source_label": "Details"
+       },
+       "key": "marks",
+       "kind": "marks",
+       "label_key": "step_marks",
+       "manual_done": false,
+       "rule": {
+        "confidence": "official",
+        "source": "https://www.pec.org.pk/wp-content/uploads/2022/11/REGULATIONS-FOR-ENGG-EDU.pdf"
+       },
+       "status": "done",
+       "tickable": false,
+       "timing": null,
+       "values": {
+        "have": 78,
+        "min": 60
+       }
+      },
+      {
+       "colour": "red",
+       "evidence": null,
+       "key": "test:ECAT (UET) / NET (NUST) / university test",
+       "kind": "test",
+       "label_key": "step_test_pass",
+       "manual_done": false,
+       "rule": {
+        "confidence": "official",
+        "source": "https://blog.maqsad.io/blog/uet-ecat-complete-guide"
+       },
+       "status": "not",
+       "tickable": true,
+       "timing": {
+        "chain": [
+         "ecat"
+        ],
+        "result": "ecat:result"
+       },
+       "values": {
+        "name": "ECAT (UET) / NET (NUST) / university test",
+        "pass": 33
+       }
+      },
+      {
+       "colour": "red",
+       "evidence": null,
+       "key": "apply",
+       "kind": "apply",
+       "label_key": "step_apply",
+       "manual_done": false,
+       "rule": null,
+       "status": "not",
+       "tickable": true,
+       "timing": null,
+       "values": {
+        "degree": "Electrical Engineering"
+       }
+      },
+      {
+       "colour": "red",
+       "evidence": null,
+       "key": "degree",
+       "kind": "degree",
+       "label_key": "step_degree",
+       "manual_done": false,
+       "rule": {
+        "confidence": "official",
+        "source": "https://www.pec.org.pk/wp-content/uploads/2022/11/REGULATIONS-FOR-ENGG-EDU.pdf"
+       },
+       "status": "not",
+       "tickable": false,
+       "timing": null,
+       "values": {
+        "degree": "Electrical Engineering",
+        "years": 4
+       }
+      }
+     ],
+     "steps_done": [],
+     "time": {
+      "basis": [
+       {
+        "confidence": "official",
+        "event_key": "ecat",
+        "month": 6,
+        "source": "https://ecat.uet.edu.pk/",
+        "step": "test:ECAT (UET) / NET (NUST) / university test",
+        "year": 2027
+       },
+       {
+        "confidence": "official",
+        "event_key": "ecat:result",
+        "month": 6,
+        "source": "https://ecat.uet.edu.pk/",
+        "step": "test:ECAT (UET) / NET (NUST) / university test",
+        "year": 2027
+       },
+       {
+        "confidence": "official",
+        "event_key": "nust_ug",
+        "month": 9,
+        "source": "https://nust.edu.pk/admissions/undergraduates/dates-to-remember/",
+        "step": null,
+        "year": 2027
+       }
+      ],
+      "confidence": "official",
+      "degree_years": 4,
+      "next_intake": {
+       "label": "September intake",
+       "start_month": 9,
+       "year": 2027
+      },
+      "to_entry_months": 10,
+      "to_finish_years": 4.8
+     },
+     "title": "Electrical Engineering",
+     "withdrawn_at": null
+    },
+    "counts": {
+     "not_open": 1,
+     "open": 2,
+     "step": 0,
+     "unknown": 0
+    },
+    "education_line": {
+     "groups": [
+      {
+       "code": "pre_engineering",
+       "label": "Pre-Engineering"
+      }
+     ],
+     "level": "fsc",
+     "level_label": "FSc",
+     "percent": 78
+    },
+    "fields": [
+     {
+      "family": "engineering",
+      "field_key": "electrical_engineering",
+      "possibility_id": "<uuid>",
+      "status": "open",
+      "steps": [
+       {
+        "colour": "green",
+        "evidence": {
+         "id": "education:<uuid>",
+         "level": "stated",
+         "source_label": "Details"
+        },
+        "key": "group",
+        "kind": "group",
+        "label_key": "step_group",
+        "manual_done": false,
+        "rule": {
+         "confidence": "official",
+         "source": "https://www.pec.org.pk/wp-content/uploads/2022/11/REGULATIONS-FOR-ENGG-EDU.pdf"
+        },
+        "status": "done",
+        "tickable": false,
+        "timing": null,
+        "values": {
+         "groups": [
+          {
+           "code": "pre_engineering",
+           "label": "Pre-Engineering",
+           "route_label": "FSc Pre-Engineering"
+          }
+         ]
+        }
+       },
+       {
+        "colour": "green",
+        "evidence": {
+         "id": "education:<uuid>",
+         "level": "stated",
+         "source_label": "Details"
+        },
+        "key": "complete_intermediate",
+        "kind": "complete_intermediate",
+        "label_key": "step_finish",
+        "manual_done": false,
+        "rule": null,
+        "status": "done",
+        "tickable": false,
+        "timing": null,
+        "values": {
+         "level": "FSc"
+        }
+       },
+       {
+        "colour": "green",
+        "evidence": {
+         "id": "education:<uuid>",
+         "level": "stated",
+         "source_label": "Details"
+        },
+        "key": "marks",
+        "kind": "marks",
+        "label_key": "step_marks",
+        "manual_done": false,
+        "rule": {
+         "confidence": "official",
+         "source": "https://www.pec.org.pk/wp-content/uploads/2022/11/REGULATIONS-FOR-ENGG-EDU.pdf"
+        },
+        "status": "done",
+        "tickable": false,
+        "timing": null,
+        "values": {
+         "have": 78,
+         "min": 60
+        }
+       },
+       {
+        "colour": "red",
+        "evidence": null,
+        "key": "test:ECAT (UET) / NET (NUST) / university test",
+        "kind": "test",
+        "label_key": "step_test_pass",
+        "manual_done": false,
+        "rule": {
+         "confidence": "official",
+         "source": "https://blog.maqsad.io/blog/uet-ecat-complete-guide"
+        },
+        "status": "not",
+        "tickable": true,
+        "timing": {
+         "chain": [
+          "ecat"
+         ],
+         "result": "ecat:result"
+        },
+        "values": {
+         "name": "ECAT (UET) / NET (NUST) / university test",
+         "pass": 33
+        }
+       },
+       {
+        "colour": "red",
+        "evidence": null,
+        "key": "apply",
+        "kind": "apply",
+        "label_key": "step_apply",
+        "manual_done": false,
+        "rule": null,
+        "status": "not",
+        "tickable": true,
+        "timing": null,
+        "values": {
+         "degree": "Electrical Engineering"
+        }
+       },
+       {
+        "colour": "red",
+        "evidence": null,
+        "key": "degree",
+        "kind": "degree",
+        "label_key": "step_degree",
+        "manual_done": false,
+        "rule": {
+         "confidence": "official",
+         "source": "https://www.pec.org.pk/wp-content/uploads/2022/11/REGULATIONS-FOR-ENGG-EDU.pdf"
+        },
+        "status": "not",
+        "tickable": false,
+        "timing": null,
+        "values": {
+         "degree": "Electrical Engineering",
+         "years": 4
+        }
+       }
+      ],
+      "time": {
+       "basis": [
+        {
+         "confidence": "official",
+         "event_key": "ecat",
+         "month": 6,
+         "source": "https://ecat.uet.edu.pk/",
+         "step": "test:ECAT (UET) / NET (NUST) / university test",
+         "year": 2027
+        },
+        {
+         "confidence": "official",
+         "event_key": "ecat:result",
+         "month": 6,
+         "source": "https://ecat.uet.edu.pk/",
+         "step": "test:ECAT (UET) / NET (NUST) / university test",
+         "year": 2027
+        },
+        {
+         "confidence": "official",
+         "event_key": "nust_ug",
+         "month": 9,
+         "source": "https://nust.edu.pk/admissions/undergraduates/dates-to-remember/",
+         "step": null,
+         "year": 2027
+        }
+       ],
+       "confidence": "official",
+       "degree_years": 4,
+       "next_intake": {
+        "label": "September intake",
+        "start_month": 9,
+        "year": 2027
+       },
+       "to_entry_months": 10,
+       "to_finish_years": 4.8
+      },
+      "title": "Electrical Engineering",
+      "verdict": {
+       "confidence": "official",
+       "min_percent": 60,
+       "needs": [],
+       "reasons": [],
+       "sources": [
+        "https://www.pec.org.pk/wp-content/uploads/2022/11/REGULATIONS-FOR-ENGG-EDU.pdf",
+        "https://ucp.edu.pk/blog/pec-allows-fsc-pre-medical-students-opt-engineering-courses/"
+       ],
+       "status": "open",
+       "student_percent": 78,
+       "subjects": [
+        "Physics",
+        "Chemistry",
+        "Mathematics"
+       ],
+       "tests": [
+        {
+         "body": "UET/NUST/university; PEC requires an institution test",
+         "codes": [
+          "ecat",
+          "net"
+         ],
+         "name": "ECAT (UET) / NET (NUST) / university test",
+         "pass_percent": 33,
+         "scope_fields": null,
+         "source": "https://blog.maqsad.io/blog/uet-ecat-complete-guide"
+        }
+       ],
+       "years": 4
+      },
+      "why": "It builds on what you said."
+     },
+     {
+      "family": "engineering",
+      "field_key": "computer_engineering",
+      "possibility_id": "<uuid>",
+      "status": "open",
+      "steps": [
+       {
+        "colour": "green",
+        "evidence": {
+         "id": "education:<uuid>",
+         "level": "stated",
+         "source_label": "Details"
+        },
+        "key": "group",
+        "kind": "group",
+        "label_key": "step_group",
+        "manual_done": false,
+        "rule": {
+         "confidence": "official",
+         "source": "https://www.pec.org.pk/wp-content/uploads/2022/11/REGULATIONS-FOR-ENGG-EDU.pdf"
+        },
+        "status": "done",
+        "tickable": false,
+        "timing": null,
+        "values": {
+         "groups": [
+          {
+           "code": "pre_engineering",
+           "label": "Pre-Engineering",
+           "route_label": "FSc Pre-Engineering"
+          }
+         ]
+        }
+       },
+       {
+        "colour": "green",
+        "evidence": {
+         "id": "education:<uuid>",
+         "level": "stated",
+         "source_label": "Details"
+        },
+        "key": "complete_intermediate",
+        "kind": "complete_intermediate",
+        "label_key": "step_finish",
+        "manual_done": false,
+        "rule": null,
+        "status": "done",
+        "tickable": false,
+        "timing": null,
+        "values": {
+         "level": "FSc"
+        }
+       },
+       {
+        "colour": "green",
+        "evidence": {
+         "id": "education:<uuid>",
+         "level": "stated",
+         "source_label": "Details"
+        },
+        "key": "marks",
+        "kind": "marks",
+        "label_key": "step_marks",
+        "manual_done": false,
+        "rule": {
+         "confidence": "official",
+         "source": "https://www.pec.org.pk/wp-content/uploads/2022/11/REGULATIONS-FOR-ENGG-EDU.pdf"
+        },
+        "status": "done",
+        "tickable": false,
+        "timing": null,
+        "values": {
+         "have": 78,
+         "min": 60
+        }
+       },
+       {
+        "colour": "red",
+        "evidence": null,
+        "key": "test:ECAT (UET) / NET (NUST) / university test",
+        "kind": "test",
+        "label_key": "step_test_pass",
+        "manual_done": false,
+        "rule": {
+         "confidence": "official",
+         "source": "https://blog.maqsad.io/blog/uet-ecat-complete-guide"
+        },
+        "status": "not",
+        "tickable": true,
+        "timing": {
+         "chain": [
+          "ecat"
+         ],
+         "result": "ecat:result"
+        },
+        "values": {
+         "name": "ECAT (UET) / NET (NUST) / university test",
+         "pass": 33
+        }
+       },
+       {
+        "colour": "red",
+        "evidence": null,
+        "key": "apply",
+        "kind": "apply",
+        "label_key": "step_apply",
+        "manual_done": false,
+        "rule": null,
+        "status": "not",
+        "tickable": true,
+        "timing": null,
+        "values": {
+         "degree": "Computer Engineering"
+        }
+       },
+       {
+        "colour": "red",
+        "evidence": null,
+        "key": "degree",
+        "kind": "degree",
+        "label_key": "step_degree",
+        "manual_done": false,
+        "rule": {
+         "confidence": "official",
+         "source": "https://www.pec.org.pk/wp-content/uploads/2022/11/REGULATIONS-FOR-ENGG-EDU.pdf"
+        },
+        "status": "not",
+        "tickable": false,
+        "timing": null,
+        "values": {
+         "degree": "Computer Engineering",
+         "years": 4
+        }
+       }
+      ],
+      "time": {
+       "basis": [
+        {
+         "confidence": "official",
+         "event_key": "ecat",
+         "month": 6,
+         "source": "https://ecat.uet.edu.pk/",
+         "step": "test:ECAT (UET) / NET (NUST) / university test",
+         "year": 2027
+        },
+        {
+         "confidence": "official",
+         "event_key": "ecat:result",
+         "month": 6,
+         "source": "https://ecat.uet.edu.pk/",
+         "step": "test:ECAT (UET) / NET (NUST) / university test",
+         "year": 2027
+        },
+        {
+         "confidence": "official",
+         "event_key": "nust_ug",
+         "month": 9,
+         "source": "https://nust.edu.pk/admissions/undergraduates/dates-to-remember/",
+         "step": null,
+         "year": 2027
+        }
+       ],
+       "confidence": "official",
+       "degree_years": 4,
+       "next_intake": {
+        "label": "September intake",
+        "start_month": 9,
+        "year": 2027
+       },
+       "to_entry_months": 10,
+       "to_finish_years": 4.8
+      },
+      "title": "Computer Engineering",
+      "verdict": {
+       "confidence": "official",
+       "min_percent": 60,
+       "needs": [],
+       "reasons": [],
+       "sources": [
+        "https://www.pec.org.pk/wp-content/uploads/2022/11/REGULATIONS-FOR-ENGG-EDU.pdf",
+        "https://ucp.edu.pk/blog/pec-allows-fsc-pre-medical-students-opt-engineering-courses/"
+       ],
+       "status": "open",
+       "student_percent": 78,
+       "subjects": [
+        "Physics",
+        "Chemistry",
+        "Mathematics"
+       ],
+       "tests": [
+        {
+         "body": "UET/NUST/university; PEC requires an institution test",
+         "codes": [
+          "ecat",
+          "net"
+         ],
+         "name": "ECAT (UET) / NET (NUST) / university test",
+         "pass_percent": 33,
+         "scope_fields": null,
+         "source": "https://blog.maqsad.io/blog/uet-ecat-complete-guide"
+        }
+       ],
+       "years": 4
+      },
+      "why": "It builds on what you said."
+     },
+     {
+      "family": "health",
+      "field_key": "mbbs",
+      "possibility_id": "<uuid>",
+      "status": "not_open",
+      "steps": [
+       {
+        "colour": "red",
+        "evidence": {
+         "id": "education:<uuid>",
+         "level": "stated",
+         "source_label": "Details"
+        },
+        "key": "group",
+        "kind": "group",
+        "label_key": "step_group",
+        "manual_done": false,
+        "rule": {
+         "confidence": "official",
+         "source": "https://pmdc.pk/Documents/law/Admissions%20Regulations-2025.pdf"
+        },
+        "status": "not",
+        "tickable": false,
+        "timing": null,
+        "values": {
+         "groups": [
+          {
+           "code": "pre_medical",
+           "label": "Pre-Medical",
+           "route_label": "FSc Pre-Medical"
+          }
+         ]
+        }
+       },
+       {
+        "colour": "green",
+        "evidence": {
+         "id": "education:<uuid>",
+         "level": "stated",
+         "source_label": "Details"
+        },
+        "key": "complete_intermediate",
+        "kind": "complete_intermediate",
+        "label_key": "step_finish",
+        "manual_done": false,
+        "rule": null,
+        "status": "done",
+        "tickable": false,
+        "timing": null,
+        "values": {
+         "level": "FSc"
+        }
+       },
+       {
+        "colour": "green",
+        "evidence": {
+         "id": "education:<uuid>",
+         "level": "stated",
+         "source_label": "Details"
+        },
+        "key": "marks",
+        "kind": "marks",
+        "label_key": "step_marks",
+        "manual_done": false,
+        "rule": {
+         "confidence": "official",
+         "source": "https://pmdc.pk/Documents/law/Admissions%20Regulations-2025.pdf"
+        },
+        "status": "done",
+        "tickable": false,
+        "timing": null,
+        "values": {
+         "have": 78,
+         "min": 60
+        }
+       },
+       {
+        "colour": "red",
+        "evidence": null,
+        "key": "test:MDCAT (MBBS)",
+        "kind": "test",
+        "label_key": "step_test_pass",
+        "manual_done": false,
+        "rule": {
+         "confidence": "official",
+         "source": "https://raahban.com/guides/mdcat-passing-marks"
+        },
+        "status": "not",
+        "tickable": true,
+        "timing": {
+         "chain": [
+          "mdcat"
+         ],
+         "result": "mdcat:result"
+        },
+        "values": {
+         "name": "MDCAT (MBBS)",
+         "pass": 55
+        }
+       },
+       {
+        "colour": "red",
+        "evidence": null,
+        "key": "apply",
+        "kind": "apply",
+        "label_key": "step_apply",
+        "manual_done": false,
+        "rule": null,
+        "status": "not",
+        "tickable": true,
+        "timing": null,
+        "values": {
+         "degree": "MBBS (Medicine)"
+        }
+       },
+       {
+        "colour": "red",
+        "evidence": null,
+        "key": "degree",
+        "kind": "degree",
+        "label_key": "step_degree",
+        "manual_done": false,
+        "rule": {
+         "confidence": "official",
+         "source": "https://pmdc.pk/Documents/law/Admissions%20Regulations-2025.pdf"
+        },
+        "status": "not",
+        "tickable": false,
+        "timing": null,
+        "values": {
+         "degree": "MBBS (Medicine)",
+         "years": 5
+        }
+       }
+      ],
+      "time": null,
+      "title": "MBBS (Medicine)",
+      "verdict": {
+       "confidence": "official",
+       "min_percent": 60,
+       "needs": [],
+       "reasons": [
+        {
+         "group_code": "pre_engineering",
+         "group_label": "Pre-Engineering",
+         "key": "not_open_group"
+        }
+       ],
+       "sources": [
+        "https://pmdc.pk/Documents/law/Admissions%20Regulations-2025.pdf"
+       ],
+       "status": "not_open",
+       "student_percent": 78,
+       "subjects": [
+        "Biology",
+        "Chemistry"
+       ],
+       "tests": [
+        {
+         "body": "PM&DC",
+         "codes": [
+          "mdcat"
+         ],
+         "name": "MDCAT (MBBS)",
+         "pass_percent": 55,
+         "scope_fields": [
+          "mbbs"
+         ],
+         "source": "https://raahban.com/guides/mdcat-passing-marks"
+        }
+       ],
+       "years": 5
+      },
+      "why": "It builds on what you said."
+     }
+    ],
+    "rules_as_of": "2026-10",
+    "standing": {
+     "field": null,
+     "groups": [
+      "pre_engineering"
+     ],
+     "level": "fsc",
+     "percent": 78,
+     "readable": true
+    }
+   },
+   "message": "ok"
+  },
+  "status": 200
+ },
+ "get_after_withdraw": {
+  "body": {
+   "code": 0,
+   "data": {
+    "calendar_as_of": "2026-10",
+    "chosen": null,
+    "counts": {
+     "not_open": 1,
+     "open": 2,
+     "step": 0,
+     "unknown": 0
+    },
+    "education_line": {
+     "groups": [
+      {
+       "code": "pre_engineering",
+       "label": "Pre-Engineering"
+      }
+     ],
+     "level": "fsc",
+     "level_label": "FSc",
+     "percent": 78
+    },
+    "fields": [
+     {
+      "family": "engineering",
+      "field_key": "electrical_engineering",
+      "possibility_id": "<uuid>",
+      "status": "open",
+      "steps": [
+       {
+        "colour": "green",
+        "evidence": {
+         "id": "education:<uuid>",
+         "level": "stated",
+         "source_label": "Details"
+        },
+        "key": "group",
+        "kind": "group",
+        "label_key": "step_group",
+        "manual_done": false,
+        "rule": {
+         "confidence": "official",
+         "source": "https://www.pec.org.pk/wp-content/uploads/2022/11/REGULATIONS-FOR-ENGG-EDU.pdf"
+        },
+        "status": "done",
+        "tickable": false,
+        "timing": null,
+        "values": {
+         "groups": [
+          {
+           "code": "pre_engineering",
+           "label": "Pre-Engineering",
+           "route_label": "FSc Pre-Engineering"
+          }
+         ]
+        }
+       },
+       {
+        "colour": "green",
+        "evidence": {
+         "id": "education:<uuid>",
+         "level": "stated",
+         "source_label": "Details"
+        },
+        "key": "complete_intermediate",
+        "kind": "complete_intermediate",
+        "label_key": "step_finish",
+        "manual_done": false,
+        "rule": null,
+        "status": "done",
+        "tickable": false,
+        "timing": null,
+        "values": {
+         "level": "FSc"
+        }
+       },
+       {
+        "colour": "green",
+        "evidence": {
+         "id": "education:<uuid>",
+         "level": "stated",
+         "source_label": "Details"
+        },
+        "key": "marks",
+        "kind": "marks",
+        "label_key": "step_marks",
+        "manual_done": false,
+        "rule": {
+         "confidence": "official",
+         "source": "https://www.pec.org.pk/wp-content/uploads/2022/11/REGULATIONS-FOR-ENGG-EDU.pdf"
+        },
+        "status": "done",
+        "tickable": false,
+        "timing": null,
+        "values": {
+         "have": 78,
+         "min": 60
+        }
+       },
+       {
+        "colour": "red",
+        "evidence": null,
+        "key": "test:ECAT (UET) / NET (NUST) / university test",
+        "kind": "test",
+        "label_key": "step_test_pass",
+        "manual_done": false,
+        "rule": {
+         "confidence": "official",
+         "source": "https://blog.maqsad.io/blog/uet-ecat-complete-guide"
+        },
+        "status": "not",
+        "tickable": true,
+        "timing": {
+         "chain": [
+          "ecat"
+         ],
+         "result": "ecat:result"
+        },
+        "values": {
+         "name": "ECAT (UET) / NET (NUST) / university test",
+         "pass": 33
+        }
+       },
+       {
+        "colour": "red",
+        "evidence": null,
+        "key": "apply",
+        "kind": "apply",
+        "label_key": "step_apply",
+        "manual_done": false,
+        "rule": null,
+        "status": "not",
+        "tickable": true,
+        "timing": null,
+        "values": {
+         "degree": "Electrical Engineering"
+        }
+       },
+       {
+        "colour": "red",
+        "evidence": null,
+        "key": "degree",
+        "kind": "degree",
+        "label_key": "step_degree",
+        "manual_done": false,
+        "rule": {
+         "confidence": "official",
+         "source": "https://www.pec.org.pk/wp-content/uploads/2022/11/REGULATIONS-FOR-ENGG-EDU.pdf"
+        },
+        "status": "not",
+        "tickable": false,
+        "timing": null,
+        "values": {
+         "degree": "Electrical Engineering",
+         "years": 4
+        }
+       }
+      ],
+      "time": {
+       "basis": [
+        {
+         "confidence": "official",
+         "event_key": "ecat",
+         "month": 6,
+         "source": "https://ecat.uet.edu.pk/",
+         "step": "test:ECAT (UET) / NET (NUST) / university test",
+         "year": 2027
+        },
+        {
+         "confidence": "official",
+         "event_key": "ecat:result",
+         "month": 6,
+         "source": "https://ecat.uet.edu.pk/",
+         "step": "test:ECAT (UET) / NET (NUST) / university test",
+         "year": 2027
+        },
+        {
+         "confidence": "official",
+         "event_key": "nust_ug",
+         "month": 9,
+         "source": "https://nust.edu.pk/admissions/undergraduates/dates-to-remember/",
+         "step": null,
+         "year": 2027
+        }
+       ],
+       "confidence": "official",
+       "degree_years": 4,
+       "next_intake": {
+        "label": "September intake",
+        "start_month": 9,
+        "year": 2027
+       },
+       "to_entry_months": 10,
+       "to_finish_years": 4.8
+      },
+      "title": "Electrical Engineering",
+      "verdict": {
+       "confidence": "official",
+       "min_percent": 60,
+       "needs": [],
+       "reasons": [],
+       "sources": [
+        "https://www.pec.org.pk/wp-content/uploads/2022/11/REGULATIONS-FOR-ENGG-EDU.pdf",
+        "https://ucp.edu.pk/blog/pec-allows-fsc-pre-medical-students-opt-engineering-courses/"
+       ],
+       "status": "open",
+       "student_percent": 78,
+       "subjects": [
+        "Physics",
+        "Chemistry",
+        "Mathematics"
+       ],
+       "tests": [
+        {
+         "body": "UET/NUST/university; PEC requires an institution test",
+         "codes": [
+          "ecat",
+          "net"
+         ],
+         "name": "ECAT (UET) / NET (NUST) / university test",
+         "pass_percent": 33,
+         "scope_fields": null,
+         "source": "https://blog.maqsad.io/blog/uet-ecat-complete-guide"
+        }
+       ],
+       "years": 4
+      },
+      "why": "It builds on what you said."
+     },
+     {
+      "family": "engineering",
+      "field_key": "computer_engineering",
+      "possibility_id": "<uuid>",
+      "status": "open",
+      "steps": [
+       {
+        "colour": "green",
+        "evidence": {
+         "id": "education:<uuid>",
+         "level": "stated",
+         "source_label": "Details"
+        },
+        "key": "group",
+        "kind": "group",
+        "label_key": "step_group",
+        "manual_done": false,
+        "rule": {
+         "confidence": "official",
+         "source": "https://www.pec.org.pk/wp-content/uploads/2022/11/REGULATIONS-FOR-ENGG-EDU.pdf"
+        },
+        "status": "done",
+        "tickable": false,
+        "timing": null,
+        "values": {
+         "groups": [
+          {
+           "code": "pre_engineering",
+           "label": "Pre-Engineering",
+           "route_label": "FSc Pre-Engineering"
+          }
+         ]
+        }
+       },
+       {
+        "colour": "green",
+        "evidence": {
+         "id": "education:<uuid>",
+         "level": "stated",
+         "source_label": "Details"
+        },
+        "key": "complete_intermediate",
+        "kind": "complete_intermediate",
+        "label_key": "step_finish",
+        "manual_done": false,
+        "rule": null,
+        "status": "done",
+        "tickable": false,
+        "timing": null,
+        "values": {
+         "level": "FSc"
+        }
+       },
+       {
+        "colour": "green",
+        "evidence": {
+         "id": "education:<uuid>",
+         "level": "stated",
+         "source_label": "Details"
+        },
+        "key": "marks",
+        "kind": "marks",
+        "label_key": "step_marks",
+        "manual_done": false,
+        "rule": {
+         "confidence": "official",
+         "source": "https://www.pec.org.pk/wp-content/uploads/2022/11/REGULATIONS-FOR-ENGG-EDU.pdf"
+        },
+        "status": "done",
+        "tickable": false,
+        "timing": null,
+        "values": {
+         "have": 78,
+         "min": 60
+        }
+       },
+       {
+        "colour": "red",
+        "evidence": null,
+        "key": "test:ECAT (UET) / NET (NUST) / university test",
+        "kind": "test",
+        "label_key": "step_test_pass",
+        "manual_done": false,
+        "rule": {
+         "confidence": "official",
+         "source": "https://blog.maqsad.io/blog/uet-ecat-complete-guide"
+        },
+        "status": "not",
+        "tickable": true,
+        "timing": {
+         "chain": [
+          "ecat"
+         ],
+         "result": "ecat:result"
+        },
+        "values": {
+         "name": "ECAT (UET) / NET (NUST) / university test",
+         "pass": 33
+        }
+       },
+       {
+        "colour": "red",
+        "evidence": null,
+        "key": "apply",
+        "kind": "apply",
+        "label_key": "step_apply",
+        "manual_done": false,
+        "rule": null,
+        "status": "not",
+        "tickable": true,
+        "timing": null,
+        "values": {
+         "degree": "Computer Engineering"
+        }
+       },
+       {
+        "colour": "red",
+        "evidence": null,
+        "key": "degree",
+        "kind": "degree",
+        "label_key": "step_degree",
+        "manual_done": false,
+        "rule": {
+         "confidence": "official",
+         "source": "https://www.pec.org.pk/wp-content/uploads/2022/11/REGULATIONS-FOR-ENGG-EDU.pdf"
+        },
+        "status": "not",
+        "tickable": false,
+        "timing": null,
+        "values": {
+         "degree": "Computer Engineering",
+         "years": 4
+        }
+       }
+      ],
+      "time": {
+       "basis": [
+        {
+         "confidence": "official",
+         "event_key": "ecat",
+         "month": 6,
+         "source": "https://ecat.uet.edu.pk/",
+         "step": "test:ECAT (UET) / NET (NUST) / university test",
+         "year": 2027
+        },
+        {
+         "confidence": "official",
+         "event_key": "ecat:result",
+         "month": 6,
+         "source": "https://ecat.uet.edu.pk/",
+         "step": "test:ECAT (UET) / NET (NUST) / university test",
+         "year": 2027
+        },
+        {
+         "confidence": "official",
+         "event_key": "nust_ug",
+         "month": 9,
+         "source": "https://nust.edu.pk/admissions/undergraduates/dates-to-remember/",
+         "step": null,
+         "year": 2027
+        }
+       ],
+       "confidence": "official",
+       "degree_years": 4,
+       "next_intake": {
+        "label": "September intake",
+        "start_month": 9,
+        "year": 2027
+       },
+       "to_entry_months": 10,
+       "to_finish_years": 4.8
+      },
+      "title": "Computer Engineering",
+      "verdict": {
+       "confidence": "official",
+       "min_percent": 60,
+       "needs": [],
+       "reasons": [],
+       "sources": [
+        "https://www.pec.org.pk/wp-content/uploads/2022/11/REGULATIONS-FOR-ENGG-EDU.pdf",
+        "https://ucp.edu.pk/blog/pec-allows-fsc-pre-medical-students-opt-engineering-courses/"
+       ],
+       "status": "open",
+       "student_percent": 78,
+       "subjects": [
+        "Physics",
+        "Chemistry",
+        "Mathematics"
+       ],
+       "tests": [
+        {
+         "body": "UET/NUST/university; PEC requires an institution test",
+         "codes": [
+          "ecat",
+          "net"
+         ],
+         "name": "ECAT (UET) / NET (NUST) / university test",
+         "pass_percent": 33,
+         "scope_fields": null,
+         "source": "https://blog.maqsad.io/blog/uet-ecat-complete-guide"
+        }
+       ],
+       "years": 4
+      },
+      "why": "It builds on what you said."
+     },
+     {
+      "family": "health",
+      "field_key": "mbbs",
+      "possibility_id": "<uuid>",
+      "status": "not_open",
+      "steps": [
+       {
+        "colour": "red",
+        "evidence": {
+         "id": "education:<uuid>",
+         "level": "stated",
+         "source_label": "Details"
+        },
+        "key": "group",
+        "kind": "group",
+        "label_key": "step_group",
+        "manual_done": false,
+        "rule": {
+         "confidence": "official",
+         "source": "https://pmdc.pk/Documents/law/Admissions%20Regulations-2025.pdf"
+        },
+        "status": "not",
+        "tickable": false,
+        "timing": null,
+        "values": {
+         "groups": [
+          {
+           "code": "pre_medical",
+           "label": "Pre-Medical",
+           "route_label": "FSc Pre-Medical"
+          }
+         ]
+        }
+       },
+       {
+        "colour": "green",
+        "evidence": {
+         "id": "education:<uuid>",
+         "level": "stated",
+         "source_label": "Details"
+        },
+        "key": "complete_intermediate",
+        "kind": "complete_intermediate",
+        "label_key": "step_finish",
+        "manual_done": false,
+        "rule": null,
+        "status": "done",
+        "tickable": false,
+        "timing": null,
+        "values": {
+         "level": "FSc"
+        }
+       },
+       {
+        "colour": "green",
+        "evidence": {
+         "id": "education:<uuid>",
+         "level": "stated",
+         "source_label": "Details"
+        },
+        "key": "marks",
+        "kind": "marks",
+        "label_key": "step_marks",
+        "manual_done": false,
+        "rule": {
+         "confidence": "official",
+         "source": "https://pmdc.pk/Documents/law/Admissions%20Regulations-2025.pdf"
+        },
+        "status": "done",
+        "tickable": false,
+        "timing": null,
+        "values": {
+         "have": 78,
+         "min": 60
+        }
+       },
+       {
+        "colour": "red",
+        "evidence": null,
+        "key": "test:MDCAT (MBBS)",
+        "kind": "test",
+        "label_key": "step_test_pass",
+        "manual_done": false,
+        "rule": {
+         "confidence": "official",
+         "source": "https://raahban.com/guides/mdcat-passing-marks"
+        },
+        "status": "not",
+        "tickable": true,
+        "timing": {
+         "chain": [
+          "mdcat"
+         ],
+         "result": "mdcat:result"
+        },
+        "values": {
+         "name": "MDCAT (MBBS)",
+         "pass": 55
+        }
+       },
+       {
+        "colour": "red",
+        "evidence": null,
+        "key": "apply",
+        "kind": "apply",
+        "label_key": "step_apply",
+        "manual_done": false,
+        "rule": null,
+        "status": "not",
+        "tickable": true,
+        "timing": null,
+        "values": {
+         "degree": "MBBS (Medicine)"
+        }
+       },
+       {
+        "colour": "red",
+        "evidence": null,
+        "key": "degree",
+        "kind": "degree",
+        "label_key": "step_degree",
+        "manual_done": false,
+        "rule": {
+         "confidence": "official",
+         "source": "https://pmdc.pk/Documents/law/Admissions%20Regulations-2025.pdf"
+        },
+        "status": "not",
+        "tickable": false,
+        "timing": null,
+        "values": {
+         "degree": "MBBS (Medicine)",
+         "years": 5
+        }
+       }
+      ],
+      "time": null,
+      "title": "MBBS (Medicine)",
+      "verdict": {
+       "confidence": "official",
+       "min_percent": 60,
+       "needs": [],
+       "reasons": [
+        {
+         "group_code": "pre_engineering",
+         "group_label": "Pre-Engineering",
+         "key": "not_open_group"
+        }
+       ],
+       "sources": [
+        "https://pmdc.pk/Documents/law/Admissions%20Regulations-2025.pdf"
+       ],
+       "status": "not_open",
+       "student_percent": 78,
+       "subjects": [
+        "Biology",
+        "Chemistry"
+       ],
+       "tests": [
+        {
+         "body": "PM&DC",
+         "codes": [
+          "mdcat"
+         ],
+         "name": "MDCAT (MBBS)",
+         "pass_percent": 55,
+         "scope_fields": [
+          "mbbs"
+         ],
+         "source": "https://raahban.com/guides/mdcat-passing-marks"
+        }
+       ],
+       "years": 5
+      },
+      "why": "It builds on what you said."
+     }
+    ],
+    "rules_as_of": "2026-10",
+    "standing": {
+     "field": null,
+     "groups": [
+      "pre_engineering"
+     ],
+     "level": "fsc",
+     "percent": 78,
+     "readable": true
+    }
+   },
+   "message": "ok"
+  },
+  "status": 200
+ },
+ "get_before_choice": {
+  "body": {
+   "code": 0,
+   "data": {
+    "calendar_as_of": "2026-10",
+    "chosen": null,
+    "counts": {
+     "not_open": 1,
+     "open": 2,
+     "step": 0,
+     "unknown": 0
+    },
+    "education_line": {
+     "groups": [
+      {
+       "code": "pre_engineering",
+       "label": "Pre-Engineering"
+      }
+     ],
+     "level": "fsc",
+     "level_label": "FSc",
+     "percent": 78
+    },
+    "fields": [
+     {
+      "family": "engineering",
+      "field_key": "electrical_engineering",
+      "possibility_id": "<uuid>",
+      "status": "open",
+      "steps": [
+       {
+        "colour": "green",
+        "evidence": {
+         "id": "education:<uuid>",
+         "level": "stated",
+         "source_label": "Details"
+        },
+        "key": "group",
+        "kind": "group",
+        "label_key": "step_group",
+        "manual_done": false,
+        "rule": {
+         "confidence": "official",
+         "source": "https://www.pec.org.pk/wp-content/uploads/2022/11/REGULATIONS-FOR-ENGG-EDU.pdf"
+        },
+        "status": "done",
+        "tickable": false,
+        "timing": null,
+        "values": {
+         "groups": [
+          {
+           "code": "pre_engineering",
+           "label": "Pre-Engineering",
+           "route_label": "FSc Pre-Engineering"
+          }
+         ]
+        }
+       },
+       {
+        "colour": "green",
+        "evidence": {
+         "id": "education:<uuid>",
+         "level": "stated",
+         "source_label": "Details"
+        },
+        "key": "complete_intermediate",
+        "kind": "complete_intermediate",
+        "label_key": "step_finish",
+        "manual_done": false,
+        "rule": null,
+        "status": "done",
+        "tickable": false,
+        "timing": null,
+        "values": {
+         "level": "FSc"
+        }
+       },
+       {
+        "colour": "green",
+        "evidence": {
+         "id": "education:<uuid>",
+         "level": "stated",
+         "source_label": "Details"
+        },
+        "key": "marks",
+        "kind": "marks",
+        "label_key": "step_marks",
+        "manual_done": false,
+        "rule": {
+         "confidence": "official",
+         "source": "https://www.pec.org.pk/wp-content/uploads/2022/11/REGULATIONS-FOR-ENGG-EDU.pdf"
+        },
+        "status": "done",
+        "tickable": false,
+        "timing": null,
+        "values": {
+         "have": 78,
+         "min": 60
+        }
+       },
+       {
+        "colour": "red",
+        "evidence": null,
+        "key": "test:ECAT (UET) / NET (NUST) / university test",
+        "kind": "test",
+        "label_key": "step_test_pass",
+        "manual_done": false,
+        "rule": {
+         "confidence": "official",
+         "source": "https://blog.maqsad.io/blog/uet-ecat-complete-guide"
+        },
+        "status": "not",
+        "tickable": true,
+        "timing": {
+         "chain": [
+          "ecat"
+         ],
+         "result": "ecat:result"
+        },
+        "values": {
+         "name": "ECAT (UET) / NET (NUST) / university test",
+         "pass": 33
+        }
+       },
+       {
+        "colour": "red",
+        "evidence": null,
+        "key": "apply",
+        "kind": "apply",
+        "label_key": "step_apply",
+        "manual_done": false,
+        "rule": null,
+        "status": "not",
+        "tickable": true,
+        "timing": null,
+        "values": {
+         "degree": "Electrical Engineering"
+        }
+       },
+       {
+        "colour": "red",
+        "evidence": null,
+        "key": "degree",
+        "kind": "degree",
+        "label_key": "step_degree",
+        "manual_done": false,
+        "rule": {
+         "confidence": "official",
+         "source": "https://www.pec.org.pk/wp-content/uploads/2022/11/REGULATIONS-FOR-ENGG-EDU.pdf"
+        },
+        "status": "not",
+        "tickable": false,
+        "timing": null,
+        "values": {
+         "degree": "Electrical Engineering",
+         "years": 4
+        }
+       }
+      ],
+      "time": {
+       "basis": [
+        {
+         "confidence": "official",
+         "event_key": "ecat",
+         "month": 6,
+         "source": "https://ecat.uet.edu.pk/",
+         "step": "test:ECAT (UET) / NET (NUST) / university test",
+         "year": 2027
+        },
+        {
+         "confidence": "official",
+         "event_key": "ecat:result",
+         "month": 6,
+         "source": "https://ecat.uet.edu.pk/",
+         "step": "test:ECAT (UET) / NET (NUST) / university test",
+         "year": 2027
+        },
+        {
+         "confidence": "official",
+         "event_key": "nust_ug",
+         "month": 9,
+         "source": "https://nust.edu.pk/admissions/undergraduates/dates-to-remember/",
+         "step": null,
+         "year": 2027
+        }
+       ],
+       "confidence": "official",
+       "degree_years": 4,
+       "next_intake": {
+        "label": "September intake",
+        "start_month": 9,
+        "year": 2027
+       },
+       "to_entry_months": 10,
+       "to_finish_years": 4.8
+      },
+      "title": "Electrical Engineering",
+      "verdict": {
+       "confidence": "official",
+       "min_percent": 60,
+       "needs": [],
+       "reasons": [],
+       "sources": [
+        "https://www.pec.org.pk/wp-content/uploads/2022/11/REGULATIONS-FOR-ENGG-EDU.pdf",
+        "https://ucp.edu.pk/blog/pec-allows-fsc-pre-medical-students-opt-engineering-courses/"
+       ],
+       "status": "open",
+       "student_percent": 78,
+       "subjects": [
+        "Physics",
+        "Chemistry",
+        "Mathematics"
+       ],
+       "tests": [
+        {
+         "body": "UET/NUST/university; PEC requires an institution test",
+         "codes": [
+          "ecat",
+          "net"
+         ],
+         "name": "ECAT (UET) / NET (NUST) / university test",
+         "pass_percent": 33,
+         "scope_fields": null,
+         "source": "https://blog.maqsad.io/blog/uet-ecat-complete-guide"
+        }
+       ],
+       "years": 4
+      },
+      "why": "It builds on what you said."
+     },
+     {
+      "family": "engineering",
+      "field_key": "computer_engineering",
+      "possibility_id": "<uuid>",
+      "status": "open",
+      "steps": [
+       {
+        "colour": "green",
+        "evidence": {
+         "id": "education:<uuid>",
+         "level": "stated",
+         "source_label": "Details"
+        },
+        "key": "group",
+        "kind": "group",
+        "label_key": "step_group",
+        "manual_done": false,
+        "rule": {
+         "confidence": "official",
+         "source": "https://www.pec.org.pk/wp-content/uploads/2022/11/REGULATIONS-FOR-ENGG-EDU.pdf"
+        },
+        "status": "done",
+        "tickable": false,
+        "timing": null,
+        "values": {
+         "groups": [
+          {
+           "code": "pre_engineering",
+           "label": "Pre-Engineering",
+           "route_label": "FSc Pre-Engineering"
+          }
+         ]
+        }
+       },
+       {
+        "colour": "green",
+        "evidence": {
+         "id": "education:<uuid>",
+         "level": "stated",
+         "source_label": "Details"
+        },
+        "key": "complete_intermediate",
+        "kind": "complete_intermediate",
+        "label_key": "step_finish",
+        "manual_done": false,
+        "rule": null,
+        "status": "done",
+        "tickable": false,
+        "timing": null,
+        "values": {
+         "level": "FSc"
+        }
+       },
+       {
+        "colour": "green",
+        "evidence": {
+         "id": "education:<uuid>",
+         "level": "stated",
+         "source_label": "Details"
+        },
+        "key": "marks",
+        "kind": "marks",
+        "label_key": "step_marks",
+        "manual_done": false,
+        "rule": {
+         "confidence": "official",
+         "source": "https://www.pec.org.pk/wp-content/uploads/2022/11/REGULATIONS-FOR-ENGG-EDU.pdf"
+        },
+        "status": "done",
+        "tickable": false,
+        "timing": null,
+        "values": {
+         "have": 78,
+         "min": 60
+        }
+       },
+       {
+        "colour": "red",
+        "evidence": null,
+        "key": "test:ECAT (UET) / NET (NUST) / university test",
+        "kind": "test",
+        "label_key": "step_test_pass",
+        "manual_done": false,
+        "rule": {
+         "confidence": "official",
+         "source": "https://blog.maqsad.io/blog/uet-ecat-complete-guide"
+        },
+        "status": "not",
+        "tickable": true,
+        "timing": {
+         "chain": [
+          "ecat"
+         ],
+         "result": "ecat:result"
+        },
+        "values": {
+         "name": "ECAT (UET) / NET (NUST) / university test",
+         "pass": 33
+        }
+       },
+       {
+        "colour": "red",
+        "evidence": null,
+        "key": "apply",
+        "kind": "apply",
+        "label_key": "step_apply",
+        "manual_done": false,
+        "rule": null,
+        "status": "not",
+        "tickable": true,
+        "timing": null,
+        "values": {
+         "degree": "Computer Engineering"
+        }
+       },
+       {
+        "colour": "red",
+        "evidence": null,
+        "key": "degree",
+        "kind": "degree",
+        "label_key": "step_degree",
+        "manual_done": false,
+        "rule": {
+         "confidence": "official",
+         "source": "https://www.pec.org.pk/wp-content/uploads/2022/11/REGULATIONS-FOR-ENGG-EDU.pdf"
+        },
+        "status": "not",
+        "tickable": false,
+        "timing": null,
+        "values": {
+         "degree": "Computer Engineering",
+         "years": 4
+        }
+       }
+      ],
+      "time": {
+       "basis": [
+        {
+         "confidence": "official",
+         "event_key": "ecat",
+         "month": 6,
+         "source": "https://ecat.uet.edu.pk/",
+         "step": "test:ECAT (UET) / NET (NUST) / university test",
+         "year": 2027
+        },
+        {
+         "confidence": "official",
+         "event_key": "ecat:result",
+         "month": 6,
+         "source": "https://ecat.uet.edu.pk/",
+         "step": "test:ECAT (UET) / NET (NUST) / university test",
+         "year": 2027
+        },
+        {
+         "confidence": "official",
+         "event_key": "nust_ug",
+         "month": 9,
+         "source": "https://nust.edu.pk/admissions/undergraduates/dates-to-remember/",
+         "step": null,
+         "year": 2027
+        }
+       ],
+       "confidence": "official",
+       "degree_years": 4,
+       "next_intake": {
+        "label": "September intake",
+        "start_month": 9,
+        "year": 2027
+       },
+       "to_entry_months": 10,
+       "to_finish_years": 4.8
+      },
+      "title": "Computer Engineering",
+      "verdict": {
+       "confidence": "official",
+       "min_percent": 60,
+       "needs": [],
+       "reasons": [],
+       "sources": [
+        "https://www.pec.org.pk/wp-content/uploads/2022/11/REGULATIONS-FOR-ENGG-EDU.pdf",
+        "https://ucp.edu.pk/blog/pec-allows-fsc-pre-medical-students-opt-engineering-courses/"
+       ],
+       "status": "open",
+       "student_percent": 78,
+       "subjects": [
+        "Physics",
+        "Chemistry",
+        "Mathematics"
+       ],
+       "tests": [
+        {
+         "body": "UET/NUST/university; PEC requires an institution test",
+         "codes": [
+          "ecat",
+          "net"
+         ],
+         "name": "ECAT (UET) / NET (NUST) / university test",
+         "pass_percent": 33,
+         "scope_fields": null,
+         "source": "https://blog.maqsad.io/blog/uet-ecat-complete-guide"
+        }
+       ],
+       "years": 4
+      },
+      "why": "It builds on what you said."
+     },
+     {
+      "family": "health",
+      "field_key": "mbbs",
+      "possibility_id": "<uuid>",
+      "status": "not_open",
+      "steps": [
+       {
+        "colour": "red",
+        "evidence": {
+         "id": "education:<uuid>",
+         "level": "stated",
+         "source_label": "Details"
+        },
+        "key": "group",
+        "kind": "group",
+        "label_key": "step_group",
+        "manual_done": false,
+        "rule": {
+         "confidence": "official",
+         "source": "https://pmdc.pk/Documents/law/Admissions%20Regulations-2025.pdf"
+        },
+        "status": "not",
+        "tickable": false,
+        "timing": null,
+        "values": {
+         "groups": [
+          {
+           "code": "pre_medical",
+           "label": "Pre-Medical",
+           "route_label": "FSc Pre-Medical"
+          }
+         ]
+        }
+       },
+       {
+        "colour": "green",
+        "evidence": {
+         "id": "education:<uuid>",
+         "level": "stated",
+         "source_label": "Details"
+        },
+        "key": "complete_intermediate",
+        "kind": "complete_intermediate",
+        "label_key": "step_finish",
+        "manual_done": false,
+        "rule": null,
+        "status": "done",
+        "tickable": false,
+        "timing": null,
+        "values": {
+         "level": "FSc"
+        }
+       },
+       {
+        "colour": "green",
+        "evidence": {
+         "id": "education:<uuid>",
+         "level": "stated",
+         "source_label": "Details"
+        },
+        "key": "marks",
+        "kind": "marks",
+        "label_key": "step_marks",
+        "manual_done": false,
+        "rule": {
+         "confidence": "official",
+         "source": "https://pmdc.pk/Documents/law/Admissions%20Regulations-2025.pdf"
+        },
+        "status": "done",
+        "tickable": false,
+        "timing": null,
+        "values": {
+         "have": 78,
+         "min": 60
+        }
+       },
+       {
+        "colour": "red",
+        "evidence": null,
+        "key": "test:MDCAT (MBBS)",
+        "kind": "test",
+        "label_key": "step_test_pass",
+        "manual_done": false,
+        "rule": {
+         "confidence": "official",
+         "source": "https://raahban.com/guides/mdcat-passing-marks"
+        },
+        "status": "not",
+        "tickable": true,
+        "timing": {
+         "chain": [
+          "mdcat"
+         ],
+         "result": "mdcat:result"
+        },
+        "values": {
+         "name": "MDCAT (MBBS)",
+         "pass": 55
+        }
+       },
+       {
+        "colour": "red",
+        "evidence": null,
+        "key": "apply",
+        "kind": "apply",
+        "label_key": "step_apply",
+        "manual_done": false,
+        "rule": null,
+        "status": "not",
+        "tickable": true,
+        "timing": null,
+        "values": {
+         "degree": "MBBS (Medicine)"
+        }
+       },
+       {
+        "colour": "red",
+        "evidence": null,
+        "key": "degree",
+        "kind": "degree",
+        "label_key": "step_degree",
+        "manual_done": false,
+        "rule": {
+         "confidence": "official",
+         "source": "https://pmdc.pk/Documents/law/Admissions%20Regulations-2025.pdf"
+        },
+        "status": "not",
+        "tickable": false,
+        "timing": null,
+        "values": {
+         "degree": "MBBS (Medicine)",
+         "years": 5
+        }
+       }
+      ],
+      "time": null,
+      "title": "MBBS (Medicine)",
+      "verdict": {
+       "confidence": "official",
+       "min_percent": 60,
+       "needs": [],
+       "reasons": [
+        {
+         "group_code": "pre_engineering",
+         "group_label": "Pre-Engineering",
+         "key": "not_open_group"
+        }
+       ],
+       "sources": [
+        "https://pmdc.pk/Documents/law/Admissions%20Regulations-2025.pdf"
+       ],
+       "status": "not_open",
+       "student_percent": 78,
+       "subjects": [
+        "Biology",
+        "Chemistry"
+       ],
+       "tests": [
+        {
+         "body": "PM&DC",
+         "codes": [
+          "mdcat"
+         ],
+         "name": "MDCAT (MBBS)",
+         "pass_percent": 55,
+         "scope_fields": [
+          "mbbs"
+         ],
+         "source": "https://raahban.com/guides/mdcat-passing-marks"
+        }
+       ],
+       "years": 5
+      },
+      "why": "It builds on what you said."
+     }
+    ],
+    "rules_as_of": "2026-10",
+    "standing": {
+     "field": null,
+     "groups": [
+      "pre_engineering"
+     ],
+     "level": "fsc",
+     "percent": 78,
+     "readable": true
+    }
+   },
+   "message": "ok"
+  },
+  "status": 200
+ },
+ "tick_apply": {
+  "body": {
+   "code": 0,
+   "data": {
+    "chosen_at": "<stamp>",
+    "field_key": "electrical_engineering",
+    "id": "<uuid>",
+    "live_status": "open",
+    "possibility_id": "<uuid>",
+    "route": {
+     "degree": {
+      "title": "Electrical Engineering",
+      "years": 4
+     },
+     "needs": [],
+     "now": {
+      "groups": [
+       {
+        "code": "pre_engineering",
+        "label": "Pre-Engineering"
+       }
+      ],
+      "level": "fsc",
+      "level_label": "FSc",
+      "percent": 78
+     },
+     "sources": [
+      "https://www.pec.org.pk/wp-content/uploads/2022/11/REGULATIONS-FOR-ENGG-EDU.pdf",
+      "https://ucp.edu.pk/blog/pec-allows-fsc-pre-medical-students-opt-engineering-courses/"
+     ],
+     "tests": [
+      {
+       "body": "UET/NUST/university; PEC requires an institution test",
+       "codes": [
+        "ecat",
+        "net"
+       ],
+       "name": "ECAT (UET) / NET (NUST) / university test",
+       "pass_percent": 33,
+       "scope_fields": null,
+       "source": "https://blog.maqsad.io/blog/uet-ecat-complete-guide"
+      }
+     ]
+    },
+    "snapshot_steps": [
+     {
+      "key": "group",
+      "label_key": "step_group",
+      "status": "done",
+      "values": {
+       "groups": [
+        {
+         "code": "pre_engineering",
+         "label": "Pre-Engineering",
+         "route_label": "FSc Pre-Engineering"
+        }
+       ]
+      }
+     },
+     {
+      "key": "complete_intermediate",
+      "label_key": "step_finish",
+      "status": "done",
+      "values": {
+       "level": "FSc"
+      }
+     },
+     {
+      "key": "marks",
+      "label_key": "step_marks",
+      "status": "done",
+      "values": {
+       "have": 78,
+       "min": 60
+      }
+     },
+     {
+      "key": "test:ECAT (UET) / NET (NUST) / university test",
+      "label_key": "step_test_pass",
+      "status": "not",
+      "values": {
+       "name": "ECAT (UET) / NET (NUST) / university test",
+       "pass": 33
+      }
+     },
+     {
+      "key": "apply",
+      "label_key": "step_apply",
+      "status": "not",
+      "values": {
+       "degree": "Electrical Engineering"
+      }
+     },
+     {
+      "key": "degree",
+      "label_key": "step_degree",
+      "status": "not",
+      "values": {
+       "degree": "Electrical Engineering",
+       "years": 4
+      }
+     }
+    ],
+    "snapshot_verdict": {
+     "confidence": "official",
+     "min_percent": 60,
+     "needs": [],
+     "reasons": [],
+     "sources": [
+      "https://www.pec.org.pk/wp-content/uploads/2022/11/REGULATIONS-FOR-ENGG-EDU.pdf",
+      "https://ucp.edu.pk/blog/pec-allows-fsc-pre-medical-students-opt-engineering-courses/"
+     ],
+     "status": "open",
+     "student_percent": 78,
+     "subjects": [
+      "Physics",
+      "Chemistry",
+      "Mathematics"
+     ],
+     "tests": [
+      {
+       "body": "UET/NUST/university; PEC requires an institution test",
+       "codes": [
+        "ecat",
+        "net"
+       ],
+       "name": "ECAT (UET) / NET (NUST) / university test",
+       "pass_percent": 33,
+       "scope_fields": null,
+       "source": "https://blog.maqsad.io/blog/uet-ecat-complete-guide"
+      }
+     ],
+     "years": 4
+    },
+    "steps": [
+     {
+      "colour": "green",
+      "evidence": {
+       "id": "education:<uuid>",
+       "level": "stated",
+       "source_label": "Details"
+      },
+      "key": "group",
+      "kind": "group",
+      "label_key": "step_group",
+      "manual_done": false,
+      "rule": {
+       "confidence": "official",
+       "source": "https://www.pec.org.pk/wp-content/uploads/2022/11/REGULATIONS-FOR-ENGG-EDU.pdf"
+      },
+      "status": "done",
+      "tickable": false,
+      "timing": null,
+      "values": {
+       "groups": [
+        {
+         "code": "pre_engineering",
+         "label": "Pre-Engineering",
+         "route_label": "FSc Pre-Engineering"
+        }
+       ]
+      }
+     },
+     {
+      "colour": "green",
+      "evidence": {
+       "id": "education:<uuid>",
+       "level": "stated",
+       "source_label": "Details"
+      },
+      "key": "complete_intermediate",
+      "kind": "complete_intermediate",
+      "label_key": "step_finish",
+      "manual_done": false,
+      "rule": null,
+      "status": "done",
+      "tickable": false,
+      "timing": null,
+      "values": {
+       "level": "FSc"
+      }
+     },
+     {
+      "colour": "green",
+      "evidence": {
+       "id": "education:<uuid>",
+       "level": "stated",
+       "source_label": "Details"
+      },
+      "key": "marks",
+      "kind": "marks",
+      "label_key": "step_marks",
+      "manual_done": false,
+      "rule": {
+       "confidence": "official",
+       "source": "https://www.pec.org.pk/wp-content/uploads/2022/11/REGULATIONS-FOR-ENGG-EDU.pdf"
+      },
+      "status": "done",
+      "tickable": false,
+      "timing": null,
+      "values": {
+       "have": 78,
+       "min": 60
+      }
+     },
+     {
+      "colour": "red",
+      "evidence": null,
+      "key": "test:ECAT (UET) / NET (NUST) / university test",
+      "kind": "test",
+      "label_key": "step_test_pass",
+      "manual_done": false,
+      "rule": {
+       "confidence": "official",
+       "source": "https://blog.maqsad.io/blog/uet-ecat-complete-guide"
+      },
+      "status": "not",
+      "tickable": true,
+      "timing": {
+       "chain": [
+        "ecat"
+       ],
+       "result": "ecat:result"
+      },
+      "values": {
+       "name": "ECAT (UET) / NET (NUST) / university test",
+       "pass": 33
+      }
+     },
+     {
+      "colour": "green",
+      "evidence": {
+       "id": null,
+       "level": "stated",
+       "source_label": "You marked it"
+      },
+      "key": "apply",
+      "kind": "apply",
+      "label_key": "step_apply",
+      "manual_done": true,
+      "rule": null,
+      "status": "done",
+      "tickable": true,
+      "timing": null,
+      "values": {
+       "degree": "Electrical Engineering"
+      }
+     },
+     {
+      "colour": "red",
+      "evidence": null,
+      "key": "degree",
+      "kind": "degree",
+      "label_key": "step_degree",
+      "manual_done": false,
+      "rule": {
+       "confidence": "official",
+       "source": "https://www.pec.org.pk/wp-content/uploads/2022/11/REGULATIONS-FOR-ENGG-EDU.pdf"
+      },
+      "status": "not",
+      "tickable": false,
+      "timing": null,
+      "values": {
+       "degree": "Electrical Engineering",
+       "years": 4
+      }
+     }
+    ],
+    "steps_done": [
+     "apply"
+    ],
+    "time": {
+     "basis": [
+      {
+       "confidence": "official",
+       "event_key": "ecat",
+       "month": 6,
+       "source": "https://ecat.uet.edu.pk/",
+       "step": "test:ECAT (UET) / NET (NUST) / university test",
+       "year": 2027
+      },
+      {
+       "confidence": "official",
+       "event_key": "ecat:result",
+       "month": 6,
+       "source": "https://ecat.uet.edu.pk/",
+       "step": "test:ECAT (UET) / NET (NUST) / university test",
+       "year": 2027
+      },
+      {
+       "confidence": "official",
+       "event_key": "nust_ug",
+       "month": 9,
+       "source": "https://nust.edu.pk/admissions/undergraduates/dates-to-remember/",
+       "step": null,
+       "year": 2027
+      }
+     ],
+     "confidence": "official",
+     "degree_years": 4,
+     "next_intake": {
+      "label": "September intake",
+      "start_month": 9,
+      "year": 2027
+     },
+     "to_entry_months": 10,
+     "to_finish_years": 4.8
+    },
+    "title": "Electrical Engineering",
+    "withdrawn_at": null
+   },
+   "message": "ok"
+  },
+  "status": 200
+ },
+ "tick_unknown_key": {
+  "body": {
+   "detail": "No such step on this route"
+  },
+  "status": 422
+ },
+ "tick_vault_step": {
+  "body": {
+   "detail": "PAI reads this step from your Vault, so it cannot be ticked. If it is wrong, update it in your Vault."
+  },
+  "status": 409
+ },
+ "untick_apply": {
+  "body": {
+   "code": 0,
+   "data": {
+    "chosen_at": "<stamp>",
+    "field_key": "electrical_engineering",
+    "id": "<uuid>",
+    "live_status": "open",
+    "possibility_id": "<uuid>",
+    "route": {
+     "degree": {
+      "title": "Electrical Engineering",
+      "years": 4
+     },
+     "needs": [],
+     "now": {
+      "groups": [
+       {
+        "code": "pre_engineering",
+        "label": "Pre-Engineering"
+       }
+      ],
+      "level": "fsc",
+      "level_label": "FSc",
+      "percent": 78
+     },
+     "sources": [
+      "https://www.pec.org.pk/wp-content/uploads/2022/11/REGULATIONS-FOR-ENGG-EDU.pdf",
+      "https://ucp.edu.pk/blog/pec-allows-fsc-pre-medical-students-opt-engineering-courses/"
+     ],
+     "tests": [
+      {
+       "body": "UET/NUST/university; PEC requires an institution test",
+       "codes": [
+        "ecat",
+        "net"
+       ],
+       "name": "ECAT (UET) / NET (NUST) / university test",
+       "pass_percent": 33,
+       "scope_fields": null,
+       "source": "https://blog.maqsad.io/blog/uet-ecat-complete-guide"
+      }
+     ]
+    },
+    "snapshot_steps": [
+     {
+      "key": "group",
+      "label_key": "step_group",
+      "status": "done",
+      "values": {
+       "groups": [
+        {
+         "code": "pre_engineering",
+         "label": "Pre-Engineering",
+         "route_label": "FSc Pre-Engineering"
+        }
+       ]
+      }
+     },
+     {
+      "key": "complete_intermediate",
+      "label_key": "step_finish",
+      "status": "done",
+      "values": {
+       "level": "FSc"
+      }
+     },
+     {
+      "key": "marks",
+      "label_key": "step_marks",
+      "status": "done",
+      "values": {
+       "have": 78,
+       "min": 60
+      }
+     },
+     {
+      "key": "test:ECAT (UET) / NET (NUST) / university test",
+      "label_key": "step_test_pass",
+      "status": "not",
+      "values": {
+       "name": "ECAT (UET) / NET (NUST) / university test",
+       "pass": 33
+      }
+     },
+     {
+      "key": "apply",
+      "label_key": "step_apply",
+      "status": "not",
+      "values": {
+       "degree": "Electrical Engineering"
+      }
+     },
+     {
+      "key": "degree",
+      "label_key": "step_degree",
+      "status": "not",
+      "values": {
+       "degree": "Electrical Engineering",
+       "years": 4
+      }
+     }
+    ],
+    "snapshot_verdict": {
+     "confidence": "official",
+     "min_percent": 60,
+     "needs": [],
+     "reasons": [],
+     "sources": [
+      "https://www.pec.org.pk/wp-content/uploads/2022/11/REGULATIONS-FOR-ENGG-EDU.pdf",
+      "https://ucp.edu.pk/blog/pec-allows-fsc-pre-medical-students-opt-engineering-courses/"
+     ],
+     "status": "open",
+     "student_percent": 78,
+     "subjects": [
+      "Physics",
+      "Chemistry",
+      "Mathematics"
+     ],
+     "tests": [
+      {
+       "body": "UET/NUST/university; PEC requires an institution test",
+       "codes": [
+        "ecat",
+        "net"
+       ],
+       "name": "ECAT (UET) / NET (NUST) / university test",
+       "pass_percent": 33,
+       "scope_fields": null,
+       "source": "https://blog.maqsad.io/blog/uet-ecat-complete-guide"
+      }
+     ],
+     "years": 4
+    },
+    "steps": [
+     {
+      "colour": "green",
+      "evidence": {
+       "id": "education:<uuid>",
+       "level": "stated",
+       "source_label": "Details"
+      },
+      "key": "group",
+      "kind": "group",
+      "label_key": "step_group",
+      "manual_done": false,
+      "rule": {
+       "confidence": "official",
+       "source": "https://www.pec.org.pk/wp-content/uploads/2022/11/REGULATIONS-FOR-ENGG-EDU.pdf"
+      },
+      "status": "done",
+      "tickable": false,
+      "timing": null,
+      "values": {
+       "groups": [
+        {
+         "code": "pre_engineering",
+         "label": "Pre-Engineering",
+         "route_label": "FSc Pre-Engineering"
+        }
+       ]
+      }
+     },
+     {
+      "colour": "green",
+      "evidence": {
+       "id": "education:<uuid>",
+       "level": "stated",
+       "source_label": "Details"
+      },
+      "key": "complete_intermediate",
+      "kind": "complete_intermediate",
+      "label_key": "step_finish",
+      "manual_done": false,
+      "rule": null,
+      "status": "done",
+      "tickable": false,
+      "timing": null,
+      "values": {
+       "level": "FSc"
+      }
+     },
+     {
+      "colour": "green",
+      "evidence": {
+       "id": "education:<uuid>",
+       "level": "stated",
+       "source_label": "Details"
+      },
+      "key": "marks",
+      "kind": "marks",
+      "label_key": "step_marks",
+      "manual_done": false,
+      "rule": {
+       "confidence": "official",
+       "source": "https://www.pec.org.pk/wp-content/uploads/2022/11/REGULATIONS-FOR-ENGG-EDU.pdf"
+      },
+      "status": "done",
+      "tickable": false,
+      "timing": null,
+      "values": {
+       "have": 78,
+       "min": 60
+      }
+     },
+     {
+      "colour": "red",
+      "evidence": null,
+      "key": "test:ECAT (UET) / NET (NUST) / university test",
+      "kind": "test",
+      "label_key": "step_test_pass",
+      "manual_done": false,
+      "rule": {
+       "confidence": "official",
+       "source": "https://blog.maqsad.io/blog/uet-ecat-complete-guide"
+      },
+      "status": "not",
+      "tickable": true,
+      "timing": {
+       "chain": [
+        "ecat"
+       ],
+       "result": "ecat:result"
+      },
+      "values": {
+       "name": "ECAT (UET) / NET (NUST) / university test",
+       "pass": 33
+      }
+     },
+     {
+      "colour": "red",
+      "evidence": null,
+      "key": "apply",
+      "kind": "apply",
+      "label_key": "step_apply",
+      "manual_done": false,
+      "rule": null,
+      "status": "not",
+      "tickable": true,
+      "timing": null,
+      "values": {
+       "degree": "Electrical Engineering"
+      }
+     },
+     {
+      "colour": "red",
+      "evidence": null,
+      "key": "degree",
+      "kind": "degree",
+      "label_key": "step_degree",
+      "manual_done": false,
+      "rule": {
+       "confidence": "official",
+       "source": "https://www.pec.org.pk/wp-content/uploads/2022/11/REGULATIONS-FOR-ENGG-EDU.pdf"
+      },
+      "status": "not",
+      "tickable": false,
+      "timing": null,
+      "values": {
+       "degree": "Electrical Engineering",
+       "years": 4
+      }
+     }
+    ],
+    "steps_done": [],
+    "time": {
+     "basis": [
+      {
+       "confidence": "official",
+       "event_key": "ecat",
+       "month": 6,
+       "source": "https://ecat.uet.edu.pk/",
+       "step": "test:ECAT (UET) / NET (NUST) / university test",
+       "year": 2027
+      },
+      {
+       "confidence": "official",
+       "event_key": "ecat:result",
+       "month": 6,
+       "source": "https://ecat.uet.edu.pk/",
+       "step": "test:ECAT (UET) / NET (NUST) / university test",
+       "year": 2027
+      },
+      {
+       "confidence": "official",
+       "event_key": "nust_ug",
+       "month": 9,
+       "source": "https://nust.edu.pk/admissions/undergraduates/dates-to-remember/",
+       "step": null,
+       "year": 2027
+      }
+     ],
+     "confidence": "official",
+     "degree_years": 4,
+     "next_intake": {
+      "label": "September intake",
+      "start_month": 9,
+      "year": 2027
+     },
+     "to_entry_months": 10,
+     "to_finish_years": 4.8
+    },
+    "title": "Electrical Engineering",
+    "withdrawn_at": null
+   },
+   "message": "ok"
+  },
+  "status": 200
+ },
+ "withdraw": {
+  "body": {
+   "code": 0,
+   "data": {
+    "chosen_at": "<stamp>",
+    "field_key": "electrical_engineering",
+    "id": "<uuid>",
+    "live_status": "open",
+    "possibility_id": "<uuid>",
+    "route": {
+     "degree": {
+      "title": "Electrical Engineering",
+      "years": 4
+     },
+     "needs": [],
+     "now": {
+      "groups": [
+       {
+        "code": "pre_engineering",
+        "label": "Pre-Engineering"
+       }
+      ],
+      "level": "fsc",
+      "level_label": "FSc",
+      "percent": 78
+     },
+     "sources": [
+      "https://www.pec.org.pk/wp-content/uploads/2022/11/REGULATIONS-FOR-ENGG-EDU.pdf",
+      "https://ucp.edu.pk/blog/pec-allows-fsc-pre-medical-students-opt-engineering-courses/"
+     ],
+     "tests": [
+      {
+       "body": "UET/NUST/university; PEC requires an institution test",
+       "codes": [
+        "ecat",
+        "net"
+       ],
+       "name": "ECAT (UET) / NET (NUST) / university test",
+       "pass_percent": 33,
+       "scope_fields": null,
+       "source": "https://blog.maqsad.io/blog/uet-ecat-complete-guide"
+      }
+     ]
+    },
+    "snapshot_steps": [
+     {
+      "key": "group",
+      "label_key": "step_group",
+      "status": "done",
+      "values": {
+       "groups": [
+        {
+         "code": "pre_engineering",
+         "label": "Pre-Engineering",
+         "route_label": "FSc Pre-Engineering"
+        }
+       ]
+      }
+     },
+     {
+      "key": "complete_intermediate",
+      "label_key": "step_finish",
+      "status": "done",
+      "values": {
+       "level": "FSc"
+      }
+     },
+     {
+      "key": "marks",
+      "label_key": "step_marks",
+      "status": "done",
+      "values": {
+       "have": 78,
+       "min": 60
+      }
+     },
+     {
+      "key": "test:ECAT (UET) / NET (NUST) / university test",
+      "label_key": "step_test_pass",
+      "status": "not",
+      "values": {
+       "name": "ECAT (UET) / NET (NUST) / university test",
+       "pass": 33
+      }
+     },
+     {
+      "key": "apply",
+      "label_key": "step_apply",
+      "status": "not",
+      "values": {
+       "degree": "Electrical Engineering"
+      }
+     },
+     {
+      "key": "degree",
+      "label_key": "step_degree",
+      "status": "not",
+      "values": {
+       "degree": "Electrical Engineering",
+       "years": 4
+      }
+     }
+    ],
+    "snapshot_verdict": {
+     "confidence": "official",
+     "min_percent": 60,
+     "needs": [],
+     "reasons": [],
+     "sources": [
+      "https://www.pec.org.pk/wp-content/uploads/2022/11/REGULATIONS-FOR-ENGG-EDU.pdf",
+      "https://ucp.edu.pk/blog/pec-allows-fsc-pre-medical-students-opt-engineering-courses/"
+     ],
+     "status": "open",
+     "student_percent": 78,
+     "subjects": [
+      "Physics",
+      "Chemistry",
+      "Mathematics"
+     ],
+     "tests": [
+      {
+       "body": "UET/NUST/university; PEC requires an institution test",
+       "codes": [
+        "ecat",
+        "net"
+       ],
+       "name": "ECAT (UET) / NET (NUST) / university test",
+       "pass_percent": 33,
+       "scope_fields": null,
+       "source": "https://blog.maqsad.io/blog/uet-ecat-complete-guide"
+      }
+     ],
+     "years": 4
+    },
+    "steps": [
+     {
+      "colour": "green",
+      "evidence": {
+       "id": "education:<uuid>",
+       "level": "stated",
+       "source_label": "Details"
+      },
+      "key": "group",
+      "kind": "group",
+      "label_key": "step_group",
+      "manual_done": false,
+      "rule": {
+       "confidence": "official",
+       "source": "https://www.pec.org.pk/wp-content/uploads/2022/11/REGULATIONS-FOR-ENGG-EDU.pdf"
+      },
+      "status": "done",
+      "tickable": false,
+      "timing": null,
+      "values": {
+       "groups": [
+        {
+         "code": "pre_engineering",
+         "label": "Pre-Engineering",
+         "route_label": "FSc Pre-Engineering"
+        }
+       ]
+      }
+     },
+     {
+      "colour": "green",
+      "evidence": {
+       "id": "education:<uuid>",
+       "level": "stated",
+       "source_label": "Details"
+      },
+      "key": "complete_intermediate",
+      "kind": "complete_intermediate",
+      "label_key": "step_finish",
+      "manual_done": false,
+      "rule": null,
+      "status": "done",
+      "tickable": false,
+      "timing": null,
+      "values": {
+       "level": "FSc"
+      }
+     },
+     {
+      "colour": "green",
+      "evidence": {
+       "id": "education:<uuid>",
+       "level": "stated",
+       "source_label": "Details"
+      },
+      "key": "marks",
+      "kind": "marks",
+      "label_key": "step_marks",
+      "manual_done": false,
+      "rule": {
+       "confidence": "official",
+       "source": "https://www.pec.org.pk/wp-content/uploads/2022/11/REGULATIONS-FOR-ENGG-EDU.pdf"
+      },
+      "status": "done",
+      "tickable": false,
+      "timing": null,
+      "values": {
+       "have": 78,
+       "min": 60
+      }
+     },
+     {
+      "colour": "red",
+      "evidence": null,
+      "key": "test:ECAT (UET) / NET (NUST) / university test",
+      "kind": "test",
+      "label_key": "step_test_pass",
+      "manual_done": false,
+      "rule": {
+       "confidence": "official",
+       "source": "https://blog.maqsad.io/blog/uet-ecat-complete-guide"
+      },
+      "status": "not",
+      "tickable": true,
+      "timing": {
+       "chain": [
+        "ecat"
+       ],
+       "result": "ecat:result"
+      },
+      "values": {
+       "name": "ECAT (UET) / NET (NUST) / university test",
+       "pass": 33
+      }
+     },
+     {
+      "colour": "red",
+      "evidence": null,
+      "key": "apply",
+      "kind": "apply",
+      "label_key": "step_apply",
+      "manual_done": false,
+      "rule": null,
+      "status": "not",
+      "tickable": true,
+      "timing": null,
+      "values": {
+       "degree": "Electrical Engineering"
+      }
+     },
+     {
+      "colour": "red",
+      "evidence": null,
+      "key": "degree",
+      "kind": "degree",
+      "label_key": "step_degree",
+      "manual_done": false,
+      "rule": {
+       "confidence": "official",
+       "source": "https://www.pec.org.pk/wp-content/uploads/2022/11/REGULATIONS-FOR-ENGG-EDU.pdf"
+      },
+      "status": "not",
+      "tickable": false,
+      "timing": null,
+      "values": {
+       "degree": "Electrical Engineering",
+       "years": 4
+      }
+     }
+    ],
+    "steps_done": [],
+    "time": {
+     "basis": [
+      {
+       "confidence": "official",
+       "event_key": "ecat",
+       "month": 6,
+       "source": "https://ecat.uet.edu.pk/",
+       "step": "test:ECAT (UET) / NET (NUST) / university test",
+       "year": 2027
+      },
+      {
+       "confidence": "official",
+       "event_key": "ecat:result",
+       "month": 6,
+       "source": "https://ecat.uet.edu.pk/",
+       "step": "test:ECAT (UET) / NET (NUST) / university test",
+       "year": 2027
+      },
+      {
+       "confidence": "official",
+       "event_key": "nust_ug",
+       "month": 9,
+       "source": "https://nust.edu.pk/admissions/undergraduates/dates-to-remember/",
+       "step": null,
+       "year": 2027
+      }
+     ],
+     "confidence": "official",
+     "degree_years": 4,
+     "next_intake": {
+      "label": "September intake",
+      "start_month": 9,
+      "year": 2027
+     },
+     "to_entry_months": 10,
+     "to_finish_years": 4.8
+    },
+    "title": "Electrical Engineering",
+    "withdrawn_at": "<stamp>"
+   },
+   "message": "ok"
+  },
+  "status": 200
+ }
+}

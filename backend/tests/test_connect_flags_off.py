@@ -127,3 +127,31 @@ async def test_student_facts_off_writes_no_version_no_outbox_and_asks_nothing_of
         bridge.sweep_once(db)
         assert touched.record_event.mock_calls == [] and touched.latest_vault_version.mock_calls == []
         assert touched.counsellor_enabled.mock_calls == []
+
+
+@pytest.mark.req("R-01")
+@pytest.mark.req("R-04")
+@pytest.mark.req("R-44")
+def test_roadmap_and_steps_are_byte_identical_to_the_pre_adapter_answers(monkeypatch):
+    """P1-T5 Task 5: /v1/roadmap, /choose, /steps and /withdraw answer exactly as captured from the code before the
+    plan adapter (tests/fixtures/connect/roadmap_pre_adapter.json), and nothing is asked of PAI OS."""
+    import json
+    from pathlib import Path
+
+    from app.os.ports import plan_actions, plan_query
+    from tests.roadmap_snapshots import walk
+
+    touched = MagicMock()
+    for module, names in ((plan_query, ("plan_view",)), (plan_actions, ("complete_step",)),
+                          (plan_source, ("supports", "counsellor_enabled")), (ports, ("services",))):
+        for name in names:
+            monkeypatch.setattr(module, name, getattr(touched, name))
+    monkeypatch.setattr(bridge, "plan_view", touched.bridge_plan_view)
+    monkeypatch.setattr(bridge, "complete_step", touched.bridge_complete_step)
+    expected = json.loads((Path(__file__).parent / "fixtures" / "connect" / "roadmap_pre_adapter.json").read_text())
+    got = walk()
+    assert sorted(got) == sorted(expected)
+    for name in expected:
+        assert got[name] == expected[name], name
+    assert json.dumps(got, sort_keys=True) == json.dumps(expected, sort_keys=True)
+    assert touched.mock_calls == []
