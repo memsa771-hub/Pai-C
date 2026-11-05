@@ -32,6 +32,7 @@ def outbox_count(db) -> int:
 
 
 @pytest.mark.asyncio
+@pytest.mark.req("R-79")
 async def test_choose_and_withdraw_behave_as_before(monkeypatch):
     touched = MagicMock()  # any call into PAI OS lands here
     for module, names in ((plan_source, ("submit_decision", "latest_version", "supports", "counsellor_enabled")),
@@ -66,6 +67,15 @@ async def test_choose_and_withdraw_behave_as_before(monkeypatch):
         journey = db.get(StudentJourney, journey_id)
         assert journey.active_goal is None and journey.current_objective is None
         assert journey.decisions[-1]["kind"] == "route_withdrawn" and journey.decisions[-1]["route_decision_id"] == second["id"]
+
+        # Final review I4: the student's data export tells each withdrawal from a choice (status, version).
+        from app.pai_c.data_export import export_student_data
+        exported = export_student_data(db, student.workspace_id)["route_decisions"]
+        assert [(d["decision_version"], d["status"], d["field_key"]) for d in exported] == [
+            (1, "chosen", "electrical_engineering"), (2, "chosen", "computer_engineering"),
+            (3, "withdrawn", "computer_engineering")]
+        assert exported[0]["id"] == first["id"] and exported[1]["id"] == second["id"]
+        assert exported[2]["steps_done"] == [] and exported[2]["chosen_at"] == exported[2]["withdrawn_at"]
 
         assert outbox_count(db) == 0  # nothing queued for PAI OS
         assert touched.mock_calls == []  # and nothing asked of it

@@ -25,13 +25,15 @@ def export_student_data(db, workspace_id):
         card = MirrorEngine(db).build(workspace_id)
         service = PossibilityService(db)
         decisions = db.scalars(select(RouteDecision).where(RouteDecision.workspace_id == workspace_id)
-            .order_by(RouteDecision.chosen_at, RouteDecision.id)).all()
+            .order_by(RouteDecision.chosen_at, RouteDecision.decision_version)).all()
         result = {'exported_at': datetime.now(timezone.utc), 'workspace_id': workspace_id,
             'scope': 'Student-visible profile, conversation, paths, chosen routes, the Mirror; document metadata. Download document bytes from Documents. Private model notes and credential data are excluded.',
             'profile': memory.profile_cards(workspace_id), 'personal': memory.personal_view(workspace_id),
             'sections': memory.profile_sections(workspace_id), 'capabilities': memory.capability_view(workspace_id), 'conversation': conversation,
             'paths': [service.serialize(row) for row in service.list(workspace_id)],
-            'route_decisions': [{'id': row.id, 'field_key': row.field_key, 'possibility_id': row.possibility_id,
+            # Each version of the decision (R-79): `status` tells a withdrawal from a choice.
+            'route_decisions': [{'id': row.id, 'decision_version': row.decision_version, 'status': row.status,
+                'field_key': row.field_key, 'possibility_id': row.possibility_id,
                 'title': row.title, 'chosen_at': row.chosen_at, 'withdrawn_at': row.withdrawn_at,
                 'steps': row.steps, 'steps_done': row.steps_done, 'route': row.route} for row in decisions],
             # The Mirror as the student sees it: the education line, what is
