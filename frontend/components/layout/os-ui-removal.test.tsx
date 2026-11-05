@@ -54,6 +54,10 @@ it('keeps roadmap notifications and Counselor conversation navigation', async ()
   const { result } = renderHook(useNotificationNavigation);
   await result.current(notification({ createdBy: 'system:roadmaps' }));
   expect(state.openView).toHaveBeenLastCalledWith('roadmap');
+  state.openView.mockClear();
+  // A PAI OS plan notice (created by system:pai-os, relative link_url) opens the Roadmap page too.
+  await result.current(notification({ createdBy: 'system:pai-os', linkUrl: '/ws?view=roadmap', isRead: true }));
+  expect(state.openView).toHaveBeenLastCalledWith('roadmap');
   await result.current(notification({ channelName: 'pai-counselor', isRead: true }));
   expect(state.setCurrentSessionId).toHaveBeenCalledWith('pai-counselor');
   expect(state.openView).toHaveBeenLastCalledWith('threads');

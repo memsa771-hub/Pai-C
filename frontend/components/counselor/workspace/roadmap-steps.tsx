@@ -7,7 +7,7 @@ import { CalendarClock, Check, CircleDot, ExternalLink, Hourglass } from "lucide
 import type { RouteStep, RouteTime, StepStatus } from "@/lib/roadmap";
 import { EvidenceBadge, vaultBadgeLabel } from "@/components/pai";
 import { cn } from "@/lib/utils";
-import { fill, stepLabel, stepWhen, timeText } from "./roadmap-text";
+import { dueText, fill, stepLabel, stepWhen, timeText } from "./roadmap-text";
 import copy from "./copy.json";
 
 const t = copy.roadmap;
@@ -35,6 +35,7 @@ const host = (url: string) => {
 /** Status word, evidence badge and source, when, and the rule link. */
 export function StepMeta({ step, time, showStatus = true }: { step: RouteStep; time?: RouteTime | null; showStatus?: boolean }) {
   const when = stepWhen(step, time);
+  const due = dueText(step);
   return (
     <div className="mt-1 flex min-w-0 flex-wrap items-center gap-x-2.5 gap-y-1 text-xs text-muted-foreground">
       {showStatus && <span data-status-word className={cn("font-semibold", STYLE[step.status]?.ink)}>{statusWord(step.status)}</span>}
@@ -44,6 +45,8 @@ export function StepMeta({ step, time, showStatus = true }: { step: RouteStep; t
           <span className="truncate">{step.evidence.source_label}</span>
         </span>
       )}
+      {step.owner && <span data-owner={step.owner}>{t.plan[`owner_${step.owner}`]}</span>}
+      {due && <span className="inline-flex items-center gap-1"><CalendarClock aria-hidden className="size-3.5 shrink-0" /><span>{due}</span></span>}
       {when && <span className="inline-flex items-center gap-1"><CalendarClock aria-hidden className="size-3.5 shrink-0" /><span>{when}</span></span>}
       {step.rule?.source && (
         <a href={step.rule.source} target="_blank" rel="noopener noreferrer" aria-label={fill(t.steps.ruleLabel, { host: host(step.rule.source) })}

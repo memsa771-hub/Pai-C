@@ -6,7 +6,7 @@ import { render, screen, fireEvent, waitFor, cleanup, within } from "@testing-li
 import { Roadmap } from "./roadmap";
 import { render as renderItem } from "./roadmap-text";
 import { workspaceApi } from "@/lib/api";
-import { chosenRoute, choiceOptionsOff, choiceOptionsOn, offeredPlaces, roadmapCards, roadmapPage, routeChoice } from "@/tests/fixtures/counselor";
+import { chosenRoute, choiceOptionsOff, choiceOptionsOn, offeredPlaces, osPlanRoute, roadmapCards, roadmapPage, routeChoice } from "@/tests/fixtures/counselor";
 import { I18nProvider } from "@/lib/i18n";
 import copy from "./copy.json";
 
@@ -468,4 +468,69 @@ it("sends the guardian a new withdraw link once they have agreed", async () => {
   fireEvent.click(within(panel).getByRole("button", { name: cs.withdrawLink }));
   await waitFor(() => expect(workspaceApi.resendGuardian).toHaveBeenCalledWith());
   expect(await within(panel).findByText(cs.withdrawLinkSent)).toBeTruthy();
+});
+
+// req: R-44, R-04 (the OS plan on the roadmap screen)
+const osPage = (over: Partial<typeof osPlanRoute> = {}) => ({ ...roadmapPage, chosen: { ...osPlanRoute, ...over } });
+
+it("shows OS plan steps by title with owner, due date and the plan state banner", async () => {
+  vi.mocked(workspaceApi.getRoadmapPage).mockResolvedValue(osPage());
+  render(<Roadmap onNavigate={vi.fn()} />);
+  expect(await screen.findByText("Collect your transcripts")).toBeTruthy();
+  expect(screen.getByText("Draft the statement of purpose")).toBeTruthy();
+  expect(screen.getByText("Due March 12, 2027")).toBeTruthy();
+  expect(screen.getByText(copy.roadmap.plan.needs_student)).toBeTruthy();
+  expect(screen.getAllByText(copy.roadmap.plan.owner_pai).length).toBe(2);
+  expect(screen.queryByText(copy.roadmap.route.unsupported)).toBeNull();
+});
+
+it.each(["empty", "paused", "stopped", "finished"] as const)("shows the %s plan banner", async (state) => {
+  vi.mocked(workspaceApi.getRoadmapPage).mockResolvedValue(osPage({ plan: { state } }));
+  render(<Roadmap onNavigate={vi.fn()} />);
+  expect(await screen.findByText(copy.roadmap.plan[state])).toBeTruthy();
+});
+
+it("shows no plan banner for an active plan", async () => {
+  vi.mocked(workspaceApi.getRoadmapPage).mockResolvedValue(osPage({ plan: { state: "active" } }));
+  render(<Roadmap onNavigate={vi.fn()} />);
+  await screen.findByText("Collect your transcripts");
+  expect(document.querySelector("[data-plan-state]")).toBeNull();
+});
+
+it("ticks an OS step through setRouteStep and then offers no untick", async () => {
+  vi.mocked(workspaceApi.getRoadmapPage).mockResolvedValue(osPage());
+  const route = osPage().chosen;
+  vi.mocked(workspaceApi.setRouteStep).mockResolvedValueOnce({ ...route, steps: route.steps.map((s) => s.key === "collect-transcripts"
+    ? { ...s, status: "done", tickable: false } : s) });
+  render(<Roadmap onNavigate={vi.fn()} />);
+  fireEvent.click(await screen.findByRole("checkbox", { name: "Collect your transcripts" }));
+  await waitFor(() => expect(workspaceApi.setRouteStep).toHaveBeenCalledWith("collect-transcripts", true));
+  await waitFor(() => expect(screen.queryByRole("checkbox", { name: "Collect your transcripts" })).toBeNull());
+  expect(screen.queryByRole("checkbox", { name: /transcripts|deadline|statement/ })).toBeNull();
+});
+
+it("never offers a tick on a PAI-owned or done OS step", async () => {
+  vi.mocked(workspaceApi.getRoadmapPage).mockResolvedValue(osPage());
+  render(<Roadmap onNavigate={vi.fn()} />);
+  await screen.findByText("Collect your transcripts");
+  expect(screen.queryByRole("checkbox", { name: "Check the application deadline" })).toBeNull();
+  expect(screen.queryByRole("checkbox", { name: "Draft the statement of purpose" })).toBeNull();
+});
+
+it("says PAI can't run the plan yet only when the choice is not OS supported", async () => {
+  vi.mocked(workspaceApi.getRoadmapPage).mockResolvedValue(chosenWith(routeChoice({ os_supported: false })));
+  render(<Roadmap onNavigate={vi.fn()} />);
+  expect(await screen.findByText(copy.roadmap.route.unsupported)).toBeTruthy();
+  cleanup();
+  vi.mocked(workspaceApi.getRoadmapPage).mockResolvedValue(chosenWith(routeChoice({ os_supported: true })));
+  render(<Roadmap onNavigate={vi.fn()} />);
+  await screen.findByRole("checkbox", { name: "Take ECAT / NET (pass 33%)" });
+  expect(screen.queryByText(copy.roadmap.route.unsupported)).toBeNull();
+});
+
+it("renders a flag-off route (no plan, no OS steps) with no plan banner or owner", async () => {
+  vi.mocked(workspaceApi.getRoadmapPage).mockResolvedValue({ ...roadmapPage, chosen: chosenRoute });
+  render(<Roadmap onNavigate={vi.fn()} />);
+  await screen.findByRole("checkbox", { name: "Take ECAT / NET (pass 33%)" });
+  expect(document.querySelector("[data-plan-state],[data-owner],[data-unsupported]")).toBeNull();
 });

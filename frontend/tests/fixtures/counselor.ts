@@ -357,6 +357,23 @@ export const routeChoice = (over: Partial<RouteChoice> = {}): RouteChoice => ({
   os_supported: true, consent: { student: "given", guardian: "not_needed" }, ...over,
 });
 
+/** A chosen route PAI OS runs (plan view on): OS steps with their own titles, owners and due dates (backend plan_adapter). */
+const osStep = (key: string, title: string, over: Partial<RouteStep> = {}): RouteStep => ({
+  key, kind: "os", label_key: "", values: {}, status: "half", evidence: null, rule: null, manual_done: false, colour: "yellow",
+  tickable: false, title, owner: "pai", due_at: null, due_tz: null, provisional: false, estimated: false, ...over,
+});
+export const osPlanRoute: ChosenRoute = {
+  ...chosenRoute, time: null,
+  steps: [
+    osStep("collect-transcripts", "Collect your transcripts", { owner: "student", tickable: true, due_at: "2027-03-12T18:59:59Z", due_tz: "Asia/Karachi" }),
+    osStep("check-deadline", "Check the application deadline", { status: "done", colour: "green" }),
+    osStep("draft-statement", "Draft the statement of purpose", { status: "not", colour: "red" }),
+  ],
+  steps_done: ["check-deadline"],
+  plan: { state: "needs_student", state_reason: null, revision: 2, decision_version: 2, proposals_waiting: 0, changes: [] },
+  choice: routeChoice(),
+};
+
 export const roadmapPage: RoadmapPage = {
   education_line: { level: "fsc", level_label: "FSc", groups: [{ code: "pre_engineering", label: "Pre-Engineering" }], percent: 78 },
   counts: { open: 2, step: 1, not_open: 1, unknown: 1 },
