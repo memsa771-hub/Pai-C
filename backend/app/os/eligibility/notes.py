@@ -15,14 +15,25 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from app.os import models
 from app.os.documents.store import ProfileStore
 from app.os.eligibility.evaluate import Card, evaluate
+from app.os.eligibility.facts import default_types, profile_from_facts
 from app.os.eligibility.swaps import suggest
 from app.os.knowledge.requests import visible_programmes
+from app.os.ports import student_facts
 
 P, SEEN, NOTES = models.plans, models.eligibility_seen, models.eligibility_notes
 
 
 def profile_of(plans, student_ref: str) -> dict:
-    return {v["key"]: v["value"] for v in ProfileStore(plans.engine, plans.kernel.tenant_id).all(student_ref)}
+    """The `<doc_type>.<field>` profile the evaluator reads. With the host's StudentFacts adapter on, it comes from
+    the student's facts; otherwise it is exactly the student's `os_profile_values`."""
+    engine, tenant = plans.engine, plans.kernel.tenant_id
+    own = {v["key"]: v["value"] for v in ProfileStore(engine, tenant).all(student_ref)}
+    if not student_facts.counsellor_active(engine, tenant):
+        return own
+    facts = student_facts.get(student_ref, engine=engine, tenant_id=tenant)
+    # interim: removed by T7. A key the Vault lacks (no fact, or an unknown one) still comes from os_profile_values,
+    # so a student whose documents were confirmed in PAI OS keeps their verdicts until T7 sends those values to the Vault.
+    return {**own, **profile_from_facts(facts, default_types())}
 
 
 def programme_cards(plans, rules, refs: list[str], year: int, profile: dict) -> dict[str, tuple[Card, int]]:

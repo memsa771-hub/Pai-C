@@ -175,3 +175,22 @@ def test_letter_type_loads_by_config():
     t = load_document_types()["min_passing_grade_letter"]
     assert [f.name for f in t.fields] == ["institution", "scale_best", "min_pass", "issue_date"]
     assert [(r.kind, r.fields) for r in t.rules] == [("lte", ["min_pass", "scale_best"])]
+
+
+@pytest.mark.req("R-13")
+def test_vault_sourced_profile_evaluates_like_the_document_profile():
+    """P1-T4 Task 5: a profile made from StudentFacts (the `fact:` mapping in the document types) gives the same cards."""
+    from app.os.contracts.student_facts import StudentFactsV1
+    from app.os.documents.types import load_document_types
+    from app.os.eligibility.facts import profile_from_facts
+
+    facts = StudentFactsV1.model_validate({
+        "schema": "pai.student_facts.v1", "student_ref": "s", "vault_version": 1, "eligible_levels": None,
+        "built_at": datetime(2026, 11, 5, tzinfo=timezone.utc),
+        "facts": [{"key": k, "value": v, "evidence": "stated", "vault_version": 1}
+                  for k, v in (("education.bachelor.gpa", 3.2), ("education.bachelor.percentage", 75),
+                               ("test.ielts.score", 7.0))]})
+    profile = profile_from_facts(facts, load_document_types())
+    assert profile == {"transcript.cgpa": 3.2, "transcript.percentage": 75, "ielts_trf.overall": 7.0}
+    for rules, research in ((DE, DE_FACTS), (IE, IE_FACTS)):
+        assert evaluate(rules, "p", research, profile) == evaluate(rules, "p", research, STRONG)

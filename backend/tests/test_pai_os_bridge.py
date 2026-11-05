@@ -169,3 +169,22 @@ def test_recipient_email_loads_as_the_workers_lookup():
     from app.os.ports import recipients
 
     assert recipients.load("app.pai_os_bridge:recipient_email") is bridge.recipient_email
+
+
+@pytest.mark.req("R-13")
+def test_student_facts_adapter_is_off_with_the_flag_and_none_for_a_bad_reference(monkeypatch):
+    """P1-T4 Task 5: the Counsellor's StudentFacts adapter answers None while CONNECT_STUDENT_FACTS is off (PAI OS then
+    uses its own values) and for a reference that names no workspace."""
+    monkeypatch.setattr(config, "CONNECT_STUDENT_FACTS", False)
+    assert bridge.student_facts("00000000-0000-0000-0000-000000000000") is None
+    monkeypatch.setattr(config, "CONNECT_STUDENT_FACTS", True)
+    assert bridge.student_facts("not-a-workspace") is None
+
+
+@pytest.mark.req("R-13")
+def test_student_facts_adapter_builds_from_the_vault_when_on(student, monkeypatch):
+    monkeypatch.setattr(config, "CONNECT_STUDENT_FACTS", True)
+    got = bridge.student_facts(student.workspace_id)
+    from app.os.contracts.student_facts import StudentFactsV1
+
+    assert StudentFactsV1.model_validate(got).student_ref == str(student.workspace_id)

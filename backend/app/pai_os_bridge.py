@@ -28,7 +28,7 @@ from app.models import OsOutbox, RouteDecision, User, VaultVersion, Workspace
 from app.os import ports
 from app.os.ports import escalation as os_escalation
 from app.os.contracts.decision_record_v2 import DecisionRecordV2
-from app.os.ports import plan_source, student_facts
+from app.os.ports import plan_source, student_facts as os_student_facts
 from app.os.contracts.vault_event import VaultEventV1
 from app.pai_c.connect import outbox
 from app.pai_c.connect.flags import part_on
@@ -49,7 +49,7 @@ def deliver_pending(db, workspace_id: str | None = None) -> dict:
     got = {"delivered": 0, "failed": 0, "not_sent": 0}
     kinds = {kind: (contract, send) for kind, part, contract, send in (
         ("decision", "CONNECT_HANDOFF", DecisionRecordV2, lambda p: plan_source.submit_decision(p)),
-        ("vault_event", "CONNECT_STUDENT_FACTS", VaultEventV1, lambda p: student_facts.record_event(p))) if part_on(part)}
+        ("vault_event", "CONNECT_STUDENT_FACTS", VaultEventV1, lambda p: os_student_facts.record_event(p))) if part_on(part)}
     if not kinds:
         return got
     for item in [i for i in outbox.pending_for(db, workspace_id) if i.kind in kinds]:
@@ -115,7 +115,7 @@ def _backfill_vault(db) -> None:
     for row in db.scalars(select(VaultVersion).where(VaultVersion.version > 0)).all():
         try:
             ws, version = str(row.workspace_id), row.version
-            held = student_facts.latest_vault_version(ws)
+            held = os_student_facts.latest_vault_version(ws)
             if held is not None and held >= version:
                 continue
             key = f"vault_event:{ws}:{version}"
@@ -223,6 +223,25 @@ def recipient_email(student_ref: str) -> str | None:
     with new_session() as db:
         return db.execute(select(User.email).join(Workspace, Workspace.owner_user_id == User.id)
                           .where(Workspace.id == workspace_id, Workspace.status == "active")).scalar_one_or_none()
+
+
+def student_facts(student_ref: str) -> dict | None:
+    """The student's StudentFacts (a dict valid as `StudentFactsV1`), built from their Vault (P1-T4, R-13). None while
+    the CONNECT_STUDENT_FACTS flag is off and for a reference that names no workspace: PAI OS then uses its own
+    profile values. Reads the plain flag, not `part_on`: PAI OS checks the `counsellor` module itself, and this runs in
+    the worker, where the module switch cannot be asked of the API. Opens its own session: PAI OS calls it on its
+    worker thread. A database error raises, so PAI OS retries."""
+    if not config.CONNECT_STUDENT_FACTS:
+        return None
+    try:
+        workspace_id = str(uuid.UUID(student_ref))
+    except (TypeError, ValueError):
+        return None
+    from app.database import new_session
+    from app.pai_c.connect import student_facts as builder
+
+    with new_session() as db:
+        return builder.build(db, workspace_id)
 
 
 def counsellor_module_on() -> bool:
