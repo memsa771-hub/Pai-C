@@ -3,18 +3,21 @@ route (spec ROADMAP_ENGINE_SPEC.md §3). Reads compute on request; writes only
 touch pai_route_decisions. Step colours and the time estimate are read
 against the request day."""
 
+import logging
 from datetime import date
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from pydantic import BaseModel, Field
 from sqlalchemy.exc import IntegrityError
 
+from app import pai_os_bridge
 from app.api.response import success_response
 from app.database import get_db
 from app.pai_c.roadmap.decisions import RouteDecisionError, RouteDecisionService
 from app.pai_c.roadmap.engine import RoadmapEngine
 from app.routers._workspace_auth import _authorized
 
+log = logging.getLogger(__name__)
 router = APIRouter(prefix="/v1/roadmap", tags=["Roadmap"])
 
 
@@ -30,7 +33,7 @@ class StepAction(BaseModel):
     done: bool
 
 
-def _write(action, db):
+def _write(action, db, workspace_id):
     try:
         result = action()
     except RouteDecisionError as exc:
@@ -40,6 +43,11 @@ def _write(action, db):
         db.rollback()
         raise HTTPException(status_code=409, detail="Another route was just chosen; reload the page") from exc
     db.commit()
+    try:  # the choice is saved; a delivery problem is logged and the 5-minute sweep tries again
+        pai_os_bridge.deliver_pending(db, workspace_id)
+    except Exception:  # noqa: BLE001
+        db.rollback()
+        log.exception("PAI OS delivery after a roadmap change failed")
     return success_response(result)
 
 
@@ -54,7 +62,7 @@ def get_roadmap(network: str = Query(...), db=Depends(get_db), x_workspace_token
 def choose_route(body: ChooseAction, network: str = Query(...), db=Depends(get_db),
                  x_workspace_token: str | None = Header(None), authorization: str | None = Header(None)):
     workspace = _authorized(db, network, x_workspace_token, authorization)
-    return _write(lambda: RouteDecisionService(db).choose(str(workspace.id), body.field_key), db)
+    return _write(lambda: RouteDecisionService(db).choose(str(workspace.id), body.field_key), db, str(workspace.id))
 
 
 @router.post("/steps")
@@ -62,11 +70,11 @@ def tick_step(body: StepAction, network: str = Query(...), db=Depends(get_db),
               x_workspace_token: str | None = Header(None), authorization: str | None = Header(None)):
     workspace = _authorized(db, network, x_workspace_token, authorization)
     return _write(lambda: RouteDecisionService(db).set_step(
-        str(workspace.id), body.done, key=body.key, index=body.index), db)
+        str(workspace.id), body.done, key=body.key, index=body.index), db, str(workspace.id))
 
 
 @router.post("/withdraw")
 def withdraw_route(network: str = Query(...), db=Depends(get_db), x_workspace_token: str | None = Header(None),
                    authorization: str | None = Header(None)):
     workspace = _authorized(db, network, x_workspace_token, authorization)
-    return _write(lambda: RouteDecisionService(db).withdraw(str(workspace.id)), db)
+    return _write(lambda: RouteDecisionService(db).withdraw(str(workspace.id)), db, str(workspace.id))
