@@ -3,8 +3,10 @@ choice goes to the plan.
 
 Tokens: `secrets.token_urlsafe(32)`; only the SHA-256 is stored; compared with `hmac.compare_digest`; an agree link
 works 72 hours (consent_texts.yaml `links`), once. A link is bound to the decision version it was issued for: if that
-is no longer the newest version the answer is `stale` and nothing is written but the audit row. Every outcome sets
-`pai_guardian_consents.outcome`. The guardian's e-mail is personal data: it is masked in every log line and never
+is no longer the newest version the answer is `stale` and nothing is written but the audit row. A withdraw link has
+no fixed lifetime: it works while the guardian consent it guards is live, and ends (`expired`) when a later consent
+replaces it. A withdraw link that finds no live guardian consent answers `stale` without recording it, so it can
+work again if that consent returns. Every other outcome sets `pai_guardian_consents.outcome`. The guardian's e-mail is personal data: it is masked in every log line and never
 goes to PAI OS (DecisionRecordV2 has no field for it).
 
 Nothing here commits; the caller's transaction carries the rows.
@@ -32,6 +34,10 @@ AGREE, WITHDRAW = "agree", "withdraw"
 
 class GuardianRateLimited(Exception):
     """Too many requests (the router answers 429)."""
+
+
+class GuardianRequestError(ValueError):
+    """The decision cannot ask for a guardian's agreement (not this student's, not the newest, no guardian needed)."""
 
 
 def now() -> datetime:
@@ -72,11 +78,11 @@ def _fill(block, **values):
 
 
 def _issue(db, workspace_id: str, decision: RouteDecision, email: str, purpose: str,
-           lifetime: timedelta) -> tuple[GuardianConsent, str]:
+           lifetime: timedelta | None) -> tuple[GuardianConsent, str]:
     token = secrets.token_urlsafe(32)
     row = GuardianConsent(workspace_id=workspace_id, decision_id=decision.id,
                           decision_version=decision.decision_version, purpose=purpose, email=email,
-                          token_hash=_digest(token), expires_at=now() + lifetime,
+                          token_hash=_digest(token), expires_at=None if lifetime is None else now() + lifetime,
                           text_version=consent.current_version(), outcome="sent")
     db.add(row)
     db.flush()
@@ -86,7 +92,13 @@ def _issue(db, workspace_id: str, decision: RouteDecision, email: str, purpose: 
 def request(db, workspace_id: str, decision: RouteDecision, email: str) -> GuardianConsent:
     """E-mails the guardian a one-time link to agree to `decision`. Raises `GuardianRateLimited`."""
     consent.ensure_usable()
-    if not rate_limit.allow("guardian_request", user=workspace_id, email=email.strip().lower()):
+    email = email.strip().lower()
+    newest = RouteDecisionService(db).newest(workspace_id)
+    if decision.workspace_id != workspace_id or newest is None or newest.id != decision.id:
+        raise GuardianRequestError("The decision is not this student's newest decision")
+    if decision.status != "chosen" or not decision.guardian_required:
+        raise GuardianRequestError("This decision needs no guardian agreement")
+    if not rate_limit.allow("guardian_request", user=workspace_id, email=email):
         raise GuardianRateLimited("guardian_request")
     texts = consent.texts()
     row, token = _issue(db, workspace_id, decision, email, AGREE, timedelta(hours=texts["links"]["agree_hours"]))
@@ -109,20 +121,35 @@ def _lookup(db, token: str, purpose: str) -> GuardianConsent | None:
 
 
 def _stale(db, row: GuardianConsent) -> bool:
-    service = RouteDecisionService(db)
-    if row.purpose == AGREE:
-        newest = service.newest(row.workspace_id)
-        return newest is None or newest.status != "chosen" or newest.decision_version != row.decision_version
-    active = service.active(row.workspace_id)  # a withdraw link works on whatever choice is live and consented
-    return active is None or active.guardian_authorized_at is None
+    newest = RouteDecisionService(db).newest(row.workspace_id)
+    return newest is None or newest.status != "chosen" or newest.decision_version != row.decision_version
+
+
+def _withdraw_state(db, row: GuardianConsent) -> str:
+    """ok | stale | expired for a withdraw link. It guards the guardian consent of the version it was issued for:
+    live consent is ok; a different, later consent replaced it: expired; no live guardian consent now: stale."""
+    guarded = db.scalar(select(RouteDecision.guardian_authorized_at).where(
+        RouteDecision.workspace_id == row.workspace_id, RouteDecision.decision_version == row.decision_version))
+    active = RouteDecisionService(db).active(row.workspace_id)
+    live = None if active is None else active.guardian_authorized_at
+    if live is None:
+        return "stale"
+    return "ok" if guarded is not None and _aware(live) == _aware(guarded) else "expired"
 
 
 def _resolve(db, row: GuardianConsent) -> str:
-    """ok | expired | used | stale. The first time a link turns expired or stale, the audit row says so."""
+    """ok | expired | used | stale. The first time an agree link turns expired or stale, the audit row says so; a
+    withdraw link records only `expired` (stale is passing: the consent it guards may return)."""
     if row.outcome in ("agreed", "withdrawn"):
         return "used"
     if row.outcome in ("expired", "stale"):
         return row.outcome
+    if row.purpose == WITHDRAW:
+        state = _withdraw_state(db, row)
+        if state == "expired":
+            row.outcome = "expired"
+            db.flush()
+        return state
     if now() >= _aware(row.expires_at):
         row.outcome = "expired"
     elif _stale(db, row):
@@ -168,7 +195,7 @@ def agree(db, token: str, *, ip: str | None = None) -> str:
     row.outcome, row.used_at = "agreed", moment
     texts = consent.texts()
     withdraw_row, withdraw_token = _issue(db, row.workspace_id, service.newest(row.workspace_id), row.email,
-                                          WITHDRAW, timedelta(days=texts["links"]["withdraw_days"]))
+                                          WITHDRAW, None)
     mail = _fill(texts["guardian_confirmation"], student_first_name=_first_name(db, row.workspace_id))
     auth_emails.send_guardian_confirmation_email(
         row.email, auth_emails.guardian_link(withdraw_token), subject=mail["subject"], title=mail["title"],

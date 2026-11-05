@@ -42,9 +42,15 @@ async def checkin_job(job, db):
                 EventRecord.metadata_['checkin_key'].as_string() == job.idempotency_key).limit(1)):
             return {'status': 'already_posted'}
         if kind == 'chosen_path':
-            # Only the still-active route decision gets its follow-up.
-            current = db.scalar(select(RouteDecision.id).where(RouteDecision.workspace_id == job.workspace_id,
-                RouteDecision.id == reference, RouteDecision.withdrawn_at.is_(None)))
+            # Only the still-active route decision gets its follow-up. A consent change supersedes the row with a
+            # copy (same field, same chosen_at), which is still the same choice.
+            referenced = db.scalar(select(RouteDecision).where(RouteDecision.workspace_id == job.workspace_id,
+                RouteDecision.id == reference))
+            active = db.scalar(select(RouteDecision).where(RouteDecision.workspace_id == job.workspace_id,
+                RouteDecision.withdrawn_at.is_(None)))
+            same_choice = referenced is not None and active is not None and (active.id == referenced.id or (
+                active.field_key == referenced.field_key and active.chosen_at == referenced.chosen_at))
+            current = active.id if same_choice else None
         else:
             run = db.scalar(select(ExecutionRun).where(ExecutionRun.id == reference,
                 ExecutionRun.workspace_id == job.workspace_id, ExecutionRun.task_type == 'path_explain', ExecutionRun.status == 'completed'))

@@ -853,13 +853,18 @@ class GuardianConsent(Base):
     purpose = Column(Text, nullable=False, default="agree", server_default=text("'agree'"))  # agree | withdraw
     email = Column(Text, nullable=False)
     token_hash = Column(Text, nullable=False, unique=True)
-    expires_at = Column(DateTime(timezone=True), nullable=False)
+    expires_at = Column(DateTime(timezone=True), nullable=True)  # null: a withdraw link has no fixed end
     used_at = Column(DateTime(timezone=True), nullable=True)
     text_version = Column(Text, nullable=False)
     outcome = Column(Text, nullable=False, default="sent", server_default=text("'sent'"))
     created_at = Column(DateTime(timezone=True), nullable=False, default=_now, server_default=text("NOW()"))
 
-    __table_args__ = (Index("idx_guardian_consents_workspace", "workspace_id", "created_at"),)
+    __table_args__ = (
+        CheckConstraint("purpose IN ('agree', 'withdraw')", name="ck_guardian_consent_purpose"),
+        CheckConstraint("outcome IN ('sent', 'agreed', 'withdrawn', 'expired', 'stale')",
+                        name="ck_guardian_consent_outcome"),
+        Index("idx_guardian_consents_workspace", "workspace_id", "created_at"),
+    )
 
 
 class StudentRequest(Base):

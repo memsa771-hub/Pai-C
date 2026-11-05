@@ -5,10 +5,9 @@ version: "1"
 approved: true
 approved_by: "owner, chat 2026-11-05"
 
-# How long a guardian link works.
+# How long the agree link works. A withdraw link has no fixed end: it works while the consent it guards is live.
 links:
   agree_hours: 72
-  withdraw_days: 365
 
 # Shown to the student before they agree to the plan.
 student:

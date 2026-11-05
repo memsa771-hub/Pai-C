@@ -324,3 +324,92 @@ def test_mask_email():
     assert mask_email("a@b.co") == "a***@b.co"
     assert mask_email("no-at-sign") == "***"
     assert mask_email("") == "***"
+
+
+@pytest.mark.asyncio
+async def test_withdraw_link_stale_is_not_recorded_and_can_work_later(mails):
+    async with confirmed_student() as (_, student, db, _journey):
+        service, decision = await chosen(student, db)
+        ws = student.workspace_id
+        with clock(START), patch("app.pai_os_bridge.route_supported", return_value=True):
+            guardian.request(db, ws, decision, EMAIL)
+            guardian.agree(db, token_of(mails[0]))
+            withdraw_token = token_of(mails[1])
+            granted = service.newest(ws).guardian_authorized_at
+            service.update_consent(ws, guardian_authorized_at=None)  # no guardian consent for the moment
+            assert guardian.open(db, withdraw_token, purpose="withdraw")["state"] == "stale"
+            assert guardian.withdraw(db, withdraw_token) == "stale"
+            db.commit()
+            withdraw_row = next(c for c in consents(db, ws) if c.purpose == "withdraw")
+            assert withdraw_row.outcome == "sent"  # stale is never persisted for a withdraw link
+            service.update_consent(ws, guardian_authorized_at=granted)  # the consent is live again
+            assert guardian.open(db, withdraw_token, purpose="withdraw")["state"] == "ok"
+            assert guardian.withdraw(db, withdraw_token) == "withdrawn"
+        assert service.newest(ws).guardian_authorized_at is None
+
+
+@pytest.mark.asyncio
+async def test_withdraw_link_has_no_fixed_lifetime_and_ends_when_its_consent_is_replaced(mails):
+    async with confirmed_student() as (_, student, db, _journey):
+        service, decision = await chosen(student, db)
+        ws = student.workspace_id
+        with clock(START), patch("app.pai_os_bridge.route_supported", return_value=True):
+            guardian.request(db, ws, decision, EMAIL)
+            guardian.agree(db, token_of(mails[0]))
+            first_withdraw = token_of(mails[1])
+            row = next(c for c in consents(db, ws) if c.purpose == "withdraw")
+            assert row.expires_at is None
+        years_later = START + timedelta(days=800)
+        with clock(years_later), patch("app.pai_os_bridge.route_supported", return_value=True):
+            assert guardian.open(db, first_withdraw, purpose="withdraw")["state"] == "ok"
+            # a newer guardian consent replaces the one the first link guards
+            service.update_consent(ws, guardian_authorized_at=None)
+            newest = service.newest(ws)
+            guardian.request(db, ws, newest, EMAIL.replace("parent", "other"))
+            assert guardian.agree(db, token_of(mails[2])) == "agreed"
+            second_withdraw = token_of(mails[3])
+            assert guardian.withdraw(db, first_withdraw) == "expired"
+            db.commit()
+            assert guardian.withdraw(db, first_withdraw) == "expired"
+            assert next(c for c in consents(db, ws) if c.token_hash == hashlib.sha256(
+                first_withdraw.encode()).hexdigest()).outcome == "expired"
+            assert guardian.withdraw(db, second_withdraw) == "withdrawn"
+
+
+@pytest.mark.asyncio
+async def test_request_checks_the_decision(mails):
+    async with confirmed_student() as (_, student, db, _journey):
+        service, decision = await chosen(student, db)
+        ws = student.workspace_id
+        with clock(START), patch("app.pai_os_bridge.route_supported", return_value=True):
+            with pytest.raises(guardian.GuardianRequestError):
+                guardian.request(db, "another-workspace", decision, EMAIL)  # not this student's
+            old = decision
+            service.update_consent(ws, authorized_at=None)
+            with pytest.raises(guardian.GuardianRequestError):
+                guardian.request(db, ws, old, EMAIL)  # no longer the newest
+            service.withdraw(ws)
+            with pytest.raises(guardian.GuardianRequestError):
+                guardian.request(db, ws, service.newest(ws), EMAIL)  # a withdrawal
+        assert mails == [] and consents(db, ws) == []
+
+
+@pytest.mark.asyncio
+async def test_request_needs_guardian_required(mails):
+    async with confirmed_student() as (_, student, db, _journey):
+        with_routes(student, db)
+        adult = ChoiceDetails(origin_country="PK", destination_country="GB", level="bachelor",
+                              places=(("uni-a:cs", 1),), intake=("autumn", 2027))
+        service = RouteDecisionService(db)
+        service.choose(student.workspace_id, "electrical_engineering", details=adult)
+        with pytest.raises(guardian.GuardianRequestError):
+            guardian.request(db, student.workspace_id, service.newest(student.workspace_id), EMAIL)
+
+
+@pytest.mark.asyncio
+async def test_email_is_stripped_and_lower_cased(mails):
+    async with confirmed_student() as (_, student, db, _journey):
+        _, decision = await chosen(student, db)
+        with clock(START):
+            row = guardian.request(db, student.workspace_id, decision, "  Parent.Person@Example.ORG ")
+        assert row.email == EMAIL and mails[0]["to"] == EMAIL

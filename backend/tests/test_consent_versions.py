@@ -178,17 +178,39 @@ async def test_withdrawing_student_consent_clears_authorized_at_and_keeps_status
 
 
 @pytest.mark.asyncio
-async def test_unchanged_arguments_keep_the_stored_value():
+async def test_no_change_is_a_no_op():
+    """A change to nothing writes no version and no outbox row (it used to write a copy)."""
+    async with confirmed_student() as (_, student, db, _journey):
+        with_routes(student, db)
+        ws = student.workspace_id
+        service = RouteDecisionService(db)
+        with on(), patch("app.pai_os_bridge.route_supported", return_value=True):
+            service.choose(ws, "electrical_engineering", details=DETAILS)
+            service.update_consent(ws, guardian_authorized_at=NOW)
+            db.commit()
+            before = (len(rows(db, ws)), len(items(db, ws)))
+            assert before == (2, 2)
+            for call in ({}, {"guardian_authorized_at": NOW}, {"authorized_at": DETAILS.authorized_at},
+                         {"authorized_at": DETAILS.authorized_at.replace(tzinfo=None), "guardian_authorized_at": ...}):
+                result = service.update_consent(ws, **call)
+                assert result["field_key"] == "electrical_engineering"
+            db.commit()
+        assert (len(rows(db, ws)), len(items(db, ws))) == before
+        newest = service.newest(ws)
+        assert same(newest.guardian_authorized_at, NOW) and same(newest.authorized_at, DETAILS.authorized_at)
+        assert newest.decision_version == 2 and newest.withdrawn_at is None
+
+
+@pytest.mark.asyncio
+async def test_a_real_change_after_a_no_op_still_makes_a_version():
     async with confirmed_student() as (_, student, db, _journey):
         with_routes(student, db)
         ws = student.workspace_id
         service = RouteDecisionService(db)
         service.choose(ws, "electrical_engineering", details=DETAILS)
+        service.update_consent(ws)
         service.update_consent(ws, guardian_authorized_at=NOW)
-        service.update_consent(ws)  # nothing named: both stay
-        newest = service.newest(ws)
-        assert same(newest.guardian_authorized_at, NOW) and same(newest.authorized_at, DETAILS.authorized_at)
-        assert newest.decision_version == 3
+        assert service.newest(ws).decision_version == 2
 
 
 @pytest.mark.asyncio
@@ -253,3 +275,63 @@ async def test_not_sent_earlier_version_does_not_count():
             service.choose(ws, "computer_engineering", details=DETAILS)
             db.commit()
         assert [(i.status, i.last_error) for i in items(db, ws)] == [("not_sent", "not_supported")] * 2
+
+
+# ---- the 7-day check-in survives a consent change ----
+
+async def _run_checkin(db, ws):
+    from app.models import BackgroundJob
+    from app.pai_c.checkins import checkin_job
+    job = db.query(BackgroundJob).filter(BackgroundJob.job_type == "counselor.checkin",
+                                         BackgroundJob.workspace_id == ws).one()
+    from app.pai_c import checkins
+    open_rules = {**checkins.policy(), "quiet_hours": 0, "minimum_spacing_hours": 0, "care_retry_hours": 0}
+    with patch("app.pai_c.checkins.policy", return_value=open_rules), \
+            patch("app.pai_c.posting.send_to_student", return_value="event-1") as post:
+        return await checkin_job(job, db), post
+
+
+@pytest.mark.asyncio
+async def test_checkin_is_posted_after_a_consent_change():
+    async with confirmed_student() as (_, student, db, _journey):
+        with_routes(student, db)
+        ws = student.workspace_id
+        service = RouteDecisionService(db)
+        service.choose(ws, "electrical_engineering", details=DETAILS)
+        service.update_consent(ws, guardian_authorized_at=NOW)
+        service.update_consent(ws, authorized_at=None)
+        db.commit()
+        result, post = await _run_checkin(db, ws)
+        assert result["status"] == "posted" and post.call_count == 1
+
+
+@pytest.mark.asyncio
+async def test_checkin_is_superseded_after_a_withdrawal():
+    async with confirmed_student() as (_, student, db, _journey):
+        with_routes(student, db)
+        ws = student.workspace_id
+        service = RouteDecisionService(db)
+        service.choose(ws, "electrical_engineering", details=DETAILS)
+        service.update_consent(ws, guardian_authorized_at=NOW)
+        service.withdraw(ws)
+        db.commit()
+        result, post = await _run_checkin(db, ws)
+        assert result == {"status": "superseded"} and post.call_count == 0
+
+
+@pytest.mark.asyncio
+async def test_checkin_is_superseded_by_another_choice():
+    async with confirmed_student() as (_, student, db, _journey):
+        with_routes(student, db)
+        ws = student.workspace_id
+        service = RouteDecisionService(db)
+        service.choose(ws, "electrical_engineering", details=DETAILS)
+        service.update_consent(ws, guardian_authorized_at=NOW)
+        service.choose(ws, "computer_engineering", details=DETAILS)
+        db.commit()
+        from app.models import BackgroundJob
+        from app.pai_c.checkins import checkin_job
+        first = db.query(BackgroundJob).filter(BackgroundJob.job_type == "counselor.checkin").order_by(
+            BackgroundJob.created_at).first()
+        with patch("app.pai_c.posting.send_to_student", return_value="event-1"):
+            assert await checkin_job(first, db) == {"status": "superseded"}

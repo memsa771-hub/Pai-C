@@ -57,6 +57,11 @@ def route_of(card: dict, education_line: dict | None) -> dict:
             "degree": {"title": card["title"], "years": verdict["years"]}, "sources": verdict["sources"]}
 
 
+def _instant(moment: datetime | None) -> datetime | None:
+    """A datetime as an aware UTC instant (SQLite returns them without a zone), so equal moments compare equal."""
+    return moment if moment is None or moment.tzinfo else moment.replace(tzinfo=timezone.utc)
+
+
 def serialize(row: RouteDecision, cards: list[dict]) -> dict:
     """The decision with the field's status, steps and time in this same build
     ("unknown" and the choose-time steps when the path is gone), beside the
@@ -233,12 +238,15 @@ class RouteDecisionService:
         intake stay; check-ins are not rescheduled and the journey and the possibility are not touched."""
         self._lock(workspace_id)
         row = self._active_or_404(workspace_id)
+        values = {name: getattr(row, name) for name in self._COPIED}
+        changes = {name: value for name, value in (("authorized_at", authorized_at),
+                                                   ("guardian_authorized_at", guardian_authorized_at))
+                   if value is not ... and _instant(value) != _instant(values[name])}
+        if not changes:  # nothing to change: no version, no outbox row
+            return serialize(row, RoadmapEngine(self.db).build(workspace_id)["fields"])
+        values.update(changes)
         row.withdrawn_at = datetime.now(timezone.utc)
         self.db.flush()  # the old row leaves the partial unique index before the new one enters
-        values = {name: getattr(row, name) for name in self._COPIED}
-        for name, value in (("authorized_at", authorized_at), ("guardian_authorized_at", guardian_authorized_at)):
-            if value is not ...:
-                values[name] = value
         new = RouteDecision(workspace_id=workspace_id, decision_version=self._next_version(workspace_id),
                             status="chosen", **values)
         self.db.add(new)

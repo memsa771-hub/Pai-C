@@ -68,3 +68,21 @@ def test_125_upgrade_and_downgrade():
     with engine.begin() as connection:
         _migrate(connection, "downgrade")
         assert TABLE not in inspect(connection).get_table_names()
+
+
+def test_125_check_constraints():
+    engine = _database_at_124()
+    with engine.begin() as connection:
+        _migrate(connection, "upgrade")
+        connection.execute(text("INSERT INTO workspaces VALUES ('w')"))
+        insert = ("INSERT INTO pai_guardian_consents (id, workspace_id, decision_version, email, token_hash, "
+                  "text_version, {cols}) VALUES ('{i}', 'w', 1, 'g@x.org', '{i}', '1', {vals})")
+        connection.execute(text(insert.format(cols="purpose, outcome", i="ok", vals="'withdraw', 'stale'")))
+        for cols, vals in (("purpose, outcome", "'other', 'sent'"), ("purpose, outcome", "'agree', 'used'")):
+            with pytest.raises(Exception):
+                with connection.begin_nested():
+                    connection.execute(text(insert.format(cols=cols, i="bad", vals=vals)))
+    table = Base.metadata.tables[TABLE]
+    assert {c.name for c in table.constraints if c.name} >= {"ck_guardian_consent_purpose",
+                                                              "ck_guardian_consent_outcome"}
+    assert table.c.expires_at.nullable  # a withdraw link has no fixed end
