@@ -27,17 +27,17 @@ phases:
 
 requirements:
   R-01: {title: "One owner per data piece; others read live via port", phases: [P1], built: false}
-  R-02: {title: "Choice changes carry an ever-increasing decision_version", phases: [P1], built: false}
-  R-03: {title: "Decision change and outbox row in one transaction, plus sweep", phases: [P1], built: false}
+  R-02: {title: "Choice changes carry an ever-increasing decision_version", phases: [P1], built: true}
+  R-03: {title: "Decision change and outbox row in one transaction, plus sweep", phases: [P1], built: true}
   R-04: {title: "Every change shows the same result in both products", phases: [P1], built: false}
   R-05: {title: "Nightly consistency job and end-of-test check run all rules", phases: [P1], built: false}
-  R-06: {title: "Withdrawing a choice stops the plan, closed as withdrawn", phases: [P1], built: false}
+  R-06: {title: "Withdrawing a choice stops the plan, closed as withdrawn", phases: [P1], built: true}
   R-07: {title: "OS never changes the choice; proposals go via choice_request", phases: [P1], built: false}
   R-08: {title: "Self-serve plan is adopted when Counsellor on and student agrees", phases: [P1], built: false}
   R-09: {title: "With Counsellor on, route builder writes through decision service", phases: [P1], built: false}
   R-10: {title: "Hand-off consent required; guardian consent by email for under-18s", phases: [P1, P5], built: false}
   R-11: {title: "Escalations accept all five reasons and return student to choosing", phases: [P1], built: false}
-  R-12: {title: "A crash anywhere loses nothing and duplicates nothing", phases: [P1], built: false}
+  R-12: {title: "A crash anywhere loses nothing and duplicates nothing", phases: [P1], built: true}
   R-13: {title: "OS reads student facts from the Vault with evidence levels", phases: [P1], built: false}
   R-14: {title: "OS derives applicable levels and routes from the Vault", phases: [P1], built: false}
   R-15: {title: "An excluded field disappears everywhere at once", phases: [P1], built: false}
@@ -104,6 +104,6 @@ requirements:
   R-76: {title: "One vocabulary for regions and statuses", phases: [P2], built: false}
   R-77: {title: "Abroad routes: Germany, UK, US with full data and gate", phases: [P6], built: false}
   R-78: {title: "Constraints reach the Vault from one source", phases: [P1], built: false}
-  R-79: {title: "Hand-off is built: export, choice columns, decision_changed", phases: [P1], built: false}
+  R-79: {title: "Hand-off is built: export, choice columns, decision_changed", phases: [P1], built: true}
   R-80: {title: "Onboarding asks for marks, written to the Vault", phases: [P1], built: false}
   R-81: {title: "Route families designed in an ADR before being built", phases: [P3], built: false}
