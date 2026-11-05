@@ -21,7 +21,7 @@ from app import pai_os_bridge
 
 from app.api.response import ResponseCode, json_response, success_response
 from app.database import get_db
-from app.pai_c.connect import guardian
+from app.pai_c.connect import flags, guardian
 from app.pai_c.connect.consent import ConsentTextNotApproved
 
 log = logging.getLogger(__name__)
@@ -32,7 +32,9 @@ def _ip(request: Request) -> str:
     return request.client.host if request.client else "unknown"
 
 
-def _answer(db, call):
+def _answer(db, call, idle=None):
+    if not flags.part_on("CONNECT_HANDOFF"):  # the connection is off: nothing is read or written
+        return success_response({"state": "stale", "text": None, "student_first_name": None} if idle is None else idle)
     try:
         result = call()
     except guardian.GuardianRateLimited:
@@ -63,7 +65,8 @@ def _changed(db, token: str, state: str, done: str) -> None:
 
 @router.post("/{token}/agree")
 def agree(token: str, request: Request, db=Depends(get_db)):
-    answer = _answer(db, lambda: {"state": guardian.agree(db, token, ip=_ip(request))})
+    answer = _answer(db, lambda: {"state": guardian.agree(db, token, ip=_ip(request))},
+                    {"state": "stale"})
     if isinstance(answer, dict):
         _changed(db, token, answer["data"]["state"], "agreed")
     return answer
@@ -76,7 +79,8 @@ def open_withdraw_page(token: str, request: Request, db=Depends(get_db)):
 
 @router.post("/{token}/withdraw")
 def withdraw(token: str, request: Request, db=Depends(get_db)):
-    answer = _answer(db, lambda: {"state": guardian.withdraw(db, token, ip=_ip(request))})
+    answer = _answer(db, lambda: {"state": guardian.withdraw(db, token, ip=_ip(request))},
+                    {"state": "stale"})
     if isinstance(answer, dict):
         _changed(db, token, answer["data"]["state"], "withdrawn")
     return answer

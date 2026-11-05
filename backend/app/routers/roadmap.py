@@ -18,6 +18,7 @@ from app.database import get_db
 from app.models import GuardianConsent
 from app.pai_c.connect import age, consent, flags, guardian, places
 from app.pai_c.connect.choice import ChoiceDetails
+from app.services.email import mask_email
 from app.pai_c.roadmap.decisions import RouteDecisionError, RouteDecisionService
 from app.pai_c.roadmap.engine import RoadmapEngine
 from app.routers._workspace_auth import _authorized
@@ -135,12 +136,15 @@ def _valid_dob(text: str) -> str:
 
 
 def _write_dob(db, workspace_id: str, dob: str) -> None:
-    """Writes the date of birth to the Vault as the student's own statement (the Vault's own write path)."""
+    """Writes the date of birth to the Vault as the student's own statement (the Vault's own write path). Anything
+    but a saved fact (the Vault may put it "in question") is refused: age is decided only from the stored value."""
     from app.routers import vault as vault_router
 
     answer = vault_router._write(db, workspace_id, "fact", "identity.date_of_birth", value=dob, text=dob)
     if not isinstance(answer, dict):  # the Vault refused it: an error response
         _refuse("The date of birth could not be saved")
+    if (answer.get("data") or {}).get("saved") is not True:
+        _refuse("Confirm your date of birth in your Vault first", 409)
 
 
 def _details(db, workspace_id: str, field_key: str, body: ChoiceIn) -> tuple[ChoiceDetails, str | None]:
@@ -170,23 +174,27 @@ def _details(db, workspace_id: str, field_key: str, body: ChoiceIn) -> tuple[Cho
                                                        body.intake.term, body.intake.year)}
         if not set(refs) <= offered:
             _refuse("A place you ranked is not on offer for this intake")
-    stored = places._vault_value(db, workspace_id, "identity.date_of_birth")
-    given = _valid_dob(body.date_of_birth.strip()) if body.date_of_birth else None
-    minor = age.under_18(stored or given, date.today())
-    if minor is None:
-        _refuse("Your date of birth is needed")
+    stored = places.vault_value(db, workspace_id, "identity.date_of_birth")
+    if not stored:  # never rewrite one that is there
+        if not body.date_of_birth:
+            _refuse("Your date of birth is needed")
+        _write_dob(db, workspace_id, _valid_dob(body.date_of_birth.strip()))
+        stored = places.vault_value(db, workspace_id, "identity.date_of_birth")
+        if not stored:
+            _refuse("Confirm your date of birth in your Vault first", 409)
+    # Age comes only from the stored value. One that cannot be read counts as under 18 (D-i).
+    minor = age.under_18(str(stored), date.today())
+    minor = True if minor is None else minor
     email = None
     if minor:
         email = (body.guardian_email or "").strip().lower()
         if not _EMAIL.match(email):
             _refuse("You are under 18: a parent or guardian's email address is needed")
-    if not stored:  # never rewrite one that is there
-        _write_dob(db, workspace_id, given)
     now = datetime.now(timezone.utc)
     return ChoiceDetails(origin_country=origin, destination_country=body.destination, level=level,
                          places=tuple((p.ref, p.rank) for p in sorted(body.places, key=lambda p: p.rank)),
                          intake=(body.intake.term, body.intake.year), authorized_at=now,
-                         guardian_required=bool(minor)), email
+                         guardian_required=minor), email
 
 
 @router.get("/choice-options")
@@ -202,7 +210,7 @@ def choice_options(field_key: str = Query(..., min_length=1, max_length=120), ne
         text = consent.texts()["student"]
     except consent.ConsentTextNotApproved:
         text = None
-    dob = places._vault_value(db, workspace_id, "identity.date_of_birth")
+    dob = places.vault_value(db, workspace_id, "identity.date_of_birth")
     return success_response({**places.choice_options(db, workspace_id, field_key), "handoff": True,
                              "consent_text": text, "consent_version": consent.current_version(),
                              "needs_dob": not dob})
@@ -227,10 +235,12 @@ def _request_guardian(db, workspace_id: str, email: str) -> bool:
     row = RouteDecisionService(db).newest(workspace_id)
     try:
         guardian.request(db, workspace_id, row, email)
-    except guardian.GuardianRateLimited:
+        db.commit()
+    except Exception as exc:  # noqa: BLE001 - the choice is saved; whatever goes wrong here must not turn into a 500
         db.rollback()
+        if not isinstance(exc, guardian.GuardianRateLimited):
+            log.warning("guardian request failed for %s: %s", mask_email(email), type(exc).__name__)
         return False
-    db.commit()
     return True
 
 

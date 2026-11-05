@@ -256,3 +256,46 @@ def test_an_adult_needs_no_guardian_and_resend_says_so(os_stub):
         data(choose_with(client, params, guardian_email=EMAIL))  # ignored
         assert not rows(student, GuardianConsent)
         assert post(client, params, "guardian/resend", {"guardian_email": EMAIL}).status_code == 409
+
+
+def test_a_dob_the_vault_did_not_save_is_refused_and_the_typed_date_is_not_trusted(os_stub):
+    with pre_eng() as (client, student, params), flag(True):
+        vault((client, student, params), dob=None)
+        in_question = {"code": 0, "message": "ok", "data": {"saved": False, "in_question": True}}
+        with patch("app.routers.vault._write", return_value=in_question):
+            refused = choose_with(client, params, date_of_birth="1990-01-01")  # an adult date typed on the screen
+        assert refused.status_code == 409 and "Vault" in refused.json()["detail"]
+        assert not rows(student)
+        saved_but_not_readable = {"code": 0, "message": "ok", "data": {"saved": True}}
+        with patch("app.routers.vault._write", return_value=saved_but_not_readable):
+            assert choose_with(client, params, date_of_birth="1990-01-01").status_code == 409
+        assert not rows(student)
+
+
+def test_an_unreadable_stored_dob_counts_as_under_18(os_stub, stubs):
+    with pre_eng() as (client, student, params), flag(True):
+        vault((client, student, params), country="Pakistan", dob=None)
+        real = places.vault_value
+        patched = lambda db, ws, key: "not-a-date" if key == "identity.date_of_birth" else real(db, ws, key)  # noqa: E731
+        with patch.object(places, "vault_value", patched):
+            got = data(client.get("/v1/roadmap/choice-options", params={**params, "field_key": FIELD}, headers=TOKEN))
+            assert got["needs_dob"] is False  # there is a date; it just cannot be read
+            assert choose_with(client, params).status_code == 422  # the guardian path, not a dead end
+            body = data(choose_with(client, params, guardian_email=EMAIL))
+        assert body["choice"]["consent"]["guardian"] == "missing" and rows(student)[0].guardian_required is True
+
+
+@pytest.mark.parametrize("failure", ["request_error", "text", "transport"])
+def test_a_guardian_mail_problem_after_the_choice_is_not_a_500(os_stub, caplog, failure):
+    from app.pai_c.connect import guardian
+    from app.pai_c.connect.consent import ConsentTextNotApproved
+    error = {"request_error": guardian.GuardianRequestError("x"), "text": ConsentTextNotApproved("x"),
+             "transport": RuntimeError(f"smtp down for {EMAIL}")}[failure]
+    with pre_eng() as (client, student, params), flag(True):
+        vault((client, student, params), dob="2012-05-05")
+        with patch.object(guardian, "request", side_effect=error):
+            body = data(choose_with(client, params, guardian_email=EMAIL))
+        assert body["guardian_email_sent"] is False and body["choice"]["version"] == 1
+        assert len(rows(student)) == 1
+        logged = "\n".join(r.getMessage() for r in caplog.records)
+        assert EMAIL not in logged and "smtp down" not in logged

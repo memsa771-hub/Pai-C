@@ -179,7 +179,8 @@ def _locked(db, token: str, purpose: str) -> tuple[GuardianConsent | None, str]:
 
 def open(db, token: str, *, ip: str | None = None, purpose: str = AGREE) -> dict:  # noqa: A001 - the spec's name
     """What the link page shows: `{"state": "ok|expired|used|stale", "text", "student_first_name"}`."""
-    consent.ensure_usable()
+    if purpose != WITHDRAW:  # withdrawing is never blocked by the text gate
+        consent.ensure_usable()
     _limit_ip(ip)
     row, state = _locked(db, token, purpose)
     if row is None or state != "ok":

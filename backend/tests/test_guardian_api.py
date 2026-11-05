@@ -160,3 +160,30 @@ def test_the_token_is_not_written_to_the_access_log(os_stub, stubs, caplog):
         text = "\n".join(r.getMessage() for r in caplog.records if r.name.startswith("app"))  # the test client logs its own URL
         assert "/v1/guardian/{token}/agree" in text
         assert token not in text and "not-a-real-token" not in text and EMAIL not in text
+
+
+def test_withdraw_is_never_blocked_by_the_text_gate(os_stub, stubs):
+    with pre_eng() as (client, student, params), flag(True):
+        token = minor((client, student, params), stubs)
+        public_ok(client.post(f"/v1/guardian/{token}/agree"))
+        withdraw = token_of(stubs[1])
+        from app.pai_c.connect import consent
+        unapproved = {**consent.texts(), "approved": False}
+        with patch("app.pai_c.connect.consent.texts", return_value=unapproved):
+            assert public_ok(client.get(f"/v1/guardian/{withdraw}/withdraw"))["state"] == "ok"
+            assert public_ok(client.post(f"/v1/guardian/{withdraw}/withdraw")) == {"state": "withdrawn"}
+        assert rows(student)[-1].guardian_authorized_at is None
+
+
+def test_with_the_flag_off_the_public_routes_answer_stale_and_write_nothing(os_stub, stubs):
+    with pre_eng() as (client, student, params), flag(True):
+        token = minor((client, student, params), stubs)
+        before = ([(c.outcome, c.used_at) for c in rows(student, GuardianConsent)], len(rows(student)), len(stubs))
+        with flag(False):
+            assert public_ok(client.get(f"/v1/guardian/{token}"))["state"] == "stale"
+            assert public_ok(client.post(f"/v1/guardian/{token}/agree")) == {"state": "stale"}
+            assert public_ok(client.get(f"/v1/guardian/{token}/withdraw"))["state"] == "stale"
+            assert public_ok(client.post(f"/v1/guardian/{token}/withdraw")) == {"state": "stale"}
+        assert ([(c.outcome, c.used_at) for c in rows(student, GuardianConsent)], len(rows(student)),
+                len(stubs)) == before
+        assert public_ok(client.post(f"/v1/guardian/{token}/agree")) == {"state": "agreed"}  # on again: link still good

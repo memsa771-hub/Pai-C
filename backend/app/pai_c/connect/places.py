@@ -62,6 +62,11 @@ def _vault_value(db, workspace_id: str, key: str):
     return row["value"] if row else None
 
 
+def vault_value(db, workspace_id: str, key: str):
+    """The student's active Vault value for `key`, or None. The one reader for routers."""
+    return _vault_value(db, workspace_id, key)
+
+
 def _standing_level(db, workspace_id: str) -> str | None:
     from app.pai_c.memory import MemoryService
     from app.pai_c.roadmap.engine import student_standing
