@@ -20,6 +20,7 @@ from app.os.compiler import CONFIRM_TYPE, DraftTask, PlanDraft
 from app.os.contracts.route_contract import RouteContract
 from app.os.contracts.route_contract_v2 import RouteContractV2
 from app.os.kernel.revisions import CANCELLED_MARK, DONE_MARK, NOTICE_PREFIX, diff
+from app.os.ports import os_events
 from app.os.replan import events as replan_events
 from app.os.kernel.states import (
     PLAN_CLOSED,
@@ -34,6 +35,10 @@ from app.os.kernel.states import (
 P, T, E = models.plans, models.tasks, models.task_edges
 S = TaskState
 NOTICE_TYPE = "student.act"
+# kernel event type -> os_event.v1 kind; a task_state change maps by its target state (R-45)
+_EVENT_KINDS = {"plan_created": "plan_created", "plan_revised": "plan_revised", "plan_paused": "plan_paused",
+                "plan_closed": "plan_stopped", "plan_finished": "plan_finished"}
+_STEP_KINDS = {"done": "step_done", "waiting_student": "student_needed"}
 REPLAN_CAUSE = "replan:"  # a replan revision's cause: "replan:<proposal id>" (Slice 7)
 
 
@@ -327,10 +332,29 @@ class Kernel:
 
     # ---------------------------------------------------------------- internals
 
-    def _event(self, conn: Connection, plan_id: int | None, task_id: int | None, type_: str, payload: dict) -> None:
-        conn.execute(insert(models.events).values(
+    def _event(self, conn: Connection, plan_id: int | None, task_id: int | None, type_: str, payload: dict) -> int:
+        at = self.clock()
+        event_id = conn.execute(insert(models.events).values(
             tenant_id=self.tenant_id, plan_id=plan_id, task_id=task_id, type=type_, payload=payload,
-            at=self.clock()))
+            at=at).returning(models.events.c.id)).scalar_one()
+        self._notify(conn, plan_id, task_id, type_, payload, event_id, at)
+        return event_id
+
+    def _notify(self, conn: Connection, plan_id: int | None, task_id: int | None, type_: str, payload: dict,
+                event_id: int, at: datetime) -> None:
+        """The one choke point for `os_event.v1` (R-45): the same transaction writes the notice for the Counsellor,
+        keyed on this event's id so a repeat is skipped. A hidden step (the "plan updated" notice) is never announced."""
+        kind = _EVENT_KINDS.get(type_)
+        if type_ == "task_state":
+            kind = _STEP_KINDS.get(payload.get("to"))
+        if kind is None or plan_id is None:
+            return
+        key = None
+        if task_id is not None:
+            key = conn.execute(select(T.c.instance_key).where(T.c.id == task_id)).scalar_one_or_none()
+            if key is None or key.startswith(NOTICE_PREFIX) or CANCELLED_MARK in key or DONE_MARK in key:
+                return
+        os_events.emit(conn, self.tenant_id, plan_id, kind, event_id, at, key)
 
     def _lock_plan(self, conn: Connection, plan_id: int) -> None:
         found = conn.execute(select(P.c.id).where(P.c.id == plan_id, P.c.tenant_id == self.tenant_id)
@@ -481,5 +505,7 @@ class Kernel:
                     self._request(conn, r.id, attempt)
         states = conn.execute(select(T.c.state).where(T.c.plan_id == plan_id)).scalars().all()
         if states and all(S(s) in TERMINAL for s in states):
-            conn.execute(update(P).where(P.c.id == plan_id, P.c.status != PLAN_CLOSED).values(
-                status="done", updated_at=self.clock()))
+            finished = conn.execute(update(P).where(P.c.id == plan_id, P.c.status.not_in((PLAN_CLOSED, "done")))
+                                    .values(status="done", updated_at=self.clock()))
+            if finished.rowcount:  # the plan has just finished: say so once (R-45)
+                self._event(conn, plan_id, None, "plan_finished", {})

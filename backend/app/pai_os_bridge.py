@@ -16,7 +16,9 @@ import asyncio
 import logging
 import uuid
 from datetime import datetime, timezone
+from pathlib import Path
 
+import yaml
 from fastapi import HTTPException
 from pydantic import ValidationError
 from sqlalchemy import and_, func, select
@@ -27,6 +29,7 @@ from app.config import config
 from app.models import OsOutbox, RouteDecision, User, VaultVersion, Workspace
 from app.os import ports
 from app.os.ports import escalation as os_escalation
+from app.os.ports import os_events as os_events_port
 from app.os.contracts.decision_record_v2 import DecisionRecordV2
 from app.os.ports import plan_source, student_facts as os_student_facts
 from app.os.contracts.vault_event import VaultEventV1
@@ -164,6 +167,38 @@ def _deliver(db) -> dict:
     return got
 
 
+OS_EVENT_TEXTS = Path(__file__).parent / "pai_c" / "connect" / "os_event_texts.yaml"
+
+
+def deliver_os_events(db) -> dict:
+    """Turns each pending `os_event` row into one app notification (the bell), never a chat message (R-45). The
+    notice is the fixed copy of `os_event_texts.yaml` for its kind, keyed by the event key, so a repeat sweep makes
+    none. A student without a workspace here is `refused`; any other error leaves the row pending for the next sweep."""
+    from app.services.notify import notify_once
+
+    got = {"sent": 0, "refused": 0, "waiting": 0}
+    texts = yaml.safe_load(OS_EVENT_TEXTS.read_text(encoding="utf-8")) or {}
+    for e in os_events_port.pending_events():
+        copy = texts.get(e.kind)
+        try:
+            if copy is None or db.get(Workspace, e.student_ref) is None:
+                os_events_port.mark_event_delivery(e.key, "refused")
+                got["refused"] += 1
+                continue
+            notify_once(db, e.student_ref, dedupe_key=e.key, source="system:pai-os", title=copy["title"],
+                        message=copy["message"], priority=copy.get("priority", "normal"),
+                        link_url=f"/{e.student_ref}?view=roadmap")
+            db.commit()
+        except Exception as exc:  # noqa: BLE001  (one event never stops the others; class name only, no student data)
+            db.rollback()
+            log.error("PAI OS event could not become a notification: %s", type(exc).__name__)
+            got["waiting"] += 1
+            continue
+        os_events_port.mark_event_delivery(e.key, "sent")
+        got["sent"] += 1
+    return got
+
+
 def sweep_once(db) -> dict:
     try:
         ports.services()
@@ -185,7 +220,14 @@ def sweep_once(db) -> dict:
         db.rollback()
         log.exception("PAI OS sweep could not deliver decisions")
         failed += 1
-    return {"submitted": delivered, "failed": failed, **_deliver(db)}
+    result = {"submitted": delivered, "failed": failed, **_deliver(db)}
+    try:
+        if part_on("CONNECT_ROADMAP_FROM_PLANVIEW"):
+            result["events"] = deliver_os_events(db)
+    except Exception:  # noqa: BLE001  (logged; the next sweep tries again)
+        db.rollback()
+        log.exception("PAI OS sweep could not deliver plan events")
+    return result
 
 
 def _sweep_with_session() -> dict:
