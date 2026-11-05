@@ -16,7 +16,7 @@ from app.pai_c.paths.analyzer import enqueue_path_analysis, path_analysis_job
 from app.pai_c.paths.fields import study_fields
 from app.pai_c.possibilities import PossibilityService
 from scripts.counselor_eval_support import StudentSession
-from tests.counselor_fixtures import fake_post
+from tests.counselor_fixtures import client_for, fake_post
 from tests.test_path_analyzer import add_education, analysis, path, seed
 
 pytestmark = pytest.mark.req("R-47")
@@ -368,3 +368,116 @@ async def test_exclusion_notice_waits_for_care():
                    AsyncMock(side_effect=fake_post(student))) as post, pytest.raises(JobDeferred):
             await exclusions.paths_excluded_job(db.get(BackgroundJob, job_id), db)
         assert post.await_count == 0 and _messages(db, student.workspace_id) == []
+
+
+# --- The Vault is the one source of an excluded field (R-78, R-15) ---
+
+def _button(client, student, row, action):
+    return client.post(f"/v1/counselor/possibilities/{row.id}/{action}?network={student.workspace_id}",
+                       headers={"X-Workspace-Token": "synthetic-test-only"})
+
+
+@pytest.mark.req("R-78", "R-15")
+def test_button_dismiss_writes_a_ruled_out_option_and_the_field_leaves_every_reader():
+    from app.main import app
+    from app.pai_c.journey_sync import _live_paths
+    from app.pai_c.roadmap.engine import RoadmapEngine
+    with StudentSession() as student, student.factory() as db:
+        _, journey = setup(student, db)
+        row = add_path(db, student, journey, "pharm_d")
+        client = client_for(student)
+        try:
+            assert [c["possibility_id"] for c in RoadmapEngine(db).build(student.workspace_id)["fields"]] == [row.id]
+            assert _button(client, student, row, "dismiss").status_code == 200
+            db.expire_all()
+            items = [i for i in db.scalars(select(VaultItem).where(VaultItem.workspace_id == student.workspace_id,
+                                                                    VaultItem.item_type == "option")).all()]
+            assert len(items) == 1
+            assert items[0].value == {"text": exclusions.field_label("pharm_d"), "status": "ruled_out"}
+            assert items[0].level == "stated" and items[0].source_type == "user_explicit"
+            assert items[0].evidence["capture"] == "paths_button" and items[0].evidence["possibility_id"] == row.id
+            assert list(exclusions.excluded_fields(db, student.workspace_id)) == ["pharm_d"]
+            assert db.get(PaiPossibility, row.id).status == "dismissed"
+            # The press is not a chat exclusion: no "I removed it" notice.
+            assert notice_jobs(db, student.workspace_id) == []
+            assert PossibilityService(db).current(student.workspace_id) == []
+            assert RoadmapEngine(db).build(student.workspace_id)["fields"] == []
+            assert _live_paths(db, student.workspace_id) is False
+        finally:
+            app.dependency_overrides.clear()
+
+
+@pytest.mark.req("R-78", "R-15")
+@pytest.mark.asyncio
+async def test_button_restore_makes_the_option_considering_and_analysis_keeps_the_path():
+    from app.main import app
+    from app.pai_c.roadmap.engine import RoadmapEngine
+    with StudentSession() as student, student.factory() as db:
+        turn, journey = setup(student, db)
+        row = add_path(db, student, journey, "pharm_d")
+        client = client_for(student)
+        try:
+            assert _button(client, student, row, "dismiss").status_code == 200
+            assert _button(client, student, row, "save").status_code == 200
+        finally:
+            app.dependency_overrides.clear()
+        db.expire_all()
+        items = db.scalars(select(VaultItem).where(VaultItem.workspace_id == student.workspace_id,
+                                                   VaultItem.item_type == "option")).all()
+        assert [i.value["status"] for i in items if i.value["status"] == "considering"] == ["considering"]
+        assert exclusions.excluded_fields(db, student.workspace_id) == {}
+        assert [r.id for r in PossibilityService(db).current(student.workspace_id)] == [row.id]
+        assert [c["possibility_id"] for c in RoadmapEngine(db).build(student.workspace_id)["fields"]] == [row.id]
+        result, sent = await run_paths(db, student, turn, analysis(path("pharm_d")))
+        db.expire_all()
+        row = db.get(PaiPossibility, row.id)
+        assert row.status == "saved" and result["status"] == "stored"
+        assert '"key":"pharm_d"' in sent[0]
+        assert notice_jobs(db, student.workspace_id) == []
+
+
+@pytest.mark.req("R-78")
+def test_restoring_a_chat_excluded_path_also_flips_the_vault_option():
+    from app.main import app
+    with StudentSession() as student, student.factory() as db:
+        _, journey = setup(student, db)
+        row = add_path(db, student, journey, "pharm_d")
+        option(db, student, "Pharm-D", quote="Pharm-D nahi karni")
+        exclusions.apply_exclusions(db, student.workspace_id)
+        db.commit()
+        client = client_for(student)
+        try:
+            assert _button(client, student, row, "save").status_code == 200
+        finally:
+            app.dependency_overrides.clear()
+        db.expire_all()
+        assert exclusions.excluded_fields(db, student.workspace_id) == {}
+        assert db.get(PaiPossibility, row.id).status == "saved"
+
+
+@pytest.mark.req("R-78")
+def test_the_vault_set_hides_an_open_path_before_the_dismissal_is_projected():
+    with StudentSession() as student, student.factory() as db:
+        _, journey = setup(student, db)
+        row = add_path(db, student, journey, "pharm_d")
+        other = add_path(db, student, journey, "mbbs")
+        option(db, student, "Pharm-D", quote="Pharm-D nahi karni")
+        assert row.status == "suggested"
+        assert [r.id for r in PossibilityService(db).current(student.workspace_id)] == [other.id]
+
+
+@pytest.mark.req("R-78")
+def test_a_path_without_a_study_field_key_stays_status_only():
+    from app.main import app
+    from tests.test_roadmap_engine import add_path as add_own
+    with StudentSession() as student, student.factory() as db:
+        setup(student, db)
+        row = add_own(student, db, "Learn to code", None, source="student", status="saved")
+        client = client_for(student)
+        try:
+            assert _button(client, student, row, "dismiss").status_code == 200
+        finally:
+            app.dependency_overrides.clear()
+        db.expire_all()
+        assert db.get(PaiPossibility, row.id).status == "dismissed"
+        assert db.scalars(select(VaultItem).where(VaultItem.item_type == "option")).all() == []

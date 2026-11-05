@@ -82,12 +82,20 @@ async def change_possibility(possibility_id: str, action: str, network: str = Qu
     service = PossibilityService(db)
     previous_status = None
     try:
+        from app.pai_c.paths import exclusions
+        was = service.get(workspace_id, possibility_id).status
         if action == "explore":
             from app.routers.counselor_paths import explore
             await explore(possibility_id, network, db, x_workspace_token, authorization)
             row = service.get(workspace_id, possibility_id)
         else:
             row, _ = service.transition(workspace_id, possibility_id, action)
+        # The Vault is the one source of an excluded field (R-78): the button
+        # writes it before the request commits.
+        if action == "dismiss" and was != "dismissed" and row.status == "dismissed":
+            exclusions.record_button_exclusion(db, row)
+        elif was == "dismissed" and row.status != "dismissed":
+            exclusions.record_restore(db, row)
         db.commit()
         return success_response(service.serialize(row))
     except PossibilityError as exc:

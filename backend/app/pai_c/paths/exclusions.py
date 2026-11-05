@@ -93,6 +93,58 @@ def apply_exclusions(db, workspace_id: str, excluded: dict[str, dict] | None = N
     return changed
 
 
+def field_label(key: str | None) -> str | None:
+    """The catalog's study_fields label for a path's field key, when the
+    Vault can read it back as that same key (code, label or synonym);
+    otherwise None."""
+    if not key:
+        return None
+    catalog = vault_catalog()
+    label = catalog.label("study_fields", key)
+    return label if catalog.choice_code("study_fields", label) == key else None
+
+
+def record_button_exclusion(db, row: PaiPossibility) -> bool:
+    """The student pressed "dismiss" on a path: the Vault learns the field is
+    ruled out, so the exclusion has one source (R-78). Call after the
+    transition and before the commit. The path is already dismissed, so the
+    reconciler hook only stamps it with the new option (no second transition,
+    no "I removed it" notice). A path without a study-field key the catalog
+    knows (the student's own typed path) has no field to exclude: it stays
+    status-only, as before. Returns whether a Vault option was written."""
+    label = field_label((row.study_field or {}).get("key"))
+    if label is None:
+        return False
+    return MemoryService(db).put_option(row.workspace_id, label, "ruled_out",
+                                        {"capture": "paths_button", "possibility_id": row.id})
+
+
+def record_restore(db, row: PaiPossibility) -> bool:
+    """The student brought a dismissed path back: a ruled-out option for its
+    field becomes `considering`, so the Vault no longer excludes it and the
+    next analysis keeps the path. Nothing is written when the Vault does not
+    exclude the field (a path dismissed by hand before this existed). Call
+    after the transition and before the commit."""
+    key = (row.study_field or {}).get("key")
+    option = excluded_fields(db, row.workspace_id).get(key) if key else None
+    if option is None:
+        return False
+    return MemoryService(db).put_option(row.workspace_id, option["text"], "considering",
+                                        {"capture": "paths_button", "possibility_id": row.id})
+
+
+def withheld_ids(db, workspace_id: str, rows) -> set[str]:
+    """Ids of open paths the Vault excludes that the projection has not
+    dismissed yet (the Vault write landed, the hook has not run or failed).
+    A path the student restored against that same option is not withheld."""
+    excluded = excluded_fields(db, workspace_id)
+    if not excluded:
+        return set()
+    return {row.id for row in rows
+            if row.status in _OPEN and (option := excluded.get((row.study_field or {}).get("key")))
+            and not _restored(row, option)}
+
+
 def hidden_field_keys(db, workspace_id: str, rows, excluded: dict[str, dict] | None = None) -> set[str]:
     """Fields the analyzer must not offer: every excluded field, except one
     whose path the student kept or restored (it stays theirs to reassess)."""
