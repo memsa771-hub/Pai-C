@@ -37,9 +37,14 @@ class PossibilityService:
             PaiPossibility.workspace_id == workspace_id).order_by(PaiPossibility.created_at, PaiPossibility.id)).all()
 
     def current(self, workspace_id):
-        """The student's current paths: everything not dismissed, in list order.
+        """The student's current paths: everything not dismissed and not excluded in the Vault, in list order.
         The one reader behind the newest chat card, Roadmaps and the journey."""
-        return [row for row in self.list(workspace_id) if row.status != "dismissed"]
+        from app.pai_c.paths.exclusions import withheld_ids
+        rows = [row for row in self.list(workspace_id) if row.status != "dismissed"]
+        # The Vault is the one source of an exclusion (R-78): an open path it
+        # excludes is not current even before the dismissal is projected.
+        withheld = withheld_ids(self.db, workspace_id, rows)
+        return [row for row in rows if row.id not in withheld]
 
     @staticmethod
     def serialize(row):

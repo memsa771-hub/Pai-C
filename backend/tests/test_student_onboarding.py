@@ -246,7 +246,9 @@ def test_every_identity_answer_is_required(db):
     # optional (R-47 C7); every other question is required.
     optional = {(f["name"], f["labelKey"]) for f in state["fields"] if not f["required"]}
     assert optional == {("marksObtained", "marksSoFar"), ("marksTotal", None), ("grades", None),
-                        ("entryTest", None), ("entryTestScore", "entryTestScore")}
+                        ("entryTest", None), ("entryTestScore", "entryTestScore"),
+                        ("part1MarksObtained", None), ("part1MarksTotal", None),
+                        ("part2MarksObtained", None), ("part2MarksTotal", None)}
 
 
 def test_existing_equal_canonical_value_keeps_its_original_provenance(db):
@@ -319,6 +321,8 @@ def test_three_step_form_is_advertised_in_order_with_no_reply_language(db):
         ("subjects", 3), ("subjects", 3), ("technology", 3), ("field", 3), ("field", 3),
         ("status", 3), ("year", 3), ("year", 3), ("year", 3), ("year", 3),
         ("marksObtained", 3), ("marksTotal", 3), ("marksObtained", 3), ("marksTotal", 3),
+        ("part1MarksObtained", 3), ("part1MarksTotal", 3), ("part1MarksObtained", 3), ("part1MarksTotal", 3),
+        ("part2MarksObtained", 3), ("part2MarksTotal", 3),
         ("grades", 3), ("grades", 3), ("matricMarksObtained", 3), ("matricMarksTotal", 3), ("oLevelGrades", 3),
         ("entryTest", 3), ("entryTestScore", 3)]
     assert "replyLanguage" not in {f["name"] for f in state["fields"]}
@@ -1024,3 +1028,104 @@ def test_marks_so_far_need_their_total(db):
     with pytest.raises(MemoryDataError, match="^Missing required answer: marksTotal$"):
         OnboardingService(db).apply(db.info["workspace"], answers)
     assert _education_rows(db) == []
+
+
+# -- P1-T4 task 2: Part-I and Part-II marks (R-80, P1-D4) ----------------------
+
+PART_NAMES = ("part1MarksObtained", "part1MarksTotal", "part2MarksObtained", "part2MarksTotal")
+PARTS = {"part1MarksObtained": "400", "part1MarksTotal": "550",
+         "part2MarksObtained": "480", "part2MarksTotal": "550"}
+COMPLETED_INTERMEDIATE = {**PERSON, "level": "intermediate", "group": "pre_medical", "status": "completed",
+                          "year": "2025", "marksObtained": "880", "marksTotal": "1100"}
+
+
+def _shown(db, answers):
+    """The part questions a set of answers shows, by name."""
+    from app.memory.onboarding import ONBOARDING_FIELDS, _visible
+    return {f.name for f in ONBOARDING_FIELDS if f.name in PART_NAMES and _visible(f.depends_on, answers)}
+
+
+@pytest.mark.req("R-80")
+def test_part_questions_are_optional_and_use_nested_result_paths(db):
+    fields = [f for f in OnboardingService(db).state(db.info["workspace"])["fields"] if f["name"] in PART_NAMES]
+    assert {f["name"] for f in fields} == set(PART_NAMES)
+    assert all(f["required"] is False and f["isNumber"] for f in fields)
+    assert {f["name"]: f["atMost"] for f in fields if f["atMost"]} == {
+        "part1MarksObtained": "part1MarksTotal", "part2MarksObtained": "part2MarksTotal"}
+
+
+@pytest.mark.req("R-80")
+@pytest.mark.parametrize("answers, expected", [
+    ({"level": "intermediate", "status": "completed"}, set(PART_NAMES)),
+    ({"level": "intermediate", "status": "current", "year": "year_2"}, {"part1MarksObtained", "part1MarksTotal"}),
+    ({"level": "intermediate", "status": "current", "year": "year_1"}, set()),
+    ({"level": "matric", "status": "completed"}, set()),
+    ({"level": "bachelor", "status": "completed"}, set()),
+    ({"level": "a_level", "status": "current", "year": "year_2"}, set()),
+])
+def test_part_questions_show_only_in_the_right_cases(db, answers, expected):
+    assert _shown(db, answers) == expected
+
+
+@pytest.mark.req("R-80")
+def test_completed_intermediate_saves_parts_stated_beside_the_totals(db):
+    result = OnboardingService(db).apply(db.info["workspace"], {**COMPLETED_INTERMEDIATE, **PARTS})
+    db.commit()
+    assert result["completed"] and not result["rejected"], result
+    education = {row["qualification_name"]: row for row in _records(db, "education")}
+    assert education["fsc"]["result"] == {
+        "marks_obtained": 880, "marks_total": 1100,
+        "part1": {"marks_obtained": 400, "marks_total": 550},
+        "part2": {"marks_obtained": 480, "marks_total": 550}}
+    assert education["fsc"]["evidence_level"] == "stated" and education["fsc"]["source_type"] == "user_explicit"
+
+
+@pytest.mark.req("R-80")
+def test_second_year_student_saves_part_one_only(db):
+    answers = {**INTERMEDIATE_WITH_MARKS, "part1MarksObtained": "400", "part1MarksTotal": "550",
+               "part2MarksObtained": "5", "part2MarksTotal": "6"}
+    result = OnboardingService(db).apply(db.info["workspace"], answers)
+    db.commit()
+    assert result["completed"], result
+    education = {row["qualification_name"]: row for row in _records(db, "education")}
+    # Part-II is not asked of a student still in year two: the stray answer is dropped.
+    assert education["fsc"]["result"] == {"marks_obtained": 480, "marks_total": 550,
+                                          "part1": {"marks_obtained": 400, "marks_total": 550}}
+
+
+@pytest.mark.req("R-80")
+def test_parts_are_optional_and_totals_stay_as_today(db):
+    result = OnboardingService(db).apply(db.info["workspace"], COMPLETED_INTERMEDIATE)
+    db.commit()
+    assert result["completed"] and not result["rejected"], result
+    education = {row["qualification_name"]: row for row in _records(db, "education")}
+    assert education["fsc"]["result"] == {"marks_obtained": 880, "marks_total": 1100}
+
+
+@pytest.mark.req("R-80")
+def test_a_part_cannot_exceed_its_own_total(db):
+    for part in ("part1", "part2"):
+        with pytest.raises(MemoryDataError, match=f"^{part}MarksObtained cannot be more than {part}MarksTotal$"):
+            OnboardingService(db).apply(db.info["workspace"], {
+                **COMPLETED_INTERMEDIATE, **PARTS, f"{part}MarksObtained": "551"})
+    assert _education_rows(db) == []
+
+
+@pytest.mark.req("R-80")
+def test_part_marks_are_whole_numbers_in_range(db):
+    with pytest.raises(MemoryDataError, match="part1MarksObtained must be .*whole number"):
+        OnboardingService(db).apply(db.info["workspace"], {**COMPLETED_INTERMEDIATE, "part1MarksObtained": "4x"})
+
+
+@pytest.mark.req("R-80")
+def test_saved_parts_prefill_and_can_be_corrected_in_place(db):
+    service, workspace = OnboardingService(db), db.info["workspace"]
+    service.apply(workspace, {**COMPLETED_INTERMEDIATE, **PARTS})
+    db.commit()
+    prefill = service.state(workspace)["prefill"]
+    assert {k: prefill.get(k) for k in PART_NAMES} == PARTS
+    service.apply(workspace, {**COMPLETED_INTERMEDIATE, **PARTS, "part1MarksObtained": "410"})
+    db.commit()
+    [fsc] = [row for row in _records(db, "education") if row["qualification_name"] == "fsc"]
+    assert fsc["result"]["part1"] == {"marks_obtained": 410, "marks_total": 550}
+    assert fsc["result"]["part2"] == {"marks_obtained": 480, "marks_total": 550}

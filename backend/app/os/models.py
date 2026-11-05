@@ -629,6 +629,20 @@ counsellor_intake = Table(
     Index("ix_os_counsellor_intake_version", "tenant_id", "student_ref", "decision_version"),
 )
 
+# --- P1-T4: Vault events from the Counsellor (os_0020) ---------------------------------------------------------------
+
+vault_events = Table(
+    "os_vault_events", md,
+    _id(), _tenant(),
+    Column("student_ref", Text, nullable=False),
+    Column("vault_version", Integer, nullable=False),
+    Column("keys", JSONB, nullable=False),  # StudentFacts keys that changed; never values
+    Column("event", JSONB, nullable=False),  # the VaultEventV1 as submitted
+    Column("occurred_at", DateTime(timezone=True), nullable=False),
+    _created(),
+    UniqueConstraint("tenant_id", "student_ref", "vault_version", name="uq_os_vault_events_version"),
+)
+
 counsellor_sweep = Table(
     "os_counsellor_sweep", md,
     Column("tenant_id", Text, primary_key=True),

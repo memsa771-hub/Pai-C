@@ -184,3 +184,29 @@ def test_inbox_lists_unread_notes_and_read_hides_it(svc, engine):
     assert c.get("/v1/os/inbox", headers={"X-Test-Student": "stu-1"}).json()["notes"] == []
     with engine.connect() as conn:
         assert conn.execute(select(func.count()).select_from(models.eligibility_notes)).scalar() == 1  # kept, read
+
+
+@pytest.mark.req("R-13")
+def test_notes_follow_the_vault_while_the_host_adapter_is_on(svc, engine):
+    """P1-T4 Task 5: with the StudentFacts adapter on, a Vault value changes the verdict (and a stored value fills a gap)."""
+    from app.os import ports
+    from app.os.adapters.counsellor import manifest
+    from app.os.ports import student_facts
+
+    def vault(ielts):
+        return {"schema": "pai.student_facts.v1", "student_ref": "stu-1", "vault_version": 1, "eligible_levels": None,
+                "built_at": datetime(2026, 11, 5, tzinfo=timezone.utc), "facts": [
+                    {"key": "test.ielts.score", "value": ielts, "evidence": "stated", "vault_version": 1}]}
+
+    start(svc, "stu-1")
+    profile(engine, "stu-1", transcript__percentage=70)  # interim: removed by T7 (a type the Vault lacks comes from the stored values)
+    manifest.set_enabled(engine, "pai", True)
+    student_facts.configure(lambda ref: vault(7.0))
+    try:
+        assert on_profile_change(svc.plans, "stu-1") == 0  # first evaluation: likely_meets, no note
+        student_facts.configure(lambda ref: vault(6.0))
+        assert on_profile_change(svc.plans, "stu-1") == 1
+    finally:
+        ports.configure(None)
+    [n] = notes(engine, "stu-1")
+    assert (n.verdict, n.payload["previous"]) == ("likely_below", "likely_meets")

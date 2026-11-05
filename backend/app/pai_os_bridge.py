@@ -24,11 +24,12 @@ from sqlalchemy import and_, func, select
 from app.config import config
 # Merge pai-c + pai-os: pai-c replaced the old decision-record table (migration 119) with `RouteDecision`
 # (`pai_route_decisions`), which has the same id / workspace_id / chosen_at the sweep reads.
-from app.models import OsOutbox, RouteDecision, User, Workspace
+from app.models import OsOutbox, RouteDecision, User, VaultVersion, Workspace
 from app.os import ports
 from app.os.ports import escalation as os_escalation
 from app.os.contracts.decision_record_v2 import DecisionRecordV2
-from app.os.ports import plan_source
+from app.os.ports import plan_source, student_facts as os_student_facts
+from app.os.contracts.vault_event import VaultEventV1
 from app.pai_c.connect import outbox
 from app.pai_c.connect.flags import part_on
 
@@ -41,23 +42,28 @@ REFUSED = {404, 409, 422}
 
 
 def deliver_pending(db, workspace_id: str | None = None) -> dict:
-    """Sends the pending `decision` outbox rows to PAI OS, oldest first, and commits its own status changes. An invalid
-    payload is `not_sent` (`invalid_export`); `duplicate` and `module_off` count as delivered (the OS holds it). When
-    PAI OS is not mounted the rows stay pending and the loop stops; any other error counts an attempt and goes on."""
+    """Sends the pending `decision` outbox rows to PAI OS (while CONNECT_HANDOFF is on) and the pending `vault_event`
+    rows (while CONNECT_STUDENT_FACTS is on), oldest first, and commits its own status changes. An invalid payload is
+    `not_sent` (`invalid_export`); `duplicate` and `module_off` count as delivered (the OS holds it). When PAI OS is
+    not mounted the rows stay pending and the loop stops; any other error counts an attempt and goes on."""
     got = {"delivered": 0, "failed": 0, "not_sent": 0}
-    if not part_on("CONNECT_HANDOFF"):
+    kinds = {kind: (contract, send) for kind, part, contract, send in (
+        ("decision", "CONNECT_HANDOFF", DecisionRecordV2, lambda p: plan_source.submit_decision(p)),
+        ("vault_event", "CONNECT_STUDENT_FACTS", VaultEventV1, lambda p: os_student_facts.record_event(p))) if part_on(part)}
+    if not kinds:
         return got
-    for item in [i for i in outbox.pending_for(db, workspace_id) if i.kind == "decision"]:
+    for item in [i for i in outbox.pending_for(db, workspace_id) if i.kind in kinds]:
         item_id = item.id
+        contract, send = kinds[item.kind]
         try:
-            DecisionRecordV2.model_validate(item.payload)
+            contract.model_validate(item.payload)
         except ValidationError:
             item.status, item.last_error = "not_sent", "invalid_export"
             db.commit()
             got["not_sent"] += 1
             continue
         try:
-            plan_source.submit_decision(item.payload)
+            send(item.payload)
         except ports.OsUnavailable:
             break
         except Exception as exc:  # noqa: BLE001  (a code is kept, never the message; the sweep tries again)
@@ -102,6 +108,33 @@ def _backfill(db) -> None:
             log.error("PAI OS backfill failed for one student: %s", type(exc).__name__)
 
 
+def _backfill_vault(db) -> None:
+    """A student whose Vault version is above the one PAI OS holds gets a Vault event for the newest version, naming
+    every key that changed since the OS copy (a write made while the part was off, or a lost row, leaves no event). A
+    delivered row the OS lacks goes back to pending."""
+    for row in db.scalars(select(VaultVersion).where(VaultVersion.version > 0)).all():
+        try:
+            ws, version = str(row.workspace_id), row.version
+            held = os_student_facts.latest_vault_version(ws)
+            if held is not None and held >= version:
+                continue
+            key = f"vault_event:{ws}:{version}"
+            item = db.scalar(select(OsOutbox).where(OsOutbox.key == key))
+            if item is None:
+                keys = sorted(k for k, v in (row.key_versions or {}).items() if v > (held or 0))
+                if not keys:
+                    continue
+                outbox.record_vault_event(db, ws, version, keys)
+            elif item.status == "delivered":
+                item.status, item.delivered_at = "pending", None
+            else:
+                continue
+            db.commit()
+        except Exception as exc:  # noqa: BLE001  (one student never stops the others; class name only)
+            db.rollback()
+            log.error("PAI OS vault backfill failed for one student: %s", type(exc).__name__)
+
+
 def _deliver(db) -> dict:
     from app.routers.escalations import EscalationInput, escalate
 
@@ -138,9 +171,13 @@ def sweep_once(db) -> dict:
         return {"mounted": False}
     delivered = failed = 0
     try:
-        if part_on("CONNECT_HANDOFF"):
+        handoff, facts = part_on("CONNECT_HANDOFF"), part_on("CONNECT_STUDENT_FACTS")
+        if handoff or facts:
             first = deliver_pending(db)
-            _backfill(db)
+            if handoff:
+                _backfill(db)
+            if facts:
+                _backfill_vault(db)
             second = deliver_pending(db)
             delivered = first["delivered"] + second["delivered"]
             failed = first["failed"] + second["failed"]
@@ -186,6 +223,25 @@ def recipient_email(student_ref: str) -> str | None:
     with new_session() as db:
         return db.execute(select(User.email).join(Workspace, Workspace.owner_user_id == User.id)
                           .where(Workspace.id == workspace_id, Workspace.status == "active")).scalar_one_or_none()
+
+
+def student_facts(student_ref: str) -> dict | None:
+    """The student's StudentFacts (a dict valid as `StudentFactsV1`), built from their Vault (P1-T4, R-13). None while
+    the CONNECT_STUDENT_FACTS flag is off and for a reference that names no workspace: PAI OS then uses its own
+    profile values. Reads the plain flag, not `part_on`: PAI OS checks the `counsellor` module itself, and this runs in
+    the worker, where the module switch cannot be asked of the API. Opens its own session: PAI OS calls it on its
+    worker thread. A database error raises, so PAI OS retries."""
+    if not config.CONNECT_STUDENT_FACTS:
+        return None
+    try:
+        workspace_id = str(uuid.UUID(student_ref))
+    except (TypeError, ValueError):
+        return None
+    from app.database import new_session
+    from app.pai_c.connect import student_facts as builder
+
+    with new_session() as db:
+        return builder.build(db, workspace_id)
 
 
 def counsellor_module_on() -> bool:

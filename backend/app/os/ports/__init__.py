@@ -3,6 +3,7 @@ configured when the OS is mounted and need no host import (invariant 11)."""
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from typing import TYPE_CHECKING
 
 from app.os.ports import recipients
@@ -19,11 +20,19 @@ class OsUnavailable(RuntimeError):
 _services: Services | None = None
 
 
-def configure(services: Services | None, recipient_lookup: RecipientLookup | None = None) -> None:
-    """Called by `mount_os`. Slice 9b: also sets the RecipientLookup port (ports.recipients) for this process."""
+def configure(services: Services | None, recipient_lookup: RecipientLookup | None = None,
+              student_facts: Callable[[str], dict | None] | None = None) -> None:
+    """Called by `mount_os`. Slice 9b: also sets the RecipientLookup port (ports.recipients) for this process.
+    P1-T4: and the host's StudentFacts adapter (ports.student_facts)."""
+    from app.os.ports import student_facts as student_facts_port  # late: that module imports this package
+
     global _services
     _services = services
     recipients.configure(recipient_lookup)
+    student_facts_port.configure(student_facts)
+    from app.os.eligibility import facts as eligibility_facts
+
+    eligibility_facts.configure_types(getattr(services, "document_types", None))  # the types mount_os loaded
 
 
 def services() -> Services:

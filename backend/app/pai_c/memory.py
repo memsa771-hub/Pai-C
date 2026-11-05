@@ -71,6 +71,19 @@ class MemoryService:
         result = MemoryReconciler(self.db).reconcile(candidate)
         return {"saved": result.accepted, "id": result.result_id, "candidate_id": candidate.id}
 
+    def put_option(self, workspace_id, text, status, evidence):
+        """Write one Vault `option` in the student's own name (a button press
+        is as explicit as a typed answer). Identity is the text, so a later
+        write with another status replaces the earlier one. Returns whether
+        the Vault accepted it. The caller commits."""
+        from app.memory.candidates import MemoryCandidateService
+        from app.memory.reconciler import MemoryReconciler
+        candidate = MemoryCandidateService(self.db).propose(workspace_id=workspace_id,
+            candidate_type="vault_item", key="option", proposed_value={"text": text, "status": status},
+            source_type="user_explicit", allow_user_explicit=True, confidence=1,
+            input_channel="profile", evidence=evidence)
+        return MemoryReconciler(self.db).reconcile(candidate).accepted
+
     def profile_cards(self, workspace_id):
         """The student's facts, records and Vault items with their evidence
         level, for the data export and the path analyzer's citable evidence."""
@@ -115,6 +128,11 @@ class MemoryService:
                 "source": {name: evidence[name] for name in evidence_policy()["source_fields"] if name in evidence},
                 "source_type": item.source_type, "updated_at": item.updated_at or item.observed_at})
         return cards
+
+    def vault_items(self, workspace_id, types):
+        """The student's active Vault items of the given types, oldest first (the one reader for connect code)."""
+        from app.memory.vault_items import VaultItemService
+        return VaultItemService(self.db).active(workspace_id, list(types))
 
     def ruled_out_options(self, workspace_id):
         """The options the student ruled out themselves (said, shown or

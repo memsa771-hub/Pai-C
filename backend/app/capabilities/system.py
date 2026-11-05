@@ -12,12 +12,15 @@ def load_system_capabilities(registry):
     from app.services.operator import run_operator_job
     from app.pai_c.mirror import text_job as mirror_text
     from app.memory.reconciler import register_accept_hook
+    from app.pai_c.connect import vault_version
 
     # After Mirror-relevant Vault writes the reconciler moves the journey to
     # MIRROR when the card is ready and queues the Mirror text.
     register_accept_hook(mirror_text.after_accept)
     # A path-relevant Vault write queues the Path engine (reason vault).
     register_accept_hook(paths.after_accept)
+    # An accepted write that touches a StudentFacts key raises the student's Vault version (P1-T4, flag-gated).
+    register_accept_hook(vault_version.after_accept)
 
     string = {"type": "string"}
     array = {"type": "array"}

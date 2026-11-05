@@ -85,6 +85,16 @@
         "incomplete": "Not completed",
         "planned": "Planned"
       },
+      "scope": {
+        "local": "Local",
+        "abroad": "Abroad",
+        "either": "Either"
+      },
+      "fallback": {
+        "none": "No fallback",
+        "local_first": "Local first",
+        "abroad_first": "Abroad first"
+      },
       "period": {
         "per_year": "per year",
         "per_month": "per month",
@@ -107,7 +117,9 @@
       "percent": "{percent}%",
       "gpa": "GPA {gpa}",
       "gpa_scale": "GPA {gpa}/{scale}",
-      "grade": "Grade {grade}"
+      "grade": "Grade {grade}",
+      "part1": "Part I {obtained}/{total}",
+      "part2": "Part II {obtained}/{total}"
     },
     "budget": {
       "amount_fields": [
@@ -157,6 +169,14 @@
           "title": "study_fields",
           "details.field_of_study": "study_fields"
         }
+      },
+      "field_order": {
+        "fields": ["fields"],
+        "wordings": {"fields": "study_fields"}
+      },
+      "place_preference": {
+        "fields": ["scope", "fallback", "regions"],
+        "wordings": {"regions": "provinces"}
       },
       "strength": {
         "fields": [

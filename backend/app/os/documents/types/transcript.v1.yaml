@@ -14,9 +14,9 @@ fields:
   - {name: enrollment_number, type: code, hint: "Enrollment number if printed"}
   - {name: admission_date, type: date, hint: "Date of admission or registration, YYYY-MM-DD"}
   - {name: completion_date, type: date, hint: "Date of completion or result notification, YYYY-MM-DD"}
-  - {name: cgpa, type: grade, hint: "Final cumulative GPA (CGPA), not a semester GPA"}
-  - {name: cgpa_scale, type: number, hint: "The CGPA scale if printed, e.g. 4.0; leave empty if not printed"}
-  - {name: percentage, type: number, hint: "Overall percentage if printed"}
+  - {name: cgpa, fact: education.bachelor.gpa, type: grade, hint: "Final cumulative GPA (CGPA), not a semester GPA"}
+  - {name: cgpa_scale, fact: education.bachelor.gpa_scale, type: number, hint: "The CGPA scale if printed, e.g. 4.0; leave empty if not printed"}
+  - {name: percentage, fact: education.bachelor.percentage, type: number, hint: "Overall percentage if printed"}
   - {name: credit_hours, type: number, hint: "Total credit hours completed or earned"}
   - {name: issue_date, type: date, hint: "Date the transcript was issued or printed, YYYY-MM-DD"}
   - {name: serial_number, type: code, hint: "Serial number of the transcript"}

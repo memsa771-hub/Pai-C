@@ -182,6 +182,8 @@ services:
       OS_WORKER_ID: local-os-worker-1
       # The worker never mounts the API, so it loads the student-email lookup itself (PAI OS Slice 9b).
       OS_RECIPIENT_LOOKUP: app.pai_os_bridge:recipient_email
+      # Likewise the Counsellor's StudentFacts adapter (P1-T4); it answers None while CONNECT_STUDENT_FACTS is off.
+      OS_STUDENT_FACTS: app.pai_os_bridge:student_facts
     depends_on:
       migrate: {condition: service_completed_successfully}
       os-setup: {condition: service_completed_successfully}

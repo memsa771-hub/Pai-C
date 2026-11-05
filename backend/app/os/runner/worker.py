@@ -31,7 +31,7 @@ from app.os.db import make_engine
 from app.os.kernel import Kernel
 from app.os.knowledge.profile import PROFILE_DIR, load_profile_dir
 from app.os.playbooks import PLAYBOOK_DIR, load_playbook_dir
-from app.os.ports import recipients
+from app.os.ports import recipients, student_facts
 from app.os.rehearsal.store import install_clock
 from app.os.rehearsal.tick import register_tick
 from app.os.runner.enqueue import enqueue_pending
@@ -199,6 +199,7 @@ def register_replan_always(settings: OsSettings, engine: Engine, kernel: Kernel,
 
 def build(settings: OsSettings) -> tuple[Registry, Kernel, DBOSClient, Engine]:
     recipients.configure(recipients.from_settings(settings))  # Slice 9b: before the deliver job is made; may refuse
+    student_facts.configure(student_facts.from_settings(settings))  # P1-T4: the host's StudentFacts adapter, if any
     registry = default_registry()
     for module in _extra_modules(os.environ.get("OS_EXTRA_MODULES", "")):
         registry.register(module)
@@ -209,6 +210,9 @@ def build(settings: OsSettings) -> tuple[Registry, Kernel, DBOSClient, Engine]:
     from app.os.packs.config import load_checked_pack_configs
 
     types = load_document_types()  # so does an invalid document type (Slice 3 spec S3-D2)
+    from app.os.eligibility import facts as eligibility_facts
+
+    eligibility_facts.configure_types(types)  # P1-T4: the profile code reads the types this worker loaded
     pack_configs = load_checked_pack_configs(PACK_SOURCE, types, books, profiles)  # and an invalid pack config (S6a-D12)
     visa_configs = load_checked_pack_configs(PACK_SOURCE, types, books, profiles, kind="visa")  # or visa file (S6b-D3)
     engine = make_engine(settings)
@@ -267,7 +271,8 @@ def main(argv: list[str] | None = None) -> int:
         signal.signal(sig, lambda *_: stop.set())
     try:  # Slice 9b: checked first, so a resend worker without a recipient lookup never starts
         recipients.from_settings(settings)
-    except recipients.RecipientLookupError as e:
+        student_facts.from_settings(settings)  # P1-T4: so does an OS_STUDENT_FACTS that cannot be loaded
+    except (recipients.RecipientLookupError, student_facts.StudentFactsSourceError) as e:
         print(str(e), file=sys.stderr)
         return 2
     parent = int(os.environ["OS_PARENT_PID"]) if os.environ.get("OS_PARENT_PID") else None

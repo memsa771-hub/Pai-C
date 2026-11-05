@@ -1,0 +1,13 @@
+# Qualification code (the Vault catalog `levels` list) -> the levels that qualification opens (P1-D13, R-14).
+# A current student counts at the level they are finishing. A code not listed opens nothing known.
+matric: [intermediate]
+o_level: [intermediate]
+fsc: [bachelor]
+ics: [bachelor]
+icom: [bachelor]
+fa: [bachelor]
+intermediate: [bachelor]
+a_level: [bachelor]
+dae: [bachelor]
+bachelor: [master]
+masters: [master, phd]

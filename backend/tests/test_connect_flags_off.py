@@ -98,3 +98,32 @@ async def test_sweep_and_delivery_do_not_touch_the_os_ports(monkeypatch):
         assert got.get("submitted") == 0 and got.get("failed") == 0
         assert touched.submit_decision.mock_calls == [] and touched.latest_version.mock_calls == []
         assert outbox_count(db) == 0
+
+
+@pytest.mark.asyncio
+@pytest.mark.req("R-13")
+async def test_student_facts_off_writes_no_version_no_outbox_and_asks_nothing_of_the_os(monkeypatch):
+    from app.memory.candidates import MemoryCandidateService
+    from app.memory.reconciler import MemoryReconciler
+    from app.models import VaultVersion
+    from app.os.ports import student_facts
+
+    touched = MagicMock()
+    touched.pending.return_value = []
+    monkeypatch.setattr(ports, "services", touched.services)
+    monkeypatch.setattr(plan_source, "counsellor_enabled", touched.counsellor_enabled)
+    monkeypatch.setattr(student_facts, "record_event", touched.record_event)
+    monkeypatch.setattr(student_facts, "latest_vault_version", touched.latest_vault_version)
+    monkeypatch.setattr(os_escalation, "pending_counsellor_escalations", touched.pending)
+    async with confirmed_student() as (_, student, db, _j):
+        ws = student.workspace_id
+        c = MemoryCandidateService(db).propose(
+            ws, "vault_item", key="domicile", proposed_value={"province": "punjab"}, confidence=0.9,
+            source_type="user_explicit", allow_user_explicit=True, input_channel="profile",
+            evidence={"quote": "q", "capture": "details"})
+        assert MemoryReconciler(db).reconcile(c).accepted
+        db.commit()
+        assert db.scalars(select(VaultVersion)).all() == [] and outbox_count(db) == 0
+        bridge.sweep_once(db)
+        assert touched.record_event.mock_calls == [] and touched.latest_vault_version.mock_calls == []
+        assert touched.counsellor_enabled.mock_calls == []

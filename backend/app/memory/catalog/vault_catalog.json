@@ -3019,6 +3019,147 @@
       "required": false
      },
      {
+      "name": "part1MarksObtained",
+      "at_most": "part1MarksTotal",
+      "prompt": "How many marks did you get in Part I?",
+      "input": "number",
+      "minimum": 0,
+      "maximum": 9999,
+      "record_field": "result.part1.marks_obtained",
+      "depends_on": {
+       "field": "status",
+       "values": [
+        "completed"
+       ],
+       "and": {
+        "field": "level",
+        "values": [
+         "intermediate"
+        ]
+       }
+      },
+      "required": false
+     },
+     {
+      "name": "part1MarksTotal",
+      "prompt": "Part I is out of how many?",
+      "input": "number",
+      "minimum": 1,
+      "maximum": 9999,
+      "record_field": "result.part1.marks_total",
+      "depends_on": {
+       "field": "status",
+       "values": [
+        "completed"
+       ],
+       "and": {
+        "field": "level",
+        "values": [
+         "intermediate"
+        ]
+       }
+      },
+      "required": false
+     },
+     {
+      "name": "part1MarksObtained",
+      "at_most": "part1MarksTotal",
+      "prompt": "How many marks did you get in Part I?",
+      "input": "number",
+      "minimum": 0,
+      "maximum": 9999,
+      "record_field": "result.part1.marks_obtained",
+      "depends_on": {
+       "field": "year",
+       "values": [
+        "year_2"
+       ],
+       "and": {
+        "field": "status",
+        "values": [
+         "current"
+        ],
+        "and": {
+         "field": "level",
+         "values": [
+          "intermediate"
+         ]
+        }
+       }
+      },
+      "required": false
+     },
+     {
+      "name": "part1MarksTotal",
+      "prompt": "Part I is out of how many?",
+      "input": "number",
+      "minimum": 1,
+      "maximum": 9999,
+      "record_field": "result.part1.marks_total",
+      "depends_on": {
+       "field": "year",
+       "values": [
+        "year_2"
+       ],
+       "and": {
+        "field": "status",
+        "values": [
+         "current"
+        ],
+        "and": {
+         "field": "level",
+         "values": [
+          "intermediate"
+         ]
+        }
+       }
+      },
+      "required": false
+     },
+     {
+      "name": "part2MarksObtained",
+      "at_most": "part2MarksTotal",
+      "prompt": "How many marks did you get in Part II?",
+      "input": "number",
+      "minimum": 0,
+      "maximum": 9999,
+      "record_field": "result.part2.marks_obtained",
+      "depends_on": {
+       "field": "status",
+       "values": [
+        "completed"
+       ],
+       "and": {
+        "field": "level",
+        "values": [
+         "intermediate"
+        ]
+       }
+      },
+      "required": false
+     },
+     {
+      "name": "part2MarksTotal",
+      "prompt": "Part II is out of how many?",
+      "input": "number",
+      "minimum": 1,
+      "maximum": 9999,
+      "record_field": "result.part2.marks_total",
+      "depends_on": {
+       "field": "status",
+       "values": [
+        "completed"
+       ],
+       "and": {
+        "field": "level",
+        "values": [
+         "intermediate"
+        ]
+       }
+      },
+      "required": false
+     },
+     {
       "name": "grades",
       "prompt": "Which grades did you get?",
       "input": "text",
@@ -3768,6 +3909,97 @@
    "identity": [
     "text"
    ]
+  },
+  {
+   "key": "field_order",
+   "label": "Field order",
+   "storage": "item",
+   "shown_on": "details",
+   "section": "education",
+   "inputs": [
+    "chat",
+    "details"
+   ],
+   "sensitivity": "normal",
+   "conflict": "latest_wins",
+   "freshness_days": 180,
+   "version": 1,
+   "schema": {
+    "type": "object",
+    "properties": {
+     "fields": {
+      "type": "array",
+      "maxItems": 30,
+      "items": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 80
+      }
+     }
+    },
+    "required": [
+     "fields"
+    ],
+    "additionalProperties": false
+   },
+   "identity": []
+  },
+  {
+   "key": "place_preference",
+   "label": "Place preference",
+   "storage": "item",
+   "shown_on": "details",
+   "section": "money_and_place",
+   "inputs": [
+    "chat",
+    "details"
+   ],
+   "sensitivity": "normal",
+   "conflict": "latest_wins",
+   "freshness_days": 180,
+   "version": 1,
+   "schema": {
+    "type": "object",
+    "properties": {
+     "scope": {
+      "type": "string",
+      "enum": [
+       "local",
+       "abroad",
+       "either"
+      ]
+     },
+     "fallback": {
+      "type": "string",
+      "enum": [
+       "none",
+       "local_first",
+       "abroad_first"
+      ]
+     },
+     "regions": {
+      "type": "array",
+      "maxItems": 10,
+      "items": {
+       "type": "string",
+       "enum": [
+        "punjab",
+        "sindh",
+        "kpk",
+        "balochistan",
+        "islamabad",
+        "gilgit_baltistan",
+        "ajk"
+       ]
+      }
+     }
+    },
+    "required": [
+     "scope"
+    ],
+    "additionalProperties": false
+   },
+   "identity": []
   }
  ]
 }

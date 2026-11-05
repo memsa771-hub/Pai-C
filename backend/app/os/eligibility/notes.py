@@ -15,14 +15,30 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from app.os import models
 from app.os.documents.store import ProfileStore
 from app.os.eligibility.evaluate import Card, evaluate
+from app.os.eligibility.facts import current_types, held_types, profile_from_facts
 from app.os.eligibility.swaps import suggest
 from app.os.knowledge.requests import visible_programmes
+from app.os.ports import student_facts
 
 P, SEEN, NOTES = models.plans, models.eligibility_seen, models.eligibility_notes
 
 
 def profile_of(plans, student_ref: str) -> dict:
-    return {v["key"]: v["value"] for v in ProfileStore(plans.engine, plans.kernel.tenant_id).all(student_ref)}
+    """The `<doc_type>.<field>` profile the evaluator reads. With the host's StudentFacts adapter on, it comes from
+    the student's facts; otherwise it is exactly the student's `os_profile_values`."""
+    engine, tenant = plans.engine, plans.kernel.tenant_id
+    own = {v["key"]: v["value"] for v in ProfileStore(engine, tenant).all(student_ref)}
+    facts = student_facts.host_facts(student_ref, engine=engine, tenant_id=tenant)
+    if facts is None:
+        return own
+    types = current_types()
+    # interim: removed by T7. The overlay works per document type: a type the Vault speaks about at all (any of its
+    # mapped keys, even an unknown one) takes nothing from os_profile_values, so its fields never mix sources and an
+    # unknown stays "needs input". A type the Vault does not hold (e.g. a minimum-pass letter) still comes from
+    # os_profile_values until T7 sends those values to the Vault.
+    held = held_types(facts, types)
+    overlay = {k: v for k, v in own.items() if k.split(".", 1)[0] not in held}
+    return {**overlay, **profile_from_facts(facts, types)}
 
 
 def programme_cards(plans, rules, refs: list[str], year: int, profile: dict) -> dict[str, tuple[Card, int]]:
@@ -78,10 +94,12 @@ def _record(plans, student_ref: str, plan_id: int, card: Card, suggestions) -> b
     return True
 
 
-def _check_plan(plans, student_ref: str, plan_id: int, only: str | None = None) -> int:
+def refresh(plans, student_ref: str, plan_id: int, only: str | None = None) -> tuple[int, dict[str, Card]]:
+    """Re-evaluates the plan's chosen programmes with its pinned rules and writes a note for each verdict that changed.
+    Returns (notes written, each programme's card); no cards without rules."""
     contract, book = _plan(plans, plan_id)
     if book.eligibility is None:
-        return 0
+        return 0, {}
     rules, year = book.eligibility, contract.target_intake.year
     chosen = [p.programme_ref for p in contract.programmes]
     profile = profile_of(plans, student_ref)
@@ -96,7 +114,12 @@ def _check_plan(plans, student_ref: str, plan_id: int, only: str | None = None) 
             return [s.programme_ref for s in suggest(card, list(cands.values()), set(chosen))]
         return make
 
-    return sum(_record(plans, student_ref, plan_id, card, suggestions_for(card)) for card, _ in mine.values())
+    written = sum(_record(plans, student_ref, plan_id, card, suggestions_for(card)) for card, _ in mine.values())
+    return written, {ref: card for ref, (card, _) in mine.items()}
+
+
+def _check_plan(plans, student_ref: str, plan_id: int, only: str | None = None) -> int:
+    return refresh(plans, student_ref, plan_id, only)[0]
 
 
 def _plans_of(plans, *, student_ref: str | None = None, intake_year: int | None = None) -> list[tuple[int, str, dict]]:

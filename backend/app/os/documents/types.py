@@ -11,6 +11,8 @@ from typing import Any, Literal
 import yaml
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, create_model, model_validator
 
+from app.os.contracts.student_facts import FACT_KEY
+
 TYPES_DIR = Path(__file__).parent / "types"
 
 GenericType = Literal["text", "name", "date", "number", "grade", "band", "code", "mrz_line", "enum"]
@@ -35,6 +37,8 @@ class FieldSpec(_Model):
     pattern: str | None = None  # `code`: the value must match
     values: list[str] = []  # `enum`: the allowed values
     cross_check: CrossCheck | None = None
+    # P1-T4: the StudentFacts key this field's value is read from (data; the startup check is this pattern)
+    fact: str | None = Field(None, pattern=FACT_KEY)
 
     @model_validator(mode="after")
     def _type_needs(self) -> "FieldSpec":

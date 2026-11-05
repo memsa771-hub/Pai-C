@@ -24,6 +24,9 @@ REASONS = {
     "failed": "A step failed twice: a person will look at it.",
     "upgrade": "There is a newer version of your route's guide.",
     "review": "The file you approved changed: please approve it again.",
+    "fact_below": "Your updated details no longer meet this programme's requirements.",
+    "fact_all_below": "The student's facts no longer meet any place on this plan; the Counsellor decides with the "
+                      "student.",
 }
 MESSAGE = "Please do this soon so your plan stays on time."
 CLOSED = ("done", "cancelled", "skipped")
@@ -38,6 +41,7 @@ class PlanState:
     tasks: dict[str, TaskRow]
     suggestions: dict[str, list[str]] = field(default_factory=dict)  # programme -> close matches (Slice 4 swaps)
     playbook_version: int = 1
+    below: tuple[str, ...] = ()  # programmes whose eligibility now reads likely_below (set for student_fact_changed)
 
 
 @dataclass(frozen=True)
@@ -122,4 +126,11 @@ def rules_for(event: Event, state: PlanState, cfg: ReplanConfig) -> list[Op] | H
     if event.type == "approved_changed":
         return [AddTask(template_key=p["template_key"], programme_ref=p.get("programme_ref"),
                         reason=REASONS["review"])]
+    if event.type == "student_fact_changed":
+        # D-o: a programme that no longer fits is proposed for removal (big: the student accepts). Plan-level breaks
+        # (an excluded field, a place preference) only refresh the eligibility note; the choice request is T6.
+        gone = [ref for ref in state.programmes if ref in state.below]
+        if gone and len(state.programmes) - len(gone) < cfg.min_programmes:
+            return [Escalate(reason=REASONS["fact_all_below"])]  # R-22: never leave fewer than the minimum
+        return [CancelProgramme(programme_ref=ref, reason=REASONS["fact_below"]) for ref in gone]
     return Handover(f"no rule for '{event.type}'")

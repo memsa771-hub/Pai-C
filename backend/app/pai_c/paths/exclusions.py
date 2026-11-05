@@ -93,6 +93,70 @@ def apply_exclusions(db, workspace_id: str, excluded: dict[str, dict] | None = N
     return changed
 
 
+def field_label(key: str | None) -> str | None:
+    """The catalog's study_fields label for a path's field key, when the
+    Vault can read it back as that same key (code, label or synonym);
+    otherwise None."""
+    if not key:
+        return None
+    catalog = vault_catalog()
+    label = catalog.label("study_fields", key)
+    return label if catalog.choice_code("study_fields", label) == key else None
+
+
+def _put(db, row, text: str, status: str) -> bool:
+    accepted = MemoryService(db).put_option(row.workspace_id, text, status,
+                                            {"capture": "paths_button", "possibility_id": row.id})
+    if not accepted:
+        logger.error("paths_button_option_rejected workspace_id=%s possibility_id=%s status=%s",
+                     row.workspace_id, row.id, status)
+    return accepted
+
+
+def record_button_exclusion(db, row: PaiPossibility) -> bool:
+    """The student pressed "dismiss" on a path: the Vault learns the field is
+    ruled out, so the exclusion has one source (R-78). Call after the
+    transition and before the commit. The path is already dismissed, so the
+    reconciler hook only stamps it with the new option (no second transition,
+    no "I removed it" notice), and the `paths_button` capture keeps the hooks
+    from queueing a path run or a Mirror job. A path without a study-field key
+    the catalog knows (the student's own typed path) has no field to exclude:
+    it stays status-only, as before. Returns whether a Vault option was written."""
+    label = field_label((row.study_field or {}).get("key"))
+    if label is None:
+        return False
+    return _put(db, row, label, "ruled_out")
+
+
+def record_restore(db, row: PaiPossibility) -> bool:
+    """The student brings a dismissed path back: every ruled-out option that
+    names its field becomes `considering`, so the Vault no longer excludes it
+    and the next analysis keeps the path. Nothing is written when the Vault
+    does not exclude the field (a path dismissed by hand before this
+    existed). Call before the restoring action, so a failure leaves both
+    untouched or both done."""
+    key = (row.study_field or {}).get("key")
+    if not key:
+        return False
+    catalog = vault_catalog()
+    texts = [o["text"] for o in MemoryService(db).ruled_out_options(row.workspace_id)
+             if catalog.choice_code("study_fields", o["text"]) == key]
+    written = [_put(db, row, text, "considering") for text in dict.fromkeys(texts)]
+    return bool(written) and all(written)
+
+
+def withheld_ids(db, workspace_id: str, rows) -> set[str]:
+    """Ids of open paths the Vault excludes that the projection has not
+    dismissed yet (the Vault write landed, the hook has not run or failed).
+    A path the student restored against that same option is not withheld."""
+    excluded = excluded_fields(db, workspace_id)
+    if not excluded:
+        return set()
+    return {row.id for row in rows
+            if row.status in _OPEN and (option := excluded.get((row.study_field or {}).get("key")))
+            and not _restored(row, option)}
+
+
 def hidden_field_keys(db, workspace_id: str, rows, excluded: dict[str, dict] | None = None) -> set[str]:
     """Fields the analyzer must not offer: every excluded field, except one
     whose path the student kept or restored (it stays theirs to reassess)."""

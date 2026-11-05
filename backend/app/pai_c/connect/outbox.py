@@ -1,6 +1,8 @@
 """The hand-off outbox (rule D-a/R-79): a decision version's export is queued in the same DB session as the decision,
 so both commit or neither does. Delivery is another task's job."""
 
+from datetime import datetime, timezone
+
 from sqlalchemy import select
 
 from app.models import OsOutbox, RouteDecision
@@ -55,3 +57,20 @@ def pending_for(db, workspace_id: str | None = None) -> list[OsOutbox]:
     if workspace_id is not None:
         query = query.where(OsOutbox.workspace_id == workspace_id)
     return list(db.scalars(query.order_by(OsOutbox.created_at, OsOutbox.key)))
+
+
+def record_vault_event(db, workspace_id: str, version: int, keys: list[str]) -> OsOutbox | None:
+    """Queues a Vault event (keys only, never values) for PAI OS. Nothing happens unless CONNECT_STUDENT_FACTS and the
+    OS counsellor module are on. No commit: the Vault write's transaction carries it."""
+    if not part_on("CONNECT_STUDENT_FACTS"):
+        return None
+    key = f"vault_event:{workspace_id}:{version}"
+    existing = db.scalar(select(OsOutbox).where(OsOutbox.key == key))
+    if existing is not None:
+        return existing
+    item = OsOutbox(workspace_id=workspace_id, kind="vault_event", key=key, status="pending", payload={
+        "schema": "pai.vault_event.v1", "key": key, "student_ref": str(workspace_id), "vault_version": version,
+        "kind": "student_fact_changed", "keys": sorted(keys), "at": datetime.now(timezone.utc).isoformat()})
+    db.add(item)
+    db.flush()
+    return item

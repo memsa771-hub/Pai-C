@@ -567,3 +567,42 @@ def test_conflict_cards_say_where_each_side_came_from():
         # Never the student's words, on any card or side.
         text = json.dumps(list(cards.values()), default=str)
         assert "SECRET-QUOTE" not in text and "quote" not in text
+
+
+# -- P1-T4 task 2: field order and place preference are shown in words ---------
+
+@pytest.mark.req("R-16")
+def test_field_order_and_place_preference_read_as_words_in_their_sections():
+    with VaultSession() as student, student.factory() as db:
+        ws = student.workspace_id
+        _item(db, ws, "field_order", {"fields": ["computer science", "mbbs", "doctor banna"]})
+        _item(db, ws, "place_preference", {"scope": "either", "fallback": "local_first", "regions": ["punjab", "kpk"]})
+        db.commit()
+        view = VaultView(db).build(ws)
+        order, place = _entry(view, "field_order"), _entry(view, "place_preference")
+        assert order in view["details"]["education"]["entries"]
+        assert place in view["details"]["money_and_place"]["entries"]
+        assert order["display"] == "Computer Science, MBBS (Medicine), Doctor banna"
+        assert place["display"] == "Either, Local first, Punjab, Khyber Pakhtunkhwa"
+        for entry in (order, place):
+            assert entry["badge"] == "Stated" and entry["kind"] == "item"
+            assert "_" not in entry["display"]  # no raw codes
+        assert {t.key for t in vault_catalog().types(shown_on="details", storage="item")} >= {
+            "field_order", "place_preference"}
+
+
+@pytest.mark.req("R-80")
+def test_part_marks_show_beside_the_total_on_a_result_card():
+    with VaultSession() as student, student.factory() as db:
+        ws = student.workspace_id
+        StudentRecordService(db).apply(
+            ws, "education", {"qualification_name": "fsc", "academic_status": "completed", "result": {
+                "marks_obtained": 880, "marks_total": 1100,
+                "part1": {"marks_obtained": 400, "marks_total": 550},
+                "part2": {"marks_obtained": 480, "marks_total": 550}}},
+            source_type="user_explicit", claim_origin="student", capture_method="onboarding",
+            evidence={"quote": "Part one 400/550"})
+        db.commit()
+        text = _entry(VaultView(db).build(ws), "education")["display"]
+        assert "880/1100 (80%)" in text
+        assert "Part I 400/550" in text and "Part II 480/550" in text
