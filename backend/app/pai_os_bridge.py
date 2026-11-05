@@ -1,103 +1,105 @@
 """The glue between the Counsellor (PAI C) and PAI OS (PAI OS Slice 8 spec §2.7). Host code: the only file that
 touches both products. Shared with the Counsellor team, who review every change.
 
-- `decision_changed(workspace_id)`: the Counsellor calls it after a student's choice; the student's current
-  decision record export goes to PAI OS (stored there; the OS worker plans it while its `counsellor` module is on).
-- `sweep_once(db)`, every 5 minutes in the API process (`start_sweep`): decisions chosen since the last mark are
-  submitted again (a lost nudge never loses a choice), then route problems PAI OS raised are handed to the
+- `deliver_pending(db, workspace_id)`: the roadmap router calls it right after a choice or withdrawal commits; the
+  pending decision outbox rows go to PAI OS (stored there; the OS worker plans them while its `counsellor` module is on).
+- `sweep_once(db)`, every 5 minutes in the API process (`start_sweep`): delivers what is still pending, queues the newest
+  decision of a student PAI OS is behind on (version compare), then hands route problems PAI OS raised to the
   Counsellor's escalation code.
-- PAI OS never reads Counsellor tables: this file reads the decision records and the Counsellor's export function,
-  and hands PAI OS the export. When PAI OS is not mounted, every function does nothing.
+- PAI OS never reads Counsellor tables: this file reads the outbox and hands PAI OS the export. When PAI OS is not mounted, every function does nothing.
 - `recipient_email(student_ref)` (PAI OS Slice 9b): the email a student signed up with, for PAI OS's reminders. The
   API gets it through `mount_os(recipient_lookup=)`, the worker through `OS_RECIPIENT_LOOKUP=app.pai_os_bridge:
   recipient_email`.
 """
 
 import asyncio
-import importlib
 import logging
 import uuid
 from datetime import datetime, timezone
 
 from fastapi import HTTPException
 from pydantic import ValidationError
-from sqlalchemy import select
+from sqlalchemy import and_, func, select
 
 from app.config import config
 # Merge pai-c + pai-os: pai-c replaced the old decision-record table (migration 119) with `RouteDecision`
 # (`pai_route_decisions`), which has the same id / workspace_id / chosen_at the sweep reads.
-from app.models import RouteDecision, User, Workspace
+from app.models import OsOutbox, RouteDecision, User, Workspace
 from app.os import ports
 from app.os.ports import escalation as os_escalation
+from app.os.contracts.decision_record_v2 import DecisionRecordV2
 from app.os.ports import plan_source
+from app.pai_c.connect import outbox
+from app.pai_c.connect.flags import part_on
 
 log = logging.getLogger("app.pai_os_bridge")
 SWEEP_SECONDS = 300
-EXPORT_MODULE = "app.pai_c.os_export"  # built by the Counsellor team (hand-over doc); until then: no export
 # The Counsellor's escalation endpoint takes three reasons today; the hand-over asks for the five shared ones. Until
 # then the other three go as `route_not_possible`, with the fixed note saying which it is.
 _TODAY = {"blocking_gap": "blocking_gap", "all_rejected": "all_rejected"}
 REFUSED = {404, 409, 422}
 
 
-def current_export(db, workspace_id: str) -> dict | None:
-    """The student's current decision record export (`pai.decision_record.v1`), or None: "not ready for PAI OS"."""
-    try:
-        module = importlib.import_module(EXPORT_MODULE)
-    except ModuleNotFoundError:
-        return None
-    return module.decision_record_v1(db, workspace_id)
-
-
-def decision_changed(workspace_id: str, db=None) -> str | None:
-    """Hands the student's current export to PAI OS: `stored`, `duplicate` or `module_off`; None when there is no
-    export yet or PAI OS is not mounted."""
-    if db is None:
-        from app.database import SessionLocal
-
-        with SessionLocal() as session:
-            return decision_changed(workspace_id, session)
-    try:
-        export = current_export(db, workspace_id)
-        if export is None:
-            return None
-        return plan_source.submit_counsellor_decision(export)
-    except ports.OsUnavailable:
-        return None
-    except Exception:  # noqa: BLE001  (a bad export is logged; the sweep tries again, never the Counsellor's request)
-        log.exception("PAI OS could not take the decision export of workspace %s", workspace_id)
-        return None
-
-
-def _aware(at: datetime) -> datetime:
-    return at if at.tzinfo else at.replace(tzinfo=timezone.utc)
-
-
-def _submit_since_mark(db) -> tuple[int, int]:
-    """(submitted, failed). Only while the `counsellor` module is on (S8-D2): while it is off the mark stays, so
-    switching on submits from there. One export that fails is logged and never stops the others."""
-    if not plan_source.counsellor_enabled():
-        return 0, 0
-    mark = plan_source.sweep_mark()
-    after = (datetime.fromisoformat(mark["chosen_at"]), mark["decision_id"]) if mark else None
-    rows = db.execute(select(RouteDecision.id, RouteDecision.workspace_id, RouteDecision.chosen_at)
-                      .order_by(RouteDecision.chosen_at, RouteDecision.id)).all()
-    rows = [r for r in rows if after is None or (_aware(r.chosen_at), r.id) > after]
-    submitted = failed = 0
-    for workspace_id in dict.fromkeys(r.workspace_id for r in rows):  # each student once, oldest change first
+def deliver_pending(db, workspace_id: str | None = None) -> dict:
+    """Sends the pending `decision` outbox rows to PAI OS, oldest first, and commits its own status changes. An invalid
+    payload is `not_sent` (`invalid_export`); `duplicate` and `module_off` count as delivered (the OS holds it). When
+    PAI OS is not mounted the rows stay pending and the loop stops; any other error counts an attempt and goes on."""
+    got = {"delivered": 0, "failed": 0, "not_sent": 0}
+    if not part_on("CONNECT_HANDOFF"):
+        return got
+    for item in [i for i in outbox.pending_for(db, workspace_id) if i.kind == "decision"]:
+        item_id = item.id
         try:
-            export = current_export(db, workspace_id)
-            if export is not None:
-                plan_source.submit_counsellor_decision(export)
-                submitted += 1
-        except Exception:  # noqa: BLE001  (logged; the Counsellor fixes the export and the next choice re-submits)
+            DecisionRecordV2.model_validate(item.payload)
+        except ValidationError:
+            item.status, item.last_error = "not_sent", "invalid_export"
+            db.commit()
+            got["not_sent"] += 1
+            continue
+        try:
+            plan_source.submit_decision(item.payload)
+        except ports.OsUnavailable:
+            break
+        except Exception as exc:  # noqa: BLE001  (a code is kept, never the message; the sweep tries again)
             db.rollback()
-            log.exception("PAI OS could not take the decision export of workspace %s", workspace_id)
-            failed += 1
-    if rows:
-        last = max(rows, key=lambda r: (_aware(r.chosen_at), r.id))
-        plan_source.set_sweep_mark({"chosen_at": _aware(last.chosen_at).isoformat(), "decision_id": last.id})
-    return submitted, failed
+            log.exception("PAI OS could not take outbox row %s", item_id)
+            item = db.get(OsOutbox, item_id)
+            item.attempts += 1
+            item.last_error = type(exc).__name__
+            db.commit()
+            got["failed"] += 1
+            continue
+        item.status, item.last_error, item.delivered_at = "delivered", None, datetime.now(timezone.utc)
+        db.commit()
+        got["delivered"] += 1
+    return got
+
+
+def _backfill(db) -> None:
+    """A student whose newest decision version is above the one PAI OS holds, and whose newest row has no outbox row
+    (the decision was made while the part was off), gets that row now; a delivered row the OS lacks goes back to pending. Only the newest version is queued."""
+    newest = (select(RouteDecision.workspace_id, func.max(RouteDecision.decision_version).label("version"))
+              .group_by(RouteDecision.workspace_id).subquery())
+    rows = db.scalars(select(RouteDecision).join(newest, and_(
+        RouteDecision.workspace_id == newest.c.workspace_id,
+        RouteDecision.decision_version == newest.c.version))).all()
+    for row in rows:
+        try:
+            held = plan_source.latest_version(row.workspace_id)
+            if held is not None and held >= row.decision_version:
+                continue
+            key = f"decision:{row.workspace_id}:{row.decision_version}"
+            item = db.scalar(select(OsOutbox).where(OsOutbox.key == key))
+            if item is None:
+                outbox.record(db, row)
+            elif item.status == "delivered":  # the OS is behind a version we sent: send it again (attempts untouched)
+                item.status, item.delivered_at = "pending", None
+            else:
+                continue
+            db.commit()
+        except Exception as exc:  # noqa: BLE001  (one student never stops the others; class name only, no student data)
+            db.rollback()
+            log.error("PAI OS backfill failed for one student: %s", type(exc).__name__)
 
 
 def _deliver(db) -> dict:
@@ -134,13 +136,19 @@ def sweep_once(db) -> dict:
         ports.services()
     except ports.OsUnavailable:
         return {"mounted": False}
+    delivered = failed = 0
     try:
-        submitted, failed = _submit_since_mark(db)
-    except Exception:  # noqa: BLE001  (logged; delivery still runs, and the next sweep tries again from the mark)
+        if part_on("CONNECT_HANDOFF"):
+            first = deliver_pending(db)
+            _backfill(db)
+            second = deliver_pending(db)
+            delivered = first["delivered"] + second["delivered"]
+            failed = first["failed"] + second["failed"]
+    except Exception:  # noqa: BLE001  (logged; escalations still go out, and the next sweep tries again)
         db.rollback()
-        log.exception("PAI OS sweep could not submit decisions")
-        submitted, failed = 0, 1
-    return {"submitted": submitted, "failed": failed, **_deliver(db)}
+        log.exception("PAI OS sweep could not deliver decisions")
+        failed += 1
+    return {"submitted": delivered, "failed": failed, **_deliver(db)}
 
 
 def _sweep_with_session() -> dict:
@@ -188,4 +196,15 @@ def counsellor_module_on() -> bool:
         return False
     except Exception:
         log.exception("counsellor module switch could not be read; treated as off")
+        return False
+
+
+def route_supported(origin: str, destination: str, level: str) -> bool:
+    """True when PAI OS has a playbook for the route. False when PAI OS is not mounted, and on any failure (logged)."""
+    try:
+        return bool(plan_source.supports(origin, destination, level))
+    except ports.OsUnavailable:
+        return False
+    except Exception:
+        log.exception("route support could not be read; treated as not supported")
         return False

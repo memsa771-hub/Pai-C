@@ -39,7 +39,7 @@ def test_student_export_is_scoped_readonly_and_excludes_private_data():
         db.add(FileRecord(workspace_id=student.workspace_id,filename='record.pdf',size=10,storage_key='private-storage-key',uploaded_by='human:student'))
         from app.models import RouteDecision
         db.add(RouteDecision(workspace_id=student.workspace_id,field_key='computer_science',title='Computer Science',
-            verdict={'status':'open'},route={'needs':[]},steps=[{'key':'step_apply'}],steps_done=[True]))
+            verdict={'status':'open'},route={'needs':[]},steps=[{'key':'step_apply'}],steps_done=[True],decision_version=1))
         db.commit()
         with patch.object(db,'commit',side_effect=AssertionError('read-only')):
             result=export_student_data(db,student.workspace_id)

@@ -9,6 +9,7 @@ from typing import Literal
 from app.os import ports
 from app.os.adapters.counsellor import manifest
 from app.os.adapters.counsellor.store import IntakeStore, SweepStore
+from app.os.playbooks import PlaybookError, select_playbook
 
 _NEEDED = ("decision_id", "journey_id", "student_ref", "chosen_at")
 
@@ -31,6 +32,32 @@ def submit_counsellor_decision(export: dict) -> Literal["stored", "duplicate", "
     if not manifest.is_enabled(svc.engine, tenant):
         return "module_off"
     return "stored" if stored else "duplicate"
+
+
+def submit_decision(export: dict) -> Literal["stored", "duplicate", "module_off"]:
+    """Like `submit_counsellor_decision` for a v2 export: it also needs `decision_version` and `status`, and stores
+    them. Each version is a row of its own; the worker applies only versions newer than the newest applied."""
+    missing = [k for k in ("decision_version", "status") if not export.get(k)]
+    if missing:
+        raise ValueError(f"export lacks {', '.join(missing)}")
+    return submit_counsellor_decision(export)
+
+
+def latest_version(student_ref: str) -> int | None:
+    """The highest decision version stored for the student (None when none is)."""
+    svc = ports.services()
+    return IntakeStore(svc.engine, svc.settings.tenant_id).latest_version(student_ref)
+
+
+def supports(origin: str, destination: str, level: str) -> bool:
+    """Whether a playbook exists for the route. `intermediate` is false until a later task takes the v2 contract (D-b)."""
+    if level == "intermediate":
+        return False
+    try:
+        select_playbook(ports.services().plans.playbooks, origin, destination, level)
+    except PlaybookError:
+        return False
+    return True
 
 
 def counsellor_enabled() -> bool:
