@@ -62,7 +62,8 @@ export function Roadmap({ onNavigate, onChat, onChanged }: {
     setPicked((list) => (on ? (list.length < max && !list.includes(id) ? [...list, id] : list) : list.filter((x) => x !== id)));
   const choose = async (card: FieldCard) => {
     // Hand-off on: the choice screens (places, intake, consent). Off: today's one-click choose.
-    const options = await workspaceApi.choiceOptions(card.field_key!);
+    // If the options cannot be read, fall back to today's one-click choose rather than block it.
+    const options: ChoiceOptions = await workspaceApi.choiceOptions(card.field_key!).catch(() => ({ handoff: false }));
     if (options.handoff) { setSheet(null); setFlow({ card, options }); return; }
     await workspaceApi.chooseRoute(card.field_key!);
     setSheet(null);

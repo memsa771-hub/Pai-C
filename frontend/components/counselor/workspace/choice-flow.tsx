@@ -46,12 +46,14 @@ export function ChoiceFlow({ card, options, onSaved, onClose, onOpenVault }: {
     [selected, setSelected] = useState<string[]>([]),
     [places, setPlaces] = useState<PlacesState>({ status: "loading", list: [] }),
     [dob, setDob] = useState(""), [agreed, setAgreed] = useState(false), [email, setEmail] = useState(""),
-    [serverMinor, setServerMinor] = useState(false),
+    [serverMinor, setServerMinor] = useState(false), [resent, setResent] = useState(false),
+    [moved, setMoved] = useState<{ ref: string; dir: "up" | "down" } | null>(null),
     [errors, setErrors] = useState<Errors>({}), [formError, setFormError] = useState(""), [vaultNote, setVaultNote] = useState(false),
     [busy, setBusy] = useState(false), [saved, setSaved] = useState<ChooseAnswer | null>(null),
     [focus, setFocus] = useState<{ field: string; n: number } | null>(null), [retry, setRetry] = useState(0);
   const body = useRef<HTMLDivElement>(null);
 
+  const termOk = (options.intake_terms[destination] ?? []).includes(term);
   const chosen = options.destinations.find((d) => d.code === destination);
   const minorByDob = options.needs_dob && dob !== "" && (ageOf(dob) ?? 99) < 18;
   const guardianNeeded = options.under_18 === true || minorByDob || serverMinor;
@@ -60,6 +62,12 @@ export function ChoiceFlow({ card, options, onSaved, onClose, onOpenVault }: {
   const step = ids[Math.min(index, ids.length - 1)];
   const last = index >= ids.length - 1;
 
+  const headingRef = useRef<HTMLHeadingElement>(null), firstRender = useRef(true);
+  // Next and Back move focus to the new step's heading (declared before the error focus so an error still wins).
+  useEffect(() => {
+    if (firstRender.current) { firstRender.current = false; return; }
+    headingRef.current?.focus();
+  }, [index]);
   useEffect(() => {
     if (!focus) return;
     const el = body.current?.querySelector<HTMLElement>(`[data-field="${focus.field}"]`);
@@ -68,14 +76,14 @@ export function ChoiceFlow({ card, options, onSaved, onClose, onOpenVault }: {
 
   // The places on offer depend on the country and the intake.
   useEffect(() => {
-    if (step !== "places" || !destination || !term || !year) return;
+    if (step !== "places" || !destination || !termOk || !year) return;
     let alive = true;
     setPlaces({ status: "loading", list: [] });
     workspaceApi.places(destination, options.level, term, Number(year))
       .then((r) => { if (alive) { setPlaces({ status: "ready", list: r.places }); setSelected((s) => s.filter((ref) => r.places.some((p) => p.ref === ref))); } })
       .catch(() => { if (alive) setPlaces({ status: "error", list: [] }); });
     return () => { alive = false; };
-  }, [step, destination, term, year, options.level, retry]);
+  }, [step, destination, term, termOk, year, options.level, retry]);
 
   const fail = (next: Errors) => {
     setErrors(next);
@@ -86,10 +94,10 @@ export function ChoiceFlow({ card, options, onSaved, onClose, onOpenVault }: {
 
   function check(id: StepId): boolean {
     if (id === "destination") return fail(destination ? {} : { destination: t.destination.required });
-    if (id === "intake") return fail({ ...(term ? {} : { term: t.intake.termRequired }), ...(year ? {} : { year: t.intake.yearRequired }) });
+    if (id === "intake") return fail({ ...(termOk ? {} : { term: t.intake.termRequired }), ...(year ? {} : { year: t.intake.yearRequired }) });
     if (id === "places") {
       const need = places.status === "ready" && !!chosen?.supported && places.list.length > 0 && selected.length === 0;
-      return fail(places.status === "loading" || places.status === "error" ? { places: t.places.error } : need ? { places: t.places.empty } : {});
+      return fail(places.status === "loading" ? { places: t.places.stillLoading } : places.status === "error" ? { places: t.places.error } : need ? { places: t.places.empty } : {});
     }
     if (id === "dob") return fail(dob ? {} : { dob: t.dob.required });
     if (id === "consent") return fail(agreed ? {} : { consent: t.consent.required });
@@ -110,7 +118,7 @@ export function ChoiceFlow({ card, options, onSaved, onClose, onOpenVault }: {
     };
     try {
       const answer = await workspaceApi.chooseRoute(card.field_key!, details);
-      await onSaved(answer);
+      try { await onSaved(answer); } catch { /* saved; the page refreshes on its next load */ }
       if (answer.guardian_email_sent === undefined) onClose(); else setSaved(answer);
     } catch (e) {
       const { status, detail } = apiError(e);
@@ -127,13 +135,23 @@ export function ChoiceFlow({ card, options, onSaved, onClose, onOpenVault }: {
     } finally { setBusy(false); }
   }
 
-  const move = (i: number, by: number) => setSelected((s) => {
+  // After a reorder the pressed button may be disabled (first or last): keep focus on a usable one.
+  useEffect(() => {
+    if (!moved) return;
+    const list = body.current;
+    const same = list?.querySelector<HTMLButtonElement>(`[data-move="${moved.ref}:${moved.dir}"]`);
+    const other = list?.querySelector<HTMLButtonElement>(`[data-move="${moved.ref}:${moved.dir === "up" ? "down" : "up"}"]`);
+    (same && !same.disabled ? same : other)?.focus();
+  }, [moved]);
+  const move = (i: number, by: number) => {
+    setMoved({ ref: selected[i], dir: by < 0 ? "up" : "down" });
+    setSelected((s) => {
     const to = i + by;
     if (to < 0 || to >= s.length) return s;
     const copyOf = [...s];
     [copyOf[i], copyOf[to]] = [copyOf[to], copyOf[i]];
     return copyOf;
-  });
+  }); };
   const toggle = useCallback((ref: string, on: boolean) =>
     setSelected((s) => (on ? (s.length < MAX_PLACES && !s.includes(ref) ? [...s, ref] : s) : s.filter((r) => r !== ref))), []);
   const nameOf = (ref: string) => places.list.find((p) => p.ref === ref)?.name ?? ref;
@@ -152,8 +170,8 @@ export function ChoiceFlow({ card, options, onSaved, onClose, onOpenVault }: {
             {sent
               ? <p role="status" className="flex items-center gap-2 text-sm font-medium"><Check aria-hidden className="size-4" />{t.done.sent}</p>
               : (<>
-                  <p role="alert" className="text-sm font-medium text-danger-ink">{t.done.notSent} {t.done.notSentAction}</p>
-                  <GuardianResend />
+                  {!resent && <p role="alert" className="text-sm font-medium text-danger-ink">{t.done.notSent} {t.done.notSentAction}</p>}
+                  <GuardianResend onSent={() => setResent(true)} />
                 </>)}
           </DialogBody>
           <DialogFooter className="flex-col items-stretch gap-2 px-7 pb-7 pt-3 max-lg:px-5 sm:flex-col sm:items-stretch">
@@ -181,7 +199,7 @@ export function ChoiceFlow({ card, options, onSaved, onClose, onOpenVault }: {
         </DialogHeader>
         <DialogBody className="px-7 py-3 max-lg:px-5">
           <div ref={body}>
-            <h3 data-testid="choice-step" className="mb-3 text-base font-semibold">
+            <h3 ref={headingRef} tabIndex={-1} data-testid="choice-step" className="mb-3 text-base font-semibold outline-none">
               {fill(t.stepOf, { n: index + 1, total: ids.length, name: stepName })}
             </h3>
 
@@ -193,7 +211,7 @@ export function ChoiceFlow({ card, options, onSaved, onClose, onOpenVault }: {
                     <label key={d.code} className={ROW}>
                       <input type="radio" name="choice-destination" value={d.code} checked={destination === d.code}
                         data-field={i === 0 ? "destination" : undefined} aria-invalid={errors.destination ? true : undefined}
-                        onChange={() => { setDestination(d.code); setSelected([]); setErrors({}); }} className="size-[18px] accent-[var(--brand)]" />
+                        onChange={() => { setDestination(d.code); setTerm(""); setSelected([]); setErrors({}); }} className="size-[18px] accent-[var(--brand)]" />
                       <span className="min-w-0">
                         <span className="block font-medium">{placeName(d.code, d.name)}</span>
                         <span className="block text-xs text-muted-foreground">{d.supported ? t.destination.supported : t.destination.unsupported}</span>
@@ -210,7 +228,7 @@ export function ChoiceFlow({ card, options, onSaved, onClose, onOpenVault }: {
                 <p className="text-sm text-muted-foreground">{t.intake.hint}</p>
                 <div>
                   <label htmlFor="choice-term" className="text-sm font-medium">{t.intake.term}</label>
-                  <select id="choice-term" data-field="term" value={term} className={cn(FIELD, "mt-1")}
+                  <select id="choice-term" data-field="term" value={termOk ? term : ""} className={cn(FIELD, "mt-1")}
                     aria-invalid={errors.term ? true : undefined} aria-describedby={errors.term ? "choice-term-error" : undefined}
                     onChange={(e) => { setTerm(e.target.value); setSelected([]); }}>
                     <option value="" />
@@ -265,8 +283,8 @@ export function ChoiceFlow({ card, options, onSaved, onClose, onOpenVault }: {
                       {selected.map((ref, i) => (
                         <li key={ref} className="flex min-w-0 items-center gap-2 rounded-2xl bg-muted/60 px-3 py-1.5">
                           <span className="min-w-0 flex-1 break-words text-sm font-medium">{fill(t.places.rank, { rank: i + 1, name: nameOf(ref) })}</span>
-                          <Button type="button" size="icon" variant="ghost" aria-label={fill(t.places.up, { name: nameOf(ref) })} disabled={i === 0} onClick={() => move(i, -1)}><ArrowUp aria-hidden /></Button>
-                          <Button type="button" size="icon" variant="ghost" aria-label={fill(t.places.down, { name: nameOf(ref) })} disabled={i === selected.length - 1} onClick={() => move(i, 1)}><ArrowDown aria-hidden /></Button>
+                          <Button type="button" size="icon" variant="ghost" data-move={`${ref}:up`} aria-label={fill(t.places.up, { name: nameOf(ref) })} disabled={i === 0} onClick={() => move(i, -1)}><ArrowUp aria-hidden /></Button>
+                          <Button type="button" size="icon" variant="ghost" data-move={`${ref}:down`} aria-label={fill(t.places.down, { name: nameOf(ref) })} disabled={i === selected.length - 1} onClick={() => move(i, 1)}><ArrowDown aria-hidden /></Button>
                           <Button type="button" size="icon" variant="ghost" aria-label={fill(t.places.remove, { name: nameOf(ref) })} onClick={() => toggle(ref, false)}><X aria-hidden /></Button>
                         </li>
                       ))}

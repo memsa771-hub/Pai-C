@@ -255,3 +255,77 @@ it("keeps the student on the step with a message when saving fails", async () =>
   expect(onSaved).not.toHaveBeenCalled();
   expect(heading()).toBe("Step 4 of 4: Consent");
 });
+
+// req: R-79
+it("clears the term when the country changes, so a stale term is never sent", async () => {
+  open();
+  pickCountry(DE); next();
+  pickIntake("winter", "2027");
+  fireEvent.click(screen.getByRole("button", { name: c.back }));
+  pickCountry(new RegExp(placeName("PK"))); next();
+  expect((screen.getByLabelText(c.intake.term) as HTMLSelectElement).value).toBe("");
+  next(); // the year is kept, the term is not
+  expect(screen.getByLabelText(c.intake.term).getAttribute("aria-invalid")).toBe("true");
+  expect(document.activeElement).toBe(screen.getByLabelText(c.intake.term));
+  fireEvent.change(screen.getByLabelText(c.intake.term), { target: { value: "fall" } });
+  next();
+  await screen.findByRole("checkbox", { name: "Alpha University" });
+  next(); // an unsupported country: places are optional
+  agree();
+  fireEvent.click(screen.getByRole("button", { name: c.submit }));
+  await waitFor(() => expect(workspaceApi.chooseRoute).toHaveBeenCalledTimes(1));
+  expect(vi.mocked(workspaceApi.chooseRoute).mock.calls[0][1]).toMatchObject({ destination: "PK", intake: { term: "fall", year: 2027 } });
+});
+
+// req: R-79
+it("says places are still loading, apart from places that did not load", async () => {
+  vi.mocked(workspaceApi.places).mockReturnValue(new Promise(() => {}));
+  open();
+  pickCountry(DE); next(); pickIntake(); next();
+  next();
+  expect(screen.getByText(c.places.stillLoading, { selector: "p[role=alert]" })).toBeTruthy();
+});
+
+// req: R-79
+it("shows the saved state, not 'did not save', when the page refresh fails after a good save", async () => {
+  onSaved.mockRejectedValueOnce(new Error("refresh failed"));
+  await toPlaces();
+  pickPlace("Alpha University"); next(); agree();
+  fireEvent.click(screen.getByRole("button", { name: c.submit }));
+  await waitFor(() => expect(onClose).toHaveBeenCalled());
+  expect(screen.queryByText(c.error)).toBeNull();
+  expect(workspaceApi.chooseRoute).toHaveBeenCalledTimes(1);
+});
+
+// req: R-10
+it("hides the not-sent alert once the resend works, and words a rejected address apart", async () => {
+  await toPlaces();
+  pickPlace("Alpha University"); next(); agree();
+  vi.mocked(workspaceApi.chooseRoute).mockResolvedValueOnce({ ...chosenRoute, choice: routeChoice({ consent: { student: "given", guardian: "missing" } }), guardian_email_sent: false });
+  fireEvent.click(screen.getByRole("button", { name: c.submit }));
+  await screen.findByText(new RegExp(c.done.notSent));
+  const field = () => screen.getByLabelText(c.consentState.resendLabel);
+  fireEvent.change(field(), { target: { value: "bad@example.com" } });
+  vi.mocked(workspaceApi.resendGuardian).mockRejectedValueOnce(new Error('API 422: {"detail":"x"}'));
+  fireEvent.click(screen.getByRole("button", { name: c.consentState.resendSend }));
+  await screen.findByText(c.consentState.resendRejected);
+  vi.mocked(workspaceApi.resendGuardian).mockResolvedValueOnce({ sent: true });
+  fireEvent.click(screen.getByRole("button", { name: c.consentState.resendSend }));
+  await screen.findByText(c.consentState.resendSent);
+  expect(screen.queryByText(new RegExp(c.done.notSent))).toBeNull();
+});
+
+// req: R-79
+it("moves focus to the step heading on Next and Back, and keeps it on a usable button after a reorder", async () => {
+  open();
+  pickCountry(DE); next();
+  expect(document.activeElement).toBe(screen.getByTestId("choice-step"));
+  fireEvent.click(screen.getByRole("button", { name: c.back }));
+  expect(document.activeElement).toBe(screen.getByTestId("choice-step"));
+  next(); pickIntake(); next();
+  await screen.findByRole("checkbox", { name: "Alpha University" });
+  pickPlace("Alpha University"); pickPlace("Beta Institute");
+  fireEvent.click(screen.getByRole("button", { name: "Move Beta Institute up" }));
+  // Beta is now first: its Up button is disabled, so focus is on its Down button.
+  await waitFor(() => expect(document.activeElement).toBe(screen.getByRole("button", { name: "Move Beta Institute down" })));
+});

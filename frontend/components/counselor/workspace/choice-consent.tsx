@@ -28,7 +28,7 @@ export function GuardianResend({ prompt, onSent }: { prompt?: string; onSent?: (
       onSent?.();
     } catch (e) {
       const { status } = apiError(e);
-      setError(status === 429 ? t.rate : status === 409 && apiError(e).detail ? apiError(e).detail : t.error);
+      setError(status === 429 ? t.rate : status === 422 ? t.resendRejected : status === 409 && apiError(e).detail ? apiError(e).detail : t.error);
     } finally { setBusy(false); }
   }
   return (

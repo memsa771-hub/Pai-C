@@ -785,7 +785,8 @@
         "down": "Move {name} down",
         "remove": "Remove {name}",
         "error": "Places did not load. Try again.",
-        "retry": "Try again"
+        "retry": "Try again",
+        "stillLoading": "Places are still loading. Wait a moment, then press Next."
       },
       "dob": {
         "label": "Your date of birth",
@@ -845,7 +846,8 @@
         "error": "This did not save. Try again.",
         "rate": "Too many emails. Try again later.",
         "textNotReady": "The consent text is not ready yet. Try again later.",
-        "notSupported": "PAI OS cannot plan this route yet."
+        "notSupported": "PAI OS cannot plan this route yet.",
+        "resendRejected": "That email address was not accepted. Check it and try again."
       }
     }
   },

@@ -425,3 +425,14 @@ it("keeps consent as it was and says so when withdrawing fails", async () => {
   expect((await within(panel).findByRole("alert")).textContent).toContain(cs.error);
   expect(within(panel).getByText(cs.studentGiven)).toBeTruthy();
 });
+
+// req: R-79
+it("still chooses in one click when the choice options cannot be read", async () => {
+  vi.mocked(workspaceApi.choiceOptions).mockRejectedValue(new Error("API 500: x"));
+  vi.mocked(workspaceApi.chooseRoute).mockResolvedValue(chosenRoute);
+  render(<Roadmap onNavigate={vi.fn()} />);
+  fireEvent.click(await screen.findByRole("button", { name: "See route for Electrical Engineering" }));
+  fireEvent.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Choose this route" }));
+  await waitFor(() => expect(workspaceApi.chooseRoute).toHaveBeenCalledTimes(1));
+  expect(vi.mocked(workspaceApi.chooseRoute).mock.calls[0]).toEqual(["electrical_engineering"]);
+});
