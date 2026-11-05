@@ -104,33 +104,45 @@ def field_label(key: str | None) -> str | None:
     return label if catalog.choice_code("study_fields", label) == key else None
 
 
+def _put(db, row, text: str, status: str) -> bool:
+    accepted = MemoryService(db).put_option(row.workspace_id, text, status,
+                                            {"capture": "paths_button", "possibility_id": row.id})
+    if not accepted:
+        logger.error("paths_button_option_rejected workspace_id=%s possibility_id=%s status=%s",
+                     row.workspace_id, row.id, status)
+    return accepted
+
+
 def record_button_exclusion(db, row: PaiPossibility) -> bool:
     """The student pressed "dismiss" on a path: the Vault learns the field is
     ruled out, so the exclusion has one source (R-78). Call after the
     transition and before the commit. The path is already dismissed, so the
     reconciler hook only stamps it with the new option (no second transition,
-    no "I removed it" notice). A path without a study-field key the catalog
-    knows (the student's own typed path) has no field to exclude: it stays
-    status-only, as before. Returns whether a Vault option was written."""
+    no "I removed it" notice), and the `paths_button` capture keeps the hooks
+    from queueing a path run or a Mirror job. A path without a study-field key
+    the catalog knows (the student's own typed path) has no field to exclude:
+    it stays status-only, as before. Returns whether a Vault option was written."""
     label = field_label((row.study_field or {}).get("key"))
     if label is None:
         return False
-    return MemoryService(db).put_option(row.workspace_id, label, "ruled_out",
-                                        {"capture": "paths_button", "possibility_id": row.id})
+    return _put(db, row, label, "ruled_out")
 
 
 def record_restore(db, row: PaiPossibility) -> bool:
-    """The student brought a dismissed path back: a ruled-out option for its
-    field becomes `considering`, so the Vault no longer excludes it and the
-    next analysis keeps the path. Nothing is written when the Vault does not
-    exclude the field (a path dismissed by hand before this existed). Call
-    after the transition and before the commit."""
+    """The student brings a dismissed path back: every ruled-out option that
+    names its field becomes `considering`, so the Vault no longer excludes it
+    and the next analysis keeps the path. Nothing is written when the Vault
+    does not exclude the field (a path dismissed by hand before this
+    existed). Call before the restoring action, so a failure leaves both
+    untouched or both done."""
     key = (row.study_field or {}).get("key")
-    option = excluded_fields(db, row.workspace_id).get(key) if key else None
-    if option is None:
+    if not key:
         return False
-    return MemoryService(db).put_option(row.workspace_id, option["text"], "considering",
-                                        {"capture": "paths_button", "possibility_id": row.id})
+    catalog = vault_catalog()
+    texts = [o["text"] for o in MemoryService(db).ruled_out_options(row.workspace_id)
+             if catalog.choice_code("study_fields", o["text"]) == key]
+    written = [_put(db, row, text, "considering") for text in dict.fromkeys(texts)]
+    return bool(written) and all(written)
 
 
 def withheld_ids(db, workspace_id: str, rows) -> set[str]:

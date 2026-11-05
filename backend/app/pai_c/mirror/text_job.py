@@ -78,6 +78,8 @@ def after_accept(db, candidate) -> None:
     savepoint and any failure (a database error, a bug or bad policy data) is
     logged by type and swallowed. The stage moves only through the one stage
     sync (journey_sync), which leaves a re-planning journey where it is."""
+    if (candidate.evidence or {}).get("capture") == "paths_button":
+        return  # a Paths-page press recorded in the Vault is not new Mirror evidence (R-78)
     try:
         if candidate.key not in mirror_types():
             return

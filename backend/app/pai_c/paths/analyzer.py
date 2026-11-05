@@ -487,6 +487,10 @@ def after_accept(db, candidate) -> None:
         except Exception as exc:  # noqa: BLE001  the Vault write outranks its read model
             logger.error("paths_exclusion_failed workspace_id=%s error_type=%s",
                          candidate.workspace_id, type(exc).__name__)
+    if (candidate.evidence or {}).get("capture") == "paths_button":
+        # A press on the Paths page already changed the path; the Vault write
+        # only records it (R-78). It must not queue a model-backed run.
+        return
     try:
         if candidate.key not in trigger_types():
             return

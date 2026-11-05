@@ -424,7 +424,9 @@ async def test_button_restore_makes_the_option_considering_and_analysis_keeps_th
         db.expire_all()
         items = db.scalars(select(VaultItem).where(VaultItem.workspace_id == student.workspace_id,
                                                    VaultItem.item_type == "option")).all()
-        assert [i.value["status"] for i in items if i.value["status"] == "considering"] == ["considering"]
+        assert sorted((i.value["text"], i.value["status"], i.status) for i in items) == sorted(
+            [(exclusions.field_label("pharm_d"), "ruled_out", "superseded"),
+             (exclusions.field_label("pharm_d"), "considering", "active")])
         assert exclusions.excluded_fields(db, student.workspace_id) == {}
         assert [r.id for r in PossibilityService(db).current(student.workspace_id)] == [row.id]
         assert [c["possibility_id"] for c in RoadmapEngine(db).build(student.workspace_id)["fields"]] == [row.id]
@@ -481,3 +483,62 @@ def test_a_path_without_a_study_field_key_stays_status_only():
         db.expire_all()
         assert db.get(PaiPossibility, row.id).status == "dismissed"
         assert db.scalars(select(VaultItem).where(VaultItem.item_type == "option")).all() == []
+
+
+@pytest.mark.req("R-78", "R-15")
+def test_button_press_queues_no_analysis_mirror_or_notice_job_but_chat_exclusion_does():
+    from app.main import app
+    from app.memory.candidates import MemoryCandidateService
+    from app.memory.reconciler import MemoryReconciler
+    with StudentSession() as student, student.factory() as db:
+        turn, journey = setup(student, db)
+        row = add_path(db, student, journey, "pharm_d")
+        before = {j.id for j in db.scalars(select(BackgroundJob).where(BackgroundJob.workspace_id == student.workspace_id))}
+        client = client_for(student)
+        try:
+            assert _button(client, student, row, "dismiss").status_code == 200
+            assert _button(client, student, row, "save").status_code == 200
+        finally:
+            app.dependency_overrides.clear()
+        db.expire_all()
+        new = [j.job_type for j in db.scalars(select(BackgroundJob).where(
+            BackgroundJob.workspace_id == student.workspace_id)) if j.id not in before]
+        watched = {"counselor.paths", "counselor.mirror_text", exclusions.JOB_PATHS_EXCLUDED}
+        assert watched.isdisjoint(new), new
+        candidate = MemoryCandidateService(db).propose(workspace_id=student.workspace_id, candidate_type="vault_item",
+            key="option", proposed_value={"text": "Pharm-D", "status": "ruled_out"}, confidence=0.9,
+            source_type="user_explicit", source_event_ids=[turn.source_event_id],
+            evidence={"quote": "Pharm-D nahi karni"}, allow_user_explicit=True)
+        assert MemoryReconciler(db).reconcile(candidate).accepted
+        db.commit()
+        jobs = [j.job_type for j in db.scalars(select(BackgroundJob).where(
+            BackgroundJob.workspace_id == student.workspace_id)) if j.id not in before]
+        assert "counselor.paths" in jobs
+
+
+@pytest.mark.req("R-78", "R-15")
+def test_restore_through_explore_flips_the_option_before_the_gateway_commits():
+    from app.main import app
+    with StudentSession() as student, student.factory() as db:
+        _, journey = setup(student, db)
+        row = add_path(db, student, journey, "pharm_d")
+        client = client_for(student)
+        seen = []
+
+        async def gateway(possibility_id, network, db_, *args):
+            # The research gateway commits: the restore must already be in it.
+            seen.append(sorted(o["status"] for o in [{"status": i.value["status"]} for i in db_.scalars(
+                select(VaultItem).where(VaultItem.item_type == "option", VaultItem.status == "active"))]))
+            PossibilityService(db_).transition(student.workspace_id, possibility_id, "explore")
+            db_.commit()
+
+        try:
+            assert _button(client, student, row, "dismiss").status_code == 200
+            with patch("app.routers.counselor_paths.explore", gateway):
+                assert _button(client, student, row, "explore").status_code == 200
+        finally:
+            app.dependency_overrides.clear()
+        db.expire_all()
+        assert seen == [["considering"]]
+        assert db.get(PaiPossibility, row.id).status == "exploring"
+        assert exclusions.excluded_fields(db, student.workspace_id) == {}
