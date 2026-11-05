@@ -180,7 +180,6 @@ def test_matric_student_is_offered_intermediate_routes_only():
                         "intake_terms": []}]
     with patch("app.pai_os_bridge.list_routes", return_value=routes), \
          patch.object(places, "_standing_level", return_value="matric"), \
-         patch.object(places, "_eligible_levels", return_value=None), \
          patch.object(places, "_vault_value", vault(targets=())), \
          patch.object(places, "_eligible_levels", return_value=["intermediate"]):
         got = places.choice_options(None, "w1", None, today=TODAY)

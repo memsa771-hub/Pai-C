@@ -129,6 +129,11 @@ class MemoryService:
                 "source_type": item.source_type, "updated_at": item.updated_at or item.observed_at})
         return cards
 
+    def vault_items(self, workspace_id, types):
+        """The student's active Vault items of the given types, oldest first (the one reader for connect code)."""
+        from app.memory.vault_items import VaultItemService
+        return VaultItemService(self.db).active(workspace_id, list(types))
+
     def ruled_out_options(self, workspace_id):
         """The options the student ruled out themselves (said, shown or
         confirmed; never PAI's guess), with their own words: the quote on the

@@ -161,3 +161,25 @@ def test_no_identity_or_guardian_key_and_no_budget_amount():
         assert "constraint.budget" in keys
         assert "250000" not in repr(built) and "2008" not in repr(built)
         assert facts_of(built)["constraint.budget"]["value"] == "1_3_lakh"
+
+
+def test_inferred_education_alone_gives_no_eligible_levels():
+    with StudentSession() as s, s.factory() as db:
+        education(db, s.workspace_id, FSC, source_type="document", evidence={"ocr": True, "file_id": "f9"})
+        assert build(db, s.workspace_id)["eligible_levels"] is None
+
+
+def test_current_record_beats_a_newer_completed_one_of_the_same_family():
+    with StudentSession() as s, s.factory() as db:
+        ws = s.workspace_id
+        education(db, ws, {"qualification_name": "fsc", "institution_name": "A", "academic_status": "current",
+                           "result": {"marks_obtained": 700}})
+        education(db, ws, {"qualification_name": "ics", "institution_name": "B", "academic_status": "completed",
+                           "result": {"marks_obtained": 900}})
+        assert facts_of(build(db, ws))["education.intermediate.marks_obtained"]["value"] == 700
+
+
+def test_unmapped_province_is_dropped():
+    with StudentSession() as s, s.factory() as db:
+        item(db, s.workspace_id, "domicile", {"province": "Atlantis"})
+        assert "constraint.domicile" not in facts_of(build(db, s.workspace_id))

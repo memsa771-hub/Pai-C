@@ -32,6 +32,11 @@ def _map() -> dict:
     return yaml.safe_load(_KEYS.read_text(encoding="utf-8"))
 
 
+def key_map() -> dict:
+    """The StudentFacts key map (student_facts_keys.yaml), read once."""
+    return _map()
+
+
 def _unwrap(value):
     if isinstance(value, dict) and set(value) == {"value"}:
         return value["value"]

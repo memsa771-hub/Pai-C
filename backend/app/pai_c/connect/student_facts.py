@@ -13,7 +13,7 @@ from pathlib import Path
 
 import yaml
 
-from app.pai_c.connect.vault_version import _map as _key_map
+from app.pai_c.connect.vault_version import key_map as _key_map
 
 _ELIGIBLE = Path(__file__).with_name("eligible_levels.yaml")
 _ORDER = {"unknown": 0, "inferred": 0, "stated": 1, "shown": 2, "confirmed": 3}
@@ -50,10 +50,11 @@ def _education_records(db, workspace_id: str) -> list[dict]:
 
 def eligible_levels(records: list[dict]) -> list[str] | None:
     """The levels the student's current education opens (the record they are finishing, else the highest completed);
-    None when there is no education or its level is unknown."""
+    None when there is no non-inferred education or its level is unknown."""
     from app.pai_c.paths.fields import current_education, read_education
 
-    current = current_education(records)
+    # An inferred record (PAI's reading, not yet the student's) opens nothing.
+    current = current_education([r for r in records if r.get("evidence_level") != "inferred"])
     if current is None:
         return None
     code = read_education(current)[0]
@@ -119,18 +120,13 @@ def _test_facts(out: _Facts, records: list[dict]) -> None:
 
 
 def _item_facts(out: _Facts, db, workspace_id: str) -> None:
-    from sqlalchemy import select
-
-    from app.models import VaultItem
-    from app.pai_c.memory import vault_catalog
+    from app.pai_c.memory import MemoryService, vault_catalog
     from app.pai_c.paths.exclusions import excluded_fields
 
     mapping = _key_map()["items"]
     catalog = vault_catalog()
     latest = {}
-    for row in db.scalars(select(VaultItem).where(
-            VaultItem.workspace_id == workspace_id, VaultItem.status == "active",
-            VaultItem.item_type.in_(["field_order", "place_preference", "domicile"])).order_by(VaultItem.created_at)):
+    for row in MemoryService(db).vault_items(workspace_id, ["field_order", "place_preference", "domicile"]):
         latest[row.item_type] = row  # oldest first: the newest active row wins
     for item_type, row in latest.items():
         key, value = mapping[item_type][0], row.value or {}
@@ -138,7 +134,7 @@ def _item_facts(out: _Facts, db, workspace_id: str) -> None:
         when = row.updated_at or row.observed_at
         if item_type == "domicile":
             province = value.get("province")
-            shaped = (catalog.choice_code("provinces", province) or province) if isinstance(province, str) else None
+            shaped = catalog.choice_code("provinces", province) if isinstance(province, str) else None  # unmapped: dropped
         elif item_type == "field_order":
             codes = [catalog.choice_code("study_fields", n) for n in value.get("fields") or []]
             shaped = [c for c in codes if c] or None
@@ -147,7 +143,8 @@ def _item_facts(out: _Facts, db, workspace_id: str) -> None:
         out.add(key, shaped, row.level, when, evidence.get("file_id"))
     excluded = excluded_fields(db, workspace_id)
     if excluded:
-        rows = [db.get(VaultItem, option["item_id"]) for option in excluded.values()]
+        by_id = {r.id: r for r in MemoryService(db).vault_items(workspace_id, ["option"])}
+        rows = [by_id.get(option["item_id"]) for option in excluded.values()]
         weakest = min((o["level"] for o in excluded.values()), key=lambda lvl: _ORDER.get(lvl, 0))
         stamps = [_aware(r.updated_at or r.observed_at) for r in rows if r is not None]
         out.add(mapping["option"][0], sorted(excluded), weakest, max((s for s in stamps if s), default=None))
