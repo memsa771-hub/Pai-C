@@ -44,7 +44,12 @@ class ChoiceIn(BaseModel):
     intake: IntakeIn
     date_of_birth: str | None = Field(default=None, max_length=10)
     consent: bool
+    consent_version: str = Field(min_length=1, max_length=40)  # the consent text version the screen showed
     guardian_email: str | None = Field(default=None, max_length=254)
+
+
+class GiveConsentAction(BaseModel):
+    consent_version: str = Field(min_length=1, max_length=40)  # the consent text version the screen showed
 
 
 class ChooseAction(BaseModel):
@@ -82,12 +87,37 @@ def _choice_view(db, workspace_id: str) -> dict | None:
         guardian_state = "not_needed"
     else:
         guardian_state = "given" if row.guardian_authorized_at else "missing"
-    return {"version": row.decision_version, "places": list(row.places or []), "intake": row.intake,
+    view = {"version": row.decision_version, "places": list(row.places or []), "intake": row.intake,
             "destination": row.destination_country, "level": row.level, "os_supported": row.os_supported,
-            "consent": {"student": "given" if row.authorized_at else "missing", "guardian": guardian_state}}
+            "consent": {"student": "given" if row.authorized_at else "missing", "guardian": guardian_state},
+            "consent_version": row.consent_version}
+    if row.authorized_at is None:  # what the student reads before giving consent again (the text is None while unapproved)
+        view["consent_offer"] = {"text": _usable_text(), "version": consent.current_version()}
+    return view
 
 
-def _write(action, db, workspace_id, *, with_choice: bool = False):
+def _usable_text() -> dict | None:
+    try:
+        consent.ensure_usable()
+    except consent.ConsentTextNotApproved:
+        return None
+    return consent.texts()["student"]
+
+
+def _same_text(version: str) -> None:
+    """The student agreed to the text version the screen showed; a text changed since is refused (R-10)."""
+    if version != consent.current_version():
+        _refuse("The consent text has changed; read it again", 409)
+
+
+def _consent_on_record(db, workspace_id: str) -> bool:
+    """True when the live choice carries a consent. With CONNECT_HANDOFF off it is still shown, so it can be withdrawn
+    (I1); a student who chose with the flag off never has one, so their answer stays as it was."""
+    row = RouteDecisionService(db).active(workspace_id)
+    return row is not None and (row.authorized_at is not None or row.guardian_authorized_at is not None)
+
+
+def _write(action, db, workspace_id, *, with_choice: bool = False, always_choice: bool = False):
     try:
         result = action()
     except RouteDecisionError as exc:
@@ -102,7 +132,7 @@ def _write(action, db, workspace_id, *, with_choice: bool = False):
     except Exception:  # noqa: BLE001
         db.rollback()
         log.exception("PAI OS delivery after a roadmap change failed")
-    if with_choice and _handoff_on():
+    if always_choice or (with_choice and _handoff_on()):
         result = {**result, "choice": _choice_view(db, workspace_id)}
     return success_response(result)
 
@@ -113,7 +143,8 @@ def get_roadmap(network: str = Query(...), db=Depends(get_db), x_workspace_token
     workspace = _authorized(db, network, x_workspace_token, authorization)
     workspace_id = str(workspace.id)
     page = RoadmapEngine(db).build(workspace_id, today=date.today())
-    if page.get("chosen") is not None and _handoff_on():  # flag off: the answer stays as it was
+    # Flag off: the answer stays as it was, except that a consent on record is shown so it can be withdrawn (I1).
+    if page.get("chosen") is not None and (_handoff_on() or _consent_on_record(db, workspace_id)):
         page["chosen"] = {**page["chosen"], "choice": _choice_view(db, workspace_id)}
     return success_response(page)
 
@@ -161,6 +192,7 @@ def _details(db, workspace_id: str, field_key: str, body: ChoiceIn) -> tuple[Cho
         consent.ensure_usable()
     except consent.ConsentTextNotApproved:
         _refuse("The consent text is not approved yet", 409)
+    _same_text(body.consent_version)
     options = places.choice_options(db, workspace_id, field_key)
     origin, level = options["origin"], options["level"]
     if origin is None:
@@ -173,6 +205,9 @@ def _details(db, workspace_id: str, field_key: str, body: ChoiceIn) -> tuple[Cho
     refs = [p.ref for p in body.places]
     if ranks != list(range(1, len(ranks) + 1)) or len(set(refs)) != len(refs):
         _refuse("Rank your places 1, 2, 3 ... without repeating one")
+    if not body.places and pai_os_bridge.route_supported(origin, body.destination, level):
+        # spec §3.2: a route PAI OS runs needs 1-5 places (C1). Without one the OS could never hear of the choice.
+        _refuse("Rank at least one place. If none is on offer for this intake, pick another intake")
     if body.places:
         offered = {p["ref"] for p in places.places_for(db, workspace_id, body.destination, level,
                                                        body.intake.term, body.intake.year)}
@@ -198,7 +233,7 @@ def _details(db, workspace_id: str, field_key: str, body: ChoiceIn) -> tuple[Cho
     return ChoiceDetails(origin_country=origin, destination_country=body.destination, level=level,
                          places=tuple((p.ref, p.rank) for p in sorted(body.places, key=lambda p: p.rank)),
                          intake=(body.intake.term, body.intake.year), authorized_at=now,
-                         guardian_required=minor), email
+                         guardian_required=minor, consent_version=body.consent_version), email
 
 
 @router.get("/choice-options")
@@ -209,11 +244,7 @@ def choice_options(field_key: str = Query(..., min_length=1, max_length=120), ne
     if not _handoff_on():
         return success_response({"handoff": False})
     workspace_id = str(workspace.id)
-    try:
-        consent.ensure_usable()
-        text = consent.texts()["student"]
-    except consent.ConsentTextNotApproved:
-        text = None
+    text = _usable_text()
     dob = places.vault_value(db, workspace_id, "identity.date_of_birth")
     under_18 = None  # no stored date: the screen asks for it. One that cannot be read counts as under 18, as in choose.
     if dob:
@@ -269,48 +300,61 @@ def choose_route(body: ChooseAction, network: str = Query(...), db=Depends(get_d
 
 
 def _consent_change(db, workspace_id: str, **change):
-    _need_handoff()
     return _write(lambda: RouteDecisionService(db).update_consent(workspace_id, **change), db, workspace_id,
-                  with_choice=True)
+                  always_choice=True)
 
 
 @router.post("/consent/withdraw")
 def withdraw_consent(network: str = Query(...), db=Depends(get_db), x_workspace_token: str | None = Header(None),
                      authorization: str | None = Header(None)):
-    """The student withdraws their own consent: a new version, the plan pauses. Never blocked by the text gate."""
+    """The student withdraws their own consent: a new version, the plan pauses. Never blocked: not by the text gate,
+    not by CONNECT_HANDOFF (an OS plan may still run with the flag off; I1). Delivery follows the flag and the sweep."""
     workspace = _authorized(db, network, x_workspace_token, authorization)
     return _consent_change(db, str(workspace.id), authorized_at=None)
 
 
 @router.post("/consent/give")
-def give_consent(network: str = Query(...), db=Depends(get_db), x_workspace_token: str | None = Header(None),
-                 authorization: str | None = Header(None)):
+def give_consent(body: GiveConsentAction, network: str = Query(...), db=Depends(get_db),
+                 x_workspace_token: str | None = Header(None), authorization: str | None = Header(None)):
     workspace = _authorized(db, network, x_workspace_token, authorization)
     _need_handoff()
     try:
         consent.ensure_usable()
     except consent.ConsentTextNotApproved:
         _refuse("The consent text is not approved yet", 409)
-    return _consent_change(db, str(workspace.id), authorized_at=datetime.now(timezone.utc))
+    _same_text(body.consent_version)
+    return _consent_change(db, str(workspace.id), authorized_at=datetime.now(timezone.utc),
+                           consent_version=body.consent_version)
 
 
 @router.post("/guardian/resend")
 def resend_guardian(body: ResendAction | None = None, network: str = Query(...), db=Depends(get_db),
                     x_workspace_token: str | None = Header(None), authorization: str | None = Header(None)):
-    """Sends the guardian a new link for the live choice, to the address on file or to a new one."""
+    """Sends the guardian a new link for the live choice: an agree link, to the address on file or to a new one; once
+    the guardian has agreed, a fresh withdraw link to the address that agreed (the old one stays valid)."""
     workspace = _authorized(db, network, x_workspace_token, authorization)
     workspace_id = str(workspace.id)
+    row = RouteDecisionService(db).active(workspace_id)
+    if row is not None and row.guardian_required and row.guardian_authorized_at is not None:
+        # The guardian has agreed: a fresh withdraw link goes to the address that agreed, never to a new one (I3).
+        # It serves a withdrawal, so like the withdraw link itself it works whatever CONNECT_HANDOFF says (I1).
+        try:
+            sent = guardian.resend_withdraw(db, workspace_id)
+        except guardian.GuardianRateLimited:
+            db.rollback()
+            raise HTTPException(status_code=429, detail="Too many requests; try again later") from None
+        except guardian.GuardianRequestError as exc:
+            db.rollback()
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
+        db.commit()
+        return success_response({"sent": sent, "kind": "withdraw"})
     _need_handoff()
-    service = RouteDecisionService(db)
-    row = service.active(workspace_id)
     if row is None:
         _refuse("No route is chosen", 404)
     if not row.guardian_required:
         _refuse("This choice needs no guardian agreement", 409)
     if row.authorized_at is None:
         _refuse("Give your own consent first", 409)
-    if row.guardian_authorized_at is not None:
-        _refuse("Your guardian has already agreed", 409)
     email = ((body.guardian_email if body else None) or "").strip().lower()
     if not email:
         email = db.scalar(select(GuardianConsent.email).where(
@@ -330,7 +374,7 @@ def resend_guardian(body: ResendAction | None = None, network: str = Query(...),
         db.rollback()
         raise HTTPException(status_code=409, detail="The consent text is not approved yet") from None
     db.commit()
-    return success_response({"sent": True})
+    return success_response({"sent": True, "kind": "agree"})
 
 
 @router.post("/steps")

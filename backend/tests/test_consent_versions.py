@@ -335,3 +335,60 @@ async def test_checkin_is_superseded_by_another_choice():
             BackgroundJob.created_at).first()
         with patch("app.pai_c.posting.send_to_student", return_value="event-1"):
             assert await checkin_job(first, db) == {"status": "superseded"}
+
+
+# ---- a consent change on a choice the OS holds is never held back (final review C1, defence in depth) ----
+
+NO_PLACES = ChoiceDetails(origin_country="PK", destination_country="GB", level="bachelor", places=(),
+                          intake=("autumn", 2027), authorized_at=DETAILS.authorized_at)
+
+
+@pytest.mark.asyncio
+async def test_a_consent_copy_without_places_is_pending_when_the_same_choice_was_delivered():
+    async with confirmed_student() as (_, student, db, _journey):
+        with_routes(student, db)
+        ws = student.workspace_id
+        service = RouteDecisionService(db)
+        with on(), patch("app.pai_os_bridge.route_supported", return_value=True):
+            service.choose(ws, "electrical_engineering", details=DETAILS)
+            items(db, ws)[0].status = "delivered"  # v1 reached the OS: a plan runs
+            service.choose(ws, "electrical_engineering", details=NO_PLACES)  # an older row (the API refuses it now)
+            service.update_consent(ws, authorized_at=None)  # the student withdraws consent
+            db.commit()
+        assert [(i.status, i.last_error) for i in items(db, ws)] == [
+            ("delivered", None), ("not_sent", "incomplete"), ("pending", None)]
+
+
+@pytest.mark.asyncio
+async def test_a_consent_copy_without_places_stays_incomplete_when_nothing_of_that_choice_was_delivered():
+    async with confirmed_student() as (_, student, db, _journey):
+        with_routes(student, db)
+        ws = student.workspace_id
+        service = RouteDecisionService(db)
+        with on(), patch("app.pai_os_bridge.route_supported", return_value=True):
+            service.choose(ws, "computer_engineering", details=DETAILS)
+            items(db, ws)[0].status = "delivered"  # another choice reached the OS
+            service.choose(ws, "electrical_engineering", details=NO_PLACES)
+            service.update_consent(ws, authorized_at=None)
+            db.commit()
+        assert [(i.status, i.last_error) for i in items(db, ws)][1:] == [
+            ("not_sent", "incomplete"), ("not_sent", "incomplete")]
+
+
+# ---- the consent text version the student agreed to (final review I2) ----
+
+@pytest.mark.asyncio
+async def test_the_agreed_text_version_is_kept_cleared_and_set_with_the_students_consent():
+    from dataclasses import replace
+    async with confirmed_student() as (_, student, db, _journey):
+        with_routes(student, db)
+        ws = student.workspace_id
+        service = RouteDecisionService(db)
+        with on(), patch("app.pai_os_bridge.route_supported", return_value=True):
+            service.choose(ws, "electrical_engineering", details=replace(DETAILS, consent_version="1"))
+            service.update_consent(ws, guardian_authorized_at=NOW)  # the guardian's change copies it
+            service.update_consent(ws, authorized_at=None)  # withdrawn: no text is agreed to
+            service.update_consent(ws, authorized_at=NOW, consent_version="2")
+            db.commit()
+        assert [r.consent_version for r in rows(db, ws)] == ["1", "1", None, "2"]
+        assert "consent_version" not in items(db, ws)[0].payload  # PAI OS does not need it (v2 contract)

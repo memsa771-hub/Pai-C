@@ -804,6 +804,8 @@ class RouteDecision(Base):
     authorized_at = Column(DateTime(timezone=True), nullable=True)
     guardian_authorized_at = Column(DateTime(timezone=True), nullable=True)
     guardian_required = Column(Boolean, nullable=False, default=False, server_default=text("false"))
+    # The consent text version the student agreed to with `authorized_at` (R-10); None while consent is missing.
+    consent_version = Column(Text, nullable=True)
 
     __table_args__ = (
         Index("uq_route_decision_version", "workspace_id", "decision_version", unique=True),

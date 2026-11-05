@@ -126,6 +126,11 @@ def workspace_of(db, token: str) -> str | None:
     return None if row is None else row.workspace_id
 
 
+def purpose_of(db, token: str) -> str | None:
+    """The kind of a link (agree or withdraw), or None for an unknown one. Reads nothing else."""
+    return db.scalar(select(GuardianConsent.purpose).where(GuardianConsent.token_hash == _digest(token or "")))
+
+
 def _stale(db, row: GuardianConsent) -> bool:
     newest = RouteDecisionService(db).newest(row.workspace_id)
     # An agree link works only while the student's own consent stands on the newest version.
@@ -182,8 +187,7 @@ def open(db, token: str, *, ip: str | None = None, purpose: str | None = None) -
     With no `purpose` the token says which kind it is (one lookup, so one page load counts once). An unknown token is
     taken for an agree link. A withdraw link is neither gated by the text approval nor counted by the rate limit."""
     if purpose is None:
-        purpose = db.scalar(select(GuardianConsent.purpose).where(
-            GuardianConsent.token_hash == _digest(token or ""))) or AGREE
+        purpose = purpose_of(db, token) or AGREE
     if purpose != WITHDRAW:  # withdrawing is never blocked by the text gate nor the rate limit
         consent.ensure_usable()
         _limit_ip(ip)
@@ -203,8 +207,9 @@ def agree(db, token: str, *, ip: str | None = None) -> str:
 
 
 def agree_with_mail(db, token: str, *, ip: str | None = None) -> tuple[str, bool]:
-    """Like `agree`, and says whether the confirmation e-mail (the only place of the withdraw link) was sent. A mail
-    problem never undoes the agreement: it is logged (class name only) and reported as not sent."""
+    """Like `agree`, and says whether the confirmation e-mail with the withdraw link was sent. A mail problem never
+    undoes the agreement: it is logged (class name only) and reported as not sent; the student's resend then sends
+    a fresh withdraw link (`resend_withdraw`)."""
     consent.ensure_usable()
     _limit_ip(ip)
     row, state = _locked(db, token, AGREE)
@@ -214,19 +219,48 @@ def agree_with_mail(db, token: str, *, ip: str | None = None) -> tuple[str, bool
     moment = now()
     service.update_consent(row.workspace_id, guardian_authorized_at=moment)
     row.outcome, row.used_at = "agreed", moment
-    texts = consent.texts()
-    withdraw_row, withdraw_token = _issue(db, row.workspace_id, service.newest(row.workspace_id), row.email,
-                                          WITHDRAW, None)
-    mail = _fill(texts["guardian_confirmation"], student_first_name=_first_name(db, row.workspace_id))
-    try:
-        sent = bool(auth_emails.send_guardian_confirmation_email(
-            row.email, auth_emails.guardian_link(withdraw_token), subject=mail["subject"], title=mail["title"],
-            paragraphs=mail["paragraphs"], button=mail["button"], footer=mail["footer"]))
-    except Exception as exc:  # noqa: BLE001
-        logger.warning("guardian: confirmation mail to %s failed (%s)", mask_email(row.email), type(exc).__name__)
-        sent = False
+    _withdraw_row, withdraw_token = _issue(db, row.workspace_id, service.newest(row.workspace_id), row.email,
+                                           WITHDRAW, None)
+    sent = _send_withdraw_link(db, row.workspace_id, row.email, withdraw_token)
     logger.info("guardian: %s agreed for decision version %s", mask_email(row.email), row.decision_version)
     return "agreed", sent
+
+
+def _send_withdraw_link(db, workspace_id: str, email: str, token: str) -> bool:
+    """The confirmation e-mail with the withdraw link. A mail problem is logged (class name only), never raised."""
+    mail = _fill(consent.texts()["guardian_confirmation"], student_first_name=_first_name(db, workspace_id))
+    try:
+        return bool(auth_emails.send_guardian_confirmation_email(
+            email, auth_emails.guardian_link(token), subject=mail["subject"], title=mail["title"],
+            paragraphs=mail["paragraphs"], button=mail["button"], footer=mail["footer"]))
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("guardian: confirmation mail to %s failed (%s)", mask_email(email), type(exc).__name__)
+        return False
+
+
+def resend_withdraw(db, workspace_id: str) -> bool:
+    """The guardian has agreed and may have lost (or never got) the withdraw link: a fresh withdraw link for the live
+    agreement goes to the address on the agreed row, never to another one. Earlier withdraw links stay valid; the same
+    rules apply (no fixed lifetime, ends when a later consent replaces the one it guards). Rate-limited like a
+    request (`guardian_request`; raises `GuardianRateLimited`); never gated by the text approval, since it serves a
+    withdrawal. Returns whether the e-mail went out."""
+    service = RouteDecisionService(db)
+    service._lock(workspace_id)
+    active = service.active(workspace_id)
+    if active is None or active.guardian_authorized_at is None:
+        raise GuardianRequestError("Your guardian has not agreed")
+    agreed = db.scalar(select(GuardianConsent).where(
+        GuardianConsent.workspace_id == workspace_id, GuardianConsent.purpose == AGREE,
+        GuardianConsent.outcome == "agreed").order_by(GuardianConsent.used_at.desc()).limit(1))
+    if agreed is None:
+        raise GuardianRequestError("No guardian agreement is on record")
+    if not rate_limit.allow("guardian_request", user=workspace_id, email=agreed.email):
+        raise GuardianRateLimited("guardian_request")
+    _row, token = _issue(db, workspace_id, active, agreed.email, WITHDRAW, None)
+    sent = _send_withdraw_link(db, workspace_id, agreed.email, token)
+    logger.info("guardian: withdraw link sent again to %s for decision version %s", mask_email(agreed.email),
+                active.decision_version)
+    return sent
 
 
 def withdraw(db, token: str, *, ip: str | None = None) -> str:

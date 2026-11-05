@@ -175,18 +175,39 @@ def test_withdraw_is_never_blocked_by_the_text_gate(os_stub, stubs):
         assert rows(student)[-1].guardian_authorized_at is None
 
 
-def test_with_the_flag_off_the_public_routes_answer_stale_and_write_nothing(os_stub, stubs):
+def test_with_the_flag_off_an_agree_link_answers_stale_and_writes_nothing(os_stub, stubs):
+    # Rule change (I1): this test pinned "stale with the flag off" for the withdraw routes too. A withdraw link now
+    # always works (next test); an agree link with the flag off still reads and writes nothing.
     with pre_eng() as (client, student, params), flag(True):
         token = minor((client, student, params), stubs)
         before = ([(c.outcome, c.used_at) for c in rows(student, GuardianConsent)], len(rows(student)), len(stubs))
         with flag(False):
             assert public_ok(client.get(f"/v1/guardian/{token}"))["state"] == "stale"
             assert public_ok(client.post(f"/v1/guardian/{token}/agree")) == {"state": "stale"}
-            assert public_ok(client.get(f"/v1/guardian/{token}/withdraw"))["state"] == "stale"
-            assert public_ok(client.post(f"/v1/guardian/{token}/withdraw")) == {"state": "stale"}
         assert ([(c.outcome, c.used_at) for c in rows(student, GuardianConsent)], len(rows(student)),
                 len(stubs)) == before
         assert public_ok(client.post(f"/v1/guardian/{token}/agree")) == {"state": "agreed", "confirmation_sent": True}  # on again: link still good
+
+
+def test_with_the_flag_off_the_guardian_can_still_withdraw(os_stub, stubs):
+    with pre_eng() as (client, student, params), flag(True):
+        token = minor((client, student, params), stubs)
+        public_ok(client.post(f"/v1/guardian/{token}/agree"))
+        withdraw = token_of(stubs[1])
+        delivered = len(os_stub["submitted"])
+        with flag(False):
+            page = public_ok(client.get(f"/v1/guardian/{withdraw}"))  # the path the mail links to
+            assert (page["state"], page["purpose"]) == ("ok", "withdraw")
+            assert public_ok(client.get(f"/v1/guardian/{withdraw}/withdraw"))["state"] == "ok"
+            assert public_ok(client.post(f"/v1/guardian/{withdraw}/withdraw")) == {"state": "withdrawn"}
+            latest = rows(student)[-1]
+            assert latest.decision_version == 3 and latest.guardian_authorized_at is None
+            assert len(os_stub["submitted"]) == delivered  # delivery follows the flag
+        from app import pai_os_bridge
+        with student.factory() as db:  # the flag is back: the sweep hands the withdrawal over
+            assert pai_os_bridge.sweep_once(db)["submitted"] == 1
+        assert os_stub["submitted"][-1]["decision_version"] == 3
+        assert os_stub["submitted"][-1]["guardian_authorized_at"] is None
 
 
 def test_one_get_answers_for_the_kind_of_token_it_is_given(os_stub, stubs):

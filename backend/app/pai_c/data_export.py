@@ -39,7 +39,8 @@ def export_student_data(db, workspace_id):
                 # The choice and the consent as given (R-10).
                 'places': row.places, 'intake': row.intake, 'level': row.level,
                 'destination_country': row.destination_country, 'os_supported': row.os_supported,
-                'authorized_at': row.authorized_at, 'guardian_required': row.guardian_required,
+                'authorized_at': row.authorized_at, 'consent_version': row.consent_version,
+                'guardian_required': row.guardian_required,
                 'guardian_authorized_at': row.guardian_authorized_at} for row in decisions],
             # The Mirror as the student sees it: the education line, what is
             # still unknown and the text (FOUR_FEATURES_SPEC 2.3).

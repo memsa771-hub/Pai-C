@@ -210,7 +210,8 @@ class RouteDecisionService:
                      "os_supported": pai_os_bridge.route_supported(
                          details.origin_country, details.destination_country, details.level),
                      "authorized_at": details.authorized_at, "guardian_required": details.guardian_required,
-                     "guardian_authorized_at": details.guardian_authorized_at}
+                     "guardian_authorized_at": details.guardian_authorized_at,
+                     "consent_version": details.consent_version if details.authorized_at else None}
         row = RouteDecision(workspace_id=workspace_id, decision_version=self._next_version(workspace_id),
                             status="chosen", field_key=field_key,
                             possibility_id=card["possibility_id"], title=card["title"], verdict=card["verdict"],
@@ -229,13 +230,15 @@ class RouteDecisionService:
     # Every column a consent change carries over unchanged into its new version.
     _COPIED = ("field_key", "possibility_id", "title", "verdict", "route", "steps", "steps_done", "chosen_at",
                "origin_country", "destination_country", "level", "path_ref", "places", "intake", "os_supported",
-               "authorized_at", "guardian_authorized_at", "guardian_required")
+               "authorized_at", "guardian_authorized_at", "guardian_required", "consent_version")
 
     def update_consent(self, workspace_id: str, *, authorized_at: "datetime | None | EllipsisType" = ...,
-                       guardian_authorized_at: "datetime | None | EllipsisType" = ...) -> dict:
+                       guardian_authorized_at: "datetime | None | EllipsisType" = ...,
+                       consent_version: "str | None | EllipsisType" = ...) -> dict:
         """A consent change is a new decision version: the active row is superseded by a copy of itself with the
         named consent fields changed (`...` leaves a field as it is, None clears it). The choice, places and
-        intake stay; check-ins are not rescheduled and the journey and the possibility are not touched."""
+        intake stay; check-ins are not rescheduled and the journey and the possibility are not touched.
+        `consent_version` goes with the student's own consent: it is cleared when `authorized_at` is."""
         self._lock(workspace_id)
         row = self._active_or_404(workspace_id)
         values = {name: getattr(row, name) for name in self._COPIED}
@@ -245,13 +248,16 @@ class RouteDecisionService:
         if not changes:  # nothing to change: no version, no outbox row
             return serialize(row, RoadmapEngine(self.db).build(workspace_id)["fields"])
         values.update(changes)
+        if "authorized_at" in changes:
+            values["consent_version"] = None if changes["authorized_at"] is None else (
+                values["consent_version"] if consent_version is ... else consent_version)
         row.withdrawn_at = datetime.now(timezone.utc)
         self.db.flush()  # the old row leaves the partial unique index before the new one enters
         new = RouteDecision(workspace_id=workspace_id, decision_version=self._next_version(workspace_id),
                             status="chosen", **values)
         self.db.add(new)
         self.db.flush()
-        outbox.record(self.db, new)
+        outbox.record(self.db, new, consent_only=True)
         return serialize(new, RoadmapEngine(self.db).build(workspace_id)["fields"])
 
     def set_step(self, workspace_id: str, done: bool, *, key: str | None = None, index: int | None = None) -> dict:

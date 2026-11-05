@@ -1,4 +1,4 @@
-"""Migration 125: the guardian consent table (R-10)."""
+"""Migration 125: the guardian consent table and the agreed consent text version on a decision (R-10)."""
 
 import importlib.util
 from pathlib import Path
@@ -50,6 +50,8 @@ def test_125_chains_after_124_and_matches_the_model():
     assert table.c.decision_id.nullable and table.c.used_at.nullable
     assert {fk.ondelete for fk in table.c.workspace_id.foreign_keys} == {"CASCADE"}
     assert {fk.ondelete for fk in table.c.decision_id.foreign_keys} == {"SET NULL"}
+    decisions = Base.metadata.tables["pai_route_decisions"]
+    assert "consent_version" in decisions.columns and decisions.c.consent_version.nullable
 
 
 def test_125_upgrade_and_downgrade():
@@ -59,6 +61,8 @@ def test_125_upgrade_and_downgrade():
         inspector = inspect(connection)
         assert TABLE in inspector.get_table_names()
         assert COLUMNS == {c["name"] for c in inspector.get_columns(TABLE)}
+        decision_columns = {c["name"]: c for c in inspector.get_columns("pai_route_decisions")}
+        assert decision_columns["consent_version"]["nullable"]
         connection.execute(text("INSERT INTO workspaces VALUES ('w')"))
         insert = ("INSERT INTO pai_guardian_consents (id, workspace_id, decision_version, email, token_hash, "
                   "expires_at, text_version, outcome) VALUES ('a', 'w', 1, 'g@x.org', :h, CURRENT_TIMESTAMP, '1', 'sent')")
@@ -68,6 +72,7 @@ def test_125_upgrade_and_downgrade():
     with engine.begin() as connection:
         _migrate(connection, "downgrade")
         assert TABLE not in inspect(connection).get_table_names()
+        assert "consent_version" not in {c["name"] for c in inspect(connection).get_columns("pai_route_decisions")}
 
 
 def test_125_check_constraints():

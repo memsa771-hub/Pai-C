@@ -7,7 +7,9 @@ POST /v1/guardian/{token}/agree      The guardian agrees
 GET  /v1/guardian/{token}/withdraw   What the withdraw page shows (no change except the audit row)
 POST /v1/guardian/{token}/withdraw   The guardian withdraws
 
-A mail scanner may open any link, so GET never agrees or withdraws. Answers carry the first name of the student and
+A mail scanner may open any link, so GET never agrees or withdraws. With CONNECT_HANDOFF off an agree link answers
+`stale` and nothing is read or written, but a withdraw link always works (I1): a PAI OS plan may still run, so the
+withdrawal is written and delivered when the flag and the sweep allow. Answers carry the first name of the student and
 nothing else about them, never an e-mail address, never the token hash. `Cache-Control: no-store` and
 `Referrer-Policy: no-referrer` are set for every /v1/guardian/ answer by the middleware in app/main.py, which also
 logs the route template instead of the path, so the token stays out of the logs.
@@ -18,7 +20,6 @@ import logging
 from fastapi import APIRouter, Depends, Request
 
 from app import pai_os_bridge
-
 from app.api.response import ResponseCode, json_response, success_response
 from app.database import get_db
 from app.pai_c.connect import flags, guardian
@@ -32,8 +33,8 @@ def _ip(request: Request) -> str:
     return request.client.host if request.client else "unknown"
 
 
-def _answer(db, call, idle=None):
-    if not flags.part_on("CONNECT_HANDOFF"):  # the connection is off: nothing is read or written
+def _answer(db, call, idle=None, *, always: bool = False):
+    if not always and not flags.part_on("CONNECT_HANDOFF"):  # the connection is off: nothing is read or written
         return success_response({"state": "stale", "text": None, "student_first_name": None} if idle is None else idle)
     try:
         result = call()
@@ -49,7 +50,9 @@ def _answer(db, call, idle=None):
 
 @router.get("/{token}")
 def open_agree_page(token: str, request: Request, db=Depends(get_db)):
-    return _answer(db, lambda: guardian.open(db, token, ip=_ip(request)))
+    # With the flag off only a withdraw link is served: withdrawing is never blocked (I1).
+    always = not flags.part_on("CONNECT_HANDOFF") and guardian.purpose_of(db, token) == guardian.WITHDRAW
+    return _answer(db, lambda: guardian.open(db, token, ip=_ip(request)), always=always)
 
 
 def _changed(db, token: str, state: str, done: str) -> None:
@@ -77,13 +80,12 @@ def agree(token: str, request: Request, db=Depends(get_db)):
 
 @router.get("/{token}/withdraw")
 def open_withdraw_page(token: str, request: Request, db=Depends(get_db)):
-    return _answer(db, lambda: guardian.open(db, token, ip=_ip(request), purpose=guardian.WITHDRAW))
+    return _answer(db, lambda: guardian.open(db, token, ip=_ip(request), purpose=guardian.WITHDRAW), always=True)
 
 
 @router.post("/{token}/withdraw")
 def withdraw(token: str, request: Request, db=Depends(get_db)):
-    answer = _answer(db, lambda: {"state": guardian.withdraw(db, token, ip=_ip(request))},
-                    {"state": "stale"})
+    answer = _answer(db, lambda: {"state": guardian.withdraw(db, token, ip=_ip(request))}, always=True)
     if isinstance(answer, dict):
         _changed(db, token, answer["data"]["state"], "withdrawn")
     return answer

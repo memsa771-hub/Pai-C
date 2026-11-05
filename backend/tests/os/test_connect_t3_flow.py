@@ -123,7 +123,7 @@ def test_an_adult_chooses_withdraws_and_gives_consent_again(svc, world):  # noqa
         assert events_of(svc, plan.id) == ["plan_paused"]
 
         # 3. the student gives consent again: the plan resumes, no second plan
-        back = data(post(client, params, "consent/give"))
+        back = data(post(client, params, "consent/give", {"consent_version": "1"}))
         assert back["choice"]["version"] == 3 and back["choice"]["consent"]["student"] == "given"
         assert run_os(svc) == [("revised", None)]
         (resumed,) = plans_of(svc, who)
@@ -197,3 +197,35 @@ def test_a_route_the_os_cannot_run_puts_nothing_in_the_os(svc, world):  # noqa: 
         with who.factory() as db:
             assert bridge.sweep_once(db)["submitted"] == 0
         assert count(svc, models.counsellor_intake) == 0
+
+
+def test_a_supported_choice_without_places_is_refused_so_a_later_withdrawal_still_pauses_the_plan(svc, world):  # noqa: F811
+    """The final review's C1 sequence against a real PAI OS: a plan runs, a 0-place re-choice of a supported route,
+    then a consent withdrawal. The re-choice is refused, so the withdrawal reaches the OS and the plan pauses."""
+    with student() as (client, who, params):
+        data(choose_with(client, params, destination="PK", places=PK_PLACE, intake=WINTER))
+        assert run_os(svc) == [("planned", None)]
+        (plan,) = plans_of(svc, who)
+        refused = choose_with(client, params, destination="PK", places=[], intake=WINTER)
+        assert refused.status_code == 422 and len(rows(who)) == 1
+        data(post(client, params, "consent/withdraw"))
+        assert outbox(who) == [("delivered", None)] * 2
+        assert run_os(svc) == [("paused", "consent_missing")]
+        (paused,) = plans_of(svc, who)
+        assert (paused.id, paused.status) == (plan.id, "paused")
+
+
+def test_with_the_flag_off_a_guardian_withdrawal_pauses_the_plan_once_the_flag_is_back(svc, world):  # noqa: F811
+    mails = world
+    with student(dob="2012-05-05") as (client, who, params):
+        data(choose_with(client, params, destination="PK", places=PK_PLACE, intake=WINTER, guardian_email=EMAIL))
+        public(client, "post", f"{link_token(mails[0])}/agree")
+        assert run_os(svc)[-1] == ("planned", None)  # the older, held version is stale by then
+        withdraw_token = link_token(mails[1])
+        with patch.object(config, "CONNECT_HANDOFF", False, create=True):  # the flag rolled back: the plan still runs
+            assert public(client, "post", f"{withdraw_token}/withdraw") == {"state": "withdrawn"}
+            assert run_os(svc) == []
+        with who.factory() as db:  # the flag is back: the sweep catches up
+            assert bridge.sweep_once(db)["submitted"] == 1
+        assert run_os(svc) == [("paused", "consent_missing")]
+        assert [p.status for p in plans_of(svc, who)] == ["paused"]

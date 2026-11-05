@@ -16,3 +16,4 @@ class ChoiceDetails:
     authorized_at: datetime | None = None
     guardian_required: bool = False
     guardian_authorized_at: datetime | None = None
+    consent_version: str | None = None  # the consent text version the student agreed to
