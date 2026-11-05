@@ -106,7 +106,9 @@ def get(student_ref: str, *, engine: Engine | None = None, tenant_id: str | None
 
 def record_event(event: dict) -> Literal["stored", "duplicate", "module_off"]:
     """Validates the event against VaultEventV1 (ValueError when it is not) and stores it, even while the
-    `counsellor` module is off (it waits until switched on, like a decision)."""
+    `counsellor` module is off. With the module off the event is only stored: no `student_fact_changed` replan event
+    is recorded and none is replayed when the module is switched on (the next replan reads the facts as they are then).
+    With the module on, the replan event is recorded on each open plan that uses a changed key, deduped by version."""
     try:
         checked = VaultEventV1.model_validate(event)
     except ValidationError as exc:

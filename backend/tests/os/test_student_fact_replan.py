@@ -34,6 +34,7 @@ pytestmark = [pytest.mark.req("R-15"), pytest.mark.req("R-16"), pytest.mark.req(
 
 FAKE = Path(__file__).parent / "playbooks"
 TENANT, NOW = "pai", datetime(2026, 11, 5, tzinfo=timezone.utc)
+URL = "https://uni.example/x"
 MARKS = "education.intermediate.marks_obtained"
 TOTAL = "education.intermediate.marks_total"
 ENTRY = "test.entry_test.score"
@@ -210,3 +211,62 @@ def test_the_student_accepting_the_proposal_removes_the_programme(world):
     world.replanner.accept("stu-1", decision.proposal_id)
     live = {t.programme_ref for t in task_rows(world.engine, TENANT, plan_id).values()}
     assert "p-hard" not in live and "p-easy" in live
+
+
+def send(world, plan_id, version, obtained):
+    world.vault["stu-1"] = facts_for("stu-1", version, obtained)
+    student_facts.record_event(vault_event(version, [MARKS]))
+    return run_rule(world, plan_id, event_id(world.engine, plan_id))
+
+
+def test_an_improving_fact_proposes_nothing_and_refreshes_the_note(world):
+    plan_id = start(world)
+    assert send(world, plan_id, 1, 1000).status == "applied"
+    first = send(world, plan_id, 2, 800)
+    assert first.status == "pending"
+    again = send(world, plan_id, 3, 1000)  # the marks are back: p-hard reads likely_meets again
+    assert again.status == "applied" and world.replanner.proposals.get(again.proposal_id).ops == []
+    assert [p.id for p in world.replanner.proposals.pending_for("stu-1")] == [first.proposal_id]  # still just the one
+    N = models.eligibility_notes
+    with world.engine.connect() as conn:
+        notes = [(n.programme_ref, n.verdict, n.payload["previous"]) for n in conn.execute(select(N).order_by(N.c.id))]
+    assert notes == [("p-hard", "likely_below", "likely_meets"), ("p-hard", "likely_meets", "likely_below")]
+
+
+def test_every_programme_reading_below_is_pinned(world):
+    plan_id = start(world)
+    assert send(world, plan_id, 1, 1000).status == "applied"
+    decision = send(world, plan_id, 2, 100)  # about 9 percent: both fake thresholds are missed
+    proposal = world.replanner.proposals.get(decision.proposal_id)
+    # Pinned (not a design choice): the kernel refuses nothing and the student gets ONE big proposal that cancels both.
+    assert decision.status == "pending" and proposal.big and proposal.refused == []
+    assert [o["programme_ref"] for o in proposal.ops] == ["p-easy", "p-hard"]
+    assert len(world.replanner.proposals.pending_for("stu-1")) == 1
+
+
+# --- the production wiring: the registered os.replan workflow ---------------------------------------------------
+
+from tests.os.test_replan_run import ctx, P1, STUDENT, TENANT as RUN_TENANT  # noqa: E402,F401 - ctx is used by name
+
+
+def test_the_workflow_reads_the_facts_for_a_fact_change(ctx):  # noqa: F811
+    """The rules step of the registered workflow passes the programmes that read below (`with_below`); without that
+    the event would close with nothing to change."""
+    host = {"v": None}
+    ports.configure(pytypes.SimpleNamespace(engine=ctx.engine, settings=pytypes.SimpleNamespace(tenant_id=RUN_TENANT),
+                                            plans=ctx.r.plans), student_facts=lambda ref: host["v"])
+    manifest.set_enabled(ctx.engine, RUN_TENANT, True)
+    ctx.r.plans.knowledge.upsert("programme", P1, "grade_requirement", Fact({"german_max": 2.5}, "q", URL, NOW, 2027,
+                                                                         "confirmed"), "manual")
+    try:
+        items = [{"key": "education.bachelor.gpa", "value": 1.0, "evidence": "stated", "vault_version": 1},
+                 {"key": "education.bachelor.gpa_scale", "value": 4.0, "evidence": "stated", "vault_version": 1}]
+        host["v"] = StudentFactsV1.model_validate({"schema": "pai.student_facts.v1", "student_ref": STUDENT,
+                                                   "vault_version": 1, "built_at": NOW, "eligible_levels": None,
+                                                   "facts": items}).model_dump(by_alias=True)
+        got = ctx.run(ctx.event("student_fact_changed", keys=["education.bachelor.gpa"], vault_version=1))
+        assert got["status"] == "pending", got
+        proposal = ctx.r.proposals.get(got["proposal_id"])
+        assert proposal.big and {o["op"] for o in proposal.ops} == {"cancel_programme"}
+    finally:
+        ports.configure(None)
