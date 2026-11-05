@@ -89,7 +89,7 @@ def record(db, workspace_id: str, n: int, chosen_at: datetime) -> str:
     # active row per workspace, so each fake row is already withdrawn (the sweep reads every row by chosen_at).
     # Ids are UUIDs with letters: SQLite would store all-digit hex as a number.
     row = RouteDecision(id=f"decd{n:04d}-aaaa-4aaa-8aaa-aaaaaaaaaaaa", workspace_id=workspace_id,
-                        field_key="f-1", title="Route", verdict={}, route={}, steps=[], steps_done=[], chosen_at=chosen_at, withdrawn_at=chosen_at)
+                        field_key="f-1", title="Route", verdict={}, route={}, steps=[], steps_done=[], decision_version=n, chosen_at=chosen_at, withdrawn_at=chosen_at)
     db.add(row)
     db.commit()
     return row.id

@@ -769,6 +769,12 @@ class RouteDecision(Base):
     route stay the snapshot the student chose, so a later Vault change shows as
     a live status beside it, not as a silently different choice. One active row
     (withdrawn_at null) per workspace.
+
+    Rule D-a (PAI OS hand-off): `withdrawn_at` and the partial index
+    `uq_route_decision_active` stay as they are. Every decision also has a
+    `decision_version` (unique per workspace); a withdrawal is its own version
+    row, inserted with `withdrawn_at = chosen_at` so it is never "active".
+    Rows are never rewritten except for `withdrawn_at` and `steps_done`.
     """
     __tablename__ = "pai_route_decisions"
 
@@ -786,13 +792,48 @@ class RouteDecision(Base):
     steps_done = Column(JSONB, nullable=False, default=list)
     chosen_at = Column(DateTime(timezone=True), nullable=False, default=_now, server_default=text("NOW()"))
     withdrawn_at = Column(DateTime(timezone=True), nullable=True)
+    decision_version = Column(Integer, nullable=False)
+    status = Column(Text, nullable=False, default="chosen", server_default=text("'chosen'"))  # chosen | withdrawn
+    origin_country = Column(Text, nullable=True)
+    destination_country = Column(Text, nullable=True)
+    level = Column(Text, nullable=True)
+    path_ref = Column(Text, nullable=True)
+    places = Column(JSONB, nullable=False, default=list, server_default=text("'[]'"))  # {programme_ref, rank}
+    intake = Column(JSONB, nullable=True)  # {term, year}
+    os_supported = Column(Boolean, nullable=False, default=False, server_default=text("false"))
+    authorized_at = Column(DateTime(timezone=True), nullable=True)
+    guardian_authorized_at = Column(DateTime(timezone=True), nullable=True)
+    guardian_required = Column(Boolean, nullable=False, default=False, server_default=text("false"))
 
     __table_args__ = (
+        Index("uq_route_decision_version", "workspace_id", "decision_version", unique=True),
         Index("uq_route_decision_active", "workspace_id", unique=True,
               postgresql_where=text("withdrawn_at IS NULL"),
               sqlite_where=text("withdrawn_at IS NULL")),
         Index("idx_route_decisions_workspace", "workspace_id", "chosen_at"),
     )
+
+
+class OsOutbox(Base):
+    """What waits to be delivered to PAI OS: a decision or a Vault event.
+
+    `key` is unique, so the same hand-off is never queued twice. `last_error`
+    holds a code, never a message with student data.
+    """
+    __tablename__ = "pai_os_outbox"
+
+    id = Column(UUID(as_uuid=False), primary_key=True, default=_uuid)
+    workspace_id = Column(UUID(as_uuid=False), ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False)
+    kind = Column(Text, nullable=False)  # decision | vault_event
+    key = Column(Text, nullable=False, unique=True)
+    payload = Column(JSONB, nullable=True)
+    status = Column(Text, nullable=False, default="pending", server_default=text("'pending'"))  # pending | delivered | not_sent
+    attempts = Column(Integer, nullable=False, default=0, server_default=text("0"))
+    last_error = Column(Text, nullable=True)
+    created_at = Column(DateTime(timezone=True), nullable=False, default=_now, server_default=text("NOW()"))
+    delivered_at = Column(DateTime(timezone=True), nullable=True)
+
+    __table_args__ = (Index("idx_os_outbox_status_created", "status", "created_at"),)
 
 
 class StudentRequest(Base):

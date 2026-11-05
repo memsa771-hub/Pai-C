@@ -9,7 +9,7 @@ page shows the live status beside that snapshot instead of rewriting it.
 
 from datetime import datetime, timezone
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 
 from app.models import RouteDecision, StudentJourney, Workspace
 from app.pai_c.possibilities import PossibilityService
@@ -174,8 +174,11 @@ class RouteDecisionService:
             previous.withdrawn_at = now
             paths.set_chosen(workspace_id, previous.possibility_id, False)
             self.db.flush()  # the old row leaves the partial unique index before the new one enters
-        row = RouteDecision(workspace_id=workspace_id, field_key=field_key, possibility_id=card["possibility_id"],
-                            title=card["title"], verdict=card["verdict"],
+        # Minimal version number (rule D-a); the full versioning lands with the decision service.
+        version = (self.db.query(func.max(RouteDecision.decision_version))
+                   .filter(RouteDecision.workspace_id == workspace_id).scalar() or 0) + 1
+        row = RouteDecision(workspace_id=workspace_id, decision_version=version, field_key=field_key,
+                            possibility_id=card["possibility_id"], title=card["title"], verdict=card["verdict"],
                             route=route_of(card, page["education_line"]), steps=_snapshot(card["steps"]),
                             steps_done=[], chosen_at=now)
         self.db.add(row)

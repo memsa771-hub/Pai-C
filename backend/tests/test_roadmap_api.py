@@ -143,7 +143,7 @@ def test_one_active_decision_per_workspace_enforced():
         data(choose(client, params, "electrical_engineering"))
         with student.factory() as db:
             db.add(RouteDecision(workspace_id=student.workspace_id, field_key="computer_engineering",
-                                 title="Computer", verdict={}, route={}, steps=[], steps_done=[]))
+                                 title="Computer", verdict={}, route={}, steps=[], steps_done=[], decision_version=2))
             with pytest.raises(IntegrityError):
                 db.commit()
 
