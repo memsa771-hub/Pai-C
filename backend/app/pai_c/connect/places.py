@@ -67,6 +67,13 @@ def vault_value(db, workspace_id: str, key: str):
     return _vault_value(db, workspace_id, key)
 
 
+def _eligible_levels(db, workspace_id: str) -> list[str] | None:
+    """The levels the student's education opens (eligible_levels.yaml); None when unknown."""
+    from app.pai_c.connect.student_facts import student_eligible_levels
+
+    return student_eligible_levels(db, workspace_id)
+
+
 def _standing_level(db, workspace_id: str) -> str | None:
     from app.pai_c.memory import MemoryService
     from app.pai_c.roadmap.engine import student_standing
@@ -110,12 +117,16 @@ def _targets(db, workspace_id: str) -> list[str]:
 def choice_options(db, workspace_id: str, field_key: str | None, today: date | None = None) -> dict:
     """What the choice screen offers (D-f, D-g). Destinations: the home country plus the destination of every OS
     route at the level (from the student's origin when it is known), plus the one target country the Vault names when
-    it is none of those (offered as unsupported). The target is pre-selected only when the Vault names exactly one
+    it is none of those (offered as unsupported). The level is always one the student's education opens
+    (eligible_levels.yaml), when that is known. The target is pre-selected only when the Vault names exactly one
     and it maps to ISO. Terms per destination: the route's own, else the generic ones."""
     from app import pai_os_bridge
 
     today = today or date.today()
     level = next_level(_standing_level(db, workspace_id), field_key)
+    eligible = _eligible_levels(db, workspace_id)
+    if eligible and level not in eligible:  # R-14: a level the education does not open is never offered
+        level = eligible[0]
     origin = to_iso(_vault_value(db, workspace_id, "location.current_country"))
     routes = [r for r in pai_os_bridge.list_routes() if r["level"] == level and (origin is None or r["origin"] == origin)]
     destinations: dict[str, dict] = {}
