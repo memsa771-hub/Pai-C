@@ -111,7 +111,11 @@ def _write(action, db, workspace_id, *, with_choice: bool = False):
 def get_roadmap(network: str = Query(...), db=Depends(get_db), x_workspace_token: str | None = Header(None),
                 authorization: str | None = Header(None)):
     workspace = _authorized(db, network, x_workspace_token, authorization)
-    return success_response(RoadmapEngine(db).build(str(workspace.id), today=date.today()))
+    workspace_id = str(workspace.id)
+    page = RoadmapEngine(db).build(workspace_id, today=date.today())
+    if page.get("chosen") is not None and _handoff_on():  # flag off: the answer stays as it was
+        page["chosen"] = {**page["chosen"], "choice": _choice_view(db, workspace_id)}
+    return success_response(page)
 
 
 _EMAIL = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
@@ -211,9 +215,13 @@ def choice_options(field_key: str = Query(..., min_length=1, max_length=120), ne
     except consent.ConsentTextNotApproved:
         text = None
     dob = places.vault_value(db, workspace_id, "identity.date_of_birth")
+    under_18 = None  # no stored date: the screen asks for it. One that cannot be read counts as under 18, as in choose.
+    if dob:
+        minor = age.under_18(str(dob), date.today())
+        under_18 = True if minor is None else minor
     return success_response({**places.choice_options(db, workspace_id, field_key), "handoff": True,
                              "consent_text": text, "consent_version": consent.current_version(),
-                             "needs_dob": not dob})
+                             "needs_dob": not dob, "under_18": under_18})
 
 
 @router.get("/places")

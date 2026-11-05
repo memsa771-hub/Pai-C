@@ -141,7 +141,28 @@ it("requires the guardian email when the date of birth makes the student under 1
 });
 
 // req: R-10
-it("adds the guardian step when the API says a stored date of birth is under 18", async () => {
+it("shows the guardian step up front when the API says the stored date of birth is under 18", async () => {
+  open({ under_18: true });
+  pickCountry(DE); next();
+  pickIntake(); next();
+  await screen.findByRole("checkbox", { name: "Alpha University" });
+  pickPlace("Alpha University"); next();
+  agree(); next();
+  expect(heading()).toBe("Step 5 of 5: Parent or guardian");
+  fireEvent.change(screen.getByLabelText(c.guardian.label), { target: { value: "parent@example.com" } });
+  fireEvent.click(screen.getByRole("button", { name: c.submit }));
+  await waitFor(() => expect(workspaceApi.chooseRoute).toHaveBeenCalledTimes(1));
+  expect(vi.mocked(workspaceApi.chooseRoute).mock.calls[0][1]).toMatchObject({ guardian_email: "parent@example.com" });
+});
+
+// req: R-10
+it("has no guardian step for an adult with a stored date of birth", async () => {
+  open({ under_18: false });
+  expect(screen.getByTestId("choice-step").textContent).toBe("Step 1 of 4: Country");
+});
+
+// req: R-10
+it("falls back to the guardian step when the API says a stored date of birth is under 18", async () => {
   await toPlaces();
   pickPlace("Alpha University"); next(); agree();
   vi.mocked(workspaceApi.chooseRoute).mockRejectedValueOnce(

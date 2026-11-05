@@ -114,6 +114,37 @@ def test_places_endpoint(os_stub):
         assert bad.status_code == 422
 
 
+def test_get_roadmap_carries_the_choice_only_with_the_flag_on(os_stub):
+    with pre_eng() as (client, student, params), flag(True):
+        vault((client, student, params))
+        assert data(client.get("/v1/roadmap", params=params, headers=TOKEN))["chosen"] is None
+        choose_with(client, params)
+        chosen = data(client.get("/v1/roadmap", params=params, headers=TOKEN))["chosen"]
+        assert chosen["choice"]["version"] == 1
+        assert chosen["choice"]["consent"] == {"student": "given", "guardian": "not_needed"}
+        post(client, params, "consent/withdraw")
+        chosen = data(client.get("/v1/roadmap", params=params, headers=TOKEN))["chosen"]
+        assert chosen["choice"]["version"] == 2 and chosen["choice"]["consent"]["student"] == "missing"
+    with pre_eng() as (client, student, params), flag(False):
+        choose(client, params, FIELD)
+        chosen = data(client.get("/v1/roadmap", params=params, headers=TOKEN))["chosen"]
+        assert chosen["field_key"] == FIELD and "choice" not in chosen
+
+
+def test_choice_options_says_if_the_stored_date_of_birth_is_under_18(os_stub):
+    def options(client, params):
+        return data(client.get("/v1/roadmap/choice-options", params={**params, "field_key": FIELD}, headers=TOKEN))
+    for dob, expected in ((None, None), ("2000-01-01", False), ("2012-05-05", True)):
+        with pre_eng() as (client, student, params), flag(True):
+            vault((client, student, params), dob=dob)
+            assert options(client, params)["under_18"] is expected
+    with pre_eng() as (client, student, params), flag(True):
+        real = places.vault_value
+        patched = lambda db, ws, key: "not-a-date" if key == "identity.date_of_birth" else real(db, ws, key)  # noqa: E731
+        with patch.object(places, "vault_value", patched):
+            assert options(client, params)["under_18"] is True
+
+
 def test_details_with_consent_make_a_pending_version(os_stub):
     with pre_eng() as (client, student, params), flag(True):
         vault((client, student, params))

@@ -92,7 +92,7 @@ export type ConsentState = { student: "given" | "missing"; guardian: "not_needed
 /** The live choice: what was picked and who has agreed. Present only when the hand-off is on. */
 export type RouteChoice = {
   version: number;
-  places: { ref: string; rank: number }[];
+  places: { programme_ref: string; rank: number }[];
   intake: { term: string; year: number } | null;
   destination: string | null;
   level: string | null;
@@ -137,6 +137,8 @@ export type ChoiceOptions =
       consent_text: string | null;
       consent_version: string | number | null;
       needs_dob: boolean;
+      /** From the stored date of birth: true under 18 (or unreadable), false adult, null when none is stored. */
+      under_18: boolean | null;
     };
 
 export type OfferedPlace = { ref: string; name: string };

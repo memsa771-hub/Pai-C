@@ -346,13 +346,14 @@ export const choiceOptionsOn: Extract<ChoiceOptions, { handoff: true }> = {
   consent_text: "PAI will share your choice with your plan. You can withdraw at any time.",
   consent_version: "v1",
   needs_dob: false,
+  under_18: false,
 };
 export const offeredPlaces: OfferedPlace[] = [
   { ref: "p1", name: "Alpha University" }, { ref: "p2", name: "Beta Institute" }, { ref: "p3", name: "Gamma College" },
   { ref: "p4", name: "Delta University" }, { ref: "p5", name: "Epsilon School" }, { ref: "p6", name: "Zeta Academy" },
 ];
 export const routeChoice = (over: Partial<RouteChoice> = {}): RouteChoice => ({
-  version: 2, places: [{ ref: "p1", rank: 1 }], intake: { term: "winter", year: 2027 }, destination: "DE", level: "bachelor",
+  version: 2, places: [{ programme_ref: "p1", rank: 1 }], intake: { term: "winter", year: 2027 }, destination: "DE", level: "bachelor",
   os_supported: true, consent: { student: "given", guardian: "not_needed" }, ...over,
 });
 

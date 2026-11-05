@@ -54,7 +54,7 @@ export function ChoiceFlow({ card, options, onSaved, onClose, onOpenVault }: {
 
   const chosen = options.destinations.find((d) => d.code === destination);
   const minorByDob = options.needs_dob && dob !== "" && (ageOf(dob) ?? 99) < 18;
-  const guardianNeeded = minorByDob || serverMinor;
+  const guardianNeeded = options.under_18 === true || minorByDob || serverMinor;
   const ids: StepId[] = useMemo(() => ["destination", "intake", "places", ...(options.needs_dob ? ["dob" as const] : []),
     "consent", ...(guardianNeeded ? ["guardian" as const] : [])], [options.needs_dob, guardianNeeded]);
   const step = ids[Math.min(index, ids.length - 1)];
@@ -101,7 +101,6 @@ export function ChoiceFlow({ card, options, onSaved, onClose, onOpenVault }: {
 
   async function submit() {
     if (!check(step)) return;
-    // Earlier answers were checked when the student left their step; a dropped one (the country changed) is checked again.
     setBusy(true); setFormError(""); setVaultNote(false);
     const details: ChoiceDetails = {
       destination, intake: { term, year: Number(year) },
@@ -116,7 +115,7 @@ export function ChoiceFlow({ card, options, onSaved, onClose, onOpenVault }: {
     } catch (e) {
       const { status, detail } = apiError(e);
       if (status === 422 && detail.includes(UNDER_18_DETAIL) && !guardianNeeded) {
-        // PAI knows the age from the Vault, not from this screen: ask for the guardian now.
+        // Fallback: the age was not known up front; ask for the guardian now.
         setServerMinor(true);
         setErrors({}); setIndex(ids.length); // the guardian step is appended after consent
         setFocus({ field: "guardian", n: Date.now() });
