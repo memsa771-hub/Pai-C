@@ -141,6 +141,15 @@ def test_tickable_rule(owner, status, kind, review, tickable):
     assert step["tickable"] is tickable
 
 
+def test_a_repeat_tick_on_a_done_step_is_a_no_op():
+    with plan_client(view_of(STEPS)) as (client, student, params, fake, _):
+        data(tick(client, params, "gather@1"))
+        again = data(tick(client, params, "gather@1"))  # a double click
+        assert "gather@1" in again["steps_done"] and fake.completed == [(student.workspace_id, 1)]
+        already = data(tick(client, params, "open@1"))  # done in the OS before the student ever ticked
+        assert "open@1" in already["steps_done"] and len(fake.completed) == 1
+
+
 def test_a_tick_completes_the_os_task_and_the_page_follows():
     with plan_client(view_of(STEPS)) as (client, student, params, fake, _):
         answer = data(tick(client, params, "gather@1"))

@@ -325,6 +325,8 @@ class RouteDecisionService:
         if not done:
             raise RouteDecisionError("A step of your plan cannot be undone here. If something changed, "
                                      "tell PAI and the plan will be updated.", 409)
+        if step["status"] == "done":  # a repeat tick (a double click) changes nothing and is no error
+            return plan_adapter.chosen(row, RoadmapEngine(self.db).build(row.workspace_id)["fields"])
         if step["review"]:
             raise RouteDecisionError("Approve the file to finish this step; it cannot be ticked.", 409)
         if not step["tickable"]:
