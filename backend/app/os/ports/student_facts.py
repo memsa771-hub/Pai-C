@@ -116,7 +116,19 @@ def record_event(event: dict) -> Literal["stored", "duplicate", "module_off"]:
     stored = VaultEventStore(svc.engine, tenant).add(json.loads(checked.model_dump_json(by_alias=True)))
     if not manifest.is_enabled(svc.engine, tenant):
         return "module_off"
+    _replan(svc, checked)  # also for a repeat: a first delivery that stopped before this step is completed
     return "stored" if stored else "duplicate"
+
+
+def _replan(svc, event: VaultEventV1) -> None:
+    """Records `student_fact_changed` on each open plan that uses a changed key (deduped by Vault version)."""
+    plans = getattr(svc, "plans", None)
+    if plans is None:  # a mount without plans has none to re-check
+        return
+    from app.os.eligibility.facts import current_types  # late: these import this port
+    from app.os.replan.student_facts import record_changes
+
+    record_changes(plans, event.student_ref, event.vault_version, event.keys, current_types())
 
 
 def latest_vault_version(student_ref: str) -> int | None:

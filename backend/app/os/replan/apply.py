@@ -100,13 +100,25 @@ class Replanner:
                 models.plans.c.id == plan_id)).one()
         return row.contract_sha256, row.current_revision
 
-    def state(self, plan_id: int, with_suggestions: bool = False) -> PlanState:
+    def below(self, plan_id: int) -> tuple[str, ...]:
+        """Re-checks the plan's programmes against the student's facts as they are now (the eligibility note is
+        refreshed on the way) and returns those that read `likely_below`, unless a pending proposal already removes
+        them (D-o)."""
+        from app.os.eligibility.notes import refresh
+
+        _, cards = refresh(self.plans, self.student_of(plan_id), plan_id)
+        held = {op.get("programme_ref") for p in self.proposals.for_plan(plan_id) if p.status == "pending"
+                for op in p.ops if op.get("op") == "cancel_programme"}
+        return tuple(ref for ref, card in cards.items() if card.verdict == "likely_below" and ref not in held)
+
+    def state(self, plan_id: int, with_suggestions: bool = False, with_below: bool = False) -> PlanState:
         contract, _ = self.plans._contract(plan_id)
         book = self.plans._pinned(plan_id)
         tasks = task_rows(self.engine, self.tenant, plan_id)
         programmes = [p.programme_ref for p in sorted(contract.programmes, key=lambda p: p.rank)]
         suggestions = {ref: self._suggestions(contract, book, ref) for ref in programmes} if with_suggestions else {}
-        return PlanState(plan_id, book.key, programmes, tasks, suggestions, book.version)
+        return PlanState(plan_id, book.key, programmes, tasks, suggestions, book.version,
+                         self.below(plan_id) if with_below else ())
 
     def _suggestions(self, contract, book, ref: str) -> list[str]:
         """Up to 3 programmes on the route the student likely meets, not in the plan, most confirmed facts first."""

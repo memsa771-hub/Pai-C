@@ -94,10 +94,12 @@ def _record(plans, student_ref: str, plan_id: int, card: Card, suggestions) -> b
     return True
 
 
-def _check_plan(plans, student_ref: str, plan_id: int, only: str | None = None) -> int:
+def refresh(plans, student_ref: str, plan_id: int, only: str | None = None) -> tuple[int, dict[str, Card]]:
+    """Re-evaluates the plan's chosen programmes with its pinned rules and writes a note for each verdict that changed.
+    Returns (notes written, each programme's card); no cards without rules."""
     contract, book = _plan(plans, plan_id)
     if book.eligibility is None:
-        return 0
+        return 0, {}
     rules, year = book.eligibility, contract.target_intake.year
     chosen = [p.programme_ref for p in contract.programmes]
     profile = profile_of(plans, student_ref)
@@ -112,7 +114,12 @@ def _check_plan(plans, student_ref: str, plan_id: int, only: str | None = None) 
             return [s.programme_ref for s in suggest(card, list(cands.values()), set(chosen))]
         return make
 
-    return sum(_record(plans, student_ref, plan_id, card, suggestions_for(card)) for card, _ in mine.values())
+    written = sum(_record(plans, student_ref, plan_id, card, suggestions_for(card)) for card, _ in mine.values())
+    return written, {ref: card for ref, (card, _) in mine.items()}
+
+
+def _check_plan(plans, student_ref: str, plan_id: int, only: str | None = None) -> int:
+    return refresh(plans, student_ref, plan_id, only)[0]
 
 
 def _plans_of(plans, *, student_ref: str | None = None, intake_year: int | None = None) -> list[tuple[int, str, dict]]:

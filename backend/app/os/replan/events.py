@@ -8,7 +8,7 @@ from sqlalchemy import Connection, Engine, exists, func, insert, select
 from app.os import models
 
 EVENT_TYPES = ("admission_rejected", "deadline_at_risk", "document_missing", "task_failed", "playbook_newer",
-               "escalate", "approved_changed", "route_invalid")
+               "escalate", "approved_changed", "route_invalid", "student_fact_changed")
 ADMISSION_TEMPLATE = "admission_result"  # its result {"choice": "rejected"} is a rejection (the Slice 6b inbox)
 REVIEW_TEMPLATES = {"review_pack": "pack", "review_visa_file": "visa"}  # review step -> the artifact kind it approves
 

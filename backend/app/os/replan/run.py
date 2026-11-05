@@ -71,8 +71,8 @@ def register_replan(engine: Engine, settings: OsSettings, replanner: Replanner, 
 
     def rules(plan_id: int, event_id: int) -> dict:
         e = ev.get(engine, tenant, event_id)
-        got = rules_for(e, replanner.state(plan_id, with_suggestions=e.type == "admission_rejected"),
-                        replanner.config(plan_id))
+        got = rules_for(e, replanner.state(plan_id, with_suggestions=e.type == "admission_rejected",
+                                           with_below=e.type == "student_fact_changed"), replanner.config(plan_id))
         if isinstance(got, Handover):
             return {"handover": got.reason}
         if isinstance(got, Retry):
