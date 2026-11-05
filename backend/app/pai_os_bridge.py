@@ -344,17 +344,17 @@ def plan_view(student_ref: str) -> dict | None:
     when the step is closed by approving a pack or visa file, never by hand. None when PAI OS is not mounted, and on any
     failure (logged); the Counsellor then shows its own view."""
     try:
-        from app.os.ports import plan_query
-        from app.os.replan.events import REVIEW_TEMPLATES
+        from app.os.ports import plan_actions, plan_query
 
         view = plan_query.plan_view(student_ref).model_dump(mode="json", by_alias=True)
+        review = plan_actions.review_templates()
     except ports.OsUnavailable:
         return None
     except Exception:
         log.exception("plan view could not be read; the Counsellor's own view is shown")
         return None
     for step in view["steps"]:
-        step["review"] = step["template_key"] in REVIEW_TEMPLATES
+        step["review"] = step["template_key"] in review
     return view
 
 

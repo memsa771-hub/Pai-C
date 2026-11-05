@@ -155,3 +155,31 @@ def test_roadmap_and_steps_are_byte_identical_to_the_pre_adapter_answers(monkeyp
         assert got[name] == expected[name], name
     assert json.dumps(got, sort_keys=True) == json.dumps(expected, sort_keys=True)
     assert touched.mock_calls == []
+
+
+@pytest.mark.req("R-04")
+def test_flags_off_an_os_supported_row_ticks_locally_and_asks_nothing_of_the_os(monkeypatch):
+    """Even a row marked os_supported answers from the Counsellor's own steps while the plan flag is off, and a
+    token-only caller may tick: no plan view, no step completion, no account check."""
+    from app.os.ports import plan_actions, plan_query
+    from tests.test_roadmap_api import data, pre_eng
+
+    touched = MagicMock()
+    monkeypatch.setattr(plan_query, "plan_view", touched.plan_view)
+    monkeypatch.setattr(plan_actions, "complete_step", touched.complete_step)
+    monkeypatch.setattr(bridge, "plan_view", touched.bridge_plan_view)
+    monkeypatch.setattr(bridge, "complete_step", touched.bridge_complete_step)
+    monkeypatch.setattr(bridge, "counsellor_module_on", touched.module_on)
+    with pre_eng() as (client, student, params):
+        choose_answer = client.post("/v1/roadmap/choose", params=params, headers=TOKEN,
+                                    json={"field_key": "electrical_engineering"})
+        assert choose_answer.status_code == 200
+        with student.factory() as db:
+            db.query(RouteDecision).one().os_supported = True
+            db.commit()
+        ticked = data(client.post("/v1/roadmap/steps", params=params, headers=TOKEN,
+                                  json={"key": "apply", "done": True}))
+        page = data(client.get("/v1/roadmap", params=params, headers=TOKEN))["chosen"]
+    assert ticked["steps_done"] == ["apply"] == page["steps_done"]
+    assert set(ticked) == CHOOSE_KEYS and set(page) == CHOOSE_KEYS
+    assert touched.mock_calls == []

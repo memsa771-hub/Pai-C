@@ -83,3 +83,7 @@ def test_step_not_waiting_is_refused(os_on, engine):
         plan_actions.complete_step(STUDENT, task_id(engine, p, "apply@p1"))
     assert e.value.code == "not_waiting"
     assert "not waiting for the student" in e.value.message
+
+
+def test_review_templates_names_the_steps_a_tick_cannot_finish():
+    assert plan_actions.review_templates() == frozenset({"review_pack", "review_visa_file"})

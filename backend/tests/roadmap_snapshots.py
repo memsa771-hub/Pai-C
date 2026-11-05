@@ -4,7 +4,7 @@ and the volatile values (ids, timestamps) normalised. P1-T5 captured it from the
 
 import json
 import re
-from datetime import date
+from datetime import date, datetime, timezone
 from unittest.mock import patch
 
 from tests.test_roadmap_api import TOKEN, choose, pre_eng
@@ -51,6 +51,15 @@ def walk() -> dict:
                                ("tick_unknown_key", {"key": "nope", "done": True}),
                                ("untick_apply", {"key": "apply", "done": False})):
                 record(name, client.post("/v1/roadmap/steps", params=params, headers=TOKEN, json=body))
+            from app.pai_c.roadmap.decisions import RouteDecisionService
+            with student.factory() as db:  # the service answers the router does not return as they are
+                service = RouteDecisionService(db)
+                out["current"] = normalise(service.current(student.workspace_id))
+                out["update_consent"] = normalise(service.update_consent(
+                    student.workspace_id, authorized_at=datetime(2026, 11, 5, 9, 0, tzinfo=timezone.utc),
+                    consent_version="v1"))
+                db.commit()
+                out["current_after_consent"] = normalise(service.current(student.workspace_id))
             record("withdraw", client.post("/v1/roadmap/withdraw", params=params, headers=TOKEN))
             record("get_after_withdraw", client.get("/v1/roadmap", params=params, headers=TOKEN))
     return json.loads(json.dumps(out))

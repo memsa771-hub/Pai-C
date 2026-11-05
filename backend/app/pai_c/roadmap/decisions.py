@@ -191,8 +191,9 @@ class RouteDecisionService:
         row = self.active(workspace_id)
         if row is None:
             return None
-        cards = RoadmapEngine(self.db).build(workspace_id)["fields"]
-        return {**plan_adapter.chosen(row, cards), "workspace_id": row.workspace_id}
+        with plan_adapter.pinned_read(row):
+            cards = RoadmapEngine(self.db).build(workspace_id)["fields"]
+            return {**plan_adapter.chosen(row, cards), "workspace_id": row.workspace_id}
 
     def choose(self, workspace_id: str, field_key: str, details: "ChoiceDetails | None" = None) -> dict:
         self._lock(workspace_id)
@@ -254,7 +255,8 @@ class RouteDecisionService:
                                                    ("guardian_authorized_at", guardian_authorized_at))
                    if value is not ... and _instant(value) != _instant(values[name])}
         if not changes:  # nothing to change: no version, no outbox row
-            return plan_adapter.chosen(row, RoadmapEngine(self.db).build(workspace_id)["fields"])
+            with plan_adapter.pinned_read(row):
+                return plan_adapter.chosen(row, RoadmapEngine(self.db).build(workspace_id)["fields"])
         values.update(changes)
         if "authorized_at" in changes:
             values["consent_version"] = None if changes["authorized_at"] is None else (
@@ -266,7 +268,8 @@ class RouteDecisionService:
         self.db.add(new)
         self.db.flush()
         outbox.record(self.db, new, consent_only=True)
-        return plan_adapter.chosen(new, RoadmapEngine(self.db).build(workspace_id)["fields"])
+        with plan_adapter.pinned_read(new):
+            return plan_adapter.chosen(new, RoadmapEngine(self.db).build(workspace_id)["fields"])
 
     def set_step(self, workspace_id: str, done: bool, *, key: str | None = None, index: int | None = None,
                  is_human=None) -> dict:
@@ -276,9 +279,17 @@ class RouteDecisionService:
         (`is_human()` is asked then, and only then)."""
         self._lock(workspace_id)
         row = self._active_or_404(workspace_id)
-        view = plan_adapter.view_for(row)
-        if view is not None and view["state"] != "empty" and plan_adapter.applied(row, view):
-            return self._set_plan_step(row, view, done, key, index, is_human)
+        try:
+            view = plan_adapter.read(row)
+        except plan_adapter.PlanUnavailable:  # an OS route whose plan cannot be read must not fall back to local ticks
+            raise RouteDecisionError(*STEP_REFUSALS["unavailable"]) from None
+        with plan_adapter.pinned(view):  # the plan is read once for this request
+            if view is not None and view["state"] != "empty" and plan_adapter.applied(row, view):
+                return self._set_plan_step(row, view, done, key, index, is_human)
+            return self._set_local_step(row, workspace_id, done, key, index)
+
+    def _set_local_step(self, row: RouteDecision, workspace_id: str, done: bool, key: str | None,
+                        index: int | None) -> dict:
         page = RoadmapEngine(self.db).build(workspace_id)
         card = next((card for card in page["fields"] if card["field_key"] == row.field_key), None)
         # The field card is gone (the route is stale): its stored steps carry no
@@ -309,6 +320,8 @@ class RouteDecisionService:
         step = next((s for s in steps if s["key"] == key), None)
         if step is None:
             raise RouteDecisionError("No such step on this route", 422)
+        if is_human is None or not is_human():  # first, so a token-only caller is refused for every OS step
+            raise RouteDecisionError("Sign in to your PAI account to tick a step of your plan.", 403)
         if not done:
             raise RouteDecisionError("A step of your plan cannot be undone here. If something changed, "
                                      "tell PAI and the plan will be updated.", 409)
@@ -316,13 +329,16 @@ class RouteDecisionService:
             raise RouteDecisionError("Approve the file to finish this step; it cannot be ticked.", 409)
         if not step["tickable"]:
             raise RouteDecisionError("This step is not waiting for you, so it cannot be ticked.", 409)
-        if is_human is None or not is_human():
-            raise RouteDecisionError("Sign in to your PAI account to tick a step of your plan.", 403)
         try:
             pai_os_bridge.complete_step(str(row.workspace_id), step["task_id"])
         except pai_os_bridge.StepError as exc:
             raise RouteDecisionError(*STEP_REFUSALS[exc.code]) from None
-        return plan_adapter.chosen(row, RoadmapEngine(self.db).build(row.workspace_id)["fields"])
+        try:  # the tick changed the plan: read it again, once, for the answer
+            fresh = plan_adapter.read(row, fresh=True)
+        except plan_adapter.PlanUnavailable:
+            fresh = view
+        with plan_adapter.pinned(fresh):
+            return plan_adapter.chosen(row, RoadmapEngine(self.db).build(row.workspace_id)["fields"])
 
     def withdraw(self, workspace_id: str) -> dict:
         self._lock(workspace_id)

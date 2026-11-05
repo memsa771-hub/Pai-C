@@ -12,6 +12,9 @@ import pytest
 from app import pai_os_bridge as bridge
 from app.config import config
 from app.models import BackgroundJob, RouteDecision
+from app.pai_c.connect.choice import ChoiceDetails
+from app.pai_c.roadmap import plan_adapter
+from app.pai_c.roadmap.decisions import RouteDecisionService
 from tests.test_connect_flags_off import CHOOSE_KEYS
 from tests.test_roadmap_api import TOKEN, choose, data, pre_eng
 
@@ -53,9 +56,10 @@ STEPS = [
 
 class FakeOs:
     def __init__(self, view):
-        self.view, self.completed, self.error = view, [], None
+        self.view, self.completed, self.error, self.reads = view, [], None, 0
 
     def plan_view(self, ref):
+        self.reads += 1
         return None if self.view is None else copy.deepcopy(self.view)
 
     def complete_step(self, ref, task_id, payload=None):
@@ -177,8 +181,11 @@ def test_a_review_step_is_refused_and_a_pai_step_too():
 def test_a_token_only_caller_cannot_tick_an_os_step():
     with plan_client(view_of(STEPS), human=False) as (client, _, params, fake, _):
         refused = tick(client, params, "gather@1")
+        everything = [tick(client, params, k, done) for k, done in (("pack@1", True), ("check@1", True),
+                                                                    ("open@1", False), ("apply@1", True))]
         assert page(client, params)["steps_done"] == ["open@1"]  # reading needs no account
     assert refused.status_code == 403 and "account" in refused.json()["detail"]
+    assert [r.status_code for r in everything] == [403] * 4
     assert fake.completed == []
 
 
@@ -202,16 +209,70 @@ def test_the_empty_state_keeps_todays_view_and_says_so():
 
 
 def test_a_plan_of_an_older_choice_is_not_shown_for_a_new_route():
-    """The OS holds version 0 of another route; the row is version 1: not applied yet, so the empty state."""
-    stale = view_of(STEPS, version=0)
+    """The OS holds version 1 of another route; the row is version 2: not applied yet, so the empty state."""
+    stale = view_of(STEPS, version=1)
     stale["route"]["destination_country"] = "FR"
     with plan_client(stale) as (client, student, params, _fake, _):
         with student.factory() as db:
             row = db.query(RouteDecision).one()
-            row.destination_country, row.level = "DE", "master"
+            row.destination_country, row.level, row.origin_country, row.decision_version = "DE", "master", "PK", 2
             db.commit()
         chosen = page(client, params)
     assert chosen["plan"] == {"state": "empty"} and all(s["kind"] != "os" for s in chosen["steps"])
+
+
+def test_the_plan_is_read_once_per_request():
+    with plan_client(view_of(STEPS)) as (client, student, params, fake, _):
+        fake.reads = 0
+        page(client, params)
+        assert fake.reads == 1
+        fake.reads = 0
+        data(tick(client, params, "gather@1"))
+        assert fake.reads == 2  # once to check the tick, once after it for the answer
+        with student.factory() as db:
+            from app.pai_c.roadmap.decisions import RouteDecisionService
+            fake.reads = 0
+            assert RouteDecisionService(db).current(student.workspace_id)["plan"]["state"] == "active"
+            assert fake.reads == 1
+    with plan_client(view_of([], state="empty", plan_id=None, decision_version=None, revision=None, route=None,
+                             consent=None, changes=[], proposals_waiting=0)) as (client, _, params, fake, _):
+        fake.reads = 0
+        data(tick(client, params, "apply"))  # an empty plan: the Counsellor's own tick, one read
+        assert fake.reads == 1
+
+
+def test_os_steps_say_who_owns_them():
+    with plan_client(view_of(STEPS)) as (client, _, params, _fake, _):
+        owners = {s["key"]: s["owner"] for s in page(client, params)["steps"]}
+    assert owners["gather@1"] == "student" and owners["check@1"] == "pai"
+
+
+DETAILS = ChoiceDetails(origin_country="PK", destination_country="DE", level="master", places=(), intake=None)
+
+
+def test_a_rechosen_route_does_not_show_the_stopped_plan_of_the_withdrawn_choice():
+    """Choose, withdraw, choose the same route again while the OS still shows the old plan, stopped, at version 1."""
+    stopped = view_of(STEPS, state="stopped", reason="withdrawn", version=1)
+    with plan_client(stopped, checkins=True) as (client, student, params, _fake, _):
+        data(client.post("/v1/roadmap/withdraw", params=params, headers=TOKEN))
+        with student.factory() as db, patch.object(bridge, "route_supported", lambda *a: True):
+            answer = RouteDecisionService(db).choose(student.workspace_id, "electrical_engineering", DETAILS)
+            db.commit()
+        assert answer["plan"] == {"state": "empty"} and all(s["kind"] != "os" for s in answer["steps"])
+        chosen = page(client, params)
+        assert chosen["plan"] == {"state": "empty"} and all(s["kind"] != "os" for s in chosen["steps"])
+        with student.factory() as db:
+            row = db.query(RouteDecision).filter(RouteDecision.withdrawn_at.is_(None)).one()
+            assert row.decision_version == 3 and plan_adapter.plan_superseded(row) is False
+
+
+def test_a_finished_old_plan_is_not_applied_to_a_newer_choice_of_the_same_route():
+    row = SimpleNamespace(decision_version=2, origin_country="PK", destination_country="DE", level="master")
+    live = view_of(STEPS, version=1)
+    assert plan_adapter.applied(row, live) is True  # a consent change: same route, plan still live
+    assert plan_adapter.applied(row, view_of(STEPS, state="finished", version=1)) is False
+    live["route"]["origin_country"] = "IN"
+    assert plan_adapter.applied(row, live) is False
 
 
 def test_a_stopped_plan_is_shown_with_its_reason():
@@ -233,6 +294,15 @@ def test_an_os_that_cannot_answer_keeps_todays_view():
     with plan_client(None) as (client, _, params, _fake, _):
         chosen = page(client, params)
     assert "plan" not in chosen and all(s["kind"] != "os" for s in chosen["steps"])
+
+
+def test_an_os_that_cannot_answer_refuses_a_tick_with_503_and_ticks_nothing_locally():
+    with plan_client(None) as (client, student, params, fake, _):
+        refused = tick(client, params, "apply")  # a legacy step key: must not fall through to a local tick
+        assert page(client, params)["steps_done"] == []
+        with student.factory() as db:
+            assert db.query(RouteDecision).one().steps_done in (None, [])
+    assert refused.status_code == 503 and fake.completed == []
 
 
 def test_flag_on_then_off_shows_todays_view():
