@@ -16,6 +16,12 @@ logger = logging.getLogger(__name__)
 RESEND_URL = "https://api.resend.com/emails"
 
 
+def mask_email(address: str | None) -> str:
+    """`a***@domain`: an address is personal data and must not reach a log line whole."""
+    local, at, domain = (address or "").partition("@")
+    return f"{local[:1]}***@{domain}" if at and local and domain else "***"
+
+
 def email_configured() -> bool:
     return bool(config.RESEND_API_KEY)
 
@@ -27,7 +33,7 @@ def send_email(to: str, subject: str, html_body: str, text_body: str | None = No
     unconfigured.
     """
     if not email_configured():
-        logger.info("email: RESEND_API_KEY not set, skipping send to %s (%s)", to, subject)
+        logger.info("email: RESEND_API_KEY not set, skipping send to %s (%s)", mask_email(to), subject)
         return False
     try:
         resp = httpx.post(
@@ -39,10 +45,11 @@ def send_email(to: str, subject: str, html_body: str, text_body: str | None = No
         )
         if resp.status_code in (200, 201):
             return True
-        logger.warning("email: send to %s failed: %s %s", to, resp.status_code, resp.text[:300])
+        logger.warning("email: send to %s failed: %s %s", mask_email(to), resp.status_code,
+                       resp.text[:300].replace(to, mask_email(to)))
         return False
     except Exception as e:  # noqa: BLE001 — network errors must not break callers
-        logger.warning("email: send to %s failed: %s", to, e)
+        logger.warning("email: send to %s failed: %s", mask_email(to), str(e).replace(to, mask_email(to)))
         return False
 
 

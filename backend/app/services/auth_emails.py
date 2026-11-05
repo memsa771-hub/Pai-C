@@ -97,3 +97,26 @@ def send_account_deleted_email(to: str) -> bool:
         None,
         "If you did not ask for this, reply to this email.",
     )
+
+
+def guardian_link(token: str) -> str:
+    """The page a guardian opens from an e-mail: /guardian/<token>."""
+    return f"{config.APP_URL.rstrip('/')}/guardian/{token}"
+
+
+def send_guardian_consent_email(to: str, link: str, *, subject: str, title: str, paragraphs: list[str],
+                                button: str, footer: str) -> bool:
+    """Asks a guardian to agree. The wording comes from the approved consent texts; `link` is the one-time link."""
+    return _send(to, subject, title, paragraphs, (button, link), footer)
+
+
+def send_guardian_confirmation_email(to: str, withdraw_link: str, *, subject: str, title: str,
+                                     paragraphs: list[str], button: str, footer: str) -> bool:
+    """Confirms the agreement and carries the link to withdraw it."""
+    return _send(to, subject, title, paragraphs, (button, withdraw_link), footer)
+
+
+def send_guardian_withdrawn_email(to: str, *, subject: str, title: str, paragraphs: list[str],
+                                  footer: str) -> bool:
+    """Confirms that the guardian withdrew."""
+    return _send(to, subject, title, paragraphs, None, footer)

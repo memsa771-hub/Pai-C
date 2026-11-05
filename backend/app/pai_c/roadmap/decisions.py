@@ -8,6 +8,7 @@ page shows the live status beside that snapshot instead of rewriting it.
 """
 
 from datetime import datetime, timezone
+from types import EllipsisType
 from typing import TYPE_CHECKING
 
 from sqlalchemy import func, select
@@ -138,7 +139,10 @@ class RouteDecisionService:
             return
         if journey.current_stage == "CHOSEN":
             self._set_stage(journey, "PROPOSED")
-        if (journey.active_goal or {}).get("route_decision_id") == row.id:
+        goal = journey.active_goal or {}
+        # A consent change supersedes the row without touching the journey, so the goal may name an older version
+        # of the same choice: match by field as well.
+        if goal.get("route_decision_id") == row.id or (goal and goal.get("field_key") == row.field_key):
             journey.active_goal = None
             journey.current_objective = None
         self._note_withdrawn(journey, row, version)
@@ -216,6 +220,31 @@ class RouteDecisionService:
         schedule(self.db, workspace_id, "chosen_path", row.id, at=now)
         outbox.record(self.db, row)
         return serialize(row, page["fields"])
+
+    # Every column a consent change carries over unchanged into its new version.
+    _COPIED = ("field_key", "possibility_id", "title", "verdict", "route", "steps", "steps_done", "chosen_at",
+               "origin_country", "destination_country", "level", "path_ref", "places", "intake", "os_supported",
+               "authorized_at", "guardian_authorized_at", "guardian_required")
+
+    def update_consent(self, workspace_id: str, *, authorized_at: "datetime | None | EllipsisType" = ...,
+                       guardian_authorized_at: "datetime | None | EllipsisType" = ...) -> dict:
+        """A consent change is a new decision version: the active row is superseded by a copy of itself with the
+        named consent fields changed (`...` leaves a field as it is, None clears it). The choice, places and
+        intake stay; check-ins are not rescheduled and the journey and the possibility are not touched."""
+        self._lock(workspace_id)
+        row = self._active_or_404(workspace_id)
+        row.withdrawn_at = datetime.now(timezone.utc)
+        self.db.flush()  # the old row leaves the partial unique index before the new one enters
+        values = {name: getattr(row, name) for name in self._COPIED}
+        for name, value in (("authorized_at", authorized_at), ("guardian_authorized_at", guardian_authorized_at)):
+            if value is not ...:
+                values[name] = value
+        new = RouteDecision(workspace_id=workspace_id, decision_version=self._next_version(workspace_id),
+                            status="chosen", **values)
+        self.db.add(new)
+        self.db.flush()
+        outbox.record(self.db, new)
+        return serialize(new, RoadmapEngine(self.db).build(workspace_id)["fields"])
 
     def set_step(self, workspace_id: str, done: bool, *, key: str | None = None, index: int | None = None) -> dict:
         """Tick or untick one step of the live route, named by its key (or,
