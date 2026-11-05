@@ -177,6 +177,31 @@ class Kernel:
             self._event(conn, plan_id, None, "plan_closed", {"number": number, "cause": cause})
             return number
 
+    def pause_plan(self, plan_id: int, reason: str) -> bool:
+        """Pauses an active or at-risk plan (P1-D11): no task is promoted and no reminder is sent until it resumes.
+        `reason` is a code (e.g. `consent_missing`), kept in the `plan_paused` event. False, and nothing changes,
+        when the plan is already paused or is closed or done."""
+        with self.engine.begin() as conn:
+            self._lock_plan(conn, plan_id)
+            status = conn.execute(select(P.c.status).where(P.c.id == plan_id)).scalar_one()
+            if status not in ("active", "at_risk"):
+                return False
+            conn.execute(update(P).where(P.c.id == plan_id).values(status="paused", updated_at=self.clock()))
+            self._event(conn, plan_id, None, "plan_paused", {"reason": reason})
+            return True
+
+    def resume_plan(self, plan_id: int) -> bool:
+        """Resumes a paused plan as active (the deadline engine marks it at risk again if it is) and promotes what
+        became ready meanwhile. False, and nothing changes, when the plan is not paused."""
+        with self.engine.begin() as conn:
+            self._lock_plan(conn, plan_id)
+            if conn.execute(select(P.c.status).where(P.c.id == plan_id)).scalar_one() != "paused":
+                return False
+            conn.execute(update(P).where(P.c.id == plan_id).values(status="active", updated_at=self.clock()))
+            self._event(conn, plan_id, None, "plan_resumed", {})
+            self._promote(conn, plan_id)
+            return True
+
     def set_changes_paused(self, plan_id: int, paused: bool) -> None:
         """Pauses or resumes replanning for a plan (S7-D9). Student-driven changes are not affected."""
         with self.engine.begin() as conn:
@@ -434,6 +459,8 @@ class Kernel:
         return number
 
     def _promote(self, conn: Connection, plan_id: int) -> None:
+        if conn.execute(select(P.c.status).where(P.c.id == plan_id)).scalar_one() == "paused":
+            return  # a paused plan readies nothing and is not marked done; `resume_plan` promotes again
         rows = conn.execute(select(T).where(T.c.plan_id == plan_id).order_by(T.c.id)).all()
         state = {r.id: S(r.state) for r in rows}
         hard_preds: dict[int, list[int]] = {}

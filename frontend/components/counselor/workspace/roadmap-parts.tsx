@@ -8,7 +8,7 @@ import {
   Sprout, Stethoscope, Users, Wrench, type LucideIcon,
 } from "lucide-react";
 import { workspaceApi } from "@/lib/api";
-import type { ChosenRoute, EducationLine, FieldCard, RoadmapStatus, RouteStep } from "@/lib/roadmap";
+import type { ChosenRoute, EducationLine, FieldCard, RoadmapStatus, RouteChoice, RouteStep } from "@/lib/roadmap";
 import { Button } from "@/components/ui/button";
 import {
   Dialog, DialogBody, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
@@ -23,6 +23,7 @@ import {
   testsText, tickable, uncertain, yearsText,
 } from "./roadmap-text";
 import { RouteSteps, StepBar, StepDot, StepMeta, TimeLine } from "./roadmap-steps";
+import { ConsentPanel } from "./choice-consent";
 import { FamilyTalk } from "./family-talk";
 import familyCopy from "./family-talk.json";
 import copy from "./copy.json";
@@ -303,10 +304,11 @@ export function YourRoute({ route, onWithdrawn, onTicked, onChat }: {
   onChat?: (topic?: string) => void;
 }) {
   const [steps, setSteps] = useState<RouteStep[]>(route.steps);
+  const [choice, setChoice] = useState<RouteChoice | null>(route.choice ?? null);
   const [error, setError] = useState(false), [confirming, setConfirming] = useState(false), [busy, setBusy] = useState(false),
     [savingView, setSavingView] = useState(false), [familyOpen, setFamilyOpen] = useState(false);
   const saving = useRef(false);
-  useEffect(() => { setSteps(route.steps); }, [route]);
+  useEffect(() => { setSteps(route.steps); setChoice(route.choice ?? null); }, [route]);
   // One save at a time: the ticks are disabled while one is saving, so a
   // double click cannot send (key, true) then (key, false) and replies never
   // arrive out of order. A failure undoes only the step that failed.
@@ -381,6 +383,7 @@ export function YourRoute({ route, onWithdrawn, onTicked, onChat }: {
           })}
         </ul>
         {error && <p role="alert" className="mt-2 text-sm font-medium text-danger-ink">{t.error}</p>}
+        {choice && <ConsentPanel choice={choice} onChange={setChoice} />}
         {confirming ? (
           <div className="mt-4 rounded-2xl bg-background p-4 ring-1 ring-border">
             <p className="text-sm">{fill(t.route.changeConfirm, { title: route.title })}</p>

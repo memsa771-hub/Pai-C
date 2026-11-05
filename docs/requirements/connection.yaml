@@ -35,7 +35,7 @@ requirements:
   R-07: {title: "OS never changes the choice; proposals go via choice_request", phases: [P1], built: false}
   R-08: {title: "Self-serve plan is adopted when Counsellor on and student agrees", phases: [P1], built: false}
   R-09: {title: "With Counsellor on, route builder writes through decision service", phases: [P1], built: false}
-  R-10: {title: "Hand-off consent required; guardian consent by email for under-18s", phases: [P1, P5], built: false}
+  R-10: {title: "Hand-off consent required; guardian consent by email for under-18s", phases: [P1, P5], built: true}
   R-11: {title: "Escalations accept all five reasons and return student to choosing", phases: [P1], built: false}
   R-12: {title: "A crash anywhere loses nothing and duplicates nothing", phases: [P1], built: true}
   R-13: {title: "OS reads student facts from the Vault with evidence levels", phases: [P1], built: false}

@@ -804,6 +804,8 @@ class RouteDecision(Base):
     authorized_at = Column(DateTime(timezone=True), nullable=True)
     guardian_authorized_at = Column(DateTime(timezone=True), nullable=True)
     guardian_required = Column(Boolean, nullable=False, default=False, server_default=text("false"))
+    # The consent text version the student agreed to with `authorized_at` (R-10); None while consent is missing.
+    consent_version = Column(Text, nullable=True)
 
     __table_args__ = (
         Index("uq_route_decision_version", "workspace_id", "decision_version", unique=True),
@@ -834,6 +836,38 @@ class OsOutbox(Base):
     delivered_at = Column(DateTime(timezone=True), nullable=True)
 
     __table_args__ = (Index("idx_os_outbox_status_created", "status", "created_at"),)
+
+
+class GuardianConsent(Base):
+    """One guardian e-mail link (R-10) and what came of it: the audit of the under-18 consent.
+
+    Only the SHA-256 of the token is stored. `purpose` is `agree` or `withdraw` (the withdraw link comes in the
+    confirmation e-mail). `outcome` starts as `sent` and ends as `agreed`, `withdrawn`, `expired` or `stale`.
+    The e-mail is personal data: never log it unmasked, never send it to PAI OS.
+    """
+    __tablename__ = "pai_guardian_consents"
+
+    id = Column(UUID(as_uuid=False), primary_key=True, default=_uuid)
+    workspace_id = Column(UUID(as_uuid=False), ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False)
+    decision_id = Column(UUID(as_uuid=False), ForeignKey("pai_route_decisions.id", ondelete="SET NULL"),
+                         nullable=True)
+    decision_version = Column(Integer, nullable=False)
+    purpose = Column(Text, nullable=False, default="agree", server_default=text("'agree'"))  # agree | withdraw
+    email = Column(Text, nullable=False)
+    token_hash = Column(Text, nullable=False, unique=True)
+    expires_at = Column(DateTime(timezone=True), nullable=True)  # null: a withdraw link has no fixed end
+    used_at = Column(DateTime(timezone=True), nullable=True)
+    text_version = Column(Text, nullable=False)
+    outcome = Column(Text, nullable=False, default="sent", server_default=text("'sent'"))
+    created_at = Column(DateTime(timezone=True), nullable=False, default=_now, server_default=text("NOW()"))
+
+    __table_args__ = (
+        CheckConstraint("purpose IN ('agree', 'withdraw')", name="ck_guardian_consent_purpose"),
+        CheckConstraint("outcome IN ('sent', 'agreed', 'withdrawn', 'expired', 'stale')",
+                        name="ck_guardian_consent_outcome"),
+        CheckConstraint("purpose <> 'agree' OR expires_at IS NOT NULL", name="ck_guardian_consent_agree_expires"),
+        Index("idx_guardian_consents_workspace", "workspace_id", "created_at"),
+    )
 
 
 class StudentRequest(Base):

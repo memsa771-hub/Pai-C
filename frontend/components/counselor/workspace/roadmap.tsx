@@ -6,11 +6,12 @@
 import { useState } from "react";
 import { ChevronDown, Columns2, Compass, Info, Map as MapIcon, PencilLine, X } from "lucide-react";
 import { workspaceApi } from "@/lib/api";
-import type { FieldCard, RoadmapStatus } from "@/lib/roadmap";
+import type { ChoiceOptions, FieldCard, RoadmapStatus } from "@/lib/roadmap";
 import { Button } from "@/components/ui/button";
 import { EmptyState, StatChip } from "@/components/pai";
 import { cn } from "@/lib/utils";
 import { Heading, LoadState, useResource } from "./resource";
+import { ChoiceFlow } from "./choice-flow";
 import { CompareDialog, FieldCardView, RouteSheet, STATUS_TONE, YourRoute } from "./roadmap-parts";
 import { educationText, fill } from "./roadmap-text";
 import copy from "./copy.json";
@@ -42,7 +43,8 @@ export function Roadmap({ onNavigate, onChat, onChanged }: {
   const resource = useResource(load);
   const [picked, setPicked] = useState<string[]>([]),
     [sheet, setSheet] = useState<FieldCard | null>(null),
-    [comparing, setComparing] = useState(false);
+    [comparing, setComparing] = useState(false),
+    [flow, setFlow] = useState<{ card: FieldCard; options: Extract<ChoiceOptions, { handoff: true }> } | null>(null);
   const data = resource.data;
   const vault = (
     <Button size="tap" variant="soft" onClick={() => onNavigate?.("profile")}><PencilLine aria-hidden />{t.updateVault}</Button>
@@ -59,6 +61,11 @@ export function Roadmap({ onNavigate, onChat, onChanged }: {
   const pick = (id: string, on: boolean) =>
     setPicked((list) => (on ? (list.length < max && !list.includes(id) ? [...list, id] : list) : list.filter((x) => x !== id)));
   const choose = async (card: FieldCard) => {
+    // Hand-off on: the choice screens (places, intake, consent). Off: today's one-click choose.
+    // Only an answer that says `handoff: false` allows the one-click choose. When the options cannot be read, nothing
+    // is chosen: a choose without details could close a plan PAI OS is running (the sheet shows the error).
+    const options: ChoiceOptions = await workspaceApi.choiceOptions(card.field_key!);
+    if (options.handoff) { setSheet(null); setFlow({ card, options }); return; }
     await workspaceApi.chooseRoute(card.field_key!);
     setSheet(null);
     await resource.refresh();
@@ -139,6 +146,11 @@ export function Roadmap({ onNavigate, onChat, onChanged }: {
       )}
 
       <RouteSheet card={sheet} line={data.education_line} chosen={data.chosen} checkedAt={data.rules_as_of} onClose={() => setSheet(null)} onChoose={choose} />
+      {flow && (
+        <ChoiceFlow card={flow.card} options={flow.options} onClose={() => setFlow(null)}
+          onOpenVault={() => { setFlow(null); onNavigate?.("profile"); }}
+          onSaved={async () => { await resource.refresh(); onChanged?.(); }} />
+      )}
       <CompareDialog open={comparing} onOpenChange={setComparing}
         cards={picked.map((id) => fields.find((c) => c.possibility_id === id)).filter((c): c is FieldCard => !!c)} />
     </>

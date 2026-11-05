@@ -5,7 +5,7 @@ import type {
 } from "@/lib/counselor-workspace";
 import type { Possibility } from "@/lib/possibilities";
 import type { VaultCatalog, VaultEntry, VaultView } from "@/lib/vault";
-import type { ChosenRoute, FieldCard, RoadmapPage, RouteStep, RouteTime, Verdict } from "@/lib/roadmap";
+import type { ChoiceOptions, ChosenRoute, FieldCard, OfferedPlace, RoadmapPage, RouteChoice, RouteStep, RouteTime, Verdict } from "@/lib/roadmap";
 import type { MirrorCard } from "@/lib/mirror";
 export const possibilities: Possibility[] = [
   {
@@ -330,6 +330,33 @@ export const chosenRoute: ChosenRoute = {
   snapshot_steps: eeSteps.map(({ key, label_key, values, status }) => ({ key, label_key, values, status })),
   steps_done: [], snapshot_verdict: roadmapCards[0].verdict, live_status: "open",
 };
+
+/** choice-options with the hand-off off: today's one-click choose. */
+export const choiceOptionsOff: ChoiceOptions = { handoff: false };
+/** choice-options with the hand-off on. Countries are ISO codes only; the text is what the API sends. */
+export const choiceOptionsOn: Extract<ChoiceOptions, { handoff: true }> = {
+  handoff: true, origin: "PK", level: "bachelor",
+  destinations: [
+    { code: "PK", supported: false, route_key: null },
+    { code: "DE", supported: true, route_key: "pk-de-bachelor" },
+  ],
+  preselected_destination: null,
+  intake_terms: { PK: ["fall"], DE: ["winter", "summer"] },
+  years: [2027, 2028],
+  consent_text: { title: "Share your choice with your plan", body: ["PAI will share your choice with your plan.", "You can withdraw at any time."] },
+  consent_version: "v1",
+  needs_dob: false,
+  under_18: false,
+};
+export const offeredPlaces: OfferedPlace[] = [
+  { ref: "p1", name: "Alpha University" }, { ref: "p2", name: "Beta Institute" }, { ref: "p3", name: "Gamma College" },
+  { ref: "p4", name: "Delta University" }, { ref: "p5", name: "Epsilon School" }, { ref: "p6", name: "Zeta Academy" },
+];
+export const routeChoice = (over: Partial<RouteChoice> = {}): RouteChoice => ({
+  version: 2, places: [{ programme_ref: "p1", rank: 1 }], intake: { term: "winter", year: 2027 }, destination: "DE", level: "bachelor",
+  os_supported: true, consent: { student: "given", guardian: "not_needed" }, ...over,
+});
+
 export const roadmapPage: RoadmapPage = {
   education_line: { level: "fsc", level_label: "FSc", groups: [{ code: "pre_engineering", label: "Pre-Engineering" }], percent: 78 },
   counts: { open: 2, step: 1, not_open: 1, unknown: 1 },

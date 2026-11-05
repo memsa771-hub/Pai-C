@@ -30,3 +30,14 @@ def programme_list(route_key: str, intake: IntakeRef) -> ProgrammeListV1:
         ProgrammeEntry(programme_ref=p.ref, university=p.university, name=p.name,
                        facts_confirmed=all((p.ref, f) in facts and facts[(p.ref, f)].confirmed for f in fields))
         for p in programmes])
+
+
+def routes() -> list[dict]:
+    """The routes the loaded playbooks serve (the newest version of each key), for the Counsellor's choice screen:
+    `{key, origin, destination, level, intake_terms}`, ordered by key. Raises OsUnavailable when PAI OS is not mounted."""
+    newest: dict[str, object] = {}
+    for (key, _), book in ports.services().plans.playbooks.items():
+        if key not in newest or book.version > newest[key].version:
+            newest[key] = book
+    return [{"key": k, "origin": b.route.origin, "destination": b.route.destination, "level": b.route.level,
+             "intake_terms": list(b.intake_terms)} for k, b in sorted(newest.items())]

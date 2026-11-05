@@ -354,6 +354,8 @@ class Config:
     CONNECT_STUDENT_FACTS: bool = os.environ.get("CONNECT_STUDENT_FACTS", "false").lower() in ("true", "1", "yes")
     CONNECT_ONE_UPLOAD: bool = os.environ.get("CONNECT_ONE_UPLOAD", "false").lower() in ("true", "1", "yes")
     CONNECT_MY_PLAN: bool = os.environ.get("CONNECT_MY_PLAN", "false").lower() in ("true", "1", "yes")
+    # Lets unapproved consent texts be used (rehearsal only). Off: consent.ensure_usable() refuses them.
+    CONNECT_CONSENT_DRAFT: bool = os.environ.get("CONNECT_CONSENT_DRAFT", "false").lower() in ("true", "1", "yes")
 
     # Transactional email. Delivery goes through Resend when a key is
     # configured (otherwise sends are logged no-ops).

@@ -164,8 +164,10 @@ async def test_move_to_unsupported_after_a_delivery_is_sent():
 
 
 @pytest.mark.asyncio
-async def test_move_to_unsupported_without_a_delivery_is_not_sent():
-    """Nothing reached the OS before, so there is no plan to close: the unsupported row stays not_sent."""
+async def test_move_to_unsupported_while_the_earlier_version_is_pending_is_sent():
+    """D-k 2: an earlier version still pending counts like a delivered one (it will arrive and open a plan), so the
+    move to an unsupported route is sent too. Only when nothing is delivered or pending does it stay not_sent
+    (test_not_sent_earlier_version_does_not_count in test_consent_versions.py)."""
     async with confirmed_student() as (_, student, db, _journey):
         with_routes(student, db)
         ws = student.workspace_id
@@ -178,7 +180,7 @@ async def test_move_to_unsupported_without_a_delivery_is_not_sent():
             db.commit()
         first, second = items(db, ws)
         assert first.status == "pending"
-        assert second.status == "not_sent" and second.last_error == "not_supported"
+        assert second.status == "pending" and second.last_error is None
 
 
 @pytest.mark.asyncio
