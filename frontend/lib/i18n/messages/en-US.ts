@@ -868,7 +868,7 @@ export const messages = {
     working: 'Please wait',
     agreedTitle: 'Thank you, your agreement is saved',
     agreedBody: 'We sent a confirmation to your email. It has a link to withdraw your agreement at any time.',
-    agreedNoMailBody: 'The confirmation email could not be sent.',
+    agreedNoMailBody: 'The confirmation email could not be sent. To withdraw later, ask the student to send you a new withdraw link from their Roadmap.',
     withdrawnTitle: 'Your agreement is withdrawn',
     withdrawnBody: 'Placement AI no longer shares the choice with the plan, and the plan is paused.',
     expiredTitle: 'This link has expired',

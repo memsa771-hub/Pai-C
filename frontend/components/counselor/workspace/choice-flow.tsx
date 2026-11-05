@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/responsive-dialog";
 import { DobPicker } from "@/components/onboarding/dob-picker";
 import { cn } from "@/lib/utils";
-import { GuardianResend } from "./choice-consent";
+import { ConsentTextView, GuardianResend } from "./choice-consent";
 import { ageOf, apiError, placeName, termLabel, UNDER_18_DETAIL, VAULT_DOB_DETAIL } from "./choice-text";
 import { fill } from "./roadmap-text";
 import copy from "./copy.json";
@@ -54,6 +54,7 @@ export function ChoiceFlow({ card, options, onSaved, onClose, onOpenVault }: {
   const body = useRef<HTMLDivElement>(null);
 
   const termOk = (options.intake_terms[destination] ?? []).includes(term);
+  const textReady = options.consent_text != null && options.consent_version != null;
   const chosen = options.destinations.find((d) => d.code === destination);
   const minorByDob = options.needs_dob && dob !== "" && (ageOf(dob) ?? 99) < 18;
   const guardianNeeded = options.under_18 === true || minorByDob || serverMinor;
@@ -96,8 +97,11 @@ export function ChoiceFlow({ card, options, onSaved, onClose, onOpenVault }: {
     if (id === "destination") return fail(destination ? {} : { destination: t.destination.required });
     if (id === "intake") return fail({ ...(termOk ? {} : { term: t.intake.termRequired }), ...(year ? {} : { year: t.intake.yearRequired }) });
     if (id === "places") {
-      const need = places.status === "ready" && !!chosen?.supported && places.list.length > 0 && selected.length === 0;
-      return fail(places.status === "loading" ? { places: t.places.stillLoading } : places.status === "error" ? { places: t.places.error } : need ? { places: t.places.empty } : {});
+      // A route PAI OS runs needs 1-5 places (the API refuses none): with none on offer the student picks another intake.
+      const supported = places.status === "ready" && !!chosen?.supported;
+      const none = supported && places.list.length === 0, need = supported && selected.length === 0;
+      return fail(places.status === "loading" ? { places: t.places.stillLoading } : places.status === "error" ? { places: t.places.error }
+        : none ? { places: t.places.noneSupported } : need ? { places: t.places.empty } : {});
     }
     if (id === "dob") return fail(dob ? {} : { dob: t.dob.required });
     if (id === "consent") return fail(agreed ? {} : { consent: t.consent.required });
@@ -110,9 +114,10 @@ export function ChoiceFlow({ card, options, onSaved, onClose, onOpenVault }: {
   async function submit() {
     if (!check(step)) return;
     setBusy(true); setFormError(""); setVaultNote(false);
+    if (options.consent_version == null) return; // no text to agree to (the consent step offers no submit)
     const details: ChoiceDetails = {
       destination, intake: { term, year: Number(year) },
-      places: selected.map((ref, i) => ({ ref, rank: i + 1 })), consent: true,
+      places: selected.map((ref, i) => ({ ref, rank: i + 1 })), consent: true, consent_version: options.consent_version,
       ...(options.needs_dob && dob ? { date_of_birth: dob } : {}),
       ...(guardianNeeded ? { guardian_email: email.trim() } : {}),
     };
@@ -260,7 +265,8 @@ export function ChoiceFlow({ card, options, onSaved, onClose, onOpenVault }: {
                     <Button size="tap" variant="soft" className="mt-2" onClick={() => setRetry((n) => n + 1)}>{t.places.retry}</Button>
                   </div>
                 )}
-                {places.status === "ready" && places.list.length === 0 && <p className="text-sm text-muted-foreground">{t.places.none}</p>}
+                {places.status === "ready" && places.list.length === 0 && !errors.places &&
+                  <p className="text-sm text-muted-foreground">{chosen?.supported ? t.places.noneSupported : t.places.none}</p>}
                 <div className="space-y-2">
                   {places.list.map((p, i) => {
                     const on = selected.includes(p.ref);
@@ -305,12 +311,12 @@ export function ChoiceFlow({ card, options, onSaved, onClose, onOpenVault }: {
             )}
 
             {step === "consent" && (
-              options.consent_text == null
+              !textReady
                 ? <p role="alert" className="text-sm font-medium text-danger-ink">{t.consent.unavailable}</p>
                 : (
                   <fieldset aria-describedby={errors.consent ? "choice-consent-error" : undefined}>
                     <legend className="mb-2 text-sm font-medium">{t.consent.legend}</legend>
-                    <p className="whitespace-pre-line rounded-2xl bg-muted/60 p-4 text-sm leading-relaxed">{options.consent_text}</p>
+                    <ConsentTextView text={options.consent_text!} />
                     {options.consent_version != null && <p className="mt-1 text-xs text-muted-foreground">{fill(t.consent.version, { version: options.consent_version })}</p>}
                     <label className={cn(ROW, "mt-3")}>
                       <input type="checkbox" checked={agreed} data-field="consent" aria-invalid={errors.consent ? true : undefined}
@@ -342,7 +348,7 @@ export function ChoiceFlow({ card, options, onSaved, onClose, onOpenVault }: {
         </DialogBody>
         <DialogFooter className="flex-col items-stretch gap-2 px-7 pb-7 pt-3 max-lg:px-5 sm:flex-col sm:items-stretch">
           {index > 0 && <Button size="tap" variant="ghost" disabled={busy} onClick={() => go(index - 1)}>{t.back}</Button>}
-          {step === "consent" && options.consent_text == null ? null : last
+          {step === "consent" && !textReady ? null : last
             ? <Button size="tap" disabled={busy} onClick={submit}>{busy ? <Loader2 aria-hidden className="animate-spin" /> : null}{busy ? t.saving : t.submit}</Button>
             : <Button size="tap" onClick={next}>{t.next}</Button>}
           <Button size="tap" variant="ghost" onClick={onClose}>{t.cancel}</Button>

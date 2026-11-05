@@ -678,12 +678,15 @@ class WorkspaceApi {
     return this.request(`/v1/roadmap/consent/withdraw?network=${this.requireWorkspace()}`, { method: 'POST' });
   }
 
-  async giveConsent(): Promise<import('./roadmap').ConsentAnswer> {
-    return this.request(`/v1/roadmap/consent/give?network=${this.requireWorkspace()}`, { method: 'POST' });
+  /** Gives consent again to the text version the student was shown. */
+  async giveConsent(consentVersion: string): Promise<import('./roadmap').ConsentAnswer> {
+    return this.request(`/v1/roadmap/consent/give?network=${this.requireWorkspace()}`,
+      { method: 'POST', body: JSON.stringify({ consent_version: consentVersion }) });
   }
 
-  /** Email the guardian a new link. The address is not kept for resend, so the client sends it again. */
-  async resendGuardian(guardianEmail?: string): Promise<{ sent: boolean }> {
+  /** Email the guardian a new link: an agree link (to `guardianEmail`, or the address on file), or, once the
+   * guardian has agreed, a fresh withdraw link to the address that agreed (`guardianEmail` is then ignored). */
+  async resendGuardian(guardianEmail?: string): Promise<{ sent: boolean; kind?: 'agree' | 'withdraw' }> {
     return this.request(`/v1/roadmap/guardian/resend?network=${this.requireWorkspace()}`,
       { method: 'POST', body: JSON.stringify(guardianEmail ? { guardian_email: guardianEmail } : {}) });
   }

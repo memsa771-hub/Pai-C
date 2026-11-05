@@ -395,13 +395,19 @@ it("withdraws consent behind one confirm, then gives it again and asks for the g
   const panel = await screen.findByRole("region", { name: cs.title });
   fireEvent.click(within(panel).getByRole("button", { name: cs.withdraw }));
   expect(workspaceApi.withdrawConsent).not.toHaveBeenCalled(); // asks first
-  vi.mocked(workspaceApi.withdrawConsent).mockResolvedValue({ choice: routeChoice({ consent: { student: "missing", guardian: "missing" } }) });
+  vi.mocked(workspaceApi.withdrawConsent).mockResolvedValue({ choice: routeChoice({ consent: { student: "missing", guardian: "missing" },
+    consent_version: null, consent_offer: { text: choiceOptionsOn.consent_text, version: "1" } }) });
   fireEvent.click(within(panel).getByRole("button", { name: cs.withdrawYes }));
   expect(await within(panel).findByText(cs.studentMissing)).toBeTruthy();
   expect(within(panel).getByText(cs.pausedNote)).toBeTruthy();
-  // Give it again: the old guardian link no longer counts, so the student is asked to send a new one.
+  // Give it again: the text is shown first and its version is sent (I2). The old guardian link no longer counts,
+  // so the student is then asked to send a new one.
   vi.mocked(workspaceApi.giveConsent).mockResolvedValue({ choice: routeChoice({ consent: { student: "given", guardian: "missing" } }) });
   fireEvent.click(within(panel).getByRole("button", { name: cs.give }));
+  expect(workspaceApi.giveConsent).not.toHaveBeenCalled();
+  expect(within(panel).getByText(choiceOptionsOn.consent_text!.title)).toBeTruthy();
+  fireEvent.click(within(panel).getByRole("button", { name: cs.giveYes }));
+  await waitFor(() => expect(workspaceApi.giveConsent).toHaveBeenCalledWith("1"));
   expect(await within(panel).findByText(cs.resendPrompt)).toBeTruthy();
   // The address is asked again: it is not kept for a resend.
   vi.mocked(workspaceApi.resendGuardian).mockResolvedValue({ sent: true });
@@ -427,12 +433,39 @@ it("keeps consent as it was and says so when withdrawing fails", async () => {
 });
 
 // req: R-79
-it("still chooses in one click when the choice options cannot be read", async () => {
+it("chooses nothing and shows an error when the choice options cannot be read", async () => {
+  // Rule change (final review I4): this test used to assert a one-click fallback on failure. A choose without
+  // details could close a plan PAI OS runs, so only an answer of `handoff: false` allows the one-click choose.
   vi.mocked(workspaceApi.choiceOptions).mockRejectedValue(new Error("API 500: x"));
   vi.mocked(workspaceApi.chooseRoute).mockResolvedValue(chosenRoute);
   render(<Roadmap onNavigate={vi.fn()} />);
   fireEvent.click(await screen.findByRole("button", { name: "See route for Electrical Engineering" }));
-  fireEvent.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Choose this route" }));
-  await waitFor(() => expect(workspaceApi.chooseRoute).toHaveBeenCalledTimes(1));
-  expect(vi.mocked(workspaceApi.chooseRoute).mock.calls[0]).toEqual(["electrical_engineering"]);
+  const sheet = await screen.findByRole("dialog");
+  fireEvent.click(within(sheet).getByRole("button", { name: "Choose this route" }));
+  expect((await within(sheet).findByRole("alert")).textContent).toContain(copy.roadmap.error);
+  expect(workspaceApi.chooseRoute).not.toHaveBeenCalled();
+  expect(screen.queryByTestId("choice-step")).toBeNull();
+});
+
+// req: R-10
+it("shows the text before giving consent and says so when it is not approved", async () => {
+  vi.mocked(workspaceApi.getRoadmapPage).mockResolvedValue(chosenWith(routeChoice({
+    consent: { student: "missing", guardian: "not_needed" }, consent_offer: { text: null, version: "1" } })));
+  render(<Roadmap onNavigate={vi.fn()} />);
+  const panel = await screen.findByRole("region", { name: cs.title });
+  fireEvent.click(within(panel).getByRole("button", { name: cs.give }));
+  expect(within(panel).getByRole("alert").textContent).toContain(cs.textNotReady);
+  expect(within(panel).queryByRole("button", { name: cs.giveYes })).toBeNull();
+  expect(workspaceApi.giveConsent).not.toHaveBeenCalled();
+});
+
+// req: R-10
+it("sends the guardian a new withdraw link once they have agreed", async () => {
+  vi.mocked(workspaceApi.getRoadmapPage).mockResolvedValue(chosenWith(routeChoice({ consent: { student: "given", guardian: "given" } })));
+  vi.mocked(workspaceApi.resendGuardian).mockResolvedValue({ sent: true, kind: "withdraw" });
+  render(<Roadmap onNavigate={vi.fn()} />);
+  const panel = await screen.findByRole("region", { name: cs.title });
+  fireEvent.click(within(panel).getByRole("button", { name: cs.withdrawLink }));
+  await waitFor(() => expect(workspaceApi.resendGuardian).toHaveBeenCalledWith());
+  expect(await within(panel).findByText(cs.withdrawLinkSent)).toBeTruthy();
 });

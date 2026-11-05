@@ -1,10 +1,10 @@
 "use client";
 /** Consent on a chosen route: the state with give / withdraw, and the guardian link sent again.
- * The consent text itself is never here; it comes from the API on the choice screens. */
+ * The consent text is never written here; it comes from the API (choice screens and `consent_offer`). */
 import { useState } from "react";
 import { Check, Loader2, Mail, ShieldCheck, TriangleAlert } from "lucide-react";
 import { workspaceApi } from "@/lib/api";
-import type { RouteChoice } from "@/lib/roadmap";
+import type { ConsentText, RouteChoice } from "@/lib/roadmap";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { apiError } from "./choice-text";
@@ -14,7 +14,18 @@ const t = copy.roadmap.choice.consentState;
 const EMAIL = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 const FIELD = "h-11 w-full rounded-xl border border-input bg-background px-3 text-sm aria-invalid:border-danger focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/30";
 
-/** Asks again for the guardian's address (it is not kept for a resend) and sends the link. */
+/** The student consent text from the API: a title and its paragraphs. */
+export function ConsentTextView({ text }: { text: ConsentText }) {
+  return (
+    <div className="rounded-2xl bg-muted/60 p-4 text-sm leading-relaxed">
+      <p className="font-semibold">{text.title}</p>
+      {text.body.map((line, i) => <p key={i} className="mt-2">{line}</p>)}
+    </div>
+  );
+}
+
+/** Asks for the guardian's address and sends the agree link (the backend falls back to the address on file when none
+ * is sent; this form always sends the one typed). */
 export function GuardianResend({ prompt, onSent }: { prompt?: string; onSent?: () => void }) {
   const [email, setEmail] = useState(""), [busy, setBusy] = useState(false), [sent, setSent] = useState(false),
     [error, setError] = useState("");
@@ -49,20 +60,34 @@ export function GuardianResend({ prompt, onSent }: { prompt?: string; onSent?: (
 
 /** Who has agreed, in words (never colour alone), with withdraw / give and the guardian status. */
 export function ConsentPanel({ choice, onChange }: { choice: RouteChoice; onChange: (next: RouteChoice) => void }) {
-  const [confirming, setConfirming] = useState(false), [busy, setBusy] = useState(false), [error, setError] = useState(""),
-    [resend, setResend] = useState(false), [prompt, setPrompt] = useState(false);
+  const [confirming, setConfirming] = useState(false), [reading, setReading] = useState(false), [busy, setBusy] = useState(false),
+    [error, setError] = useState(""), [resend, setResend] = useState(false), [prompt, setPrompt] = useState(false),
+    [linkSent, setLinkSent] = useState(false);
   const { student, guardian } = choice.consent;
+  const offer = choice.consent_offer;
   async function change(action: "withdraw" | "give") {
+    if (action === "give" && !offer?.text) return;
     setBusy(true); setError("");
     try {
-      const answer = action === "withdraw" ? await workspaceApi.withdrawConsent() : await workspaceApi.giveConsent();
+      // Giving consent sends the text version the student just read; the API refuses a text changed since.
+      const answer = action === "withdraw" ? await workspaceApi.withdrawConsent() : await workspaceApi.giveConsent(offer!.version);
       if (answer.choice) onChange(answer.choice);
       if (action === "give" && answer.choice?.consent.guardian === "missing") { setPrompt(true); setResend(true); }
       if (action === "withdraw") { setPrompt(false); setResend(false); }
     } catch (e) {
       const { status, detail } = apiError(e);
-      setError(status === 409 && /not approved/i.test(detail) ? t.textNotReady : t.error);
-    } finally { setBusy(false); setConfirming(false); }
+      setError(status === 409 && /not approved|changed/i.test(detail) ? t.textNotReady : t.error);
+    } finally { setBusy(false); setConfirming(false); setReading(false); }
+  }
+  /** The guardian has agreed: a fresh withdraw link goes to the address that agreed (the old one keeps working). */
+  async function sendWithdrawLink() {
+    setBusy(true); setError(""); setLinkSent(false);
+    try {
+      await workspaceApi.resendGuardian();
+      setLinkSent(true);
+    } catch (e) {
+      setError(apiError(e).status === 429 ? t.rate : t.error);
+    } finally { setBusy(false); }
   }
   const studentWord = student === "given" ? t.studentGiven : t.studentMissing;
   const guardianWord = guardian === "given" ? t.guardianGiven : guardian === "missing" ? t.guardianMissing : t.guardianNotNeeded;
@@ -89,15 +114,31 @@ export function ConsentPanel({ choice, onChange }: { choice: RouteChoice; onChan
             <Button size="tap" variant="ghost" onClick={() => setConfirming(false)}>{t.withdrawNo}</Button>
           </div>
         </div>
+      ) : reading ? (
+        <div className="mt-3">
+          {offer?.text ? (<>
+            <p className="mb-2 text-sm">{t.giveRead}</p>
+            <ConsentTextView text={offer.text} />
+            <div className="mt-2 flex flex-wrap gap-2">
+              <Button size="tap" disabled={busy} onClick={() => change("give")}>{t.giveYes}</Button>
+              <Button size="tap" variant="ghost" onClick={() => setReading(false)}>{t.giveNo}</Button>
+            </div>
+          </>) : (
+            <p role="alert" className="text-sm font-medium text-danger-ink">{t.textNotReady}</p>
+          )}
+        </div>
       ) : (
         <div className="mt-3 flex flex-wrap gap-2">
           {student === "given"
             ? <Button size="tap" variant="ghost" onClick={() => setConfirming(true)}>{t.withdraw}</Button>
-            : <Button size="tap" variant="soft" disabled={busy} onClick={() => change("give")}>{t.give}</Button>}
+            : <Button size="tap" variant="soft" disabled={busy} onClick={() => setReading(true)}>{t.give}</Button>}
           {student === "given" && guardian === "missing" && !resend &&
             <Button size="tap" variant="soft" onClick={() => setResend(true)}><Mail aria-hidden />{t.resend}</Button>}
+          {guardian === "given" &&
+            <Button size="tap" variant="ghost" disabled={busy} onClick={sendWithdrawLink}><Mail aria-hidden />{t.withdrawLink}</Button>}
         </div>
       )}
+      {linkSent && <p role="status" className="mt-2 flex items-center gap-1.5 text-sm font-medium"><Check aria-hidden className="size-4" />{t.withdrawLinkSent}</p>}
       {resend && student === "given" && guardian === "missing" && (
         <GuardianResend prompt={prompt ? t.resendPrompt : undefined} onSent={() => setPrompt(false)} />
       )}

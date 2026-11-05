@@ -777,6 +777,7 @@
         "hint": "Pick the ones you like, then put them in order. 1 is your first choice.",
         "loading": "Loading places",
         "none": "No places are listed for this yet. You can add them later.",
+        "noneSupported": "No places are listed for this intake yet. Go back and pick another intake.",
         "empty": "Pick at least one place.",
         "full": "You picked {max}. Remove one to add another.",
         "ranking": "Your order",
@@ -847,7 +848,12 @@
         "rate": "Too many emails. Try again later.",
         "textNotReady": "The consent text is not ready yet. Try again later.",
         "notSupported": "PAI OS cannot plan this route yet.",
-        "resendRejected": "That email address was not accepted. Check it and try again."
+        "resendRejected": "That email address was not accepted. Check it and try again.",
+        "giveRead": "Read this, then give your consent again.",
+        "giveYes": "I agree, give consent",
+        "giveNo": "Not now",
+        "withdrawLink": "Send my parent or guardian a new withdraw link",
+        "withdrawLinkSent": "We emailed your parent or guardian a new link to withdraw."
       }
     }
   },

@@ -86,6 +86,9 @@ export type EducationLine = {
   percent: number | null;
 };
 
+/** The student consent text as the API sends it (backend consent_texts.yaml `student`). */
+export type ConsentText = { title: string; body: string[] };
+
 /** Consent on a choice (backend routers/roadmap.py `_choice_view`). */
 export type ConsentState = { student: "given" | "missing"; guardian: "not_needed" | "given" | "missing" };
 
@@ -98,6 +101,10 @@ export type RouteChoice = {
   level: string | null;
   os_supported: boolean;
   consent: ConsentState;
+  /** The consent text version the student agreed to; null while their consent is missing. */
+  consent_version?: string | null;
+  /** While the student's consent is missing: the text to read before giving it again (null while not approved). */
+  consent_offer?: { text: ConsentText | null; version: string };
 };
 
 export type ChosenRoute = {
@@ -134,8 +141,8 @@ export type ChoiceOptions =
       intake_terms: Record<string, string[]>;
       years: number[];
       /** The approved text, from the API. Null while it is not approved. */
-      consent_text: string | null;
-      consent_version: string | number | null;
+      consent_text: ConsentText | null;
+      consent_version: string | null;
       needs_dob: boolean;
       /** From the stored date of birth: true under 18 (or unreadable), false adult, null when none is stored. */
       under_18: boolean | null;
@@ -150,6 +157,8 @@ export type ChoiceDetails = {
   intake: { term: string; year: number };
   date_of_birth?: string;
   consent: true;
+  /** The consent text version the screen showed; the API refuses a text changed since. */
+  consent_version: string;
   guardian_email?: string;
 };
 

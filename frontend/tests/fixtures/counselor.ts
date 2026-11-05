@@ -343,7 +343,7 @@ export const choiceOptionsOn: Extract<ChoiceOptions, { handoff: true }> = {
   preselected_destination: null,
   intake_terms: { PK: ["fall"], DE: ["winter", "summer"] },
   years: [2027, 2028],
-  consent_text: "PAI will share your choice with your plan. You can withdraw at any time.",
+  consent_text: { title: "Share your choice with your plan", body: ["PAI will share your choice with your plan.", "You can withdraw at any time."] },
   consent_version: "v1",
   needs_dob: false,
   under_18: false,

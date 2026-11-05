@@ -48,7 +48,8 @@ it("walks destination, intake, places and consent in order, and shows the API's 
   expect(heading()).toBe("Step 3 of 4: Places");
   pickPlace("Alpha University"); next();
   expect(heading()).toBe("Step 4 of 4: Consent");
-  expect(screen.getByText(choiceOptionsOn.consent_text!)).toBeTruthy();
+  expect(screen.getByText(choiceOptionsOn.consent_text!.title)).toBeTruthy();
+  for (const line of choiceOptionsOn.consent_text!.body) expect(screen.getByText(line)).toBeTruthy();
   // The step list names every step and marks where the student is.
   const steps = within(screen.getByRole("list", { name: c.progress })).getAllByRole("listitem");
   expect(steps.map((li) => li.textContent)).toEqual(["Country", "Intake", "Places", "Consent"].map((n) => expect.stringContaining(n)) as unknown as string[]);
@@ -92,7 +93,7 @@ it("sends exactly the picked details to chooseRoute", async () => {
   await waitFor(() => expect(workspaceApi.chooseRoute).toHaveBeenCalledTimes(1));
   expect(workspaceApi.chooseRoute).toHaveBeenCalledWith("electrical_engineering", {
     destination: "DE", intake: { term: "winter", year: 2027 },
-    places: [{ ref: "p3", rank: 1 }, { ref: "p1", rank: 2 }], consent: true,
+    places: [{ ref: "p3", rank: 1 }, { ref: "p1", rank: 2 }], consent: true, consent_version: "v1",
   });
   expect(workspaceApi.places).toHaveBeenCalledWith("DE", "bachelor", "winter", 2027);
   await waitFor(() => expect(onSaved).toHaveBeenCalled());
@@ -135,7 +136,7 @@ it("requires the guardian email when the date of birth makes the student under 1
   fireEvent.click(screen.getByRole("button", { name: c.submit }));
   await waitFor(() => expect(workspaceApi.chooseRoute).toHaveBeenCalledTimes(1));
   expect(vi.mocked(workspaceApi.chooseRoute).mock.calls[0][1]).toEqual({
-    destination: "DE", intake: { term: "winter", year: 2027 }, places: [{ ref: "p1", rank: 1 }], consent: true,
+    destination: "DE", intake: { term: "winter", year: 2027 }, places: [{ ref: "p1", rank: 1 }], consent: true, consent_version: "v1",
     date_of_birth: `${year}-01-01`, guardian_email: "parent@example.com",
   });
 });
@@ -328,4 +329,40 @@ it("moves focus to the step heading on Next and Back, and keeps it on a usable b
   fireEvent.click(screen.getByRole("button", { name: "Move Beta Institute up" }));
   // Beta is now first: its Up button is disabled, so focus is on its Down button.
   await waitFor(() => expect(document.activeElement).toBe(screen.getByRole("button", { name: "Move Beta Institute down" })));
+});
+
+// req: R-79
+it("blocks the places step on a supported route when no place is on offer for the intake", async () => {
+  vi.mocked(workspaceApi.places).mockResolvedValue({ handoff: true, places: [] });
+  open();
+  pickCountry(DE); next(); pickIntake(); next();
+  expect(await screen.findByText(c.places.noneSupported)).toBeTruthy();
+  next();
+  expect(heading()).toBe("Step 3 of 4: Places"); // a route PAI OS runs needs 1 to 5 places
+  expect(screen.getByRole("alert").textContent).toContain(c.places.noneSupported);
+  fireEvent.click(screen.getByRole("button", { name: c.back })); // another intake
+  expect(heading()).toBe("Step 2 of 4: Intake");
+});
+
+// req: R-79
+it("lets an unsupported route go on with no place on offer", async () => {
+  vi.mocked(workspaceApi.places).mockResolvedValue({ handoff: true, places: [] });
+  open();
+  pickCountry(new RegExp(placeName("PK"))); next();
+  fireEvent.change(screen.getByLabelText(c.intake.term), { target: { value: "fall" } });
+  fireEvent.change(screen.getByLabelText(c.intake.year), { target: { value: "2027" } });
+  next();
+  expect(await screen.findByText(c.places.none)).toBeTruthy();
+  next();
+  expect(heading()).toBe("Step 4 of 4: Consent");
+});
+
+// req: R-10
+it("offers no submit when the API sends no consent text version", async () => {
+  open({ consent_version: null });
+  pickCountry(DE); next(); pickIntake(); next();
+  await screen.findByRole("checkbox", { name: "Alpha University" });
+  pickPlace("Alpha University"); next();
+  expect(screen.getByText(c.consent.unavailable)).toBeTruthy();
+  expect(screen.queryByRole("button", { name: c.submit })).toBeNull();
 });
