@@ -32,7 +32,7 @@ P = models.plans
 
 @dataclass(frozen=True)
 class IntakeResult:
-    status: str  # planned | revised | replaced | refused | stale | withdrawn
+    status: str  # planned | revised | replaced | refused | stale | withdrawn | unsupported
     reason: str | None = None
     plan_id: int | None = None
 
@@ -102,12 +102,23 @@ def _v1_contract(decision: DecisionRecordV2) -> RouteContract:
                          programmes=two.programmes, target_intake=two.target_intake)
 
 
-def _withdraw(svc, decision: DecisionRecordV2) -> IntakeResult:
-    """The student withdrew the decision: every open Counsellor plan of the student is closed by the kernel."""
+def _close_all(svc, decision: DecisionRecordV2, cause: str, status: str) -> IntakeResult:
+    """Every open Counsellor plan of the student is closed by the kernel (one active choice per student)."""
     closed = [p.id for p in _plans_of(svc, decision.student_ref, SOURCE) if p.status in PLAN_OPEN]
     for plan_id in closed:
-        svc.kernel.close_plan(plan_id, f"withdrawn:{decision.decision_id}")
-    return IntakeResult("withdrawn", None, closed[-1] if closed else None)
+        svc.kernel.close_plan(plan_id, f"{cause}:{decision.decision_id}")
+    return IntakeResult(status, None, closed[-1] if closed else None)
+
+
+def _withdraw(svc, decision: DecisionRecordV2) -> IntakeResult:
+    """The student withdrew the decision: every open Counsellor plan of the student is closed (R-06)."""
+    return _close_all(svc, decision, "withdrawn", "withdrawn")
+
+
+def _unsupported(svc, decision: DecisionRecordV2) -> IntakeResult:
+    """The student moved to a route the OS cannot run: the old route's plan is over (row 6.3) and nothing is planned
+    for the new one (row 6.14)."""
+    return _close_all(svc, decision, "unsupported", "unsupported")
 
 
 def process(svc, intake: Intake) -> IntakeResult:
@@ -116,11 +127,13 @@ def process(svc, intake: Intake) -> IntakeResult:
             decision = DecisionRecordV2.model_validate(intake.export)
         except ValidationError:
             return _refuse(svc, intake, "invalid_export")
-        newest = IntakeStore(svc.engine, svc.kernel.tenant_id).newest_processed_version(decision.student_ref, intake.id)
+        newest = IntakeStore(svc.engine, svc.kernel.tenant_id).newest_other_version(decision.student_ref, intake.id)
         if newest is not None and decision.decision_version <= newest:
-            return IntakeResult("stale")
+            return IntakeResult("stale")  # any newer stored version wins, pending or processed (R-02)
         if decision.status == "withdrawn":
             return _withdraw(svc, decision)
+        if not decision.os_supported:
+            return _unsupported(svc, decision)
     else:
         try:
             decision = DecisionRecordV1.model_validate(intake.export)
@@ -128,7 +141,7 @@ def process(svc, intake: Intake) -> IntakeResult:
             return _refuse(svc, intake, "invalid_export")
     if decision.authorized_at is None:
         return _refuse(svc, intake, "not_authorized")
-    if isinstance(decision, DecisionRecordV2) and (not decision.os_supported or decision.level == "intermediate"):
+    if isinstance(decision, DecisionRecordV2) and decision.level == "intermediate":
         return _refuse(svc, intake, "route_not_supported")  # intermediate waits for the v2 plan engine (D-b)
     try:
         book = select_playbook(svc.plans.playbooks, decision.origin_country, decision.destination_country,

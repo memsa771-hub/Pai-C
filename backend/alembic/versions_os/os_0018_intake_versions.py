@@ -2,7 +2,8 @@
 
 New columns `decision_version` and `decision_status` (null for v1 rows; no check on the status, so an invalid export
 still gets stored and the worker refuses it with a reason); the intake status gains `stale` (an older
-version than one already processed) and `withdrawn` (the plan was closed because the student withdrew the decision).
+version than one already stored), `withdrawn` (the plan was closed because the student withdrew the decision) and
+`unsupported` (the student chose a route the OS cannot run, so the old route's plan was closed).
 
 Revision ID: os_0018
 Revises: os_0017
@@ -23,7 +24,7 @@ S = "os"
 T = "os_counsellor_intake"
 CK = "ck_os_counsellor_intake_status"
 OLD = ("pending", "planned", "revised", "replaced", "refused")
-NEW = (*OLD, "stale", "withdrawn")
+NEW = (*OLD, "stale", "withdrawn", "unsupported")
 IX = "ix_os_counsellor_intake_version"
 
 
@@ -41,7 +42,7 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     op.drop_index(IX, table_name=T, schema=S)
-    op.execute(f"UPDATE {S}.{T} SET status = 'refused', reason = NULL WHERE status IN ('stale', 'withdrawn')")
+    op.execute(f"UPDATE {S}.{T} SET status = 'refused', reason = NULL WHERE status IN ('stale', 'withdrawn', 'unsupported')")
     op.drop_constraint(CK, T, schema=S, type_="check")
     op.create_check_constraint(CK, T, _in("status", OLD), schema=S)
     op.drop_column(T, "decision_status", schema=S)

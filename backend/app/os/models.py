@@ -538,7 +538,7 @@ visa_choices = Table(
 PROPOSAL_STATUSES = ("applied", "pending", "accepted", "declined", "expired", "refused")
 OVERRIDE_OPS = ("skip", "cancel", "cancel_programme", "add", "reprioritise")
 # Slice 8 (spec S8-D10, S8-D12)
-INTAKE_STATUSES = ("pending", "planned", "revised", "replaced", "refused", "stale", "withdrawn")
+INTAKE_STATUSES = ("pending", "planned", "revised", "replaced", "refused", "stale", "withdrawn", "unsupported")
 INTAKE_REFUSALS = ("not_authorized", "invalid_export", "route_not_supported", "unknown_programme",
                    "self_serve_plan_open", "plan_closed")
 COUNSELLOR_DELIVERY = ("pending", "sent", "refused")

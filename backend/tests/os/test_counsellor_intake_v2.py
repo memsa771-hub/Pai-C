@@ -107,11 +107,50 @@ def test_older_version_is_stale(svc):
         assert conn.execute(select(func.count()).select_from(R).where(R.c.plan_id == third.plan_id)).scalar() == 1
 
 
-def test_stale_counts_only_processed_versions(svc):
-    """A newer version that is still pending has not been applied, so an older one is not stale yet."""
+def test_any_stored_newer_version_makes_older_stale(svc):
+    """Rule change (final review I1, R-02): a newer version stored for the student, even one still pending, makes an
+    older one stale. The newer one is processed anyway, so the older one is never applied."""
     store = IntakeStore(svc.engine, "pai")
     store.add(chosen(3), "0" * 64)
-    assert run(svc, chosen(2)).status == "planned"
+    assert run(svc, chosen(2)).status == "stale"
+    with svc.engine.connect() as conn:
+        assert conn.execute(select(func.count()).select_from(P)).scalar() == 0
+
+
+def test_both_pending_older_first_is_stale_newer_plans(svc):
+    store = IntakeStore(svc.engine, "pai")
+    store.add(chosen(1), "0" * 64)
+    store.add(chosen(2, programmes=NEW_PLACES), "0" * 64)
+    first = process(svc, store.get("d-v1"))
+    assert (first.status, first.plan_id) == ("stale", None)
+    store.finish(store.get("d-v1").id, first.status, first.reason, first.plan_id)
+    second = process(svc, store.get("d-v2"))
+    assert second.status == "planned"
+    assert [p["programme_ref"] for p in plan_row(svc, second.plan_id).contract["programmes"]] == [
+        "ovgu-eeit", "btu-artificial-intelligence"]
+
+
+def test_late_chosen_after_processed_withdrawal_is_stale(svc):
+    """The reviewer's case: v2 withdrawn is processed, then a late v1 arrives. It is stale; the plan stays closed."""
+    store = IntakeStore(svc.engine, "pai")
+    first = run(svc, v1())
+    gone = run(svc, withdrawn(2))
+    store.finish(store.get("d-v2").id, gone.status, gone.reason, gone.plan_id)
+    late = run(svc, chosen(1))
+    assert (late.status, late.plan_id) == ("stale", None)
+    assert plan_row(svc, first.plan_id).status == "closed"
+    with svc.engine.connect() as conn:
+        assert conn.execute(select(func.count()).select_from(P).where(P.c.status != "closed")).scalar() == 0
+
+
+def test_newer_version_stored_mid_process_makes_repeat_stale(svc):
+    """v2 processed but not finished, then v1 arrives late: v1 is stale and changes nothing."""
+    r = run(svc, chosen(2, programmes=NEW_PLACES))
+    assert r.status == "planned"
+    before = plan_row(svc, r.plan_id).contract
+    late = run(svc, chosen(1))
+    assert late.status == "stale"
+    assert plan_row(svc, r.plan_id).contract == before
 
 
 def test_stale_is_stored_as_status(svc):
@@ -213,9 +252,36 @@ def test_intermediate_refused_until_t5(svc):
         ports.configure(None)
 
 
-def test_unsupported_v2_is_route_not_supported(svc):
+def test_unsupported_v2_without_a_plan_plans_nothing(svc):
+    """Row 6.14: the OS does nothing for a route it cannot run (no plan, no refusal sent to the Counsellor)."""
     r = run(svc, v2("decision_unsupported_pk_inter.json"))
-    assert (r.status, r.reason) == ("refused", "route_not_supported")
+    assert (r.status, r.reason, r.plan_id) == ("unsupported", None, None)
+    with svc.engine.connect() as conn:
+        assert conn.execute(select(func.count()).select_from(P)).scalar() == 0
+
+
+def test_move_to_unsupported_route_closes_the_old_plan(svc):
+    """Final review I3 (rows 6.3 and 6.14): a planned, supported route changed to one the OS cannot run closes the
+    old plan, and its reminders stop."""
+    store = IntakeStore(svc.engine, "pai")
+    first = run(svc, chosen(1))
+    store.finish(store.get("d-v1").id, first.status, first.reason, first.plan_id)
+    moved = v2("decision_unsupported_pk_inter.json", decision_id="d-v2", decision_version=2,
+               chosen_at="2027-01-12T09:00:00+05:00")
+    r = run(svc, moved)
+    assert (r.status, r.reason, r.plan_id) == ("unsupported", None, first.plan_id)
+    assert plan_row(svc, first.plan_id).status == "closed"
+    assert not states(svc, first.plan_id) & set(OPEN_STATES)
+    with svc.engine.connect() as conn:
+        last = conn.execute(select(R.c.cause).where(R.c.plan_id == first.plan_id).order_by(R.c.number.desc())).first()
+    assert last.cause == "unsupported:d-v2"
+    assert run_reminders(svc.engine, Outbox(svc.engine, "pai"), datetime(2027, 3, 1, tzinfo=timezone.utc), "pai") == 0
+    store.finish(store.get("d-v2").id, r.status, r.reason, r.plan_id)
+    assert store.get("d-v2").status == "unsupported"  # the status check accepts it
+    again = process(svc, store.get("d-v2"))  # a repeat changes nothing more
+    assert again.status == "unsupported"
+    with svc.engine.connect() as conn:
+        assert conn.execute(select(func.count()).select_from(R).where(R.c.cause == "unsupported:d-v2")).scalar() == 1
 
 
 def test_invalid_v2_is_invalid_export(svc):

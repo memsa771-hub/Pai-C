@@ -136,3 +136,65 @@ async def test_supported_but_incomplete_is_not_sent():
             db.commit()
         (row,) = items(db, student.workspace_id)
         assert row.status == "not_sent" and row.last_error == "incomplete"
+
+
+@pytest.mark.asyncio
+@pytest.mark.req("R-06")
+async def test_move_to_unsupported_after_a_delivery_is_sent():
+    """Final review I3: after a version reached the OS, a change to a route the OS cannot run is still sent, so the
+    OS closes the old plan (rows 6.3, 6.14)."""
+    async with confirmed_student() as (_, student, db, _journey):
+        with_routes(student, db)
+        ws = student.workspace_id
+        service = RouteDecisionService(db)
+        with on(), patch("app.pai_os_bridge.route_supported", return_value=True):
+            service.choose(ws, "electrical_engineering", details=DETAILS)
+            db.commit()
+        (first,) = items(db, ws)
+        first.status = "delivered"
+        db.commit()
+        with on(), patch("app.pai_os_bridge.route_supported", return_value=False):
+            service.choose(ws, "computer_engineering", details=DETAILS)
+            db.commit()
+        _, second = items(db, ws)
+        assert second.key == f"decision:{ws}:2" and second.status == "pending" and second.last_error is None
+        assert second.payload["os_supported"] is False and second.payload["status"] == "chosen"
+        from app.os.contracts.decision_record_v2 import DecisionRecordV2
+        DecisionRecordV2.model_validate(second.payload)
+
+
+@pytest.mark.asyncio
+async def test_move_to_unsupported_without_a_delivery_is_not_sent():
+    """Nothing reached the OS before, so there is no plan to close: the unsupported row stays not_sent."""
+    async with confirmed_student() as (_, student, db, _journey):
+        with_routes(student, db)
+        ws = student.workspace_id
+        service = RouteDecisionService(db)
+        with on(), patch("app.pai_os_bridge.route_supported", return_value=True):
+            service.choose(ws, "electrical_engineering", details=DETAILS)
+            db.commit()
+        with on(), patch("app.pai_os_bridge.route_supported", return_value=False):
+            service.choose(ws, "computer_engineering", details=DETAILS)
+            db.commit()
+        first, second = items(db, ws)
+        assert first.status == "pending"
+        assert second.status == "not_sent" and second.last_error == "not_supported"
+
+
+@pytest.mark.asyncio
+async def test_incomplete_after_a_delivery_stays_not_sent():
+    async with confirmed_student() as (_, student, db, _journey):
+        with_routes(student, db)
+        ws = student.workspace_id
+        service = RouteDecisionService(db)
+        bare = ChoiceDetails(origin_country="PK", destination_country="GB", level="bachelor", places=(), intake=None)
+        with on(), patch("app.pai_os_bridge.route_supported", return_value=True):
+            service.choose(ws, "electrical_engineering", details=DETAILS)
+            db.commit()
+            (first,) = items(db, ws)
+            first.status = "delivered"
+            db.commit()
+            service.choose(ws, "computer_engineering", details=bare)
+            db.commit()
+        _, second = items(db, ws)
+        assert second.status == "not_sent" and second.last_error == "incomplete"

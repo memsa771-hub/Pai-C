@@ -21,7 +21,7 @@ class Intake:
     export: dict
     export_sha256: str
     chosen_at: datetime
-    status: str  # pending | planned | revised | replaced | refused | stale | withdrawn
+    status: str  # pending | planned | revised | replaced | refused | stale | withdrawn | unsupported
     reason: str | None
     plan_id: int | None
     counsellor_status: str | None
@@ -73,12 +73,12 @@ class IntakeStore:
             return conn.execute(select(func.max(I.c.decision_version)).where(
                 I.c.tenant_id == self.tenant_id, I.c.student_ref == student_ref)).scalar()
 
-    def newest_processed_version(self, student_ref: str, excluding_id: int) -> int | None:
-        """The highest version already processed (status not `pending`) for the student."""
+    def newest_other_version(self, student_ref: str, excluding_id: int) -> int | None:
+        """The highest version stored for the student in any other row, pending or processed (R-02): a newer stored
+        version is processed anyway, so an older one never needs to be applied."""
         with self.engine.connect() as conn:
             return conn.execute(select(func.max(I.c.decision_version)).where(
-                I.c.tenant_id == self.tenant_id, I.c.student_ref == student_ref, I.c.status != "pending",
-                I.c.id != excluding_id)).scalar()
+                I.c.tenant_id == self.tenant_id, I.c.student_ref == student_ref, I.c.id != excluding_id)).scalar()
 
     def finish(self, intake_id: int, status: str, reason: str | None = None, plan_id: int | None = None) -> None:
         with self.engine.begin() as conn:
