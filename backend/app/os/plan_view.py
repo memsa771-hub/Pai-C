@@ -97,13 +97,13 @@ def build_plan_view(svc: Any, student_ref: str) -> PlanViewV1:
             PR.c.tenant_id == tenant_id, PR.c.plan_id == plan.id, PR.c.status == "pending")).scalar()
         version = decision.decision_version
         pin = conn.execute(select(PIN.c.playbook_key).where(PIN.c.tenant_id == tenant_id, PIN.c.plan_id == plan.id)
-                           .order_by(PIN.c.id.desc()).limit(1)).scalar()
+                           .order_by(PIN.c.version.desc(), PIN.c.id.desc()).limit(1)).scalar()
         reason = None
         if plan.status == PLAN_CLOSED:
-            cause = conn.execute(select(R.c.cause).where(R.c.tenant_id == tenant_id, R.c.plan_id == plan.id, R.c.number == plan.current_revision)
-                                 ).scalar()
+            cause = conn.execute(select(R.c.cause).where(
+                R.c.tenant_id == tenant_id, R.c.plan_id == plan.id, R.c.number == plan.current_revision)).scalar()
             reason = _code(cause)
-        elif plan.status == "paused":
+        elif plan.status == "paused" and decision.status not in _CLOSED_STATUSES:  # a stop is not a pause
             payload = conn.execute(select(EV.c.payload).where(
                 EV.c.tenant_id == tenant_id, EV.c.plan_id == plan.id, EV.c.type == "plan_paused")
                 .order_by(EV.c.id.desc()).limit(1)).scalar()
@@ -121,16 +121,21 @@ def build_plan_view(svc: Any, student_ref: str) -> PlanViewV1:
     else:
         state = "active"
     c = plan.contract
+    try:
+        origin, destination, level, intake = (c["origin_country"], c["destination_country"], c["level"],
+                                              c["target_intake"])
+    except (KeyError, TypeError) as e:
+        raise ValueError(f"plan {plan.id} has a contract without its route") from e
     if pin is None:  # no pin: the key of the playbook this route runs on
         try:
-            pin = select_playbook(svc.plans.playbooks, c["origin_country"], c["destination_country"], c["level"]).key
+            pin = select_playbook(svc.plans.playbooks, origin, destination, level).key
         except PlaybookError as e:
             raise ValueError(f"plan {plan.id} has no playbook pin and no playbook serves its route") from e
+    # consent is the applied row's: the Counsellor holds the newest consent itself and shows it from its own side
     return PlanViewV1(
         student_ref=student_ref, state=state, state_reason=reason, plan_id=plan.id, decision_version=version,
         revision=plan.current_revision,
-        route=PlanRoute(route_key=pin, origin_country=c["origin_country"],
-                        destination_country=c["destination_country"], level=c["level"],
-                        target_intake=c["target_intake"]),
+        route=PlanRoute(route_key=pin, origin_country=origin, destination_country=destination, level=level,
+                        target_intake=intake),
         pages=[], consent=_consent(decision.export or {}), steps=steps, requests=[], documents_needed=[],
         changes=changes, proposals_waiting=waiting)

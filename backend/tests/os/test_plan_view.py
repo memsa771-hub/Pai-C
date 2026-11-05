@@ -14,7 +14,7 @@ from app.os.playbooks import load_playbook_dir
 from app.os.plan_view import build_plan_view
 from app.os.ports import plan_query
 from test_counsellor_intake_v2 import chosen, run, svc, v1, withdrawn  # noqa: F401
-from test_plan_summary import STUDENT, plan, task
+from test_plan_summary import CONTRACT, STUDENT, plan, task
 
 pytestmark = [pytest.mark.req("R-04"), pytest.mark.req("R-44")]
 
@@ -291,7 +291,7 @@ def test_no_pin_and_no_playbook_is_an_error(engine, clean):
         build_plan_view(_Svc(engine, {}), STUDENT)
 
 
-def test_other_students_and_tenants_are_never_returned(engine, clean):
+def test_other_students_are_never_returned(engine, clean):
     mine = plan(engine)
     task(engine, mine, "a", "running")
     decision(engine, "planned", mine, n=1)
@@ -302,4 +302,62 @@ def test_other_students_and_tenants_are_never_returned(engine, clean):
     assert view(engine).plan_id == mine
     assert build_plan_view(_Svc(engine), "ws-other").plan_id == other
     assert build_plan_view(_Svc(engine), "ws-nobody").state == "empty"
-    assert build_plan_view(_Svc(engine, tenant="other"), STUDENT).state == "empty"
+
+
+def test_other_tenants_are_never_returned(engine, clean):
+    """A full plan, task, revision, intake row and closed plan of the same student_ref under tenant `other`."""
+    with engine.begin() as conn:
+        o = conn.execute(insert(models.plans).values(
+            tenant_id="other", source="counsellor", external_ref="j-1:DE:master", student_ref=STUDENT,
+            contract=CONTRACT, contract_sha256="0" * 64, status="closed", current_revision=2
+        ).returning(models.plans.c.id)).scalar_one()
+        conn.execute(insert(models.plan_revisions).values(tenant_id="other", plan_id=o, number=2,
+                                                          cause="leaked:x", diff={"added": ["leak"]}))
+        conn.execute(insert(models.counsellor_intake).values(
+            tenant_id="other", decision_id="d-o", student_ref=STUDENT, journey_id="j-1", export={}, export_sha256="0",
+            chosen_at=AT, status="withdrawn", plan_id=o, decision_version=5))
+    task(engine, o, "leak", "running")
+    assert build_plan_view(_Svc(engine, tenant="pai"), STUDENT).state == "empty"
+    assert build_plan_view(_Svc(engine, tenant="other"), STUDENT).plan_id == o
+    # the same plan id reached through a pai intake row must not show other tenant data
+    decision(engine, "planned", o)
+    v = view(engine)
+    assert v.plan_id is None and v.steps == [] and v.changes == []
+
+
+def test_stopped_by_decision_never_shows_the_pause_reason(engine, clean):
+    p = plan(engine, status="paused")
+    with engine.begin() as conn:
+        conn.execute(insert(models.events).values(tenant_id="pai", plan_id=p, type="plan_paused",
+                                                  payload={"reason": "consent_missing"}))
+    decision(engine, "withdrawn", p, version=2)
+    v = view(engine)
+    assert (v.state, v.state_reason) == ("stopped", "withdrawn")
+
+
+def test_unsupported_row_with_open_plan_is_stopped(engine, clean):
+    p = plan(engine)
+    task(engine, p, "a", "running")
+    decision(engine, "unsupported", p)
+    v = view(engine)
+    assert (v.state, v.state_reason) == ("stopped", "unsupported")
+
+
+def test_contract_without_its_route_is_a_clear_error(engine, clean):
+    p = plan(engine)
+    with engine.begin() as conn:
+        conn.execute(update(models.plans).where(models.plans.c.id == p).values(contract={"level": "master"}))
+    decision(engine, "planned", p)
+    with pytest.raises(ValueError, match="contract without its route"):
+        view(engine)
+
+
+def test_pin_with_the_highest_version_wins(engine, clean):
+    """os_playbook_pins is unique per plan_id, so two pins cannot be stored; the ordering (version, then id, newest
+    first) is defensive. This checks the single stored pin is the one used."""
+    p = plan(engine)
+    with engine.begin() as conn:
+        conn.execute(insert(models.playbook_pins).values(tenant_id="pai", plan_id=p, playbook_key="pin_key",
+                                                         version=2))
+    decision(engine, "planned", p)
+    assert view(engine).route.route_key == "pin_key"
