@@ -189,3 +189,14 @@ def counsellor_module_on() -> bool:
     except Exception:
         log.exception("counsellor module switch could not be read; treated as off")
         return False
+
+
+def route_supported(origin: str, destination: str, level: str) -> bool:
+    """True when PAI OS has a playbook for the route. False when PAI OS is not mounted, and on any failure (logged)."""
+    try:
+        return bool(plan_source.supports(origin, destination, level))
+    except ports.OsUnavailable:
+        return False
+    except Exception:
+        log.exception("route support could not be read; treated as not supported")
+        return False

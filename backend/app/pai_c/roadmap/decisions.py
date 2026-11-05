@@ -8,6 +8,7 @@ page shows the live status beside that snapshot instead of rewriting it.
 """
 
 from datetime import datetime, timezone
+from typing import TYPE_CHECKING
 
 from sqlalchemy import func, select
 
@@ -15,6 +16,9 @@ from app.models import RouteDecision, StudentJourney, Workspace
 from app.pai_c.possibilities import PossibilityService
 from app.pai_c.roadmap.engine import RoadmapEngine
 from app.pai_c.roadmap.steps import is_tickable, step_key_of_legacy
+
+if TYPE_CHECKING:
+    from app.pai_c.connect.choice import ChoiceDetails
 
 CHOOSABLE = {"open", "step"}
 REFUSALS = {"not_open": "This field is not open from your education, so it cannot be chosen",
@@ -118,15 +122,16 @@ class RouteDecisionService:
             return
         journey.decisions = [*(journey.decisions or []), {
             "kind": "route_choice", "route_decision_id": row.id, "field_key": row.field_key,
-            "chosen_at": row.chosen_at.isoformat()}]
+            "chosen_at": row.chosen_at.isoformat(), "decision_version": row.decision_version}]
 
     @staticmethod
-    def _note_withdrawn(journey: StudentJourney, row: RouteDecision) -> None:
+    def _note_withdrawn(journey: StudentJourney, row: RouteDecision, version: int | None = None) -> None:
         journey.decisions = [*(journey.decisions or []), {
             "kind": "route_withdrawn", "route_decision_id": row.id, "field_key": row.field_key,
-            "withdrawn_at": row.withdrawn_at.isoformat()}]
+            "withdrawn_at": row.withdrawn_at.isoformat(),
+            "decision_version": version if version is not None else row.decision_version}]
 
-    def _record_withdraw(self, workspace_id: str, row: RouteDecision) -> None:
+    def _record_withdraw(self, workspace_id: str, row: RouteDecision, version: int) -> None:
         journey = self._journey(workspace_id)
         if journey is None:
             return
@@ -135,7 +140,7 @@ class RouteDecisionService:
         if (journey.active_goal or {}).get("route_decision_id") == row.id:
             journey.active_goal = None
             journey.current_objective = None
-        self._note_withdrawn(journey, row)
+        self._note_withdrawn(journey, row, version)
 
     def active(self, workspace_id: str) -> RouteDecision | None:
         return self.db.scalar(select(RouteDecision).where(
@@ -145,6 +150,17 @@ class RouteDecisionService:
         # Serializes choose/tick/withdraw per workspace; the partial unique
         # index is the final guard.
         self.db.scalar(select(Workspace.id).where(Workspace.id == workspace_id).with_for_update())
+
+    def _next_version(self, workspace_id: str) -> int:
+        """The next decision version of the student (1 when there is none). Call under `_lock`."""
+        newest = self.db.scalar(select(func.max(RouteDecision.decision_version)).where(
+            RouteDecision.workspace_id == workspace_id))
+        return (newest or 0) + 1
+
+    def newest(self, workspace_id: str) -> RouteDecision | None:
+        """The student's highest-version row: a choice, or the withdrawal that followed it."""
+        return self.db.scalar(select(RouteDecision).where(RouteDecision.workspace_id == workspace_id)
+                              .order_by(RouteDecision.decision_version.desc()).limit(1))
 
     def _active_or_404(self, workspace_id: str) -> RouteDecision:
         row = self.active(workspace_id)
@@ -159,7 +175,7 @@ class RouteDecisionService:
         cards = RoadmapEngine(self.db).build(workspace_id)["fields"]
         return {**serialize(row, cards), "workspace_id": row.workspace_id}
 
-    def choose(self, workspace_id: str, field_key: str) -> dict:
+    def choose(self, workspace_id: str, field_key: str, details: "ChoiceDetails | None" = None) -> dict:
         self._lock(workspace_id)
         page = RoadmapEngine(self.db).build(workspace_id)
         card = next((card for card in page["fields"] if field_key and card["field_key"] == field_key), None)
@@ -174,13 +190,22 @@ class RouteDecisionService:
             previous.withdrawn_at = now
             paths.set_chosen(workspace_id, previous.possibility_id, False)
             self.db.flush()  # the old row leaves the partial unique index before the new one enters
-        # Minimal version number (rule D-a); the full versioning lands with the decision service.
-        version = (self.db.query(func.max(RouteDecision.decision_version))
-                   .filter(RouteDecision.workspace_id == workspace_id).scalar() or 0) + 1
-        row = RouteDecision(workspace_id=workspace_id, decision_version=version, field_key=field_key,
+        extra = {}
+        if details is not None:
+            from app import pai_os_bridge
+            extra = {"origin_country": details.origin_country, "destination_country": details.destination_country,
+                     "level": details.level, "path_ref": details.path_ref,
+                     "places": [{"programme_ref": ref, "rank": rank} for ref, rank in details.places],
+                     "intake": {"term": details.intake[0], "year": details.intake[1]} if details.intake else None,
+                     "os_supported": pai_os_bridge.route_supported(
+                         details.origin_country, details.destination_country, details.level),
+                     "authorized_at": details.authorized_at, "guardian_required": details.guardian_required,
+                     "guardian_authorized_at": details.guardian_authorized_at}
+        row = RouteDecision(workspace_id=workspace_id, decision_version=self._next_version(workspace_id),
+                            status="chosen", field_key=field_key,
                             possibility_id=card["possibility_id"], title=card["title"], verdict=card["verdict"],
                             route=route_of(card, page["education_line"]), steps=_snapshot(card["steps"]),
-                            steps_done=[], chosen_at=now)
+                            steps_done=[], chosen_at=now, **extra)
         self.db.add(row)
         self.db.flush()
         paths.set_chosen(workspace_id, row.possibility_id, True)
@@ -219,8 +244,19 @@ class RouteDecisionService:
     def withdraw(self, workspace_id: str) -> dict:
         self._lock(workspace_id)
         row = self._active_or_404(workspace_id)
-        row.withdrawn_at = datetime.now(timezone.utc)
+        now = datetime.now(timezone.utc)
+        row.withdrawn_at = now
         PossibilityService(self.db).set_chosen(workspace_id, row.possibility_id, False)
-        self._record_withdraw(workspace_id, row)
+        self.db.flush()
+        # The withdrawal is a version of its own, born withdrawn so it is never the active row (rule D-a).
+        marker = RouteDecision(
+            workspace_id=workspace_id, decision_version=self._next_version(workspace_id), status="withdrawn",
+            field_key=row.field_key, possibility_id=row.possibility_id, title=row.title, verdict=row.verdict,
+            route=row.route, steps=list(row.steps or []), steps_done=[], origin_country=row.origin_country,
+            destination_country=row.destination_country, level=row.level, path_ref=row.path_ref, places=[],
+            intake=None, os_supported=row.os_supported, chosen_at=now, withdrawn_at=now)
+        self.db.add(marker)
+        self.db.flush()
+        self._record_withdraw(workspace_id, row, marker.decision_version)
         self.db.flush()
         return serialize(row, RoadmapEngine(self.db).build(workspace_id)["fields"])
