@@ -46,7 +46,8 @@ def current_export(db, workspace_id: str) -> dict | None:
         module = importlib.import_module(EXPORT_MODULE)
     except ModuleNotFoundError:
         return None
-    return module.decision_record_v1(db, workspace_id)
+    export = getattr(module, "decision_record_v1", None)  # the v2 export lives in the same module
+    return export(db, workspace_id) if export else None
 
 
 def decision_changed(workspace_id: str, db=None) -> str | None:

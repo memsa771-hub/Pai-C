@@ -13,6 +13,7 @@ from typing import TYPE_CHECKING
 from sqlalchemy import func, select
 
 from app.models import RouteDecision, StudentJourney, Workspace
+from app.pai_c.connect import outbox
 from app.pai_c.possibilities import PossibilityService
 from app.pai_c.roadmap.engine import RoadmapEngine
 from app.pai_c.roadmap.steps import is_tickable, step_key_of_legacy
@@ -213,6 +214,7 @@ class RouteDecisionService:
         self.db.flush()
         from app.pai_c.checkins import schedule
         schedule(self.db, workspace_id, "chosen_path", row.id, at=now)
+        outbox.record(self.db, row)
         return serialize(row, page["fields"])
 
     def set_step(self, workspace_id: str, done: bool, *, key: str | None = None, index: int | None = None) -> dict:
@@ -258,5 +260,6 @@ class RouteDecisionService:
         self.db.add(marker)
         self.db.flush()
         self._record_withdraw(workspace_id, row, marker.decision_version)
+        outbox.record(self.db, marker)
         self.db.flush()
         return serialize(row, RoadmapEngine(self.db).build(workspace_id)["fields"])
