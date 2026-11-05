@@ -1,0 +1,55 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "schema": {
+      "const": "pai.vault_event.v1",
+      "default": "pai.vault_event.v1",
+      "title": "Schema",
+      "type": "string"
+    },
+    "key": {
+      "minLength": 1,
+      "title": "Key",
+      "type": "string"
+    },
+    "student_ref": {
+      "minLength": 1,
+      "title": "Student Ref",
+      "type": "string"
+    },
+    "vault_version": {
+      "minimum": 1,
+      "title": "Vault Version",
+      "type": "integer"
+    },
+    "kind": {
+      "const": "student_fact_changed",
+      "title": "Kind",
+      "type": "string"
+    },
+    "keys": {
+      "items": {
+        "pattern": "^[a-z_]+(\\.[a-z0-9_]+)*$",
+        "type": "string"
+      },
+      "minItems": 1,
+      "title": "Keys",
+      "type": "array"
+    },
+    "at": {
+      "format": "date-time",
+      "title": "At",
+      "type": "string"
+    }
+  },
+  "required": [
+    "key",
+    "student_ref",
+    "vault_version",
+    "kind",
+    "keys",
+    "at"
+  ],
+  "title": "VaultEventV1",
+  "type": "object"
+}

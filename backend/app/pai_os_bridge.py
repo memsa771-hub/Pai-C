@@ -178,3 +178,14 @@ def recipient_email(student_ref: str) -> str | None:
     with new_session() as db:
         return db.execute(select(User.email).join(Workspace, Workspace.owner_user_id == User.id)
                           .where(Workspace.id == workspace_id, Workspace.status == "active")).scalar_one_or_none()
+
+
+def counsellor_module_on() -> bool:
+    """True when the OS `counsellor` module is switched on. False when PAI OS is not mounted, and on any failure."""
+    try:
+        return bool(plan_source.counsellor_enabled())
+    except ports.OsUnavailable:
+        return False
+    except Exception:
+        log.exception("counsellor module switch could not be read; treated as off")
+        return False

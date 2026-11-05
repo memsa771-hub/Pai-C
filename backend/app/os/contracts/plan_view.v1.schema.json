@@ -1,0 +1,557 @@
+{
+  "$defs": {
+    "ConsentState": {
+      "additionalProperties": false,
+      "properties": {
+        "student": {
+          "enum": [
+            "given",
+            "missing"
+          ],
+          "title": "Student",
+          "type": "string"
+        },
+        "guardian": {
+          "enum": [
+            "not_needed",
+            "given",
+            "missing"
+          ],
+          "title": "Guardian",
+          "type": "string"
+        }
+      },
+      "required": [
+        "student",
+        "guardian"
+      ],
+      "title": "ConsentState",
+      "type": "object"
+    },
+    "DocumentNeed": {
+      "additionalProperties": false,
+      "properties": {
+        "doc_type": {
+          "pattern": "^[a-z_]+$",
+          "title": "Doc Type",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "missing",
+            "uploaded",
+            "confirmed"
+          ],
+          "title": "Status",
+          "type": "string"
+        }
+      },
+      "required": [
+        "doc_type",
+        "status"
+      ],
+      "title": "DocumentNeed",
+      "type": "object"
+    },
+    "IntakeRef": {
+      "additionalProperties": false,
+      "properties": {
+        "term": {
+          "pattern": "^[a-z_]+$",
+          "title": "Term",
+          "type": "string"
+        },
+        "year": {
+          "maximum": 2100,
+          "minimum": 2025,
+          "title": "Year",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "term",
+        "year"
+      ],
+      "title": "IntakeRef",
+      "type": "object"
+    },
+    "PlanChange": {
+      "additionalProperties": false,
+      "properties": {
+        "revision": {
+          "minimum": 1,
+          "title": "Revision",
+          "type": "integer"
+        },
+        "at": {
+          "format": "date-time",
+          "title": "At",
+          "type": "string"
+        },
+        "cause": {
+          "pattern": "^[a-z_]+$",
+          "title": "Cause",
+          "type": "string"
+        },
+        "kind": {
+          "enum": [
+            "added",
+            "removed",
+            "moved",
+            "done",
+            "revised"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "instance_key": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Instance Key"
+        }
+      },
+      "required": [
+        "revision",
+        "at",
+        "cause",
+        "kind",
+        "instance_key"
+      ],
+      "title": "PlanChange",
+      "type": "object"
+    },
+    "PlanRequest": {
+      "additionalProperties": false,
+      "properties": {
+        "request_id": {
+          "title": "Request Id",
+          "type": "integer"
+        },
+        "need": {
+          "$ref": "#/$defs/StepNeed"
+        },
+        "status": {
+          "enum": [
+            "open",
+            "answered"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "due_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Due At"
+        },
+        "due_tz": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Due Tz"
+        }
+      },
+      "required": [
+        "request_id",
+        "need",
+        "status",
+        "due_at",
+        "due_tz"
+      ],
+      "title": "PlanRequest",
+      "type": "object"
+    },
+    "PlanRoute": {
+      "additionalProperties": false,
+      "properties": {
+        "route_key": {
+          "title": "Route Key",
+          "type": "string"
+        },
+        "origin_country": {
+          "title": "Origin Country",
+          "type": "string"
+        },
+        "destination_country": {
+          "title": "Destination Country",
+          "type": "string"
+        },
+        "level": {
+          "enum": [
+            "intermediate",
+            "foundation",
+            "bachelor",
+            "master",
+            "phd"
+          ],
+          "title": "Level",
+          "type": "string"
+        },
+        "target_intake": {
+          "$ref": "#/$defs/IntakeRef"
+        }
+      },
+      "required": [
+        "route_key",
+        "origin_country",
+        "destination_country",
+        "level",
+        "target_intake"
+      ],
+      "title": "PlanRoute",
+      "type": "object"
+    },
+    "PlanStep": {
+      "additionalProperties": false,
+      "properties": {
+        "task_id": {
+          "title": "Task Id",
+          "type": "integer"
+        },
+        "instance_key": {
+          "title": "Instance Key",
+          "type": "string"
+        },
+        "template_key": {
+          "title": "Template Key",
+          "type": "string"
+        },
+        "title": {
+          "title": "Title",
+          "type": "string"
+        },
+        "owner": {
+          "enum": [
+            "student",
+            "pai"
+          ],
+          "title": "Owner",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "pending",
+            "ready",
+            "running",
+            "waiting_student",
+            "waiting_review",
+            "done",
+            "failed",
+            "skipped",
+            "cancelled",
+            "blocked"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "blocked_reason": {
+          "anyOf": [
+            {
+              "pattern": "^[a-z_]+$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Blocked Reason"
+        },
+        "inbox_kind": {
+          "anyOf": [
+            {
+              "enum": [
+                "provide",
+                "approve",
+                "act",
+                "choose"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Inbox Kind"
+        },
+        "programme_ref": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Programme Ref"
+        },
+        "due_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Due At"
+        },
+        "due_tz": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Due Tz"
+        },
+        "depends_on": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Depends On",
+          "type": "array"
+        },
+        "provisional": {
+          "title": "Provisional",
+          "type": "boolean"
+        },
+        "estimated": {
+          "title": "Estimated",
+          "type": "boolean"
+        },
+        "needs": {
+          "items": {
+            "$ref": "#/$defs/StepNeed"
+          },
+          "title": "Needs",
+          "type": "array"
+        }
+      },
+      "required": [
+        "task_id",
+        "instance_key",
+        "template_key",
+        "title",
+        "owner",
+        "status",
+        "blocked_reason",
+        "inbox_kind",
+        "programme_ref",
+        "due_at",
+        "due_tz",
+        "depends_on",
+        "provisional",
+        "estimated",
+        "needs"
+      ],
+      "title": "PlanStep",
+      "type": "object"
+    },
+    "StepNeed": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "enum": [
+            "fact",
+            "document"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "ref": {
+          "pattern": "^[a-z_][a-z0-9_.]*$",
+          "title": "Ref",
+          "type": "string"
+        },
+        "evidence": {
+          "enum": [
+            "stated",
+            "shown",
+            "confirmed"
+          ],
+          "title": "Evidence",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "ref",
+        "evidence"
+      ],
+      "title": "StepNeed",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "schema": {
+      "const": "pai.plan_view.v1",
+      "default": "pai.plan_view.v1",
+      "title": "Schema",
+      "type": "string"
+    },
+    "student_ref": {
+      "minLength": 1,
+      "title": "Student Ref",
+      "type": "string"
+    },
+    "state": {
+      "enum": [
+        "empty",
+        "active",
+        "needs_student",
+        "paused",
+        "stopped",
+        "finished"
+      ],
+      "title": "State",
+      "type": "string"
+    },
+    "state_reason": {
+      "anyOf": [
+        {
+          "pattern": "^[a-z_]+$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "State Reason"
+    },
+    "plan_id": {
+      "anyOf": [
+        {
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Plan Id"
+    },
+    "decision_version": {
+      "anyOf": [
+        {
+          "minimum": 1,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Decision Version"
+    },
+    "revision": {
+      "anyOf": [
+        {
+          "minimum": 1,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Revision"
+    },
+    "route": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/PlanRoute"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "pages": {
+      "items": {
+        "pattern": "^[a-z_]+$",
+        "type": "string"
+      },
+      "title": "Pages",
+      "type": "array"
+    },
+    "consent": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ConsentState"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "steps": {
+      "items": {
+        "$ref": "#/$defs/PlanStep"
+      },
+      "title": "Steps",
+      "type": "array"
+    },
+    "requests": {
+      "items": {
+        "$ref": "#/$defs/PlanRequest"
+      },
+      "title": "Requests",
+      "type": "array"
+    },
+    "documents_needed": {
+      "items": {
+        "$ref": "#/$defs/DocumentNeed"
+      },
+      "title": "Documents Needed",
+      "type": "array"
+    },
+    "changes": {
+      "items": {
+        "$ref": "#/$defs/PlanChange"
+      },
+      "title": "Changes",
+      "type": "array"
+    },
+    "proposals_waiting": {
+      "minimum": 0,
+      "title": "Proposals Waiting",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "student_ref",
+    "state",
+    "state_reason",
+    "plan_id",
+    "decision_version",
+    "revision",
+    "route",
+    "pages",
+    "consent",
+    "steps",
+    "requests",
+    "documents_needed",
+    "changes",
+    "proposals_waiting"
+  ],
+  "title": "PlanViewV1",
+  "type": "object"
+}
