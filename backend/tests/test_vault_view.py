@@ -575,14 +575,14 @@ def test_conflict_cards_say_where_each_side_came_from():
 def test_field_order_and_place_preference_read_as_words_in_their_sections():
     with VaultSession() as student, student.factory() as db:
         ws = student.workspace_id
-        _item(db, ws, "field_order", {"fields": ["computer_science", "mbbs"]})
+        _item(db, ws, "field_order", {"fields": ["computer science", "mbbs", "doctor banna"]})
         _item(db, ws, "place_preference", {"scope": "either", "fallback": "local_first", "regions": ["punjab", "kpk"]})
         db.commit()
         view = VaultView(db).build(ws)
         order, place = _entry(view, "field_order"), _entry(view, "place_preference")
         assert order in view["details"]["education"]["entries"]
         assert place in view["details"]["money_and_place"]["entries"]
-        assert order["display"] == "Computer Science, MBBS (Medicine)"
+        assert order["display"] == "Computer Science, MBBS (Medicine), Doctor banna"
         assert place["display"] == "Either, Local first, Punjab, Khyber Pakhtunkhwa"
         for entry in (order, place):
             assert entry["badge"] == "Stated" and entry["kind"] == "item"

@@ -162,13 +162,13 @@ def test_field_order_and_place_preference_are_catalogued_items():
         assert spec.storage == "item" and spec.identity == []
         assert set(spec.inputs) == {"chat", "details"}
         assert spec.shown_on == "details" and spec.section in {"about", "education", "money_and_place"}
-    study_codes = {c.code for c in catalog.choices("study_fields")}
-    validate_schema_instance(order.schema, {"fields": ["computer_science", "mbbs"]})
+    # Names as the student says them; mapping to study-field codes happens later (StudentFacts builder).
+    validate_schema_instance(order.schema, {"fields": ["computer science", "Doctor banna hai"]})
     validate_schema_instance(order.schema, {"fields": []})
-    for bad in ({"fields": ["not_a_field"]}, {"fields": ["mbbs"] * 31}, {"fields": "mbbs"}, {}, {"fields": [], "x": 1}):
+    for bad in ({"fields": ["x"] * 31}, {"fields": ["x" * 81]}, {"fields": [""]}, {"fields": "mbbs"}, {},
+                {"fields": [], "x": 1}):
         with pytest.raises(SchemaValidationError):
             validate_schema_instance(order.schema, bad)
-    assert set(order.schema["properties"]["fields"]["items"]["enum"]) == study_codes
     assert order.schema["properties"]["fields"]["maxItems"] == 30
 
     validate_schema_instance(place.schema, {"scope": "either", "fallback": "local_first", "regions": ["punjab"]})

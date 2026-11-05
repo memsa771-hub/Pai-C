@@ -114,7 +114,8 @@ def test_keys_for_is_the_privacy_allow_list():
     assert vault_version.keys_for(cand("vault_item", "field_order", {})) == ["constraint.field_order"]
     assert vault_version.keys_for(cand("student_record", "education", {"qualification_name": "Bachelor"})) == [
         f"education.bachelor.{f}" for f in sorted(
-            ["level", "marks_obtained", "marks_total", "percentage", "gpa", "gpa_scale", "grade"])]
+            ["level", "marks_obtained", "marks_total", "percentage", "gpa", "gpa_scale", "grade",
+             "part1.marks_obtained", "part1.marks_total", "part2.marks_obtained", "part2.marks_total"])]
     for kind, key in (("vault_fact", "identity.date_of_birth"), ("vault_fact", "identity.full_name"),
                       ("vault_fact", "contact.email"), ("vault_item", "family_member"),
                       ("student_record", "goal"), ("vault_item", "interest")):
@@ -151,3 +152,20 @@ def test_a_retract_and_a_marks_patch_read_the_level_from_the_stored_record():
         write(db, ws, "student_record", "education", None, operation="retract", entities={"record_id": record_id})
         assert version_row(db, ws).version == 3
         assert "education.bachelor.gpa" in version_row(db, ws).key_versions
+
+
+@pytest.mark.req("R-80")
+def test_a_part_only_edit_names_the_part_keys():
+    with StudentSession() as student, student.factory() as db, facts_flag(), part():
+        ws = student.workspace_id
+        first = write(db, ws, "student_record", "education",
+                      {"qualification_name": "fsc", "institution_name": "C", "academic_status": "completed"})
+        record_id = db.get(MemoryCandidate, first.id).result_id
+        patch_ = write(db, ws, "student_record", "education",
+                       {"result": {"part1": {"marks_obtained": 400, "marks_total": 550}}},
+                       entities={"record_id": record_id})
+        keys = vault_version.keys_for(patch_, db)
+        assert {"education.intermediate.part1.marks_obtained", "education.intermediate.part1.marks_total",
+                "education.intermediate.part2.marks_obtained", "education.intermediate.part2.marks_total"} <= set(keys)
+        versions = version_row(db, ws).key_versions
+        assert versions["education.intermediate.part1.marks_obtained"] == 2

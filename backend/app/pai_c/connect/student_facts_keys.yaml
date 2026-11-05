@@ -12,7 +12,8 @@ education:
     intermediate: [fsc, ics, icom, fa, intermediate, a_level, dae]
     bachelor: [bachelor]
     master: [masters]
-  fields: [level, marks_obtained, marks_total, percentage, gpa, gpa_scale, grade]
+  fields: [level, marks_obtained, marks_total, percentage, gpa, gpa_scale, grade,
+           part1.marks_obtained, part1.marks_total, part2.marks_obtained, part2.marks_total]
 
 # student_record "test_attempt": test.<type>.score, the type being the Vault catalog `tests` code.
 tests:
