@@ -15,6 +15,7 @@ Unset means no host adapter: the standalone one always answers."""
 
 import importlib
 import json
+import logging
 from collections.abc import Callable
 from typing import Literal
 
@@ -28,6 +29,8 @@ from app.os.adapters.standalone.student_facts import build as standalone_build
 from app.os.contracts.student_facts import StudentFactsV1
 from app.os.contracts.vault_event import VaultEventV1
 from app.os.settings import OsSettings
+
+log = logging.getLogger("app.os.ports.student_facts")
 
 StudentFactsSource = Callable[[str], dict | None]
 
@@ -72,19 +75,33 @@ def counsellor_active(engine: Engine, tenant_id: str) -> bool:
     return _source is not None and manifest.is_enabled(engine, tenant_id)
 
 
+def host_facts(student_ref: str, *, engine: Engine, tenant_id: str) -> StudentFactsV1 | None:
+    """The host adapter's answer, or None when the module is off, no adapter is set, it answers None, or it answers
+    for another student (logged by class only). An adapter that raises is not hidden: the caller retries or fails."""
+    if not counsellor_active(engine, tenant_id):
+        return None
+    raw = _source(student_ref)
+    if raw is None:
+        return None
+    facts = StudentFactsV1.model_validate(raw)
+    if facts.student_ref != student_ref:
+        log.error("StudentFacts adapter answered for another student (student_ref_mismatch); using own values")
+        return None
+    return facts
+
+
 def get(student_ref: str, *, engine: Engine | None = None, tenant_id: str | None = None) -> StudentFactsV1:
     """The student's facts. `engine` and `tenant_id` default to the mounted services (callers inside the OS that hold
-    their own engine pass them). A host adapter that raises is not hidden: the caller retries or fails."""
+    their own engine pass them)."""
     if engine is None or tenant_id is None:
         svc = ports.services()
         engine, tenant_id = svc.engine, svc.settings.tenant_id
-    if counsellor_active(engine, tenant_id):
-        raw = _source(student_ref)
-        if raw is not None:
-            return StudentFactsV1.model_validate(raw)
-    from app.os.eligibility.facts import default_types  # late: the eligibility code imports this port
+    found = host_facts(student_ref, engine=engine, tenant_id=tenant_id)
+    if found is not None:
+        return found
+    from app.os.eligibility.facts import current_types  # late: the eligibility code imports this port
 
-    return standalone_build(engine, tenant_id, student_ref, default_types())
+    return standalone_build(engine, tenant_id, student_ref, current_types())
 
 
 def record_event(event: dict) -> Literal["stored", "duplicate", "module_off"]:

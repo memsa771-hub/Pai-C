@@ -199,7 +199,7 @@ def test_notes_follow_the_vault_while_the_host_adapter_is_on(svc, engine):
                     {"key": "test.ielts.score", "value": ielts, "evidence": "stated", "vault_version": 1}]}
 
     start(svc, "stu-1")
-    profile(engine, "stu-1", transcript__percentage=70)  # interim: removed by T7 (the stored value fills the gap)
+    profile(engine, "stu-1", transcript__percentage=70)  # interim: removed by T7 (a type the Vault lacks comes from the stored values)
     manifest.set_enabled(engine, "pai", True)
     student_facts.configure(lambda ref: vault(7.0))
     try:

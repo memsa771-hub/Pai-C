@@ -210,6 +210,9 @@ def build(settings: OsSettings) -> tuple[Registry, Kernel, DBOSClient, Engine]:
     from app.os.packs.config import load_checked_pack_configs
 
     types = load_document_types()  # so does an invalid document type (Slice 3 spec S3-D2)
+    from app.os.eligibility import facts as eligibility_facts
+
+    eligibility_facts.configure_types(types)  # P1-T4: the profile code reads the types this worker loaded
     pack_configs = load_checked_pack_configs(PACK_SOURCE, types, books, profiles)  # and an invalid pack config (S6a-D12)
     visa_configs = load_checked_pack_configs(PACK_SOURCE, types, books, profiles, kind="visa")  # or visa file (S6b-D3)
     engine = make_engine(settings)

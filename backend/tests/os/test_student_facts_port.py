@@ -238,32 +238,95 @@ def test_flags_off_profile_is_exactly_todays_os_profile_values(mounted, setup):
     assert json.dumps(got) == json.dumps(today(mounted)) and calls == []
 
 
-def test_a_vault_value_wins_and_the_interim_overlay_fills_only_keys_the_vault_lacks(mounted):
-    # interim: removed by T7 (the overlay of os_profile_values for keys the Vault lacks)
+def vault_on(engine, **by_key):
+    manifest.set_enabled(engine, TENANT, True)
+    student_facts.configure(counsellor(facts_v1(**by_key).model_dump(by_alias=True))[0])
+
+
+def grade_of(profile, route="germany"):
+    book, research = CASES[route][0], CASES[route][1]
+    card = evaluate(BOOKS[(book, 1)].eligibility, "p", research, profile)
+    return next(ln for ln in card.lines if ln.check == "grade")
+
+
+def test_a_vault_value_wins_and_the_interim_overlay_fills_only_types_the_vault_lacks(mounted):
+    # interim: removed by T7 (the overlay of os_profile_values for document types the Vault does not hold)
     seed(mounted)
-    manifest.set_enabled(mounted, TENANT, True)
-    vault = facts_v1(test__ielts__score=7.5, education__intermediate__marks_total=1100)
-    student_facts.configure(counsellor(vault.model_dump(by_alias=True))[0])
+    vault_on(mounted, test__ielts__score=7.5, education__intermediate__marks_total=1100)
     got = profile_of(plans_of(mounted), "stu-1")
     assert got["ielts_trf.overall"] == 7.5  # the Vault wins over the stored 6.0
     assert got["hssc_certificate.marks_total"] == 1100
-    assert got["hssc_certificate.marks_obtained"] == 700  # the Vault lacks it: the overlay supplies it
-    assert got["transcript.cgpa"] == 3.0 and got["min_passing_grade_letter.min_pass"] == "C"
-    assert set(got) == set(today(mounted)) | {"hssc_certificate.marks_total"}
+    assert "hssc_certificate.marks_obtained" not in got  # the Vault holds this type: nothing of it from the overlay
+    assert got["transcript.cgpa"] == 3.0 and got["min_passing_grade_letter.min_pass"] == "C"  # types the Vault lacks
+    assert set(got) == {"ielts_trf.overall", "hssc_certificate.marks_total", "transcript.cgpa",
+                        "transcript.percentage", "min_passing_grade_letter.min_pass"}
 
 
-def test_an_unknown_vault_fact_does_not_hide_a_stored_value_but_gives_needs_input_without_one(mounted):
+def test_vault_cgpa_without_a_scale_never_mixes_with_an_os_document(mounted):
     # interim: removed by T7
+    own(mounted, transcript__cgpa=3.9, transcript__cgpa_scale=5.0, transcript__percentage=40)
+    vault_on(mounted, education__bachelor__gpa=3.2)
+    got = profile_of(plans_of(mounted), "stu-1")
+    assert got == {"transcript.cgpa": 3.2}  # neither the OS scale (5.0) nor the OS percentage is mixed in
+    # the evaluator reads a CGPA with no scale on the route's own scale; mixed with the OS scale it would be "other_scale"
+    mixed = {"transcript.cgpa": 3.2, "transcript.cgpa_scale": 5.0, "transcript.percentage": 40}
+    assert grade_of(got).status == "likely_meets" and grade_of(mixed).status == "likely_below"
+
+
+def test_an_unknown_vault_fact_stays_needs_input_over_an_os_document(mounted):
+    # interim: removed by T7
+    own(mounted, hssc_certificate__marks_obtained=990, hssc_certificate__marks_total=1100, entry_test__score=80)
+    vault_on(mounted, education__intermediate__marks_obtained=(None, "unknown"))
+    got = profile_of(plans_of(mounted), "stu-1")
+    assert not any(k.startswith("hssc_certificate.") for k in got) and got["entry_test.score"] == 80
+    assert grade_of(got, "pk_bs").status == "needs_input"
+
+
+def test_a_type_the_vault_does_not_hold_still_comes_from_the_overlay(mounted):
+    # interim: removed by T7
+    own(mounted, min_passing_grade_letter__min_pass="C", entry_test__score=80)
+    vault_on(mounted, test__ielts__score=7.0)
+    assert profile_of(plans_of(mounted), "stu-1") == {"min_passing_grade_letter.min_pass": "C", "entry_test.score": 80,
+                                                      "ielts_trf.overall": 7.0}
+
+
+def test_an_answer_for_another_student_is_ignored(mounted, caplog):
+    own(mounted, transcript__cgpa=3.0)
     manifest.set_enabled(mounted, TENANT, True)
-    vault = facts_v1(education__bachelor__percentage=(None, "unknown"), test__ielts__score=7.0)
-    student_facts.configure(counsellor(vault.model_dump(by_alias=True))[0])
-    profile = profile_of(plans_of(mounted), "stu-1")
-    assert profile == {"ielts_trf.overall": 7.0}
-    rules = BOOKS[("ireland_master", 1)].eligibility
-    grade = next(ln for ln in evaluate(rules, "p", CASES["ireland"][1], profile).lines if ln.check == "grade")
-    assert grade.status == "needs_input"
-    own(mounted, transcript__percentage=70)
-    assert profile_of(plans_of(mounted), "stu-1")["transcript.percentage"] == 70
+    student_facts.configure(counsellor(facts_v1(student="stu-2", test__ielts__score=9.0).model_dump(by_alias=True))[0])
+    with caplog.at_level("ERROR"):
+        got = student_facts.get("stu-1")
+        assert profile_of(plans_of(mounted), "stu-1") == {"transcript.cgpa": 3.0}
+    assert [f.key for f in got.facts] == ["education.bachelor.gpa"]
+    assert "student_ref_mismatch" in caplog.text and "stu-2" not in caplog.text
+
+
+def test_an_adapter_answering_none_skips_the_standalone_round_trip(mounted, monkeypatch):
+    own(mounted, transcript__cgpa=3.0)
+    manifest.set_enabled(mounted, TENANT, True)
+    student_facts.configure(counsellor(None)[0])
+
+    def boom(*a, **k):
+        raise AssertionError("standalone facts built")
+
+    monkeypatch.setattr(student_facts, "standalone_build", boom)
+    assert profile_of(plans_of(mounted), "stu-1") == {"transcript.cgpa": 3.0}
+
+
+def test_profile_uses_the_document_types_the_process_loaded(mounted, tmp_path):
+    from app.os.eligibility import facts as eligibility_facts
+
+    for path in TYPES_DIR.glob("*.yaml"):
+        text = path.read_text(encoding="utf-8")
+        if path.name.startswith("ielts_trf"):
+            text = text.replace("test.ielts.score", "test.other.score")
+        (tmp_path / path.name).write_text(text, encoding="utf-8")
+    try:
+        eligibility_facts.configure_types(load_document_types(tmp_path))
+        vault_on(mounted, test__other__score=6.5, test__ielts__score=9.0)
+        assert profile_of(plans_of(mounted), "stu-1") == {"ielts_trf.overall": 6.5}
+    finally:
+        eligibility_facts.configure_types(None)
 
 
 # --- the red-flag search -----------------------------------------------------------------------------------------

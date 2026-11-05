@@ -15,7 +15,7 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from app.os import models
 from app.os.documents.store import ProfileStore
 from app.os.eligibility.evaluate import Card, evaluate
-from app.os.eligibility.facts import default_types, profile_from_facts
+from app.os.eligibility.facts import current_types, held_types, profile_from_facts
 from app.os.eligibility.swaps import suggest
 from app.os.knowledge.requests import visible_programmes
 from app.os.ports import student_facts
@@ -28,12 +28,17 @@ def profile_of(plans, student_ref: str) -> dict:
     the student's facts; otherwise it is exactly the student's `os_profile_values`."""
     engine, tenant = plans.engine, plans.kernel.tenant_id
     own = {v["key"]: v["value"] for v in ProfileStore(engine, tenant).all(student_ref)}
-    if not student_facts.counsellor_active(engine, tenant):
+    facts = student_facts.host_facts(student_ref, engine=engine, tenant_id=tenant)
+    if facts is None:
         return own
-    facts = student_facts.get(student_ref, engine=engine, tenant_id=tenant)
-    # interim: removed by T7. A key the Vault lacks (no fact, or an unknown one) still comes from os_profile_values,
-    # so a student whose documents were confirmed in PAI OS keeps their verdicts until T7 sends those values to the Vault.
-    return {**own, **profile_from_facts(facts, default_types())}
+    types = current_types()
+    # interim: removed by T7. The overlay works per document type: a type the Vault speaks about at all (any of its
+    # mapped keys, even an unknown one) takes nothing from os_profile_values, so its fields never mix sources and an
+    # unknown stays "needs input". A type the Vault does not hold (e.g. a minimum-pass letter) still comes from
+    # os_profile_values until T7 sends those values to the Vault.
+    held = held_types(facts, types)
+    overlay = {k: v for k, v in own.items() if k.split(".", 1)[0] not in held}
+    return {**overlay, **profile_from_facts(facts, types)}
 
 
 def programme_cards(plans, rules, refs: list[str], year: int, profile: dict) -> dict[str, tuple[Card, int]]:

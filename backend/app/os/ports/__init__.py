@@ -30,6 +30,9 @@ def configure(services: Services | None, recipient_lookup: RecipientLookup | Non
     _services = services
     recipients.configure(recipient_lookup)
     student_facts_port.configure(student_facts)
+    from app.os.eligibility import facts as eligibility_facts
+
+    eligibility_facts.configure_types(getattr(services, "document_types", None))  # the types mount_os loaded
 
 
 def services() -> Services:
