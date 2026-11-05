@@ -23,7 +23,6 @@ from app.os.api.queries import (
     plan_out,
     research_runs,
     student_programmes,
-    task_plan_and_template,
     waiting_items,
 )
 from app.os.api.schemas import (
@@ -88,14 +87,14 @@ from app.os.documents.run import enqueue_document
 from app.os.documents.store import DocumentStore, DuplicateDocument, FindingStore, ProfileStore
 from app.os.eligibility.notes import on_profile_change
 from app.os.api import self_serve
-from app.os.replan.events import REVIEW_TEMPLATES
-from app.os.api.packs import add_pack_routes, add_visa_routes, complete_ready_packs, refresh_visa_date
+from app.os import inbox_actions
+from app.os.inbox_actions import StepActionError
+from app.os.api.packs import add_pack_routes, add_visa_routes, complete_ready_packs
 from app.os.api.replan import add_replan_routes, changes_paused, student_proposals
 from app.os.knowledge.requests import RequestLimit, request_programme
 from app.os.routes import builder
 from app.os.kernel import IllegalTransition
 from app.os.kernel.revisions import NOTICE_PREFIX
-from app.os.packs.visa import ADMISSION_TASK
 from app.os.playbooks import PlaybookError
 from app.os.workers import confirm_fact, open_confirm_tasks, supply_fact
 
@@ -224,19 +223,11 @@ def build_router(get_services: Callable[[], Services]) -> APIRouter:
     def complete(task_id: int, body: CompleteIn | None = None,
                  student: str = Depends(current_student_ref_for_write),  # a write: needs write access (I6)
                  svc: Services = Depends(services)) -> dict:
-        found = task_plan_and_template(svc.engine, svc.settings.tenant_id, task_id)
-        if found is not None and found[1] in REVIEW_TEMPLATES:  # closed by approving the pack or visa file, never by hand
-            noun = "visa file" if REVIEW_TEMPLATES[found[1]] == "visa" else "pack"
-            raise HTTPException(status_code=409, detail=f"approve the {noun} to finish this step")
         try:
-            done = svc.kernel.complete_student_task(task_id, student, (body or CompleteIn()).payload)
-        except (KeyError, PermissionError):
-            raise HTTPException(status_code=404, detail="inbox item not found") from None
-        except IllegalTransition as e:
-            raise HTTPException(status_code=409, detail=str(e)) from None
-        if done:  # an admission answer can change the visa programme, and so the visa step's date (F1)
-            if found is not None and found[1] == ADMISSION_TASK:
-                refresh_visa_date(svc, found[0])
+            done = inbox_actions.complete(svc, student, task_id, (body or CompleteIn()).payload) == "done"
+        except StepActionError as e:
+            raise HTTPException(status_code=404 if e.code in ("not_found", "not_yours") else 409,
+                                detail=e.message) from None
         return {"completed": done}
 
     @router.post("/facts/{fact_id}/confirm", response_model=ConfirmOut, dependencies=[Depends(require_admin)])
