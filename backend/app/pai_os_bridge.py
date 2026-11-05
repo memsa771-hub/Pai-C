@@ -77,21 +77,29 @@ def deliver_pending(db, workspace_id: str | None = None) -> dict:
 
 def _backfill(db) -> None:
     """A student whose newest decision version is above the one PAI OS holds, and whose newest row has no outbox row
-    (the decision was made while the part was off), gets that row now. Only the newest version is queued."""
+    (the decision was made while the part was off), gets that row now; a delivered row the OS lacks goes back to pending. Only the newest version is queued."""
     newest = (select(RouteDecision.workspace_id, func.max(RouteDecision.decision_version).label("version"))
               .group_by(RouteDecision.workspace_id).subquery())
     rows = db.scalars(select(RouteDecision).join(newest, and_(
         RouteDecision.workspace_id == newest.c.workspace_id,
         RouteDecision.decision_version == newest.c.version))).all()
     for row in rows:
-        held = plan_source.latest_version(row.workspace_id)
-        if held is not None and held >= row.decision_version:
-            continue
-        key = f"decision:{row.workspace_id}:{row.decision_version}"
-        if db.scalar(select(OsOutbox.id).where(OsOutbox.key == key)) is not None:
-            continue
-        outbox.record(db, row)
-        db.commit()
+        try:
+            held = plan_source.latest_version(row.workspace_id)
+            if held is not None and held >= row.decision_version:
+                continue
+            key = f"decision:{row.workspace_id}:{row.decision_version}"
+            item = db.scalar(select(OsOutbox).where(OsOutbox.key == key))
+            if item is None:
+                outbox.record(db, row)
+            elif item.status == "delivered":  # the OS is behind a version we sent: send it again (attempts untouched)
+                item.status = "pending"
+            else:
+                continue
+            db.commit()
+        except Exception as exc:  # noqa: BLE001  (one student never stops the others; class name only, no student data)
+            db.rollback()
+            log.error("PAI OS backfill failed for one student: %s", type(exc).__name__)
 
 
 def _deliver(db) -> dict:

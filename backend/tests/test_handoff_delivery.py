@@ -9,7 +9,7 @@ from sqlalchemy import select
 
 from app import pai_os_bridge as bridge
 from app.config import config
-from app.models import OsOutbox
+from app.models import OsOutbox, RouteDecision
 from app.os import ports
 from app.os.ports import escalation as os_escalation
 from app.os.ports import plan_source
@@ -32,6 +32,7 @@ def os_stub(monkeypatch):
         if got["raises"]:
             raise got["raises"]
         got["submitted"].append(export)
+        got["held"] = max(got["held"] or 0, export["decision_version"])  # the OS now holds it
         return "stored"
 
     monkeypatch.setattr(plan_source, "counsellor_enabled", lambda: True)
@@ -169,3 +170,97 @@ async def test_a_failing_bridge_never_fails_the_request(os_stub):
         with flag(True), patch.object(bridge, "deliver_pending", side_effect=RuntimeError("down")):
             out = request(db, ws, lambda: RouteDecisionService(db).choose(ws, "electrical_engineering", details=DETAILS))
         assert out is not None and rows(db, ws)[0].status == "pending"
+
+
+@pytest.mark.asyncio
+async def test_sweep_resends_a_delivered_version_the_os_lacks(os_stub):
+    async with confirmed_student() as (_, student, db, _j):
+        with_routes(student, db)
+        ws = student.workspace_id
+        with flag(True):
+            service = RouteDecisionService(db)
+            service.choose(ws, "electrical_engineering", details=DETAILS)
+            service.withdraw(ws)
+            db.commit()
+            bridge.deliver_pending(db, ws)
+            assert [r.status for r in rows(db, ws)] == ["delivered", "delivered"]
+            os_stub["submitted"].clear()
+            os_stub["held"] = 1  # the OS lost v2
+            bridge.sweep_once(db)
+        assert [e["decision_version"] for e in os_stub["submitted"]] == [2]
+        first, second = rows(db, ws)
+        assert second.status == "delivered" and second.attempts == 0 and first.status == "delivered"
+
+
+@pytest.mark.asyncio
+async def test_sweep_leaves_not_sent_rows_alone(os_stub):
+    async with confirmed_student() as (_, student, db, _j):
+        with_routes(student, db)
+        ws = student.workspace_id
+        with flag(True):
+            RouteDecisionService(db).choose(ws, "electrical_engineering", details=DETAILS)
+            db.commit()
+            (row,) = rows(db, ws)
+            row.status, row.last_error = "not_sent", "incomplete"
+            db.commit()
+            bridge.sweep_once(db)
+        assert rows(db, ws)[0].status == "not_sent" and os_stub["submitted"] == []
+
+
+@pytest.mark.asyncio
+async def test_one_students_error_does_not_stop_the_others(os_stub, monkeypatch):
+    async with confirmed_student() as (_, student, db, _j):
+        with_routes(student, db)
+        ws = student.workspace_id
+        with flag(False):
+            RouteDecisionService(db).choose(ws, "electrical_engineering", details=DETAILS)
+            db.commit()
+        # student A: a second workspace's newest row, whose version lookup raises
+        a_row = RouteDecision(id="a0000000-aaaa-4aaa-8aaa-aaaaaaaaaaaa", workspace_id=_second_workspace(db),
+                              field_key="f", title="R", verdict={}, route={}, steps=[], steps_done=[],
+                              decision_version=1, status="withdrawn")
+        db.add(a_row)
+        db.commit()
+        bad = a_row.workspace_id
+
+        def latest(ref):
+            if ref == bad:
+                raise RuntimeError("lookup failed")
+            return None
+
+        monkeypatch.setattr(plan_source, "latest_version", latest)
+        with flag(True):
+            bridge.sweep_once(db)
+        assert [e["student_ref"] for e in os_stub["submitted"]] == [ws]
+        assert rows(db, ws)[0].status == "delivered"
+
+
+def _second_workspace(db) -> str:
+    from app.models import Workspace
+    w = Workspace(name="Second", password_hash="synthetic-test-only")
+    db.add(w)
+    db.commit()
+    return str(w.id)
+
+
+@pytest.mark.asyncio
+async def test_escalations_still_delivered_when_decision_delivery_raises(os_stub, monkeypatch):
+    async with confirmed_student() as (_, student, db, _j):
+        calls = []
+        monkeypatch.setattr(os_escalation, "pending_counsellor_escalations", lambda limit=100: [object()])
+        monkeypatch.setattr(bridge, "_deliver", lambda d: calls.append(1) or {"sent": 1})
+        with flag(True), patch.object(bridge, "deliver_pending", side_effect=RuntimeError("x")):
+            got = bridge.sweep_once(db)
+        assert calls == [1] and got["sent"] == 1 and got["failed"] == 1
+
+
+@pytest.mark.asyncio
+async def test_module_off_answer_counts_as_delivered(os_stub, monkeypatch):
+    async with confirmed_student() as (_, student, db, _j):
+        with_routes(student, db)
+        ws = student.workspace_id
+        monkeypatch.setattr(plan_source, "submit_decision", lambda export: "module_off")
+        with flag(True):
+            request(db, ws, lambda: RouteDecisionService(db).choose(ws, "electrical_engineering", details=DETAILS))
+        (row,) = rows(db, ws)
+        assert row.status == "delivered" and row.delivered_at is not None
