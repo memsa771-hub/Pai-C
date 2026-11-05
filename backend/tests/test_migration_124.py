@@ -94,7 +94,7 @@ def test_124_backfills_versions_and_withdrawn_rows():
         assert original.id == "a" and original.withdrawn_at.startswith(t2[:10])
         assert withdrawn.id not in {"a", "b", "c"} and withdrawn.title == "T-a"
         assert withdrawn.chosen_at == withdrawn.withdrawn_at and withdrawn.chosen_at.startswith(t2[:10])
-        assert withdrawn.steps_done == '["s"]'
+        assert withdrawn.steps_done == "[]"  # a withdrawal has no steps done, like the live withdraw()
         assert active.id == "b" and active.withdrawn_at is None
         assert other.withdrawn_at is None
         assert all(r.places == "[]" and not r.os_supported and not r.guardian_required for r in rows)
@@ -125,3 +125,28 @@ def test_124_downgrade_drops_what_it_added():
         names = {i["name"] for i in inspector.get_indexes(DECISIONS)}
         assert "uq_route_decision_version" not in names and "uq_route_decision_active" in names
         assert {r.id for r in connection.execute(text("SELECT id FROM pai_route_decisions"))} == {"a", "b"}
+
+
+def test_124_a_change_of_route_is_not_a_withdrawal():
+    """Final review I2: the old choose() stamped the previous row's withdrawn_at with the new row's chosen_at. That is
+    a change (v1 A, v2 B, as the live code writes it), not a withdrawal; a real withdrawal still gets its row."""
+    t1, t2, t3, t4, t5 = ("2026-01-01 10:00:00", "2026-01-02 10:00:00", "2026-01-03 10:00:00",
+                          "2026-01-04 10:00:00", "2026-01-05 10:00:00")
+    engine = _database_at_123()
+    with engine.begin() as connection:
+        connection.execute(text("INSERT INTO workspaces VALUES ('w1'), ('w2')"))
+        _insert(connection, "a", "w1", t1, t2)  # changed to b at t2
+        _insert(connection, "b", "w1", t2, t3)  # really withdrawn at t3
+        _insert(connection, "c", "w1", t4, t5)  # withdrawn at t5; the next row (another workspace's) does not count
+        _insert(connection, "d", "w2", t5, t5)  # withdrawn at once; nothing follows
+
+        _migrate(connection, "upgrade")
+        rows = connection.execute(text(
+            "SELECT id, workspace_id, decision_version, status, title, chosen_at, steps_done FROM pai_route_decisions "
+            "ORDER BY workspace_id, decision_version")).fetchall()
+        assert [(r.workspace_id, r.decision_version, r.status, r.title) for r in rows] == [
+            ("w1", 1, "chosen", "T-a"), ("w1", 2, "chosen", "T-b"), ("w1", 3, "withdrawn", "T-b"),
+            ("w1", 4, "chosen", "T-c"), ("w1", 5, "withdrawn", "T-c"),
+            ("w2", 1, "chosen", "T-d"), ("w2", 2, "withdrawn", "T-d")]
+        assert [r.steps_done for r in rows if r.status == "withdrawn"] == ["[]", "[]", "[]"]
+        assert rows[2].chosen_at.startswith(t3[:10])

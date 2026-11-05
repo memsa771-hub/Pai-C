@@ -12,9 +12,13 @@ authorisation). The `withdrawn_at` marker and the partial index
 `pai_os_outbox` holds what is waiting to be delivered to PAI OS.
 
 Backfill, per workspace in (chosen_at, id) order: each existing row takes the
-next version; a row that was withdrawn is followed by a `withdrawn` version
-row (a copy of it, stamped at its withdrawal time). Downgrade deletes those
-withdrawn version rows and drops everything this migration added.
+next version; a row that was really withdrawn is followed by a `withdrawn`
+version row (a copy of it, stamped at its withdrawal time, with no steps
+done). A row whose `withdrawn_at` equals the next row's `chosen_at` was a
+change of route (the old `choose()` stamped the previous row with the same
+time), not a withdrawal: it gets no withdrawn row, as the live code writes a
+change. Downgrade deletes those withdrawn version rows and drops everything
+this migration added.
 """
 import uuid
 
@@ -37,20 +41,27 @@ COPY_AS_WITHDRAWN = (
     "SELECT :new_id, workspace_id, field_key, possibility_id, title, verdict, route, steps, steps_done, "
     "withdrawn_at, withdrawn_at, :version, 'withdrawn', places, os_supported, guardian_required "
     "FROM pai_route_decisions WHERE id = :id")
+# A withdrawal has no steps done, like the live `withdraw()`. A separate UPDATE so the literal takes the column's
+# type on every dialect (an untyped literal in INSERT ... SELECT is text on Postgres).
+NO_STEPS_DONE = "UPDATE pai_route_decisions SET steps_done = '[]' WHERE id = :id"
 
 
 def _backfill(bind):
     rows = bind.execute(sa.text(
-        "SELECT id, workspace_id, withdrawn_at FROM pai_route_decisions "
+        "SELECT id, workspace_id, chosen_at, withdrawn_at FROM pai_route_decisions "
         "ORDER BY workspace_id, chosen_at, id")).fetchall()
     versions: dict = {}
-    for ident, workspace, withdrawn_at in rows:
+    for index, (ident, workspace, _chosen_at, withdrawn_at) in enumerate(rows):
         version = versions.get(workspace, 0) + 1
         bind.execute(sa.text("UPDATE pai_route_decisions SET decision_version = :v WHERE id = :id"),
                      {"v": version, "id": ident})
-        if withdrawn_at is not None:
+        following = rows[index + 1] if index + 1 < len(rows) else None
+        changed = following is not None and following[1] == workspace and following[2] == withdrawn_at
+        if withdrawn_at is not None and not changed:
             version += 1
-            bind.execute(sa.text(COPY_AS_WITHDRAWN), {"new_id": str(uuid.uuid4()), "version": version, "id": ident})
+            new_id = str(uuid.uuid4())
+            bind.execute(sa.text(COPY_AS_WITHDRAWN), {"new_id": new_id, "version": version, "id": ident})
+            bind.execute(sa.text(NO_STEPS_DONE), {"id": new_id})
         versions[workspace] = version
 
 
