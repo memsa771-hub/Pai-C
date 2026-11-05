@@ -291,3 +291,60 @@ it('lets an onboarded student save without the completed marks', async () => {
     level: 'intermediate', group: 'pre_medical', status: 'completed', year: '2025',
   });
 });
+
+// req: R-80
+const inter = { field: 'level', values: ['intermediate'] };
+const partsDone = { field: 'status', values: ['completed'], and: inter };
+const partsYearTwo = { field: 'year', values: ['year_2'], and: { field: 'status', values: ['current'], and: inter } };
+const partsState: OnboardingState = {
+  ...state,
+  fields: [
+    ...state.fields,
+    spec('part1MarksObtained', { isNumber: true, required: false, atMost: 'part1MarksTotal', minimum: 0, maximum: 9999, depends_on: partsDone }),
+    spec('part1MarksTotal', { isNumber: true, required: false, minimum: 1, maximum: 9999, depends_on: partsDone }),
+    spec('part1MarksObtained', { isNumber: true, required: false, atMost: 'part1MarksTotal', minimum: 0, maximum: 9999, depends_on: partsYearTwo }),
+    spec('part1MarksTotal', { isNumber: true, required: false, minimum: 1, maximum: 9999, depends_on: partsYearTwo }),
+    spec('part2MarksObtained', { isNumber: true, required: false, atMost: 'part2MarksTotal', minimum: 0, maximum: 9999, depends_on: partsDone }),
+    spec('part2MarksTotal', { isNumber: true, required: false, minimum: 1, maximum: 9999, depends_on: partsDone }),
+  ],
+};
+
+// req: R-80
+it('shows labelled Part-I and Part-II marks of a completed Intermediate and submits them', async () => {
+  api.submit.mockResolvedValue({ saved: ['education'], rejected: {}, completed: true });
+  view(partsState);
+  fireEvent.click(chip('Intermediate'));
+  fireEvent.click(chip('FSc Pre-Medical'));
+  fireEvent.click(chip('Completed'));
+  fireEvent.change(screen.getByLabelText('Year completed'), { target: { value: '2025' } });
+  fireEvent.change(screen.getByLabelText('Part I marks obtained'), { target: { value: '400' } });
+  fireEvent.change(screen.getByLabelText('Part I total marks'), { target: { value: '550' } });
+  fireEvent.change(screen.getByLabelText('Part II marks obtained'), { target: { value: '480' } });
+  fireEvent.change(screen.getByLabelText('Part II total marks'), { target: { value: '550' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Start with PAI' }));
+  await waitFor(() => expect(api.submit).toHaveBeenCalledTimes(1));
+  expect(api.submit.mock.calls[0][0]).toEqual({
+    level: 'intermediate', group: 'pre_medical', status: 'completed', year: '2025',
+    part1MarksObtained: '400', part1MarksTotal: '550', part2MarksObtained: '480', part2MarksTotal: '550',
+  });
+});
+
+// req: R-80
+it('asks Part-I only of a second-year student, none in year one, and lets all parts stay empty', async () => {
+  api.submit.mockResolvedValue({ saved: ['education'], rejected: {}, completed: true });
+  view(partsState);
+  fireEvent.click(chip('Intermediate'));
+  fireEvent.click(chip('FSc Pre-Medical'));
+  fireEvent.click(chip('Studying now'));
+  fireEvent.click(chip('1st year'));
+  expect(screen.queryByLabelText('Part I marks obtained')).toBeNull();
+  fireEvent.click(chip('2nd year'));
+  expect(screen.getByLabelText('Part I marks obtained')).toBeTruthy();
+  expect(screen.getByLabelText('Part I total marks')).toBeTruthy();
+  expect(screen.queryByLabelText('Part II marks obtained')).toBeNull();
+  fireEvent.click(screen.getByRole('button', { name: 'Start with PAI' }));
+  await waitFor(() => expect(api.submit).toHaveBeenCalledTimes(1));
+  expect(api.submit.mock.calls[0][0]).toEqual({
+    level: 'intermediate', group: 'pre_medical', status: 'current', year: 'year_2',
+  });
+});

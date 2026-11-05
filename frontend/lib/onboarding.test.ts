@@ -123,3 +123,40 @@ describe('marks questions', () => {
       .toEqual({ level: 'other', status: 'current', entryTest: 'mdcat' });
   });
 });
+
+// req: R-80
+describe('Part-I and Part-II marks questions', () => {
+  const inter = { field: 'level', values: ['intermediate'] };
+  const done = { field: 'status', values: ['completed'], and: inter };
+  const yearTwo = { field: 'year', values: ['year_2'], and: { field: 'status', values: ['current'], and: inter } };
+  const PARTS: OnboardingFieldSpec[] = [
+    ...EDUCATION,
+    spec('part1MarksObtained', { isNumber: true, required: false, atMost: 'part1MarksTotal', depends_on: done }),
+    spec('part1MarksTotal', { isNumber: true, required: false, depends_on: done }),
+    spec('part1MarksObtained', { isNumber: true, required: false, atMost: 'part1MarksTotal', depends_on: yearTwo }),
+    spec('part1MarksTotal', { isNumber: true, required: false, depends_on: yearTwo }),
+    spec('part2MarksObtained', { isNumber: true, required: false, atMost: 'part2MarksTotal', depends_on: done }),
+    spec('part2MarksTotal', { isNumber: true, required: false, depends_on: done }),
+  ];
+  const names = (answers: Record<string, string>) => visibleOnboardingFields(PARTS, answers)
+    .map((f) => f.name).filter((n) => n.startsWith('part'));
+
+  it('asks both parts of a completed intermediate student', () => {
+    expect(names({ level: 'intermediate', status: 'completed' }))
+      .toEqual(['part1MarksObtained', 'part1MarksTotal', 'part2MarksObtained', 'part2MarksTotal']);
+  });
+
+  it('asks only Part-I of a second-year student, and nothing in year one or at another level', () => {
+    expect(names({ level: 'intermediate', status: 'current', year: 'year_2' }))
+      .toEqual(['part1MarksObtained', 'part1MarksTotal']);
+    expect(names({ level: 'intermediate', status: 'current', year: 'year_1' })).toEqual([]);
+    expect(names({ level: 'matric', status: 'completed' })).toEqual([]);
+  });
+
+  it('leaves unanswered optional parts out of the answers', () => {
+    const base = { level: 'intermediate', status: 'completed', group: 'pre_medical', year: '2025' };
+    expect(visibleOnboardingAnswers(PARTS, base)).toEqual(base);
+    expect(visibleOnboardingAnswers(PARTS, { ...base, part1MarksObtained: '400', part1MarksTotal: '550' }))
+      .toEqual({ ...base, part1MarksObtained: '400', part1MarksTotal: '550' });
+  });
+});

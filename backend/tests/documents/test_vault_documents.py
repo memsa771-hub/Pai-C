@@ -784,3 +784,11 @@ def test_only_a_trusted_document_clears_a_chat_guess(extra, clears):
         with student.factory() as db:
             fact = VaultService(db).get_fact(student.workspace_id, "identity.full_name")
             assert bool(fact.evidence.get("inferred")) is (not clears)
+
+
+def test_the_new_chat_and_details_items_are_not_document_items():
+    from app.documents.extractor import SYSTEM_PROMPT, document_item_types
+
+    allowed = {spec.key for spec in document_item_types()}
+    assert not allowed & {"field_order", "place_preference"}
+    assert "- field_order:" not in SYSTEM_PROMPT and "- place_preference:" not in SYSTEM_PROMPT

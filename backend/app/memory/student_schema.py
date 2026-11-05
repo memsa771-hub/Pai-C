@@ -37,6 +37,11 @@ RESULT_SCHEMA = obj({
     "class_or_division": string(),
 })
 
+# Intermediate-family results may carry the marks of each part beside the
+# totals (P1-D4): optional, education only. `course.score` stays RESULT_SCHEMA.
+PART_SCHEMA = obj({"marks_obtained": number(), "marks_total": number()})
+EDUCATION_RESULT_SCHEMA = obj({**RESULT_SCHEMA["properties"], "part1": PART_SCHEMA, "part2": PART_SCHEMA})
+
 # Each entry owns required fields, the permitted nested data, identity hints,
 # and fields safe/useful in routine counseling. Prompts render this registry.
 RECORD_SPECS = {
@@ -50,7 +55,7 @@ RECORD_SPECS = {
             "field_of_study": string(), "start_date": string(), "end_date": string(),
             "graduation_year": {"type": "integer", "minimum": 1900, "maximum": 2200},
             "academic_status": {"type": "string", "enum": ["current", "completed", "incomplete", "planned"]},
-            "result": RESULT_SCHEMA,
+            "result": EDUCATION_RESULT_SCHEMA,
             "details": obj({"institution_country": string(), "institution_city": string(),
                 "awarding_body": string(),
                 "framework": string(), "major": string(), "minor": string(),
@@ -284,6 +289,11 @@ def validate_record(kind: str, values: dict, *, partial: bool = False) -> dict:
         for actual, maximum in (("gpa", "gpa_scale"), ("marks_obtained", "marks_total")):
             if actual in result and maximum in result and (result[maximum] <= 0 or result[actual] > result[maximum]):
                 raise ValueError(f"{actual} exceeds its stated scale")
+        for part in ("part1", "part2"):
+            marks = result.get(part)
+            if isinstance(marks, dict) and "marks_obtained" in marks and "marks_total" in marks and (
+                    marks["marks_total"] <= 0 or marks["marks_obtained"] > marks["marks_total"]):
+                raise ValueError(f"{part} marks_obtained exceeds its stated scale")
         if kind == "test_attempt":
             sections = value.get("section_scores", {})
             if len(sections) > 20 or any(not isinstance(k, str) or len(k) > 80 or

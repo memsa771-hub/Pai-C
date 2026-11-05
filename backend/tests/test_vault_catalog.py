@@ -38,7 +38,7 @@ def test_every_type_is_valid():
     assert all(t.key in RECORD_SPECS for t in catalog.types("record"))
     assert {t.key for t in catalog.types("item")} == {
         "interest", "strength", "value", "pressure", "option", "myth", "certainty",
-        "family_member", "domicile", "quota", "daily_life"}
+        "family_member", "domicile", "quota", "daily_life", "field_order", "place_preference"}
     assert catalog.type("nope") is None
     assert catalog.type("domicile").identity == []
     assert catalog.type("family_member").identity == ["relation", "name"]
@@ -51,7 +51,8 @@ def test_every_type_is_valid():
     assert "basis" in catalog.type("strength").schema["properties"]
     assert "evidence" not in catalog.type("strength").schema["properties"]
     assert catalog.type("education").freshness_days is None
-    assert [t.key for t in catalog.types(shown_on="details", storage="item")] == ["domicile", "quota"]
+    assert [t.key for t in catalog.types(shown_on="details", storage="item")] == [
+        "domicile", "quota", "field_order", "place_preference"]
     onboarding = [t for t in types if t.onboarding]
     assert {t.onboarding["input"] for t in onboarding} <= {"text", "choice", "date"}
     assert len({t.onboarding["order"] for t in onboarding}) == len(onboarding)
@@ -149,3 +150,82 @@ def test_clashing_choice_wording_is_rejected():
     duplicate = {"choices": {"tests": [_choice("sat", "SAT"), _choice("sat", "SAT again")]}, "types": []}
     with pytest.raises(ValueError, match="tests"):
         VaultCatalog.from_dict(duplicate)
+
+
+# -- P1-T4 task 2: field order, place preference, per-part marks ---------------
+
+@pytest.mark.req("R-16")
+def test_field_order_and_place_preference_are_catalogued_items():
+    catalog = vault_catalog()
+    order, place = catalog.type("field_order"), catalog.type("place_preference")
+    for spec in (order, place):
+        assert spec.storage == "item" and spec.identity == []
+        assert set(spec.inputs) == {"chat", "details"}
+        assert spec.shown_on == "details" and spec.section in {"about", "education", "money_and_place"}
+    study_codes = {c.code for c in catalog.choices("study_fields")}
+    validate_schema_instance(order.schema, {"fields": ["computer_science", "mbbs"]})
+    validate_schema_instance(order.schema, {"fields": []})
+    for bad in ({"fields": ["not_a_field"]}, {"fields": ["mbbs"] * 31}, {"fields": "mbbs"}, {}, {"fields": [], "x": 1}):
+        with pytest.raises(SchemaValidationError):
+            validate_schema_instance(order.schema, bad)
+    assert set(order.schema["properties"]["fields"]["items"]["enum"]) == study_codes
+    assert order.schema["properties"]["fields"]["maxItems"] == 30
+
+    validate_schema_instance(place.schema, {"scope": "either", "fallback": "local_first", "regions": ["punjab"]})
+    validate_schema_instance(place.schema, {"scope": "local", "fallback": "none", "regions": []})
+    for bad in ({"scope": "mars"}, {"scope": "local", "fallback": "sometimes"},
+                {"scope": "local", "regions": ["atlantis"]}, {"scope": "local", "regions": "punjab"},
+                {"scope": "local", "extra": 1}):
+        with pytest.raises(SchemaValidationError):
+            validate_schema_instance(place.schema, bad)
+    provinces = {c.code for c in catalog.choices("provinces")}
+    assert set(place.schema["properties"]["regions"]["items"]["enum"]) == provinces
+
+
+@pytest.mark.req("R-16")
+def test_the_extractor_is_told_the_new_item_types():
+    from app.memory.extractor import SYSTEM_PROMPT
+    for key, names in (("field_order", ("fields",)), ("place_preference", ("scope", "fallback", "regions"))):
+        assert f"- {key}:" in SYSTEM_PROMPT
+        assert all(name in SYSTEM_PROMPT for name in names)
+
+
+EDUCATION = {"qualification_name": "fsc", "academic_status": "completed"}
+
+
+@pytest.mark.req("R-80")
+def test_education_results_take_optional_part_marks():
+    from app.memory.student_schema import validate_record
+    plain = {**EDUCATION, "result": {"marks_obtained": 900, "marks_total": 1100}}
+    assert validate_record("education", plain) == plain  # a total-only record stays valid
+    parts = {**EDUCATION, "result": {"marks_obtained": 900, "marks_total": 1100,
+                                     "part1": {"marks_obtained": 400, "marks_total": 550},
+                                     "part2": {"marks_obtained": 500, "marks_total": 550}}}
+    assert validate_record("education", parts) == parts
+    only_part1 = {**EDUCATION, "result": {"part1": {"marks_obtained": 400, "marks_total": 550}}}
+    assert validate_record("education", only_part1) == only_part1
+
+
+@pytest.mark.req("R-80")
+@pytest.mark.parametrize("result", [
+    {"part1": {"marks_obtained": 600, "marks_total": 550}},
+    {"part2": {"marks_obtained": 551, "marks_total": 550}},
+    {"marks_obtained": 100, "marks_total": 1100, "part1": {"marks_obtained": 1, "marks_total": 0}},
+    {"part1": {"marks_obtained": -1, "marks_total": 550}},
+    {"part3": {"marks_obtained": 1, "marks_total": 2}},
+    {"part1": {"marks_obtained": 1, "marks_total": 2, "grade": "A"}},
+])
+def test_a_part_above_its_total_is_refused(result):
+    from app.memory.errors import MemoryDataError
+    from app.memory.student_schema import validate_record
+    with pytest.raises(MemoryDataError):
+        validate_record("education", {**EDUCATION, "result": result})
+
+
+@pytest.mark.req("R-80")
+def test_course_score_is_not_widened_to_parts():
+    from app.memory.errors import MemoryDataError
+    from app.memory.student_schema import validate_record
+    with pytest.raises(MemoryDataError):
+        validate_record("course", {"education_id": "e", "name": "Physics",
+                                   "score": {"part1": {"marks_obtained": 1, "marks_total": 2}}})

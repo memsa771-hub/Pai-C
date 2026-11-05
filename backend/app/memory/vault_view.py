@@ -145,6 +145,19 @@ def _result_text(result: dict) -> str:
     return ""
 
 
+def _part_texts(result: dict) -> list[str]:
+    """Part-I and Part-II marks of an education result ("Part I 400/550"), only
+    for the parts that carry both numbers."""
+    words = view_copy()["display"]["result"]
+    out = []
+    for part in ("part1", "part2"):
+        marks = result.get(part)
+        got, total = (marks or {}).get("marks_obtained"), (marks or {}).get("marks_total")
+        if isinstance(got, (int, float)) and isinstance(total, (int, float)) and total > 0:
+            out.append(words[part].format(obtained=_number(got), total=_number(total)))
+    return out
+
+
 def _budget_amount(value: dict) -> str:
     """The budget as its band label; a range or amount the student gave reads
     as the band it falls in, else in lakh ("3-8 lakh"), never as 600000."""
@@ -215,7 +228,7 @@ def _display(spec: Optional[TypeSpec], value: Any, type_key: Optional[str] = Non
         if node is None or node == "" or (path and (_skip_in_display(name) or name in hidden)):
             return []
         if name == "result" and isinstance(node, dict):
-            parts = [_result_text(node)]
+            parts = [_result_text(node), *_part_texts(node)]
         elif isinstance(node, bool):
             parts = [rules["yes"] if node else rules["no"]]
         elif isinstance(node, dict):
