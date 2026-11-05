@@ -22,11 +22,11 @@ from app.os.knowledge.programmes import Programme, ProgrammeStore
 from app.os.outbox import Outbox
 from app.os.playbooks import load_playbook_dir
 from app.os.ports import student_facts
-from app.os.replan.apply import Replanner
+from app.os.replan.apply import ProposalStale, Replanner
 from app.os.replan.checks import task_rows
 from app.os.replan.config import ReplanConfig, load_replan_configs
 from app.os.replan.events import Event, pending
-from app.os.replan.ops import CancelProgramme
+from app.os.replan.ops import CancelProgramme, Escalate
 from app.os.replan.rules import REASONS, PlanState, rules_for
 from app.os.settings import load_settings
 
@@ -219,29 +219,45 @@ def send(world, plan_id, version, obtained):
     return run_rule(world, plan_id, event_id(world.engine, plan_id))
 
 
-def test_an_improving_fact_proposes_nothing_and_refreshes_the_note(world):
+def test_an_improving_fact_proposes_nothing_expires_the_old_proposal_and_refreshes_the_note(world):
     plan_id = start(world)
     assert send(world, plan_id, 1, 1000).status == "applied"
     first = send(world, plan_id, 2, 800)
     assert first.status == "pending"
     again = send(world, plan_id, 3, 1000)  # the marks are back: p-hard reads likely_meets again
     assert again.status == "applied" and world.replanner.proposals.get(again.proposal_id).ops == []
-    assert [p.id for p in world.replanner.proposals.pending_for("stu-1")] == [first.proposal_id]  # still just the one
+    # final review I2: the earlier removal is no longer true, so it expired and cannot be accepted
+    assert world.replanner.proposals.get(first.proposal_id).status == "expired"
+    assert world.replanner.proposals.pending_for("stu-1") == []
+    with pytest.raises(ProposalStale):
+        world.replanner.accept("stu-1", first.proposal_id)
+    live = [p.programme_ref for p in world.svc.plans._contract(plan_id)[0].programmes]
+    assert live == ["p-easy", "p-hard"]
     N = models.eligibility_notes
     with world.engine.connect() as conn:
         notes = [(n.programme_ref, n.verdict, n.payload["previous"]) for n in conn.execute(select(N).order_by(N.c.id))]
     assert notes == [("p-hard", "likely_below", "likely_meets"), ("p-hard", "likely_meets", "likely_below")]
 
 
-def test_every_programme_reading_below_is_pinned(world):
+def test_every_programme_reading_below_escalates_and_proposes_no_removal(world):
     plan_id = start(world)
     assert send(world, plan_id, 1, 1000).status == "applied"
     decision = send(world, plan_id, 2, 100)  # about 9 percent: both fake thresholds are missed
-    proposal = world.replanner.proposals.get(decision.proposal_id)
-    # Pinned (not a design choice): the kernel refuses nothing and the student gets ONE big proposal that cancels both.
-    assert decision.status == "pending" and proposal.big and proposal.refused == []
-    assert [o["programme_ref"] for o in proposal.ops] == ["p-easy", "p-hard"]
-    assert len(world.replanner.proposals.pending_for("stu-1")) == 1
+    # R-22: when every place is affected the plan escalates; it is never emptied by one accepted proposal.
+    ops = [o["op"] for o in world.replanner.proposals.get(decision.proposal_id).ops]
+    assert ops == ["escalate"] and decision.status != "pending"
+    assert world.replanner.proposals.pending_for("stu-1") == []
+    live = [p.programme_ref for p in world.svc.plans._contract(plan_id)[0].programmes]
+    assert live == ["p-easy", "p-hard"]
+
+
+def test_rule_escalates_when_the_removals_would_leave_fewer_than_the_minimum():
+    event = Event(1, 1, None, "student_fact_changed", {"keys": [MARKS], "vault_version": 2})
+    assert rules_for(event, state(["a", "b"]), ReplanConfig()) == [Escalate(reason=REASONS["fact_all_below"])]
+    two = ReplanConfig(min_programmes=2)  # one would be left, the route wants two
+    assert rules_for(event, state(["b"]), two) == [Escalate(reason=REASONS["fact_all_below"])]
+    assert rules_for(event, state(["b"]), ReplanConfig(min_programmes=1)) == [
+        CancelProgramme(programme_ref="b", reason=REASONS["fact_below"])]
 
 
 # --- the production wiring: the registered os.replan workflow ---------------------------------------------------
@@ -249,24 +265,54 @@ def test_every_programme_reading_below_is_pinned(world):
 from tests.os.test_replan_run import ctx, P1, STUDENT, TENANT as RUN_TENANT  # noqa: E402,F401 - ctx is used by name
 
 
-def test_the_workflow_reads_the_facts_for_a_fact_change(ctx):  # noqa: F811
-    """The rules step of the registered workflow passes the programmes that read below (`with_below`); without that
-    the event would close with nothing to change."""
+def _germany_gpa_change(ctx, min_pass: bool):
+    """Germany, a Vault CGPA of 1.0 out of 4.0 against a 2.5 maximum German grade. With `min_pass` the student's own
+    minimum-pass letter is on file (a firm verdict); without it the route default stands in (provisional)."""
+    from app.os.documents.store import ProfileStore
+
     host = {"v": None}
     ports.configure(pytypes.SimpleNamespace(engine=ctx.engine, settings=pytypes.SimpleNamespace(tenant_id=RUN_TENANT),
                                             plans=ctx.r.plans), student_facts=lambda ref: host["v"])
     manifest.set_enabled(ctx.engine, RUN_TENANT, True)
     ctx.r.plans.knowledge.upsert("programme", P1, "grade_requirement", Fact({"german_max": 2.5}, "q", URL, NOW, 2027,
                                                                          "confirmed"), "manual")
+    from app.os.eligibility.notes import refresh
+
+    refresh(ctx.r.plans, STUDENT, ctx.plan_id)  # the first reading writes no note; the change below does
+    if min_pass:
+        profiles = ProfileStore(ctx.engine, RUN_TENANT)
+        profiles.set(STUDENT, "min_passing_grade_letter.min_pass", 2.0, None)
+        profiles.set(STUDENT, "min_passing_grade_letter.scale_best", 4.0, None)
+    items = [{"key": "education.bachelor.gpa", "value": 1.0, "evidence": "stated", "vault_version": 1},
+             {"key": "education.bachelor.gpa_scale", "value": 4.0, "evidence": "stated", "vault_version": 1}]
+    host["v"] = StudentFactsV1.model_validate({"schema": "pai.student_facts.v1", "student_ref": STUDENT,
+                                               "vault_version": 1, "built_at": NOW, "eligible_levels": None,
+                                               "facts": items}).model_dump(by_alias=True)
+    return ctx.run(ctx.event("student_fact_changed", keys=["education.bachelor.gpa"], vault_version=1))
+
+
+def test_the_workflow_reads_the_facts_for_a_fact_change(ctx):  # noqa: F811
+    """The rules step of the registered workflow passes the programmes that read below (`with_below`); without that
+    the event would close with nothing to change. A firm verdict (the student's own minimum pass is on file)."""
     try:
-        items = [{"key": "education.bachelor.gpa", "value": 1.0, "evidence": "stated", "vault_version": 1},
-                 {"key": "education.bachelor.gpa_scale", "value": 4.0, "evidence": "stated", "vault_version": 1}]
-        host["v"] = StudentFactsV1.model_validate({"schema": "pai.student_facts.v1", "student_ref": STUDENT,
-                                                   "vault_version": 1, "built_at": NOW, "eligible_levels": None,
-                                                   "facts": items}).model_dump(by_alias=True)
-        got = ctx.run(ctx.event("student_fact_changed", keys=["education.bachelor.gpa"], vault_version=1))
+        got = _germany_gpa_change(ctx, min_pass=True)
         assert got["status"] == "pending", got
         proposal = ctx.r.proposals.get(got["proposal_id"])
         assert proposal.big and {o["op"] for o in proposal.ops} == {"cancel_programme"}
+    finally:
+        ports.configure(None)
+
+
+def test_a_provisional_below_verdict_shows_in_the_note_but_proposes_no_removal(ctx):  # noqa: F811
+    """Final review I3 (evidence rule): the route's default minimum pass is not the student's own, so a verdict that
+    stands on it only writes the labelled note."""
+    try:
+        got = _germany_gpa_change(ctx, min_pass=False)
+        assert got["status"] == "applied" and ctx.r.proposals.pending_for(STUDENT) == []
+        N = models.eligibility_notes
+        with ctx.engine.connect() as conn:
+            notes = [(n.programme_ref, n.verdict, n.payload["lines"]) for n in conn.execute(select(N))]
+        assert [(r, v) for r, v, _ in notes if r == P1][-1] == (P1, "likely_below")
+        assert any(line.get("provisional") for _, _, lines in notes for line in lines)
     finally:
         ports.configure(None)

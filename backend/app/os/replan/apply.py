@@ -25,7 +25,7 @@ from app.os.replan.events import Event
 from app.os.replan.ops import (
     Escalate, Op, Ops, RequestFromStudent, SwapProgramme, UpgradePlaybook, is_big, to_overrides,
 )
-from app.os.replan.rules import PlanState
+from app.os.replan.rules import REASONS, PlanState
 from app.os.replan.store import OverrideStore, ProposalStore, SupportStore
 
 EXPIRY = timedelta(days=7)
@@ -107,9 +107,24 @@ class Replanner:
         from app.os.eligibility.notes import refresh
 
         _, cards = refresh(self.plans, self.student_of(plan_id), plan_id)
+        # Firm only: a line that stands on the route's default minimum pass (provisional) keeps its note, but is
+        # not a ground to propose a removal (evidence rule; final review I3).
+        firm = {ref for ref, card in cards.items()
+                if any(ln.status == "likely_below" and not ln.provisional for ln in card.lines)}
+        self._expire_stale_removals(plan_id, firm)
         held = {op.get("programme_ref") for p in self.proposals.for_plan(plan_id) if p.status == "pending"
                 for op in p.ops if op.get("op") == "cancel_programme"}
-        return tuple(ref for ref, card in cards.items() if card.verdict == "likely_below" and ref not in held)
+        return tuple(ref for ref in cards if ref in firm and ref not in held)
+
+    def _expire_stale_removals(self, plan_id: int, firm: set[str]) -> None:
+        """A pending removal made for a fact change goes stale when a programme it removes no longer reads firmly
+        below: it expires, so one tap cannot drop a programme the student now meets (final review I2)."""
+        for p in self.proposals.for_plan(plan_id):
+            if p.status != "pending" or not p.ops:
+                continue
+            if all(op.get("op") == "cancel_programme" and op.get("reason") == REASONS["fact_below"] for op in p.ops) \
+                    and any(op.get("programme_ref") not in firm for op in p.ops):
+                self.proposals.set_status(p.id, "expired")
 
     def state(self, plan_id: int, with_suggestions: bool = False, with_below: bool = False) -> PlanState:
         contract, _ = self.plans._contract(plan_id)
