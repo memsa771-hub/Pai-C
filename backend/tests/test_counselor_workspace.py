@@ -1,4 +1,5 @@
 """Offline student-facing workspace, retirement and student data export."""
+import pytest
 from unittest.mock import patch
 from scripts.counselor_eval_support import StudentSession
 
@@ -52,6 +53,60 @@ def test_student_export_is_scoped_readonly_and_excludes_private_data():
         for forbidden in ['hidden interpretation','private_notes','secret-value','private-storage-key','Other student']:
             assert forbidden not in json.dumps(result)
         assert not db.new and not db.dirty and not db.deleted
+
+
+@pytest.mark.req("R-10")
+def test_export_lists_the_choice_and_the_consent_with_the_guardian_email_but_no_token():
+    from datetime import datetime, timezone
+    from app.pai_c.data_export import export_student_data
+    from app.models import GuardianConsent, RouteDecision
+    import json
+    stamp = datetime(2026, 11, 5, 9, 0, tzinfo=timezone.utc)
+    with StudentSession() as student, student.factory() as db:
+        row = RouteDecision(workspace_id=student.workspace_id, field_key='computer_science', title='Computer Science',
+            verdict={'status': 'open'}, route={'needs': []}, steps=[], steps_done=[], decision_version=1,
+            places=[{'programme_ref': 'p1', 'rank': 1}], intake={'term': 'autumn', 'year': 2027}, level='master',
+            destination_country='DE', os_supported=True, authorized_at=stamp, guardian_required=True,
+            guardian_authorized_at=stamp)
+        db.add(row)
+        db.flush()
+        db.add(GuardianConsent(workspace_id=student.workspace_id, decision_id=row.id, decision_version=1,
+            email='parent@example.test', token_hash='SECRETHASH', purpose='agree', outcome='agreed',
+            text_version='v1', expires_at=stamp, used_at=stamp))
+        db.commit()
+        result = export_student_data(db, student.workspace_id)
+        decision = result['route_decisions'][0]
+        assert decision['places'] == [{'programme_ref': 'p1', 'rank': 1}]
+        assert decision['intake'] == {'term': 'autumn', 'year': 2027}
+        assert (decision['level'], decision['destination_country'], decision['os_supported'],
+                decision['guardian_required']) == ('master', 'DE', True, True)
+        assert decision['authorized_at'] and decision['guardian_authorized_at']
+        consent, = result['guardian_consents']
+        assert consent['email'] == 'parent@example.test'
+        assert (consent['outcome'], consent['text_version'], consent['decision_version'],
+                consent['purpose']) == ('agreed', 'v1', 1, 'agree')
+        assert consent['created_at'] and consent['used_at'] and consent['expires_at']
+        assert 'token_hash' not in consent and 'SECRETHASH' not in json.dumps(result, default=str)
+
+
+@pytest.mark.req("R-10")
+def test_erasing_the_workspace_removes_the_guardian_consent_rows():
+    from datetime import datetime, timezone
+    from sqlalchemy import select
+    from app.models import GuardianConsent, Workspace
+    from app.routers.account import _erase_workspace
+    from app.database import Base
+    with StudentSession() as student, student.factory() as db:
+        Base.metadata.create_all(student.engine)  # every table a deleted workspace cascades into
+        db.add(GuardianConsent(workspace_id=student.workspace_id, decision_version=1, email='parent@example.test',
+            token_hash='erase-hash', text_version='v1',
+            expires_at=datetime(2026, 11, 8, tzinfo=timezone.utc)))
+        db.commit()
+        assert db.scalars(select(GuardianConsent)).all()
+        _erase_workspace(db, db.get(Workspace, student.workspace_id))
+        db.commit()
+        assert db.scalars(select(GuardianConsent).where(
+            GuardianConsent.workspace_id == student.workspace_id)).all() == []
 
 
 def test_profile_sections_are_evidence_only_and_retirement_aware():
