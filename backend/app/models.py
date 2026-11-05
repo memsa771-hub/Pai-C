@@ -863,6 +863,7 @@ class GuardianConsent(Base):
         CheckConstraint("purpose IN ('agree', 'withdraw')", name="ck_guardian_consent_purpose"),
         CheckConstraint("outcome IN ('sent', 'agreed', 'withdrawn', 'expired', 'stale')",
                         name="ck_guardian_consent_outcome"),
+        CheckConstraint("purpose <> 'agree' OR expires_at IS NOT NULL", name="ck_guardian_consent_agree_expires"),
         Index("idx_guardian_consents_workspace", "workspace_id", "created_at"),
     )
 

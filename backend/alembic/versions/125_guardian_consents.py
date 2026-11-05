@@ -5,7 +5,7 @@ Revises: 124
 
 New table `pai_guardian_consents`: one row per e-mailed guardian link and its outcome (the audit of the under-18
 consent). Only the SHA-256 of the token is stored. Deleting the workspace removes its rows; deleting a decision row
-keeps the audit (`decision_id` SET NULL). `expires_at` is null for a withdraw link (no fixed end). Downgrade drops the table.
+keeps the audit (`decision_id` SET NULL). `expires_at` is null for a withdraw link (no fixed end) and never null for an agree link (CHECK). Downgrade drops the table.
 """
 from alembic import op
 import sqlalchemy as sa
@@ -38,6 +38,7 @@ def upgrade():
         sa.CheckConstraint("purpose IN ('agree', 'withdraw')", name="ck_guardian_consent_purpose"),
         sa.CheckConstraint("outcome IN ('sent', 'agreed', 'withdrawn', 'expired', 'stale')",
                            name="ck_guardian_consent_outcome"),
+        sa.CheckConstraint("purpose <> 'agree' OR expires_at IS NOT NULL", name="ck_guardian_consent_agree_expires"),
     )
     op.create_index("idx_guardian_consents_workspace", TABLE, ["workspace_id", "created_at"])
 

@@ -3,7 +3,7 @@ choice goes to the plan.
 
 Tokens: `secrets.token_urlsafe(32)`; only the SHA-256 is stored; compared with `hmac.compare_digest`; an agree link
 works 72 hours (consent_texts.yaml `links`), once. A link is bound to the decision version it was issued for: if that
-is no longer the newest version the answer is `stale` and nothing is written but the audit row. A withdraw link has
+is no longer the newest version, or the student's own consent is not set on it, the answer is `stale` and nothing is written but the audit row. A withdraw link has
 no fixed lifetime: it works while the guardian consent it guards is live, and ends (`expired`) when a later consent
 replaces it. A withdraw link that finds no live guardian consent answers `stale` without recording it, so it can
 work again if that consent returns. Every other outcome sets `pai_guardian_consents.outcome`. The guardian's e-mail is personal data: it is masked in every log line and never
@@ -58,8 +58,8 @@ def _limit_ip(ip: str | None) -> None:
 
 
 def _first_name(db, workspace_id: str) -> str:
-    from app.memory.student_snapshot import StudentSnapshotService
-    facts = StudentSnapshotService(db).build(workspace_id).facts
+    from app.pai_c.memory import MemoryService  # the Counsellor's one door to the Vault
+    facts = MemoryService(db).profile(workspace_id).facts
     for key in ("identity.preferred_name", "identity.full_name"):
         value = (facts.get(key) or {}).get("value")
         if isinstance(value, str) and value.split():
@@ -120,9 +120,17 @@ def _lookup(db, token: str, purpose: str) -> GuardianConsent | None:
     return row
 
 
+def workspace_of(db, token: str) -> str | None:
+    """The workspace a link belongs to (for the caller's delivery after a change), or None for an unknown link."""
+    row = db.scalar(select(GuardianConsent).where(GuardianConsent.token_hash == _digest(token or "")))
+    return None if row is None else row.workspace_id
+
+
 def _stale(db, row: GuardianConsent) -> bool:
     newest = RouteDecisionService(db).newest(row.workspace_id)
-    return newest is None or newest.status != "chosen" or newest.decision_version != row.decision_version
+    # An agree link works only while the student's own consent stands on the newest version.
+    return (newest is None or newest.status != "chosen" or newest.decision_version != row.decision_version
+            or newest.authorized_at is None)
 
 
 def _withdraw_state(db, row: GuardianConsent) -> str:

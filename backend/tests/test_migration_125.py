@@ -78,11 +78,14 @@ def test_125_check_constraints():
         insert = ("INSERT INTO pai_guardian_consents (id, workspace_id, decision_version, email, token_hash, "
                   "text_version, {cols}) VALUES ('{i}', 'w', 1, 'g@x.org', '{i}', '1', {vals})")
         connection.execute(text(insert.format(cols="purpose, outcome", i="ok", vals="'withdraw', 'stale'")))
-        for cols, vals in (("purpose, outcome", "'other', 'sent'"), ("purpose, outcome", "'agree', 'used'")):
+        # an agree link always has an end; a withdraw link may have none
+        for cols, vals in (("purpose, outcome", "'other', 'sent'"), ("purpose, outcome", "'agree', 'used'"),
+                           ("purpose, outcome", "'agree', 'sent'")):
             with pytest.raises(Exception):
                 with connection.begin_nested():
                     connection.execute(text(insert.format(cols=cols, i="bad", vals=vals)))
     table = Base.metadata.tables[TABLE]
     assert {c.name for c in table.constraints if c.name} >= {"ck_guardian_consent_purpose",
-                                                              "ck_guardian_consent_outcome"}
+                                                              "ck_guardian_consent_outcome",
+                                                              "ck_guardian_consent_agree_expires"}
     assert table.c.expires_at.nullable  # a withdraw link has no fixed end

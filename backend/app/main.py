@@ -27,7 +27,7 @@ from app.os.api import mount_os
 from app.pai_os_bridge import recipient_email
 from app.security.errors import EmailNotVerified, IdentityUnavailable
 from app.api.response import ResponseCode, json_response
-from app.routers import counselor_possibilities, account, app_version, auth, counselor_summary, counselor_voice, decision_records, escalations, events, feedback, fetch, files, network, notifications, operator, roadmap, search, shares, student_requests, tasks, vault, workflows, workspaces
+from app.routers import counselor_possibilities, account, app_version, auth, counselor_summary, counselor_voice, decision_records, escalations, events, feedback, fetch, files, guardian, network, notifications, operator, roadmap, search, shares, student_requests, tasks, vault, workflows, workspaces
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -238,6 +238,10 @@ class NoTransformCompressionHeadersMiddleware(BaseHTTPMiddleware):
 app.add_middleware(NoTransformCompressionHeadersMiddleware)
 
 
+def _is_guardian_link(request: Request) -> bool:
+    return request.url.path.startswith("/v1/guardian/")
+
+
 class PrivateApiMiddleware(BaseHTTPMiddleware):
     """API answers are per-student: never let a cache keep them.
 
@@ -249,7 +253,8 @@ class PrivateApiMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         response = await call_next(request)
         if request.url.path.startswith("/v1/"):
-            response.headers["Cache-Control"] = "private, no-store"
+            # The guardian link pages are public and carry a one-time token: never cached, by anyone.
+            response.headers["Cache-Control"] = "no-store" if _is_guardian_link(request) else "private, no-store"
         return response
 
 
@@ -275,7 +280,8 @@ class SafeAccessLogMiddleware(BaseHTTPMiddleware):
         response = await call_next(request)
         response.headers["x-request-id"] = request_id
         response.headers["x-content-type-options"] = "nosniff"
-        response.headers["referrer-policy"] = "strict-origin-when-cross-origin"
+        # A guardian link page holds a token in its URL: it must not leak in a Referer header.
+        response.headers["referrer-policy"] = "no-referrer" if _is_guardian_link(request) else "strict-origin-when-cross-origin"
         response.headers["content-security-policy"] = "frame-ancestors 'none'"
         response.headers["permissions-policy"] = "camera=(), microphone=(), geolocation=()"
         # Successful GET event polls are frequent; retain errors and mutations.
@@ -406,6 +412,7 @@ app.include_router(events.router)
 app.include_router(feedback.router)
 app.include_router(fetch.router)
 app.include_router(files.router)
+app.include_router(guardian.router)
 app.include_router(network.router)
 app.include_router(notifications.router)
 app.include_router(operator.router)
