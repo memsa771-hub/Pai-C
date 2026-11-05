@@ -264,3 +264,20 @@ async def test_module_off_answer_counts_as_delivered(os_stub, monkeypatch):
             request(db, ws, lambda: RouteDecisionService(db).choose(ws, "electrical_engineering", details=DETAILS))
         (row,) = rows(db, ws)
         assert row.status == "delivered" and row.delivered_at is not None
+
+
+@pytest.mark.asyncio
+async def test_backfill_reset_clears_delivered_at(os_stub):
+    """A delivered row the OS lacks goes back to pending with no delivery time (ledger deferred minor, T5)."""
+    async with confirmed_student() as (_, student, db, _j):
+        with_routes(student, db)
+        ws = student.workspace_id
+        with flag(True):
+            RouteDecisionService(db).choose(ws, "electrical_engineering", details=DETAILS)
+            db.commit()
+            bridge.deliver_pending(db, ws)
+            assert rows(db, ws)[0].delivered_at is not None
+            os_stub["held"] = None  # the OS lost v1
+            bridge._backfill(db)
+        (row,) = rows(db, ws)
+        assert row.status == "pending" and row.delivered_at is None

@@ -93,7 +93,7 @@ def _backfill(db) -> None:
             if item is None:
                 outbox.record(db, row)
             elif item.status == "delivered":  # the OS is behind a version we sent: send it again (attempts untouched)
-                item.status = "pending"
+                item.status, item.delivered_at = "pending", None
             else:
                 continue
             db.commit()
