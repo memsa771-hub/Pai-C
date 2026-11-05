@@ -15,7 +15,7 @@ touches both products. Shared with the Counsellor team, who review every change.
 import asyncio
 import logging
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import yaml
@@ -170,16 +170,24 @@ def _deliver(db) -> dict:
 OS_EVENT_TEXTS = Path(__file__).parent / "pai_c" / "connect" / "os_event_texts.yaml"
 
 
+OS_EVENT_MAX_AGE = timedelta(hours=48)  # older events are skipped, so switching the part on later sends no flood
+
+
 def deliver_os_events(db) -> dict:
     """Turns each pending `os_event` row into one app notification (the bell), never a chat message (R-45). The
     notice is the fixed copy of `os_event_texts.yaml` for its kind, keyed by the event key, so a repeat sweep makes
     none. A student without a workspace here is `refused`; any other error leaves the row pending for the next sweep."""
     from app.services.notify import notify_once
 
-    got = {"sent": 0, "refused": 0, "waiting": 0}
+    got = {"sent": 0, "refused": 0, "waiting": 0, "stale": 0}
+    oldest = datetime.now(timezone.utc) - OS_EVENT_MAX_AGE
     texts = yaml.safe_load(OS_EVENT_TEXTS.read_text(encoding="utf-8")) or {}
     for e in os_events_port.pending_events():
         copy = texts.get(e.kind)
+        if e.at < oldest:  # too old to tell the student now: skipped, no notification
+            os_events_port.mark_event_delivery(e.key, "refused")
+            got["stale"] += 1
+            continue
         try:
             if copy is None or db.get(Workspace, e.student_ref) is None:
                 os_events_port.mark_event_delivery(e.key, "refused")

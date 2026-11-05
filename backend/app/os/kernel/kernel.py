@@ -39,6 +39,7 @@ NOTICE_TYPE = "student.act"
 _EVENT_KINDS = {"plan_created": "plan_created", "plan_revised": "plan_revised", "plan_paused": "plan_paused",
                 "plan_closed": "plan_stopped", "plan_finished": "plan_finished"}
 _STEP_KINDS = {"done": "step_done", "waiting_student": "student_needed"}
+_QUIET = "os_event_quiet"  # conn.info flag: set while a new plan is first promoted
 REPLAN_CAUSE = "replan:"  # a replan revision's cause: "replan:<proposal id>" (Slice 7)
 
 
@@ -110,7 +111,11 @@ class Kernel:
             self._event(conn, plan_id, None, "plan_created",
                         {"playbook": draft.playbook_key, "version": draft.playbook_version, "tasks": len(keys)})
             self._set_risk(conn, plan_id, draft.at_risk)
-            self._promote(conn, plan_id)
+            conn.info[_QUIET] = True
+            try:
+                self._promote(conn, plan_id)
+            finally:
+                conn.info.pop(_QUIET, None)
             return PlanRef(plan_id, 1, True)
 
     def revise(self, plan_id: int, cause: str, draft: PlanDraft, based_on: str | None = None) -> int | None:
@@ -351,8 +356,17 @@ class Kernel:
             return
         key = None
         if task_id is not None:
-            key = conn.execute(select(T.c.instance_key).where(T.c.id == task_id)).scalar_one_or_none()
-            if key is None or key.startswith(NOTICE_PREFIX) or CANCELLED_MARK in key or DONE_MARK in key:
+            row = conn.execute(select(T.c.instance_key, T.c.kind).where(T.c.id == task_id)).first()
+            if row is None or row.instance_key.startswith(NOTICE_PREFIX) or CANCELLED_MARK in row.instance_key \
+                    or DONE_MARK in row.instance_key:
+                return
+            key = row.instance_key
+            # Tell the student only what needs them or informs them: a step PAI finished (work), or a step that
+            # now waits for the student. Never the student's own tick. When a plan is created, `plan_created`
+            # stands for that revision, so the steps that open with it are not announced again.
+            if kind == "step_done" and row.kind != "work":
+                return
+            if kind == "student_needed" and (row.kind != "student" or conn.info.get(_QUIET)):
                 return
         os_events.emit(conn, self.tenant_id, plan_id, kind, event_id, at, key)
 

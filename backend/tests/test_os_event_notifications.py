@@ -2,7 +2,7 @@
 legacy suite has no OS database); the Counsellor side is real. Fictional data."""
 
 import types
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 import pytest
 import yaml
@@ -25,9 +25,9 @@ def student():
         yield s
 
 
-def event(student, kind: str = "plan_paused", n: int = 1, ref: str | None = None) -> OsEventV1:
+def event(student, kind: str = "plan_paused", n: int = 1, ref: str | None = None, at: datetime | None = None) -> OsEventV1:
     return OsEventV1(key=f"os_event:7:{kind}:{n}", student_ref=ref or student.workspace_id, plan_id=7,
-                     decision_version=2, kind=kind, instance_key=None, at=datetime(2027, 1, 10, tzinfo=timezone.utc))
+                     decision_version=2, kind=kind, instance_key=None, at=at or datetime.now(timezone.utc))
 
 
 @pytest.fixture
@@ -62,7 +62,7 @@ def test_each_event_is_one_notification_with_fixed_copy(student, os_events):
     texts = yaml.safe_load(bridge.OS_EVENT_TEXTS.read_text(encoding="utf-8"))
     os_events["pending"] = [event(student, k, i) for i, k in enumerate(KINDS)]
     with student.factory() as db:
-        assert bridge.deliver_os_events(db) == {"sent": len(KINDS), "refused": 0, "waiting": 0}
+        assert bridge.deliver_os_events(db) == {"sent": len(KINDS), "refused": 0, "waiting": 0, "stale": 0}
     got = notices(student)
     assert len(got) == len(KINDS)
     assert {(n.title, n.message) for n in got} == {(t["title"], t["message"]) for t in texts.values()}
@@ -93,7 +93,7 @@ def test_no_chat_or_other_rows_are_created(student, os_events):
 def test_unknown_student_is_refused_not_retried(student, os_events):
     os_events["pending"] = [event(student, ref="00000000-0000-4000-8000-000000000000")]
     with student.factory() as db:
-        assert bridge.deliver_os_events(db) == {"sent": 0, "refused": 1, "waiting": 0}
+        assert bridge.deliver_os_events(db) == {"sent": 0, "refused": 1, "waiting": 0, "stale": 0}
     assert os_events["marked"] == [("os_event:7:plan_paused:1", "refused")]
     assert notices(student) == []
 
@@ -121,3 +121,13 @@ def test_copy_covers_every_kind_in_plain_english():
         text = f"{t['title']} {t['message']}".lower()
         assert all(name.lower() not in text for name in countries if len(name) > 3), kind
         assert "—" not in text and "chat" not in text
+
+
+def test_old_events_are_skipped_and_fresh_ones_notified(student, os_events):
+    now = datetime.now(timezone.utc)
+    os_events["pending"] = [event(student, "plan_paused", 1, at=now - timedelta(hours=49)),
+                            event(student, "plan_revised", 2, at=now - timedelta(hours=47))]
+    with student.factory() as db:
+        assert bridge.deliver_os_events(db) == {"sent": 1, "refused": 0, "waiting": 0, "stale": 1}
+    assert os_events["marked"] == [("os_event:7:plan_paused:1", "refused"), ("os_event:7:plan_revised:2", "sent")]
+    assert [n.dedupe_key for n in notices(student)] == ["os_event:7:plan_revised:2"]

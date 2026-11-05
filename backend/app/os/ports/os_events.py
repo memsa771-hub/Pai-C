@@ -24,6 +24,8 @@ def emit(conn: Connection, tenant_id: str, plan_id: int, kind: str, n: int, at: 
     `os_events` or proposal id), so the key is the same on a repeat and a repeat is skipped (invariant 8). Nothing is
     written when the module is off or the plan is not a Counsellor plan. True if a new row was written."""
     assert kind in KINDS, kind
+    # Gate: Counsellor plans only. A self-serve plan has no Counsellor workspace to notify, so it emits nothing
+    # (same rule as the escalation adapter).
     M, P, I, O = models.modules, models.plans, models.counsellor_intake, models.outbox
     if conn.execute(select(M.c.enabled).where(M.c.module == _SOURCE, M.c.tenant_id == tenant_id)).scalar() is not True:
         return False

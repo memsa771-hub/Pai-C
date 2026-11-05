@@ -18,7 +18,7 @@ from app.os.ports.escalation import mark_counsellor_delivery, pending_counsellor
 from app.os.replan import events as replan_events
 from app.os.replan.store import ProposalStore
 from app.os.settings import load_settings
-from tests.os.kernel_helpers import contract, draft, kernel
+from tests.os.kernel_helpers import contract, draft, kernel, playbook
 
 O = models.outbox
 pytestmark = [pytest.mark.req("R-45"), pytest.mark.req("R-04")]
@@ -63,7 +63,7 @@ def test_plan_created_and_student_needed_and_step_done(engine, on):
         ("plan_created", None), ("step_done", "a"), ("student_needed", "apply@p1")]
     assert k.complete_student_task(apply.id, "stu-1", {})
     kinds = [(r["kind"], r["instance_key"]) for r in rows(engine)]
-    assert kinds[3:] == [("step_done", "apply@p1"), ("student_needed", "visa")]
+    assert kinds[3:] == [("student_needed", "visa")]  # the student's own tick is never announced
     first = rows(engine)[0]
     assert first["key"] == f"os_event:{ref.plan_id}:plan_created:{first['key'].rsplit(':', 1)[1]}"
     assert (first["student_ref"], first["plan_id"], first["schema"]) == ("stu-1", ref.plan_id, "pai.os_event.v1")
@@ -234,3 +234,26 @@ def test_outbox_sender_ignores_os_events(engine, svc):
 
     assert Outbox(engine, "pai").deliver(Spy()) == 0
     assert sent == [] and all(r["status"] == "pending" for r in rows(engine))
+
+
+def test_student_step_open_at_creation_is_not_announced(engine, on):
+    pb = playbook(extra_tasks=[{"template_key": "first", "task_type": "student.act", "title": "First",
+                                "kind": "student", "inbox_kind": "act"}])
+    k = kernel(engine)
+    ref = k.create_plan(counsellor_contract(), draft(pb))
+    assert task(engine, ref.plan_id, "first").state == "waiting_student"
+    assert [r["kind"] for r in rows(engine)] == ["plan_created"]  # plan_created stands for the first revision
+    k.pause_plan(ref.plan_id, "consent_missing")
+    k.resume_plan(ref.plan_id)
+    assert [r["kind"] for r in rows(engine)] == ["plan_created", "plan_paused"]
+
+
+def test_only_work_steps_say_done_and_only_student_steps_say_needed(engine, on):
+    k, ref = make_plan(engine)
+    a = task(engine, ref.plan_id, "a")
+    k.mark_running(a.id, 1)
+    k.apply_result(a.id, 1, Outcome("done"))
+    for r in rows(engine, "step_done"):
+        assert task(engine, ref.plan_id, r["instance_key"]).kind == "work"
+    for r in rows(engine, "student_needed"):
+        assert task(engine, ref.plan_id, r["instance_key"]).kind == "student"
