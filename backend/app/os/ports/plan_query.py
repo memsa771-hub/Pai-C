@@ -5,15 +5,23 @@ HTTP endpoint. They answer even while the `counsellor` module is off (for tests)
 from app.os import clock, ports
 from app.os.compiler.compile import needed_fields
 from app.os.contracts.plan_summary import PlanSummaryV1
+from app.os.contracts.plan_view import PlanViewV1
 from app.os.contracts.programme_list import ProgrammeEntry, ProgrammeListV1
 from app.os.contracts.route_contract import IntakeRef
 from app.os.knowledge.programmes import ProgrammeStore
+from app.os.plan_view import build_plan_view
 from app.os.summary import build_summary
 
 
 def plan_summary(student_ref: str) -> PlanSummaryV1 | None:
     svc = ports.services()
     return build_summary(svc.engine, svc.settings.tenant_id, student_ref, clock.now())
+
+
+def plan_view(student_ref: str) -> PlanViewV1:
+    """The student's plan as the Counsellor shows it (P1-T5): chosen through the Counsellor intake, `empty` when no
+    applied decision maps to a plan."""
+    return build_plan_view(ports.services(), student_ref)
 
 
 def programme_list(route_key: str, intake: IntakeRef) -> ProgrammeListV1:
