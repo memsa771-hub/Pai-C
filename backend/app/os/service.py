@@ -8,6 +8,7 @@ from sqlalchemy import Engine, and_, select
 from app.os import models
 from app.os.compiler import PlanDraft, compile_plan, date_of, needed_fields
 from app.os.contracts.route_contract import RouteContract
+from app.os.contracts.route_contract_v2 import RouteContractV2
 from app.os.kernel import Kernel, PlanRef, StaleDraft
 from app.os.knowledge import KnowledgePort
 from app.os.packs.visa import ADMITTED, REJECTED, VisaChoiceStore, answers, preselect
@@ -47,14 +48,14 @@ class PlanService:
         except KeyError:
             raise PlaybookError(f"pinned playbook {pin.playbook_key} v{pin.version} is not loaded") from None
 
-    def _existing_plan(self, contract: RouteContract) -> int | None:
+    def _existing_plan(self, contract: RouteContract | RouteContractV2) -> int | None:
         P = models.plans
         with self.engine.connect() as conn:
             return conn.execute(select(P.c.id).where(and_(
                 P.c.tenant_id == self.kernel.tenant_id, P.c.source == contract.source,
                 P.c.external_ref == contract.external_ref))).scalar_one_or_none()
 
-    def compile(self, contract: RouteContract, playbook: Playbook, plan_id: int | None = None,
+    def compile(self, contract: RouteContract | RouteContractV2, playbook: Playbook, plan_id: int | None = None,
                 extra_overrides: Sequence = ()) -> PlanDraft:
         """`plan_id`: a running plan, whose replan overrides (Slice 7) are applied, so every recompile keeps them.
         `extra_overrides`: a replan's candidate overrides, compiled to check them before they are stored."""
@@ -73,7 +74,7 @@ class PlanService:
             excluded={"visa": self.not_visa_programmes(contract, plan_id)},
         )
 
-    def not_visa_programmes(self, contract: RouteContract, plan_id: int | None) -> set[str]:
+    def not_visa_programmes(self, contract: RouteContract | RouteContractV2, plan_id: int | None) -> set[str]:
         """Programmes the provisional visa date (no visa programme yet) must not come from: once any programme
         admitted the student, every other one; before that, those that said "not admitted" (still in the plan until
         the removal is accepted). Slice 9 Task 11 fix round 1."""
@@ -84,7 +85,7 @@ class PlanService:
         yes = {r for r, a in said.items() if a == ADMITTED and r in refs}
         return refs - yes if yes else {r for r, a in said.items() if a == REJECTED}
 
-    def visa_programme(self, contract: RouteContract, plan_id: int | None, overrides: Sequence = ()) -> str | None:
+    def visa_programme(self, contract: RouteContract | RouteContractV2, plan_id: int | None, overrides: Sequence = ()) -> str | None:
         """The programme the student's visa file is for: their stored choice, else the one programme that admitted
         them (the visa page's rule, Slice 6b S6b-D8 and Slice 9 Task 11), else None. A removed programme is never
         it. The visa step's date follows its semester start (F1)."""
@@ -97,21 +98,23 @@ class PlanService:
             return stored.programme_ref
         return preselect(self.engine, self.kernel.tenant_id, plan_id, among=live)
 
-    def start_plan(self, contract: RouteContract) -> PlanRef:
+    def start_plan(self, contract: RouteContract | RouteContractV2) -> PlanRef:
         """A new plan uses the newest playbook for its route; an existing plan keeps its pinned version."""
         existing = self._existing_plan(contract)
         playbook = (self._pinned(existing) if existing is not None else select_playbook(
             self.playbooks, contract.origin_country, contract.destination_country, contract.level))
         return self.kernel.create_plan(contract, self.compile(contract, playbook))
 
-    def _contract(self, plan_id: int) -> tuple[RouteContract, str]:
+    def _contract(self, plan_id: int) -> tuple[RouteContract | RouteContractV2, str]:
         P = models.plans
         with self.engine.connect() as conn:
             row = conn.execute(select(P.c.contract, P.c.contract_sha256).where(
                 P.c.id == plan_id, P.c.tenant_id == self.kernel.tenant_id)).first()
         if row is None:
             raise KeyError(f"plan {plan_id}")
-        return RouteContract.model_validate(row.contract), row.contract_sha256
+        # the stored contract_version picks the class: a v1 plan keeps parsing as v1 (D-u)
+        cls = RouteContractV2 if row.contract.get("contract_version") == "2" else RouteContract
+        return cls.model_validate(row.contract), row.contract_sha256
 
     def recompile(self, plan_id: int, cause: str) -> int | None:
         """Compiles outside the lock, then revises only if the contract is still the one compiled from
@@ -131,7 +134,7 @@ class PlanService:
         overwritten (final review). Compiled with the pinned playbook and applied by the kernel."""
         for _ in range(3):
             contract, sha = self._contract(plan_id)
-            new = RouteContract.model_validate({**contract.model_dump(mode="json"),
+            new = type(contract).model_validate({**contract.model_dump(mode="json"),
                                                 "programmes": [p.model_dump() for p in edit(contract)]})
             draft = self.compile(new, self._pinned(plan_id), plan_id)
             try:

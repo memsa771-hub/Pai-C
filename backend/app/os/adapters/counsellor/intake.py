@@ -15,6 +15,7 @@ from app.os.compiler import CompileError
 from app.os.contracts.decision_record import DecisionRecordV1
 from app.os.contracts.decision_record_v2 import DecisionRecordV2
 from app.os.contracts.route_contract import RouteContract
+from app.os.contracts.route_contract_v2 import RouteContractV2
 from app.os.kernel import StaleDraft
 from app.os.kernel.states import PLAN_CLOSED, PLAN_OPEN
 from app.os.knowledge.programmes import ProgrammeStore
@@ -80,7 +81,7 @@ def _intake_event(svc, plan_id: int, intake: Intake, reason: str) -> int:
             payload={"decision_id": intake.decision_id, "refused": reason}).returning(E.c.id)).scalar_one()
 
 
-def _revise(svc, plan_id: int, contract: RouteContract, cause: str) -> None:
+def _revise(svc, plan_id: int, contract: RouteContract | RouteContractV2, cause: str) -> None:
     """The same route with new places, order or intake: the plan's contract changes as a revision (like a Slice 4
     swap); started and done tasks are kept by the kernel's revision rules."""
     for _ in range(3):
@@ -95,7 +96,7 @@ def _revise(svc, plan_id: int, contract: RouteContract, cause: str) -> None:
 
 
 def _v1_contract(decision: DecisionRecordV2) -> RouteContract:
-    """The plan engine takes the v1 contract (D-b): a v2 decision of one of the four v1 levels converts to it."""
+    """A v2 decision of one of the four v1 levels converts to the v1 contract, so those plans stay as they were (D-u)."""
     two = decision.to_route_contract()
     return RouteContract(contract_version="1", source="counsellor", external_ref=two.external_ref,
                          student_ref=two.student_ref, origin_country=two.origin_country,
@@ -161,8 +162,6 @@ def process(svc, intake: Intake) -> IntakeResult:
             return _hold_or_pause(svc, decision)
     elif decision.authorized_at is None:
         return _refuse(svc, intake, "not_authorized")
-    if isinstance(decision, DecisionRecordV2) and decision.level == "intermediate":
-        return _refuse(svc, intake, "route_not_supported")  # intermediate waits for the v2 plan engine (D-b)
     try:
         book = select_playbook(svc.plans.playbooks, decision.origin_country, decision.destination_country,
                                decision.level)
@@ -174,7 +173,10 @@ def process(svc, intake: Intake) -> IntakeResult:
     own = [p for p in _plans_of(svc, decision.student_ref, "self_serve") if p.status in PLAN_OPEN]
     if own:
         return _refuse(svc, intake, "self_serve_plan_open", own[-1].id)
-    contract = _v1_contract(decision) if isinstance(decision, DecisionRecordV2) else decision.to_route_contract()
+    if isinstance(decision, DecisionRecordV2):  # only the intermediate level needs the v2 contract (D-u)
+        contract = decision.to_route_contract() if decision.level == "intermediate" else _v1_contract(decision)
+    else:
+        contract = decision.to_route_contract()
     theirs = _plans_of(svc, decision.student_ref, SOURCE)
     same = next((p for p in theirs if p.external_ref == contract.external_ref), None)
     if same is not None and same.status == PLAN_CLOSED:

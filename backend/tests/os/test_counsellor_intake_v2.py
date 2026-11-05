@@ -37,7 +37,8 @@ def svc(engine, clean, os_db):
     load_seed(SEED_DIR / "germany_ws2027.yaml", SqlKnowledge(engine, "pai"))
     store = ProgrammeStore(engine, "pai")
     load_programme_seed(PROGRAMME_SEED, store)
-    for ref, route in (("ie-p1", "ireland_master"), ("ie-p2", "ireland_master"), ("pk-p1", "pakistan_bs")):
+    for ref, route in (("ie-p1", "ireland_master"), ("ie-p2", "ireland_master"), ("pk-p1", "pakistan_bs"),
+                       ("pk-i1", "pakistan_inter")):
         store.upsert(Programme(ref=ref, route_key=route, university="University", name=f"Programme {ref}",
                                aliases=(), start_urls=(f"https://example.org/{ref}",), official_domains=("example.org",)))
     return s
@@ -237,17 +238,62 @@ def test_choose_after_withdraw_same_route(svc):
     assert plan_row(svc, first.plan_id).status == "closed"
 
 
-def test_intermediate_refused_until_t5(svc):
-    export = chosen(1, origin_country="PK", destination_country="PK", level="intermediate",
-                    programmes=[{"programme_ref": "pk-p1", "rank": 1}])
-    r = run(svc, export)
-    assert (r.status, r.reason, r.plan_id) == ("refused", "route_not_supported", None)
+def inter(n: int, **over) -> dict:
+    return chosen(n, origin_country="PK", destination_country="PK", level="intermediate",
+                  programmes=[{"programme_ref": "pk-i1", "rank": 1}], **over)
+
+
+@pytest.mark.req("R-41")
+def test_intermediate_plans_with_a_v2_contract(svc):
+    r = run(svc, inter(1))
+    assert (r.status, r.reason) == ("planned", None) and r.plan_id is not None
+    row = plan_row(svc, r.plan_id)
+    assert (row.contract["contract_version"], row.contract["level"]) == ("2", "intermediate")
+    assert states(svc, r.plan_id)
+
+
+@pytest.mark.req("R-41")
+def test_intermediate_newer_version_revises(svc):
+    first = run(svc, inter(1))
+    r = run(svc, inter(2))
+    assert (r.status, r.plan_id) == ("revised", first.plan_id)
+    assert plan_row(svc, first.plan_id).contract["contract_version"] == "2"
+
+
+@pytest.mark.req("R-41")
+def test_intermediate_programme_change_keeps_v2(svc):
+    first = run(svc, inter(1))
+    svc.plans.change_programmes(first.plan_id, lambda c: list(c.programmes), "test")
+    assert plan_row(svc, first.plan_id).contract["contract_version"] == "2"
+
+
+@pytest.mark.req("R-41")
+def test_stored_v1_plan_still_revises_as_v1(svc):
+    first = run(svc, v1())
+    r = run(svc, chosen(2, programmes=NEW_PLACES))
+    assert (r.status, r.plan_id) == ("revised", first.plan_id)
+    assert plan_row(svc, first.plan_id).contract["contract_version"] == "1"
+    svc.plans.change_programmes(first.plan_id, lambda c: list(c.programmes), "test")
+    assert plan_row(svc, first.plan_id).contract["contract_version"] == "1"
+
+
+@pytest.mark.req("R-41")
+def test_intermediate_plan_has_no_summary(svc):
+    from app.os.summary import build_summary
+    r = run(svc, inter(1))
+    assert r.plan_id is not None
+    assert build_summary(svc.engine, "pai", inter(1)["student_ref"], datetime.now(timezone.utc)) is None
+
+
+@pytest.mark.req("R-41")
+def test_supports_checks_the_playbook_only(svc):
     ports.configure(svc)
     try:
-        assert plan_source.supports("PK", "PK", "intermediate") is False
+        assert plan_source.supports("PK", "PK", "intermediate") is True
         assert plan_source.supports("PK", "DE", "master") is True
         assert plan_source.supports("PK", "IE", "master") is True
         assert plan_source.supports("PK", "FR", "master") is False
+        assert plan_source.supports("PK", "FR", "intermediate") is False
     finally:
         ports.configure(None)
 

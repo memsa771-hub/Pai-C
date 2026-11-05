@@ -50,9 +50,7 @@ def latest_version(student_ref: str) -> int | None:
 
 
 def supports(origin: str, destination: str, level: str) -> bool:
-    """Whether a playbook exists for the route. `intermediate` is false until a later task takes the v2 contract (D-b)."""
-    if level == "intermediate":
-        return False
+    """Whether a playbook exists for the route (every level, intermediate too: D-u)."""
     try:
         select_playbook(ports.services().plans.playbooks, origin, destination, level)
     except PlaybookError:

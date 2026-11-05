@@ -18,6 +18,7 @@ from app.os import models
 from app.os import clock as shared_clock
 from app.os.compiler import CONFIRM_TYPE, DraftTask, PlanDraft
 from app.os.contracts.route_contract import RouteContract
+from app.os.contracts.route_contract_v2 import RouteContractV2
 from app.os.kernel.revisions import CANCELLED_MARK, DONE_MARK, NOTICE_PREFIX, diff
 from app.os.replan import events as replan_events
 from app.os.kernel.states import (
@@ -59,7 +60,7 @@ _OUTCOME_STATE = {
 }
 
 
-def contract_sha256(contract: RouteContract) -> str:
+def contract_sha256(contract: RouteContract | RouteContractV2) -> str:
     canonical = json.dumps(contract.model_dump(mode="json"), sort_keys=True, separators=(",", ":"))
     return hashlib.sha256(canonical.encode()).hexdigest()
 
@@ -72,7 +73,7 @@ class Kernel:
 
     # ---------------------------------------------------------------- plans
 
-    def create_plan(self, contract: RouteContract, draft: PlanDraft) -> PlanRef:
+    def create_plan(self, contract: RouteContract | RouteContractV2, draft: PlanDraft) -> PlanRef:
         payload = contract.model_dump(mode="json")
         sha = contract_sha256(contract)
         identity = and_(P.c.tenant_id == self.tenant_id, P.c.source == contract.source,
@@ -118,7 +119,7 @@ class Kernel:
             self._check_current(conn, plan_id, based_on)
             return self._revise(conn, plan_id, cause, draft)
 
-    def change_contract(self, plan_id: int, contract: RouteContract, draft: PlanDraft, cause: str,
+    def change_contract(self, plan_id: int, contract: RouteContract | RouteContractV2, draft: PlanDraft, cause: str,
                         based_on: str) -> int | None:
         """Stores a new contract for the plan (e.g. the student swapped a programme, Slice 4) and applies its draft
         as a revision, in one transaction under the plan lock. `based_on` is the contract_sha256 the change was

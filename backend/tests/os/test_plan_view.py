@@ -361,3 +361,19 @@ def test_pin_with_the_highest_version_wins(engine, clean):
                                                          version=2))
     decision(engine, "planned", p)
     assert view(engine).route.route_key == "pin_key"
+
+
+@pytest.mark.req("R-41")
+def test_intermediate_plan_builds_a_view(svc):
+    from test_counsellor_intake_v2 import inter
+    export = inter(1)
+    r = run(svc, export)
+    store = IntakeStore(svc.engine, "pai")
+    store.finish(store.get(export["decision_id"]).id, r.status, r.reason, r.plan_id)
+    ports.configure(svc)
+    try:
+        v = plan_query.plan_view(export["student_ref"])
+        assert v.plan_id == r.plan_id and v.steps
+        assert (v.route.route_key, v.route.level) == ("pakistan_inter", "intermediate")
+    finally:
+        ports.configure(None)
