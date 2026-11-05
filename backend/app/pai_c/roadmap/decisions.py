@@ -338,7 +338,8 @@ class RouteDecisionService:
         try:  # the tick changed the plan: read it again, once, for the answer
             fresh = plan_adapter.read(row, fresh=True)
         except plan_adapter.PlanUnavailable:
-            fresh = view
+            fresh = {**view, "steps": [{**s, "status": "done"} if s["task_id"] == step["task_id"] else s
+                                       for s in view["steps"]]}  # the OS took the tick: show it done
         with plan_adapter.pinned(fresh):
             return plan_adapter.chosen(row, RoadmapEngine(self.db).build(row.workspace_id)["fields"])
 

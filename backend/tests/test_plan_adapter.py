@@ -360,3 +360,21 @@ async def test_a_checkin_for_a_row_the_os_does_not_run_ignores_the_plan():
     with plan_client(view_of(STEPS, state="stopped", reason="withdrawn"), checkins=True,
                      os_supported=False) as (_, student, _p, _f, _):
         assert (await run_checkin(student)) != {"status": "superseded"}
+
+
+def test_a_tick_whose_reread_fails_answers_with_the_step_done():
+    with plan_client(view_of(STEPS)) as (client, student, params, fake, _):
+        done_in_os, down = fake.complete_step, {"on": False}
+        read = fake.plan_view
+
+        def complete_then_go_down(ref, task_id, payload=None):
+            result = done_in_os(ref, task_id, payload)
+            down["on"] = True  # the OS took the tick, then cannot answer the re-read
+            return result
+
+        with patch.object(bridge, "complete_step", complete_then_go_down), \
+                patch.object(bridge, "plan_view", lambda ref: None if down["on"] else read(ref)):
+            answer = data(tick(client, params, "gather@1"))
+        assert fake.completed == [(student.workspace_id, 1)]
+        assert "gather@1" in answer["steps_done"]
+        assert next(s for s in answer["steps"] if s["key"] == "gather@1")["status"] == "done"

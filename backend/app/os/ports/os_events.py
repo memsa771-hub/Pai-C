@@ -3,13 +3,13 @@
 key `os_event:{plan_id}:{kind}:{n}`. Only while the `counsellor` module is on and only for Counsellor plans. The host's
 glue reads them here and turns each into one app notification; it is never a chat message. IDs and codes only."""
 
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Literal
 
-from sqlalchemy import Connection, func, select, update
+from sqlalchemy import Connection, DateTime, cast, func, select, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
-from app.os import models, ports
+from app.os import clock, models, ports
 from app.os.contracts.os_event import OsEventV1
 
 CHANNEL = "counsellor"
@@ -52,6 +52,19 @@ def pending_events(limit: int = 100) -> list[OsEventV1]:
             O.c.tenant_id == svc.settings.tenant_id, O.c.channel == CHANNEL, O.c.template == TEMPLATE,
             O.c.status == "pending").order_by(O.c.id).limit(limit)).scalars().all()
     return [OsEventV1.model_validate(p) for p in rows]
+
+
+def skip_stale_events(max_age: timedelta) -> int:
+    """Marks every pending event row older than `max_age` as skipped, in one statement (the same status a refused
+    delivery gets), so a backlog of old rows never hides a fresh one behind the page limit. Returns the count."""
+    svc = ports.services()
+    O = models.outbox
+    cutoff = clock.now() - max_age
+    with svc.engine.begin() as conn:
+        return conn.execute(update(O).where(
+            O.c.tenant_id == svc.settings.tenant_id, O.c.channel == CHANNEL, O.c.template == TEMPLATE,
+            O.c.status == "pending", cast(O.c.payload["at"].astext, DateTime(timezone=True)) < cutoff)
+            .values(status="skipped", sent_at=func.now(), attempts=O.c.attempts + 1)).rowcount
 
 
 def mark_event_delivery(key: str, status: Literal["sent", "refused"]) -> None:

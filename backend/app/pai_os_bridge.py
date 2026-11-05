@@ -182,6 +182,7 @@ def deliver_os_events(db) -> dict:
     got = {"sent": 0, "refused": 0, "waiting": 0, "stale": 0}
     oldest = datetime.now(timezone.utc) - OS_EVENT_MAX_AGE
     texts = yaml.safe_load(OS_EVENT_TEXTS.read_text(encoding="utf-8")) or {}
+    got["stale"] += os_events_port.skip_stale_events(OS_EVENT_MAX_AGE)  # one statement, before the page is read
     for e in os_events_port.pending_events():
         copy = texts.get(e.kind)
         if e.at < oldest:  # too old to tell the student now: skipped, no notification
@@ -360,16 +361,15 @@ def plan_view(student_ref: str) -> dict | None:
 
 def complete_step(student_ref: str, task_id: int, payload: dict | None = None) -> str:
     """The student's tick on a plan step, done through PAI OS: "done", or "already_done" on a repeat. Raises StepError."""
-    try:
-        from app.os.ports import plan_actions
+    from app.os.ports import plan_actions  # outside the try: an OS that is not installed is a plain import error
 
+    try:
         return plan_actions.complete_step(student_ref, task_id, payload)
     except ports.OsUnavailable:
         raise StepError("unavailable") from None
-    except Exception as exc:
-        code = getattr(exc, "code", None)
-        if type(exc).__name__ == "StepActionError" and code:
-            raise StepError(code) from None
+    except plan_actions.StepActionError as exc:
+        raise StepError(exc.code) from None
+    except Exception:
         log.exception("a plan step could not be completed")
         raise StepError("unavailable") from None
 

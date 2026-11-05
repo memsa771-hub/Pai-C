@@ -306,7 +306,11 @@ class Kernel:
                 replan_events.record(conn, self.tenant_id, row.plan_id, "admission_rejected",
                                      {"programme_ref": row.programme_ref, "instance_key": row.instance_key},
                                      f"task:{task_id}", task_id)
-            self._promote(conn, row.plan_id)
+            conn.info[_QUIET] = True  # the student's own tick: the next student step is not announced as "needed"
+            try:
+                self._promote(conn, row.plan_id)
+            finally:
+                conn.info.pop(_QUIET, None)
             return True
 
     def complete_review(self, task_id: int, result: dict, *, only_if_waiting: bool = False) -> bool:

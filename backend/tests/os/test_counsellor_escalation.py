@@ -188,3 +188,11 @@ def test_admin_support_list_fields(svc):
     cid = escalate(svc, "escalate", SUPERVISOR)
     got = case_fields(SupportStore(svc.engine, "pai").get(cid))
     assert (got["counsellor_status"], got["counsellor_reason"]) == ("pending", "blocking_gap")
+
+
+def test_an_os_event_key_never_updates_a_support_case(svc):
+    cid = escalate(svc, "escalate", SUPERVISOR)
+    mark_counsellor_delivery(f"os_event:{cid}:plan_created:5", "sent")  # same number as the case: still not an escalation
+    case = SupportStore(svc.engine, "pai").get(cid)
+    assert case.counsellor_status != "sent"
+    assert [e.key for e in pending_counsellor_escalations()] == [f"escalation:{cid}"]

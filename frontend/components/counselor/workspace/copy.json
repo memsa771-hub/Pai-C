@@ -698,7 +698,7 @@
       "due": "Due {date}",
       "owner_pai": "PAI does this",
       "owner_student": "You do this",
-      "empty": "PAI is preparing your plan. Your steps will appear here.",
+      "empty": "Your plan is not ready yet. PAI will tell you when it is.",
       "needs_student": "PAI is waiting for you on one or more steps.",
       "paused": "Your plan is paused.",
       "paused_consent_missing": "Your plan is paused until your consent is back.",

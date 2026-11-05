@@ -35,6 +35,8 @@ def mark_counsellor_delivery(key: str, status: Literal["sent", "refused"], reaso
     escalation stays a support case, open, for a person in PAI OS (spec §2.5)."""
     from app.os.adapters.counsellor.store import IntakeStore
 
+    if not key.startswith("escalation:"):  # an `os_event:` key (or any other) is not an escalation: write nothing
+        return
     svc = ports.services()
     tenant, O, C = svc.settings.tenant_id, models.outbox, models.support_cases
     delivery = {"delivery": {"status": status, "reason": (reason or "")[:500] or None}}

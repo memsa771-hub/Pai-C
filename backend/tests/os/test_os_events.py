@@ -63,7 +63,7 @@ def test_plan_created_and_student_needed_and_step_done(engine, on):
         ("plan_created", None), ("step_done", "a"), ("student_needed", "apply@p1")]
     assert k.complete_student_task(apply.id, "stu-1", {})
     kinds = [(r["kind"], r["instance_key"]) for r in rows(engine)]
-    assert kinds[3:] == [("student_needed", "visa")]  # the student's own tick is never announced
+    assert kinds[3:] == []  # the student's own tick is never announced, nor is the student step it opens (visa)
     first = rows(engine)[0]
     assert first["key"] == f"os_event:{ref.plan_id}:plan_created:{first['key'].rsplit(':', 1)[1]}"
     assert (first["student_ref"], first["plan_id"], first["schema"]) == ("stu-1", ref.plan_id, "pai.os_event.v1")
@@ -257,3 +257,32 @@ def test_only_work_steps_say_done_and_only_student_steps_say_needed(engine, on):
         assert task(engine, ref.plan_id, r["instance_key"]).kind == "work"
     for r in rows(engine, "student_needed"):
         assert task(engine, ref.plan_id, r["instance_key"]).kind == "student"
+
+
+def test_a_students_own_tick_does_not_announce_the_next_student_step(engine, on):
+    pb = playbook(extra_tasks=[{"template_key": "first", "task_type": "student.act", "title": "First",
+                                "kind": "student", "inbox_kind": "act"},
+                               {"template_key": "second", "task_type": "student.act", "title": "Second",
+                                "kind": "student", "inbox_kind": "act", "depends_on": [{"key": "first"}]}])
+    k = kernel(engine)
+    ref = k.create_plan(counsellor_contract(), draft(pb))
+    first = task(engine, ref.plan_id, "first")
+    assert first.state == "waiting_student" and task(engine, ref.plan_id, "second").state != "waiting_student"
+    before = len(rows(engine, "student_needed"))
+    assert k.complete_student_task(first.id, "stu-1", {}) is True
+    assert task(engine, ref.plan_id, "second").state == "waiting_student"
+    assert len(rows(engine, "student_needed")) == before  # the student just acted: no "needed" for the next step
+
+
+def test_skip_stale_events_marks_only_old_pending_rows_in_one_statement(engine, svc):
+    from datetime import timedelta
+    k, ref = make_plan(engine)
+    k.pause_plan(ref.plan_id, "consent_missing")
+    old = (datetime.now(timezone.utc) - timedelta(hours=60)).isoformat()
+    with engine.begin() as conn:  # age the first event only
+        first = conn.execute(select(O.c.id, O.c.payload).where(O.c.template == "os_event").order_by(O.c.id)).first()
+        conn.execute(update(O).where(O.c.id == first.id).values(payload={**first.payload, "at": old}))
+    assert os_events.skip_stale_events(timedelta(hours=48)) == 1
+    assert [r["status"] for r in rows(engine)] == ["skipped", "pending"]
+    assert os_events.skip_stale_events(timedelta(hours=48)) == 0  # nothing pending is old now
+    assert [e.kind for e in os_events.pending_events()] == ["plan_paused"]

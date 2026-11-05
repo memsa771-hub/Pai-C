@@ -36,6 +36,16 @@ def os_events(monkeypatch):
     got = {"pending": [], "marked": []}
     monkeypatch.setattr(os_events_port, "pending_events", lambda limit=100: list(got["pending"]))
     monkeypatch.setattr(os_events_port, "mark_event_delivery", lambda key, status: got["marked"].append((key, status)))
+    got["skipped_stale"] = []
+
+    def skip_stale(max_age):  # the OS marks the old rows in one statement; the stub drops them from `pending`
+        cut = datetime.now(timezone.utc) - max_age
+        old = [e for e in got["pending"] if e.at < cut]
+        got["pending"] = [e for e in got["pending"] if e.at >= cut]
+        got["skipped_stale"] += [e.key for e in old]
+        return len(old)
+
+    monkeypatch.setattr(os_events_port, "skip_stale_events", skip_stale)
     ports.configure(types.SimpleNamespace())
     yield got
     ports.configure(None)
@@ -129,5 +139,26 @@ def test_old_events_are_skipped_and_fresh_ones_notified(student, os_events):
                             event(student, "plan_revised", 2, at=now - timedelta(hours=47))]
     with student.factory() as db:
         assert bridge.deliver_os_events(db) == {"sent": 1, "refused": 0, "waiting": 0, "stale": 1}
-    assert os_events["marked"] == [("os_event:7:plan_paused:1", "refused"), ("os_event:7:plan_revised:2", "sent")]
+    assert os_events["skipped_stale"] == ["os_event:7:plan_paused:1"]
+    assert os_events["marked"] == [("os_event:7:plan_revised:2", "sent")]
     assert [n.dedupe_key for n in notices(student)] == ["os_event:7:plan_revised:2"]
+
+
+def test_stale_rows_are_skipped_before_the_page_is_read(student, os_events, monkeypatch):
+    """More than a page of stale rows must not hide a fresh one: the stale ones go first, in one call."""
+    now = datetime.now(timezone.utc)
+    calls = []
+    real = os_events_port.skip_stale_events
+    monkeypatch.setattr(os_events_port, "skip_stale_events", lambda age: calls.append("skip") or real(age))
+    page = os_events_port.pending_events
+    monkeypatch.setattr(os_events_port, "pending_events", lambda limit=100: calls.append("read") or page(limit)[:limit])
+    os_events["pending"] = [event(student, "plan_paused", n, at=now - timedelta(hours=60)) for n in range(1, 151)]
+    os_events["pending"].append(event(student, "plan_revised", 999, at=now))
+    # the stub page is the first 100 rows, as the real port would give
+    monkeypatch.setattr(os_events_port, "pending_events",
+                        lambda limit=100: calls.append("read") or list(os_events["pending"])[:limit])
+    with student.factory() as db:
+        got = bridge.deliver_os_events(db)
+    assert calls[:2] == ["skip", "read"]
+    assert got["sent"] == 1 and got["stale"] == 150
+    assert [n.dedupe_key for n in notices(student)] == ["os_event:7:plan_revised:999"]
