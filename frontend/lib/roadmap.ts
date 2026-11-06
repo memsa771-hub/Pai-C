@@ -45,6 +45,23 @@ export type RouteStep = {
   manual_done?: boolean;
   /** The student may tick it: set by the backend only where the Vault is silent. */
   tickable?: boolean;
+  /** OS plan steps only (PAI OS runs the route): the step's own title, who does it and when it is due. */
+  title?: string;
+  owner?: "student" | "pai";
+  due_at?: string | null;
+  due_tz?: string | null;
+  provisional?: boolean;
+  estimated?: boolean;
+};
+
+/** The OS plan on a chosen route; absent when the plan view is off. "empty" means PAI is still preparing the plan. */
+export type RoutePlan = {
+  state: "empty" | "active" | "needs_student" | "paused" | "stopped" | "finished";
+  state_reason?: string | null;
+  revision?: number | null;
+  decision_version?: number | null;
+  proposals_waiting?: number;
+  changes?: unknown[];
 };
 
 /** A dated calendar event behind the estimate; month null is "date not confirmed". */
@@ -124,6 +141,8 @@ export type ChosenRoute = {
   live_status: RoadmapStatus;
   /** Consent state of the live choice; absent when the hand-off is off. */
   choice?: RouteChoice | null;
+  /** The OS plan, when the plan view is on and PAI OS runs this route. */
+  plan?: RoutePlan;
 };
 
 /** One country on the choice screen: an ISO code, with a name only if the API sends one. */

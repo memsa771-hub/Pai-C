@@ -694,7 +694,19 @@
       "close": "Close",
       "checked": "Checked {date}"
     },
+    "plan": {
+      "due": "Due {date}",
+      "owner_pai": "PAI does this",
+      "owner_student": "You do this",
+      "empty": "Your plan is not ready yet. PAI will tell you when it is.",
+      "needs_student": "PAI is waiting for you on one or more steps.",
+      "paused": "Your plan is paused.",
+      "paused_consent_missing": "Your plan is paused until your consent is back.",
+      "stopped": "This plan has stopped.",
+      "finished": "Your plan is finished."
+    },
     "route": {
+      "unsupported": "PAI can't run this plan yet. You can still follow the steps yourself.",
       "title": "Your route",
       "progress": "{done} of {total}",
       "progressLabel": "{done} of {total} steps done",

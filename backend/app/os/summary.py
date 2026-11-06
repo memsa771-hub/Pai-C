@@ -57,6 +57,8 @@ def build_summary(engine: Engine, tenant_id: str, student_ref: str, now: datetim
                            reason=t.blocked_reason if t.blocked_reason and _CODE.match(t.blocked_reason) else "blocked")
                for t in tasks if t.state == "blocked"]
     c = plan.contract
+    if c["level"] == "intermediate":
+        return None  # plan_summary.v1 is frozen to four levels and has no Counsellor reader (D-u)
     return PlanSummaryV1(
         student_ref=student_ref, plan_id=plan.id, built_at=now, state=state,
         route=SummaryRoute(origin_country=c["origin_country"], destination_country=c["destination_country"],

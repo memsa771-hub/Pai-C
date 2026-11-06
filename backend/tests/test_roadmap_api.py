@@ -319,3 +319,20 @@ def test_tick_on_a_stale_route_reads_the_rule_from_its_stored_steps():
             assert ticked.status_code == 200, ticked.text
             refused = client.post("/v1/roadmap/steps", params=params, headers=TOKEN, json={"key": "degree", "done": True})
             assert refused.status_code == 409
+
+
+@pytest.mark.req("R-04")
+def test_a_route_the_os_does_not_run_ticks_as_before_with_the_plan_flag_on():
+    """CONNECT_ROADMAP_FROM_PLANVIEW on, but the row is not os_supported: the Counsellor's own steps and ticks, no
+    `plan` key, and a token-only caller may tick (the account check is for OS steps only)."""
+    from app import pai_os_bridge
+    from app.config import config
+    with pre_eng() as (client, _, params), \
+            patch.object(config, "CONNECT_ROADMAP_FROM_PLANVIEW", True, create=True), \
+            patch.object(pai_os_bridge, "counsellor_module_on", lambda: True), \
+            patch.object(pai_os_bridge, "plan_view", side_effect=AssertionError("asked the OS")):
+        chosen = data(choose(client, params, "electrical_engineering"))
+        assert "plan" not in chosen
+        ticked = data(client.post("/v1/roadmap/steps", params=params, headers=TOKEN, json={"key": "apply", "done": True}))
+        assert ticked["steps_done"] == ["apply"] and "plan" not in ticked
+        assert "plan" not in data(client.get("/v1/roadmap", params=params, headers=TOKEN))["chosen"]

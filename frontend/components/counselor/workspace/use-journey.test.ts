@@ -2,7 +2,7 @@
 import { it, expect, vi, beforeEach } from 'vitest';
 import { workspaceApi } from '@/lib/api';
 import { journeyProgress, signalMet, useJourney, type JourneySignals } from './use-journey';
-import { chosenRoute, picture, roadmapPage } from '@/tests/fixtures/counselor';
+import { chosenRoute, osPlanRoute, picture, roadmapPage } from '@/tests/fixtures/counselor';
 import copy from './copy.json';
 
 const at = (stage: string | null, moments: Record<string, string>, extra: Partial<JourneySignals> = {}) => journeyProgress({
@@ -90,4 +90,13 @@ it('reads places search state only for explored paths', async () => {
   const { result } = renderHook(() => useJourney());
   await waitFor(() => expect(result.current.data?.placesSearched).toBe(true));
   expect(workspaceApi.getPrograms).toHaveBeenCalledExactlyOnceWith('seen');
+});
+
+// req: R-44: a done step PAI owns is not the student's tick
+const dataOf = (roadmap: JourneySignals['roadmap']) => ({ picture, possibilities: [], placesSearched: false, roadmap }) as JourneySignals;
+it('counts only student-owned OS steps for route_step_done', () => {
+  const os = (owner: 'student' | 'pai') => ({ ...osPlanRoute, steps_done: ['check-deadline'],
+    steps: osPlanRoute.steps.map((s) => (s.key === 'check-deadline' ? { ...s, owner } : { ...s, status: 'not' as const })) });
+  expect(signalMet('route_step_done', dataOf({ ...roadmapPage, chosen: os('pai') }))).toBe(false);
+  expect(signalMet('route_step_done', dataOf({ ...roadmapPage, chosen: os('student') }))).toBe(true);
 });

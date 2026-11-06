@@ -36,7 +36,7 @@ export function signalMet(signal: string, data: JourneySignals): boolean {
   if (signal === "route_step_done") {
     const chosen = data.roadmap?.chosen;
     const ticks = new Set(chosen?.steps_done || []);
-    return !!chosen?.steps.some((step) => ticks.has(step.key) && (step.tickable || step.status === "done"));
+    return !!chosen?.steps.some((step) => ticks.has(step.key) && (step.tickable || step.status === "done") && (!step.owner || step.owner === "student"));
   }
   return false;
 }

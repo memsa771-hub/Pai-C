@@ -11,8 +11,8 @@ export function useNotificationNavigation() {
 
   return (item: NotificationItem) => {
     const read = item.isRead ? Promise.resolve() : markNotificationRead(item.id);
-    // Older notifications from the removed roadmap research open the Roadmap page.
-    if (item.createdBy === 'system:roadmaps') {
+    // Older notifications from the removed roadmap research, and PAI OS plan notices, open the Roadmap page.
+    if (item.createdBy === 'system:roadmaps' || item.createdBy === 'system:pai-os') {
       openView('roadmap');
     } else if (item.channelName && sessions.some((session) => session.sessionId === item.channelName)) {
       setCurrentSessionId(item.channelName);

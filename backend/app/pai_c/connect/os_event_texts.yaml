@@ -1,0 +1,39 @@
+# Fixed notification copy for PAI OS plan events (R-45). One title and message per kind. Plain English; no country
+# names, no institution names, no dates or figures: the plan itself (the roadmap) holds the detail. These are bell
+# notifications only and never a chat message. priority: normal | high.
+plan_created:
+  title: Your plan is ready
+  message: Your application plan has been set up. Open your roadmap to see the steps.
+  priority: normal
+plan_revised:
+  title: Your plan was updated
+  message: Your plan changed. Open your roadmap to see what is different.
+  priority: normal
+plan_paused:
+  title: Your plan is on hold
+  message: Your plan is paused for now. Open your roadmap to see why and what comes next.
+  priority: normal
+plan_stopped:
+  title: Your plan was stopped
+  message: Your earlier plan is closed. Open your roadmap to see where things stand.
+  priority: normal
+plan_finished:
+  title: Your plan is complete
+  message: Every step of your plan is done. Open your roadmap to look it over.
+  priority: normal
+step_done:
+  title: A step is done
+  message: A step of your plan is marked done. Open your roadmap to see your progress.
+  priority: low
+student_needed:
+  title: A step is waiting for you
+  message: A step of your plan needs you. Open your roadmap to see what to do.
+  priority: high
+deadline_at_risk:
+  title: A deadline may be at risk
+  message: A step may not fit before its deadline. Open your roadmap to see which one.
+  priority: high
+proposal_waiting:
+  title: A change is waiting for your answer
+  message: A change to your plan is waiting for you to accept or decline it. Open your roadmap to review it.
+  priority: normal

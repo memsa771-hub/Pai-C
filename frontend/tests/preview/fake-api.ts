@@ -1,4 +1,4 @@
-import {picture,vault,vaultCatalog,possibilities,pathResult,programs,roadmapPage,chosenRoute,mirrorCard,mirrorEmpty} from '../fixtures/counselor';
+import {osPlanRoute,picture,vault,vaultCatalog,possibilities,pathResult,programs,roadmapPage,chosenRoute,mirrorCard,mirrorEmpty} from '../fixtures/counselor';
 import type {ChosenRoute} from '@/lib/roadmap';
 export const calls:{method:string;args:unknown[]}[]=[];
 // ?mirror=empty: the Mirror before it is ready (onboarding only).
@@ -21,7 +21,7 @@ const richPrograms={status:'completed',missing:[],programs:[
 ]};
 let searched=new URLSearchParams(location.search).has('programs');
 // The Roadmap page (GET /v1/roadmap): ?chosen=1 starts with a chosen route.
-let route:ChosenRoute|null=new URLSearchParams(location.search).has('chosen')?structuredClone(chosenRoute):null;
+let route:ChosenRoute|null=new URLSearchParams(location.search).has('chosen')?structuredClone(new URLSearchParams(location.search).has('osplan')?osPlanRoute:chosenRoute):null;
 const choose=(fieldKey:string)=>{const card=roadmapPage.fields.find(c=>c.field_key===fieldKey)!;
   const steps=structuredClone(card.steps||[]);
   route={id:'route-offline',field_key:fieldKey,possibility_id:card.possibility_id,title:card.title,chosen_at:'2026-10-26T09:00:00Z',

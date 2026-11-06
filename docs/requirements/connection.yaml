@@ -69,8 +69,8 @@ requirements:
   R-41: {title: "Contract level gains intermediate (contract v2)", phases: [P1], built: true}
   R-42: {title: "Review queue for data checkers with two-person rule", phases: [P2], built: false}
   R-43: {title: "Counsellor prompts, policy and pipeline frozen in connection work", phases: [P1], built: false}
-  R-44: {title: "Counsellor reads OS data in the same shape as today", phases: [P1], built: false}
-  R-45: {title: "OS adds no chat messages", phases: [P1], built: false}
+  R-44: {title: "Counsellor reads OS data in the same shape as today", phases: [P1], built: true}
+  R-45: {title: "OS adds no chat messages", phases: [P1], built: true}
   R-46: {title: "Proof per PR and phase: replays unchanged, live graded run", phases: [P1], built: false}
   R-47: {title: "Counsellor fixes from the live run", phases: [P0], built: true}
   R-48: {title: "Merit and admission answers come from MeritCheck and ProgrammeFacts", phases: [P2], built: false}

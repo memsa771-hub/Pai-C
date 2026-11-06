@@ -15,8 +15,10 @@ touches both products. Shared with the Counsellor team, who review every change.
 import asyncio
 import logging
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
 
+import yaml
 from fastapi import HTTPException
 from pydantic import ValidationError
 from sqlalchemy import and_, func, select
@@ -27,6 +29,7 @@ from app.config import config
 from app.models import OsOutbox, RouteDecision, User, VaultVersion, Workspace
 from app.os import ports
 from app.os.ports import escalation as os_escalation
+from app.os.ports import os_events as os_events_port
 from app.os.contracts.decision_record_v2 import DecisionRecordV2
 from app.os.ports import plan_source, student_facts as os_student_facts
 from app.os.contracts.vault_event import VaultEventV1
@@ -164,6 +167,47 @@ def _deliver(db) -> dict:
     return got
 
 
+OS_EVENT_TEXTS = Path(__file__).parent / "pai_c" / "connect" / "os_event_texts.yaml"
+
+
+OS_EVENT_MAX_AGE = timedelta(hours=48)  # older events are skipped, so switching the part on later sends no flood
+
+
+def deliver_os_events(db) -> dict:
+    """Turns each pending `os_event` row into one app notification (the bell), never a chat message (R-45). The
+    notice is the fixed copy of `os_event_texts.yaml` for its kind, keyed by the event key, so a repeat sweep makes
+    none. A student without a workspace here is `refused`; any other error leaves the row pending for the next sweep."""
+    from app.services.notify import notify_once
+
+    got = {"sent": 0, "refused": 0, "waiting": 0, "stale": 0}
+    oldest = datetime.now(timezone.utc) - OS_EVENT_MAX_AGE
+    texts = yaml.safe_load(OS_EVENT_TEXTS.read_text(encoding="utf-8")) or {}
+    got["stale"] += os_events_port.skip_stale_events(OS_EVENT_MAX_AGE)  # one statement, before the page is read
+    for e in os_events_port.pending_events():
+        copy = texts.get(e.kind)
+        if e.at < oldest:  # too old to tell the student now: skipped, no notification
+            os_events_port.mark_event_delivery(e.key, "refused")
+            got["stale"] += 1
+            continue
+        try:
+            if copy is None or db.get(Workspace, e.student_ref) is None:
+                os_events_port.mark_event_delivery(e.key, "refused")
+                got["refused"] += 1
+                continue
+            notify_once(db, e.student_ref, dedupe_key=e.key, source="system:pai-os", title=copy["title"],
+                        message=copy["message"], priority=copy.get("priority", "normal"),
+                        link_url=f"/{e.student_ref}?view=roadmap")
+            db.commit()
+        except Exception as exc:  # noqa: BLE001  (one event never stops the others; class name only, no student data)
+            db.rollback()
+            log.error("PAI OS event could not become a notification: %s", type(exc).__name__)
+            got["waiting"] += 1
+            continue
+        os_events_port.mark_event_delivery(e.key, "sent")
+        got["sent"] += 1
+    return got
+
+
 def sweep_once(db) -> dict:
     try:
         ports.services()
@@ -185,7 +229,14 @@ def sweep_once(db) -> dict:
         db.rollback()
         log.exception("PAI OS sweep could not deliver decisions")
         failed += 1
-    return {"submitted": delivered, "failed": failed, **_deliver(db)}
+    result = {"submitted": delivered, "failed": failed, **_deliver(db)}
+    try:
+        if part_on("CONNECT_ROADMAP_FROM_PLANVIEW"):
+            result["events"] = deliver_os_events(db)
+    except Exception:  # noqa: BLE001  (logged; the next sweep tries again)
+        db.rollback()
+        log.exception("PAI OS sweep could not deliver plan events")
+    return result
 
 
 def _sweep_with_session() -> dict:
@@ -278,6 +329,49 @@ def list_routes() -> list[dict]:
     except Exception:
         log.exception("routes could not be read; treated as none")
         return []
+
+
+class StepError(Exception):
+    """A step could not be completed through PAI OS. `code` is not_found, not_yours, not_waiting, review_required or
+    unavailable (PAI OS is not mounted or failed)."""
+
+    def __init__(self, code: str):
+        super().__init__(code)
+        self.code = code
+
+
+def plan_view(student_ref: str) -> dict | None:
+    """The student's plan as PAI OS shows it (a JSON dict valid as `PlanViewV1`), each step carrying `review`: True
+    when the step is closed by approving a pack or visa file, never by hand. None when PAI OS is not mounted, and on any
+    failure (logged); the Counsellor then shows its own view."""
+    try:
+        from app.os.ports import plan_actions, plan_query
+
+        view = plan_query.plan_view(student_ref).model_dump(mode="json", by_alias=True)
+        review = plan_actions.review_templates()
+    except ports.OsUnavailable:
+        return None
+    except Exception:
+        log.exception("plan view could not be read; the Counsellor's own view is shown")
+        return None
+    for step in view["steps"]:
+        step["review"] = step["template_key"] in review
+    return view
+
+
+def complete_step(student_ref: str, task_id: int, payload: dict | None = None) -> str:
+    """The student's tick on a plan step, done through PAI OS: "done", or "already_done" on a repeat. Raises StepError."""
+    from app.os.ports import plan_actions  # outside the try: an OS that is not installed is a plain import error
+
+    try:
+        return plan_actions.complete_step(student_ref, task_id, payload)
+    except ports.OsUnavailable:
+        raise StepError("unavailable") from None
+    except plan_actions.StepActionError as exc:
+        raise StepError(exc.code) from None
+    except Exception:
+        log.exception("a plan step could not be completed")
+        raise StepError("unavailable") from None
 
 
 def programmes_for(route_key: str, term: str, year: int) -> list[dict]:

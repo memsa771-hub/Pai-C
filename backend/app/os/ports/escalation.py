@@ -24,7 +24,8 @@ def pending_counsellor_escalations(limit: int = 100) -> list[EscalationV1]:
     O = models.outbox
     with svc.engine.connect() as conn:
         rows = conn.execute(select(O.c.payload).where(
-            O.c.tenant_id == svc.settings.tenant_id, O.c.channel == _CHANNEL, O.c.status == "pending")
+            O.c.tenant_id == svc.settings.tenant_id, O.c.channel == _CHANNEL, O.c.template == "escalation",
+            O.c.status == "pending")  # not the `os_event` rows that share this channel (R-45)
             .order_by(O.c.id).limit(limit)).scalars().all()
     return [EscalationV1.model_validate(p) for p in rows]
 
@@ -34,11 +35,14 @@ def mark_counsellor_delivery(key: str, status: Literal["sent", "refused"], reaso
     escalation stays a support case, open, for a person in PAI OS (spec §2.5)."""
     from app.os.adapters.counsellor.store import IntakeStore
 
+    if not key.startswith("escalation:"):  # an `os_event:` key (or any other) is not an escalation: write nothing
+        return
     svc = ports.services()
     tenant, O, C = svc.settings.tenant_id, models.outbox, models.support_cases
     delivery = {"delivery": {"status": status, "reason": (reason or "")[:500] or None}}
     with svc.engine.begin() as conn:
-        conn.execute(update(O).where(O.c.tenant_id == tenant, O.c.channel == _CHANNEL, O.c.idempotency_key == key)
+        conn.execute(update(O).where(O.c.tenant_id == tenant, O.c.channel == _CHANNEL, O.c.template == "escalation",
+                                     O.c.idempotency_key == key)
                      .values(status="sent" if status == "sent" else "skipped", sent_at=func.now(),
                              attempts=O.c.attempts + 1, payload=O.c.payload.op("||")(delivery)))
         if not key.startswith("escalation:intake:"):

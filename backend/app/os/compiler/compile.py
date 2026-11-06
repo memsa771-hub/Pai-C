@@ -11,6 +11,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from app.os.compiler.conditions import evaluate
 from app.os.compiler.schedule import Node, end_of_day, schedule
 from app.os.contracts.route_contract import RouteContract
+from app.os.contracts.route_contract_v2 import RouteContractV2
 from app.os.knowledge import Fact
 from app.os.playbooks import Playbook, TaskTemplate
 
@@ -203,7 +204,7 @@ def _apply_overrides(insts: dict[str, _Inst], confirms: dict[str, tuple[str, str
 
 
 def compile_plan(
-    contract: RouteContract,
+    contract: RouteContract | RouteContractV2,
     playbook: Playbook,
     route_facts: Mapping[str, Fact],
     programme_facts: Mapping[tuple[str, str], Fact],

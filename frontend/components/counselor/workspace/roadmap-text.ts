@@ -66,8 +66,8 @@ export const uncertain = (card: FieldCard) =>
 
 /** A route step's words: its copy key with its values. Steps saved before
  * steps had keys carry the copy key itself as `key`. */
-export const stepLabel = (step: Pick<RouteStep, "key" | "label_key" | "values">) =>
-  step.label_key ? render({ ...(step.values || {}), key: step.label_key }) : render(step as unknown as CopyItem);
+export const stepLabel = (step: Pick<RouteStep, "key" | "label_key" | "values"> & { title?: string }) =>
+  step.title ? step.title : step.label_key ? render({ ...(step.values || {}), key: step.label_key }) : render(step as unknown as CopyItem);
 
 /** Whether the student may tick a step: the backend decides (only where the
  * Vault is silent); the page holds no rule of its own. */
@@ -122,3 +122,11 @@ export const intakeText = (time: RouteTime | null | undefined) => {
     { month: "long", timeZone: "UTC" });
   return fill(t.time.intake, { label: intake.label, month, year: intake.year });
 };
+
+/** "Due 12 March 2027" for an OS step with a due date (the date in its own time zone); empty otherwise. */
+export function dueText(step: Pick<RouteStep, "due_at" | "due_tz">): string {
+  if (!step.due_at) return "";
+  let tz: string | undefined = step.due_tz || undefined;
+  try { if (tz) new Intl.DateTimeFormat("en", { timeZone: tz }); } catch { tz = undefined; }
+  return fill(t.plan.due, { date: formatDate(step.due_at, DEFAULT_LOCALE, { day: "numeric", month: "long", year: "numeric", timeZone: tz || "UTC" }) });
+}

@@ -7,8 +7,9 @@ from datetime import datetime
 
 from sqlalchemy import Engine, func, insert, select, update
 
-from app.os import models
+from app.os import clock, models
 from app.os.kernel.states import PLAN_OPEN
+from app.os.ports import os_events
 
 PR, O, C, P = models.proposals, models.plan_overrides, models.support_cases, models.plans
 
@@ -72,10 +73,13 @@ class ProposalStore:
                big: bool, expires_at: datetime | None, status: str = "pending", based_on: str | None = None,
                base_revision: int | None = None) -> int:
         with self.engine.begin() as conn:
-            return conn.execute(insert(PR).values(
+            proposal_id = conn.execute(insert(PR).values(
                 tenant_id=self.tenant_id, plan_id=plan_id, event_ids=event_ids, source=source, ops=ops,
                 refused=refused, big=big, status=status, expires_at=expires_at, based_on=based_on,
                 base_revision=base_revision).returning(PR.c.id)).scalar_one()
+            if status == "pending":  # a suggestion waits for the student: tell the Counsellor in this transaction
+                os_events.emit(conn, self.tenant_id, plan_id, "proposal_waiting", proposal_id, clock.now())
+            return proposal_id
 
     def get(self, proposal_id: int) -> Proposal | None:
         with self.engine.connect() as conn:
