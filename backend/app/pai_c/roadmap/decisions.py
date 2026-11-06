@@ -399,12 +399,21 @@ class RouteDecisionService:
         return "written", new.decision_version, None
 
     def adoption_state(self, workspace_id: str, plan: dict, *, lock: bool = False) -> str:
-        """Whether the student can keep their self-serve plan now: `ready`, `no_journey`, `choose_field_first` or
-        `too_many_places`. With `lock` it takes the workspace lock first, so the answer holds until the caller commits."""
+        """Whether the student can keep their self-serve plan now: `ready`, `no_journey`, `several_plans` (more than one
+        open self-serve plan: the intake would refuse), `no_places` (every place was dropped), `no_intake` (a plan with
+        no intake cannot become a decision; a self-serve contract always has one, this only guards a damaged row),
+        `choose_field_first` or `too_many_places`. With `lock` it takes the workspace lock first, so the answer holds
+        until the caller commits."""
         if lock:
             self._lock(workspace_id)
         if self._journey(workspace_id) is None:
             return "no_journey"
+        if plan.get("open_plans", 1) > 1:
+            return "several_plans"
+        if not plan["programmes"]:
+            return "no_places"
+        if not plan.get("intake"):
+            return "no_intake"
         if self.active(workspace_id) is None:
             return "choose_field_first"
         return "too_many_places" if len(plan["programmes"]) > self.MAX_PLACES else "ready"

@@ -179,3 +179,17 @@ def test_no_offer_while_the_os_module_is_off(world, monkeypatch):
         monkeypatch.setattr(plan_source, "counsellor_enabled", lambda: False)
         assert offer(client, params) == {"offer": False}
         assert agree(client, params).status_code == 409  # the hand-off part is off with the module
+
+
+def test_several_plans_no_places_and_no_intake_offer_nothing_and_post_writes_nothing(world):
+    with pre_eng() as (client, student, params):
+        chosen(client, params, student)
+        for key, changed, code in (("open_plans", 2, "several_plans"), ("programmes", [], "no_places"),
+                                   ("intake", None, "no_intake")):
+            world["plan"] = {**plan(), key: changed}
+            assert offer(client, params) == {"offer": False, "state": code}
+            r = agree(client, params)
+            assert r.status_code == 409 and r.json()["detail"] == code, r.text
+            assert world["asked"] == [] and len(versions(student)) == 1  # no intent, no decision
+        world["plan"] = plan()
+        assert offer(client, params)["state"] == "ready"

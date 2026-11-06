@@ -57,17 +57,19 @@ def routes() -> list[dict]:
 
 def self_serve_plan(student_ref: str) -> dict | None:
     """The student's open self-serve plan (the newest one), for the adoption offer (P1-T6, R-08): `{plan_id, route_key,
-    origin, destination, level, intake, programmes, contract_sha256}`, programmes as `{programme_ref, rank}` in order: the live
+    origin, destination, level, intake, programmes, contract_sha256, open_plans}` (`open_plans`: how many open self-serve
+    plans the student has; the offer is made only for one), programmes as `{programme_ref, rank}` in order: the live
     places only (the contract's minus those an active `cancel_programme` override dropped), ranked 1..n.
     None when there is none."""
     svc = ports.services()
     P = models.plans
     with svc.engine.connect() as conn:
-        row = conn.execute(select(P.c.id, P.c.contract, P.c.contract_sha256).where(
+        rows = conn.execute(select(P.c.id, P.c.contract, P.c.contract_sha256).where(
             P.c.tenant_id == svc.settings.tenant_id, P.c.student_ref == student_ref, P.c.source == "self_serve",
-            P.c.status.in_(PLAN_OPEN)).order_by(P.c.id.desc()).limit(1)).first()
-        if row is None:
+            P.c.status.in_(PLAN_OPEN)).order_by(P.c.id.desc())).all()
+        if not rows:
             return None
+        row = rows[0]
         route_key = conn.execute(select(models.playbook_pins.c.playbook_key).where(
             models.playbook_pins.c.plan_id == row.id)).scalar()
     contract = row.contract
@@ -78,4 +80,4 @@ def self_serve_plan(student_ref: str) -> dict | None:
             "destination": contract["destination_country"], "level": contract["level"],
             "intake": None if intake is None else {"term": intake["term"], "year": intake["year"]},
             "programmes": [{"programme_ref": p["programme_ref"], "rank": i + 1} for i, p in enumerate(live)],
-            "contract_sha256": row.contract_sha256}
+            "contract_sha256": row.contract_sha256, "open_plans": len(rows)}

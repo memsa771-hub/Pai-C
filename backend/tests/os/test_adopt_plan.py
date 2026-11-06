@@ -134,8 +134,12 @@ def test_self_serve_plan_query(world):
     got = plan_query.self_serve_plan(STUDENT)
     assert got == {"plan_id": plan_id, "route_key": "germany_master", "origin": "PK", "destination": "DE",
                    "level": "master", "intake": {"term": "winter", "year": 2027}, "programmes": SAMPLE_PLACES,
-                   "contract_sha256": plan_row(world, plan_id).contract_sha256}
+                   "contract_sha256": plan_row(world, plan_id).contract_sha256, "open_plans": 1}
+    second = world.plans.start_plan(self_contract(places=SAMPLE_PLACES[:1], external_ref=f"self:{STUDENT}:other:winter:2028",
+                                                  target_intake={"term": "winter", "year": 2028})).plan_id
+    assert plan_query.self_serve_plan(STUDENT)["open_plans"] == 2 and plan_query.self_serve_plan(STUDENT)["plan_id"] == second
     world.kernel.close_plan(plan_id, "test")
+    world.kernel.close_plan(second, "test")
     assert plan_query.self_serve_plan(STUDENT) is None
 
 
@@ -296,3 +300,16 @@ def test_a_pending_proposal_goes_stale_after_adoption(world):
     assert run(world, chosen(1)).status == "revised"  # adopted: the contract (source, identity) is another one
     with pytest.raises(ProposalStale):
         replanner.accept(STUDENT, pending.proposal_id)
+
+
+def test_every_place_cancelled_leaves_no_live_places(world):
+    plan_id = self_plan(world)
+    cancel_one(world, plan_id, "ovgu-eeit")
+    cancel_one_more = plan_query.self_serve_plan(STUDENT)
+    assert [p["programme_ref"] for p in cancel_one_more["programmes"]] == ["tu-chemnitz-embedded-systems"]
+    with world.engine.begin() as conn:  # the other place is dropped by an override too
+        proposal = conn.execute(select(models.proposals.c.id).where(models.proposals.c.plan_id == plan_id)).scalars().first()
+        conn.execute(insert(models.plan_overrides).values(
+            tenant_id="pai", plan_id=plan_id, proposal_id=proposal, op="cancel_programme",
+            target="tu-chemnitz-embedded-systems", payload={}))
+    assert plan_query.self_serve_plan(STUDENT)["programmes"] == []
