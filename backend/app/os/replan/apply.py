@@ -18,12 +18,14 @@ from app.os import clock as shared_clock
 from app.os.adapters.standalone.escalation import StandaloneSink
 from app.os.compiler import CompileError
 from app.os.kernel import IllegalTransition, StaleDraft
+from app.os.contracts.route_contract import ProgrammeChoice
+from app.os.ports import choice_requests
 from app.os.ports.escalation import EscalationSink
 from app.os.replan.checks import check_operations, task_rows
 from app.os.replan.config import ReplanConfig
 from app.os.replan.events import Event
 from app.os.replan.ops import (
-    Escalate, Op, Ops, RequestFromStudent, SwapProgramme, UpgradePlaybook, is_big, to_overrides,
+    CancelProgramme, Escalate, Op, Ops, RequestFromStudent, SwapProgramme, UpgradePlaybook, is_big, to_overrides,
 )
 from app.os.replan.rules import REASONS, PlanState
 from app.os.replan.store import OverrideStore, ProposalStore, SupportStore
@@ -35,6 +37,7 @@ DAILY_REVISIONS = 3  # replan revisions per plan per UTC day; the 4th pauses cha
 LIMIT_REASON = "Changes are paused: this plan reached today's limit of 3 automatic changes."
 REFUSED_REASON = "Every proposed change was refused by the plan's checks."
 BROKEN_REASON = "This plan no longer compiles: a person needs to check it."
+NO_PLACES_REASON = "This change would leave no places in the plan: a person needs to check it."
 PAUSED_REASON = "Changes are paused while a person checks your plan: try again once they are done."
 LOCK_CLASS = 7007  # pg_advisory_lock(LOCK_CLASS, plan id): one replan or answer per plan at a time
 _OPS = TypeAdapter(Ops)
@@ -241,8 +244,11 @@ class Replanner:
         raw = [op.model_dump(mode="json") for op in kept]
         sha, revision = self._base(plan_id)
         if any(is_big(op, tasks, book) for op in kept):
+            with self.engine.connect() as conn:  # a Counsellor plan: the choice the proposal was made against
+                version = choice_requests.decision_version_of(conn, self.tenant, plan_id)
             pid = self.proposals.create(plan_id, event_ids, source, raw, refused, big=True,
-                                        expires_at=self._expires(plan_id, kept), based_on=sha, base_revision=revision)
+                                        expires_at=self._expires(plan_id, kept), based_on=sha, base_revision=revision,
+                                        base_decision_version=version)
             return Decision("pending", pid)
         if any(_writes(op) for op in kept) and self.plans.kernel.replan_revisions_today(plan_id) >= DAILY_REVISIONS:
             pid = self._refuse(plan_id, event_ids, source, raw, refused, {"why": LIMIT_REASON, "limit": True})
@@ -271,11 +277,13 @@ class Replanner:
 
     # ------------------------------------------------------------------ applying
 
-    def apply(self, proposal_id: int, status: str) -> int | None:
+    def apply(self, proposal_id: int, status: str | None, ops_filter: Callable[[Op], bool] | None = None) -> int | None:
         """Applies a proposal's operations. The overrides and the revision are one kernel transaction (final review
-        I3); a repeat finds them stored and recompiles to no change. Raises ReplanFailed if it cannot be written."""
+        I3); a repeat finds them stored and recompiles to no change. Raises ReplanFailed if it cannot be written.
+        `ops_filter` keeps only the operations it accepts (P1-T6: a choice change on a Counsellor plan is requested,
+        not applied); with `status` None the proposal's status is left to the caller."""
         p = self.proposals.get(proposal_id)
-        ops, plan_id = ops_of(p.ops), p.plan_id
+        ops, plan_id = [o for o in ops_of(p.ops) if ops_filter is None or ops_filter(o)], p.plan_id
         stored = bool(self.overrides.for_proposal(proposal_id))
         new = [] if stored else [o for op in ops for o in to_overrides(op)]
         cause = f"replan:{proposal_id}"
@@ -310,7 +318,8 @@ class Replanner:
         # still records the plan's revision: it is shown, and a repeated step does not apply it again.
         made = made or self._revised_by(plan_id, cause) or not all(_writes(op) for op in ops)
         revision = self._base(plan_id)[1] if made else None
-        self.proposals.set_status(proposal_id, status, revision=revision)
+        if status is not None:
+            self.proposals.set_status(proposal_id, status, revision=revision)
         return revision
 
     def _revised_by(self, plan_id: int, cause: str) -> bool:
@@ -366,10 +375,43 @@ class Replanner:
                 raise ProposalStale("your plan changed since this was suggested") from None
             if len(kept) != len(ops):
                 raise ProposalStale("your plan changed since this was suggested: " + refused[0]["why"])
+            with self.engine.connect() as conn:
+                to_counsellor = any(isinstance(op, (SwapProgramme, CancelProgramme)) for op in ops) \
+                    and choice_requests.applies(conn, self.tenant, p.plan_id)
             try:
+                if to_counsellor:
+                    return self._request_choice(p, ops)
                 return self.apply(p.id, "accepted")
             except ReplanFailed as e:
                 raise ProposalStale(f"your plan changed since this was suggested ({e})") from None
+
+    def _request_choice(self, p, ops: list[Op]) -> int | None:
+        """A choice change on a Counsellor plan is never applied here (R-07): the other operations apply now (D-x2),
+        and the swap / removal goes to the Counsellor as one choice_request, written in the same transaction as the
+        proposal's new status `requested`. Called under the plan lock."""
+        choice = (SwapProgramme, CancelProgramme)
+        contract, _ = self.plans._contract(p.plan_id)
+        places = [x.programme_ref for x in sorted(contract.programmes, key=lambda x: x.rank)]
+        for op in ops:
+            if isinstance(op, SwapProgramme) and op.out_ref in places and op.in_ref not in places:
+                places[places.index(op.out_ref)] = op.in_ref
+            elif isinstance(op, CancelProgramme) and op.programme_ref in places:
+                places.remove(op.programme_ref)
+        if not places:  # R-22: dropping every place is an escalation, not a choice request
+            self.proposals.set_status(p.id, "refused")
+            self.support(p.plan_id, p.event_ids, NO_PLACES_REASON, p.id)
+            return None
+        with self.engine.connect() as conn:
+            base = p.base_decision_version or choice_requests.decision_version_of(conn, self.tenant, p.plan_id)
+        if base is None:
+            raise ProposalStale("your plan is not ready to change yet")
+        revision = self.apply(p.id, None, ops_filter=lambda op: not isinstance(op, choice))
+        chosen = [ProgrammeChoice(programme_ref=ref, rank=i + 1) for i, ref in enumerate(places)]
+        with self.engine.begin() as conn:  # the status and the request row commit together, or not at all
+            if not self.proposals.request(conn, p.id, revision):
+                raise ProposalStale("this suggestion is no longer waiting for you")
+            choice_requests.emit(conn, self.tenant, p.plan_id, p.id, base, chosen, self.clock())
+        return revision
 
     def decline(self, student_ref: str, proposal_id: int) -> None:
         p = self.proposals.get(proposal_id)

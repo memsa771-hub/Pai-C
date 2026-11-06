@@ -18,6 +18,8 @@ class ReplanConfig(BaseModel):
 def load_replan_configs(directory: Path = REPLAN_DIR) -> dict[str, ReplanConfig]:
     out: dict[str, ReplanConfig] = {}
     for path in sorted(directory.glob("*.yaml")):
+        if path.stem.endswith("_texts"):  # student sentences (choice_texts.yaml), not a route's settings
+            continue
         cfg = ReplanConfig.model_validate(yaml.safe_load(path.read_text(encoding="utf-8")))
         out[cfg.route_key] = cfg
     return out

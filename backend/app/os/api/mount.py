@@ -35,11 +35,15 @@ def mount_os(app: FastAPI, *, env: Mapping[str, str] | None = None,
              playbook_dir: Path = PLAYBOOK_DIR, profile_dir: Path = PROFILE_DIR,
              document_types_dir: Path = TYPES_DIR, pack_dir: Path = PACK_DIR,
              recipient_lookup: RecipientLookup | None = None,
-             student_facts: Callable[[str], dict | None] | None = None) -> bool:
+             student_facts: Callable[[str], dict | None] | None = None,
+             choice_enabled: Callable[[], bool] | None = None,
+             on_choice_request: Callable[[str], None] | None = None) -> bool:
     """False when the OS stays off. `recipient_lookup` (Slice 9b): the host's student ref -> email address function,
     handed to the RecipientLookup port for this process (the worker loads its own from OS_RECIPIENT_LOOKUP).
     `student_facts` (P1-T4): the host's student ref -> StudentFacts dict (None while its part is off), handed to the
-    StudentFacts port (the worker loads its own from OS_STUDENT_FACTS)."""
+    StudentFacts port (the worker loads its own from OS_STUDENT_FACTS). `choice_enabled` / `on_choice_request`
+    (P1-T6): the host's gate and post-commit hook for choice requests (ports.choice_requests); None keeps the OS's
+    own behaviour."""
     enabled = flag(os.environ if env is None else env, "OS_ENABLED")
     try:
         settings = load_settings(env)
@@ -69,7 +73,7 @@ def mount_os(app: FastAPI, *, env: Mapping[str, str] | None = None,
     services = make_services(settings, playbooks=books, document_types=types, statement_configs=statement_configs,
                              pack_configs=pack_configs, visa_configs=visa_configs)
     app.include_router(build_router(lambda: services), prefix=PREFIX)
-    ports.configure(services, recipient_lookup, student_facts)  # the host calls go through the ports, never the services directly
+    ports.configure(services, recipient_lookup, student_facts, choice_enabled, on_choice_request)  # the host calls go through the ports, never the services directly
     if student_dependency is not None:
         app.dependency_overrides[current_student_ref] = student_dependency
     if student_write_dependency is not None:

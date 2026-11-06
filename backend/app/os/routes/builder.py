@@ -17,6 +17,9 @@ from app.os.eligibility.notes import on_profile_change
 from app.os.kernel import PlanRef, contract_sha256
 from app.os.kernel.states import is_started
 from app.os.knowledge.requests import visible_programmes
+from app.os.ports import choice_requests
+from app.os.replan.ops import CancelProgramme, SwapProgramme
+from app.os.replan.store import ProposalStore
 
 log = logging.getLogger(__name__)
 CHANGES_PER_DAY = 3  # swaps and removals per plan (S4-D10); the kernel has no revision limit yet (Slice 7)
@@ -119,8 +122,29 @@ def _within_limit(plans, plan_id: int) -> None:
         raise SwapLimit(f"at most {CHANGES_PER_DAY} programme changes a day; try again tomorrow")
 
 
-def swap(plans, student_ref: str, plan_id: int, out_ref: str, in_ref: str) -> int | None:
-    """Replaces one programme with another at the same rank, with the student's OK (the screens ask first)."""
+def _request(plans, plan_id: int, op, places: list[str]) -> tuple[str, int] | None:
+    """On a Counsellor plan the builder does not change the choice (R-07): it records the student's change as a
+    proposal in status `requested` and writes its choice_request row, in one transaction. None when the plan is not
+    one the Counsellor chooses for (the host part is off, or a self-serve plan): the caller edits the plan as before."""
+    tenant = plans.kernel.tenant_id
+    with plans.engine.begin() as conn:
+        if not choice_requests.applies(conn, tenant, plan_id):
+            return None
+        base = choice_requests.decision_version_of(conn, tenant, plan_id)
+        if base is None:
+            raise NotAllowed("your plan is not ready to change yet")
+        sha, revision = conn.execute(select(P.c.contract_sha256, P.c.current_revision).where(P.c.id == plan_id)).one()
+        pid = ProposalStore(plans.engine, tenant).create(
+            plan_id, [], "student", [op.model_dump(mode="json")], [], big=True, expires_at=None, status="requested",
+            based_on=sha, base_revision=revision, base_decision_version=base, conn=conn)
+        choice_requests.emit(conn, tenant, plan_id, pid, base,
+                             [ProgrammeChoice(programme_ref=r, rank=i + 1) for i, r in enumerate(places)], clock.now())
+    return "requested", pid
+
+
+def swap(plans, student_ref: str, plan_id: int, out_ref: str, in_ref: str) -> int | tuple[str, int] | None:
+    """Replaces one programme with another at the same rank, with the student's OK (the screens ask first). On a
+    Counsellor plan it only requests the change: `("requested", proposal_id)`."""
     contract = _own(plans, student_ref, plan_id)
     refs = [p.programme_ref for p in contract.programmes]
     if out_ref not in refs:
@@ -138,6 +162,11 @@ def swap(plans, student_ref: str, plan_id: int, out_ref: str, in_ref: str) -> in
         raise NotAllowed(f"{in_ref} is still being researched")
     _not_started(plans, plan_id, out_ref)
     _within_limit(plans, plan_id)
+    ordered = [p.programme_ref for p in sorted(contract.programmes, key=lambda p: p.rank)]
+    requested = _request(plans, plan_id, SwapProgramme(out_ref=out_ref, in_ref=in_ref, reason="student_swap"),
+                         [in_ref if r == out_ref else r for r in ordered])
+    if requested is not None:
+        return requested
 
     def edit(current: RouteContract) -> list[ProgrammeChoice]:  # re-applied to the current list on every retry
         refs_now = [p.programme_ref for p in current.programmes]
@@ -153,8 +182,9 @@ def swap(plans, student_ref: str, plan_id: int, out_ref: str, in_ref: str) -> in
     return revision
 
 
-def remove(plans, student_ref: str, plan_id: int, ref: str) -> int | None:
-    """Drops one programme while nothing for it has started; at least one stays (Q3)."""
+def remove(plans, student_ref: str, plan_id: int, ref: str) -> int | tuple[str, int] | None:
+    """Drops one programme while nothing for it has started; at least one stays (Q3). On a Counsellor plan it only
+    requests the change: `("requested", proposal_id)`."""
     contract = _own(plans, student_ref, plan_id)
     refs = [p.programme_ref for p in sorted(contract.programmes, key=lambda p: p.rank)]
     if ref not in refs:
@@ -163,6 +193,10 @@ def remove(plans, student_ref: str, plan_id: int, ref: str) -> int | None:
         raise NotAllowed("this is the last programme in your plan; swap it instead")
     _not_started(plans, plan_id, ref)
     _within_limit(plans, plan_id)
+    requested = _request(plans, plan_id, CancelProgramme(programme_ref=ref, reason="student_remove"),
+                         [r for r in refs if r != ref])
+    if requested is not None:
+        return requested
 
     def edit(current: RouteContract) -> list[ProgrammeChoice]:  # re-applied to the current list on every retry
         now = [p.programme_ref for p in sorted(current.programmes, key=lambda p: p.rank)]

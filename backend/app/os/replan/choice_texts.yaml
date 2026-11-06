@@ -1,0 +1,6 @@
+# The sentences a student sees next to a choice change that went to their counsellor (P1-T6, R-07).
+# OWNER approval, stored approved:false. While it is false, the API returns these only in rehearsal mode (null otherwise).
+version: 1
+approved: false
+requested: Your change is with your counsellor. It is not in your plan yet; we will tell you when it is.
+expired: This change was not made, because your choice has moved on. Look at your plan and ask again if you still want it.

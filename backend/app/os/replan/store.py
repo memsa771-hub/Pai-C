@@ -5,7 +5,7 @@ through a compile and a kernel revision."""
 from dataclasses import dataclass
 from datetime import datetime
 
-from sqlalchemy import Connection, Engine, func, insert, select, update
+from sqlalchemy import Connection, Engine, and_, func, insert, or_, select, update
 
 from app.os import clock, models
 from app.os.kernel.states import PLAN_OPEN
@@ -75,16 +75,22 @@ class ProposalStore:
 
     def create(self, plan_id: int, event_ids: list[int], source: str, ops: list[dict], refused: list[dict],
                big: bool, expires_at: datetime | None, status: str = "pending", based_on: str | None = None,
-               base_revision: int | None = None, base_decision_version: int | None = None) -> int:
-        with self.engine.begin() as conn:
-            proposal_id = conn.execute(insert(PR).values(
-                tenant_id=self.tenant_id, plan_id=plan_id, event_ids=event_ids, source=source, ops=ops,
-                refused=refused, big=big, status=status, expires_at=expires_at, based_on=based_on,
-                base_revision=base_revision, base_decision_version=base_decision_version).returning(PR.c.id)
-            ).scalar_one()
-            if status == "pending":  # a suggestion waits for the student: tell the Counsellor in this transaction
-                os_events.emit(conn, self.tenant_id, plan_id, "proposal_waiting", proposal_id, clock.now())
-            return proposal_id
+               base_revision: int | None = None, base_decision_version: int | None = None,
+               conn: Connection | None = None) -> int:
+        """Inserts the proposal. With `conn` it joins the caller's transaction (the builder's request is one: the
+        proposal and its choice_request row commit together); otherwise it is its own."""
+        if conn is None:
+            with self.engine.begin() as own:
+                return self.create(plan_id, event_ids, source, ops, refused, big, expires_at, status, based_on,
+                                   base_revision, base_decision_version, conn=own)
+        proposal_id = conn.execute(insert(PR).values(
+            tenant_id=self.tenant_id, plan_id=plan_id, event_ids=event_ids, source=source, ops=ops,
+            refused=refused, big=big, status=status, expires_at=expires_at, based_on=based_on,
+            base_revision=base_revision, base_decision_version=base_decision_version).returning(PR.c.id)
+        ).scalar_one()
+        if status == "pending":  # a suggestion waits for the student: tell the Counsellor in this transaction
+            os_events.emit(conn, self.tenant_id, plan_id, "proposal_waiting", proposal_id, clock.now())
+        return proposal_id
 
     def get(self, proposal_id: int) -> Proposal | None:
         with self.engine.connect() as conn:
@@ -97,6 +103,17 @@ class ProposalStore:
             row = conn.execute(select(PR).where(PR.c.tenant_id == self.tenant_id,
                                                 PR.c.event_ids.contains([event_id])).order_by(PR.c.id)).first()
         return _proposal(row) if row else None
+
+    def requested_for(self, student_ref: str, since: datetime) -> list[Proposal]:
+        """The student's choice changes that went to the Counsellor: those still `requested` on an open plan, and
+        those that ended `expired` with the Counsellor's answer since `since` (P1-T6)."""
+        with self.engine.connect() as conn:
+            rows = conn.execute(select(PR).join(P, P.c.id == PR.c.plan_id).where(
+                PR.c.tenant_id == self.tenant_id, P.c.student_ref == student_ref,
+                or_(and_(PR.c.status == "requested", P.c.status.in_(PLAN_OPEN)),
+                    and_(PR.c.status == "expired", PR.c.request_outcome.is_not(None), PR.c.answered_at >= since))
+            ).order_by(PR.c.id)).all()
+        return [_proposal(r) for r in rows]
 
     def pending_for(self, student_ref: str) -> list[Proposal]:
         with self.engine.connect() as conn:
