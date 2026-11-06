@@ -239,6 +239,18 @@ async def test_escalation_for_an_earlier_version_of_the_same_choice_is_taken():
             assert post(client, student, journey_id, "other", decision_version=1).status_code == 200
 
 
+@pytest.mark.asyncio
+@pytest.mark.req("R-11")
+async def test_escalation_for_a_choice_whose_field_changed_is_refused():
+    """The same places, route and intake under another field is another choice: the old escalation is stale."""
+    async with confirmed_student() as (client, student, db, journey_id):
+        with_routes(student, db)
+        await choose_with(db, student, "electrical_engineering", DETAILS)  # version 1
+        await choose_with(db, student, "computer_engineering", DETAILS)  # version 2, same places, other field
+        with handoff_on():
+            assert post(client, student, journey_id, "not_eligible", decision_version=1).status_code == 409
+
+
 async def _escalated(client, student, db, journey_id):
     with_routes(student, db)
     await choose_with(db, student, "electrical_engineering", DETAILS)

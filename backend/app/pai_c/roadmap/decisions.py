@@ -87,9 +87,9 @@ def serialize(row: RouteDecision, cards: list[dict]) -> dict:
 
 
 def choice_of(row: RouteDecision) -> tuple:
-    """What the student chose, apart from consent: route, places in order, intake."""
+    """What the student chose, apart from consent: field, route, places in order, intake."""
     intake = row.intake or None
-    return (row.origin_country, row.destination_country, row.level,
+    return (row.field_key, row.origin_country, row.destination_country, row.level,
             tuple((p["programme_ref"], p["rank"]) for p in sorted(row.places or [], key=lambda p: p["rank"])),
             None if intake is None else (intake.get("term"), intake.get("year")))
 
