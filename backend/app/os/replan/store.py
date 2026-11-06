@@ -156,38 +156,42 @@ class ProposalStore:
     def settle_requested(self, plan_id: int, applied_version: int, revision: int | None,
                          conn: Connection | None = None) -> int:
         """requested → accepted for this plan's requests whose version is now applied (D-x3). Idempotent: only a
-        `requested` row moves, so a second call changes nothing. Keeps an earlier revision when `revision` is None.
+        `requested` row moves, so a second call changes nothing. An earlier revision (the one the other ops made) is kept.
         Returns how many proposals moved."""
         q = update(PR).where(
             PR.c.tenant_id == self.tenant_id, PR.c.plan_id == plan_id, PR.c.status == "requested",
             PR.c.requested_version.is_not(None), PR.c.requested_version <= applied_version
-        ).values(status="accepted", revision=func.coalesce(revision, PR.c.revision), answered_at=func.now())
+        ).values(status="accepted", revision=func.coalesce(PR.c.revision, revision), answered_at=func.now())
         if conn is not None:
             return conn.execute(q).rowcount
         with self.engine.begin() as own:
             return own.execute(q).rowcount
 
-    def expire_requested(self, proposal_id: int, outcome: str | None) -> bool:
+    def expire_requested(self, proposal_id: int, outcome: str | None, conn: Connection | None = None) -> bool:
         """requested → expired, recording the Counsellor's answer (`stale`, `refused`). With `outcome` None (the plan
         was withdrawn or closed) the outcome stays as delivered. True if it changed."""
         values = {"status": "expired", "answered_at": func.now()}
         if outcome is not None:
             values["request_outcome"] = outcome
-        with self.engine.begin() as conn:
-            done = conn.execute(update(PR).where(PR.c.tenant_id == self.tenant_id, PR.c.id == proposal_id,
-                                                 PR.c.status == "requested").values(**values))
-        return done.rowcount == 1
+        q = update(PR).where(PR.c.tenant_id == self.tenant_id, PR.c.id == proposal_id,
+                             PR.c.status == "requested").values(**values)
+        if conn is not None:
+            return conn.execute(q).rowcount == 1
+        with self.engine.begin() as own:
+            return own.execute(q).rowcount == 1
 
-    def set_requested_version(self, proposal_id: int, version: int, outcome: str) -> bool:
+    def set_requested_version(self, proposal_id: int, version: int, outcome: str,
+                              conn: Connection | None = None) -> bool:
         """The Counsellor wrote (or already had) `version` for this request: `written` or `duplicate`. The proposal
         stays `requested` until the OS applies that version. True if it changed."""
         if outcome not in ("written", "duplicate"):
             raise ValueError(f"{outcome!r} does not write a version: stale and refused expire the proposal")
-        with self.engine.begin() as conn:
-            done = conn.execute(update(PR).where(PR.c.tenant_id == self.tenant_id, PR.c.id == proposal_id,
-                                                 PR.c.status == "requested")
-                                .values(requested_version=version, request_outcome=outcome))
-        return done.rowcount == 1
+        q = update(PR).where(PR.c.tenant_id == self.tenant_id, PR.c.id == proposal_id,
+                             PR.c.status == "requested").values(requested_version=version, request_outcome=outcome)
+        if conn is not None:
+            return conn.execute(q).rowcount == 1
+        with self.engine.begin() as own:
+            return own.execute(q).rowcount == 1
 
 
 class OverrideStore:

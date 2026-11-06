@@ -121,6 +121,21 @@ def _expire_requests(svc, plan_id: int) -> None:
             proposals.expire_requested(p.id, None)
 
 
+def _refuse_v2(svc, intake: Intake, decision: DecisionRecordV2 | DecisionRecordV1, reason: str,
+               plan_id: int | None = None) -> IntakeResult:
+    """A refusal of a version that a choice request asked for: the request can never be applied, so it ends
+    `expired` (its `request_outcome` stays as delivered) and a later consent copy cannot settle it."""
+    result = _refuse(svc, intake, reason, plan_id)
+    if isinstance(decision, DecisionRecordV2):
+        proposals = ProposalStore(svc.engine, svc.kernel.tenant_id)
+        for plan in _plans_of(svc, decision.student_ref, SOURCE):
+            for p in proposals.for_plan(plan.id):
+                if (p.status == "requested" and p.requested_version is not None
+                        and p.requested_version <= decision.decision_version):
+                    proposals.expire_requested(p.id, None)
+    return result
+
+
 def _settle_requests(svc, plan_id: int, decision: DecisionRecordV2, revision: int | None) -> None:
     ProposalStore(svc.engine, svc.kernel.tenant_id).settle_requested(plan_id, decision.decision_version, revision)
 
@@ -179,13 +194,13 @@ def process(svc, intake: Intake) -> IntakeResult:
         book = select_playbook(svc.plans.playbooks, decision.origin_country, decision.destination_country,
                                decision.level)
     except PlaybookError:
-        return _refuse(svc, intake, "route_not_supported")
+        return _refuse_v2(svc, intake, decision, "route_not_supported")
     known = {p.ref for p in ProgrammeStore(svc.engine, svc.kernel.tenant_id).active(book.key)}
     if any(p.programme_ref not in known for p in decision.programmes):
-        return _refuse(svc, intake, "unknown_programme")
+        return _refuse_v2(svc, intake, decision, "unknown_programme")
     own = [p for p in _plans_of(svc, decision.student_ref, "self_serve") if p.status in PLAN_OPEN]
     if own:
-        return _refuse(svc, intake, "self_serve_plan_open", own[-1].id)
+        return _refuse_v2(svc, intake, decision, "self_serve_plan_open", own[-1].id)
     if isinstance(decision, DecisionRecordV2):  # only the intermediate level needs the v2 contract (D-u)
         contract = decision.to_route_contract() if decision.level == "intermediate" else _v1_contract(decision)
     else:
@@ -193,7 +208,7 @@ def process(svc, intake: Intake) -> IntakeResult:
     theirs = _plans_of(svc, decision.student_ref, SOURCE)
     same = next((p for p in theirs if p.external_ref == contract.external_ref), None)
     if same is not None and same.status == PLAN_CLOSED:
-        return _refuse(svc, intake, "plan_closed", same.id)
+        return _refuse_v2(svc, intake, decision, "plan_closed", same.id)
     try:
         if same is not None:
             if same.status == "paused":  # the consent is back (P1-D11)
@@ -204,7 +219,7 @@ def process(svc, intake: Intake) -> IntakeResult:
             started = svc.plans.start_plan(contract)
             plan_id, status, revision = started.plan_id, "planned", None
     except CompileError:
-        return _refuse(svc, intake, "route_not_supported")
+        return _refuse_v2(svc, intake, decision, "route_not_supported")
     if isinstance(decision, DecisionRecordV2):  # the Counsellor's n+1 is applied: its requests are done (D-x3)
         _settle_requests(svc, plan_id, decision, revision)
     others = [p for p in theirs if p.id != plan_id and p.status in PLAN_OPEN]

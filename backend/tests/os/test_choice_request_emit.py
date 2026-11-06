@@ -479,3 +479,16 @@ def test_open_builder_request_makes_a_pending_accept_409(world):
     r = accept(world, pid)
     assert r.status_code == 409 and "request_open" in r.text
     assert world.proposal(pid).status == "pending" and len(world.requests()) == 1
+
+
+def test_non_choice_proposal_still_accepts_while_a_request_is_open(world):
+    """The request_open guard is for choice-changing accepts only: a proposal with no swap or removal still applies."""
+    template = _addable(world)
+    first = world.propose(CancelProgramme(programme_ref=FIRST, reason=WHY))
+    assert accept(world, first).json()["status"] == "requested"
+    store = world.r.proposals
+    pid = store.create(world.plan_id, [], "rules", [AddTask(template_key=template, programme_ref=None,
+                                                            reason=WHY).model_dump(mode="json")], [], True, None)
+    r = accept(world, pid)
+    assert r.status_code == 200 and r.json()["status"] == "accepted", r.text
+    assert len(world.requests()) == 1 and world.proposal(first).status == "requested"

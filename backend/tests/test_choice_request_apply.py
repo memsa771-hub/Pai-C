@@ -22,6 +22,13 @@ OTHER = ChoiceDetails(origin_country="PK", destination_country="GB", level="bach
                       authorized_at=datetime(2026, 11, 1, tzinfo=timezone.utc), consent_version="1")
 
 
+@pytest.fixture(autouse=True)
+def route_runs():
+    """The route is one PAI OS runs, unless a test patches route_supported itself (apply_choice_request asks it)."""
+    with patch("app.pai_os_bridge.route_supported", return_value=True):
+        yield
+
+
 def request(key="choice_request:7", base=1, refs=("uni-b:cs", "uni-a:cs")):
     return {"schema": "pai.choice_request.v1", "key": key, "student_ref": "x", "journey_id": "j", "proposal_id": 7,
             "based_on_version": base,
@@ -44,11 +51,11 @@ def outbox_keys(db, ws):
     return sorted(db.scalars(select(OsOutbox.key).where(OsOutbox.workspace_id == ws)))
 
 
-async def three_versions(student, db):
-    """v1 chosen, v2 consent copy, v3 consent copy: the request below is made against v1 or v3 as a test needs."""
+async def one_choice(student, db):
+    """One supported choice (version 1) with consent; each test then adds the versions it needs."""
     with_routes(student, db)
     service = RouteDecisionService(db)
-    with on(), patch("app.pai_os_bridge.route_supported", return_value=True):
+    with on():
         service.choose(student.workspace_id, "electrical_engineering", details=DETAILS)
     db.commit()
     return service
@@ -58,8 +65,8 @@ async def three_versions(student, db):
 async def test_written_when_base_current():
     async with confirmed_student() as (_, student, db, _j):
         ws = student.workspace_id
-        service = await three_versions(student, db)
-        with on(), patch("app.pai_os_bridge.route_supported", return_value=True):
+        service = await one_choice(student, db)
+        with on():
             assert service.apply_choice_request(ws, request()) == ("written", 2)
         db.commit()
         old, new = rows(db, ws)
@@ -77,7 +84,7 @@ async def test_written_when_base_current():
 async def test_consent_copy_does_not_make_stale():
     async with confirmed_student() as (_, student, db, _j):
         ws = student.workspace_id
-        service = await three_versions(student, db)
+        service = await one_choice(student, db)
         with on():
             service.update_consent(ws, authorized_at=datetime(2026, 11, 2, tzinfo=timezone.utc))
             db.commit()
@@ -91,8 +98,8 @@ async def test_consent_copy_does_not_make_stale():
 async def test_changed_places_make_stale():
     async with confirmed_student() as (_, student, db, _j):
         ws = student.workspace_id
-        service = await three_versions(student, db)
-        with on(), patch("app.pai_os_bridge.route_supported", return_value=True):
+        service = await one_choice(student, db)
+        with on():
             service.choose(ws, "electrical_engineering", details=OTHER)
             db.commit()
             before = (len(rows(db, ws)), outbox_keys(db, ws))
@@ -105,9 +112,9 @@ async def test_changed_places_make_stale():
 async def test_changed_intake_makes_stale():
     async with confirmed_student() as (_, student, db, _j):
         ws = student.workspace_id
-        service = await three_versions(student, db)
+        service = await one_choice(student, db)
         later = ChoiceDetails(**{**DETAILS.__dict__, "intake": ("autumn", 2028)})
-        with on(), patch("app.pai_os_bridge.route_supported", return_value=True):
+        with on():
             service.choose(ws, "electrical_engineering", details=later)
             db.commit()
             assert service.apply_choice_request(ws, request(base=1)) == ("stale", None)
@@ -117,7 +124,7 @@ async def test_changed_intake_makes_stale():
 async def test_withdrawn_makes_stale():
     async with confirmed_student() as (_, student, db, _j):
         ws = student.workspace_id
-        service = await three_versions(student, db)
+        service = await one_choice(student, db)
         with on():
             service.withdraw(ws)
             db.commit()
@@ -129,7 +136,7 @@ async def test_withdrawn_makes_stale():
 @pytest.mark.asyncio
 async def test_missing_base_is_stale():
     async with confirmed_student() as (_, student, db, _j):
-        service = await three_versions(student, db)
+        service = await one_choice(student, db)
         assert service.apply_choice_request(student.workspace_id, request(base=9)) == ("stale", None)
 
 
@@ -137,8 +144,8 @@ async def test_missing_base_is_stale():
 async def test_repeat_is_duplicate_not_n_plus_2():
     async with confirmed_student() as (_, student, db, _j):
         ws = student.workspace_id
-        service = await three_versions(student, db)
-        with on(), patch("app.pai_os_bridge.route_supported", return_value=True):
+        service = await one_choice(student, db)
+        with on():
             assert service.apply_choice_request(ws, request()) == ("written", 2)
             db.commit()
             count, keys = len(rows(db, ws)), outbox_keys(db, ws)
@@ -151,8 +158,8 @@ async def test_repeat_is_duplicate_not_n_plus_2():
 async def test_duplicate_wins_over_stale_after_a_later_version():
     async with confirmed_student() as (_, student, db, _j):
         ws = student.workspace_id
-        service = await three_versions(student, db)
-        with on(), patch("app.pai_os_bridge.route_supported", return_value=True):
+        service = await one_choice(student, db)
+        with on():
             service.apply_choice_request(ws, request())
             service.update_consent(ws, authorized_at=datetime(2026, 11, 3, tzinfo=timezone.utc))
             db.commit()
@@ -163,7 +170,7 @@ async def test_duplicate_wins_over_stale_after_a_later_version():
 async def test_consent_copy_does_not_carry_request_key():
     async with confirmed_student() as (_, student, db, _j):
         ws = student.workspace_id
-        service = await three_versions(student, db)
+        service = await one_choice(student, db)
         with on():
             service.apply_choice_request(ws, request())
             service.update_consent(ws, authorized_at=datetime(2026, 11, 3, tzinfo=timezone.utc))
@@ -192,9 +199,9 @@ async def test_unsupported_route_is_refused():
 async def test_intake_only_request_keeps_places():
     async with confirmed_student() as (_, student, db, _j):
         ws = student.workspace_id
-        service = await three_versions(student, db)
+        service = await one_choice(student, db)
         req = {**request(), "programmes": None, "target_intake": {"term": "spring", "year": 2028}}
-        with on(), patch("app.pai_os_bridge.route_supported", return_value=True):
+        with on():
             assert service.apply_choice_request(ws, req) == ("written", 2)
         db.commit()
         new = rows(db, ws)[-1]
@@ -207,13 +214,27 @@ async def test_no_journey_possibility_or_checkin_change():
     from app.models import StudentJourney
     async with confirmed_student() as (_, student, db, journey_id):
         ws = student.workspace_id
-        service = await three_versions(student, db)
+        service = await one_choice(student, db)
         db.expire_all()
         j = db.get(StudentJourney, journey_id)
         before = (j.current_stage, list(j.decisions or []), j.active_goal)
-        with on(), patch("app.pai_os_bridge.route_supported", return_value=True):
+        with on():
             service.apply_choice_request(ws, request())
         db.commit()
         db.expire_all()
         j = db.get(StudentJourney, journey_id)
         assert (j.current_stage, list(j.decisions or []), j.active_goal) == before
+
+
+@pytest.mark.asyncio
+async def test_os_supported_is_recomputed_not_copied():
+    """D-x4: a route PAI OS no longer runs is still written as n+1, with os_supported False."""
+    async with confirmed_student() as (_, student, db, _j):
+        ws = student.workspace_id
+        service = await one_choice(student, db)
+        assert rows(db, ws)[0].os_supported is True
+        with on(), patch("app.pai_os_bridge.route_supported", return_value=False) as check:
+            assert service.apply_choice_request(ws, request()) == ("written", 2)
+        check.assert_called_once_with("PK", "GB", "bachelor")
+        db.commit()
+        assert rows(db, ws)[-1].os_supported is False

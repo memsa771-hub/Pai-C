@@ -210,7 +210,7 @@ async def test_t6_sweep_and_roadmap_unchanged(monkeypatch):
         got = bridge.sweep_once(db)
         assert got == {"submitted": 0, "failed": 0, "sent": 0, "refused": 0, "waiting": 0}
         assert bridge.deliver_choice_requests(db) == {"written": 0, "duplicate": 0, "stale": 0, "refused": 0,
-                                                      "failed": 0}
+                                                      "failed": 0, "skipped": 0}
         assert touched.choice_pending.mock_calls == [] and touched.mark_delivery.mock_calls == []
         assert touched.submit_decision.mock_calls == [] and outbox_count(db) == 0
     expected = json.loads((Path(__file__).parent / "fixtures" / "connect" / "roadmap_pre_adapter.json").read_text())

@@ -113,29 +113,39 @@ def notify(key: str) -> None:
         log.warning("choice request hook failed (%s)", type(e).__name__)
 
 
+def is_open(key: str) -> bool:
+    """True while the request's proposal is still `requested`. A pending row whose proposal moved on (expired,
+    withdrawn plan) is not applied again."""
+    from app.os.replan.store import ProposalStore
+
+    svc = ports.services()
+    p = ProposalStore(svc.engine, svc.settings.tenant_id).get(int(key.rsplit(":", 1)[1]))
+    return p is not None and p.status == "requested"
+
+
 def mark_delivery(key: str, outcome: str, version: int | None = None) -> None:
-    """Records the decision service's answer (D-x3). `written` / `duplicate` give the proposal its `requested_version`,
-    and it is settled (`accepted`) at once if the plan has already applied that version; `stale` / `refused` expire
-    it. The outbox row is set to `sent` in every case. Safe to repeat."""
+    """Records the decision service's answer (D-x3), the proposal and the outbox row in ONE OS transaction.
+    `written` / `duplicate` give the proposal its `requested_version`, and it is settled (`accepted`) at once if the
+    plan has already applied that version; `stale` / `refused` expire it; `skipped` (its proposal is no longer
+    `requested`) touches no proposal. The outbox row is set to `sent` in every case. Safe to repeat."""
     from app.os.replan.store import ProposalStore  # late: the replan code imports this port
 
+    if outcome in ("written", "duplicate") and version is None:
+        raise ValueError("a written or duplicate request names its version")
     svc = ports.services()
     tenant = svc.settings.tenant_id
     store = ProposalStore(svc.engine, tenant)
     proposal = store.get(int(key.rsplit(":", 1)[1]))
-    if proposal is not None:
-        if outcome in ("written", "duplicate"):
-            if version is None:
-                raise ValueError("a written or duplicate request names its version")
-            store.set_requested_version(proposal.id, version, outcome)
-            with svc.engine.connect() as conn:
-                applied = decision_version_of(conn, tenant, proposal.plan_id)
-            if applied is not None and applied >= version:
-                store.settle_requested(proposal.plan_id, applied, None)
-        else:
-            store.expire_requested(proposal.id, outcome)
     O = models.outbox
     with svc.engine.begin() as conn:
+        if proposal is not None and outcome != "skipped":
+            if outcome in ("written", "duplicate"):
+                store.set_requested_version(proposal.id, version, outcome, conn=conn)
+                applied = decision_version_of(conn, tenant, proposal.plan_id)
+                if applied is not None and applied >= version:
+                    store.settle_requested(proposal.plan_id, applied, None, conn=conn)
+            else:
+                store.expire_requested(proposal.id, outcome, conn=conn)
         conn.execute(update(O).where(O.c.tenant_id == tenant, O.c.channel == CHANNEL, O.c.template == TEMPLATE,
                                      O.c.idempotency_key == key)
                      .values(status="sent", sent_at=func.now(), attempts=O.c.attempts + 1))

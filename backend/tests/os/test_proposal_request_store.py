@@ -69,6 +69,15 @@ def test_settle_keeps_an_earlier_revision_when_none_is_given(engine, clean):
     assert store.get(pid).revision == 6
 
 
+def test_settle_keeps_the_revision_the_other_ops_made(engine, clean):
+    store, pid = make(engine)
+    with engine.begin() as conn:
+        store.request(conn, pid, 6)
+    store.set_requested_version(pid, 4, "written")
+    assert store.settle_requested(store.get(pid).plan_id, 5, 9) == 1
+    assert store.get(pid).revision == 6  # the earlier value wins
+
+
 def test_expire_requested_records_outcome(engine, clean):
     store, pid = make(engine)
     assert store.expire_requested(pid, "stale") is False  # still pending: not its to expire

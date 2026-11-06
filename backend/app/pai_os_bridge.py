@@ -98,6 +98,9 @@ def _deliver_choice_request(db, request) -> str:
     pending."""
     from app.pai_c.roadmap.decisions import RouteDecisionService  # lazy: decisions.py imports this module
 
+    if not os_choice_requests.is_open(request.key):  # its proposal moved on: never applied again
+        os_choice_requests.mark_delivery(request.key, "skipped")
+        return "skipped"
     try:
         workspace_id = str(uuid.UUID(request.student_ref))
     except ValueError:
@@ -119,7 +122,7 @@ def _deliver_choice_request(db, request) -> str:
 def deliver_choice_requests(db) -> dict:
     """Delivers the pending choice requests, oldest first (P1-T6, R-07). Only while CONNECT_HANDOFF is on. One failure
     leaves its row pending and never stops the others."""
-    got = {"written": 0, "duplicate": 0, "stale": 0, "refused": 0, "failed": 0}
+    got = {"written": 0, "duplicate": 0, "stale": 0, "refused": 0, "failed": 0, "skipped": 0}
     if not choice_enabled():
         return got
     for request in os_choice_requests.pending():
@@ -283,9 +286,9 @@ def sweep_once(db) -> dict:
             if handoff:
                 try:
                     deliver_choice_requests(db)  # before the pending decisions, so n+1 goes out in this sweep
-                except Exception:  # noqa: BLE001  (logged; the decisions below still go out, and the next sweep retries)
+                except Exception as exc:  # noqa: BLE001  (class name only; the decisions below still go out)
                     db.rollback()
-                    log.exception("PAI OS sweep could not deliver choice requests")
+                    log.error("PAI OS sweep could not deliver choice requests: %s", type(exc).__name__)
             first = deliver_pending(db)
             if handoff:
                 _backfill(db)

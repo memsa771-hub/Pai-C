@@ -302,6 +302,10 @@ class RouteDecisionService:
         if not newest.os_supported:
             return "refused", "not_supported"
         values = {name: getattr(newest, name) for name in self._COPIED}
+        # D-x4: recomputed, never copied. A route PAI OS no longer runs is still written (the student's choice stands);
+        # the hand-off then closes the old plan through the unsupported path.
+        values["os_supported"] = pai_os_bridge.route_supported(
+            values["origin_country"], values["destination_country"], values["level"])
         if request.get("programmes"):
             ordered = sorted(request["programmes"], key=lambda p: p["rank"])
             values["places"] = [{"programme_ref": p["programme_ref"], "rank": i + 1} for i, p in enumerate(ordered)]

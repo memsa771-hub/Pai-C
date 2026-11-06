@@ -16,6 +16,12 @@ from app.os.adapters.counsellor.store import IntakeStore
 from app.os.outbox import Outbox
 from app.os.ports import choice_requests
 from app.os.replan import events
+from dataclasses import replace
+from datetime import datetime, timezone
+
+from sqlalchemy import text
+
+from app.os.knowledge.programmes import ProgrammeStore
 from app.os.replan.apply import Replanner, ProposalStale
 from app.os.replan.config import load_replan_configs
 from app.os.replan.ops import CancelProgramme
@@ -127,7 +133,7 @@ def test_stale_answer_expires_proposal(world):
         p = f.proposal(pid)
         assert p.status == "expired" and p.request_outcome == "stale" and p.requested_version is None
         assert f.versions() == [1, 2] and f.requests()[0].status == "sent"
-        assert f.sweep() == {"written": 0, "duplicate": 0, "stale": 0, "refused": 0, "failed": 0}
+        assert f.sweep() == {"written": 0, "duplicate": 0, "stale": 0, "refused": 0, "failed": 0, "skipped": 0}
 
 
 def test_mark_after_intake_settles_at_once(world):
@@ -163,7 +169,7 @@ def test_crash_after_app_commit_before_mark(world):
         assert f.proposal(pid).status == "accepted" and f.proposal(pid).request_outcome == "duplicate"
 
 
-def test_crash_after_mark_before_intake(world):
+def test_nothing_pending_after_mark_so_no_second_version_and_intake_settles(world):
     with flow(world) as f:
         pid = f.propose()
         f.r.accept(f.ref, pid)
@@ -206,7 +212,7 @@ def test_a_second_request_for_one_plan_comes_back_stale(world):
             f.r.accept(f.ref, first)
             f.r.accept(f.ref, second)
         assert len(f.requests()) == 2
-        assert f.sweep() == {"written": 1, "duplicate": 0, "stale": 1, "refused": 0, "failed": 0}
+        assert f.sweep() == {"written": 1, "duplicate": 0, "stale": 1, "refused": 0, "failed": 0, "skipped": 0}
         assert f.versions() == [1, 2]
         assert f.proposal(first).request_outcome == "written"
         assert f.proposal(second).status == "expired" and f.proposal(second).request_outcome == "stale"
@@ -261,3 +267,74 @@ def _pending(store, f):
     I = models.counsellor_intake
     with f.svc.engine.connect() as conn:
         return conn.execute(select(I.c.decision_id).where(I.c.student_ref == f.ref, I.c.decision_version == 2)).all()
+
+
+def retire(f, ref, status="excluded"):
+    store = ProgrammeStore(f.svc.engine, "pai")
+    store.upsert(replace(store.get(ref), status=status))
+
+
+def test_refused_version_expires_the_request_and_a_consent_copy_cannot_settle_it(world):
+    """A programme retired between accept and intake: the OS refuses n+1, the request expires (outcome as
+    delivered), a new accept is no longer blocked by request_open, and a later consent copy settles nothing."""
+    from app.pai_c.roadmap.decisions import RouteDecisionService
+
+    with flow(world) as f:
+        pid = f.propose()
+        f.r.accept(f.ref, pid)
+        assert f.sweep()["written"] == 1
+        retire(f, "ovgu-eeit")  # the one place v2 keeps
+        assert run_os(f.svc) == [("refused", "unknown_programme")]
+        p = f.proposal(pid)
+        assert p.status == "expired" and p.request_outcome == "written" and p.requested_version == 2
+        assert f.r._request_open(f.plan_id()) is False
+        retire(f, "ovgu-eeit", "active")
+        with f.who.factory() as db:
+            RouteDecisionService(db).update_consent(f.ref, authorized_at=datetime(2026, 11, 20, tzinfo=timezone.utc))
+            db.commit()
+            bridge.deliver_pending(db, f.ref)
+        assert run_os(f.svc) == [("revised", None)]  # the consent copy of v2 applies
+        assert f.proposal(pid).status == "expired"  # and does not settle the refused request
+
+
+def test_non_uuid_student_ref_is_refused_and_the_row_sent(world):
+    with flow(world) as f:
+        pid = f.propose()
+        f.r.accept(f.ref, pid)
+        with f.svc.engine.begin() as conn:
+            conn.execute(text("UPDATE os.os_outbox SET payload = jsonb_set(payload, '{student_ref}', '\"not-a-uuid\"') "
+                              "WHERE template = 'choice_request'"))
+        assert f.sweep()["refused"] == 1
+        p = f.proposal(pid)
+        assert p.status == "expired" and p.request_outcome == "refused"
+        assert f.requests()[0].status == "sent" and f.versions() == [1]
+
+
+def test_pending_row_of_a_closed_proposal_is_sent_not_applied(world):
+    with flow(world) as f:
+        pid = f.propose()
+        f.r.accept(f.ref, pid)
+        assert f.store.expire_requested(pid, None)  # the proposal moved on while its row still waits
+        assert f.sweep()["skipped"] == 1
+        assert f.versions() == [1] and f.requests()[0].status == "sent"
+        assert f.proposal(pid).status == "expired" and f.proposal(pid).request_outcome is None
+
+
+def test_mark_delivery_is_one_transaction(world):
+    with flow(world) as f:
+        pid = f.propose()
+        f.r.accept(f.ref, pid)
+        # the outbox update fails AFTER the proposal update: both roll back
+        calls = []
+
+        def boom(*a, **k):
+            calls.append(1)
+            raise RuntimeError("down")
+
+        with patch.object(choice_requests, "update", boom):
+            with pytest.raises(RuntimeError):
+                choice_requests.mark_delivery(choice_requests.key_of(pid), "stale")
+        assert calls
+        assert f.proposal(pid).status == "requested" and f.requests()[0].status == "pending"
+        choice_requests.mark_delivery(choice_requests.key_of(pid), "stale")
+        assert f.proposal(pid).status == "expired" and f.requests()[0].status == "sent"
