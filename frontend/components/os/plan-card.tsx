@@ -9,7 +9,7 @@ import { OS_UI_ENABLED } from '@/lib/config';
 import { formatDue, isNotice, isWaiting, type OsInboxItem } from '@/lib/os-inbox';
 import { useT } from '@/lib/i18n';
 import type { Adoption } from '@/lib/os-connect';
-import { AdoptionOffer } from '@/components/os/adoption-offer';
+import { AdoptionOffer, adoptionShows } from '@/components/os/adoption-offer';
 
 /** The study abroad plan on the counsellor's Journey page (pai-merge hand test: the journey said "Stage B, 1 of 11"
  * while a full plan ran beside it, unmentioned). The plan's own next step and how many are open, in one card; the
@@ -35,7 +35,7 @@ function OsPlanCardShown() {
   }, []);
   const open = (items ?? []).filter((i) => !isWaiting(i) && !isNotice(i));
   const offer = <AdoptionOffer adoption={adoption} />;
-  if (!items || !workspaceId || (items.length === 0)) return adoption?.offer ? offer : null;
+  if (!items || !workspaceId || (items.length === 0)) return adoptionShows(adoption) ? offer : null;
   const next = [...open].sort((a, b) => (a.due_at ?? '9').localeCompare(b.due_at ?? '9'))[0];
   return (
     <>

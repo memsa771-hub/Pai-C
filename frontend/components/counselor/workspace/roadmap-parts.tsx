@@ -333,6 +333,7 @@ export function YourRoute({ route, onWithdrawn, onTicked, onChat }: {
   const [error, setError] = useState(false), [confirming, setConfirming] = useState(false), [busy, setBusy] = useState(false),
     [savingView, setSavingView] = useState(false), [familyOpen, setFamilyOpen] = useState(false);
   const saving = useRef(false);
+  const confirmRef = useRef<HTMLDivElement>(null);
   const [osSaving, setOsSaving] = useState<string | null>(null);
   useEffect(() => { setSteps(route.steps); setChoice(route.choice ?? null); }, [route]);
   // One save at a time: the ticks are disabled while one is saving, so a
@@ -396,7 +397,7 @@ export function YourRoute({ route, onWithdrawn, onTicked, onChat }: {
             <Info aria-hidden className="mt-0.5 size-4 shrink-0" />{t.route.unsupported}
           </p>
         )}
-        <PlanBanner plan={route.plan} onChange={() => setConfirming(true)} />
+        <PlanBanner plan={route.plan} onChange={() => { setConfirming(true); setTimeout(() => { confirmRef.current?.focus(); confirmRef.current?.scrollIntoView?.({ block: "center" }); }, 0); }} />
         <ul aria-label={t.steps.title} className="divide-y divide-border/70">
           {steps.map((step) => {
             const label = stepLabel(step);
@@ -420,7 +421,7 @@ export function YourRoute({ route, onWithdrawn, onTicked, onChat }: {
         {error && <p role="alert" className="mt-2 text-sm font-medium text-danger-ink">{t.error}</p>}
         {choice && <ConsentPanel choice={choice} onChange={setChoice} />}
         {confirming ? (
-          <div className="mt-4 rounded-2xl bg-background p-4 ring-1 ring-border">
+          <div ref={confirmRef} tabIndex={-1} className="mt-4 rounded-2xl bg-background p-4 ring-1 ring-border">
             <p className="text-sm">{fill(t.route.changeConfirm, { title: route.title })}</p>
             <div className="mt-3 flex flex-wrap gap-2">
               <Button size="tap" variant="destructive" disabled={busy} onClick={withdraw}>{t.route.changeYes}</Button>

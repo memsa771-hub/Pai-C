@@ -956,6 +956,7 @@
       "unavailable": "PAI cannot take this right now. Please try again in a few minutes."
     },
     "change": {
+      "refused": "The Counsellor could not take that change. Your plan stays as it is.",
       "sent_title": "Changes waiting for an answer",
       "requested": "Your change was sent. It will show here once it is done.",
       "request_open": "A change is already waiting. Wait for it to finish before asking for another."

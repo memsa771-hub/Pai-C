@@ -93,4 +93,25 @@ describe('plan card adoption offer', () => {
     expect((await screen.findByRole('alert')).textContent).toBe(copy.connect.adoption.plan_changed);
     expect(screen.getByRole('button', { name: TEXT.agree })).toBeTruthy();
   });
+
+  it.each(['choose_field_first', 'too_many_places'] as const)('state %s shows its text and no button', async (state) => {
+    setup(offer({ state }));
+    show();
+    expect(await screen.findByText(TEXT[state])).toBeTruthy();
+    expect(screen.queryByRole('button', { name: TEXT.agree })).toBeNull();
+  });
+
+  it('an unknown state renders no empty card', async () => {
+    setup(offer({ state: 'something_new' }));
+    show();
+    await screen.findByText(/Collect transcripts/);
+    expect(document.querySelectorAll('section').length).toBe(1);  // only the plan card itself
+  });
+
+  it.each(['several_plans', 'no_places', 'no_intake'] as const)('offer false with %s says why', async (state) => {
+    setup({ offer: false, state });
+    show();
+    expect(await screen.findByText((copy.connect.adoption as Record<string, string>)[state])).toBeTruthy();
+    expect(screen.queryByRole('button', { name: TEXT.agree })).toBeNull();
+  });
 });

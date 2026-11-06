@@ -32,10 +32,15 @@ export default function OsInboxPage({ params }: { params: Promise<{ workspaceId:
   const [info, setInfo] = useState<string | null>(null);
 
   const load = useCallback(async () => {
-    try {
-      setItems(await workspaceApi.getOsInbox());
+    let notesFound: OsNote[] = [];
+    try {  // one request feeds the steps, the eligibility notes and the suggestions sent to the Counsellor
+      const inbox = await workspaceApi.getOsInboxAll();
+      setItems(inbox.items);
+      setSent(inbox.proposals.filter((p) => p.status === 'requested' || p.status === 'expired'));
+      notesFound = inbox.notes;
       setError(null);
     } catch {
+      setSent([]);
       setError('Could not load your next steps. Please try again.');
     }
     try {  // Slice 7: suggested changes and what changed (extra: the inbox works without them)
@@ -44,12 +49,6 @@ export default function OsInboxPage({ params }: { params: Promise<{ workspaceId:
       setNames((n) => ({ ...(got.names ?? {}), ...n }));  // a removed programme keeps its name in "What changed"
     } catch {
       setChanges(null);
-    }
-    try {  // P1-T6: requested and recently expired proposals, shown without buttons (extra, like the notes)
-      const all = await workspaceApi.getOsInboxProposals();
-      setSent(all.filter((p) => p.status === 'requested' || p.status === 'expired'));
-    } catch {
-      setSent([]);
     }
     let years: number[] = [];
     try {  // the fact labels are extra: the inbox works without them
@@ -61,7 +60,7 @@ export default function OsInboxPage({ params }: { params: Promise<{ workspaceId:
       setFactStatus({});
     }
     try {  // Slice 4: eligibility changes, and the names of the programmes they suggest
-      const found = await workspaceApi.getOsInboxNotes();
+      const found = notesFound;
       setNotes(found);
       if (found.some((n) => n.payload.suggestions.length > 0) && years.length > 0) {
         const routes = await workspaceApi.getOsRoutes();
@@ -97,6 +96,7 @@ export default function OsInboxPage({ params }: { params: Promise<{ workspaceId:
   };
 
   const swap = async (note: OsNote, inRef: string) => {
+    setInfo(null);
     const planId = note.payload.plan_id;
     if (planId === undefined) return;
     // The student's OK first (spec S4-D5): a swap removes the steps not yet started for the old programme.
@@ -110,9 +110,11 @@ export default function OsInboxPage({ params }: { params: Promise<{ workspaceId:
     } catch (e) {
       const refusal = changeMessage(undefined, e, copy.connect);
       if (refusal) {
+        setInfo(null);
         setError(refusal.text);
         return;
       }
+      setInfo(null);
       const msg = e instanceof Error ? e.message : '';
       const detail = msg.match(/"detail":"([^"]+)"/)?.[1];
       setError(detail ? `That swap could not be made: ${detail}.` : 'That swap did not go through. Please try again.');
@@ -121,10 +123,13 @@ export default function OsInboxPage({ params }: { params: Promise<{ workspaceId:
 
   const answer = async (id: number, accept: boolean) => {
     setBusyId(-id);
+    setInfo(null);
     try {
-      await (accept ? workspaceApi.acceptOsProposal(id) : workspaceApi.declineOsProposal(id));
+      const done = await (accept ? workspaceApi.acceptOsProposal(id) : workspaceApi.declineOsProposal(id));
       await load();
+      if (done.status === 'refused') setError(copy.connect.change.refused);  // not silent: the card is gone from the list
     } catch (e) {
+      setInfo(null);
       const msg = e instanceof Error ? e.message : '';
       const detail = msg.match(/"detail":"([^"]+)"/)?.[1];
       setError(detail ? `That could not be done: ${detail}.` : 'That did not save. Please try again.');

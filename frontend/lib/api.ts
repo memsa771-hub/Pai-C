@@ -278,6 +278,13 @@ class WorkspaceApi {
   // PAI OS self-serve start and eligibility (Slice 4 spec §4)
   // ---------------------------------------------------------------------------
 
+  /** PAI OS: the whole inbox in one request: items, eligibility notes and suggestions (P1-T6 fix: one GET, not three). */
+  async getOsInboxAll(): Promise<{ items: import('./os-inbox').OsInboxItem[]; notes: import('./os-self-serve').OsNote[]; proposals: import('./os-replan').OsProposal[] }> {
+    const params = new URLSearchParams({ network: this.requireWorkspace() });
+    const body = await this.requestJson<{ items: import('./os-inbox').OsInboxItem[]; notes?: import('./os-self-serve').OsNote[]; proposals?: import('./os-replan').OsProposal[] }>(`/v1/os/inbox?${params}`);
+    return { items: body.items, notes: body.notes ?? [], proposals: body.proposals ?? [] };
+  }
+
   /** PAI OS: the suggestions in the inbox, requested ones and recently expired requests included (P1-T6). */
   async getOsInboxProposals(): Promise<import('./os-replan').OsProposal[]> {
     const params = new URLSearchParams({ network: this.requireWorkspace() });

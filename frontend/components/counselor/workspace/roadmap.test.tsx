@@ -586,7 +586,8 @@ it("PlanBanner shows reason_text and one action that opens change route", async 
   const buttons = within(banner).getAllByRole("button");
   expect(buttons.length).toBe(1);
   fireEvent.click(buttons[0]);
-  expect(await screen.findByRole("button", { name: copy.roadmap.route.changeYes })).toBeTruthy();
+  const yes = await screen.findByRole("button", { name: copy.roadmap.route.changeYes });
+  await waitFor(() => expect(document.activeElement).toBe(yes.parentElement?.parentElement));  // focus moves to the confirm
 });
 
 // req: R-11
