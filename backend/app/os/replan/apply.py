@@ -5,13 +5,12 @@ One plan's replans and the student's answers run one at a time (a per-plan advis
 the proposal, and a proposal by its event, so a repeated step or workflow finds its work already done (invariant 8).
 """
 
-from collections.abc import Callable, Iterator, Mapping
-from contextlib import contextmanager
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 
 from pydantic import TypeAdapter
-from sqlalchemy import Engine, func, select, text
+from sqlalchemy import Engine, func, select
 
 from app.os import models
 from app.os import clock as shared_clock
@@ -370,12 +369,19 @@ class Replanner:
             with self.engine.connect() as conn:
                 to_counsellor = any(isinstance(op, (SwapProgramme, CancelProgramme)) for op in ops) \
                     and choice_requests.applies(conn, self.tenant, p.plan_id)
+            if to_counsellor and self._request_open(p.plan_id):  # one change with the Counsellor at a time (the builder
+                raise ProposalStale("request_open")  # answers the same code)
             try:
                 if to_counsellor:
                     return self._request_choice(p, ops)
                 return self.apply(p.id, "accepted")
             except ReplanFailed as e:
                 raise ProposalStale(f"your plan changed since this was suggested ({e})") from None
+
+    def _request_open(self, plan_id: int) -> bool:
+        """True while a choice request of this plan is with the Counsellor (a `requested` proposal). Called under the
+        plan lock."""
+        return any(x.status == "requested" for x in self.proposals.for_plan(plan_id))
 
     def _request_choice(self, p, ops: list[Op]) -> int | None:
         """A choice change on a Counsellor plan is never applied here (R-07): the other operations apply now (D-x2),

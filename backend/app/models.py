@@ -806,9 +806,15 @@ class RouteDecision(Base):
     guardian_required = Column(Boolean, nullable=False, default=False, server_default=text("false"))
     # The consent text version the student agreed to with `authorized_at` (R-10); None while consent is missing.
     consent_version = Column(Text, nullable=True)
+    # The OS choice request that made this version (`choice_request:{proposal_id}`); None for every other version and
+    # never copied by a consent change (P1-T6, R-07).
+    request_key = Column(Text, nullable=True)
 
     __table_args__ = (
         Index("uq_route_decision_version", "workspace_id", "decision_version", unique=True),
+        Index("uq_route_decision_request_key", "workspace_id", "request_key", unique=True,
+              postgresql_where=text("request_key IS NOT NULL"),
+              sqlite_where=text("request_key IS NOT NULL")),
         Index("uq_route_decision_active", "workspace_id", unique=True,
               postgresql_where=text("withdrawn_at IS NULL"),
               sqlite_where=text("withdrawn_at IS NULL")),

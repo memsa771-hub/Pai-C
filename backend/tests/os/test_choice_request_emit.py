@@ -450,6 +450,8 @@ def test_zero_places_through_the_route(world, monkeypatch):
         c = dict(world.plan().contract)
         c["programmes"] = [{"programme_ref": FIRST, "rank": 1}]
         conn.execute(update(P).where(P.c.id == world.plan_id).values(contract=c))
+    # The check stub makes the zero-places branch reachable: the real checks refuse dropping the last place earlier.
+    # The branch itself is a defensive R-22 guard (dropping every place is an escalation, never a choice request).
     monkeypatch.setattr(Replanner, "check", lambda self, plan_id, ops: (ops, []))  # the plan checks are not the subject
     r = accept(world, pid)
     assert r.status_code == 200 and r.json()["status"] == "refused"
@@ -457,3 +459,23 @@ def test_zero_places_through_the_route(world, monkeypatch):
     assert accept(world, pid).status_code == 409  # no second case
     with world.engine.connect() as conn:
         assert conn.execute(select(func.count()).select_from(models.support_cases)).scalar() == 1
+
+
+def test_builder_places_exclude_programmes_cancelled_by_override(world):
+    pid = world.propose(SwapProgramme(out_ref=SECOND, in_ref=THIRD, reason=WHY))
+    world.r.overrides.add(world.plan_id, pid, "cancel_programme", FIRST, {})  # an earlier proposal dropped FIRST
+    r = world.client.post(f"/v1/os/plans/{world.plan_id}/swap", json=swap_body(SECOND, THIRD), headers=ME)
+    assert r.status_code == 202, r.text
+    req = ChoiceRequestV1.model_validate(world.requests()[0].payload)
+    assert [(c.programme_ref, c.rank) for c in req.programmes] == [(THIRD, 1)]
+
+
+def test_open_builder_request_makes_a_pending_accept_409(world):
+    """Carried from the Task 2 review: the accept path refuses a choice change while the plan already has a request
+    with the Counsellor, as the builder does (`request_open`), and writes no second outbox row."""
+    pid = world.propose(SwapProgramme(out_ref=SECOND, in_ref=THIRD, reason=WHY))
+    first = world.client.delete(f"/v1/os/plans/{world.plan_id}/programmes/{SECOND}", headers=ME)
+    assert first.status_code == 202
+    r = accept(world, pid)
+    assert r.status_code == 409 and "request_open" in r.text
+    assert world.proposal(pid).status == "pending" and len(world.requests()) == 1

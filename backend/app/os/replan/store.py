@@ -167,13 +167,15 @@ class ProposalStore:
         with self.engine.begin() as own:
             return own.execute(q).rowcount
 
-    def expire_requested(self, proposal_id: int, outcome: str) -> bool:
-        """requested → expired, recording the Counsellor's answer (`stale`, `refused`) or the reason it ended.
-        True if it changed."""
+    def expire_requested(self, proposal_id: int, outcome: str | None) -> bool:
+        """requested → expired, recording the Counsellor's answer (`stale`, `refused`). With `outcome` None (the plan
+        was withdrawn or closed) the outcome stays as delivered. True if it changed."""
+        values = {"status": "expired", "answered_at": func.now()}
+        if outcome is not None:
+            values["request_outcome"] = outcome
         with self.engine.begin() as conn:
             done = conn.execute(update(PR).where(PR.c.tenant_id == self.tenant_id, PR.c.id == proposal_id,
-                                                 PR.c.status == "requested")
-                                .values(status="expired", request_outcome=outcome, answered_at=func.now()))
+                                                 PR.c.status == "requested").values(**values))
         return done.rowcount == 1
 
     def set_requested_version(self, proposal_id: int, version: int, outcome: str) -> bool:

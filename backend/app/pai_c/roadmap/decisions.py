@@ -271,6 +271,51 @@ class RouteDecisionService:
         with plan_adapter.pinned_read(new):
             return plan_adapter.chosen(new, RoadmapEngine(self.db).build(workspace_id)["fields"])
 
+    @staticmethod
+    def _choice_of(row: RouteDecision) -> tuple:
+        """What a choice request is checked against: refs in order, intake, destination, level and field."""
+        refs = tuple(p["programme_ref"] for p in sorted(row.places or [], key=lambda p: p["rank"]))
+        intake = (row.intake["term"], row.intake["year"]) if row.intake else None
+        return refs, intake, row.destination_country, row.level, row.field_key
+
+    def apply_choice_request(self, workspace_id: str, request: dict) -> tuple[str, "int | None | str"]:
+        """Writes an accepted PAI OS choice request (`choice_request.v1`, R-07) as the next decision version, once, and
+        only while the choice it was made against is still the newest. Returns `("written", n+1)`,
+        `("duplicate", version)` for a request already written (its key is on a row; asked FIRST, so a repeat after
+        n+1 never reads as stale), `("stale", None)` and `("refused", code)` (`no_decision`, `not_supported`).
+        A consent copy in between does not make a request stale. Like `update_consent` it makes no journey,
+        possibility or check-in change. No commit: the caller commits, then delivers the outbox row."""
+        self._lock(workspace_id)
+        key = request["key"]
+        done = self.db.scalar(select(RouteDecision).where(RouteDecision.workspace_id == workspace_id,
+                                                          RouteDecision.request_key == key))
+        if done is not None:
+            return "duplicate", done.decision_version
+        newest = self.newest(workspace_id)
+        if newest is None:
+            return "refused", "no_decision"
+        base = self.db.scalar(select(RouteDecision).where(
+            RouteDecision.workspace_id == workspace_id, RouteDecision.decision_version == request["based_on_version"]))
+        if (base is None or newest.status != "chosen" or newest.withdrawn_at is not None
+                or self._choice_of(base) != self._choice_of(newest)):
+            return "stale", None
+        if not newest.os_supported:
+            return "refused", "not_supported"
+        values = {name: getattr(newest, name) for name in self._COPIED}
+        if request.get("programmes"):
+            ordered = sorted(request["programmes"], key=lambda p: p["rank"])
+            values["places"] = [{"programme_ref": p["programme_ref"], "rank": i + 1} for i, p in enumerate(ordered)]
+        if request.get("target_intake"):
+            values["intake"] = {"term": request["target_intake"]["term"], "year": request["target_intake"]["year"]}
+        newest.withdrawn_at = datetime.now(timezone.utc)
+        self.db.flush()  # the old row leaves the partial unique index before the new one enters
+        new = RouteDecision(workspace_id=workspace_id, decision_version=self._next_version(workspace_id),
+                            status="chosen", request_key=key, **values)
+        self.db.add(new)
+        self.db.flush()
+        outbox.record(self.db, new)
+        return "written", new.decision_version
+
     def set_step(self, workspace_id: str, done: bool, *, key: str | None = None, index: int | None = None,
                  is_human=None) -> dict:
         """Tick or untick one step of the live route, named by its key (or,

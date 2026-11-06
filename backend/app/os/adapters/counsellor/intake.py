@@ -20,6 +20,7 @@ from app.os.kernel import StaleDraft
 from app.os.kernel.states import PLAN_CLOSED, PLAN_OPEN
 from app.os.knowledge.programmes import ProgrammeStore
 from app.os.playbooks import PlaybookError, select_playbook
+from app.os.replan.store import ProposalStore
 
 REFUSALS = ("not_authorized", "invalid_export", "route_not_supported", "unknown_programme", "self_serve_plan_open",
             "plan_closed")
@@ -81,15 +82,14 @@ def _intake_event(svc, plan_id: int, intake: Intake, reason: str) -> int:
             payload={"decision_id": intake.decision_id, "refused": reason}).returning(E.c.id)).scalar_one()
 
 
-def _revise(svc, plan_id: int, contract: RouteContract | RouteContractV2, cause: str) -> None:
+def _revise(svc, plan_id: int, contract: RouteContract | RouteContractV2, cause: str) -> int | None:
     """The same route with new places, order or intake: the plan's contract changes as a revision (like a Slice 4
     swap); started and done tasks are kept by the kernel's revision rules."""
     for _ in range(3):
         _, sha = svc.plans._contract(plan_id)
         draft = svc.plans.compile(contract, svc.plans._pinned(plan_id), plan_id)
         try:
-            svc.kernel.change_contract(plan_id, contract, draft, cause, based_on=sha)
-            return
+            return svc.kernel.change_contract(plan_id, contract, draft, cause, based_on=sha)
         except StaleDraft:
             continue
     raise StaleDraft(f"plan {plan_id} kept changing during the Counsellor revision")
@@ -109,7 +109,20 @@ def _close_all(svc, decision: DecisionRecordV2, cause: str, status: str) -> Inta
     closed = [p.id for p in _plans_of(svc, decision.student_ref, SOURCE) if p.status in PLAN_OPEN]
     for plan_id in closed:
         svc.kernel.close_plan(plan_id, f"{cause}:{decision.decision_id}")
+        _expire_requests(svc, plan_id)
     return IntakeResult(status, None, closed[-1] if closed else None)
+
+
+def _expire_requests(svc, plan_id: int) -> None:
+    """A plan that ended while a choice request of it was `requested`: the request cannot be applied (D-x3)."""
+    proposals = ProposalStore(svc.engine, svc.kernel.tenant_id)
+    for p in proposals.for_plan(plan_id):
+        if p.status == "requested":
+            proposals.expire_requested(p.id, None)
+
+
+def _settle_requests(svc, plan_id: int, decision: DecisionRecordV2, revision: int | None) -> None:
+    ProposalStore(svc.engine, svc.kernel.tenant_id).settle_requested(plan_id, decision.decision_version, revision)
 
 
 def _withdraw(svc, decision: DecisionRecordV2) -> IntakeResult:
@@ -185,13 +198,17 @@ def process(svc, intake: Intake) -> IntakeResult:
         if same is not None:
             if same.status == "paused":  # the consent is back (P1-D11)
                 svc.kernel.resume_plan(same.id)
-            _revise(svc, same.id, contract, f"counsellor:{decision.decision_id}")
+            revision = _revise(svc, same.id, contract, f"counsellor:{decision.decision_id}")
             plan_id, status = same.id, "revised"
         else:
-            plan_id, status = svc.plans.start_plan(contract).plan_id, "planned"
+            started = svc.plans.start_plan(contract)
+            plan_id, status, revision = started.plan_id, "planned", None
     except CompileError:
         return _refuse(svc, intake, "route_not_supported")
+    if isinstance(decision, DecisionRecordV2):  # the Counsellor's n+1 is applied: its requests are done (D-x3)
+        _settle_requests(svc, plan_id, decision, revision)
     others = [p for p in theirs if p.id != plan_id and p.status in PLAN_OPEN]
     for p in others:  # a new country or level: the old route's plan is over (S8-D8)
         svc.kernel.close_plan(p.id, f"superseded:{plan_id}")
+        _expire_requests(svc, p.id)
     return IntakeResult("replaced" if others else status, None, plan_id)

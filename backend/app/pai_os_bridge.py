@@ -28,6 +28,7 @@ from app.config import config
 # (`pai_route_decisions`), which has the same id / workspace_id / chosen_at the sweep reads.
 from app.models import OsOutbox, RouteDecision, User, VaultVersion, Workspace
 from app.os import ports
+from app.os.ports import choice_requests as os_choice_requests
 from app.os.ports import escalation as os_escalation
 from app.os.ports import os_events as os_events_port
 from app.os.contracts.decision_record_v2 import DecisionRecordV2
@@ -82,6 +83,68 @@ def deliver_pending(db, workspace_id: str | None = None) -> dict:
         db.commit()
         got["delivered"] += 1
     return got
+
+
+def choice_enabled() -> bool:
+    """True when the OS may send choice requests to the Counsellor: the hand-off part is on (P1-T6, R-07). The OS reads
+    it through `mount_os(choice_enabled=)`; it cannot read host flags itself."""
+    return part_on("CONNECT_HANDOFF")
+
+
+def _deliver_choice_request(db, request) -> str:
+    """Hands one choice request to the decision service and marks the answer on the OS side. The app transaction
+    commits first, then the new version goes to the OS, then the OS is told (a crash in between repeats harmlessly:
+    the request key makes the repeat a `duplicate`). Returns the outcome; an exception rolls back and leaves the row
+    pending."""
+    from app.pai_c.roadmap.decisions import RouteDecisionService  # lazy: decisions.py imports this module
+
+    try:
+        workspace_id = str(uuid.UUID(request.student_ref))
+    except ValueError:
+        outcome, detail = "refused", "no_decision"
+    else:
+        try:
+            outcome, detail = RouteDecisionService(db).apply_choice_request(
+                workspace_id, request.model_dump(mode="json", by_alias=True))
+            db.commit()
+        except Exception:
+            db.rollback()
+            raise
+        if outcome in ("written", "duplicate"):
+            deliver_pending(db, workspace_id)
+    os_choice_requests.mark_delivery(request.key, outcome, detail if outcome in ("written", "duplicate") else None)
+    return outcome
+
+
+def deliver_choice_requests(db) -> dict:
+    """Delivers the pending choice requests, oldest first (P1-T6, R-07). Only while CONNECT_HANDOFF is on. One failure
+    leaves its row pending and never stops the others."""
+    got = {"written": 0, "duplicate": 0, "stale": 0, "refused": 0, "failed": 0}
+    if not choice_enabled():
+        return got
+    for request in os_choice_requests.pending():
+        try:
+            got[_deliver_choice_request(db, request)] += 1
+        except ports.OsUnavailable:
+            break
+        except Exception as exc:  # noqa: BLE001  (class name only, no student data; the next sweep tries again)
+            log.error("PAI OS choice request could not be delivered: %s", type(exc).__name__)
+            got["failed"] += 1
+    return got
+
+
+def deliver_choice_request_now(key: str) -> None:
+    """The post-commit nudge after the student accepted (`mount_os(on_choice_request=)`): delivers that one request
+    in its own session, so the decision does not wait for the sweep. Never raises past the OS port's guard."""
+    if not choice_enabled():
+        return
+    from app.database import new_session
+
+    request = next((r for r in os_choice_requests.pending() if r.key == key), None)
+    if request is None:
+        return
+    with new_session() as db:
+        _deliver_choice_request(db, request)
 
 
 def _backfill(db) -> None:
@@ -217,6 +280,8 @@ def sweep_once(db) -> dict:
     try:
         handoff, facts = part_on("CONNECT_HANDOFF"), part_on("CONNECT_STUDENT_FACTS")
         if handoff or facts:
+            if handoff:
+                deliver_choice_requests(db)  # before the pending decisions, so n+1 goes out in this sweep
             first = deliver_pending(db)
             if handoff:
                 _backfill(db)

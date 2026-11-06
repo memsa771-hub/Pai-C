@@ -12,7 +12,7 @@ import logging
 from collections.abc import Callable, Sequence
 from datetime import datetime
 
-from sqlalchemy import Connection, func, select
+from sqlalchemy import Connection, func, select, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from app.os import clock, models, ports
@@ -111,3 +111,31 @@ def notify(key: str) -> None:
         _on_request(key)
     except Exception as e:
         log.warning("choice request hook failed (%s)", type(e).__name__)
+
+
+def mark_delivery(key: str, outcome: str, version: int | None = None) -> None:
+    """Records the decision service's answer (D-x3). `written` / `duplicate` give the proposal its `requested_version`,
+    and it is settled (`accepted`) at once if the plan has already applied that version; `stale` / `refused` expire
+    it. The outbox row is set to `sent` in every case. Safe to repeat."""
+    from app.os.replan.store import ProposalStore  # late: the replan code imports this port
+
+    svc = ports.services()
+    tenant = svc.settings.tenant_id
+    store = ProposalStore(svc.engine, tenant)
+    proposal = store.get(int(key.rsplit(":", 1)[1]))
+    if proposal is not None:
+        if outcome in ("written", "duplicate"):
+            if version is None:
+                raise ValueError("a written or duplicate request names its version")
+            store.set_requested_version(proposal.id, version, outcome)
+            with svc.engine.connect() as conn:
+                applied = decision_version_of(conn, tenant, proposal.plan_id)
+            if applied is not None and applied >= version:
+                store.settle_requested(proposal.plan_id, applied, None)
+        else:
+            store.expire_requested(proposal.id, outcome)
+    O = models.outbox
+    with svc.engine.begin() as conn:
+        conn.execute(update(O).where(O.c.tenant_id == tenant, O.c.channel == CHANNEL, O.c.template == TEMPLATE,
+                                     O.c.idempotency_key == key)
+                     .values(status="sent", sent_at=func.now(), attempts=O.c.attempts + 1))
