@@ -127,7 +127,7 @@ def build_plan_view(svc: Any, student_ref: str) -> PlanViewV1:
                                               c["target_intake"])
     except (KeyError, TypeError) as e:
         raise ValueError(f"plan {plan.id} has a contract without its route") from e
-    if pin is None:  # no pin: the playbook this route runs on
+    if pin is None:  # no pin: the playbook this route runs on (legacy: pins are written at compile, so this takes the newest version)
         try:
             book = select_playbook(svc.plans.playbooks, origin, destination, level)
         except PlaybookError as e:

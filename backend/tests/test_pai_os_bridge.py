@@ -280,3 +280,32 @@ def test_a_plan_that_was_not_paused_is_logged_not_retried(student, os_stub, acti
     assert got["sent"] == 1 and len(calls) == 1 and os_stub["marked"] == [("escalation:7", "sent", None)]
     assert any("was not paused" in r.getMessage() and "other" in r.getMessage() for r in caplog.records)
     assert student.workspace_id not in caplog.text
+
+
+@pytest.mark.parametrize("module,flag,expected", [(False, False, False), (True, False, False), (False, True, False),
+                                                  (True, True, True)])
+def test_my_plan_enabled_needs_module_and_flag(module, flag, expected):
+    """P1-T9 (R-53): the OS gate is the CONNECT_MY_PLAN part, which needs the counsellor module as well."""
+    with patch.object(bridge, "counsellor_module_on", lambda: module), \
+            patch.object(config, "CONNECT_MY_PLAN", flag, create=True):
+        assert bridge.my_plan_enabled() is expected
+
+
+def test_mount_passes_my_plan_gate():
+    import inspect
+
+    from fastapi import FastAPI
+
+    from app import main
+    from app.os.api import mount_os
+    from app.os.ports import my_plan
+
+    env = {"DATABASE_URL": "postgresql://x/y", "OS_ENABLED": "true", "OS_ADMIN_TOKEN": "t"}
+    try:
+        assert mount_os(FastAPI(), env=env, my_plan_enabled=lambda: True)
+        assert my_plan.enabled() is True
+        assert mount_os(FastAPI(), env=env)
+        assert my_plan.enabled() is False  # not handed in: off
+    finally:
+        ports.configure(None)
+    assert "my_plan_enabled=my_plan_enabled" in inspect.getsource(main)  # the host hands in its own gate
