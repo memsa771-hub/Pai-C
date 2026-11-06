@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 import type { ReactElement } from 'react';
 import copy from '@/components/counselor/workspace/copy.json';
-import { factLevel, stepLevel, checkedOn, type MyPlan } from '@/lib/os-my-plan';
+import { factLevel, stepLevel, checkedOn, sourceLevel, type MyPlan } from '@/lib/os-my-plan';
 import type { OsInboxItem } from '@/lib/os-inbox';
 import type { OsPack } from '@/lib/os-packs';
 import type { OsCard } from '@/lib/os-self-serve';
@@ -13,6 +13,7 @@ import { InboxList } from './inbox-list';
 import { PackView } from './pack';
 import { VisaFunds } from './visa-funds';
 import { EligibilityCard } from './eligibility-card';
+import { StepMeta } from '@/components/counselor/workspace/roadmap-steps';
 
 const L = copy.connect.myPlan.levels;
 const noop = () => {};
@@ -76,7 +77,7 @@ describe('levels and dates (R-54)', () => {
   it('confirmed fact shows Confirmed, date and source', () => {
     const html = on(<FactSource level="confirmed" url="https://a.example/x" />);
     expect(html).toContain(L.confirmed);
-    expect(html).toContain('Checked 17 Oct 2026');
+    expect(html).toContain('Checked Oct 17, 2026');
     expect(html).toContain('href="https://a.example/x"');
     expect(html).toContain('rel="noopener noreferrer"');
   });
@@ -85,6 +86,29 @@ describe('levels and dates (R-54)', () => {
     const html = on(<FactSource level="not_confirmed" url="https://zzz.example/q" />);
     expect(html).toContain(copy.connect.myPlan.checkedUnknown);
     expect(html).not.toContain('Checked ');
+  });
+
+  it('no source or an unknown source is never Confirmed (absent is not confirmed)', () => {
+    expect(sourceLevel(PLAN, null, 'confirmed')).toBe('not_confirmed');
+    expect(sourceLevel(PLAN, '', 'confirmed')).toBe('not_confirmed');
+    expect(sourceLevel(PLAN, 'https://zzz.example/q', 'confirmed')).toBe('not_confirmed');
+    expect(sourceLevel(PLAN, 'https://a.example/x', 'confirmed')).toBe('confirmed');
+    expect(sourceLevel(PLAN, null, 'estimated')).toBe('estimated');
+    const html = on(<FactSource level="confirmed" url="https://zzz.example/q" />);
+    expect(html).not.toContain(`>${L.confirmed}<`);
+    expect(html).toContain(L.not_confirmed);
+  });
+
+  it('pack steps and fees without a source are not Confirmed; a firm inbox date without a citation is not Confirmed', () => {
+    const p = pack({ instructions: [{ n: 1, text: 'Do it.', source_url: null, unconfirmed: [] }], fees: [] });
+    expect(on(packView(p))).not.toContain(`>${L.confirmed}<`);
+    const html = on(<InboxList items={[item({ citations: [] })]} now={new Date('2026-11-06T00:00:00Z')} onComplete={noop} />);
+    expect(html).toContain(L.not_confirmed);
+    expect(html).not.toContain(`>${L.confirmed}<`);
+  });
+
+  it('the source link names its host', () => {
+    expect(on(<FactSource level="confirmed" url="https://a.example/x" />)).toContain('aria-label="Source: a.example"');
   });
 
   it('a source the endpoint marks not confirmed is never shown as confirmed', () => {
@@ -99,20 +123,20 @@ describe('surfaces with My plan on (R-54)', () => {
   it('unconfirmed programme fact shows Not confirmed, its checked date and source', () => {
     const html = on(<ProgrammeFacts programmes={prog([fact({ status: 'unconfirmed', source_url: 'https://zzz.example/q' })])} />);
     expect(html).toContain(L.not_confirmed);
-    expect(html).toContain('Checked 12 Oct 2026');  // the fact's own date: the endpoint has none for this url
+    expect(html).toContain('Checked Oct 12, 2026');  // the fact's own date: the endpoint has none for this url
     expect(html).toContain('href="https://zzz.example/q"');
   });
 
   it('confirmed programme fact shows Confirmed, date and source', () => {
     const html = on(<ProgrammeFacts programmes={prog([fact()])} />);
     expect(html).toContain(L.confirmed);
-    expect(html).toContain('Checked 17 Oct 2026');
+    expect(html).toContain('Checked Oct 17, 2026');
   });
 
   it('estimated inbox date shows Estimated with the playbook source date', () => {
     const html = on(<InboxList items={[item({ estimated: true })]} now={new Date('2026-11-06T00:00:00Z')} onComplete={noop} />);
     expect(html).toContain(L.estimated);
-    expect(html).toContain('Checked 17 Oct 2026');
+    expect(html).toContain('Checked Oct 17, 2026');
     expect(html).toContain('href="https://a.example/x"');
   });
 
@@ -127,13 +151,13 @@ describe('surfaces with My plan on (R-54)', () => {
     expect(html).toContain(L.estimated);
     expect(html).toContain(L.not_confirmed);
     expect(html).toContain(L.confirmed);  // step 1
-    expect(html).toContain('Checked 12 Oct 2026');
+    expect(html).toContain('Checked Oct 12, 2026');
   });
 
   it('visa funds show level, date and source', () => {
     const html = on(<VisaFunds funds={funds()} busy={false} onReduction={noop} />);
     expect(html).toContain(L.not_confirmed);
-    expect(html).toContain('Checked 17 Oct 2026');
+    expect(html).toContain('Checked Oct 17, 2026');
     expect(html).toContain('href="https://a.example/x"');
   });
 
@@ -143,7 +167,7 @@ describe('surfaces with My plan on (R-54)', () => {
       sources: [{ field: 'min_grade', url: 'https://a.example/x', status: 'confirmed' }] }] };
     const html = on(<EligibilityCard card={card} />);
     expect(html).toContain(L.confirmed);
-    expect(html).toContain('Checked 17 Oct 2026');
+    expect(html).toContain('Checked Oct 17, 2026');
   });
 
   it('nothing shows Verified in P1 fixtures', () => {
@@ -168,6 +192,10 @@ describe('flags off: every surface renders as today', () => {
                  factStatus={{ p1: 'unconfirmed' }} />,
       packView(pack()),
       <VisaFunds key="c" funds={funds()} busy={false} onReduction={noop} />,
+      <EligibilityCard key="d" card={{ programme_ref: 'p1', verdict: 'likely_meets', lines: [{
+        check: 'grade', status: 'likely_meets', have: 1, need: 1, provisional: false, needs: [], reason: null,
+        sources: [{ field: 'f', url: 'https://a.example/x', status: 'confirmed' }] }] }} />,
+      <StepMeta key="e" step={{ key: 's', kind: 'os', status: 'half', due_at: '2027-03-12T18:59:59Z', due_tz: 'UTC', estimated: true } as never} />,
     ];
     for (const el of els) {
       expect(off2(el)).toBe(off(el));

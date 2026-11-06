@@ -24,7 +24,7 @@ export function FactSource({ level, url, date = null }: { level: FactLevel | nul
       {url && (
         <>
           <span aria-hidden>·</span>
-          <a href={url} target="_blank" rel="noopener noreferrer" title={sourceHost(url)}
+          <a href={url} target="_blank" rel="noopener noreferrer" aria-label={`${t.source}: ${sourceHost(url)}`}
              className="inline-flex items-center gap-1 text-primary underline-offset-2 hover:underline">
             {t.source}<ExternalLink className="size-3" aria-hidden />
           </a>

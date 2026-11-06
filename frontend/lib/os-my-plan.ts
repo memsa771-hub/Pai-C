@@ -1,6 +1,9 @@
 /** My plan (P1-T9, R-50..R-53): the student's plan as `GET /v1/os/plan` answers it. Pure helpers; every word on a
  * page comes from the route's own data, so nothing here names a country, a body or a document. */
 
+import { formatDate } from '@/lib/i18n/format';
+import { DEFAULT_LOCALE } from '@/lib/i18n/locales';
+
 export interface MyPlanPage {
   key: string;
   label: string;
@@ -76,14 +79,15 @@ export function checkedOn(plan: MyPlan | null, url: string | null | undefined): 
   return typeof at === 'string' && at ? at : null;
 }
 
-/** A level, held down to "not confirmed" when the endpoint says the source itself is not confirmed. */
+/** A level, held down to "not confirmed" unless a source stands behind it: no url, a url the endpoint does not know, or a
+ * source it marks not confirmed all mean "not confirmed" (absent is not confirmed). Estimated stays estimated. */
 export function sourceLevel(plan: MyPlan | null, url: string | null | undefined, level: FactLevel): FactLevel {
-  return url && plan?.sources?.[url]?.confirmed === false ? weakerLevel(level, 'not_confirmed') : level;
+  if (level !== 'confirmed' && level !== 'verified') return level;
+  return url && plan?.sources?.[url]?.confirmed === true ? level : 'not_confirmed';
 }
 
-/** "6 Nov 2026" from an ISO date or timestamp (the date part only, in UTC). */
+/** "Nov 6, 2026" (the default locale) from an ISO date or timestamp (the date part only, in UTC). */
 export function formatChecked(iso: string): string {
-  const d = new Date(`${iso.slice(0, 10)}T12:00:00Z`);
-  if (Number.isNaN(d.getTime())) return iso;
-  return new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' }).format(d);
+  const text = formatDate(`${iso.slice(0, 10)}T12:00:00Z`, DEFAULT_LOCALE, { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' });
+  return text || iso;
 }
