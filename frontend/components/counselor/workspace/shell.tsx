@@ -12,7 +12,7 @@ import { NotificationsMenu } from "@/components/layout/notifications-menu";
 import { UserMenu } from "@/components/layout/user-menu";
 import { NotificationsCenterView } from "@/components/notifications/notifications-center-view";
 import { SidebarProvider } from "@/components/ui/sidebar";
-import { OS_PAGES, OsNavGroup, osMenuOpen, type OsPage } from "@/components/os/os-nav-group";
+import { OS_PAGES, OsNavGroup, osMenuOpen, osOpenAt, type OsPage } from "@/components/os/os-nav-group";
 import { MyPlanProvider, useMyPlan } from "@/components/os/my-plan-context";
 import { cn } from "@/lib/utils";
 import { LivingProfile } from "./profile";
@@ -35,7 +35,7 @@ import copy from "./copy.json";
 const health = () => workspaceApi.getCounselorHealth();
 const COLLAPSE_KEY = "pai.sidebar.collapsed";
 
-/** `children`: a PAI OS page (app/[workspaceId]/(os)), shown in this shell's main area so the study abroad plan and
+/** `children`: a PAI OS page (app/[workspaceId]/(os)), shown in this shell's main area so My plan and
  * the counsellor are one app: one rail, one header, one tab bar. Without it the shell shows its own views. */
 export function CounselorShell({ children }: { children?: React.ReactNode } = {}) {
   return <MyPlanProvider><CounselorShellBody>{children}</CounselorShellBody></MyPlanProvider>;
@@ -56,6 +56,9 @@ function CounselorShellBody({ children }: { children?: React.ReactNode }) {
     [command, setCommand] = useState(false);
   const diagnostic = useResource(health);
   const journey = useJourney();
+  const stageId = journey.progress?.stage?.id;
+  const { setStartOpen } = myPlan;
+  useEffect(() => { setStartOpen(osOpenAt(stageId)); }, [stageId, setStartOpen]);  // the builder page, before a choice
   useEffect(() => {
     if (currentSessionId !== "pai-counselor")
       setCurrentSessionId("pai-counselor");
@@ -103,7 +106,7 @@ function CounselorShellBody({ children }: { children?: React.ReactNode }) {
     setPlaces(false);
     const q = new URLSearchParams({ view });
     if (event) q.set("moment", event);
-    // On a study abroad plan page the counsellor's views are another route: go there.
+    // On a My plan page the counsellor's views are another route: go there.
     if (children) router.push(`${base}?${q}`);
     else window.history.pushState({}, "", `${base}?${q}`);
   };
@@ -230,7 +233,7 @@ function CounselorShellBody({ children }: { children?: React.ReactNode }) {
                 <NavItem key={item.key} section={item} current={!children && section.key === item.key} collapsed={collapsed}
                   onSelect={() => navigate(item.views[0])} />
               ))}
-              {/* The PAI OS "Study abroad plan" places, styled as the counsellor's own; open from stage H (any
+              {/* The PAI OS "My plan" places, styled as the counsellor's own; open from stage H (any
                   stage in a rehearsal). Phones reach them from the command menu (CommandMenu in shell-parts.tsx). */}
               <OsNavGroup stageId={stage?.id} current={osPage} collapsed={collapsed} />
             </nav>
@@ -323,7 +326,7 @@ function CounselorShellBody({ children }: { children?: React.ReactNode }) {
         </LayoutGroup>
         </div>
         <CommandMenu open={command} onOpenChange={setCommand} onGo={navigate} onAsk={chat} osOpen={osMenuOpen(myPlan, stage?.id)}
-          pages={myPlan.on ? myPlan.plan!.pages : undefined} />
+          pages={myPlan.on ? (myPlan.plan!.pages ?? undefined) : undefined} />
       </div>
     </SidebarProvider>
     </MotionConfig>

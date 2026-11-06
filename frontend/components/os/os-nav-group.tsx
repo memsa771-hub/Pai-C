@@ -28,7 +28,7 @@ export const ICONS: Record<OsPage, LucideIcon> = {
   'os-statements': PenLine, 'os-pack': Package, 'os-visa': Plane,
 };
 
-/** Whether the study abroad plan is open to this student: from stage H ("Where to study", paths first and places
+/** Whether My plan is open to this student: from stage H ("Where to study", paths first and places
  * later), or at any stage in a rehearsal. `stageId` undefined (still loading) keeps it closed. */
 export function osOpenAt(stageId: string | undefined, rehearsal = OS_REHEARSAL_UI): boolean {
   if (!OS_UI_ENABLED) return false;
@@ -38,10 +38,10 @@ export function osOpenAt(stageId: string | undefined, rehearsal = OS_REHEARSAL_U
 
 /** Whether the plan's places are open at all: with My plan on, when the route has pages; off, today's stage gate. */
 export function osMenuOpen(my: MyPlanState, stageId: string | undefined): boolean {
-  return my.on ? my.plan!.pages.length > 0 : osOpenAt(stageId);
+  return my.on && my.plan!.pages !== null ? my.plan!.pages.length > 0 : osOpenAt(stageId);
 }
 
-/** "Study abroad plan" in the counsellor's rail: the same pills, icons and current-page mark as the counsellor's own
+/** "My plan" in the counsellor's rail: the same pills, icons and current-page mark as the counsellor's own
  * places, so the two read as one app. Renders nothing until the plan is open to the student (osOpenAt). */
 export function OsNavGroup({ stageId, current, collapsed = false, onNavigate }: {
   stageId?: string;
@@ -54,11 +54,13 @@ export function OsNavGroup({ stageId, current, collapsed = false, onNavigate }: 
   const t = useT();
   const { on, plan } = useMyPlan();
   // With My plan on (P1-T9) the group is always there and lists the route's own pages; off, today's group.
-  if (!workspaceId || !(on ? OS_UI_ENABLED : osOpenAt(stageId))) return null;
-  if (on && plan!.pages.length === 0 && collapsed) return null;  // nothing to show in a narrow rail
+  // `pages: null` (the route declares none) keeps today's list and gate, as with the part off
+  const mine = on && plan!.pages !== null;
+  if (!workspaceId || !(mine ? OS_UI_ENABLED : osOpenAt(stageId))) return null;
+  if (mine && plan!.pages!.length === 0 && collapsed) return null;  // nothing to show in a narrow rail
   const name = t(on ? 'nav.myPlan' : 'nav.myPlanOff');
-  const pages: { page: OsPage; label: string }[] = on
-    ? plan!.pages.map((p) => ({ page: `os-${p.key}` as OsPage, label: p.label }))
+  const pages: { page: OsPage; label: string }[] = mine
+    ? plan!.pages!.map((p) => ({ page: `os-${p.key}` as OsPage, label: p.label }))
     : OS_PAGES.map(([page, key]) => ({ page, label: t(key) }));
   return (
     <div role="group" aria-label={name} className="pt-4">
@@ -67,9 +69,16 @@ export function OsNavGroup({ stageId, current, collapsed = false, onNavigate }: 
           {name}
         </p>
       )}
-      {on && pages.length === 0 && !collapsed && (
+      {mine && pages.length === 0 && !collapsed && (
         <p className="px-4 text-sm text-muted-foreground">
           {copy.connect.myPlan.empty}{' '}
+          {osOpenAt(stageId) && (  // the builder stays reachable before a choice
+            <>
+              <Link href={`/${workspaceId}/os-start`} onClick={() => onNavigate?.()} className="font-semibold text-primary hover:underline">
+                {t('nav.osStart')}
+              </Link>{' '}
+            </>
+          )}
           <Link href={`/${workspaceId}?view=journey`} onClick={() => onNavigate?.()} className="font-semibold text-primary hover:underline">
             {copy.connect.myPlan.emptyLink}
           </Link>

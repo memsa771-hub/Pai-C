@@ -528,5 +528,5 @@ class MyPlanOut(BaseModel):
     plan_id: int | None
     route_key: str | None
     abroad: bool | None
-    pages: list[MyPlanPage]
+    pages: list[MyPlanPage] | None  # None: the playbook declares no pages
     sources: dict[str, MyPlanSource]

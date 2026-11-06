@@ -115,7 +115,7 @@ export function CommandMenu({ open, onOpenChange, onGo, onAsk, osOpen = false, p
   onOpenChange: (open: boolean) => void;
   onGo: (view: string) => void;
   onAsk: (text: string) => void;
-  /** Whether the study abroad plan is open to the student (osOpenAt): its pages are listed only then. */
+  /** Whether My plan is open to the student (osOpenAt): its pages are listed only then. */
   osOpen?: boolean;
   /** With My plan on (P1-T9): the route's pages and their labels, listed under "My plan". Absent: today's list. */
   pages?: { key: string; label: string }[];

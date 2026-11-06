@@ -14,6 +14,7 @@ from app.os.api import build_router, current_student_ref, current_student_ref_fo
 from app.os.adapters.counsellor.store import IntakeStore
 from app.os.knowledge import Fact, SqlKnowledge
 from app.os.ports import my_plan as my_plan_port
+from app.os.plan_view import build_plan_view
 from tests.os.route_labels import ROUTES, abroad_words, all_text, foreign_words, load_words
 from tests.os.test_counsellor_intake_v2 import run, v2
 from tests.os.test_counsellor_intake_v2 import svc  # noqa: F401 - the fixture is used by name
@@ -71,7 +72,10 @@ def read_route(api, route_key: str) -> tuple[dict, dict]:
     head = {"X-Test-Student": student}
     plan, inbox = api.get("/v1/os/plan", headers=head), api.get("/v1/os/inbox", headers=head)
     assert plan.status_code == 200 and inbox.status_code == 200, (plan.text, inbox.text)
-    return plan.json(), inbox.json()
+    # every compiled step title of the real plan is read too, not only what the inbox lists
+    titles = [s.title for s in build_plan_view(api.svc, student).steps]
+    assert titles, route_key
+    return plan.json(), {**inbox.json(), "plan_step_titles": titles}
 
 
 @pytest.fixture

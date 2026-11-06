@@ -108,6 +108,15 @@ def test_counsellor_plan_pages_and_route(api):  # R-51
     assert {p["key"]: p["title"] for p in got["pages"]}["inbox"] == "Your next steps"
 
 
+def test_undeclared_pages_are_null_not_empty(api):  # R-52: a plan whose playbook declares no pages
+    plan_id = self_plan(api, "stu-1", "PK", "PK", "bachelor")
+    key = next(k for k in api.svc.plans.playbooks if k[0] == "pakistan_bs")
+    api.svc.plans.playbooks[key] = api.svc.plans.playbooks[key].model_copy(update={"pages": None})
+    got = get(api)
+    assert got["plan_id"] == plan_id and got["pages"] is None
+    assert get(api, "nobody")["pages"] == []  # no plan at all: still the empty answer
+
+
 def test_self_serve_plan_pages(api):  # R-51
     plan_id = self_plan(api, "stu-1", "PK", "PK", "bachelor")
     got = get(api)

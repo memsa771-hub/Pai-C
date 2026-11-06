@@ -120,7 +120,8 @@ def build_my_plan(svc: Any, student_ref: str) -> dict:
         _knowledge_sources(svc, route_key, refs, year, found)
     if book is not None:
         _playbook_sources(book, found)
-    pages = [p.model_dump() for p in (book.pages or [])] if book is not None else []
+    # null: the playbook declares no pages (the screens keep today's page list); [] is a route with none to show
+    pages = None if book is None or book.pages is None else [p.model_dump() for p in book.pages]
     return {"state": chosen["state"], "source": source, "plan_id": chosen["plan_id"], "route_key": route_key,
             "abroad": c["origin_country"] != c["destination_country"], "pages": pages,
             "sources": dict(sorted(found.items()))}

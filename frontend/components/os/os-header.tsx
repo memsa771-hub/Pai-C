@@ -18,7 +18,7 @@ interface OsHeaderProps {
   description?: string;
 }
 
-/** The OS pages' heading: the counsellor's own PageHeader (the "Study abroad plan" eyebrow, the page's icon, the
+/** The OS pages' heading: the counsellor's own PageHeader (the "My plan" eyebrow, the page's icon, the
  * title), so both products read as one app. Desktop moves between the pages from the rail; on a phone the Menu
  * button opens the same links and the way back to the main menu (Slice 9 Task 11, `walk:S1:no_menu_on_os_pages`). */
 export function OsHeader({ workspaceId, current, title, description }: OsHeaderProps) {
@@ -26,7 +26,7 @@ export function OsHeader({ workspaceId, current, title, description }: OsHeaderP
   const [open, setOpen] = useState(false);
   const { on, plan } = useMyPlan();
   const name = t(on ? 'nav.myPlan' : 'nav.myPlanOff');
-  const pages = on ? plan!.pages.map((p) => [`os-${p.key}`, p.label] as const)
+  const pages = on && plan!.pages !== null ? plan!.pages.map((p) => [`os-${p.key}`, p.label] as const)
     : OS_PAGES.map(([page, key]) => [page, t(key)] as const);
   return (
     <>

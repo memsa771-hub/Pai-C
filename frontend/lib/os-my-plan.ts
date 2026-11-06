@@ -22,7 +22,8 @@ export interface MyPlan {
   plan_id: number | null;
   route_key: string | null;
   abroad: boolean | null;
-  pages: MyPlanPage[];
+  /** null: the route's playbook declares no pages; the screens then show today's page list. */
+  pages: MyPlanPage[] | null;
   sources: Record<string, MyPlanSource>;
 }
 
@@ -33,7 +34,8 @@ export const PAGE_KEYS = ['start', 'inbox', 'documents', 'programmes', 'statemen
  * key and string label and title; a page that does not is dropped, the rest of the plan stays. */
 export function asMyPlan(body: unknown): MyPlan | null {
   const b = body as Partial<MyPlan> | null;
-  if (!b || typeof b !== 'object' || !Array.isArray(b.pages) || typeof b.state !== 'string') return null;
+  if (!b || typeof b !== 'object' || (b.pages !== null && !Array.isArray(b.pages)) || typeof b.state !== 'string') return null;
+  if (b.pages === null) return { ...(b as MyPlan), pages: null };
   const pages = (b.pages as unknown[]).filter((p): p is MyPlanPage => {
     const x = p as Partial<MyPlanPage> | null;
     return !!x && typeof x === 'object' && typeof x.key === 'string' && (PAGE_KEYS as readonly string[]).includes(x.key)
@@ -42,13 +44,20 @@ export function asMyPlan(body: unknown): MyPlan | null {
   return { ...(b as MyPlan), pages };
 }
 
-const page = (plan: MyPlan | null, key: string) => plan?.pages.find((p) => p.key === key);
+const page = (plan: MyPlan | null, key: string) => plan?.pages?.find((p) => p.key === key);
 
 /** The route's menu label for a page (`os-start` is page `start`); `fallback` when the plan has none. */
 export const pageLabel = (plan: MyPlan | null, key: string, fallback: string) => page(plan, key)?.label ?? fallback;
 export const pageTitle = (plan: MyPlan | null, key: string, fallback: string) => page(plan, key)?.title ?? fallback;
 export const pageNoun = (plan: MyPlan | null, key: string, fallback: string) => page(plan, key)?.noun ?? fallback;
-export const inPlan = (plan: MyPlan | null, key: string) => page(plan, key) !== undefined;
+/** Whether a page is part of the plan. A plan that declares no pages (`pages: null`) keeps today's page set. While the
+ * plan is empty the start page is allowed when the stage is open (`startOpen`), so the builder stays reachable. */
+export function inPlan(plan: MyPlan | null, key: string, startOpen = false): boolean {
+  if (!plan) return false;
+  if (plan.state === 'empty' && key === 'start' && startOpen) return true;
+  if (plan.pages === null) return plan.state !== 'empty';
+  return page(plan, key) !== undefined;
+}
 
 /** The four levels a fact can show (D-z8). `verified` exists in the copy but nothing produces it in P1 (R-25 is P2). */
 export type FactLevel = 'verified' | 'confirmed' | 'not_confirmed' | 'estimated';

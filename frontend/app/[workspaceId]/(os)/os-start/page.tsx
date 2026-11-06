@@ -29,8 +29,8 @@ const TERM = 'winter'; // the intake term; routes do not list their terms yet (S
 /** PAI OS self-serve start: /<workspace>/os-start. Hidden unless NEXT_PUBLIC_OS_ENABLED=true. */
 export default function OsStartPage({ params }: { params: Promise<{ workspaceId: string }> }) {
   const { workspaceId } = use(params);
-  const { on, plan, refresh } = useMyPlan();  // P1-T9: the route's own page words; off, today's
-  const outOfPlan = on && !inPlan(plan, 'start');  // a page the route does not have makes none of its own calls
+  const { on, plan, refresh, startOpen } = useMyPlan();  // P1-T9: the route's own page words; off, today's
+  const outOfPlan = on && !inPlan(plan, 'start', startOpen);  // a page the route does not have makes none of its own calls
   const router = useRouter();
   const { user, idToken, loading } = usePaiAuth();
   const [routes, setRoutes] = useState<OsRoute[]>([]);

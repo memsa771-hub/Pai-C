@@ -13,7 +13,8 @@ import { OsPlanCard } from './plan-card';
 import { OsVaultStrip } from './vault-strip';
 import { NotInPlan } from './not-in-plan';
 import { CommandMenu } from '@/components/counselor/workspace/shell-parts';
-import { asMyPlan, pageNoun, pageTitle } from '@/lib/os-my-plan';
+import { act } from '@testing-library/react';
+import { asMyPlan, inPlan, pageNoun, pageTitle } from '@/lib/os-my-plan';
 
 const config = vi.hoisted(() => ({ OS_UI_ENABLED: true, OS_REHEARSAL_UI: false }));
 const auth = vi.hoisted(() => ({ loading: false, user: { uid: 'u' } as object | null, idToken: 'tok' }));
@@ -23,7 +24,8 @@ vi.mock('@/lib/config', () => ({
   get OS_REHEARSAL_UI() { return config.OS_REHEARSAL_UI; },
   OS_FROM_STAGE: 'H',
 }));
-vi.mock('next/navigation', () => ({ useParams: () => ({ workspaceId: 'ws1' }), useRouter: () => ({ push: vi.fn() }) }));
+const route = vi.hoisted(() => ({ id: 'ws1' }));
+vi.mock('next/navigation', () => ({ useParams: () => ({ workspaceId: route.id }), useRouter: () => ({ push: vi.fn() }) }));
 vi.mock('@/lib/api', () => ({ workspaceApi: {
   isConfigured: vi.fn(() => true), getMyPlan: vi.fn(), getOsInbox: vi.fn(), getAdoption: vi.fn(), getOsDocuments: vi.fn() } }));
 
@@ -35,7 +37,7 @@ beforeAll(() => {
   window.ResizeObserver ??= class { observe() {} unobserve() {} disconnect() {} } as never;
   Element.prototype.scrollIntoView ??= () => {};
 });
-afterEach(() => { cleanup(); vi.clearAllMocks(); auth.loading = false; auth.user = { uid: 'u' }; vi.mocked(workspaceApi.isConfigured).mockReturnValue(true); config.OS_UI_ENABLED = true; config.OS_REHEARSAL_UI = false; });
+afterEach(() => { vi.useRealTimers(); route.id = 'ws1'; cleanup(); vi.clearAllMocks(); auth.loading = false; auth.user = { uid: 'u' }; vi.mocked(workspaceApi.isConfigured).mockReturnValue(true); config.OS_UI_ENABLED = true; config.OS_REHEARSAL_UI = false; });
 
 const ITEM = { id: 1, instance_key: 'k', title: 'Collect transcripts', kind: 'student', inbox_kind: 'act', programme_ref: null,
   state: 'ready', blocked_reason: null, due_at: null, due_tz: 'UTC', provisional: false, estimated: false,
@@ -236,5 +238,128 @@ describe('my plan provider timing', () => {
     fireEvent.click(screen.getByText('again'));
     await screen.findByRole('link', { name: 'Places' });
     expect(links()).toEqual(['again', 'Inbox', 'Documents', 'Places'].slice(1));
+  });
+});
+
+// req: R-53
+describe('my plan fills in after a choice', () => {
+  function Again() { const { refresh } = useMyPlan(); return <button onClick={refresh}>again</button>; }
+
+  it('an empty answer after refresh() is asked again every 2 s until the plan arrives, with no remount', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    plan(myPlanEmpty);
+    wrap(<><OsNavGroup stageId="H" /><Again /></>);
+    await screen.findByText(copy.connect.myPlan.empty);
+    fireEvent.click(screen.getByText('again'));
+    await act(async () => { await vi.advanceTimersByTimeAsync(2100); });
+    const before = vi.mocked(workspaceApi.getMyPlan).mock.calls.length;
+    expect(before).toBeGreaterThanOrEqual(3);  // first ask, the refresh, a poll
+    vi.mocked(workspaceApi.getMyPlan).mockResolvedValue(myPlanPkBs as never);
+    await act(async () => { await vi.advanceTimersByTimeAsync(2100); });
+    await screen.findByRole('link', { name: 'Places' });
+    const after = vi.mocked(workspaceApi.getMyPlan).mock.calls.length;
+    await act(async () => { await vi.advanceTimersByTimeAsync(10_000); });
+    expect(vi.mocked(workspaceApi.getMyPlan).mock.calls.length).toBe(after);  // stopped once the plan arrived
+  });
+
+  it('stops asking after 60 s', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    plan(myPlanEmpty);
+    wrap(<><OsNavGroup stageId="H" /><Again /></>);
+    await screen.findByText(copy.connect.myPlan.empty);
+    fireEvent.click(screen.getByText('again'));
+    await act(async () => { await vi.advanceTimersByTimeAsync(63_000); });
+    const n = vi.mocked(workspaceApi.getMyPlan).mock.calls.length;
+    expect(n).toBeLessThanOrEqual(34);
+    await act(async () => { await vi.advanceTimersByTimeAsync(20_000); });
+    expect(vi.mocked(workspaceApi.getMyPlan).mock.calls.length).toBe(n);
+  });
+
+  it('no refresh() means no polling', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    plan(myPlanEmpty);
+    wrap(<OsNavGroup stageId="H" />);
+    await screen.findByText(copy.connect.myPlan.empty);
+    await act(async () => { await vi.advanceTimersByTimeAsync(10_000); });
+    expect(workspaceApi.getMyPlan).toHaveBeenCalledTimes(1);
+  });
+
+  it('asks again when the window gets focus', async () => {
+    plan(myPlanEmpty);
+    wrap(<OsNavGroup stageId="H" />);
+    await screen.findByText(copy.connect.myPlan.empty);
+    vi.mocked(workspaceApi.getMyPlan).mockResolvedValue(myPlanPkBs as never);
+    fireEvent.focus(window);
+    await screen.findByRole('link', { name: 'Places' });
+  });
+});
+
+// req: R-53
+describe('the builder stays reachable before a choice', () => {
+  it('an empty plan lets the start page through only when the stage is open', () => {
+    const empty = asMyPlan(myPlanEmpty)!;
+    expect(inPlan(empty, 'start', true)).toBe(true);
+    expect(inPlan(empty, 'start', false)).toBe(false);
+    expect(inPlan(empty, 'inbox', true)).toBe(false);
+    expect(inPlan(empty, 'visa', true)).toBe(false);
+  });
+
+  it('the rail shows a Start link next to the Journey link while empty and the stage is open', async () => {
+    plan(myPlanEmpty);
+    wrap(<OsNavGroup stageId="H" />);
+    await screen.findByText(copy.connect.myPlan.empty);
+    expect(links()).toEqual(['Start', copy.connect.myPlan.emptyLink]);
+    expect(screen.getByRole('link', { name: 'Start' }).getAttribute('href')).toBe('/ws1/os-start');
+  });
+
+  it('no Start link while the stage is closed', async () => {
+    plan(myPlanEmpty);
+    wrap(<OsNavGroup stageId="A" />);
+    await screen.findByText(copy.connect.myPlan.empty);
+    expect(links()).toEqual([copy.connect.myPlan.emptyLink]);
+  });
+});
+
+// req: R-50
+describe('a workspace switch', () => {
+  it('resets to off and asks again for the new workspace', async () => {
+    plan(myPlanPkBs);
+    const view = wrap(<OsNavGroup stageId="H" />);
+    await screen.findByText('My plan');
+    expect(workspaceApi.getMyPlan).toHaveBeenCalledTimes(1);
+    let release: (v: unknown) => void = () => {};
+    vi.mocked(workspaceApi.getMyPlan).mockReturnValue(new Promise((r) => { release = r; }) as never);
+    route.id = 'ws2';
+    view.rerender(<I18nProvider><SidebarProvider><MyPlanProvider><OsNavGroup stageId="H" /></MyPlanProvider></SidebarProvider></I18nProvider>);
+    await waitFor(() => expect(screen.queryByText('My plan')).toBeNull());  // off: today's rail
+    expect(workspaceApi.getMyPlan).toHaveBeenCalledTimes(2);
+    release(myPlanPkBs);
+    await screen.findByText('My plan');
+  });
+});
+
+// req: R-52
+describe('pages not declared', () => {
+  const nullPages = { ...myPlanPkBs, pages: null };
+  it('asMyPlan keeps null pages', () => {
+    expect(asMyPlan(nullPages)!.pages).toBeNull();
+    expect(asMyPlan({ ...nullPages, pages: 'x' })).toBeNull();
+  });
+  it('the rail falls back to today\'s page list and gating', async () => {
+    plan(nullPages);
+    wrap(<OsNavGroup stageId="H" />);
+    await screen.findByText('Study abroad plan');
+    expect(links().length).toBe(7);
+  });
+  it('the rail stays closed before the stage, as with the part off', async () => {
+    plan(nullPages);
+    wrap(<OsNavGroup stageId="A" />);
+    await waitFor(() => expect(workspaceApi.getMyPlan).toHaveBeenCalled());
+    expect(screen.queryByRole('group')).toBeNull();
+  });
+  it('every page is in the plan', () => {
+    const p = asMyPlan(nullPages)!;
+    expect(inPlan(p, 'visa')).toBe(true);
+    expect(inPlan(p, 'inbox')).toBe(true);
   });
 });

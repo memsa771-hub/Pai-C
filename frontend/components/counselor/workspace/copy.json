@@ -977,7 +977,7 @@
       "empty": "Your plan will appear here once you choose a path.",
       "emptyLink": "Go to your journey",
       "notInPlanTitle": "Not part of your plan",
-    "notInPlan": "This page is not part of your plan.",
+      "notInPlan": "This page is not part of your plan.",
       "notInPlanLink": "Go to your plan",
       "levels": {
         "verified": "Verified",
