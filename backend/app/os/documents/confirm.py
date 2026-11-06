@@ -112,6 +112,9 @@ def delete_document(engine: Engine, tenant_id: str, types: Mapping[str, Document
     P = models.profile_values
     with engine.begin() as conn:
         conn.execute(delete(P).where(P.c.tenant_id == tenant_id, P.c.source_document_id == doc.id))
+    from app.os.ports import fact_proposals  # late: the ports import the stores
+
+    fact_proposals.drop_for_document(engine, tenant_id, doc.id)  # not yet taken by the Vault: never taken now
     compare_documents(engine, tenant_id, doc.student_ref, types, variants)
     if notify_host and doc.file_ref is not None:
         from app.os.ports import document_files  # late: that module imports this one

@@ -145,6 +145,12 @@ def _register_typed_upload(
     return uploads.register_typed(db, workspace_id, file_id, data, filename, doc_type)
 
 
+def _os_reads(os_document: Optional[dict]) -> bool:
+    """True when PAI OS reads (or already reads) this file, so the Counsellor's own extraction is skipped: the OS
+    document was made, or the registration was refused as a `duplicate` (the same bytes already have an OS document)."""
+    return bool(os_document) and ("id" in os_document or os_document.get("refused") == "duplicate")
+
+
 def _forget_os_documents(workspace_id: str, file_ids: list) -> None:
     """The student trashed or deleted files: the OS documents linked to them go too (P1-T7, D-y7). Called after the
     commit. A failure is logged by class name and never fails the trash."""
@@ -562,7 +568,7 @@ async def upload_file(
     )
     document = _register_student_document(
         db, str(workspace.id), file_id, data, filename, content_type,
-        extract=not (os_document and "id" in os_document),
+        extract=not _os_reads(os_document),
     )
 
     # Emit event
@@ -1067,7 +1073,7 @@ async def upload_files_to_folder(
         )
         document = _register_student_document(
             db, str(workspace.id), file_id, data, target, content_type,
-            extract=not (os_document and "id" in os_document),
+            extract=not _os_reads(os_document),
         )
 
         # Same event as POST /files — existing listeners shouldn't have to
