@@ -6,18 +6,20 @@ route's origin, destination and level come from its playbook, and the task the b
 """
 
 import logging
+from dataclasses import dataclass
 from datetime import timedelta
 
 from pydantic import ValidationError
 from sqlalchemy import func, select
 
 from app.os import clock, models
+from app.os.adapters.counsellor import manifest
 from app.os.contracts.route_contract import IntakeRef, ProgrammeChoice, RouteContract
 from app.os.eligibility.notes import on_profile_change
 from app.os.kernel import PlanRef, contract_sha256
 from app.os.kernel.states import is_started
 from app.os.knowledge.requests import visible_programmes
-from app.os.ports import choice_requests
+from app.os.ports import choice_requests, choice_sink
 from app.os.replan.ops import CancelProgramme, SwapProgramme
 from app.os.replan.lock import plan_lock
 from app.os.replan.store import OverrideStore, ProposalStore
@@ -43,6 +45,23 @@ class RequestOpen(NotAllowed):
     """A change of this plan is already with the Counsellor (the API answers 409 `request_open`)."""
 
 
+class ChoiceRefused(Exception):
+    """With the Counsellor on, the decision service would not take the choice (the API answers 409 with the code:
+    `choose_field_first` or `too_many_places`). Not a NotAllowed: the message is a code, not a sentence."""
+
+    def __init__(self, code: str):
+        super().__init__(code)
+        self.code = code
+
+
+@dataclass(frozen=True)
+class Preparing:
+    """With the Counsellor on, the choice went to the decision service as `decision_version`; the plan comes from the
+    intake of that version, not from the builder (the API answers 202)."""
+
+    decision_version: int
+
+
 class SwapLimit(NotAllowed):
     """CHANGES_PER_DAY programme changes in the last 24 hours."""
 
@@ -61,8 +80,12 @@ def _check_programmes(plans, route_key: str, year: int, refs: list[str]) -> None
         raise NotAllowed(f"not a programme of this route for {year}: {', '.join(unknown)}")
 
 
-def start(plans, student_ref: str, route_key: str, intake: IntakeRef, choices: list[ProgrammeChoice]) -> PlanRef:
-    """Starts the student's plan for a route and intake (or returns the one they already have)."""
+def start(plans, student_ref: str, route_key: str, intake: IntakeRef,
+          choices: list[ProgrammeChoice]) -> PlanRef | Preparing:
+    """Starts the student's plan for a route and intake (or returns the one they already have). With the `counsellor`
+    module on and a host that takes it (P1-T6, R-09), it writes nothing itself: the choice goes through the decision
+    service (ChoiceSink) and `Preparing(decision_version)` is returned; `ChoiceRefused` when the host refuses. A host
+    answer of None (its part is off, or no host) leaves everything below as it always was."""
     book = _route(plans, route_key)
     if len(choices) > 10:
         raise NotAllowed("choose at most 10 programmes")
@@ -79,6 +102,13 @@ def start(plans, student_ref: str, route_key: str, intake: IntakeRef, choices: l
     existing = plans._existing_plan(contract)
     if existing is not None and plans._contract(existing)[1] != contract_sha256(contract):
         raise PlanExists("you already have a plan for this route and intake; change its programmes with swap or remove")
+    if existing is None and manifest.is_enabled(plans.engine, plans.kernel.tenant_id):
+        answer = choice_sink.request(student_ref, book.route.origin, book.route.destination, book.route.level,
+                                     intake.model_dump(), [c.model_dump() for c in choices])
+        if answer is not None:
+            if answer["outcome"] == "refused":
+                raise ChoiceRefused(answer["code"])
+            return Preparing(answer["decision_version"])
     ref = plans.start_plan(contract)
     task = book.self_serve.choose_task if book.self_serve else None
     if task and ref.created:

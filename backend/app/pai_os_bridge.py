@@ -91,6 +91,35 @@ def choice_enabled() -> bool:
     return part_on("CONNECT_HANDOFF")
 
 
+def request_choice(student_ref: str, origin: str, destination: str, level: str, intake: dict,
+                   choices: list[dict]) -> dict | None:
+    """The route builder's ChoiceSink (P1-T6, R-09): with the hand-off part on, the student's route, intake and places
+    are written through the decision service and the new version goes to PAI OS. None while the part is off (then the
+    builder works standalone). Opens its own session: PAI OS calls it from a request thread. Returns `{"outcome":
+    "written" | "unchanged" | "refused", "decision_version", "code"}`; an error rolls back and is raised, so nothing
+    is half written."""
+    if not choice_enabled():
+        return None
+    from app.database import new_session
+    from app.pai_c.roadmap.decisions import RouteDecisionService  # lazy: decisions.py imports this module
+
+    try:
+        workspace_id = str(uuid.UUID(student_ref))
+    except (TypeError, ValueError):
+        return {"outcome": "refused", "decision_version": None, "code": "choose_field_first"}
+    with new_session() as db:
+        try:
+            outcome, version, code = RouteDecisionService(db).request_from_builder(
+                workspace_id, origin, destination, level, intake, choices)
+            db.commit()
+        except Exception:
+            db.rollback()
+            raise
+        if outcome == "written":
+            deliver_pending(db, workspace_id)
+    return {"outcome": outcome, "decision_version": version, "code": code}
+
+
 def _deliver_choice_request(db, request) -> str:
     """Hands one choice request to the decision service and marks the answer on the OS side. The app transaction
     commits first, then the new version goes to the OS, then the OS is told (a crash in between repeats harmlessly:

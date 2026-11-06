@@ -94,6 +94,7 @@ from app.os.api.packs import add_pack_routes, add_visa_routes, complete_ready_pa
 from app.os.api.replan import add_replan_routes, changes_paused, student_proposals
 from app.os.knowledge.requests import RequestLimit, request_programme
 from app.os.ports import choice_requests
+from app.os.replan import choice_texts
 from app.os.routes import builder
 from app.os.kernel import IllegalTransition
 from app.os.kernel.revisions import NOTICE_PREFIX
@@ -304,8 +305,13 @@ def build_router(get_services: Callable[[], Services]) -> APIRouter:
             ref = builder.start(svc.plans, student, body.route, body.intake, body.choices)
         except builder.PlanExists as e:
             raise HTTPException(status_code=409, detail=str(e)) from None
+        except builder.ChoiceRefused as e:  # the Counsellor is on and would not take the choice (R-09)
+            return JSONResponse(status_code=409, content={"detail": e.code, "note": choice_texts.note(e.code, svc.settings)})
         except (builder.NotAllowed, PlaybookError, CompileError) as e:
             raise HTTPException(status_code=422, detail=str(e)) from None
+        if isinstance(ref, builder.Preparing):  # no plan yet: it comes from the intake of the decision version
+            return JSONResponse(status_code=202, content={"state": "preparing", "decision_version": ref.decision_version,
+                                                          "note": choice_texts.note("preparing", svc.settings)})
         if not ref.created:
             response.status_code = 200
         return self_serve.self_plan_out(svc.plans, ref.plan_id)

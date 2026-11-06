@@ -7,6 +7,8 @@ away. The row keeps the verdict and route as they were at choose time; the
 page shows the live status beside that snapshot instead of rewriting it.
 """
 
+import hashlib
+import json
 from datetime import datetime, timezone
 from types import EllipsisType
 from typing import TYPE_CHECKING
@@ -342,6 +344,52 @@ class RouteDecisionService:
         self.db.flush()
         outbox.record(self.db, new)
         return "written", new.decision_version
+
+    MAX_PLACES = 5  # decision_record.v2 holds at most five places
+
+    def request_from_builder(self, workspace_id: str, origin: str, destination: str, level: str, intake: dict,
+                             places: list[dict]) -> tuple[str, "int | None", "str | None"]:
+        """The OS route builder's choice (R-09), written as the next decision version. Returns `(outcome, version,
+        code)`: `("written", n+1, None)`, `("unchanged", n, None)` when the active row already has this route, these
+        places in this order and this intake (or this exact request was written), or `("refused", None, code)` with
+        `choose_field_first` (no active decision: the builder knows no field, D-x4) or `too_many_places`. The new
+        version copies everything else from the active row, field and consent included. The key is
+        `builder:{sha256 of the base version, route, intake and places}`: the base version keeps a student who goes back
+        to an earlier choice from being read as a repeat. No commit: the caller commits, then delivers the outbox row."""
+        self._lock(workspace_id)
+        active = self.active(workspace_id)
+        if active is None:
+            return "refused", None, "choose_field_first"
+        if len(places) > self.MAX_PLACES:
+            return "refused", None, "too_many_places"
+        ordered = sorted(places, key=lambda p: p["rank"])
+        wanted = [{"programme_ref": p["programme_ref"], "rank": i + 1} for i, p in enumerate(ordered)]
+        want_intake = {"term": intake["term"], "year": intake["year"]}
+        have = [{"programme_ref": p["programme_ref"], "rank": i + 1}
+                for i, p in enumerate(sorted(active.places or [], key=lambda p: p["rank"]))]
+        if ((active.origin_country, active.destination_country, active.level, have, active.intake)
+                == (origin, destination, level, wanted, want_intake)):
+            return "unchanged", active.decision_version, None
+        key = "builder:" + hashlib.sha256(json.dumps(
+            [active.decision_version, origin, destination, level, want_intake, wanted], sort_keys=True).encode()
+        ).hexdigest()
+        done = self.db.scalar(select(RouteDecision).where(RouteDecision.workspace_id == workspace_id,
+                                                          RouteDecision.request_key == key))
+        if done is not None:
+            return "unchanged", done.decision_version, None
+        values = {name: getattr(active, name) for name in self._COPIED}
+        same_path = (active.destination_country, active.level) == (destination, level)
+        values.update(origin_country=origin, destination_country=destination, level=level, places=wanted,
+                      intake=want_intake, path_ref=values["path_ref"] if same_path else None,
+                      os_supported=pai_os_bridge.route_supported(origin, destination, level))
+        active.withdrawn_at = datetime.now(timezone.utc)
+        self.db.flush()  # the old row leaves the partial unique index before the new one enters
+        new = RouteDecision(workspace_id=workspace_id, decision_version=self._next_version(workspace_id),
+                            status="chosen", request_key=key, **values)
+        self.db.add(new)
+        self.db.flush()
+        outbox.record(self.db, new)
+        return "written", new.decision_version, None
 
     def set_step(self, workspace_id: str, done: bool, *, key: str | None = None, index: int | None = None,
                  is_human=None) -> dict:

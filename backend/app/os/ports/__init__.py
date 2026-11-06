@@ -23,11 +23,14 @@ _services: Services | None = None
 def configure(services: Services | None, recipient_lookup: RecipientLookup | None = None,
               student_facts: Callable[[str], dict | None] | None = None,
               choice_enabled: Callable[[], bool] | None = None,
-              on_choice_request: Callable[[str], None] | None = None) -> None:
+              on_choice_request: Callable[[str], None] | None = None,
+              choice_sink: Callable[..., dict | None] | None = None) -> None:
     """Called by `mount_os`. Slice 9b: also sets the RecipientLookup port (ports.recipients) for this process.
     P1-T4: and the host's StudentFacts adapter (ports.student_facts). P1-T6: and the choice request gate and hook
-    (ports.choice_requests); None for both leaves the OS on its own, as before."""
+    (ports.choice_requests); None for both leaves the OS on its own, as before. And the route builder's ChoiceSink
+    (ports.choice_sink); None leaves the builder standalone."""
     from app.os.ports import choice_requests  # late: that module imports this package
+    from app.os.ports import choice_sink as choice_sink_port
     from app.os.ports import student_facts as student_facts_port  # late: that module imports this package
 
     global _services
@@ -35,6 +38,7 @@ def configure(services: Services | None, recipient_lookup: RecipientLookup | Non
     recipients.configure(recipient_lookup)
     student_facts_port.configure(student_facts)
     choice_requests.configure(choice_enabled, on_choice_request)
+    choice_sink_port.configure(choice_sink)
     from app.os.eligibility import facts as eligibility_facts
 
     eligibility_facts.configure_types(getattr(services, "document_types", None))  # the types mount_os loaded
