@@ -5,7 +5,7 @@ that reads it carries the Counsellor file ID as `file_ref` and has no bytes of i
 reaches those bytes and how the host tells the OS about files.
 
 Host side (all optional; an unconfigured port is the OS exactly as it was, with its own `os_document_files` table):
-- `read(student_ref, file_ref) -> bytes`: the bytes of the student's file. Any failure is `KeyError`. The worker
+- `read(student_ref, file_ref) -> bytes`: the bytes of the student's file. Any failure is `KeyError` (the port turns other host errors into one). The worker
   loads it from `OS_DOCUMENT_FILES=module.path:callable`, like `OS_STUDENT_FACTS`; the API gets it from `mount_os`.
 - `enabled() -> bool`: whether the host part is on (the OS cannot read host flags). False when unconfigured or when
   the callable raises.
@@ -89,7 +89,13 @@ def read(student_ref: str, file_ref: str) -> bytes:
     """The bytes of a linked file. `KeyError` when no reader is configured or the host cannot give them."""
     if _read is None:
         raise KeyError(file_ref)
-    return _read(student_ref, file_ref)
+    try:
+        return _read(student_ref, file_ref)
+    except KeyError:
+        raise
+    except Exception as e:  # any host failure reads as "no file", so the workflow skips the reading; class name only
+        log.error("document file read failed (%s)", type(e).__name__)
+        raise KeyError(file_ref) from None
 
 
 def on_deleted(student_ref: str, file_ref: str) -> None:

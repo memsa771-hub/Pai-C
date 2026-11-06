@@ -64,6 +64,22 @@ def test_downgrade_refuses_while_a_linked_document_has_no_bytes(os_db, engine, c
         eng.dispose()
 
 
+def test_downgrade_allows_a_deleted_linked_row(os_db, engine, clean):
+    _doc(engine, "a" * 64, file_ref="file-1", status="deleted")
+    engine.dispose()
+    run_alembic(["downgrade", "os_0021"], os_db)
+    try:
+        eng = create_engine(os_db)
+        try:
+            assert "file_ref" not in {c["name"] for c in inspect(eng).get_columns("os_documents", schema=OS_SCHEMA)}
+            with eng.begin() as conn:
+                conn.execute(text("DELETE FROM os.os_documents"))
+        finally:
+            eng.dispose()
+    finally:
+        run_alembic(["upgrade", "os@head"], os_db)
+
+
 def test_one_os_head():
     done = subprocess.run([sys.executable, "scripts/check_alembic_heads.py"], cwd=BACKEND, capture_output=True,
                           text=True)

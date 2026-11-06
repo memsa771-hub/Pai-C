@@ -147,6 +147,26 @@ def test_file_bytes_standalone_row_reads_os_document_files(engine, clean, host):
     assert store.file_bytes(doc_id) == PNG and host.reads == []  # the port is not called
 
 
+def test_file_bytes_of_a_deleted_linked_document_is_keyerror_and_the_host_is_not_asked(engine, clean, host):
+    store = DocumentStore(engine, "pai")
+    doc_id = store.create_ref("stu-1", "transcript", 1, "t.png", "image/png", PNG, "file-1")
+    host.files[("stu-1", "file-1")] = PNG
+    store.delete(doc_id)
+    with pytest.raises(KeyError):
+        store.file_bytes(doc_id)
+    assert host.reads == []
+
+
+def test_a_host_error_in_read_is_keyerror_without_detail(caplog):
+    def boom(student_ref, file_ref):
+        raise OSError("disk path /secret")
+
+    document_files.configure(read=boom)
+    with pytest.raises(KeyError):
+        document_files.read("stu-1", "file-1")
+    assert "secret" not in caplog.text and "OSError" in caplog.text
+
+
 # --- register ------------------------------------------------------------------------------------------------------
 
 

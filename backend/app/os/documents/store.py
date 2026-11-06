@@ -115,10 +115,13 @@ class DocumentStore:
         own student (`KeyError` without an adapter, or when the host cannot give the file); any other reads
         `os_document_files` as it always did."""
         with self.engine.connect() as conn:
-            link = conn.execute(select(D.c.student_ref, D.c.file_ref).where(self._mine(doc_id))).first()
+            link = conn.execute(select(D.c.student_ref, D.c.file_ref, D.c.status).where(self._mine(doc_id))
+                                ).first()
         if link is None:
             raise KeyError(doc_id)  # another tenant's document, or none
         if link.file_ref is not None:
+            if link.status == "deleted":
+                raise KeyError(doc_id)  # a deleted document is never read; the host is not asked
             from app.os.ports import document_files  # late: that module imports this store
 
             return bytes(document_files.read(link.student_ref, link.file_ref))

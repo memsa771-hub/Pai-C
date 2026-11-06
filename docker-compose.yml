@@ -184,8 +184,6 @@ services:
       OS_RECIPIENT_LOOKUP: app.pai_os_bridge:recipient_email
       # Likewise the Counsellor's StudentFacts adapter (P1-T4); it answers None while CONNECT_STUDENT_FACTS is off.
       OS_STUDENT_FACTS: app.pai_os_bridge:student_facts
-      # And the reader of the Counsellor's file store (P1-T7): a linked document has no bytes of its own.
-      OS_DOCUMENT_FILES: app.pai_os_bridge:document_file_bytes
     depends_on:
       migrate: {condition: service_completed_successfully}
       os-setup: {condition: service_completed_successfully}
