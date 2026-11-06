@@ -294,15 +294,26 @@ export function CompareDialog({ cards, open, onOpenChange }: {
 
 /** What the OS plan is doing, in words: preparing, waiting for the student, paused, stopped or finished.
  * An active plan needs no banner. Nothing shows when the plan view is off (no `plan`). */
-function PlanBanner({ plan }: { plan: RoutePlan | undefined }) {
+function PlanBanner({ plan, onChange }: { plan: RoutePlan | undefined; onChange?: () => void }) {
   const words = t.plan as Record<string, string>;
-  // The reason's own words when copy.json has them (`<state>_<reason>`), else the neutral line for the state.
-  const text = plan && ((plan.state_reason && words[`${plan.state}_${plan.state_reason}`]) || words[plan.state]);
+  // The server's own sentence for a paused plan wins (P1-T6, only sent once approved); else the reason's words when
+  // copy.json has them (`<state>_<reason>`); else the neutral line for the state.
+  const text = plan && (plan.reason_text || (plan.state_reason && words[`${plan.state}_${plan.state_reason}`]) || words[plan.state]);
   if (!text) return null;
+  // One button, only with the server's sentence: it opens the same "Change route" confirm the route card has.
+  const action = plan.reason_text && plan.reason_action && onChange ? plan.reason_action : null;
+  if (!action) {  // no button: the banner is exactly what it was
+    return (
+      <p role="status" data-plan-state={plan.state} className="mb-3 flex items-start gap-2 rounded-2xl bg-info-soft px-4 py-3 text-sm text-info-ink">
+        <Info aria-hidden className="mt-0.5 size-4 shrink-0" />{text}
+      </p>
+    );
+  }
   return (
-    <p role="status" data-plan-state={plan.state} className="mb-3 flex items-start gap-2 rounded-2xl bg-info-soft px-4 py-3 text-sm text-info-ink">
-      <Info aria-hidden className="mt-0.5 size-4 shrink-0" />{text}
-    </p>
+    <div role="status" data-plan-state={plan.state} className="mb-3 rounded-2xl bg-info-soft px-4 py-3 text-sm text-info-ink">
+      <p className="flex items-start gap-2"><Info aria-hidden className="mt-0.5 size-4 shrink-0" />{text}</p>
+      <Button size="tap" variant="soft" className="mt-2" onClick={onChange}>{action}</Button>
+    </div>
   );
 }
 
@@ -385,7 +396,7 @@ export function YourRoute({ route, onWithdrawn, onTicked, onChat }: {
             <Info aria-hidden className="mt-0.5 size-4 shrink-0" />{t.route.unsupported}
           </p>
         )}
-        <PlanBanner plan={route.plan} />
+        <PlanBanner plan={route.plan} onChange={() => setConfirming(true)} />
         <ul aria-label={t.steps.title} className="divide-y divide-border/70">
           {steps.map((step) => {
             const label = stepLabel(step);

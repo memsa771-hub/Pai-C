@@ -3,6 +3,8 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { EligibilityCard } from './eligibility-card';
 import { RouteBuilder } from './route-builder';
 import { InboxList } from './inbox-list';
+import copy from '@/components/counselor/workspace/copy.json';
+import { changeMessage, isStartPending, startPendingMessage, startRefusalMessage } from '@/lib/os-connect';
 import {
   CARD_FOOTER,
   MAX_CHOICES,
@@ -167,5 +169,64 @@ describe('InboxList notes', () => {
     expect(html).toContain('Yours 6 · needs 6.5');
     expect(html).toContain('Swap for Robotics');
     expect(html).not.toContain('Nothing to do');
+  });
+});
+
+// req: R-09, R-07
+describe('what the builder says when the Counsellor holds the route', () => {
+  const COPY = copy.connect;
+
+  it('route builder 202 shows preparing note and no plan', () => {
+    const body = { state: 'preparing' as const, decision_version: 3, note: 'Your plan is being prepared.' };
+    expect(isStartPending(body)).toBe(true);
+    expect(isStartPending({ plan_id: 1, revision: 1, status: 'active', programmes: [] })).toBe(false);
+    const message = startPendingMessage(body, COPY);
+    expect(message).toEqual({ text: 'Your plan is being prepared.', tone: 'info' });
+    const html = builder({ message });
+    expect(html).toContain('Your plan is being prepared.');
+    expect(html).toContain('role="status"');
+  });
+
+  it('falls back to copy.json when the 202 has no note', () => {
+    expect(startPendingMessage({ state: 'unchanged', decision_version: 3, note: null }, COPY).text).toBe(COPY.start.unchanged);
+    expect(startPendingMessage({ state: 'preparing', decision_version: 3 }, COPY).text).toBe(COPY.start.preparing);
+  });
+
+  it('409 choose_field_first shows note', () => {
+    const err = new Error('API 409: {"detail":"choose_field_first","note":"Choose your field first."}');
+    const message = startRefusalMessage(err, COPY, '/ws-1');
+    expect(message).toEqual({ text: 'Choose your field first.', tone: 'error' });
+    expect(builder({ message })).toContain('role="alert"');
+  });
+
+  it('409 too_many_places shows its note, or the copy.json line without one', () => {
+    expect(startRefusalMessage(new Error('API 409: {"detail":"too_many_places","note":"Too many."}'), COPY, '/w')?.text).toBe('Too many.');
+    expect(startRefusalMessage(new Error('API 409: {"detail":"too_many_places"}'), COPY, '/w')?.text).toBe(COPY.start.too_many_places);
+  });
+
+  it('adopt_first links to the journey where the adoption offer is', () => {
+    const message = startRefusalMessage(new Error('API 409: {"detail":"adopt_first","note":"Keep your plan first."}'), COPY, '/ws-1');
+    expect(message).toMatchObject({ text: 'Keep your plan first.', href: '/ws-1', linkLabel: COPY.start.adopt_first_link });
+    expect(builder({ message })).toContain('href="/ws-1"');
+  });
+
+  it('503 counsellor_unavailable is a temporary error; other errors are not ours', () => {
+    expect(startRefusalMessage(new Error('API 503: {"detail":"counsellor_unavailable"}'), COPY, '/w')?.text).toBe(COPY.start.unavailable);
+    expect(startRefusalMessage(new Error('API 409: {"detail":{"code":"consent_needed"}}'), COPY, '/w')).toBeNull();
+    expect(startRefusalMessage(new Error('API 422: bad'), COPY, '/w')).toBeNull();
+    expect(startRefusalMessage(new Error('network down'), COPY, '/w')).toBeNull();
+  });
+
+  it('swap and remove: requested, and request_open', () => {
+    expect(changeMessage({ state: 'requested', proposal_id: 4 }, undefined, COPY)?.text).toBe(COPY.change.requested);
+    expect(changeMessage(undefined, new Error('API 409: {"detail":"request_open"}'), COPY)?.text).toBe(COPY.change.request_open);
+    expect(changeMessage({ plan_id: 1 }, undefined, COPY)).toBeNull();
+    expect(changeMessage(undefined, new Error('API 409: {"detail":"swap_limit"}'), COPY)).toBeNull();
+  });
+
+  it('flags off: no message prop renders no message line', () => {
+    const html = builder();
+    expect(html).not.toContain('role="status"');
+    expect(html).not.toContain('role="alert"');
   });
 });

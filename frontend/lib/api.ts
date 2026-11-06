@@ -278,6 +278,13 @@ class WorkspaceApi {
   // PAI OS self-serve start and eligibility (Slice 4 spec §4)
   // ---------------------------------------------------------------------------
 
+  /** PAI OS: the suggestions in the inbox, requested ones and recently expired requests included (P1-T6). */
+  async getOsInboxProposals(): Promise<import('./os-replan').OsProposal[]> {
+    const params = new URLSearchParams({ network: this.requireWorkspace() });
+    const body = await this.requestJson<{ proposals?: import('./os-replan').OsProposal[] }>(`/v1/os/inbox?${params}`);
+    return body.proposals ?? [];
+  }
+
   /** PAI OS: the student's eligibility change notes (the inbox's `notes`). */
   async getOsInboxNotes(): Promise<import('./os-self-serve').OsNote[]> {
     const params = new URLSearchParams({ network: this.requireWorkspace() });
@@ -340,7 +347,7 @@ class WorkspaceApi {
 
   /** PAI OS: start the student's own plan (or get the one they already have). */
   async startOsPlan(route: string, intake: { term: string; year: number },
-                    choices: { programme_ref: string; rank: number }[]): Promise<import('./os-self-serve').OsSelfPlan> {
+                    choices: { programme_ref: string; rank: number }[]): Promise<import('./os-self-serve').OsSelfPlan | import('./os-connect').OsStartPending> {
     const params = new URLSearchParams({ network: this.requireWorkspace() });
     return this.requestJson(`/v1/os/plans/self?${params}`, {
       method: 'POST', body: JSON.stringify({ route, intake, choices }),
@@ -348,7 +355,7 @@ class WorkspaceApi {
   }
 
   /** PAI OS: swap one programme for another (the screen asks the student first). */
-  async swapOsProgramme(planId: number, outRef: string, inRef: string): Promise<import('./os-self-serve').OsSelfPlan> {
+  async swapOsProgramme(planId: number, outRef: string, inRef: string): Promise<import('./os-self-serve').OsSelfPlan | import('./os-connect').OsChangeRequested> {
     const params = new URLSearchParams({ network: this.requireWorkspace() });
     return this.requestJson(`/v1/os/plans/${planId}/swap?${params}`, {
       method: 'POST', body: JSON.stringify({ out: outRef, in: inRef }),
@@ -356,7 +363,7 @@ class WorkspaceApi {
   }
 
   /** PAI OS: drop one programme from the plan while nothing for it has started. */
-  async removeOsProgramme(planId: number, ref: string): Promise<import('./os-self-serve').OsSelfPlan> {
+  async removeOsProgramme(planId: number, ref: string): Promise<import('./os-self-serve').OsSelfPlan | import('./os-connect').OsChangeRequested> {
     const params = new URLSearchParams({ network: this.requireWorkspace() });
     return this.requestJson(`/v1/os/plans/${planId}/programmes/${encodeURIComponent(ref)}?${params}`, {
       method: 'DELETE',
@@ -504,7 +511,7 @@ class WorkspaceApi {
     return this.requestJson(`/v1/os/changes?${params}`);
   }
 
-  async acceptOsProposal(id: number): Promise<{ status: string; revision: number | null }> {
+  async acceptOsProposal(id: number): Promise<{ status: 'accepted' | 'requested' | 'refused'; revision: number | null }> {
     const params = new URLSearchParams({ network: this.requireWorkspace() });
     return this.requestJson(`/v1/os/proposals/${id}/accept?${params}`, { method: 'POST' });
   }
@@ -660,6 +667,17 @@ class WorkspaceApi {
   async chooseRoute(fieldKey: string, details?: import('./roadmap').ChoiceDetails): Promise<import('./roadmap').ChooseAnswer> {
     return this.request(`/v1/roadmap/choose?network=${this.requireWorkspace()}`,
       { method: 'POST', body: JSON.stringify(details ? { field_key: fieldKey, details } : { field_key: fieldKey }) });
+  }
+
+  /** Whether the student can keep a plan they built themselves as their PAI plan (R-08). `{offer: false}` when off. */
+  async getAdoption(): Promise<import('./os-connect').Adoption> {
+    return this.request(`/v1/roadmap/adoption?network=${this.requireWorkspace()}`);
+  }
+
+  /** The student agrees to keep their plan: 200 `{state, decision_version}`, or 409 with a code. */
+  async adoptPlan(planId: number): Promise<import('./os-connect').AdoptionDone> {
+    return this.request(`/v1/roadmap/adoption?network=${this.requireWorkspace()}`,
+      { method: 'POST', body: JSON.stringify({ plan_id: planId }) });
   }
 
   /** What the choice screens offer; `{handoff: false}` when the hand-off to PAI OS is off. */

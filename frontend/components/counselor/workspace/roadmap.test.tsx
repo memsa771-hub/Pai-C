@@ -574,3 +574,30 @@ it("keeps an OS step's checkbox (disabled) while it saves, and reverts with the 
   expect(back.disabled).toBe(false);
   expect(screen.getByText("Collect your transcripts").closest("li")!.getAttribute("data-status")).toBe("half");
 });
+
+// req: R-11
+it("PlanBanner shows reason_text and one action that opens change route", async () => {
+  vi.mocked(workspaceApi.getRoadmapPage).mockResolvedValue(osPage({ plan: { state: "paused", state_reason: "all_rejected",
+    reason_text: "None of your places took you.", reason_action: "Choose again" } }));
+  render(<Roadmap onNavigate={vi.fn()} />);
+  expect(await screen.findByText("None of your places took you.")).toBeTruthy();
+  expect(screen.queryByText(copy.roadmap.plan.paused)).toBeNull();
+  const banner = document.querySelector("[data-plan-state]") as HTMLElement;
+  const buttons = within(banner).getAllByRole("button");
+  expect(buttons.length).toBe(1);
+  fireEvent.click(buttons[0]);
+  expect(await screen.findByRole("button", { name: copy.roadmap.route.changeYes })).toBeTruthy();
+});
+
+// req: R-11
+it("PlanBanner shows reason_text with no button when there is no reason_action, and nothing new when both are null", async () => {
+  vi.mocked(workspaceApi.getRoadmapPage).mockResolvedValue(osPage({ plan: { state: "paused", reason_text: "None of your places took you." } }));
+  render(<Roadmap onNavigate={vi.fn()} />);
+  expect(await screen.findByText("None of your places took you.")).toBeTruthy();
+  expect(within(document.querySelector("[data-plan-state]") as HTMLElement).queryByRole("button")).toBeNull();
+  cleanup();
+  vi.mocked(workspaceApi.getRoadmapPage).mockResolvedValue(osPage({ plan: { state: "paused", reason_text: null, reason_action: null } }));
+  render(<Roadmap onNavigate={vi.fn()} />);
+  expect(await screen.findByText(copy.roadmap.plan.paused)).toBeTruthy();
+  expect(within(document.querySelector("[data-plan-state]") as HTMLElement).queryByRole("button")).toBeNull();
+});

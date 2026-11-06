@@ -8,6 +8,8 @@ import { RouteBuilder } from '@/components/os/route-builder';
 import { workspaceApi } from '@/lib/api';
 import { OS_UI_ENABLED } from '@/lib/config';
 import { consentCode, type OsConsent } from '@/lib/os-consent';
+import { isStartPending, startPendingMessage, startRefusalMessage, type ConnectMessage } from '@/lib/os-connect';
+import copy from '@/components/counselor/workspace/copy.json';
 import {
   moveChoice,
   requestErrorText,
@@ -39,6 +41,7 @@ export default function OsStartPage({ params }: { params: Promise<{ workspaceId:
   const [starting, setStarting] = useState(false);
   const [consent, setConsent] = useState<OsConsent | null>(null);
   const [refused, setRefused] = useState(false);
+  const [message, setMessage] = useState<ConnectMessage | null>(null);
 
   // Slice 9a: the pilot terms come first; nothing else shows until the student agrees to the current version.
   const loadConsent = useCallback(() => workspaceApi.getOsConsent().then(
@@ -87,11 +90,21 @@ export default function OsStartPage({ params }: { params: Promise<{ workspaceId:
 
   const start = async () => {
     setStarting(true);
+    setMessage(null);
     try {
-      await workspaceApi.startOsPlan(route, { term: TERM, year },
-                                     choices.map((programme_ref, i) => ({ programme_ref, rank: i + 1 })));
+      const started = await workspaceApi.startOsPlan(route, { term: TERM, year },
+                                                     choices.map((programme_ref, i) => ({ programme_ref, rank: i + 1 })));
+      if (isStartPending(started)) {  // the Counsellor holds the route (202): no plan yet, so stay and show the note
+        setMessage(startPendingMessage(started, copy.connect));
+        return;
+      }
       router.push(`/${workspaceId}/os-inbox`);
     } catch (e) {
+      const refusal = startRefusalMessage(e, copy.connect, `/${workspaceId}`);
+      if (refusal) {
+        setMessage(refusal);
+        return;
+      }
       if (consentCode(e) === 'consent_needed') {  // the terms changed since this page loaded
         setRefused(true);
         await loadConsent();
@@ -135,7 +148,8 @@ export default function OsStartPage({ params }: { params: Promise<{ workspaceId:
                       choices={choices} onToggle={(ref) => setChoices((c) => toggleChoice(c, ref))}
                       onMove={(i, d) => setChoices((c) => moveChoice(c, i, d))} onStart={start} starting={starting}
                       openRef={openRef} openCard={open?.card ?? null} openSuggestions={open?.suggestions ?? []}
-                      onOpen={openCard} onRequest={request} requestError={requestError} requestSent={requestSent} />
+                      onOpen={openCard} onRequest={request} requestError={requestError} requestSent={requestSent}
+                      message={message} />
       )}
     </div>
   );

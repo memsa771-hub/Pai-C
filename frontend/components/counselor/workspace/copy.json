@@ -944,5 +944,32 @@
         "topic": "I want to tell you what I do well."
       }
     }
+  },
+  "connect": {
+    "start": {
+      "preparing": "Your choice was sent. Your plan will appear here when it is ready.",
+      "unchanged": "Your plan already matches this choice.",
+      "choose_field_first": "Choose your field in PAI first, then start your plan.",
+      "too_many_places": "Your choice has more places than PAI can hold. Remove some places and try again.",
+      "adopt_first": "Keep your current plan as your PAI plan first.",
+      "adopt_first_link": "Go to your journey",
+      "unavailable": "PAI cannot take this right now. Please try again in a few minutes."
+    },
+    "change": {
+      "sent_title": "Changes waiting for an answer",
+      "requested": "Your change was sent. It will show here once it is done.",
+      "request_open": "A change is already waiting. Wait for it to finish before asking for another."
+    },
+    "adoption": {
+      "linked": "Your plan is now your PAI plan.",
+      "linking_wait": "This can take a few minutes.",
+      "several_plans": "You have more than one plan, so PAI cannot keep one of them yet.",
+      "no_places": "Your plan has no places that PAI can keep.",
+      "no_intake": "Your plan has no start date that PAI can keep.",
+      "plan_changed": "Your plan changed. Look at it again, then keep it.",
+      "no_plan": "That plan is no longer there.",
+      "unavailable": "PAI cannot take this right now. Please try again in a few minutes.",
+      "other": "Your plan could not be kept. Please try again."
+    }
   }
 }

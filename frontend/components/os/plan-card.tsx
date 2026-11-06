@@ -8,6 +8,8 @@ import { workspaceApi } from '@/lib/api';
 import { OS_UI_ENABLED } from '@/lib/config';
 import { formatDue, isNotice, isWaiting, type OsInboxItem } from '@/lib/os-inbox';
 import { useT } from '@/lib/i18n';
+import type { Adoption } from '@/lib/os-connect';
+import { AdoptionOffer } from '@/components/os/adoption-offer';
 
 /** The study abroad plan on the counsellor's Journey page (pai-merge hand test: the journey said "Stage B, 1 of 11"
  * while a full plan ran beside it, unmentioned). The plan's own next step and how many are open, in one card; the
@@ -25,10 +27,19 @@ function OsPlanCardShown() {
     workspaceApi.getOsInbox().then((got) => { if (active) setItems(got); }).catch(() => {});
     return () => { active = false; };
   }, []);
+  const [adoption, setAdoption] = useState<Adoption | null>(null);
+  useEffect(() => {  // P1-T6: the offer is extra; any failure, or no offer, leaves the card exactly as it was
+    let active = true;
+    Promise.resolve().then(() => workspaceApi.getAdoption()).then((got) => { if (active) setAdoption(got); }).catch(() => {});
+    return () => { active = false; };
+  }, []);
   const open = (items ?? []).filter((i) => !isWaiting(i) && !isNotice(i));
-  if (!items || !workspaceId || (items.length === 0)) return null;
+  const offer = <AdoptionOffer adoption={adoption} />;
+  if (!items || !workspaceId || (items.length === 0)) return adoption?.offer ? offer : null;
   const next = [...open].sort((a, b) => (a.due_at ?? '9').localeCompare(b.due_at ?? '9'))[0];
   return (
+    <>
+    {offer}
     <section aria-label={t('nav.studyAbroadPlan')} className="mb-6 rounded-[22px] bg-card p-5 shadow-card ring-1 ring-border/70">
       <p className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.12em] text-muted-foreground">
         <Plane aria-hidden className="size-4 text-primary" />{t('nav.studyAbroadPlan')}
@@ -46,5 +57,6 @@ function OsPlanCardShown() {
         {t('nav.osInbox')}<ArrowRight aria-hidden className="size-4" />
       </Link>
     </section>
+    </>
   );
 }
