@@ -459,10 +459,12 @@ async def delete_folder(
 
     for record in records:
         record.status = "deleted"
+    folder_ids = [r.id for r in records]
 
     # Commit before emitting (see create_folder) so an EventRejected can't
     # silently discard the soft-delete while returning 200.
     db.commit()
+    _forget_os_documents(str(workspace.id), folder_ids)
 
     await _emit_event(
         Event(
@@ -1005,6 +1007,7 @@ async def upload_files_to_folder(
             if on_conflict == "rename":
                 target = _next_free_name(taken, folder or "", name)
             else:
+                replaced_ids = []
                 for old in db.execute(
                     select(FileRecord)
                     .where(FileRecord.workspace_id == str(workspace.id))
@@ -1012,6 +1015,12 @@ async def upload_files_to_folder(
                     .where(FileRecord.status == "active")
                 ).scalars().all():
                     old.status = "deleted"
+                    replaced_ids.append(old.id)
+                if replaced_ids and part_on("CONNECT_ONE_UPLOAD"):
+                    # P1-T7: the replaced file's OS document goes first, so the same bytes registered again for the
+                    # new file are linked, not refused as a duplicate.
+                    db.commit()
+                    _forget_os_documents(str(workspace.id), replaced_ids)
                 replaced = True
 
         content_type = upload.content_type or "application/octet-stream"
@@ -1996,6 +2005,10 @@ async def delete_file(
         return json_response(ResponseCode.UNAUTHORIZED, "Unidentified caller")
 
     record.status = "deleted"
+    forget = part_on("CONNECT_ONE_UPLOAD")
+    if forget:
+        db.commit()  # P1-T7: the OS document is forgotten only for a delete that is really committed
+        _forget_os_documents(str(workspace.id), [file_id])
 
     event = Event(
         type="workspace.file.deleted",
@@ -2007,10 +2020,5 @@ async def delete_file(
         },
     )
     await _emit_event(event, workspace, db, token=x_workspace_token or workspace.password_hash)
-
-    if part_on("CONNECT_ONE_UPLOAD"):
-        db.expire(record)  # forget only what was really committed as deleted (a rejected event commits nothing)
-        if record.status == "deleted":
-            _forget_os_documents(str(workspace.id), [file_id])
 
     return success_response({"id": file_id, "status": "deleted"})

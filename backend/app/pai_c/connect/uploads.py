@@ -15,10 +15,10 @@ from app import pai_os_bridge as bridge
 log = logging.getLogger("app.pai_c.connect.uploads")
 
 TEXTS_PATH = Path(__file__).with_name("upload_texts.yaml")
-KEYS = ("type_label", "type_none", "registered", "consent_needed", "duplicate", "unknown_type", "not_readable")
-# The refusal codes that have a sentence. `terms_not_set` and `not_on` have none (no approved copy): note is None.
+KEYS = ("type_label", "type_none", "registered", "consent_needed", "duplicate", "unknown_type", "not_readable", "not_now")
+# The sentence for each refusal code. `terms_not_set`, `not_on` and `failed` (an unexpected error) share one plain one.
 REFUSAL_TEXT = {"consent_needed": "consent_needed", "duplicate": "duplicate", "unknown_type": "unknown_type",
-                "not_readable": "not_readable"}
+                "not_readable": "not_readable", "terms_not_set": "not_now", "not_on": "not_now", "failed": "not_now"}
 
 
 def _load() -> dict[str, str]:
@@ -42,16 +42,15 @@ def text(key: str) -> str:
 def register_typed(db, workspace_id: str, file_id: str, data: bytes, filename: str, doc_type: str) -> dict:
     """Makes the stored file `file_id` an OS document of `doc_type`. Never raises: the file is already stored and an
     upload does not fail over derived state. Returns `{"id", "status", "note"}` when registered, else
-    `{"refused": code, "note": sentence | None}`. (`db` is the caller's session; the OS has its own database.)"""
+    `{"refused": code, "note": sentence}`. (`db` is the caller's session; the OS has its own database.)"""
     try:
         got = bridge.register_os_document(workspace_id, doc_type, file_id, filename, data)
     except Exception as exc:  # noqa: BLE001  (class name only: no file content, no student data)
         log.error("registering a typed upload failed: %s", type(exc).__name__)
-        return {"refused": "failed", "note": None}
+        return {"refused": "failed", "note": text("not_now")}
     code = got.get("refused")
     if code is not None:
-        key = REFUSAL_TEXT.get(code)
-        return {"refused": code, "note": text(key) if key else None}
+        return {"refused": code, "note": text(REFUSAL_TEXT.get(code, "not_now"))}
     return {"id": got["id"], "status": got["status"], "note": text("registered")}
 
 

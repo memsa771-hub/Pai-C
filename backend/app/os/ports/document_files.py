@@ -133,6 +133,9 @@ def register(student_ref: str, doc_type: str, file_ref: str, filename: str, data
         doc_id = store.create_ref(student_ref, doc_type, t.version, name,
                                   "application/pdf" if kind == "pdf" else f"image/{kind}", data, file_ref)
     except DuplicateDocument:
+        linked = store.find_by_file_ref(student_ref, file_ref)
+        if linked is not None:  # a retry of a registration that already worked: the same document, not a refusal
+            return {"id": linked.id, "status": linked.status}
         raise Refused("duplicate") from None
     doc = store.get(doc_id)
     enqueue_document(svc.dbos_client(), tenant, doc)  # if this is lost, the daily documents_retry sends it

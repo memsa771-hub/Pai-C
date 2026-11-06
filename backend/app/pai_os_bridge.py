@@ -503,6 +503,18 @@ def document_types() -> list[dict]:
         return []
 
 
+def _emit_file_deleted(db, workspace, file_id: str, filename: str) -> None:
+    from app.security.event_identity import emit_internal_event
+
+    try:
+        asyncio.run(emit_internal_event(db, workspace, type="workspace.file.deleted", source="system:pai-os",
+                                        target="core", payload={"file_id": file_id, "filename": filename}))
+        db.commit()
+    except Exception as exc:  # noqa: BLE001  (class name only)
+        db.rollback()
+        log.error("the file event of an OS delete could not be emitted: %s", type(exc).__name__)
+
+
 def on_os_document_deleted(student_ref: str, file_ref: str) -> None:
     """The OS deleted a linked document: purge the Counsellor file the way `purge_trash` does (P1-T7, D-y7): its bytes,
     its document state, the unindex job and the record. Idempotent: a file that is already gone is a no-op. A failure
@@ -521,8 +533,12 @@ def on_os_document_deleted(student_ref: str, file_ref: str) -> None:
         get_file_store().delete(record.storage_key)  # a missing object is a no-op in both stores
         DocumentArtifactService(db).purge_for_files(str(student_ref), [record.id])
         _enqueue_document_unindex(db, str(student_ref), [record.id])
+        workspace = db.get(Workspace, str(student_ref))
+        filename, record_id = record.filename, record.id
         db.delete(record)
         db.commit()
+        if workspace is not None:  # the same file event the trash purge emits; a failure here never undoes the purge
+            _emit_file_deleted(db, workspace, record_id, filename)
 
 
 def counsellor_module_on() -> bool:

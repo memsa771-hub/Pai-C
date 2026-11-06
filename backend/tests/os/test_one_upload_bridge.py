@@ -263,3 +263,56 @@ def test_off_the_os_route_is_todays(world, monkeypatch):
                         files={"file": ("t.pdf", PDF, "application/pdf")})
     assert got.status_code == 201 and world.count(models.document_files) == 1
     assert world.os_rows()[0].file_ref is None
+
+
+def test_a_retry_of_a_registration_returns_the_same_document(world):
+    world.agree()
+    first = world.upload(doc_type="transcript").json()["data"]
+    file_id = first["id"]
+    again = bridge.register_os_document(world.id, "transcript", file_id, "t.pdf", PDF)
+    assert again == {"id": first["os_document"]["id"], "status": first["os_document"]["status"]}
+    assert len(world.os_rows()) == 1
+    other = bridge.register_os_document(world.id, "transcript", "another-file", "t.pdf", PDF)  # same bytes, other file
+    assert other == {"refused": "duplicate"}
+
+
+def test_replacing_a_file_with_the_same_bytes_links_the_new_file(world):
+    world.agree()
+    first = world.client.post("/v1/files/upload", headers=world.auth, data={
+        "network": world.id, "doc_type": "transcript"}, files={"files": ("a.pdf", PDF, "application/pdf")})
+    old = first.json()["data"]["files"][0]
+    second = world.client.post("/v1/files/upload", headers=world.auth, data={
+        "network": world.id, "doc_type": "transcript", "on_conflict": "replace"},
+        files={"files": ("a.pdf", PDF, "application/pdf")})
+    new = second.json()["data"]["files"][0]
+    assert new["os_document"].get("refused") is None and new["os_document"]["id"] != old["os_document"]["id"]
+    live = [r for r in world.os_rows() if r.status != "deleted"]
+    assert [r.file_ref for r in live] == [new["id"]]
+
+
+def test_deleting_a_folder_forgets_the_os_documents(world):
+    world.agree()
+    got = world.client.post("/v1/files/upload", headers=world.auth, data={
+        "network": world.id, "doc_type": "transcript", "path": "docs"},
+        files={"files": ("a.pdf", PDF, "application/pdf")})
+    doc_id = got.json()["data"]["files"][0]["os_document"]["id"]
+    done = world.client.delete("/v1/files/folders", headers=world.auth, params={"network": world.id, "path": "docs"})
+    assert done.status_code == 200
+    assert DocumentStore(world.svc.engine, TENANT).get(doc_id).status == "deleted"
+
+
+def test_an_os_delete_emits_the_file_event_the_purge_emits(world, monkeypatch):
+    seen = []
+    from app.eventing import factory
+
+    real = factory.pipeline.process
+
+    async def spy(event, context):
+        seen.append((event.type, event.payload.get("file_id")))
+        return await real(event, context)
+
+    data = world.typed()
+    monkeypatch.setattr(factory.pipeline, "process", spy)
+    gone = world.os.delete(f"/v1/os/documents/{data['os_document']['id']}", headers={"x-test-student": world.id})
+    assert gone.status_code == 204
+    assert ("workspace.file.deleted", data["id"]) in seen
