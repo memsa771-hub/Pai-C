@@ -23,3 +23,24 @@ So, under R-68, the import loads these rows with Claude's status (`found`, `unco
 - Older column layouts (the batch 2 and 3 Programmes sheets) are mapped into the canonical layout by the import (R-67), not by hand.
 
 The files are kept unchanged as the source record. The P2 import (R-68) reads them from here.
+
+## v3 (returned by the owner on 2026-11-06)
+
+The v3 files add an AI first check on every row. Its name is "Claude – check 1". Checker 2 is empty everywhere. That check reported many tool limits: its web-reading credits ran out, some pages were blocked, and some pages were JavaScript-rendered. These are its results:
+
+| | correct | unclear | not_readable | wrong |
+|---|---|---|---|---|
+| Institutions (570) | 400 | 102 | 68 | 0 |
+| Programmes (296) | 75 | 195 | 26 | 0 |
+| Facts (336) | 92 | 199 | 44 | 1 |
+| of which high-stakes facts (303) | 89 | 175 | 39 | 0 |
+
+One programme row has no check result.
+
+**Owner decision (chat, 2026-11-06).** The batches are verified by AI, and both developers have viewed them and are comfortable with them, so they are to be used. The import applies the decision this way:
+
+- **Rows the check marked `correct`** are accepted. The record says `checked_by: "Claude – check 1"` and `accepted_by: owner, 2026-11-06`.
+- **Rows marked `unclear` or `not_readable`** are loaded as `unconfirmed`. The student sees them labelled "not confirmed yet". The P2 re-fetch and quote match (R-68) promotes a row automatically when the official page still carries the exact quote.
+- **The row marked `wrong`** goes to the review queue and is not used.
+
+v3 is the version to import. v2 is kept as history.
