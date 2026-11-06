@@ -281,7 +281,11 @@ def sweep_once(db) -> dict:
         handoff, facts = part_on("CONNECT_HANDOFF"), part_on("CONNECT_STUDENT_FACTS")
         if handoff or facts:
             if handoff:
-                deliver_choice_requests(db)  # before the pending decisions, so n+1 goes out in this sweep
+                try:
+                    deliver_choice_requests(db)  # before the pending decisions, so n+1 goes out in this sweep
+                except Exception:  # noqa: BLE001  (logged; the decisions below still go out, and the next sweep retries)
+                    db.rollback()
+                    log.exception("PAI OS sweep could not deliver choice requests")
             first = deliver_pending(db)
             if handoff:
                 _backfill(db)
