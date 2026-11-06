@@ -96,8 +96,9 @@ def build_plan_view(svc: Any, student_ref: str) -> PlanViewV1:
         waiting = conn.execute(select(func.count()).select_from(PR).where(
             PR.c.tenant_id == tenant_id, PR.c.plan_id == plan.id, PR.c.status == "pending")).scalar()
         version = decision.decision_version
-        pin = conn.execute(select(PIN.c.playbook_key).where(PIN.c.tenant_id == tenant_id, PIN.c.plan_id == plan.id)
-                           .order_by(PIN.c.version.desc(), PIN.c.id.desc()).limit(1)).scalar()
+        pin = conn.execute(select(PIN.c.playbook_key, PIN.c.version).where(
+            PIN.c.tenant_id == tenant_id, PIN.c.plan_id == plan.id)
+            .order_by(PIN.c.version.desc(), PIN.c.id.desc()).limit(1)).first()
         reason = None
         if plan.status == PLAN_CLOSED:
             cause = conn.execute(select(R.c.cause).where(
@@ -126,16 +127,20 @@ def build_plan_view(svc: Any, student_ref: str) -> PlanViewV1:
                                               c["target_intake"])
     except (KeyError, TypeError) as e:
         raise ValueError(f"plan {plan.id} has a contract without its route") from e
-    if pin is None:  # no pin: the key of the playbook this route runs on
+    if pin is None:  # no pin: the playbook this route runs on (legacy: pins are written at compile, so this takes the newest version)
         try:
-            pin = select_playbook(svc.plans.playbooks, origin, destination, level).key
+            book = select_playbook(svc.plans.playbooks, origin, destination, level)
         except PlaybookError as e:
             raise ValueError(f"plan {plan.id} has no playbook pin and no playbook serves its route") from e
+        route_key, book_key = book.key, (book.key, book.version)
+    else:
+        route_key, book_key = pin.playbook_key, (pin.playbook_key, pin.version)
+    pages = [p.key for p in (getattr(svc.plans.playbooks.get(book_key), "pages", None) or [])]  # D-z6
     # consent is the applied row's: the Counsellor holds the newest consent itself and shows it from its own side
     return PlanViewV1(
         student_ref=student_ref, state=state, state_reason=reason, plan_id=plan.id, decision_version=version,
         revision=plan.current_revision,
-        route=PlanRoute(route_key=pin, origin_country=origin, destination_country=destination, level=level,
+        route=PlanRoute(route_key=route_key, origin_country=origin, destination_country=destination, level=level,
                         target_intake=intake),
-        pages=[], consent=_consent(decision.export or {}), steps=steps, requests=[], documents_needed=[],
+        pages=pages, consent=_consent(decision.export or {}), steps=steps, requests=[], documents_needed=[],
         changes=changes, proposals_waiting=waiting)

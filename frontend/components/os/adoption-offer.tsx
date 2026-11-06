@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useMyPlan } from '@/components/os/my-plan-context';
 import { Button } from '@/components/ui/button';
 import { workspaceApi } from '@/lib/api';
 import { adoptionRefusalText, type Adoption } from '@/lib/os-connect';
@@ -16,6 +17,7 @@ export function adoptionShows(a: Adoption | null): boolean {
 /** The offer to keep a plan the student built themselves as their PAI plan (P1-T6, R-08). Every sentence is the
  * server's (`text`); with no text, or no offer, nothing shows. "Agree" is there only while the state is `ready`. */
 export function AdoptionOffer({ adoption }: { adoption: Adoption | null }) {
+  const { refresh: refreshMyPlan } = useMyPlan();
   const [state, setState] = useState<string | null>(null);  // the answer to our own POST, when there is one
   const [busy, setBusy] = useState(false);
   const [refusal, setRefusal] = useState<string | null>(null);
@@ -35,6 +37,7 @@ export function AdoptionOffer({ adoption }: { adoption: Adoption | null }) {
     setRefusal(null);
     try {
       setState((await workspaceApi.adoptPlan(adoption.plan!.plan_id)).state);
+      refreshMyPlan();  // the plan may now be the student's own: ask My plan again
     } catch (e) {
       setRefusal(adoptionRefusalText(e, copy.connect, text));
     } finally {

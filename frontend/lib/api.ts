@@ -199,6 +199,12 @@ class WorkspaceApi {
     return body.items;
   }
 
+  /** P1-T9: the student's plan page list. Throws on anything but 200 (404 while the My plan part is off). */
+  async getMyPlan(): Promise<import('./os-my-plan').MyPlan> {
+    const params = new URLSearchParams({ network: this.requireWorkspace() });
+    return this.requestJson(`/v1/os/plan?${params}`);
+  }
+
   async completeOsInboxItem(id: number, payload: Record<string, unknown> = {}): Promise<{ completed: boolean }> {
     const params = new URLSearchParams({ network: this.requireWorkspace() });
     return this.requestJson(`/v1/os/inbox/${id}/complete?${params}`, {

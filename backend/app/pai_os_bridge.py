@@ -91,6 +91,12 @@ def choice_enabled() -> bool:
     return part_on("CONNECT_HANDOFF")
 
 
+def my_plan_enabled() -> bool:
+    """True when the My plan part is on (P1-T9, R-53). The OS reads it through `mount_os(my_plan_enabled=)`; it cannot
+    read host flags itself."""
+    return part_on("CONNECT_MY_PLAN")
+
+
 def request_choice(student_ref: str, origin: str, destination: str, level: str, intake: dict,
                    choices: list[dict]) -> dict | None:
     """The route builder's ChoiceSink (P1-T6, R-09): with the hand-off part on, the student's route, intake and places

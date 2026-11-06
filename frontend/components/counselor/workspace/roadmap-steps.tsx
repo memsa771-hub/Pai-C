@@ -4,6 +4,10 @@
  * also says its status in words and shows its evidence badge, its source, the
  * rule behind it and when it happens. */
 import { CalendarClock, Check, CircleDot, ExternalLink, Hourglass } from "lucide-react";
+import { useParams } from "next/navigation";
+import Link from "next/link";
+import { useMyPlan } from "@/components/os/my-plan-context";
+import { stepLevel } from "@/lib/os-my-plan";
 import type { RouteStep, RouteTime, StepStatus } from "@/lib/roadmap";
 import { EvidenceBadge, vaultBadgeLabel } from "@/components/pai";
 import { cn } from "@/lib/utils";
@@ -11,6 +15,7 @@ import { dueText, fill, stepLabel, stepWhen, timeText } from "./roadmap-text";
 import copy from "./copy.json";
 
 const t = copy.roadmap;
+const tp = copy.connect.myPlan;
 const STYLE: Record<StepStatus, { dot: string; ink: string; bar: string; icon: typeof Check }> = {
   done: { dot: "bg-success text-white dark:text-[#04201c]", ink: "text-success-ink", bar: "bg-success", icon: Check },
   half: { dot: "bg-warning text-[#2b1700]", ink: "text-warning-ink", bar: "bg-warning", icon: Hourglass },
@@ -36,6 +41,11 @@ const host = (url: string) => {
 export function StepMeta({ step, time, showStatus = true }: { step: RouteStep; time?: RouteTime | null; showStatus?: boolean }) {
   const when = stepWhen(step, time);
   const due = dueText(step);
+  const { on } = useMyPlan();
+  const workspaceId = useParams<{ workspaceId: string }>()?.workspaceId;
+  // My plan (D-z12): a step with an estimated or provisional date says so and links to where its source is shown.
+  const level = on && step.kind === "os" && step.due_at && (step.estimated || step.provisional) ? stepLevel(step) : null;
+  const dateLink = on && step.kind === "os" && step.due_at && workspaceId;
   return (
     <div className="mt-1 flex min-w-0 flex-wrap items-center gap-x-2.5 gap-y-1 text-xs text-muted-foreground">
       {showStatus && <span data-status-word className={cn("font-semibold", STYLE[step.status]?.ink)}>{statusWord(step.status)}</span>}
@@ -47,6 +57,8 @@ export function StepMeta({ step, time, showStatus = true }: { step: RouteStep; t
       )}
       {step.owner && <span data-owner={step.owner}>{t.plan[`owner_${step.owner}`]}</span>}
       {due && <span className="inline-flex items-center gap-1"><CalendarClock aria-hidden className="size-3.5 shrink-0" /><span>{due}</span></span>}
+      {level && <span data-level={level} className="font-semibold">{tp.levels[level]}</span>}
+      {dateLink && <Link href={`/${workspaceId}/os-inbox`} className="font-medium text-primary hover:underline">{tp.dateSource}</Link>}
       {when && <span className="inline-flex items-center gap-1"><CalendarClock aria-hidden className="size-3.5 shrink-0" /><span>{when}</span></span>}
       {step.rule?.source && (
         <a href={step.rule.source} target="_blank" rel="noopener noreferrer" aria-label={fill(t.steps.ruleLabel, { host: host(step.rule.source) })}

@@ -3,6 +3,8 @@
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { FileText, Flag, GraduationCap, Inbox, Package, PenLine, Plane, type LucideIcon } from 'lucide-react';
+import copy from '@/components/counselor/workspace/copy.json';
+import { useMyPlan, type MyPlanState } from '@/components/os/my-plan-context';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { OS_FROM_STAGE, OS_REHEARSAL_UI, OS_UI_ENABLED } from '@/lib/config';
 import { useT } from '@/lib/i18n';
@@ -21,12 +23,12 @@ export const OS_PAGES = [
 
 export type OsPage = (typeof OS_PAGES)[number][0];
 
-const ICONS: Record<OsPage, LucideIcon> = {
+export const ICONS: Record<OsPage, LucideIcon> = {
   'os-start': Flag, 'os-inbox': Inbox, 'os-documents': FileText, 'os-programmes': GraduationCap,
   'os-statements': PenLine, 'os-pack': Package, 'os-visa': Plane,
 };
 
-/** Whether the study abroad plan is open to this student: from stage H ("Where to study", paths first and places
+/** Whether My plan is open to this student: from stage H ("Where to study", paths first and places
  * later), or at any stage in a rehearsal. `stageId` undefined (still loading) keeps it closed. */
 export function osOpenAt(stageId: string | undefined, rehearsal = OS_REHEARSAL_UI): boolean {
   if (!OS_UI_ENABLED) return false;
@@ -34,7 +36,12 @@ export function osOpenAt(stageId: string | undefined, rehearsal = OS_REHEARSAL_U
   return !!stageId && stageId >= OS_FROM_STAGE;
 }
 
-/** "Study abroad plan" in the counsellor's rail: the same pills, icons and current-page mark as the counsellor's own
+/** Whether the plan's places are open at all: with My plan on, when the route has pages; off, today's stage gate. */
+export function osMenuOpen(my: MyPlanState, stageId: string | undefined): boolean {
+  return my.on && my.plan!.pages !== null ? my.plan!.pages.length > 0 : osOpenAt(stageId);
+}
+
+/** "My plan" in the counsellor's rail: the same pills, icons and current-page mark as the counsellor's own
  * places, so the two read as one app. Renders nothing until the plan is open to the student (osOpenAt). */
 export function OsNavGroup({ stageId, current, collapsed = false, onNavigate }: {
   stageId?: string;
@@ -45,21 +52,45 @@ export function OsNavGroup({ stageId, current, collapsed = false, onNavigate }: 
 }) {
   const workspaceId = useParams<{ workspaceId: string }>()?.workspaceId;  // null outside a workspace route
   const t = useT();
-  if (!workspaceId || !osOpenAt(stageId)) return null;
+  const { on, plan } = useMyPlan();
+  // With My plan on (P1-T9) the group is always there and lists the route's own pages; off, today's group.
+  // `pages: null` (the route declares none) keeps today's list and gate, as with the part off
+  const mine = on && plan!.pages !== null;
+  if (!workspaceId || !(mine ? OS_UI_ENABLED : osOpenAt(stageId))) return null;
+  if (mine && plan!.pages!.length === 0 && collapsed) return null;  // nothing to show in a narrow rail
+  const name = t(on ? 'nav.myPlan' : 'nav.myPlanOff');
+  const pages: { page: OsPage; label: string }[] = mine
+    ? plan!.pages!.map((p) => ({ page: `os-${p.key}` as OsPage, label: p.label }))
+    : OS_PAGES.map(([page, key]) => ({ page, label: t(key) }));
   return (
-    <div role="group" aria-label={t('nav.studyAbroadPlan')} className="pt-4">
+    <div role="group" aria-label={name} className="pt-4">
       {!collapsed && (
         <p className="px-4 pb-1.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
-          {t('nav.studyAbroadPlan')}
+          {name}
+        </p>
+      )}
+      {mine && pages.length === 0 && !collapsed && (
+        <p className="px-4 text-sm text-muted-foreground">
+          {copy.connect.myPlan.empty}{' '}
+          {osOpenAt(stageId) && (  // the builder stays reachable before a choice
+            <>
+              <Link href={`/${workspaceId}/os-start`} onClick={() => onNavigate?.()} className="font-semibold text-primary hover:underline">
+                {t('nav.osStart')}
+              </Link>{' '}
+            </>
+          )}
+          <Link href={`/${workspaceId}?view=journey`} onClick={() => onNavigate?.()} className="font-semibold text-primary hover:underline">
+            {copy.connect.myPlan.emptyLink}
+          </Link>
         </p>
       )}
       <ul className="space-y-1">
-        {OS_PAGES.map(([page, key]) => {
-          const Icon = ICONS[page];
+        {pages.map(({ page, label }) => {
+          const Icon = ICONS[page] ?? Flag;
           const here = page === current;
           const link = (
             <Link href={`/${workspaceId}/${page}`} onClick={() => onNavigate?.()} aria-current={here ? 'page' : undefined}
-              aria-label={collapsed ? t(key) : undefined}
+              aria-label={collapsed ? label : undefined}
               className={cn(
                 'relative flex h-10 w-full items-center gap-3 rounded-full text-sm font-semibold transition-colors duration-200',
                 collapsed ? 'justify-center' : 'px-4',
@@ -67,13 +98,13 @@ export function OsNavGroup({ stageId, current, collapsed = false, onNavigate }: 
                   : 'text-muted-foreground hover:bg-accent hover:text-foreground',
               )}>
               <Icon aria-hidden className="size-[18px] shrink-0" strokeWidth={here ? 2.2 : 1.9} />
-              {!collapsed && <span className="truncate">{t(key)}</span>}
+              {!collapsed && <span className="truncate">{label}</span>}
             </Link>
           );
           return (
             <li key={page}>
               {collapsed ? (
-                <Tooltip><TooltipTrigger asChild>{link}</TooltipTrigger><TooltipContent side="right">{t(key)}</TooltipContent></Tooltip>
+                <Tooltip><TooltipTrigger asChild>{link}</TooltipTrigger><TooltipContent side="right">{label}</TooltipContent></Tooltip>
               ) : link}
             </li>
           );
