@@ -3,6 +3,9 @@
 import { use, useCallback, useEffect, useState } from 'react';
 import { notFound } from 'next/navigation';
 import { OsHeader } from '@/components/os/os-header';
+import { useMyPlan } from '@/components/os/my-plan-context';
+import { NotInPlan } from '@/components/os/not-in-plan';
+import { inPlan, pageTitle } from '@/lib/os-my-plan';
 import { ConsentCard } from '@/components/os/consent-card';
 import { DocumentConfirm } from '@/components/os/document-confirm';
 import { DocumentList } from '@/components/os/documents';
@@ -31,6 +34,8 @@ function reason(e: unknown, fallback: string): string {
 /** PAI OS documents: /<workspace>/os-documents. Hidden unless NEXT_PUBLIC_OS_ENABLED=true. */
 export default function OsDocumentsPage({ params }: { params: Promise<{ workspaceId: string }> }) {
   const { workspaceId } = use(params);
+  const { on, plan } = useMyPlan();  // P1-T9: the route's own page words; off, today's
+  const outOfPlan = on && !inPlan(plan, 'documents');  // a page the route does not have makes none of its own calls
   const { user, idToken, loading } = usePaiAuth();
   const [data, setData] = useState<OsDocuments | null>(null);
   const [openId, setOpenId] = useState<number | null>(null);
@@ -51,7 +56,7 @@ export default function OsDocumentsPage({ params }: { params: Promise<{ workspac
   ), []);
 
   useEffect(() => {
-    if (!OS_UI_ENABLED || loading) return;
+    if (!OS_UI_ENABLED || loading || outOfPlan) return;
     if (!user) {
       goToSignIn();
       return;
@@ -60,7 +65,7 @@ export default function OsDocumentsPage({ params }: { params: Promise<{ workspac
     workspaceApi.configure(workspaceId, '', idToken || undefined);
     load();
     void loadConsent();
-  }, [loading, user, idToken, workspaceId, load, loadConsent]);
+  }, [outOfPlan, loading, user, idToken, workspaceId, load, loadConsent]);
 
   const waiting = data?.documents.some((d) => d.status === 'uploaded' || d.status === 'reading') ?? false;
   useEffect(() => {
@@ -103,10 +108,12 @@ export default function OsDocumentsPage({ params }: { params: Promise<{ workspac
 
   const open: OsDocument | undefined = data?.documents.find((d) => d.id === openId);
 
+  if (outOfPlan) return <NotInPlan workspaceId={workspaceId} />;
+
   return (
     <div className="mx-auto w-full max-w-3xl">
       <OsHeader workspaceId={workspaceId} current="os-documents"
-                title={open && data ? `Check what we read: ${typeLabel(open.doc_type, data.doc_types)}` : 'Your documents'} />
+                title={open && data ? `Check what we read: ${typeLabel(open.doc_type, data.doc_types)}` : pageTitle(plan, 'documents', 'Your documents')} />
       {error && <p role="alert" className="mb-3 break-words text-sm text-destructive">{error}</p>}
       {consent && !consent.agreed && !open && (
         <div className="mb-4">

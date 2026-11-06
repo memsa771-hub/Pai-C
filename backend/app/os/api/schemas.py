@@ -518,3 +518,27 @@ class EmailStatusOut(BaseModel):
     app_url_set: bool
     counts: dict[str, int]
     last_config_error: EmailConfigErrorOut | None
+
+
+class MyPlanPage(BaseModel):
+    """One page of the student's plan as the playbook declares it (P1-T9, R-51, R-52)."""
+    key: str
+    label: str
+    title: str
+    noun: str | None = None
+
+
+class MyPlanSource(BaseModel):
+    """The oldest day a source was checked (R-54). `confirmed` is false when any reading behind it was not."""
+    checked_at: str
+    confirmed: bool
+
+
+class MyPlanOut(BaseModel):
+    state: str
+    source: str | None
+    plan_id: int | None
+    route_key: str | None
+    abroad: bool | None
+    pages: list[MyPlanPage] | None  # None: the playbook declares no pages
+    sources: dict[str, MyPlanSource]

@@ -110,13 +110,15 @@ export function shortcutLabel() {
 
 /** Jump anywhere, or hand a question straight to PAI as a draft. Nothing is
  * sent from here: asking only opens the conversation with the words typed. */
-export function CommandMenu({ open, onOpenChange, onGo, onAsk, osOpen = false }: {
+export function CommandMenu({ open, onOpenChange, onGo, onAsk, osOpen = false, pages }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onGo: (view: string) => void;
   onAsk: (text: string) => void;
-  /** Whether the study abroad plan is open to the student (osOpenAt): its pages are listed only then. */
+  /** Whether My plan is open to the student (osOpenAt): its pages are listed only then. */
   osOpen?: boolean;
+  /** With My plan on (P1-T9): the route's pages and their labels, listed under "My plan". Absent: today's list. */
+  pages?: { key: string; label: string }[];
 }) {
   const [q, setQ] = React.useState("");
   React.useEffect(() => { if (!open) setQ(""); }, [open]);
@@ -161,11 +163,12 @@ export function CommandMenu({ open, onOpenChange, onGo, onAsk, osOpen = false }:
           })}
         </CommandGroup>
         {OS_UI_ENABLED && osOpen && workspaceId && (
-          <CommandGroup heading={t("nav.studyAbroadPlan")}>
-            {OS_PAGES.map(([page, key]) => (
-              <CommandItem key={page} value={`${t("nav.studyAbroadPlan")} ${t(key)}`}
+          <CommandGroup heading={t(pages ? "nav.myPlan" : "nav.myPlanOff")}>
+            {(pages ? pages.map((p) => [`os-${p.key}`, p.label] as const)
+              : OS_PAGES.map(([page, key]) => [page, t(key)] as const)).map(([page, label]) => (
+              <CommandItem key={page} value={`${t(pages ? "nav.myPlan" : "nav.myPlanOff")} ${label}`}
                 onSelect={() => run(() => router.push(`/${workspaceId}/${page}`))}>
-                <span>{t(key)}</span>
+                <span>{label}</span>
               </CommandItem>
             ))}
           </CommandGroup>

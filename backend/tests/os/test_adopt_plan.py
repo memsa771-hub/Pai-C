@@ -134,13 +134,35 @@ def test_self_serve_plan_query(world):
     got = plan_query.self_serve_plan(STUDENT)
     assert got == {"plan_id": plan_id, "route_key": "germany_master", "origin": "PK", "destination": "DE",
                    "level": "master", "intake": {"term": "winter", "year": 2027}, "programmes": SAMPLE_PLACES,
-                   "contract_sha256": plan_row(world, plan_id).contract_sha256, "open_plans": 1}
+                   "contract_sha256": plan_row(world, plan_id).contract_sha256, "open_plans": 1,
+                   "identity_taken": False}
     second = world.plans.start_plan(self_contract(places=SAMPLE_PLACES[:1], external_ref=f"self:{STUDENT}:other:winter:2028",
                                                   target_intake={"term": "winter", "year": 2028})).plan_id
     assert plan_query.self_serve_plan(STUDENT)["open_plans"] == 2 and plan_query.self_serve_plan(STUDENT)["plan_id"] == second
     world.kernel.close_plan(plan_id, "test")
     world.kernel.close_plan(second, "test")
     assert plan_query.self_serve_plan(STUDENT) is None
+
+
+def test_self_serve_plan_query_says_when_the_identity_is_taken(world):
+    """The full identity `{journey}:{destination}:{level}` is held by a Counsellor plan, open or closed. Without the
+    active journey id there is no identity block; an older journey's plan on the same route does not block."""
+    plan_id = self_plan(world)
+    assert plan_query.self_serve_plan(STUDENT, "j-sample-1")["identity_taken"] is False
+    older = world.plans.start_plan(intake_mod._v1_contract(intake_mod.DecisionRecordV2.model_validate(
+        chosen(1, journey_id="j-old")))).plan_id
+    assert plan_query.self_serve_plan(STUDENT, "j-sample-1")["identity_taken"] is False  # an older journey
+    assert plan_query.self_serve_plan(STUDENT, "j-old")["identity_taken"] is True
+    taken = world.plans.start_plan(intake_mod._v1_contract(intake_mod.DecisionRecordV2.model_validate(
+        chosen(1)))).plan_id
+    assert plan_query.self_serve_plan(STUDENT, "j-sample-1")["identity_taken"] is True
+    assert plan_query.self_serve_plan(STUDENT)["identity_taken"] is False  # no journey id: no block
+    world.kernel.close_plan(taken, "test")
+    assert plan_query.self_serve_plan(STUDENT, "j-sample-1")["identity_taken"] is True  # a closed plan keeps it
+    with world.engine.begin() as conn:  # the same text under another student does not count
+        conn.execute(update(P).where(P.c.id.in_([taken, older])).values(student_ref="someone-else"))
+    assert plan_query.self_serve_plan(STUDENT, "j-sample-1")["identity_taken"] is False
+    assert plan_row(world, plan_id).source == "self_serve"
 
 
 # --- intake -----------------------------------------------------------------------------------------------------

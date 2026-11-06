@@ -32,11 +32,11 @@ requirements:
   R-04: {title: "Every change shows the same result in both products", phases: [P1], built: false}
   R-05: {title: "Nightly consistency job and end-of-test check run all rules", phases: [P1], built: false}
   R-06: {title: "Withdrawing a choice stops the plan, closed as withdrawn", phases: [P1], built: true}
-  R-07: {title: "OS never changes the choice; proposals go via choice_request", phases: [P1], built: false}
-  R-08: {title: "Self-serve plan is adopted when Counsellor on and student agrees", phases: [P1], built: false}
-  R-09: {title: "With Counsellor on, route builder writes through decision service", phases: [P1], built: false}
+  R-07: {title: "OS never changes the choice; proposals go via choice_request", phases: [P1], built: true}
+  R-08: {title: "Self-serve plan is adopted when Counsellor on and student agrees", phases: [P1], built: true}
+  R-09: {title: "With Counsellor on, route builder writes through decision service", phases: [P1], built: true}
   R-10: {title: "Hand-off consent required; guardian consent by email for under-18s", phases: [P1, P5], built: true}
-  R-11: {title: "Escalations accept all five reasons and return student to choosing", phases: [P1], built: false}
+  R-11: {title: "Escalations accept all five reasons and return student to choosing", phases: [P1], built: true}
   R-12: {title: "A crash anywhere loses nothing and duplicates nothing", phases: [P1], built: true}
   R-13: {title: "OS reads student facts from the Vault with evidence levels", phases: [P1], built: true}
   R-14: {title: "OS derives applicable levels and routes from the Vault", phases: [P1], built: true}
@@ -75,12 +75,12 @@ requirements:
   R-47: {title: "Counsellor fixes from the live run", phases: [P0], built: true}
   R-48: {title: "Merit and admission answers come from MeritCheck and ProgrammeFacts", phases: [P2], built: false}
   R-49: {title: "Stage H lists places from OS registry with coverage level", phases: [P3, P4], built: false}
-  R-50: {title: "Study abroad plan renamed My plan everywhere", phases: [P1], built: false}
-  R-51: {title: "Each route declares its plan pages", phases: [P1], built: false}
-  R-52: {title: "Step, page and pack wording come from route data", phases: [P1], built: false}
-  R-53: {title: "My plan visible from the start with an empty state", phases: [P1], built: false}
-  R-54: {title: "Every fact on screen shows source, date and level", phases: [P1], built: false}
-  R-55: {title: "Label test fails on another route's country, body or document", phases: [P1], built: false}
+  R-50: {title: "Study abroad plan renamed My plan everywhere", phases: [P1], built: true}
+  R-51: {title: "Each route declares its plan pages", phases: [P1], built: true}
+  R-52: {title: "Step, page and pack wording come from route data", phases: [P1], built: true}
+  R-53: {title: "My plan visible from the start with an empty state", phases: [P1], built: true}
+  R-54: {title: "Every fact on screen shows source, date and level", phases: [P1], built: true}
+  R-55: {title: "Label test fails on another route's country, body or document", phases: [P1], built: true}
   R-56: {title: "Every phase: spec, plan, build, gate, handoff, sign-off", phases: [P5], built: false}
   R-57: {title: "Requirement traceability check in CI", phases: [P0], built: true}
   R-58: {title: "Fake routes stay in tests; red-flag search for country names", phases: [P0], built: true}

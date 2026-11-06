@@ -3,11 +3,15 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { ArrowRight, Plane } from 'lucide-react';
+import { ArrowRight, ListChecks, Plane } from 'lucide-react';
+import copy from '@/components/counselor/workspace/copy.json';
+import { useMyPlan } from '@/components/os/my-plan-context';
 import { workspaceApi } from '@/lib/api';
 import { OS_UI_ENABLED } from '@/lib/config';
 import { formatDue, isNotice, isWaiting, type OsInboxItem } from '@/lib/os-inbox';
 import { useT } from '@/lib/i18n';
+import type { Adoption } from '@/lib/os-connect';
+import { AdoptionOffer, adoptionShows } from '@/components/os/adoption-offer';
 
 /** The study abroad plan on the counsellor's Journey page (pai-merge hand test: the journey said "Stage B, 1 of 11"
  * while a full plan ran beside it, unmentioned). The plan's own next step and how many are open, in one card; the
@@ -19,19 +23,41 @@ export function OsPlanCard() {
 function OsPlanCardShown() {
   const workspaceId = useParams<{ workspaceId: string }>()?.workspaceId;  // null outside a workspace route
   const t = useT();
+  const { on, plan } = useMyPlan();
   const [items, setItems] = useState<OsInboxItem[] | null>(null);
   useEffect(() => {
     let active = true;
     workspaceApi.getOsInbox().then((got) => { if (active) setItems(got); }).catch(() => {});
     return () => { active = false; };
   }, []);
+  const [adoption, setAdoption] = useState<Adoption | null>(null);
+  useEffect(() => {  // P1-T6: the offer is extra; any failure, or no offer, leaves the card exactly as it was
+    let active = true;
+    Promise.resolve().then(() => workspaceApi.getAdoption()).then((got) => { if (active) setAdoption(got); }).catch(() => {});
+    return () => { active = false; };
+  }, []);
   const open = (items ?? []).filter((i) => !isWaiting(i) && !isNotice(i));
-  if (!items || !workspaceId || (items.length === 0)) return null;
+  const offer = <AdoptionOffer adoption={adoption} />;
+  const name = t(on ? 'nav.myPlan' : 'nav.myPlanOff');
+  const Icon = on ? ListChecks : Plane;  // D-z10: a plane only belongs to a route that leaves the country
+  if (on && workspaceId && plan?.state === 'empty' && !adoptionShows(adoption)) {  // R-53: visible before a choice
+    return (
+      <section aria-label={name} className="mb-6 rounded-[22px] bg-card p-5 shadow-card ring-1 ring-border/70">
+        <p className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.12em] text-muted-foreground">
+          <Icon aria-hidden className="size-4 text-primary" />{name}
+        </p>
+        <p className="mt-2 text-sm">{copy.connect.myPlan.empty}</p>
+      </section>
+    );
+  }
+  if (!items || !workspaceId || (items.length === 0)) return adoptionShows(adoption) ? offer : null;
   const next = [...open].sort((a, b) => (a.due_at ?? '9').localeCompare(b.due_at ?? '9'))[0];
   return (
-    <section aria-label={t('nav.studyAbroadPlan')} className="mb-6 rounded-[22px] bg-card p-5 shadow-card ring-1 ring-border/70">
+    <>
+    {offer}
+    <section aria-label={name} className="mb-6 rounded-[22px] bg-card p-5 shadow-card ring-1 ring-border/70">
       <p className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.12em] text-muted-foreground">
-        <Plane aria-hidden className="size-4 text-primary" />{t('nav.studyAbroadPlan')}
+        <Icon aria-hidden className="size-4 text-primary" />{name}
       </p>
       <p className="mt-2 text-sm">
         {open.length === 0 ? 'Nothing waits on you right now.' : `${open.length} ${open.length === 1 ? 'step waits' : 'steps wait'} on you.`}
@@ -46,5 +72,6 @@ function OsPlanCardShown() {
         {t('nav.osInbox')}<ArrowRight aria-hidden className="size-4" />
       </Link>
     </section>
+    </>
   );
 }

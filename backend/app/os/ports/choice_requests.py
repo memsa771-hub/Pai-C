@@ -68,6 +68,31 @@ def decision_version_of(conn: Connection, tenant_id: str, plan_id: int) -> int |
         I.c.tenant_id == tenant_id, I.c.plan_id == plan_id)).scalar()
 
 
+_APPLIED = ("planned", "revised", "replaced")  # intake statuses that put a version on the plan (not paused, not refused)
+
+
+def _applied_version(conn: Connection, tenant_id: str, plan_id: int) -> int | None:
+    """The newest decision version the plan has actually applied."""
+    I = models.counsellor_intake
+    return conn.execute(select(func.max(I.c.decision_version)).where(
+        I.c.tenant_id == tenant_id, I.c.plan_id == plan_id, I.c.status.in_(_APPLIED))).scalar()
+
+
+def _refused(conn: Connection, tenant_id: str, plan_id: int, version: int) -> bool:
+    """Whether the request can never be applied: the student's intake refused exactly this version, or the newest
+    processed intake row at or above it is a refusal (n+1 went stale because n+2 was stored, and n+2 was refused).
+    A refusal may have no plan, so rows are found by student."""
+    P, I = models.plans, models.counsellor_intake
+    student = conn.execute(select(P.c.student_ref).where(P.c.id == plan_id, P.c.tenant_id == tenant_id)).scalar()
+    if student is None:
+        return False
+    rows = conn.execute(select(I.c.decision_version, I.c.status).where(
+        I.c.tenant_id == tenant_id, I.c.student_ref == student, I.c.decision_version >= version,
+        I.c.status != "pending").order_by(I.c.decision_version.desc())).all()
+    exact = any(r.decision_version == version and r.status == "refused" for r in rows)
+    return exact or (bool(rows) and rows[0].status == "refused")
+
+
 def check_places(programmes: Sequence[ProgrammeChoice]) -> None:
     """Raises ValueError (a pydantic ValidationError) when the places cannot be sent: too many, or ranks not 1..n."""
     ChoiceRequestV1(key="check", student_ref="check", journey_id="check", proposal_id=0, based_on_version=1,
@@ -141,9 +166,12 @@ def mark_delivery(key: str, outcome: str, version: int | None = None) -> None:
         if proposal is not None and outcome != "skipped":
             if outcome in ("written", "duplicate"):
                 store.set_requested_version(proposal.id, version, outcome, conn=conn)
-                applied = decision_version_of(conn, tenant, proposal.plan_id)
-                if applied is not None and applied >= version:
-                    store.settle_requested(proposal.plan_id, applied, None, conn=conn)
+                if _refused(conn, tenant, proposal.plan_id, version):  # never applied, and a later copy cannot settle it
+                    store.expire_requested(proposal.id, None, conn=conn)
+                else:
+                    applied = _applied_version(conn, tenant, proposal.plan_id)
+                    if applied is not None and applied >= version:
+                        store.settle_requested(proposal.plan_id, applied, None, conn=conn)
             else:
                 store.expire_requested(proposal.id, outcome, conn=conn)
         conn.execute(update(O).where(O.c.tenant_id == tenant, O.c.channel == CHANNEL, O.c.template == TEMPLATE,

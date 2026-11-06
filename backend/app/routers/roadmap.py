@@ -274,6 +274,11 @@ def offered_places(destination: str = Query(...), level: str = Query(...), term:
         db, str(workspace.id), destination, level, term, year)})
 
 
+def _journey_id(db, workspace_id: str) -> str | None:
+    journey = RouteDecisionService(db)._journey(workspace_id)
+    return None if journey is None else str(journey.id)
+
+
 @router.get("/adoption")
 def adoption_offer(network: str = Query(...), db=Depends(get_db), x_workspace_token: str | None = Header(None),
                    authorization: str | None = Header(None)):
@@ -285,13 +290,13 @@ def adoption_offer(network: str = Query(...), db=Depends(get_db), x_workspace_to
     if not (_handoff_on() and flags.part_on("CONNECT_MY_PLAN")):
         return none
     workspace_id = str(workspace.id)
-    plan = pai_os_bridge.self_serve_plan(workspace_id)
+    plan = pai_os_bridge.self_serve_plan(workspace_id, _journey_id(db, workspace_id))
     if plan is None:
         return none
     state = RouteDecisionService(db).adoption_state(workspace_id, plan)
     if state == "no_journey":
         return none
-    if state in ("several_plans", "no_places", "no_intake"):  # nothing to offer; the state says why
+    if state in ("several_plans", "identity_taken", "no_places", "no_intake"):  # nothing to offer; the state says why
         return success_response({"offer": False, "state": state})
     return success_response({"offer": True, "state": state, "text": adoption_texts.texts(),
                              "plan": {"plan_id": plan["plan_id"], "route_key": plan["route_key"],
@@ -308,7 +313,7 @@ def adopt_plan(body: AdoptAction, network: str = Query(...), db=Depends(get_db),
     _need_handoff()
     workspace_id = str(workspace.id)
     service = RouteDecisionService(db)
-    plan = pai_os_bridge.self_serve_plan(workspace_id)
+    plan = pai_os_bridge.self_serve_plan(workspace_id, _journey_id(db, workspace_id))
     if plan is None:  # already adopted? the newest decision is the one this plan's adoption wrote
         newest = service.newest(workspace_id)
         if newest is not None and (newest.request_key or "").startswith(f"adopt:{body.plan_id}:"):

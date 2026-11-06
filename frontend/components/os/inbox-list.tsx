@@ -23,6 +23,9 @@ import {
   collapseNotices,
 } from '@/lib/os-inbox';
 import { statusLabel, type FactStatus } from '@/lib/os-programmes';
+import { factLevel, stepLevel, weakerLevel } from '@/lib/os-my-plan';
+import { FactSource } from './fact-source';
+import { useMyPlan } from './my-plan-context';
 import { checkLabel, chipLabel, chipTone, lineText, type OsNote } from '@/lib/os-self-serve';
 
 interface InboxListProps {
@@ -79,6 +82,7 @@ export function InboxList({ items, now, onComplete, busyId = null, factStatus = 
   const [asking, setAsking] = useState<{ id: number; action: CompleteAction } | null>(null);
   // focus (batch B review): into the question when it opens, back to the button that opened it on Cancel
   const [returnTo, setReturnTo] = useState<string | null>(null);
+  const { on } = useMyPlan();
   const root = useRef<HTMLDivElement>(null);
   const cancel = useRef<HTMLButtonElement>(null);
   useEffect(() => {
@@ -116,7 +120,7 @@ export function InboxList({ items, now, onComplete, busyId = null, factStatus = 
             {groupItemsList.map((item) => {
               const due = formatDue(item);
               const fact = item.programme_ref ? factStatus[item.programme_ref] : null;
-              const labels = [...dateLabels(item), ...(due && fact ? [statusLabel(fact)] : [])];
+              const labels = on ? [] : [...dateLabels(item), ...(due && fact ? [statusLabel(fact)] : [])];
               const source = item.citations[0];
               const prog = programmeName(item, names);
               const hint = actionHint(item);
@@ -151,7 +155,15 @@ export function InboxList({ items, now, onComplete, busyId = null, factStatus = 
                         </p>
                       )}
                       {note && <p className="mt-0.5 break-words text-xs text-muted-foreground">{note}</p>}
-                      {source && (
+                      {on && (due || source) && (
+                        <p className="mt-1">
+                          <FactSource
+                            level={due ? (fact ? weakerLevel(stepLevel(item), factLevel(fact)) : stepLevel(item)) : null}
+                            url={source?.url}
+                          />
+                        </p>
+                      )}
+                      {!on && source && (
                         <a
                           href={source.url}
                           target="_blank"

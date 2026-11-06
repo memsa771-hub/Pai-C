@@ -92,6 +92,12 @@ def choice_enabled() -> bool:
     return part_on("CONNECT_HANDOFF")
 
 
+def my_plan_enabled() -> bool:
+    """True when the My plan part is on (P1-T9, R-53). The OS reads it through `mount_os(my_plan_enabled=)`; it cannot
+    read host flags itself."""
+    return part_on("CONNECT_MY_PLAN")
+
+
 def request_choice(student_ref: str, origin: str, destination: str, level: str, intake: dict,
                    choices: list[dict]) -> dict | None:
     """The route builder's ChoiceSink (P1-T6, R-09): with the hand-off part on, the student's route, intake and places
@@ -124,8 +130,9 @@ def request_choice(student_ref: str, origin: str, destination: str, level: str, 
     return {"outcome": outcome, "decision_version": version, "code": code}
 
 
-def self_serve_plan(workspace_id: str) -> dict | None:
+def self_serve_plan(workspace_id: str, journey_id: str | None = None) -> dict | None:
     """The student's open self-serve plan as `plan_query.self_serve_plan` gives it (P1-T6, R-08), for the adoption offer.
+    `journey_id` is the student's active journey: without it the plan never reads as `identity_taken`.
     None when there is none, when the `counsellor` module is off, when PAI OS is not mounted and on any failure (logged by
     type only)."""
     if not counsellor_module_on():
@@ -133,7 +140,7 @@ def self_serve_plan(workspace_id: str) -> dict | None:
     try:
         from app.os.ports import plan_query
 
-        return plan_query.self_serve_plan(str(workspace_id))
+        return plan_query.self_serve_plan(str(workspace_id), journey_id)
     except ports.OsUnavailable:
         return None
     except Exception as exc:  # noqa: BLE001
@@ -315,6 +322,14 @@ def _backfill_vault(db) -> None:
             log.error("PAI OS vault backfill failed for one student: %s", type(exc).__name__)
 
 
+def _is_fact_change(e) -> bool:
+    """Whether the escalation was raised for a Vault fact change (R-22): a hand-off-only route problem."""
+    try:
+        return os_escalation.event_type_of(e.key) == "student_fact_changed"
+    except ports.OsUnavailable:
+        return False
+
+
 def _deliver(db) -> dict:
     from app.routers.escalations import EscalationInput, escalate
 
@@ -323,8 +338,22 @@ def _deliver(db) -> dict:
         if not config.PAI_OS_SERVICE_TOKEN:
             got["waiting"] += 1  # not configured: tried again on the next sweep
             continue
+        handoff = part_on("CONNECT_HANDOFF")
+        if not handoff:
+            try:
+                fact_change = _is_fact_change(e)
+                if fact_change:
+                    # A fact change is a route problem only for the hand-off (R-22); without it the Counsellor was
+                    # never told and still is not: no endpoint call; the row is dropped, the case left as it was.
+                    os_escalation.drop_counsellor_escalation(e.key, "handoff_off")
+            except Exception as exc:  # noqa: BLE001  (one bad row never ends the sweep; class name only)
+                log.error("PAI OS escalation could not be checked for the hand-off: %s", type(exc).__name__)
+                got["waiting"] += 1
+                continue
+            if fact_change:
+                got["refused"] += 1
+                continue
         try:
-            handoff = part_on("CONNECT_HANDOFF")
             if handoff:  # the five reasons go as they are, with the decision version they belong to
                 body = EscalationInput(workspace_id=e.student_ref, journey_id=e.journey_id, reason_type=e.reason,
                                        details=e.note, decision_version=e.decision_version)

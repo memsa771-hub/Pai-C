@@ -9,7 +9,8 @@ from fastapi.responses import JSONResponse
 
 from datetime import date
 
-from app.os import clock
+from app.os import clock, my_plan as my_plan_view
+from app.os.ports import my_plan as my_plan_gate
 from app.os.costs import cost_report
 from app.os.api.deps import check_admin, current_student_ref, current_student_ref_for_write
 from app.os.api.queries import (
@@ -41,6 +42,7 @@ from app.os.api.schemas import (
     DocumentsOut,
     FindingOut,
     InboxOut,
+    MyPlanOut,
     OpenFactsOut,
     PlanOut,
     ProfileOut,
@@ -276,6 +278,14 @@ def build_router(get_services: Callable[[], Services]) -> APIRouter:
         return {"programmes": student_programmes(svc.engine, svc.settings.tenant_id, student)}
 
     # --- Slice 4: self-serve start and eligibility (spec §4). Eligibility warns, never blocks (S4-D5). ----------
+
+    def my_plan_on() -> None:
+        if not my_plan_gate.enabled():  # P1-T9: off, the route does not exist (the body FastAPI gives an unknown one)
+            raise HTTPException(status_code=404, detail="Not Found")
+
+    @router.get("/plan", response_model=MyPlanOut, dependencies=[Depends(my_plan_on)])
+    def my_plan(student: str = Depends(current_student_ref), svc: Services = Depends(services)) -> dict:
+        return my_plan_view.build_my_plan(svc, student)
 
     @router.get("/routes", response_model=RoutesOut)
     def routes(student: str = Depends(current_student_ref), svc: Services = Depends(services)) -> dict:

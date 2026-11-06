@@ -106,7 +106,8 @@ class Replanner:
         firm = {ref for ref, card in cards.items()
                 if any(ln.status == "likely_below" and not ln.provisional for ln in card.lines)}
         self._expire_stale_removals(plan_id, firm)
-        held = {op.get("programme_ref") for p in self.proposals.for_plan(plan_id) if p.status == "pending"
+        held = {op.get("programme_ref") for p in self.proposals.for_plan(plan_id)
+                if p.status in ("pending", "requested")  # a removal asked of the Counsellor still holds its programme
                 for op in p.ops if op.get("op") == "cancel_programme"}
         return tuple(ref for ref in cards if ref in firm and ref not in held)
 

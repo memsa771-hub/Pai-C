@@ -46,7 +46,7 @@ def world(os_stub):  # noqa: F811
         return got["recorded"]
 
     with flag(True), patch.object(config, "CONNECT_MY_PLAN", True, create=True), \
-            patch.object(bridge, "self_serve_plan", lambda ws: got["plan"]), \
+            patch.object(bridge, "self_serve_plan", lambda ws, journey_id=None: got["plan"]), \
             patch.object(bridge, "request_adoption", request):
         yield got
 
@@ -163,7 +163,7 @@ def test_bridge_asks_nothing_about_a_plan_while_the_os_module_is_off(monkeypatch
     from app.os.ports import plan_query, plan_source
 
     asked = []
-    monkeypatch.setattr(plan_query, "self_serve_plan", lambda ref: asked.append(ref) or plan())
+    monkeypatch.setattr(plan_query, "self_serve_plan", lambda ref, journey_id=None: asked.append(ref) or plan())
     monkeypatch.setattr(plan_source, "counsellor_enabled", lambda: False)
     assert bridge.self_serve_plan("ws-1") is None and asked == []
     monkeypatch.setattr(plan_source, "counsellor_enabled", lambda: True)
@@ -181,11 +181,11 @@ def test_no_offer_while_the_os_module_is_off(world, monkeypatch):
         assert agree(client, params).status_code == 409  # the hand-off part is off with the module
 
 
-def test_several_plans_no_places_and_no_intake_offer_nothing_and_post_writes_nothing(world):
+def test_several_plans_no_places_no_intake_and_taken_identity_offer_nothing_and_post_writes_nothing(world):
     with pre_eng() as (client, student, params):
         chosen(client, params, student)
         for key, changed, code in (("open_plans", 2, "several_plans"), ("programmes", [], "no_places"),
-                                   ("intake", None, "no_intake")):
+                                   ("intake", None, "no_intake"), ("identity_taken", True, "identity_taken")):
             world["plan"] = {**plan(), key: changed}
             assert offer(client, params) == {"offer": False, "state": code}
             r = agree(client, params)

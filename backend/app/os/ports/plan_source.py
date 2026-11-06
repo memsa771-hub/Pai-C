@@ -85,7 +85,8 @@ def pause_for_escalation(student_ref: str, decision_version: int | None, reason:
     reason code. When a version is given, only a plan that has applied that version or a newer one is paused (the
     Counsellor refuses an escalation for a choice that was since changed; a plan that has not reached the version
     yet is not the one it is about). A plan already paused for a missing consent takes the escalation reason, which
-    a later consent never replaces. False when there is no such plan or it is closed."""
+    a later consent never replaces. The plan's `requested` choice changes expire (their outcome stays as delivered).
+    False when there is no such plan or it is closed."""
     svc = ports.services()
     tenant = svc.settings.tenant_id
     P = models.plans
@@ -96,6 +97,12 @@ def pause_for_escalation(student_ref: str, decision_version: int | None, reason:
     for plan_id in ids:
         held = applied_version(svc.engine, tenant, plan_id)
         if decision_version is None or (held is not None and held >= decision_version):
+            from app.os.replan.store import ProposalStore  # late: the replan code imports the ports
+
+            proposals = ProposalStore(svc.engine, tenant)
+            for p in proposals.for_plan(plan_id):  # a choice change asked of the Counsellor is moot now
+                if p.status == "requested":
+                    proposals.expire_requested(p.id, None)
             return svc.kernel.pause_plan(plan_id, reason) or svc.kernel.set_pause_reason(plan_id, reason)
     return False
 

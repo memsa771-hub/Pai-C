@@ -338,3 +338,66 @@ def test_mark_delivery_is_one_transaction(world):
         assert f.proposal(pid).status == "requested" and f.requests()[0].status == "pending"
         choice_requests.mark_delivery(choice_requests.key_of(pid), "stale")
         assert f.proposal(pid).status == "expired" and f.requests()[0].status == "sent"
+
+
+def intake_at(f, version: int, status: str, plan_id: int | None, n: int = 0) -> None:
+    I = models.counsellor_intake
+    with f.svc.engine.begin() as conn:
+        conn.execute(I.insert().values(
+            tenant_id="pai", decision_id=f"x-{version}-{status}-{n}", student_ref=f.ref, journey_id="j-x", export={},
+            export_sha256="0" * 64, chosen_at=datetime(2026, 11, 6, tzinfo=timezone.utc), status=status,
+            plan_id=plan_id, decision_version=version))
+
+
+def test_mark_delivery_does_not_settle_on_a_paused_row(world):
+    """A paused row (consent missing) has not applied the version: the request stays `requested`."""
+    with flow(world) as f:
+        pid = f.propose()
+        f.r.accept(f.ref, pid)
+        intake_at(f, 2, "paused", f.plan_id())
+        choice_requests.mark_delivery(choice_requests.key_of(pid), "written", 2)
+        p = f.proposal(pid)
+        assert p.status == "requested" and p.requested_version == 2
+
+
+def test_mark_delivery_expires_when_the_intake_refused_that_version(world):
+    """The intake refused n+1 before the mark arrived (a refusal has no plan): the request ends `expired`, outcome as
+    delivered, and a later applied consent copy (n+2) does not settle it."""
+    with flow(world) as f:
+        pid = f.propose()
+        f.r.accept(f.ref, pid)
+        intake_at(f, 2, "refused", None)
+        intake_at(f, 3, "revised", f.plan_id())
+        choice_requests.mark_delivery(choice_requests.key_of(pid), "written", 2)
+        p = f.proposal(pid)
+        assert p.status == "expired" and p.request_outcome == "written" and p.requested_version == 2
+
+
+def test_mark_delivery_settles_on_a_later_applied_version(world):
+    with flow(world) as f:
+        pid = f.propose()
+        f.r.accept(f.ref, pid)
+        intake_at(f, 3, "revised", f.plan_id())
+        choice_requests.mark_delivery(choice_requests.key_of(pid), "written", 2)
+        assert f.proposal(pid).status == "accepted"
+
+
+def test_mark_delivery_expires_when_a_later_version_was_refused_and_n_plus_1_went_stale(world):
+    """n+1 went stale at intake (n+2 was already stored), n+2 was refused, and the mark arrives after both."""
+    with flow(world) as f:
+        pid = f.propose()
+        f.r.accept(f.ref, pid)
+        intake_at(f, 2, "stale", None)
+        intake_at(f, 3, "refused", None)
+        choice_requests.mark_delivery(choice_requests.key_of(pid), "written", 2)
+        p = f.proposal(pid)
+        assert p.status == "expired" and p.request_outcome == "written"
+
+
+def test_mark_delivery_ignores_a_pending_later_row(world):
+    with flow(world) as f:
+        pid = f.propose()
+        f.r.accept(f.ref, pid)
+        intake_at(f, 3, "pending", None)
+        choice_requests.mark_delivery(choice_requests.key_of(pid), "written", 2)
+        assert f.proposal(pid).status == "requested"

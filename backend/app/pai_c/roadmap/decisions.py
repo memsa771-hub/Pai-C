@@ -296,13 +296,6 @@ class RouteDecisionService:
         with plan_adapter.pinned_read(new):
             return plan_adapter.chosen(new, RoadmapEngine(self.db).build(workspace_id)["fields"])
 
-    @staticmethod
-    def _choice_of(row: RouteDecision) -> tuple:
-        """What a choice request is checked against: refs in order, intake, destination, level and field."""
-        refs = tuple(p["programme_ref"] for p in sorted(row.places or [], key=lambda p: p["rank"]))
-        intake = (row.intake["term"], row.intake["year"]) if row.intake else None
-        return refs, intake, row.destination_country, row.level, row.field_key
-
     def apply_choice_request(self, workspace_id: str, request: dict) -> tuple[str, "int | None | str"]:
         """Writes an accepted PAI OS choice request (`choice_request.v1`, R-07) as the next decision version, once, and
         only while the choice it was made against is still the newest. Returns `("written", n+1)`,
@@ -322,7 +315,7 @@ class RouteDecisionService:
         base = self.db.scalar(select(RouteDecision).where(
             RouteDecision.workspace_id == workspace_id, RouteDecision.decision_version == request["based_on_version"]))
         if (base is None or newest.status != "chosen" or newest.withdrawn_at is not None
-                or self._choice_of(base) != self._choice_of(newest)):
+                or choice_of(base) != choice_of(newest)):
             return "stale", None
         if not newest.os_supported:
             return "refused", "not_supported"
@@ -343,7 +336,15 @@ class RouteDecisionService:
         self.db.add(new)
         self.db.flush()
         outbox.record(self.db, new)
+        self._after_os_write(workspace_id, "system:os_choice_request")
         return "written", new.decision_version
+
+    def _after_os_write(self, workspace_id: str, actor: str) -> None:
+        """A choice the OS wrote after an escalation (D-x9): a journey held at PROPOSED follows the active decision
+        to CHOSEN at once; `_escalated` still holds it for a consent copy or the same choice. No commit."""
+        journey = self._journey(workspace_id)
+        if journey is not None and journey.current_stage == "PROPOSED":
+            self.follow_active(workspace_id, actor=actor)
 
     MAX_PLACES = 5  # decision_record.v2 holds at most five places
 
@@ -378,10 +379,10 @@ class RouteDecisionService:
                                                           RouteDecision.request_key == key))
         if done is not None:
             return "unchanged", done.decision_version, None
-        return self._write_from(active, key, origin, destination, level, wanted, want_intake)
+        return self._write_from(active, key, origin, destination, level, wanted, want_intake, "system:os_builder")
 
     def _write_from(self, active: RouteDecision, key: str, origin: str, destination: str, level: str,
-                    wanted: list[dict], want_intake: dict) -> tuple[str, "int | None", "str | None"]:
+                    wanted: list[dict], want_intake: dict, actor: str) -> tuple[str, "int | None", "str | None"]:
         """The next version after `active`, copying everything but the route, places and intake from it (D-x4). The
         old row leaves the partial unique index before the new one enters. No commit."""
         values = {name: getattr(active, name) for name in self._COPIED}
@@ -396,11 +397,13 @@ class RouteDecisionService:
         self.db.add(new)
         self.db.flush()
         outbox.record(self.db, new)
+        self._after_os_write(active.workspace_id, actor)
         return "written", new.decision_version, None
 
     def adoption_state(self, workspace_id: str, plan: dict, *, lock: bool = False) -> str:
         """Whether the student can keep their self-serve plan now: `ready`, `no_journey`, `several_plans` (more than one
-        open self-serve plan: the intake would refuse), `no_places` (every place was dropped), `no_intake` (a plan with
+        open self-serve plan: the intake would refuse), `identity_taken` (a Counsellor plan already holds the identity the
+        adoption would take: the intake would refuse), `no_places` (every place was dropped), `no_intake` (a plan with
         no intake cannot become a decision; a self-serve contract always has one, this only guards a damaged row),
         `choose_field_first` or `too_many_places`. With `lock` it takes the workspace lock first, so the answer holds
         until the caller commits."""
@@ -410,6 +413,8 @@ class RouteDecisionService:
             return "no_journey"
         if plan.get("open_plans", 1) > 1:
             return "several_plans"
+        if plan.get("identity_taken"):
+            return "identity_taken"
         if not plan["programmes"]:
             return "no_places"
         if not plan.get("intake"):
@@ -441,7 +446,8 @@ class RouteDecisionService:
         wanted = [{"programme_ref": p["programme_ref"], "rank": i + 1}
                   for i, p in enumerate(sorted(plan["programmes"], key=lambda p: p["rank"]))]
         _, version, _ = self._write_from(active, key, plan["origin"], plan["destination"], plan["level"], wanted,
-                                         {"term": plan["intake"]["term"], "year": plan["intake"]["year"]})
+                                         {"term": plan["intake"]["term"], "year": plan["intake"]["year"]},
+                                         "system:os_adoption")
         return "written", version
 
     def set_step(self, workspace_id: str, done: bool, *, key: str | None = None, index: int | None = None,

@@ -55,11 +55,13 @@ def routes() -> list[dict]:
              "intake_terms": list(b.intake_terms)} for k, b in sorted(newest.items())]
 
 
-def self_serve_plan(student_ref: str) -> dict | None:
+def self_serve_plan(student_ref: str, journey_id: str | None = None) -> dict | None:
     """The student's open self-serve plan (the newest one), for the adoption offer (P1-T6, R-08): `{plan_id, route_key,
-    origin, destination, level, intake, programmes, contract_sha256, open_plans}` (`open_plans`: how many open self-serve
-    plans the student has; the offer is made only for one), programmes as `{programme_ref, rank}` in order: the live
-    places only (the contract's minus those an active `cancel_programme` override dropped), ranked 1..n.
+    origin, destination, level, intake, programmes, contract_sha256, open_plans, identity_taken}` (`open_plans`: how many open self-serve
+    plans the student has; the offer is made only for one; `identity_taken`: a Counsellor plan, open or closed, already
+    holds `{journey_id}:{destination}:{level}` for the student's active `journey_id`, so this plan could not take that
+    identity; never true without a `journey_id`), programmes as
+    `{programme_ref, rank}` in order: the live places only (the contract's minus those an active `cancel_programme` override dropped), ranked 1..n.
     None when there is none."""
     svc = ports.services()
     P = models.plans
@@ -72,7 +74,12 @@ def self_serve_plan(student_ref: str) -> dict | None:
         row = rows[0]
         route_key = conn.execute(select(models.playbook_pins.c.playbook_key).where(
             models.playbook_pins.c.plan_id == row.id)).scalar()
+        held = conn.execute(select(P.c.external_ref).where(
+            P.c.tenant_id == svc.settings.tenant_id, P.c.student_ref == student_ref, P.c.source == "counsellor")
+        ).scalars().all()
     contract = row.contract
+    wanted = f"{journey_id}:{contract['destination_country']}:{contract['level']}"  # S8-D8, as intake reads it
+    taken = journey_id is not None and wanted in held
     cancelled = OverrideStore(svc.engine, svc.settings.tenant_id).cancelled(row.id)
     live = [p for p in sorted(contract["programmes"], key=lambda p: p["rank"]) if p["programme_ref"] not in cancelled]
     intake = contract.get("target_intake")
@@ -80,4 +87,4 @@ def self_serve_plan(student_ref: str) -> dict | None:
             "destination": contract["destination_country"], "level": contract["level"],
             "intake": None if intake is None else {"term": intake["term"], "year": intake["year"]},
             "programmes": [{"programme_ref": p["programme_ref"], "rank": i + 1} for i, p in enumerate(live)],
-            "contract_sha256": row.contract_sha256, "open_plans": len(rows)}
+            "contract_sha256": row.contract_sha256, "open_plans": len(rows), "identity_taken": taken}
