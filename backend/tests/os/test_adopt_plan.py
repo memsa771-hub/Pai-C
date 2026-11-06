@@ -46,9 +46,13 @@ def self_plan(svc_, places=None) -> int:
     return svc_.plans.start_plan(self_contract(places)).plan_id
 
 
-def agree(svc_, plan_id: int) -> str:
-    assert plan_source.request_adoption(STUDENT, plan_id) == "recorded"
+def sha_of(svc_, plan_id: int) -> str:
     return plan_row(svc_, plan_id).contract_sha256
+
+
+def agree(svc_, plan_id: int) -> str:
+    assert plan_source.request_adoption(STUDENT, plan_id, sha_of(svc_, plan_id)) == "recorded"
+    return sha_of(svc_, plan_id)
 
 
 def snapshot(svc_, plan_id: int) -> dict:
@@ -76,7 +80,8 @@ def test_adopt_plan_keeps_tasks_and_revision(world):
     plan_id = self_plan(world)
     before = snapshot(world, plan_id)
     decision_contract = intake_mod._v1_contract(intake_mod.DecisionRecordV2.model_validate(chosen(1)))
-    assert world.kernel.adopt_plan(plan_id, decision_contract.external_ref, decision_contract) is True
+    assert world.kernel.adopt_plan(plan_id, decision_contract.external_ref, decision_contract,
+                                   sha_of(world, plan_id)) is True
     assert snapshot(world, plan_id) == before  # tasks, task states, revisions and current_revision: unchanged
     row = plan_row(world, plan_id)
     assert row.source == "counsellor" and row.external_ref == "j-sample-1:DE:master"
@@ -90,12 +95,17 @@ def test_adopt_plan_keeps_tasks_and_revision(world):
 def test_adopt_plan_refuses_a_plan_that_is_not_open_self_serve(world):
     plan_id = self_plan(world)
     contract = intake_mod._v1_contract(intake_mod.DecisionRecordV2.model_validate(chosen(1)))
-    assert world.kernel.adopt_plan(plan_id, contract.external_ref, contract) is True
-    assert world.kernel.adopt_plan(plan_id, contract.external_ref, contract) is False  # already the Counsellor's
+    stale = sha_of(world, plan_id)
+    assert world.kernel.adopt_plan(plan_id, contract.external_ref, contract, "0" * 64) is False  # changed since agreed
+    assert plan_row(world, plan_id).source == "self_serve"
+    assert world.kernel.adopt_plan(plan_id, contract.external_ref, contract, stale) is True
+    assert world.kernel.adopt_plan(plan_id, contract.external_ref, contract, stale) is False  # already the Counsellor's
+    with pytest.raises(ValueError):  # the identity is the contract's own
+        world.kernel.adopt_plan(plan_id, "other:ref", contract, stale)
     other = world.plans.start_plan(self_contract(places=SAMPLE_PLACES[:1], student_ref="ws-other",
                                                  external_ref="self:ws-other:germany_master:winter:2027")).plan_id
     world.kernel.close_plan(other, "test")
-    assert world.kernel.adopt_plan(other, "x:DE:master", contract) is False  # closed
+    assert world.kernel.adopt_plan(other, contract.external_ref, contract, sha_of(world, other)) is False  # closed
     assert plan_row(world, other).source == "self_serve"
 
 
@@ -103,15 +113,19 @@ def test_adopt_plan_refuses_a_plan_that_is_not_open_self_serve(world):
 
 def test_request_adoption_port(world, engine):
     plan_id = self_plan(world)
-    assert plan_source.request_adoption(STUDENT, plan_id) == "recorded"
-    assert plan_source.request_adoption(STUDENT, plan_id) == "recorded"  # idempotent: one row
+    sha = sha_of(world, plan_id)
+    assert plan_source.request_adoption(STUDENT, plan_id, "0" * 64) == "changed"  # not the plan that was offered
+    with engine.connect() as conn:
+        assert conn.execute(select(func.count()).select_from(A)).scalar() == 0
+    assert plan_source.request_adoption(STUDENT, plan_id, sha) == "recorded"
+    assert plan_source.request_adoption(STUDENT, plan_id, sha) == "recorded"  # idempotent: one row
     with engine.connect() as conn:
         assert conn.execute(select(func.count()).select_from(A)).scalar() == 1
-    assert plan_source.request_adoption("ws-someone-else", plan_id) == "not_found"  # not the student's plan
-    assert plan_source.request_adoption(STUDENT, plan_id + 999) == "not_found"
+    assert plan_source.request_adoption("ws-someone-else", plan_id, sha) == "not_found"  # not the student's plan
+    assert plan_source.request_adoption(STUDENT, plan_id + 999, sha) == "not_found"
     with engine.begin() as conn:
         conn.execute(update(models.modules).values(enabled=False))
-    assert plan_source.request_adoption(STUDENT, plan_id) == "module_off"
+    assert plan_source.request_adoption(STUDENT, plan_id, sha) == "module_off"
 
 
 def test_self_serve_plan_query(world):
@@ -189,7 +203,7 @@ def test_identity_taken_refuses_cleanly(world):
             P.c.source == "counsellor", P.c.external_ref == "j-sample-1:DE:master")).scalar() == 1
     contract = intake_mod._v1_contract(intake_mod.DecisionRecordV2.model_validate(chosen(1)))
     with pytest.raises(PlanIdentityTaken):  # the kernel says so by itself too
-        world.kernel.adopt_plan(plan_id, contract.external_ref, contract)
+        world.kernel.adopt_plan(plan_id, contract.external_ref, contract, sha_of(world, plan_id))
     assert plan_row(world, plan_id).source == "self_serve"
 
 
@@ -210,3 +224,75 @@ def test_adoption_does_not_run_for_a_withdrawn_or_unsupported_decision(world):
     agree(world, plan_id)
     assert run(world, chosen(1, os_supported=False)).status == "unsupported"
     assert plan_row(world, plan_id).source == "self_serve"
+
+
+# --- review round: only plan, live places, stale proposals --------------------------------------------------------
+
+def test_two_open_self_serve_plans_adopt_nothing(world):
+    first = self_plan(world)
+    second = world.plans.start_plan(self_contract(places=SAMPLE_PLACES[:1], external_ref=f"self:{STUDENT}:other:winter:2028",
+                                                  target_intake={"term": "winter", "year": 2028})).plan_id
+    agree(world, first)
+    before = (snapshot(world, first), snapshot(world, second))
+    result = run(world, chosen(1))
+    assert (result.status, result.reason) == ("refused", "self_serve_plan_open")
+    assert plan_row(world, first).source == "self_serve" and plan_row(world, second).source == "self_serve"
+    assert (snapshot(world, first), snapshot(world, second)) == before and adopted_at(world, first) is None
+    with world.engine.connect() as conn:
+        assert conn.execute(select(func.count()).select_from(P).where(P.c.source == "counsellor")).scalar() == 0
+        assert conn.execute(select(func.count()).select_from(EV).where(EV.c.type == "plan_adopted")).scalar() == 0
+
+
+def cancel_one(svc_, plan_id: int, ref: str) -> None:
+    """The student accepted a suggestion that drops `ref`: an active `cancel_programme` override (the contract still lists it)."""
+    from app.os.outbox import Outbox
+    from app.os.replan import events
+    from app.os.replan.apply import Replanner
+    from app.os.replan.config import load_replan_configs
+    from app.os.replan.ops import CancelProgramme
+
+    replanner = Replanner(svc_.engine, svc_.plans, load_replan_configs(), Outbox(svc_.engine, "pai"))
+    with svc_.engine.begin() as conn:
+        eid = events.record(conn, "pai", plan_id, "admission_rejected", {"programme_ref": ref}, "k-cancel")
+    decided = replanner.decide(plan_id, [eid], "rules", [CancelProgramme(programme_ref=ref, reason="test")])
+    assert decided.status == "pending"
+    replanner.accept(STUDENT, decided.proposal_id)
+
+
+THREE = SAMPLE_PLACES + [{"programme_ref": "btu-artificial-intelligence", "rank": 3}]
+
+
+def test_adoption_uses_the_live_places(world):
+    plan_id = self_plan(world, THREE)
+    cancel_one(world, plan_id, "ovgu-eeit")  # a middle place is dropped by an override
+    live = [{"programme_ref": "tu-chemnitz-embedded-systems", "rank": 1},
+            {"programme_ref": "btu-artificial-intelligence", "rank": 2}]
+    offered = plan_query.self_serve_plan(STUDENT)
+    assert offered["programmes"] == live  # what the Counsellor's decision will carry: no cancelled place, ranked 1..n
+    agree(world, plan_id)
+    assert run(world, chosen(1, programmes=THREE)).reason == "self_serve_plan_open"  # the raw contract is not the choice
+    result = run(world, chosen(2, programmes=live))
+    assert (result.status, result.plan_id) == ("revised", plan_id)
+    row = plan_row(world, plan_id)
+    assert row.source == "counsellor"
+    assert [p["programme_ref"] for p in sorted(row.contract["programmes"], key=lambda p: p["rank"])] == [
+        "tu-chemnitz-embedded-systems", "btu-artificial-intelligence"]  # the normal revise dropped the cancelled place
+
+
+def test_a_pending_proposal_goes_stale_after_adoption(world):
+    from app.os.outbox import Outbox
+    from app.os.replan import events
+    from app.os.replan.apply import ProposalStale, Replanner
+    from app.os.replan.config import load_replan_configs
+    from app.os.replan.ops import CancelProgramme
+
+    plan_id = self_plan(world)
+    replanner = Replanner(world.engine, world.plans, load_replan_configs(), Outbox(world.engine, "pai"))
+    with world.engine.begin() as conn:
+        eid = events.record(conn, "pai", plan_id, "admission_rejected", {"programme_ref": "ovgu-eeit"}, "k-stale")
+    pending = replanner.decide(plan_id, [eid], "rules", [CancelProgramme(programme_ref="ovgu-eeit", reason="test")])
+    assert pending.status == "pending"
+    agree(world, plan_id)
+    assert run(world, chosen(1)).status == "revised"  # adopted: the contract (source, identity) is another one
+    with pytest.raises(ProposalStale):
+        replanner.accept(STUDENT, pending.proposal_id)

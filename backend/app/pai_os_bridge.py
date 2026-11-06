@@ -125,7 +125,10 @@ def request_choice(student_ref: str, origin: str, destination: str, level: str, 
 
 def self_serve_plan(workspace_id: str) -> dict | None:
     """The student's open self-serve plan as `plan_query.self_serve_plan` gives it (P1-T6, R-08), for the adoption offer.
-    None when there is none, when PAI OS is not mounted and on any failure (logged by type only)."""
+    None when there is none, when the `counsellor` module is off, when PAI OS is not mounted and on any failure (logged by
+    type only)."""
+    if not counsellor_module_on():
+        return None
     try:
         from app.os.ports import plan_query
 
@@ -137,12 +140,12 @@ def self_serve_plan(workspace_id: str) -> dict | None:
         return None
 
 
-def request_adoption(workspace_id: str, plan_id: int) -> str:
+def request_adoption(workspace_id: str, plan_id: int, contract_sha256: str) -> str:
     """Records the student's agreement to adopt their self-serve plan on the OS side (P1-T6, R-08): "recorded",
-    "not_found" or "module_off". "module_off" too when PAI OS is not mounted. Raises on any other failure, so the caller
+    "not_found", "changed" (the plan is no longer the contract `contract_sha256` that was offered) or "module_off". "module_off" too when PAI OS is not mounted. Raises on any other failure, so the caller
     writes no decision for an agreement the OS did not take."""
     try:
-        return plan_source.request_adoption(str(workspace_id), plan_id)
+        return plan_source.request_adoption(str(workspace_id), plan_id, contract_sha256)
     except ports.OsUnavailable:
         return "module_off"
 

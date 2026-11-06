@@ -12,6 +12,7 @@ from app.os.contracts.programme_list import ProgrammeEntry, ProgrammeListV1
 from app.os.contracts.route_contract import IntakeRef
 from app.os.kernel.states import PLAN_OPEN
 from app.os.knowledge.programmes import ProgrammeStore
+from app.os.replan.store import OverrideStore
 from app.os.plan_view import build_plan_view
 from app.os.summary import build_summary
 
@@ -56,7 +57,8 @@ def routes() -> list[dict]:
 
 def self_serve_plan(student_ref: str) -> dict | None:
     """The student's open self-serve plan (the newest one), for the adoption offer (P1-T6, R-08): `{plan_id, route_key,
-    origin, destination, level, intake, programmes, contract_sha256}`, programmes as `{programme_ref, rank}` in order.
+    origin, destination, level, intake, programmes, contract_sha256}`, programmes as `{programme_ref, rank}` in order: the live
+    places only (the contract's minus those an active `cancel_programme` override dropped), ranked 1..n.
     None when there is none."""
     svc = ports.services()
     P = models.plans
@@ -69,10 +71,11 @@ def self_serve_plan(student_ref: str) -> dict | None:
         route_key = conn.execute(select(models.playbook_pins.c.playbook_key).where(
             models.playbook_pins.c.plan_id == row.id)).scalar()
     contract = row.contract
+    cancelled = OverrideStore(svc.engine, svc.settings.tenant_id).cancelled(row.id)
+    live = [p for p in sorted(contract["programmes"], key=lambda p: p["rank"]) if p["programme_ref"] not in cancelled]
     intake = contract.get("target_intake")
     return {"plan_id": row.id, "route_key": route_key, "origin": contract["origin_country"],
             "destination": contract["destination_country"], "level": contract["level"],
             "intake": None if intake is None else {"term": intake["term"], "year": intake["year"]},
-            "programmes": [{"programme_ref": p["programme_ref"], "rank": p["rank"]}
-                           for p in sorted(contract["programmes"], key=lambda p: p["rank"])],
+            "programmes": [{"programme_ref": p["programme_ref"], "rank": i + 1} for i, p in enumerate(live)],
             "contract_sha256": row.contract_sha256}

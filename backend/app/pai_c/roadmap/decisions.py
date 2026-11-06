@@ -424,8 +424,6 @@ class RouteDecisionService:
             return "refused", "choose_field_first"
         if len(plan["programmes"]) > self.MAX_PLACES:
             return "refused", "too_many_places"
-        if not plan.get("intake"):
-            return "refused", "no_intake"
         key = f"adopt:{plan['plan_id']}:{plan['contract_sha256']}"
         done = self.db.scalar(select(RouteDecision).where(RouteDecision.workspace_id == workspace_id,
                                                           RouteDecision.request_key == key))

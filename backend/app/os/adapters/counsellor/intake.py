@@ -20,7 +20,7 @@ from app.os.kernel import PlanIdentityTaken, StaleDraft
 from app.os.kernel.states import PLAN_CLOSED, PLAN_OPEN
 from app.os.knowledge.programmes import ProgrammeStore
 from app.os.playbooks import PlaybookError, select_playbook
-from app.os.replan.store import ProposalStore
+from app.os.replan.store import OverrideStore, ProposalStore
 
 REFUSALS = ("not_authorized", "invalid_export", "route_not_supported", "unknown_programme", "self_serve_plan_open",
             "plan_closed")
@@ -188,26 +188,37 @@ def _contract_of(decision: DecisionRecordV2) -> RouteContract | RouteContractV2:
     return decision.to_route_contract() if decision.level == "intermediate" else _v1_contract(decision)
 
 
+def _live_choice(svc, plan_id: int, contract: RouteContract | RouteContractV2) -> tuple:
+    """The choice of a plan as the student lives it: the contract's places minus those an active `cancel_programme`
+    override dropped, ranked 1..n (what the adoption offer shows and the decision carries)."""
+    cancelled = OverrideStore(svc.engine, svc.kernel.tenant_id).cancelled(plan_id)
+    refs = [p.programme_ref for p in sorted(contract.programmes, key=lambda p: p.rank) if p.programme_ref not in cancelled]
+    intake = contract.target_intake
+    return (contract.origin_country, contract.destination_country, contract.level,
+            tuple((ref, i + 1) for i, ref in enumerate(refs)), None if intake is None else (intake.term, intake.year))
+
+
 def _adoptable(svc, decision: DecisionRecordV2, contract: RouteContract | RouteContractV2):
-    """The open self-serve plan this decision adopts (R-08, D-x6), or None. All four must hold: the student asked for
-    it (an intent row, not yet used); the plan is still the contract they agreed to (same SHA); the decision's route,
-    places in order and intake equal the plan's; and no plan holds the Counsellor identity already."""
+    """The open self-serve plan this decision adopts (R-08, D-x6) as `(plan_id, contract_sha256)`, or None, or "refuse"
+    when it must not be adopted. All must hold: the student asked for it (an intent row, not yet used); the plan is
+    still the contract they agreed to (same SHA); the decision's route, places in order and intake equal the plan's live
+    ones; it is the student's ONLY open self-serve plan (the intake would refuse the decision while another is open, so
+    adopting one would leave the student half-adopted); and no plan holds the Counsellor identity already."""
     A = models.plan_adoptions
     tenant = svc.kernel.tenant_id
+    open_own = [p for p in _plans_of(svc, decision.student_ref, "self_serve") if p.status in PLAN_OPEN]
     with svc.engine.connect() as conn:
-        for plan in _plans_of(svc, decision.student_ref, "self_serve"):
-            if plan.status not in PLAN_OPEN:
-                continue
+        for plan in open_own:
             intent = conn.execute(select(A.c.contract_sha256).where(
                 A.c.tenant_id == tenant, A.c.plan_id == plan.id, A.c.adopted_at.is_(None))).scalar()
             if intent is None:
                 continue
             stored, sha = svc.plans._contract(plan.id)
-            if sha != intent or _choice_of(stored) != _choice_of(contract):
+            if sha != intent or _live_choice(svc, plan.id, stored) != _choice_of(contract):
                 continue
             taken = conn.execute(select(P.c.id).where(
                 P.c.tenant_id == tenant, P.c.source == SOURCE, P.c.external_ref == contract.external_ref).limit(1)).first()
-            return "taken" if taken is not None else plan.id
+            return "refuse" if taken is not None or len(open_own) != 1 else (plan.id, sha)
     return None
 
 
@@ -229,17 +240,22 @@ def _adopt(svc, intake: Intake, decision: DecisionRecordV2) -> IntakeResult | No
     if found is None:
         return None
     own = [p for p in _plans_of(svc, decision.student_ref, "self_serve") if p.status in PLAN_OPEN]
-    if found == "taken":
+    def refused() -> IntakeResult:
         return _refuse_v2(svc, intake, decision, "self_serve_plan_open", own[-1].id if own else None)
+
+    if found == "refuse":
+        return refused()
+    plan_id, sha = found
     try:
-        adopted = svc.kernel.adopt_plan(found, contract.external_ref, contract)
+        adopted = svc.kernel.adopt_plan(plan_id, contract.external_ref, contract, sha)
     except PlanIdentityTaken:
-        return _refuse_v2(svc, intake, decision, "self_serve_plan_open", found)
-    if adopted:
-        A = models.plan_adoptions
-        with svc.engine.begin() as conn:
-            conn.execute(update(A).where(A.c.tenant_id == svc.kernel.tenant_id, A.c.plan_id == found,
-                                         A.c.adopted_at.is_(None)).values(adopted_at=clock.now()))
+        return refused()
+    if not adopted:  # the plan changed or closed since: nothing was touched
+        return refused()
+    A = models.plan_adoptions
+    with svc.engine.begin() as conn:
+        conn.execute(update(A).where(A.c.tenant_id == svc.kernel.tenant_id, A.c.plan_id == plan_id,
+                                     A.c.adopted_at.is_(None)).values(adopted_at=clock.now()))
     return None
 
 

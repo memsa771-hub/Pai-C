@@ -100,11 +100,13 @@ def pause_for_escalation(student_ref: str, decision_version: int | None, reason:
     return False
 
 
-def request_adoption(student_ref: str, plan_id: int) -> Literal["recorded", "not_found", "module_off"]:
+def request_adoption(student_ref: str, plan_id: int,
+                     contract_sha256: str) -> Literal["recorded", "not_found", "changed", "module_off"]:
     """The student agreed to adopt their open self-serve plan as the Counsellor's plan (P1-T6, R-08, D-x6). The intent
     is one row per plan, keyed on the plan's contract as it is now; asking again renews it (idempotent). Intake adopts
     the plan only while the plan is still that contract and the Counsellor's decision is the same choice. `not_found`
-    when the plan is not this student's, not open or not self-serve."""
+    when the plan is not this student's, not open or not self-serve; `changed` when the plan is no longer the contract
+    (`contract_sha256`) the student was shown, so no agreement is recorded for it."""
     svc = ports.services()
     tenant = svc.settings.tenant_id
     if not manifest.is_enabled(svc.engine, tenant):
@@ -116,6 +118,8 @@ def request_adoption(student_ref: str, plan_id: int) -> Literal["recorded", "not
             P.c.status.in_(PLAN_OPEN)).with_for_update()).scalar()
         if sha is None:
             return "not_found"
+        if sha != contract_sha256:
+            return "changed"
         A = models.plan_adoptions
         stmt = pg_insert(A).values(tenant_id=tenant, student_ref=student_ref, plan_id=plan_id, contract_sha256=sha,
                                    requested_at=clock.now())

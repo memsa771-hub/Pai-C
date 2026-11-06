@@ -39,8 +39,8 @@ def routes(monkeypatch):
 def world(os_stub):  # noqa: F811
     got = {"plan": plan(), "recorded": "recorded", "asked": [], "raises": None}
 
-    def request(ws, plan_id):
-        got["asked"].append((ws, plan_id))
+    def request(ws, plan_id, sha):
+        got["asked"].append((ws, plan_id, sha))
         if got["raises"]:
             raise got["raises"]
         return got["recorded"]
@@ -123,7 +123,7 @@ def test_post_adoption_writes_version_and_intent(world, os_stub):  # noqa: F811
         ws = student.workspace_id
         body = data(agree(client, params))
         assert body == {"state": "linking", "decision_version": 2}
-        assert world["asked"] == [(ws, 7)]  # the intent first
+        assert world["asked"] == [(ws, 7, SHA)]  # the intent first
         old, new = versions(student)
         assert new.request_key == f"adopt:7:{SHA}" and old.withdrawn_at is not None
         assert [p["programme_ref"] for p in new.places] == ["uni-c:cs", "uni-a:cs"] and new.intake == AUTUMN
@@ -132,6 +132,10 @@ def test_post_adoption_writes_version_and_intent(world, os_stub):  # noqa: F811
         assert [e["decision_version"] for e in os_stub["submitted"]][-1] == 2  # delivered right away
         again = data(agree(client, params))  # a repeat: the same version, no n+2
         assert again == {"state": "linking", "decision_version": 2} and len(versions(student)) == 2
+        world["plan"] = None  # PAI OS has since adopted the plan: no self-serve plan any more
+        linked = data(agree(client, params))
+        assert linked == {"state": "linked", "decision_version": 2} and len(versions(student)) == 2
+        assert agree(client, params, plan_id=8).status_code == 409  # another plan's id is no repeat
 
 
 def test_post_refusals_write_nothing(world):
@@ -145,8 +149,33 @@ def test_post_refusals_write_nothing(world):
         world["plan"] = plan()
         world["recorded"] = "not_found"
         assert agree(client, params).status_code == 409
+        world["recorded"] = "changed"
+        r = agree(client, params)
+        assert r.status_code == 409 and r.json()["detail"] == "plan_changed" and len(versions(student)) == 1
         world["recorded"] = "recorded"
         world["raises"] = RuntimeError("secret detail")
         r = agree(client, params)
         assert r.status_code == 503 and "secret" not in r.text
         assert len(versions(student)) == 1  # nothing was written for an agreement PAI OS did not take
+
+
+def test_bridge_asks_nothing_about_a_plan_while_the_os_module_is_off(monkeypatch):
+    from app.os.ports import plan_query, plan_source
+
+    asked = []
+    monkeypatch.setattr(plan_query, "self_serve_plan", lambda ref: asked.append(ref) or plan())
+    monkeypatch.setattr(plan_source, "counsellor_enabled", lambda: False)
+    assert bridge.self_serve_plan("ws-1") is None and asked == []
+    monkeypatch.setattr(plan_source, "counsellor_enabled", lambda: True)
+    assert bridge.self_serve_plan("ws-1") == plan() and asked == ["ws-1"]
+
+
+def test_no_offer_while_the_os_module_is_off(world, monkeypatch):
+    from app.os.ports import plan_source
+
+    with pre_eng() as (client, student, params):
+        chosen(client, params, student)
+        assert offer(client, params)["offer"] is True
+        monkeypatch.setattr(plan_source, "counsellor_enabled", lambda: False)
+        assert offer(client, params) == {"offer": False}
+        assert agree(client, params).status_code == 409  # the hand-off part is off with the module

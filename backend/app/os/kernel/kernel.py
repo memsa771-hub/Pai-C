@@ -148,24 +148,30 @@ class Kernel:
                 "contract": contract.model_dump(mode="json"), "contract_sha256": contract_sha256(contract),
                 "student_ref": contract.student_ref})
 
-    def adopt_plan(self, plan_id: int, external_ref: str, contract: RouteContract | RouteContractV2) -> bool:
+    def adopt_plan(self, plan_id: int, external_ref: str, contract: RouteContract | RouteContractV2,
+                   based_on: str) -> bool:
         """Turns an open self-serve plan into the Counsellor's plan in place (R-08): source `counsellor`, the decision's
         external_ref and contract, in one transaction under the plan lock. No revision and no task change: the plan the
-        student has been working on stays as it is. One `plan_adopted` event. False, and nothing changes, when the plan
-        is not open or not `self_serve`. PlanIdentityTaken when another plan already holds the new identity."""
+        student has been working on stays as it is. One `plan_adopted` event. `based_on` is the contract_sha256 the
+        student agreed to. False, and nothing changes, when the plan is not open, not `self_serve`, or its contract is no
+        longer `based_on`. PlanIdentityTaken when another plan already holds the new identity."""
+        if external_ref != contract.external_ref:
+            raise ValueError("adopt_plan: external_ref must be the contract's own")
         try:
             with self.engine.begin() as conn:
                 self._lock_plan(conn, plan_id)
-                status, source = conn.execute(select(P.c.status, P.c.source).where(P.c.id == plan_id)).one()
-                if source != "self_serve" or status not in PLAN_OPEN:
+                status, source, sha = conn.execute(select(P.c.status, P.c.source, P.c.contract_sha256).where(
+                    P.c.id == plan_id)).one()
+                if source != "self_serve" or status not in PLAN_OPEN or sha != based_on:
                     return False
                 conn.execute(update(P).where(P.c.id == plan_id).values(
-                    source=contract.source, external_ref=external_ref, contract=contract.model_dump(mode="json"),
+                    source="counsellor", external_ref=external_ref, contract=contract.model_dump(mode="json"),
                     contract_sha256=contract_sha256(contract), updated_at=self.clock()))
-                self._event(conn, plan_id, None, "plan_adopted", {"source": contract.source})
+                self._event(conn, plan_id, None, "plan_adopted", {"source": "counsellor"})
                 return True
         except IntegrityError as exc:
-            if "uq_os_plans_identity" in str(exc.orig) or "uq_os_plans_identity" in str(exc):
+            name = getattr(getattr(exc.orig, "diag", None), "constraint_name", None)
+            if name == "uq_os_plans_identity" or (name is None and "uq_os_plans_identity" in str(exc)):
                 raise PlanIdentityTaken(f"plan {plan_id}") from None
             raise
 

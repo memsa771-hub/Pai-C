@@ -301,12 +301,16 @@ def adopt_plan(body: AdoptAction, network: str = Query(...), db=Depends(get_db),
                x_workspace_token: str | None = Header(None), authorization: str | None = Header(None)):
     """The student agrees to keep their self-serve plan (R-08). Under the workspace lock: the state is checked again,
     PAI OS records the agreement, then the next decision version is written and delivered. A repeat before PAI OS has
-    adopted the plan answers with the same version."""
+    adopted the plan answers with the same version; a repeat after it has answers `linked` with that version."""
     workspace = _authorized(db, network, x_workspace_token, authorization)
     _need_handoff()
     workspace_id = str(workspace.id)
     service = RouteDecisionService(db)
     plan = pai_os_bridge.self_serve_plan(workspace_id)
+    if plan is None:  # already adopted? the newest decision is the one this plan's adoption wrote
+        newest = service.newest(workspace_id)
+        if newest is not None and (newest.request_key or "").startswith(f"adopt:{body.plan_id}:"):
+            return success_response({"state": "linked", "decision_version": newest.decision_version})
     if plan is None or plan["plan_id"] != body.plan_id:
         _refuse("no_plan", 409)
     state = service.adoption_state(workspace_id, plan, lock=True)
@@ -314,14 +318,15 @@ def adopt_plan(body: AdoptAction, network: str = Query(...), db=Depends(get_db),
         db.rollback()
         _refuse(state, 409)
     try:
-        recorded = pai_os_bridge.request_adoption(workspace_id, plan["plan_id"])
+        recorded = pai_os_bridge.request_adoption(workspace_id, plan["plan_id"], plan["contract_sha256"])
     except Exception as exc:  # noqa: BLE001  nothing is written without PAI OS having the agreement
         db.rollback()
         log.error("PAI OS could not take the adoption: %s", type(exc).__name__)
         _refuse("unavailable", 503)
     if recorded != "recorded":
         db.rollback()
-        _refuse("no_plan" if recorded == "not_found" else "unavailable", 409 if recorded == "not_found" else 503)
+        code = {"not_found": "no_plan", "changed": "plan_changed"}.get(recorded)
+        _refuse(code or "unavailable", 409 if code else 503)
 
     def act() -> dict:
         outcome, detail = service.adopt(workspace_id, plan)
