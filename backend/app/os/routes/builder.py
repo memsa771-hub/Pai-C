@@ -133,8 +133,8 @@ def start(plans, student_ref: str, route_key: str, intake: IntakeRef,
         try:
             answer = choice_sink.request(student_ref, book.route.origin, book.route.destination, book.route.level,
                                          intake.model_dump(), [c.model_dump() for c in choices])
-        except Exception:
-            log.exception("the Counsellor could not take the route builder's choice")
+        except Exception as exc:  # noqa: BLE001  the host's message can carry student data: log the type only
+            log.error("the Counsellor could not take the route builder's choice: %s", type(exc).__name__)
             raise CounsellorUnavailable() from None
         if answer is not None:
             if answer["outcome"] == "refused":
