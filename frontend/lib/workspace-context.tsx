@@ -161,7 +161,7 @@ interface WorkspaceContextValue {
   refreshAgents: () => Promise<void>;
   refreshFiles: () => Promise<void>;
   /** Queue a batch into `folder` and draw it going up; see {@link PendingUpload}. */
-  enqueueUploads: (files: File[], folder: string) => void;
+  enqueueUploads: (files: File[], folder: string, docType?: string) => void;
   pendingUploads: PendingUpload[];
   retryUpload: (id: string) => void;
   cancelUpload: (id: string) => void;

@@ -1,0 +1,21 @@
+# From a confirmed PAI OS document to Vault candidates (P1-T7, D-y10). Counsellor data: the OS names no qualification,
+# exam or authority. Keys of a fact are the StudentFacts keys in student_facts_keys.yaml.
+
+# The OS document type -> the evidence authority (evidence_policy.json `shown_authorities`). A type that is not listed
+# here is refused (`no_mapping`): nothing is written for a document the Vault has no rule for.
+authority:
+  ssc_certificate: institution_issued
+  hssc_certificate: institution_issued
+  degree_certificate: institution_issued
+  transcript: institution_issued
+  ielts_trf: test_provider_issued
+
+# Education family -> the qualification code (Vault catalog `levels`) of the record made when the Vault has none.
+new_record_code:
+  matric: matric
+  intermediate: fsc
+  bachelor: bachelor
+  master: masters
+
+# Education result fields that are text; every other result field is a number.
+text_fields: [grade]

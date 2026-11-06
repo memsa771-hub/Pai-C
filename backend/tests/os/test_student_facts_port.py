@@ -350,3 +350,90 @@ def test_red_flag_search_is_clean():
 def test_the_fact_keys_live_in_yaml_only():
     for path in APP_OS.rglob("*.py"):
         assert not re.search(r"""["']education\.""", path.read_text(encoding="utf-8")), path
+
+
+# --- P1-T7 Task 4: with ONE_UPLOAD on too, the interim overlay is replaced by the per-field rule (D-y12) ---------------
+
+
+@pytest.fixture
+def one_upload_on():
+    from app.os.ports import document_files
+
+    document_files.configure(enabled=lambda: True)
+    yield
+    document_files.configure()
+
+
+def test_both_on_a_vault_value_wins_and_only_fields_without_a_vault_key_come_from_the_stored_values(mounted, one_upload_on):
+    seed(mounted)
+    vault_on(mounted, test__ielts__score=7.5, education__intermediate__marks_total=1100)
+    got = profile_of(plans_of(mounted), "stu-1")
+    assert got["ielts_trf.overall"] == 7.5 and got["hssc_certificate.marks_total"] == 1100
+    assert "hssc_certificate.marks_obtained" not in got
+    assert "transcript.cgpa" not in got and "transcript.percentage" not in got  # a `fact:` field is the Vault's alone
+    assert got["min_passing_grade_letter.min_pass"] == "C"  # no Vault type: still the stored value
+    assert set(got) == {"ielts_trf.overall", "hssc_certificate.marks_total", "min_passing_grade_letter.min_pass"}
+
+
+def test_both_on_vault_cgpa_without_a_scale_never_mixes_with_an_os_document(mounted, one_upload_on):
+    own(mounted, transcript__cgpa=3.9, transcript__cgpa_scale=5.0, transcript__percentage=40)
+    vault_on(mounted, education__bachelor__gpa=3.2)
+    assert profile_of(plans_of(mounted), "stu-1") == {"transcript.cgpa": 3.2}
+
+
+def test_both_on_an_unknown_vault_fact_stays_needs_input_over_an_os_document(mounted, one_upload_on):
+    own(mounted, hssc_certificate__marks_obtained=990, hssc_certificate__marks_total=1100, entry_test__score=80)
+    vault_on(mounted, education__intermediate__marks_obtained=(None, "unknown"))
+    got = profile_of(plans_of(mounted), "stu-1")
+    assert not any(k.startswith("hssc_certificate.") for k in got) and got["entry_test.score"] == 80
+    assert grade_of(got, "pk_bs").status == "needs_input"
+
+
+def test_both_on_a_field_without_a_vault_key_still_comes_from_the_stored_values(mounted, one_upload_on):
+    own(mounted, min_passing_grade_letter__min_pass="C", entry_test__score=80)
+    vault_on(mounted, test__ielts__score=7.0)
+    assert profile_of(plans_of(mounted), "stu-1") == {"min_passing_grade_letter.min_pass": "C", "entry_test.score": 80,
+                                                      "ielts_trf.overall": 7.0}
+
+
+FLAG = {"on": True}
+
+
+def flag_on() -> bool:
+    return FLAG["on"]
+
+
+@pytest.mark.req("R-01")
+def test_the_worker_is_given_the_one_upload_gate_and_profile_of_follows_the_per_field_rule(mounted, os_db, monkeypatch):
+    """P1-T7 final review I1: the worker loads OS_DOCUMENTS_ENABLED, so its eligibility uses the same rule as the API."""
+    from dbos import DBOS
+
+    from app.os.ports import document_files
+    from app.os.runner import worker
+    from app.os.settings import load_settings
+
+    monkeypatch.setattr(worker, "register_job", lambda *a: None)
+    for var in ("OS_TEST_RESEARCH_MODEL", "OS_TEST_DOCUMENT_MODEL", "OS_TEST_STATEMENT_MODEL", "OS_TEST_REPLAN_MODEL",
+                "OS_EXTRA_MODULES"):
+        monkeypatch.delenv(var, raising=False)
+    settings = load_settings({"OS_DATABASE_URL": os_db, "OS_ENABLED": "true", "OS_WORKER_ID": "w1",
+                              "OS_DOCUMENTS_ENABLED": f"{__name__}:flag_on"})
+    seed(mounted)
+    try:
+        _, _, client, _ = worker.build(settings)  # builds what the worker runs; sets the port
+        client.destroy()
+        vault_on(mounted, test__ielts__score=7.5, education__intermediate__marks_total=1100)  # after: build resets it
+        FLAG["on"] = True
+        got = profile_of(plans_of(mounted), "stu-1")
+        assert document_files.enabled() is True
+        assert "transcript.cgpa" not in got  # per-field rule: a field with a Vault key is the Vault's alone
+        assert got["ielts_trf.overall"] == 7.5 and got["min_passing_grade_letter.min_pass"] == "C"
+        FLAG["on"] = False  # the flag off: T4's overlay again
+        assert profile_of(plans_of(mounted), "stu-1")["transcript.cgpa"] == 3.0
+        manifest.set_enabled(mounted, TENANT, False)  # the OS's own module row also gates it
+        FLAG["on"] = True
+        assert document_files.enabled() is False
+    finally:
+        FLAG["on"] = True
+        document_files.configure()
+        DBOS.destroy(destroy_registry=True)

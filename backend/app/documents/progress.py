@@ -49,6 +49,11 @@ _LABELS = {
 }
 
 
+# P1-T7: the marker for a file an OS document reads. The parse job sets it when it skips extraction, so the file
+# reports done with the same wording as any finished document.
+OS_DOCUMENT_VERSION = "os_document"
+
+
 def document_stage(artifact: Optional[DocumentArtifact]) -> str:
     from .extractor import EXTRACTOR_VERSION
 
@@ -60,7 +65,7 @@ def document_stage(artifact: Optional[DocumentArtifact]) -> str:
         return STAGE_FAILED
     if artifact.status in ("queued", "processing"):
         return STAGE_READING
-    if artifact.classification and artifact.extractor_version == EXTRACTOR_VERSION:
+    if artifact.classification and artifact.extractor_version in (EXTRACTOR_VERSION, OS_DOCUMENT_VERSION):
         return STAGE_DONE
     return STAGE_UNDERSTANDING
 

@@ -26,7 +26,7 @@ phases:
   P6: {name: "Abroad", status: planned}
 
 requirements:
-  R-01: {title: "One owner per data piece; others read live via port", phases: [P1], built: false}
+  R-01: {title: "One owner per data piece; others read live via port", phases: [P1], built: true}
   R-02: {title: "Choice changes carry an ever-increasing decision_version", phases: [P1], built: true}
   R-03: {title: "Decision change and outbox row in one transaction, plus sweep", phases: [P1], built: true}
   R-04: {title: "Every change shows the same result in both products", phases: [P1], built: false}
@@ -41,7 +41,7 @@ requirements:
   R-13: {title: "OS reads student facts from the Vault with evidence levels", phases: [P1], built: true}
   R-14: {title: "OS derives applicable levels and routes from the Vault", phases: [P1], built: true}
   R-15: {title: "An excluded field disappears everywhere at once", phases: [P1], built: false}
-  R-16: {title: "Vault owns marks; Intermediate marks stored per part", phases: [P1], built: false}
+  R-16: {title: "Vault owns marks; Intermediate marks stored per part", phases: [P1], built: true}
   R-17: {title: "Plan built despite missing data; missing items become provide steps", phases: [P1], built: false}
   R-18: {title: "Each playbook step declares the evidence level it needs", phases: [P1], built: false}
   R-19: {title: "One open request per fact per student", phases: [P1], built: false}

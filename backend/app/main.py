@@ -24,11 +24,11 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from app.config import config
 from app.database import get_db
 from app.os.api import mount_os
-from app.pai_os_bridge import (choice_enabled, deliver_choice_request_now, my_plan_enabled, recipient_email,
-                               request_choice, student_facts)
+from app.pai_os_bridge import (choice_enabled, deliver_choice_request_now, deliver_fact_proposal_now, document_file_bytes, documents_enabled,
+                               my_plan_enabled, on_os_document_deleted, recipient_email, request_choice, student_facts)
 from app.security.errors import EmailNotVerified, IdentityUnavailable
 from app.api.response import ResponseCode, json_response
-from app.routers import counselor_possibilities, account, app_version, auth, counselor_summary, counselor_voice, decision_records, escalations, events, feedback, fetch, files, guardian, network, notifications, operator, roadmap, search, shares, student_requests, tasks, vault, workflows, workspaces
+from app.routers import counselor_possibilities, account, app_version, auth, counselor_summary, counselor_voice, decision_records, escalations, events, feedback, fetch, files, guardian, network, notifications, operator, roadmap, search, shares, student_requests, tasks, uploads, vault, workflows, workspaces
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -422,6 +422,7 @@ app.include_router(search.router)
 app.include_router(shares.router)
 app.include_router(student_requests.router)
 app.include_router(tasks.router)
+app.include_router(uploads.router)
 app.include_router(vault.router)
 app.include_router(workflows.router)
 app.include_router(workspaces.router)
@@ -478,7 +479,10 @@ def _os_student_ref_for_write(
 OS_MOUNTED = mount_os(app, student_dependency=_os_student_ref, student_write_dependency=_os_student_ref_for_write,
                       recipient_lookup=recipient_email, student_facts=student_facts,
                       choice_enabled=choice_enabled, on_choice_request=deliver_choice_request_now,
-                      choice_sink=request_choice, choice_sink_enabled=choice_enabled, my_plan_enabled=my_plan_enabled)
+                      choice_sink=request_choice, choice_sink_enabled=choice_enabled,
+                      document_files=document_file_bytes, documents_enabled=documents_enabled,
+                      on_document_deleted=on_os_document_deleted, on_fact_proposal=deliver_fact_proposal_now,
+                      my_plan_enabled=my_plan_enabled)
 
 
 @app.get("/health")

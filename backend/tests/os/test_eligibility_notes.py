@@ -210,3 +210,33 @@ def test_notes_follow_the_vault_while_the_host_adapter_is_on(svc, engine):
         ports.configure(None)
     [n] = notes(engine, "stu-1")
     assert (n.verdict, n.payload["previous"]) == ("likely_below", "likely_meets")
+
+
+@pytest.mark.req("R-01")
+def test_notes_follow_the_vault_alone_for_vault_fields_with_one_upload_on(svc, engine):
+    """P1-T7 Task 4 (D-y12): with ONE_UPLOAD on too, a stored value of a field the Vault has a key for is never used."""
+    from app.os import ports
+    from app.os.adapters.counsellor import manifest
+    from app.os.ports import document_files, student_facts
+
+    def vault(ielts, percentage=70):
+        return {"schema": "pai.student_facts.v1", "student_ref": "stu-1", "vault_version": 1, "eligible_levels": None,
+                "built_at": datetime(2026, 11, 5, tzinfo=timezone.utc), "facts": [
+                    {"key": "test.ielts.score", "value": ielts, "evidence": "stated", "vault_version": 1},
+                    {"key": "education.bachelor.percentage", "value": percentage, "evidence": "stated",
+                     "vault_version": 1}]}
+
+    start(svc, "stu-1")
+    profile(engine, "stu-1", transcript__percentage=10)  # a stored value of a Vault field: ignored
+    manifest.set_enabled(engine, "pai", True)
+    document_files.configure(enabled=lambda: True)
+    student_facts.configure(lambda ref: vault(7.0))
+    try:
+        assert on_profile_change(svc.plans, "stu-1") == 0  # likely_meets from the Vault's 70, not the stored 10
+        student_facts.configure(lambda ref: vault(6.0))
+        assert on_profile_change(svc.plans, "stu-1") == 1
+    finally:
+        document_files.configure()
+        ports.configure(None)
+    [n] = notes(engine, "stu-1")
+    assert (n.verdict, n.payload["previous"]) == ("likely_below", "likely_meets")

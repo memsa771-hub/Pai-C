@@ -31,7 +31,7 @@ from app.os.db import make_engine
 from app.os.kernel import Kernel
 from app.os.knowledge.profile import PROFILE_DIR, load_profile_dir
 from app.os.playbooks import PLAYBOOK_DIR, load_playbook_dir
-from app.os.ports import recipients, student_facts
+from app.os.ports import document_files, recipients, student_facts
 from app.os.rehearsal.store import install_clock
 from app.os.rehearsal.tick import register_tick
 from app.os.runner.enqueue import enqueue_pending
@@ -200,6 +200,7 @@ def register_replan_always(settings: OsSettings, engine: Engine, kernel: Kernel,
 def build(settings: OsSettings) -> tuple[Registry, Kernel, DBOSClient, Engine]:
     recipients.configure(recipients.from_settings(settings))  # Slice 9b: before the deliver job is made; may refuse
     student_facts.configure(student_facts.from_settings(settings))  # P1-T4: the host's StudentFacts adapter, if any
+    host_files = document_files.from_settings(settings)  # P1-T7: the host's file reader, if any
     registry = default_registry()
     for module in _extra_modules(os.environ.get("OS_EXTRA_MODULES", "")):
         registry.register(module)
@@ -216,6 +217,12 @@ def build(settings: OsSettings) -> tuple[Registry, Kernel, DBOSClient, Engine]:
     pack_configs = load_checked_pack_configs(PACK_SOURCE, types, books, profiles)  # and an invalid pack config (S6a-D12)
     visa_configs = load_checked_pack_configs(PACK_SOURCE, types, books, profiles, kind="visa")  # or visa file (S6b-D3)
     engine = make_engine(settings)
+    from app.os.adapters.counsellor import manifest as os_manifest
+
+    host_gate = document_files.gate_from_settings(  # P1-T7: the one upload gate; also needs the OS's module row
+        settings, lambda: os_manifest.is_enabled(engine, settings.tenant_id))
+    if host_files is not None or host_gate is not None:  # unset leaves the port as it is
+        document_files.configure(read=host_files, enabled=host_gate)
     install_clock(settings, engine)  # Slice 9a: rehearsal mode reads the stored offset (loud warning); else real time
     kernel = Kernel(engine, settings.tenant_id)
     DBOS(config=dbos_config(settings, settings.worker_id))
@@ -272,7 +279,9 @@ def main(argv: list[str] | None = None) -> int:
     try:  # Slice 9b: checked first, so a resend worker without a recipient lookup never starts
         recipients.from_settings(settings)
         student_facts.from_settings(settings)  # P1-T4: so does an OS_STUDENT_FACTS that cannot be loaded
-    except (recipients.RecipientLookupError, student_facts.StudentFactsSourceError) as e:
+        document_files.from_settings(settings)  # P1-T7: and an OS_DOCUMENT_FILES
+    except (recipients.RecipientLookupError, student_facts.StudentFactsSourceError,
+            document_files.DocumentFilesSourceError) as e:
         print(str(e), file=sys.stderr)
         return 2
     parent = int(os.environ["OS_PARENT_PID"]) if os.environ.get("OS_PARENT_PID") else None

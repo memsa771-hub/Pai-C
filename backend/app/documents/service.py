@@ -204,19 +204,23 @@ class DocumentArtifactService:
 
     # -- enqueue ----------------------------------------------------------
 
-    def enqueue_parse(self, artifact: DocumentArtifact) -> None:
+    def enqueue_parse(self, artifact: DocumentArtifact, extract: bool = True) -> None:
         """Queue parsing for a registered artifact.
 
         The idempotency key carries the content hash and parser version, so a
         duplicate upload of identical bytes is a no-op while a parser upgrade
         legitimately re-queues the same file.
+
+        `extract=False` (P1-T7, D-y4) is for a file an OS document reads: the parse job then enqueues no extraction.
+        The payload carries the key only in that case, so every other job is exactly as before.
         """
         from app.runtime.task_runtime import enqueue
 
         enqueue(self.db,
             job_type=JOB_DOCUMENT_PARSE,
             workspace_id=artifact.workspace_id,
-            payload={"file_id": artifact.file_id, "artifact_id": artifact.id},
+            payload={"file_id": artifact.file_id, "artifact_id": artifact.id,
+                     **({} if extract else {"extract": False})},
             idempotency_key=(
                 f"document.parse:{artifact.file_id}:"
                 f"{artifact.content_sha256}:{PARSER_VERSION}"
@@ -225,7 +229,7 @@ class DocumentArtifactService:
 
     def register_and_enqueue(
         self, workspace_id: str, file_id: str, data: bytes, filename: str,
-        declared_content_type: str = "",
+        declared_content_type: str = "", extract: bool = True,
     ) -> Optional[DocumentArtifact]:
         """The upload path's single entry point. Cheap and non-blocking.
 
@@ -236,7 +240,7 @@ class DocumentArtifactService:
             workspace_id, file_id, data, filename, declared_content_type,
         )
         if artifact is not None and artifact.status == "queued":
-            self.enqueue_parse(artifact)
+            self.enqueue_parse(artifact, extract=extract)
             logger.info(
                 "document queued workspace=%s file=%s type=%s bytes=%d",
                 workspace_id, file_id, artifact.document_type, len(data),
