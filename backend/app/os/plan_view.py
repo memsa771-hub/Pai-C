@@ -93,6 +93,7 @@ def _documents_needed(svc: Any, student_ref: str, route_key: str) -> list[Docume
     while the one upload is on; a route with no pack config, or a service without any, gives none."""
     if not document_files.enabled():
         return []
+    # route_key is the playbook key, which is also the pack-config key
     cfg = (getattr(svc, "pack_configs", None) or {}).get(route_key)
     if cfg is None:
         return []

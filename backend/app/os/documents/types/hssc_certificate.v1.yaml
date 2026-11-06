@@ -14,7 +14,7 @@ fields:
   - {name: certificate_number, type: code, hint: "Certificate number"}
   - {name: group, type: text, hint: "Group, e.g. PRE-ENGINEERING or SCIENCE GENERAL"}
   - {name: institution, type: text, hint: "The college the candidate appeared from"}
-  - {name: marks_obtained, fact: education.intermediate.marks_obtained, type: number, hint: "Total marks obtained"}
+  - {name: marks_obtained, scale_of: marks_total, fact: education.intermediate.marks_obtained, type: number, hint: "Total marks obtained"}
   - {name: marks_total, fact: education.intermediate.marks_total, type: number, hint: "Total maximum marks"}
   - {name: grade, type: text, hint: "Overall grade, e.g. A1"}
   - {name: issue_date, type: date, hint: "Date the certificate was issued, YYYY-MM-DD"}

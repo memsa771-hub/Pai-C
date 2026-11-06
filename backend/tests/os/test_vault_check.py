@@ -115,8 +115,22 @@ def test_vault_check_outcomes():
     assert got["cgpa_scale"] == "differs"  # "4.0" against 5.0
     assert got["percentage"] == "new"  # the Vault does not know it
     assert got["student_name"] == "not_compared"  # no `fact:` key
-    other = {f["field"]: f["outcome"] for f in compare(t, {"cgpa": 705}, facts_obj(education__bachelor__gpa=700))}
+    other = {f["field"]: f["outcome"] for f in compare(
+        t, {"cgpa": 705, "cgpa_scale": 5}, facts_obj(education__bachelor__gpa=700, education__bachelor__gpa_scale=5))}
     assert other["cgpa"] == "differs"  # 700 against 705
+
+
+def test_a_value_is_comparable_only_with_its_scale_on_both_sides():
+    t = TYPES["transcript"]
+    out = lambda values, **vault: {f["field"]: f["outcome"] for f in compare(t, values, facts_obj(**vault))}  # noqa: E731
+    both = out({"cgpa": 3.5, "cgpa_scale": 5}, education__bachelor__gpa=3.5, education__bachelor__gpa_scale=5)
+    assert both["cgpa"] == "same" and both["cgpa_scale"] == "same"
+    assert out({"cgpa": 3.5}, education__bachelor__gpa=3.5, education__bachelor__gpa_scale=5)["cgpa"] == "not_compared"
+    assert out({"cgpa": 3.5, "cgpa_scale": 5}, education__bachelor__gpa=3.0)["cgpa"] == "not_compared"  # no Vault scale
+    h = TYPES["hssc_certificate"]
+    got = {f["field"]: f["outcome"] for f in compare(h, {"marks_obtained": 900}, facts_obj(
+        education__intermediate__marks_obtained=900, education__intermediate__marks_total=1100))}
+    assert got["marks_obtained"] == "not_compared"
 
 
 def test_compare_text_and_numbers():
@@ -156,11 +170,11 @@ def test_note_is_set_only_when_something_differs(api):
     connect(api.engine, facts_v1(education__bachelor__gpa=3.7, education__bachelor__gpa_scale=(None, "unknown")))
     d = doc(api.engine, confirmed=True)
     body = api.get(f"/v1/os/documents/{d}/vault-check", headers=ME).json()
-    assert by_field(body)["cgpa"] == "same" and by_field(body)["cgpa_scale"] == "new" and body["note"] is None
+    assert by_field(body)["cgpa"] == "not_compared" and by_field(body)["cgpa_scale"] == "new" and body["note"] is None
 
 
 def test_unconfirmed_document_compares_the_read_value(api):
-    connect(api.engine, facts_v1(education__bachelor__gpa=3.0))
+    connect(api.engine, facts_v1(education__bachelor__gpa=3.0, education__bachelor__gpa_scale=4.0))
     d = doc(api.engine)  # read, not confirmed: value_read 3.7
     assert by_field(api.get(f"/v1/os/documents/{d}/vault-check", headers=ME).json())["cgpa"] == "differs"
 
