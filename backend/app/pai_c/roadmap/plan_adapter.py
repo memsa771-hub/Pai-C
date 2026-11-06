@@ -119,12 +119,24 @@ def chosen_from_plan(row, cards: list[dict], view: dict) -> dict:
     from app.pai_c.roadmap.decisions import serialize
 
     steps = steps_of(view)
+    plan = {"state": view["state"], "state_reason": view["state_reason"], "revision": view["revision"],
+            "decision_version": view["decision_version"], "proposals_waiting": view["proposals_waiting"],
+            "changes": view["changes"], **_reason_copy(view)}
     return {**serialize(row, cards), "steps": [{k: v for k, v in s.items() if k not in ("task_id", "review")}
                                                 for s in steps],
-            "time": None, "steps_done": [s["key"] for s in steps if s["status"] == "done"],
-            "plan": {"state": view["state"], "state_reason": view["state_reason"], "revision": view["revision"],
-                     "decision_version": view["decision_version"], "proposals_waiting": view["proposals_waiting"],
-                     "changes": view["changes"]}}
+            "time": None, "steps_done": [s["key"] for s in steps if s["status"] == "done"], "plan": plan}
+
+
+def _reason_copy(view: dict) -> dict:
+    """A plan paused by an escalation (R-11) carries the student's sentence and the button label, when the texts may
+    be shown. Additive keys only (R-44); a consent pause and every other state add nothing."""
+    from app.pai_c.connect import escalation_texts
+
+    reason = view["state_reason"]
+    if view["state"] != "paused" or reason not in escalation_texts.REASONS or not part_on("CONNECT_HANDOFF"):
+        return {}
+    sentence = escalation_texts.text(reason)
+    return {} if sentence is None else {"reason_text": sentence, "reason_action": escalation_texts.action()}
 
 
 def plan_superseded(row) -> bool:

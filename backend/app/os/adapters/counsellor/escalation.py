@@ -29,7 +29,8 @@ _SYSTEM = (LIMIT_REASON, REFUSED_REASON, REASONS["failed"], BUDGET_REASON, INVAL
 # problem is still real, so the triggering event decides (final review I1).
 _SYSTEM_PREFIXES = ("The plan kept changing",)
 _BY_EVENT = {"route_invalid": "not_eligible", "admission_rejected": "all_rejected",
-             "deadline_at_risk": "deadline_passed", "escalate": "blocking_gap", "document_missing": "blocking_gap"}
+             "deadline_at_risk": "deadline_passed", "escalate": "blocking_gap", "document_missing": "blocking_gap",
+             "student_fact_changed": "not_eligible"}  # every place fell below its bar (R-22): the route itself is in doubt
 
 
 @cache

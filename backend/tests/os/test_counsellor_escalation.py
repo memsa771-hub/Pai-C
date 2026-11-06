@@ -242,3 +242,16 @@ def test_an_os_event_key_never_updates_a_support_case(svc):
     case = SupportStore(svc.engine, "pai").get(cid)
     assert case.counsellor_status != "sent"
     assert [e.key for e in pending_counsellor_escalations()] == [f"escalation:{cid}"]
+
+
+@pytest.mark.req("R-11")
+def test_student_fact_changed_reaches_counsellor(svc):
+    """P1-T6 Task 4 (ruling 11): the R-22 `Escalate(fact_all_below)` arrives as a `student_fact_changed` event and is
+    sent as `not_eligible`; it used to map to nothing and never reached the Counsellor."""
+    assert reason_for("student_fact_changed", REASONS["fact_all_below"]) == "not_eligible"
+    cid = escalate(svc, "student_fact_changed", REASONS["fact_all_below"])
+    (row,) = sent(svc)
+    assert (row["reason"], row["case_id"]) == ("not_eligible", cid)
+    (pending,) = pending_counsellor_escalations()
+    assert pending.reason == "not_eligible" and pending.key == f"escalation:{cid}"
+    assert SupportStore(svc.engine, "pai").get(cid).counsellor_status == "pending"

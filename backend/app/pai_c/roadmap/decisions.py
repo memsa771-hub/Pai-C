@@ -117,8 +117,18 @@ class RouteDecisionService:
         """Called by the stage sync once the journey is in PROPOSED: an
         active route decision (made before the paths) takes it on to CHOSEN."""
         journey, row = self._journey(workspace_id), self.active(workspace_id)
-        if journey is not None and row is not None:
+        if journey is not None and row is not None and not self._escalated(journey, row):
             self._enter_chosen(journey, row, actor)
+
+    @staticmethod
+    def _escalated(journey: StudentJourney, row: RouteDecision) -> bool:
+        """PAI OS sent the student back to choosing (D-x9): the newest route entry is an escalation made for this
+        decision (a version, never an older legacy entry without one). Only a new choice moves the stage on."""
+        newest = next((d for d in reversed(journey.decisions or [])
+                       if str(d.get("kind", "")).startswith("route_")), None)
+        return (newest is not None and newest["kind"] == "route_escalation"
+                and newest.get("decision_version") is not None
+                and newest["decision_version"] >= row.decision_version)
 
     def _record_choice(self, workspace_id: str, row: RouteDecision, previous: RouteDecision | None) -> None:
         """The choice syncs the stage (journey_sync, reason "chosen"): it is

@@ -9,7 +9,7 @@ from pydantic import ValidationError
 from sqlalchemy import and_, insert, select
 
 from app.os import models
-from app.os.adapters.counsellor.escalation import intake_refused
+from app.os.adapters.counsellor.escalation import REASON_CODES, intake_refused
 from app.os.adapters.counsellor.store import Intake, IntakeStore
 from app.os.compiler import CompileError
 from app.os.contracts.decision_record import DecisionRecordV1
@@ -80,6 +80,34 @@ def _intake_event(svc, plan_id: int, intake: Intake, reason: str) -> int:
         return conn.execute(insert(E).values(
             tenant_id=svc.kernel.tenant_id, plan_id=plan_id, type="counsellor_intake",
             payload={"decision_id": intake.decision_id, "refused": reason}).returning(E.c.id)).scalar_one()
+
+
+def _pause_reason(svc, plan_id: int) -> str | None:
+    """The reason code of the plan's newest `plan_paused` event (None when it has none)."""
+    E = models.events
+    with svc.engine.connect() as conn:
+        payload = conn.execute(select(E.c.payload).where(
+            E.c.tenant_id == svc.kernel.tenant_id, E.c.plan_id == plan_id, E.c.type == "plan_paused")
+            .order_by(E.c.id.desc()).limit(1)).scalar()
+    return (payload or {}).get("reason")
+
+
+def _choice_of(contract: RouteContract | RouteContractV2) -> tuple:
+    """What the student chose: route, places in order, intake. Not the contract version."""
+    intake = contract.target_intake
+    return (contract.origin_country, contract.destination_country, contract.level,
+            tuple((p.programme_ref, p.rank) for p in sorted(contract.programmes, key=lambda p: p.rank)),
+            None if intake is None else (intake.term, intake.year))
+
+
+def _resumes(svc, plan_id: int, contract: RouteContract | RouteContractV2) -> bool:
+    """A paused plan resumes when the decision brings it back (D-x8). A plan paused by an escalation (the Counsellor
+    took the student back to choosing) resumes only when the choice itself changed; a copy that only renews a consent
+    leaves it paused. A `consent_missing` pause resumes on any decision with the consent given."""
+    if _pause_reason(svc, plan_id) not in REASON_CODES:
+        return True
+    stored, _sha = svc.plans._contract(plan_id)
+    return _choice_of(stored) != _choice_of(contract)
 
 
 def _revise(svc, plan_id: int, contract: RouteContract | RouteContractV2, cause: str) -> int | None:
@@ -211,7 +239,7 @@ def process(svc, intake: Intake) -> IntakeResult:
         return _refuse_v2(svc, intake, decision, "plan_closed", same.id)
     try:
         if same is not None:
-            if same.status == "paused":  # the consent is back (P1-D11)
+            if same.status == "paused" and _resumes(svc, same.id, contract):  # the consent is back (P1-D11)
                 svc.kernel.resume_plan(same.id)
             revision = _revise(svc, same.id, contract, f"counsellor:{decision.decision_id}")
             plan_id, status = same.id, "revised"

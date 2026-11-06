@@ -213,8 +213,13 @@ def _deliver(db) -> dict:
             got["waiting"] += 1  # not configured: tried again on the next sweep
             continue
         try:
-            body = EscalationInput(workspace_id=e.student_ref, journey_id=e.journey_id,
-                                   reason_type=_TODAY.get(e.reason, "route_not_possible"), details=e.note)
+            handoff = part_on("CONNECT_HANDOFF")
+            if handoff:  # the five reasons go as they are, with the decision version they belong to
+                body = EscalationInput(workspace_id=e.student_ref, journey_id=e.journey_id, reason_type=e.reason,
+                                       details=e.note, decision_version=e.decision_version)
+            else:
+                body = EscalationInput(workspace_id=e.student_ref, journey_id=e.journey_id,
+                                       reason_type=_TODAY.get(e.reason, "route_not_possible"), details=e.note)
             escalate(body, db, x_pai_service_token=config.PAI_OS_SERVICE_TOKEN)
         except ValidationError:
             db.rollback()
@@ -228,9 +233,21 @@ def _deliver(db) -> dict:
             else:
                 got["waiting"] += 1
         else:
+            if handoff:
+                _pause_after_escalation(e)
             os_escalation.mark_counsellor_delivery(e.key, "sent")
             got["sent"] += 1
     return got
+
+
+def _pause_after_escalation(e) -> None:
+    """D-x7: the Counsellor took the escalation, so the student's plan pauses with the reason. A failure here never
+    undoes the delivery (the Counsellor has the escalation); the plan is then paused by the next student-facing read
+    of the reason only, so it is logged."""
+    try:
+        plan_source.pause_for_escalation(e.student_ref, e.decision_version, e.reason)
+    except Exception as exc:  # noqa: BLE001  (class name only, no student data)
+        log.error("PAI OS plan could not be paused after an escalation: %s", type(exc).__name__)
 
 
 OS_EVENT_TEXTS = Path(__file__).parent / "pai_c" / "connect" / "os_event_texts.yaml"

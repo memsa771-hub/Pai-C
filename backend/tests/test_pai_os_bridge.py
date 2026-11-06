@@ -188,3 +188,79 @@ def test_student_facts_adapter_builds_from_the_vault_when_on(student, monkeypatc
     from app.os.contracts.student_facts import StudentFactsV1
 
     assert StudentFactsV1.model_validate(got).student_ref == str(student.workspace_id)
+
+
+# ---- P1-T6 Task 4 (R-11, D-x7): the five reasons reach the endpoint unchanged; the plan then pauses ----
+from app.os.contracts.escalation_v2 import EscalationV2  # noqa: E402
+
+
+def escalation_v2(student, journey_id: str, reason: str, version: int | None = 1) -> EscalationV2:
+    return EscalationV2(key="escalation:7", case_id=7, journey_id=journey_id, student_ref=student.workspace_id,
+                        decision_version=version, reason=reason, note="A fixed note.", raised_at=T0)
+
+
+@pytest.fixture
+def active_decision(monkeypatch):
+    """The endpoint needs an active decision when the part is on; the decision table itself is tested elsewhere."""
+    from app.pai_c.roadmap.decisions import RouteDecisionService
+    monkeypatch.setattr(RouteDecisionService, "active",
+                        lambda self, ws: types.SimpleNamespace(decision_version=3))
+
+
+@pytest.fixture
+def paused(monkeypatch):
+    calls = []
+    monkeypatch.setattr(plan_source, "pause_for_escalation", lambda *a: calls.append(a) or True, raising=False)
+    return calls
+
+
+@pytest.mark.req("R-11")
+@pytest.mark.parametrize("reason", ["not_eligible", "deadline_passed", "other"])
+def test_bridge_sends_reason_unchanged_when_on(student, os_stub, paused, active_decision, reason):
+    journey_id = journey_at(student, "CHOSEN")
+    os_stub["pending"] = [escalation_v2(student, journey_id, reason, 3)]
+    with patch.object(config, "PAI_OS_SERVICE_TOKEN", TOKEN), patch.object(config, "CONNECT_HANDOFF", True), \
+            patch.object(bridge, "counsellor_module_on", lambda: True), student.factory() as db:
+        got = bridge.sweep_once(db)
+    assert got["sent"] == 1 and os_stub["marked"] == [("escalation:7", "sent", None)]
+    with student.factory() as db:
+        entry = db.get(StudentJourney, journey_id).decisions[-1]
+        assert (entry["reason_type"], entry["decision_version"]) == (reason, 3)
+    assert paused == [(student.workspace_id, 3, reason)]  # once, with the reason code
+
+
+@pytest.mark.req("R-11")
+def test_refused_escalation_does_not_pause(student, os_stub, paused):
+    journey_id = journey_at(student, "CHOSEN")  # no active decision: the endpoint answers 409
+    os_stub["pending"] = [escalation_v2(student, journey_id, "not_eligible")]
+    with patch.object(config, "PAI_OS_SERVICE_TOKEN", TOKEN), patch.object(config, "CONNECT_HANDOFF", True), \
+            patch.object(bridge, "counsellor_module_on", lambda: True), student.factory() as db:
+        got = bridge.sweep_once(db)
+    assert got["refused"] == 1 and paused == []
+
+
+@pytest.mark.req("R-11")
+def test_a_failed_pause_does_not_undo_the_delivery(student, os_stub, active_decision, monkeypatch):
+    journey_id = journey_at(student, "CHOSEN")
+
+    def boom(*_a):
+        raise RuntimeError("os down")
+    monkeypatch.setattr(plan_source, "pause_for_escalation", boom, raising=False)
+    os_stub["pending"] = [escalation_v2(student, journey_id, "other")]
+    with patch.object(config, "PAI_OS_SERVICE_TOKEN", TOKEN), patch.object(config, "CONNECT_HANDOFF", True), \
+            patch.object(bridge, "counsellor_module_on", lambda: True), student.factory() as db:
+        got = bridge.sweep_once(db)
+    assert got["sent"] == 1 and os_stub["marked"] == [("escalation:7", "sent", None)]
+
+
+@pytest.mark.req("R-11")
+@pytest.mark.parametrize("reason,sent_as", [("not_eligible", "route_not_possible"), ("other", "route_not_possible"),
+                                            ("blocking_gap", "blocking_gap")])
+def test_flags_off_no_pause_call(student, os_stub, paused, reason, sent_as):
+    journey_id = journey_at(student, "CHOSEN")
+    os_stub["pending"] = [escalation_v2(student, journey_id, reason)]
+    with patch.object(config, "PAI_OS_SERVICE_TOKEN", TOKEN), student.factory() as db:
+        got = bridge.sweep_once(db)
+    assert got["sent"] == 1 and paused == []
+    with student.factory() as db:
+        assert db.get(StudentJourney, journey_id).decisions[-1]["reason_type"] == sent_as

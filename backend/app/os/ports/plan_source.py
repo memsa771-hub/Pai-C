@@ -6,8 +6,12 @@ import hashlib
 import json
 from typing import Literal
 
-from app.os import ports
+from sqlalchemy import select
+
+from app.os import models, ports
 from app.os.adapters.counsellor import manifest
+from app.os.adapters.counsellor.escalation import applied_version
+from app.os.kernel.states import PLAN_OPEN
 from app.os.adapters.counsellor.store import IntakeStore, SweepStore
 from app.os.playbooks import PlaybookError, select_playbook
 
@@ -73,3 +77,20 @@ def sweep_mark() -> dict | None:
 def set_sweep_mark(mark: dict) -> None:
     svc = ports.services()
     SweepStore(svc.engine, svc.settings.tenant_id).set_mark(mark)
+
+
+def pause_for_escalation(student_ref: str, decision_version: int | None, reason: str) -> bool:
+    """The host sent an escalation to the Counsellor (D-x7): the student's open Counsellor plan is paused with the
+    reason code. When a version is given, only the plan whose newest applied version is that one is paused (an older
+    escalation never pauses a plan that has moved on). False when there is no such plan or it is not active."""
+    svc = ports.services()
+    tenant = svc.settings.tenant_id
+    P = models.plans
+    with svc.engine.connect() as conn:
+        ids = conn.execute(select(P.c.id).where(
+            P.c.tenant_id == tenant, P.c.student_ref == student_ref, P.c.source == manifest.NAME,
+            P.c.status.in_(PLAN_OPEN)).order_by(P.c.id.desc())).scalars().all()
+    for plan_id in ids:
+        if decision_version is None or applied_version(svc.engine, tenant, plan_id) == decision_version:
+            return svc.kernel.pause_plan(plan_id, reason)
+    return False

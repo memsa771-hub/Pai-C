@@ -1,0 +1,16 @@
+# What the student reads when PAI OS has paused their plan and sent them back to choosing (R-11, row 6.12).
+# OWNER approval: stored approved:false. While it is false, escalation_texts.text() and .action() return None unless
+# CONNECT_CONSENT_DRAFT is on (rehearsal). Plain English. No country, institution or date.
+version: "1"
+approved: false
+
+# One sentence per reason code PAI OS sends. The plan stays paused until the student's choice changes.
+reasons:
+  not_eligible: "Your plan is paused because your choice no longer fits your results. Please choose again."
+  all_rejected: "Your plan is paused because every place on it has said no. Please choose again."
+  deadline_passed: "Your plan is paused because a deadline on it can no longer be met. Please choose again."
+  blocking_gap: "Your plan is paused because a step on it is blocked and cannot be fixed from here. Please choose again."
+  other: "Your plan is paused because it could not go on as it stands. Please choose again."
+
+# The label of the button on the banner.
+action: "Choose again"
