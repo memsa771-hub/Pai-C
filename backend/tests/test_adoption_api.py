@@ -12,7 +12,7 @@ from app.models import RouteDecision, StudentJourney
 from app.pai_c.connect import adoption_texts
 from tests.test_handoff_delivery import flag, os_stub  # noqa: F401 - the fixture is used by name
 from tests.test_roadmap_api import TOKEN, data, pre_eng
-from tests.test_roadmap_choice_api import choose_with, stubs, vault  # noqa: F401 - stubs is autouse
+from tests.test_roadmap_choice_api import LIST, ROUTES, choose_with, vault
 
 pytestmark = pytest.mark.req("R-08")
 
@@ -26,6 +26,13 @@ def plan(places=2, plan_id=7) -> dict:
                                              for i, r in enumerate(("uni-c:cs", "uni-a:cs", "uni-b:ee", "uni-d", "uni-e",
                                                                     "uni-f")[:places])],
             "contract_sha256": SHA}
+
+
+@pytest.fixture(autouse=True)
+def routes(monkeypatch):
+    """The routes and places the choice screen offers. `route_supported` is stubbed by os_stub, with the same undo."""
+    monkeypatch.setattr(bridge, "list_routes", lambda: ROUTES)
+    monkeypatch.setattr(bridge, "programmes_for", lambda *a: LIST)
 
 
 @pytest.fixture
